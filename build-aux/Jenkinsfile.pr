@@ -12,17 +12,22 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-build_and_test = '''
-mkdir -p ${COUCHDB_IO_LOG_DIR} ${ERLANG_VERSION}
-cd ${ERLANG_VERSION}
-rm -rf build
-mkdir build
-cd build
-tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
-cd apache-couchdb-*
-./configure
-make check || (make build-report && false)
-'''
+
+// build_and_test = '''
+// #mkdir -p ${COUCHDB_IO_LOG_DIR} ${ERLANG_VERSION}
+// #cd ${ERLANG_VERSION}
+// #rm -rf build
+// #mkdir build
+// #cd build
+// #rm -rf apache-couchdb-*
+// ./configure --spidermonkey-version 78
+// make dist
+// #tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
+// #cd apache-couchdb-*
+// #./configure
+// #make
+// make check || (make build-report && false)
+// '''
 
 pipeline {
 
@@ -32,28 +37,24 @@ pipeline {
   environment {
     COUCHAUTH = credentials('couchdb_vm2_couchdb')
     recipient = 'notifications@couchdb.apache.org'
-    COUCHDB_IO_LOG_DIR = '/tmp/couchjslogs'
+    //COUCHDB_IO_LOG_DIR = '/tmp/couchjslogs'
     // Following fix an issue with git <= 2.6.5 where no committer
     // name or email are present for reflog, required for git clone
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
     // Parameters for the matrix build
-    DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:erlang'
+    DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bullseye-erlang'
     // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
-    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
+    //DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
 
     // *** BE SURE TO ALSO CHANGE THE ERLANG VERSIONS FARTHER DOWN ***
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '23'
-
-    // erlfmt doesn't run with the lowest erlang version so we run it in a
-    // separate stage with a higher erlang version.
-    ERLFMT_ERLANG_VER = '23'
+    //LOW_ERLANG_VER = '23.3.4.15'
   }
 
   options {
@@ -67,68 +68,68 @@ pipeline {
 
   stages {
 
-    stage('erlfmt') {
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${ERLFMT_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 15, unit: "MINUTES")
-      }
-      steps {
-        sh '''
-          set
-          rm -rf apache-couchdb-*
-          ./configure --skip-deps
-          make erlfmt-check
-        '''
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage erlfmt
+    // stage('erlfmt') {
+    //   agent {
+    //     docker {
+    //       image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+    //       label 'docker'
+    //       args "${DOCKER_ARGS}"
+    //       registryUrl 'https://docker.io/'
+    //       registryCredentialsId 'dockerhub_creds'
+    //     }
+    //   }
+    //   options {
+    //     timeout(time: 15, unit: "MINUTES")
+    //   }
+    //   steps {
+    //     sh '''
+    //       set
+    //       rm -rf apache-couchdb-*
+    //       ./configure --skip-deps
+    //       make erlfmt-check
+    //     '''
+    //   }
+    //   post {
+    //     cleanup {
+    //       // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+    //       sh 'rm -rf ${WORKSPACE}/*'
+    //     }
+    //   }
+    // } // stage erlfmt
 
 
-    stage('Build Release Tarball') {
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 15, unit: "MINUTES")
-      }
-      steps {
-        sh '''
-          set
-          rm -rf apache-couchdb-*
-          ./configure --spidermonkey-version 78
-          make dist
-          chmod -R a+w * .
-        '''
-      }
-      post {
-        success {
-          stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
-        }
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage Build Release Tarball
+    // stage('Build Release Tarball') {
+    //   agent {
+    //     docker {
+    //       image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+    //       label 'docker'
+    //       args "${DOCKER_ARGS}"
+    //       registryUrl 'https://docker.io/'
+    //       registryCredentialsId 'dockerhub_creds'
+    //     }
+    //   }
+    //   options {
+    //     timeout(time: 15, unit: "MINUTES")
+    //   }
+    //   steps {
+    //     sh '''
+    //       set
+    //       rm -rf apache-couchdb-*
+    //       ./configure --spidermonkey-version 78
+    //       make dist
+    //       chmod -R a+w * .
+    //     '''
+    //   }
+    //   post {
+    //     success {
+    //       stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
+    //     }
+    //     cleanup {
+    //       // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+    //       sh 'rm -rf ${WORKSPACE}/*'
+    //     }
+    //   }
+    // } // stage Build Release Tarball
 
     // TODO Rework once Improved Docker Pipeline Engine is released
     // https://issues.jenkins-ci.org/browse/JENKINS-47962
@@ -140,23 +141,12 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '23', '24'
+            //values '23.3.4.15', '24.3.4.2', '25.0.2'
+            values '25.0.2'
           }
           axis {
             name 'SM_VSN'
-            values '60', '78'
-          }
-        }
-        excludes {
-          exclude {
-            axis {
-              name 'ERLANG_VERSION'
-              values '23', '24'
-            }
-            axis {
-              name 'SM_VSN'
-              notValues '78'
-            }
+            values '78'
           }
         }
 
@@ -166,23 +156,42 @@ pipeline {
               docker {
                 image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
                 label 'docker'
-                args "${DOCKER_ARGS}"
+                customWorkspace "workspace/${JOB_NAME}/${ERLANG_VERSION}/${SM_VSN}"
+                //args "${DOCKER_ARGS}"
+                registryUrl 'https://docker.io/'
+                registryCredentialsId 'dockerhub_creds'
               }
             }
             options {
-              skipDefaultCheckout()
+              //skipDefaultCheckout()
               timeout(time: 90, unit: "MINUTES")
             }
             steps {
-              unstash 'tarball'
-              sh( script: build_and_test )
+               sh "set"
+               sh "rm -rf ~/.mix"
+               sh "./configure --spidermonkey-version 78"
+               sh 'make'
+               //sh 'make eunit'
+               sh '''
+                  erl -noshell -eval '{ok, F} = file:read_file("/usr/local/lib/elixir/ebin/Elixir.Code.Formatter.beam"), {ok, Info} = beam_lib:chunks(F, [compile_info, attributes]), erlang:display(Info), halt().'
+               '''
+               sh 'make elixir-suite'
+               sh 'make exunit'
+               sh 'make mango-test'
+               sh 'make weatherreport-test'
+             // sh '''
+             //    set
+             //    ./configure --spidermonkey-version 78
+             //    make
+             //    make check || (make build-report && false)
+             // '''
             }
             post {
               always {
                 junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               }
               cleanup {
-                sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
+                sh 'rm -rf ${WORKSPACE}/*'
               }
             }
           } // stage
