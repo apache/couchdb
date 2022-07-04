@@ -49,14 +49,10 @@ start_link(Name, StoreModule, StoreState) ->
     gen_statem:start_link({local, Name}, ?MODULE, new(Name, StoreModule, StoreState), []).
 
 new(Name, StoreModule, StoreState) ->
-    #{cohort := Cohort} = StoreState,
-    Peers = peers(Cohort),
     maps:merge(#{
         name => Name,
         store_module => StoreModule,
         votesGranted => #{},
-        nextIndex => maps:from_list([{Peer, 1} || Peer <- Peers]),
-        matchIndex => maps:from_list([{Peer, 0} || Peer <- Peers]),
         froms => #{}
     }, StoreState).
 
@@ -81,7 +77,8 @@ handle_event(enter, _OldState, follower, Data) ->
     #{term := Term, froms := Froms} = Data,
     couch_log:notice("~p became follower in term ~B", [node(), Term]),
     Replies = [{reply, From, {error, deposed}} || From <- maps:values(Froms)],
-    persist({keep_state, Data#{votedFor => undefined, froms => #{}}, [restart_election_timeout() | Replies]});
+    persist({keep_state, maps:without([nextIndex, matchIndex], Data#{votedFor => undefined, froms => #{}}),
+        [restart_election_timeout() | Replies]});
 
 handle_event(enter, _OldState, candidate, Data) ->
     #{term := Term} = Data,
@@ -234,7 +231,7 @@ handle_event(cast, #{type := 'AppendEntriesResponse', term := PastTerm}, _State,
     couch_log:notice("~p ignored AppendEntriesResponse from past term ~B", [node(), PastTerm]),
     keep_state_and_data;
 
-handle_event(cast, #{type := 'AppendEntriesResponse', term := Term} = Msg, _State, #{term := Term} = Data) ->
+handle_event(cast, #{type := 'AppendEntriesResponse', term := Term} = Msg, leader, #{term := Term} = Data) ->
     #{success := MSuccess, matchIndex := MMatchIndex, source := MSource} = Msg,
     #{nextIndex := NextIndex, matchIndex := MatchIndex} = Data,
     couch_log:debug("~p received AppendEntriesResponse from ~p in current term ~B (Success:~p)", [node(), MSource, Term, MSuccess]),
@@ -250,6 +247,9 @@ handle_event(cast, #{type := 'AppendEntriesResponse', term := Term} = Msg, _Stat
                 nextIndex => NextIndex#{MSource => max(SourceNextIndex - 1, 1)}
             }}
     end;
+
+handle_event(cast, #{type := 'AppendEntriesResponse'}, _State, _Data) ->
+    keep_state_and_data;
 
 handle_event({call, From}, #{type := 'ClientRequest'} = Msg, leader, Data) ->
     #{value := Value} = Msg,
