@@ -139,10 +139,53 @@ should_fail_for_missing_cb() ->
 to_hex_test_() ->
     [
         ?_assertEqual("", couch_util:to_hex([])),
+        ?_assertEqual(<<>>, couch_util:to_hex_bin(<<>>)),
+        ?_assertEqual(<<"00">>, couch_util:to_hex_bin(<<0>>)),
+        ?_assertEqual(<<"01">>, couch_util:to_hex_bin(<<1>>)),
         ?_assertEqual("010203faff", couch_util:to_hex([1, 2, 3, 250, 255])),
+        ?_assertEqual(<<"010203faff">>, couch_util:to_hex_bin(<<1, 2, 3, 250, 255>>)),
         ?_assertEqual("", couch_util:to_hex(<<>>)),
         ?_assertEqual("010203faff", couch_util:to_hex(<<1, 2, 3, 250, 255>>))
     ].
+
+to_hex_range_test() ->
+    lists:foreach(
+        fun(PrefixSize) ->
+            lists:foreach(
+                fun(I) ->
+                    Prefix = list_to_binary(lists:duplicate(PrefixSize, 1)),
+                    Bin = <<Prefix/binary, I:8/integer>>,
+                    ?assertEqual(list_to_binary(to_hex_simple(Bin)), couch_util:to_hex_bin(Bin))
+                end,
+                lists:seq(0, 16#ff)
+            )
+        end,
+        lists:seq(0, 8)
+    ).
+
+% Use previous implementation from couch_util for validation
+%
+to_hex_simple(<<Hi:4, Lo:4, Rest/binary>>) ->
+    [nibble_to_hex(Hi), nibble_to_hex(Lo) | to_hex_simple(Rest)];
+to_hex_simple(<<>>) ->
+    [].
+
+nibble_to_hex(0) -> $0;
+nibble_to_hex(1) -> $1;
+nibble_to_hex(2) -> $2;
+nibble_to_hex(3) -> $3;
+nibble_to_hex(4) -> $4;
+nibble_to_hex(5) -> $5;
+nibble_to_hex(6) -> $6;
+nibble_to_hex(7) -> $7;
+nibble_to_hex(8) -> $8;
+nibble_to_hex(9) -> $9;
+nibble_to_hex(10) -> $a;
+nibble_to_hex(11) -> $b;
+nibble_to_hex(12) -> $c;
+nibble_to_hex(13) -> $d;
+nibble_to_hex(14) -> $e;
+nibble_to_hex(15) -> $f.
 
 json_decode_test_() ->
     [

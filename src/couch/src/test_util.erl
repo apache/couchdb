@@ -482,7 +482,7 @@ revs1(Pos, {Rev, _Val, Nodes}) ->
     ).
 
 random_rev() ->
-    ?l2b(couch_util:to_hex(crypto:strong_rand_bytes(16))).
+    couch_util:to_hex_bin(crypto:strong_rand_bytes(16)).
 
 shuffle(List) ->
     Paired = [{couch_rand:uniform(), I} || I <- List],

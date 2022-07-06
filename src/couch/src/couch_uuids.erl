@@ -37,7 +37,7 @@ new() ->
     gen_server:call(?MODULE, create).
 
 random() ->
-    list_to_binary(couch_util:to_hex(crypto:strong_rand_bytes(16))).
+    couch_util:to_hex_bin(crypto:strong_rand_bytes(16)).
 
 init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),

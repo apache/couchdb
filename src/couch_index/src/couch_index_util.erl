@@ -71,4 +71,4 @@ sort_lib([{LName, LCode} | Rest], LAcc) ->
     sort_lib(Rest, [{LName, LCode} | LAcc]).
 
 hexsig(Sig) ->
-    couch_util:to_hex(binary_to_list(Sig)).
+    couch_util:to_hex(Sig).
