@@ -74,7 +74,7 @@ to_json_revisions(Options, Start, RevIds0) ->
     end.
 
 revid_to_str(RevId) when size(RevId) =:= 16 ->
-    ?l2b(couch_util:to_hex(RevId));
+    couch_util:to_hex_bin(RevId);
 revid_to_str(RevId) ->
     RevId.
 

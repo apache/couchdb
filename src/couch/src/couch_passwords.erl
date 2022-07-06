@@ -23,7 +23,7 @@
 %% legacy scheme, not used for new passwords.
 -spec simple(binary(), binary()) -> binary().
 simple(Password, Salt) when is_binary(Password), is_binary(Salt) ->
-    ?l2b(couch_util:to_hex(crypto:hash(sha, <<Password/binary, Salt/binary>>)));
+    couch_util:to_hex_bin(crypto:hash(sha, <<Password/binary, Salt/binary>>));
 simple(Password, Salt) when is_binary(Salt) ->
     Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
     throw({forbidden, Msg});
@@ -116,7 +116,7 @@ pbkdf2(Password, Salt, Iterations, DerivedLength) when
     L = ceiling(DerivedLength / ?SHA1_OUTPUT_LENGTH),
     <<Bin:DerivedLength/binary, _/binary>> =
         iolist_to_binary(pbkdf2(Password, Salt, Iterations, L, 1, [])),
-    {ok, ?l2b(couch_util:to_hex(Bin))}.
+    {ok, couch_util:to_hex_bin(Bin)}.
 
 -spec pbkdf2(binary(), binary(), integer(), integer(), integer(), iolist()) ->
     iolist().

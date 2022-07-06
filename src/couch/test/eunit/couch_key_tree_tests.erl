@@ -564,7 +564,7 @@ should_not_use_excessive_memory_when_stemming() ->
         Opts = [
             monitor,
             {max_heap_size, #{
-                size => 13000000,
+                size => 15000000,
                 error_logger => false,
                 kill => true
             }}
