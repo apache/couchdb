@@ -1,0 +1,18 @@
+WithProper = code:lib_dir(proper) /= {error, bad_name}.
+
+
+ErlOpts =
+    case WithProper of
+        true ->
+            [{d, 'WITH_PROPER'}];
+        false ->
+            []
+    end,
+
+[{eunit_opts, [
+    verbose,
+    {report, {
+        eunit_surefire, [{dir,"."}]
+    }}
+]},
+{erl_opts, [{i, "../"} | ErlOpts]}].

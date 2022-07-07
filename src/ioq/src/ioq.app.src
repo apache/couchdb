@@ -11,11 +11,14 @@
 % the License.
 
 {application,ioq, [
-    {description, "I/O prioritizing engine"},
+    {description, "IO request management in a multi-tenant Erlang VM"},
     {vsn, git},
     {registered,[]},
-    {applications,[kernel,stdlib,config]},
+    {applications,[kernel,stdlib,config,couch_stats,hqueue]},
     {mod,{ioq_app,[]}},
-    {env, []},
-    {modules,[ioq,ioq_app,ioq_sup]}
+    {env, [
+        {stats_db, "stats"},
+        {stats_interval, 60000}
+    ]},
+    {modules,[ioq,ioq_app,ioq_osq,ioq_server,ioq_sup]}
 ]}.
