@@ -61,30 +61,53 @@ in_allowed_window(From, To) ->
 
 file_delete(Path) ->
     case file:delete(Path) of
+        % When deleting a state file, we do not care if it does not exist.
         Ret when Ret =:= ok; Ret =:= {error, enoent} ->
             ok;
-        Error ->
-            Error
+        {error, Reason} ->
+            {error, Reason}
     end.
-
-throw_on_error(_Args, ok) ->
-    ok;
-throw_on_error(Args, {error, Reason}) ->
-    throw({error, {Reason, Args}}).
 
 write_to_file(Content, FileName, VSN) ->
     Level = log_level("compaction_log_level", "debug"),
     couch_log:Level("~p Writing state ~s", [?MODULE, FileName]),
     OnDisk = <<VSN, (erlang:term_to_binary(Content, [compressed, {minor_version, 1}]))/binary>>,
     TmpFileName = FileName ++ ".tmp",
-    try
-        throw_on_error(TmpFileName, file_delete(TmpFileName)),
-        throw_on_error(TmpFileName, file:write_file(TmpFileName, OnDisk, [sync])),
-        throw_on_error(FileName, file_delete(FileName)),
-        throw_on_error([TmpFileName, FileName], file:rename(TmpFileName, FileName))
-    catch
-        throw:Error ->
-            Error
+    case file_delete(TmpFileName) of
+        ok ->
+            case file:write_file(TmpFileName, OnDisk, [sync]) of
+                ok ->
+                    case file_delete(FileName) of
+                        ok ->
+                            case file:rename(TmpFileName, FileName) of
+                                ok ->
+                                    ok;
+                                {error, Reason} ->
+                                    couch_log:error(
+                                        "~p (~p) Error renaming temporary state file ~s to ~s", [
+                                            ?MODULE, Reason, TmpFileName, FileName
+                                        ]
+                                    ),
+                                    ok
+                            end;
+                        {error, Reason} ->
+                            couch_log:error("~p (~p) Error deleting state file ~s", [
+                                ?MODULE, Reason, FileName
+                            ]),
+                            ok
+                    end;
+                {error, Reason} ->
+                    couch_log:error("~p (~p) Error writing state to temporary file ~s", [
+                        ?MODULE, Reason, TmpFileName
+                    ]),
+                    ok
+            end;
+        {error, Reason} ->
+            % Failing to persist the queue should not crash smoosh. Return ok.
+            couch_log:error("~p (~p) Error deleting temporary state file ~s", [
+                ?MODULE, Reason, TmpFileName
+            ]),
+            ok
     end.
 
 parse_time(undefined, Default) ->
