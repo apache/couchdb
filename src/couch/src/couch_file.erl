@@ -72,32 +72,33 @@ open(Filepath, Options) ->
 
 open(Filepath, Options, IOQPid0) ->
     case gen_server:start_link(couch_file,
-            {Filepath, Options, self(), Ref = make_ref()}, []) of
-    {ok, Fd} ->
-        IOQPid = case IOQPid0 of
-            undefined ->
-                {ok, IOQPid1} = ioq_server2:start_link({by_shard, Filepath, Fd}),
-                IOQPid1;
-            IOQPid0 when is_pid(IOQPid0) ->
-                IOQPid0
-        end,
-        Tab = gen_server:call(Fd, get_cache_ref),
-        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab}};
-    ignore ->
-        % get the error
-        receive
-        {Ref, Pid, {error, Reason} = Error} ->
-            case process_info(self(), trap_exit) of
-            {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
-            {trap_exit, false} -> ok
-            end,
-            case {lists:member(nologifmissing, Options), Reason} of
-            {true, enoent} -> ok;
-            _ ->
-            couch_log:error("Could not open file ~s: ~s",
-                            [Filepath, file:format_error(Reason)])
-            end,
-            Error
+                               {Filepath, Options, self(), Ref = make_ref()}, []) of
+        {ok, Fd} ->
+            IOQPid = case IOQPid0 of
+                         undefined ->
+                             {ok, IOQPid1} = ioq_server2:start_link({by_shard, Filepath, Fd}),
+                             IOQPid1;
+                         IOQPid0 when is_pid(IOQPid0) ->
+                             IOQPid0
+                     end,
+            Tab = gen_server:call(Fd, get_cache_ref),
+            {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab}};
+        ignore ->
+            % get the error
+            receive
+                {Ref, Pid, {error, Reason} = Error} ->
+                    case process_info(self(), trap_exit) of
+                        {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
+                        {trap_exit, false} -> ok
+                    end,
+                    case {lists:member(nologifmissing, Options), Reason} of
+                        {true, enoent} -> ok;
+                        _ ->
+                            couch_log:error("Could not open file ~s: ~s",
+                                            [Filepath, file:format_error(Reason)])
+                    end,
+                    Error
+            end
     end.
 
 set_db_pid(#ioq_file{fd=Fd}, Pid) ->
@@ -492,25 +493,9 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                  Error ->
                      init_status_error(ReturnPid, Ref, Error)
             end;
-        false ->
-            % open in read mode first, so we don't create the file if it doesn't exist.
-            case file:open(Filepath, [read, raw]) of
-                {ok, Fd_Read} ->
-                    case file:open(Filepath, OpenOptions) of
-                        {ok, Fd} ->
-                            %% Save Fd in process dictionary for debugging purposes
-                            put(couch_file_fd, {Fd, Filepath}),
-                            ok = file:close(Fd_Read),
-                            maybe_track_open_os_files(Options),
-                            {ok, Eof} = file:position(Fd, eof),
-                            erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit}};
-                        Error ->
-                            init_status_error(ReturnPid, Ref, Error)
-                    end;
-                Error ->
-                    init_status_error(ReturnPid, Ref, Error)
-            end
+        Error ->
+            init_status_error(ReturnPid, Ref, Error)
+        end
     end.
 
 file_open_options(Options) ->
