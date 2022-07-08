@@ -17,7 +17,7 @@
 
 -import(couch_replicator_test_helper, [
     db_url/1,
-    replicate/2
+    replicate/1
 ]).
 
 -define(DOCS_CONFLICTS, [
@@ -32,88 +32,100 @@
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).
 
-setup() ->
+setup_db() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
 
-setup(remote) ->
-    {remote, setup()};
-setup({A, B}) ->
+teardown_db(DbName) ->
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]).
+
+setup() ->
     Ctx = test_util:start_couch([couch_replicator]),
-    Source = setup(A),
-    Target = setup(B),
+    Source = setup_db(),
+    Target = setup_db(),
     {Ctx, {Source, Target}}.
 
-teardown({remote, DbName}) ->
-    teardown(DbName);
-teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-    ok.
-
-teardown(_, {Ctx, {Source, Target}}) ->
-    teardown(Source),
-    teardown(Target),
-    ok = application:stop(couch_replicator),
+teardown({Ctx, {Source, Target}}) ->
+    teardown_db(Source),
+    teardown_db(Target),
     ok = test_util:stop_couch(Ctx).
 
 docs_with_many_leaves_test_() ->
-    Pairs = [{remote, remote}],
     {
         "Replicate documents with many leaves",
         {
-            foreachx,
-            fun setup/1,
-            fun teardown/2,
+            foreach,
+            fun setup/0,
+            fun teardown/1,
             [
-                {Pair, fun should_populate_replicate_compact/2}
-             || Pair <- Pairs
+                fun should_populate_replicate_compact/1
             ]
         }
     }.
 
-should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
+docs_with_many_leaves_test_winning_revs_only_test_() ->
     {
-        lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-        {inorder, [
-            should_populate_source(Source),
-            should_replicate(Source, Target),
-            should_verify_target(Source, Target),
-            should_add_attachments_to_source(Source),
-            should_replicate(Source, Target),
-            should_verify_target(Source, Target)
-        ]}
+        "Replicate winning revs only for documents with many leaves",
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                fun should_replicate_winning_revs_only/1
+            ]
+        }
     }.
 
-should_populate_source({remote, Source}) ->
-    should_populate_source(Source);
+should_populate_replicate_compact({_Ctx, {Source, Target}}) ->
+    {inorder, [
+        should_populate_source(Source),
+        should_replicate(Source, Target),
+        should_verify_target(Source, Target, all_revs),
+        should_add_attachments_to_source(Source),
+        should_replicate(Source, Target),
+        should_verify_target(Source, Target, all_revs)
+    ]}.
+
+should_replicate_winning_revs_only({_Ctx, {Source, Target}}) ->
+    {inorder, [
+        should_populate_source(Source),
+        should_replicate(Source, Target, [{<<"winning_revs_only">>, true}]),
+        should_verify_target(Source, Target, winning_revs),
+        should_add_attachments_to_source(Source),
+        should_replicate(Source, Target, [{<<"winning_revs_only">>, true}]),
+        should_verify_target(Source, Target, winning_revs)
+    ]}.
+
 should_populate_source(Source) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(populate_db(Source))}.
 
-should_replicate({remote, Source}, Target) ->
-    should_replicate(db_url(Source), Target);
-should_replicate(Source, {remote, Target}) ->
-    should_replicate(Source, db_url(Target));
 should_replicate(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target))}.
+    should_replicate(Source, Target, []).
 
-should_verify_target({remote, Source}, Target) ->
-    should_verify_target(Source, Target);
-should_verify_target(Source, {remote, Target}) ->
-    should_verify_target(Source, Target);
-should_verify_target(Source, Target) ->
+should_replicate(Source, Target, Options) ->
+    {timeout, ?TIMEOUT_EUNIT,
+        ?_test(begin
+            RepObj = {
+                [
+                    {<<"source">>, db_url(Source)},
+                    {<<"target">>, db_url(Target)}
+                ] ++ Options
+            },
+            replicate(RepObj)
+        end)}.
+
+should_verify_target(Source, Target, Mode) ->
     {timeout, ?TIMEOUT_EUNIT,
         ?_test(begin
             {ok, SourceDb} = couch_db:open_int(Source, []),
             {ok, TargetDb} = couch_db:open_int(Target, []),
-            verify_target(SourceDb, TargetDb, ?DOCS_CONFLICTS),
+            verify_target(SourceDb, TargetDb, ?DOCS_CONFLICTS, Mode),
             ok = couch_db:close(SourceDb),
             ok = couch_db:close(TargetDb)
         end)}.
 
-should_add_attachments_to_source({remote, Source}) ->
-    should_add_attachments_to_source(Source);
 should_add_attachments_to_source(Source) ->
     {timeout, ?TIMEOUT_EUNIT,
         ?_test(begin
@@ -131,7 +143,11 @@ populate_db(DbName) ->
                 id = DocId,
                 body = {[{<<"value">>, Value}]}
             },
-            {ok, _} = couch_db:update_doc(Db, Doc, [?ADMIN_CTX]),
+            {ok, {Pos, Rev}} = couch_db:update_doc(Db, Doc, [?ADMIN_CTX]),
+            % Update first initial doc rev twice to ensure it's always a winner
+            {ok, Db2} = couch_db:reopen(Db),
+            Doc1 = Doc#doc{revs = {Pos, [Rev]}},
+            {ok, _} = couch_db:update_doc(Db2, Doc1, [?ADMIN_CTX]),
             {ok, _} = add_doc_siblings(Db, DocId, NumConflicts)
         end,
         ?DOCS_CONFLICTS
@@ -160,9 +176,9 @@ add_doc_siblings(Db, DocId, NumLeaves, AccDocs, AccRevs) ->
         [{1, Rev} | AccRevs]
     ).
 
-verify_target(_SourceDb, _TargetDb, []) ->
+verify_target(_SourceDb, _TargetDb, [], _Mode) ->
     ok;
-verify_target(SourceDb, TargetDb, [{DocId, NumConflicts} | Rest]) ->
+verify_target(SourceDb, TargetDb, [{DocId, NumConflicts} | Rest], all_revs) ->
     {ok, SourceLookups} = couch_db:open_doc_revs(
         SourceDb,
         DocId,
@@ -187,7 +203,19 @@ verify_target(SourceDb, TargetDb, [{DocId, NumConflicts} | Rest]) ->
         end,
         lists:zip(SourceDocs, TargetDocs)
     ),
-    verify_target(SourceDb, TargetDb, Rest).
+    verify_target(SourceDb, TargetDb, Rest, all_revs);
+verify_target(SourceDb, TargetDb, [{DocId, _NumConflicts} | Rest], winning_revs) ->
+    {ok, SourceWinner} = couch_db:open_doc(SourceDb, DocId),
+    {ok, TargetWinner} = couch_db:open_doc(TargetDb, DocId),
+    SourceWinnerJson = couch_doc:to_json_obj(SourceWinner, [attachments]),
+    TargetWinnerJson = couch_doc:to_json_obj(TargetWinner, [attachments]),
+    % Source winner is the same as the target winner
+    ?assertEqual(SourceWinnerJson, TargetWinnerJson),
+    Opts = [conflicts, deleted_conflicts],
+    {ok, TargetAll} = couch_db:open_doc_revs(TargetDb, DocId, all, Opts),
+    % There is only one version on the target
+    ?assert(length(TargetAll) == 1),
+    verify_target(SourceDb, TargetDb, Rest, winning_revs).
 
 add_attachments(_SourceDb, _NumAtts, []) ->
     ok;

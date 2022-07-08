@@ -76,6 +76,12 @@
                 reportError('The `create_target\\' field must be a boolean.');
             }
 
+            if ((typeof newDoc.winning_revs_only !== 'undefined') &&
+                (typeof newDoc.winning_revs_only !== 'boolean')) {
+
+                reportError('The `winning_revs_only\\' field must be a boolean.');
+            }
+
             if ((typeof newDoc.continuous !== 'undefined') &&
                 (typeof newDoc.continuous !== 'boolean')) {
 

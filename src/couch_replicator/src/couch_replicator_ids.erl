@@ -110,7 +110,17 @@ maybe_append_filters(
                 {error, FilterParseError} ->
                     throw({error, FilterParseError})
             end,
-    couch_util:to_hex(couch_hash:md5_hash(term_to_binary(Base2))).
+    Base3 =
+        Base2 ++
+            case couch_util:get_value(winning_revs_only, Options) of
+                undefined ->
+                    [];
+                false ->
+                    [];
+                true ->
+                    [<<"winning_revs_only">>]
+            end,
+    couch_util:to_hex(couch_hash:md5_hash(term_to_binary(Base3))).
 
 maybe_append_options(Options, RepOptions) ->
     lists:foldl(
@@ -169,6 +179,42 @@ get_non_default_port(_Schema, Port) ->
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("couch_replicator/test/eunit/couch_replicator_test.hrl").
+
+winning_revs_id_test_() ->
+    {
+        foreach,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        [
+            ?TDEF_FE(winning_revs_generates_new_id),
+            ?TDEF_FE(winning_revs_false_same_as_undefined)
+        ]
+    }.
+
+winning_revs_generates_new_id(_) ->
+    RepDoc1 = [
+        {<<"source">>, <<"http://foo.example.bar">>},
+        {<<"target">>, <<"http://bar.example.foo">>}
+    ],
+    Rep1 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc1}),
+    Id1 = replication_id(Rep1),
+    RepDoc2 = RepDoc1 ++ [{<<"winning_revs_only">>, true}],
+    Rep2 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc2}),
+    Id2 = replication_id(Rep2),
+    ?assertNotEqual(Id1, Id2).
+
+winning_revs_false_same_as_undefined(_) ->
+    RepDoc1 = [
+        {<<"source">>, <<"http://foo.example.bar">>},
+        {<<"target">>, <<"http://bar.example.foo">>}
+    ],
+    Rep1 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc1}),
+    Id1 = replication_id(Rep1),
+    RepDoc2 = RepDoc1 ++ [{<<"winning_revs_only">>, false}],
+    Rep2 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc2}),
+    Id2 = replication_id(Rep2),
+    ?assertEqual(Id1, Id2).
 
 replication_id_convert_test_() ->
     [
