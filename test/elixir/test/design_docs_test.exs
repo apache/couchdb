@@ -476,12 +476,13 @@ defmodule DesignDocsTest do
       ddoc_resp.body
       |> Map.put("_deleted", true)
 
-    del_resp =
-      Couch.post("/#{db_name}",
-        body: ddoc
-      )
-
-    assert del_resp.status_code in [201, 202]
+    retry_until(fn ->
+      retry_resp =
+        Couch.post("/#{db_name}",
+          body: ddoc
+        )
+      retry_resp.status_code in [201, 202]
+    end)
 
     {:ok, _} = create_doc(db_name, %{_id: "doc1", value: 4})
   end
