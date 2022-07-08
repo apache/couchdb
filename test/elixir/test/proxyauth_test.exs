@@ -38,12 +38,12 @@ defmodule ProxyAuthTest do
         :value => users_db_name
       },
       %{
-        :section => "couch_httpd_auth",
+        :section => "chttpd_auth",
         :key => "proxy_use_secret",
         :value => "true"
       },
       %{
-        :section => "couch_httpd_auth",
+        :section => "chttpd_auth",
         :key => "secret",
         :value => secret
       }
@@ -62,11 +62,9 @@ defmodule ProxyAuthTest do
     |> Enum.join("")
   end
 
-  defp hex_hmac_sha1(secret, message) do
+  defp hex_hmac_sha256(secret, message) do
     signature = case :erlang.system_info(:otp_release) do
-      '20' -> :crypto.hmac(:sha, secret, message)
-      '21' -> :crypto.hmac(:sha, secret, message)
-      _ -> :crypto.mac(:hmac, :sha, secret, message)
+      _ -> :crypto.mac(:hmac, :sha256, secret, message)
     end
     Base.encode16(signature, case: :lower)
   end
@@ -86,7 +84,7 @@ defmodule ProxyAuthTest do
     headers = [
       "X-Auth-CouchDB-UserName": "couch@apache.org",
       "X-Auth-CouchDB-Roles": "test",
-      "X-Auth-CouchDB-Token": hex_hmac_sha1(secret, "couch@apache.org")
+      "X-Auth-CouchDB-Token": hex_hmac_sha256(secret, "couch@apache.org")
     ]
     resp = Couch.get("/#{db_name}/_design/test/_show/welcome", headers: headers)
     assert resp.body == "Welcome couch@apache.org"
@@ -128,7 +126,7 @@ defmodule ProxyAuthTest do
         :value => users_db_name
       },
       %{
-        :section => "couch_httpd_auth",
+        :section => "chttpd_auth",
         :key => "proxy_use_secret",
         :value => "false"
       }
