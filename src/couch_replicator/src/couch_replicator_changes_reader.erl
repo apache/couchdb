@@ -20,7 +20,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
--include("couch_replicator.hrl").
 
 -import(couch_util, [
     get_value/2
@@ -49,10 +48,15 @@ start_link(StartSeq, Db, ChangesQueue, Options) ->
 
 read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
     Continuous = couch_util:get_value(continuous, Options),
+    Style =
+        case couch_util:get_value(winning_revs_only, Options, false) of
+            true -> main_only;
+            false -> all_docs
+        end,
     try
         couch_replicator_api_wrap:changes_since(
             Db,
-            all_docs,
+            Style,
             StartSeq,
             fun(Item) ->
                 process_change(Item, {Parent, Db, ChangesQueue, Continuous})

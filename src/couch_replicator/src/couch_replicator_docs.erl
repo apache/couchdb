@@ -510,6 +510,10 @@ convert_options([{<<"create_target_params">>, V} | _R]) when not is_tuple(V) ->
     throw({bad_request, <<"parameter `create_target_params` must be a JSON object">>});
 convert_options([{<<"create_target_params">>, V} | R]) ->
     [{create_target_params, V} | convert_options(R)];
+convert_options([{<<"winning_revs_only">>, V} | _R]) when not is_boolean(V) ->
+    throw({bad_request, <<"parameter `winning_revs_only` must be a boolean">>});
+convert_options([{<<"winning_revs_only">>, V} | R]) ->
+    [{winning_revs_only, V} | convert_options(R)];
 convert_options([{<<"continuous">>, V} | _R]) when not is_boolean(V) ->
     throw({bad_request, <<"parameter `continuous` must be a boolean">>});
 convert_options([{<<"continuous">>, V} | R]) ->
@@ -794,6 +798,10 @@ check_convert_options_pass_test() ->
         convert_options([{<<"create_target">>, true}])
     ),
     ?assertEqual(
+        [{winning_revs_only, true}],
+        convert_options([{<<"winning_revs_only">>, true}])
+    ),
+    ?assertEqual(
         [{continuous, true}],
         convert_options([{<<"continuous">>, true}])
     ),
@@ -814,6 +822,10 @@ check_convert_options_fail_test() ->
     ?assertThrow(
         {bad_request, _},
         convert_options([{<<"create_target">>, <<"true">>}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        convert_options([{<<"winning_revs_only">>, <<"foo">>}])
     ),
     ?assertThrow(
         {bad_request, _},
