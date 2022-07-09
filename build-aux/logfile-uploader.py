@@ -12,6 +12,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+# *** NOT CURRENTLY USED AS LOG UPLOADS BROKE ***
 
 import datetime
 import glob
