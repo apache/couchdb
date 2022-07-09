@@ -285,7 +285,7 @@ elixir-credo: elixir-init
 # target: build-report - Generate and upload a build report
 build-report:
 	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
-	build-aux/logfile-uploader.py
+	#build-aux/logfile-uploader.py
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
