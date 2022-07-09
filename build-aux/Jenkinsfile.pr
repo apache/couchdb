@@ -13,7 +13,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 build_and_test = '''
-mkdir -p ${COUCHDB_IO_LOG_DIR} ${ERLANG_VERSION}
+mkdir -p ${ERLANG_VERSION}
 cd ${ERLANG_VERSION}
 rm -rf build
 mkdir build
@@ -30,9 +30,7 @@ pipeline {
   agent none
 
   environment {
-    COUCHAUTH = credentials('couchdb_vm2_couchdb')
     recipient = 'notifications@couchdb.apache.org'
-    COUCHDB_IO_LOG_DIR = '/tmp/couchjslogs'
     // Following fix an issue with git <= 2.6.5 where no committer
     // name or email are present for reflog, required for git clone
     GIT_COMMITTER_NAME = 'Jenkins User'
@@ -166,7 +164,7 @@ pipeline {
                 junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               }
               cleanup {
-                sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
+                sh 'rm -rf ${WORKSPACE}/*'
               }
             }
           } // stage
