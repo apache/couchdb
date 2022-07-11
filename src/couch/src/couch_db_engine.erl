@@ -737,8 +737,8 @@ delete_compaction_files(Engine, RootDir, DbPath, DelOpts) when
 ->
     Engine:delete_compaction_files(RootDir, DbPath, DelOpts).
 
-is_compacting(Engine, DbName) ->
-    Engine:is_compacting(DbName).
+is_compacting(Engine, FilePath) ->
+    Engine:is_compacting(FilePath).
 
 init(Engine, DbPath, Options) ->
     case Engine:init(DbPath, Options) of
