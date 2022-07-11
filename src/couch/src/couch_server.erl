@@ -185,9 +185,11 @@ delete_compaction_files(DbName, DelOpts) when is_binary(DbName) ->
     delete_compaction_files(?b2l(DbName), DelOpts).
 
 is_compacting(DbName) ->
+    RootDir = config:get("couchdb", "database_dir", "."),
     lists:any(
-        fun({_, Engine}) ->
-            couch_db_engine:is_compacting(Engine, DbName)
+        fun({Ext, Engine}) ->
+            FilePath = make_filepath(RootDir, DbName, Ext),
+            couch_db_engine:is_compacting(Engine, FilePath)
         end,
         get_configured_engines()
     ).
