@@ -370,11 +370,19 @@ get_priority(Channel, {Shard, GroupId}) ->
 get_priority(Channel, DbName) when is_list(DbName) ->
     get_priority(Channel, ?l2b(DbName));
 get_priority(Channel, DbName) when is_binary(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
-    try
-        get_priority(Channel, Db)
-    after
-        couch_db:close(Db)
+    case couch_db:open_int(DbName, []) of
+        {ok, Db} ->
+            try
+                get_priority(Channel, Db)
+            after
+                couch_db:close(Db)
+            end;
+        Error = {not_found, no_db_file} ->
+            couch_log:warning(
+                "~p: Error getting priority for ~p: ~p",
+                [Channel, DbName, Error]
+            ),
+            0
     end;
 get_priority(Channel, Db) ->
     {ok, DocInfo} = couch_db:get_db_info(Db),
