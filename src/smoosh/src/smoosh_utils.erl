@@ -14,7 +14,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([get/2, get/3, split/1, stringify/1, ignore_db/1]).
--export([in_allowed_window/1, write_to_file/3]).
+-export([in_allowed_window/1, is_view_channel/1, write_to_file/3]).
 -export([log_level/2]).
 
 get(Channel, Key) ->
@@ -58,6 +58,12 @@ in_allowed_window(From, To) ->
         false ->
             ({HH, MM} >= From) orelse ({HH, MM} < To)
     end.
+
+is_view_channel(ChannelName) ->
+    ViewChannels = smoosh_utils:split(
+        config:get("smoosh", "view_channels", "upgrade_views,ratio_views,slack_views")
+    ),
+    lists:member(ChannelName, ViewChannels).
 
 file_delete(Path) ->
     case file:delete(Path) of

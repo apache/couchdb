@@ -29,7 +29,7 @@ teardown(DbName) when is_binary(DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
-compaction_resume_test_() ->
+basic_compaction_test_() ->
     {
         setup,
         fun test_util:start_couch/0,
@@ -58,6 +58,25 @@ compaction_resume(DbName) ->
         check_db_validity(DbName),
         compact_db(DbName),
         check_db_validity(DbName)
+    end).
+
+is_compacting_works(DbName) ->
+    ?_test(begin
+        check_db_validity(DbName),
+        meck:new(couch_emsort, [passthrough]),
+        ok = wait_in_emsort_bind(self()),
+        {_Pid, Ref} = spawn_monitor(fun() -> compact_db(DbName) end),
+        receive
+            {in_emsort_bind, From} ->
+                % When emsort:open(Fd) is called the files should
+                % have been created already
+                ?assert(couch_db:is_compacting(DbName)),
+                From ! {please_continue, self()}
+        end,
+        receive
+            {'DOWN', Ref, _, _, _} -> ok
+        end,
+        meck:unload(couch_emsort)
     end).
 
 check_db_validity(DbName) ->
@@ -122,3 +141,13 @@ wait_db_compact_done(DbName, N) ->
             timer:sleep(?DELAY),
             wait_db_compact_done(DbName, N - 1)
     end.
+
+wait_in_emsort_bind(WaitingPid) when is_pid(WaitingPid) ->
+    meck:expect(couch_emsort, open, fun(Fd) ->
+        WaitingPid ! {in_emsort_bind, self()},
+        receive
+            {please_continue, WaitingPid} ->
+                ok
+        end,
+        meck:passthrough([Fd])
+    end).

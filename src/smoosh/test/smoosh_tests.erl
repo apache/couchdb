@@ -59,8 +59,7 @@ persistence_tests() ->
 
 channels_tests() ->
     Tests = [
-        fun should_enqueue/2,
-        fun should_start_compact/2
+        fun should_enqueue/2
     ],
     {
         "Various channels tests",
@@ -97,17 +96,6 @@ should_persist_queue(ChannelType, DbName) ->
         ok
     end).
 
-should_start_compact(ChannelType, DbName) ->
-    ?_test(begin
-        {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
-        ok = grow_db_file(DbName, 3000),
-        smoosh_channel:resume(ChannelPid),
-        ok = wait_compact(ChannelType),
-        ?assertEqual(true, couch_db:is_compacting(DbName)),
-        application:start(smoosh),
-        ok
-    end).
-
 grow_db_file(DbName, SizeInKb) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     Data = b64url:encode(crypto:strong_rand_bytes(SizeInKb * 1024)),
@@ -122,30 +110,16 @@ is_enqueued(ChannelType, DbName) ->
     smoosh_channel:is_key(ChannelPid, DbName).
 
 wait_enqueue(ChannelType, DbName) ->
-    test_util:wait(fun() ->
-        case is_enqueued(ChannelType, DbName) of
-            false ->
-                wait;
-            true ->
-                ok
-        end
-    end).
-
-wait_compact(ChannelType) ->
-    {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
     test_util:wait(
         fun() ->
-            {ok, Status} = smoosh_channel:get_status(ChannelPid),
-            {active, Active} = lists:keyfind(active, 1, Status),
-            case Active of
-                1 ->
-                    application:stop(smoosh),
-                    ok;
-                _ ->
-                    wait
+            case is_enqueued(ChannelType, DbName) of
+                false ->
+                    wait;
+                true ->
+                    ok
             end
         end,
-        10000
+        15000
     ).
 
 channel_queue(ChannelType) ->
