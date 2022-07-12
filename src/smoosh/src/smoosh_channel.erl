@@ -17,7 +17,7 @@
 
 % public api.
 -export([start_link/1, close/1, suspend/1, resume/1, activate/1, get_status/1]).
--export([enqueue/3, last_updated/2, flush/1, is_key/2, is_activated/1, persist/1]).
+-export([enqueue/3, last_updated/2, flush/1, is_key/2, is_activated/1]).
 
 % gen_server api.
 -export([
@@ -28,6 +28,11 @@
     terminate/2
 ]).
 
+-define(VIEW_CHANNELS,
+    smoosh_utils:split(
+        config:get("smoosh", "view_channels", "upgrade_views,ratio_views,slack_views")
+    )
+).
 -define(VSN, 1).
 -define(CHECKPOINT_INTERVAL_IN_MSEC, 180000).
 
@@ -37,6 +42,7 @@
 -else.
 -define(START_DELAY_IN_MSEC, 0).
 -define(ACTIVATE_DELAY_IN_MSEC, 0).
+-export([persist/1]).
 -endif.
 
 % records.
@@ -94,6 +100,7 @@ is_key(ServerRef, Key) ->
 is_activated(ServerRef) ->
     gen_server:call(ServerRef, is_activated).
 
+% only exported to force persistence in tests
 persist(ServerRef) ->
     gen_server:call(ServerRef, persist).
 
@@ -103,8 +110,14 @@ init(Name) ->
     erlang:send_after(60 * 1000, self(), check_window),
     process_flag(trap_exit, true),
     Waiting = smoosh_priority_queue:new(Name),
-    State = #state{name = Name, waiting = Waiting, paused = true, activated = false},
-    erlang:send_after(?START_DELAY_IN_MSEC, self(), start_recovery),
+    case lists:member(Name, ?VIEW_CHANNELS) of
+        true ->
+            State = #state{name = Name, waiting = Waiting, paused = true, activated = true},
+            schedule_unpause();
+        false ->
+            State = #state{name = Name, waiting = Waiting, paused = true, activated = false},
+            erlang:send_after(?START_DELAY_IN_MSEC, self(), start_recovery)
+    end,
     {ok, State}.
 
 handle_call({last_updated, Object}, _From, State) ->
