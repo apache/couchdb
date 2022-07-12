@@ -110,7 +110,8 @@ init(Name) ->
     erlang:send_after(60 * 1000, self(), check_window),
     process_flag(trap_exit, true),
     Waiting = smoosh_priority_queue:new(Name),
-    case lists:member(Name, ?VIEW_CHANNELS) of
+    Persist = config:get("smoosh", "persist", "false"),
+    case lists:member(Name, ?VIEW_CHANNELS) orelse Persist =:= "false" of
         true ->
             State = #state{name = Name, waiting = Waiting, paused = true, activated = true},
             schedule_unpause();

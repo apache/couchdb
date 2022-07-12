@@ -13,12 +13,14 @@ setup(ChannelType) ->
     couch_db:close(Db),
     {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
     smoosh_channel:flush(ChannelPid),
+    ok = config:set("smoosh", "persist", "true", false),
     ok = config:set(config_section(ChannelType), "min_size", "1", false),
     ok = config:set(config_section(ChannelType), "min_priority", "1", false),
     DbName.
 
 teardown(ChannelType, DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+    ok = config:delete("smoosh", "persist", false),
     ok = config:delete(config_section(DbName), "min_size", false),
     ok = config:delete(config_section(DbName), "min_priority", false),
     {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
