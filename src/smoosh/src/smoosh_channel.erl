@@ -105,8 +105,9 @@ init(Name) ->
     erlang:send_after(60 * 1000, self(), check_window),
     process_flag(trap_exit, true),
     Waiting = smoosh_priority_queue:new(Name),
+    Persist = config:get_boolean("smoosh", "persist", false),
     State =
-        case smoosh_utils:is_view_channel(Name) of
+        case smoosh_utils:is_view_channel(Name) orelse Persist =:= false of
             true ->
                 schedule_unpause(),
                 #state{name = Name, waiting = Waiting, paused = true, activated = true};
@@ -273,8 +274,7 @@ handle_info(start_recovery, #state{name = Name, waiting = Waiting0} = State0) ->
 handle_info(activate, State) ->
     {noreply, activate_channel(State)};
 handle_info(persist, State) ->
-    persist_queue(State),
-    erlang:send_after(?CHECKPOINT_INTERVAL_IN_MSEC, self(), persist),
+    ok = persist_and_reschedule(State),
     {noreply, State};
 handle_info(pause, State) ->
     {noreply, State#state{paused = true}};
@@ -284,8 +284,7 @@ handle_info(unpause, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-persist_queue(State) ->
-    write_state_to_file(State).
+% private functions.
 
 recover(FilePath) ->
     case do_recover(FilePath) of
@@ -333,7 +332,12 @@ parse_state(1, ?VSN, Binary) ->
 parse_state(Vsn, ?VSN, _) ->
     error({unsupported_version, Vsn}).
 
-write_state_to_file(#state{name = Name, active = Active, starting = Starting, waiting = Waiting}) ->
+persist_and_reschedule(State) ->
+    persist_queue(State),
+    erlang:send_after(?CHECKPOINT_INTERVAL_IN_MSEC, self(), persist),
+    ok.
+
+persist_queue(#state{name = Name, active = Active, starting = Starting, waiting = Waiting}) ->
     Active1 = lists:foldl(
         fun({DbName, _}, Acc) ->
             [DbName | Acc]
@@ -357,8 +361,6 @@ active_file_name(Name) ->
 
 starting_file_name(Name) ->
     filename:join(config:get("smoosh", "state_dir", "."), Name ++ ".starting").
-
-% private functions.
 
 add_to_queue(Key, Priority, State) ->
     #state{active = Active, waiting = Q} = State,
@@ -414,7 +416,7 @@ activate_channel(#state{name = Name, waiting = Waiting0, requests = Requests0} =
     State1 = maybe_start_compaction(State0#state{
         waiting = Waiting2, paused = false, activated = true, requests = []
     }),
-    handle_info(persist, State1),
+    ok = persist_and_reschedule(State1),
     schedule_unpause(),
     State1#state{paused = true}.
 

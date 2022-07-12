@@ -13,14 +13,17 @@ setup(ChannelType) ->
     couch_db:close(Db),
     {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
     smoosh_channel:flush(ChannelPid),
+    ok = config:set("smoosh", "persist", "true", false),
     ok = config:set(config_section(ChannelType), "min_size", "1", false),
     ok = config:set(config_section(ChannelType), "min_priority", "1", false),
     DbName.
 
 teardown(ChannelType, DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+    ok = config:delete("smoosh", "persist", false),
     ok = config:delete(config_section(DbName), "min_size", false),
     ok = config:delete(config_section(DbName), "min_priority", false),
+    meck:unload(),
     {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
     smoosh_channel:flush(ChannelPid),
     ok.
@@ -48,10 +51,12 @@ smoosh_test_() ->
 
 persistence_tests() ->
     Tests = [
-        fun should_persist_queue/2
+        fun should_persist_queue/2,
+        fun should_call_recover/2,
+        fun should_not_call_recover/2
     ],
     {
-        "Should persist queue state",
+        "Various persistence tests",
         [
             make_test_case("ratio_dbs", Tests)
         ]
@@ -93,6 +98,28 @@ should_persist_queue(ChannelType, DbName) ->
         ?assertNotEqual(Q0, smoosh_priority_queue:new(ChannelType)),
         ?assertNotEqual(Q1, smoosh_priority_queue:new(ChannelType)),
         ?assertEqual(Q0, Q1),
+        ok
+    end).
+
+should_call_recover(_ChannelType, _DbName) ->
+    ?_test(begin
+        ok = application:stop(smoosh),
+        ok = config:set("smoosh", "persist", "true", false),
+        meck:new(smoosh_priority_queue, [passthrough]),
+        ok = application:start(smoosh),
+        timer:sleep(1000),
+        ?assertNotEqual(0, meck:num_calls(smoosh_priority_queue, recover, '_')),
+        ok
+    end).
+
+should_not_call_recover(_ChannelType, _DbName) ->
+    ?_test(begin
+        ok = application:stop(smoosh),
+        ok = config:set("smoosh", "persist", "false", false),
+        meck:new(smoosh_priority_queue, [passthrough]),
+        ok = application:start(smoosh),
+        timer:sleep(1000),
+        ?assertEqual(0, meck:num_calls(smoosh_priority_queue, recover, '_')),
         ok
     end).
 
