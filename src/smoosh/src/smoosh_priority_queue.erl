@@ -22,7 +22,7 @@
 
 -export([is_empty/1]).
 
--export([file_name/1, write_to_file/1]).
+-export([write_to_file/1]).
 
 -define(VSN, 1).
 
