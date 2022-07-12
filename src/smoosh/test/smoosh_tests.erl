@@ -3,8 +3,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(KILOBYTE, binary:copy(<<"x">>, 1024)).
-
 %% ==========
 %% Setup
 %% ----------
@@ -20,11 +18,11 @@ setup(ChannelType) ->
     DbName.
 
 teardown(ChannelType, DbName) ->
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok = config:delete(config_section(DbName), "min_size", false),
     ok = config:delete(config_section(DbName), "min_priority", false),
     {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
     smoosh_channel:flush(ChannelPid),
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
 config_section(ChannelType) ->
@@ -92,6 +90,7 @@ should_persist_queue(ChannelType, DbName) ->
         ok = application:stop(smoosh),
         ok = application:start(smoosh),
         Q1 = channel_queue(ChannelType),
+        % Assert that queues are not empty
         ?assertNotEqual(Q0, smoosh_priority_queue:new(ChannelType)),
         ?assertNotEqual(Q1, smoosh_priority_queue:new(ChannelType)),
         ?assertEqual(Q0, Q1),
@@ -105,6 +104,7 @@ should_start_compact(ChannelType, DbName) ->
         smoosh_channel:resume(ChannelPid),
         ok = wait_compact(ChannelType),
         ?assertEqual(true, couch_db:is_compacting(DbName)),
+        application:start(smoosh),
         ok
     end).
 
@@ -139,7 +139,7 @@ wait_compact(ChannelType) ->
             {active, Active} = lists:keyfind(active, 1, Status),
             case Active of
                 1 ->
-                    smoosh_channel:suspend(ChannelPid),
+                    application:stop(smoosh),
                     ok;
                 _ ->
                     wait
