@@ -472,11 +472,19 @@ maybe_start_compaction(State) ->
 start_compact(State, DbName) when is_list(DbName) ->
     start_compact(State, ?l2b(DbName));
 start_compact(State, DbName) when is_binary(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
-    try
-        start_compact(State, Db)
-    after
-        couch_db:close(Db)
+    case couch_db:open_int(DbName, []) of
+        {ok, Db} ->
+            try
+                start_compact(State, Db)
+            after
+                couch_db:close(Db)
+            end;
+        Error = {not_found, no_db_file} ->
+            couch_log:warning(
+                "Error starting compaction for ~p: ~p",
+                [smoosh_utils:stringify(DbName), Error]
+            ),
+            false
     end;
 start_compact(State, {Shard, GroupId}) ->
     case smoosh_utils:ignore_db({Shard, GroupId}) of
@@ -517,23 +525,31 @@ start_compact(State, Db) ->
     end.
 
 maybe_remonitor_cpid(State, DbName, Reason) when is_binary(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
-    case couch_db:get_compactor_pid_sync(Db) of
-        nil ->
+    case couch_db:open_int(DbName, []) of
+        {ok, Db} ->
+            case couch_db:get_compactor_pid_sync(Db) of
+                nil ->
+                    couch_log:warning(
+                        "exit for compaction of ~p: ~p",
+                        [smoosh_utils:stringify(DbName), Reason]
+                    ),
+                    {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [DbName]),
+                    State;
+                CPid ->
+                    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+                    couch_log:Level(
+                        "~s compaction already running. Re-monitor Pid ~p",
+                        [smoosh_utils:stringify(DbName), CPid]
+                    ),
+                    erlang:monitor(process, CPid),
+                    State#state{active = [{DbName, CPid} | State#state.active]}
+            end;
+        Error = {not_found, no_db_file} ->
             couch_log:warning(
                 "exit for compaction of ~p: ~p",
-                [smoosh_utils:stringify(DbName), Reason]
+                [smoosh_utils:stringify(DbName), Error]
             ),
-            {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [DbName]),
-            State;
-        CPid ->
-            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
-            couch_log:Level(
-                "~s compaction already running. Re-monitor Pid ~p",
-                [smoosh_utils:stringify(DbName), CPid]
-            ),
-            erlang:monitor(process, CPid),
-            State#state{active = [{DbName, CPid} | State#state.active]}
+            State
     end;
 % not a database compaction, so ignore the pid check
 maybe_remonitor_cpid(State, Key, Reason) ->
