@@ -60,6 +60,9 @@ init([]) ->
         end,
     MaxWriteDelay = list_to_integer(MaxWriteDelay0),
 
+    GlobalChangesDbName = global_changes_util:get_dbname(),
+    ioq:set_io_priority({system, GlobalChangesDbName}),
+
     % Start our write triggers
     erlang:send_after(MaxWriteDelay, self(), flush_updates),
 
@@ -68,7 +71,7 @@ init([]) ->
         pending_update_count = 0,
         pending_updates = sets:new(),
         max_write_delay = MaxWriteDelay,
-        dbname = global_changes_util:get_dbname(),
+        dbname = GlobalChangesDbName,
         handler_ref = erlang:monitor(process, Handler)
     },
     {ok, State}.

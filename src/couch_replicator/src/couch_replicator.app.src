@@ -32,6 +32,7 @@
         config,
         couch,
         couch_event,
-        couch_stats
+        couch_stats,
+        ioq
     ]}
 ]}.

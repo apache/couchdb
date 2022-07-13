@@ -85,6 +85,7 @@ init_state() ->
                     "couch_httpd_auth", "authentication_db", "_users"
                 )
             ),
+            ioq:set_io_priority({system, DbName}),
             DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
             Q = config:get_integer("couch_peruser", "q", 1),
             Prefix = config:get("couch_peruser", "database_prefix", ?DEFAULT_USERDB_PREFIX),
@@ -186,6 +187,7 @@ start_listening(
 -spec init_changes_handler(ChangesState :: #changes_state{}) -> ok.
 init_changes_handler(#changes_state{db_name = DbName} = ChangesState) ->
     % couch_log:debug("peruser: init_changes_handler() on DbName ~p", [DbName]),
+    ioq:set_io_priority({system, DbName}),
     try
         {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX, sys_db]),
         FunAcc = {fun ?MODULE:changes_handler/3, ChangesState},

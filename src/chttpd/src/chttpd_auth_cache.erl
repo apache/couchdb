@@ -156,7 +156,7 @@ spawn_changes(Since) ->
 
 listen_for_changes(Since) ->
     DbName = dbname(),
-    erlang:put(io_priority, {system, DbName}),
+    ioq:set_io_priority({system, DbName}),
     ensure_auth_ddoc_exists(DbName, <<"_design/_auth">>),
     CBFun = fun ?MODULE:changes_callback/2,
     Args = #changes_args{

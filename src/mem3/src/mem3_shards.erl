@@ -220,6 +220,8 @@ init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),
     SizeList = config:get("mem3", "shard_cache_size", "25000"),
     WriteTimeout = config:get_integer("mem3", "shard_write_timeout", 1000),
+    DbName = mem3_sync:shards_db(),
+    ioq:set_io_priority({system, DbName}),
     UpdateSeq = get_update_seq(),
     {ok, #st{
         max_size = list_to_integer(SizeList),
@@ -341,7 +343,9 @@ get_update_seq() ->
     Seq.
 
 listen_for_changes(Since) ->
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
+    DbName = mem3_sync:shards_db(),
+    ioq:set_io_priority({system, DbName}),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
         since = Since,
