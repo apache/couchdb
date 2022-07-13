@@ -24,63 +24,68 @@ CopyIfDifferent = fun(Path, Contents) ->
     end
 end.
 
-
-CouchJSName = case os:type() of
-    {win32, _} ->
-        "couchjs.exe";
-    _ ->
-        "couchjs"
-end.
+CouchJSName =
+    case os:type() of
+        {win32, _} ->
+            "couchjs.exe";
+        _ ->
+            "couchjs"
+    end.
 CouchJSPath = filename:join(["priv", CouchJSName]).
-Version = case os:getenv("COUCHDB_VERSION") of
-    false ->
-        string:strip(os:cmd("git describe --always"), right, $\n);
-    Version0 ->
-        string:strip(Version0, right)
-end.
+Version =
+    case os:getenv("COUCHDB_VERSION") of
+        false ->
+            string:strip(os:cmd("git describe --always"), right, $\n);
+        Version0 ->
+            string:strip(Version0, right)
+    end.
 
-GitSha = case os:getenv("COUCHDB_GIT_SHA") of
-    false ->
-        ""; % release builds won\'t get a fallback
-    GitSha0 ->
-        string:strip(GitSha0, right)
-end.
+GitSha =
+    case os:getenv("COUCHDB_GIT_SHA") of
+        false ->
+            % release builds won\'t get a fallback
+            "";
+        GitSha0 ->
+            string:strip(GitSha0, right)
+    end.
 
-CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
-    true ->
-        {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
-        Result;
-    false ->
-        []
-end.
+CouchConfig =
+    case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
+        true ->
+            {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
+            Result;
+        false ->
+            []
+    end.
 
-SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
-    {_, "1.8.5"} ->
-        "1.8.5";
-    {_, "60"} ->
-        "60";
-    {_, "68"} ->
-        "68";
-    {_, "78"} ->
-        "78";
-    {_, "86"} ->
-        "86";
-    {_, "91"} ->
-        "91";
-    undefined ->
-        "1.8.5";
-    {_, Unsupported} ->
-        io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
-        erlang:halt(1);
-    false ->
-        "1.8.5"
-end.
+SMVsn =
+    case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
+        {_, "1.8.5"} ->
+            "1.8.5";
+        {_, "60"} ->
+            "60";
+        {_, "68"} ->
+            "68";
+        {_, "78"} ->
+            "78";
+        {_, "86"} ->
+            "86";
+        {_, "91"} ->
+            "91";
+        undefined ->
+            "1.8.5";
+        {_, Unsupported} ->
+            io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
+            erlang:halt(1);
+        false ->
+            "1.8.5"
+    end.
 
 ConfigH = [
     {"SM185", ""},
     {"HAVE_JS_GET_STRING_CHARS_AND_LENGTH", "1"},
     {"JSSCRIPT_TYPE", "JSObject*"},
-    {"COUCHJS_NAME", "\"" ++ CouchJSName++ "\""},
+    {"COUCHJS_NAME", "\"" ++ CouchJSName ++ "\""},
     {"PACKAGE", "\"apache-couchdb\""},
     {"PACKAGE_BUGREPORT", "\"https://github.com/apache/couchdb/issues\""},
     {"PACKAGE_NAME", "\"Apache CouchDB\""},
@@ -88,166 +93,272 @@ ConfigH = [
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
 ].
 
-CouchJSConfig = case SMVsn of
-    "78" ->
-        "priv/couch_js/86/config.h";
-    "91" ->
-        "priv/couch_js/86/config.h";
-    _ ->
-        "priv/couch_js/" ++ SMVsn ++ "/config.h"
-end.
+CouchJSConfig =
+    case erlang:function_exported(rebar3, main, 1) of
+        % rebar3
+        true ->
+            case SMVsn of
+                "78" ->
+                    "src/couch/priv/couch_js/86/config.h";
+                "91" ->
+                    "src/couch/priv/couch_js/86/config.h";
+                _ ->
+                    "src/couch/priv/couch_js/" ++ SMVsn ++ "/config.h"
+            end;
+        % mix
+        false ->
+            case SMVsn of
+                "78" ->
+                    "priv/couch_js/86/config.h";
+                "91" ->
+                    "priv/couch_js/86/config.h";
+                _ ->
+                    "priv/couch_js/" ++ SMVsn ++ "/config.h"
+            end
+    end.
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
 ConfigBin = iolist_to_binary(ConfigSrc).
 ok = CopyIfDifferent(CouchJSConfig, ConfigBin).
 
-MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
-    {erlang_md5, true} ->
-        [{d, 'ERLANG_MD5', true}];
-    _ ->
-        []
-end.
+MD5Config =
+    case lists:keyfind(erlang_md5, 1, CouchConfig) of
+        {erlang_md5, true} ->
+            [{d, 'ERLANG_MD5', true}];
+        _ ->
+            []
+    end.
 
-ProperConfig = case code:lib_dir(proper) of
-    {error, bad_name} -> [];
-    _ -> [{d, 'WITH_PROPER'}]
-end.
+{JS_CFLAGS, JS_LDFLAGS} =
+    case os:type() of
+        {win32, _} when SMVsn == "1.8.5" ->
+            {
+                "/DXP_WIN",
+                "mozjs185-1.0.lib"
+            };
+        {unix, _} when SMVsn == "1.8.5" ->
+            {
+                "-DXP_UNIX -I/usr/include/js -I/usr/local/include/js",
+                "-L/usr/local/lib -lmozjs185 -lm"
+            };
+        {win32, _} when SMVsn == "60" ->
+            {
+                "/DXP_WIN",
+                "mozjs-60.lib"
+            };
+        {unix, darwin} when SMVsn == "60" ->
+            {
+                "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14",
+                "-L/usr/local/lib -lmozjs-60 -lm -std=c++14 -lc++"
+            };
+        {unix, _} when SMVsn == "60" ->
+            {
+                "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14 -Wno-invalid-offsetof",
+                "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm"
+            };
+        {unix, _} when SMVsn == "68" ->
+            {
+                "-DXP_UNIX -I/usr/include/mozjs-68 -I/usr/local/include/mozjs-68 -std=c++14 -Wno-invalid-offsetof",
+                "-L/usr/local/lib -std=c++14 -lmozjs-68 -lm"
+            };
+        {unix, _} when SMVsn == "78" ->
+            {
+                "-DXP_UNIX -I/usr/include/mozjs-78 -I/usr/local/include/mozjs-78 -std=c++17 -Wno-invalid-offsetof",
+                "-L/usr/local/lib -std=c++17 -lmozjs-78 -lm"
+            };
+        {unix, _} when SMVsn == "86" ->
+            {
+                "-DXP_UNIX -I/usr/include/mozjs-86 -I/usr/local/include/mozjs-86 -I/opt/homebrew/include/mozjs-86/ -std=c++17 -Wno-invalid-offsetof",
+                "-L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-86 -lm"
+            };
+        {unix, _} when SMVsn == "91" ->
+            {
+                "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-91 -I/usr/local/include/mozjs-91 -I/opt/homebrew/include/mozjs-91/ -std=c++17 -Wno-invalid-offsetof",
+                "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-91 -lm"
+            };
+        {win32, _} when SMVsn == "91" ->
+            {
+                "/std:c++17 /DXP_WIN",
+                "$LDFLAGS mozjs-91.lib"
+            }
+    end.
 
-{JS_CFLAGS, JS_LDFLAGS} = case os:type() of
-    {win32, _} when SMVsn == "1.8.5" ->
-        {
-            "/DXP_WIN",
-            "mozjs185-1.0.lib"
-        };
-    {unix, _} when SMVsn == "1.8.5" ->
-        {
-            "-DXP_UNIX -I/usr/include/js -I/usr/local/include/js",
-            "-L/usr/local/lib -lmozjs185 -lm"
-        };
-    {win32, _} when SMVsn == "60" ->
-        {
-            "/DXP_WIN",
-            "mozjs-60.lib"
-        };
-    {unix, darwin} when SMVsn == "60" ->
-        {
-            "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14",
-            "-L/usr/local/lib -lmozjs-60 -lm -std=c++14 -lc++"
-        };
-    {unix, _} when SMVsn == "60" ->
-        {
-            "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm"
-        };
-    {unix, _} when SMVsn == "68" ->
-        {
-            "-DXP_UNIX -I/usr/include/mozjs-68 -I/usr/local/include/mozjs-68 -std=c++14 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -std=c++14 -lmozjs-68 -lm"
-        };
-    {unix, _} when SMVsn == "78" ->
-        {
-            "-DXP_UNIX -I/usr/include/mozjs-78 -I/usr/local/include/mozjs-78 -std=c++17 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -std=c++17 -lmozjs-78 -lm"
-        };
-    {unix, _} when SMVsn == "86" ->
-        {
-            "-DXP_UNIX -I/usr/include/mozjs-86 -I/usr/local/include/mozjs-86 -I/opt/homebrew/include/mozjs-86/ -std=c++17 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-86 -lm"
-        };
-    {unix, _} when SMVsn == "91" ->
-        {
-            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-91 -I/usr/local/include/mozjs-91 -I/opt/homebrew/include/mozjs-91/ -std=c++17 -Wno-invalid-offsetof",
-            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-91 -lm"
-        };
-    {win32, _} when SMVsn == "91" ->
-        {
-            "/std:c++17 /DXP_WIN",
-            "$LDFLAGS mozjs-91.lib"
-        }
-end.
+CouchJSSrc =
+    case SMVsn of
+        "1.8.5" -> ["priv/couch_js/1.8.5/*.c"];
+        "60" -> ["priv/couch_js/60/*.cpp"];
+        "68" -> ["priv/couch_js/68/*.cpp"];
+        "78" -> ["priv/couch_js/86/*.cpp"];
+        "86" -> ["priv/couch_js/86/*.cpp"];
+        "91" -> ["priv/couch_js/86/*.cpp"]
+    end.
 
-CouchJSSrc = case SMVsn of
-    "1.8.5" -> ["priv/couch_js/1.8.5/*.c"];
-    "60" -> ["priv/couch_js/60/*.cpp"];
-    "68" -> ["priv/couch_js/68/*.cpp"];
-    "78" -> ["priv/couch_js/86/*.cpp"];
-    "86" -> ["priv/couch_js/86/*.cpp"];
-    "91" -> ["priv/couch_js/86/*.cpp"]
-end.
+CouchJSEnv =
+    case SMVsn of
+        "1.8.5" ->
+            [
+                {"CFLAGS", JS_CFLAGS},
+                {"LDFLAGS", JS_LDFLAGS}
+            ];
+        _ ->
+            [
+                {"CXXFLAGS", JS_CFLAGS},
+                {"LDFLAGS", JS_LDFLAGS}
+            ]
+    end.
 
-CouchJSEnv = case SMVsn of
-    "1.8.5" ->
-        [
-            {"CFLAGS", JS_CFLAGS},
-            {"LDFLAGS", JS_LDFLAGS}
-        ];
-    _ ->
-        [
-            {"CXXFLAGS", JS_CFLAGS},
-            {"LDFLAGS", JS_LDFLAGS}
-        ]
-end.
-
-IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
-          {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}].
-IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include"},
-                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib"}].
-IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
-             {"LDFLAGS", "-L/usr/local/lib"}].
-IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
-             {"LDFLAGS", "$LDFLAGS icuin.lib icudt.lib icuuc.lib"}].
+IcuEnv = [
+    {"DRV_CFLAGS", "$DRV_CFLAGS -DPIC -O2 -fno-common"},
+    {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}
+].
+IcuDarwinEnv = [
+    {"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include"},
+    {"LDFLAGS", "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib"}
+].
+IcuBsdEnv = [
+    {"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
+    {"LDFLAGS", "-L/usr/local/lib"}
+].
+IcuWinEnv = [
+    {"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
+    {"LDFLAGS", "$LDFLAGS icuin.lib icudt.lib icuuc.lib"}
+].
 
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
 BaseSpecs = [
-        %% couchjs
-        {".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]},
-        % ejson_compare
-        {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
-        {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
-        {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
-        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
+    %% couchjs
+    {".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]},
+    % ejson_compare
+    {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
+    {"linux", ComparePath, CompareSrc, [{env, IcuEnv}]},
+    {"bsd", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
+    {"win32", ComparePath, CompareSrc, [{env, IcuWinEnv}]}
 ].
 
-SpawnSpec = [
-    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
-].
+SpawnSpec =
+    case erlang:function_exported(rebar3, main, 1) of
+        % rebar3
+        true ->
+            [{"src/couch/priv/couchspawnkillable", ["src/couch/priv/spawnkillable/*.c"]}];
+        % mix
+        false ->
+            [{"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}]
+    end.
 
 %% hack required until switch to enc/rebar3
 PortEnvOverrides = [
     {"win32", "EXE_LINK_CXX_TEMPLATE",
-    "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"}
+        "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"}
 ].
 
-PortSpecs = case os:type() of
-    {win32, _} ->
-        BaseSpecs ++ SpawnSpec;
-    _ ->
-        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
-        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
-        os:cmd("chmod +x priv/couchspawnkillable"),
-        BaseSpecs
-end.
+PortSpecs =
+    case os:type() of
+        {win32, _} ->
+            BaseSpecs ++ SpawnSpec;
+        _ ->
+            case erlang:function_exported(rebar3, main, 1) of
+                % rebar3
+                true ->
+                    {ok, CSK} = file:read_file(
+                        "src/couch/priv/spawnkillable/couchspawnkillable.sh"
+                    ),
+                    ok = CopyIfDifferent("src/couch/priv/couchspawnkillable", CSK),
+                    os:cmd("chmod +x src/couch/priv/couchspawnkillable");
+                % mix
+                false ->
+                    {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
+                    ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
+                    os:cmd("chmod +x priv/couchspawnkillable")
+            end,
+            BaseSpecs
+    end.
 PlatformDefines = [
-   {platform_define, "win32", 'WINDOWS'}
+    {platform_define, "win32", 'WINDOWS'}
 ].
+
+DepDescs = [
+    %% Independent Apps
+    {config, "config", {tag, "2.1.9"}},
+    {b64url, "b64url", {tag, "1.0.3"}},
+    {ets_lru, "ets-lru", {tag, "1.1.0"}},
+    {khash, {url, "https://github.com/jiahuili430/couchdb-khash"}, {branch, "82-rebar3"}},
+    {snappy, {url, "https://github.com/jiahuili430/couchdb-snappy.git"}, {branch, "82-rebar3"}},
+
+    %% Non-Erlang deps
+    {docs, {url, "https://github.com/jiahuili430/couchdb-documentation"}, {branch, "82-rebar3"}},
+    %% Third party deps
+    {snappy, {url, "https://github.com/jiahuili430/couchdb-folsom.git"}, {branch, "82-rebar3"}},
+    {hyper, {url, "https://github.com/jiahuili430/couchdb-hyper.git"}, {branch, "82-rebar3"}},
+    {ibrowse, "ibrowse", {tag, "CouchDB-4.4.2-5"}},
+    {jiffy, "jiffy", {tag, "1.1.1"}},
+    {mochiweb, "mochiweb", {tag, "v3.0.0"}},
+    {meck, "meck", {tag, "0.9.2"}},
+    {recon, "recon", {tag, "2.5.2"}}
+].
+
+WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
+
+OptionalDeps =
+    case WithProper of
+        true ->
+            [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.4"}}];
+        false ->
+            []
+    end.
+
+BaseUrl = "https://github.com/apache/".
+
+MakeDep = fun
+    ({AppName, {url, Url}, Version}) ->
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, {url, Url}, Version, Options}) ->
+        {AppName, ".*", {git, Url, Version}, Options};
+    ({AppName, RepoName, Version}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}};
+    ({AppName, RepoName, Version, Options}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, ".*", {git, Url, Version}, Options}
+end.
+
 AddConfig = [
+    {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
+    {plugins, [{pc, "~> 1.0"}]},
+    {artifacts, [
+        "priv/couch_ejson_compare.so",
+        "priv/couchjs",
+        "priv/couchspawnkillable"
+    ]},
+    {provider_hooks, [
+        {post, [
+            {compile, {pc, compile}},
+            {clean, {pc, clean}}
+        ]}
+    ]},
     {port_specs, PortSpecs},
-    {erl_opts, PlatformDefines ++ [
-        {d, 'COUCHDB_VERSION', Version},
-        {d, 'COUCHDB_GIT_SHA', GitSha},
-        {d, 'COUCHDB_SPIDERMONKEY_VERSION', SMVsn},
-        {i, "../"}
-    ] ++ MD5Config ++ ProperConfig},
+    {erl_opts,
+        PlatformDefines ++
+            [
+                {d, 'COUCHDB_VERSION', Version},
+                {d, 'COUCHDB_GIT_SHA', GitSha},
+                {d, 'COUCHDB_SPIDERMONKEY_VERSION', SMVsn},
+                {d, 'WITH_PROPER'},
+                {i, "../"}
+            ] ++ MD5Config},
     {port_env, PortEnvOverrides},
     {eunit_compile_opts, PlatformDefines}
 ].
 
-lists:foldl(fun({K, V}, CfgAcc) ->
-    case lists:keyfind(K, 1, CfgAcc) of
-        {K, Existent} when is_list(Existent) andalso is_list(V) ->
-            lists:keystore(K, 1, CfgAcc, {K, Existent ++ V});
-        false ->
-            lists:keystore(K, 1, CfgAcc, {K, V})
-    end
-end, CONFIG, AddConfig).
+lists:foldl(
+    fun({K, V}, CfgAcc) ->
+        case lists:keyfind(K, 1, CfgAcc) of
+            {K, Existent} when is_list(Existent) andalso is_list(V) ->
+                lists:keystore(K, 1, CfgAcc, {K, Existent ++ V});
+            false ->
+                lists:keystore(K, 1, CfgAcc, {K, V})
+        end
+    end,
+    CONFIG,
+    AddConfig
+).

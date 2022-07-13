@@ -12,7 +12,7 @@
 
 {application, setup,
  [
-  {description, ""},
+  {description, "Manages the setting up of CouchDB clusters."},
   {vsn, "1"},
   {registered, []},
   {applications, [

@@ -1,0 +1,7 @@
+{application, ic, [
+    {description, "rebar3 ic plugin"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications, [kernel, stdlib]},
+    {env, []}
+]}.

@@ -130,3 +130,9 @@ test/javascript/junit.xml
 /src/httpotion/
 /src/jason/
 /src/junit_formatter/
+
+.idea
+src/erlfmt_parse.erl
+*.lock
+*.crashdump
+*.log

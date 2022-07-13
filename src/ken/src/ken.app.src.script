@@ -29,7 +29,7 @@ Applications =
 
 {application, ken,
  [
-  {description, ""},
+  {description, "Ken builds views and search indexes automatically."},
   {vsn, git},
   {registered, []},
   {applications, Applications},

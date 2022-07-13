@@ -140,8 +140,7 @@ defmodule CouchDBTest.Mixfile do
       "khash",
       "hyper",
       "fauxton",
-      "folsom",
-      "hqueue"
+      "folsom"
     ]
 
     deps |> Enum.map(fn app -> "src/#{app}" end)

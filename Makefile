@@ -16,7 +16,8 @@
 
 include version.mk
 
-REBAR?=$(shell echo `pwd`/bin/rebar)
+REBAR3?=$(shell echo `pwd`/bin/rebar3)
+BASE_DIR?=$(shell echo `pwd`/_build/default)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
@@ -120,7 +121,7 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) compile
 	@cp src/couch/priv/couchjs bin/
 
 
@@ -129,7 +130,7 @@ couch: config.erl
 ifeq ($(IN_RELEASE), true)
 docs: share/docs/html
 else
-docs: src/docs/build
+docs: docs/build
 endif
 
 .PHONY: fauxton
@@ -139,9 +140,9 @@ fauxton: share/www
 
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
-escriptize: couch
-	@$(REBAR) -r escriptize apps=weatherreport
-	@cp src/weatherreport/weatherreport bin/weatherreport
+escriptize: config.erl
+	@$(REBAR3) escriptize -a weatherreport
+	@cp $(BASE_DIR)/bin/weatherreport bin/weatherreport
 
 
 ################################################################################
@@ -171,10 +172,8 @@ eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
-	@for dir in $(subdirs); do \
-            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-        done
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) ic setup_eunit 2> /dev/null
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) eunit 2> /dev/null
 
 
 .PHONY: exunit
@@ -372,10 +371,10 @@ dist: all derived
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
-	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
+	@cp -r $(BASE_DIR)/lib/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
 
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
-	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
+	@cp $(BASE_DIR)/lib/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
 	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"
@@ -434,18 +433,15 @@ install: release
 .PHONY: clean
 # target: clean - Remove build artifacts
 clean:
-	@$(REBAR) -r clean
-	@rm -rf .rebar/
+	@$(REBAR3) clean
+	@rm -rf _build
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
-	@rm -rf src/*/ebin
-	@rm -rf src/*/.rebar
 	@rm -rf src/*/priv/*.so
 	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-coffee.js
 	@rm -rf tmp dev/data dev/lib dev/logs
 	@rm -rf src/mango/.venv
-	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
@@ -486,15 +482,17 @@ config.erl:
 	@false
 
 
-src/docs/build:
+docs/build:
 ifeq ($(with_docs), 1)
-	@cd src/docs; $(MAKE)
+	@cd $(BASE_DIR)/lib/docs; $(MAKE)
 endif
 
 
 share/www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
+	@echo ${PWD}
+	@ls src | grep fauxton
 	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
 
