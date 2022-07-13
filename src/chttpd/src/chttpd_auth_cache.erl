@@ -155,7 +155,9 @@ spawn_changes(Since) ->
     Pid.
 
 listen_for_changes(Since) ->
-    ensure_auth_ddoc_exists(dbname(), <<"_design/_auth">>),
+    DbName = dbname(),
+    erlang:put(io_priority, {system, DbName}),
+    ensure_auth_ddoc_exists(DbName, <<"_design/_auth">>),
     CBFun = fun ?MODULE:changes_callback/2,
     Args = #changes_args{
         feed = "continuous",
@@ -163,7 +165,7 @@ listen_for_changes(Since) ->
         heartbeat = true,
         filter = {default, main_only}
     },
-    fabric:changes(dbname(), CBFun, Since, Args).
+    fabric:changes(DbName, CBFun, Since, Args).
 
 changes_callback(waiting_for_updates, Acc) ->
     {ok, Acc};
