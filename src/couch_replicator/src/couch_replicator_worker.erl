@@ -24,7 +24,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
--include("couch_replicator.hrl").
 
 % TODO: maybe make both buffer max sizes configurable
 

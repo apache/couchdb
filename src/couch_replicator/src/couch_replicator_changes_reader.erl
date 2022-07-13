@@ -38,12 +38,6 @@ start_link(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
                 ChangesQueue,
                 Options
             )
-        end)};
-start_link(StartSeq, Db, ChangesQueue, Options) ->
-    Parent = self(),
-    {ok,
-        spawn_link(fun() ->
-            ?MODULE:read_changes(Parent, StartSeq, Db, ChangesQueue, Options)
         end)}.
 
 read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->

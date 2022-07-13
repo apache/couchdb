@@ -58,11 +58,7 @@
 -define(MIN_URL_LEN, 200).
 
 db_uri(#httpdb{url = Url}) ->
-    couch_util:url_strip_password(Url);
-db_uri(DbName) when is_binary(DbName) ->
-    ?b2l(DbName);
-db_uri(Db) ->
-    db_uri(couch_db:name(Db)).
+    couch_util:url_strip_password(Url).
 
 db_open(Db) ->
     db_open(Db, false, []).
