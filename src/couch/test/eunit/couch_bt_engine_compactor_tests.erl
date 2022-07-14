@@ -26,6 +26,7 @@ setup() ->
     DbName.
 
 teardown(DbName) when is_binary(DbName) ->
+    meck:unload(),
     couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
@@ -39,7 +40,8 @@ basic_compaction_test_() ->
             fun setup/0,
             fun teardown/1,
             [
-                fun compaction_resume/1
+                fun compaction_resume/1,
+                fun is_compacting_works/1
             ]
         }
     }.
