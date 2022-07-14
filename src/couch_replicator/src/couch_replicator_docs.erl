@@ -396,7 +396,7 @@ rep_user_ctx({RepDoc}) ->
             }
     end.
 
--spec parse_rep_db({[_]} | binary(), binary(), [_]) -> #httpd{} | binary().
+-spec parse_rep_db({[_]} | binary(), [_] | binary(), [_]) -> #httpdb{} | no_return().
 parse_rep_db({Props}, Proxy, Options) ->
     ProxyParams = parse_proxy_params(Proxy),
     ProxyURL =

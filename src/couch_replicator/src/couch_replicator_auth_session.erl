@@ -207,9 +207,7 @@ init_state(#httpdb{} = HttpDb) ->
                     {error, Error}
             end;
         {error, missing_credentials} ->
-            ignore;
-        {error, Error} ->
-            {error, Error}
+            ignore
     end.
 
 -spec extract_creds(#httpdb{}) ->
@@ -428,7 +426,7 @@ parse_max_age(CaseInsKVs) ->
     end.
 
 -spec maybe_update_cookie(headers(), #state{}) ->
-    {ok, string()} | {error, term()}.
+    {ok, #state{}} | {error, term()}.
 maybe_update_cookie(ResponseHeaders, State) ->
     case parse_cookie(ResponseHeaders) of
         {ok, MaxAge, Cookie} ->
