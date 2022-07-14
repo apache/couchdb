@@ -165,7 +165,7 @@ normalize_rep(#rep{} = Rep) ->
         db_name = Rep#rep.db_name
     }.
 
--spec ejson_state_info(binary() | nil) -> binary() | null.
+-spec ejson_state_info([_] | binary() | nil) -> tuple() | null.
 ejson_state_info(nil) ->
     null;
 ejson_state_info(Info) when is_binary(Info) ->
@@ -198,12 +198,12 @@ get_basic_auth_creds(#httpdb{auth_props = AuthProps}) ->
             {undefined, undefined}
     end.
 
--spec remove_basic_auth_creds(#httpd{}) -> #httpdb{}.
+-spec remove_basic_auth_creds(#httpdb{}) -> #httpdb{}.
 remove_basic_auth_creds(#httpdb{auth_props = Props} = HttpDb) ->
     Props1 = lists:keydelete(<<"basic">>, 1, Props),
     HttpDb#httpdb{auth_props = Props1}.
 
--spec set_basic_auth_creds(string(), string(), #httpd{}) -> #httpdb{}.
+-spec set_basic_auth_creds(string(), string(), #httpdb{}) -> #httpdb{}.
 set_basic_auth_creds(undefined, undefined, #httpdb{} = HttpDb) ->
     HttpDb;
 set_basic_auth_creds(User, Pass, #httpdb{} = HttpDb) when

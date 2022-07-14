@@ -38,7 +38,7 @@
 % ?WORKER_TIMEOUT_MSEC timeout period.A timeout is considered a
 %`temporary_error`. Result will be sent as the `Reason` in the {'DOWN',...}
 % message.
--spec spawn_worker(db_doc_id(), #rep{}, seconds(), reference()) -> pid().
+-spec spawn_worker(db_doc_id(), #rep{}, seconds(), reference()) -> pid() | no_return().
 spawn_worker(Id, Rep, WaitSec, WRef) ->
     {Pid, _Ref} = spawn_monitor(fun() ->
         worker_fun(Id, Rep, WaitSec, WRef)

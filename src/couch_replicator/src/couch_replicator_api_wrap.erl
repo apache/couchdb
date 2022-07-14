@@ -206,6 +206,7 @@ get_missing_revs(#httpdb{} = Db, IdRevs) ->
         end
     ).
 
+-spec open_doc_revs(#httpdb{}, binary(), list(), list(), function(), any()) -> no_return().
 open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
     Path = encode_doc_id(Id),
     QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
@@ -451,11 +452,11 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
         ],
         fun
             (201, _, Results) when is_list(Results) ->
-                {ok, bulk_results_to_errors(DocList, Results, remote)};
+                {ok, bulk_results_to_errors(Results)};
             (413, _, _) ->
                 {error, request_body_too_large};
             (417, _, Results) when is_list(Results) ->
-                {ok, bulk_results_to_errors(DocList, Results, remote)};
+                {ok, bulk_results_to_errors(Results)};
             (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
                 {error, {bulk_docs_failed, ErrCode, ErrMsg}}
         end
@@ -898,39 +899,7 @@ json_to_doc_info({Props}) ->
             }
     end.
 
-bulk_results_to_errors(Docs, {ok, Results}, interactive_edit) ->
-    lists:reverse(
-        lists:foldl(
-            fun
-                ({_, {ok, _}}, Acc) ->
-                    Acc;
-                ({#doc{id = Id, revs = {Pos, [RevId | _]}}, Error}, Acc) ->
-                    {_, Error, Reason} = couch_httpd:error_info(Error),
-                    [
-                        {[
-                            {id, Id},
-                            {rev, rev_to_str({Pos, RevId})},
-                            {error, Error},
-                            {reason, Reason}
-                        ]}
-                        | Acc
-                    ]
-            end,
-            [],
-            lists:zip(Docs, Results)
-        )
-    );
-bulk_results_to_errors(Docs, {ok, Results}, replicated_changes) ->
-    bulk_results_to_errors(Docs, {aborted, Results}, interactive_edit);
-bulk_results_to_errors(_Docs, {aborted, Results}, interactive_edit) ->
-    lists:map(
-        fun({{Id, Rev}, Err}) ->
-            {_, Error, Reason} = couch_httpd:error_info(Err),
-            {[{id, Id}, {rev, rev_to_str(Rev)}, {error, Error}, {reason, Reason}]}
-        end,
-        Results
-    );
-bulk_results_to_errors(_Docs, Results, remote) ->
+bulk_results_to_errors(Results) ->
     lists:reverse(
         lists:foldl(
             fun({Props}, Acc) ->

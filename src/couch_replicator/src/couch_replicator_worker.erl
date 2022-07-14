@@ -256,6 +256,7 @@ remote_process_batch([{Id, Revs, PAs} | Rest], Parent) ->
     ),
     remote_process_batch(Rest, Parent).
 
+-spec spawn_doc_reader(#httpdb{}, #httpdb{}, {list(), list(), list()}) -> no_return().
 spawn_doc_reader(Source, Target, FetchParams) ->
     Parent = self(),
     spawn_link(fun() ->
@@ -264,6 +265,7 @@ spawn_doc_reader(Source, Target, FetchParams) ->
         )
     end).
 
+-spec fetch_doc(#httpd{}, {list(), list(), list()}, function(), any()) -> no_return().
 fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     try
         couch_replicator_api_wrap:open_doc_revs(

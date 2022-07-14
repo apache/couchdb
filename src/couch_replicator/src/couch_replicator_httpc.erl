@@ -322,6 +322,7 @@ discard_message(ReqId, Worker, Count) ->
         exit({timeout, ibrowse_stream_cleanup})
     end.
 
+-spec maybe_retry(any(), pid(), #httpdb{}, list()) -> no_return().
 maybe_retry(Error, Worker, #httpdb{retries = 0} = HttpDb, Params) ->
     report_error(Worker, HttpDb, Params, {error, Error});
 maybe_retry(

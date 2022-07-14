@@ -809,7 +809,7 @@ ejson_url(#httpdb{} = Httpdb) ->
 ejson_url(DbName) when is_binary(DbName) ->
     DbName.
 
--spec job_ejson(#job{}) -> {[_ | _]}.
+-spec job_ejson(#job{}) -> {[_ | _]} | no_return().
 job_ejson(Job) ->
     Rep = Job#job.rep,
     Source = ejson_url(Rep#rep.source),
