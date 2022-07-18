@@ -50,7 +50,7 @@ defmodule CouchDBTest.Mixfile do
     [
       app: :couchdbtest,
       version: "0.1.0",
-      elixir: "~> 1.5",
+      elixir: "~> 1.13",
       lockfile: Path.expand("mix.lock", __DIR__),
       deps_path: Path.expand("src", __DIR__),
       build_path: Path.expand("_build", __DIR__),
@@ -88,12 +88,17 @@ defmodule CouchDBTest.Mixfile do
       {:junit_formatter, "~> 3.0", only: [:dev, :test, :integration]},
       {:httpotion, ">= 3.1.3", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.12", only: :test},
-      {:b64url, path: Path.expand("src/b64url", __DIR__)},
-      {:jiffy, path: Path.expand("src/jiffy", __DIR__)},
-      {:jwtf, path: Path.expand("src/jwtf", __DIR__)},
-      {:ibrowse, path: Path.expand("src/ibrowse", __DIR__), override: true},
+      {:b64url, path: path("b64url")},
+      {:jiffy, path: path("jiffy")},
+      {:jwtf, path: path("jwtf")},
+      {:ibrowse, path: path("ibrowse"), override: true},
       {:credo, "~> 1.6.4", only: [:dev, :test, :integration], runtime: false}
     ]
+  end
+
+  defp path(app) do
+    lib_dir = Path.expand("src", __DIR__)
+    Path.expand(app, lib_dir)
   end
 
   def get_test_paths(:test) do
@@ -140,8 +145,7 @@ defmodule CouchDBTest.Mixfile do
       "khash",
       "hyper",
       "fauxton",
-      "folsom",
-      "hqueue"
+      "folsom"
     ]
 
     deps |> Enum.map(fn app -> "src/#{app}" end)
