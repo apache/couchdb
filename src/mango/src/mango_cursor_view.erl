@@ -229,9 +229,11 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             Result =
                 case mango_idx:def(Idx) of
                     all_docs ->
+                        couch_stats:increment_counter([mango_cursor, view, all_docs]),
                         CB = fun ?MODULE:handle_all_docs_message/2,
                         fabric:all_docs(Db, DbOpts, CB, Cursor, Args);
                     _ ->
+                        couch_stats:increment_counter([mango_cursor, view, idx]),
                         CB = fun ?MODULE:handle_message/2,
                         % Normal view
                         DDoc = ddocid(Idx),

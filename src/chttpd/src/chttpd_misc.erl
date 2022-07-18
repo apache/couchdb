@@ -20,6 +20,7 @@
     handle_replicate_req/1,
     handle_reload_query_servers_req/1,
     handle_task_status_req/1,
+    handle_resource_status_req/1,
     handle_up_req/1,
     handle_utils_dir_req/1,
     handle_utils_dir_req/2,
@@ -228,6 +229,20 @@ handle_task_status_req(#httpd{method = 'GET'} = Req) ->
     ),
     send_json(Req, lists:sort(Response));
 handle_task_status_req(Req) ->
+    send_method_not_allowed(Req, "GET,HEAD").
+
+handle_resource_status_req(#httpd{method = 'GET'} = Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
+    {Resp, Bad} = rpc:multicall(erlang, apply, [
+        fun() ->
+            {node(), couch_stats_resource_tracker:active()}
+        end,
+        []
+    ]),
+    %% TODO: incorporate Bad responses
+    io:format("ACTIVE RESP: ~p~nBAD RESP: ~p~n", [Resp, Bad]),
+    send_json(Req, {Resp});
+handle_resource_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_replicate_req(#httpd{method = 'POST', user_ctx = Ctx, req_body = PostBody} = Req) ->

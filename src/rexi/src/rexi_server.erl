@@ -136,9 +136,12 @@ init_p(From, MFA) ->
     string() | undefined
 ) -> any().
 init_p(From, {M, F, A}, Nonce) ->
+    MFA = {M, F, length(A)},
     put(rexi_from, From),
-    put('$initial_call', {M, F, length(A)}),
+    put('$initial_call', MFA),
     put(nonce, Nonce),
+    couch_stats:create_context(From, MFA, Nonce),
+    couch_stats:maybe_track_rexi_init_p(MFA),
     try
         apply(M, F, A)
     catch

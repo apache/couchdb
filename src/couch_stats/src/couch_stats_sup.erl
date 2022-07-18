@@ -29,6 +29,7 @@ init([]) ->
         {
             {one_for_one, 5, 10}, [
                 ?CHILD(couch_stats_server, worker),
+                ?CHILD(couch_stats_resource_tracker, worker),
                 ?CHILD(couch_stats_process_tracker, worker)
             ]
         }}.

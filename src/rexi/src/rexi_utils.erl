@@ -83,7 +83,27 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             end;
         {rexi, '$rexi_ping'} ->
             {ok, Acc0};
+        {Ref, Msg, {delta, Delta}} ->
+            io:format("[~p]GOT DELTA: ~p -- ~p~n", [self(), Delta, Msg]),
+            couch_stats_resource_tracker:accumulate_delta(Delta),
+            case lists:keyfind(Ref, Keypos, RefList) of
+            false ->
+                % this was some non-matching message which we will ignore
+                {ok, Acc0};
+            Worker ->
+                Fun(Msg, Worker, Acc0)
+            end;
+        {Ref, From, Msg, {delta, Delta}} ->
+            io:format("[~p]GOT DELTA: ~p -- ~p~n", [self(), Delta, Msg]),
+            couch_stats_resource_tracker:accumulate_delta(Delta),
+            case lists:keyfind(Ref, Keypos, RefList) of
+            false ->
+                {ok, Acc0};
+            Worker ->
+                Fun(Msg, {Worker, From}, Acc0)
+            end;
         {Ref, Msg} ->
+            %%io:format("GOT NON DELTA MSG: ~p~n", [Msg]),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     % this was some non-matching message which we will ignore
@@ -92,6 +112,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                     Fun(Msg, Worker, Acc0)
             end;
         {Ref, From, Msg} ->
+            %%io:format("GOT NON DELTA MSG: ~p~n", [Msg]),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
