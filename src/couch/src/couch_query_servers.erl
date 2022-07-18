@@ -542,6 +542,8 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
         {ok, filter_docs_int(Db, DDoc, FName, JsonReq, JsonDocs)}
     catch
         throw:{os_process_error, {exit_status, 1}} ->
+            %% TODO: wire in csrt tracking
+            couch_stats:increment_counter([couchdb, query_server, js_filter_error]),
             %% batch used too much memory, retry sequentially.
             Fun = fun(JsonDoc) ->
                 filter_docs_int(Db, DDoc, FName, JsonReq, [JsonDoc])
@@ -550,6 +552,12 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
     end.
 
 filter_docs_int(Db, DDoc, FName, JsonReq, JsonDocs) ->
+    %% Count usage in _int version as this can be repeated for OS error
+    %% Pros & cons... might not have actually processed `length(JsonDocs)` docs
+    %% but it certainly undercounts if we count in `filter_docs/5` above
+    %% TODO: wire in csrt tracking
+    couch_stats:increment_counter([couchdb, query_server, js_filter]),
+    couch_stats:increment_counter([couchdb, query_server, js_filtered_docs], length(JsonDocs)),
     [true, Passes] = ddoc_prompt(
         Db,
         DDoc,
