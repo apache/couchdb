@@ -2,8 +2,6 @@
   "CookieAuthTest": [
     "cookie auth"
   ],
-  "ProxyAuthTest": [
-  ],
   "ReaderACLTest": [
     "unrestricted db can be read"
   ],
