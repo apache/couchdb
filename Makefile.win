@@ -109,7 +109,7 @@ all: couch fauxton docs
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile $(COMPILE_OPTS)
-	@copy src\couch\priv\couchjs.exe bin
+	@copy apps\couch\priv\couchjs.exe bin
 
 
 .PHONY: docs
@@ -117,7 +117,7 @@ couch: config.erl
 ifeq ($(IN_RELEASE), true)
 docs: share\docs\html
 else
-docs: src\docs\build
+docs: apps\docs\build
 endif
 
 .PHONY: fauxton
@@ -140,7 +140,7 @@ check: all python-black
 ifdef apps
 subdirs = $(apps)
 else
-subdirs=$(shell dir /b src)
+subdirs=$(shell dir /b apps)
 endif
 
 .PHONY: eunit
@@ -157,7 +157,7 @@ eunit: couch
 # target: exunit - Run ExUnit tests
 exunit: export BUILDDIR = $(shell echo %cd%)
 exunit: export MIX_ENV=test
-exunit: export ERL_LIBS = $(shell echo %cd%)\src
+exunit: export ERL_LIBS = $(shell echo %cd%)\apps
 exunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
@@ -191,16 +191,16 @@ python-black: .venv/bin/black
 		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
 	@$(PYTHON) -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe --check \
-		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux dev\run dev\format_*.py src\mango\test src\docs\src\conf.py src\docs\ext .
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|apps/erlfmt|apps/rebar/pr2relnotes.py|apps/fauxton" \
+		build-aux dev\run dev\format_*.py apps\mango\test apps\docs\src\conf.py apps\docs\ext .
 
 python-black-update: .venv/bin/black
 	@$(PYTHON) -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
 	@$(PYTHON) -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe \
-		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux dev\run dev\format_*.py src\mango\test src\docs\src\conf.py src\docs\ext .
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|apps/erlfmt|apps/rebar/pr2relnotes.py|apps/fauxton" \
+		build-aux dev\run dev\format_*.py apps\mango\test apps\docs\src\conf.py apps\docs\ext .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -259,10 +259,10 @@ check-qs:
 .PHONY: mango-test
 mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
-	@cd src\mango && \
+	@cd apps\mango && \
 		python.exe -m venv .venv && \
 		.venv\Scripts\pip.exe install -r requirements.txt
-	@cd src\mango && .venv\Scripts\python.exe ..\..\dev\run -n 1 --admin=testuser:testpass .venv\Scripts\nose2
+	@cd apps\mango && .venv\Scripts\python.exe ..\..\dev\run -n 1 --admin=testuser:testpass .venv\Scripts\nose2
 
 
 ################################################################################
@@ -307,10 +307,10 @@ dist: all derived
 
 	@copy -r share\www apache-couchdb-$(COUCHDB_VERSION)\share
 	@mkdir apache-couchdb-$(COUCHDB_VERSION)\share\docs\html
-	@copy -r src\docs\build\html apache-couchdb-$(COUCHDB_VERSION)\share\docs
+	@copy -r apps\docs\build\html apache-couchdb-$(COUCHDB_VERSION)\share\docs
 
 	@mkdir apache-couchdb-$(COUCHDB_VERSION)\share\docs\man
-	@copy src\docs\build\man\apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)\share\docs\man
+	@copy apps\docs\build\man\apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)\share\docs\man
 
 	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo 'Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz'
@@ -323,7 +323,7 @@ release: all
 	@echo 'Installing CouchDB into rel\couchdb\ ...'
 	-@rmdir /s/q rel\couchdb
 	@$(REBAR) generate
-	@copy src\couch\priv\couchjs.exe rel\couchdb\bin
+	@copy apps\couch\priv\couchjs.exe rel\couchdb\bin
 
 ifeq ($(with_fauxton), 1)
 	-@mkdir rel\couchdb\share
@@ -337,8 +337,8 @@ ifeq ($(IN_RELEASE), true)
 	@xcopy share\docs\html rel\couchdb\share\www\docs /E /I
 	@copy share\docs\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
 else
-	@xcopy src\docs\build\html rel\couchdb\share\www\docs /E /I
-	@copy src\docs\build\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
+	@xcopy apps\docs\build\html rel\couchdb\share\www\docs /E /I
+	@copy apps\docs\build\man\apachecouchdb.1 rel\couchdb\share\docs\couchdb.1
 endif
 endif
 
@@ -370,17 +370,17 @@ clean:
 	@$(REBAR) -r clean
 	-@rmdir /s/q .rebar
 	-@del /f/q bin\couchjs.exe
-	-@rmdir /s/q src\*\ebin
-	-@rmdir /s/q src\*\.rebar
-	-@del /f/q/s src\*.dll
-	-@del /f/q src\couch\priv\*.exe
+	-@rmdir /s/q apps\*\ebin
+	-@rmdir /s/q apps\*\.rebar
+	-@del /f/q/s apps\*.dll
+	-@del /f/q apps\couch\priv\*.exe
 	-@del /f/q share\server\main.js share\server\main-coffee.js
 	-@rmdir /s/q tmp
 	-@rmdir /s/q dev\data
 	-@rmdir /s/q dev\lib
 	-@rmdir /s/q dev\logs
-	-@rmdir /s/q src\mango\.venv
-	-@del /f/q src\couch\priv\couch_js\config.h
+	-@rmdir /s/q apps\mango\.venv
+	-@del /f/q apps\couch\priv\couch_js\config.h
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log
 
 
@@ -395,7 +395,7 @@ ifneq ($(IN_RELEASE), true)
 # copied sources, generated docs, or fauxton
 	-@rmdir /s/q rel\couchdb
 	-@rmdir /s/q share\www
-	-@rmdir /s/q src\docs
+	-@rmdir /s/q apps\docs
 endif
 
 
@@ -425,17 +425,17 @@ config.erl:
 	@false
 
 
-src\docs\build:
+apps\docs\build:
 	@echo 'Building docs...'
 ifeq ($(with_docs), 1)
-	@cd src\docs && make.bat html && make.bat man
+	@cd apps\docs && make.bat html && make.bat man
 endif
 
 
 share\www:
 ifeq ($(with_fauxton), 1)
 	@echo 'Building Fauxton'
-	@cd src\fauxton && npm install && .\node_modules\.bin\grunt couchdb
+	@cd apps\fauxton && npm install && .\node_modules\.bin\grunt couchdb
 endif
 
 derived:

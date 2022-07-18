@@ -125,11 +125,11 @@ apps/jwtf/.rebar3/
 test/javascript/junit.xml
 
 /_build/
-/src/bunt
-/src/credo/
-/src/httpotion/
-/src/jason/
-/src/junit_formatter/
+/apps/bunt
+/apps/credo/
+/apps/httpotion/
+/apps/jason/
+/apps/junit_formatter/
 
 .idea
 *.lock

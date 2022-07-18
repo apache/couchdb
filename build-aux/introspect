@@ -45,7 +45,7 @@ introspect_diff(App, From, ToBranch) ->
     end.
 
 sh(App, Cmd) ->
-    Dir = lists:flatten(["src/", atom_to_list(App)]),
+    Dir = lists:flatten(["apps/", atom_to_list(App)]),
     Port = open_port({spawn, lists:flatten(Cmd)},
                      [{cd, Dir},
                       {line, 16384},

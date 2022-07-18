@@ -127,7 +127,7 @@ end
 
 class ExternalRunner < OSProcessRunner
   def self.run_command
-    "#{COUCH_ROOT}/src/couchdb/couchjs #{COUCH_ROOT}/share/server/echo.js"
+    "#{COUCH_ROOT}/apps/couchdb/couchjs #{COUCH_ROOT}/share/server/echo.js"
   end
 end
 

@@ -18,17 +18,17 @@ CURRENT_BRANCH=`git rev-parse --abbrev-ref HEAD`
 
 # copy sources over
 git archive ${CURRENT_BRANCH} | tar -xC ${REL_DIR}/ -f -
-cd src/
+cd apps/
 for repo in *; do
   cd ${repo}
   if [ -d ".git" ]; then
-    mkdir -p ../../${REL_DIR}/src/${repo}
+    mkdir -p ../../${REL_DIR}/apps/${repo}
     git_ish=`git rev-parse --short HEAD`
     git archive ${git_ish} \
-        | tar --exclude '*do_not_compile.erl' -xC ../../${REL_DIR}/src/${repo}/ -f -
+        | tar --exclude '*do_not_compile.erl' -xC ../../${REL_DIR}/apps/${repo}/ -f -
   fi
   set +e
-  grep -rl '{vsn, git}' ../../${REL_DIR}/src/${repo}/ 2>/dev/null \
+  grep -rl '{vsn, git}' ../../${REL_DIR}/apps/${repo}/ 2>/dev/null \
       | xargs sed -ie "s/{vsn, git}/{vsn, \"${VERSION}\"}/" 2>/dev/null
   set -e
   cd ..
