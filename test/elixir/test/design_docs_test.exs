@@ -482,8 +482,7 @@ defmodule DesignDocsTest do
           body: ddoc
         )
       retry_resp.status_code in [201, 202]
+      {:ok, _} = create_doc(db_name, %{_id: "doc1", value: 4})
     end)
-
-    {:ok, _} = create_doc(db_name, %{_id: "doc1", value: 4})
   end
 end
