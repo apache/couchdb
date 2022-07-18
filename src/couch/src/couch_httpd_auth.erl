@@ -189,7 +189,7 @@ proxy_auth_user(Req) ->
             Roles =
                 case header_value(Req, XHeaderRoles) of
                     undefined -> [];
-                    Else -> [?l2b(R) || R <- string:tokens(Else, ",")]
+                    Else -> re:split(Else, "\\s*,\\s*", [trim, {return, binary}])
                 end,
             case
                 chttpd_util:get_chttpd_auth_config_boolean(
