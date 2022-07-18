@@ -149,7 +149,7 @@ def generateNativeStage(platform) {
             error("Build step failed with error: ${err.getMessage()}")
           }
           finally {
-            junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+            junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/apps/mango/nosetests.xml, **/test/javascript/junit.xml'
             sh 'killall -9 beam.smp || true'
             sh 'rm -rf ${WORKSPACE}/*'
           }
@@ -195,7 +195,7 @@ def generateContainerStage(platform) {
                   error("Build step failed with error: ${err.getMessage()}")
                 }
                 finally {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/apps/mango/nosetests.xml, **/test/javascript/junit.xml'
                   sh 'rm -rf ${WORKSPACE}/*'
                 }
               }
@@ -357,7 +357,7 @@ pipeline {
               post {
                 always {
 */
-//                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+//                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/apps/mango/nosetests.xml, **/test/javascript/junit.xml'
 /*
                 }
                 success {

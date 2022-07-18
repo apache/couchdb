@@ -46,7 +46,7 @@ However, you do not need them if:
 If you intend to build Fauxton, you will also need to install its
 dependencies. After running ``./configure`` to download all of the
 dependent repositories, you can read about required dependencies in
-`src/fauxton/readme.md`. Typically, installing npm and node.js are
+`apps/fauxton/readme.md`. Typically, installing npm and node.js are
 sufficient to enable a Fauxton build.
 
 Here is a list of *optional* dependencies for various operating systems.
@@ -146,9 +146,9 @@ Developing
 Formatting
 ~~~~~~~~~~
 
-The ``erl`` files in ``src`` are formatted using erlfmt_. The checks are run
+The ``erl`` files in ``apps`` are formatted using erlfmt_. The checks are run
 for every PR in the CI. To run the checks locally, run ``make erlfmt-check``.
-To format the ``erl`` files in ``src``, run ``make erlfmt-format``.
+To format the ``erl`` files in ``apps``, run ``make erlfmt-format``.
 To use ``erlfmt`` for specific files only, use the executable ``bin/erlfmt``
 that is installed by ``configure``.
 

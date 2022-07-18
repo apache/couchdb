@@ -121,7 +121,7 @@ help:
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
-	@cp src/couch/priv/couchjs bin/
+	@cp apps/couch/priv/couchjs bin/
 
 
 .PHONY: docs
@@ -129,7 +129,7 @@ couch: config.erl
 ifeq ($(IN_RELEASE), true)
 docs: share/docs/html
 else
-docs: src/docs/build
+docs: apps/docs/build
 endif
 
 .PHONY: fauxton
@@ -141,7 +141,7 @@ fauxton: share/www
 # target: escriptize - Build CLI tools
 escriptize: couch
 	@$(REBAR) -r escriptize apps=weatherreport
-	@cp src/weatherreport/weatherreport bin/weatherreport
+	@cp apps/weatherreport/weatherreport bin/weatherreport
 
 
 ################################################################################
@@ -161,7 +161,7 @@ check: all python-black
 ifdef apps
 subdirs = $(apps)
 else
-subdirs=$(shell ls src)
+subdirs=$(shell ls apps)
 endif
 
 .PHONY: eunit
@@ -181,7 +181,7 @@ eunit: couch
 # target: exunit - Run ExUnit tests
 exunit: export BUILDDIR = $(shell pwd)
 exunit: export MIX_ENV=test
-exunit: export ERL_LIBS = $(shell pwd)/src
+exunit: export ERL_LIBS = $(shell pwd)/apps
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
@@ -221,16 +221,16 @@ python-black: .venv/bin/black
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
-		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/jiffy|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux/*.py dev/run dev/format_*.py src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|apps/erlfmt|apps/jiffy|apps/rebar/pr2relnotes.py|apps/fauxton" \
+		build-aux/*.py dev/run dev/format_*.py apps/mango/test/*.py apps/docs/src/conf.py apps/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
-		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|apps/rebar/pr2relnotes.py|apps/fauxton" \
+		build-aux/*.py dev/run apps/mango/test/*.py apps/docs/src/conf.py apps/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -296,7 +296,7 @@ check-qs:
 .PHONY: list-eunit-apps
 # target: list-eunit-apps - List EUnit target apps
 list-eunit-apps:
-	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl \
+	@find ./apps/ -type f -name *_test.erl -o -name *_tests.erl \
 		| cut -d '/' -f 3 \
 		| sort -u
 
@@ -304,7 +304,7 @@ list-eunit-apps:
 .PHONY: list-eunit-suites
 # target: list-eunit-suites - List EUnit target test suites
 list-eunit-suites:
-	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
+	@find ./apps/ -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
@@ -319,10 +319,10 @@ build-test:
 # target: mango-test - Run Mango tests
 mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
-	@cd src/mango && \
+	@cd apps/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose2'
+	@cd apps/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose2'
 
 
 .PHONY: weatherreport-test
@@ -372,10 +372,10 @@ dist: all derived
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
-	@cp -r src/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
+	@cp -r apps/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
 
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
-	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
+	@cp apps/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
 	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"
@@ -404,8 +404,8 @@ ifeq ($(IN_RELEASE), true)
 else
 	@mkdir -p rel/couchdb/share/www/docs/
 	@mkdir -p rel/couchdb/share/docs/
-	@cp -R src/docs/build/html/ rel/couchdb/share/www/docs
-	@cp src/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
+	@cp -R apps/docs/build/html/ rel/couchdb/share/www/docs
+	@cp apps/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
 endif
 endif
 
@@ -438,15 +438,15 @@ clean:
 	@rm -rf .rebar/
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
-	@rm -rf src/*/ebin
-	@rm -rf src/*/.rebar
-	@rm -rf src/*/priv/*.so
-	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
+	@rm -rf apps/*/ebin
+	@rm -rf apps/*/.rebar
+	@rm -rf apps/*/priv/*.so
+	@rm -rf apps/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-coffee.js
 	@rm -rf tmp dev/data dev/lib dev/logs
-	@rm -rf src/mango/.venv
-	@rm -f src/couch/priv/couchspawnkillable
-	@rm -f src/couch/priv/couch_js/config.h
+	@rm -rf apps/mango/.venv
+	@rm -f apps/couch/priv/couchspawnkillable
+	@rm -f apps/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
 
@@ -462,7 +462,7 @@ ifneq ($(IN_RELEASE), true)
 # copied sources, generated docs, or fauxton
 	@rm -rf rel/couchdb
 	@rm -rf share/www
-	@rm -rf src/docs
+	@rm -rf apps/docs
 endif
 
 
@@ -486,16 +486,16 @@ config.erl:
 	@false
 
 
-src/docs/build:
+apps/docs/build:
 ifeq ($(with_docs), 1)
-	@cd src/docs; $(MAKE)
+	@cd apps/docs; $(MAKE)
 endif
 
 
 share/www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
-	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
+	@cd apps/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
 
 

@@ -121,13 +121,13 @@ Below we present a few use cases where code-generation is really helpful.
 ## How to write ExUnit tests
 
 1. Create new file in test/exunit/ directory (the file name should match *_test.exs)
-2. In case it is a first file in the directory create test_helper.exs (look at src/couch/test/exunit/test_helper.exs to get an idea)
+2. In case it is a first file in the directory create test_helper.exs (look at apps/couch/test/exunit/test_helper.exs to get an idea)
 3. define test module which does `use Couch.Test.ExUnit.Case`
 4. Define test cases in the module
 
 You can run tests either:
 - using make: `make exunit`
-- using mix: BUILDDIR=`pwd` ERL_LIBS=`pwd`/src MIX_ENV=test mix test --trace
+- using mix: BUILDDIR=`pwd` ERL_LIBS=`pwd`/apps MIX_ENV=test mix test --trace
 
 ## Generating tests from spec
 

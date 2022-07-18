@@ -30,7 +30,7 @@ function get_contributors {
       | grep -v @apache.org \
       | sed $SED_ERE_FLAG -e "$CONTRIB_EMAIL_SED_COMMAND"
   else
-    cd src/$1
+    cd apps/$1
     git shortlog -se HEAD \
       | grep -v @apache.org \
       | sed $SED_ERE_FLAG -e "$CONTRIB_EMAIL_SED_COMMAND"
@@ -43,7 +43,7 @@ function print_comitter_list {
   local EXCLUDE=("bear" "folsom" "goldrush" "ibrowse" "jiffy" "lager" "meck" "mochiweb" "snappy")
   local EXCLUDE=$(printf "\|%s" "${EXCLUDE[@]}")
   local EXCLUDE=${EXCLUDE:2}
-  local SUBREPOS=$(ls src/ | grep -v "$EXCLUDE")
+  local SUBREPOS=$(ls apps/ | grep -v "$EXCLUDE")
 
   if test -e .git; then
 
