@@ -44,6 +44,4 @@ t_handle_shard_doc_conflict() ->
     ]),
     meck:expect(fabric_util, recv, 4, {error, conflict}),
     ?assertEqual({error, file_exists}, fabric_db_create:go(DbName, [])),
-
-    meck:unload(),
-    ok = fabric:delete_db(DbName).
+    meck:unload().

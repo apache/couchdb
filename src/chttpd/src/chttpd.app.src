@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
- {application, chttpd, [
+{application, chttpd, [
     {description, "HTTP interface for CouchDB cluster"},
     {vsn, git},
     {registered, [
@@ -24,10 +24,11 @@
         stdlib,
         couch_log,
         couch_stats,
+        couch_tests,
         config,
         couch,
         ets_lru,
         fabric
     ]},
-    {mod, {chttpd_app,[]}}
+    {mod, {chttpd_app, []}}
 ]}.

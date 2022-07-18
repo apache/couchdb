@@ -10,18 +10,17 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, setup,
- [
-  {description, ""},
-  {vsn, "1"},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  couch_epi,
-                  chttpd,
-                  couch_log
-                 ]},
-  {mod, { setup_app, []}},
-  {env, []}
- ]}.
+{application, setup, [
+    {description, "Implements `_cluster_setup` and manages the setup of a CouchDB cluster"},
+    {vsn, "1"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib,
+        couch_epi,
+        chttpd,
+        couch_log
+    ]},
+    {mod, {setup_app, []}},
+    {env, []}
+]}.

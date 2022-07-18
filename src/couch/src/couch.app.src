@@ -40,17 +40,19 @@
 
         % ASF deps
         couch_epi,
+        config,
         b64url,
         couch_log,
         couch_event,
         ioq,
         couch_stats,
+        couch_tests,
         hyper,
         couch_prometheus,
         couch_dist
     ]},
     {env, [
-        { httpd_global_handlers, [
+        {httpd_global_handlers, [
             {"/", "{couch_httpd_misc_handlers, handle_welcome_req, <<\"Welcome\">>}"},
             {"favicon.ico", "{couch_httpd_misc_handlers, handle_favicon_req, \"{{prefix}}/share/www\"}"},
             {"_utils", "{couch_httpd_misc_handlers, handle_utils_dir_req, \"{{prefix}}/share/www\"}"},
@@ -63,7 +65,7 @@
             {"_session", "{couch_httpd_auth, handle_session_req}"},
             {"_plugins", "{couch_plugins_httpd, handle_req}"}
         ]},
-          { httpd_db_handlers, [
+        {httpd_db_handlers, [
             {"_all_docs", "{couch_mrview_http, handle_all_docs_req}"},
             {"_local_docs", "{couch_mrview_http, handle_local_docs_req}"},
             {"_design_docs", "{couch_mrview_http, handle_design_docs_req}"},
@@ -73,7 +75,7 @@
             {"_temp_view", "{couch_mrview_http, handle_temp_view_req}"},
             {"_view_cleanup", "{couch_mrview_http, handle_cleanup_req}"}
         ]},
-        { httpd_design_handlers, [
+        {httpd_design_handlers, [
             {"_compact", "{couch_mrview_http, handle_compact_req}"},
             {"_info", "{couch_mrview_http, handle_info_req}"},
             {"_list", "{couch_mrview_show, handle_view_list_req}"},
