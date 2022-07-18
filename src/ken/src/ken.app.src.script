@@ -27,12 +27,11 @@ Applications =
     if HaveHastings -> [hastings]; true -> [] end ++
     BaseApplications.
 
-{application, ken,
- [
-  {description, ""},
-  {vsn, git},
-  {registered, []},
-  {applications, Applications},
-  {mod, { ken_app, []}},
-  {env, []}
- ]}.
+{application, ken, [
+    {description, "Ken builds views and search indexes automatically"},
+    {vsn, git},
+    {registered, []},
+    {applications, Applications},
+    {mod, {ken_app, []}},
+    {env, []}
+]}.

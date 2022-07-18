@@ -17,12 +17,12 @@
 -define(TIMEOUT, 20).
 
 setup_all() ->
-    test_util:start_applications([config]),
+    test_util:start_applications([config, couch_log]),
     couch_uuids:start().
 
 teardown_all(_) ->
     couch_uuids:stop(),
-    test_util:stop_applications([config]).
+    test_util:stop_applications([config, couch_log]).
 
 uuids_test_() ->
     {

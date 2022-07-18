@@ -34,6 +34,7 @@
     {applications, [
         kernel,
         stdlib,
-        inets
+        inets,
+        config
     ]}
- ]}.
+]}.
