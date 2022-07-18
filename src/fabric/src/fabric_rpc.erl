@@ -491,6 +491,8 @@ view_cb({meta, Meta}, Acc) ->
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
 view_cb({row, Row}, Acc) ->
+    %% TODO: distinguish between rows and docs
+    couch_cost:inc_doc(),
     % Adding another row
     ViewRow = #view_row{
         id = couch_util:get_value(id, Row),

@@ -295,6 +295,7 @@ open_doc(Db, IdOrDocInfo) ->
 
 open_doc(Db, Id, Options) ->
     increment_stat(Db, [couchdb, database_reads]),
+    couch_cost:inc_doc(),
     case open_doc_int(Db, Id, Options) of
         {ok, #doc{deleted = true} = Doc} ->
             case lists:member(deleted, Options) of
