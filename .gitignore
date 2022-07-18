@@ -130,3 +130,6 @@ test/javascript/junit.xml
 /src/httpotion/
 /src/jason/
 /src/junit_formatter/
+
+.idea
+*.lock
