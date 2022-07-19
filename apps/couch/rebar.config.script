@@ -10,6 +10,12 @@
 %% License for the specific language governing permissions and limitations under
 %% the License.
 
+Rebar3MixPath =
+    case erlang:function_exported(rebar3, main, 1) of
+        true -> "apps/couch/";	% rebar3
+        false -> ""				% mix
+    end.
+
 CopyIfDifferent = fun(Path, Contents) ->
     case filelib:is_file(Path) of
         true ->
@@ -90,11 +96,11 @@ ConfigH = [
 
 CouchJSConfig = case SMVsn of
     "78" ->
-        "priv/couch_js/86/config.h";
+        Rebar3MixPath ++ "priv/couch_js/86/config.h";
     "91" ->
-        "priv/couch_js/86/config.h";
+        Rebar3MixPath ++ "priv/couch_js/86/config.h";
     _ ->
-        "priv/couch_js/" ++ SMVsn ++ "/config.h"
+        Rebar3MixPath ++ "priv/couch_js/" ++ SMVsn ++ "/config.h"
 end.
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
 ConfigBin = iolist_to_binary(ConfigSrc).
@@ -210,7 +216,7 @@ BaseSpecs = [
 ].
 
 SpawnSpec = [
-    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
+    {Rebar3MixPath ++ "priv/couchspawnkillable", [Rebar3MixPath ++ "priv/spawnkillable/*.c"]}
 ].
 
 %% hack required until switch to enc/rebar3
@@ -223,15 +229,27 @@ PortSpecs = case os:type() of
     {win32, _} ->
         BaseSpecs ++ SpawnSpec;
     _ ->
-        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
-        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
-        os:cmd("chmod +x priv/couchspawnkillable"),
+        {ok, CSK} = file:read_file(Rebar3MixPath ++ "priv/spawnkillable/couchspawnkillable.sh"),
+        ok = CopyIfDifferent(Rebar3MixPath ++ "priv/couchspawnkillable", CSK),
+        os:cmd("chmod +x " ++ Rebar3MixPath ++ "priv/couchspawnkillable"),
         BaseSpecs
 end.
 PlatformDefines = [
    {platform_define, "win32", 'WINDOWS'}
 ].
 AddConfig = [
+	{plugins, [{pc, "~> 1.0"}]},
+    {artifacts, [
+        "priv/couch_ejson_compare.so",
+        "priv/couchjs",
+        "priv/couchspawnkillable"
+    ]},
+    {provider_hooks, [
+        {post, [
+            {compile, {pc, compile}},
+            {clean, {pc, clean}}
+        ]}
+    ]},
     {port_specs, PortSpecs},
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},

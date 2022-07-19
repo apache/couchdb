@@ -55,7 +55,6 @@ Options:
   --dev                       alias for --disable-docs --disable-fauxton
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --skip-deps                 do not update erlang dependencies
-  --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
   --generate-tls-dev-cert     generate a cert for TLS distribution (To enable TLS, change the vm.args file.)
   --rebar3=PATH               use rebar3 by specified path
   --erlfmt=PATH               use erlfmt by specified path
@@ -124,22 +123,6 @@ parse_opts() {
                 SKIP_DEPS=1
                 shift
                 continue
-                ;;
-
-            --rebar)
-                if [ -x "$2" ]; then
-                    version=`$2 --version 2> /dev/null | grep -o "2\.[6-9]\.[0-9]"`
-                    if [ $? -ne 0 ]; then
-                        printf 'Rebar >=2.6.0 and <3.0.0 required' >&2
-                        exit 1
-                    fi
-                    eval REBAR=$2
-                    shift 2
-                    continue
-                else
-                    printf 'ERROR: "--rebar" requires valid path to executable.\n' >&2
-                    exit 1
-                fi
                 ;;
 
             --rebar3)
@@ -291,18 +274,6 @@ cat > $rootdir/config.erl << EOF
 {spidermonkey_version, "$SM_VSN"}.
 EOF
 
-install_local_rebar() {
-    if [ ! -x "${rootdir}/bin/rebar" ]; then
-        if [ ! -d "${rootdir}/apps/rebar" ]; then
-            # git clone --depth 1 https://github.com/apache/couchdb-rebar.git ${rootdir}/apps/rebar
-            git clone https://github.com/apache/couchdb-rebar.git ${rootdir}/apps/rebar
-        fi
-        make -C ${rootdir}/apps/rebar
-        mv ${rootdir}/apps/rebar/rebar ${rootdir}/bin/rebar
-        make -C ${rootdir}/apps/rebar clean
-    fi
-}
-
 install_local_rebar3() {
     if [ ! -x "${rootdir}/bin/rebar3" ]; then
         if [ ! -d "${rootdir}/apps/rebar3" ]; then
@@ -328,10 +299,13 @@ install_local_erlfmt() {
     fi
 }
 
-if [ -z "${REBAR}" ]; then
-    install_local_rebar
-    REBAR=${rootdir}/bin/rebar
-fi
+install_dependencies() {
+    # fauxton is a Non-Erlang deps, rebar3 cannot get it.
+    if [ ! -d "${rootdir}/apps/fauxton" ] && [ $WITH_FAUXTON == 1 ]; then
+        echo "==> Fetching fauxton"
+        git clone --depth 1 --branch v1.2.8 https://github.com/apache/couchdb-fauxton "${rootdir}/apps/fauxton"
+    fi
+}
 
 if [ -z "${REBAR3}" ]; then
     install_local_rebar3
@@ -343,10 +317,15 @@ if [ -z "${ERLFMT}" ]; then
     ERLFMT=${rootdir}/bin/erlfmt
 fi
 
+if [ $SKIP_DEPS -ne 1 ]; then
+    echo "==> installing dependencies"
+    install_dependencies
+fi
+
 # only update dependencies, when we are not in a release tarball
 if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
     echo "==> updating dependencies"
-    ${REBAR} get-deps update-deps
+    ${REBAR3} get-deps
 fi
 
 # External repos frequently become integrated with the primary repo,
