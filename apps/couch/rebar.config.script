@@ -248,6 +248,7 @@ DepDescs = [
 
 %% Non-Erlang deps
 {docs, {url, "https://github.com/apache/couchdb-documentation"}, {branch, "main"}},
+{fauxton, {url, "https://github.com/apache/couchdb-fauxton.git"}, {branch, "rebar3-bogus-app"}},
 
 %% Third party deps
 {folsom, {url, "https://github.com/jiahuili430/couchdb-folsom"}, {branch, "82-rebar3"}},
@@ -272,14 +273,9 @@ BaseUrl = "https://github.com/apache/".
 MakeDep = fun
     ({AppName, {url, Url}, Version}) ->
         {AppName, {git, Url, Version}};
-    ({AppName, {url, Url}, Version, Options}) ->
-        {AppName, {git, Url, Version}, Options};
     ({AppName, RepoName, Version}) ->
         Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
-        {AppName, {git, Url, Version}};
-    ({AppName, RepoName, Version, Options}) ->
-        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
-        {AppName, {git, Url, Version}, Options}
+        {AppName, {git, Url, Version}}
 end.
 
 AddConfig = [

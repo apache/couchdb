@@ -299,14 +299,6 @@ install_local_erlfmt() {
     fi
 }
 
-install_dependencies() {
-    # fauxton is a Non-Erlang deps, rebar3 cannot get it.
-    if [ ! -d "${rootdir}/apps/fauxton" ] && [ $WITH_FAUXTON == 1 ]; then
-        echo "==> Fetching fauxton"
-        git clone --depth 1 --branch v1.2.8 https://github.com/apache/couchdb-fauxton "${rootdir}/apps/fauxton"
-    fi
-}
-
 if [ -z "${REBAR3}" ]; then
     install_local_rebar3
     REBAR3=${rootdir}/bin/rebar3
@@ -315,11 +307,6 @@ fi
 if [ -z "${ERLFMT}" ]; then
     install_local_erlfmt
     ERLFMT=${rootdir}/bin/erlfmt
-fi
-
-if [ $SKIP_DEPS -ne 1 ]; then
-    echo "==> installing dependencies"
-    install_dependencies
 fi
 
 # only update dependencies, when we are not in a release tarball

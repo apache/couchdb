@@ -370,7 +370,7 @@ introspect:
 dist: all derived
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
-	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
+	@cp -r _build/default/share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
 	@cp -r _build/default/lib/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
 
@@ -495,7 +495,7 @@ endif
 share/www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
-	@cd apps/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
+	@cd _build/default/lib/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
 
 
