@@ -372,10 +372,10 @@ dist: all derived
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html
-	@cp -r apps/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
+	@cp -r _build/default/lib/docs/build/html apache-couchdb-$(COUCHDB_VERSION)/share/docs/
 
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
-	@cp apps/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
+	@cp _build/default/lib/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
 	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"

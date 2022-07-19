@@ -53,4 +53,4 @@ if test -e .git; then
 fi
 
 # copy our rebar
-cp bin/rebar ${REL_DIR}/bin/rebar
+cp bin/rebar3 ${REL_DIR}/bin/rebar3
