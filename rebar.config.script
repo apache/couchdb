@@ -104,53 +104,8 @@ end.
 
 os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
-DepDescs = [
-%% Independent Apps
-{config, {url, "https://github.com/jiahuili430/couchdb-config.git"}, {branch, "82-rebar3"}},
-{b64url,           "b64url",           {tag, "1.0.3"}},
-{ets_lru,          "ets-lru",          {tag, "1.1.0"}},
-{khash, {url, "https://github.com/jiahuili430/couchdb-khash"}, {branch, "82-rebar3"}},
-{snappy, {url, "https://github.com/jiahuili430/couchdb-snappy"}, {branch, "82-rebar3"}},
-
-%% Non-Erlang deps
-{docs, {url, "https://github.com/apache/couchdb-documentation"}, {branch, "main"}},
-
-%% Third party deps
-{folsom, {url, "https://github.com/jiahuili430/couchdb-folsom"}, {branch, "82-rebar3"}},
-{hyper, {url, "https://github.com/jiahuili430/couchdb-hyper"}, {branch, "82-rebar3"}},
-{ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-5"}},
-{jiffy,            "jiffy",            {tag, "1.1.1"}},
-{mochiweb,         "mochiweb",         {tag, "v3.0.0"}},
-{recon,            "recon",            {tag, "2.5.2"}}
-].
-
-WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
-
-OptionalDeps = case WithProper of
-    true ->
-        [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.4"}}];
-    false ->
-        []
-end.
-
-BaseUrl = "https://github.com/apache/".
-
-MakeDep = fun
-    ({AppName, {url, Url}, Version}) ->
-        {AppName, {git, Url, Version}};
-    ({AppName, {url, Url}, Version, Options}) ->
-        {AppName, {git, Url, Version}, Options};
-    ({AppName, RepoName, Version}) ->
-        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
-        {AppName, {git, Url, Version}};
-    ({AppName, RepoName, Version, Options}) ->
-        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
-        {AppName, {git, Url, Version}, Options}
-end.
-
 AddConfig = [
     {require_otp_vsn, "23|24|25"},
-    {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}]},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {dialyzer, [

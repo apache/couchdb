@@ -16,7 +16,7 @@
 
 include version.mk
 
-REBAR?=$(shell echo `pwd`/bin/rebar)
+REBAR3?=$(shell echo `pwd`/bin/rebar3)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
@@ -120,7 +120,7 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
+	@[ -e bin/couchjs ] || COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) compile $(COMPILE_OPTS)
 	@cp apps/couch/priv/couchjs bin/
 
 
@@ -140,8 +140,8 @@ fauxton: share/www
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
 escriptize: couch
-	@$(REBAR) -r escriptize apps=weatherreport
-	@cp apps/weatherreport/weatherreport bin/weatherreport
+	@[ -e bin/weatherreport ] ||$(REBAR3) escriptize -a weatherreport
+	@cp _build/default/bin/weatherreport bin/weatherreport
 
 
 ################################################################################
@@ -488,7 +488,7 @@ config.erl:
 
 apps/docs/build:
 ifeq ($(with_docs), 1)
-	@cd apps/docs; $(MAKE)
+	@cd _build/default/lib/docs; $(MAKE)
 endif
 
 
