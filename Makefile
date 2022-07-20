@@ -77,10 +77,6 @@ skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse
 suites=
 tests=
 
-DIALYZE_OPTS=$(shell echo "\
-	apps=$(apps) \
-	skip_deps=$(skip_deps) \
-	" | sed -e 's/[a-z]\{1,\}= / /g')
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
 TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
@@ -330,28 +326,16 @@ weatherreport-test: devclean escriptize
 ################################################################################
 
 
-.PHONY: build-plt
-# target: build-plt - Build project-specific PLT
-build-plt:
-	@$(REBAR) -r build-plt $(DIALYZE_OPTS)
-
-
-.PHONY: check-plt
-# target: check-plt - Check the PLT for consistency and rebuild it if it is not up-to-date
-check-plt:
-	@$(REBAR) -r check-plt $(DIALYZE_OPTS)
-
-
 .PHONY: dialyze
 # target: dialyze - Analyze the code for discrepancies
-dialyze: .rebar
-	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
+dialyze:
+	@$(REBAR3) dialyzer
 
 
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:
-	@$(REBAR) -r update-deps
+	@$(REBAR3) upgrade --all
 	@build-aux/introspect
 
 ################################################################################
