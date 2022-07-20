@@ -69,6 +69,9 @@ all_test_() ->
                     fun should_return_ok_true_on_bulk_update/1,
                     fun should_return_201_new_edits_false_with_revs_on_bulk_update/1,
                     fun should_return_400_new_edits_false_no_revs_on_bulk_update/1,
+                    fun should_return_201_new_edits_false_with_rev_on_doc_update/1,
+                    fun should_return_201_new_edits_false_with_revisions_on_doc_update/1,
+                    fun should_return_400_new_edits_false_no_revs_on_doc_update/1,
                     fun should_return_ok_true_on_ensure_full_commit/1,
                     fun should_return_404_for_ensure_full_commit_on_no_db/1,
                     fun should_accept_live_as_an_alias_for_continuous/1,
@@ -158,6 +161,59 @@ should_return_400_new_edits_false_no_revs_on_bulk_update(Url) ->
                     <<"bad_request">>,
                     couch_util:get_value(<<"error">>, ResultJson)
                 )
+            end
+        )}.
+
+should_return_201_new_edits_false_with_rev_on_doc_update(Url) ->
+    {timeout, ?TIMEOUT,
+        ?_test(
+            begin
+                Url1 = Url ++ "/docrev2?new_edits=false",
+                Headers = [?CONTENT_JSON, ?AUTH],
+                Body = "{\"foo\": \"bar\", \"_rev\": \"1-abc\"}",
+                {ok, Status, _, ResultBody} = test_request:put(Url1, Headers, Body),
+                {Props} = ?JSON_DECODE(ResultBody),
+                ?assertEqual(201, Status),
+                Id = couch_util:get_value(<<"id">>, Props),
+                Rev = couch_util:get_value(<<"rev">>, Props),
+                ?assertEqual(<<"docrev2">>, Id),
+                ?assertEqual(<<"1-abc">>, Rev)
+            end
+        )}.
+
+should_return_201_new_edits_false_with_revisions_on_doc_update(Url) ->
+    {timeout, ?TIMEOUT,
+        ?_test(
+            begin
+                Url1 = Url ++ "/docrev3?new_edits=false",
+                Headers = [?CONTENT_JSON, ?AUTH],
+                Body =
+                    "{\"foo\": \"bar\", " ++
+                        "\"_revisions\": {" ++
+                        "\"ids\": [\"abc\", \"def\"], " ++
+                        "\"start\": 2}} ",
+                {ok, Status, _, ResultBody} = test_request:put(Url1, Headers, Body),
+                {Props} = ?JSON_DECODE(ResultBody),
+                Id = couch_util:get_value(<<"id">>, Props),
+                Rev = couch_util:get_value(<<"rev">>, Props),
+                ?assertEqual(201, Status),
+                ?assertEqual(<<"docrev3">>, Id),
+                ?assertEqual(<<"2-abc">>, Rev)
+            end
+        )}.
+
+should_return_400_new_edits_false_no_revs_on_doc_update(Url) ->
+    {timeout, ?TIMEOUT,
+        ?_test(
+            begin
+                Url1 = Url ++ "/docnorev4?new_edits=false",
+                Headers = [?CONTENT_JSON, ?AUTH],
+                Body = "{\"foo\": \"bar\"}",
+                {ok, Status, _, ResultBody} = test_request:put(Url1, Headers, Body),
+                {Props} = ?JSON_DECODE(ResultBody),
+                ?assertEqual(400, Status),
+                Error = couch_util:get_value(<<"error">>, Props),
+                ?assertEqual(<<"bad_request">>, Error)
             end
         )}.
 
