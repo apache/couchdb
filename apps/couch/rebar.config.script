@@ -113,6 +113,7 @@ MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
         []
 end.
 
+code:add_path("_build/default/lib/proper/ebin").
 ProperConfig = case code:lib_dir(proper) of
     {error, bad_name} -> [];
     _ -> [{d, 'WITH_PROPER'}]

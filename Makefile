@@ -77,14 +77,6 @@ skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse
 suites=
 tests=
 
-COMPILE_OPTS=$(shell echo "\
-	apps=$(apps) \
-	" | sed -e 's/[a-z_]\{1,\}= / /g')
-EUNIT_OPTS=$(shell echo "\
-	skip_deps=$(skip_deps) \
-	suites=$(suites) \
-	tests=$(tests) \
-	" | sed -e 's/[a-z]\{1,\}= / /g')
 DIALYZE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
@@ -120,7 +112,7 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
-	@[ -e bin/couchjs ] || COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) compile $(COMPILE_OPTS)
+	@[ -e bin/couchjs ] || COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) compile
 	@cp apps/couch/priv/couchjs bin/
 
 
@@ -158,23 +150,25 @@ check: all python-black
 	@$(MAKE) elixir-suite
 	@$(MAKE) weatherreport-test
 
-ifdef apps
-subdirs = $(apps)
-else
-subdirs=$(shell ls apps)
-endif
-
 .PHONY: eunit
-# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
+# target: eunit - Run EUnit tests, use apps to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
+	@[ -d $(shell pwd)/apps/b64url ] || cp -r $(shell pwd)/_build/default/lib/b64url $(shell pwd)/apps
+	@[ -d $(shell pwd)/apps/config ] || cp -r $(shell pwd)/_build/default/lib/config $(shell pwd)/apps
+	@[ -d $(shell pwd)/apps/ets_lru ] || cp -r $(shell pwd)/_build/default/lib/ets_lru $(shell pwd)/apps
+	@[ -d $(shell pwd)/apps/jiffy ] || cp -r $(shell pwd)/_build/default/lib/jiffy $(shell pwd)/apps
+	@[ -d $(shell pwd)/apps/khash ] || cp -r $(shell pwd)/_build/default/lib/khash $(shell pwd)/apps
+	@[ -d $(shell pwd)/apps/recon ] || cp -r $(shell pwd)/_build/default/lib/recon $(shell pwd)/apps
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) ic setup_eunit 2> /dev/null
-	@for dir in $(subdirs); do \
-            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-        done
+ifdef apps
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) eunit --app $(apps) || exit 1
+else
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) eunit || exit 1
+endif
 
 
 .PHONY: exunit
@@ -196,14 +190,14 @@ setup-eunit:
 just-eunit: export BUILDDIR = $(shell pwd)
 just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@$(REBAR3) eunit
 
 .PHONY: soak-eunit
 soak-eunit: export BUILDDIR = $(shell pwd)
 soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR3) ic setup_eunit 2> /dev/null
-	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+	while [ $$? -eq 0 ] ; do $(REBAR3) eunit ; done
 
 erlfmt-check:
 	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py

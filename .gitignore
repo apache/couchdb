@@ -136,4 +136,5 @@ _build
 *.iml
 *.lock
 *.log
+*.xml
 *.crashdump

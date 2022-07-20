@@ -9,7 +9,7 @@ import xml.dom.minidom as md
 
 
 TEST_COLLECTIONS = {
-    "EUnit": "apps/**/.eunit/*.xml",
+    "EUnit": "_build/test/*.xml",
     "EXUnit": "_build/integration/lib/couchdbtest/*.xml",
     "Mango": "apps/mango/*.xml",
     "JavaScript": "test/javascript/*.xml",
