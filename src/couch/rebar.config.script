@@ -90,11 +90,11 @@ ConfigH = [
 
 CouchJSConfig = case SMVsn of
     "78" ->
-        "priv/couch_js/86/config.h";
+        APP_DIR ++ "/priv/couch_js/86/config.h";
     "91" ->
-        "priv/couch_js/86/config.h";
+        APP_DIR ++ "/priv/couch_js/86/config.h";
     _ ->
-        "priv/couch_js/" ++ SMVsn ++ "/config.h"
+        APP_DIR ++ "/priv/couch_js/" ++ SMVsn ++ "/config.h"
 end.
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
 ConfigBin = iolist_to_binary(ConfigSrc).
@@ -210,7 +210,7 @@ BaseSpecs = [
 ].
 
 SpawnSpec = [
-    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
+    {APP_DIR ++ "/priv/couchspawnkillable", [APP_DIR ++ "/priv/spawnkillable/*.c"]}
 ].
 
 %% hack required until switch to enc/rebar3
@@ -223,16 +223,49 @@ PortSpecs = case os:type() of
     {win32, _} ->
         BaseSpecs ++ SpawnSpec;
     _ ->
-        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
-        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
-        os:cmd("chmod +x priv/couchspawnkillable"),
+        {ok, CSK} = file:read_file(APP_DIR ++ "/priv/spawnkillable/couchspawnkillable.sh"),
+        ok = CopyIfDifferent(APP_DIR ++ "/priv/couchspawnkillable", CSK),
+        os:cmd("chmod +x " ++ APP_DIR ++ "/priv/couchspawnkillable"),
         BaseSpecs
 end.
 PlatformDefines = [
    {platform_define, "win32", 'WINDOWS'}
 ].
+
+LibDir = "../../_build/default/lib/".
+
 AddConfig = [
     {port_specs, PortSpecs},
+    {plugins, [rebar3_path_deps]},
+    {deps, [
+        {config, {path, LibDir ++ "config"}},
+        {proper, {path, LibDir ++ "proper"}},
+        {bear, {path, LibDir ++ "bear"}},
+        {b64url, {path, LibDir ++ "b64url"}},
+        {ets_lru, {path, LibDir ++ "ets_lru"}},
+        {ibrowse, {path, LibDir ++ "ibrowse"}},
+        {jiffy, {path, LibDir ++ "jiffy"}},
+        {mochiweb, {path, LibDir ++ "mochiweb"}},
+        {meck, {path, LibDir ++ "meck"}},
+        {recon, {path, LibDir ++ "recon"}},
+        {khash, {path, LibDir ++ "khash"}},
+        {snappy, {path, LibDir ++ "snappy"}},
+        {folsom, {path, LibDir ++ "folsom"}},
+        {hyper, {path, LibDir ++ "hyper"}}
+    ]},
+    {profiles, [{test, [
+        {extra_src_dirs, [{"test", [{recursive, true}]}]},
+        {deps, [
+            {b64url, {path, LibDir ++ "b64url"}},
+            {ets_lru, {path, LibDir ++ "ets_lru"}},
+            {jiffy, {path, LibDir ++ "jiffy"}},
+            {config, {path, LibDir ++ "config"}},
+            {khash, {path, LibDir ++ "khash"}}
+        ]}
+    ]}]},
+    {eunit_tests, [
+        {application, config}
+    ]},
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},

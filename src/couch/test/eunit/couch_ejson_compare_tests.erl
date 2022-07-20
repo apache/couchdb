@@ -51,6 +51,8 @@
     {[{<<"b">>, 2}, {<<"c">>, 2}]}
 ]).
 
+-include_lib("eunit/include/eunit.hrl").
+
 % Propery tests
 
 -ifdef(WITH_PROPER).

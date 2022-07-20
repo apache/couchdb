@@ -16,7 +16,7 @@
 
 include version.mk
 
-REBAR?=$(shell echo `pwd`/bin/rebar)
+REBAR3?=$(shell echo `pwd`/bin/rebar3)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
@@ -27,13 +27,13 @@ ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 #      tarball itself.
 #   4. When not on a clean tag, use version.mk + git sha + dirty status.
 
-COUCHDB_GIT_SHA=$(git_sha)
+# COUCHDB_GIT_SHA=$(git_sha)
 
 IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
 
 # 1. Building from tarball, use version.mk.
-COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
+export COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)
 
 else
 
@@ -52,15 +52,15 @@ REL_TAG = $(shell git describe --tags --always --first-parent \
 # DIRTY identifies if we're not on a commit
 DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
 # COUCHDB_GIT_SHA is our current git hash.
-COUCHDB_GIT_SHA=$(shell git rev-parse --short=7 --verify HEAD)
+export COUCHDB_GIT_SHA=$(shell git rev-parse --short=7 --verify HEAD)
 
 ifeq ($(ON_TAG),)
 # 4. Not on a tag.
 COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)$(DIRTY)
-COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
+export COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
 # 2 and 3. On a tag.
-COUCHDB_VERSION = $(REL_TAG)$(DIRTY)
+export COUCHDB_VERSION = $(REL_TAG)$(DIRTY)
 endif
 endif
 
@@ -71,24 +71,6 @@ space:= $(empty) $(empty)
 
 DESTDIR=
 
-# Rebar options
-apps=
-skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse
-suites=
-tests=
-
-COMPILE_OPTS=$(shell echo "\
-	apps=$(apps) \
-	" | sed -e 's/[a-z_]\{1,\}= / /g')
-EUNIT_OPTS=$(shell echo "\
-	skip_deps=$(skip_deps) \
-	suites=$(suites) \
-	tests=$(tests) \
-	" | sed -e 's/[a-z]\{1,\}= / /g')
-DIALYZE_OPTS=$(shell echo "\
-	apps=$(apps) \
-	skip_deps=$(skip_deps) \
-	" | sed -e 's/[a-z]\{1,\}= / /g')
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
 TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
@@ -120,7 +102,8 @@ help:
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
+	@# FIXME
+	@[ -e bin/couchjs ] || COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) compile
 	@cp src/couch/priv/couchjs bin/
 
 
@@ -140,8 +123,8 @@ fauxton: share/www
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
 escriptize: couch
-	@$(REBAR) -r escriptize apps=weatherreport
-	@cp src/weatherreport/weatherreport bin/weatherreport
+	@[ -e bin/weatherreport ] || COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) escriptize -a weatherreport
+	@cp _build/default/bin/weatherreport bin/weatherreport
 
 
 ################################################################################
@@ -158,51 +141,43 @@ check: all python-black
 	@$(MAKE) elixir-suite
 	@$(MAKE) weatherreport-test
 
-ifdef apps
-subdirs = $(apps)
-else
-subdirs=$(shell ls src)
-endif
-
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-eunit: couch
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
-	@for dir in $(subdirs); do \
-            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-        done
-
+eunit: couch setup-eunit
+	echo ${COUCH_VERSION}
+	$(REBAR3) eunit $(addprefix --app ,$(apps)) || exit 1
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests
 exunit: export BUILDDIR = $(shell pwd)
 exunit: export MIX_ENV=test
-exunit: export ERL_LIBS = $(shell pwd)/src
+exunit: export ERL_LIBS = $(shell pwd)/_build/default/lib
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --trace $(EXUNIT_OPTS)
 
+.PHONY: setup-eunit
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 setup-eunit:
-	@$(REBAR) setup_eunit 2> /dev/null
+	@$(REBAR3) ic setup_eunit 2> /dev/null
 
 just-eunit: export BUILDDIR = $(shell pwd)
 just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
-just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+just-eunit: setup_eunit
+	@$(REBAR3) -r eunit $(EUNIT_OPTS)
 
 .PHONY: soak-eunit
 soak-eunit: export BUILDDIR = $(shell pwd)
 soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
-soak-eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
+soak-eunit: couch setup_eunit
+	@$(REBAR3) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 erlfmt-check:
@@ -335,30 +310,11 @@ weatherreport-test: devclean escriptize
 # Developing
 ################################################################################
 
-
-.PHONY: build-plt
-# target: build-plt - Build project-specific PLT
-build-plt:
-	@$(REBAR) -r build-plt $(DIALYZE_OPTS)
-
-
-.PHONY: check-plt
-# target: check-plt - Check the PLT for consistency and rebuild it if it is not up-to-date
-check-plt:
-	@$(REBAR) -r check-plt $(DIALYZE_OPTS)
-
-
-.PHONY: dialyze
+.PHONY: dialyzer
 # target: dialyze - Analyze the code for discrepancies
-dialyze: .rebar
-	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
+dialyzer: .rebar
+	@$(REBAR3) -r dialyzer $(DIALYZE_OPTS)
 
-
-.PHONY: introspect
-# target: introspect - Check for commits difference between rebar.config and repository
-introspect:
-	@$(REBAR) -r update-deps
-	@build-aux/introspect
 
 ################################################################################
 # Distributing
@@ -387,28 +343,21 @@ dist: all derived
 release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
-	@$(REBAR) generate # make full erlang release
-	@cp bin/weatherreport rel/couchdb/bin/weatherreport
+	@$(REBAR3) release # make full erlang release
 
 ifeq ($(with_fauxton), 1)
-	@mkdir -p rel/couchdb/share/
-	@cp -R share/www rel/couchdb/share/
+	@mkdir -p _build/default/rel/couchdb/share/
+	@cp -R share/www _build/default/rel/couchdb/share/
 endif
 
 ifeq ($(with_docs), 1)
 ifeq ($(IN_RELEASE), true)
-	@mkdir -p rel/couchdb/share/www/docs/
-	@mkdir -p rel/couchdb/share/docs/
-	@cp -R share/docs/html/* rel/couchdb/share/www/docs/
-	@cp share/docs/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
-else
-	@mkdir -p rel/couchdb/share/www/docs/
-	@mkdir -p rel/couchdb/share/docs/
-	@cp -R src/docs/build/html/ rel/couchdb/share/www/docs
-	@cp src/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
+	@mkdir -p _build/default/rel/couchdb/share/www/docs/
+	@mkdir -p _build/default/rel/couchdb/share/docs/
+	@cp -R share/docs/html/* _build/default/rel/couchdb/share/www/docs/
+	@cp share/docs/man/apachecouchdb.1 _build/default/rel/couchdb/share/docs/couchdb.1
 endif
 endif
-
 	@echo "... done"
 	@echo
 	@echo "    You can now copy the rel/couchdb directory anywhere on your system."
@@ -434,22 +383,14 @@ install: release
 .PHONY: clean
 # target: clean - Remove build artifacts
 clean:
-	@$(REBAR) -r clean
-	@rm -rf .rebar/
+	@$(REBAR3) clean
+	@rm -rf _build
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
-	@rm -rf src/*/ebin
-	@rm -rf src/*/.rebar
-	@rm -rf src/*/priv/*.so
-	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-coffee.js
 	@rm -rf tmp dev/data dev/lib dev/logs
-	@rm -rf src/mango/.venv
-	@rm -f src/couch/priv/couchspawnkillable
-	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
-
 
 .PHONY: distclean
 # target: distclean - Remove build and release artifacts

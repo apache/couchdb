@@ -32,7 +32,19 @@
 -define(TEMPDIR,
     filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
 
--define(APPDIR, filename:dirname(element(2, file:get_cwd()))).
+
+%% Rebar3 doesn't change the current directory
+%% Therefore the only way to get the directory of current app
+%% is to construct it from ?FILE
+%% we iterate backwards and remove elements until we find "test"
+%% then remove "test" entry by calling `filename:dirname/`
+-define(APPDIR, filename:dirname(
+    filename:join(
+        lists:reverse(
+            lists:dropwhile(
+                fun(E) -> E =/= "test" end,
+                lists:reverse(filename:split(?FILE))))))).
+
 %% Account for the fact that source files are in src/<app>/.eunit/<module>.erl
 %% when run from eunit
 -define(ABS_PATH(File), %% src/<app>/.eunit/<module>.erl
