@@ -46,7 +46,7 @@ ARGS_FILE="${COUCHDB_ARGS_FILE:-$ROOTDIR/etc/vm.args}"
 [ -n "${COUCHDB_INI_FILES:-}" ] && INI_ARGS="-couch_ini $COUCHDB_INI_FILES"
 SYSCONFIG_FILE="${COUCHDB_SYSCONFIG_FILE:-$ROOTDIR/releases/$APP_VSN/sys.config}"
 
-exec "$BINDIR/erlexec" -boot "$ROOTDIR/releases/$APP_VSN/couchdb" \
+exec "$BINDIR/erlexec" -boot "$ROOTDIR/releases/$APP_VSN/start" \
      -args_file "${ARGS_FILE}" \
      ${INI_ARGS:-} \
      -config "${SYSCONFIG_FILE}" "$@"

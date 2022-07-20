@@ -365,12 +365,12 @@ dist: all derived
 release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
-	@$(REBAR) generate # make full erlang release
-	@cp bin/weatherreport rel/couchdb/bin/weatherreport
+	@$(REBAR3) release # make full erlang release
+	@cp -r _build/default/rel/couchdb rel/couchdb
 
 ifeq ($(with_fauxton), 1)
 	@mkdir -p rel/couchdb/share/
-	@cp -R share/www rel/couchdb/share/
+	@cp -R _build/default/share/www rel/couchdb/share/
 endif
 
 ifeq ($(with_docs), 1)
@@ -382,8 +382,8 @@ ifeq ($(IN_RELEASE), true)
 else
 	@mkdir -p rel/couchdb/share/www/docs/
 	@mkdir -p rel/couchdb/share/docs/
-	@cp -R apps/docs/build/html/ rel/couchdb/share/www/docs
-	@cp apps/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
+	@cp -R _build/default/lib/docs/build/html/ rel/couchdb/share/www/docs
+	@cp _build/default/lib/docs/build/man/apachecouchdb.1 rel/couchdb/share/docs/couchdb.1
 endif
 endif
 

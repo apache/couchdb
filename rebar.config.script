@@ -159,7 +159,48 @@ AddConfig = [
         {plt_extra_apps, [
             asn1, compiler, crypto, inets, kernel, runtime_tools,
             sasl, setup, ssl, stdlib, syntax_tools, xmerl]},
-        {warnings, [unmatched_returns, error_handling, race_conditions]}]},
+        {warnings, [unmatched_returns, error_handling, race_conditions]}
+    ]},
+    {relx, [
+        {release, {couchdb, "3.2.2"}, [
+            %% stdlib
+            asn1, compiler, crypto, inets, runtime_tools,
+            sasl, ssl, syntax_tools, xmerl,
+
+            %% couchdb
+            b64url, bear, chttpd, config, couch, couch_epi,
+            couch_index, couch_log, couch_mrview, couch_plugins,
+            couch_replicator, couch_stats, couch_event,
+            couch_peruser, couch_dist, custodian, ddoc_cache,
+            dreyfus, ets_lru, fabric, folsom, global_changes,
+            hyper, ibrowse, ioq, jiffy, jwtf, ken, khash, mango,
+            mem3, mochiweb, rexi, setup, smoosh, snappy,
+            weatherreport, couch_prometheus,
+
+            %% extra
+            recon
+        ]},
+
+        {mode, prod},
+        {overlay_vars, "rel/couchdb.config"},
+        {sys_config, "rel/files/sys.config"},
+        {vm_args, "rel/files/vm.args"},
+        {check_for_undefined_functions, false},
+        {overlay, [
+            {copy, "LICENSE", "LICENSE"},
+            {mkdir, "var/log"},
+            {copy, "rel/overlay/bin", "bin"},
+            {copy, "rel/overlay/etc", "etc"},
+            {copy, "bin/couchjs", "bin/couchjs"},
+            {copy, "share/server/main.js", "share/rserver/main.js"},
+            {copy, "share/server/main-coffee.js", "share/server/main-coffee.js"},
+            {copy, "bin/weatherreport", "bin/weatherreport"},
+            {template, "rel/overlay/etc/default.ini", "etc/default.ini"},
+            {template, "rel/overlay/etc/vm.args", "etc/vm.args"},
+            {template, "rel/files/couchdb.in", "bin/couchdb"},
+            {template, "rel/files/couchdb.cmd.in", "bin/couchdb.cmd"}
+        ]}
+    ]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
 ].
 
