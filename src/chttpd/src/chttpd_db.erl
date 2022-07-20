@@ -1205,6 +1205,8 @@ db_doc_req(#httpd{method = 'PUT', user_ctx = Ctx} = Req, Db, DocId) ->
                 fun() -> receive_request_data(Req) end
             ),
             Doc = couch_doc_from_req(Req, Db, DocId, Doc0),
+            validate_revs(Doc, UpdateType =:= ?INTERACTIVE_EDIT),
+
             try
                 {HttpCode, RespHeaders1, RespBody} = update_doc_req(
                     Req,
@@ -1227,6 +1229,7 @@ db_doc_req(#httpd{method = 'PUT', user_ctx = Ctx} = Req, Db, DocId) ->
                 "ok" ->
                     % batch
                     Doc = couch_doc_from_req(Req, Db, DocId, chttpd:json_body(Req)),
+                    validate_revs(Doc, UpdateType =:= ?INTERACTIVE_EDIT),
 
                     spawn(fun() ->
                         case catch (fabric:update_doc(Db, Doc, Options)) of
@@ -1253,6 +1256,7 @@ db_doc_req(#httpd{method = 'PUT', user_ctx = Ctx} = Req, Db, DocId) ->
                     % normal
                     Body = chttpd:json_body(Req),
                     Doc = couch_doc_from_req(Req, Db, DocId, Body),
+                    validate_revs(Doc, UpdateType =:= ?INTERACTIVE_EDIT),
                     send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
             end
     end;
