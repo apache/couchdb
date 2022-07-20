@@ -280,7 +280,7 @@ def check_beams(ctx):
 def check_boot_script(ctx):
     if not os.path.exists(os.path.join(ctx["devdir"], "devnode.boot")):
         env = os.environ.copy()
-        env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "apps")
+        env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "_build/default/lib")
         sp.check_call(["escript", "make_boot_script"], env=env, cwd=ctx["devdir"])
 
 
@@ -598,15 +598,17 @@ def check_node_alive(url):
 def set_boot_env(ctx):
 
     # fudge fauxton path
-    if os.path.exists("apps/fauxton/dist/release"):
-        fauxton_root = "apps/fauxton/dist/release"
+    if os.path.exists("_build/default/lib/fauxton/dist/release"):
+        fauxton_root = "_build/default/lib/fauxton/dist/release"
     else:
         fauxton_root = "share/www"
 
     os.environ["COUCHDB_FAUXTON_DOCROOT"] = fauxton_root
 
     # fudge default query server paths
-    couchjs = os.path.join(ctx["rootdir"], "apps", "couch", "priv", "couchjs")
+    couchjs = os.path.join(
+        ctx["rootdir"], "_build/default/lib", "couch", "priv", "couchjs"
+    )
     mainjs = os.path.join(ctx["rootdir"], "share", "server", "main.js")
     coffeejs = os.path.join(ctx["rootdir"], "share", "server", "main-coffee.js")
 
@@ -621,7 +623,7 @@ def set_boot_env(ctx):
 def boot_node(ctx, node):
     set_boot_env(ctx)
     env = os.environ.copy()
-    env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "apps")
+    env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "_build/default/lib")
 
     node_etcdir = os.path.join(ctx["devdir"], "lib", node, "etc")
     reldir = os.path.join(ctx["rootdir"], "rel")
