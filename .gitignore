@@ -135,4 +135,5 @@ test/javascript/junit.xml
 _build
 *.iml
 *.lock
+*.log
 *.crashdump

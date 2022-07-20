@@ -21,26 +21,8 @@
         # You can give explicit globs or simply directories.
         # In the latter case `**/*.{ex,exs}` will be used.
         #
-        included: ["lib/", "apps/", "test/", "web/", "apps/"],
-        excluded: [
-          ~r"/_build/",
-          ~r"/node_modules/",
-          ~r"/apps/certifi/",
-          ~r"/apps/excoveralls/",
-          ~r"/apps/jason",
-          ~r"/apps/hackney",
-          ~r"/apps/httpotion",
-          ~r"/apps/file_system",
-          ~r"/apps/credo",
-          ~r"/apps/idna",
-          ~r"/apps/junit_formatter",
-          ~r"/apps/bunt",
-          ~r"/apps/metrics",
-          ~r"/apps/minerl",
-          ~r"/apps/parse_trans",
-          ~r"/apps/ssl_verify_fun",
-          ~r"/test/elixir/deps/"
-        ]
+        included: ["lib/", "src/", "test/", "web/", "apps/"],
+        excluded: [~r"/_build/"]
       },
       #
       # If you create your own checks, you must specify the source files for

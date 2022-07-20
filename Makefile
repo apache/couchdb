@@ -140,7 +140,7 @@ fauxton: share/www
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
 escriptize: couch
-	@[ -e bin/weatherreport ] ||$(REBAR3) escriptize -a weatherreport
+	@[ -e bin/weatherreport ] || COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) escriptize -a weatherreport
 	@cp _build/default/bin/weatherreport bin/weatherreport
 
 
@@ -181,7 +181,7 @@ eunit: couch
 # target: exunit - Run ExUnit tests
 exunit: export BUILDDIR = $(shell pwd)
 exunit: export MIX_ENV=test
-exunit: export ERL_LIBS = $(shell pwd)/apps
+exunit: export ERL_LIBS = $(shell pwd)/_build/default/lib
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
