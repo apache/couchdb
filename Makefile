@@ -171,7 +171,7 @@ eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR3) ic setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
             COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
@@ -191,7 +191,7 @@ exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 setup-eunit:
-	@$(REBAR) setup_eunit 2> /dev/null
+	@$(REBAR3) ic setup_eunit 2> /dev/null
 
 just-eunit: export BUILDDIR = $(shell pwd)
 just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
@@ -202,7 +202,7 @@ just-eunit:
 soak-eunit: export BUILDDIR = $(shell pwd)
 soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
+	@$(REBAR3) ic setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 erlfmt-check:
@@ -222,7 +222,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|apps/erlfmt|apps/jiffy|apps/rebar/pr2relnotes.py|apps/fauxton" \
-		build-aux/*.py dev/run dev/format_*.py apps/mango/test/*.py apps/docs/src/conf.py apps/docs/ext/*.py .
+		build-aux/*.py dev/run dev/format_*.py apps/mango/test/*.py _build/default/lib/docs/src/conf.py _build/default/lib/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -230,7 +230,7 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|apps/rebar/pr2relnotes.py|apps/fauxton" \
-		build-aux/*.py dev/run apps/mango/test/*.py apps/docs/src/conf.py apps/docs/ext/*.py .
+		build-aux/*.py dev/run apps/mango/test/*.py _build/default/lib/docs/src/conf.py _build/default/lib/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration

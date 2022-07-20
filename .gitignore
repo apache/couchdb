@@ -132,6 +132,7 @@ test/javascript/junit.xml
 /apps/junit_formatter/
 
 .idea
-*.iml
 _build
+*.iml
 *.lock
+*.crashdump

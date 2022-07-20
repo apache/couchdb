@@ -107,6 +107,8 @@ os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 AddConfig = [
     {require_otp_vsn, "23|24|25"},
     {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}]},
+    {plugins, [ic, erlfmt]},
+	{erlfmt, [write]},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {dialyzer, [
         {plt_location, local},
