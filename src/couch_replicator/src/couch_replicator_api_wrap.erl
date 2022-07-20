@@ -332,12 +332,12 @@ open_doc(#httpdb{} = Db, Id, Options) ->
     ).
 
 update_doc(Db, Doc, Options) ->
-    update_doc(Db, Doc, Options, interactive_edit).
+    update_doc(Db, Doc, Options, ?INTERACTIVE_EDIT).
 
 update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
     QArgs =
         case Type of
-            replicated_changes ->
+            ?REPLICATED_CHANGES ->
                 [{"new_edits", "false"}];
             _ ->
                 []
@@ -397,7 +397,7 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
     ).
 
 update_docs(Db, DocList, Options) ->
-    update_docs(Db, DocList, Options, interactive_edit).
+    update_docs(Db, DocList, Options, ?INTERACTIVE_EDIT).
 
 update_docs(_Db, [], _Options, _UpdateType) ->
     {ok, []};
@@ -405,9 +405,9 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
     FullCommit = atom_to_list(not lists:member(delay_commit, Options)),
     Prefix =
         case UpdateType of
-            replicated_changes ->
+            ?REPLICATED_CHANGES ->
                 <<"{\"new_edits\":false,\"docs\":[">>;
-            interactive_edit ->
+            ?INTERACTIVE_EDIT ->
                 <<"{\"docs\":[">>
         end,
     Suffix = <<"]}">>,

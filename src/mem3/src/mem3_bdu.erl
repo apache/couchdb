@@ -25,7 +25,7 @@ before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db, _Updat
 before_doc_update(#doc{deleted = true} = Doc, _Db, _UpdateType) ->
     % Skip deleted
     Doc;
-before_doc_update(#doc{} = Doc, _Db, replicated_changes) ->
+before_doc_update(#doc{} = Doc, _Db, ?REPLICATED_CHANGES) ->
     % Skip internal replicator updates
     Doc;
 before_doc_update(#doc{} = Doc, _Db, _UpdateType) ->

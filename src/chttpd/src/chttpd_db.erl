@@ -52,7 +52,7 @@
     options = [],
     rev = nil,
     open_revs = [],
-    update_type = interactive_edit,
+    update_type = ?INTERACTIVE_EDIT,
     atts_since = nil
 }).
 
@@ -648,7 +648,7 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_docs">>], user_ctx = Ct
                     send_json(Req, 417, ErrorsJson)
             end;
         false ->
-            case fabric:update_docs(Db, Docs, [replicated_changes | Options]) of
+            case fabric:update_docs(Db, Docs, [?REPLICATED_CHANGES | Options]) of
                 {ok, Errors} ->
                     chttpd_stats:incr_writes(length(Docs)),
                     ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
@@ -1539,7 +1539,7 @@ send_updated_doc(Req, Db, DocId, Json) ->
     send_updated_doc(Req, Db, DocId, Json, []).
 
 send_updated_doc(Req, Db, DocId, Doc, Headers) ->
-    send_updated_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
+    send_updated_doc(Req, Db, DocId, Doc, Headers, ?INTERACTIVE_EDIT).
 
 send_updated_doc(Req, Db, DocId, Doc, Headers, Type) ->
     {Code, Headers1, Body} = update_doc_req(Req, Db, DocId, Doc, Headers, Type),
@@ -2160,9 +2160,9 @@ parse_doc_query({Key, Value}, Args) ->
             JsonArray = ?JSON_DECODE(RevsJsonStr),
             Args#doc_query_args{atts_since = couch_doc:parse_revs(JsonArray)};
         {"new_edits", "false"} ->
-            Args#doc_query_args{update_type = replicated_changes};
+            Args#doc_query_args{update_type = ?REPLICATED_CHANGES};
         {"new_edits", "true"} ->
-            Args#doc_query_args{update_type = interactive_edit};
+            Args#doc_query_args{update_type = ?INTERACTIVE_EDIT};
         {"att_encoding_info", "true"} ->
             Options = [att_encoding_info | Args#doc_query_args.options],
             Args#doc_query_args{options = Options};

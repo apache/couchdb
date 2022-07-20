@@ -100,7 +100,7 @@ cpse_increment_purge_seq_on_partial_purge(DbName) ->
             {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
             {vsn, <<"1.2">>}
         ]},
-    {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
+    {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [?REPLICATED_CHANGES]),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
         {doc_count, 1},

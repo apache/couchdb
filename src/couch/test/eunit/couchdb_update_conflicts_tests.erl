@@ -294,7 +294,7 @@ bulk_create_local_doc(DbName) ->
         Db,
         [LocalDoc],
         [],
-        replicated_changes
+        ?REPLICATED_CHANGES
     ),
     ok = couch_db:close(Db),
     ?assertEqual([], Results),
@@ -319,7 +319,7 @@ ignore_invalid_local_doc(DbName) ->
         Db,
         [LocalDoc],
         [],
-        replicated_changes
+        ?REPLICATED_CHANGES
     ),
     ok = couch_db:close(Db),
     ?assertEqual([], Results),

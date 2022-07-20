@@ -354,7 +354,7 @@ pull_purges(Db, Count, SrcShard, #tgt{} = Tgt0) ->
         Infos == [] ->
             ok;
         true ->
-            {ok, _} = couch_db:purge_docs(Db, Infos, [replicated_changes]),
+            {ok, _} = couch_db:purge_docs(Db, Infos, [?REPLICATED_CHANGES]),
             Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
             mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, LocalPurgeId, Body)
     end,
@@ -648,7 +648,7 @@ open_docs(Db, Infos, Missing) ->
 
 save_on_target(Node, Name, Docs) ->
     mem3_rpc:update_docs(Node, Name, Docs, [
-        replicated_changes,
+        ?REPLICATED_CHANGES,
         full_commit,
         ?ADMIN_CTX,
         {io_priority, {internal_repl, Name}}
@@ -657,7 +657,7 @@ save_on_target(Node, Name, Docs) ->
 
 purge_on_target(Node, Name, PurgeInfos) ->
     mem3_rpc:purge_docs(Node, Name, PurgeInfos, [
-        replicated_changes,
+        ?REPLICATED_CHANGES,
         full_commit,
         ?ADMIN_CTX,
         {io_priority, {internal_repl, Name}}

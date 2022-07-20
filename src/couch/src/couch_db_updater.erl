@@ -100,7 +100,7 @@ handle_call({purge_docs, [], _}, _From, Db) ->
 handle_call({purge_docs, PurgeReqs0, Options}, _From, Db) ->
     % Filter out any previously applied updates during
     % internal replication
-    IsRepl = lists:member(replicated_changes, Options),
+    IsRepl = lists:member(?REPLICATED_CHANGES, Options),
     PurgeReqs =
         if
             not IsRepl ->
