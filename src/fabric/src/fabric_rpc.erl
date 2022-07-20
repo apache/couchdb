@@ -290,12 +290,12 @@ update_docs(DbName, Docs0, Options) ->
         case couch_util:get_value(read_repair, Options) of
             NodeRevs when is_list(NodeRevs) ->
                 Filtered = read_repair_filter(DbName, Docs0, NodeRevs, Options),
-                {Filtered, replicated_changes};
+                {Filtered, ?REPLICATED_CHANGES};
             undefined ->
                 X =
-                    case proplists:get_value(replicated_changes, Options) of
-                        true -> replicated_changes;
-                        _ -> interactive_edit
+                    case proplists:get_value(?REPLICATED_CHANGES, Options) of
+                        true -> ?REPLICATED_CHANGES;
+                        _ -> ?INTERACTIVE_EDIT
                     end,
                 {Docs0, X}
         end,

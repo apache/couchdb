@@ -392,7 +392,7 @@ flush_docs(Target, DocList) ->
         Target,
         DocList,
         [delay_commit],
-        replicated_changes
+        ?REPLICATED_CHANGES
     ),
     handle_flush_docs_result(FlushResult, Target, DocList).
 
@@ -442,7 +442,7 @@ handle_flush_docs_result({error, {bulk_docs_failed, _, _} = Err}, _, _) ->
     exit(Err).
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
-    try couch_replicator_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
+    try couch_replicator_api_wrap:update_doc(Target, Doc, [], ?REPLICATED_CHANGES) of
         {ok, _} ->
             ok;
         Error ->

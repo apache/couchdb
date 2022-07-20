@@ -146,7 +146,7 @@ test_purge_partial(Db) ->
                 {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
                 {'val', 1.2}
             ]},
-        {ok, [_Rev2]} = save_docs(Db, [Update], [replicated_changes]),
+        {ok, [_Rev2]} = save_docs(Db, [Update], [?REPLICATED_CHANGES]),
 
         PurgeInfos = [{<<"UUID1">>, <<"1">>, [Rev1]}],
 
@@ -534,10 +534,10 @@ save_docs(Db, JsonDocs, Options) ->
         JsonDocs
     ),
     Opts = [full_commit | Options],
-    case lists:member(replicated_changes, Options) of
+    case lists:member(?REPLICATED_CHANGES, Options) of
         true ->
             {ok, []} = couch_db:update_docs(
-                Db, Docs, Opts, replicated_changes
+                Db, Docs, Opts, ?REPLICATED_CHANGES
             ),
             {ok,
                 lists:map(

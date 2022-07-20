@@ -132,10 +132,10 @@ save_docs(DbName, JsonDocs, Options) ->
     Opts = [full_commit | Options],
     {ok, Db} = couch_db:open_int(DbName, []),
     try
-        case lists:member(replicated_changes, Options) of
+        case lists:member(?REPLICATED_CHANGES, Options) of
             true ->
                 {ok, []} = couch_db:update_docs(
-                    Db, Docs, Opts, replicated_changes
+                    Db, Docs, Opts, ?REPLICATED_CHANGES
                 ),
                 {ok,
                     lists:map(
@@ -281,7 +281,7 @@ apply_batch(Db, Actions) ->
     false = lists:member(conflict, Resp),
     {ok, Db1} = couch_db:reopen(Db),
 
-    {ok, []} = couch_db:update_docs(Db, Conflicts, [], replicated_changes),
+    {ok, []} = couch_db:update_docs(Db, Conflicts, [], ?REPLICATED_CHANGES),
     {ok, Db2} = couch_db:reopen(Db1),
 
     if

@@ -46,6 +46,8 @@
     <<"_users">>
 ]).
 
+-define(INTERACTIVE_EDIT, interactive_edit).
+-define(REPLICATED_CHANGES, replicated_changes).
 
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.

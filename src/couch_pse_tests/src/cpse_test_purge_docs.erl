@@ -250,7 +250,7 @@ cpse_purge_partial_revs(DbName) ->
             {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
             {vsn, <<"1.2">>}
         ]},
-    {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
+    {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [?REPLICATED_CHANGES]),
 
     PurgeInfos = [
         {cpse_util:uuid(), <<"foo">>, [Rev1]}
@@ -386,7 +386,7 @@ cpse_purge_repeated_revisions(DbName) ->
             {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
             {vsn, <<"1.2">>}
         ]},
-    {ok, [Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
+    {ok, [Rev2]} = cpse_util:save_docs(DbName, [Update], [?REPLICATED_CHANGES]),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
         {doc_count, 1},
@@ -447,7 +447,7 @@ cpse_purge_repeated_uuid(DbName) ->
     ?assertThrow({badreq, _}, cpse_util:purge(DbName, DifferentRevs)),
 
     % Although we can replicate it in
-    {ok, []} = cpse_util:purge(DbName, PurgeInfos, [replicated_changes]),
+    {ok, []} = cpse_util:purge(DbName, PurgeInfos, [?REPLICATED_CHANGES]),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
         {doc_count, 0},

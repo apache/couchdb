@@ -158,7 +158,7 @@ add_doc_siblings(Db, DocId, NumLeaves) when NumLeaves > 0 ->
     add_doc_siblings(Db, DocId, NumLeaves, [], []).
 
 add_doc_siblings(Db, _DocId, 0, AccDocs, AccRevs) ->
-    {ok, []} = couch_db:update_docs(Db, AccDocs, [], replicated_changes),
+    {ok, []} = couch_db:update_docs(Db, AccDocs, [], ?REPLICATED_CHANGES),
     {ok, AccRevs};
 add_doc_siblings(Db, DocId, NumLeaves, AccDocs, AccRevs) ->
     Value = ?l2b(?i2l(NumLeaves)),

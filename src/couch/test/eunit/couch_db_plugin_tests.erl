@@ -59,12 +59,12 @@ validate_dbname({false, _Db}, _) -> {decided, false};
 validate_dbname({fail, _Db}, _) -> throw(validate_dbname);
 validate_dbname({pass, _Db}, _) -> no_decision.
 
-before_doc_update({fail, _Doc}, _Db, interactive_edit) ->
+before_doc_update({fail, _Doc}, _Db, ?INTERACTIVE_EDIT) ->
     throw(before_doc_update);
-before_doc_update({true, Doc}, Db, interactive_edit) ->
-    [{true, [before_doc_update | Doc]}, Db, interactive_edit];
-before_doc_update({false, Doc}, Db, interactive_edit) ->
-    [{false, Doc}, Db, interactive_edit].
+before_doc_update({true, Doc}, Db, ?INTERACTIVE_EDIT) ->
+    [{true, [before_doc_update | Doc]}, Db, ?INTERACTIVE_EDIT];
+before_doc_update({false, Doc}, Db, ?INTERACTIVE_EDIT) ->
+    [{false, Doc}, Db, ?INTERACTIVE_EDIT].
 
 after_doc_read({fail, _Doc}, _Db) -> throw(after_doc_read);
 after_doc_read({true, Doc}, Db) -> [{true, [after_doc_read | Doc]}, Db];
@@ -152,7 +152,7 @@ before_doc_update_match() ->
     ?assertMatch(
         {true, [before_doc_update, doc]},
         couch_db_plugin:before_doc_update(
-            fake_db(), {true, [doc]}, interactive_edit
+            fake_db(), {true, [doc]}, ?INTERACTIVE_EDIT
         )
     ).
 
@@ -160,7 +160,7 @@ before_doc_update_no_match() ->
     ?assertMatch(
         {false, [doc]},
         couch_db_plugin:before_doc_update(
-            fake_db(), {false, [doc]}, interactive_edit
+            fake_db(), {false, [doc]}, ?INTERACTIVE_EDIT
         )
     ).
 
@@ -168,7 +168,7 @@ before_doc_update_throw() ->
     ?assertThrow(
         before_doc_update,
         couch_db_plugin:before_doc_update(
-            fake_db(), {fail, [doc]}, interactive_edit
+            fake_db(), {fail, [doc]}, ?INTERACTIVE_EDIT
         )
     ).
 

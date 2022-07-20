@@ -864,7 +864,7 @@ doc_from_json_obj_validate(#db{} = Db, DocJson) ->
     Doc.
 
 update_doc(Db, Doc, Options) ->
-    update_doc(Db, Doc, Options, interactive_edit).
+    update_doc(Db, Doc, Options, ?INTERACTIVE_EDIT).
 
 update_doc(Db, Doc, Options, UpdateType) ->
     case update_docs(Db, [Doc], Options, UpdateType) of
@@ -1140,7 +1140,7 @@ prep_and_validate_updates(
     ).
 
 update_docs(Db, Docs, Options) ->
-    update_docs(Db, Docs, Options, interactive_edit).
+    update_docs(Db, Docs, Options, ?INTERACTIVE_EDIT).
 
 prep_and_validate_replicated_updates(_Db, [], [], AccPrepped, AccErrors) ->
     Errors2 = [
@@ -1308,7 +1308,7 @@ doc_tag(#doc{meta = Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
-update_docs(Db, Docs0, Options, replicated_changes) ->
+update_docs(Db, Docs0, Options, ?REPLICATED_CHANGES) ->
     Docs = tag_docs(Docs0),
 
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
@@ -1322,7 +1322,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     end,
 
     {ok, DocBuckets, NonRepDocs, DocErrors} =
-        before_docs_update(Db, Docs, PrepValidateFun, replicated_changes),
+        before_docs_update(Db, Docs, PrepValidateFun, ?REPLICATED_CHANGES),
 
     DocBuckets2 = [
         [
@@ -1338,7 +1338,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
         [merge_conflicts | Options]
     ),
     {ok, DocErrors};
-update_docs(Db, Docs0, Options, interactive_edit) ->
+update_docs(Db, Docs0, Options, ?INTERACTIVE_EDIT) ->
     Docs = tag_docs(Docs0),
 
     AllOrNothing = lists:member(all_or_nothing, Options),
@@ -1354,7 +1354,7 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
     end,
 
     {ok, DocBuckets, NonRepDocs, DocErrors} =
-        before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
+        before_docs_update(Db, Docs, PrepValidateFun, ?INTERACTIVE_EDIT),
 
     if
         (AllOrNothing) and (DocErrors /= []) ->
