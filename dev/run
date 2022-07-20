@@ -351,6 +351,7 @@ def generate_haproxy_config(ctx):
 
     with open(haproxy_config, "w") as handle:
         handle.write("\n".join(out))
+        handle.write("\n")
 
 
 def apply_config_overrides(ctx, content):
