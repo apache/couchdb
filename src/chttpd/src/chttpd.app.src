@@ -24,7 +24,6 @@
         stdlib,
         couch_log,
         couch_stats,
-        couch_tests,
         config,
         couch,
         ets_lru,

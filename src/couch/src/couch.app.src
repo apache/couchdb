@@ -46,7 +46,6 @@
         couch_event,
         ioq,
         couch_stats,
-        couch_tests,
         hyper,
         couch_prometheus,
         couch_dist
