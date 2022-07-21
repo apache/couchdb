@@ -1077,6 +1077,7 @@ stream_node(Bt, Reds, Node, StartKey, InRange, Dir, Fun, Acc) ->
 stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc) ->
     Pointer = element(1, Node),
     {NodeType, NodeList} = get_node(Bt, Pointer),
+    couch_cost:inc_get_node(NodeType),
     case NodeType of
         kp_node ->
             stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc);
