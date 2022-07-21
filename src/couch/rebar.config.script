@@ -88,6 +88,8 @@ ConfigH = [
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
 ].
 
+APP_DIR = filename:dirname(SCRIPT).
+
 CouchJSConfig = case SMVsn of
     "78" ->
         APP_DIR ++ "/priv/couch_js/86/config.h";
