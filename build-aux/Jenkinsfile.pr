@@ -161,7 +161,7 @@ pipeline {
             }
             post {
               always {
-                junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                junit '**/_build/test/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/test/javascript/junit.xml'
               }
               cleanup {
                 sh 'rm -rf ${WORKSPACE}/*'

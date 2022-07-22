@@ -37,7 +37,7 @@ all_combinations_return_same_result() ->
         {"bar||shards/test/blacklist*", "true"}
     ],
     Expected = [
-        {{<<"shards/test/blacklist*">>}, {<<"shards/test/blacklist*">>, 22, [bar, baz, foo]}},
+        {{<<"shards/test/blacklist*">>}, {<<"shards/test/blacklist*">>, 22, [bar, foo]}},
         {{<<"shards/test*">>}, {<<"shards/test*">>, 12, [baz, foo]}},
         {{<<"shards/blacklist*">>}, {<<"shards/blacklist*">>, 17, [bar, foo]}},
         {{<<"*">>}, {<<"*">>, 1, [bar, foo]}}

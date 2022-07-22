@@ -10,11 +10,24 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{erl_opts, [debug_info,
-    {src_dirs, ["src", "setups"]}]}.
+ConfigFile = filename:join([os:getenv("COUCHDB_APPS_CONFIG_DIR"), "couch_epi.config"]).
+AppConfig =
+    case filelib:is_file(ConfigFile) of
+        true ->
+            {ok, Result} = file:consult(ConfigFile),
+            Result;
+        false ->
+            []
+    end.
 
-{eunit_opts, [verbose]}.
-
-{cover_enabled, true}.
-
-{cover_print_enabled, true}.
+{application, couch_epi, [
+    {description, "extensible plugin interface"},
+    {vsn, git},
+    {registered, [couch_epi_sup, couch_epi_server]},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {mod, {couch_epi_app, []}},
+    {env, AppConfig}
+]}.
