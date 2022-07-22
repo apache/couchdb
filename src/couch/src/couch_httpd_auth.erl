@@ -153,14 +153,14 @@ null_authentication_handler(Req) ->
 % Headers  name can be defined in local.ini. By default they are :
 %
 %   * X-Auth-CouchDB-UserName : contain the username, (x_auth_username in
-%   cttpd_auth section)
+%   couch_httpd_auth section)
 %   * X-Auth-CouchDB-Roles : contain the user roles, list of roles separated by a
-%   comma (x_auth_roles in chttpd_auth section)
+%   comma (x_auth_roles in couch_httpd_auth section)
 %   * X-Auth-CouchDB-Token : token to authenticate the authorization (x_auth_token
-%   in chttpd_auth section). This token is an hmac-sha256 created from secret key
+%   in couch_httpd_auth section). This token is an hmac-sha1 created from secret key
 %   and username. The secret key should be the same in the client and couchdb node.
-%   Secret key is the secret key in chttpd_auth section of ini. This token is optional
-%   if value of proxy_use_secret key in chttpd_auth section of ini isn't true.
+%   Secret key is the secret key in couch_httpd_auth section of ini. This token is optional
+%   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
 %
 proxy_authentication_handler(Req) ->
     case proxy_auth_user(Req) of
@@ -202,7 +202,7 @@ proxy_auth_user(Req) ->
                             Req#httpd{user_ctx = #user_ctx{name = ?l2b(UserName), roles = Roles}};
                         Secret ->
                             ExpectedToken = couch_util:to_hex(
-                                couch_util:hmac(sha256, Secret, UserName)
+                                couch_util:hmac(sha, Secret, UserName)
                             ),
                             case header_value(Req, XHeaderToken) of
                                 Token when Token == ExpectedToken ->
@@ -308,9 +308,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                         {ok, UserProps, _AuthCtx} ->
                             UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                             FullSecret = <<Secret/binary, UserSalt/binary>>,
-                            ExpectedHash = couch_util:hmac(
-                                sha256, FullSecret, User ++ ":" ++ TimeStr
-                            ),
+                            ExpectedHash = couch_util:hmac(sha, FullSecret, User ++ ":" ++ TimeStr),
                             Hash = ?l2b(HashStr),
                             Timeout = chttpd_util:get_chttpd_auth_config_integer(
                                 "timeout", 600
@@ -369,7 +367,7 @@ cookie_auth_header(_Req, _Headers) ->
 
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
-    Hash = couch_util:hmac(sha256, Secret, SessionData),
+    Hash = couch_util:hmac(sha, Secret, SessionData),
     mochiweb_cookies:cookie(
         "AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
