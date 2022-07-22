@@ -4,7 +4,27 @@ defmodule ProxyAuthTest do
   @moduletag :authentication
 
   @tag :with_db
-  test "proxy auth with secret" do
+  test "proxy auth with secret", context do
+    db_name = context[:db_name]
+
+    design_doc = %{
+      _id: "_design/test",
+      language: "javascript",
+      shows: %{
+        welcome: """
+           function(doc,req) {
+          return "Welcome " + req.userCtx["name"];
+        }
+        """,
+        role: """
+          function(doc, req) {
+          return req.userCtx['roles'][0];
+        }
+        """
+      }
+    }
+
+    {:ok, _} = create_doc(db_name, design_doc)
 
     users_db_name = random_db_name()
     create_db(users_db_name)
@@ -18,19 +38,19 @@ defmodule ProxyAuthTest do
         :value => users_db_name
       },
       %{
-        :section => "chttpd_auth",
+        :section => "couch_httpd_auth",
         :key => "proxy_use_secret",
         :value => "true"
       },
       %{
-        :section => "chttpd_auth",
+        :section => "couch_httpd_auth",
         :key => "secret",
         :value => secret
       }
     ]
 
     run_on_modified_server(server_config, fn ->
-      test_fun(users_db_name, secret)
+      test_fun(db_name, users_db_name, secret)
     end)
     delete_db(users_db_name)
   end
@@ -42,12 +62,16 @@ defmodule ProxyAuthTest do
     |> Enum.join("")
   end
 
-  defp hex_hmac_sha256(secret, message) do
-    signature = :crypto.mac(:hmac, :sha256, secret, message)
+  defp hex_hmac_sha1(secret, message) do
+    signature = case :erlang.system_info(:otp_release) do
+      '20' -> :crypto.hmac(:sha, secret, message)
+      '21' -> :crypto.hmac(:sha, secret, message)
+      _ -> :crypto.mac(:hmac, :sha, secret, message)
+    end
     Base.encode16(signature, case: :lower)
   end
 
-  def test_fun(users_db_name, secret) do
+  def test_fun(db_name, users_db_name, secret) do
     user = prepare_user_doc(name: "couch@apache.org", password: "test")
     create_doc(users_db_name, user)
 
@@ -61,24 +85,38 @@ defmodule ProxyAuthTest do
 
     headers = [
       "X-Auth-CouchDB-UserName": "couch@apache.org",
-      "X-Auth-CouchDB-Roles": "test_role",
-      "X-Auth-CouchDB-Token": hex_hmac_sha256(secret, "couch@apache.org")
+      "X-Auth-CouchDB-Roles": "test",
+      "X-Auth-CouchDB-Token": hex_hmac_sha1(secret, "couch@apache.org")
     ]
+    resp = Couch.get("/#{db_name}/_design/test/_show/welcome", headers: headers)
+    assert resp.body == "Welcome couch@apache.org"
 
-    resp2 =
-      Couch.get("/_session",
-        headers: headers
-      )
-
-    assert resp2.body["userCtx"]["name"] == "couch@apache.org"
-    assert resp2.body["userCtx"]["roles"] == ["test_role"]
-    assert resp2.body["info"]["authenticated"] == "proxy"
-    assert resp2.body["ok"] == true
-
+    resp = Couch.get("/#{db_name}/_design/test/_show/role", headers: headers)
+    assert resp.body == "test"
   end
 
   @tag :with_db
-  test "proxy auth without secret" do
+  test "proxy auth without secret", context do
+    db_name = context[:db_name]
+
+    design_doc = %{
+      _id: "_design/test",
+      language: "javascript",
+      shows: %{
+        welcome: """
+           function(doc,req) {
+          return "Welcome " + req.userCtx["name"];
+        }
+        """,
+        role: """
+          function(doc, req) {
+          return req.userCtx['roles'][0];
+        }
+        """
+      }
+    }
+
+    {:ok, _} = create_doc(db_name, design_doc)
 
     users_db_name = random_db_name()
     create_db(users_db_name)
@@ -90,20 +128,20 @@ defmodule ProxyAuthTest do
         :value => users_db_name
       },
       %{
-        :section => "chttpd_auth",
+        :section => "couch_httpd_auth",
         :key => "proxy_use_secret",
         :value => "false"
       }
     ]
 
     run_on_modified_server(server_config, fn ->
-      test_fun_no_secret(users_db_name)
+      test_fun_no_secret(db_name, users_db_name)
     end)
 
     delete_db(users_db_name)
   end
 
-  def test_fun_no_secret(users_db_name) do
+  def test_fun_no_secret(db_name, users_db_name) do
     user = prepare_user_doc(name: "couch@apache.org", password: "test")
     create_doc(users_db_name, user)
 
@@ -117,18 +155,13 @@ defmodule ProxyAuthTest do
 
     headers = [
       "X-Auth-CouchDB-UserName": "couch@apache.org",
-      "X-Auth-CouchDB-Roles": "test_role_1,test_role_2"
+      "X-Auth-CouchDB-Roles": "test"
     ]
 
-    resp2 =
-      Couch.get("/_session",
-        headers: headers
-      )
+    resp = Couch.get("/#{db_name}/_design/test/_show/welcome", headers: headers)
+    assert resp.body == "Welcome couch@apache.org"
 
-    assert resp2.body["userCtx"]["name"] == "couch@apache.org"
-    assert resp2.body["userCtx"]["roles"] == ["test_role_1", "test_role_2"]
-    assert resp2.body["info"]["authenticated"] == "proxy"
-    assert resp2.body["ok"] == true
-
+    resp = Couch.get("/#{db_name}/_design/test/_show/role", headers: headers)
+    assert resp.body == "test"
   end
 end
