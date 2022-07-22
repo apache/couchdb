@@ -104,103 +104,103 @@ end.
 
 os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
-SubDirs = [
-    %% must be compiled first as it has a custom behavior
-    "src/couch_epi",
-    "src/couch_log",
-    "src/chttpd",
-    "src/couch",
-    "src/couch_event",
-    "src/mem3",
-    "src/couch_index",
-    "src/couch_mrview",
-    "src/couch_replicator",
-    "src/couch_plugins",
-    "src/couch_pse_tests",
-    "src/couch_stats",
-    "src/couch_peruser",
-    "src/couch_tests",
-    "src/couch_dist",
-    "src/custodian",
-    "src/ddoc_cache",
-    "src/dreyfus",
-    "src/fabric",
-    "src/global_changes",
-    "src/ioq",
-    "src/jwtf",
-    "src/ken",
-    "src/mango",
-    "src/rexi",
-    "src/setup",
-    "src/smoosh",
-    "src/weatherreport",
-    "src/couch_prometheus",
-    "rel"
-].
-
-DepDescs = [
-%% Independent Apps
-{config,           "config",           {tag, "2.1.9"}},
-{b64url,           "b64url",           {tag, "1.0.3"}},
-{ets_lru,          "ets-lru",          {tag, "1.1.0"}},
-{khash,            "khash",            {tag, "1.1.0"}},
-{snappy,           "snappy",           {tag, "CouchDB-1.0.8"}},
-
-%% Non-Erlang deps
-{docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   {tag, "3.2.1-1"}, [raw]},
-{fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.2.8"}, [raw]},
-%% Third party deps
-{folsom,           "folsom",           {tag, "CouchDB-0.8.4"}},
-{hyper,            "hyper",            {tag, "CouchDB-2.2.0-7"}},
-{ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-5"}},
-{jiffy,            "jiffy",            {tag, "1.1.1"}},
-{mochiweb,         "mochiweb",         {tag, "v3.0.0"}},
-{meck,             "meck",             {tag, "0.9.2"}},
-{recon,            "recon",            {tag, "2.5.2"}}
-].
-
-WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
-
-OptionalDeps = case WithProper of
-    true ->
-        [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.4"}}];
-    false ->
-        []
-end.
-
-BaseUrl = "https://github.com/apache/".
-
-MakeDep = fun
-    ({AppName, {url, Url}, Version}) ->
-        {AppName, ".*", {git, Url, Version}};
-    ({AppName, {url, Url}, Version, Options}) ->
-        {AppName, ".*", {git, Url, Version}, Options};
-    ({AppName, RepoName, Version}) ->
-        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
-        {AppName, ".*", {git, Url, Version}};
-    ({AppName, RepoName, Version, Options}) ->
-        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
-        {AppName, ".*", {git, Url, Version}, Options}
-end.
-
 AddConfig = [
     {require_otp_vsn, "23|24|25"},
-    {deps_dir, "src"},
-    {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
-    {sub_dirs, SubDirs},
-    {lib_dirs, ["src"]},
     {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}]},
-    {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
-    {plugins, [eunit_plugin]},
+    {deps, []},
+    {plugins, [ic, erlfmt]},
+	{erlfmt, [write]},
+    {eunit_opts, [
+        verbose,
+        {report, {eunit_progress, [colored, profile]}},
+        {report, {eunit_surefire, [{dir, "_build/test"}]}}
+    ]},
+    {eunit_tests, [
+        {application, b64url},
+        {application, chttpd},
+        {application, config},
+        {application, couch_dist},
+        {application, couch_event},
+        {application, couch_index},
+        {application, couch_log},
+        {application, couch_mrview},
+        {application, couch_peruser},
+        {application, couch_plugins},
+        {application, couch_prometheus},
+        {application, couch_pse_tests},
+        {application, couch_replicator},
+        {application, couch_stats},
+        {application, couch_tests},
+        {application, couch},
+        {application, custodian},
+        {application, ddoc_cache},
+        {application, dreyfus},
+        {application, ets_lru},
+        {application, fabric},
+        {application, global_changes},
+        {application, ioq},
+        {application, jiffy},
+        {application, jwtf},
+        {application, ken},
+        {application, khash},
+        {application, mango},
+        {application, mem3},
+        {application, recon},
+        {application, rexi},
+        {application, setup},
+        {application, smoosh},
+        {application, weatherreport},
+        {application, couch_epi}
+	]},
+    {profiles, [{test, [{extra_src_dirs, [{"test", [{recursive, true}]}]}]}]},
     {dialyzer, [
         {plt_location, local},
         {plt_location, COUCHDB_ROOT},
         {plt_extra_apps, [
             asn1, compiler, crypto, inets, kernel, runtime_tools,
             sasl, setup, ssl, stdlib, syntax_tools, xmerl]},
-        {warnings, [unmatched_returns, error_handling, race_conditions]}]},
+        {warnings, [unmatched_returns, error_handling, race_conditions]}
+    ]},
+    {relx, [
+        {release, {couchdb, "3.2.2"}, [
+            %% stdlib
+            asn1, compiler, crypto, inets, runtime_tools,
+            sasl, ssl, syntax_tools, xmerl,
+
+            %% couchdb
+            b64url, bear, chttpd, config, couch, couch_epi,
+            couch_index, couch_log, couch_mrview, couch_plugins,
+            couch_replicator, couch_stats, couch_event,
+            couch_peruser, couch_dist, custodian, ddoc_cache,
+            dreyfus, ets_lru, fabric, folsom, global_changes,
+            hyper, ibrowse, ioq, jiffy, jwtf, ken, khash, mango,
+            mem3, mochiweb, rexi, setup, smoosh, snappy,
+            weatherreport, couch_prometheus,
+
+            %% extra
+            recon
+        ]},
+
+        {mode, prod},
+        {overlay_vars, "rel/couchdb.config"},
+        {sys_config, "rel/files/sys.config"},
+        {vm_args, "rel/files/vm.args"},
+        {check_for_undefined_functions, false},
+        {overlay, [
+            {copy, "LICENSE", "LICENSE"},
+            {mkdir, "var/log"},
+            {copy, "rel/overlay/bin", "bin"},
+            {copy, "rel/overlay/etc", "etc"},
+            {copy, "bin/couchjs", "bin/couchjs"},
+            {copy, "share/server/main.js", "share/rserver/main.js"},
+            {copy, "share/server/main-coffee.js", "share/server/main-coffee.js"},
+            {copy, "bin/weatherreport", "bin/weatherreport"},
+            {template, "rel/overlay/etc/default.ini", "etc/default.ini"},
+            {template, "rel/overlay/etc/vm.args", "etc/vm.args"},
+            {template, "rel/files/couchdb.in", "bin/couchdb"},
+            {template, "rel/files/couchdb.cmd.in", "bin/couchdb.cmd"}
+        ]}
+    ]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
 ].
 

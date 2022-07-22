@@ -41,7 +41,7 @@ def collect_logfiles():
     for log in glob.glob("test-results.log"):
         tb.add(log)
     # EUnit
-    for log in glob.glob("src/*/.eunit/couch.log"):
+    for log in glob.glob("couch.log"):
         tb.add(log)
     # JS harness
     for log in glob.glob("dev/logs/node1.log"):

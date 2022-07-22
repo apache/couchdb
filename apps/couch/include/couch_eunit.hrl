@@ -28,11 +28,11 @@
     filename:join([?BUILDDIR(), "tmp", "etc", "local_eunit.ini"]),
     filename:join([?BUILDDIR(), "tmp", "etc", "eunit.ini"])]).
 -define(FIXTURESDIR,
-    filename:join([?BUILDDIR(), "src", "couch", "test", "eunit", "fixtures"])).
+    filename:join([?BUILDDIR(), "apps", "couch", "test", "eunit", "fixtures"])).
 -define(TEMPDIR,
     filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
 
--define(APPDIR, filename:dirname(element(2, file:get_cwd()))).
+-define(APPDIR, element(2, file:get_cwd())).
 %% Account for the fact that source files are in src/<app>/.eunit/<module>.erl
 %% when run from eunit
 -define(ABS_PATH(File), %% src/<app>/.eunit/<module>.erl

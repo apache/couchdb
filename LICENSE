@@ -221,7 +221,7 @@ For the share/www/favicon.ico component from https://github.com/BigBlueHat/futon
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
-For the src/mochiweb component:
+For the apps/mochiweb component:
 
   Copyright (c) 2007 Mochi Media, Inc.
 
@@ -244,7 +244,7 @@ For the src/mochiweb component:
   OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
   WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-For the src/ibrowse component:
+For the apps/ibrowse component:
 
   Copyright (c) 2006, Chandrashekhar Mullaparthi
   All rights reserved.
@@ -272,8 +272,8 @@ For the src/ibrowse component:
   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-For the src/couch_log/src/couch_log_trunc_io.erl and
-    the src/couch_log/src/couch_log_trunc_io_fmt.erl components
+For the apps/couch_log/src/couch_log_trunc_io.erl and
+    the apps/couch_log/src/couch_log_trunc_io_fmt.erl components
 
 ERLANG PUBLIC LICENSE
 Version 1.1
@@ -563,7 +563,7 @@ Portions created by Ericsson are Copyright 1999, Ericsson Utvecklings
 AB. All Rights Reserved.''
 
 
-For the src/ejson/yajl component
+For the apps/ejson/yajl component
 
 Copyright 2010, Lloyd Hilaiel.
 
@@ -595,7 +595,7 @@ STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
 IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
-For the src/ejson/erl_nif_compat.h file
+For the apps/ejson/erl_nif_compat.h file
 
   Copyright (c) 2010-2011 Basho Technologies, Inc.
   With some minor modifications for Apache CouchDB.
@@ -614,7 +614,7 @@ For the src/ejson/erl_nif_compat.h file
   specific language governing permissions and limitations
   under the License.
 
-For the src/snappy/google-snappy component
+For the apps/snappy/google-snappy component
 
  Copyright 2005 and onwards Google Inc.
 
@@ -708,7 +708,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-for src/fauxton/assets/js/libs/bootstrap.js
+for apps/fauxton/assets/js/libs/bootstrap.js
 for share/www/js/require*
 
                                  Apache License
@@ -716,7 +716,7 @@ for share/www/js/require*
                         http://www.apache.org/licenses/
 
 
-for src/fauxton/assets/js/plugins/prettify.js
+for apps/fauxton/assets/js/plugins/prettify.js
 for share/www/js/require*
 
                                  Apache License
@@ -724,7 +724,7 @@ for share/www/js/require*
                         http://www.apache.org/licenses/
 
 
-for src/fauxton/assets/js/plugins/beautify.js
+for apps/fauxton/assets/js/plugins/beautify.js
 for share/www/js/require*
 
 The MIT License (MIT)
@@ -751,7 +751,7 @@ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-for src/fauxton/assets/js/plugins/cloudant.pagingcollection.js
+for apps/fauxton/assets/js/plugins/cloudant.pagingcollection.js
 for share/www/js/require*
 
 Apache License
@@ -759,7 +759,7 @@ Apache License
                         http://www.apache.org/licenses/
 
 
-for src/fauxton/assets/fonts/fontawesome
+for apps/fauxton/assets/fonts/fontawesome
 for share/www/fonts/*
 
 SIL OPEN FONT LICENSE
@@ -905,7 +905,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-for src/fauxton/assets/less/bootstrap/font-awesome/*
+for apps/fauxton/assets/less/bootstrap/font-awesome/*
 for share/www/css/*
 
 The MIT License (MIT)
@@ -931,7 +931,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 
-for src/fauxton/test/nightwatch_tests/custom-commands/waitForAttribute.js:
+for apps/fauxton/test/nightwatch_tests/custom-commands/waitForAttribute.js:
 
     The MIT License (MIT)
 
@@ -2213,7 +2213,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-For the src/hyper component:
+For the apps/hyper component:
 
 The MIT License (MIT)
 
@@ -2237,7 +2237,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-For the src/recon component:
+For the apps/recon component:
 
 Copyright (c) 2012-2017, Frédéric Trottier-Hébert
 All rights reserved.

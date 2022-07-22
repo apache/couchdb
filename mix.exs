@@ -52,7 +52,7 @@ defmodule CouchDBTest.Mixfile do
       version: "0.1.0",
       elixir: "~> 1.13",
       lockfile: Path.expand("mix.lock", __DIR__),
-      deps_path: Path.expand("src", __DIR__),
+      deps_path: Path.expand("_build/default/lib", __DIR__),
       build_path: Path.expand("_build", __DIR__),
       compilers: [:elixir, :app],
       start_permanent: Mix.env() == :prod,
@@ -90,24 +90,24 @@ defmodule CouchDBTest.Mixfile do
       {:excoveralls, "~> 0.12", only: :test},
       {:b64url, path: path("b64url")},
       {:jiffy, path: path("jiffy")},
-      {:jwtf, path: path("jwtf")},
+      {:jwtf, path: Path.expand("apps/jwtf", __DIR__)},
       {:ibrowse, path: path("ibrowse"), override: true},
       {:credo, "~> 1.6.4", only: [:dev, :test, :integration], runtime: false}
     ]
   end
 
   defp path(app) do
-    lib_dir = Path.expand("src", __DIR__)
+    lib_dir = Path.expand("_build/default/lib", __DIR__)
     Path.expand(app, lib_dir)
   end
 
   def get_test_paths(:test) do
-    Path.wildcard("src/*/test/exunit") |> Enum.filter(&File.dir?/1)
+    Path.wildcard("apps/*/test/exunit") |> Enum.filter(&File.dir?/1)
   end
 
   def get_test_paths(:integration) do
     integration_tests =
-      Path.wildcard("src/*/test/integration") |> Enum.filter(&File.dir?/1)
+      Path.wildcard("apps/*/test/integration") |> Enum.filter(&File.dir?/1)
 
     ["test/elixir/test" | integration_tests]
   end
@@ -148,7 +148,7 @@ defmodule CouchDBTest.Mixfile do
       "folsom"
     ]
 
-    deps |> Enum.map(fn app -> "src/#{app}" end)
+    deps |> Enum.map(fn app -> "_build/default/lib/#{app}" end)
   end
 
   defp get_coverage_paths() do
@@ -158,7 +158,7 @@ defmodule CouchDBTest.Mixfile do
         MapSet.put(set, "#{x}/ebin")
       end)
 
-    Path.wildcard("src/*/ebin")
+    Path.wildcard("apps/*/ebin")
     |> Enum.filter(&File.dir?/1)
     |> Enum.filter(fn path -> not MapSet.member?(deps, path) end)
   end

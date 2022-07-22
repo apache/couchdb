@@ -196,30 +196,30 @@ if (((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null) -or
 if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
 {
    Write-Verbose "==> rebar.cmd not found; bootstrapping..."
-   if (-Not (Test-Path "src\rebar"))
+   if (-Not (Test-Path "apps\rebar"))
    {
-      git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\src\rebar
+      git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\apps\rebar
    }
-   cmd /c "cd src\rebar && $rootdir\src\rebar\bootstrap.bat"
-   cp $rootdir\src\rebar\rebar $rootdir\bin\rebar
-   cp $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
-   make -C $rootdir\src\rebar clean
+   cmd /c "cd apps\rebar && $rootdir\apps\rebar\bootstrap.bat"
+   cp $rootdir\apps\rebar\rebar $rootdir\bin\rebar
+   cp $rootdir\apps\rebar\rebar.cmd $rootdir\bin\rebar.cmd
+   make -C $rootdir\apps\rebar clean
 }
 
 # check for rebar3; if not found, build it and add it to our path
 if ((Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue) -eq $null)
 {
    Write-Verbose "==> rebar3.cmd not found; bootstrapping..."
-   if (-Not (Test-Path "src\rebar3"))
+   if (-Not (Test-Path "apps\rebar3"))
    {
-      git clone --depth 1 https://github.com/erlang/rebar3.git $rootdir\src\rebar3
+      git clone --depth 1 https://github.com/erlang/rebar3.git $rootdir\apps\rebar3
    }
-   cd src\rebar3
+   cd apps\rebar3
    .\bootstrap.ps1
-   cp $rootdir\src\rebar3\rebar3 $rootdir\bin\rebar3
-   cp $rootdir\src\rebar3\rebar3.cmd $rootdir\bin\rebar3.cmd
-   cp $rootdir\src\rebar3\rebar3.ps1 $rootdir\bin\rebar3.ps1
-   make -C $rootdir\src\rebar3 clean
+   cp $rootdir\apps\rebar3\rebar3 $rootdir\bin\rebar3
+   cp $rootdir\apps\rebar3\rebar3.cmd $rootdir\bin\rebar3.cmd
+   cp $rootdir\apps\rebar3\rebar3.ps1 $rootdir\bin\rebar3.ps1
+   make -C $rootdir\apps\rebar3 clean
    cd ..\..
 }
 
@@ -227,15 +227,15 @@ if ((Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue) -eq $null)
 if ((Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue) -eq $null)
 {
    Write-Verbose "==> erlfmt.cmd not found; bootstrapping..."
-   if (-Not (Test-Path "src\erlfmt"))
+   if (-Not (Test-Path "apps\erlfmt"))
    {
-      git clone --depth 1 https://github.com/WhatsApp/erlfmt.git $rootdir\src\erlfmt
+      git clone --depth 1 https://github.com/WhatsApp/erlfmt.git $rootdir\apps\erlfmt
    }
-   cd src\erlfmt
+   cd apps\erlfmt
    rebar3 as release escriptize
-   cp $rootdir\src\erlfmt\_build\release\bin\erlfmt $rootdir\bin\erlfmt
-   cp $rootdir\src\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
-   make -C $rootdir\src\erlfmt clean
+   cp $rootdir\apps\erlfmt\_build\release\bin\erlfmt $rootdir\bin\erlfmt
+   cp $rootdir\apps\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
+   make -C $rootdir\apps\erlfmt clean
    cd ..\..
 }
 

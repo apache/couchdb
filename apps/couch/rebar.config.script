@@ -10,6 +10,12 @@
 %% License for the specific language governing permissions and limitations under
 %% the License.
 
+Rebar3MixPath =
+    case erlang:function_exported(rebar3, main, 1) of
+        true -> "apps/couch/";  % rebar3
+        false -> ""             % mix
+    end.
+
 CopyIfDifferent = fun(Path, Contents) ->
     case filelib:is_file(Path) of
         true ->
@@ -90,11 +96,11 @@ ConfigH = [
 
 CouchJSConfig = case SMVsn of
     "78" ->
-        "priv/couch_js/86/config.h";
+        Rebar3MixPath ++ "priv/couch_js/86/config.h";
     "91" ->
-        "priv/couch_js/86/config.h";
+        Rebar3MixPath ++ "priv/couch_js/86/config.h";
     _ ->
-        "priv/couch_js/" ++ SMVsn ++ "/config.h"
+        Rebar3MixPath ++ "priv/couch_js/" ++ SMVsn ++ "/config.h"
 end.
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
 ConfigBin = iolist_to_binary(ConfigSrc).
@@ -107,6 +113,7 @@ MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
         []
 end.
 
+code:add_path("_build/default/lib/proper/ebin").
 ProperConfig = case code:lib_dir(proper) of
     {error, bad_name} -> [];
     _ -> [{d, 'WITH_PROPER'}]
@@ -210,7 +217,7 @@ BaseSpecs = [
 ].
 
 SpawnSpec = [
-    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
+    {Rebar3MixPath ++ "priv/couchspawnkillable", [Rebar3MixPath ++ "priv/spawnkillable/*.c"]}
 ].
 
 %% hack required until switch to enc/rebar3
@@ -223,15 +230,69 @@ PortSpecs = case os:type() of
     {win32, _} ->
         BaseSpecs ++ SpawnSpec;
     _ ->
-        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
-        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
-        os:cmd("chmod +x priv/couchspawnkillable"),
+        {ok, CSK} = file:read_file(Rebar3MixPath ++ "priv/spawnkillable/couchspawnkillable.sh"),
+        ok = CopyIfDifferent(Rebar3MixPath ++ "priv/couchspawnkillable", CSK),
+        os:cmd("chmod +x " ++ Rebar3MixPath ++ "priv/couchspawnkillable"),
         BaseSpecs
 end.
 PlatformDefines = [
    {platform_define, "win32", 'WINDOWS'}
 ].
+
+DepDescs = [
+%% Independent Apps
+{config, {url, "https://github.com/jiahuili430/couchdb-config.git"}, {branch, "82-rebar3"}},
+{b64url,           "b64url",           {tag, "1.0.3"}},
+{ets_lru,          "ets-lru",          {tag, "1.1.0"}},
+{khash, {url, "https://github.com/jiahuili430/couchdb-khash"}, {branch, "82-rebar3"}},
+{snappy, {url, "https://github.com/jiahuili430/couchdb-snappy"}, {branch, "82-rebar3"}},
+
+%% Non-Erlang deps
+{docs, {url, "https://github.com/apache/couchdb-documentation"}, {branch, "main"}},
+{fauxton, {url, "https://github.com/apache/couchdb-fauxton.git"}, {branch, "rebar3-bogus-app"}},
+
+%% Third party deps
+{folsom, {url, "https://github.com/jiahuili430/couchdb-folsom"}, {branch, "82-rebar3"}},
+{hyper, {url, "https://github.com/jiahuili430/couchdb-hyper"}, {branch, "82-rebar3"}},
+{ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-5"}},
+{jiffy,            "jiffy",            {tag, "1.1.1"}},
+{mochiweb,         "mochiweb",         {tag, "v3.0.0"}},
+{recon,            "recon",            {tag, "2.5.2"}}
+].
+
+WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
+
+OptionalDeps = case WithProper of
+    true ->
+        [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.4"}}];
+    false ->
+        []
+end.
+
+BaseUrl = "https://github.com/apache/".
+
+MakeDep = fun
+    ({AppName, {url, Url}, Version}) ->
+        {AppName, {git, Url, Version}};
+    ({AppName, RepoName, Version}) ->
+        Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
+        {AppName, {git, Url, Version}}
+end.
+
 AddConfig = [
+    {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
+    {plugins, [{pc, "~> 1.0"}]},
+    {artifacts, [
+        "priv/couch_ejson_compare.so",
+        "priv/couchjs",
+        "priv/couchspawnkillable"
+    ]},
+    {provider_hooks, [
+        {post, [
+            {compile, {pc, compile}},
+            {clean, {pc, clean}}
+        ]}
+    ]},
     {port_specs, PortSpecs},
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},

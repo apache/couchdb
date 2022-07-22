@@ -52,8 +52,8 @@ loop(Pid) ->
     end.
 
 main([]) ->
-    code:add_pathz("src/couchdb"),
-    code:add_pathz("src/mochiweb"),
+    code:add_pathz("apps/couchdb"),
+    code:add_pathz("apps/mochiweb"),
     {ok, Pid} = couch_native_process:start_link(),
     loop(Pid).
 
