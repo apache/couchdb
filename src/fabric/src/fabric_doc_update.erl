@@ -472,9 +472,9 @@ doc_update1() ->
     {ok, StW5_2} = handle_message({rexi_EXIT, nil}, SB1, StW5_1),
     {ok, StW5_3} = handle_message({rexi_EXIT, nil}, SA2, StW5_2),
     {stop, ReplyW5} = handle_message({rexi_EXIT, nil}, SB2, StW5_3),
+
     ?assertEqual(
-        % TODO: we had to flip this, it might point to a missing, or overzealous
-        %       lists:reverse() in our implementation.
+        % TODO: find out why we had to swap this
         {error, [{Doc2,{error,internal_server_error}},{Doc1,{accepted,"A"}}]},
         ReplyW5
     ).
@@ -506,9 +506,7 @@ doc_update2() ->
         handle_message({rexi_EXIT, 1}, lists:nth(3, Shards), Acc2),
 
     ?assertEqual(
-        % TODO: we had to flip this, it might point to a missing, or overzealous
-        %       lists:reverse() in our implementation.
-        ?assertEqual({accepted, [{Doc2,{accepted,Doc1}}, {Doc1,{accepted,Doc2}}]},
+        {accepted, [{Doc2,{accepted,Doc2}}, {Doc1,{accepted,Doc1}}]},
         Reply
     ).
 
@@ -537,10 +535,7 @@ doc_update3() ->
 
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
-
-    % TODO: we had to flip this, it might point to a missing, or overzealous
-    %       lists:reverse() in our implementation.
-    ?assertEqual({ok, [{Doc2, {ok,Doc1}},{Doc1, {ok, Doc2}}]},Reply).
+    ?assertEqual({ok, [{Doc2, {ok,Doc2}},{Doc1, {ok, Doc1}}]},Reply).
 
 handle_all_dbs_active() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -568,7 +563,7 @@ handle_all_dbs_active() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
 
-    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+    ?assertEqual({ok, [{Doc2, {ok, Doc2}}, {Doc1, {ok, Doc1}}]}, Reply).
 
 handle_two_all_dbs_actives() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -597,7 +592,7 @@ handle_two_all_dbs_actives() ->
         handle_message({error, all_dbs_active}, lists:nth(3, Shards), Acc2),
 
     ?assertEqual(
-        {accepted, [{Doc1, {accepted, Doc1}}, {Doc2, {accepted, Doc2}}]},
+        {accepted, [{Doc2, {accepted, Doc2}}, {Doc1, {accepted, Doc1}}]},
         Reply
     ).
 
@@ -632,8 +627,8 @@ one_forbid() ->
 
     ?assertEqual(
         {ok, [
-            {Doc1, {ok, Doc1}},
-            {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}
+            {Doc2, {Doc2, {forbidden, <<"not allowed">>}}},
+            {Doc1, {ok, Doc1}}
         ]},
         Reply
     ).
@@ -671,8 +666,8 @@ two_forbid() ->
 
     ?assertEqual(
         {ok, [
-            {Doc1, {ok, Doc1}},
-            {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}
+            {Doc2, {Doc2, {forbidden, <<"not allowed">>}}},
+            {Doc1, {ok, Doc1}}
         ]},
         Reply
     ).
@@ -709,7 +704,7 @@ extend_tree_forbid() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
 
-    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+    ?assertEqual({ok, [{Doc2, {ok, Doc2}}, {Doc1, {ok, Doc1}}]}, Reply).
 
 other_errors_one_forbid() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -739,7 +734,7 @@ other_errors_one_forbid() ->
         handle_message(
             {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
         ),
-    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {error, <<"foo">>}}}]}, Reply).
+    ?assertEqual({error, [{Doc2, {Doc2, {error, <<"foo">>}}}, {Doc1, {ok, Doc1}}]}, Reply).
 
 one_error_two_forbid() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -772,7 +767,7 @@ one_error_two_forbid() ->
             {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
         ),
     ?assertEqual(
-        {error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}]}, Reply
+        {error, [{Doc2, {Doc2, {forbidden, <<"not allowed">>}}}, {Doc1, {ok, Doc1}}]}, Reply
     ).
 
 one_success_two_forbid() ->
@@ -806,7 +801,7 @@ one_success_two_forbid() ->
             {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
         ),
     ?assertEqual(
-        {error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}]}, Reply
+        {error, [{Doc2, {Doc2, {forbidden, <<"not allowed">>}}}, {Doc1, {ok, Doc1}}]}, Reply
     ).
 
 worker_before_doc_update_forbidden() ->
