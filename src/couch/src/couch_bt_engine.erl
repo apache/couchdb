@@ -671,7 +671,10 @@ id_tree_split(#full_doc_info{} = Info) ->
 
 id_tree_join(Id, {HighSeq, Deleted, DiskTree}) ->
     % Handle old formats before data_size was added
-    id_tree_join(Id, {HighSeq, Deleted, #size_info{}, DiskTree, []});
+    id_tree_join(Id, {HighSeq, Deleted, #size_info{}, DiskTree});
+
+id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree}) ->
+    id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree, []});
 id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree, Access}) ->
     #full_doc_info{
         id = Id,
@@ -722,7 +725,9 @@ seq_tree_split(#full_doc_info{} = Info) ->
     {Seq, {Id, ?b2i(Del), split_sizes(SizeInfo), disk_tree(Tree), split_access(Access)}}.
 
 seq_tree_join(Seq, {Id, Del, DiskTree}) when is_integer(Del) ->
-    seq_tree_join(Seq, {Id, Del, {0, 0}, DiskTree, []});
+    seq_tree_join(Seq, {Id, Del, {0, 0}, DiskTree});
+seq_tree_join(Seq, {Id, Del, Sizes, DiskTree}) when is_integer(Del) ->
+    seq_tree_join(Seq, {Id, Del, Sizes, DiskTree, []});
 seq_tree_join(Seq, {Id, Del, Sizes, DiskTree, Access}) when is_integer(Del) ->
     #full_doc_info{
         id = Id,
@@ -733,6 +738,8 @@ seq_tree_join(Seq, {Id, Del, Sizes, DiskTree, Access}) when is_integer(Del) ->
         access = join_access(Access)
     };
 seq_tree_join(KeySeq, {Id, RevInfos, DeletedRevInfos}) ->
+    seq_tree_join(KeySeq, {Id, RevInfos, DeletedRevInfos, []});
+seq_tree_join(KeySeq, {Id, RevInfos, DeletedRevInfos, Access}) ->
     % Older versions stored #doc_info records in the seq_tree.
     % Compact to upgrade.
     Revs = lists:map(
@@ -750,7 +757,8 @@ seq_tree_join(KeySeq, {Id, RevInfos, DeletedRevInfos}) ->
     #doc_info{
         id = Id,
         high_seq = KeySeq,
-        revs = Revs ++ DeletedRevs
+        revs = Revs ++ DeletedRevs,
+        access = Access
     }.
 
 seq_tree_reduce(reduce, DocInfos) ->

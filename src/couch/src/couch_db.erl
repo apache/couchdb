@@ -824,6 +824,7 @@ validate_access3(_) -> throw({forbidden, <<"can't touch this">>}).
 check_access(Db, #doc{access=Access}) ->
     check_access(Db, Access);
 check_access(Db, Access) ->
+    %couch_log:notice("~n Db.user_ctx: ~p, Access: ~p ~n", [Db#db.user_ctx, Access]),
     #user_ctx{
         name=UserName,
         roles=UserRoles
@@ -2026,17 +2027,19 @@ open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
     end;
 open_doc_int(Db, #doc_info{id = Id, revs = [RevInfo | _], access = Access} = DocInfo, Options) ->
     #rev_info{deleted = IsDeleted, rev = {Pos, RevId}, body_sp = Bp} = RevInfo,
-    Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos, [RevId], Access}),
-    apply_open_options(
-        {ok, Doc#doc{meta = doc_meta_info(DocInfo, [], Options)}}, Options, Access
+    Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos, [RevId]}, Access),
+    apply_open_options(Db,
+        {ok, Doc#doc{meta = doc_meta_info(DocInfo, [], Options)}},
+        Options
     );
 open_doc_int(Db, #full_doc_info{id = Id, rev_tree = RevTree, access = Access} = FullDocInfo, Options) ->
     #doc_info{revs = [#rev_info{deleted = IsDeleted, rev = Rev, body_sp = Bp} | _]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
     Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath, Access),
-    apply_open_options(
-        {ok, Doc#doc{meta = doc_meta_info(DocInfo, RevTree, Options)}}, Options, Access
+    apply_open_options(Db,
+        {ok, Doc#doc{meta = doc_meta_info(DocInfo, RevTree, Options)}},
+        Options
     );
 open_doc_int(Db, Id, Options) ->
     case get_full_doc_info(Db, Id) of
