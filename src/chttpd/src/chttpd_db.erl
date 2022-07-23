@@ -1972,7 +1972,7 @@ parse_shards_opt(Req) ->
     [
         {n, parse_shards_opt("n", Req, config:get_integer("cluster", "n", 3))},
         {q, parse_shards_opt("q", Req, config:get_integer("cluster", "q", 2))},
-        {access, parse_shards_opt_access(chttpd:qs_value(Req, "access", false))},
+        {access, parse_shards_opt("access", Req, chttpd:qs_value(Req, "access", false))},
         {placement,
             parse_shards_opt(
                 "placement", Req, config:get("cluster", "placement")
@@ -2001,7 +2001,18 @@ parse_shards_opt("placement", Req, Default) ->
                     throw({bad_request, Err})
             end
     end;
+
+
+parse_shards_opt("access", Req, Value) when is_list(Value) ->
+    parse_shards_opt("access", Req, list_to_existing_atom(Value));
+parse_shards_opt("access", _Req, Value) when is_boolean(Value) ->
+    Value;
+parse_shards_opt("access", _Req, _Value) ->
+    Err = ?l2b(["The woopass `access` value should be a boolean."]),
+    throw({bad_request, Err});
+
 parse_shards_opt(Param, Req, Default) ->
+    couch_log:error("~n parse_shards_opt Param: ~p, Default: ~p~n", [Param, Default]),
     Val = chttpd:qs_value(Req, Param, Default),
     Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
     case couch_util:validate_positive_int(Val) of
@@ -2009,11 +2020,6 @@ parse_shards_opt(Param, Req, Default) ->
         false -> throw({bad_request, Err})
     end.
 
-parse_shards_opt_access(Value) when is_boolean(Value) ->
-    Value;
-parse_shards_opt_access(_Value) ->
-    Err = ?l2b(["The `access` value should be a boolean."]),
-    throw({bad_request, Err}).
 
 parse_engine_opt(Req) ->
     case chttpd:qs_value(Req, "engine") of

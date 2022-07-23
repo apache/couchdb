@@ -735,7 +735,14 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
     %.  if invalid, then send_result tagged `access`(c.f. `conflict)
     %.    and don’t add to DLV, nor ODI
 
+    %couch_log:notice("~nDb: ~p, UserCtx: ~p~n", [Db, UserCtx]),
+
+
     { DocsListValidated, OldDocInfosValidated } = validate_docs_access(Db, UserCtx, DocsList, OldDocInfos),
+
+    %couch_log:notice("~nDocsListValidated: ~p, OldDocInfosValidated: ~p~n", [DocsListValidated, OldDocInfosValidated]),
+
+    
     {ok, AccOut} = merge_rev_trees(DocsListValidated, OldDocInfosValidated, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
@@ -798,14 +805,17 @@ validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
 validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos) ->
     validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
 
-validate_docs_access(_Db, UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
+validate_docs_access(_Db, _UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
     { lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated) };
 validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated) ->
     % loop over Docs as {Client,  NewDoc}
     %   validate Doc
     %   if valid, then put back in Docs
     %   if not, then send_result and skip
+    %couch_log:notice("~nvalidate_docs_access() UserCtx: ~p, Docs: ~p, OldInfo: ~p~n", [UserCtx, Docs, OldInfo]),
     NewDocs = lists:foldl(fun({ Client, Doc }, Acc) ->
+        %couch_log:notice("~nvalidate_docs_access lists:foldl() Doc: ~p Doc#doc.access: ~p~n", [Doc, Doc#doc.access]),
+
         % check if we are allowed to update the doc, skip when new doc
         OldDocMatchesAccess = case OldInfo#full_doc_info.rev_tree of
             [] -> true;
@@ -813,6 +823,8 @@ validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], Doc
         end,
 
         NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
+        %couch_log:notice("~nvalidate_docs_access lists:foldl() OldDocMatchesAccess: ~p, NewDocMatchesAccess: ~p, andalso: ~p~n", [OldDocMatchesAccess, NewDocMatchesAccess, OldDocMatchesAccess andalso NewDocMatchesAccess]),
+
         case OldDocMatchesAccess andalso NewDocMatchesAccess of
             true -> % if valid, then send to DocsListValidated, OldDocsInfo
                     % and store the access context on the new doc
