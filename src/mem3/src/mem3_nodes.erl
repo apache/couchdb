@@ -49,6 +49,8 @@ get_node_info(Node, Key) ->
     end.
 
 init([]) ->
+    DbName = mem3_sync:nodes_db(),
+    ioq:set_io_priority({system, DbName}),
     ets:new(?MODULE, [named_table, {read_concurrency, true}]),
     UpdateSeq = initialize_nodelist(),
     {Pid, _} = spawn_monitor(fun() -> listen_for_changes(UpdateSeq) end),
@@ -104,7 +106,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %% internal functions
 
 initialize_nodelist() ->
-    DbName = config:get("mem3", "nodes_db", "_nodes"),
+    DbName = mem3_sync:nodes_db(),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
     insert_if_missing(Db, [node() | mem3_seeds:get_seeds()]),
@@ -122,7 +124,8 @@ first_fold(#full_doc_info{id = Id} = DocInfo, Db) ->
     {ok, Db}.
 
 listen_for_changes(Since) ->
-    DbName = config:get("mem3", "nodes_db", "_nodes"),
+    DbName = mem3_sync:nodes_db(),
+    ioq:set_io_priority({system, DbName}),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",

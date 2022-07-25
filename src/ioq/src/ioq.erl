@@ -16,6 +16,7 @@
 
 -export([start_link/0, call/3]).
 -export([get_queue_lengths/0]).
+-export([get_io_priority/0, set_io_priority/1, maybe_set_io_priority/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 % config_listener api
@@ -38,6 +39,18 @@
     from,
     ref
 }).
+
+set_io_priority(Priority) ->
+    erlang:put(io_priority, Priority).
+
+get_io_priority() ->
+    erlang:get(io_priority).
+
+maybe_set_io_priority(Priority) ->
+    case get_io_priority() of
+        undefined -> set_io_priority(Priority);
+        _ -> ok
+    end.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -81,6 +94,12 @@ io_class(_, {db_compact, _}) ->
     compaction;
 io_class(_, {view_compact, _, _}) ->
     compaction;
+io_class(_, {system, _}) ->
+    system;
+io_class(_, {search, _}) ->
+    search;
+io_class(_, {search, _, _}) ->
+    search;
 io_class(_, _) ->
     other.
 

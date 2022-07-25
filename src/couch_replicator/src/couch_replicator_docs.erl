@@ -357,6 +357,7 @@ update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs, _Try) ->
     end.
 
 open_rep_doc(DbName, DocId) ->
+    ioq:maybe_set_io_priority({system, DbName}),
     case couch_db:open_int(DbName, [?CTX, sys_db]) of
         {ok, Db} ->
             try
@@ -369,6 +370,7 @@ open_rep_doc(DbName, DocId) ->
     end.
 
 save_rep_doc(DbName, Doc) ->
+    ioq:maybe_set_io_priority({system, DbName}),
     {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
     try
         couch_db:update_doc(Db, Doc, [])

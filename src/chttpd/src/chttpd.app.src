@@ -27,7 +27,8 @@
         config,
         couch,
         ets_lru,
-        fabric
+        fabric,
+        ioq
     ]},
     {mod, {chttpd_app, []}}
 ]}.

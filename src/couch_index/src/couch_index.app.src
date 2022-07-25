@@ -14,6 +14,6 @@
     {description, "CouchDB Secondary Index Manager"},
     {vsn, git},
     {registered, []},
-    {applications, [kernel, stdlib, couch_epi]},
+    {applications, [kernel, stdlib, couch_epi, ioq]},
     {mod, {couch_index_app, []}}
 ]}.

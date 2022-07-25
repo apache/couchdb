@@ -119,6 +119,7 @@ write_db_doc(Doc) ->
     write_db_doc(mem3_sync:shards_db(), Doc, true).
 
 write_db_doc(DbName, #doc{id = Id, body = Body} = Doc, ShouldMutate) ->
+    ioq:maybe_set_io_priority({system, DbName}),
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     try couch_db:open_doc(Db, Id, [ejson_body]) of
         {ok, #doc{body = Body}} ->
@@ -144,6 +145,7 @@ update_db_doc(Doc) ->
     update_db_doc(mem3_sync:shards_db(), Doc, true).
 
 update_db_doc(DbName, #doc{id = Id, body = Body} = Doc, ShouldMutate) ->
+    ioq:maybe_set_io_priority({system, DbName}),
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     try couch_db:open_doc(Db, Id, [ejson_body]) of
         {ok, #doc{body = Body}} ->
@@ -174,6 +176,7 @@ delete_db_doc(DocId) ->
     delete_db_doc(mem3_sync:shards_db(), DocId, true).
 
 delete_db_doc(DbName, DocId, ShouldMutate) ->
+    ioq:maybe_set_io_priority({system, DbName}),
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     {ok, Revs} = couch_db:open_doc_revs(Db, DocId, all, []),
     try [Doc#doc{deleted = true} || {ok, #doc{deleted = false} = Doc} <- Revs] of
