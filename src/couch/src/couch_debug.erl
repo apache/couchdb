@@ -47,7 +47,9 @@
 ]).
 
 -export([
-    print_table/2
+    print_table/2,
+    print_report/1,
+    print_report_with_info_width/2
 ]).
 
 -type throw(_Reason) :: no_return().
@@ -80,6 +82,8 @@ help() ->
         print_linked_processes,
         memory_info,
         print_table,
+        print_report,
+        print_report_with_info_width,
         restart,
         restart_busy
     ].
@@ -287,15 +291,16 @@ help(print_linked_processes) ->
 
         Print cluster of linked processes. This function receives the
         initial Pid to start from. The function doesn't recurse to pids
-        older than initial one. The output would look like similar to:
-        ```
-couch_debug:print_linked_processes(whereis(couch_index_server)).
-name                                         | reductions | message_queue_len |  memory
-couch_index_server[<0.288.0>]                |   478240   |         0         |  109696
-  couch_index:init/1[<0.3520.22>]            |    4899    |         0         |  109456
-    couch_file:init/1[<0.886.22>]            |   11973    |         0         |  67984
-      couch_index:init/1[<0.3520.22>]        |    4899    |         0         |  109456
-        ```
+        older than initial one.
+
+        The output will look like similar to:
+
+            couch_debug:print_linked_processes(whereis(couch_index_server)).
+            name                                         | reductions | message_queue_len |  memory
+            couch_index_server[<0.288.0>]                |   478240   |         0         |  109696
+            couch_index:init/1[<0.3520.22>]              |    4899    |         0         |  109456
+                couch_file:init/1[<0.886.22>]            |   11973    |         0         |  67984
+                couch_index:init/1[<0.3520.22>]          |    4899    |         0         |  109456
 
         ---
     ", []);
@@ -325,6 +330,41 @@ help(print_table) ->
           - Rows: List of {Id, Props} to be printed from the TableSpec
           - TableSpec: List of either {Value} or {Width, Align, Value}
             where Align is either left/center/right.
+
+        ---
+    ", []);
+help(print_report) ->
+    io:format("
+        print_report(Report)
+        --------------------------------
+
+        Print a report in table form.
+          - Report: List of {InfoKey, InfoVal} where each InfoKey is unique
+          (unlike print_table/2).
+
+        The output will look similar to:
+
+            |info           |                                                                                               value
+            |  btree_size   |                                                                                                  51
+            |  def          |                                                                     function(doc){emit(doc.id, 1);}
+            |  id_num       |                                                                                                   0
+            |  options      |
+            |  purge_seq    |                                                                                                   0
+            |  reduce_funs  |
+            |  update_seq   |                                                                                                   3
+
+        ---
+    ", []);
+help(print_report_with_info_width) ->
+    io:format("
+        print_report_with_info_width(Report, Width)
+        --------------------------------
+
+        Print a report in table form. Same as print_report/1 but with a custom
+        width for the InfoKey column.
+          - Report: List of {InfoKey, InfoVal} where each InfoKey is unique
+            (unlike print_table/2).
+          - Width: Width of InfoKey column in TableSpec. Default is 50.
 
         ---
     ", []);
@@ -890,6 +930,26 @@ print_table(Rows, TableSpec) ->
         Rows
     ),
     ok.
+
+print_report(Report) ->
+    print_report_with_info_width(Report, 50).
+
+print_report_with_info_width(Report, Width) ->
+    TableSpec = [
+        {Width, left, info},
+        {100, right, value}
+    ],
+    io:format("~s~n", [format(TableSpec)]),
+    lists:map(
+        fun({InfoKey, Value}) ->
+            TableSpec1 = [
+                {Width, left, info},
+                {100, right, InfoKey}
+            ],
+            io:format("~s~n", [table_row(InfoKey, 2, [{InfoKey, Value}], TableSpec1)])
+        end,
+        Report
+    ).
 
 print_tree(Tree, TableSpec) ->
     io:format("~s~n", [format(TableSpec)]),
