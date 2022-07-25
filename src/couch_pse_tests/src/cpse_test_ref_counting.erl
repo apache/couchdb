@@ -40,8 +40,15 @@ cpse_incref_decref({Db, _}) ->
     {Pid, _} = Client = start_client(Db),
     wait_client(Client),
 
-    Pids1 = couch_db_engine:monitored_by(Db),
-    ?assert(lists:member(Pid, Pids1)),
+    test_util:wait(
+        fun() ->
+            MonitoredPids1 = couch_db_engine:monitored_by(Db),
+            case lists:member(Pid, MonitoredPids1) of
+                true -> ok;
+                false -> wait
+            end
+        end
+    ),
 
     close_client(Client),
 
