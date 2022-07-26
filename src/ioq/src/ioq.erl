@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 -behaviour(config_listener).
 
--export([start_link/0, call/3]).
+-export([start_link/0, call/3, call_search/3]).
 -export([get_queue_lengths/0]).
 -export([get_io_priority/0, set_io_priority/1, maybe_set_io_priority/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
@@ -54,6 +54,9 @@ maybe_set_io_priority(Priority) ->
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+call_search(Fd, Msg, Metadata) ->
+    call(Fd, Msg, Metadata).
 
 call(Fd, Msg, Metadata) ->
     Priority = io_class(Msg, Metadata),
