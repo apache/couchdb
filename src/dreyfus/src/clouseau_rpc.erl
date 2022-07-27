@@ -102,7 +102,7 @@ connected() ->
     end.
 
 rpc(Ref, Msg) ->
-    ioq:call(Ref, Msg, erlang:get(io_priority)).
+    ioq:call_search(Ref, Msg, erlang:get(io_priority)).
 
 clouseau() ->
     list_to_atom(config:get("dreyfus", "name", "clouseau@127.0.0.1")).
