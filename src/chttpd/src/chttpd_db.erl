@@ -968,7 +968,7 @@ db_doc_req(#httpd{method = 'DELETE'} = Req, Db, DocId) ->
         Rev ->
             Body = {[{<<"_rev">>, ?l2b(Rev)}, {<<"_deleted">>, true}]}
     end,
-    Doc = #doc{revs=Revs,body=Body,deleted=true,access=Doc0#doc.access},
+    Doc = #doc{revs = Revs, body = Body, deleted = true, access = Doc0#doc.access},
     send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
     #doc_query_args{
@@ -1419,7 +1419,7 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
-update_doc_result_to_json({#doc{id=Id,revs=Rev}, access}) ->
+update_doc_result_to_json({#doc{id = Id, revs = Rev}, access}) ->
     update_doc_result_to_json({{Id, Rev}, access});
 update_doc_result_to_json({error, _} = Error) ->
     {_Code, Err, Msg} = chttpd:error_info(Error),
@@ -1972,13 +1972,12 @@ parse_shards_opt("placement", Req, Default) ->
                     throw({bad_request, Err})
             end
     end;
-
-
 parse_shards_opt("access", Req, Value) when is_list(Value) ->
     parse_shards_opt("access", Req, list_to_existing_atom(Value));
 parse_shards_opt("access", _Req, Value) when Value =:= true ->
     case config:get_boolean("per_doc_access", "enabled", false) of
-        true -> true;
+        true ->
+            true;
         false ->
             Err = ?l2b(["The `access` option is not available on this CouchDB installation."]),
             throw({bad_request, Err})
@@ -1988,7 +1987,6 @@ parse_shards_opt("access", _Req, Value) when Value =:= false ->
 parse_shards_opt("access", _Req, _Value) ->
     Err = ?l2b(["The `access` value should be a boolean."]),
     throw({bad_request, Err});
-
 parse_shards_opt(Param, Req, Default) ->
     couch_log:error("~n parse_shards_opt Param: ~p, Default: ~p~n", [Param, Default]),
     Val = chttpd:qs_value(Req, Param, Default),
@@ -1997,7 +1995,6 @@ parse_shards_opt(Param, Req, Default) ->
         true -> Val;
         false -> throw({bad_request, Err})
     end.
-
 
 parse_engine_opt(Req) ->
     case chttpd:qs_value(Req, "engine") of

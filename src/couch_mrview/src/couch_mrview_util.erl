@@ -451,7 +451,7 @@ reduce_to_count(Reductions) ->
     FinalReduction = couch_btree:final_reduce(CountReduceFun, Reductions),
     get_count(FinalReduction).
 
-get_access_row_count(#mrview{btree=Bt}, UserName) ->
+get_access_row_count(#mrview{btree = Bt}, UserName) ->
     couch_btree:full_reduce_with_options(Bt, [
         {start_key, UserName}
     ]).

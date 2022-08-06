@@ -430,7 +430,10 @@ to_doc_info_path(#full_doc_info{id = Id, rev_tree = Tree, update_seq = FDISeq, a
     ),
     [{_RevInfo, WinPath} | _] = SortedRevInfosAndPath,
     RevInfos = [RevInfo || {RevInfo, _Path} <- SortedRevInfosAndPath],
-    {#doc_info{id = Id, high_seq = max_seq(Tree, FDISeq), revs = RevInfos, access = Access}, WinPath}.
+    {
+        #doc_info{id = Id, high_seq = max_seq(Tree, FDISeq), revs = RevInfos, access = Access},
+        WinPath
+    }.
 
 rev_info({#leaf{} = Leaf, {Pos, [RevId | _]}}) ->
     #rev_info{
@@ -472,7 +475,7 @@ is_deleted(Tree) ->
 
 get_access({Props}) ->
     get_access(couch_doc:from_json_obj({Props}));
-get_access(#doc{access=Access}) ->
+get_access(#doc{access = Access}) ->
     Access.
 
 has_access(Doc) ->
