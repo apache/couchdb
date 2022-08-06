@@ -821,6 +821,7 @@ validate_access2(Db, Doc) ->
     validate_access3(check_access(Db, Doc)).
 
 validate_access3(true) -> ok;
+% TODO: fix language
 validate_access3(_) -> throw({forbidden, <<"can't touch this">>}).
 
 check_access(Db, #doc{access=Access}) ->
@@ -854,6 +855,7 @@ check_name(null, _Access) -> true;
 check_name(UserName, Access) ->
             lists:member(UserName, Access).
 % nicked from couch_db:check_security
+% TODO: might need DRY
 
 check_roles(Roles, Access) ->
     UserRolesSet = ordsets:from_list(Roles),
