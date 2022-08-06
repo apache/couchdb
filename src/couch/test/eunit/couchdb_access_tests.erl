@@ -46,6 +46,7 @@ before_all() ->
     ok = config:set("admins", "a", binary_to_list(Hashed), _Persist=false),
     ok = config:set("couchdb", "uuid", "21ac467c1bc05e9d9e9d2d850bb1108f", _Persist=false),
     ok = config:set("log", "level", "debug", _Persist=false),
+    ok = config:set("per_doc_access", "enabled", "true", _Persist=false),
 
     % cleanup and setup
     {ok, _, _, _} = test_request:delete(url() ++ "/db", ?ADMIN_REQ_HEADERS),
