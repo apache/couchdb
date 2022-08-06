@@ -672,7 +672,6 @@ id_tree_split(#full_doc_info{} = Info) ->
 id_tree_join(Id, {HighSeq, Deleted, DiskTree}) ->
     % Handle old formats before data_size was added
     id_tree_join(Id, {HighSeq, Deleted, #size_info{}, DiskTree});
-
 id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree}) ->
     id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree, []});
 id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree, Access}) ->

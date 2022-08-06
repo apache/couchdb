@@ -18,7 +18,8 @@
 -define(i2l(I), integer_to_list(I)).
 -define(DOC_ID, <<"foobar">>).
 -define(LOCAL_DOC_ID, <<"_local/foobar">>).
--define(NUM_CLIENTS, [100, 500 ]). % TODO: enable 1000, 2000, 5000, 10000]).
+% TODO: enable 1000, 2000, 5000, 10000]).
+-define(NUM_CLIENTS, [100, 500]).
 -define(TIMEOUT, 200000).
 
 start() ->

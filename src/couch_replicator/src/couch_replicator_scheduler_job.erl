@@ -859,9 +859,11 @@ do_checkpoint(State) ->
 
             try
                 {SrcRevPos, SrcRevId} = update_checkpoint(
-                    Source, SourceLog#doc{body = NewRepHistory}, SrcAccess, UserCtx, source),
+                    Source, SourceLog#doc{body = NewRepHistory}, SrcAccess, UserCtx, source
+                ),
                 {TgtRevPos, TgtRevId} = update_checkpoint(
-                    Target, TargetLog#doc{body = NewRepHistory}, TgtAccess, UserCtx, target),
+                    Target, TargetLog#doc{body = NewRepHistory}, TgtAccess, UserCtx, target
+                ),
                 NewState = State#rep_state{
                     checkpoint_history = NewRepHistory,
                     committed_seq = NewTsSeq,
@@ -907,10 +909,11 @@ update_checkpoint(Db, Doc, Access, UserCtx, DbType) ->
 update_checkpoint(Db, #doc{id = LogId} = Doc0, Access, UserCtx) ->
     % if db has _access, then:
     %    get userCtx from replication and splice into doc _access
-    Doc = case Access of
-        true -> Doc0#doc{access = [UserCtx#user_ctx.name]};
-        _False -> Doc0
-    end,
+    Doc =
+        case Access of
+            true -> Doc0#doc{access = [UserCtx#user_ctx.name]};
+            _False -> Doc0
+        end,
 
     try
         case couch_replicator_api_wrap:update_doc(Db, Doc, [delay_commit]) of

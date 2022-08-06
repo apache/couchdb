@@ -25,8 +25,8 @@
 -define(DEFAULT_MAX_PARTITION_SIZE, 16#280000000).
 
 -define(DEFAULT_SECURITY_OBJECT, [
-    {<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
-    {<<"admins">>, {[{<<"roles">>,[<<"_admin">>]}]}}
+    {<<"members">>, {[{<<"roles">>, [<<"_admin">>]}]}},
+    {<<"admins">>, {[{<<"roles">>, [<<"_admin">>]}]}}
 ]).
 
 -record(merge_acc, {
@@ -266,10 +266,11 @@ sort_and_tag_grouped_docs(Client, GroupedDocs) ->
     % duplicate documents if the incoming groups are not sorted, so as a sanity
     % check we sort them again here. See COUCHDB-2735.
     Cmp = fun
-        ([], []) -> false; % TODO: re-evaluate this addition, might be
-                           %       superflous now
-        ([#doc{id=A}|_], [#doc{id=B}|_]) -> A < B
-     end,
+        % TODO: re-evaluate this addition, might be
+        ([], []) -> false;
+        %       superflous now
+        ([#doc{id = A} | _], [#doc{id = B} | _]) -> A < B
+    end,
     lists:map(
         fun(DocGroup) ->
             [{Client, maybe_tag_doc(D)} || D <- DocGroup]
@@ -674,12 +675,12 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
-    Ids = [Id || [{_Client, #doc{id=Id}}|_] <- DocsList],
+    Ids = [Id || [{_Client, #doc{id = Id}} | _] <- DocsList],
     % TODO: maybe a perf hit, instead of zip3-ing existing Accesses into
     %       our doc lists, maybe find 404 docs differently down in
     %       validate_docs_access (revs is [], which we can then use
     %       to skip validation as we know it is the first doc rev)
-    Accesses = [Access || [{_Client, #doc{access=Access}}|_] <- DocsList],
+    Accesses = [Access || [{_Client, #doc{access = Access}} | _] <- DocsList],
 
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
@@ -688,7 +689,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
             (_Id, #full_doc_info{} = FDI, _Access) ->
                 FDI;
             (Id, not_found, Access) ->
-               #full_doc_info{id=Id,access=Access}
+                #full_doc_info{id = Id, access = Access}
         end,
         Ids,
         OldDocLookups,
@@ -737,12 +738,12 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
 
     %couch_log:notice("~nDb: ~p, UserCtx: ~p~n", [Db, UserCtx]),
 
-
-    { DocsListValidated, OldDocInfosValidated } = validate_docs_access(Db, UserCtx, DocsList, OldDocInfos),
+    {DocsListValidated, OldDocInfosValidated} = validate_docs_access(
+        Db, UserCtx, DocsList, OldDocInfos
+    ),
 
     %couch_log:notice("~nDocsListValidated: ~p, OldDocInfosValidated: ~p~n", [DocsListValidated, OldDocInfosValidated]),
 
-    
     {ok, AccOut} = merge_rev_trees(DocsListValidated, OldDocInfosValidated, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
@@ -771,7 +772,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
 
     % Check if we just updated any non-access design documents,
     % and update the validation funs if we did.
-    NonAccessIds = [Id || [{_Client, #doc{id=Id,access=[]}}|_] <- DocsList],
+    NonAccessIds = [Id || [{_Client, #doc{id = Id, access = []}} | _] <- DocsList],
     UpdatedDDocIds = lists:flatmap(
         fun
             (<<"_design/", _/binary>> = Id) -> [Id];
@@ -789,55 +790,68 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
 %     true;
 
 % at this point, we already validated this Db is access enabled, so do the checks right away.
-check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
+check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx = UserCtx}, Access).
 
 validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
     case couch_db:has_access_enabled(Db) of
         true -> validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos);
-        _Else -> { DocsList, OldDocInfos }
+        _Else -> {DocsList, OldDocInfos}
     end.
 
 validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos) ->
     validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
 
 validate_docs_access(_Db, _UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
-    { lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated) };
-validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated) ->
+    {lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated)};
+validate_docs_access(
+    Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated
+) ->
     % loop over Docs as {Client,  NewDoc}
     %   validate Doc
     %   if valid, then put back in Docs
     %   if not, then send_result and skip
     %couch_log:notice("~nvalidate_docs_access() UserCtx: ~p, Docs: ~p, OldInfo: ~p~n", [UserCtx, Docs, OldInfo]),
-    NewDocs = lists:foldl(fun({ Client, Doc }, Acc) ->
-        %couch_log:notice("~nvalidate_docs_access lists:foldl() Doc: ~p Doc#doc.access: ~p~n", [Doc, Doc#doc.access]),
+    NewDocs = lists:foldl(
+        fun({Client, Doc}, Acc) ->
+            %couch_log:notice("~nvalidate_docs_access lists:foldl() Doc: ~p Doc#doc.access: ~p~n", [Doc, Doc#doc.access]),
 
-        % check if we are allowed to update the doc, skip when new doc
-        OldDocMatchesAccess = case OldInfo#full_doc_info.rev_tree of
-            [] -> true;
-            _ -> check_access(Db, UserCtx, OldInfo#full_doc_info.access)
-        end,
+            % check if we are allowed to update the doc, skip when new doc
+            OldDocMatchesAccess =
+                case OldInfo#full_doc_info.rev_tree of
+                    [] -> true;
+                    _ -> check_access(Db, UserCtx, OldInfo#full_doc_info.access)
+                end,
 
-        NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
-        %couch_log:notice("~nvalidate_docs_access lists:foldl() OldDocMatchesAccess: ~p, NewDocMatchesAccess: ~p, andalso: ~p~n", [OldDocMatchesAccess, NewDocMatchesAccess, OldDocMatchesAccess andalso NewDocMatchesAccess]),
+            NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
+            %couch_log:notice("~nvalidate_docs_access lists:foldl() OldDocMatchesAccess: ~p, NewDocMatchesAccess: ~p, andalso: ~p~n", [OldDocMatchesAccess, NewDocMatchesAccess, OldDocMatchesAccess andalso NewDocMatchesAccess]),
 
-        case OldDocMatchesAccess andalso NewDocMatchesAccess of
-            true -> % if valid, then send to DocsListValidated, OldDocsInfo
+            case OldDocMatchesAccess andalso NewDocMatchesAccess of
+                % if valid, then send to DocsListValidated, OldDocsInfo
+                true ->
                     % and store the access context on the new doc
-                [{Client, Doc} | Acc];
-            false -> % if invalid, then send_result tagged `access`(c.f. `conflict)
-                      % and don’t add to DLV, nor ODI
-                send_result(Client, Doc, access),
-                Acc
-        end
-    end, [], Docs),
+                    [{Client, Doc} | Acc];
+                % if invalid, then send_result tagged `access`(c.f. `conflict)
+                false ->
+                    % and don’t add to DLV, nor ODI
+                    send_result(Client, Doc, access),
+                    Acc
+            end
+        end,
+        [],
+        Docs
+    ),
 
-    { NewDocsListValidated, NewOldDocInfosValidated } = case length(NewDocs) of
-        0 -> % we sent out all docs as invalid access, drop the old doc info associated with it
-            { [NewDocs | DocsListValidated], OldDocInfosValidated };
-        _ ->
-            { [NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated] }
-    end,
-    validate_docs_access(Db, UserCtx, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated).
+    {NewDocsListValidated, NewOldDocInfosValidated} =
+        case length(NewDocs) of
+            % we sent out all docs as invalid access, drop the old doc info associated with it
+            0 ->
+                {[NewDocs | DocsListValidated], OldDocInfosValidated};
+            _ ->
+                {[NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated]}
+        end,
+    validate_docs_access(
+        Db, UserCtx, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated
+    ).
 
 apply_local_docs_access(Db, Docs) ->
     apply_local_docs_access1(couch_db:has_access_enabled(Db), Docs).
@@ -845,10 +859,13 @@ apply_local_docs_access(Db, Docs) ->
 apply_local_docs_access1(false, Docs) ->
     Docs;
 apply_local_docs_access1(true, Docs) ->
-    lists:map(fun({Client, #doc{access = Access, body = {Body}} = Doc}) ->
-        Doc1 = Doc#doc{body = {[{<<"_access">>, Access} | Body]}},
-        {Client, Doc1}
-    end, Docs).
+    lists:map(
+        fun({Client, #doc{access = Access, body = {Body}} = Doc}) ->
+            Doc1 = Doc#doc{body = {[{<<"_access">>, Access} | Body]}},
+            {Client, Doc1}
+        end,
+        Docs
+    ).
 
 update_local_doc_revs(Docs) ->
     lists:foldl(
@@ -1038,14 +1055,15 @@ get_meta_body_size(Meta) ->
 
 default_security_object(<<"shards/", _/binary>>) ->
     case config:get("couchdb", "default_security", "admin_only") of
-        "admin_only" -> ?DEFAULT_SECURITY_OBJECT;
+        "admin_only" ->
+            ?DEFAULT_SECURITY_OBJECT;
         Everyone when Everyone == "everyone"; Everyone == "admin_local" ->
             []
     end;
 default_security_object(_DbName) ->
     case config:get("couchdb", "default_security", "admin_only") of
         Admin when Admin == "admin_only"; Admin == "admin_local" ->
-           ?DEFAULT_SECURITY_OBJECT;
+            ?DEFAULT_SECURITY_OBJECT;
         "everyone" ->
             []
     end.

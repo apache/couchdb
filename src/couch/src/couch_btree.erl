@@ -116,9 +116,11 @@ full_reduce_with_options(Bt, Options0) ->
     end,
     [UserName] = proplists:get_value(start_key, Options0, <<"">>),
     EndKey = {[UserName, {[]}]},
-    Options = Options0 ++ [
-        {end_key, EndKey}
-    ],
+    Options =
+        Options0 ++
+            [
+                {end_key, EndKey}
+            ],
     fold_reduce(Bt, CountFun, 0, Options).
 
 size(#btree{root = nil}) ->

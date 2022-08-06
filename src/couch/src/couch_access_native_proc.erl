@@ -13,7 +13,6 @@
 -module(couch_access_native_proc).
 -behavior(gen_server).
 
-
 -export([
     start_link/0,
     set_timeout/2,
@@ -29,70 +28,54 @@
     code_change/3
 ]).
 
-
 -record(st, {
     indexes = [],
-    timeout = 5000 % TODO: make configurable
+    % TODO: make configurable
+    timeout = 5000
 }).
 
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
-
 set_timeout(Pid, TimeOut) when is_integer(TimeOut), TimeOut > 0 ->
     gen_server:call(Pid, {set_timeout, TimeOut}).
-
 
 prompt(Pid, Data) ->
     gen_server:call(Pid, {prompt, Data}).
 
-
 init(_) ->
     {ok, #st{}}.
-
 
 terminate(_Reason, _St) ->
     ok.
 
-
 handle_call({set_timeout, TimeOut}, _From, St) ->
-    {reply, ok, St#st{timeout=TimeOut}};
-
+    {reply, ok, St#st{timeout = TimeOut}};
 handle_call({prompt, [<<"reset">>]}, _From, St) ->
-    {reply, true, St#st{indexes=[]}};
-
+    {reply, true, St#st{indexes = []}};
 handle_call({prompt, [<<"reset">>, _QueryConfig]}, _From, St) ->
-    {reply, true, St#st{indexes=[]}};
-
+    {reply, true, St#st{indexes = []}};
 handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
     {reply, true, St};
-
 handle_call({prompt, [<<"map_doc">>, Doc]}, _From, St) ->
     {reply, map_doc(St, mango_json:to_binary(Doc)), St};
-
 handle_call({prompt, [<<"reduce">>, _, _]}, _From, St) ->
     {reply, null, St};
-
 handle_call({prompt, [<<"rereduce">>, _, _]}, _From, St) ->
     {reply, null, St};
-
 handle_call({prompt, [<<"index_doc">>, Doc]}, _From, St) ->
     {reply, [[]], St};
-
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
 handle_cast(garbage_collect, St) ->
     erlang:garbage_collect(),
     {noreply, St};
-
 handle_cast(Msg, St) ->
     {stop, {invalid_cast, Msg}, St}.
 
-
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
-
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
@@ -115,7 +98,8 @@ code_change(_OldVsn, St, _Extra) ->
 map_doc(_St, {Doc}) ->
     case couch_util:get_value(<<"_access">>, Doc) of
         undefined ->
-            [[],[]]; % do not index this doc
+            % do not index this doc
+            [[], []];
         Access when is_list(Access) ->
             Id = couch_util:get_value(<<"_id">>, Doc),
             Rev = couch_util:get_value(<<"_rev">>, Doc),
@@ -123,21 +107,33 @@ map_doc(_St, {Doc}) ->
             Deleted = couch_util:get_value(<<"_deleted">>, Doc, false),
             BodySp = couch_util:get_value(<<"_body_sp">>, Doc),
             % by-access-id
-            ById = case Deleted of
-                false ->
-                    lists:map(fun(UserOrRole) -> [
-                        [[UserOrRole, Id], Rev]
-                    ] end, Access);
-                _True -> [[]]
-            end,
+            ById =
+                case Deleted of
+                    false ->
+                        lists:map(
+                            fun(UserOrRole) ->
+                                [
+                                    [[UserOrRole, Id], Rev]
+                                ]
+                            end,
+                            Access
+                        );
+                    _True ->
+                        [[]]
+                end,
 
             % by-access-seq
-            BySeq = lists:map(fun(UserOrRole) -> [
-                [[UserOrRole, Seq], [{rev, Rev}, {deleted, Deleted}, {body_sp, BodySp}]]
-            ] end, Access),
+            BySeq = lists:map(
+                fun(UserOrRole) ->
+                    [
+                        [[UserOrRole, Seq], [{rev, Rev}, {deleted, Deleted}, {body_sp, BodySp}]]
+                    ]
+                end,
+                Access
+            ),
             ById ++ BySeq;
         Else ->
             % TODO: no comprende: should not be needed once we implement
             % _access field validation
-            [[],[]]
+            [[], []]
     end.

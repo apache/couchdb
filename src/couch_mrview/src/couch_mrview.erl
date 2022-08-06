@@ -266,22 +266,27 @@ query_all_docs(Db, Args0, Callback, Acc) ->
 access_ddoc() ->
     #doc{
         id = <<"_design/_access">>,
-        body = {[
-            {<<"language">>,<<"_access">>},
-            {<<"options">>, {[
-                {<<"include_design">>, true}
-            ]}},
-            {<<"views">>, {[
-                {<<"_access_by_id">>, {[
-                    {<<"map">>, <<"_access/by-id-map">>},
-                    {<<"reduce">>, <<"_count">>}
-                ]}},
-                {<<"_access_by_seq">>, {[
-                    {<<"map">>, <<"_access/by-seq-map">>},
-                    {<<"reduce">>, <<"_count">>}
-                ]}}
-            ]}}
-        ]}
+        body =
+            {[
+                {<<"language">>, <<"_access">>},
+                {<<"options">>,
+                    {[
+                        {<<"include_design">>, true}
+                    ]}},
+                {<<"views">>,
+                    {[
+                        {<<"_access_by_id">>,
+                            {[
+                                {<<"map">>, <<"_access/by-id-map">>},
+                                {<<"reduce">>, <<"_count">>}
+                            ]}},
+                        {<<"_access_by_seq">>,
+                            {[
+                                {<<"map">>, <<"_access/by-seq-map">>},
+                                {<<"reduce">>, <<"_count">>}
+                            ]}}
+                    ]}}
+            ]}
     }.
 query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
     DDoc = access_ddoc(),
@@ -289,15 +294,16 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
     UserName = UserCtx#user_ctx.name,
     %% % TODO: add roles
     Args1 = prefix_startkey_endkey(UserName, #mrargs{}, fwd),
-    Args2 = Args1#mrargs{deleted=true},
-    Args = Args2#mrargs{reduce=false},
+    Args2 = Args1#mrargs{deleted = true},
+    Args = Args2#mrargs{reduce = false},
     %% % filter out the user-prefix from the key, so _all_docs looks normal
     %% % this isn’t a separate function because I’m binding Callback0 and I don’t
     %% % know the Erlang equivalent of JS’s fun.bind(this, newarg)
     Callback = fun
-         ({meta, _}, Acc0) ->
-            {ok, Acc0}; % ignore for now
-         ({row, Props}, Acc0) ->
+        ({meta, _}, Acc0) ->
+            % ignore for now
+            {ok, Acc0};
+        ({row, Props}, Acc0) ->
             % turn row into FDI
             Value = couch_util:get_value(value, Props),
             [Owner, Seq] = couch_util:get_value(key, Props),
@@ -307,7 +313,16 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
             [Pos, RevId] = string:split(?b2l(Rev), "-"),
             FDI = #full_doc_info{
                 id = proplists:get_value(id, Props),
-                rev_tree = [{list_to_integer(Pos), {?l2b(RevId), #leaf{deleted=Deleted, ptr=BodySp, seq=Seq, sizes=#size_info{}}, []}}],
+                rev_tree = [
+                    {
+                        list_to_integer(Pos),
+                        {
+                            ?l2b(RevId),
+                            #leaf{deleted = Deleted, ptr = BodySp, seq = Seq, sizes = #size_info{}},
+                            []
+                        }
+                    }
+                ],
                 deleted = Deleted,
                 update_seq = 0,
                 sizes = #size_info{},
@@ -315,8 +330,9 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
             },
             Fun(FDI, Acc0);
         (_Else, Acc0) ->
-            {ok, Acc0} % ignore for now
-        end,
+            % ignore for now
+            {ok, Acc0}
+    end,
     VName = <<"_access_by_seq">>,
     query_view(Db, DDoc, VName, Args, Callback, Acc).
 
@@ -327,7 +343,7 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
     Args1 = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
-    Args = Args1#mrargs{reduce=false, extra=Args1#mrargs.extra ++ [{all_docs_access, true}]},
+    Args = Args1#mrargs{reduce = false, extra = Args1#mrargs.extra ++ [{all_docs_access, true}]},
     Callback = fun
         ({row, Props}, Acc0) ->
             % filter out the user-prefix from the key, so _all_docs looks normal
@@ -339,34 +355,37 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
             Callback0({row, Row}, Acc0);
         (Row, Acc0) ->
             Callback0(Row, Acc0)
-        end,
+    end,
     VName = <<"_access_by_id">>,
     query_view(Db, DDoc, VName, Args, Callback, Acc).
 
 prefix_startkey_endkey(UserName, Args, fwd) ->
-    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
-    Args#mrargs {
-        start_key = case StartKey of
-            undefined -> [UserName];
-            StartKey -> [UserName, StartKey]
-        end,
-        end_key = case EndKey of
-            undefined -> [UserName, {}];
-            EndKey -> [UserName, EndKey, {}]
-        end
+    #mrargs{start_key = StartKey, end_key = EndKey} = Args,
+    Args#mrargs{
+        start_key =
+            case StartKey of
+                undefined -> [UserName];
+                StartKey -> [UserName, StartKey]
+            end,
+        end_key =
+            case EndKey of
+                undefined -> [UserName, {}];
+                EndKey -> [UserName, EndKey, {}]
+            end
     };
-
 prefix_startkey_endkey(UserName, Args, rev) ->
-    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
-    Args#mrargs {
-        end_key = case StartKey of
-            undefined -> [UserName];
-            StartKey -> [UserName, StartKey]
-        end,
-        start_key = case EndKey of
-            undefined -> [UserName, {}];
-            EndKey -> [UserName, EndKey, {}]
-        end
+    #mrargs{start_key = StartKey, end_key = EndKey} = Args,
+    Args#mrargs{
+        end_key =
+            case StartKey of
+                undefined -> [UserName];
+                StartKey -> [UserName, StartKey]
+            end,
+        start_key =
+            case EndKey of
+                undefined -> [UserName, {}];
+                EndKey -> [UserName, EndKey, {}]
+            end
     }.
 query_all_docs_admin(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->

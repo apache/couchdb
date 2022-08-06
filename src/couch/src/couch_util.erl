@@ -876,8 +876,7 @@ validate_design_access(Db, DDoc) ->
     validate_design_access1(DDoc, couch_db:has_access_enabled(Db)).
 
 validate_design_access1(_DDoc, false) -> ok;
-validate_design_access1(DDoc, true) ->
-    is_users_ddoc(DDoc).
+validate_design_access1(DDoc, true) -> is_users_ddoc(DDoc).
 
-is_users_ddoc(#doc{access=[<<"_users">>]}) -> ok;
+is_users_ddoc(#doc{access = [<<"_users">>]}) -> ok;
 is_users_ddoc(_) -> throw({forbidden, <<"per-user ddoc access">>}).

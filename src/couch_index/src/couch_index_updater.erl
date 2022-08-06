@@ -124,7 +124,7 @@ update(Idx, Mod, IdxState) ->
     DocOpts =
         case lists:member(local_seq, UpdateOpts) of
             true -> [conflicts, deleted_conflicts, local_seq, deleted];
-            _ -> [conflicts, deleted_conflicts,local_seq, deleted]
+            _ -> [conflicts, deleted_conflicts, local_seq, deleted]
         end,
 
     couch_util:with_db(DbName, fun(Db) ->
@@ -142,9 +142,9 @@ update(Idx, Mod, IdxState) ->
         end,
 
         GetInfo = fun
-            (#full_doc_info{id=Id, update_seq=Seq, deleted=Del,access=Access}=FDI) ->
+            (#full_doc_info{id = Id, update_seq = Seq, deleted = Del, access = Access} = FDI) ->
                 {Id, Seq, Del, couch_doc:to_doc_info(FDI), Access};
-            (#doc_info{id=Id, high_seq=Seq, revs=[RI|_],access=Access}=DI) ->
+            (#doc_info{id = Id, high_seq = Seq, revs = [RI | _], access = Access} = DI) ->
                 {Id, Seq, RI#rev_info.deleted, DI, Access}
         end,
 
@@ -155,19 +155,20 @@ update(Idx, Mod, IdxState) ->
                 {false, <<"_design/", _/binary>>} ->
                     {nil, Seq};
                 _ ->
-                    case IndexName of % TODO: move into outer case statement
+                    % TODO: move into outer case statement
+                    case IndexName of
                         <<"_design/_access">> ->
                             {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
                             % TODO: hande conflicted docs in _access index
                             % probably remove
-                            [RevInfo|_] = DocInfo#doc_info.revs,
+                            [RevInfo | _] = DocInfo#doc_info.revs,
                             Doc1 = Doc#doc{
                                 meta = [{body_sp, RevInfo#rev_info.body_sp}],
                                 access = Access
                             },
                             {Doc1, Seq};
                         _ when Deleted ->
-                            {#doc{id=DocId, deleted=true}, Seq};
+                            {#doc{id = DocId, deleted = true}, Seq};
                         _ ->
                             {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
                             {Doc, Seq}
