@@ -965,7 +965,7 @@ db_doc_req(#httpd{method = 'DELETE'} = Req, Db, DocId) ->
         Rev ->
             Body = {[{<<"_rev">>, ?l2b(Rev)}, {<<"_deleted">>, true}]}
     end,
-    Doc = Doc0#doc{revs=Revs,body=Body,deleted=true},
+    Doc = #doc{revs=Revs,body=Body,deleted=true,access=Doc0#doc.access},
     send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
     #doc_query_args{
