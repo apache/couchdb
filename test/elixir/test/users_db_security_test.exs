@@ -400,11 +400,11 @@ defmodule UsersDbSecurityTest do
 
     # admin should be able to read from any view
     resp = view_as(@users_db, "user_db_auth/test", user: "jerry")
-    assert resp.body["total_rows"] == 3
+    assert resp.body["total_rows"] == 4
 
     # db admin should be able to read from any view
     resp = view_as(@users_db, "user_db_auth/test", user: "speedy")
-    assert resp.body["total_rows"] == 3
+    assert resp.body["total_rows"] == 4
 
     # non-admins can't read design docs
     open_as(@users_db, "_design/user_db_auth",
@@ -419,7 +419,7 @@ defmodule UsersDbSecurityTest do
       request_raw_as(@users_db, "_design/user_db_auth/_list/names/test", user: "jerry")
 
     assert result.status_code == 200
-    assert length(String.split(result.body, "\n")) == 4
+    assert length(String.split(result.body, "\n")) == 5
 
     # non-admins can't read _list
     request_raw_as(@users_db, "_design/user_db_auth/_list/names/test",
