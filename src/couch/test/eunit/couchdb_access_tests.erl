@@ -73,6 +73,10 @@ after_all(_) ->
 
 access_test_() ->
     Tests = [
+
+        % Server config
+        fun should_not_let_create_access_db_if_disabled/2,
+
         % Doc creation
         fun should_not_let_anonymous_user_create_doc/2,
         fun should_let_admin_create_doc_with_access/2,
@@ -166,6 +170,12 @@ make_test_cases(Mod, Funs) ->
 %       ?assertEqual(200, Code)
 %   end).
 %
+
+should_not_let_create_access_db_if_disabled(_PortType, Url) ->
+    ok = config:set("per_doc_access", "enabled", "false", _Persist=false),
+    {ok, Code, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
+    ok = config:set("per_doc_access", "enabled", "true", _Persist=false),
+    ?_assertEqual(400, Code).
 
 should_not_let_anonymous_user_create_doc(_PortType, Url) ->
     % TODO: debugging leftover
