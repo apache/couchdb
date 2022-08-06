@@ -796,11 +796,6 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
 % at this point, we already validated this Db is access enabled, so do the checks right away.
 check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
 
-% TODO: looks like we go into validation here unconditionally and only check in
-%       check_access() whether the Db has_access_enabled(), we should do this
-%       here on the outside. Might be our perf issue.
-%       However, if it is, that means we have to speed this up as it would still
-%       be too slow for when access is enabled.
 validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
     case couch_db:has_access_enabled(Db) of
         true -> validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos);
