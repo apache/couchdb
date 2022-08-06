@@ -810,6 +810,8 @@ validate_access1(true, Db, #doc{meta=Meta}=Doc, Options) ->
                 _False -> validate_access2(Db, Doc)
             end;
         _Else -> % only admins can read conflicted docs in _access dbs
+               % TODO: expand: if leaves agree on _access, then a user should be able
+               %       to proceed normally, only if they disagree should this become admin-only
             case is_admin(Db) of
                 true -> ok;
                 _Else2 -> throw({forbidden, <<"document is in conflict">>})
