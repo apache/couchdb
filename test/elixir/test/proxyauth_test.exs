@@ -5,7 +5,6 @@ defmodule ProxyAuthTest do
 
   @tag :with_db
   test "proxy auth with secret" do
-
     users_db_name = random_db_name()
     create_db(users_db_name)
 
@@ -79,7 +78,6 @@ defmodule ProxyAuthTest do
 
   @tag :with_db
   test "proxy auth without secret" do
-
     users_db_name = random_db_name()
     create_db(users_db_name)
 
