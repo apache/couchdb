@@ -2005,13 +2005,15 @@ parse_shards_opt("placement", Req, Default) ->
 
 parse_shards_opt("access", Req, Value) when is_list(Value) ->
     parse_shards_opt("access", Req, list_to_existing_atom(Value));
-parse_shards_opt("access", _Req, Value) when is_boolean(Value) ->
+parse_shards_opt("access", _Req, Value) when Value =:= true ->
     case config:get_boolean("per_doc_access", "enabled", false) of
-        true -> Value;
+        true -> true;
         false ->
-            Err = ?l2b(["The `access` is not available on this CouchDB installation."]),
+            Err = ?l2b(["The `access` option is not available on this CouchDB installation."]),
             throw({bad_request, Err})
     end;
+parse_shards_opt("access", _Req, Value) when Value =:= false ->
+    false;
 parse_shards_opt("access", _Req, _Value) ->
     Err = ?l2b(["The `access` value should be a boolean."]),
     throw({bad_request, Err});
