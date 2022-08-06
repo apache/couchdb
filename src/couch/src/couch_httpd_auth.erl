@@ -103,7 +103,7 @@ extract_roles(UserProps) ->
     Roles = couch_util:get_value(<<"roles">>, UserProps, []),
     case lists:member(<<"_admin">>, Roles) of
         true -> Roles;
-        _ -> Roles ++ [<<"_users">>]
+        _ -> [<<"_users">> | Roles]
     end.
 
 default_authentication_handler(Req) ->
