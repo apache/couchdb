@@ -829,7 +829,7 @@ validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], Doc
             true -> % if valid, then send to DocsListValidated, OldDocsInfo
                     % and store the access context on the new doc
                 [{Client, Doc} | Acc];
-            _Else2 -> % if invalid, then send_result tagged `access`(c.f. `conflict)
+            false -> % if invalid, then send_result tagged `access`(c.f. `conflict)
                       % and don’t add to DLV, nor ODI
                 send_result(Client, Doc, access),
                 Acc
