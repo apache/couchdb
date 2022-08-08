@@ -138,7 +138,8 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
         receive
-            {Ref, {ok, Db}} ->
+            {Ref, {ok, Db}, {cost, Cost}} ->
+                couch_cost:accumulate_costs(Cost),
                 {ok, Db};
             {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
                 throw(Error);
@@ -146,7 +147,10 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
                 throw(Error);
             {Ref, Reason} ->
                 couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
-                get_shard(Rest, Opts, Timeout, Factor)
+                get_shard(Rest, Opts, Timeout, Factor);
+            Other ->
+                io:format("GOT UNEXPECTED MESSAGE FORMAT: ~p~n", [Other]),
+                erlang:error(Other)
         after Timeout ->
             couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
             get_shard(Rest, Opts, Factor * Timeout, Factor)

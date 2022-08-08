@@ -96,6 +96,7 @@ sup_start_link(N) ->
     gen_server:start_link({local, couch_server(N)}, couch_server, [N], []).
 
 open(DbName, Options) ->
+    couch_cost:inc_db_open(),
     try
         validate_open_or_create(DbName, Options),
         open_int(DbName, Options)

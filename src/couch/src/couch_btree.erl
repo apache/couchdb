@@ -472,6 +472,7 @@ reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
 
 get_node(#btree{fd = Fd}, NodePos) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
+    couch_cost:inc_get_node(NodeType),
     {NodeType, NodeList}.
 
 write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
@@ -1077,7 +1078,6 @@ stream_node(Bt, Reds, Node, StartKey, InRange, Dir, Fun, Acc) ->
 stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc) ->
     Pointer = element(1, Node),
     {NodeType, NodeList} = get_node(Bt, Pointer),
-    couch_cost:inc_get_node(NodeType),
     case NodeType of
         kp_node ->
             stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc);
@@ -1164,6 +1164,7 @@ stream_kv_node2(Bt, Reds, PrevKVs, [{K, V} | RestKVs], InRange, Dir, Fun, Acc) -
         false ->
             {stop, {PrevKVs, Reds}, Acc};
         true ->
+            couch_cost:inc_changes_processed(),
             AssembledKV = assemble(Bt, K, V),
             case Fun(visit, AssembledKV, {PrevKVs, Reds}, Acc) of
                 {ok, Acc2} ->

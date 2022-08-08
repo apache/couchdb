@@ -84,7 +84,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         {rexi, '$rexi_ping'} ->
             {ok, Acc0};
         {Ref, Msg, {cost,Cost}} ->
-            io:format("GOT COST: ~p -- ~p~n", [Cost, Msg]),
+            io:format("[~p]GOT COST: ~p -- ~p~n", [self(), Cost, Msg]),
+            couch_cost:accumulate_costs(Cost),
             case lists:keyfind(Ref, Keypos, RefList) of
             false ->
                 % this was some non-matching message which we will ignore
@@ -94,7 +95,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             end;
         {Ref, From, Msg, {cost,Cost}} ->
             %%io:format("GOT COST: ~p~n", [Cost]),
-            io:format("GOT COST: ~p -- ~p~n", [Cost, Msg]),
+            io:format("[~p]GOT COST: ~p -- ~p~n", [self(), Cost, Msg]),
+            couch_cost:accumulate_costs(Cost),
             case lists:keyfind(Ref, Keypos, RefList) of
             false ->
                 {ok, Acc0};
@@ -102,7 +104,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                 Fun(Msg, {Worker, From}, Acc0)
             end;
         {Ref, Msg} ->
-            io:format("GOT NON COST MSG: ~p~n", [Msg]),
+            %%io:format("GOT NON COST MSG: ~p~n", [Msg]),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     % this was some non-matching message which we will ignore
@@ -111,7 +113,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                     Fun(Msg, Worker, Acc0)
             end;
         {Ref, From, Msg} ->
-            io:format("GOT NON COST MSG: ~p~n", [Msg]),
+            %%io:format("GOT NON COST MSG: ~p~n", [Msg]),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
