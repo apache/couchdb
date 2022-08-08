@@ -296,9 +296,9 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                 end,
             % Verify expiry and hash
             CurrentTime = make_cookie_time(),
+            HashAlgorithms = get_config_hash_algorithms(),
             case chttpd_util:get_chttpd_auth_config("secret") of
                 undefined ->
-                    couch_log:debug("cookie auth secret is not set", []),
                     Req;
                 SecretStr ->
                     Secret = ?l2b(SecretStr),
@@ -308,15 +308,26 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                         {ok, UserProps, _AuthCtx} ->
                             UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                             FullSecret = <<Secret/binary, UserSalt/binary>>,
-                            ExpectedHash = couch_util:hmac(sha, FullSecret, User ++ ":" ++ TimeStr),
+                            CalculatedHashes = lists:map(
+                                fun(HashAlg) ->
+                                    couch_util:hmac(HashAlg, FullSecret, User ++ ":" ++ TimeStr)
+                                end,
+                                HashAlgorithms
+                            ),
                             Hash = ?l2b(HashStr),
+                            VerifiedHashes = lists:map(
+                                fun(HashToValidate) ->
+                                    couch_passwords:verify(HashToValidate, Hash)
+                                end,
+                                CalculatedHashes
+                            ),
                             Timeout = chttpd_util:get_chttpd_auth_config_integer(
                                 "timeout", 600
                             ),
                             couch_log:debug("timeout ~p", [Timeout]),
                             case (catch erlang:list_to_integer(TimeStr, 16)) of
                                 TimeStamp when CurrentTime < TimeStamp + Timeout ->
-                                    case couch_passwords:verify(ExpectedHash, Hash) of
+                                    case lists:member(true, VerifiedHashes) of
                                         true ->
                                             TimeLeft = TimeStamp + Timeout - CurrentTime,
                                             couch_log:debug(
@@ -367,7 +378,8 @@ cookie_auth_header(_Req, _Headers) ->
 
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
-    Hash = couch_util:hmac(sha, Secret, SessionData),
+    [HashAlgorithm | _] = get_config_hash_algorithms(),
+    Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
     mochiweb_cookies:cookie(
         "AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
@@ -694,4 +706,13 @@ authentication_warning(#httpd{mochi_req = Req}, User) ->
     couch_log:warning(
         "~p: Authentication failed for user ~s from ~s",
         [?MODULE, User, Peer]
+    ).
+
+-spec get_config_hash_algorithms() -> list(atom()).
+get_config_hash_algorithms() ->
+    HashAlgorithmStr = string:to_lower(
+        chttpd_util:get_chttpd_auth_config("hash_algorithms", "sha256, sha")
+    ),
+    lists:map(
+        fun binary_to_atom/1, re:split(HashAlgorithmStr, "\\s*,\\s*", [trim, {return, binary}])
     ).
