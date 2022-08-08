@@ -34,6 +34,7 @@
     get_kp_node = 0
 }).
 
+
 get_cost() ->
     case get(cost_accounting_context) of
         undefined ->
@@ -43,6 +44,7 @@ get_cost() ->
         #cost{}=Cost ->
             Cost
     end.
+
 
 get_costs() ->
     case get(cost_accounting_context_aggregation) of
@@ -54,16 +56,20 @@ get_costs() ->
             Costs
     end.
 
+
 update_cost(#cost{}=Cost) ->
     put(cost_accounting_context, Cost).
+
 
 accumulate_costs(#cost{}=Cost) ->
     Costs = get_costs(),
     put(cost_accounting_context_aggregation, [Cost | Costs]).
 
+
 inc_doc() -> inc_doc(1).
 inc_doc(N) -> inc_doc(N, get_cost()).
 inc_doc(N, #cost{docs_read=DR0}=Cost) -> update_cost(Cost#cost{docs_read=DR0+N}).
+
 
 inc_ioq() -> inc_ioq(1).
 inc_ioq(N) -> inc_ioq(N, get_cost()).
