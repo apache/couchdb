@@ -432,7 +432,7 @@ purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
             {ok, []};
         [_ | _] ->
             increment_stat(Db, [couchdb, database_purges]),
-            gen_server:call(Pid, {purge_docs, UUIDsIdsRevs2, Options})
+            gen_server:call(Pid, {purge_docs, UUIDsIdsRevs2, Options}, infinity)
     end.
 
 -spec get_purge_infos(#db{}, [UUId]) -> [PurgeInfo] when
