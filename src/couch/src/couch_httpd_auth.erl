@@ -16,6 +16,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(DEFAULT_HASH_ALGORITHM, sha256).
+
 -export([party_mode_handler/1]).
 
 -export([
@@ -299,6 +301,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
             HashAlgorithms = get_config_hash_algorithms(),
             case chttpd_util:get_chttpd_auth_config("secret") of
                 undefined ->
+                    couch_log:debug("cookie auth secret is not set", []),
                     Req;
                 SecretStr ->
                     Secret = ?l2b(SecretStr),
@@ -308,26 +311,18 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                         {ok, UserProps, _AuthCtx} ->
                             UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
                             FullSecret = <<Secret/binary, UserSalt/binary>>,
-                            CalculatedHashes = lists:map(
-                                fun(HashAlg) ->
-                                    couch_util:hmac(HashAlg, FullSecret, User ++ ":" ++ TimeStr)
-                                end,
-                                HashAlgorithms
-                            ),
                             Hash = ?l2b(HashStr),
-                            VerifiedHashes = lists:map(
-                                fun(HashToValidate) ->
-                                    couch_passwords:verify(HashToValidate, Hash)
-                                end,
-                                CalculatedHashes
-                            ),
+                            VerifyHash = fun(HashAlg) ->
+                                Hmac = couch_util:hmac(HashAlg, FullSecret, User ++ ":" ++ TimeStr),
+                                couch_passwords:verify(Hmac, Hash)
+                            end,
                             Timeout = chttpd_util:get_chttpd_auth_config_integer(
                                 "timeout", 600
                             ),
                             couch_log:debug("timeout ~p", [Timeout]),
                             case (catch erlang:list_to_integer(TimeStr, 16)) of
                                 TimeStamp when CurrentTime < TimeStamp + Timeout ->
-                                    case lists:member(true, VerifiedHashes) of
+                                    case lists:any(VerifyHash, HashAlgorithms) of
                                         true ->
                                             TimeLeft = TimeStamp + Timeout - CurrentTime,
                                             couch_log:debug(
@@ -708,11 +703,31 @@ authentication_warning(#httpd{mochi_req = Req}, User) ->
         [?MODULE, User, Peer]
     ).
 
+verify_hash_names(HashAlgorithms, SupportedHashFun) ->
+    verify_hash_names(HashAlgorithms, SupportedHashFun, []).
+verify_hash_names([], _, HashNames) ->
+    lists:reverse(HashNames);
+verify_hash_names([H | T], SupportedHashFun, HashNames) ->
+    try
+        HashAtom = binary_to_existing_atom(H),
+        Result =
+            case lists:member(HashAtom, SupportedHashFun) of
+                true -> [HashAtom | HashNames];
+                false -> HashNames
+            end,
+        verify_hash_names(T, SupportedHashFun, Result)
+    catch
+        error:badarg ->
+            couch_log:warning("~p: Hash algorithm ~s is not valid.", [?MODULE, H]),
+            verify_hash_names(T, SupportedHashFun, HashNames)
+    end.
+
 -spec get_config_hash_algorithms() -> list(atom()).
 get_config_hash_algorithms() ->
-    HashAlgorithmStr = string:to_lower(
-        chttpd_util:get_chttpd_auth_config("hash_algorithms", "sha256, sha")
-    ),
-    lists:map(
-        fun binary_to_atom/1, re:split(HashAlgorithmStr, "\\s*,\\s*", [trim, {return, binary}])
-    ).
+    SupportedHashAlgorithms = crypto:supports(hashs),
+    HashAlgorithmsStr = chttpd_util:get_chttpd_auth_config("hash_algorithms", "sha256, sha"),
+    HashAlgorithms = re:split(HashAlgorithmsStr, "\\s*,\\s*", [trim, {return, binary}]),
+    case verify_hash_names(HashAlgorithms, SupportedHashAlgorithms) of
+        [] -> [?DEFAULT_HASH_ALGORITHM];
+        VerifiedHashNames -> VerifiedHashNames
+    end.
