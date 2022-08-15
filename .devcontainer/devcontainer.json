@@ -1,19 +1,29 @@
 {
     "build": {
         "dockerfile": "Dockerfile",
+        "context": "..",
         "args": {
+            "name": "couchdb-dev",
             // Useful choices include:
-            // 1.11 -> Erlang 23, Debian Buster
-            // 1.10 -> Erlang 22, Debian Buster
-            // 1.9  -> Erlang 22, Debian Buster
+            // apache/couchdbci-debian:bullseye-erlang-25.0.2
+            // apache/couchdbci-debian:bullseye-erlang-24.3.4.2
+            // apache/couchdbci-debian:bullseye-erlang-23.3.4.15
             //
-            // Older versions based on Debian Stretch will not include
-            // SpiderMonkey 60, which the Dockerfile expects to be able
-            // to install via apt-get.
-            "ELIXIR_VERSION": "1.10"
+            "IMG": "apache/couchdbci-debian:bullseye-erlang-25.0.2"
         }
     },
-    "extensions": [
-        "erlang-ls.erlang-ls"
-    ]
+
+    // We are using a volume mount to improve performance
+    // https://code.visualstudio.com/remote/advancedcontainers/improve-performance#_use-a-named-volume-for-your-entire-source-tree
+    //
+    // and eliminate test flake.
+    // https://github.com/apache/couchdb/discussions/4145
+    //
+    // Your code will not be bound to the host OS folder you started this project from.
+    // Your code will live inside the volume created for the container under /workspace.
+    "workspaceMount": "target=/workspaces/couchdb,type=volume",
+    "workspaceFolder": "/workspaces/couchdb",
+    "postCreateCommand": "./configure && make",
+
+    "extensions": ["erlang-ls.erlang-ls"]
 }
