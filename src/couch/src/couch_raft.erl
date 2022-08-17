@@ -52,7 +52,7 @@ new(Name, StoreModule, StoreState) ->
     maps:merge(#{
         name => Name,
         store_module => StoreModule,
-        votesGranted => #{},
+        votesGranted => undefined,
         froms => #{}
     }, StoreState).
 
@@ -71,13 +71,13 @@ callback_mode() ->
 %% erlfmt-ignore
 handle_event(cast, #{term := FutureTerm} = Msg, _State, #{term := CurrentTerm} = Data) when FutureTerm > CurrentTerm ->
     couch_log:notice("~p received message from future term ~B, moving to that term, becoming follower and clearing votedFor", [node(), FutureTerm]),
-    persist({next_state, follower, Data#{term => FutureTerm, votedFor => undefined}, {next_event, cast, Msg}});
+    persist({next_state, follower, Data#{term => FutureTerm, votedFor => undefined, votesGranted => undefined}, {next_event, cast, Msg}});
 
 handle_event(enter, _OldState, follower, Data) ->
     #{term := Term, froms := Froms} = Data,
     couch_log:notice("~p became follower in term ~B", [node(), Term]),
     Replies = [{reply, From, {error, deposed}} || From <- maps:values(Froms)],
-    persist({keep_state, maps:without([nextIndex, matchIndex], Data#{votedFor => undefined, froms => #{}}),
+    persist({keep_state, maps:without([nextIndex, matchIndex], Data#{votedFor => undefined, votesGranted => undefined, froms => #{}}),
         [restart_election_timeout() | Replies]});
 
 handle_event(enter, _OldState, candidate, Data) ->
