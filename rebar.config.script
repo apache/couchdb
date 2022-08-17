@@ -141,7 +141,7 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           {tag, "2.1.9"}},
+{config,           "config",           {tag, "2.2.0"}},
 {b64url,           "b64url",           {tag, "1.0.3"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
 {khash,            "khash",            {tag, "1.1.0"}},
@@ -157,7 +157,7 @@ DepDescs = [
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-7"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-5"}},
 {jiffy,            "jiffy",            {tag, "1.1.1"}},
-{mochiweb,         "mochiweb",         {tag, "v3.0.0"}},
+{mochiweb,         "mochiweb",         {tag, "v3.1.0"}},
 {meck,             "meck",             {tag, "0.9.2"}},
 {recon,            "recon",            {tag, "2.5.2"}}
 ].
