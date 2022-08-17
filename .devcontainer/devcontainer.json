@@ -9,7 +9,7 @@
             // apache/couchdbci-debian:bullseye-erlang-24.3.4.2
             // apache/couchdbci-debian:bullseye-erlang-23.3.4.15
             //
-            "IMG": "apache/couchdbci-debian:bullseye-erlang-25.0.2"
+            "COUCHDB_IMAGE": "apache/couchdbci-debian:bullseye-erlang-25.0.2"
         }
     },
 

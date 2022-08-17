@@ -76,7 +76,8 @@ and spin up a dev container for use.
 
 This ``devcontainer`` will automatically run ``./configure && make`` the first time it is created.  
 While this may take some extra time to spin up, this tradeoff means you will be able to 
-run things like ``./dev/run`` and ``make check`` straight away.  Subsequent startups should be quick.
+run things like ``./dev/run``, ``./dev/run --admin=admin:admin``,  ``./dev/run --with-admin-party-please``, 
+and ``make check`` straight away.  Subsequent startups should be quick.
 
 
 Debian-based (inc. Ubuntu) Systems
