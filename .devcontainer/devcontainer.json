@@ -1,9 +1,9 @@
 {
+    "name": "couchdb-dev",
     "build": {
         "dockerfile": "Dockerfile",
         "context": "..",
         "args": {
-            "name": "couchdb-dev",
             // Useful choices include:
             // apache/couchdbci-debian:bullseye-erlang-25.0.2
             // apache/couchdbci-debian:bullseye-erlang-24.3.4.2
