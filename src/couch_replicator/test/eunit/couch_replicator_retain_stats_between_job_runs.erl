@@ -15,104 +15,70 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
+-include("couch_replicator_test.hrl").
 
 -define(DELAY, 500).
 -define(TIMEOUT, 60000).
 
-setup_all() ->
-    test_util:start_couch([couch_replicator, chttpd, mem3, fabric]).
-
-teardown_all(Ctx) ->
-    ok = test_util:stop_couch(Ctx).
-
-setup() ->
-    Source = setup_db(),
-    Target = setup_db(),
-    {Source, Target}.
-
-teardown({Source, Target}) ->
-    teardown_db(Source),
-    teardown_db(Target),
-    ok.
-
 stats_retained_test_() ->
     {
-        setup,
-        fun setup_all/0,
-        fun teardown_all/1,
-        {
-            foreach,
-            fun setup/0,
-            fun teardown/1,
-            [
-                fun t_stats_retained_by_scheduler/1,
-                fun t_stats_retained_on_job_removal/1
-            ]
-        }
+        foreach,
+        fun couch_replicator_test_helper:test_setup/0,
+        fun couch_replicator_test_helper:test_teardown/1,
+        [
+            ?TDEF_FE(t_stats_retained_by_scheduler),
+            ?TDEF_FE(t_stats_retained_on_job_removal)
+        ]
     }.
 
-t_stats_retained_by_scheduler({Source, Target}) ->
-    ?_test(begin
-        {ok, _} = add_vdu(Target),
-        populate_db_reject_even_docs(Source, 1, 10),
-        {ok, RepPid, RepId} = replicate(Source, Target),
-        wait_target_in_sync(6, Target),
+t_stats_retained_by_scheduler({_Ctx, {Source, Target}}) ->
+    {ok, _} = add_vdu(Target),
+    populate_db_reject_even_docs(Source, 1, 10),
+    {ok, RepPid, RepId} = replicate(Source, Target),
+    wait_target_in_sync(6, Target),
 
-        check_active_tasks(10, 5, 5),
-        check_scheduler_jobs(10, 5, 5),
+    check_active_tasks(10, 5, 5),
+    check_scheduler_jobs(10, 5, 5),
 
-        stop_job(RepPid),
-        check_scheduler_jobs(10, 5, 5),
+    stop_job(RepPid),
+    check_scheduler_jobs(10, 5, 5),
 
-        start_job(),
-        check_active_tasks(10, 5, 5),
-        check_scheduler_jobs(10, 5, 5),
-        couch_replicator_scheduler:remove_job(RepId)
-    end).
+    start_job(),
+    check_active_tasks(10, 5, 5),
+    check_scheduler_jobs(10, 5, 5),
+    couch_replicator_scheduler:remove_job(RepId).
 
-t_stats_retained_on_job_removal({Source, Target}) ->
-    ?_test(begin
-        {ok, _} = add_vdu(Target),
-        populate_db_reject_even_docs(Source, 1, 10),
-        {ok, _, RepId} = replicate(Source, Target),
-        % 5 + 1 vdu
-        wait_target_in_sync(6, Target),
+t_stats_retained_on_job_removal({_Ctx, {Source, Target}}) ->
+    {ok, _} = add_vdu(Target),
+    populate_db_reject_even_docs(Source, 1, 10),
+    {ok, _, RepId} = replicate(Source, Target),
+    % 5 + 1 vdu
+    wait_target_in_sync(6, Target),
 
-        check_active_tasks(10, 5, 5),
-        check_scheduler_jobs(10, 5, 5),
+    check_active_tasks(10, 5, 5),
+    check_scheduler_jobs(10, 5, 5),
 
-        couch_replicator_scheduler:remove_job(RepId),
+    couch_replicator_scheduler:remove_job(RepId),
 
-        populate_db_reject_even_docs(Source, 11, 20),
-        {ok, _, RepId} = replicate(Source, Target),
-        % 6 + 5
-        wait_target_in_sync(11, Target),
+    populate_db_reject_even_docs(Source, 11, 20),
+    {ok, _, RepId} = replicate(Source, Target),
+    % 6 + 5
+    wait_target_in_sync(11, Target),
 
-        check_scheduler_jobs(20, 10, 10),
-        check_active_tasks(20, 10, 10),
+    check_scheduler_jobs(20, 10, 10),
+    check_active_tasks(20, 10, 10),
 
-        couch_replicator_scheduler:remove_job(RepId),
+    couch_replicator_scheduler:remove_job(RepId),
 
-        populate_db_reject_even_docs(Source, 21, 30),
-        {ok, _, RepId} = replicate(Source, Target),
-        % 11 + 5
-        wait_target_in_sync(16, Target),
+    populate_db_reject_even_docs(Source, 21, 30),
+    {ok, _, RepId} = replicate(Source, Target),
+    % 11 + 5
+    wait_target_in_sync(16, Target),
 
-        check_scheduler_jobs(30, 15, 15),
-        check_active_tasks(30, 15, 15),
+    check_scheduler_jobs(30, 15, 15),
+    check_active_tasks(30, 15, 15),
 
-        couch_replicator_scheduler:remove_job(RepId)
-    end).
-
-setup_db() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    ok = couch_db:close(Db),
-    DbName.
-
-teardown_db(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-    ok.
+    couch_replicator_scheduler:remove_job(RepId).
 
 stop_job(RepPid) ->
     Ref = erlang:monitor(process, RepPid),
@@ -201,7 +167,6 @@ populate_db_reject_even_docs(DbName, Start, End) ->
     populate_db(DbName, Start, End, BodyFun).
 
 populate_db(DbName, Start, End, BodyFun) when is_function(BodyFun, 1) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
     Docs = lists:foldl(
         fun(DocIdCounter, Acc) ->
             Id = integer_to_binary(DocIdCounter),
@@ -211,8 +176,7 @@ populate_db(DbName, Start, End, BodyFun) when is_function(BodyFun, 1) ->
         [],
         lists:seq(Start, End)
     ),
-    {ok, _} = couch_db:update_docs(Db, Docs, []),
-    ok = couch_db:close(Db).
+    {ok, _} = fabric:update_docs(DbName, Docs, [?ADMIN_CTX]).
 
 wait_target_in_sync(DocCount, Target) when is_integer(DocCount) ->
     wait_target_in_sync_loop(DocCount, Target, 300).
@@ -226,10 +190,7 @@ wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
         ]}
     );
 wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
-    {ok, Target} = couch_db:open_int(TargetName, []),
-    {ok, TargetInfo} = couch_db:get_db_info(Target),
-    ok = couch_db:close(Target),
-    TargetDocCount = couch_util:get_value(doc_count, TargetInfo),
+    {ok, TargetDocCount} = fabric:get_doc_count(TargetName),
     case TargetDocCount == DocCount of
         true ->
             true;
@@ -238,13 +199,14 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
             wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft - 1)
     end.
 
+db_url(DbName) ->
+    couch_replicator_test_helper:cluster_db_url(DbName).
+
 replicate(Source, Target) ->
-    SrcUrl = couch_replicator_test_helper:db_url(Source),
-    TgtUrl = couch_replicator_test_helper:db_url(Target),
     RepObject =
         {[
-            {<<"source">>, SrcUrl},
-            {<<"target">>, TgtUrl},
+            {<<"source">>, db_url(Source)},
+            {<<"target">>, db_url(Target)},
             {<<"continuous">>, true}
         ]},
     {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
@@ -254,10 +216,8 @@ replicate(Source, Target) ->
     {ok, Pid, Rep#rep.id}.
 
 scheduler_jobs() ->
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
-    Url = lists:flatten(io_lib:format("http://~s:~b/_scheduler/jobs", [Addr, Port])),
-    {ok, 200, _, Body} = test_request:get(Url, []),
+    JobsUrl = couch_replicator_test_helper:cluster_db_url(<<"_scheduler/jobs">>),
+    {ok, 200, _, Body} = test_request:get(?b2l(JobsUrl), []),
     Json = jiffy:decode(Body, [return_maps]),
     maps:get(<<"jobs">>, Json).
 
@@ -279,9 +239,4 @@ add_vdu(DbName) ->
         {<<"validate_doc_update">>, vdu()}
     ],
     Doc = couch_doc:from_json_obj({DocProps}, []),
-    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-    try
-        {ok, _Rev} = couch_db:update_doc(Db, Doc, [])
-    after
-        couch_db:close(Db)
-    end.
+    {ok, _Rev} = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]).
