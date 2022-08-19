@@ -35,6 +35,7 @@
     update_docs/4,
     ensure_full_commit/1,
     get_missing_revs/2,
+    bulk_get/3,
     open_doc/3,
     open_doc_revs/6,
     changes_since/5,
@@ -205,6 +206,74 @@ get_missing_revs(#httpdb{} = Db, IdRevs) ->
                 {error, {revs_diff_failed, ErrCode, ErrMsg}}
         end
     ).
+
+bulk_get(#httpdb{} = Db, #{} = IdRevs, Options) ->
+    FoldFun = fun({Id, Rev}, PAs, Acc) -> [{Id, Rev, PAs} | Acc] end,
+    ReqDocsList = lists:sort(maps:fold(FoldFun, [], IdRevs)),
+    MapFun = fun({Id, Rev, PAs}) ->
+        #{
+            <<"id">> => Id,
+            <<"rev">> => couch_doc:rev_to_str(Rev),
+            <<"atts_since">> => couch_doc:revs_to_strs(PAs)
+        }
+    end,
+    ReqDocsMaps = lists:map(MapFun, ReqDocsList),
+    % We are also sending request parameters in the doc body with the hopes
+    % that at some point in the future we could make that the default, instead
+    % of having to send query parameters with a POST request as we do today
+    Body = options_to_json_map(Options, #{<<"docs">> => ReqDocsMaps}),
+    Req = [
+        {method, post},
+        {path, "_bulk_get"},
+        {qs, options_to_query_args(Options, [])},
+        {body, ?JSON_ENCODE(Body)},
+        {headers, [
+            {"Content-Type", "application/json"},
+            {"Accept", "application/json"}
+        ]}
+    ],
+    try
+        send_req(Db, Req, fun
+            (200, _, {[{<<"results">>, Res}]}) when is_list(Res) ->
+                Zip = lists:zipwith(fun bulk_get_zip/2, ReqDocsList, Res),
+                {ok, maps:from_list(Zip)};
+            (200, _, _) ->
+                {error, {bulk_get_failed, invalid_results}};
+            (ErrCode, _, _) when is_integer(ErrCode) ->
+                % On older Apache CouchDB instances where _bulk_get is not
+                % implemented we would hit the POST db/doc form uploader
+                % handler. When that fails the request body is not consumed and
+                % we'd end up recycling a worker with an unsent body in the
+                % connection stream. Instead of waiting for it to blow up
+                % eventually and consuming an extra retry attempt, proactively
+                % advise httpc logic to stop this worker and not return back to
+                % the pool.
+                couch_replicator_httpc:stop_http_worker(),
+                {error, {bulk_get_failed, ErrCode}}
+        end)
+    catch
+        exit:{http_request_failed, _, _, {error, {code, ErrCode}}} ->
+            % We are being a bit more tolerant of _bulk_get errors as we can
+            % always fallback to individual fetches
+            {error, {bulk_get_failed, ErrCode}}
+    end.
+
+bulk_get_zip({Id, Rev, _}, {[_ | _] = Props}) ->
+    Docs = couch_util:get_value(<<"docs">>, Props),
+    ResId = couch_util:get_value(<<"id">>, Props),
+    % "docs" is a one item list, either [{"ok": Doc}] or [{"error": Error}]
+    case Docs of
+        [{[{<<"ok">>, {[_ | _]} = Doc}]}] when ResId =:= Id ->
+            {{Id, Rev}, couch_doc:from_json_obj(Doc)};
+        [{[{<<"error">>, {[_ | _] = Err}}]}] when ResId =:= Id ->
+            Tag = couch_util:get_value(<<"error">>, Err),
+            Reason = couch_util:get_value(<<"reason">>, Err),
+            couch_log:debug("~p bulk_get zip error ~p:~p", [?MODULE, Tag, Reason]),
+            {{Id, Rev}, {error, {Tag, Reason}}};
+        Other ->
+            couch_log:debug("~p bulk_get zip other error:~p", [?MODULE, Other]),
+            {{Id, Rev}, {error, {unexpected_bulk_get_response, Other}}}
+    end.
 
 -spec open_doc_revs(#httpdb{}, binary(), list(), list(), function(), any()) -> no_return().
 open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
@@ -647,7 +716,19 @@ options_to_query_args([latest | Rest], Acc) ->
     options_to_query_args(Rest, [{"latest", "true"} | Acc]);
 options_to_query_args([{open_revs, Revs} | Rest], Acc) ->
     JsonRevs = ?b2l(iolist_to_binary(?JSON_ENCODE(couch_doc:revs_to_strs(Revs)))),
-    options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]).
+    options_to_query_args(Rest, [{"open_revs", JsonRevs} | Acc]);
+options_to_query_args([{attachments, Bool} | Rest], Acc) when is_atom(Bool) ->
+    BoolStr = atom_to_list(Bool),
+    options_to_query_args(Rest, [{"attachments", BoolStr} | Acc]).
+
+options_to_json_map([], #{} = Acc) ->
+    Acc;
+options_to_json_map([latest | Rest], #{} = Acc) ->
+    options_to_json_map(Rest, Acc#{<<"latest">> => true});
+options_to_json_map([revs | Rest], #{} = Acc) ->
+    options_to_json_map(Rest, Acc#{<<"revs">> => true});
+options_to_json_map([{attachments, Bool} | Rest], #{} = Acc) when is_atom(Bool) ->
+    options_to_json_map(Rest, Acc#{<<"attachments">> => Bool}).
 
 atts_since_arg(_UrlLen, [], _MaxLen, Acc) ->
     lists:reverse(Acc);

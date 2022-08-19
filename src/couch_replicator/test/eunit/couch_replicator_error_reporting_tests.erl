@@ -26,6 +26,7 @@ error_reporting_test_() ->
             ?TDEF_FE(t_fail_bulk_docs),
             ?TDEF_FE(t_fail_changes_reader),
             ?TDEF_FE(t_fail_revs_diff),
+            ?TDEF_FE(t_fail_bulk_get, 15),
             ?TDEF_FE(t_fail_changes_queue),
             ?TDEF_FE(t_fail_changes_manager),
             ?TDEF_FE(t_fail_changes_reader_proc)
@@ -73,6 +74,31 @@ t_fail_revs_diff({_Ctx, {Source, Target}}) ->
     ?assertEqual({revs_diff_failed, 407, {[{<<"x">>, <<"y">>}]}}, Result),
 
     couch_replicator_notifier:stop(Listener).
+
+t_fail_bulk_get({_Ctx, {Source, Target}}) ->
+    % For _bulk_get the expectation is that the replication job will fallback
+    % to a plain GET so the shape of the test is a bit different than the other
+    % tests here.
+    meck:new(couch_replicator_api_wrap, [passthrough]),
+    populate_db(Source, 1, 5),
+    {ok, _} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
+
+    % Tolerate a 500 error
+    mock_fail_req("/_bulk_get", {ok, "501", [], [<<"not_implemented">>]}),
+    meck:reset(couch_replicator_api_wrap),
+    populate_db(Source, 6, 6),
+    wait_target_in_sync(Source, Target),
+    % Check that there was a fallback to a plain GET
+    ?assertEqual(1, meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6)),
+
+    % Tolerate a 400 error
+    mock_fail_req("/_bulk_get", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
+    meck:reset(couch_replicator_api_wrap),
+    populate_db(Source, 7, 7),
+    wait_target_in_sync(Source, Target),
+    % Check that there was a falback to a plain GET
+    ?assertEqual(1, meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6)).
 
 t_fail_changes_queue({_Ctx, {Source, Target}}) ->
     populate_db(Source, 1, 5),

@@ -25,13 +25,12 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 
-% TODO: maybe make both buffer max sizes configurable
-
-% for remote targets
 -define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).
-% 10 seconds (in microseconds)
--define(STATS_DELAY, 10000000).
+-define(STATS_DELAY_SEC, 10).
 -define(MISSING_DOC_RETRY_MSEC, 2000).
+-define(BULK_GET_RATIO_THRESHOLD, 0.5).
+-define(BULK_GET_RATIO_DECAY, 0.25).
+-define(BULK_GET_RETRY_SEC, 37).
 
 -import(couch_util, [
     to_binary/1,
@@ -54,7 +53,22 @@
     pending_fetch = nil,
     flush_waiter = nil,
     stats = couch_replicator_stats:new(),
+    last_stats_report_sec = 0,
     batch = #batch{}
+}).
+
+-record(bulk_get_stats, {
+    ratio = 0,
+    tsec = 0
+}).
+
+-record(fetch_st, {
+    source,
+    target,
+    parent,
+    cp,
+    changes_manager,
+    bulk_get_stats
 }).
 
 start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
@@ -64,17 +78,22 @@ start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
 
 init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     process_flag(trap_exit, true),
-    Parent = self(),
-    LoopPid = spawn_link(fun() ->
-        queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
-    end),
-    erlang:put(last_stats_report, os:timestamp()),
+    NowSec = erlang:monotonic_time(second),
+    FetchSt = #fetch_st{
+        cp = Cp,
+        source = Source,
+        target = Target,
+        parent = self(),
+        changes_manager = ChangesManager,
+        bulk_get_stats = #bulk_get_stats{ratio = 0, tsec = NowSec}
+    },
     State = #state{
         cp = Cp,
         max_parallel_conns = MaxConns,
-        loop = LoopPid,
+        loop = spawn_link(fun() -> queue_fetch_loop(FetchSt) end),
         source = Source,
-        target = Target
+        target = Target,
+        last_stats_report_sec = NowSec
     },
     {ok, State}.
 
@@ -106,11 +125,6 @@ handle_call(
 handle_call({batch_doc, Doc}, From, State) ->
     gen_server:reply(From, ok),
     {noreply, maybe_flush_docs(Doc, State)};
-handle_call({add_stats, IncStats}, From, #state{stats = Stats} = State) ->
-    gen_server:reply(From, ok),
-    NewStats = couch_replicator_utils:sum_stats(Stats, IncStats),
-    NewStats2 = maybe_report_stats(State#state.cp, NewStats),
-    {noreply, State#state{stats = NewStats2}};
 handle_call(
     flush,
     {Pid, _} = From,
@@ -131,8 +145,11 @@ handle_call(
         end,
     {noreply, State2#state{flush_waiter = From}}.
 
+handle_cast({sum_stats, IncStats}, #state{stats = Stats} = State) ->
+    SumStats = couch_replicator_utils:sum_stats(Stats, IncStats),
+    {noreply, maybe_report_stats(State#state{stats = SumStats})};
 handle_cast(Msg, State) ->
-    {stop, {unexpected_async_call, Msg}, State}.
+    {stop, {unexpected_cast, Msg}, State}.
 
 handle_info({'EXIT', Pid, normal}, #state{loop = Pid} = State) ->
     #state{
@@ -188,6 +205,8 @@ handle_info({'EXIT', _Pid, max_backoff}, State) ->
     {stop, {shutdown, max_backoff}, State};
 handle_info({'EXIT', _Pid, {bulk_docs_failed, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
+handle_info({'EXIT', _Pid, {bulk_get_failed, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
 handle_info({'EXIT', _Pid, {revs_diff_failed, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
 handle_info({'EXIT', _Pid, {http_request_failed, _, _, _} = Err}, State) ->
@@ -221,40 +240,109 @@ format_status(_Opt, [_PDict, State]) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
+sum_stats(Pid, Stats) when is_pid(Pid) ->
+    ok = gen_server:cast(Pid, {sum_stats, Stats}).
+
+report_seq_done(Cp, Seq) ->
+    ok = report_seq_done(Cp, Seq, couch_replicator_stats:new()).
+
+report_seq_done(Cp, Seq, Stats) ->
+    ok = couch_replicator_scheduler_job:report_seq_done(Cp, Seq, Stats).
+
+queue_fetch_loop(#fetch_st{} = St) ->
+    #fetch_st{
+        cp = Cp,
+        source = Source,
+        target = Target,
+        parent = Parent,
+        changes_manager = ChangesManager,
+        bulk_get_stats = BgSt
+    } = St,
     ChangesManager ! {get_changes, self()},
     receive
         {closed, ChangesManager} ->
             ok;
         {changes, ChangesManager, [], ReportSeq} ->
-            Stats = couch_replicator_stats:new(),
-            ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
-            queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager);
+            ok = report_seq_done(Cp, ReportSeq),
+            queue_fetch_loop(St);
         {changes, ChangesManager, Changes, ReportSeq} ->
-            {IdRevs, Stats0} = find_missing(Changes, Target),
-            ok = gen_server:call(Parent, {add_stats, Stats0}, infinity),
-            remote_process_batch(IdRevs, Parent),
+            % Find missing revisions (POST to _revs_diff)
+            IdRevs = find_missing(Changes, Target, Parent),
+            {Docs, BgSt1} = bulk_get(Source, IdRevs, Parent, BgSt),
+            % Documents without attachments can be uploaded right away
+            BatchFun = fun({_, #doc{} = Doc}) ->
+                ok = gen_server:call(Parent, {batch_doc, Doc}, infinity)
+            end,
+            lists:foreach(BatchFun, lists:sort(maps:to_list(Docs))),
+            % Fetch individually if _bulk_get failed or there are attachments
+            FetchFun = fun({Id, Rev}, PAs) ->
+                ok = gen_server:call(Parent, {fetch_doc, {Id, [Rev], PAs}}, infinity)
+            end,
+            maps:map(FetchFun, maps:without(maps:keys(Docs), IdRevs)),
             {ok, Stats} = gen_server:call(Parent, flush, infinity),
-            ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
-            erlang:put(last_stats_report, os:timestamp()),
+            ok = report_seq_done(Cp, ReportSeq, Stats),
             couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
-            queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
+            queue_fetch_loop(St#fetch_st{bulk_get_stats = BgSt1})
     end.
 
-remote_process_batch([], _Parent) ->
-    ok;
-remote_process_batch([{Id, Revs, PAs} | Rest], Parent) ->
-    % When the source is a remote database, we fetch a single document revision
-    % per HTTP request. This is mostly to facilitate retrying of HTTP requests
-    % due to network transient failures. It also helps not exceeding the maximum
-    % URL length allowed by proxies and Mochiweb.
-    lists:foreach(
-        fun(Rev) ->
-            ok = gen_server:call(Parent, {fetch_doc, {Id, [Rev], PAs}}, infinity)
+% Return revisions without attachments. Maintain an exponential moving failure
+% ratio. When the ratio becomes greater than the threshold, skip calling
+% bulk_get altogether. To avoid getting permanently stuck with a high failure
+% ratio after replicating lots of attachments, periodically attempt to use
+% _bulk_get. After a few successful attempts that should lower the failure rate
+% enough to start allow using _bulk_get again.
+%
+bulk_get(Source, IdRevs, Parent, #bulk_get_stats{} = St) ->
+    NowSec = erlang:monotonic_time(second),
+    case attempt_bulk_get(St, NowSec) of
+        true ->
+            Docs = bulk_get(Source, IdRevs),
+            Attempts = map_size(IdRevs),
+            Successes = map_size(Docs),
+            Stats = couch_replicator_stats:new([
+                {bulk_get_docs, Successes},
+                {bulk_get_attempts, Attempts}
+            ]),
+            ok = sum_stats(Parent, Stats),
+            St1 = update_bulk_get_ratio(St, Successes, Attempts),
+            {Docs, St1#bulk_get_stats{tsec = NowSec}};
+        false ->
+            {#{}, St}
+    end.
+
+bulk_get(#httpdb{} = Source, #{} = IdRevs) ->
+    Opts = [latest, revs, {attachments, false}],
+    case couch_replicator_api_wrap:bulk_get(Source, IdRevs, Opts) of
+        {ok, #{} = Docs} ->
+            FilterFun = fun
+                (_, #doc{atts = []}) -> true;
+                (_, #doc{atts = [_ | _]}) -> false;
+                (_, {error, _}) -> false
+            end,
+            maps:filter(FilterFun, Docs);
+        {error, Error} ->
+            couch_log:debug("_bulk_get failed ~p", [Error]),
+            #{}
+    end.
+
+attempt_bulk_get(#bulk_get_stats{} = St, NowSec) ->
+    #bulk_get_stats{tsec = TSec, ratio = Ratio} = St,
+    TimeThreshold = (NowSec - TSec) > ?BULK_GET_RETRY_SEC,
+    RatioThreshold = Ratio =< ?BULK_GET_RATIO_THRESHOLD,
+    TimeThreshold orelse RatioThreshold.
+
+% Update fail ratio. Use the basic exponential moving average formula to smooth
+% over minor bumps in case we encounter a few % attachments and then get back
+% to replicationg documents without attachments.
+%
+update_bulk_get_ratio(#bulk_get_stats{} = St, Successes, Attempts) ->
+    #bulk_get_stats{ratio = Avg} = St,
+    Ratio =
+        case Attempts > 0 of
+            true -> (Attempts - Successes) / Attempts;
+            false -> 0
         end,
-        Revs
-    ),
-    remote_process_batch(Rest, Parent).
+    St#bulk_get_stats{ratio = ?BULK_GET_RATIO_DECAY * (Ratio - Avg) + Avg}.
 
 -spec spawn_doc_reader(#httpdb{}, #httpdb{}, {list(), list(), list()}) -> no_return().
 spawn_doc_reader(Source, Target, FetchParams) ->
@@ -331,7 +419,7 @@ doc_handler_flush_doc(#doc{} = Doc, {Parent, Target} = Acc) ->
             false ->
                 {{skip, Acc}, couch_replicator_stats:increment(doc_write_failures, Stats)}
         end,
-    ok = gen_server:call(Parent, {add_stats, Stats2}, infinity),
+    ok = sum_stats(Parent, Stats2),
     Result.
 
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
@@ -345,32 +433,30 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
     spawn_link(
         fun() ->
             Stats = flush_docs(Target, DocList),
-            ok = gen_server:call(Parent, {add_stats, Stats}, infinity)
+            ok = sum_stats(Parent, Stats)
         end
     ).
 
 after_full_flush(#state{stats = Stats, flush_waiter = Waiter} = State) ->
     gen_server:reply(Waiter, {ok, Stats}),
-    erlang:put(last_stats_report, os:timestamp()),
     State#state{
         stats = couch_replicator_stats:new(),
         flush_waiter = nil,
         writer = nil,
-        batch = #batch{}
+        batch = #batch{},
+        last_stats_report_sec = erlang:monotonic_time(second)
     }.
 
 maybe_flush_docs(Doc, State) ->
     #state{
         target = Target,
         batch = Batch,
-        stats = Stats,
-        cp = Cp
+        stats = Stats
     } = State,
     {Batch2, WStats} = maybe_flush_docs(Target, Batch, Doc),
     Stats2 = couch_replicator_stats:sum_stats(Stats, WStats),
     Stats3 = couch_replicator_stats:increment(docs_read, Stats2),
-    Stats4 = maybe_report_stats(Cp, Stats3),
-    State#state{stats = Stats4, batch = Batch2}.
+    maybe_report_stats(State#state{stats = Stats3, batch = Batch2}).
 
 maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
     #batch{docs = DocAcc, size = SizeAcc} = Batch,
@@ -481,7 +567,7 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
             {error, Err}
     end.
 
-find_missing(DocInfos, Target) ->
+find_missing(DocInfos, Target, Parent) ->
     {IdRevs, AllRevsCount} = lists:foldr(
         fun
             (#doc_info{revs = []}, {IdRevAcc, CountAcc}) ->
@@ -504,21 +590,37 @@ find_missing(DocInfos, Target) ->
         0,
         Missing
     ),
-    Stats = couch_replicator_stats:new([
-        {missing_checked, AllRevsCount},
-        {missing_found, MissingRevsCount}
-    ]),
-    {Missing, Stats}.
+    ok = sum_stats(
+        Parent,
+        couch_replicator_stats:new([
+            {missing_checked, AllRevsCount},
+            {missing_found, MissingRevsCount}
+        ])
+    ),
+    % Turn {Id, [Rev1, Rev2, ...], PAs} into a map:
+    % #{{Id, Rev1} => PAs, {Id, Rev2} => PAs, ...}
+    id_rev_map(Missing).
 
-maybe_report_stats(Cp, Stats) ->
-    Now = os:timestamp(),
-    case timer:now_diff(erlang:get(last_stats_report), Now) >= ?STATS_DELAY of
+id_rev_map(IdRevs) ->
+    id_rev_map(IdRevs, #{}).
+
+id_rev_map([], #{} = Acc) ->
+    Acc;
+id_rev_map([{_, [], _} | Docs], #{} = Acc) ->
+    id_rev_map(Docs, Acc);
+id_rev_map([{Id, [Rev | Revs], PAs} | Docs], #{} = Acc) ->
+    id_rev_map([{Id, Revs, PAs} | Docs], Acc#{{Id, Rev} => PAs}).
+
+maybe_report_stats(#state{} = State) ->
+    #state{cp = Cp, stats = Stats, last_stats_report_sec = LastReport} = State,
+    Now = erlang:monotonic_time(second),
+    case Now - LastReport >= ?STATS_DELAY_SEC of
         true ->
-            ok = gen_server:call(Cp, {add_stats, Stats}, infinity),
-            erlang:put(last_stats_report, Now),
-            couch_replicator_stats:new();
+            ok = couch_replicator_scheduler_job:sum_stats(Cp, Stats),
+            NewStats = couch_replicator_stats:new(),
+            State#state{stats = NewStats, last_stats_report_sec = Now};
         false ->
-            Stats
+            State
     end.
 
 -ifdef(TEST).
@@ -543,5 +645,71 @@ replication_worker_format_status_test() ->
     ?assertEqual(3, proplists:get_value(num_readers, Format)),
     ?assertEqual(nil, proplists:get_value(pending_fetch, Format)),
     ?assertEqual(5, proplists:get_value(batch_size, Format)).
+
+bulk_get_attempt_test() ->
+    Now = erlang:monotonic_time(second),
+    St = #bulk_get_stats{ratio = 0, tsec = Now},
+    ?assert(attempt_bulk_get(St#bulk_get_stats{ratio = 0.1}, Now)),
+    ?assertNot(attempt_bulk_get(St#bulk_get_stats{ratio = 0.9}, Now)),
+    RetryTime = Now + ?BULK_GET_RETRY_SEC + 1,
+    ?assert(attempt_bulk_get(St#bulk_get_stats{ratio = 0.9}, RetryTime)).
+
+update_bulk_get_ratio_test() ->
+    Init = #bulk_get_stats{ratio = 0, tsec = 0},
+
+    % Almost all failures
+    Fail = lists:foldl(
+        fun(_, Acc) ->
+            update_bulk_get_ratio(Acc, 1, 1000)
+        end,
+        Init,
+        lists:seq(1, 100)
+    ),
+    ?assert(Fail#bulk_get_stats.ratio > 0.9),
+
+    % Almost all successes
+    Success = lists:foldl(
+        fun(_, Acc) ->
+            update_bulk_get_ratio(Acc, 900, 1000)
+        end,
+        Init,
+        lists:seq(1, 100)
+    ),
+    ?assert(Success#bulk_get_stats.ratio < 0.1),
+
+    % Half and half
+    Half = lists:foldl(
+        fun(_, Acc) ->
+            update_bulk_get_ratio(Acc, 500, 1000)
+        end,
+        Init,
+        lists:seq(1, 100)
+    ),
+    ?assert(Half#bulk_get_stats.ratio > 0.49),
+    ?assert(Half#bulk_get_stats.ratio < 0.51),
+
+    % Successes after failures
+    FailThenSuccess = lists:foldl(
+        fun(_, Acc) ->
+            update_bulk_get_ratio(Acc, 1000, 1000)
+        end,
+        Fail,
+        lists:seq(1, 100)
+    ),
+    ?assert(FailThenSuccess#bulk_get_stats.ratio < 0.1),
+
+    % Failures after success
+    SuccessThenFailure = lists:foldl(
+        fun(_, Acc) ->
+            update_bulk_get_ratio(Acc, 0, 1000)
+        end,
+        Success,
+        lists:seq(1, 100)
+    ),
+    ?assert(SuccessThenFailure#bulk_get_stats.ratio > 0.9),
+
+    % 0 attempts doesn't crash with a division by 0
+    ZeroAttempts = update_bulk_get_ratio(Init, 0, 0),
+    ?assertEqual(0.0, ZeroAttempts#bulk_get_stats.ratio).
 
 -endif.

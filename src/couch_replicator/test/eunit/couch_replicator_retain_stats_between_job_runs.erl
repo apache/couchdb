@@ -98,6 +98,8 @@ check_active_tasks(DocsRead, DocsWritten, DocsFailed) ->
     RepTask = wait_for_task_status(DocsWritten),
     ?assertNotEqual(timeout, RepTask),
     ?assertEqual(DocsRead, couch_util:get_value(docs_read, RepTask)),
+    ?assertEqual(DocsRead, couch_util:get_value(bulk_get_docs, RepTask)),
+    ?assertEqual(DocsRead, couch_util:get_value(bulk_get_attempts, RepTask)),
     ?assertEqual(DocsWritten, couch_util:get_value(docs_written, RepTask)),
     ?assertEqual(
         DocsFailed,
@@ -112,12 +114,16 @@ check_scheduler_jobs(DocsRead, DocsWritten, DocFailed) ->
     ?assert(maps:is_key(<<"changes_pending">>, Info)),
     ?assert(maps:is_key(<<"doc_write_failures">>, Info)),
     ?assert(maps:is_key(<<"docs_read">>, Info)),
+    ?assert(maps:is_key(<<"bulk_get_docs">>, Info)),
+    ?assert(maps:is_key(<<"bulk_get_attempts">>, Info)),
     ?assert(maps:is_key(<<"docs_written">>, Info)),
     ?assert(maps:is_key(<<"missing_revisions_found">>, Info)),
     ?assert(maps:is_key(<<"checkpointed_source_seq">>, Info)),
     ?assert(maps:is_key(<<"source_seq">>, Info)),
     ?assert(maps:is_key(<<"revisions_checked">>, Info)),
     ?assertMatch(#{<<"docs_read">> := DocsRead}, Info),
+    ?assertMatch(#{<<"bulk_get_docs">> := DocsRead}, Info),
+    ?assertMatch(#{<<"bulk_get_attempts">> := DocsRead}, Info),
     ?assertMatch(#{<<"docs_written">> := DocsWritten}, Info),
     ?assertMatch(#{<<"doc_write_failures">> := DocFailed}, Info).
 
