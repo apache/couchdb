@@ -26,7 +26,9 @@
     missing_found/1,
     docs_read/1,
     docs_written/1,
-    doc_write_failures/1
+    doc_write_failures/1,
+    bulk_get_docs/1,
+    bulk_get_attempts/1
 ]).
 
 new() ->
@@ -50,6 +52,12 @@ docs_written(Stats) ->
 
 doc_write_failures(Stats) ->
     get(doc_write_failures, Stats).
+
+bulk_get_docs(Stats) ->
+    get(bulk_get_docs, Stats).
+
+bulk_get_attempts(Stats) ->
+    get(bulk_get_attempts, Stats).
 
 get(Field, Stats) ->
     case orddict:find(Field, Stats) of
@@ -84,4 +92,8 @@ fmap({docs_written, _}) -> true;
 fmap({<<"docs_written">>, V}) -> {true, {docs_written, V}};
 fmap({doc_write_failures, _}) -> true;
 fmap({<<"doc_write_failures">>, V}) -> {true, {doc_write_failures, V}};
+fmap({bulk_get_docs, _}) -> true;
+fmap({<<"bulk_get_docs">>, V}) -> {true, {bulk_get_docs, V}};
+fmap({bulk_get_attempts, _}) -> true;
+fmap({<<"bulk_get_attempts">>, V}) -> {true, {bulk_get_attempts, V}};
 fmap({_, _}) -> false.

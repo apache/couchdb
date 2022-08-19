@@ -18,6 +18,7 @@
 
 -export([setup/1]).
 -export([send_req/3]).
+-export([stop_http_worker/0]).
 -export([full_url/2]).
 
 -import(couch_util, [
@@ -101,6 +102,9 @@ send_req(HttpDb, Params1, Callback) ->
         _ ->
             Ret
     end.
+
+stop_http_worker() ->
+    put(?STOP_HTTP_WORKER, stop).
 
 send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
     Method = get_value(method, Params, get),

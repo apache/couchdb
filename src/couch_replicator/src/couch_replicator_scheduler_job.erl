@@ -25,7 +25,9 @@
     handle_info/2,
     handle_cast/2,
     code_change/3,
-    format_status/2
+    format_status/2,
+    sum_stats/2,
+    report_seq_done/3
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -181,20 +183,13 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
         workers = Workers
     }}.
 
-handle_call({add_stats, Stats}, From, State) ->
-    gen_server:reply(From, ok),
-    NewStats = couch_replicator_utils:sum_stats(State#rep_state.stats, Stats),
-    {noreply, State#rep_state{stats = NewStats}};
-handle_call(
-    {report_seq_done, Seq, StatsInc},
-    From,
+handle_call({report_seq_done, Seq, StatsInc}, From, State) ->
     #rep_state{
         seqs_in_progress = SeqsInProgress,
         highest_seq_done = HighestDone,
         current_through_seq = ThroughSeq,
         stats = Stats
-    } = State
-) ->
+    } = State,
     gen_server:reply(From, ok),
     {NewThroughSeq0, NewSeqsInProgress} =
         case SeqsInProgress of
@@ -237,6 +232,9 @@ handle_call(
     update_task(NewState),
     {noreply, NewState}.
 
+handle_cast({sum_stats, Stats}, State) ->
+    NewStats = couch_replicator_utils:sum_stats(State#rep_state.stats, Stats),
+    {noreply, State#rep_state{stats = NewStats}};
 handle_cast(checkpoint, State) ->
     case do_checkpoint(State) of
         {ok, NewState} ->
@@ -466,6 +464,12 @@ format_status(_Opt, [_PDict, State]) ->
         {current_through_seq, ThroughSeq},
         {highest_seq_done, HighestSeqDone}
     ].
+
+sum_stats(Pid, Stats) when is_pid(Pid) ->
+    gen_server:cast(Pid, {sum_stats, Stats}).
+
+report_seq_done(Pid, ReportSeq, Stats) when is_pid(Pid) ->
+    gen_server:call(Pid, {report_seq_done, ReportSeq, Stats}, infinity).
 
 startup_jitter() ->
     Jitter = config:get_integer(
@@ -792,7 +796,9 @@ do_checkpoint(State) ->
                     {<<"missing_found">>, couch_replicator_stats:missing_found(Stats)},
                     {<<"docs_read">>, couch_replicator_stats:docs_read(Stats)},
                     {<<"docs_written">>, couch_replicator_stats:docs_written(Stats)},
-                    {<<"doc_write_failures">>, couch_replicator_stats:doc_write_failures(Stats)}
+                    {<<"doc_write_failures">>, couch_replicator_stats:doc_write_failures(Stats)},
+                    {<<"bulk_get_docs">>, couch_replicator_stats:bulk_get_docs(Stats)},
+                    {<<"bulk_get_attempts">>, couch_replicator_stats:bulk_get_attempts(Stats)}
                 ]},
             BaseHistory =
                 [
@@ -1056,6 +1062,8 @@ rep_stats(State) ->
         {docs_written, couch_replicator_stats:docs_written(Stats)},
         {changes_pending, get_pending_count(State)},
         {doc_write_failures, couch_replicator_stats:doc_write_failures(Stats)},
+        {bulk_get_docs, couch_replicator_stats:bulk_get_docs(Stats)},
+        {bulk_get_attempts, couch_replicator_stats:bulk_get_attempts(Stats)},
         {checkpointed_source_seq, CommittedSeq}
     ].
 
