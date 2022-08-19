@@ -15,149 +15,115 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
-
-setup_all() ->
-    test_util:start_couch([couch_replicator, chttpd, mem3, fabric]).
-
-teardown_all(Ctx) ->
-    ok = test_util:stop_couch(Ctx).
-
-setup() ->
-    meck:unload(),
-    Source = setup_db(),
-    Target = setup_db(),
-    {Source, Target}.
-
-teardown({Source, Target}) ->
-    meck:unload(),
-    teardown_db(Source),
-    teardown_db(Target),
-    ok.
+-include("couch_replicator_test.hrl").
 
 error_reporting_test_() ->
     {
-        setup,
-        fun setup_all/0,
-        fun teardown_all/1,
-        {
-            foreach,
-            fun setup/0,
-            fun teardown/1,
-            [
-                fun t_fail_bulk_docs/1,
-                fun t_fail_changes_reader/1,
-                fun t_fail_revs_diff/1,
-                fun t_fail_changes_queue/1,
-                fun t_fail_changes_manager/1,
-                fun t_fail_changes_reader_proc/1
-            ]
-        }
+        foreach,
+        fun couch_replicator_test_helper:test_setup/0,
+        fun couch_replicator_test_helper:test_teardown/1,
+        [
+            ?TDEF_FE(t_fail_bulk_docs),
+            ?TDEF_FE(t_fail_changes_reader),
+            ?TDEF_FE(t_fail_revs_diff),
+            ?TDEF_FE(t_fail_changes_queue),
+            ?TDEF_FE(t_fail_changes_manager),
+            ?TDEF_FE(t_fail_changes_reader_proc)
+        ]
     }.
 
-t_fail_bulk_docs({Source, Target}) ->
-    ?_test(begin
-        populate_db(Source, 1, 5),
-        {ok, RepId} = replicate(Source, Target),
-        wait_target_in_sync(Source, Target),
+t_fail_bulk_docs({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
 
-        {ok, Listener} = rep_result_listener(RepId),
-        mock_fail_req("/_bulk_docs", {ok, "403", [], [<<"{\"x\":\"y\"}">>]}),
-        populate_db(Source, 6, 6),
+    {ok, Listener} = rep_result_listener(RepId),
+    mock_fail_req("/_bulk_docs", {ok, "403", [], [<<"{\"x\":\"y\"}">>]}),
+    populate_db(Source, 6, 6),
 
-        {error, Result} = wait_rep_result(RepId),
-        ?assertEqual({bulk_docs_failed, 403, {[{<<"x">>, <<"y">>}]}}, Result),
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({bulk_docs_failed, 403, {[{<<"x">>, <<"y">>}]}}, Result),
 
-        couch_replicator_notifier:stop(Listener)
-    end).
+    couch_replicator_notifier:stop(Listener).
 
-t_fail_changes_reader({Source, Target}) ->
-    ?_test(begin
-        populate_db(Source, 1, 5),
-        {ok, RepId} = replicate(Source, Target),
-        wait_target_in_sync(Source, Target),
+t_fail_changes_reader({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
 
-        {ok, Listener} = rep_result_listener(RepId),
-        mock_fail_req("/_changes", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
-        populate_db(Source, 6, 6),
+    {ok, Listener} = rep_result_listener(RepId),
+    mock_fail_req("/_changes", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
+    populate_db(Source, 6, 6),
 
-        {error, Result} = wait_rep_result(RepId),
-        ?assertEqual({changes_req_failed, 418, {[{<<"x">>, <<"y">>}]}}, Result),
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({changes_req_failed, 418, {[{<<"x">>, <<"y">>}]}}, Result),
 
-        couch_replicator_notifier:stop(Listener)
-    end).
+    couch_replicator_notifier:stop(Listener).
 
-t_fail_revs_diff({Source, Target}) ->
-    ?_test(begin
-        populate_db(Source, 1, 5),
-        {ok, RepId} = replicate(Source, Target),
-        wait_target_in_sync(Source, Target),
+t_fail_revs_diff({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
 
-        {ok, Listener} = rep_result_listener(RepId),
-        mock_fail_req("/_revs_diff", {ok, "407", [], [<<"{\"x\":\"y\"}">>]}),
-        populate_db(Source, 6, 6),
+    {ok, Listener} = rep_result_listener(RepId),
+    mock_fail_req("/_revs_diff", {ok, "407", [], [<<"{\"x\":\"y\"}">>]}),
+    populate_db(Source, 6, 6),
 
-        {error, Result} = wait_rep_result(RepId),
-        ?assertEqual({revs_diff_failed, 407, {[{<<"x">>, <<"y">>}]}}, Result),
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({revs_diff_failed, 407, {[{<<"x">>, <<"y">>}]}}, Result),
 
-        couch_replicator_notifier:stop(Listener)
-    end).
+    couch_replicator_notifier:stop(Listener).
 
-t_fail_changes_queue({Source, Target}) ->
-    ?_test(begin
-        populate_db(Source, 1, 5),
-        {ok, RepId} = replicate(Source, Target),
-        wait_target_in_sync(Source, Target),
+t_fail_changes_queue({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
 
-        RepPid = couch_replicator_test_helper:get_pid(RepId),
-        State = sys:get_state(RepPid),
-        ChangesQueue = element(20, State),
-        ?assert(is_process_alive(ChangesQueue)),
+    RepPid = couch_replicator_test_helper:get_pid(RepId),
+    State = sys:get_state(RepPid),
+    ChangesQueue = element(20, State),
+    ?assert(is_process_alive(ChangesQueue)),
 
-        {ok, Listener} = rep_result_listener(RepId),
-        exit(ChangesQueue, boom),
+    {ok, Listener} = rep_result_listener(RepId),
+    exit(ChangesQueue, boom),
 
-        {error, Result} = wait_rep_result(RepId),
-        ?assertEqual({changes_queue_died, boom}, Result),
-        couch_replicator_notifier:stop(Listener)
-    end).
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({changes_queue_died, boom}, Result),
+    couch_replicator_notifier:stop(Listener).
 
-t_fail_changes_manager({Source, Target}) ->
-    ?_test(begin
-        populate_db(Source, 1, 5),
-        {ok, RepId} = replicate(Source, Target),
-        wait_target_in_sync(Source, Target),
+t_fail_changes_manager({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
 
-        RepPid = couch_replicator_test_helper:get_pid(RepId),
-        State = sys:get_state(RepPid),
-        ChangesManager = element(21, State),
-        ?assert(is_process_alive(ChangesManager)),
+    RepPid = couch_replicator_test_helper:get_pid(RepId),
+    State = sys:get_state(RepPid),
+    ChangesManager = element(21, State),
+    ?assert(is_process_alive(ChangesManager)),
 
-        {ok, Listener} = rep_result_listener(RepId),
-        exit(ChangesManager, bam),
+    {ok, Listener} = rep_result_listener(RepId),
+    exit(ChangesManager, bam),
 
-        {error, Result} = wait_rep_result(RepId),
-        ?assertEqual({changes_manager_died, bam}, Result),
-        couch_replicator_notifier:stop(Listener)
-    end).
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({changes_manager_died, bam}, Result),
+    couch_replicator_notifier:stop(Listener).
 
-t_fail_changes_reader_proc({Source, Target}) ->
-    ?_test(begin
-        populate_db(Source, 1, 5),
-        {ok, RepId} = replicate(Source, Target),
-        wait_target_in_sync(Source, Target),
+t_fail_changes_reader_proc({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
 
-        RepPid = couch_replicator_test_helper:get_pid(RepId),
-        State = sys:get_state(RepPid),
-        ChangesReader = element(22, State),
-        ?assert(is_process_alive(ChangesReader)),
+    RepPid = couch_replicator_test_helper:get_pid(RepId),
+    State = sys:get_state(RepPid),
+    ChangesReader = element(22, State),
+    ?assert(is_process_alive(ChangesReader)),
 
-        {ok, Listener} = rep_result_listener(RepId),
-        exit(ChangesReader, kapow),
+    {ok, Listener} = rep_result_listener(RepId),
+    exit(ChangesReader, kapow),
 
-        {error, Result} = wait_rep_result(RepId),
-        ?assertEqual({changes_reader_died, kapow}, Result),
-        couch_replicator_notifier:stop(Listener)
-    end).
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({changes_reader_died, kapow}, Result),
+    couch_replicator_notifier:stop(Listener).
 
 mock_fail_req(Path, Return) ->
     meck:expect(
@@ -190,17 +156,7 @@ wait_rep_result(RepId) ->
         {error, RepId, Reason} -> {error, Reason}
     end.
 
-setup_db() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    ok = couch_db:close(Db),
-    DbName.
-
-teardown_db(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]).
-
 populate_db(DbName, Start, End) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
     Docs = lists:foldl(
         fun(DocIdCounter, Acc) ->
             Id = integer_to_binary(DocIdCounter),
@@ -210,14 +166,10 @@ populate_db(DbName, Start, End) ->
         [],
         lists:seq(Start, End)
     ),
-    {ok, _} = couch_db:update_docs(Db, Docs, []),
-    ok = couch_db:close(Db).
+    {ok, [_ | _]} = fabric:update_docs(DbName, Docs, [?ADMIN_CTX]).
 
 wait_target_in_sync(Source, Target) ->
-    {ok, SourceDb} = couch_db:open_int(Source, []),
-    {ok, SourceInfo} = couch_db:get_db_info(SourceDb),
-    ok = couch_db:close(SourceDb),
-    SourceDocCount = couch_util:get_value(doc_count, SourceInfo),
+    {ok, SourceDocCount} = fabric:get_doc_count(Source),
     wait_target_in_sync_loop(SourceDocCount, Target, 300).
 
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
@@ -229,10 +181,7 @@ wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
         ]}
     );
 wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
-    {ok, Target} = couch_db:open_int(TargetName, []),
-    {ok, TargetInfo} = couch_db:get_db_info(Target),
-    ok = couch_db:close(Target),
-    TargetDocCount = couch_util:get_value(doc_count, TargetInfo),
+    {ok, TargetDocCount} = fabric:get_doc_count(TargetName),
     case TargetDocCount == DocCount of
         true ->
             true;
@@ -242,12 +191,10 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     end.
 
 replicate(Source, Target) ->
-    SrcUrl = couch_replicator_test_helper:db_url(Source),
-    TgtUrl = couch_replicator_test_helper:db_url(Target),
     RepObject =
         {[
-            {<<"source">>, SrcUrl},
-            {<<"target">>, TgtUrl},
+            {<<"source">>, url(Source)},
+            {<<"target">>, url(Target)},
             {<<"continuous">>, true},
             {<<"worker_processes">>, 1},
             {<<"retries_per_request">>, 1},
@@ -258,3 +205,6 @@ replicate(Source, Target) ->
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),
     {ok, Rep#rep.id}.
+
+url(DbName) ->
+    couch_replicator_test_helper:cluster_db_url(DbName).
