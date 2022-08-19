@@ -14,73 +14,43 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_replicator/src/couch_replicator.hrl").
-
-setup(_) ->
-    Ctx = test_util:start_couch([couch_replicator]),
-    Source = create_db(),
-    create_doc(Source),
-    Target = create_db(),
-    {Ctx, {Source, Target}}.
-
-teardown(_, {Ctx, {Source, Target}}) ->
-    delete_db(Source),
-    delete_db(Target),
-    config:set("replicator", "max_document_id_length", "infinity"),
-    ok = test_util:stop_couch(Ctx).
+-include("couch_replicator_test.hrl").
 
 id_too_long_replication_test_() ->
-    Pairs = [{remote, remote}],
     {
         "Doc id too long tests",
         {
-            foreachx,
-            fun setup/1,
-            fun teardown/2,
-            [{Pair, fun should_succeed/2} || Pair <- Pairs] ++
-                [{Pair, fun should_fail/2} || Pair <- Pairs]
+            foreach,
+            fun couch_replicator_test_helper:test_setup/0,
+            fun couch_replicator_test_helper:test_teardown/1,
+            [
+                ?TDEF_FE(should_succeed),
+                ?TDEF_FE(should_fail)
+            ]
         }
     }.
 
-should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject =
-        {[
-            {<<"source">>, db_url(From, Source)},
-            {<<"target">>, db_url(To, Target)}
-        ]},
-    config:set("replicator", "max_document_id_length", "5"),
-    {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
+should_succeed({_Ctx, {Source, Target}}) ->
+    create_doc(Source),
+    config:set("replicator", "max_document_id_length", "5", _Persist = false),
+    replicate(Source, Target),
+    ?assertEqual(ok, compare(Source, Target)).
 
-should_fail({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject =
-        {[
-            {<<"source">>, db_url(From, Source)},
-            {<<"target">>, db_url(To, Target)}
-        ]},
-    config:set("replicator", "max_document_id_length", "4"),
-    {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertError(
-        {badmatch, {not_found, missing}},
-        couch_replicator_test_helper:compare_dbs(Source, Target)
-    ).
-
-create_db() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    ok = couch_db:close(Db),
-    DbName.
+should_fail({_Ctx, {Source, Target}}) ->
+    create_doc(Source),
+    config:set("replicator", "max_document_id_length", "4", _Persist = false),
+    replicate(Source, Target),
+    ?assertError({not_found, <<"12345">>}, compare(Source, Target)).
 
 create_doc(DbName) ->
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     Doc = couch_doc:from_json_obj({[{<<"_id">>, <<"12345">>}]}),
-    {ok, _} = couch_db:update_doc(Db, Doc, []),
-    couch_db:close(Db).
+    {ok, _} = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]).
 
-delete_db(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]).
+db_url(DbName) ->
+    couch_replicator_test_helper:cluster_db_url(DbName).
 
-db_url(remote, DbName) ->
-    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(couch_httpd, port),
-    ?l2b(io_lib:format("http://~s:~b/~s", [Addr, Port, DbName])).
+compare(Source, Target) ->
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target).
+
+replicate(Source, Target) ->
+    couch_replicator_test_helper:replicate(db_url(Source), db_url(Target)).
