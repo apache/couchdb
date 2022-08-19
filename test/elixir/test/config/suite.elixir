@@ -297,7 +297,7 @@
     "partition _all_docs works with limit",
     "partition all docs can set query limits",
     "partition all_docs errors with incorrect partition supplied",
-    "partitioned _all_docs works with keys",
+    "partitioned _all_docs works with keys and rejects docs not in partition",
     "partitioned _all_docs works with startkey, endkey range"
   ],
   "PartitionCrudTest": [

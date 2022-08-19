@@ -286,6 +286,20 @@ all_docs_concurrency() ->
             10
     end.
 
+validate_if_partition(Row, Acc) ->
+    QueryStr = Acc#vacc.req#httpd.qs,
+    case QueryStr of
+        undefined -> Row;
+        [{"partition", Id}] -> is_doc_in_partition(Row, Id)
+    end.
+is_doc_in_partition(Row, Id) ->
+    BinRowId = element(2, Row),
+    IsDocInPartition = binary:match(BinRowId, list_to_binary(Id)) /= nomatch,
+    case IsDocInPartition of
+        true -> Row;
+        false -> {view_row, BinRowId, undefined, undefined, undefined, undefined}
+    end.
+
 doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
     case {Keys, queue:len(Pids)} of
         {[], 0} ->
@@ -298,9 +312,10 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
             Timeout = fabric_util:all_docs_timeout(),
             receive
                 {'DOWN', Ref, process, Pid, Row} ->
-                    case Row of
+                    ValidRow = validate_if_partition(Row, AccIn),
+                    case ValidRow of
                         #view_row{} ->
-                            case Callback(fabric_view:transform_row(Row), AccIn) of
+                            case Callback(fabric_view:transform_row(ValidRow), AccIn) of
                                 {ok, Acc} ->
                                     doc_receive_loop(
                                         Keys, RestPids, SpawnFun, MaxJobs, Callback, Acc

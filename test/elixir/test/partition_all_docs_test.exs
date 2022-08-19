@@ -55,15 +55,22 @@ defmodule PartitionAllDocsTest do
     assert Enum.dedup(partitions) == ["foo"]
   end
 
-  test "partitioned _all_docs works with keys", context do
+  test "partitioned _all_docs works with keys and rejects docs not in partition", context do
     db_name = context[:db_name]
 
     url = "/#{db_name}/_partition/foo/_all_docs"
-    resp = Couch.post(url, body: %{keys: ["foo:2", "foo:4", "foo:6"]})
+    resp = Couch.post(url, body: %{keys: ["foo:2", "foo:4", "foo:6", "bar:7", "bar:11"]})
     assert resp.status_code == 200
     ids = get_ids(resp)
-    assert length(ids) == 3
-    assert ids == ["foo:2", "foo:4", "foo:6"]
+    assert length(ids) == 5
+    assert ids == ["foo:2", "foo:4", "foo:6", nil, nil]
+
+    url2 = "/#{db_name}/_partition/bar/_all_docs"
+    resp2 = Couch.post(url2, body: %{keys: ["bar:3", "bar:5", "bar:7", "foo:6", "foo:10"]})
+    assert resp2.status_code == 200
+    ids2 = get_ids(resp2)
+    assert length(ids2) == 5
+    assert ids2 == ["bar:3", "bar:5", "bar:7", nil, nil]
   end
 
   test "partition _all_docs works with limit", context do
