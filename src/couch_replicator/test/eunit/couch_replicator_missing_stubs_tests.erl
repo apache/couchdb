@@ -14,106 +14,34 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
--import(couch_replicator_test_helper, [
-    db_url/1,
-    replicate/2,
-    compare_dbs/2
-]).
+-include("couch_replicator_test.hrl").
 
 -define(REVS_LIMIT, 3).
 -define(TIMEOUT_EUNIT, 30).
 
-setup() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    ok = couch_db:close(Db),
-    DbName.
-
-setup(remote) ->
-    {remote, setup()};
-setup({A, B}) ->
-    Ctx = test_util:start_couch([couch_replicator]),
-    Source = setup(A),
-    Target = setup(B),
-    {Ctx, {Source, Target}}.
-
-teardown({remote, DbName}) ->
-    teardown(DbName);
-teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-    ok.
-
-teardown(_, {Ctx, {Source, Target}}) ->
-    teardown(Source),
-    teardown(Target),
-    ok = application:stop(couch_replicator),
-    ok = test_util:stop_couch(Ctx).
-
 missing_stubs_test_() ->
-    Pairs = [{remote, remote}],
     {
         "Replicate docs with missing stubs (COUCHDB-1365)",
         {
-            foreachx,
-            fun setup/1,
-            fun teardown/2,
+            foreach,
+            fun couch_replicator_test_helper:test_setup/0,
+            fun couch_replicator_test_helper:test_teardown/1,
             [
-                {Pair, fun should_replicate_docs_with_missed_att_stubs/2}
-             || Pair <- Pairs
+                ?TDEF_FE(replicate_docs_with_missing_att_stubs, ?TIMEOUT_EUNIT)
             ]
         }
     }.
 
-should_replicate_docs_with_missed_att_stubs({From, To}, {_Ctx, {Source, Target}}) ->
-    {
-        lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-        {inorder, [
-            should_populate_source(Source),
-            should_set_target_revs_limit(Target, ?REVS_LIMIT),
-            should_replicate(Source, Target),
-            should_compare_databases(Source, Target),
-            should_update_source_docs(Source, ?REVS_LIMIT * 2),
-            should_replicate(Source, Target),
-            should_compare_databases(Source, Target)
-        ]}
-    }.
-
-should_populate_source({remote, Source}) ->
-    should_populate_source(Source);
-should_populate_source(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(populate_db(Source))}.
-
-should_replicate({remote, Source}, Target) ->
-    should_replicate(db_url(Source), Target);
-should_replicate(Source, {remote, Target}) ->
-    should_replicate(Source, db_url(Target));
-should_replicate(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target))}.
-
-should_set_target_revs_limit({remote, Target}, RevsLimit) ->
-    should_set_target_revs_limit(Target, RevsLimit);
-should_set_target_revs_limit(Target, RevsLimit) ->
-    ?_test(begin
-        {ok, Db} = couch_db:open_int(Target, [?ADMIN_CTX]),
-        ?assertEqual(ok, couch_db:set_revs_limit(Db, RevsLimit)),
-        ok = couch_db:close(Db)
-    end).
-
-should_compare_databases({remote, Source}, Target) ->
-    should_compare_databases(Source, Target);
-should_compare_databases(Source, {remote, Target}) ->
-    should_compare_databases(Source, Target);
-should_compare_databases(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target))}.
-
-should_update_source_docs({remote, Source}, Times) ->
-    should_update_source_docs(Source, Times);
-should_update_source_docs(Source, Times) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(update_db_docs(Source, Times))}.
+replicate_docs_with_missing_att_stubs({_Ctx, {Source, Target}}) ->
+    populate_db(Source),
+    fabric:set_revs_limit(Target, ?REVS_LIMIT, [?ADMIN_CTX]),
+    replicate(Source, Target),
+    compare(Source, Target),
+    update_docs(Source, ?REVS_LIMIT * 2),
+    replicate(Source, Target),
+    compare(Source, Target).
 
 populate_db(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
     AttData = crypto:strong_rand_bytes(6000),
     Doc = #doc{
         id = <<"doc1">>,
@@ -126,34 +54,38 @@ populate_db(DbName) ->
             ])
         ]
     },
-    {ok, _} = couch_db:update_doc(Db, Doc, []),
-    couch_db:close(Db).
+    {ok, _} = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]).
 
-update_db_docs(DbName, Times) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
-    {ok, _} = couch_db:fold_docs(
-        Db,
-        fun(FDI, Acc) -> db_fold_fun(FDI, Acc) end,
-        {DbName, Times},
-        []
-    ),
-    ok = couch_db:close(Db).
+update_docs(DbName, Times) ->
+    lists:foreach(
+        fun({Id, _Rev}) ->
+            {ok, Doc} = fabric:open_doc(DbName, Id, [?ADMIN_CTX]),
+            update_doc(DbName, Doc, Times)
+        end,
+        couch_replicator_test_helper:cluster_doc_revs(DbName)
+    ).
 
-db_fold_fun(FullDocInfo, {DbName, Times}) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
-    {ok, Doc} = couch_db:open_doc(Db, FullDocInfo),
+update_doc(DbName, Doc, Times) ->
+    {Pos0, [Rev0 | _]} = Doc#doc.revs,
     lists:foldl(
         fun(_, {Pos, RevId}) ->
-            {ok, Db2} = couch_db:reopen(Db),
-            NewDocVersion = Doc#doc{
+            Val = base64:encode(crypto:strong_rand_bytes(100)),
+            NewDoc = Doc#doc{
                 revs = {Pos, [RevId]},
-                body = {[{<<"value">>, base64:encode(crypto:strong_rand_bytes(100))}]}
+                body = {[{<<"value">>, Val}]}
             },
-            {ok, NewRev} = couch_db:update_doc(Db2, NewDocVersion, []),
+            {ok, NewRev} = fabric:update_doc(DbName, NewDoc, [?ADMIN_CTX]),
             NewRev
         end,
-        {element(1, Doc#doc.revs), hd(element(2, Doc#doc.revs))},
+        {Pos0, Rev0},
         lists:seq(1, Times)
-    ),
-    ok = couch_db:close(Db),
-    {ok, {DbName, Times}}.
+    ).
+
+db_url(DbName) ->
+    couch_replicator_test_helper:cluster_db_url(DbName).
+
+replicate(Source, Target) ->
+    couch_replicator_test_helper:replicate(db_url(Source), db_url(Target)).
+
+compare(Source, Target) ->
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target).
