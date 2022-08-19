@@ -14,133 +14,78 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
--import(couch_replicator_test_helper, [
-    db_url/1,
-    replicate/1
-]).
+-include("couch_replicator_test.hrl").
 
 -define(DOCS_COUNT, 100).
 -define(TIMEOUT_EUNIT, 30).
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).
 
-start(false) ->
-    fun
-        ({finished, _, {CheckpointHistory}}) ->
-            ?assertEqual([{<<"use_checkpoints">>, false}], CheckpointHistory);
-        (_) ->
-            ok
-    end;
-start(true) ->
-    fun
-        ({finished, _, {CheckpointHistory}}) ->
-            ?assertNotEqual(
-                false,
-                lists:keyfind(
-                    <<"session_id">>,
-                    1,
-                    CheckpointHistory
-                )
-            );
-        (_) ->
-            ok
-    end.
-
-stop(_, _) ->
-    ok.
-
-setup() ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    ok = couch_db:close(Db),
-    DbName.
-
-setup(remote) ->
-    {remote, setup()};
-setup({_, Fun, {A, B}}) ->
-    Ctx = test_util:start_couch([couch_replicator]),
+setup_checkpoints() ->
+    {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
+    Fun = fun notifier_checkpoint_fun/1,
     {ok, Listener} = couch_replicator_notifier:start_link(Fun),
-    Source = setup(A),
-    Target = setup(B),
     {Ctx, {Source, Target, Listener}}.
 
-teardown({remote, DbName}) ->
-    teardown(DbName);
-teardown(DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+setup_no_checkpoints() ->
+    {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
+    Fun = fun notifier_no_checkpoint_fun/1,
+    {ok, Listener} = couch_replicator_notifier:start_link(Fun),
+    {Ctx, {Source, Target, Listener}}.
+
+teardown({Ctx, {Source, Target, Listener}}) ->
+    couch_replicator_notifier:stop(Listener),
+    couch_replicator_test_helper:test_teardown({Ctx, {Source, Target}}).
+
+notifier_checkpoint_fun({finished, _, {CheckpointHistory}}) ->
+    SId = lists:keyfind(<<"session_id">>, 1, CheckpointHistory),
+    SId =/= false orelse ?debugFmt("~nsession_id not found when using checkpoints", []),
+    ?assertNotEqual(false, SId);
+notifier_checkpoint_fun(_) ->
     ok.
 
-teardown(_, {Ctx, {Source, Target, Listener}}) ->
-    teardown(Source),
-    teardown(Target),
-
-    couch_replicator_notifier:stop(Listener),
-    ok = application:stop(couch_replicator),
-    ok = test_util:stop_couch(Ctx).
+notifier_no_checkpoint_fun({finished, _, {CheckpointHistory}}) ->
+    ?assertEqual([{<<"use_checkpoints">>, false}], CheckpointHistory);
+notifier_no_checkpoint_fun(_) ->
+    ok.
 
 use_checkpoints_test_() ->
     {
-        "Replication use_checkpoints feature tests",
+        "Replication test using checkpoints",
         {
-            foreachx,
-            fun start/1,
-            fun stop/2,
+            foreach,
+            fun setup_checkpoints/0,
+            fun teardown/1,
             [
-                {UseCheckpoints, fun use_checkpoints_tests/2}
-             || UseCheckpoints <- [false, true]
+                ?TDEF_FE(use_checkpoints, ?TIMEOUT_EUNIT)
             ]
         }
     }.
 
-use_checkpoints_tests(UseCheckpoints, Fun) ->
-    Pairs = [{remote, remote}],
+dont_use_checkpoints_test_() ->
     {
-        "use_checkpoints: " ++ atom_to_list(UseCheckpoints),
+        "Replication test without using checkpoints",
         {
-            foreachx,
-            fun setup/1,
-            fun teardown/2,
+            foreach,
+            fun setup_no_checkpoints/0,
+            fun teardown/1,
             [
-                {{UseCheckpoints, Fun, Pair}, fun should_test_checkpoints/2}
-             || Pair <- Pairs
+                ?TDEF_FE(dont_use_checkpoints, ?TIMEOUT_EUNIT)
             ]
         }
     }.
 
-should_test_checkpoints({UseCheckpoints, _, {From, To}}, {_Ctx, {Source, Target, _}}) ->
-    should_test_checkpoints(UseCheckpoints, {From, To}, {Source, Target}).
-should_test_checkpoints(UseCheckpoints, {From, To}, {Source, Target}) ->
-    {
-        lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-        {inorder, [
-            should_populate_source(Source, ?DOCS_COUNT),
-            should_replicate(Source, Target, UseCheckpoints),
-            should_compare_databases(Source, Target)
-        ]}
-    }.
+use_checkpoints({_Ctx, {Source, Target, _}}) ->
+    populate_db(Source, ?DOCS_COUNT),
+    replicate(Source, Target, true),
+    compare_dbs(Source, Target).
 
-should_populate_source({remote, Source}, DocCount) ->
-    should_populate_source(Source, DocCount);
-should_populate_source(Source, DocCount) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(populate_db(Source, DocCount))}.
-
-should_replicate({remote, Source}, Target, UseCheckpoints) ->
-    should_replicate(db_url(Source), Target, UseCheckpoints);
-should_replicate(Source, {remote, Target}, UseCheckpoints) ->
-    should_replicate(Source, db_url(Target), UseCheckpoints);
-should_replicate(Source, Target, UseCheckpoints) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target, UseCheckpoints))}.
-
-should_compare_databases({remote, Source}, Target) ->
-    should_compare_databases(Source, Target);
-should_compare_databases(Source, {remote, Target}) ->
-    should_compare_databases(Source, Target);
-should_compare_databases(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target))}.
+dont_use_checkpoints({_Ctx, {Source, Target, _}}) ->
+    populate_db(Source, ?DOCS_COUNT),
+    replicate(Source, Target, false),
+    compare_dbs(Source, Target).
 
 populate_db(DbName, DocCount) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
     Docs = lists:foldl(
         fun(DocIdCounter, Acc) ->
             Id = ?io2b(["doc", ?i2l(DocIdCounter)]),
@@ -154,48 +99,19 @@ populate_db(DbName, DocCount) ->
         [],
         lists:seq(1, DocCount)
     ),
-    {ok, _} = couch_db:update_docs(Db, Docs, []),
-    ok = couch_db:close(Db).
+    {ok, _} = fabric:update_docs(DbName, Docs, [?ADMIN_CTX]).
 
 compare_dbs(Source, Target) ->
-    {ok, SourceDb} = couch_db:open_int(Source, []),
-    {ok, TargetDb} = couch_db:open_int(Target, []),
-    Fun = fun(FullDocInfo, Acc) ->
-        {ok, Doc} = couch_db:open_doc(SourceDb, FullDocInfo),
-        {Props} = DocJson = couch_doc:to_json_obj(Doc, [attachments]),
-        DocId = couch_util:get_value(<<"_id">>, Props),
-        DocTarget =
-            case couch_db:open_doc(TargetDb, DocId) of
-                {ok, DocT} ->
-                    DocT;
-                Error ->
-                    erlang:error(
-                        {assertion_failed, [
-                            {module, ?MODULE},
-                            {line, ?LINE},
-                            {reason,
-                                lists:concat([
-                                    "Error opening document '",
-                                    ?b2l(DocId),
-                                    "' from target: ",
-                                    couch_util:to_list(Error)
-                                ])}
-                        ]}
-                    )
-            end,
-        DocTargetJson = couch_doc:to_json_obj(DocTarget, [attachments]),
-        ?assertEqual(DocJson, DocTargetJson),
-        {ok, Acc}
-    end,
-    {ok, _} = couch_db:fold_docs(SourceDb, Fun, [], []),
-    ok = couch_db:close(SourceDb),
-    ok = couch_db:close(TargetDb).
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target).
+
+db_url(DbName) ->
+    couch_replicator_test_helper:cluster_db_url(DbName).
 
 replicate(Source, Target, UseCheckpoints) ->
-    replicate(
+    couch_replicator_test_helper:replicate(
         {[
-            {<<"source">>, Source},
-            {<<"target">>, Target},
+            {<<"source">>, db_url(Source)},
+            {<<"target">>, db_url(Target)},
             {<<"use_checkpoints">>, UseCheckpoints}
         ]}
     ).

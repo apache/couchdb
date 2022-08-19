@@ -4,39 +4,75 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
+-define(USERNAME, "rep_test_user").
+-define(PASSWORD, "rep_test_pass").
+
 -export([
-    compare_dbs/2,
-    compare_dbs/3,
-    db_url/1,
+    cluster_compare_dbs/2,
+    cluster_compare_dbs/3,
+    cluster_doc_revs/1,
+    cluster_open_rev/3,
+    cluster_url/0,
+    cluster_db_url/1,
     replicate/1,
     get_pid/1,
-    replicate/2
+    replicate/2,
+    test_setup/0,
+    test_teardown/1,
+    setup_db/0,
+    teardown_db/1
 ]).
 
-compare_dbs(Source, Target) ->
-    compare_dbs(Source, Target, []).
+cluster_compare_dbs(Source, Target) ->
+    cluster_compare_dbs(Source, Target, []).
 
-compare_dbs(Source, Target, ExceptIds) ->
-    {ok, SourceDb} = couch_db:open_int(Source, []),
-    {ok, TargetDb} = couch_db:open_int(Target, []),
-
-    Fun = fun(FullDocInfo, Acc) ->
-        {ok, DocSource} = couch_db:open_doc(SourceDb, FullDocInfo),
-        Id = DocSource#doc.id,
-        case lists:member(Id, ExceptIds) of
-            true ->
-                ?assertEqual(not_found, couch_db:get_doc_info(TargetDb, Id));
-            false ->
-                {ok, TDoc} = couch_db:open_doc(TargetDb, Id),
-                compare_docs(DocSource, TDoc)
+cluster_compare_dbs(Source, Target, ExceptIds) ->
+    ?assertMatch({ok, [_ | _]}, fabric:get_db_info(Source)),
+    ?assertMatch({ok, [_ | _]}, fabric:get_db_info(Target)),
+    lists:foreach(
+        fun({Id, Rev}) ->
+            SrcDoc = cluster_open_rev(Source, Id, Rev),
+            TgtDoc = cluster_open_rev(Target, Id, Rev),
+            case lists:member(Id, ExceptIds) of
+                true ->
+                    ?assertEqual(not_found, TgtDoc);
+                false ->
+                    compare_docs(SrcDoc, TgtDoc)
+            end
         end,
-        {ok, Acc}
-    end,
+        cluster_doc_revs(Source)
+    ).
 
-    {ok, _} = couch_db:fold_docs(SourceDb, Fun, [], []),
-    ok = couch_db:close(SourceDb),
-    ok = couch_db:close(TargetDb).
+cluster_open_rev(DbName, Id, Rev) ->
+    {ok, [Result]} = fabric:open_revs(DbName, Id, [Rev], []),
+    case Result of
+        {ok, #doc{} = Doc} ->
+            Doc;
+        {{not_found, missing}, _} ->
+            not_found
+    end.
 
+cluster_doc_revs(DbName) ->
+    Opts = [{style, all_docs}],
+    {ok, Acc} = fabric_util:isolate(fun() ->
+        fabric:changes(DbName, fun changes_callback/2, [], Opts)
+    end),
+    Acc.
+
+changes_callback(start, Acc) ->
+    {ok, Acc};
+changes_callback({change, {Change}}, Acc) ->
+    Id = proplists:get_value(id, Change),
+    Revs = proplists:get_value(changes, Change),
+    IdRevs = [{Id, couch_doc:parse_rev(R)} || {[{<<"rev">>, R}]} <- Revs],
+    {ok, IdRevs ++ Acc};
+changes_callback(timeout, Acc) ->
+    {ok, Acc};
+changes_callback({stop, _EndSeq, _Pending}, Acc) ->
+    {ok, Acc}.
+
+compare_docs(#doc{} = Doc1, not_found) ->
+    error({not_found, Doc1#doc.id});
 compare_docs(Doc1, Doc2) ->
     ?assertEqual(Doc1#doc.body, Doc2#doc.body),
     #doc{atts = Atts1} = Doc1,
@@ -111,15 +147,17 @@ att_decoded_md5(Att) ->
     ),
     couch_hash:md5_hash_final(Md50).
 
-db_url(DbName) ->
-    iolist_to_binary([
-        "http://",
-        config:get("httpd", "bind_address", "127.0.0.1"),
-        ":",
-        integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
-        "/",
-        DbName
-    ]).
+cluster_url() ->
+    Fmt = "http://~s:~s@~s:~b",
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
+    Args = [?USERNAME, ?PASSWORD, Addr, Port],
+    ?l2b(io_lib:format(Fmt, Args)).
+
+cluster_db_url(<<"/", _/binary>> = Path) ->
+    <<(cluster_url())/binary, Path/binary>>;
+cluster_db_url(Path) ->
+    <<(cluster_url())/binary, "/", Path/binary>>.
 
 get_pid(RepId) ->
     Pid = global:whereis_name({couch_replicator_scheduler_job, RepId}),
@@ -145,3 +183,31 @@ replicate({[_ | _]} = RepObject) ->
             ok
     end,
     ok = couch_replicator_scheduler:remove_job(Rep#rep.id).
+
+setup_db() ->
+    DbName = ?tempdb(),
+    ok = fabric:create_db(DbName, [{q, 1}, {n, 1}, ?ADMIN_CTX]),
+    DbName.
+
+teardown_db(DbName) ->
+    try
+        ok = fabric:delete_db(DbName, [?ADMIN_CTX])
+    catch
+        error:database_does_not_exist ->
+            ok
+    end.
+
+test_setup() ->
+    Ctx = test_util:start_couch([fabric, mem3, chttpd, couch_replicator]),
+    Hashed = couch_passwords:hash_admin_password(?PASSWORD),
+    ok = config:set("admins", ?USERNAME, ?b2l(Hashed), _Persist = false),
+    Source = setup_db(),
+    Target = setup_db(),
+    {Ctx, {Source, Target}}.
+
+test_teardown({Ctx, {Source, Target}}) ->
+    meck:unload(),
+    teardown_db(Source),
+    teardown_db(Target),
+    config:delete("admins", ?USERNAME, _Persist = false),
+    ok = test_util:stop_couch(Ctx).
