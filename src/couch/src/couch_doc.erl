@@ -50,10 +50,6 @@ to_json_rev(0, []) ->
 to_json_rev(Start, [FirstRevId | _]) ->
     [{<<"_rev">>, rev_to_str({Start, FirstRevId})}].
 
-% TODO: remove if we can
-% to_json_body(Del, Body) ->
-%     to_json_body(Del, Body, []).
-
 to_json_body(true, {Body}, []) ->
     Body ++ [{<<"_deleted">>, true}];
 to_json_body(false, {Body}, []) ->
