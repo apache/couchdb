@@ -70,7 +70,7 @@ defmodule ProxyAuthTest do
       )
 
     assert resp2.body["userCtx"]["name"] == "couch@apache.org"
-    assert resp2.body["userCtx"]["roles"] == ["test_role"]
+    assert resp2.body["userCtx"]["roles"] == ["_users", "test_role"]
     assert resp2.body["info"]["authenticated"] == "proxy"
     assert resp2.body["ok"] == true
 
@@ -124,7 +124,7 @@ defmodule ProxyAuthTest do
       )
 
     assert resp2.body["userCtx"]["name"] == "couch@apache.org"
-    assert resp2.body["userCtx"]["roles"] == ["test_role_1", "test_role_2"]
+    assert resp2.body["userCtx"]["roles"] == ["_users", "test_role_1", "test_role_2"]
     assert resp2.body["info"]["authenticated"] == "proxy"
     assert resp2.body["ok"] == true
 
