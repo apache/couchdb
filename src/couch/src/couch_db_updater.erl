@@ -265,12 +265,7 @@ sort_and_tag_grouped_docs(Client, GroupedDocs) ->
     % The merge_updates function will fail and the database can end up with
     % duplicate documents if the incoming groups are not sorted, so as a sanity
     % check we sort them again here. See COUCHDB-2735.
-    Cmp = fun
-        % TODO: re-evaluate this addition, might be
-        %([], []) -> false;
-        %       superflous now
-        ([#doc{id = A} | _], [#doc{id = B} | _]) -> A < B
-    end,
+    Cmp = fun([#doc{id = A} | _], [#doc{id = B} | _]) -> A < B end,
     lists:map(
         fun(DocGroup) ->
             [{Client, maybe_tag_doc(D)} || D <- DocGroup]
@@ -783,7 +778,6 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
     ),
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
-
 
 % at this point, we already validated this Db is access enabled, so do the checks right away.
 check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx = UserCtx}, Access).
