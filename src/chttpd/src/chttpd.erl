@@ -1173,7 +1173,7 @@ error_headers(#httpd{mochi_req = MochiReq} = Req, 401 = Code, ErrorStr, ReasonSt
                                     {Code, []};
                                 AuthRedirect ->
                                     case
-                                        chttpd_util:get_chttpd_auth_config_boolean(
+                                        chttpd_util:get_chttpd_config_boolean(
                                             "require_valid_user", false
                                         )
                                     of
