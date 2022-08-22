@@ -18,7 +18,6 @@
 
 -define(ADM_USER, "adm_user").
 -define(ADM_PASS, "adm_pass").
--define(ADM, {?ADM_USER, ?ADM_PASS}).
 -define(ALLOWED_HASHES, "sha256, sha512, sha, blake2s").
 -define(DISALLOWED_HASHES, "md4, md5, ripemd160").
 
@@ -26,53 +25,37 @@ hash_algorithms_test_() ->
     {
         "Testing hash algorithms for cookie auth",
         {
-            setup,
-            fun setup_all/0,
-            fun teardown_all/1,
-            {
-                foreach,
-                fun setup/0,
-                fun cleanup/1,
-                [
-                    ?TDEF_FE(test_hash_algorithms_should_authorized),
-                    ?TDEF_FE(test_hash_algorithms_should_unauthorized)
-                ]
-            }
+            foreach,
+            fun setup/0,
+            fun cleanup/1,
+            [
+                ?TDEF_FE(test_hash_algorithms_should_work),
+                ?TDEF_FE(test_hash_algorithms_should_fail)
+            ]
         }
     }.
 
-% Utility functions
-
-% Server utility functions
-setup_all() ->
-    Ctx = test_util:start_couch([chttpd]),
-    Hashed = couch_passwords:hash_admin_password(?ADM_PASS),
-    config:set("log", "level", "debug", false),
-    config:set("admins", ?ADM_USER, ?b2l(Hashed), false),
-    NewSecret = ?b2l(couch_uuids:random()),
-    config:set("chttpd_auth", "secret", NewSecret, false),
-    config:set("chttpd", "require_valid_user", "true", _Persist = false),
-    config:set("chttpd_auth", "hash_algorithms", ?ALLOWED_HASHES, false),
-    Ctx.
-
-teardown_all(Ctx) ->
-    config:delete("chttpd_auth", "hash_algorithms", false),
-    config:delete("chttpd", "require_valid_user", false),
-    config:delete("chttpd_auth", "secret", false),
-    config:delete("admins", ?ADM_USER, false),
-    config:delete("log", "level", false),
-    test_util:stop_couch(Ctx).
-
 % Test utility functions
 setup() ->
+    Ctx = test_util:start_couch([chttpd]),
+    Hashed = couch_passwords:hash_admin_password(?ADM_PASS),
+    NewSecret = ?b2l(couch_uuids:random()),
+    config:set("admins", ?ADM_USER, ?b2l(Hashed), false),
+    config:set("chttpd_auth", "secret", NewSecret, false),
+    config:set("chttpd", "require_valid_user", "true", false),
+    config:set("chttpd_auth", "hash_algorithms", ?ALLOWED_HASHES, false),
     AllowedHashes = re:split(config:get("chttpd_auth", "hash_algorithms"), "\\s*,\\s*", [
         trim, {return, binary}
     ]),
     DisallowedHashes = re:split(?DISALLOWED_HASHES, "\\s*,\\s*", [trim, {return, binary}]),
-    {AllowedHashes, DisallowedHashes}.
+    {Ctx, {AllowedHashes, DisallowedHashes}}.
 
-cleanup(_) ->
-    ok.
+cleanup({Ctx, _}) ->
+    config:delete("chttpd_auth", "hash_algorithms", false),
+    config:delete("chttpd", "require_valid_user", false),
+    config:delete("chttpd_auth", "secret", false),
+    config:delete("admins", ?ADM_USER, false),
+    test_util:stop_couch(Ctx).
 
 % Helper functions
 base_url() ->
@@ -109,8 +92,8 @@ test_hash_algorithm([DefaultHashAlgorithm | DecodingHashAlgorithmsList] = _, Sta
     ?assertEqual(Status, ReqStatus),
     test_hash_algorithm(DecodingHashAlgorithmsList, Status).
 
-test_hash_algorithms_should_authorized({AllowedHashes, _} = _) ->
+test_hash_algorithms_should_work({_, {AllowedHashes, _}} = _) ->
     test_hash_algorithm(AllowedHashes, 200).
 
-test_hash_algorithms_should_unauthorized({_, DisallowedHashes} = _) ->
+test_hash_algorithms_should_fail({_, {_, DisallowedHashes}} = _) ->
     test_hash_algorithm(DisallowedHashes, 401).
