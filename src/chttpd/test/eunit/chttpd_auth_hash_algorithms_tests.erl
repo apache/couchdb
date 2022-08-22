@@ -47,6 +47,7 @@ hash_algorithms_test_() ->
 setup_all() ->
     Ctx = test_util:start_couch([chttpd]),
     Hashed = couch_passwords:hash_admin_password(?ADM_PASS),
+    config:set("log", "level", "debug", false),
     config:set("admins", ?ADM_USER, ?b2l(Hashed), false),
     NewSecret = ?b2l(couch_uuids:random()),
     config:set("chttpd_auth", "secret", NewSecret, false),
@@ -58,7 +59,8 @@ teardown_all(Ctx) ->
     config:delete("chttpd_auth", "hash_algorithms", false),
     config:delete("chttpd", "require_valid_user", false),
     config:delete("chttpd_auth", "secret", false),
-    config:delete("chttpd_auth", ?ADM_USER, false),
+    config:delete("admins", ?ADM_USER, false),
+    config:delete("log", "level", false),
     test_util:stop_couch(Ctx).
 
 % Test utility functions
