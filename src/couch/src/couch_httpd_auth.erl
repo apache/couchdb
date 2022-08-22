@@ -43,7 +43,7 @@
 
 party_mode_handler(Req) ->
     case
-        chttpd_util:get_chttpd_auth_config_boolean(
+        chttpd_util:get_chttpd_config_boolean(
             "require_valid_user", false
         )
     of
@@ -131,7 +131,7 @@ default_authentication_handler(Req, AuthModule) ->
                     Req;
                 false ->
                     case
-                        chttpd_util:get_chttpd_auth_config_boolean(
+                        chttpd_util:get_chttpd_config_boolean(
                             "require_valid_user", false
                         )
                     of
