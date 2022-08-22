@@ -25,13 +25,13 @@ hash_algorithms_test_() ->
     {
         "Testing hash algorithms for cookie auth",
         {
-            foreach,
+            setup,
             fun setup/0,
             fun teardown/1,
-            [
-                ?TDEF_FE(test_hash_algorithms_should_work),
-                ?TDEF_FE(test_hash_algorithms_should_fail)
-            ]
+            with([
+                ?TDEF(test_hash_algorithms_should_work),
+                ?TDEF(test_hash_algorithms_should_fail)
+            ])
         }
     }.
 
