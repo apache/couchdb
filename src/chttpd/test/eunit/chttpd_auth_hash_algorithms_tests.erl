@@ -27,7 +27,7 @@ hash_algorithms_test_() ->
         {
             foreach,
             fun setup/0,
-            fun cleanup/1,
+            fun teardown/1,
             [
                 ?TDEF_FE(test_hash_algorithms_should_work),
                 ?TDEF_FE(test_hash_algorithms_should_fail)
@@ -50,7 +50,7 @@ setup() ->
     DisallowedHashes = re:split(?DISALLOWED_HASHES, "\\s*,\\s*", [trim, {return, binary}]),
     {Ctx, {AllowedHashes, DisallowedHashes}}.
 
-cleanup({Ctx, _}) ->
+teardown({Ctx, _}) ->
     config:delete("chttpd_auth", "hash_algorithms", false),
     config:delete("chttpd", "require_valid_user", false),
     config:delete("chttpd_auth", "secret", false),
