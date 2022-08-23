@@ -286,22 +286,15 @@ all_docs_concurrency() ->
             10
     end.
 
-get_query_list(undefined) ->
-    [];
-get_query_list(List) when is_list(List) ->
-    List.
 validate_if_partition(Row, Acc) ->
-    QueryList = get_query_list(Acc#vacc.req#httpd.qs),
-    case couch_util:get_value("partition", QueryList) of
+    case chttpd:qs_value(Acc#vacc.req, "partition") of
         undefined -> Row;
-        Id -> is_doc_in_partition(Row, Id)
+        Partition -> is_doc_in_partition(Row, list_to_binary(Partition))
     end.
-is_doc_in_partition(Row, Id) ->
-    BinRowKey = Row#view_row.key,
-    IsDocInPartition = binary:match(BinRowKey, list_to_binary(Id)) /= nomatch,
-    case IsDocInPartition of
+is_doc_in_partition(Row, Partition) ->
+    case couch_partition:is_member(Row#view_row.key, Partition) of
         true -> Row;
-        false -> #view_row{key = BinRowKey}
+        false -> #view_row{key = Row#view_row.key}
     end.
 
 doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
