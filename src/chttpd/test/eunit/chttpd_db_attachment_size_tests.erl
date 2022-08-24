@@ -23,8 +23,9 @@
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
-    ok = config:set("couchdb", "max_attachment_size", "50", _Persist = false),
+    Persist = false,
+    ok = config:set("admins", ?USER, ?b2l(Hashed), Persist),
+    ok = config:set("couchdb", "max_attachment_size", "50", Persist),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),

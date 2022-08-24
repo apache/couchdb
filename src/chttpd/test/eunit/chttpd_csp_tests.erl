@@ -223,9 +223,10 @@ setup() ->
     DbName.
 
 cleanup(DbName) ->
-    config:delete("csp", "utils_enable", _Persist = false),
-    config:delete("csp", "attachments_enable", _Persist = false),
-    config:delete("csp", "showlist_enable", _Persist = false),
+    Persist = false,
+    config:delete("csp", "utils_enable", Persist),
+    config:delete("csp", "attachments_enable", Persist),
+    config:delete("csp", "showlist_enable", Persist),
     DbUrl = base_url() ++ "/" ++ DbName,
     {200, _} = req(delete, ?ADM, DbUrl),
     UsersDb = config:get("chttpd_auth", "authentication_db"),

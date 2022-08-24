@@ -23,36 +23,38 @@ setup() ->
         ["httpd", "chttpd", "couch_httpd_auth", "chttpd_auth"]
     ),
 
+    Persist = false,
     ok = config:set(
         "httpd",
         "authentication_handlers",
         "{couch_httpd_auth, cookie_authentication_handler}, "
         "{couch_httpd_auth, default_authentication_handler}",
-        _Persist = false
+        Persist
     ),
-    ok = config:set("httpd", "backlog", "512", _Persist = false),
-    ok = config:set("chttpd", "require_valid_user", "false", _Persist = false),
-    ok = config:set("httpd", "both_exist", "get_in_httpd", _Persist = false),
-    ok = config:set("chttpd", "both_exist", "get_in_chttpd", _Persist = false),
-    ok = config:set("httpd", "httpd_only", "true", _Persist = false),
-    ok = config:set("chttpd", "chttpd_only", "1", _Persist = false),
-    ok = config:set("couch_httpd_auth", "both_exist", "cha", _Persist = false),
-    ok = config:set("chttpd_auth", "both_exist", "ca", _Persist = false),
-    ok = config:set("couch_httpd_auth", "cha_only", "true", _Persist = false),
-    ok = config:set("chttpd_auth", "ca_only", "1", _Persist = false).
+    ok = config:set("httpd", "backlog", "512", Persist),
+    ok = config:set("chttpd", "require_valid_user", "false", Persist),
+    ok = config:set("httpd", "both_exist", "get_in_httpd", Persist),
+    ok = config:set("chttpd", "both_exist", "get_in_chttpd", Persist),
+    ok = config:set("httpd", "httpd_only", "true", Persist),
+    ok = config:set("chttpd", "chttpd_only", "1", Persist),
+    ok = config:set("couch_httpd_auth", "both_exist", "cha", Persist),
+    ok = config:set("chttpd_auth", "both_exist", "ca", Persist),
+    ok = config:set("couch_httpd_auth", "cha_only", "true", Persist),
+    ok = config:set("chttpd_auth", "ca_only", "1", Persist).
 
 teardown(_) ->
-    ok = config:delete("httpd", "authentication_handlers", _Persist = false),
-    ok = config:delete("httpd", "backlog", _Persist = false),
-    ok = config:delete("chttpd", "require_valid_user", _Persist = false),
-    ok = config:delete("httpd", "both_exist", _Persist = false),
-    ok = config:delete("chttpd", "both_exist", _Persist = false),
-    ok = config:delete("httpd", "httpd_only", _Persist = false),
-    ok = config:delete("chttpd", "chttpd_only", _Persist = false),
-    ok = config:delete("couch_httpd_auth", "both_exist", _Persist = false),
-    ok = config:delete("chttpd_auth", "both_exist", _Persist = false),
-    ok = config:delete("couch_httpd_auth", "cha_only", _Persist = false),
-    ok = config:delete("chttpd_auth", "ca_only", _Persist = false).
+    Persist = false,
+    ok = config:delete("httpd", "authentication_handlers", Persist),
+    ok = config:delete("httpd", "backlog", Persist),
+    ok = config:delete("chttpd", "require_valid_user", Persist),
+    ok = config:delete("httpd", "both_exist", Persist),
+    ok = config:delete("chttpd", "both_exist", Persist),
+    ok = config:delete("httpd", "httpd_only", Persist),
+    ok = config:delete("chttpd", "chttpd_only", Persist),
+    ok = config:delete("couch_httpd_auth", "both_exist", Persist),
+    ok = config:delete("chttpd_auth", "both_exist", Persist),
+    ok = config:delete("couch_httpd_auth", "cha_only", Persist),
+    ok = config:delete("chttpd_auth", "ca_only", Persist).
 
 config_delete_all_keys(Section) ->
     lists:foreach(
