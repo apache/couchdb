@@ -19,14 +19,16 @@
 -define(PASS, "pass").
 
 setup() ->
-    ok = config:delete("chttpd_auth", "authentication_db", _Persist = false),
+    Persist = false,
+    ok = config:delete("chttpd_auth", "authentication_db", Persist),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, binary_to_list(Hashed), _Persist = false),
+    ok = config:set("admins", ?USER, binary_to_list(Hashed), Persist),
     root_url() ++ "/_session".
 
 cleanup(_) ->
-    ok = config:delete("chttpd_auth", "authentication_db", _Persist = false),
-    ok = config:delete("admins", ?USER, _Persist = false).
+    Persist = false,
+    ok = config:delete("chttpd_auth", "authentication_db", Persist),
+    ok = config:delete("admins", ?USER, Persist).
 
 session_test_() ->
     {
