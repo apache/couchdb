@@ -18,8 +18,8 @@
 
 -define(ADM_USER, "adm_user").
 -define(ADM_PASS, "adm_pass").
--define(ALLOWED_HASHES, "sha256, sha512, sha, blake2s").
--define(DISALLOWED_HASHES, "md4, md5, ripemd160").
+-define(WORKING_HASHES, "sha256, sha512, sha, blake2s").
+-define(FAILING_HASHES, "md4, md5, ripemd160").
 
 hash_algorithms_test_() ->
     {
@@ -43,12 +43,13 @@ setup() ->
     config:set("admins", ?ADM_USER, ?b2l(Hashed), false),
     config:set("chttpd_auth", "secret", NewSecret, false),
     config:set("chttpd", "require_valid_user", "true", false),
-    config:set("chttpd_auth", "hash_algorithms", ?ALLOWED_HASHES, false),
-    AllowedHashes = re:split(config:get("chttpd_auth", "hash_algorithms"), "\\s*,\\s*", [
+    config:set("chttpd_auth", "hash_algorithms", ?WORKING_HASHES, false),
+    HashesShouldWork = re:split(config:get("chttpd_auth", "hash_algorithms"), "\\s*,\\s*", [
         trim, {return, binary}
     ]),
-    DisallowedHashes = re:split(?DISALLOWED_HASHES, "\\s*,\\s*", [trim, {return, binary}]),
-    {Ctx, {AllowedHashes, DisallowedHashes}}.
+    HashesShouldFail = re:split(?FAILING_HASHES, "\\s*,\\s*", [trim, {return, binary}]),
+    SupportedHashAlgorithms = crypto:supports(hashs),
+    {Ctx, {HashesShouldWork, HashesShouldFail, SupportedHashAlgorithms}}.
 
 teardown({Ctx, _}) ->
     config:delete("chttpd_auth", "hash_algorithms", false),
@@ -83,7 +84,7 @@ test_hash_algorithm([], _) ->
 test_hash_algorithm([DefaultHashAlgorithm | DecodingHashAlgorithmsList] = _, Status) ->
     CurrentTime = couch_httpd_auth:make_cookie_time(),
     Cookie = make_auth_session_string(
-        erlang:binary_to_existing_atom(DefaultHashAlgorithm),
+        DefaultHashAlgorithm,
         ?ADM_USER,
         get_full_secret(?ADM_USER),
         CurrentTime
@@ -92,8 +93,10 @@ test_hash_algorithm([DefaultHashAlgorithm | DecodingHashAlgorithmsList] = _, Sta
     ?assertEqual(Status, ReqStatus),
     test_hash_algorithm(DecodingHashAlgorithmsList, Status).
 
-test_hash_algorithms_should_work({_, {AllowedHashes, _}} = _) ->
-    test_hash_algorithm(AllowedHashes, 200).
+test_hash_algorithms_should_work({_, {WorkingHashes, _, SupportedHashAlgorithms}} = _) ->
+    Hashes = couch_util:verify_hash_names(WorkingHashes, SupportedHashAlgorithms),
+    test_hash_algorithm(Hashes, 200).
 
-test_hash_algorithms_should_fail({_, {_, DisallowedHashes}} = _) ->
-    test_hash_algorithm(DisallowedHashes, 401).
+test_hash_algorithms_should_fail({_, {_, FailingHashes, SupportedHashAlgorithms}} = _) ->
+    Hashes = couch_util:verify_hash_names(FailingHashes, SupportedHashAlgorithms),
+    test_hash_algorithm(Hashes, 401).
