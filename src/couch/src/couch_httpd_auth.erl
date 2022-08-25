@@ -16,8 +16,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--define(DEFAULT_HASH_ALGORITHM, sha256).
-
 -export([party_mode_handler/1]).
 
 -export([
@@ -298,7 +296,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                 end,
             % Verify expiry and hash
             CurrentTime = make_cookie_time(),
-            HashAlgorithms = get_config_hash_algorithms(),
+            HashAlgorithms = couch_util:get_config_hash_algorithms(),
             case chttpd_util:get_chttpd_auth_config("secret") of
                 undefined ->
                     couch_log:debug("cookie auth secret is not set", []),
@@ -373,7 +371,7 @@ cookie_auth_header(_Req, _Headers) ->
 
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
-    [HashAlgorithm | _] = get_config_hash_algorithms(),
+    [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
     Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
     mochiweb_cookies:cookie(
         "AuthSession",
@@ -702,32 +700,3 @@ authentication_warning(#httpd{mochi_req = Req}, User) ->
         "~p: Authentication failed for user ~s from ~s",
         [?MODULE, User, Peer]
     ).
-
-verify_hash_names(HashAlgorithms, SupportedHashFun) ->
-    verify_hash_names(HashAlgorithms, SupportedHashFun, []).
-verify_hash_names([], _, HashNames) ->
-    lists:reverse(HashNames);
-verify_hash_names([H | T], SupportedHashFun, HashNames) ->
-    try
-        HashAtom = binary_to_existing_atom(H),
-        Result =
-            case lists:member(HashAtom, SupportedHashFun) of
-                true -> [HashAtom | HashNames];
-                false -> HashNames
-            end,
-        verify_hash_names(T, SupportedHashFun, Result)
-    catch
-        error:badarg ->
-            couch_log:warning("~p: Hash algorithm ~s is not valid.", [?MODULE, H]),
-            verify_hash_names(T, SupportedHashFun, HashNames)
-    end.
-
--spec get_config_hash_algorithms() -> list(atom()).
-get_config_hash_algorithms() ->
-    SupportedHashAlgorithms = crypto:supports(hashs),
-    HashAlgorithmsStr = chttpd_util:get_chttpd_auth_config("hash_algorithms", "sha256, sha"),
-    HashAlgorithms = re:split(HashAlgorithmsStr, "\\s*,\\s*", [trim, {return, binary}]),
-    case verify_hash_names(HashAlgorithms, SupportedHashAlgorithms) of
-        [] -> [?DEFAULT_HASH_ALGORITHM];
-        VerifiedHashNames -> VerifiedHashNames
-    end.

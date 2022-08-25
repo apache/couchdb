@@ -15,6 +15,8 @@
 -define(DESIGN_DOC_PREFIX, "_design/").
 -define(DEFAULT_COMPRESSION, snappy).
 
+-define(DEFAULT_HASH_ALGORITHM, sha256).
+
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 

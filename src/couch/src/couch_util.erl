@@ -43,6 +43,8 @@
 -export([set_process_priority/2]).
 -export([hmac/3]).
 -export([version_to_binary/1]).
+-export([verify_hash_names/2]).
+-export([get_config_hash_algorithms/0]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -829,3 +831,32 @@ hex(X) ->
         16#6530, 16#6531, 16#6532, 16#6533, 16#6534, 16#6535, 16#6536, 16#6537, 16#6538, 16#6539, 16#6561, 16#6562, 16#6563, 16#6564, 16#6565, 16#6566,
         16#6630, 16#6631, 16#6632, 16#6633, 16#6634, 16#6635, 16#6636, 16#6637, 16#6638, 16#6639, 16#6661, 16#6662, 16#6663, 16#6664, 16#6665, 16#6666
     }).
+
+verify_hash_names(HashAlgorithms, SupportedHashes) ->
+    verify_hash_names(HashAlgorithms, SupportedHashes, []).
+verify_hash_names([], _, HashNames) ->
+    lists:reverse(HashNames);
+verify_hash_names([H | T], SupportedHashes, HashNames) ->
+    try
+        HashAtom = binary_to_existing_atom(H),
+        Result =
+            case lists:member(HashAtom, SupportedHashes) of
+                true -> [HashAtom | HashNames];
+                false -> HashNames
+            end,
+        verify_hash_names(T, SupportedHashes, Result)
+    catch
+        error:badarg ->
+            couch_log:warning("~p: Hash algorithm ~s is not valid.", [?MODULE, H]),
+            verify_hash_names(T, SupportedHashes, HashNames)
+    end.
+
+-spec get_config_hash_algorithms() -> list(atom()).
+get_config_hash_algorithms() ->
+    SupportedHashes = crypto:supports(hashs),
+    HashAlgorithmsStr = chttpd_util:get_chttpd_auth_config("hash_algorithms", "sha256, sha"),
+    HashAlgorithms = re:split(HashAlgorithmsStr, "\\s*,\\s*", [trim, {return, binary}]),
+    case verify_hash_names(HashAlgorithms, SupportedHashes) of
+        [] -> [?DEFAULT_HASH_ALGORITHM];
+        VerifiedHashNames -> VerifiedHashNames
+    end.
