@@ -152,8 +152,7 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
         store_module := StoreModule
     } = Data,
     {LastIndex, _LastTerm} = StoreModule:last(Data),
-    {NthTerm, _} = StoreModule:lookup(MPrevLogIndex, Data),
-    LogOk = MPrevLogIndex == 0 orelse (MPrevLogIndex > 0 andalso MPrevLogIndex =< LastIndex andalso MPrevLogTerm == NthTerm),
+    LogOk = MPrevLogIndex == 0 orelse (MPrevLogIndex > 0 andalso MPrevLogIndex =< LastIndex andalso MPrevLogTerm == nthterm(MPrevLogIndex, Data)),
     if
         Term < CurrentTerm orelse (Term == CurrentTerm andalso State == follower andalso not LogOk) ->
             Reply = #{
@@ -369,6 +368,18 @@ state_timeout(leader) ->
 
 peers(Cohort) ->
     Cohort -- [node()].
+
+
+nthterm(N, Data) ->
+    #{
+        store_module := StoreModule
+    } = Data,
+    case StoreModule:lookup(N, Data) of
+        not_found ->
+            not_found;
+        {Term, _Value} ->
+            Term
+        end.
 
 persist({next_state, _NextState, NewData, _Actions} = HandleEventResult) ->
     persist(NewData, HandleEventResult);
