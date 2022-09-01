@@ -2393,7 +2393,10 @@ throw_bad_query_param(Key) when is_binary(Key) ->
     throw({bad_request, Msg}).
 
 bulk_get_open_doc_revs(Db, {Props}, Options) ->
-    bulk_get_open_doc_revs1(Db, Props, Options, {}).
+    bulk_get_open_doc_revs1(Db, Props, Options, {});
+bulk_get_open_doc_revs(_Db, _Invalid, Options) ->
+    Error = {null, bad_request, <<"document must be a JSON object">>},
+    {null, {error, Error}, Options}.
 
 bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
     case couch_util:get_value(<<"id">>, Props) of
