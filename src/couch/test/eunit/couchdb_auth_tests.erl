@@ -34,6 +34,7 @@ auth_test_() ->
     Tests = [
         fun should_return_username_on_post_to_session/2,
         fun should_not_return_authenticated_field/2,
+        fun should_return_bad_content_type_appropriately/2,
         fun should_return_list_of_handlers/2
     ],
     RequireValidUserTests = [
@@ -82,6 +83,20 @@ should_return_username_on_post_to_session(_PortType, Url) ->
             ),
             {Json} = jiffy:decode(Body),
             proplists:get_value(<<"name">>, Json)
+        end
+    ).
+
+should_return_bad_content_type_appropriately(_PortType, Url) ->
+    ?_assertEqual(
+        <<"bad_content_type">>,
+        begin
+            {ok, 415, _, Body} = test_request:post(
+                Url,
+                [{"Content-Type", ""}],
+                []
+            ),
+            #{<<"error">> := Error} = jiffy:decode(Body, [return_maps]),
+            Error
         end
     ).
 

@@ -459,7 +459,13 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
                     Pairs
                 );
             _ ->
-                []
+                throw(
+                    {bad_ctype, <<
+                        "Content-Type must be "
+                        "'application/x-www-form-urlencoded' or "
+                        "'application/json'"
+                    >>}
+                )
         end,
     UserName = ?l2b(extract_username(Form)),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
