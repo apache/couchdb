@@ -256,7 +256,7 @@ get_value(Key, List) ->
 
 get_value(Key, List, Default) ->
     case lists:keysearch(Key, 1, List) of
-        {value, {Key, Value}} ->
+        {value, {K, Value}} when K =:= Key ->
             Value;
         false ->
             Default
