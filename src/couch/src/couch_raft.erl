@@ -40,10 +40,10 @@
 %% public api
 
 start(Name, StoreModule, StoreState) ->
-    gen_statem:start({local, Name}, ?MODULE, new(Name, StoreModule, StoreState), []).
+    gen_statem:start({global, [Name, node()]}, ?MODULE, new(Name, StoreModule, StoreState), []).
 
 start_link(Name, StoreModule, StoreState) ->
-    gen_statem:start_link({local, Name}, ?MODULE, new(Name, StoreModule, StoreState), []).
+    gen_statem:start_link({global, [Name, node()]}, ?MODULE, new(Name, StoreModule, StoreState), []).
 
 new(Name, StoreModule, StoreState) ->
     maps:merge(#{
@@ -354,8 +354,7 @@ start_election(Data) ->
     Data#{term => ElectionTerm, votedFor => node(), votesGranted => [node()]}.
 
 cast(Node, Msg, #{name := Name}) ->
-    gen_statem:cast({Name, Node}, Msg).
-
+    gen_statem:cast({global, [Name, Node]}, Msg).
 
 state_timeout(follower) ->
     {state_timeout, 150 + rand:uniform(150), new_election};
