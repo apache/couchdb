@@ -963,6 +963,17 @@ init_state(FilePath, Fd, Header0, Options) ->
         {reduce, fun ?MODULE:raft_tree_reduce/2}
     ]),
 
+    %% ugly hack just to see the elections
+    RaftPid = case re:run(FilePath, "shards/[0-9a-f]+-[0-9a-f]+/[^.]+", [{capture, all, list}]) of
+        {match, [ShardName]} ->
+            Cohort = mem3:nodes(), %% hack
+            {ok, InitialRaftState} = couch_raft_store_sha256:init(Cohort),
+            {ok, P} = couch_raft:start(ShardName, couch_raft_store_sha256, InitialRaftState),
+            P;
+        _ ->
+            undefined
+    end,
+
     ok = couch_file:set_db_pid(Fd, self()),
 
     St = #st{
@@ -977,7 +988,8 @@ init_state(FilePath, Fd, Header0, Options) ->
         compression = Compression,
         purge_tree = PurgeTree,
         purge_seq_tree = PurgeSeqTree,
-        raft_tree = RaftTree
+        raft_tree = RaftTree,
+        raft_pid = RaftPid
     },
 
     % If this is a new database we've just created a

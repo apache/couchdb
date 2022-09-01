@@ -24,5 +24,6 @@
     compression,
     purge_tree,
     purge_seq_tree,
-    raft_tree
+    raft_tree,
+    raft_pid
 }).
