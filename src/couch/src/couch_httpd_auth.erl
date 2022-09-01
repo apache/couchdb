@@ -574,7 +574,7 @@ extract_username(Form) ->
     case couch_util:get_value("username", Form, CouchFormat) of
         undefined ->
             throw({bad_request, <<"request body must contain a username">>});
-        CouchFormat ->
+        Format when Format =:= CouchFormat ->
             CouchFormat;
         Else1 when CouchFormat == undefined ->
             Else1;
