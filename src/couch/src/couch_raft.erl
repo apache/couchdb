@@ -67,24 +67,24 @@ callback_mode() ->
 
 %% erlfmt-ignore
 handle_event(cast, #{term := FutureTerm} = Msg, _State, #{term := CurrentTerm} = Data) when FutureTerm > CurrentTerm ->
-    couch_log:notice("~p received message from future term ~B, moving to that term, becoming follower and clearing votedFor", [node(), FutureTerm]),
+    couch_log:notice("~p received message from future term ~B, moving to that term, becoming follower and clearing votedFor", [id(Data), FutureTerm]),
     persist({next_state, follower, Data#{term => FutureTerm, votedFor => undefined, votesGranted => undefined}, {next_event, cast, Msg}});
 
 handle_event(enter, _OldState, follower, Data) ->
     #{term := Term, froms := Froms} = Data,
-    couch_log:notice("~p became follower in term ~B", [node(), Term]),
+    couch_log:notice("~p became follower in term ~B", [id(Data), Term]),
     Replies = [{reply, From, {error, deposed}} || From <- maps:values(Froms)],
     persist({keep_state, maps:without([nextIndex, matchIndex], Data#{votedFor => undefined, votesGranted => undefined, froms => #{}}),
         [state_timeout(follower) | Replies]});
 
 handle_event(enter, _OldState, candidate, Data) ->
     #{term := Term} = Data,
-    couch_log:notice("~p became candidate in term ~B", [node(), Term]),
+    couch_log:notice("~p became candidate in term ~B", [id(Data), Term]),
     persist({keep_state, start_election(Data), state_timeout(candidate)});
 
 handle_event(enter, _OldState, leader, Data) ->
     #{store_module := StoreModule, cohort := Cohort, term := Term} = Data,
-    couch_log:notice("~p became leader in term ~B", [node(), Term]),
+    couch_log:notice("~p became leader in term ~B", [id(Data), Term]),
     Peers = peers(Cohort),
     {LastIndex, _} = StoreModule:last(Data),
     {keep_state, Data#{
@@ -106,7 +106,7 @@ handle_event(cast, #{type := 'RequestVoteRequest', term := Term} = Msg, State, #
     {LastIndex, LastTerm} = StoreModule:last(Data),
     LogOk = MLastLogTerm > LastTerm orelse (MLastLogTerm == LastTerm andalso MLastLogIndex >= LastIndex),
     Grant = Term == CurrentTerm andalso LogOk andalso (VotedFor == undefined orelse VotedFor == MSource),
-    couch_log:notice("~p received RequestVoteRequest from ~p in term ~B when in term ~B (Grant:~p, LogOk:~p, VotedFor:~p)", [node(), MSource, Term, CurrentTerm, Grant, LogOk, VotedFor]),
+    couch_log:notice("~p received RequestVoteRequest from ~p in term ~B when in term ~B (Grant:~p, LogOk:~p, VotedFor:~p)", [id(Data), MSource, Term, CurrentTerm, Grant, LogOk, VotedFor]),
     Reply = #{
         type => 'RequestVoteResponse',
         term => CurrentTerm,
@@ -121,18 +121,18 @@ handle_event(cast, #{type := 'RequestVoteRequest', term := Term} = Msg, State, #
             {keep_state_and_data, state_timeout(State)}
     end;
 
-handle_event(cast, #{type := 'RequestVoteResponse', term := PastTerm}, _State, #{term := CurrentTerm}) when PastTerm < CurrentTerm ->
-    couch_log:notice("~p ignored RequestVoteResponse from past term ~B", [node(), PastTerm]),
+handle_event(cast, #{type := 'RequestVoteResponse', term := PastTerm}, _State, #{term := CurrentTerm} = Data) when PastTerm < CurrentTerm ->
+    couch_log:notice("~p ignored RequestVoteResponse from past term ~B", [id(Data), PastTerm]),
     keep_state_and_data;
 
 handle_event(cast, #{type := 'RequestVoteResponse', term := Term} = Msg, _State, #{term := Term} = Data) ->
     #{source := MSource, voteGranted := MVoteGranted} = Msg,
     #{cohort := Cohort, votesGranted := VotesGranted0} = Data,
     VotesGranted1 = if MVoteGranted -> lists:usort([MSource | VotesGranted0]); true -> VotesGranted0 end,
-    couch_log:notice("~p received RequestVoteResponse from ~p in current term ~B (VotesGranted:~p)", [node(), MSource, Term, VotesGranted1]),
+    couch_log:notice("~p received RequestVoteResponse from ~p in current term ~B (VotesGranted:~p)", [id(Data), MSource, Term, VotesGranted1]),
     if
         length(VotesGranted1) >= length(Cohort) div 2 + 1 ->
-            couch_log:notice("~p has enough votes to be leader in term ~B", [node(), Term]),
+            couch_log:notice("~p has enough votes to be leader in term ~B", [id(Data), Term]),
             {next_state, leader, Data#{votesGranted => VotesGranted1}};
         true ->
             {keep_state, Data#{votesGranted => VotesGranted1}}
@@ -181,7 +181,7 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
                         matchIndex => MPrevLogIndex,
                         source => node()
                     },
-                    couch_log:debug("~p received heartbeat and everything matches, sending matchIndex:~p", [node(), MPrevLogIndex]),
+                    couch_log:debug("~p received heartbeat and everything matches, sending matchIndex:~p", [id(Data), MPrevLogIndex]),
                     cast(MSource, Reply, Data),
                     {keep_state, update_state_machine(Data#{commitIndex => MCommitIndex}), state_timeout(State)};
                 true ->
@@ -199,11 +199,11 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
                                         matchIndex => MPrevLogIndex + length(MEntries),
                                         source => node()
                                     },
-                                    couch_log:notice("~p received entry:~p that's already applied, sending matchIndex:~p", [node(), MEntries, MPrevLogIndex + length(MEntries)]),
+                                    couch_log:notice("~p received entry:~p that's already applied, sending matchIndex:~p", [id(Data), MEntries, MPrevLogIndex + length(MEntries)]),
                                     cast(MSource, Reply, Data),
                                     {keep_state, update_state_machine(Data#{commitIndex => MCommitIndex}), state_timeout(State)};
                                 NthLogTerm /= FirstEntryTerm ->
-                                    couch_log:notice("~p received conflicting entry:~p, deleting it", [node(), MEntries]),
+                                    couch_log:notice("~p received conflicting entry:~p, deleting it", [id(Data), MEntries]),
                                     case StoreModule:truncate(LastIndex - 1, Data) of
                                         {ok, NewData} ->
                                             {keep_state, NewData, [{next_event, cast, Msg}, state_timeout(State)]};
@@ -212,7 +212,7 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
                                     end
                             end;
                         LastIndex == MPrevLogIndex ->
-                            couch_log:notice("~p received new entries:~p, appending it to log", [node(), MEntries]),
+                            couch_log:notice("~p received new entries:~p, appending it to log", [id(Data), MEntries]),
                             case StoreModule:append(MEntries, Data) of
                                 {ok, _EntryIndex, NewData} ->
                                     {keep_state, NewData, [{next_event, cast, Msg}, state_timeout(State)]};
@@ -223,14 +223,14 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
             end
     end;
 
-handle_event(cast, #{type := 'AppendEntriesResponse', term := PastTerm}, _State, #{term := CurrentTerm}) when PastTerm < CurrentTerm ->
-    couch_log:notice("~p ignored AppendEntriesResponse from past term ~B", [node(), PastTerm]),
+handle_event(cast, #{type := 'AppendEntriesResponse', term := PastTerm}, _State, #{term := CurrentTerm} = Data) when PastTerm < CurrentTerm ->
+    couch_log:notice("~p ignored AppendEntriesResponse from past term ~B", [id(Data), PastTerm]),
     keep_state_and_data;
 
 handle_event(cast, #{type := 'AppendEntriesResponse', term := Term} = Msg, leader, #{term := Term} = Data) ->
     #{success := MSuccess, matchIndex := MMatchIndex, source := MSource} = Msg,
     #{nextIndex := NextIndex, matchIndex := MatchIndex} = Data,
-    couch_log:debug("~p received AppendEntriesResponse from ~p in current term ~B (Success:~p)", [node(), MSource, Term, MSuccess]),
+    couch_log:debug("~p received AppendEntriesResponse from ~p in current term ~B (Success:~p)", [id(Data), MSource, Term, MSuccess]),
     SourceNextIndex = maps:get(MSource, NextIndex),
     if
         MSuccess ->
@@ -263,12 +263,12 @@ handle_event({call, From}, #{type := 'ClientRequest'}, _State, _Data) ->
 
 handle_event(state_timeout, new_election, State, Data) when State == follower; State == candidate ->
     #{term := Term} = Data,
-    couch_log:notice("~p election timeout in state ~p, term ~B", [node(), State, Term]),
+    couch_log:notice("~p election timeout in state ~p, term ~B", [id(Data), State, Term]),
     persist({next_state, candidate, start_election(Data), state_timeout(State)});
 
 handle_event(state_timeout, heartbeat, leader, Data) ->
     #{term := Term} = Data,
-    couch_log:debug("~p leader sending a heartbeat in term ~B", [node(), Term]),
+    couch_log:debug("~p leader sending a heartbeat in term ~B", [id(Data), Term]),
     ok = send_append_entries(Data),
     {keep_state, advance_commit_index(Data), state_timeout(leader)};
 
@@ -341,7 +341,7 @@ update_state_machine(#{lastApplied := LastApplied, commitIndex := CommitIndex} =
 start_election(Data) ->
     #{term := Term, cohort := Cohort, store_module := StoreModule} = Data,
     ElectionTerm = Term + 1,
-    couch_log:notice("~p starting election in term ~B", [node(), ElectionTerm]),
+    couch_log:notice("~p starting election in term ~B", [id(Data), ElectionTerm]),
     {LastLogIndex, LastLogTerm} = StoreModule:last(Data),
     RequestVote = #{
         type => 'RequestVoteRequest',
@@ -393,3 +393,6 @@ persist(Data, HandleEventResult) ->
         {error, Reason} ->
             {stop, Reason}
     end.
+
+id(#{name := Name}) ->
+    [Name, node()].
