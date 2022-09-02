@@ -24,6 +24,9 @@ cd apache-couchdb-*
 make check || (make build-report && false)
 '''
 
+docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
+other_changes = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q -v '^src/docs/'"
+
 pipeline {
 
   // no top-level agent; agents must be declared for each stage
@@ -61,7 +64,68 @@ pipeline {
 
   stages {
 
+    stage('Docs Check') {
+      // Run docs `make check` stage if any docs changed
+      when { expression { return sh(returnStatus: true, script: docs_changed) == 0 } }
+      agent {
+          docker {
+              image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+              label 'docker'
+              args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
+          }
+      }
+      options {
+        timeout(time: 15, unit: 'MINUTES')
+      }
+      steps {
+        sh '''
+          (cd src/docs && make check)
+        '''
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // Docs Check
+
+    stage('Build Docs') {
+      // Build docs separately if only docs changed. If there are other changes, docs are
+      // already built as part of `make dist`
+      when { expression { return (sh(returnStatus: true, script: docs_changed) == 0 && sh(returnStatus: true, script: other_changes) == 1)} }
+      agent {
+          docker {
+              image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+              label 'docker'
+              args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
+          }
+      }
+      options {
+          timeout(time: 30, unit: 'MINUTES')
+      }
+      steps {
+         sh '''
+           (cd src/docs && make html)
+         '''
+         sh '''
+           (cd src/docs && make man)
+         '''
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage
+
     stage('erlfmt') {
+      when { expression { return ! (sh(returnStatus: true, script: docs_changed) == 0 && sh(returnStatus: true, script: other_changes) == 1) } }
       agent {
         docker {
           image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
@@ -92,6 +156,7 @@ pipeline {
 
 
     stage('Build Release Tarball') {
+      when { expression { return ! (sh(returnStatus: true, script: docs_changed) == 0 && sh(returnStatus: true, script: other_changes) == 1) } }
       agent {
         docker {
           image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
@@ -129,7 +194,6 @@ pipeline {
     // https://issues.jenkins-ci.org/browse/JENKINS-48050
 
     stage('Make Check') {
-
       matrix {
         axes {
           axis {
@@ -144,6 +208,7 @@ pipeline {
 
         stages {
           stage('Build and Test') {
+            when { expression { return ! (sh(returnStatus: true, script: docs_changed) == 0 && sh(returnStatus: true, script: other_changes) == 1) } }
             agent {
               docker {
                 image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
