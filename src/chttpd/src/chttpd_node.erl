@@ -42,8 +42,12 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]}
     IcuVer = couch_ejson_compare:get_icu_version(),
     UcaVer = couch_ejson_compare:get_uca_version(),
     ColVer = couch_ejson_compare:get_collator_version(),
+    Hashes = crypto:supports(hashs),
     send_json(Req, 200, #{
-        erlang_version => ?l2b(?COUCHDB_ERLANG_VERSION),
+        erlang => #{
+            version => ?l2b(?COUCHDB_ERLANG_VERSION),
+            supported_hashes => Hashes
+        },
         collation_driver => #{
             name => <<"libicu">>,
             library_version => couch_util:version_to_binary(IcuVer),
