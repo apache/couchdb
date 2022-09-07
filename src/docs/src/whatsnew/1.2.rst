@@ -1,0 +1,235 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/1.2.x:
+
+============
+1.2.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/1.2.x/upgrade:
+
+Upgrade Notes
+=============
+
+.. warning::
+    This version drops support for the database format that was introduced in
+    version 0.9.0. Compact your older databases (that have not been compacted
+    for a long time) before upgrading, or they will become inaccessible.
+
+.. warning::
+    :ref:`release/1.2.1` contains important security fixes. Previous `1.2.x`
+    releases are not recommended for regular usage.
+
+Security changes
+----------------
+
+The interface to the ``_users`` and ``_replicator`` databases have been
+changed so that non-administrator users can see less information:
+
+* In the ``_users`` database:
+
+  * User documents can now only be read by the respective users, as well as
+    administrators. Other users cannot read these documents.
+  * Views can only be defined and queried by administrator users.
+  * The ``_changes`` feed can only be queried by administrator users.
+
+* In the ``_replicator`` database:
+
+  * Documents now have a forced ``owner`` field that corresponds to the
+    authenticated user that created them.
+  * Non-owner users will not see confidential information like passwords or
+    OAuth tokens in replication documents; they can still see the other
+    contents of those documents. Administrators can see everything.
+  * Views can only be defined and queried by administrators.
+
+Database Compression
+--------------------
+
+The new optional (but enabled by default) compression of disk files requires
+an upgrade of the on-disk format (5 -> 6) which occurs on creation for new
+databases and views, and on compaction for existing files. This format is not
+supported in previous releases, so rollback would require replication to the
+previous CouchDB release or restoring from backup.
+
+Compression can be disabled by setting ``compression = none`` in your
+``local.ini`` ``[couchdb]`` section, but the on-disk format will still be
+upgraded.
+
+.. _release/1.2.2:
+
+Version 1.2.2
+=============
+
+Build System
+------------
+
+* Fixed issue in `couchdb` script where stopped status returns before process
+  exits.
+
+HTTP Interface
+--------------
+
+* Reset rewrite counter on new request, avoiding unnecessary request failures
+  due to bogus rewrite limit reports.
+
+.. _release/1.2.1:
+
+Version 1.2.1
+=============
+
+Build System
+------------
+
+* Fix couchdb start script.
+* Win: fix linker invocations.
+
+Futon
+-----
+
+* Disable buttons that aren't available for the logged-in user.
+
+HTTP Interface
+--------------
+
+* No longer rewrites the ``X-CouchDB-Requested-Path`` during recursive
+  calls to the rewriter.
+* Limit recursion depth in the URL rewriter. Defaults to a maximum
+  of 100 invocations but is configurable.
+
+Security
+--------
+
+* Fixed :ref:`cve/2012-5641`
+* Fixed :ref:`cve/2012-5649`
+* Fixed :ref:`cve/2012-5650`
+
+Replication
+-----------
+
+* Fix potential timeouts.
+
+View Server
+-----------
+
+* Change use of signals to avoid broken view groups.
+
+.. _release/1.2.0:
+
+Version 1.2.0
+=============
+
+Authentication
+--------------
+
+* Fix use of OAuth with VHosts and URL rewriting.
+* OAuth secrets can now be stored in the users system database
+  as an alternative to key value pairs in the .ini configuration.
+  By default this is disabled (secrets are stored in the .ini)
+  but can be enabled via the .ini configuration key `use_users_db`
+  in the `couch_httpd_oauth` section.
+* Documents in the _users database are no longer publicly
+  readable.
+* Confidential information in the _replication database is no
+  longer publicly readable.
+* Password hashes are now calculated by CouchDB. Clients are no
+  longer required to do this manually.
+* Cookies used for authentication can be made persistent by enabling
+  the .ini configuration key `allow_persistent_cookies` in the
+  `couch_httpd_auth` section.
+
+Build System
+------------
+
+* cURL is no longer required to build CouchDB as it is only
+  used by the command line JS test runner. If cURL is available
+  when building CouchJS you can enable the HTTP bindings by
+  passing -H on the command line.
+* Temporarily made `make check` pass with R15B. A more thorough
+  fix is in the works (:issue:`1424`).
+* Fixed --with-js-include and --with-js-lib options.
+* Added --with-js-lib-name option.
+
+Futon
+-----
+
+* The `Status` screen (active tasks) now displays two new task status
+  fields: `Started on` and `Updated on`.
+* Futon remembers view code every time it is saved, allowing to save an
+  edit that amounts to a revert.
+
+HTTP Interface
+--------------
+
+* Added a native JSON parser.
+* The _active_tasks API now offers more granular fields. Each
+  task type is now able to expose different properties.
+* Added built-in changes feed filter `_view`.
+* Fixes to the `_changes` feed heartbeat option which caused
+  heartbeats to be missed when used with a filter. This caused
+  timeouts of continuous pull replications with a filter.
+* Properly restart the SSL socket on configuration changes.
+
+OAuth
+-----
+
+* Updated bundled `erlang_oauth` library to the latest version.
+
+Replicator
+----------
+
+* A new replicator implementation. It offers more performance and
+  configuration options.
+* Passing non-string values to query_params is now a 400 bad
+  request. This is to reduce the surprise that all parameters
+  are converted to strings internally.
+* Added optional field `since_seq` to replication objects/documents.
+  It allows to bootstrap a replication from a specific source sequence
+  number.
+* Simpler replication cancellation. In addition to the current method,
+  replications can now be canceled by specifying the replication ID
+  instead of the original replication object/document.
+
+Storage System
+--------------
+
+* Added optional database and view index file compression (using Google's
+  snappy or zlib's deflate). This feature is enabled by default, but it
+  can be disabled by adapting local.ini accordingly. The on-disk format
+  is upgraded on compaction and new DB/view creation to support this.
+* Several performance improvements, most notably regarding database writes
+  and view indexing.
+* Computation of the size of the latest MVCC snapshot data and all its
+  supporting metadata, both for database and view index files. This
+  information is exposed as the `data_size` attribute in the database and
+  view group information URIs.
+* The size of the buffers used for database and view compaction is now
+  configurable.
+* Added support for automatic database and view compaction. This feature
+  is disabled by default, but it can be enabled via the .ini configuration.
+* Performance improvements for the built-in changes feed filters `_doc_ids`
+  and `_design`.
+
+View Server
+-----------
+
+* Add CoffeeScript (http://coffeescript.org/) as a first class view server
+  language.
+* Fixed old index file descriptor leaks after a view cleanup.
+* The requested_path property keeps the pre-rewrite path even when no VHost
+  configuration is matched.
+* Fixed incorrect reduce query results when using pagination parameters.
+* Made icu_driver work with Erlang R15B and later.

@@ -1,0 +1,67 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2018-17188:
+
+===========================================================
+CVE-2018-17188: Apache CouchDB Remote Privilege Escalations
+===========================================================
+
+:Date: 17.12.2018
+
+:Affected: All Versions of Apache CouchDB
+
+:Severity: Medium
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+Prior to CouchDB version 2.3.0, CouchDB allowed for runtime-configuration of key
+components of the database. In some cases, this lead to vulnerabilities where
+CouchDB admin users could access the underlying operating system as the CouchDB
+user. Together with other vulnerabilities, it allowed full system entry for
+unauthenticated users.
+
+These vulnerabilities were fixed and disclosed in the following CVE reports:
+
+- :ref:`CVE-2018-11769: Apache CouchDB Remote Code Execution <cve/2018-11769>`
+- :ref:`CVE-2018-8007: Apache CouchDB Remote Code Execution <cve/2018-8007>`
+- :ref:`CVE-2017-12636: Apache CouchDB Remote Code Execution <cve/2017-12636>`
+- :ref:`CVE-2017-12635: Apache CouchDB Remote Privilege Escalation <cve/2017-12635>`
+
+Rather than waiting for new vulnerabilities to be discovered, and fixing them
+as they come up, the CouchDB development team decided to make changes to avoid
+this entire class of vulnerabilities.
+
+With CouchDB version 2.3.0, CouchDB no longer can configure key components at
+runtime. While some flexibility is needed for speciality configurations of
+CouchDB, the configuration was changed from being available at runtime to
+start-up time. And as such now requires shell access to the CouchDB server.
+
+This closes all future paths for vulnerabilities of this type.
+
+Mitigation
+==========
+
+All users should upgrade to CouchDB :ref:`2.3.0 <release/2.3.0>`.
+
+Upgrades from previous 2.x versions in the same series should be
+seamless.
+
+Users on earlier versions should consult with upgrade notes.
+
+Credit
+======
+
+This issue was discovered by the Apple Information Security team.

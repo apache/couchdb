@@ -1,0 +1,65 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2022-24706:
+
+===========================================================
+CVE-2022-24706: Apache CouchDB Remote Privilege Escalation
+===========================================================
+
+:Date: 25.04.2022
+
+:Affected: 3.2.1 and below
+
+:Severity: Critical
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+An attacker can access an improperly secured default installation without
+authenticating and gain admin privileges.
+
+1. CouchDB opens a random network port, bound to all available interfaces
+   in anticipation of clustered operation and/or runtime introspection. A
+   utility process called `epmd` advertises that random port to the network.
+   `epmd` itself listens on a fixed port.
+2. CouchDB packaging previously chose a default `cookie` value for single-node
+   as well as clustered installations. That cookie authenticates any
+   communication between Erlang nodes.
+
+The `CouchDB documentation has always made recommendations`_ for properly securing
+an installation, but not all users follow the advice.
+
+We recommend a firewall in front of all CouchDB installations. The full CouchDB api
+is available on registered port `5984` and this is the only port that needs to be
+exposed for a single-node install. Installations that do not expose the separate
+distribution port to external access are not vulnerable.
+
+Mitigation
+==========
+
+CouchDB :ref:`3.2.2 <release/3.2.2>` and onwards will refuse to start with
+the former default erlang cookie value of `monster`. Installations that
+upgrade to this versions are forced to choose a different value.
+
+In addition, all binary packages have been updated to bind `epmd` as well
+as the CouchDB distribution port to `127.0.0.1` and/or `::1` respectively.
+
+Credit
+======
+
+This issue was identified by `Alex Vandiver`_.
+
+.. _Alex Vandiver: mailto:alexmv@zulip.com
+.. _CouchDB documentation has always made recommendations: https://docs.couchdb.org/en/stable/setup/cluster.html

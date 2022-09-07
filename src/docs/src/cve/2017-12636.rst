@@ -1,0 +1,54 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2017-12636:
+
+====================================================
+CVE-2017-12636: Apache CouchDB Remote Code Execution
+====================================================
+
+:Date: 14.11.2017
+
+:Affected: All Versions of Apache CouchDB
+
+:Severity: Critical
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+CouchDB administrative users can configure the database server via HTTP(S). Some
+of the configuration options include paths for operating system-level binaries
+that are subsequently launched by CouchDB. This allows a CouchDB admin user to
+execute arbitrary shell commands as the CouchDB user, including downloading
+and executing scripts from the public internet.
+
+Mitigation
+==========
+
+All users should upgrade to CouchDB :ref:`1.7.1 <release/1.7.1>` or
+:ref:`2.1.1 <release/2.1.1>`.
+
+Upgrades from previous 1.x and 2.x versions in the same series should be
+seamless.
+
+Users on earlier versions, or users upgrading from 1.x to 2.x should consult
+with upgrade notes.
+
+Credit
+======
+
+This issue was discovered by `Joan Touzet`_ of the CouchDB Security team during
+the investigation of :ref:`CVE-2017-12635 <cve/2017-12635>`.
+
+.. _Joan Touzet: http://www.atypical.net

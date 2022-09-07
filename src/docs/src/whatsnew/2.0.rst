@@ -1,0 +1,151 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/2.0.x:
+
+============
+2.0.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/2.0.0:
+
+Version 2.0.0
+=============
+
+* Native clustering is now supported. Rather than use CouchDB replication
+  between multiple, distinct CouchDB servers, configure a cluster of CouchDB
+  nodes. These nodes will use an optimized Erlang-driven 'internal replication'
+  to ensure data durability and accessibility. Combine a clustered CouchDB with
+  a load balancer (such as ``haproxy``) to scale CouchDB out horizontally. More
+  details of the clustering feature are available in the :ref:`cluster`.
+* `Futon` replaced by brand-new, completely re-engineered `Fauxton` interface.
+  URL remains the same.
+* The new Mango Query Server provides a simple JSON-based way to perform CouchDB
+  queries without JavaScript or MapReduce. Mango Queries have a similar indexing
+  speed advantage over JavaScript Queries than the Erlang Queries have (2x-10x
+  faster indexing depending on doc size and system configuration). We recommend
+  all new apps start using Mango as a default. Further details are available
+  in the :ref:`_find, _index and _explain API <api/db/_find>`.
+* Mango :ref:`selectors <changes/filter/selector>` can be used in _changes
+  feeds instead of JavaScript MapReduce filters. Mango has been tested to be
+  up to an order of magnitude (10x) faster than JavaScript in this application.
+* :ref:`Rewrite rules <api/ddoc/rewrite>` for URLs can be performed using
+  JavaScript functions.
+* :ref:`Multiple queries <api/ddoc/view/multiple_queries>` can be made of a
+  view with a single HTTP request.
+* Views can be queried with sorting turned off ( ``sorted=false``) for a
+  performance boost.
+* The global changes feed has been enhanced. It is now resumable and persistent.
+* New endpoints added (documentation forthcoming):
+
+  * :ref:`api/server/membership` shows all nodes in a cluster
+  * ``/_bulk_get`` speeds up the replication protocol over low-latency
+    connections
+  * ``/_node/`` api to access individual nodes' configuration and compaction
+    features
+  * ``/_cluster_setup`` api to set up a cluster from scratch.
+  * ``/_up`` api to signal health of a node to a load-balancer
+  * ``/db/_local_docs`` and ``/db/_design_docs`` (similar to ``/db/_all_docs``)
+
+* The ``/_log`` endpoint was removed.
+* "Backend" interface on port 5986 used for specific cluster admin tasks. Of
+  interest are the ``_nodes`` and ``_dbs`` databases visible only through this
+  interface.
+* Support added for Erlang/OTP 17.x, 18.x and 19
+* New streamlined build system written for Unix-like systems and Microsoft
+  Windows
+* :ref:`Configuration <api/config>` has moved from ``/_config`` to
+  ``/_node/{node-name}/_config``
+* ``instance_start_time`` now always reports ``"0"``.
+
+.. _release/2.0.x/upgrade:
+
+Upgrade Notes
+=============
+
+* The update sequences returned by the :ref:`api/db/changes` feed are no longer
+  integers. They can be any JSON value. Applications should treat them as opaque
+  values and return them to CouchDB as-is.
+* Temporary views are no longer supported.
+* It is possible to have multiple replicator databases.
+  ``replicator/db`` config option has been removed.
+  Instead ``_replicator`` and any database names ending
+  with the ``/_replicator`` suffix will be recognized as
+  replicator databases by the system.
+* Note that the semantics of some API calls have changed due to the introduction
+  of the clustering feature. Specifically, make note of the difference between
+  receiving a ``201`` and a ``202`` when storing a document.
+* ``all_or_nothing`` is no longer supported by the :ref:`bulk_docs
+  <api/db/bulk_docs>` API
+* After updating a design document containing a ``show``, an immediate GET to
+  that same ``show`` function may still return results from the previous
+  definition. This is due to design document caching, which may take a few
+  seconds to fully evict, or longer (up to ~30s) for a clustered installation.
+
+.. _release/2.0.x/knownissues:
+
+Known Issues
+============
+
+All `known issues`_ filed against the 2.0 release are contained within the
+official `CouchDB JIRA instance` or `CouchDB GitHub Issues`.
+
+The following are some highlights of known issues for which fixes did not land
+in time for the 2.0.0 release:
+
+* :issue:`2980`: The replicator (whether invoked via ``_replicate`` or a
+  document stored in the ``_replicator`` database) understands two kinds of
+  source and target:
+
+  #. A URL (e.g., ``https://foo:bar@foo.com/db1``), called a "remote" source or
+     target
+  #. A database name (e.g., ``db1``), called a "local" source or target.
+
+  Whenever the latter type is used, this refers to a local unclustered
+  database, not a clustered one.
+
+  In a future release we hope to support "local" source or target specs to
+  clustered databases. For now, we recommend always using the URL format for
+  both source and target specifications.
+* :issue:`3034`: CouchDB will occasionally return 500 errors when multiple
+  clients attempt to PUT or DELETE the same database concurrently.
+* :issue:`3119`: Adding nodes to a cluster fails if the Erlang node name
+  is not ``couchdb`` (of the form ``couchdb@hostname``.)
+* :issue:`3050`: Occasionally the ``dev/run`` script used for development
+  purposes to start a local 3-node cluster will fail to start one or more
+  nodes.
+* :issue:`2817`: The compaction daemon will only compact views for shards
+  that contain the design document.
+* :issue:`2804`: The fast_view optimization is not enabled on the clustered
+  interface.
+* :ghissue:`656`: The OAuth 1.0 support is broken and deprecated. It will be
+  removed in a future version of CouchDB.
+
+.. _known issues: https://s.apache.org/couchdb-2.0-known-issues
+.. _CouchDB JIRA instance: https://issues.apache.org/jira/browse/COUCHDB
+.. _CouchDB GitHub Issues: https://github.com/apache/couchdb/issues
+
+.. _release/2.0.x/breakingchanges:
+
+Breaking Changes
+================
+
+The following changes in 2.0 represent a significant deviation from
+CouchDB 1.x and may alter behaviour of systems designed to work with
+older versions of CouchDB:
+
+* :ghissue:`620`: ``POST /dbname`` no longer returns an ETag response header,
+  in compliance with RFC 7231, Section 7.2.

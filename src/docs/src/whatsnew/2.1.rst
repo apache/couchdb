@@ -1,0 +1,454 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/2.1.x:
+
+============
+2.1.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/2.1.x/upgrade:
+
+Upgrade Notes
+=============
+
+* When upgrading from 2.x to 2.1.1, if you have not customized your
+  node name in ``vm.args``, be sure to retain your original ``vm.args``
+  file. The default node name has changed from ``couchdb@localhost`` to
+  ``couchdb@127.0.0.1``, which can prevent CouchDB from accessing existing
+  databases on the system. You may also change the name option back to the
+  old value by setting ``-name couchdb@localhost`` in ``etc/vm.args`` by
+  hand. The default has changed to meet new guidelines and to provide
+  additional functionality in the future.
+
+  If you receive errors in the logfile, such as
+  ``internal_server_error : No DB shards could be opened.`` or in Fauxton,
+  such as ``This database failed to load.`` you need to make this change.
+
+* The deprecated (and broken) OAuth 1.0 implementation has been removed.
+
+* If user code reads or manipulates replicator document states,
+  consider using the ``[replicator] update_docs = true`` compatibility
+  parameter. In that case the replicator will continue updating documents
+  with transient replication states. However, that will incur a
+  performance cost. Consider instead using the ``_scheduler/docs`` HTTP
+  endpoint.
+
+* The ``stale`` parameter for views and ``_find`` has been deprecated in favour
+  of two new parameters: ``stable`` and ``update``. The old ``stale=ok``
+  behaviour is equivalent to ``stable=true&update=false``, and the old
+  ``stale=update_after`` behaviour is equivalent to ``stable=true&update=lazy``.
+  The deprecated ``stale`` parameter will be removed in CouchDB 3.0.
+
+* The new :``httpd/max_http_request_size`` configuration parameter
+  was added. This has the same behavior as the old
+  :config:option:`couchdb/max_document_size` configuration parameter, which
+  had been unfortunately misnamed, and has now been updated to behave as the
+  name would suggest. Both are documented in the shipped ``default.ini`` file.
+
+  Note that the default for this new parameter is 64MB instead of 4GB. If you
+  get errors when trying to PUT or POST and see HTTP 413 return codes in couchdb
+  logs, this could be the culprit. This can affect couchup in-place upgrades as
+  well.
+
+* :ghissue:`914`: Certain critical config sections are blacklisted from being
+  modified through the HTTP API. These sections can still be modified through
+  the standard ``local.ini`` or ``local.d/*.ini`` files.
+
+* :ghissue:`916`: ``couchjs`` now disables ``eval()`` and the ``Function()``
+  constructor by default. To restore the original behaviour, add the
+  ``--eval`` flag to the definition of the javascript query server in your
+  ``local.ini`` file.
+
+.. _release/2.1.2:
+
+Version 2.1.2
+=============
+
+Security
+--------
+* :ref:`CVE 2018-8007 <cve/2018-8007>`
+
+.. _release/2.1.1:
+
+Version 2.1.1
+=============
+
+Security
+--------
+* :ref:`CVE 2017-12635 <cve/2017-12635>`
+* :ref:`CVE 2017-12636 <cve/2017-12636>`
+
+General
+-------
+
+* :ghissue:`617`: CouchDB now supports compilation and running under Erlang/OTP
+  20.x.
+
+* :ghissue:`756`: The ``couch_peruser`` functionality is now *really* fixed.
+  Really.
+
+* :ghissue:`827`: The cookie domain for AuthSession cookies, used in a
+  proxy authentication configuration, can now be customized via the ini file.
+
+* :ghissue:`858`: It is now possible to modify shard maps for system databases.
+
+* :ghissue:`732`: Due to an Erlang bug (ERL-343_), invalid paths can be
+  returned if volumes are mounted containing whitespace in their name. This
+  problem surfaced primarily on macOS (Time Machine volumes). CouchDB now
+  works around this bug in unpatched versions of Erlang by skipping the free
+  space check performed by the compaction daemon. Erlang itself will
+  correctly perform free space checks in version 21.0.
+
+* :ghissue:`824`: The current node's local interface can now be accessed at
+  ``/_node/_local/{endpoint}`` as well as at
+  ``/_node/<nodename>@<hostname>/{endpoint}``.
+
+* The Dockerfile in the source repository has been retired. For a current
+  Dockerfile, see the `couchdb-docker repository`.
+
+* Fauxton now uses a version of React with a BSD license.
+
+.. _ERL-343: https://bugs.erlang.org/browse/ERL-343
+.. _couchdb-docker repository: https://github.com/apache/couchdb-docker
+
+Performance
+-----------
+
+* :ghissue:`835`: CouchDB now no longer decompresses documents just to
+  determine their uncompressed size. In tests, this has lead to improvements
+  between 10-40% in both CPU and wall-clock time for database compaction.
+
+* The design document cache (``ddoc_cache``) has been rewritten to improve
+  performance.
+
+Mango
+-----
+
+* :ghissue:`808`: Mango now supports
+  :ref:`partial indexes <find/partial_indexes>`. Partial indexes allow
+  documents to be filtered at indexing time, potentially offering
+  significant performance improvements for query selectors that don't map
+  cleanly to a range query on an index.
+
+* :ghissue:`740`: Mango queries can now be paginated. Each query response
+  includes a bookmark.  The bookmark can be provided on a subsequent query to
+  continue from a specific key.
+
+* :ghissue:`768`: Mango ``_find`` accepts an ``execution_stats``
+  parameter. If present, a new object is included in the response which
+  contains information about the query executed. The object contains the
+  count of total keys examined (0 for json indexes), total documents
+  examined (when ``include_docs=true`` is used), and the total quorum
+  documents examined (when fabric doc lookups are used).
+
+* :ghissue:`816` and :ghissue:`866`: Mango now requires that all of the fields
+  in a candidate index must exist in a query's selector. Previously, this check
+  was incorrect, and indexes that might only contain a subset of valid
+  documents might be selected by the query planner if no explicit index was
+  specified at query time. Further, if a sort field is specified at query time,
+  that field needs to exist (but could be null) in the results returned.
+
+Other
+-----
+
+The 2.1.1 release also includes the following minor improvements:
+
+  * :ghissue:`635`: Stop couch_index processes on ddoc update
+  * :ghissue:`721`: Save migrated replicator checkpoint documents immediately
+  * :ghissue:`688`: Reuse http-based replication checkpoints when upgrading
+    to https
+  * :ghissue:`729`: Recommend the use only of ``-name`` and not ``-sname`` in
+    `vm.args` for compatibility.
+  * :ghissue:`738`: Allow replicator application to always update replicator
+    docs.
+  * :ghissue:`605`: Add ``Prefer: return=minimal`` header options from
+    RFC7240 to reduce the number of headers in the response.
+  * :ghissue:`744`: Allow a 503 response to be returned to clients (with
+    metric support)
+  * :ghissue:`746`: Log additional information on crashes from rexi
+  * :ghissue:`752`: Allow Mango $in queries without requiring the index to
+    use an array
+  * (multiple) Additional debugging utilities have been added.
+  * (multiple) Hot code upgrades from 2.0 -> 2.1.1 are now possible.
+  * (multiple) Improvements to the test suite have been made.
+  * :ghissue:`765`: Mango ``_explain`` now includes view parameters as requested
+    by the user.
+  * :ghissue:`653`: `_show` and `_list` should now work for admin-only
+    databases such as ``_users``.
+  * :ghissue:`807`: Mango index selection should occur only once.
+  * :ghissue:`804`: Unhandled Mango errors are now logged.
+  * :ghissue:`659`: Improve accuracy of the ``max_document_size`` check.
+  * :ghissue:`817`: Invalid Base64 in inline attachments is now caught.
+  * :ghissue:`825`: Replication IDs no longer need to be URL encoded when
+    using the ``_scheduler/jobs/<job_id>`` endpoint.
+  * :ghissue:`838`: Do not buffer rexi messages to disconnected nodes.
+  * :ghissue:`830`: The stats collection interval is now configurable in
+    an ini file, not in the application context. The default value is 10,
+    and the setting is reloaded every 600 seconds.
+  * :ghissue:`812`: The ``/{db}`` endpoint now includes a ``cluster`` block
+    with the database's ``q``, ``n``, and default ``w`` and ``r`` values.
+    This supplements the existing ``/{db}/_shards`` and ``/{db}/_shards/{id}``
+    detailed information on sharding and quorum.
+  * :ghissue:`810`: The replicator scheduler crashed counter gauge more
+    reliably detects replication crashes by reducing the default number
+    of retries from 10 to 5 (reducing the duration from 4 mins to 8 secs).
+  * :issue:`3288`: Tolerate mixed clusters for the upcoming pluggable
+    storage engine work.
+  * :ghissue:`839`: Mango python tests now support Python 3 as well as 2.
+  * :ghissue:`845`: A convenience ``remsh`` script has been added to support
+    live debugging of running systems.
+  * :ghissue:`846`: Replicator logging is now less verbose and more informative
+    when replication terminates unexpectedly.
+  * :ghissue:`797`: Reduce overflow errors are now returned to the client,
+    allowing views with a single bad reduce to build while not exhausting the
+    server's RAM usage.
+  * :ghissue:`881`: Mango now allows match on documents where the indexed
+    value is an object if a range query is issued. Previously, query results
+    might change in the presence of an index, and operators/selectors which
+    explicitly depend on a full index scan (such as ``$exists``) would not
+    return a complete result set.
+  * :ghissue:`883`: Erlang time module compatibility has been improved for
+    releases of Erlang newer than 18.0.
+  * :ghissue:`933`: 410 is now returned when attempting to make a temporary
+    view request.
+  * :ghissue:`934`: The replicator now has a configurable delay before
+    retrying to retrieve a document after receiving a ``missing_doc`` error.
+  * :ghissue:`936`: jiffy now deduplicates JSON keys.
+
+.. _release/2.1.0:
+
+Version 2.1.0
+=============
+
+* The Mango ``_find`` endpoint supports a new combination operator,
+  ``$allMatch``, which matches and returns all documents that contain an
+  array field with all its elements matching all the specified query
+  criteria.
+
+* New scheduling replicator. The core of the new replicator is a
+  scheduler which allows running a large number of replication
+  jobs by switching between them, stopping some and starting others
+  periodically. Jobs which fail are backed off exponentially. There is
+  also an improved inspection and querying API: ``_scheduler/jobs`` and
+  ``_scheduler/docs``:
+
+  * ``_scheduler/jobs`` : This endpoint shows active replication
+    jobs. These are jobs managed by the scheduler. Some of them might
+    be running, some might be waiting to run, or backed off
+    (penalized) because they crashed too many times. Semantically this
+    is somewhat equivalent to ``_active_tasks`` but focuses only on
+    replications. Jobs which have completed or which were never
+    created because of malformed replication documents will not be
+    shown here as they are not managed by the scheduler.
+    ``_replicate`` replications, started form _replicate endpoint not
+    from a document in a ``_replicator`` db, will also show up here.
+
+  * ``_scheduler/docs`` : This endpoint is an improvement on having to go
+    back and read replication documents to query their state. It
+    represents the state of all the replications started from
+    documents in _replicator db. Unlike ``_scheduler/jobs`` it will also
+    show jobs which have failed or have completed.
+
+  By default, scheduling replicator will not update documents with
+  transient states like ``triggered`` or ``error`` anymore, instead
+  ``_scheduler/docs`` API should be used to query replication document
+  states.
+
+Other scheduling replicator improvements
+-----------------------------------------
+
+  * Network resource usage and performance was improved by
+    implementing a shared connection pool. This should help in cases
+    of a large number of connections to the same sources or
+    target. Previously connection pools were shared only within a
+    single replication job.
+
+  * Improved request rate limit handling. Replicator requests will
+    auto-discover rate limit capacity on targets and sources based on
+    a proven Additive Increase / Multiplicative Decrease feedback
+    control algorithm.
+
+  * Improved performance by having exponential backoff for all
+    replication jobs failures.  Previously there were some scenarios
+    were failure led to continuous repeated retries, consuming CPU and
+    disk resources in the process.
+
+  * Improved recovery from long but temporary network
+    failure. Currently if replications jobs fail to start 10 times in
+    a row, they will not be retried anymore. This is sometimes
+    desirable, but in some cases, for example, after a sustained DNS
+    failure which eventually recovers, replications reach their retry
+    limit, stop retrying and never recover. Previously it required
+    user intervention to continue. Scheduling replicator will never
+    give up retrying a valid scheduled replication job and so it
+    should recover automatically.
+
+  * Better handling of filtered replications. Failing user filter code
+    fetches from the source will not block replicator manager and
+    stall other replications. Failing filter fetches will also be
+    backed off exponentially. Another improvement is when filter code
+    changes on the source, a running replication will detect that and
+    restart itself with a new replication ID automatically.
+
+The 2.1.0 release also includes the following minor improvements:
+
+  * :issue:`1946`: Hibernate couch_stream after each write (up to 70% reduction
+    in memory usage during replication of DBs with large attachments)
+  * :issue:`2964`: Investigate switching replicator manager change feeds to
+    using "normal" instead of "longpoll"
+  * :issue:`2988`: (mango) Allow query selector as changes and replication
+    filter
+  * :issue:`2992`: Add additional support for document size
+  * :issue:`3046`: Improve reduce function overflow protection
+  * :issue:`3061`: Use vectored reads to search for buried headers in .couch
+    files. "On a modern linux system with SSD, we see improvements up to 15x."
+  * :issue:`3063`: "stale=ok" option replaced with new "stable" and "update"
+    options.
+  * :issue:`3180`: Add features list in the welcome message
+  * :issue:`3203`: Make auth handlers configurable (in ini files)
+  * :issue:`3234`: Track open shard timeouts with a counter instead of logging
+  * :issue:`3242`: Make get view group info timeout in couch_indexer
+    configurable
+  * :issue:`3249`: Add config to disable index all fields (text indexes)
+  * :issue:`3251`: Remove hot loop usage of filename:rootname/1
+  * :issue:`3284`: 8Kb read-ahead in couch_file causes extra IO and binary
+    memory usage
+  * :issue:`3298`: Optimize writing btree nodes
+  * :issue:`3302`: (Improve) Attachment replication over low bandwidth network
+    connections
+  * :issue:`3307`: Limit calls to maybe_add_sys_db_callbacks to once per db
+    open
+  * :issue:`3318`: bypass couch_httpd_vhost if there are none
+  * :issue:`3323`: Idle dbs cause excessive overhead
+  * :issue:`3324`: Introduce couch_replicator_scheduler
+  * :issue:`3337`: End-point _local_docs doesn't conform to query params of
+    _all_docs
+  * :issue:`3358`: (mango) Use efficient set storage for field names
+  * :issue:`3425`: Make _doc_ids _changes filter fast-path limit configurable
+  * :ghissue:`457`: TeX/LaTeX/texinfo removed from default docs build chain
+  * :ghissue:`469`: (mango) Choose index based on fields match
+  * :ghissue:`483`: couchup database migration tool
+  * :ghissue:`582`: Add X-Frame-Options support to help protect against
+    clickjacking
+  * :ghissue:`593`: Allow bind address of 127.0.0.1 in ``_cluster_setup`` for
+    single nodes
+  * :ghissue:`624`: Enable compaction daemon by default
+  * :ghissue:`626`: Allow enable node decom using string "true"
+  * (mango) Configurable default limit, defaults to 25.
+  * (mango) _design documents ignored when querying _all_docs
+  * (mango) add $allMatch selector
+  * Add local.d/default.d directories by default and document
+  * Improved INSTALL.* text files
+
+.. _release/2.1.x/fixes:
+
+Fixed Issues
+============
+
+The 2.1.0 release includes fixes for the following issues:
+
+* :issue:`1447`: X-Couch-Update-NewRev header is missed if custom headers are
+  specified in response of _update handler (missed in 2.0 merge)
+* :issue:`2731`: Authentication DB was not considered a system DB
+* :issue:`3010`: (Superseded fix for replication exponential backoff)
+* :issue:`3090`: Error when handling empty "Access-Control-Request-Headers"
+  header
+* :issue:`3100`: Fix documentation on require_valid_user
+* :issue:`3109`: 500 when include_docs=true for linked documents
+* :issue:`3113`: fabric:open_revs can return {ok, []}
+* :issue:`3149`: Exception written to the log if db deleted while there is a
+  change feed running
+* :issue:`3150`: Update all shards with stale=update_after
+* :issue:`3158`: Fix a crash when connection closes for _update
+* :issue:`3162`: Default ssl settings cause a crash
+* :issue:`3164`: Request fails when using
+  _changes?feed=eventsource&heartbeat=30000
+* :issue:`3168`: Replicator doesn't handle well writing documents to a target
+  db which has a small max_document_size
+* :issue:`3173`: Views return corrupt data for text fields containing non-BMP
+  characters
+* :issue:`3174`: max_document_size setting can by bypassed by issuing
+  multipart/related requests
+* :issue:`3178`: Fabric does not send message when filtering lots of documents
+* :issue:`3181`: function_clause error when adding attachment to doc in _users
+  db
+* :issue:`3184`: couch_mrview_compactor:recompact/1 does not handle errors in
+  spawned process
+* :issue:`3193`: fabric:open_revs returns multiple results when one of the
+  shards has stem_interactive_updates=false
+* :issue:`3199`: Replicator VDU function doesn't account for an already
+  malformed document in replicator db
+* :issue:`3202`: (mango) do not allow empty field names
+* :issue:`3220`: Handle timeout in _revs_diff
+* :issue:`3222`: (Fix) HTTP code 500 instead of 400 for invalid key during
+  document creation
+* :issue:`3231`: Allow fixing users' documents (type and roles)
+* :issue:`3232`: user context not passed down in fabric_view_all_docs
+* :issue:`3238`: os_process_limit documentation wrong
+* :issue:`3241`: race condition in couch_server if delete msg for a db is
+  received before open_result msg
+* :issue:`3245`: Make couchjs -S option take effect again
+* :issue:`3252`: Include main-coffee.js in release artifact (broken
+  CoffeeScript view server)
+* :issue:`3255`: Conflicts introduced by recreating docs with attachments
+* :issue:`3259`: Don't trap exits in couch_file
+* :issue:`3264`: POST to _all_docs does not respect conflicts=true
+* :issue:`3269`: view response can 'hang' with filter and limit specified
+* :issue:`3271`: Replications crash with 'kaboom' exit
+* :issue:`3274`: eof in couch_file can be incorrect after error
+* :issue:`3277`: Replication manager crashes when it finds _replicator db
+  shards which are not part of a mem3 db
+* :issue:`3286`: Validation function throwing unexpected json crashes with
+  function_clause
+* :issue:`3289`: handle error clause when calling fabric:open_revs
+* :issue:`3291`: Excessively long document IDs prevent replicator from making
+  progress
+* :issue:`3293`: Allow limiting length of document ID (for CouchDB proper)
+* :issue:`3305`: (mango) don't crash with invalid input to built in reducer
+  function
+* :issue:`3362`: DELETE attachment on non-existing document creates the
+  document, rather than returning 404
+* :issue:`3364`: Don't crash compactor when compacting process fails.
+* :issue:`3367`: Require server admin user for db/_compact and db_view_cleanup
+  endpoints
+* :issue:`3376`: Fix mem3_shards under load
+* :issue:`3378`: Fix mango full text detection
+* :issue:`3379`: Fix couch_auth_cache reinitialization logic
+* :issue:`3400`: Notify couch_index_processes on all shards when ddoc updated
+* :issue:`3402`: race condition in mem3 startup
+* :ghissue:`511`: (mango)  Return false for empty list
+* :ghissue:`595`: Return 409 to PUT attachment with non-existent rev
+* :ghissue:`623`: Ensure replicator _active_tasks entry reports recent pending
+  changes value
+* :ghissue:`627`: Pass UserCtx to fabric's all_docs from mango query
+* :ghissue:`631`: fix couchdb_os_proc_pool eunit timeouts
+* :ghissue:`644`: Make couch_event_sup:stop/1 synchronous
+* :ghissue:`645`: Pass db open options to fabric_view_map for _view and _list
+  queries on _users DB
+* :ghissue:`648`: Fix couch_replicator_changes_reader:process_change
+* :ghissue:`649`: Avoid a race when restarting an index updater
+* :ghissue:`667`: Prevent a terrible race condition
+* :ghissue:`677`: Make replication filter fetch error for _replicate return a
+  404
+* Fix CORS ``max_age`` configuration parameter via Access-Control-Max-Age
+* Chunk missing revisions before attempting to save on target (improves
+  replication for very conflicted, very deep revision tree documents)
+* Allow w parameter for attachments
+* Return "Bad Request" when count in ``/_uuids`` exceeds max
+* Fix crashes when replicator db is deleted
+* Skip internal replication if changes already replicated
+* Fix encoding issues on ``_update/../doc_id`` and PUT attachments

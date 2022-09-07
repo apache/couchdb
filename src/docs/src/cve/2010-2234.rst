@@ -1,0 +1,61 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2010-2234:
+
+===============================================================
+CVE-2010-2234: Apache CouchDB Cross Site Request Forgery Attack
+===============================================================
+
+:Date: 21.02.2010
+
+:Affected: Apache CouchDB 0.8.0 to 0.11.1
+
+:Severity: Important
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+Apache CouchDB versions prior to version :ref:`0.11.1 <release/0.11.1>` are
+vulnerable to `Cross Site Request Forgery`_ (CSRF) attacks.
+
+.. _Cross Site Request Forgery: http://en.wikipedia.org/wiki/Cross-site_request_forgery
+
+Mitigation
+==========
+
+All users should upgrade to CouchDB :ref:`0.11.2 <release/0.11.2>`
+or :ref:`1.0.1 <release/1.0.1>`.
+
+Upgrades from the :ref:`0.11.x <release/0.11.x>` and
+:ref:`0.10.x <release/0.10.x>` series should be seamless.
+
+Users on earlier versions should consult with upgrade notes.
+
+Example
+=======
+
+A malicious website can `POST` arbitrary JavaScript code to well
+known CouchDB installation URLs (like http://localhost:5984/)
+and make the browser execute the injected JavaScript in the
+security context of CouchDB's admin interface Futon.
+
+Unrelated, but in addition the JSONP API has been turned off
+by default to avoid potential information leakage.
+
+Credit
+======
+
+This CSRF issue was discovered by a source that wishes to stay
+anonymous.

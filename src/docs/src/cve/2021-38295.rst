@@ -1,0 +1,58 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2021-38295:
+
+===========================================================
+CVE-2021-38295: Apache CouchDB Privilege Escalation
+===========================================================
+
+:Date: 12.10.2021
+
+:Affected: 3.1.1 and below
+
+:Severity: Low
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+A malicious user with permission to create documents in a database is able
+to attach a HTML attachment to a document. If a CouchDB admin opens that
+attachment in a browser, e.g. via the CouchDB admin interface Fauxton,
+any JavaScript code embedded in that HTML attachment will be executed within
+the security context of that admin. A similar route is available with the
+already deprecated `_show` and `_list` functionality.
+
+This *privilege escalation* vulnerability allows an attacker to add or remove
+data in any database or make configuration changes.
+
+Mitigation
+==========
+
+CouchDB :ref:`3.2.0 <release/3.2.0>`  and onwards adds `Content-Security-Policy`
+headers for all attachment, `_show` and `_list` requests. This breaks certain
+niche use-cases and there are configuration options to restore the previous
+behaviour for those who need it.
+
+CouchDB :ref:`3.1.2 <release/3.1.2>`  defaults to the previous behaviour, but
+adds configuration options to turn `Content-Security-Policy` headers on for
+all affected requests.
+
+Credit
+======
+
+This issue was identified by `Cory Sabol`_ of `Secure Ideas`_.
+
+.. _Secure Ideas: https://secureideas.com/
+.. _Cory Sabol: mailto:cory@secureideas.com
