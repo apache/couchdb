@@ -1,0 +1,147 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/3.1.x:
+
+============
+3.1.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/3.1.2:
+
+Version 3.1.2
+=============
+
+This is a security release for a *low severity* vulnerability. Details of
+the issue will be published one week after this release. See the `CVE
+database <https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-38295>`_
+for details at a later time.
+
+.. _release/3.1.1:
+
+Version 3.1.1
+=============
+
+Features and Enhancements
+-------------------------
+
+.. rst-class:: open
+
+* :ghissue:`3102`, :ghissue:`1600`, :ghissue:`2877`, :ghissue:`2041`: When a
+  client disconnects unexpectedly, CouchDB will no longer log a "``normal :
+  unknown``" error. Bring forth the rainbows.
+
+.. figure:: ../../images/gf-gnome-rainbows.png
+  :align: center
+  :alt: The Gravity Falls gnome pukes some rainbows for us.
+
+* :ghissue:`3109`: Drilldown parameters for text index searches may now be
+  specified as a list of lists, to avoid having to define this redundantly
+  in a single query. (Some languages don't have this facility.)
+
+* :ghissue:`3132`: The new ``[chttpd] buffer_response`` option can be enabled
+  to delay the start of a response until the end has been calculated. This
+  increases memory usage, but simplifies client error handling as it
+  eliminates the possibility that a response may be deliberately
+  terminated midway through, due to a timeout. This config value may be
+  changed at runtime, without impacting any in-flight responses.
+
+Performance
+-----------
+
+Bugfixes
+--------
+
+* :ghissue:`2935`: The replicator now correctly picks jobs to restart during
+  rescheduling, where previously with high load it may have failed to try to
+  restart crashed jobs.
+
+* :ghissue:`2981`: When handling extremely large documents (≥50MB), CouchDB
+  can no longer time out on a ``gen_server:call`` if bypassing the IOQ.
+
+* :ghissue:`2941`: CouchDB will no longer fail to compact databases if it
+  finds files from a 2.x compaction process (prior to an upgrade) on disk.
+
+* :ghissue:`2955` CouchDB now sends the correct CSP header to ensure
+  Fauxton operates correctly with newer browsers.
+
+* :ghissue:`3061`, :ghissue:`3080`: The `couch_index` server won't crash
+  and log errors if a design document is deleted while that index is
+  building, or when a ddoc is added immediately after database creation.
+
+* :ghissue:`3078`: CouchDB now checks for and complains correctly about
+  invalid parameters on database creation.
+
+* :ghissue:`3090`: CouchDB now correctly encodes URLs correctly when
+  encoding the ``atts_since`` query string.
+
+* :ghissue:`2953`: Some parameters not allowed for text-index queries on
+  partitioned database are now properly validated and rejected.
+
+* :ghissue:`3118`: Text-based search indexes may now be cleaned up
+  correctly, even if the design document is now invalid.
+
+* :ghissue:`3121`: ``fips`` is now only reported in the welcome message
+  if FIPS mode was enabled at boot (such as in ``vm.args``).
+
+* :ghissue:`3128`: Using :method:`COPY` to copy a document will no longer
+  return a JSON result with two ``ok`` fields.
+
+* :ghissue:`3138`: Malformed URLs in replication requests or documents
+  will no longer throw an error.
+
+Other
+-----
+
+* JS tests skip faster now.
+
+* More JS tests ported into elixir: ``reader_acl``, ``reduce_builtin``,
+  ``reduce_false``, ``rev_stemming``, ``update_documents``,
+  ``view_collation_raw``, ``view_compaction``, all the
+  ``view_multi_key`` tests, ``view_sandboxing``,
+  ``view_update_seq``.
+
+.. _release/3.1.0:
+
+Version 3.1.0
+=============
+
+Features and Enhancements
+-------------------------
+
+.. rst-class:: open
+
+* :ghissue:`2648`: Authentication via :ref:`JSON Web Token (JWT) <api/auth/jwt>`. Full
+  documentation is at the friendly link.
+
+* :ghissue:`2770`: CouchDB now supports linking against SpiderMonkey 68, the current
+  Mozilla SpiderMonkey ESR release. This provides direct support for packaging on the
+  latest operating system variants, including Ubuntu 20.04 "Focal Fossa."
+
+* A new Fauxton release is included, with updated dependencies, and a new optional
+   CouchDB news page.
+
+Performance
+-----------
+
+.. rst-class:: open
+
+* :ghissue:`2754`: Optimized compactor performance, resulting in a 40% speed improvement
+  when document revisions approach the ``revs_limit``. The fixes also include additional
+  metrics on size tracking during the sort and copy phases, accessible via the
+  :get:`GET /_active_tasks </active_tasks>` endpoint.
+
+* A big bowl of candy! OK, no, not really. If you got this far...thank you for reading.

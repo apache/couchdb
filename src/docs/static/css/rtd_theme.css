@@ -1,0 +1,60 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ * use this file except in compliance with the License. You may obtain a copy of
+ * the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations under
+ * the License.
+ */
+
+@import url("theme.css");
+
+.wy-side-nav-search {
+  background-color: #370000;
+}
+
+.wy-nav-content {
+  background-color: #eee;
+}
+
+.wy-menu h2 {
+  margin: 1em auto 0.3em 0.25em;
+  color: #bbb;
+}
+
+/* -- index page ------------------------------------------------------------ */
+
+table.contentstable {
+    width: 90%;
+}
+
+table.contentstable p.biglink {
+    line-height: 150%;
+}
+
+a.biglink {
+    font-size: 1.3em;
+}
+
+span.linkdescr {
+    font-style: italic;
+    padding-top: 5px;
+    font-size: 90%;
+}
+
+/* https://github.com/rtfd/sphinx_rtd_theme/pull/591/files and
+   https://github.com/rtfd/sphinx_rtd_theme/issues/590 */
+
+.rst-content .section ol li p:last-child,
+.rst-content .section ul li p:last-child {
+    margin-bottom: 24px !important;
+}
+
+ul.simple {
+  margin-bottom: 2ex !important; /* dirty but necessary hack */
+}

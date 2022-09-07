@@ -1,0 +1,263 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/0.9.x:
+
+============
+0.9.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/0.9.x/upgrade:
+
+Upgrade Notes
+=============
+
+Response to Bulk Creation/Updates
+---------------------------------
+
+The response to a bulk creation / update now looks like this
+
+.. code-block:: javascript
+
+    [
+        {"id": "0", "rev": "3682408536"},
+        {"id": "1", "rev": "3206753266"},
+        {"id": "2", "error": "conflict", "reason": "Document update conflict."}
+    ]
+
+Database File Format
+--------------------
+
+The database file format has changed. CouchDB itself does yet not provide any
+tools for migrating your data. In the meantime, you can use third-party scripts
+to deal with the migration, such as the dump/load tools that come with the
+development version (trunk) of `couchdb-python`_.
+
+.. _couchdb-python: http://code.google.com/p/couchdb-python/
+
+Renamed "count" to "limit"
+--------------------------
+
+The view query API has been changed: ``count`` has become ``limit``.
+This is a better description of what the parameter does, and should be a simple
+update in any client code.
+
+Moved View URLs
+---------------
+
+The view URLs have been moved to design document resources. This means that
+paths that used to be like::
+
+    http://hostname:5984/mydb/_view/designname/viewname?limit=10
+
+will now look like::
+
+    http://hostname:5984/mydb/_design/designname/_view/viewname?limit=10.
+
+See the `REST, Hypermedia, and CouchApps`_  thread on dev for details.
+
+.. _REST, Hypermedia, and CouchApps: http://mail-archives.apache.org/mod_mbox/couchdb-dev/200902.mbox/%3Ce282921e0902242116n2cd207c4x7a9d0feced3f10d9@mail.gmail.com%3E
+
+Attachments
+-----------
+
+Names of attachments are no longer allowed to start with an underscore.
+
+Error Codes
+-----------
+
+Some refinements have been made to error handling. CouchDB will send 400 instead
+of 500 on invalid query parameters. Most notably, document update conflicts now
+respond with `409 Conflict` instead of `412 Precondition Failed`. The error code
+for when attempting to create a database that already exists is now 412
+instead of 409.
+
+ini file format
+---------------
+
+CouchDB 0.9 changes sections and configuration variable names in configuration
+files. Old .ini files won't work. Also note that CouchDB now ships with two .ini
+files where 0.8 used couch.ini there are now `default.ini` and `local.ini`.
+`default.ini` contains CouchDB's standard configuration values. local.ini is
+meant for local changes. `local.ini` is not overwritten on CouchDB updates, so
+your edits are safe. In addition, the new runtime configuration system persists
+changes to the configuration in `local.ini`.
+
+.. _release/0.9.2:
+
+Version 0.9.2
+=============
+
+Build and System Integration
+----------------------------
+
+* Remove branch callbacks to allow building couchjs against newer versions of
+  Spidermonkey.
+
+Replication
+-----------
+
+* Fix replication with 0.10 servers initiated by an 0.9 server (:issue:`559`).
+
+.. _release/0.9.1:
+
+Version 0.9.1
+=============
+
+Build and System Integration
+----------------------------
+
+* PID file directory is now created by the SysV/BSD daemon scripts.
+* Fixed the environment variables shown by the configure script.
+* Fixed the build instructions shown by the configure script.
+* Updated ownership and permission advice in `README` for better security.
+
+Configuration and stats system
+------------------------------
+
+* Corrected missing configuration file error message.
+* Fixed incorrect recording of request time.
+
+Database Core
+-------------
+
+* Document validation for underscore prefixed variables.
+* Made attachment storage less sparse.
+* Fixed problems when a database with delayed commits pending is considered
+  idle, and subject to losing changes when shutdown. (:issue:`334`)
+
+External Handlers
+-----------------
+
+* Fix POST requests.
+
+Futon
+-----
+
+* Redirect when loading a deleted view URI from the cookie.
+
+HTTP Interface
+--------------
+
+* Attachment requests respect the "rev" query-string parameter.
+
+JavaScript View Server
+----------------------
+
+* Useful JavaScript Error messages.
+
+Replication
+-----------
+
+* Added support for Unicode characters transmitted as UTF-16 surrogate pairs.
+* URL-encode attachment names when necessary.
+* Pull specific revisions of an attachment, instead of just the latest one.
+* Work around a rare chunk-merging problem in ibrowse.
+* Work with documents containing Unicode characters outside the Basic
+  Multilingual Plane.
+
+.. _release/0.9.0:
+
+Version 0.9.0
+=============
+
+Build and System Integration
+----------------------------
+
+* The `couchdb` script now supports system chainable configuration files.
+* The Mac OS X daemon script now redirects STDOUT and STDERR like SysV/BSD.
+* The build and system integration have been improved for portability.
+* Added COUCHDB_OPTIONS to etc/default/couchdb file.
+* Remove COUCHDB_INI_FILE and COUCHDB_PID_FILE from etc/default/couchdb file.
+* Updated `configure.ac` to manually link `libm` for portability.
+* Updated `configure.ac` to extended default library paths.
+* Removed inets configuration files.
+* Added command line test runner.
+* Created dev target for make.
+
+Configuration and stats system
+------------------------------
+
+* Separate default and local configuration files.
+* HTTP interface for configuration changes.
+* Statistics framework with HTTP query API.
+
+Database Core
+-------------
+
+* Faster B-tree implementation.
+* Changed internal JSON term format.
+* Improvements to Erlang VM interactions under heavy load.
+* User context and administrator role.
+* Update validations with design document validation functions.
+* Document purge functionality.
+* Ref-counting for database file handles.
+
+Design Document Resource Paths
+------------------------------
+
+* Added httpd_design_handlers config section.
+* Moved _view to httpd_design_handlers.
+* Added ability to render documents as non-JSON content-types with _show and
+  _list functions, which are also httpd_design_handlers.
+
+Futon Utility Client
+--------------------
+
+* Added pagination to the database listing page.
+* Implemented attachment uploading from the document page.
+* Added page that shows the current configuration, and allows modification of
+  option values.
+* Added a JSON "source view" for document display.
+* JSON data in view rows is now syntax highlighted.
+* Removed the use of an iframe for better integration with browser history and
+  bookmarking.
+* Full database listing in the sidebar has been replaced by a short list of
+  recent databases.
+* The view editor now allows selection of the view language if there is more
+  than one configured.
+* Added links to go to the raw view or document URI.
+* Added status page to display currently running tasks in CouchDB.
+* JavaScript test suite split into multiple files.
+* Pagination for reduce views.
+
+HTTP Interface
+--------------
+
+* Added client side UUIDs for idempotent document creation
+* HTTP COPY for documents
+* Streaming of chunked attachment PUTs to disk
+* Remove negative count feature
+* Add include_docs option for view queries
+* Add multi-key view post for views
+* Query parameter validation
+* Use stale=ok to request potentially cached view index
+* External query handler module for full-text or other indexers.
+* Etags for attachments, views, shows and lists
+* Show and list functions for rendering documents and views as developer
+  controlled content-types.
+* Attachment names may use slashes to allow uploading of nested directories
+  (useful for static web hosting).
+* Option for a view to run over design documents.
+* Added newline to JSON responses. Closes bike-shed.
+
+Replication
+-----------
+
+* Using ibrowse.
+* Checkpoint replications so failures are less expensive.
+* Automatically retry of failed replications.
+* Stream attachments in pull-replication.

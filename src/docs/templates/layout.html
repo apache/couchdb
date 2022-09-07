@@ -1,0 +1,55 @@
+<!--
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+-->
+
+{%- extends "!layout.html" %}
+{% block menu %}
+<h2>Table of Contents</h2>
+{{ super() }}
+<h2>Quick Reference Guides</h2>
+<ul>
+<li><a href="{{ pathto('http-api') }}">API Quick Reference</a></li>
+<li><a href="{{ pathto('config-ref') }}">Configuration Quick Reference</a></li>
+</ul>
+
+{% if local %}
+<h2>Local Links</h2>
+<ul>
+<li><a href="../">Fauxton</a></li>
+</ul>
+{% endif %}
+
+<h2>More Help</h2>
+<ul>
+<li><a href="https://couchdb.apache.org/"{% if not local %} onclick="_gaq.push(['_link', 'https://couchdb.apache.org/']); return false;"{% endif %}>CouchDB Homepage</a></li>
+<li><a href="https://couchdb.apache.org/#mailing-list"{% if not local %} onclick="_gaq.push(['_link', 'https://couchdb.apache.org/#mailing-list']); return false;"{% endif %}>Mailing Lists</a></li>
+<li><a href="https://couchdb.apache.org/#chat">Realtime Chat</a></li>
+<li><a href="https://github.com/apache/couchdb/issues">Issue Tracker</a></li>
+<li><a href="{{ pathto('download') }}">Download Docs</a></li>
+</ul>
+
+{% if not local %}
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', '{{ ga_code }}']);
+  _gaq.push(['_setDomainName', 'couchdb.org']);
+  _gaq.push(['_setAllowLinker', true]);
+  _gaq.push(['_trackPageview']);
+
+  (function() {
+    var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+    ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+  })();
+</script>
+{% endif %}
+{% endblock %}

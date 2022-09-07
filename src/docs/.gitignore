@@ -1,0 +1,11 @@
+ext/*.pyc
+ext/__pycache__/
+build/
+venv
+.venv
+Pipfile
+Pipfile.lock
+.DS_Store
+*~
+*.swp
+*.bak

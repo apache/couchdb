@@ -1,0 +1,117 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/1.7.x:
+
+============
+1.7.x Branch
+============
+
+.. contents::
+   :depth: 1
+   :local:
+
+.. _release/1.7.2:
+
+Version 1.7.2
+=============
+
+Security
+--------
+* :ref:`CVE 2018-8007 <cve/2018-8007>`
+
+.. _release/1.7.1:
+
+Version 1.7.1
+=============
+
+Bug Fix
+-------
+
+- :ghissue:`974`: Fix access to /db/_all_docs for database members.
+
+.. _release/1.7.0:
+
+Version 1.7.0
+=============
+
+Security
+--------
+* :ref:`CVE 2017-12635 <cve/2017-12635>`
+* :ref:`CVE 2017-12636 <cve/2017-12635>`
+
+API Changes
+-----------
+
+- :issue:`1356`: Return username on :http:post:`/_session`.
+- :issue:`1876`: Fix duplicated Content-Type for show/update functions.
+- :issue:`2310`: Implement :http:post:`/{db}/_bulk_get`.
+- :issue:`2375`: :statuscode:`400` returned when invalid revision specified.
+- :issue:`2845`: :statuscode:`400` returned when `revs` is not a list.
+
+Build
+-----
+
+- :issue:`1964`: Replace etap test suite with EUnit.
+- :issue:`2225`: Enforce that shared libraries can be built by the system.
+- :issue:`2761`: Support glibc >= 2.20.
+- :issue:`2747`: Support Erlang 18.
+- :commit:`5b9742c`: Support Erlang 19.
+- :commit:`1545bf4`: Remove broken benchmarks.
+
+Database Core
+-------------
+
+- :issue:`2534`: Improve checks for db admin/member.
+- :issue:`2735`: Duplicate document _ids created under high edit load.
+
+Documentation
+-------------
+
+- :commit:`c3c9588`: Improve documentation of `cacert_file` ssl option.
+- :commit:`3266f23`: Clarify the purpose of tombstones.
+- :commit:`75887d9`: Improve CouchDB Replication Protocol definition.
+- :commit:`3b1dc0f`: Remove mention of `group_level=exact`.
+- :commit:`2a11daa`: Remove mention of "Test Suite" in Futon.
+- :commit:`01c60f1`: Clarify type of key, startkey and endkey params.
+
+Futon
+-----
+
+- :issue:`241`: Support document copying.
+- :issue:`1011`: Run replication filtered by document ids from Futon.
+- :issue:`1275`: Unescape database names in Futon recently used list.
+- :commit:`f18f82a`: Update jquery.ui to 1.10.4 with fixes of potential
+  XSS issues.
+
+HTTP Server
+-----------
+
+- :issue:`2430`: Disable Nagle's algorithm by default.
+- :issue:`2583`: Don't drop connection by the endpoints which doesn't require
+  any payload.
+- :issue:`2673`: Properly escape Location: HTTP header.
+- :issue:`2677`: Wrong Expires header weekday.
+- :issue:`2783`: Bind both to IPv4 and IPv6.
+- :commit:`f30f3dd`: Support for user configurable SSL ciphers.
+
+Query Server
+------------
+
+- :issue:`1447`: Custom response headers from design functions get merged with
+  default ones.
+- :commit:`7779c11`: Upgrade Coffeescript to version 1.10.
+
+jquery.couch.js
+---------------
+
+- :commit:`f9095e7`: Fix document copying.
