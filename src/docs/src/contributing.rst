@@ -24,7 +24,7 @@ If you don't have a GitHub account yet, it is a good time to get one, they are
 free. If you don't want to use GitHub, there are alternate ways to
 contributing back, that we'll cover next time.
 
-Go to https://github.com/apache/couchdb-documentation and click the "fork"
+Go to https://github.com/apache/couchdb and click the "fork"
 button in the top right. This will create a fork of CouchDB in your GitHub
 account. If your account is `username`, your fork lives at
 https://github.com/username/couchdb-documentation. In the header, it tells me my
