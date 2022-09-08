@@ -16,6 +16,7 @@
 
 include version.mk
 
+
 REBAR?=$(shell echo `pwd`/bin/rebar)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
