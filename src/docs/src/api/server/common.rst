@@ -1967,6 +1967,67 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 
     :code 200: Request completed successfully
 
+.. _api/server/versions:
+
+================================
+``/_node/{node-name}/_versions``
+================================
+
+.. http:get:: /_node/{node-name}/_versions
+    :synopsis: Returns system-level server version informations
+
+    The ``_versions`` resource returns a JSON object containing various
+    system-level informations for the running server.
+
+    The literal string ``_local`` serves as an alias for the local node name, so
+    for all stats URLs, ``{node-name}`` may be replaced with ``_local``, to
+    interact with the local node's informations.
+
+    :<header Accept: - :mimetype:`application/json`
+                     - :mimetype:`text/plain`
+    :>header Content-Type: - :mimetype:`application/json`
+    :code 200: Request completed successfully
+
+    **Request**:
+
+    .. code-block:: http
+
+        GET /_node/_local/_versions HTTP/1.1
+        Accept: application/json
+        Host: localhost:5984
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Length: 368
+        Content-Type: application/json
+        Date: Sat, 03 Sep 2022 08:12:12 GMT
+        Server: CouchDB/3.2.2-ea382cf (Erlang OTP/25)
+
+        {
+            "javascript_engine": {
+                "version": "91",
+                "name": "spidermonkey"
+            },
+            "erlang": {
+                "version": "25.0.4",
+                "supported_hashes": [
+                    "sha",
+                    "sha224",
+                    "sha256",
+                ]
+            },
+            "collation_driver": {
+                "name": "libicu",
+                "library_version": "70.1",
+                "collator_version": "153.112",
+                "collation_algorithm_version": "14"
+            }
+        }
+
 .. _api/server/search_analyze:
 
 ==========================================
