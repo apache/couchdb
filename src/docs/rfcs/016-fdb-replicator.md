@@ -21,11 +21,11 @@ CouchDB <= 3.x, replication jobs were mapped to individual cluster nodes and a
 scheduler component would run up to `max_jobs` number of jobs at a time on each
 node. The new design proposes using `couch_jobs`, as described in the
 [Background Jobs
-RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/007-background-jobs.md),
+RFC](https://github.com/apache/couchdb/blob/main/src/docs/rfcs/007-background-jobs.md),
 to have a central, FDB-based queue of replication jobs. `couch_jobs`
 application will manage job scheduling and coordination. The new design also
 proposes using heterogeneous node types as defined in the [Node Types
-RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/013-node-types.md)
+RFC](https://github.com/apache/couchdb/blob/main/src/docs/rfcs/013-node-types.md)
 such that replication jobs will be created only on `api_frontend` nodes and run
 only on `replication` nodes.
 
@@ -58,12 +58,12 @@ changes feed, then stop.
 
 `api_frontend node` : Database node which has the `api_frontend` type set to
 `true` as described in
-[RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/013-node-types.md).
+[RFC](https://github.com/apache/couchdb/blob/main/src/docs/rfcs/013-node-types.md).
 Replication jobs can be only be created on these nodes.
 
 `replication node` : Database node which has the `replication` type set to
 `true` as described in
-[RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/013-node-types.md).
+[RFC](https://github.com/apache/couchdb/blob/main/src/docs/rfcs/013-node-types.md).
 Replication jobs can only be run on these nodes.
 
 `filtered` replications: Replications with a user-defined filter on the source
@@ -369,9 +369,9 @@ traffic sent out only from those nodes.
 
 # References
 
-* [Background Jobs RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/007-background-jobs.md)
+* [Background Jobs RFC](https://github.com/apache/couchdb/blob/main/src/docs/rfcs/007-background-jobs.md)
 
-* [Node Types RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/013-node-types.md)
+* [Node Types RFC](https://github.com/apache/couchdb/blob/main/src/docs/rfcs/013-node-types.md)
 
 * [CouchDB 3.x replicator implementation](https://github.com/apache/couchdb/blob/3.x/src/couch_replicator/README.md)
 

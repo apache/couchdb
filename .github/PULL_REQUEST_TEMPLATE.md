@@ -32,4 +32,4 @@
 - [ ] Code is written and works correctly
 - [ ] Changes are covered by tests
 - [ ] Any new configurable parameters are documented in `rel/overlay/etc/default.ini`
-- [ ] A PR for documentation changes has been made in https://github.com/apache/couchdb-documentation
+- [ ] Documentation changes were made in the `src/docs` folder
