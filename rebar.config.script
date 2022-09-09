@@ -147,9 +147,7 @@ DepDescs = [
 {khash,            "khash",            {tag, "1.1.0"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.8"}},
 
-%% Non-Erlang deps
-{docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   {tag, "3.2.1-1"}, [raw]},
+%% %% Non-Erlang deps
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.2.8"}, [raw]},
 %% Third party deps

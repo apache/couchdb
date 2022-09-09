@@ -1,0 +1,55 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2010-3854:
+
+========================================================
+CVE-2010-3854: Apache CouchDB Cross Site Scripting Issue
+========================================================
+
+:Date: 28.01.2011
+
+:Affected: Apache CouchDB 0.8.0 to 1.0.1
+
+:Severity: Important
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+Apache CouchDB versions prior to version :ref:`1.0.2 <release/1.0.2>` are
+vulnerable to `Cross Site Scripting`_ (XSS) attacks.
+
+.. _Cross Site Scripting: http://en.wikipedia.org/wiki/Cross-site_scripting
+
+Mitigation
+==========
+
+All users should upgrade to CouchDB :ref:`1.0.2 <release/1.0.2>`.
+
+Upgrades from the :ref:`0.11.x <release/0.11.x>` and
+:ref:`0.10.x <release/0.10.x>` series should be seamless.
+
+Users on earlier versions should consult with upgrade notes.
+
+Example
+=======
+
+Due to inadequate validation of request parameters and cookie data in Futon,
+CouchDB's web-based administration UI, a malicious site can execute arbitrary
+code in the context of a user's browsing session.
+
+Credit
+======
+
+This XSS issue was discovered by a source that wishes to stay anonymous.

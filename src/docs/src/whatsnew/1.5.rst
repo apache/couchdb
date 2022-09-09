@@ -1,0 +1,60 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/1.5.x:
+
+============
+1.5.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. warning::
+    :ref:`release/1.5.1` contains important security fixes. Previous `1.5.x`
+    releases are not recommended for regular usage.
+
+.. _release/1.5.1:
+
+Version 1.5.1
+=============
+
+* Add the ``max_count`` option (:ref:`config/uuids`) to allow rate-limiting
+  the amount of UUIDs that can be requested from the :ref:`api/server/uuids`
+  handler in a single request (:ref:`CVE 2014-2668 <cve/2014-2668>`).
+
+.. _release/1.5.0:
+
+Version 1.5.0
+=============
+
+* :issue:`1781`: The official documentation has been overhauled. A lot of
+  content from other sources have been merged, and the index page
+  has been rebuilt to make the docs much more accessible.
+  :commit:`54813a7`
+* A new administration UI, codenamed Fauxton, has been included as an
+  experimental preview. It can be accessed at ``/_utils/fauxton/``. There
+  are too many improvements here to list them all. We are looking for
+  feedback from the community on this preview release.
+* :issue:`1888`: Fixed an issue where admin users would be restricted by
+  the ``public_fields`` feature.
+* Fixed an issue with the JavaScript CLI test runner. :commit:`be76882`,
+  :commit:`54813a7`
+* :issue:`1867`: An experimental plugin feature has been added. See
+  ``src/couch_plugin/README.md`` for details. We invite the community to
+  test and report any findings.
+* :issue:`1894`: An experimental Node.js-based query server runtime
+  has been added. See :ref:`experimental` for details. We invite the
+  community to test and report any findings.
+* :issue:`1901`: Better retry mechanism for transferring attachments
+  during replication. :commit:`4ca2cec`

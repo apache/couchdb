@@ -1,0 +1,336 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/3.2.x:
+
+============
+3.2.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/3.2.2:
+
+Version 3.2.2
+=============
+
+Bugfixes
+---------
+
+* Fix for `CVE-2022-24706 <https://docs.couchdb.org/en/stable/cve/2022-24706.html>`_.
+  This is a security release for a *critical* vulnerability.
+
+* :ghissue:`3963`: Optimize compaction and doc updates for conflicted
+  documents on Erlang versions higher than 21.
+
+* :ghissue:`3852`: Add support for SpiderMonkey 91esr.
+
+.. _release/3.2.1:
+
+Version 3.2.1
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`3746`: ``couch_icu_driver`` collation driver has been
+  removed. ICU collation functionality is consolidated in the single
+  ``couch_ejson_compare`` module. View performance might slightly
+  increase as there are less corner cases when the C collation driver
+  fails and falls back to Erlang.
+
+* :ghissue:`3787`: Update sequences generated from DB info and
+  ``_changes?since=now&limit=0`` now contain shard uuids as part of
+  their internal, opaque, representation. As a result, there should be
+  less chance of experiencing changes feed rewinds with these
+  sequences.
+
+* :ghissue:`3798`: ICU driver and collator algorithm versions are
+  returned in the ``_node/$node/_versions`` result.
+
+* :ghissue:`3801`: Users with the ``_metrics`` role can now read
+  ``_prometheus`` metrics.
+
+Bugfixes
+--------
+
+* :ghissue:`3780`: Avoid changes feed rewinds after shard moves.
+
+* :ghissue:`3779`, :ghissue:`3785`: Prevent deleted view file cleanup
+  from crashing when database is deleted while the cleanup process is
+  running.
+
+* :ghissue:`3789`: Fix ``badarith`` 500 errors when ``[fabric]
+  request_timeout`` is set to ``infinity``.
+
+* :ghissue:`3786`: Fix off-by-one ``limit`` error for
+  ``_all_dbs``. Also, the auto-injected shard ``_dbs`` design doc is
+  removed and replaced with an Erlang module.
+
+* :ghissue:`3788`: Minimize changes feeds rewinds when a node is down.
+
+* :ghissue:`3807`: Enable ``custodian`` application
+  reporting. Previously, ``custodian`` was accidentally left disabled
+  as it used a hard-coded shards db name different than ``_dbs``.
+
+* :ghissue:`3805`: Cluster setup correctly syncs admin passwords and
+  uses the new (since 3.2.0) ``[chttpd_auth]`` config section instead
+  of the previous ``[couch_httpd_auth]`` section.
+
+* :ghissue:`3810`: Local development ``dev/run`` script now uses the
+  ``[chttpd_auth]`` section in ``local.ini`` instead of
+  ``[couch_httpd_auth]``.
+
+* :ghissue:`3773`: Fix reduce view collation results for unicode
+  equivalent keys.
+
+.. _release/3.2.0:
+
+Version 3.2.0
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`3364`: CouchDB's replicator now implements a Fair Share replication
+  scheduler. Rather than using a round-robin scheduling mechanism, this update allows
+  specifying the relative priority of jobs via different ``_replicator`` databases.
+  More information is available in the :ref:`_replicator DB docs <replicator>`.
+
+.. figure:: ../../images/fair-enough.png
+  :align: center
+  :alt: Robert Downey, Jr., thinks that's fair enough for him.
+
+* :ghissue:`3166`: Allow custom JWT claims for roles, via the ``[jwt_auth]
+  roles_claim_name`` config setting.
+
+* :ghissue:`3296`, :ghissue:`3312`: CouchDB now includes ``weatherreport`` and its
+  dependency ``custodian``, a diagnostic app forked from Basho's ``riaknostic`` tool.
+  More documentation is available in the :ref:`Cluster Troubleshooting
+  <cluster/troubleshooting>` section.
+
+* :ghissue:`2911`, :ghissue:`3298`, :ghissue:`3425`: CouchDB now returns the version of
+  SpiderMonkey to administrators in the ``GET /_node/{node-name}/_versions`` response.
+
+* :ghissue:`3303`: CouchDB now treats a ``408`` response received by the replicator
+  similar to any ``5xx`` error (by retrying, as opposed to a permanent error). CouchDB
+  will never return a ``408``, but some reverse proxies in front of CouchDB may return
+  this code.
+
+* :ghissue:`3322`: ``_session`` now accepts gzip encoding.
+
+* :ghissue:`3254`: The new ``$keyMapMatch`` operator allows Mango to query on the keys
+  of a map. It is similar to the ``$elemMatch`` operator, but instead of operating on
+  the elements of array, it operates on the keys of a map.
+
+* :ghissue:`3336`: Developers now have access to a ``.devcontainer`` configuration for
+  the 3.x version of CouchDB, right in the source code repository.
+
+* :ghissue:`3347`: The default maximum attachment size has been reduced from
+  ``infinity`` to 1 GiB.
+
+* :ghissue:`3361`: Compaction process suspension now appears in the ``active_tasks``
+  output, allowing administrators to verify that the ``strict_window`` value is being
+  respected.
+
+* :ghissue:`3378`: The ``[admins]`` section and the ``[replicator] password`` are now
+  redacted from all logs. In addition, :ghissue:`3380` removes user credentials,
+  user documents and design documents from logfiles as much as possible. Further,
+  :ghissue:`3489` no longer logs all of the messages received by a terminated internal
+  Erlang process.
+
+* :ghissue:`3421`, :ghissue:`3500`: CouchDB now supports SpiderMonkey 78 and 86.
+
+* :ghissue:`3422`: CouchDB now supports Erlang/OTP 23 and ``error_logger`` reports
+  for Erlang/OTP >= 21.
+
+* :ghissue:`3566`: CouchDB now also supports Erlang/OTP 24.
+
+* :ghissue:`3571`: CouchDB *no longer supports Erlang/OTP 19*.
+
+* :ghissue:`3643`: Contribute a custom Erlang network protocol to CouchDB,
+  users can specify nodes to use TCP or TLS.
+
+.. figure:: ../../images/TLS-Handshake.png
+  :align: center
+  :alt: The SSL/TLS handshake enables the TLS client and server to establish
+        the secret keys with which they communicate.
+
+* :ghissue:`3472`, :ghissue:`3473`, :ghissue:`3609`: Migrate some config options from
+  ``[httpd]`` to ``[chttpd]``, migrate some from ``[couch_httpd_auth]`` to
+  ``[chttpd_auth]``, and comment all out in the ``default.ini``.
+
+  * Config options moved from ``[httpd]`` to ``[chttpd]``:
+    ``allow_jsonp``, ``changes_timeout``, ``config_whitelist``,
+    ``enable_cors``, ``secure_rewrites``, ``x_forwarded_host``,
+    ``x_forwarded_proto``, ``x_forwarded_ssl``,
+    ``enable_xframe_options``, ``max_http_request_size``.
+
+  * Config options moved from ``[couch_httpd_auth]`` to ``[chttpd_auth]``:
+    ``authentication_redirect``, ``timeout``, ``auth_cache_size``,
+    ``allow_persistent_cookies``, ``iterations``, ``min_iterations``, ``max_iterations``,
+    ``password_scheme``, ``proxy_use_secret``, ``public_fields``, ``secret``,
+    ``users_db_public``, ``x_auth_roles``, ``x_auth_token``, ``x_auth_username``,
+    ``cookie_domain``, ``same_site``
+
+* :ghissue:`3586`: We added a new way of specifying basic auth credentials
+  which can include various characters previously not allowed to be included
+  in the url info part of endpoint urls.
+
+* :ghissue:`3483`: We added a way of specifying requirements for new user passwords
+  using a list of regular expressions.
+
+* :ghissue:`3506`, :ghissue:`3416`, :ghissue:`3377`: CouchDB now provides a Prometheus
+  compatible endpoint at ``GET /_node/{node-name}/_prometheus``. A configuration option
+  allows for scraping via a different port (17986) that does not require authentication,
+  if desired. More information is available at the :ref:`Prometheus API endpoint
+  <api/server/prometheus>` summary.
+
+* :ghissue:`3697`, :issue:`883` (JIRA): As an opt-in policy, CouchDB can now stop
+  encoding the plus sign ``+`` in non-query parts of URLs, in compliance with the
+  original CouchDB standards. The opt-in is via the ``[chttpd] decode_plus_to_space =
+  true`` setting. *In CouchDB 4.x, this is going to be an opt-out policy.*
+
+* :ghissue:`3724`: CouchDB now has new CSP settings for attachments and show/list
+  functions. This deprecates the old ``[csp] enable`` and ``[csp] header_value``
+  settings, replacing them with the new ``[csp] utils_enable`` and ``[csp]
+  utils_header_value`` settings respectively. In addition, new settings for
+  ``attachments_enable``, ``attachments_header_value``, ``showlist_enable`` and
+  ``showlist_header_value`` now are available. Documentation is in the ``default.ini``
+  file.
+
+* :ghissue:`3734`, :ghissue:`3733`: Users with databases that have low ``q`` and ``n``
+  values would often receive the ``No DB shards could be opened`` error when the cluster
+  is overloaded, due to a hard-coded 100ms timeout. CouchDB now calculates a more
+  reasonable timeout, based on the number of shards and the overall maximum fabric
+  request timeout limit, using a geometric series.
+
+Performance
+-----------
+
+* :ghissue:`3337`: Developer nodes now start faster when using the ``dev/run`` script.
+
+* :ghissue:`3366`: The monolithic ``couch_server`` process has been sharded for
+  performance. Previously, as a single ``gen_server``, the process would
+  have a finite throughput that, in busy clusters, is easily breached -- causing a
+  sizeable backlog in the message queue, ultimately leading to failure and errors. No
+  more! The aggregate message queue info is still available in the ``_system`` output.
+  ( :ghissue:`3370` )
+
+* :ghissue:`3208`: CouchDB now uses the latest ibrowse 4.4.2 client for the replicator.
+
+* :ghissue:`3600`, :ghissue:`3047`, :ghissue:`3019`: The default ``slack`` channel for
+  smoosh auto-compaction has been increased to a more reasonable value, reducing load
+  on systems that would have normally been idle in CouchDB 2.x (where no auto-compaction
+  daemon exists).
+
+* :ghissue:`3711`: Changes feeds may no longer rewind after shard moves, assuming the
+  node and range specified by the changes feed nonce can still match an existing node's
+  shard.
+
+Bugfixes
+--------
+
+* Complete retirement of the JavaScript test suite - replaced by Elixir. Hooray!
+* :ghissue:`3165`: Allow configurability of JWT claims that require a value. Also fixes
+  :ghissue:`3232`. Further, :ghissue:`3392` no longer validates claims provided that
+  CouchDB does not require.
+* :ghissue:`3160`, :ghissue:`3161`: The ``run_queue`` statistic now returns valid
+  information even when using Erlang BEAM dirty CPU and IO queues.
+* :ghissue:`3162`: Makefiles updated to include local configs & clean configs when
+  running ``make devclean``.
+* :ghissue:`3195`: The ``max_document_size`` parameter now has a clearer explanation in
+  ``default.ini``.
+* :ghissue:`3207`, :ghissue:`2536`: Improve the ``INSTALL.Unix.md`` file.
+* :ghissue:`3212`: Base and extra headers are properly combined when making replicator
+  requests that contain duplicate headers.
+* :ghissue:`3201`: When using a POST with request body to pass parameters to a view-like
+  request, the boolean parameters are accepting only JSON strings, but not booleans.
+  Now, CouchDB accepts ``true`` and ``false`` for the ``stable`` parameter, in addition
+  to ``"true"`` and ``"false"``.
+  comment in
+* :ghissue:`1988`: Attachment operations ``PUT /db/doc`` and ``POST /db`` now perform
+  consistent attachment name validation.
+* :ghissue:`3249`: Documents with lots of conflicts no longer blow up couchjs if the
+  user calls ``_changes`` with a JS filter and with ``style=all_docs``.
+* :ghissue:`3144`: Respawning compaction jobs to catch up with intervening changes are
+  now handled correctly by the smoosh monitor.
+* :ghissue:`3252`: CouchDB now exports the ``couch_util:json_decode/2`` function to
+  support maps instead of the default data structure.
+* :ghissue:`3255`, :ghissue:`2558`: View files that have incorrect ``db_headers``
+  now reset the index forcing a rebuild.
+* :ghissue:`3271`: Attachments that are stored uncompressed but later replicated to
+  nodes that compress the attachment no longer fail an internal md5 check that would
+  break eventual consistency between nodes.
+* :ghissue:`3277`: ``req_body`` requests that have ``req_body`` set already now
+  properly return the field without parsing.
+* :ghissue:`3279`: Some default headers were missing from some responses in replication,
+  including ``X-CouchDB-Body-Time`` and ``X-Couch-Request-ID``.
+* :ghissue:`3329`, :ghissue:`2962`: CouchDB no longer returns broken couchjs processes
+  to the internal viewserver process pool.
+* :ghissue:`3340`, :ghissue:`1943`: ``PUTs`` of ``multipart/related`` attachments now
+  support a ``Transfer-Encoding`` value of ``chunked``. Hooray!
+* :ghissue:`2858`, :ghissue:`3359`: The cluster setup wizard no longer fails when a
+  request to ``/`` is not made before a request to ``finish_cluster``.
+* :ghissue:`3368`: Changing the ``max_dbs_open`` configuration setting correctly
+  ensures that each new ``couch_server_X`` property receives ``1/num_servers()`` of it.
+* :ghissue:`3373`: Requests to ``{db}/_changes`` with a custom filter no longer result
+  in a fabric request timeout if the request body is not available to additional cluster
+  nodes, resulting in a more descriptive exit message and proper JSON object validation
+  in the payload.
+* :ghissue:`3409`: The internal ``chttpd_external:json_req_obj/2`` function now reads
+  the cached ``peer`` before falling back to a socket read operation.
+* :ghissue:`3335`, :ghissue:`3617`, :ghissue:`3708`: The ``COUCHDB_FAUXTON_DOCROOT``
+  environment variable is now introduced to allow its explicit overriding at startup.
+* :ghissue:`3471`: http clients should no longer receive stacktraces unexpectedly.
+* :ghissue:`3491`: libicu tests no longer fail on older OS releases such as CentOS 6
+  and 7.
+* :ghissue:`3541`: Usernames and passwords can now contain `@` and not break the
+  CouchDB replicator.
+* :ghissue:`3545`: The ``dreyfus_index_manager`` process now supports offheap message
+  queues.
+* :ghissue:`3551`: The replication worker pool now properly cleans up worker processes
+  as they are done via the ``worker_trap_exits = false`` setting.
+* :ghissue:`3633`, :ghissue:`3631`: All code paths for creating databases now fully
+  respect db creation options, including partitioning options.
+* :ghissue:`3424`, :ghissue:`3362`: When using ``latest=true`` and an old revision with
+  conflicting children as rev is specified, CouchDB no longer returns an ``"error":
+  "case_clause"`` response.
+* :ghissue:`3673`: Non-existent attachments now return a ``404`` when the attachment
+  is missing.
+* :ghissue:`3698`: The ``dev/run`` development script now allows clusters where ``n >
+  5``.
+* :ghissue:`3700`: The ``maybe_close`` message is now sent to the correct internal
+  process.
+* :ghissue:`3183`: The smoosh operator guide now recommends to use the ``rpc:multicall``
+  function.
+* :ghissue:`3712`: Including a payload within a ``DELETE`` operation no longer hangs
+  the next request made to the same mochiweb acceptor.
+* :ghissue:`3715`: For clusters with databases where ``n > [cluster] n``, attachments
+  chunks are longer dropped on quorum writes.
+* :ghissue:`3507`: If a file is truncated underneath CouchDB, CouchDB will now log
+  the filename if it finds this situation with a ``file_truncate_error``.
+* :ghissue:`3739`: Shards with large purge sequences no longer fail to split in a
+  shard splitting job.
+* :ghissue:`3754`: Always return views meta info when ``limit=0`` and
+  ``sorted=true``.
+* :ghissue:`3757`: Properly sort ``descending=true`` view results with a ``keys``
+  list.
+* :ghissue:`3763`: Stabilize view row sorting order when they are merged by the
+  coordinator.
+
+Other
+-----
+
+* Donuts for everyone! Er, not really - thank you for reading the 3.2 release notes.

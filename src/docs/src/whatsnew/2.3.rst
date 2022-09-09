@@ -1,0 +1,316 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/2.3.x:
+
+============
+2.3.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/2.3.x/upgrade:
+
+Upgrade Notes
+=============
+
+.. rst-class:: open
+
+* :ghissue:`1602`: To improve security, there have been major changes in the
+  configuration of query servers, SSL support, and HTTP global handlers:
+
+    1. Query servers
+
+    Query servers are NO LONGER DEFINED in the .ini files, and can
+    no longer be altered at run-time.
+
+    The JavaScript and CoffeeScript query servers continue to be enabled
+    by default. Setup differences have been moved from default.ini to
+    the ``couchdb`` and ``couchdb.cmd`` start scripts respectively.
+
+    Additional query servers can now be configured using environment
+    variables:
+
+    .. code-block:: bash
+
+        export COUCHDB_QUERY_SERVER_PYTHON="/path/to/python/query/server.py with args"
+        couchdb
+
+    where the last segment in the environment variable (``_PYTHON``) matches
+    the usual lowercase(!) query language in the design doc
+    ``language`` field (here, ``python``.)
+
+    Multiple query servers can be configured by using more environment
+    variables.
+
+    You can also override the default servers if you need to set command-
+    line options (such as ``couchjs`` stack size):
+
+    .. code-block:: bash
+
+        export COUCHDB_QUERY_SERVER_JAVASCRIPT="/path/to/couchjs /path/to/main.js -S <STACKSIZE>"
+        couchdb
+
+    2. Native Query Servers
+
+    The mango query server continues to be enabled by default. The Erlang
+    query server continues to be disabled by default. This change adds
+    a ``[native_query_servers] enable_erlang_query_server = BOOL`` setting
+    (defaults to ``false``) to enable the Erlang query server.
+
+    If the legacy configuration for enabling the query server is detected,
+    that is counted as a ``true`` setting as well, so existing configurations
+    continue to work just fine.
+
+    3. SSL Support
+
+    Enabling SSL support in the ini file is now easier:
+
+    .. code-block:: bash
+
+        [ssl]
+        enable = true
+
+    If the legacy httpsd configuration is found in your ini file, this will
+    still enable SSL support, so existing configurations do not need to be
+    changed.
+
+    4. HTTP global handlers
+
+    These are no longer defined in the default.ini file, but have been
+    moved to the couch.app context. If you need to customize your handlers,
+    you can modify the app context using a couchdb.config file as usual.
+
+* :ghissue:`1602`: Also to improve security, the deprecated ``os_daemons`` and
+  ``couch_httpd_proxy`` functionality has been completely removed ahead of the planned
+  CouchDB 3.0 release. We recommend the use of OS-level daemons such as runit, sysvinit,
+  systemd, upstart, etc. to launch and maintain OS daemons instead, and the use of
+  a reverse proxy server in front of CouchDB (such as haproxy) to proxy access to other
+  services or domains alongside CouchDB.
+* :ghissue:`1543`: The node-local (default port 5986) ``/_restart`` endpoint has been
+  replaced by the clustered (default port 5984) endpoint ``/_node/$node/_restart`` and
+  ``/_node/_local/_restart`` endpoints. The node-local endpoint has been removed.
+* :ghissue:`1764`: All python scripts shipped with CouchDB, including ``couchup`` and the
+  ``dev/run`` development cluster script, now specify and require Python 3.x.
+* :ghissue:`1396`: CouchDB is now compatible with Erlang 21.x.
+* :ghissue:`1680`: The embedded version of ``rebar`` used to build CouchDB has been
+  updated to the last version of ``rebar2`` available. This assists in building on
+  non-x86 platforms.
+* :ghissue:`1857`: Refuse building with known bad versions of Erlang.
+
+.. _release/2.3.1:
+
+Version 2.3.1
+=============
+
+Features
+--------
+
+.. rst-class:: open
+
+* :ghissue:`1811`: Add new ``/{db}/_sync_shards`` endpoint (admin-only).
+* :ghissue:`1870`: Update to mochiweb 2.19.0. See also :ghissue:`1875`.
+* :ghissue:`1857`: Refuse building with known bad versions of Erlang.
+* :ghissue:`1880`: Compaction: Add snooze_period_ms for finer tuning.
+
+Bugfixes
+--------
+
+.. rst-class:: open
+
+* :ghissue:`1795`: Filter out empty missing_revs results in ``mem3_rep``.
+* :ghissue:`1384`: Fix ``function_clause`` error on invalid DB ``_security`` objects.
+* :ghissue:`1841`: Fix ``end_time`` field in ``/_replicate`` response.
+* :ghissue:`1860`: Fix read repair in a mixed cluster environment.
+* :ghissue:`1862`: Fix ``fabric_open_doc_revs``.
+* :ghissue:`1865`: Support purge requests with more than 100 doc ids.
+* :ghissue:`1867`: Fix timeout in ``chttpd_purge_tests``.
+* :ghissue:`1766`: Add default fabric request timeouts.
+* :ghissue:`1810`: Requests return 400 Bad Request when URL length exceeds 1460
+  characters. See :ghissue:`1870` for details.
+* :ghissue:`1799`: Restrict ``_purge`` to server admin.
+* :ghissue:`1874`: This fixes inability to set keys with regex symbols in them.
+* :ghissue:`1901`: Fix badarg crash on invalid rev for individual doc update.
+* :ghissue:`1897`: Fix ``from_json_obj_validate`` crash when provided rev isn't
+  a valid hex.
+* :ghissue:`1803`: Use the same salt for admin passwords on cluster setup.
+* :ghissue:`1053`: Fix python2 compatibility for ``couchup``.
+* :ghissue:`1905`: Fix python3 compatibility for ``couchup``.
+
+.. _release/2.3.0:
+
+Version 2.3.0
+=============
+
+Features
+--------
+
+.. rst-class:: open
+
+* (Multiple) Clustered purge is now available. This feature restores the CouchDB 1.x
+  ability to completely remove any record of a document from a database. Conditions
+  apply; to use the feature safely, and for full details, read the complete
+  :ref:`cluster/purging` documentation.
+* :ghissue:`1658`: A new config setting is available, allowing an administrator to
+  configure an initial list of nodes that should be contacted when a node boots up.
+  Nodes in the ``seedlist`` that are successfully reached will be added to that node's
+  ``_nodes`` database automatically, triggering a distributed Erlang connection and
+  replication of the internal system databases to the new node. This can be used instead
+  of manual config or the cluster setup wizard to bootstrap a cluster. The progress of
+  the initial seeding of new nodes is exposed at the ``GET /_up`` endpoint.
+* Replication supports ipv6-only peers after updating ibrowse dependency.
+* :ghissue:`1708`: The UUID of the server/cluster is once again exposed in the
+  ``GET /`` response. This was a regression from CouchDB 1.x.
+* :ghissue:`1722`: Stats counts between job runs of the replicator are no longer reset
+  on job restart.
+* :ghissue:`1195`, :ghissue:`1742`: CouchDB's ``_bulk_get`` implementation now supports
+  the ``multipart/mixed`` and ``multipart/related`` content types if requested,
+  extending compatibility with third-party replication clients.
+
+Performance
+-----------
+
+.. rst-class:: open
+
+* :ghissue:`1409`: CouchDB no longer forces the TCP receive buffer to a fixed size
+  of 256KB, allowing the operating system to dynamically adjust the buffer size. This
+  can lead to significantly improved network performance when transferring large
+  attachments.
+* :ghissue:`1423`: Mango selector matching now occurs at the shard level, reducing the
+  network traffic within a cluster for a mango query.
+* :ghissue:`1423`: Long running operations at the node level could exceed the inter-node
+  timeout, leading to a fabric timeout error in the logfile and a cancellation of the
+  task. Nodes can now ping to stop that from happening.
+* :ghissue:`1560`: An optimization to how external data sizes of attachments were
+  recorded was made.
+* :ghissue:`1586`: When cleaning up outdated secondary index files, the search is limited
+  to the index directory of a specific database.
+* :ghissue:`1593`: The ``couch_server`` ETS table now has the ``read_concurrency``
+  option set, improving access to the global list of open database handles.
+* :ghissue:`1593`: Messages to update the least-recently used (LRU) cache are not
+  sent when the ``[couchdb] update_lru_on_read`` setting is disabled.
+* :ghissue:`1625`: All nodes in a cluster now run their own ``rexi`` server.
+
+Bugfixes
+--------
+
+.. rst-class:: open
+
+* :ghissue:`1484`: ``_stats`` now correctly handles the case where a map function emits
+  an array of integers. This bug was introduced in 2.2.0.
+* :ghissue:`1544`: Certain list functions could return a ``render_error`` error
+  intermittently.
+* :ghissue:`1550`: Replicator ``_session`` support was incompatible with CouchDB
+  installations using the ``require_valid_user = true`` setting.
+* :ghissue:`1571`: Under very heavy load, it was possible that ``rexi_server`` could
+  die in such a way that it's never restarted, leaving a cluster without the ability
+  to issue RPC calls - effectively rendering the cluster useless.
+* :ghissue:`1574`: The built-in ``_sum`` reduce function has been improved to check
+  if the objects being summed are not overflowing the view storage. Previously, there
+  was no protection for ``_sum``-introduced overflows.
+* :ghissue:`1582`: Database creation parameters now have improved validation, giving a
+  more readable error on invalid input.
+* :ghissue:`1588`: A missing security check has been restored for the noop
+  ``/db/_ensure_full_commit`` call to restore database validation checks.
+* :ghissue:`1591`: CouchDB now creates missing shard files when accessing a database
+  if necessary. This handles the situation when, on database creation, no nodes were
+  capable of creating any of the shard files required for that database.
+* :ghissue:`1568`: CouchDB now logs a warning if a changes feed is rewound to 0. This
+  can help diagnose problems in busy or malfunctioning clusters.
+* :ghissue:`1596`: It is no longer possible that a busy ``couch_server``, under a
+  specific ordering and timing of events, will incorrectly track ``open_async``
+  messages in its mailbox.
+* :ghissue:`1601`, :ghissue:`1654`: CouchDB now logs better when an error causes it to
+  read past the EOF of a database shard. The check for whether CouchDB is trying to read
+  too many bytes has been correctly separated out from the error indicating it has
+  attempted to read past the EOF.
+* :ghissue:`1613`: Local nodes are now filtered out during read repair operations.
+* :ghissue:`1636`: A memory leak when replicating over HTTPS and a problem occurs
+  has been squashed.
+* :ghissue:`1635`: ``/_replicate`` jobs are no longer restarted if parameters haven't
+  changed.
+* :ghissue:`1612`: JavaScript rewrite functions now send the body of the request to
+  the rewritten endpoint.
+* :ghissue:`1631`: The replicator no longer crashes if the user has placed an
+  invalid VDU function into one of the ``_replicator`` databases.
+* :ghissue:`1644`, :ghissue:`1647`: It is no longer possible to create illegally-named
+  databases within the reserved system space (``_`` prefix.)
+* :ghissue:`1650`: ``_bulk_get`` is once again operational for system databases such
+  as ``_users``.
+* :ghissue:`1652`: Access to ``/_active_tasks`` is once again restricted to server
+  admins only.
+* :ghissue:`1662`: The ``couch_log`` application no longer crashes when new, additional
+  information is supplied by a crashing application, or when any of its own children are
+  restarted.
+* :ghissue:`1666`: Mango could return an error that would crash the
+  ``couch_query_servers`` application. This is no longer the case.
+* :ghissue:`1655`: Configuration of ``ets_lru`` in ``chttpd`` now performs proper error
+  checking of the specified config value.
+* :ghissue:`1667`: The ``snappy`` dependency has been updated to fix a memory allocation
+  error.
+* :ghissue:`1683`: Attempting to create a local document with an invalid revision no
+  longer throws a ``badarg`` exception. Also, when setting ``new_edits`` to ``false``
+  and performing a bulk write operation, local documents are no longer written into the
+  wrong btree. Finally, it is no longer possible to create a document with an empty
+  ID during a bulk operation with ``new_edits`` set to ``false``.
+* :ghissue:`1721`: The ``couchup`` convenience script for upgrading from CouchDB 1.x
+  now also copies a database's ``_security`` object on migration.
+* :ghissue:`1672`: When checking the status of a view compaction immediately after
+  starting it, the ``total_changes`` and ``changes_done`` fields are now immediately
+  populated with valid values.
+* :ghissue:`1717`: If the ``.ini`` config file is read only, an attempt to update the
+  config through the HTTP API will now result in a proper ``eacces`` error response.
+* :ghissue:`1603`: CouchDB now returns the correct ``total_rows`` result when querying
+  ``/{db}/_design_docs``.
+* :ghissue:`1629`: Internal load validation functions no longer incorrectly hold open
+  a deleted database or its host process.
+* :ghissue:`1746`: Server admins defined in the ini file accessing via HTTP API no longer
+  result in the auth cache logging the access as a miss in the statistics.
+* :ghissue:`1607`: The replicator no longer fails to re-authenticate to open a remote
+  database when its session cookie times out due to a VDU function forbidding writes
+  or a non-standard cookie expiration duration.
+* :ghissue:`1579`: The compaction daemon no longer incorrectly only compacts a single
+  view shard for databases with a ``q`` value greater than 1.
+* :ghissue:`1737`: CouchDB 2.x now performs as well as 1.x when using a ``_doc_ids``
+  or ``_design_docs`` filter on a changes feed.
+
+Mango
+-----
+
+.. rst-class:: open
+
+Other
+-----
+
+The 2.3.0 release also includes the following minor improvements:
+
+.. rst-class:: open
+
+* Improved test cases:
+
+  * The Elixir test suite has been merged. These test cases are intended to replace the
+    aging, unmaintainable JavaScript test suite, and help reduce our dependency on
+    Mozilla Spidermonkey 1.8.5. The test suite does not yet cover all of the tests that
+    the JS test suite does. Once it achieves full coverage, the JS test suite will be
+    removed.
+  * Many racy test cases improved for reliable CI runs.
+  * The Makefile targets for ``list-eunit-*`` now work correctly on macOS.
+  * :ghissue:`1732`, :ghissue:`1733`, :ghissue:`1736`: All of the test suites run and
+    pass on the Windows platform once again.
+
+* :ghissue:`1597`: Off-heap messages, a new feature in Erlang 19+, can now be disabled
+  per module if desired.
+* :ghissue:`1682`: A new ``[feature_flags]`` config section exists for the purpose of
+  enabling or disabling experimental features by CouchDB developers.
+* A narwhal! OK, no, not really. If you got this far...thank you for reading.

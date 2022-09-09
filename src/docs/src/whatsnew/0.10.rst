@@ -1,0 +1,143 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/0.10.x:
+
+=============
+0.10.x Branch
+=============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/0.10.x/upgrade:
+
+Upgrade Notes
+=============
+
+.. warning::
+    :ref:`release/0.10.2` contains important security fixes. Previous `0.10.x`
+    releases are not recommended for regular usage.
+
+Modular Configuration Directories
+---------------------------------
+
+CouchDB now loads configuration from the following places (`glob(7)`_ syntax)
+in order:
+
+- PREFIX/default.ini
+- PREFIX/default.d/*
+- PREFIX/local.ini
+- PREFIX/local.d/*
+
+The configuration options for `couchdb` script have changed to::
+
+  -a FILE     add configuration FILE to chain
+  -A DIR      add configuration DIR to chain
+  -n          reset configuration file chain (including system default)
+  -c          print configuration file chain and exit
+
+.. _glob(7): http://linux.die.net/man/7/glob
+
+Show and List API change
+------------------------
+
+Show and List functions must have a new structure in 0.10.
+See `Formatting_with_Show_and_List`_ for details.
+
+.. _Formatting_with_Show_and_List: http://wiki.apache.org/couchdb/Formatting_with_Show_and_List
+
+Stricter enforcing of reduciness in reduce-functions
+----------------------------------------------------
+
+Reduce functions are now required to reduce the number of values for a key.
+
+View query reduce parameter strictness
+--------------------------------------
+
+CouchDB now considers the parameter ``reduce=false`` to be an error for queries
+of map-only views, and responds with status code 400.
+
+.. _release/0.10.2:
+
+Version 0.10.2
+==============
+
+Build and System Integration
+----------------------------
+
+* Fixed distribution preparation for building on Mac OS X.
+
+Security
+--------
+
+* Fixed :ref:`cve/2010-0009`
+
+Replicator
+----------
+
+* Avoid leaking file descriptors on automatic replication restarts.
+
+.. _release/0.10.1:
+
+Version 0.10.1
+==============
+
+Build and System Integration
+----------------------------
+
+* Test suite now works with the distcheck target.
+
+Replicator
+----------
+
+* Stability enhancements regarding redirects, timeouts, OAuth.
+
+Query Server
+------------
+
+* Avoid process leaks
+* Allow list and view to span languages
+
+Stats
+-----
+
+* Eliminate new process flood on system wake
+
+.. _release/0.10.0:
+
+Version 0.10.0
+==============
+
+Build and System Integration
+----------------------------
+
+* Changed `couchdb` script configuration options.
+* Added default.d and local.d configuration directories to load sequence.
+
+HTTP Interface
+--------------
+
+* Added optional cookie-based authentication handler.
+* Added optional two-legged OAuth authentication handler.
+
+Storage Format
+--------------
+
+* Add move headers with checksums to the end of database files for extra robust
+  storage and faster storage.
+
+View Server
+-----------
+
+* Added native Erlang views for high-performance applications.
