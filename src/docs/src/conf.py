@@ -76,8 +76,8 @@ html_context = {
     # Set the following variables to generate the resulting github URL for each page.
     # Format Template: https://{{ github_host|default("github.com") }}/{{ github_user }}/{{ github_repo }}/blob/{{ github_version }}{{ conf_py_path }}{{ pagename }}{{ suffix }}
     "github_user": "apache",
-    "github_repo": "couchdb-documentation",
-    "github_version": "master/src/",
+    "github_repo": "couchdb",
+    "github_version": "main/src/",
 }
 
 master_doc = "index"
@@ -110,11 +110,11 @@ extlinks = {
     ),
 }
 
-github_project = "apache/couchdb-documentation"
+github_project = "apache/couchdb"
 
-html_context["git_branch"] = github_branch = "master"
+html_context["git_branch"] = github_branch = "main"
 
-github_docs_path = "src"
+github_docs_path = "src/docs/src"
 
 
 def setup(app):
