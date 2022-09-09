@@ -284,6 +284,8 @@ Replication Settings
 +--------------------------------+---------------------------------------------+
 | winning_revs_only (optional)   | Replicate only the winning revisions.       |
 +--------------------------------+---------------------------------------------+
+| use_bulk_get (optional)        | Try to use ``_bulk_get`` to fetch revisions.|
++--------------------------------+---------------------------------------------+
 
 .. _replication-status:
 

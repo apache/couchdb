@@ -133,12 +133,11 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
     % This starts the worker processes. They ask the changes queue manager for a
     % a batch of _changes rows to process -> check which revs are missing in the
     % target, and for the missing ones, it copies them from the source to the target.
-    MaxConns = get_value(http_connections, Options),
     Workers = lists:map(
         fun(_) ->
             couch_stats:increment_counter([couch_replicator, workers_started]),
             {ok, Pid} = couch_replicator_worker:start_link(
-                self(), Source, Target, ChangesManager, MaxConns
+                self(), Source, Target, ChangesManager, Options
             ),
             Pid
         end,

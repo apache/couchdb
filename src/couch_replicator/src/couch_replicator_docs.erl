@@ -464,6 +464,7 @@ make_options(Props) ->
     DefTimeout = config:get_integer("replicator", "connection_timeout", 30000),
     DefRetries = config:get_integer("replicator", "retries_per_request", 5),
     UseCheckpoints = config:get_boolean("replicator", "use_checkpoints", true),
+    UseBulkGet = config:get_boolean("replicator", "use_bulk_get", true),
     DefCheckpointInterval = config:get_integer(
         "replicator",
         "checkpoint_interval",
@@ -487,6 +488,7 @@ make_options(Props) ->
             {worker_batch_size, DefBatchSize},
             {worker_processes, DefWorkers},
             {use_checkpoints, UseCheckpoints},
+            {use_bulk_get, UseBulkGet},
             {checkpoint_interval, DefCheckpointInterval}
         ])
     ).
@@ -554,6 +556,10 @@ convert_options([{<<"since_seq">>, V} | R]) ->
     [{since_seq, V} | convert_options(R)];
 convert_options([{<<"use_checkpoints">>, V} | R]) ->
     [{use_checkpoints, V} | convert_options(R)];
+convert_options([{<<"use_bulk_get">>, V} | _R]) when not is_boolean(V) ->
+    throw({bad_request, <<"parameter `use_bulk_get` must be a boolean">>});
+convert_options([{<<"use_bulk_get">>, V} | R]) ->
+    [{use_bulk_get, V} | convert_options(R)];
 convert_options([{<<"checkpoint_interval">>, V} | R]) ->
     [{checkpoint_interval, couch_util:to_integer(V)} | convert_options(R)];
 % skip unknown option
