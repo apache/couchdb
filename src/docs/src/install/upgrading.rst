@@ -69,8 +69,8 @@ If you are running a CouchDB cluster:
 #. Upgrade that CouchDB install in place.
 #. Start CouchDB.
 #. Double-check that the node has re-joined the cluster through the
-   :ref:`/_membership<api/server/membership>` endpoint. If your load balancer has
-   health check functionality driven by the :ref:`/_up<api/server/up>` endpoint,
+   `/_membership <api/server/membership>` endpoint. If your load balancer has
+   health check functionality driven by the `/_up <api/server/up>` endpoint,
    check whether it thinks the node is healthy as well.
 #. Repeat the last 4 steps on the remaining nodes in the cluster.
 #. Relax! You're done.

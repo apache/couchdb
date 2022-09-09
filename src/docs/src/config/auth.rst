@@ -116,8 +116,6 @@ Authentication Configuration
 
     .. config:option:: require_valid_user :: Force user authentication
 
-        .. versionchanged:: 3.2 moved from [couch_httpd_auth] to [chttpd] section
-
         When this option is set to ``true``, no requests are allowed from
         anonymous users. Everyone must be authenticated. ::
 
@@ -136,7 +134,7 @@ Authentication Configuration
 .. config:section:: chttpd_auth :: Authentication Configuration
 
     .. versionchanged:: 3.2 These options were moved to [chttpd_auth] section:
-                        `authentication_redirect`, `timeout`,
+                        `authentication_redirect`, `require_valid_user`, `timeout`,
                         `auth_cache_size`, `allow_persistent_cookies`, `iterations`,
                         `min_iterations`, `max_iterations`, `secret`, `users_db_public`,
                         `x_auth_roles`, `x_auth_token`, `x_auth_username`,
@@ -196,33 +194,6 @@ Authentication Configuration
             [chttpd_auth]
             authentication_redirect = /_utils/session.html
 
-    .. config:option:: hash_algorithms :: Supported hash algorithms for cookie auth
-
-        .. versionadded:: 3.3
-
-        Sets the HMAC hash algorithm used for cookie authentication. You can provide a
-        comma-separated list of hash algorithms. New cookie sessions or
-        session updates are calculated with the first hash algorithm. All values in the
-        list can be used to decode the cookie session. ::
-
-            [chttpd_auth]
-            hash_algorithms = sha256, sha
-
-        .. note::
-            You can select any hash algorithm the version of erlang used in your CouchDB
-            install supports. The common list of available hashes might be: ::
-
-                sha, sha224, sha256, sha384, sha512
-
-            To retrieve a complete list of supported hash algorithms you can use our
-            ``bin/remsh`` script and retrieve a full list of available hash algorithms
-            with ``crypto:supports(hashs).``.
-
-        .. warning::
-            We do not recommend using the following hash algorithms: ::
-
-                md4, md5
-
     .. config:option:: iterations :: PBKDF2 iterations count
 
         .. versionadded:: 1.3
@@ -230,9 +201,7 @@ Authentication Configuration
 
         The number of iterations for password hashing by the PBKDF2 algorithm.
         A higher  number provides better hash durability, but comes at a cost
-        in performance for each request that requires authentication.
-        When using hundreds of thousands of iterations, use session cookies, or the performance hit will be huge.
-        (The internal hashing algorithm is SHA1, which affects the recommended number of iterations.) ::
+        in performance for each request that requires authentication. ::
 
             [chttpd_auth]
             iterations = 10000
@@ -310,6 +279,16 @@ Authentication Configuration
                 [chttpd_auth]
                 users_db_public = true
 
+    .. config:option:: require_valid_user :: Force user authentication
+
+        .. versionchanged:: 3.2 moved from [couch_httpd_auth] to [chttpd_auth] section
+
+        When this option is set to ``true``, no requests are allowed from
+        anonymous users. Everyone must be authenticated. ::
+
+            [chttpd_auth]
+            require_valid_user = false
+
     .. config:option:: secret :: Authentication secret token
 
         .. versionchanged:: 3.2 moved from [couch_httpd_auth] to [chttpd_auth] section
@@ -382,8 +361,8 @@ Authentication Configuration
     .. config:option:: required_claims :: Mandatory claims in JWT tokens
 
         This parameter is a comma-separated list of additional mandatory JWT claims
-        that must be present in any presented JWT token. A :http:statuscode:`404`
-        is sent if any are missing. ::
+        that must be present in any presented JWT token. A
+        `:code 400:Bad Request` is sent if any are missing. ::
 
             [jwt_auth]
                 required_claims = exp,iat

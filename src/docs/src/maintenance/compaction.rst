@@ -141,24 +141,6 @@ active compactions in this channel when exiting the window, and resume them when
 re-entering. If ``strict_window`` is left at its default of false, the active
 compactions will be allowed to complete but no new compactions will be started.
 
-.. note::
-    When a channel is created, a 60s timer is started to check if the channel
-    should be processing any compactions based on the time window defined in your config.
-
-    The channel is set to pending and after 60s it checks if it should be running
-    at all and is set to paused if not.
-    At the end of the check another 60s timer is started to schedule another check.
-
-    Eventually, when in the time window, it starts processing compactions.
-    But since it will continue running a check every 60s running compaction
-    processes will be suspended when exiting the time window and resume them when
-    re-entering the window.
-
-    This means that for the first 60s after exiting the time window,
-    or when a channel is created and you are outside the time window,
-    compactions are run for up to 60s.This is different to the behavior of the
-    old compaction daemon which would cancel the compactions outright.
-
 Migration Guide
 ---------------
 

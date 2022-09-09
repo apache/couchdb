@@ -14,5 +14,5 @@
     {description, "CouchDB Documentation"},
     {vsn, git},
     {registered, []},
-    {applications, [kernel, stdlib]}
+    {applications, [kernel]}
 ]}.

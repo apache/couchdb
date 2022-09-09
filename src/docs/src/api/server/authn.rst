@@ -73,7 +73,7 @@ For cookie authentication (:rfc:`2109`) CouchDB generates a token that the
 client can use for the next few requests to CouchDB. Tokens are valid until
 a timeout. When CouchDB sees a valid token in a subsequent request, it will
 authenticate the user by this token without requesting the password again. By
-default, cookies are valid for 10 minutes, but it's adjustable via :config:option:`timeout
+default, cookies are valid for 10 minutes, but it's :config:option:`adjustable
 <chttpd_auth/timeout>`. Also it's possible to make cookies
 :config:option:`persistent <chttpd_auth/allow_persistent_cookies>`.
 
@@ -385,8 +385,8 @@ Two sections of config exist to configure JWT authentication;
 
 The :config:option:`required_claims <jwt_auth/required_claims>` config
 setting is a comma-separated list of additional mandatory JWT claims
-that must be present in any presented JWT token. A :statuscode:`400`
-is sent if any are missing.
+that must be present in any presented JWT token. A `:code 400:Bad
+Request` is sent if any are missing.
 
 The ``alg`` claim is mandatory as it used to lookup the correct key for verifying the
 signature.
@@ -407,8 +407,8 @@ list as long as the JWT token is valid.
     ; Examples
     ; hmac:_default = aGVsbG8=
     ; hmac:foo = aGVsbG8=
-    ; The config values can represent symmetric and asymmetric keys.
-    ; For symmetric keys, the value is base64 encoded;
+    ; The config values can represent symmetric and asymmetrics keys.
+    ; For symmetrics keys, the value is base64 encoded;
     ; hmac:_default = aGVsbG8= # base64-encoded form of "hello"
     ; For asymmetric keys, the value is the PEM encoding of the public
     ; key with newlines replaced with the escape sequence \n.

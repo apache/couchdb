@@ -178,7 +178,7 @@ Features and Enhancements
     ``enable_xframe_options``, ``max_http_request_size``.
 
   * Config options moved from ``[couch_httpd_auth]`` to ``[chttpd_auth]``:
-    ``authentication_redirect``, ``timeout``, ``auth_cache_size``,
+    ``authentication_redirect``, ``require_valid_user``, ``timeout``, ``auth_cache_size``,
     ``allow_persistent_cookies``, ``iterations``, ``min_iterations``, ``max_iterations``,
     ``password_scheme``, ``proxy_use_secret``, ``public_fields``, ``secret``,
     ``users_db_public``, ``x_auth_roles``, ``x_auth_token``, ``x_auth_username``,

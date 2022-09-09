@@ -29,7 +29,7 @@ the contents of the design document - not its name, ``_id`` or revision. This
 means that two design documents with identical view code will share the same
 on-disk view index files.
 
-Here is a worked example, assuming your ``/db/_design/ddoc`` needs to be updated.
+Here is a worked example, assuming your ``/db/_design/ddoc`` needs tobe updated.
 
 1. Upload the old design doc to ``/db/_design/ddoc-old`` (or copy the document)
    if you want an easy way to rollback in case of problems. The ``ddoc-old``

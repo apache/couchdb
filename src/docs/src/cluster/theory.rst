@@ -44,6 +44,7 @@ We will focus on the shards and replicas for now.
 A shard is a part of a database. It can be replicated multiple times. The more
 copies of a shard, the more you can scale out. If you have 4 replicas, that
 means that all 4 copies of this specific shard will live on at most 4 nodes.
+With one replica you can have only one node, just as with CouchDB 1.x.
 No node can have more than one copy of each shard replica. The default for
 CouchDB since 3.0.0 is ``q=2`` and ``n=3``, meaning each database (and secondary
 index) is split into 2 shards, with 3 replicas per shard, for a total of 6

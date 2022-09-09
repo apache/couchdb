@@ -307,7 +307,7 @@ several *mandatory* fields, that CouchDB needs for authentication:
 - **salt** (*string*): Hash salt. Used for both ``simple`` and ``pbkdf2``
   ``password_scheme`` options.
 - **iterations** (*integer*): Number of iterations to derive key, used for ``pbkdf2``
-  ``password_scheme`` See the :ref:`configuration API <config/chttpd_auth>`:: for details.
+  ``password_scheme``
 - **type** (*string*): Document type. Constantly has the value ``user``
 
 Additionally, you may specify any custom fields that relate to the target

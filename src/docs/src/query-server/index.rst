@@ -27,7 +27,7 @@ server key in the ``language`` property of a design document or the
 `Content-Type` header of a `temporary view`. Design documents that do not
 specify a ``language`` property are assumed to be of type `javascript`.
 
-.. _Mozilla SpiderMonkey: https://spidermonkey.dev/
+.. _Mozilla SpiderMonkey: https://developer.mozilla.org/en/docs/SpiderMonkey
 
 .. toctree::
     :maxdepth: 2

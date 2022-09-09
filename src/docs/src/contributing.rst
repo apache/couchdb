@@ -192,7 +192,7 @@ The guidelines are in descending priority.
 
 #. Line length
 
-   * The maximum line length is ``90`` characters.
+   * The maximum line length is ``80`` characters.
 
 #. Links
 

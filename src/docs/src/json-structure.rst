@@ -282,8 +282,6 @@ Replication Settings
 | use_checkpoints (optional)     | Whether to use replication checkpoints      |
 |                                | or not.                                     |
 +--------------------------------+---------------------------------------------+
-| winning_revs_only (optional)   | Replicate only the winning revisions.       |
-+--------------------------------+---------------------------------------------+
 
 .. _replication-status:
 
@@ -323,10 +321,6 @@ Replication Status
 | missing_checked    | Number of missing documents checked       |
 +--------------------+-------------------------------------------+
 | missing_found      | Number of missing documents found         |
-+--------------------+-------------------------------------------+
-| bulk_get_attempts  | Number of attempted _bulk_get fetches     |
-+--------------------+-------------------------------------------+
-| bulk_get_docs      | Number of documents read with _bulk_get   |
 +--------------------+-------------------------------------------+
 
 .. _request_object:

@@ -22,7 +22,7 @@ Logging
 Logging options
 ================
 
-.. config:section:: log :: Logging Options
+.. config:section:: log :: Logging options
 
     CouchDB logging configuration.
 
@@ -54,7 +54,7 @@ Logging options
         This path should be readable and writable for user that runs CouchDB
         service (`couchdb` by default).
 
-    .. config:option:: write_buffer :: File log write buffer size
+    .. config:option:: write_buffer
 
        Specifies the size of the file log write buffer in bytes, to enable
        delayed log writes. Only used by the ``file``
@@ -63,7 +63,7 @@ Logging options
             [log]
             write_buffer = 0
 
-    .. config:option:: write_delay :: Wait delay before commiting logs to disk
+    .. config:option:: write_delay
 
         Specifies the wait in milliseconds before committing logs to disk, to
         enable delayed log writes. Only used by the ``file``
@@ -97,7 +97,7 @@ Logging options
         - ``emergency`` or ``emerg``
         - ``none``: Disables logging any messages.
 
-    .. config:option:: include_sasl :: Include SASL information in logs
+    .. config:option:: include_sasl
 
         Includes `SASL`_ information in logs::
 
@@ -106,11 +106,7 @@ Logging options
 
         .. _SASL: http://www.erlang.org/doc/apps/sasl/
 
-    .. config:option:: syslog_host :: Syslog host
-
-        .. note::
-
-            Setting `syslog_host` is mandatory for ``syslog`` to work!
+    .. config:option:: syslog_host
 
         Specifies the syslog host to send logs to. Only used by the
         ``syslog`` :option:`writer <log/writer>`::
@@ -118,7 +114,7 @@ Logging options
             [log]
             syslog_host = localhost
 
-    .. config:option:: syslog_port :: Syslog port
+    .. config:option:: syslog_port
 
         Specifies the syslog port to connect to when sending logs. Only used by
         the ``syslog`` :option:`writer <log/writer>`::
@@ -126,7 +122,7 @@ Logging options
             [log]
             syslog_port = 514
 
-    .. config:option:: syslog_appid :: Application name for syslog
+    .. config:option:: syslog_appid
 
         Specifies application name to the ``syslog``
         :option:`writer <log/writer>`::
@@ -134,20 +130,10 @@ Logging options
             [log]
             syslog_appid = couchdb
 
-    .. config:option:: syslog_facility :: Syslog designations for message sources
+    .. config:option:: syslog_facility
 
         Specifies the syslog facility to use with the ``syslog``
         :option:`writer <log/writer>`::
 
             [log]
             syslog_facility = local2
-
-    .. note::
-        CouchDB's ``syslog`` only knows how to use UDP logging. Please ensure that your
-        ``syslog`` server has UDP logging enabled.
-
-        For ``rsyslog`` you can enable the UDP module `imudp` in ``/etc/rsyslog.conf``::
-
-            # provides UDP syslog reception
-            module(load="imudp")
-            input(type="imudp" port="514")

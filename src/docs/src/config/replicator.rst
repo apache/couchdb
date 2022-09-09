@@ -23,7 +23,7 @@ Replicator Database Configuration
 
 .. config:section:: replicator :: Replicator Database Configuration
 
-    .. config:option:: max_jobs :: Maximum replications jobs
+    .. config:option:: max_jobs
 
         .. versionadded:: 2.1
 
@@ -43,7 +43,7 @@ Replicator Database Configuration
              [replicator]
              max_jobs = 500
 
-    .. config:option:: interval :: Checking interval of replication jobs
+    .. config:option:: interval
 
         .. versionadded:: 2.1
 
@@ -54,7 +54,7 @@ Replicator Database Configuration
              [replicator]
              interval = 60000
 
-    .. config:option:: max_churn :: Maximum number of jobs to start and stop
+    .. config:option:: max_churn
 
         .. versionadded:: 2.1
 
@@ -66,7 +66,7 @@ Replicator Database Configuration
              [replicator]
              max_churn = 20
 
-    .. config:option:: max_history :: Maximum number of events recorded for each job
+    .. config:option:: max_history
 
         Maximum number of events recorded for each job. This parameter defines
         an upper bound on the consecutive failure count for a job, and in turn
@@ -77,8 +77,7 @@ Replicator Database Configuration
              [replicator]
              max_history = 20
 
-    .. config:option:: update_docs :: Update replication document with error and \
-        triggered states
+    .. config:option:: update_docs
 
         .. versionadded:: 2.1
 
@@ -89,7 +88,7 @@ Replicator Database Configuration
              [replicator]
              update_docs = false
 
-    .. config:option:: worker_batch_size :: Batch size of workers
+    .. config:option:: worker_batch_size
 
         With lower batch sizes checkpoints are done more frequently. Lower
         batch sizes also reduce the total amount of used RAM memory::
@@ -97,7 +96,7 @@ Replicator Database Configuration
             [replicator]
             worker_batch_size = 500
 
-    .. config:option:: worker_processes :: Number of worker processes
+    .. config:option:: worker_processes
 
         More worker processes can give higher network throughput but can also
         imply more disk and network IO::
@@ -105,14 +104,14 @@ Replicator Database Configuration
             [replicator]
             worker_processes = 4
 
-    .. config:option:: http_connections :: Maximum number of HTTP connections
+    .. config:option:: http_connections
 
         Maximum number of HTTP connections per replication::
 
             [replicator]
             http_connections = 20
 
-    .. config:option:: connection_timeout :: Per replication connection timeout
+    .. config:option:: connection_timeout
 
         HTTP connection timeout per replication.
         This is divided by three (3) when the replicator makes changes feed requests.
@@ -122,7 +121,7 @@ Replicator Database Configuration
             [replicator]
             connection_timeout = 30000
 
-    .. config:option:: retries_per_request :: Number of retries per request
+    .. config:option:: retries_per_request
 
         .. versionchanged:: 2.1.1
 
@@ -136,7 +135,7 @@ Replicator Database Configuration
             [replicator]
             retries_per_request = 5
 
-    .. config:option:: socket_options :: Erlang socket options
+    .. config:option:: socket_options
 
         Some socket options that might boost performance in some scenarios:
 
@@ -152,7 +151,7 @@ Replicator Database Configuration
 
         .. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
 
-    .. config:option:: checkpoint_interval :: Replication checkpoint interval
+    .. config:option:: checkpoint_interval
 
         .. versionadded:: 1.6
 
@@ -167,7 +166,7 @@ Replicator Database Configuration
         higher values will lower bandwidth and make fewer requests for
         infrequently updated databases.
 
-    .. config:option:: use_checkpoints :: Use checkpoints during replication
+    .. config:option:: use_checkpoints
 
         .. versionadded:: 1.6
 
@@ -188,21 +187,21 @@ Replicator Database Configuration
             Disabling checkpoints is **not recommended** as CouchDB will scan
             the Source database's changes feed from the beginning.
 
-    .. config:option:: cert_file :: Path to user PEM certificate file
+    .. config:option:: cert_file
 
         Path to a file containing the user's certificate::
 
             [replicator]
             cert_file = /full/path/to/server_cert.pem
 
-    .. config:option:: key_file :: Path to private user PEM file
+    .. config:option:: key_file
 
         Path to file containing user's private PEM encoded key::
 
             [replicator]
             key_file = /full/path/to/server_key.pem
 
-    .. config:option:: password :: Optional password for protected key file
+    .. config:option:: password
 
         String containing the user's password. Only used if the private key file
         is password protected::
@@ -210,14 +209,14 @@ Replicator Database Configuration
             [replicator]
             password = somepassword
 
-    .. config:option:: verify_ssl_certificates :: Check peer certificates
+    .. config:option:: verify_ssl_certificates
 
         Set to true to validate peer certificates::
 
             [replicator]
             verify_ssl_certificates = false
 
-    .. config:option:: ssl_trusted_certificates_file :: Trusted peer certificates
+    .. config:option:: ssl_trusted_certificates_file
 
         File containing a list of peer trusted certificates (in the PEM
         format)::
@@ -225,8 +224,7 @@ Replicator Database Configuration
             [replicator]
             ssl_trusted_certificates_file = /etc/ssl/certs/ca-certificates.crt
 
-    .. config:option:: ssl_certificate_max_depth :: Maximum peer certificate \
-        depth checking size
+    .. config:option:: ssl_certificate_max_depth
 
         Maximum peer certificate depth (must be set even if certificate
         validation is off)::
@@ -234,7 +232,7 @@ Replicator Database Configuration
             [replicator]
             ssl_certificate_max_depth = 3
 
-    .. config:option:: auth_plugins :: List of replicator client authentication plugins
+    .. config:option:: auth_plugins
 
         .. versionadded:: 2.2
 
@@ -249,7 +247,7 @@ Replicator Database Configuration
           [replicator]
           auth_plugins = couch_replicator_auth_session,couch_replicator_auth_noop
 
-    .. config:option:: usage_coeff :: Usage coefficient decay
+    .. config:option:: usage_coeff
 
         .. versionadded:: 3.2.0
 
@@ -261,7 +259,7 @@ Replicator Database Configuration
             [replicator]
             usage_coeff = 0.5
 
-    .. config:option:: priority_coeff :: Priority coefficient decays
+    .. config:option:: priority_coeff
 
         .. versionadded:: 3.2.0
 
@@ -285,25 +283,15 @@ Fair Share Replicator Share Allocation
 
 .. config:section:: replicator.shares :: Per-Database Fair Share Allocation
 
-    .. config:option:: $replicator_db :: Value for a replicator database
+    .. config:option:: $replicator_db
 
         .. versionadded:: 3.2.0
 
-        Fair share configuration section. Higher share values results in a
+        Fair share configuration section. More shares result in a
         higher chance that jobs from that db get to run. The default
         value is 100, minimum is 1 and maximum is 1000. The
-        configuration may be set even if the database does not exist.
-
-        In this context the option ``$replicator_db`` acts as a placeholder
-        for your replicator database name. The default replicator database is
-        ``_replicator``. Additional replicator databases can be created. To be
-        recognized as such by the system, their database names should end with
-        ``/_replicator``. See the :ref:`Replicator Database <replicator>`
-        section for more info.
-
-        ::
+        configuration may be set even if the database does not exist::
 
             [replicator.shares]
-            _replicator = 50
-            foo/_replicator = 25
-            bar/_replicator = 25
+            _replicator_db = 100
+            $another/_replicator_db = 100

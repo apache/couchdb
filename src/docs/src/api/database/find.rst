@@ -20,10 +20,9 @@
     :synopsis: Find documents within a given database
 
     Find documents using a declarative JSON querying syntax.
-    Queries will use custom indexes, specified using the :ref:`_index <api/db/find/index>`
-    endpoint, if available.
-    Otherwise, they use the built-in :ref:`_all_docs <api/db/all_docs>` index, which
-    can be arbitrarily slow.
+    Queries can use the built-in :ref:`_all_docs <api/db/all_docs>` index or
+    custom indexes, specified using the :ref:`_index <api/db/find/index>`
+    endpoint.
 
     :param db: Database name
 

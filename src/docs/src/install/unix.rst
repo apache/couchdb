@@ -193,33 +193,6 @@ The package can be installed by running::
 
     sudo yum install erlang-reltool
 
-Fedora 36
----------
-
-On Fedora 36, you may need these packages in addition to the ones listed above:
-
-* `mozjs91-devel`
-* `erlang-rebar`
-
-If the system contains dangling links to Erlang chunk files, the compiler will
-abort. They can be deleted with the following command::
-
-    find -L /usr/lib64/erlang/lib/ -type l -name chunks | xargs rm -f
-
-Fauxton is not built on the Node.js version (v16) shipped by the system. The
-installation of v12.22.12 can be done via::
-
-    wget https://nodejs.org/download/release/v12.22.12/node-v12.22.12-linux-x64.tar.gz
-    mkdir -p /usr/local/lib/nodejs
-    tar -xvf node-v12.22.12-linux-x64.tar.gz -C /usr/local/lib/nodejs
-    export PATH=/usr/local/lib/nodejs/node-v12.22.12-linux-x64/bin:$PATH
-
-Note that due to a problem with the Python package sphinx-build, it is not
-possible to compile the documentation on Fedora 36. You can skip compiling the
-documentation via::
-
-    ./configure --disable-docs --spidermonkey-version 91
-
 Mac OS X
 --------
 

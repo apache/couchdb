@@ -176,7 +176,7 @@ Bugfixes
   This should resolve a long-standing gradual memory increase bug in CouchDB.
 
 * :ghissue:`2613`: Simultaneous attempts to create the same new database should
-  no longer result in a :statuscode:`500` error.
+  no longer result in a :code 500: error.
 
 * :ghissue:`2678`: Defaults for the ``smoosh`` compaction daemon are now consistent
   with the shipped ``default.ini`` file.
@@ -268,9 +268,9 @@ Features and Enhancements
 
 * :ghissue:`1875`, :ghissue:`2437`, :ghissue:`2423`: CouchDB now supports linking against
   SpiderMonkey 60 or SpiderMonkey 1.8.5. SpiderMonkey 60 provides enhanced support for
-  ES5, ES6, and ES2016+. Full compatibility information is available at the
-  `ECMAScript compatibility table`_. Click on "Show obsolete platforms", then look for
-  "FF 60 ESR" in the list of engine types.
+  ES5, ES6, and ES2016+. Full compatibility information is available at the `ECMAScript
+  compatibility table`_: click on "Show obsolete platforms," then look for "FF 60 ESR"
+  in the list of engine types.
 
   However, it was discovered that on some ARM 64-bit distributions, SM 60 segfaults
   frequently, including the SM 60 packages on CentOS 8 and Debian 10.
@@ -419,7 +419,7 @@ Bugfixes
   to match other case clauses.
 
 * :ghissue:`1897`: The ``/{db}/_bulk_docs`` endpoint now correctly catches invalid
-  (*i.e.*, non-hexadecimal) ``_rev_`` values and responds with a :statuscode:`400` error.
+  (*i.e.*, non-hexadecimal) ``_rev_`` values and responds with a :code 400: error.
 
 * :ghissue:`2321`: CouchDB no longer requires Basic auth credentials to reach the
   ``/_session`` endpoint for login, even when ``require_valid_user`` is enabled.
@@ -435,8 +435,8 @@ Bugfixes
 * :ghissue:`2153`: CouchDB no longer may return a ``badmatch`` error when querying
   ``all_docs`` with a passed ``keys`` array.
 
-* :ghissue:`2137`: If search is not available, return a :statuscode:`400` instead of a
-  :statuscode:`500` status code.
+* :ghissue:`2137`: If search is not available, return a :code 400: instead of a
+  :code 500: status code.
 
 * :ghissue:`2077`: Any failed ``fsync(2)`` calls are now correctly raised to avoid
   data corruption arising from retry attempts.
@@ -540,8 +540,8 @@ The 3.0.0 release also includes the following minor improvements:
 * :ghissue:`2337`: The md5 shim (introduced to support FIPS-compliance) is now
   used consistently throughout the code base.
 
-* :ghissue:`2270`: Negative and non-integer ``heartbeat`` values now return
-  :statuscode:`400`.
+* :ghissue:`2270`: Negative and non-integer ``heartbeat`` values now return :code 400:
+  Bad Request.
 
 * :ghissue:`2268`: When rescheduling jobs, CouchDB now stops sufficient running jobs
   to make room for the pending jobs.

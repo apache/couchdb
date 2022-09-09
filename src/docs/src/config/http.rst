@@ -129,7 +129,7 @@ HTTP Server Options
             [chttpd]
             changes_timeout = 60000 ; 60 seconds
 
-    .. config:option:: config_whitelist :: Config options whitelist
+    .. config:option:: config_whitelist :: Config options while list
 
         .. versionchanged:: 3.2 moved from [httpd] to [chttpd] section
 
@@ -490,7 +490,7 @@ Cross-Origin Resource Sharing
         [chttpd]
         enable_cors = true
 
-    .. config:option:: credentials :: Enable credentials support in CouchDB
+    .. config:option:: credentials
 
         By default, neither authentication headers nor cookies are included in
         requests and responses. To do so requires both setting
@@ -503,7 +503,7 @@ Cross-Origin Resource Sharing
         CouchDB will respond to a credentials-enabled CORS request with an
         additional header, ``Access-Control-Allow-Credentials=true``.
 
-    .. config:option:: origins :: List of allowed origins
+    .. config:option:: origins
 
         List of origins separated by a comma, ``*`` means accept all. You can’t
         set ``origins = *`` and ``credentials = true`` option at the same
@@ -521,21 +521,21 @@ Cross-Origin Resource Sharing
         Note that by default, no origins are accepted. You must define them
         explicitly.
 
-    .. config:option:: headers :: List of accepted headers
+    .. config:option:: headers
 
         List of accepted headers separated by a comma::
 
             [cors]
             headers = X-Couch-Id, X-Couch-Rev
 
-    .. config:option:: methods :: List of accepted methods
+    .. config:option:: methods
 
         List of accepted methods::
 
             [cors]
             methods = GET,POST
 
-    .. config:option:: max_age :: Set Access-Control-Max-Age header
+    .. config:option:: max_age
 
         Sets the ``Access-Control-Max-Age`` header in seconds. Use it to
         avoid repeated ``OPTIONS`` requests.

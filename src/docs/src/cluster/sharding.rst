@@ -64,12 +64,9 @@ CouchDB nodes have a ``etc/default.ini`` file with a section named
 
 These settings specify the default sharding parameters for newly created
 databases. These can be overridden in the ``etc/local.ini`` file by copying the
-text above, and replacing the values with your new defaults.
-If ``[couch_peruser]`` ``q`` is set, that value is used for per-user databases.
-(By default, it is set to 1, on the assumption that per-user dbs will be quite
-small and there will be many of them.)  The values can also be set on a
-per-database basis by specifying the ``q`` and ``n`` query parameters when the
-database is created. For example:
+text above, and replacing the values with your new defaults.  The values can
+also be set on a per-database basis by specifying the ``q`` and ``n`` query
+parameters when the database is created. For example:
 
 .. code-block:: bash
 
@@ -103,13 +100,10 @@ refers to the number of replicas of each shard. In a default cluster where
     request. There are no special roles for nodes inside the cluster.
 
 The size of the required quorum can be configured at request time by
-setting the ``r`` parameter for document reads, and the ``w``
-parameter for document writes. The ``_view``, ``_find``, and
-``_search`` endpoints read only one copy no matter what quorum is
-configured, effectively making a quorum of 1 for these requests.
-
-For example, here is a request that directs the coordinating node to
-send a response once at least two nodes have responded:
+setting the ``r`` parameter for document and view reads, and the ``w``
+parameter for document writes. For example, here is a request that
+directs the coordinating node to send a response once at least two nodes
+have responded:
 
 .. code-block:: bash
 

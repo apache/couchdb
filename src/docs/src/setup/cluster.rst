@@ -248,7 +248,7 @@ CouchDB as a single-node instance or set up a cluster.
 
 When you click "Setup Cluster" you are asked for admin credentials again, and
 then to add nodes by IP address. To get more nodes, go through the same install
-procedure for each node, using the same machine to perform the setup process.
+procedure for each node, using the same machien to perform the setup process.
 Be sure to specify the total number of nodes you expect to add to the cluster
 before adding nodes.
 
@@ -362,10 +362,7 @@ Response:
         ]
     }
 
-If the cluster is enabled and ``all_nodes`` and ``cluster_nodes`` lists don't match, use curl to add nodes with
-PUT ``/_node/_local/_nodes/couchdb@<reachable-ip-address|fully-qualified-domain-name>``
-and remove nodes with
-DELETE ``/_node/_local/_nodes/couchdb@<reachable-ip-address|fully-qualified-domain-name>``
+Ensure the ``all_nodes`` and ``cluster_nodes`` lists match.
 
 You CouchDB cluster is now set up.
 
