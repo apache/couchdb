@@ -68,23 +68,27 @@
     parent,
     cp,
     changes_manager,
+    use_bulk_get,
     bulk_get_stats
 }).
 
-start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
+start_link(Cp, #httpdb{} = Source, Target, ChangesManager, [_ | _] = Options) ->
     gen_server:start_link(
-        ?MODULE, {Cp, Source, Target, ChangesManager, MaxConns}, []
+        ?MODULE, {Cp, Source, Target, ChangesManager, Options}, []
     ).
 
-init({Cp, Source, Target, ChangesManager, MaxConns}) ->
+init({Cp, Source, Target, ChangesManager, Options}) ->
     process_flag(trap_exit, true),
     NowSec = erlang:monotonic_time(second),
+    MaxConns = couch_util:get_value(http_connections, Options),
+    UseBulkGet = couch_util:get_value(use_bulk_get, Options),
     FetchSt = #fetch_st{
         cp = Cp,
         source = Source,
         target = Target,
         parent = self(),
         changes_manager = ChangesManager,
+        use_bulk_get = UseBulkGet,
         bulk_get_stats = #bulk_get_stats{ratio = 0, tsec = NowSec}
     },
     State = #state{
@@ -256,6 +260,7 @@ queue_fetch_loop(#fetch_st{} = St) ->
         target = Target,
         parent = Parent,
         changes_manager = ChangesManager,
+        use_bulk_get = UseBulkGet,
         bulk_get_stats = BgSt
     } = St,
     ChangesManager ! {get_changes, self()},
@@ -268,7 +273,7 @@ queue_fetch_loop(#fetch_st{} = St) ->
         {changes, ChangesManager, Changes, ReportSeq} ->
             % Find missing revisions (POST to _revs_diff)
             IdRevs = find_missing(Changes, Target, Parent),
-            {Docs, BgSt1} = bulk_get(Source, IdRevs, Parent, BgSt),
+            {Docs, BgSt1} = bulk_get(UseBulkGet, Source, IdRevs, Parent, BgSt),
             % Documents without attachments can be uploaded right away
             BatchFun = fun({_, #doc{} = Doc}) ->
                 ok = gen_server:call(Parent, {batch_doc, Doc}, infinity)
@@ -292,7 +297,9 @@ queue_fetch_loop(#fetch_st{} = St) ->
 % _bulk_get. After a few successful attempts that should lower the failure rate
 % enough to start allow using _bulk_get again.
 %
-bulk_get(Source, IdRevs, Parent, #bulk_get_stats{} = St) ->
+bulk_get(false, _Source, _IdRevs, _Parent, #bulk_get_stats{} = St) ->
+    {#{}, St};
+bulk_get(true, Source, IdRevs, Parent, #bulk_get_stats{} = St) ->
     NowSec = erlang:monotonic_time(second),
     case attempt_bulk_get(St, NowSec) of
         true ->

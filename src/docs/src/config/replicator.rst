@@ -188,6 +188,16 @@ Replicator Database Configuration
             Disabling checkpoints is **not recommended** as CouchDB will scan
             the Source database's changes feed from the beginning.
 
+    .. config:option:: use_bulk_get :: Use ``_bulk_get`` to fetch docs from the source
+
+        .. versionadded:: 3.3
+
+        If ``use_bulk_get`` is ``true``, CouchDB will attempt to use the
+        ``_bulk_get`` HTTP API endpoint to fetch documents from the source.
+        Replicator should automatically fall back to individual doc GETs on
+        on error; however, in some cases it may be useful to prevent spending
+        time attempting to call ``_bulk_get`` altogether.
+
     .. config:option:: cert_file :: Path to user PEM certificate file
 
         Path to a file containing the user's certificate::
