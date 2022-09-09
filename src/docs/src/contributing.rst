@@ -24,16 +24,16 @@ If you don't have a GitHub account yet, it is a good time to get one, they are
 free. If you don't want to use GitHub, there are alternate ways to
 contributing back, that we'll cover next time.
 
-Go to https://github.com/apache/couchdb-documentation and click the "fork"
+Go to https://github.com/apache/couchdb and click the "fork"
 button in the top right. This will create a fork of CouchDB in your GitHub
 account. If your account is `username`, your fork lives at
-https://github.com/username/couchdb-documentation. In the header, it tells me my
+https://github.com/username/couchdb. In the header, it tells me my
 "GitHub Clone URL". We need to copy that and start a terminal:
 
 .. code-block:: bash
 
-    $ git clone https://github.com/username/couchdb-documentation.git
-    $ cd couchdb-documentation
+    $ git clone https://github.com/username/couchdb.git
+    $ cd couchdb/src/docs
     $ subl .
 
 I'm opening the whole CouchDB documentation source tree in my favourite editor.
@@ -57,8 +57,8 @@ It gives me the usual directory listing:
     themes/
     .travis.yml
 
-The documentation sources live in `src`, you can safely ignore all
-the other files and directories.
+The documentation sources live in `src/docs/src`, you can safely
+ignore all the other files and directories.
 
 First we should determine where we want to document this inside the
 documentation. We can look through http://docs.couchdb.org/en/latest/
@@ -149,7 +149,7 @@ Then we push the commit to our CouchDB fork::
     $ git push origin main
 
 Next, we go back to our GitHub page
-https://github.com/username/couchdb-documentation and click the "Pull Request"
+https://github.com/username/couchdb and click the "Pull Request"
 button. Fill in the description with something useful and hit the
 "Send Pull Request" button.
 

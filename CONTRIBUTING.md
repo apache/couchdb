@@ -199,7 +199,7 @@ If you never created a pull request before, welcome :tada: :smile:
    the project’s README for more information.
 
 4. If you added or changed a feature, make sure to document it accordingly in
-   the [CouchDB documentation][14] repository.
+   the [documentation][14] directory.
 
 5. Push your topic branch up to our repo
 
@@ -320,7 +320,7 @@ some commit message conventions.
 [11]: mailto:security@couchdb.apache.org?subject=Security
 [12]: https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github
 [13]: https://help.github.com/fork-a-repo
-[14]: https://github.com/apache/couchdb-documentation
+[14]: https://github.com/apache/couchdb/tree/main/src/docs
 [15]: https://help.github.com/articles/using-pull-requests
 [16]: https://help.github.com/articles/about-two-factor-authentication
 [17]: https://gitbox.apache.org/setup
