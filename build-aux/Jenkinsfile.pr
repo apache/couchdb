@@ -66,27 +66,27 @@ pipeline {
 
     stage('Setup Env') {
       agent {
-          docker {
-              image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-          }
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
       }
       options {
-          timeout(time: 10, unit: 'MINUTES')
+        timeout(time: 10, unit: 'MINUTES')
       }
       steps {
         script {
-            env.DOCS_CHANGED = '0'
-            env.ONLY_DOCS_CHANGED = '0'
-            if ( sh(returnStatus: true, script: docs_changed) == 0 ) {
-               env.DOCS_CHANGED = '1'
-               if (sh(returnStatus: true, script: other_changes) == 1) {
-                   env.ONLY_DOCS_CHANGED = '1'
-               }
+          env.DOCS_CHANGED = '0'
+          env.ONLY_DOCS_CHANGED = '0'
+          if ( sh(returnStatus: true, script: docs_changed) == 0 ) {
+            env.DOCS_CHANGED = '1'
+            if (sh(returnStatus: true, script: other_changes) == 1) {
+              env.ONLY_DOCS_CHANGED = '1'
             }
+          }
         }
       }
       post {
@@ -100,17 +100,17 @@ pipeline {
     stage('Docs Check') {
       // Run docs `make check` stage if any docs changed
       when {
-          beforeOptions true
-          expression { DOCS_CHANGED == '1' }
+        beforeOptions true
+        expression { DOCS_CHANGED == '1' }
       }
       agent {
-          docker {
-              image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-          }
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
       }
       options {
         timeout(time: 15, unit: 'MINUTES')
@@ -132,23 +132,23 @@ pipeline {
       // Build docs separately if only docs changed. If there are other changes, docs are
       // already built as part of `make dist`
       when {
-          beforeOptions true
-          expression { ONLY_DOCS_CHANGED == '1' }
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '1' }
       }
       agent {
-          docker {
-              image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-          }
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
       }
       options {
-          timeout(time: 30, unit: 'MINUTES')
+        timeout(time: 30, unit: 'MINUTES')
       }
       steps {
-         sh '''
+        sh '''
            (cd src/docs && make html)
          '''
       }
@@ -161,10 +161,10 @@ pipeline {
     } // stage Build Docs
 
     stage('Erlfmt') {
-       when {
-          beforeOptions true
-          expression { ONLY_DOCS_CHANGED == '0' }
-       }
+      when {
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '0' }
+      }
       agent {
         docker {
           image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
@@ -195,8 +195,8 @@ pipeline {
 
     stage('Make Dist') {
       when {
-          beforeOptions true
-          expression { ONLY_DOCS_CHANGED == '0' }
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '0' }
       }
       agent {
         docker {
@@ -235,8 +235,8 @@ pipeline {
 
     stage('Make Check') {
       when {
-          beforeOptions true
-          expression { ONLY_DOCS_CHANGED == '0' }
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '0' }
       }
       matrix {
         axes {
