@@ -5,7 +5,7 @@ You can view the latest rendered build of this content at:
 
     http://docs.couchdb.org/en/latest
 
-# Building this repo
+# Building the docs
 
 Install Python3 and pip. Then:
 
@@ -27,5 +27,3 @@ with issue reporting or contributing to the upkeep of this project.
 [1]: http://mail-archives.apache.org/mod_mbox/couchdb-user/
 [2]: http://mail-archives.apache.org/mod_mbox/couchdb-dev/
 [3]: https://github.com/apache/couchdb/blob/main/CONTRIBUTING.md
-
-
