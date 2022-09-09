@@ -216,7 +216,9 @@ Authentication Configuration
 
             To retrieve a complete list of supported hash algorithms you can use our
             ``bin/remsh`` script and retrieve a full list of available hash algorithms
-            with ``crypto:supports(hashs).``.
+            with ``crypto:supports(hashs).`` or use the
+            :ref:`_node/$node/_versions <api/server/versions>` endpoint to retrieve the
+            hashes.
 
         .. warning::
             We do not recommend using the following hash algorithms: ::
