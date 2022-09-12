@@ -154,7 +154,10 @@
 
 **Response**:
 
-.. code-block:: javascript
+.. code-block:: http
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
 
     {
         "name": "_design/cookbook/ingredients",

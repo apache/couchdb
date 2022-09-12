@@ -784,7 +784,7 @@ results for each unique value of each named field.
 
 *Example of a query using the counts facet syntax:*
 
-.. code-block:: http
+.. code-block:: text
 
     ?q=*:*&counts=["type"]
 
@@ -857,7 +857,7 @@ brackets (``[``, ``]``). Exclusive range queries are denoted by curly brackets (
 
 *Example of a request that uses faceted search for matching ranges:*
 
-.. code-block:: http
+.. code-block:: text
 
     ?q=*:*&ranges={"price":{"cheap":"[0 TO 100]","expensive":"{100 TO Infinity}"}}
 

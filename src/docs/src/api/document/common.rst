@@ -378,7 +378,7 @@
 
     **Request**:
 
-    .. code-block:: http
+    .. code-block:: text
 
         COPY /recipes/SpaghettiWithMeatballs HTTP/1.1
         Accept: application/json
@@ -636,7 +636,7 @@ To solve this problem, CouchDB allows to get documents in
 
 **Response**:
 
-.. code-block:: http
+.. code-block:: text
 
     HTTP/1.1 200 OK
     Content-Length: 538
@@ -773,7 +773,7 @@ The subsequent MIME bodies are the attachments.
 
 **Request**:
 
-.. code-block:: http
+.. code-block:: text
 
     PUT /temp/somedoc HTTP/1.1
     Accept: application/json
@@ -1150,7 +1150,7 @@ or :header:`If-Match`:
 
 **Request**:
 
-.. code-block:: http
+.. code-block:: text
 
     COPY /recipes/SpaghettiWithMeatballs HTTP/1.1
     Accept: application/json
@@ -1188,7 +1188,7 @@ for the target document by appending the ``rev`` parameter to the
 
 **Request**:
 
-.. code-block:: http
+.. code-block:: text
 
     COPY /recipes/SpaghettiWithMeatballs?rev=8-6f5ad8db0f34af24a6e0984cd1a6cfb9 HTTP/1.1
     Accept: application/json

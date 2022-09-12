@@ -10,7 +10,7 @@
 ## License for the specific language governing permissions and limitations under
 ## the License.
 
-SPHINXBUILD  := sphinx-build
+SPHINXBUILD  := ./.venv/bin/sphinx-build
 TEX          := tex
 PDFLATEX     := pdflatex
 MAKEINFO     := makeinfo

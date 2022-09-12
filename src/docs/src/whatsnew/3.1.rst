@@ -142,6 +142,6 @@ Performance
 * :ghissue:`2754`: Optimized compactor performance, resulting in a 40% speed improvement
   when document revisions approach the ``revs_limit``. The fixes also include additional
   metrics on size tracking during the sort and copy phases, accessible via the
-  :get:`GET /_active_tasks </active_tasks>` endpoint.
+  :get:`/_active_tasks` endpoint.
 
 * A big bowl of candy! OK, no, not really. If you got this far...thank you for reading.
