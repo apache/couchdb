@@ -1,3 +1,4 @@
-Sphinx==2.4.4
+Sphinx==5.1.1
 sphinx-rtd-theme==1.0.0
-jinja2<3.1
+sphinxcontrib-httpdomain==1.8.0
+

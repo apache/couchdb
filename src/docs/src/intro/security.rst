@@ -43,12 +43,9 @@ identification for certain requests:
   </{db}/_design/{ddoc}>`)
 - Triggering compaction (:post:`POST /database/_compact </{db}/_compact>`)
 - Reading the task status list (:get:`GET /_active_tasks </_active_tasks>`)
-- Restarting the server on a given node
-  (:post:`POST /_node/{node-name}/_restart </_restart>`)
-- Reading the active configuration
-  (:get:`GET /_node/{node-name}/_config </_config>`)
-- Updating the active configuration
-  (:put:`PUT /_node/{node-name}/_config/section/key </_config/{section}/{key}>`)
+- Restarting the server on a given node (:post:`/_node/{node-name}/_restart`)
+- Reading the active configuration (:get:`/_node/{node-name}/_config`)
+- Updating the active configuration (:put:`/_node/{node-name}/_config/{section}/{key}`)
 
 Creating a New Admin User
 -------------------------

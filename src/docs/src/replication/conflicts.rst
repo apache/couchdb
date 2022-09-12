@@ -191,7 +191,7 @@ arbitrarily large.
 Working with conflicting documents
 ==================================
 
-The basic :get:`/{doc}/{docid}` operation will not show you any
+The basic :get:`/{db}/{docid}` operation will not show you any
 information about conflicts. You see only the deterministically-chosen winner,
 and get no indication as to whether other conflicting revisions exist or not:
 

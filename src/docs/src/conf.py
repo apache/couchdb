@@ -18,17 +18,14 @@ import sphinx_rtd_theme
 
 sys.path.insert(0, os.path.abspath("../ext"))
 
-needs_sphinx = "1.5"
+needs_sphinx = "5.1.1"
 
 extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.extlinks",
-    "github",
-    "httpdomain",
+    "sphinxcontrib.httpdomain",
     "configdomain",
 ]
-
-source_suffix = ".rst"
 
 nitpicky = True
 
@@ -51,15 +48,13 @@ pygments_style = "sphinx"
 html_theme = "sphinx_rtd_theme"
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
-html_theme_options = {"canonical_url": "http://docs.couchdb.org/en/stable/"}
+html_theme_options = {"canonical_url": "https://docs.couchdb.org/en/stable/"}
 
 templates_path = ["../templates"]
 
 html_static_path = ["../static"]
 
 html_title = " ".join([project, version, "Documentation"])
-
-# html_style = "css/rtd_theme.css"
 
 html_logo = "../images/logo.png"
 
@@ -75,12 +70,11 @@ html_context = {
     "display_github": False,
     # Set the following variables to generate the resulting github URL for each page.
     # Format Template: https://{{ github_host|default("github.com") }}/{{ github_user }}/{{ github_repo }}/blob/{{ github_version }}{{ conf_py_path }}{{ pagename }}{{ suffix }}
+    "github_version": "main",
+    "conf_py_path": "/src/docs/src/",
     "github_user": "apache",
     "github_repo": "couchdb",
-    "github_version": "main/src/",
 }
-
-master_doc = "index"
 
 text_newlines = "native"
 
@@ -102,19 +96,13 @@ texinfo_documents = [
 ]
 
 extlinks = {
-    "issue": ("%s-%%s" % "https://issues.apache.org/jira/browse/COUCHDB", "COUCHDB-"),
-    "ghissue": ("https://github.com/apache/couchdb/issues/%s", "#"),
+    "issue": ("https://issues.apache.org/jira/browse/COUCHDB-%s", "COUCHDB-%s"),
+    "ghissue": ("https://github.com/apache/couchdb/issues/%s", "#%s"),
     "commit": (
         "https://git-wip-us.apache.org/repos/asf?p=couchdb.git;a=commit;h=%s",
-        "#",
+        "#%s",
     ),
 }
-
-github_project = "apache/couchdb"
-
-html_context["git_branch"] = github_branch = "main"
-
-github_docs_path = "src/docs/src"
 
 
 def setup(app):

@@ -149,7 +149,7 @@ pipeline {
       }
       steps {
          sh '''
-           (cd src/docs && make html)
+           (cd src/docs && ./setup.sh ; make html)
          '''
       }
       post {

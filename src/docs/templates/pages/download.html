@@ -16,7 +16,7 @@ specific language governing permissions and limitations under the License.
 {% extends "layout.html" %}
 {% set title = 'Download' %}
 {% set url = 'https://media.readthedocs.org/%s/couchdb/%s/couchdb.%s' %}
-{% if git_branch == 'master' %}
+{% if git_branch == 'main' %}
   {% set rtd_ver = 'latest' %}
 {% else %}
   {% set rtd_ver = git_branch %}

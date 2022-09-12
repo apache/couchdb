@@ -488,7 +488,7 @@ config.erl:
 
 src/docs/build:
 ifeq ($(with_docs), 1)
-	@cd src/docs; $(MAKE)
+	@cd src/docs; ./setup.sh ; $(MAKE)
 endif
 
 

@@ -1181,7 +1181,7 @@ Documents-Attachments and may handle it as stream with lesser memory footprint.
 
     **Response**:
 
-    .. code-block:: http
+    .. code-block:: text
 
         HTTP/1.1 200 OK
         Content-Type: multipart/mixed; boundary="7b1596fc4940bc1be725ad67f11ec1c4"
@@ -1429,7 +1429,7 @@ one by one without any serialization overhead.
 
     **Request**:
 
-    .. code-block:: http
+    .. code-block:: text
 
         PUT /target/SpaghettiWithMeatballs?new_edits=false HTTP/1.1
         Accept: application/json

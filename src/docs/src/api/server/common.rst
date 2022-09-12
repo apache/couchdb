@@ -1904,8 +1904,7 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 
         {
           "uptime": 259,
-          "memory": {
-          ...
+          "memory": {}
         }
 
     These statistics are generally intended for CouchDB developers only.
@@ -2308,8 +2307,7 @@ You can verify the change by obtaining a list of UUIDs:
                             "detail": "initial_copy",
                             "timestamp": "2019-03-28T15:28:02Z",
                             "type": "running"
-                        },
-                        ...
+                        }
                     ],
                     "id": "001-171d1211418996ff47bd610b1d1257fc4ca2628868def4a05e63e8f8fe50694a",
                     "job_state": "completed",
@@ -2324,8 +2322,7 @@ You can verify the change by obtaining a list of UUIDs:
                     ],
                     "type": "split",
                     "update_time": "2019-03-28T15:28:08Z"
-                },
-                ...
+                }
             ],
             "offset": 0,
             "total_rows": 24
@@ -2402,8 +2399,7 @@ You can verify the change by obtaining a list of UUIDs:
                     "detail": "initial_copy",
                     "timestamp": "2019-03-28T15:28:02Z",
                     "type": "running"
-                },
-                ...
+                }
             ]
         }
 
@@ -2461,11 +2457,11 @@ You can verify the change by obtaining a list of UUIDs:
         Accept: application/json
         Content-Type: application/json
 
-       {
+        {
            "db": "db3",
            "range": "80000000-ffffffff",
            "type": "split"
-       }
+        }
 
     **Response**:
 
