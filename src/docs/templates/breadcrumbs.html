@@ -1,0 +1,11 @@
+{%- extends "sphinx_rtd_theme/breadcrumbs.html" %}
+
+{% block breadcrumbs_aside %}
+  {% if pagename != 'index' %}
+    {{ super() }}
+  {% else %}
+   <li class="wy-breadcrumbs-aside">
+      <a href="https://github.com/apache/couchdb/tree/main/src/docs" class="fa fa-github"> Edit on GitHub</a>
+   </li>
+  {% endif %}
+{% endblock %}
