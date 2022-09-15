@@ -122,9 +122,6 @@ changes_callback({change, Change0}, #acc{feed = "continuous"} = Acc) ->
             },
             maybe_finish(Acc1)
     end;
-changes_callback({stop, EndSeq}, #acc{feed = "continuous"} = Acc) ->
-    % Temporary upgrade clause - Case 24236
-    changes_callback({stop, EndSeq, null}, Acc);
 changes_callback({stop, EndSeq, _Pending}, #acc{feed = "continuous"} = Acc) ->
     #acc{resp = Resp} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(
@@ -158,7 +155,7 @@ changes_callback(timeout, #acc{feed = "eventsource"} = Acc) ->
     Chunk = "event: heartbeat\ndata: \n\n",
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
     {ok, {"eventsource", Resp1}};
-changes_callback({stop, _EndSeq}, #acc{feed = "eventsource"} = Acc) ->
+changes_callback({stop, _EndSeq, _Pending}, #acc{feed = "eventsource"} = Acc) ->
     #acc{resp = Resp} = Acc,
     % {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
     chttpd:end_delayed_json_response(Resp);
@@ -200,9 +197,6 @@ changes_callback({change, Change0}, Acc) ->
             },
             maybe_finish(Acc1)
     end;
-changes_callback({stop, EndSeq}, Acc) ->
-    % Temporary upgrade clause - Case 24236
-    changes_callback({stop, EndSeq, null}, Acc);
 changes_callback({stop, EndSeq, _Pending}, Acc) ->
     #acc{resp = Resp} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(
