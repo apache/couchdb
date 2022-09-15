@@ -24,7 +24,6 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 -import(fabric_db_update_listener, [wait_db_updated/1]).
 
@@ -431,16 +430,10 @@ seq({Seq, _Uuid}) -> Seq;
 seq(Seq) -> Seq.
 
 unpack_seq_regex_match(Packed) ->
-    NewPattern = "^\\[[0-9]+\s*,\s*\"(?<opaque>.*)\"\\]$",
-    OldPattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
+    Pattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
     Options = [{capture, [opaque], binary}],
-    case re:run(Packed, NewPattern, Options) of
-        {match, Match} ->
-            Match;
-        nomatch ->
-            {match, Match} = re:run(Packed, OldPattern, Options),
-            Match
-    end.
+    {match, Match} = re:run(Packed, Pattern, Options),
+    Match.
 
 unpack_seq_decode_term(Opaque) ->
     binary_to_term(couch_util:decodeBase64Url(Opaque)).
@@ -464,9 +457,6 @@ unpack_seqs(0, DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
 unpack_seqs("0", DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
-% deprecated
-unpack_seqs([_SeqNum, Opaque], DbName) ->
-    do_unpack_seqs(Opaque, DbName);
 unpack_seqs(Packed, DbName) ->
     Opaque = unpack_seq_regex_match(Packed),
     do_unpack_seqs(Opaque, DbName).
@@ -758,21 +748,14 @@ make_split_seq({Num, Uuid, Node}, RepCount) when RepCount > 1 ->
 make_split_seq(Seq, _) ->
     Seq.
 
-validate_start_seq(_DbName, "now") ->
-    ok;
 validate_start_seq(_DbName, 0) ->
     ok;
 validate_start_seq(_DbName, "0") ->
     ok;
-validate_start_seq(_DbName, Seq) ->
+validate_start_seq(_DbName, Seq) when is_list(Seq) orelse is_binary(Seq) ->
     try
-        case Seq of
-            [_SeqNum, Opaque] ->
-                unpack_seq_decode_term(Opaque);
-            Seq ->
-                Opaque = unpack_seq_regex_match(Seq),
-                unpack_seq_decode_term(Opaque)
-        end,
+        Opaque = unpack_seq_regex_match(Seq),
+        unpack_seq_decode_term(Opaque),
         ok
     catch
         _:_ ->
@@ -792,10 +775,17 @@ get_changes_epoch() ->
 increment_changes_epoch() ->
     application:set_env(fabric, changes_epoch, os:timestamp()).
 
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+-define(TDEF(Name), {atom_to_list(Name), fun Name/0}).
+
 unpack_seq_setup() ->
     meck:new(mem3),
     meck:new(fabric_view),
     meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
+    meck:expect(mem3, shards, fun(_) -> [#shard{}] end),
     meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end),
     ok.
 
@@ -805,74 +795,110 @@ unpack_seqs_test_() ->
         fun unpack_seq_setup/0,
         fun(_) -> meck:unload() end,
         [
-            t_unpack_seqs()
+            ?TDEF(t_full_seq),
+            ?TDEF(t_full_seq_quoted),
+            ?TDEF(t_full_seq_with_hyphen),
+            ?TDEF(t_full_seq_quoted_with_hyphen),
+            ?TDEF(t_no_numeric_prefix),
+            ?TDEF(t_zero_seq_int),
+            ?TDEF(t_zero_seq_string),
+            ?TDEF(t_fail_now),
+            ?TDEF(t_fail_numeric_int),
+            ?TDEF(t_fail_numeric_string),
+            ?TDEF(t_fail_numeric_string_quoted),
+            ?TDEF(t_fail_empty_string),
+            ?TDEF(t_fail_empty_string_quoted),
+            ?TDEF(t_fail_random_junk),
+            ?TDEF(t_fail_old_bigcouch_term),
+            ?TDEF(t_fail_old_bigcouch_string)
         ]
     }.
 
-t_unpack_seqs() ->
-    ?_test(begin
-        % BigCouch 0.3 style.
-        assert_shards(
-            "23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+t_full_seq() ->
+    assert_shards(
+        "23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"
+    ).
+
+t_full_seq_quoted() ->
+    assert_shards(
+        "\"23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\""
+    ).
+
+t_full_seq_with_hyphen() ->
+    assert_shards(
+        "651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
+        "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
+        "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"
+    ).
+
+t_full_seq_quoted_with_hyphen() ->
+    assert_shards(
+        "\"651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
+        "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
+        "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB\""
+    ).
+
+t_no_numeric_prefix() ->
+    assert_shards(
+        "g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"
+    ).
+
+t_zero_seq_int() ->
+    assert_shards(0).
+
+t_zero_seq_string() ->
+    assert_shards("0").
+
+t_fail_now() ->
+    % "now" should have been transformed into a sequence in get_start_seq/2
+    fail("now").
+
+t_fail_numeric_int() ->
+    fail(1234).
+
+t_fail_numeric_string() ->
+    fail("1234").
+
+t_fail_numeric_string_quoted() ->
+    fail("\"1234\"").
+
+t_fail_empty_string() ->
+    fail("").
+
+t_fail_empty_string_quoted() ->
+    fail("\"\"").
+
+t_fail_random_junk() ->
+    fail("randomjunk").
+
+t_fail_old_bigcouch_term() ->
+    fail([
+        23423,
+        <<
+            "g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
             "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
             "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"
-        ),
+        >>
+    ]).
 
-        % BigCouch 0.4 style.
-        assert_shards([
-            23423,
-            <<
-                "g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-                "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-                "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"
-            >>
-        ]),
-
-        % BigCouch 0.4 style (as string).
-        assert_shards(
-            "[23423,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-            "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-            "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"
-        ),
-        assert_shards(
-            "[23423 ,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-            "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-            "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"
-        ),
-        assert_shards(
-            "[23423, \"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-            "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-            "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"
-        ),
-        assert_shards(
-            "[23423 , \"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-            "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-            "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"
-        ),
-
-        % with internal hypen
-        assert_shards(
-            "651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
-            "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
-            "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"
-        ),
-        assert_shards([
-            651,
-            "g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
-            "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
-            "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"
-        ]),
-
-        % CouchDB 1.2 style
-        assert_shards(
-            "\"23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-            "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-            "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\""
-        )
-    end).
+t_fail_old_bigcouch_string() ->
+    fail(
+        "[23423,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"
+    ).
 
 assert_shards(Packed) ->
     ?assertMatch([{#shard{}, _} | _], unpack_seqs(Packed, <<"foo">>)).
+
+fail(Packed) ->
+    ?assertError(badarg, unpack_seqs(Packed, <<"foo">>)).
 
 find_replacements_test() ->
     % None of the workers are in the live list of shard but there is a
@@ -1040,3 +1066,5 @@ find_replacement_sequence_test() ->
     Dead4 = mk_workers(Shards, {replace, 'n1', Uuid, 45}),
     ?assertEqual(0, find_replacement_sequence(Dead4, [0, 10])),
     ?assertEqual(0, find_replacement_sequence(Dead4, [0, 5])).
+
+-endif.
