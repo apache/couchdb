@@ -93,8 +93,8 @@ check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
     ?assert(is_integer(couch_util:get_value(doc_write_failures, RepTask))),
     ?assert(is_integer(couch_util:get_value(revisions_checked, RepTask))),
     ?assert(is_integer(couch_util:get_value(missing_revisions_found, RepTask))),
-    ?assert(is_integer(couch_util:get_value(checkpointed_source_seq, RepTask))),
-    ?assert(is_integer(couch_util:get_value(source_seq, RepTask))),
+    ?assert(is_binary(couch_util:get_value(checkpointed_source_seq, RepTask))),
+    ?assert(is_binary(couch_util:get_value(source_seq, RepTask))),
     Pending = couch_util:get_value(changes_pending, RepTask),
     ?assert(is_integer(Pending)).
 

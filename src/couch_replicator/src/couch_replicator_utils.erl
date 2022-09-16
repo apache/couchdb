@@ -27,7 +27,8 @@
     ejson_state_info/1,
     get_basic_auth_creds/1,
     remove_basic_auth_creds/1,
-    normalize_basic_auth/1
+    normalize_basic_auth/1,
+    seq_encode/1
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
@@ -269,6 +270,15 @@ normalize_basic_auth(#httpdb{} = HttpDb) ->
             {{_, _}, {_, _}, {U, P}} -> {U, P}
         end,
     set_basic_auth_creds(User, Pass, HttpDb1).
+
+seq_encode(Seq) when is_binary(Seq) ->
+    % Don't encode a string, we already got it encoded from the changes feed
+    Seq;
+seq_encode(Seq) ->
+    % This could be either an integer sequence from CouchDB 1.x, a
+    % [Seq, Opaque] json array from BigCouch 0.4, or any other json
+    % object. We are being maximally compatible here.
+    ?JSON_ENCODE(Seq).
 
 -ifdef(TEST).
 
