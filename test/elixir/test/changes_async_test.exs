@@ -104,6 +104,30 @@ defmodule ChangesAsyncTest do
   end
 
   @tag :with_db
+  test "eventsource no junk in response", context do
+    db_name = context[:db_name]
+
+    check_empty_db(db_name)
+    create_doc(db_name, sample_doc_foo())
+    create_doc_bar(db_name, "bar")
+
+    resp = Rawresp.get("/#{db_name}/_changes?feed=eventsource&timeout=500")
+
+    lines = String.split(resp.body, "\n")
+
+    all_lines = lines
+    |> Enum.map(fn p -> Enum.at(String.split(p, ":"), 0) end)
+
+    allowed = ["", "data", "id", "event"]
+
+    allowed_lines = all_lines
+    |> Enum.filter(fn p -> Enum.member?(allowed, p) end)
+
+    assert length(all_lines) == length(allowed_lines)
+
+  end
+
+  @tag :with_db
   test "eventsource heartbeat", context do
     db_name = context[:db_name]
 

@@ -101,6 +101,7 @@
     "continuous filtered changes",
     "continuous filtered changes with doc ids",
     "eventsource changes",
+    "eventsource no junk in response",
     "eventsource heartbeat",
     "live changes",
     "longpoll changes",
