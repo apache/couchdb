@@ -154,7 +154,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
             {source, ?l2b(SourceName)},
             {target, ?l2b(TargetName)},
             {continuous, get_value(continuous, Options, false)},
-            {source_seq, HighestSeq},
+            {source_seq, seq_encode(HighestSeq)},
             {checkpoint_interval, CheckpointInterval}
         ] ++ rep_stats(State)
     ),
@@ -1034,6 +1034,9 @@ get_pending_count_int(#rep_state{source = Db} = St) ->
     {ok, Pending} = couch_replicator_api_wrap:get_pending_count(Db, Seq),
     Pending.
 
+seq_encode(Seq) ->
+    couch_replicator_utils:seq_encode(Seq).
+
 update_task(State) ->
     #rep_state{
         rep_details = #rep{id = JobId},
@@ -1043,8 +1046,8 @@ update_task(State) ->
     Status =
         rep_stats(State) ++
             [
-                {source_seq, HighestSeq},
-                {through_seq, ThroughSeq}
+                {source_seq, seq_encode(HighestSeq)},
+                {through_seq, seq_encode(ThroughSeq)}
             ],
     couch_replicator_scheduler:update_job_stats(JobId, Status),
     couch_task_status:update(Status).
@@ -1063,7 +1066,7 @@ rep_stats(State) ->
         {doc_write_failures, couch_replicator_stats:doc_write_failures(Stats)},
         {bulk_get_docs, couch_replicator_stats:bulk_get_docs(Stats)},
         {bulk_get_attempts, couch_replicator_stats:bulk_get_attempts(Stats)},
-        {checkpointed_source_seq, CommittedSeq}
+        {checkpointed_source_seq, seq_encode(CommittedSeq)}
     ].
 
 replication_start_error({unauthorized, DbUri}) ->

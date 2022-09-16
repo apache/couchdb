@@ -148,7 +148,8 @@ get_pending_count(#httpdb{} = Db, Seq) when is_number(Seq) ->
         end
     end);
 get_pending_count(#httpdb{} = Db, Seq) ->
-    Options = [{path, "_changes"}, {qs, [{"since", ?JSON_ENCODE(Seq)}, {"limit", "0"}]}],
+    EncodedSeq = couch_replicator_utils:seq_encode(Seq),
+    Options = [{path, "_changes"}, {qs, [{"since", EncodedSeq}, {"limit", "0"}]}],
     send_req(Db, Options, fun(200, _, {Props}) ->
         {ok, couch_util:get_value(<<"pending">>, Props, null)}
     end).
@@ -539,6 +540,7 @@ changes_since(
     Options
 ) ->
     Timeout = erlang:max(1000, InactiveTimeout div 3),
+    EncodedSeq = couch_replicator_utils:seq_encode(StartSeq),
     BaseQArgs =
         case get_value(continuous, Options, false) of
             false ->
@@ -548,7 +550,7 @@ changes_since(
         end ++
             [
                 {"style", atom_to_list(Style)},
-                {"since", ?JSON_ENCODE(StartSeq)},
+                {"since", EncodedSeq},
                 {"timeout", integer_to_list(Timeout)}
             ],
     DocIds = get_value(doc_ids, Options),
