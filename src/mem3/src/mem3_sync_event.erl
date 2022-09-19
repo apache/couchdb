@@ -28,7 +28,7 @@ init(_) ->
     {ok, nil}.
 
 handle_event({add_node, Node}, State) when Node =/= node() ->
-    net_kernel:connect_node(Node),
+    mem3_distribution:connect_node(Node),
     mem3_sync_nodes:add([Node]),
     {ok, State};
 handle_event({remove_node, Node}, State) ->

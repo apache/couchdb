@@ -87,6 +87,14 @@ Cluster Options
         [cluster]
         seedlist = couchdb@node1.example.com,couchdb@node2.example.com
 
+    .. config:option:: reconnect_interval_sec:: Cluster connectivity check period.
+
+        .. versionadded:: 3.3
+
+    Period in seconds specifying how often to attempt reconnecting to
+    disconnected nodes. There is a 25% random jitter applied to this
+    value.
+
 RPC Performance Tuning
 ======================
 
