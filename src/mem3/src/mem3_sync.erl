@@ -266,7 +266,6 @@ sync_nodes_and_dbs() ->
     [push(Db, Node) || Db <- local_dbs()].
 
 initial_sync() ->
-    [net_kernel:connect_node(Node) || Node <- mem3:nodes()],
     mem3_sync_nodes:add(nodes()).
 
 initial_sync(Live) ->

@@ -21,6 +21,7 @@ init(_Args) ->
     Children = [
         child(mem3_events),
         child(mem3_nodes),
+        child(mem3_distribution),
         child(mem3_seeds),
         % Order important?
         child(mem3_sync_nodes),
