@@ -46,10 +46,11 @@ teardown({Url, {Db1, Db2, Db3}}) ->
     delete_db(Url, Db1),
     delete_db(Url, Db2),
     delete_db(Url, Db3),
-    ok = config:delete("reshard", "max_jobs", _Persist = false),
-    ok = config:delete("reshard", "require_node_param", _Persist = false),
-    ok = config:delete("reshard", "require_range_param", _Persist = false),
-    ok = config:delete("admins", ?USER, _Persist = false),
+    Persist = false,
+    ok = config:delete("reshard", "max_jobs", Persist),
+    ok = config:delete("reshard", "require_node_param", Persist),
+    ok = config:delete("reshard", "require_range_param", Persist),
+    ok = config:delete("admins", ?USER, Persist),
     meck:unload().
 
 start_couch() ->
@@ -764,12 +765,13 @@ check_max_jobs({Top, {Db1, Db2, _}}) ->
     {timeout, ?TIMEOUT,
         ?_test(begin
             Jobs = Top ++ ?JOBS,
+            Persist = false,
 
-            config:set("reshard", "max_jobs", "0", _Persist = false),
+            config:set("reshard", "max_jobs", "0", Persist),
             {C1, R1} = req(post, Jobs, #{type => split, db => Db1}),
             ?assertMatch({500, [#{<<"error">> := <<"max_jobs_exceeded">>}]}, {C1, R1}),
 
-            config:set("reshard", "max_jobs", "1", _Persist = false),
+            config:set("reshard", "max_jobs", "1", Persist),
             {201, R2} = req(post, Jobs, #{type => split, db => Db1}),
             wait_to_complete(Top, R2),
 
@@ -784,13 +786,13 @@ check_max_jobs({Top, {Db1, Db2, _}}) ->
             ),
 
             % Allow the job to be created by raising max_jobs
-            config:set("reshard", "max_jobs", "2", _Persist = false),
+            config:set("reshard", "max_jobs", "2", Persist),
 
             {C4, R4} = req(post, Jobs, #{type => split, db => Db2}),
             ?assertEqual(201, C4),
 
             % Lower max_jobs after job is created but it's not running
-            config:set("reshard", "max_jobs", "1", _Persist = false),
+            config:set("reshard", "max_jobs", "1", Persist),
 
             % Start resharding again
             ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
@@ -804,11 +806,12 @@ check_node_and_range_required_params({Top, {Db1, _, _}}) ->
     {timeout, ?TIMEOUT,
         ?_test(begin
             Jobs = Top ++ ?JOBS,
+            Persist = false,
 
             Node = atom_to_binary(node(), utf8),
             Range = <<"00000000-ffffffff">>,
 
-            config:set("reshard", "require_node_param", "true", _Persist = false),
+            config:set("reshard", "require_node_param", "true", Persist),
             {C1, R1} = req(post, Jobs, #{type => split, db => Db1}),
             NodeRequiredErr = <<"`node` prameter is required">>,
             ?assertEqual(
@@ -819,7 +822,7 @@ check_node_and_range_required_params({Top, {Db1, _, _}}) ->
                 {C1, R1}
             ),
 
-            config:set("reshard", "require_range_param", "true", _Persist = false),
+            config:set("reshard", "require_range_param", "true", Persist),
             {C2, R2} = req(post, Jobs, #{type => split, db => Db1, node => Node}),
             RangeRequiredErr = <<"`range` prameter is required">>,
             ?assertEqual(
