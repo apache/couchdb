@@ -20,7 +20,7 @@
 ]).
 -export([
     open_doc/3,
-    open_revs/4,
+    open_revs/3, open_revs/4,
     get_doc_info/3,
     get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3,
@@ -269,6 +269,9 @@ set_purge_infos_limit(DbName, Limit, Options) ->
 
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
+
+open_revs(DbName, IdRevsOpts, Options) ->
+    with_db(DbName, Options, {couch_db, open_doc_revs, [IdRevsOpts, Options]}).
 
 open_revs(DbName, Id, Revs, Options) ->
     with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}).
