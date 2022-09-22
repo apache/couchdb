@@ -72,6 +72,7 @@
 
     open_doc/2,
     open_doc/3,
+    open_doc_revs/3,
     open_doc_revs/4,
     open_doc_int/3,
     get_doc_info/2,
@@ -346,6 +347,18 @@ find_ancestor_rev_pos({RevPos, [RevId | Rest]}, AttsSinceRevs) ->
         false ->
             find_ancestor_rev_pos({RevPos - 1, Rest}, AttsSinceRevs)
     end.
+
+open_doc_revs(Db, IdRevsOpts, Options) when is_list(IdRevsOpts) ->
+    increment_stat(Db, [couchdb, database_reads], length(IdRevsOpts)),
+    % IdRevsOpts looks like [{{Id, Revs}, DocOpts}, ...]
+    {IdRevs, DocOptsOnly} = lists:unzip(IdRevsOpts),
+    % Function open_doc_revs_int takes [{Id, Revs},...] as its argument
+    AllResults = open_doc_revs_int(Db, IdRevs, Options),
+    % Apply document open options like {atts_since, ...} etc
+    ResultsZipFun = fun(DocOpts, {ok, Results}) ->
+        [apply_open_options(R, DocOpts) || R <- Results]
+    end,
+    lists:zipwith(ResultsZipFun, DocOptsOnly, AllResults).
 
 open_doc_revs(Db, Id, Revs, Options) ->
     increment_stat(Db, [couchdb, database_reads]),
@@ -1985,12 +1998,17 @@ after_doc_read(#db{} = Db, Doc) ->
     DocWithBody = couch_doc:with_ejson_body(Doc),
     couch_db_plugin:after_doc_read(Db, DocWithBody).
 
-increment_stat(#db{options = Options}, Stat) ->
+increment_stat(#db{} = Db, Stat) ->
+    increment_stat(Db, Stat, 1).
+
+increment_stat(#db{options = Options}, Stat, Count) when
+    is_integer(Count), Count >= 0
+->
     case lists:member(sys_db, Options) of
         true ->
             ok;
         false ->
-            couch_stats:increment_counter(Stat)
+            couch_stats:increment_counter(Stat, Count)
     end.
 
 -spec normalize_dbname(list() | binary()) -> binary().
