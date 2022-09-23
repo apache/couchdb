@@ -28,7 +28,9 @@
     hostname,
     os_pid,
     appid,
-    facility
+    facility,
+    report_level,
+    enterprise_number
 }).
 
 -define(SYSLOG_VERSION, 1).
@@ -55,7 +57,7 @@ init() ->
                         undefined
                 end
         end,
-
+    Level = list_to_atom(config:get("log", "syslog_report_level", "info")),
     {ok, #st{
         socket = Socket,
         host = Host,
@@ -63,20 +65,36 @@ init() ->
         hostname = net_adm:localhost(),
         os_pid = os:getpid(),
         appid = config:get("log", "syslog_appid", "couchdb"),
-        facility = get_facility(config:get("log", "syslog_facility", "local2"))
+        facility = get_facility(config:get("log", "syslog_facility", "local2")),
+        report_level = Level,
+        enterprise_number = config:get("log", "syslog_enterprise_number")
     }}.
 
 terminate(_Reason, St) ->
     gen_udp:close(St#st.socket).
 
-write(Entry, St) ->
+write(#log_entry{level = report} = Entry, #st{enterprise_number = undefined} = St) ->
+    do_write(Entry#log_entry{level = error}, St);
+write(#log_entry{level = report, type = Type} = Entry0, #st{report_level = Level} = St) ->
+    % append @${enterprise_number} to the type to conform with
+    % https://www.rfc-editor.org/rfc/rfc5424.html#page-15
+    TypeSDID = lists:flatten(io_lib:format("~s@~s", [Type, St#st.enterprise_number])),
+    Entry = Entry0#log_entry{
+        type = TypeSDID,
+        level = Level
+    },
+    do_write(Entry, St);
+write(#log_entry{} = Entry, #st{} = St) ->
+    do_write(Entry, St).
+
+do_write(Entry, St) ->
     #log_entry{
         level = Level,
         pid = Pid,
         msg = Msg,
         msg_id = MsgId,
         time_stamp = TimeStamp
-    } = Entry,
+    } = couch_log_util:maybe_format_type(Entry),
     Fmt = "<~B>~B ~s ~s ~s ~p ~s - ",
     Args = [
         St#st.facility bor get_level(Level),

@@ -21,7 +21,7 @@
     critical/2,
     alert/2,
     emergency/2,
-
+    report/2,
     set_level/1
 ]).
 
@@ -49,16 +49,25 @@ alert(Fmt, Args) -> log(alert, Fmt, Args).
 -spec emergency(string(), list()) -> ok.
 emergency(Fmt, Args) -> log(emergency, Fmt, Args).
 
+-spec report(string(), map()) -> ok.
+report(ReportId, Meta) when is_map(Meta) ->
+    couch_stats:increment_counter([couch_log, level, report]),
+    Entry = couch_log_formatter:format(report, self(), ReportId, "", [], Meta),
+    ok = couch_log_server:report(Entry).
+
 -spec set_level(atom() | string() | integer()) -> true.
 set_level(Level) ->
     config:set("log", "level", couch_log_util:level_to_string(Level)).
 
 -spec log(atom(), string(), list()) -> ok.
 log(Level, Fmt, Args) ->
+    log(Level, undefined, Fmt, Args, #{}).
+
+log(Level, Type, Fmt, Args, Meta) ->
     case couch_log_util:should_log(Level) of
         true ->
             couch_stats:increment_counter([couch_log, level, Level]),
-            Entry = couch_log_formatter:format(Level, self(), Fmt, Args),
+            Entry = couch_log_formatter:format(Level, self(), Type, Fmt, Args, Meta),
             ok = couch_log_server:log(Entry);
         false ->
             ok

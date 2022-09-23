@@ -31,6 +31,12 @@ couch_log_writer_syslog_test_() ->
                 [{gen_udp, [unstick]}],
                 fun check_udp_send/0
             )
+        end,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{gen_udp, [unstick]}],
+                fun check_format/0
+            )
         end
     ]}.
 
@@ -80,6 +86,42 @@ check_udp_send() ->
     ?assert(meck:called(gen_udp, send, 4)),
     ?assert(meck:called(gen_udp, close, 1)),
     ?assert(meck:validate(gen_udp)).
+
+check_format() ->
+    meck:expect(gen_udp, open, 1, {ok, socket}),
+    meck:expect(gen_udp, send, 4, ok),
+    meck:expect(gen_udp, close, fun(socket) -> ok end),
+    config:set("log", "syslog_host", "localhost"),
+    config:set("log", "syslog_enterprise_number", "12345"),
+    try
+        Entry = #log_entry{
+            level = report,
+            pid = list_to_pid("<0.1.0>"),
+            msg = "[foo=1] stuff",
+            msg_id = "msg_id",
+            time_stamp = "time_stamp",
+            type = report123
+        },
+        {ok, St} = ?WRITER:init(),
+        {ok, NewSt} = ?WRITER:write(Entry, St),
+        ok = ?WRITER:terminate(stop, NewSt)
+    after
+        config:delete("log", "syslog_host")
+    end,
+
+    ?assert(meck:called(gen_udp, open, 1)),
+    Packet = lists:flatten(meck:capture(first, gen_udp, send, '_', 4)),
+    [SeverityAndVsn, TS, _Host, AppId, Pid, MsgId, _ | Rest] = string:split(Packet, " ", all),
+    ?assertEqual("<150>1", SeverityAndVsn),
+    ?assertEqual("time_stamp", TS),
+    ?assertEqual("couchdb", AppId),
+    ?assertEqual("msg_id", MsgId),
+    ?assert(is_pid(catch list_to_pid(Pid))),
+    ?assertEqual("[report123@12345 foo=1] stuff\n", string:join(Rest, " ")),
+    ?assert(meck:called(gen_udp, close, 1)),
+    ?assert(meck:validate(gen_udp)).
+
+
 
 facility_test() ->
     Names = [

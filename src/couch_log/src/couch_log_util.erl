@@ -21,7 +21,9 @@
     level_to_atom/1,
     level_to_string/1,
 
-    string_p/1
+    string_p/1,
+
+    maybe_format_type/1
 ]).
 
 -include("couch_log.hrl").
@@ -29,6 +31,8 @@
 -spec should_log(#log_entry{} | atom()) -> boolean().
 should_log(#log_entry{level = Level}) ->
     should_log(Level);
+should_log(report) ->
+    should_log(couch_log_config:get(report_level));
 should_log(Level) ->
     level_to_integer(Level) >= couch_log_config:get(level_int).
 
@@ -145,3 +149,10 @@ string_p1([]) ->
     true;
 string_p1(_) ->
     false.
+
+maybe_format_type(#log_entry{type = undefined} = Entry) ->
+    Entry;
+maybe_format_type(#log_entry{type = Type, msg = [$[ | Msg]} = Entry) ->
+    Entry#log_entry{msg = ["[", Type, " " | Msg]};
+maybe_format_type(#log_entry{} = Entry) ->
+    Entry.

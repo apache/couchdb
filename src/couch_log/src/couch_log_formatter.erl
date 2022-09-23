@@ -17,6 +17,7 @@
 -module(couch_log_formatter).
 
 -export([
+    format/6,
     format/4,
     format/3,
     format/1,
@@ -32,12 +33,26 @@
 -define(DEFAULT_TRUNCATION, 1024).
 
 format(Level, Pid, Fmt, Args) ->
+    format(Level, Pid, undefined, Fmt, Args, #{}).
+
+format(report = Level, Pid, Type, Fmt, Args, Meta) ->
     #log_entry{
         level = couch_log_util:level_to_atom(Level),
         pid = Pid,
-        msg = maybe_truncate(Fmt, Args),
+        msg = maybe_truncate(Fmt, Args, Meta, false),
         msg_id = couch_log_util:get_msg_id(),
-        time_stamp = couch_log_util:iso8601_timestamp()
+        time_stamp = couch_log_util:iso8601_timestamp(),
+        type = Type
+    };
+
+format(Level, Pid, Type, Fmt, Args, Meta) ->
+    #log_entry{
+        level = couch_log_util:level_to_atom(Level),
+        pid = Pid,
+        msg = maybe_truncate(Fmt, Args, Meta, true),
+        msg_id = couch_log_util:get_msg_id(),
+        time_stamp = couch_log_util:iso8601_timestamp(),
+        type = Type
     }.
 
 format(Level, Pid, Msg) ->
@@ -365,9 +380,16 @@ format_args([H | T], FmtAcc, ArgsAcc) ->
     {Str, _} = couch_log_trunc_io:print(H, 100),
     format_args(T, ["~s" | FmtAcc], [Str | ArgsAcc]).
 
-maybe_truncate(Fmt, Args) ->
+maybe_truncate(Fmt, Args, Meta, TruncateMeta) ->
     MaxMsgSize = couch_log_config:get(max_message_size),
-    couch_log_trunc_io:format(Fmt, Args, MaxMsgSize).
+    case format_meta(Meta) of
+        "" ->
+            couch_log_trunc_io:format(Fmt, Args, MaxMsgSize);
+        MetaStr when TruncateMeta ->
+            couch_log_trunc_io:format(["[", MetaStr, "] " | Fmt], Args, MaxMsgSize);
+        MetaStr ->
+            ["[", MetaStr, "] " | couch_log_trunc_io:format(Fmt, Args, MaxMsgSize)]
+    end.
 
 maybe_truncate(Msg) ->
     MaxMsgSize = couch_log_config:get(max_message_size),
@@ -436,3 +458,29 @@ get_value(Key, List, Default) ->
 
 supervisor_name({local, Name}) -> Name;
 supervisor_name(Name) -> Name.
+
+format_meta(Meta) ->
+    %% https://www.rfc-editor.org/rfc/rfc5424.html#section-6.3
+    %% iut="3" eventSource="Application" eventID="1011"
+    string:join(maps:fold(fun(K, V, Acc) ->
+        [to_str(K, V) | Acc]
+    end, [], Meta), " ").
+
+%% passing complex terms as meta value is a mistake so we are going
+%% to eat it, because we cannot bubble up errors from logger
+%% Therefore following are not supported
+%% - lists
+%% - tuples
+%% - maps
+%% However we are not going to try to distinguish lists from string
+%% Atoms would be printed as strings
+to_str(K, _) when not (is_list(K) or is_atom(K)) ->
+    "";
+to_str(K, Term) when is_list(Term) ->
+    io_lib:format("~s=\"~s\"", [K, Term]);
+to_str(_K, Term) when is_tuple(Term) ->
+    "";
+to_str(_K, Term) when is_map(Term) ->
+    "";
+to_str(K, Term) ->
+    io_lib:format("~s=\"~p\"", [K, Term]).

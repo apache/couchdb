@@ -25,6 +25,17 @@ truncate_test() ->
     Entry = couch_log_formatter:format(info, self(), Msg),
     ?assert(length(Entry#log_entry.msg) =< 16000).
 
+format_report_test() ->
+    MsgFmt = "This is a reason: ~r",
+    Reason = {foo, [{x, k, 3}, {c, d, 2}]},
+    Entry = couch_log_formatter:format(report, self(), report123, MsgFmt, [Reason], #{
+        foo => 123,
+        bar => "barStr",
+        baz => baz
+    }),
+    Formatted = "[foo=\"123\" baz=\"baz\" bar=\"barStr\"] This is a reason: foo at x:k/3 <= c:d/2",
+    ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
+
 format_reason_test() ->
     MsgFmt = "This is a reason: ~r",
     Reason = {foo, [{x, k, 3}, {c, d, 2}]},

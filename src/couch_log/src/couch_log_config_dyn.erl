@@ -22,6 +22,7 @@
 ]).
 
 get(level) -> info;
+get(report_level) -> info;
 get(level_int) -> 2;
 get(max_message_size) -> 16000;
 get(strip_last_msg) -> true;
