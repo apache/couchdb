@@ -74,6 +74,7 @@ html_context = {
     "conf_py_path": "/src/docs/src/",
     "github_user": "apache",
     "github_repo": "couchdb",
+    "rtd_ver": os.environ.get("READTHEDOCS_VERSION_NAME") or "latest",
 }
 
 text_newlines = "native"
