@@ -17,7 +17,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
 recover(DbName) ->
@@ -37,12 +37,12 @@ check_refresh_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"refresh_ddoc", fun refresh_ddoc/1},
-            {"refresh_ddoc_rev", fun refresh_ddoc_rev/1},
-            {"refresh_vdu", fun refresh_vdu/1},
-            {"refresh_custom", fun refresh_custom/1},
-            {"refresh_multiple", fun refresh_multiple/1}
+        with([
+            ?TDEF(refresh_ddoc),
+            ?TDEF(refresh_ddoc_rev),
+            ?TDEF(refresh_vdu),
+            ?TDEF(refresh_custom),
+            ?TDEF(refresh_multiple)
         ])
     }.
 

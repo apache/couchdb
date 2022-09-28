@@ -333,7 +333,6 @@ float_val(Str, Default) when is_list(Str) ->
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch_replicator/test/eunit/couch_replicator_test.hrl").
 
 -define(DB1, <<"db1">>).
 -define(DB2, <<"db2">>).

@@ -14,11 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--import(couch_prometheus_util, [
-    to_prom/3,
-    to_prom_summary/2
-]).
-
 couch_prometheus_util_test_() ->
     [
         ?_assertEqual(
@@ -67,9 +62,9 @@ couch_prometheus_util_test_() ->
     ].
 
 test_to_prom_output(Metric, Type, Val) ->
-    Out = to_prom(Metric, Type, Val),
+    Out = couch_prometheus_util:to_prom(Metric, Type, Val),
     lists:nth(2, Out).
 
 test_to_prom_sum_output(Metric, Info) ->
-    Out = to_prom_summary(Metric, Info),
+    Out = couch_prometheus_util:to_prom_summary(Metric, Info),
     lists:nth(3, Out).

@@ -845,49 +845,48 @@ reset_remaining(#{} = Targets) ->
     ).
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
 
--define(TDEF(A), {atom_to_list(A), fun A/0}).
+-include_lib("couch/include/couch_eunit.hrl").
 
 find_source_seq_int_test_() ->
     {
         setup,
         fun() -> meck:expect(couch_log, warning, 2, ok) end,
         fun(_) -> meck:unload() end,
-        [
+        with([
             ?TDEF(t_unknown_node),
             ?TDEF(t_unknown_uuid),
             ?TDEF(t_ok),
             ?TDEF(t_old_ok),
             ?TDEF(t_different_node)
-        ]
+        ])
     }.
 
-t_unknown_node() ->
+t_unknown_node(_) ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bing">>, <<"bar_uuid">>, 10),
         0
     ).
 
-t_unknown_uuid() ->
+t_unknown_uuid(_) ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"teapot">>, 10),
         0
     ).
 
-t_ok() ->
+t_ok(_) ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 100),
         100
     ).
 
-t_old_ok() ->
+t_old_ok(_) ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 84),
         50
     ).
 
-t_different_node() ->
+t_different_node(_) ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo2">>, <<"bar">>, <<"bar_uuid">>, 92),
         31
@@ -983,112 +982,104 @@ targets_map_test_() ->
         setup,
         fun() -> meck:new(mem3, [passthrough]) end,
         fun(_) -> meck:unload() end,
-        [
-            target_not_a_shard(),
-            source_contained_in_target(),
-            multiple_targets(),
-            uneven_overlap(),
-            target_not_in_shard_map()
-        ]
+        with([
+            ?TDEF(target_not_a_shard),
+            ?TDEF(source_contained_in_target),
+            ?TDEF(multiple_targets),
+            ?TDEF(uneven_overlap),
+            ?TDEF(target_not_in_shard_map)
+        ])
     }.
 
-target_not_a_shard() ->
-    ?_assertEqual(#{[0, ?RING_END] => <<"t">>}, targets_map(<<"s">>, <<"t">>)).
+target_not_a_shard(_) ->
+    ?assertEqual(#{[0, ?RING_END] => <<"t">>}, targets_map(<<"s">>, <<"t">>)).
 
-source_contained_in_target() ->
-    ?_test(begin
-        R07 = [16#00000000, 16#7fffffff],
-        R8f = [16#80000000, 16#ffffffff],
-        R0f = [16#00000000, 16#ffffffff],
+source_contained_in_target(_) ->
+    R07 = [16#00000000, 16#7fffffff],
+    R8f = [16#80000000, 16#ffffffff],
+    R0f = [16#00000000, 16#ffffffff],
 
-        Shards = [
-            #shard{node = 'n1', range = R07},
-            #shard{node = 'n1', range = R8f},
-            #shard{node = 'n2', range = R07},
-            #shard{node = 'n2', range = R8f},
-            #shard{node = 'n3', range = R0f}
-        ],
-        meck:expect(mem3, shards, 1, Shards),
+    Shards = [
+        #shard{node = 'n1', range = R07},
+        #shard{node = 'n1', range = R8f},
+        #shard{node = 'n2', range = R07},
+        #shard{node = 'n2', range = R8f},
+        #shard{node = 'n3', range = R0f}
+    ],
+    meck:expect(mem3, shards, 1, Shards),
 
-        SrcName1 = <<"shards/00000000-7fffffff/d.1551893552">>,
-        TgtName1 = <<"shards/00000000-7fffffff/d.1551893552">>,
+    SrcName1 = <<"shards/00000000-7fffffff/d.1551893552">>,
+    TgtName1 = <<"shards/00000000-7fffffff/d.1551893552">>,
 
-        Src1 = #shard{name = SrcName1, node = 'n1'},
-        Tgt1 = #shard{name = TgtName1, node = 'n2'},
-        Map1 = targets_map(Src1, Tgt1),
-        ?assertEqual(1, map_size(Map1)),
-        ?assertMatch(#{R07 := #shard{node = 'n2'}}, Map1),
+    Src1 = #shard{name = SrcName1, node = 'n1'},
+    Tgt1 = #shard{name = TgtName1, node = 'n2'},
+    Map1 = targets_map(Src1, Tgt1),
+    ?assertEqual(1, map_size(Map1)),
+    ?assertMatch(#{R07 := #shard{node = 'n2'}}, Map1),
 
-        Tgt2 = #shard{name = TgtName1, node = 'n3'},
-        Map2 = targets_map(Src1, Tgt2),
-        ?assertEqual(1, map_size(Map2)),
-        ?assertMatch(#{R0f := #shard{node = 'n3'}}, Map2)
-    end).
+    Tgt2 = #shard{name = TgtName1, node = 'n3'},
+    Map2 = targets_map(Src1, Tgt2),
+    ?assertEqual(1, map_size(Map2)),
+    ?assertMatch(#{R0f := #shard{node = 'n3'}}, Map2).
 
-multiple_targets() ->
-    ?_test(begin
-        R07 = [16#00000000, 16#7fffffff],
-        R8f = [16#80000000, 16#ffffffff],
-        R0f = [16#00000000, 16#ffffffff],
+multiple_targets(_) ->
+    R07 = [16#00000000, 16#7fffffff],
+    R8f = [16#80000000, 16#ffffffff],
+    R0f = [16#00000000, 16#ffffffff],
 
-        Shards = [
-            #shard{node = 'n1', range = R07},
-            #shard{node = 'n1', range = R8f},
-            #shard{node = 'n2', range = R0f}
-        ],
-        meck:expect(mem3, shards, 1, Shards),
+    Shards = [
+        #shard{node = 'n1', range = R07},
+        #shard{node = 'n1', range = R8f},
+        #shard{node = 'n2', range = R0f}
+    ],
+    meck:expect(mem3, shards, 1, Shards),
 
-        SrcName = <<"shards/00000000-ffffffff/d.1551893552">>,
-        TgtName = <<"shards/00000000-7fffffff/d.1551893552">>,
+    SrcName = <<"shards/00000000-ffffffff/d.1551893552">>,
+    TgtName = <<"shards/00000000-7fffffff/d.1551893552">>,
 
-        Src = #shard{name = SrcName, node = 'n2'},
-        Tgt = #shard{name = TgtName, node = 'n1'},
-        Map = targets_map(Src, Tgt),
-        ?assertEqual(2, map_size(Map)),
-        ?assertMatch(#{R07 := #shard{node = 'n1'}}, Map),
-        ?assertMatch(#{R8f := #shard{node = 'n1'}}, Map)
-    end).
+    Src = #shard{name = SrcName, node = 'n2'},
+    Tgt = #shard{name = TgtName, node = 'n1'},
+    Map = targets_map(Src, Tgt),
+    ?assertEqual(2, map_size(Map)),
+    ?assertMatch(#{R07 := #shard{node = 'n1'}}, Map),
+    ?assertMatch(#{R8f := #shard{node = 'n1'}}, Map).
 
-uneven_overlap() ->
-    ?_test(begin
-        R04 = [16#00000000, 16#4fffffff],
-        R26 = [16#20000000, 16#6fffffff],
-        R58 = [16#50000000, 16#8fffffff],
-        R9f = [16#90000000, 16#ffffffff],
-        Shards = [
-            #shard{node = 'n1', range = R04},
-            #shard{node = 'n1', range = R58},
-            #shard{node = 'n1', range = R9f},
-            #shard{node = 'n2', range = R26}
-        ],
+uneven_overlap(_) ->
+    R04 = [16#00000000, 16#4fffffff],
+    R26 = [16#20000000, 16#6fffffff],
+    R58 = [16#50000000, 16#8fffffff],
+    R9f = [16#90000000, 16#ffffffff],
+    Shards = [
+        #shard{node = 'n1', range = R04},
+        #shard{node = 'n1', range = R58},
+        #shard{node = 'n1', range = R9f},
+        #shard{node = 'n2', range = R26}
+    ],
 
-        meck:expect(mem3, shards, 1, Shards),
+    meck:expect(mem3, shards, 1, Shards),
 
-        SrcName = <<"shards/20000000-6fffffff/d.1551893552">>,
-        TgtName = <<"shards/20000000-6fffffff/d.1551893552">>,
+    SrcName = <<"shards/20000000-6fffffff/d.1551893552">>,
+    TgtName = <<"shards/20000000-6fffffff/d.1551893552">>,
 
-        Src = #shard{name = SrcName, node = 'n2'},
-        Tgt = #shard{name = TgtName, node = 'n1'},
-        Map = targets_map(Src, Tgt),
-        ?assertEqual(2, map_size(Map)),
-        ?assertMatch(#{R04 := #shard{node = 'n1'}}, Map),
-        ?assertMatch(#{R58 := #shard{node = 'n1'}}, Map)
-    end).
+    Src = #shard{name = SrcName, node = 'n2'},
+    Tgt = #shard{name = TgtName, node = 'n1'},
+    Map = targets_map(Src, Tgt),
+    ?assertEqual(2, map_size(Map)),
+    ?assertMatch(#{R04 := #shard{node = 'n1'}}, Map),
+    ?assertMatch(#{R58 := #shard{node = 'n1'}}, Map).
 
-target_not_in_shard_map() ->
-    ?_test(begin
-        R0f = [16#00000000, 16#ffffffff],
-        Name = <<"shards/00000000-ffffffff/d.1551893552">>,
-        Shards = [
-            #shard{name = Name, node = 'n1', range = R0f},
-            #shard{name = Name, node = 'n2', range = R0f}
-        ],
-        meck:expect(mem3, shards, 1, Shards),
-        Src = #shard{name = Name, node = 'n1'},
-        Tgt = #shard{name = Name, node = 'n3'},
-        Map = targets_map(Src, Tgt),
-        ?assertEqual(1, map_size(Map)),
-        ?assertMatch(#{R0f := #shard{name = Name, node = 'n3'}}, Map)
-    end).
+target_not_in_shard_map(_) ->
+    R0f = [16#00000000, 16#ffffffff],
+    Name = <<"shards/00000000-ffffffff/d.1551893552">>,
+    Shards = [
+        #shard{name = Name, node = 'n1', range = R0f},
+        #shard{name = Name, node = 'n2', range = R0f}
+    ],
+    meck:expect(mem3, shards, 1, Shards),
+    Src = #shard{name = Name, node = 'n1'},
+    Tgt = #shard{name = Name, node = 'n3'},
+    Map = targets_map(Src, Tgt),
+    ?assertEqual(1, map_size(Map)),
+    ?assertMatch(#{R0f := #shard{name = Name, node = 'n3'}}, Map).
 
 -endif.

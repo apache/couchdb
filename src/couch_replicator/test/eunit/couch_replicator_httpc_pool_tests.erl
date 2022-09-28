@@ -13,7 +13,6 @@
 -module(couch_replicator_httpc_pool_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("couch_replicator_test.hrl").
 
 -define(TIMEOUT, 1000).
 

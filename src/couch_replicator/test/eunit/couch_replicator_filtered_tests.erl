@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include("couch_replicator_test.hrl").
 
 -define(DDOC,
     {[

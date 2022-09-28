@@ -12,6 +12,9 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+% Some test modules do not use with, so squash the unused fun compiler warning
+-compile([{nowarn_unused_function, [{with, 1}]}]).
+
 -define(BUILDDIR,
     fun() ->
         case os:getenv("BUILDDIR") of
@@ -75,3 +78,24 @@
 	  end)(Expect))).
 -endif.
 -define(_assertEquiv(Expect, Expr), ?_test(?assertEquiv(Expect, Expr))).
+
+
+-ifndef(TDEF).
+-define(TDEF(Name), {atom_to_list(Name), fun Name/1}).
+-define(TDEF(Name, Timeout), {atom_to_list(Name), Timeout, fun Name/1}).
+-endif.
+
+-ifndef(TDEF_FE).
+-define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
+-define(TDEF_FE(Name, Timeout), fun(Arg) -> {atom_to_list(Name), {timeout, Timeout, ?_test(Name(Arg))}} end).
+-endif.
+
+with(Tests) ->
+    fun(ArgsTuple) ->
+        lists:map(fun
+            ({Name, Fun}) ->
+                {Name, ?_test(Fun(ArgsTuple))};
+            ({Name, Timeout, Fun}) ->
+                {Name, {timeout, Timeout, ?_test(Fun(ArgsTuple))}}
+        end, Tests)
+    end.

@@ -12,10 +12,10 @@
 
 -module(global_changes_hooks_tests).
 
+-export([allowed_owner/2]).
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
--export([allowed_owner/2]).
 
 -define(t2l(V), lists:flatten(io_lib:format("~p", [V]))).
 

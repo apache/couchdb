@@ -1,12 +1,5 @@
 -module(couch_replicator_test_helper).
 
--include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
--include_lib("couch_replicator/src/couch_replicator.hrl").
-
--define(USERNAME, "rep_test_user").
--define(PASSWORD, "rep_test_pass").
-
 -export([
     cluster_compare_dbs/2,
     cluster_compare_dbs/3,
@@ -22,6 +15,13 @@
     setup_db/0,
     teardown_db/1
 ]).
+
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_replicator/src/couch_replicator.hrl").
+
+-define(USERNAME, "rep_test_user").
+-define(PASSWORD, "rep_test_pass").
 
 cluster_compare_dbs(Source, Target) ->
     cluster_compare_dbs(Source, Target, []).

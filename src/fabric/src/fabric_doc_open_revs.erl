@@ -14,10 +14,8 @@
 
 -export([go/4]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 -record(state, {
     dbname,
@@ -317,7 +315,7 @@ collapse_duplicate_revs_int([Reply | Rest]) ->
     [Reply | collapse_duplicate_revs(Rest)].
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 setup_all() ->
     config:start_link([]),

@@ -271,7 +271,9 @@ stop_unused_workers(Workers, AllResponses, UsedResponses, CleanupCb) ->
 stop_workers(Shards) when is_list(Shards) ->
     rexi:kill_all([{Node, Ref} || #shard{node = Node, ref = Ref} <- Shards]).
 
-% Unit tests
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
 
 is_progress_possible_full_range_test() ->
     % a base case
@@ -558,3 +560,5 @@ mk_shard(Name, Range) ->
     Node = list_to_atom(Name),
     BName = list_to_binary(Name),
     #shard{name = BName, node = Node, range = Range}.
+
+-endif.

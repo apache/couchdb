@@ -13,7 +13,6 @@
 -module(chttpd_util_test).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("chttpd_test.hrl").
 
 setup() ->
     ok = lists:foreach(

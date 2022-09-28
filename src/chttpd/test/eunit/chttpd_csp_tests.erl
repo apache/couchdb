@@ -31,12 +31,6 @@
 -define(SHOW1, "show1").
 -define(LIST1, "list1").
 -define(SALT, <<"01234567890123456789012345678901">>).
--define(TDEF(Name), {atom_to_list(Name), fun Name/1}).
--define(TDEF(Name, Timeout), {atom_to_list(Name), Timeout, fun Name/1}).
--define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
--define(TDEF_FE(Name, Timeout), fun(Arg) ->
-    {atom_to_list(Name), {timeout, Timeout, ?_test(Name(Arg))}}
-end).
 
 csp_test_() ->
     {

@@ -18,7 +18,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
 recover(DbName) ->
@@ -46,12 +46,12 @@ check_refresh_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"remove_ddoc", fun remove_ddoc/1},
-            {"remove_ddoc_rev", fun remove_ddoc_rev/1},
-            {"remove_ddoc_rev_only", fun remove_ddoc_rev_only/1},
-            {"remove_custom_not_ok", fun remove_custom_not_ok/1},
-            {"remove_custom_error", fun remove_custom_error/1}
+        with([
+            ?TDEF(remove_ddoc),
+            ?TDEF(remove_ddoc_rev),
+            ?TDEF(remove_ddoc_rev_only),
+            ?TDEF(remove_custom_not_ok),
+            ?TDEF(remove_custom_error)
         ])
     }.
 
