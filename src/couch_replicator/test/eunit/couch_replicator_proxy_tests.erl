@@ -15,7 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
--include("couch_replicator_test.hrl").
 
 setup() ->
     ok.

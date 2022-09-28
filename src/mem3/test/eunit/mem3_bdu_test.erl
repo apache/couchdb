@@ -15,8 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
-
 -define(USER, "mem3_bdu_test_admin").
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).

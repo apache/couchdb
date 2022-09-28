@@ -15,8 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TDEF(A), {A, fun A/1}).
-
 main_test_() ->
     {
         setup,
@@ -28,27 +26,27 @@ main_test_() ->
                 foreach,
                 fun setup_no_db_or_config/0,
                 fun teardown_db/1,
-                lists:map(fun wrap/1, [
-                    ?TDEF(t_no_config_non_shard_db_create_succeeds)
-                ])
+                [
+                    ?TDEF_FE(t_no_config_non_shard_db_create_succeeds)
+                ]
             },
             {
                 foreach,
                 fun setup_shard/0,
                 fun teardown_noop/1,
-                lists:map(fun wrap/1, [
-                    ?TDEF(t_no_db),
-                    ?TDEF(t_no_config_db_create_fails_for_shard),
-                    ?TDEF(t_no_config_db_create_fails_for_shard_rpc)
-                ])
+                [
+                    ?TDEF_FE(t_no_db),
+                    ?TDEF_FE(t_no_config_db_create_fails_for_shard),
+                    ?TDEF_FE(t_no_config_db_create_fails_for_shard_rpc)
+                ]
             },
             {
                 foreach,
                 fun setup_shard/0,
                 fun teardown_db/1,
-                lists:map(fun wrap/1, [
-                    ?TDEF(t_db_create_with_config)
-                ])
+                [
+                    ?TDEF_FE(t_db_create_with_config)
+                ]
             }
         ]
     }.
@@ -77,15 +75,6 @@ teardown_noop(_DbName) ->
 
 teardown_db(DbName) ->
     ok = couch_server:delete(DbName, []).
-
-wrap({Name, Fun}) ->
-    fun(Arg) ->
-        {timeout, 60,
-            {atom_to_list(Name), fun() ->
-                process_flag(trap_exit, true),
-                Fun(Arg)
-            end}}
-    end.
 
 t_no_db(DbName) ->
     ?assertEqual({not_found, no_db_file}, couch_db:open_int(DbName, [?ADMIN_CTX])).

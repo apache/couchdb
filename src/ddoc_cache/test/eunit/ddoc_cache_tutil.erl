@@ -102,9 +102,3 @@ purge_modules() ->
         undefined ->
             ok
     end.
-
-%% eunit implementation of {with, Tests} doesn't detect test name correctly
-with(Tests) ->
-    fun(ArgsTuple) ->
-        [{Name, ?_test(Fun(ArgsTuple))} || {Name, Fun} <- Tests]
-    end.

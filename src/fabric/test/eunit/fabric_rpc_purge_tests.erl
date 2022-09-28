@@ -15,8 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TDEF(A), {A, fun A/1}).
-
 % TODO: Add tests:
 %         - filter some updates
 %         - allow for an update that was filtered by a node
@@ -33,35 +31,35 @@ main_test_() ->
                 foreach,
                 fun setup_no_purge/0,
                 fun teardown_no_purge/1,
-                lists:map(fun wrap/1, [
-                    ?TDEF(t_no_purge_no_filter)
-                ])
+                [
+                    ?TDEF_FE(t_no_purge_no_filter)
+                ]
             },
             {
                 foreach,
                 fun setup_single_purge/0,
                 fun teardown_single_purge/1,
-                lists:map(fun wrap/1, [
-                    ?TDEF(t_filter),
-                    ?TDEF(t_filter_unknown_node),
-                    ?TDEF(t_filter_local_node),
-                    ?TDEF(t_no_filter_old_node),
-                    ?TDEF(t_no_filter_different_node),
-                    ?TDEF(t_no_filter_after_repl)
-                ])
+                [
+                    ?TDEF_FE(t_filter),
+                    ?TDEF_FE(t_filter_unknown_node),
+                    ?TDEF_FE(t_filter_local_node),
+                    ?TDEF_FE(t_no_filter_old_node),
+                    ?TDEF_FE(t_no_filter_different_node),
+                    ?TDEF_FE(t_no_filter_after_repl)
+                ]
             },
             {
                 foreach,
                 fun setup_multi_purge/0,
                 fun teardown_multi_purge/1,
-                lists:map(fun wrap/1, [
-                    ?TDEF(t_filter),
-                    ?TDEF(t_filter_unknown_node),
-                    ?TDEF(t_filter_local_node),
-                    ?TDEF(t_no_filter_old_node),
-                    ?TDEF(t_no_filter_different_node),
-                    ?TDEF(t_no_filter_after_repl)
-                ])
+                [
+                    ?TDEF_FE(t_filter),
+                    ?TDEF_FE(t_filter_unknown_node),
+                    ?TDEF_FE(t_filter_local_node),
+                    ?TDEF_FE(t_no_filter_old_node),
+                    ?TDEF_FE(t_no_filter_different_node),
+                    ?TDEF_FE(t_no_filter_after_repl)
+                ]
             }
         ]
     }.
@@ -189,15 +187,6 @@ t_no_filter_after_repl({DbName, DocId, OldDoc, PSeq}) ->
     rpc_update_doc(DbName, OldDoc),
 
     ?assertEqual({ok, OldDoc}, open_doc(DbName, DocId)).
-
-wrap({Name, Fun}) ->
-    fun(Arg) ->
-        {timeout, 60,
-            {atom_to_list(Name), fun() ->
-                process_flag(trap_exit, true),
-                Fun(Arg)
-            end}}
-    end.
 
 create_db() ->
     DbName = ?tempdb(),

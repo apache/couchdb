@@ -13,7 +13,6 @@
 -module(couch_replicator_connection_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("couch_replicator_test.hrl").
 
 setup() ->
     Host = config:get("httpd", "bind_address", "127.0.0.1"),

@@ -777,9 +777,7 @@ increment_changes_epoch() ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
-
--define(TDEF(Name), {atom_to_list(Name), fun Name/0}).
+-include_lib("couch/include/couch_eunit.hrl").
 
 unpack_seq_setup() ->
     meck:new(mem3),
@@ -794,7 +792,7 @@ unpack_seqs_test_() ->
         setup,
         fun unpack_seq_setup/0,
         fun(_) -> meck:unload() end,
-        [
+        with([
             ?TDEF(t_full_seq),
             ?TDEF(t_full_seq_quoted),
             ?TDEF(t_full_seq_with_hyphen),
@@ -811,73 +809,73 @@ unpack_seqs_test_() ->
             ?TDEF(t_fail_random_junk),
             ?TDEF(t_fail_old_bigcouch_term),
             ?TDEF(t_fail_old_bigcouch_string)
-        ]
+        ])
     }.
 
-t_full_seq() ->
+t_full_seq(_) ->
     assert_shards(
         "23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"
     ).
 
-t_full_seq_quoted() ->
+t_full_seq_quoted(_) ->
     assert_shards(
         "\"23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\""
     ).
 
-t_full_seq_with_hyphen() ->
+t_full_seq_with_hyphen(_) ->
     assert_shards(
         "651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
         "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
         "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"
     ).
 
-t_full_seq_quoted_with_hyphen() ->
+t_full_seq_quoted_with_hyphen(_) ->
     assert_shards(
         "\"651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
         "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
         "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB\""
     ).
 
-t_no_numeric_prefix() ->
+t_no_numeric_prefix(_) ->
     assert_shards(
         "g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"
     ).
 
-t_zero_seq_int() ->
+t_zero_seq_int(_) ->
     assert_shards(0).
 
-t_zero_seq_string() ->
+t_zero_seq_string(_) ->
     assert_shards("0").
 
-t_fail_now() ->
+t_fail_now(_) ->
     % "now" should have been transformed into a sequence in get_start_seq/2
     fail("now").
 
-t_fail_numeric_int() ->
+t_fail_numeric_int(_) ->
     fail(1234).
 
-t_fail_numeric_string() ->
+t_fail_numeric_string(_) ->
     fail("1234").
 
-t_fail_numeric_string_quoted() ->
+t_fail_numeric_string_quoted(_) ->
     fail("\"1234\"").
 
-t_fail_empty_string() ->
+t_fail_empty_string(_) ->
     fail("").
 
-t_fail_empty_string_quoted() ->
+t_fail_empty_string_quoted(_) ->
     fail("\"\"").
 
-t_fail_random_junk() ->
+t_fail_random_junk(_) ->
     fail("randomjunk").
 
-t_fail_old_bigcouch_term() ->
+t_fail_old_bigcouch_term(_) ->
     fail([
         23423,
         <<
@@ -887,7 +885,7 @@ t_fail_old_bigcouch_term() ->
         >>
     ]).
 
-t_fail_old_bigcouch_string() ->
+t_fail_old_bigcouch_string(_) ->
     fail(
         "[23423,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"

@@ -13,7 +13,7 @@
 -module(ddoc_cache_disabled_test).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
 start_couch() ->
@@ -26,10 +26,10 @@ check_disabled_test_() ->
         setup,
         fun start_couch/0,
         fun ddoc_cache_tutil:stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"resp_ok", fun resp_ok/1},
-            {"resp_not_found", fun resp_not_found/1},
-            {"check_effectively_disabled", fun check_effectively_disabled/1}
+        with([
+            ?TDEF(resp_ok),
+            ?TDEF(resp_not_found),
+            ?TDEF(check_effectively_disabled)
         ])
     }.
 

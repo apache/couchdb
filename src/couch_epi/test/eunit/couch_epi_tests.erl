@@ -12,12 +12,12 @@
 
 -module(couch_epi_tests).
 
+-export([notify_cb/4, save/3, get/2]).
+
 -include_lib("couch/include/couch_eunit.hrl").
 
 -define(DATA_FILE1, ?ABS_PATH("test/eunit/fixtures/app_data1.cfg")).
 -define(DATA_FILE2, ?ABS_PATH("test/eunit/fixtures/app_data2.cfg")).
-
--export([notify_cb/4, save/3, get/2]).
 
 -record(ctx, {file, handle, pid, kv, key, modules = []}).
 

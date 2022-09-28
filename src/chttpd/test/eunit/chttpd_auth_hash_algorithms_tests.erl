@@ -14,7 +14,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("chttpd/test/eunit/chttpd_test.hrl").
 
 -define(ADM_USER, "adm_user").
 -define(ADM_PASS, "adm_pass").

@@ -480,6 +480,10 @@ fix_skip_and_limit(#mrargs{} = Args) ->
 remove_finalizer(Args) ->
     couch_mrview_util:set_extra(Args, finalizer, null).
 
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
 remove_overlapping_shards_test() ->
     Cb = undefined,
 
@@ -559,3 +563,5 @@ mk_shard(Name, Range) ->
     Node = list_to_atom(Name),
     BName = list_to_binary(Name),
     #shard{name = BName, node = Node, range = Range}.
+
+-endif.

@@ -1,7 +1,6 @@
 -module(couch_replicator_rate_limiter_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("couch_replicator_test.hrl").
 
 rate_limiter_test_() ->
     {

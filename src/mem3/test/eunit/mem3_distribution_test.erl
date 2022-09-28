@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
 -define(MOD, mem3_distribution).
 
 setup() ->

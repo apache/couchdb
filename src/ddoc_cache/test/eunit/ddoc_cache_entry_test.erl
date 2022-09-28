@@ -16,8 +16,7 @@
     recover/1
 ]).
 
--include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
 recover(<<"foo">>) ->
@@ -39,14 +38,14 @@ check_entry_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"cancel_and_replace_opener", fun cancel_and_replace_opener/1},
-            {"condenses_access_messages", fun condenses_access_messages/1},
-            {"kill_opener_on_terminate", fun kill_opener_on_terminate/1},
-            {"evict_when_not_accessed", fun evict_when_not_accessed/1},
-            {"open_dead_entry", fun open_dead_entry/1},
-            {"handles_bad_messages", fun handles_bad_messages/1},
-            {"handles_code_change", fun handles_code_change/1}
+        with([
+            ?TDEF(cancel_and_replace_opener),
+            ?TDEF(condenses_access_messages),
+            ?TDEF(kill_opener_on_terminate),
+            ?TDEF(evict_when_not_accessed),
+            ?TDEF(open_dead_entry),
+            ?TDEF(handles_bad_messages),
+            ?TDEF(handles_code_change)
         ])
     }.
 

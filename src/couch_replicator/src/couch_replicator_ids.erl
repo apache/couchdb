@@ -178,8 +178,7 @@ get_non_default_port(_Schema, Port) ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
--include_lib("couch_replicator/test/eunit/couch_replicator_test.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 winning_revs_id_test_() ->
     {

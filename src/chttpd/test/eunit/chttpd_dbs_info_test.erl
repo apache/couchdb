@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include("chttpd_test.hrl").
 
 -define(USER, "chttpd_db_test_admin").
 -define(PASS, "pass").

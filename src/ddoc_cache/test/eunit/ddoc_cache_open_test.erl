@@ -19,9 +19,7 @@
     insert/2
 ]).
 
--include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
--include("ddoc_cache_test.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 %% behaviour callbacks
 dbname(DbName) ->
@@ -58,12 +56,11 @@ check_open_error_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"should_return_database_does_not_exist", fun should_return_database_does_not_exist/1},
-            {"should_not_call_recover_when_database_does_not_exist",
-                fun should_not_call_recover_when_database_does_not_exist/1},
-            {"should_call_recover_when_needed", fun should_call_recover_when_needed/1},
-            {"should_call_recover_when_needed", fun should_not_crash_lru_process/1}
+        with([
+            ?TDEF(should_return_database_does_not_exist),
+            ?TDEF(should_not_call_recover_when_database_does_not_exist),
+            ?TDEF(should_call_recover_when_needed),
+            ?TDEF(should_not_crash_lru_process)
         ])
     }.
 

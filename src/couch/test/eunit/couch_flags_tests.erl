@@ -12,8 +12,6 @@
 
 -module(couch_flags_tests).
 
--include_lib("couch/include/couch_eunit.hrl").
-
 %% couch_epi_plugin behaviour callbacks
 -export([
     app/0,
@@ -28,6 +26,8 @@
 -export([
     rules/0
 ]).
+
+-include_lib("couch/include/couch_eunit.hrl").
 
 app() ->
     test_app.

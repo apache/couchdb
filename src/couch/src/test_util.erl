@@ -12,11 +12,6 @@
 
 -module(test_util).
 
--include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
--include("couch_db_int.hrl").
--include("couch_bt_engine.hrl").
-
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
 -export([revtree_generate/4, revtree_get_revs/1, random_rev/0]).
@@ -41,6 +36,11 @@
 -export([fake_db/1]).
 
 -export([shuffle/1]).
+
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch/include/couch_db.hrl").
+-include("couch_db_int.hrl").
+-include("couch_bt_engine.hrl").
 
 -record(test_context, {mocked = [], started = [], module}).
 

@@ -17,7 +17,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
 recover(DbName) ->
@@ -37,14 +37,14 @@ check_basic_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"cache_ddoc", fun cache_ddoc/1},
-            {"cache_ddoc_rev", fun cache_ddoc_rev/1},
-            {"cache_vdu", fun cache_vdu/1},
-            {"cache_custom", fun cache_custom/1},
-            {"cache_ddoc_refresher_unchanged", fun cache_ddoc_refresher_unchanged/1},
-            {"dont_cache_not_found", fun dont_cache_not_found/1},
-            {"deprecated_api_works", fun deprecated_api_works/1}
+        with([
+            ?TDEF(cache_ddoc),
+            ?TDEF(cache_ddoc_rev),
+            ?TDEF(cache_vdu),
+            ?TDEF(cache_custom),
+            ?TDEF(cache_ddoc_refresher_unchanged),
+            ?TDEF(dont_cache_not_found),
+            ?TDEF(deprecated_api_works)
         ])
     }.
 

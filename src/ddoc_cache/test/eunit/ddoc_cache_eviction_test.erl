@@ -16,8 +16,7 @@
     recover/1
 ]).
 
--include_lib("couch/include/couch_db.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include("ddoc_cache_test.hrl").
 
@@ -38,9 +37,9 @@ check_eviction_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        ddoc_cache_tutil:with([
-            {"evict_all", fun evict_all/1},
-            {"dont_evict_all_unrelated", fun dont_evict_all_unrelated/1}
+        with([
+            ?TDEF(evict_all),
+            ?TDEF(dont_evict_all_unrelated)
         ])
     }.
 

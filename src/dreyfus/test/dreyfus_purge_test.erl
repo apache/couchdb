@@ -12,11 +12,6 @@
 
 -module(dreyfus_purge_test).
 
--include_lib("couch/include/couch_db.hrl").
--include_lib("dreyfus/include/dreyfus.hrl").
--include_lib("couch/include/couch_eunit.hrl").
--include_lib("mem3/include/mem3.hrl").
-
 -export([
     test_purge_single/0,
     test_purge_multiple/0,
@@ -32,6 +27,7 @@
     test_delete_conflict/0,
     test_all/0
 ]).
+
 -export([
     test_verify_index_exists1/0,
     test_verify_index_exists2/0,
@@ -43,6 +39,11 @@
 
 -compile(export_all).
 -compile(nowarn_export_all).
+
+-include_lib("couch/include/couch_db.hrl").
+-include_lib("dreyfus/include/dreyfus.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 test_all() ->
     test_purge_single(),
