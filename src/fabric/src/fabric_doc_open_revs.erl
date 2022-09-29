@@ -91,8 +91,10 @@ handle_message({ok, RawReplies}, Worker, State) ->
 
     IsTree = Revs == all orelse Latest,
 
+    NewReplyCount = ReplyCount + 1,
+
     % Do not count error replies when checking quorum
-    RealReplyCount = ReplyCount + 1 - ReplyErrorCount,
+    RealReplyCount = NewReplyCount - ReplyErrorCount,
     QuorumReplies = RealReplyCount >= R,
     {NewReplies, QuorumMet, Repair} =
         case IsTree of
@@ -108,26 +110,8 @@ handle_message({ok, RawReplies}, Worker, State) ->
                 {NewReplies0, MinCount} = dict_replies(PrevReplies, RawReplies),
                 {NewReplies0, MinCount >= R, false}
         end,
-    NewNodeRevs =
-        if
-            Worker == nil ->
-                PrevNodeRevs;
-            true ->
-                IdRevs = lists:foldl(
-                    fun
-                        ({ok, #doc{revs = {Pos, [Rev | _]}}}, Acc) ->
-                            [{Pos, Rev} | Acc];
-                        (_, Acc) ->
-                            Acc
-                    end,
-                    [],
-                    RawReplies
-                ),
-                if
-                    IdRevs == [] -> PrevNodeRevs;
-                    true -> [{Worker#shard.node, IdRevs} | PrevNodeRevs]
-                end
-        end,
+
+    NewNodeRevs = update_node_revs(Worker, RawReplies, PrevNodeRevs),
 
     Complete = (ReplyCount =:= (WorkerCount - 1)),
 
@@ -139,7 +123,7 @@ handle_message({ok, RawReplies}, Worker, State) ->
                 IsTree,
                 NewReplies,
                 NewNodeRevs,
-                ReplyCount + 1,
+                NewReplyCount,
                 InRepair orelse Repair
             ),
             {stop, format_reply(IsTree, NewReplies, RealReplyCount)};
@@ -147,10 +131,30 @@ handle_message({ok, RawReplies}, Worker, State) ->
             {ok, State#state{
                 replies = NewReplies,
                 node_revs = NewNodeRevs,
-                reply_count = ReplyCount + 1,
+                reply_count = NewReplyCount,
                 workers = lists:delete(Worker, Workers),
                 repair = InRepair orelse Repair
             }}
+    end.
+
+% Update node revs from the latest replies
+%
+update_node_revs(nil, _, PrevNodeRevs) ->
+    % This handles the error cases when Worker is explicitly set to nil. (See
+    % rexi_DOWN and rexi_EXIT clauses).
+    PrevNodeRevs;
+update_node_revs(Worker, RawReplies, PrevNodeRevs) ->
+    FoldFun = fun
+        ({ok, #doc{revs = {Pos, [Rev | _]}}}, Acc) ->
+            [{Pos, Rev} | Acc];
+        (_, Acc) ->
+            Acc
+    end,
+    case lists:foldl(FoldFun, [], RawReplies) of
+        [] ->
+            PrevNodeRevs;
+        [_ | _] = IdRevs ->
+            [{Worker#shard.node, IdRevs} | PrevNodeRevs]
     end.
 
 tree_replies(RevTree, []) ->
