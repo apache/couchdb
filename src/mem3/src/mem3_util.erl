@@ -43,7 +43,8 @@
     get_ring/4,
     non_overlapping_shards/1,
     non_overlapping_shards/3,
-    calculate_max_n/1
+    calculate_max_n/1,
+    calculate_max_n/3
 ]).
 
 %% do not use outside mem3.
@@ -502,6 +503,9 @@ non_overlapping_shards(Shards, Start, End) ->
 % across all the ranges. If the ring is incomplete it will return 0.
 % If there it is an n = 1 database, it should return 1, etc.
 calculate_max_n(Shards) ->
+    calculate_max_n(Shards, 0, ?RING_END).
+
+calculate_max_n(Shards, Start, End) when is_integer(Start), is_integer(End) ->
     Ranges = lists:map(
         fun(Shard) ->
             [B, E] = mem3:range(Shard),
@@ -509,13 +513,15 @@ calculate_max_n(Shards) ->
         end,
         Shards
     ),
-    calculate_max_n(Ranges, get_ring(Ranges), 0).
+    FirstRing = get_ring(Ranges, Start, End),
+    calculate_max_n(Ranges, FirstRing, Start, End, 0).
 
-calculate_max_n(_Ranges, [], N) ->
+calculate_max_n(_Ranges, [], _Start, _End, N) ->
     N;
-calculate_max_n(Ranges, Ring, N) ->
+calculate_max_n(Ranges, Ring, Start, End, N) ->
     NewRanges = Ranges -- Ring,
-    calculate_max_n(NewRanges, get_ring(NewRanges), N + 1).
+    NewRing = get_ring(NewRanges, Start, End),
+    calculate_max_n(NewRanges, NewRing, Start, End, N + 1).
 
 get_ring(Ranges) ->
     get_ring(Ranges, fun sort_ranges_fun/2, 0, ?RING_END).
@@ -749,6 +755,22 @@ calculate_max_n_test_() ->
             {2, [shard(0, ?RING_END), shard(0, ?RING_END)]},
             {2, [shard(0, 1), shard(2, ?RING_END), shard(0, ?RING_END)]},
             {0, [shard(0, 3), shard(5, ?RING_END), shard(1, ?RING_END)]}
+        ]
+    ].
+
+calculate_max_n_custom_range_test_() ->
+    [
+        ?_assertEqual(Res, calculate_max_n(Shards, B, E))
+     || {Res, Shards, B, E} <- [
+            {0, [], 1, 15},
+            {0, [], 0, 15},
+            {0, [shard(1, 10)], 1, 15},
+            {0, [shard(0, 8)], 1, 15},
+            {1, [shard(0, 15)], 0, 15},
+            {1, [shard(0, 15), shard(1, 15)], 0, 15},
+            {2, [shard(0, 15), shard(0, 15)], 0, 15},
+            {2, [shard(0, 1), shard(2, 15), shard(0, 15)], 0, 15},
+            {0, [shard(0, 3), shard(3, 15), shard(1, 15)], 0, 15}
         ]
     ].
 
