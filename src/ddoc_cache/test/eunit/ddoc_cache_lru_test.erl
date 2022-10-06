@@ -202,7 +202,14 @@ check_cache_refill({DbName, _}) ->
     {ok, _} = ddoc_cache_lru:handle_db_event(ShardName, deleted, foo),
     meck:wait(ddoc_cache_ev, event, [evicted, DbName], 1000),
     meck:wait(10, ddoc_cache_ev, event, [removed, '_'], 1000),
-    ?assertEqual(0, ets:info(?CACHE, size)),
+    test_util:wait(
+        fun() ->
+            case ets:info(?CACHE, size) of
+                0 -> ok;
+                _ -> wait
+            end
+        end
+    ),
 
     lists:foreach(
         fun(I) ->
