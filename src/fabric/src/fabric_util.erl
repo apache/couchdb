@@ -159,6 +159,9 @@ get_db_timeout(N, Factor, MinTimeout, infinity) ->
     % MaxTimeout may be infinity so we just use the largest Erlang small int to
     % avoid blowing up the arithmetic
     get_db_timeout(N, Factor, MinTimeout, 1 bsl 59);
+get_db_timeout(N, _Factor, MinTimeout, _MaxTimeout) when N > 64 ->
+    % Guard against max:pow/2 blowing from a large exponent
+    MinTimeout;
 get_db_timeout(N, Factor, MinTimeout, MaxTimeout) ->
     %
     % The progression of timeouts forms a geometric series:
@@ -445,6 +448,9 @@ get_db_timeout_test() ->
 
     % Q=256, N=3
     ?assertEqual(100, get_db_timeout(256 * 3, 2, 100, 60000)),
+
+    % Q=9999 N=3
+    ?assertEqual(100, get_db_timeout(9999 * 3, 2, 100, 60000)),
 
     % Large factor = 100
     ?assertEqual(100, get_db_timeout(2 * 3, 100, 100, 60000)),
