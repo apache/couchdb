@@ -45,6 +45,7 @@
 -export([version_to_binary/1]).
 -export([verify_hash_names/2]).
 -export([get_config_hash_algorithms/0]).
+-export([remove_sensitive_data/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -860,3 +861,9 @@ get_config_hash_algorithms() ->
         [] -> [?DEFAULT_HASH_ALGORITHM];
         VerifiedHashNames -> VerifiedHashNames
     end.
+
+-spec remove_sensitive_data(list()) -> list().
+remove_sensitive_data(KVList) ->
+    KVList1 = lists:keyreplace(<<"password">>, 1, KVList, {<<"password">>, <<"****">>}),
+    % some KVList entries are atoms, so test fo this too
+    lists:keyreplace(password, 1, KVList1, {password, <<"****">>}).
