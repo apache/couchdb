@@ -31,6 +31,7 @@
 -export([num_servers/0, couch_server/1, couch_dbs_pid_to_name/1, couch_dbs/1]).
 -export([aggregate_queue_len/0, get_spidermonkey_version/0]).
 -export([names/0]).
+-export([try_lock/2, unlock/2]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -723,9 +724,8 @@ handle_cast({update_lru, DbName}, #server{lru = Lru, update_lru_on_read = true} 
 handle_cast({update_lru, _DbName}, Server) ->
     {noreply, Server};
 handle_cast({close_db_if_idle, DbName}, Server) ->
-    case ets:update_element(couch_dbs(Server), DbName, {#entry.lock, locked}) of
-        true ->
-            [#entry{db = Db, db_options = DbOpts}] = ets:lookup(couch_dbs(Server), DbName),
+    case try_lock(couch_dbs(Server), DbName) of
+        {ok, #entry{db = Db, db_options = DbOpts}} ->
             case couch_db:is_idle(Db) of
                 true ->
                     DbPid = couch_db:get_pid(Db),
@@ -734,9 +734,7 @@ handle_cast({close_db_if_idle, DbName}, Server) ->
                     exit(DbPid, kill),
                     {noreply, db_closed(Server, DbOpts)};
                 false ->
-                    true = ets:update_element(
-                        couch_dbs(Server), DbName, {#entry.lock, unlocked}
-                    ),
+                    true = unlock(couch_dbs(Server), DbName),
                     {noreply, Server}
             end;
         false ->
@@ -1010,6 +1008,24 @@ aggregate_queue_len() ->
 names() ->
     N = couch_server:num_servers(),
     [couch_server:couch_server(I) || I <- lists:seq(1, N)].
+
+%% Try to lock an entry, must be unlocked at the time.
+try_lock(Table, DbName) when is_atom(Table), is_binary(DbName) ->
+    case ets:lookup(Table, DbName) of
+        [#entry{lock = unlocked} = Entry0] ->
+            Entry1 = Entry0#entry{lock = locked},
+            case ets:select_replace(Table, [{Entry0, [], [{const, Entry1}]}]) of
+                0 ->
+                    false;
+                1 ->
+                    {ok, Entry1}
+            end;
+        _ ->
+            false
+    end.
+
+unlock(Table, DbName) when is_atom(Table), is_binary(DbName) ->
+    ets:update_element(Table, DbName, {#entry.lock, unlocked}).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
