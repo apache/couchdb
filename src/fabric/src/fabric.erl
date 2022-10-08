@@ -38,7 +38,7 @@
 % Documents
 -export([
     open_doc/3,
-    open_revs/4,
+    open_revs/3, open_revs/4,
     get_doc_info/3,
     get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3,
@@ -271,6 +271,21 @@ open_doc(DbName, Id, Options) ->
         Else ->
             {error, {invalid_option, {doc_info, Else}}}
     end.
+
+%% @doc retrieve a collection of revisions for a batch of docs
+-spec open_revs(dbname(), [{{docid(), [revision()] | all}, option()}], [option()]) ->
+    {ok, [[{ok, #doc{}} | {{not_found, missing}, revision()}]]}
+    | {timeout, any()}
+    | {error, any()}
+    | {error, any(), any()}.
+open_revs(DbName, IdRevsOpts0, Options) ->
+    IdRevsOpts = lists:map(
+        fun({{Id, Revs}, DocOpts}) ->
+            {{docid(Id), Revs}, DocOpts}
+        end,
+        IdRevsOpts0
+    ),
+    fabric_open_revs:go(dbname(DbName), IdRevsOpts, opts(Options)).
 
 %% @doc retrieve a collection of revisions, possible all
 -spec open_revs(dbname(), docid(), [revision()] | all, [option()]) ->
