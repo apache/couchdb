@@ -19,7 +19,7 @@ handle_setup_req(#httpd{method = 'POST'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     couch_httpd:validate_ctype(Req, "application/json"),
     Setup = get_body(Req),
-    couch_log:notice("Setup: ~p~n", [remove_sensitive(Setup)]),
+    couch_log:notice("Setup: ~p~n", [couch_util:remove_sensitive_data(Setup)]),
     Action = binary_to_list(couch_util:get_value(<<"action">>, Setup, <<"missing">>)),
     case handle_action(Action, Setup) of
         ok ->
@@ -92,7 +92,7 @@ handle_action("enable_cluster", Setup) ->
             ok
     end;
 handle_action("finish_cluster", Setup) ->
-    couch_log:notice("finish_cluster: ~p~n", [remove_sensitive(Setup)]),
+    couch_log:notice("finish_cluster: ~p~n", [couch_util:remove_sensitive_data(Setup)]),
 
     Options = get_options(
         [
@@ -108,7 +108,7 @@ handle_action("finish_cluster", Setup) ->
             ok
     end;
 handle_action("enable_single_node", Setup) ->
-    couch_log:notice("enable_single_node: ~p~n", [remove_sensitive(Setup)]),
+    couch_log:notice("enable_single_node: ~p~n", [couch_util:remove_sensitive_data(Setup)]),
 
     Options = get_options(
         [
@@ -129,7 +129,7 @@ handle_action("enable_single_node", Setup) ->
             ok
     end;
 handle_action("add_node", Setup) ->
-    couch_log:notice("add_node: ~p~n", [remove_sensitive(Setup)]),
+    couch_log:notice("add_node: ~p~n", [couch_util:remove_sensitive_data(Setup)]),
 
     Options = get_options(
         [
@@ -154,9 +154,9 @@ handle_action("add_node", Setup) ->
             ok
     end;
 handle_action("remove_node", Setup) ->
-    couch_log:notice("remove_node: ~p~n", [remove_sensitive(Setup)]);
+    couch_log:notice("remove_node: ~p~n", [couch_util:remove_sensitive_data(Setup)]);
 handle_action("receive_cookie", Setup) ->
-    couch_log:notice("receive_cookie: ~p~n", [remove_sensitive(Setup)]),
+    couch_log:notice("receive_cookie: ~p~n", [couch_util:remove_sensitive_data(Setup)]),
     Options = get_options(
         [
             {cookie, <<"cookie">>}
@@ -181,6 +181,3 @@ get_body(Req) ->
             couch_log:notice("Body Fail: ~p~n", [Else]),
             couch_httpd:send_error(Req, 400, <<"bad_request">>, <<"Missing JSON body'">>)
     end.
-
-remove_sensitive(KVList) ->
-    lists:keyreplace(<<"password">>, 1, KVList, {<<"password">>, <<"****">>}).

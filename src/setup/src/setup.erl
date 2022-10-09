@@ -166,7 +166,7 @@ enable_cluster_int(Options, false) ->
     Port = proplists:get_value(port, Options),
 
     setup_node(NewCredentials, NewBindAddress, NodeCount, Port),
-    couch_log:debug("Enable Cluster: ~p~n", [Options]).
+    couch_log:debug("Enable Cluster: ~p~n", [couch_util:remove_sensitive_data(Options)]).
 
 set_admin(Username, Password) ->
     config:set("admins", binary_to_list(Username), binary_to_list(Password), #{sensitive => true}).
@@ -325,7 +325,7 @@ add_node(Options) ->
 add_node_int(_Options, false) ->
     {error, cluster_not_enabled};
 add_node_int(Options, true) ->
-    couch_log:debug("add node_int: ~p~n", [Options]),
+    couch_log:debug("add node_int: ~p~n", [couch_util:remove_sensitive_data(Options)]),
     ErlangCookie = erlang:get_cookie(),
 
     % POST to nodeB/_setup
