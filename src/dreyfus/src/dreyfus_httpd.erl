@@ -277,8 +277,10 @@ validate_index_query(q, Value, Args) ->
     Args#index_query_args{q = Value};
 validate_index_query(partition, Value, Args) ->
     Args#index_query_args{partition = Value};
-validate_index_query(stale, Value, Args) ->
-    Args#index_query_args{stale = Value};
+validate_index_query(stale, false, Args) ->
+    Args#index_query_args{update = true};
+validate_index_query(stale, "ok", Args) ->
+    Args#index_query_args{update = false};
 validate_index_query(limit, Value, Args) ->
     Args#index_query_args{limit = Value};
 validate_index_query(include_docs, Value, Args) ->
@@ -297,6 +299,8 @@ validate_index_query(group_sort, Value, #index_query_args{grouping = Grouping} =
     Args#index_query_args{grouping = Grouping#grouping{sort = Value}};
 validate_index_query(group_limit, Value, #index_query_args{grouping = Grouping} = Args) ->
     Args#index_query_args{grouping = Grouping#grouping{limit = Value}};
+validate_index_query(update, Value, Args) ->
+    Args#index_query_args{update = Value};
 validate_index_query(stable, Value, Args) ->
     Args#index_query_args{stable = Value};
 validate_index_query(counts, Value, Args) ->
@@ -349,6 +353,10 @@ parse_index_param("group_sort", Value) ->
     [{group_sort, ?JSON_DECODE(Value)}];
 parse_index_param("group_limit", Value) ->
     [{group_limit, parse_positive_int_param("group_limit", Value, "max_group_limit", "200")}];
+parse_index_param("update", "lazy") ->
+    [{update, lazy}];
+parse_index_param("update", Value) ->
+    [{update, parse_bool_param("update", Value)}];
 parse_index_param("stable", Value) ->
     [{stable, parse_bool_param("stable", Value)}];
 parse_index_param("include_fields", Value) ->
@@ -396,6 +404,8 @@ parse_json_index_param(<<"group_sort">>, Value) ->
     [{group_sort, Value}];
 parse_json_index_param(<<"group_limit">>, Value) ->
     [{group_limit, parse_positive_int_param("group_limit", Value, "max_group_limit", "200")}];
+parse_json_index_param(<<"update">>, Value) ->
+    [{update, parse_bool_param("update", Value)}];
 parse_json_index_param(<<"stable">>, Value) ->
     [{stable, parse_bool_param("stable", Value)}];
 parse_json_index_param(<<"include_fields">>, Value) ->

@@ -50,8 +50,6 @@ get_shards(DbName, #index_query_args{partition = Partition} = Args) ->
 get_shards(DbName, Args) ->
     get_shards(DbName, upgrade(Args)).
 
-use_ushards(#index_query_args{stale = ok}) ->
-    true;
 use_ushards(#index_query_args{stable = true}) ->
     true;
 use_ushards(#index_query_args{}) ->

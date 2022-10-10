@@ -41,9 +41,9 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
     check_interactive_mode(),
     {ok, Db} = get_or_create_db(DbName, []),
     #index_query_args{
-        stale = Stale
+        update = Update
     } = QueryArgs,
-    {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
+    {_LastSeq, MinSeq} = calculate_seqs(Db, Update),
     case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
@@ -114,10 +114,10 @@ get_or_create_db(DbName, Options) ->
             Else
     end.
 
-calculate_seqs(Db, Stale) ->
+calculate_seqs(Db, Update) ->
     LastSeq = couch_db:get_update_seq(Db),
     if
-        Stale == ok orelse Stale == update_after ->
+        Update == true orelse Update == lazy ->
             {LastSeq, 0};
         true ->
             {LastSeq, LastSeq}

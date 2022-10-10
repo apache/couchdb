@@ -365,7 +365,7 @@ args_to_proplist(#index_query_args{} = Args) ->
         {'query', Args#index_query_args.q},
         {partition, Args#index_query_args.partition},
         {limit, Args#index_query_args.limit},
-        {refresh, Args#index_query_args.stale =:= false},
+        {refresh, Args#index_query_args.update =:= true},
         {'after', Args#index_query_args.bookmark},
         {sort, Args#index_query_args.sort},
         {include_fields, Args#index_query_args.include_fields},
@@ -383,7 +383,7 @@ args_to_proplist2(#index_query_args{} = Args) ->
     [
         {'query', Args#index_query_args.q},
         {field, Args#index_query_args.grouping#grouping.by},
-        {refresh, Args#index_query_args.stale =:= false},
+        {refresh, Args#index_query_args.update =:= true},
         {groups, Args#index_query_args.grouping#grouping.groups},
         {group_sort, Args#index_query_args.grouping#grouping.sort},
         {sort, Args#index_query_args.sort},
@@ -405,7 +405,7 @@ group1_int(Pid, QueryArgs0) ->
     QueryArgs = dreyfus_util:upgrade(QueryArgs0),
     #index_query_args{
         q = Query,
-        stale = Stale,
+        update = Update,
         grouping = #grouping{
             by = GroupBy,
             offset = Offset,
@@ -417,7 +417,7 @@ group1_int(Pid, QueryArgs0) ->
         Pid,
         Query,
         GroupBy,
-        Stale =:= false,
+        Update,
         Sort,
         Offset,
         Limit

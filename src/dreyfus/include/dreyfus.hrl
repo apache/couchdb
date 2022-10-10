@@ -34,7 +34,7 @@
     q,
     partition=nil,
     limit=25,
-    stale=false,
+    update=true,
     include_docs=false,
     bookmark=nil,
     sort=relevance,
