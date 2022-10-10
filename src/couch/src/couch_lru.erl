@@ -46,9 +46,8 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
     CouchDbs = couch_server:couch_dbs(DbName),
     CouchDbsPidToName = couch_server:couch_dbs_pid_to_name(DbName),
 
-    case ets:update_element(CouchDbs, DbName, {#entry.lock, locked}) of
-        true ->
-            [#entry{db = Db, pid = Pid}] = ets:lookup(CouchDbs, DbName),
+    case couch_server:try_lock(CouchDbs, DbName) of
+        {ok, #entry{db = Db, pid = Pid}} ->
             case couch_db:is_idle(Db) of
                 true ->
                     true = ets:delete(CouchDbs, DbName),
@@ -56,8 +55,7 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
                     exit(Pid, kill),
                     {true, {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)}};
                 false ->
-                    ElemSpec = {#entry.lock, unlocked},
-                    true = ets:update_element(CouchDbs, DbName, ElemSpec),
+                    true = couch_server:unlock(CouchDbs, DbName),
                     couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
                     close_int(gb_trees:next(Iter), update(DbName, Cache))
             end;
