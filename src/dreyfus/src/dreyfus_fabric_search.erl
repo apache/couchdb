@@ -47,7 +47,7 @@ go(DbName, DDoc, IndexName, #index_query_args{bookmark = nil} = QueryArgs) ->
         Shards,
         dreyfus_rpc,
         search,
-        [DDoc, IndexName, dreyfus_util:export(QueryArgs)]
+        [DDoc, IndexName, QueryArgs]
     ),
     Counters = fabric_dict:init(Workers, nil),
     go(DbName, DDoc, IndexName, QueryArgs, Counters, Counters, RingOpts);
@@ -65,9 +65,9 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
     Bookmark1 = dreyfus_bookmark:add_missing_shards(Bookmark0, LiveShards),
     Counters0 = lists:flatmap(
         fun({#shard{name = Name, node = N} = Shard, After}) ->
-            QueryArgs1 = dreyfus_util:export(QueryArgs#index_query_args{
+            QueryArgs1 = QueryArgs#index_query_args{
                 bookmark = After
-            }),
+            },
             case lists:member(Shard, LiveShards) of
                 true ->
                     Ref = rexi:cast(N, {dreyfus_rpc, search, [Name, DDoc, IndexName, QueryArgs1]}),
@@ -92,9 +92,7 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
     QueryArgs2 = QueryArgs#index_query_args{
         bookmark = Bookmark1
     },
-    go(DbName, DDoc, IndexName, QueryArgs2, Counters, Bookmark1, RingOpts);
-go(DbName, DDoc, IndexName, OldArgs) ->
-    go(DbName, DDoc, IndexName, dreyfus_util:upgrade(OldArgs)).
+    go(DbName, DDoc, IndexName, QueryArgs2, Counters, Bookmark1, RingOpts).
 
 go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
     {Workers, _} = lists:unzip(Counters),

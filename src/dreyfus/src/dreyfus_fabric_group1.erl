@@ -42,7 +42,7 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
     Workers = fabric_util:submit_jobs(Shards, dreyfus_rpc, group1, [
         DDoc,
         IndexName,
-        dreyfus_util:export(QueryArgs)
+        QueryArgs
     ]),
     Replacements = fabric_view:get_shard_replacements(DbName, Workers),
     Counters = fabric_dict:init(Workers, nil),
@@ -68,9 +68,7 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
     after
         rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers)
-    end;
-go(DbName, DDoc, IndexName, OldArgs) ->
-    go(DbName, DDoc, IndexName, dreyfus_util:upgrade(OldArgs)).
+    end.
 
 handle_message({ok, NewTopGroups}, Shard, State0) ->
     State = upgrade_state(State0),
