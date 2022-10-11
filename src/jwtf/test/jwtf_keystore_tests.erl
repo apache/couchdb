@@ -24,7 +24,8 @@
 ).
 
 setup() ->
-    test_util:start_applications([couch_log, config, jwtf]),
+    meck:expect(couch_log, notice, 2, fun(_, _) -> ok end),
+    test_util:start_applications([config, jwtf]),
     config:set("jwt_keys", "hmac:hmac", ?HMAC_SECRET),
     config:set("jwt_keys", "rsa:hmac", ?HMAC_SECRET),
     config:set("jwt_keys", "ec:hmac", ?HMAC_SECRET),
@@ -38,7 +39,8 @@ setup() ->
     config:set("jwt_keys", "ec:ec", ?EC_SECRET).
 
 teardown(_) ->
-    test_util:stop_applications([couch_log, config, jwtf]).
+    test_util:stop_applications([config, jwtf]),
+    meck:unload().
 
 jwtf_keystore_test_() ->
     {
