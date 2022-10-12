@@ -13,7 +13,6 @@
 -module(couch_prometheus_e2e_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(USER, "prometheus_test_admin").
 -define(PASS, "pass").
@@ -21,131 +20,128 @@
 -define(PROM_PORT, "17986").
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
-start() ->
-    test_util:start_couch([chttpd, couch_prometheus]).
-
-setup() ->
-    Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
-    ok = config:set_integer("stats", "interval", 2),
-    ok = config:set_integer("couch_prometheus", "interval", 1),
-    Port = mochiweb_socket_server:get(chttpd, port),
-    construct_url(Port).
-
-teardown(_) ->
-    ok.
-
-couch_prometheus_e2e_test_() ->
+e2e_test_() ->
     {
-        "Prometheus E2E Tests",
+        "With dedicated port",
         {
             setup,
-            fun start/0,
-            fun test_util:stop_couch/1,
+            fun() ->
+                setup_prometheus(true)
+            end,
+            fun(Ctx) ->
+                test_util:stop_couch(Ctx)
+            end,
             {
                 foreach,
-                fun setup/0,
-                fun teardown/1,
+                fun() ->
+                    mochiweb_socket_server:get(chttpd, port)
+                end,
                 [
-                    fun node_call_chttpd/1,
-                    fun node_call_prometheus_http/1,
-                    fun deny_prometheus_http/1,
-                    fun node_see_updated_metrics/1
+                    ?TDEF_FE(t_chttpd_port),
+                    ?TDEF_FE(t_prometheus_port),
+                    ?TDEF_FE(t_metric_updated)
                 ]
             }
         }
     }.
 
-% normal chttpd path via cluster port
-node_call_chttpd(Url) ->
-    {ok, RC1, _, _} = test_request:get(
-        Url,
-        [?CONTENT_JSON, ?AUTH],
-        []
-    ),
-    ?_assertEqual(200, RC1).
+reject_test_() ->
+    {
+        "Without dedicated port",
+        {
+            setup,
+            fun() ->
+                setup_prometheus(false)
+            end,
+            fun(Ctx) ->
+                test_util:stop_couch(Ctx)
+            end,
+            {
+                foreach,
+                fun() ->
+                    ?PROM_PORT
+                end,
+                [
+                    ?TDEF_FE(t_reject_prometheus_port)
+                ]
+            }
+        }
+    }.
 
-% normal chttpd path via cluster port
-node_see_updated_metrics(Url) ->
-    TmpDb = ?tempdb(),
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
-    DbUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
-    create_db(DbUrl),
-    [create_doc(DbUrl, "testdoc" ++ integer_to_binary(I)) || I <- lists:seq(1, 100)],
-    delete_db(DbUrl),
-    InitMetrics = wait_for_metrics(Url, "couchdb_httpd_requests_total 0", 5000),
-    UpdatedMetrics = wait_for_metrics(Url, "couchdb_httpd_requests_total", 10000),
-    % since the puts happen so fast, we can't have an exact
-    % total requests given the scraping interval. so we just want to acknowledge
-    % a change as occurred
-    ?_assertNotEqual(InitMetrics, UpdatedMetrics).
-
-% normal chttpd path via cluster port
-node_call_prometheus_http(_) ->
-    maybe_start_http_server("true"),
-    Url = construct_url(?PROM_PORT),
-    {ok, RC1, _, _} = test_request:get(
-        Url,
-        [?CONTENT_JSON, ?AUTH]
-    ),
-    % since this port doesn't require auth, this should work
-    {ok, RC2, _, _} = test_request:get(
-        Url,
-        [?CONTENT_JSON]
-    ),
-    delete_db(Url),
-    ?_assertEqual({200, 200}, {RC1, RC2}).
-
-% we don't start the http server
-deny_prometheus_http(_) ->
-    maybe_start_http_server("false"),
-    Url = construct_url(?PROM_PORT),
-    Response = test_request:get(
-        Url,
-        [?CONTENT_JSON, ?AUTH],
-        []
-    ),
-    ?_assertEqual({error, {conn_failed, {error, econnrefused}}}, Response).
-
-maybe_start_http_server(Additional) ->
-    test_util:stop_applications([couch_prometheus, chttpd]),
+setup_prometheus(WithAdditionalPort) ->
+    Ctx = test_util:start_couch([chttpd]),
+    Persist = false,
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
-    ok = config:set("prometheus", "additional_port", Additional),
-    ok = config:set("prometheus", "port", ?PROM_PORT),
-    test_util:start_applications([couch_prometheus, chttpd]).
+    ok = config:set("admins", ?USER, binary_to_list(Hashed), Persist),
+    ok = config:set_integer("stats", "interval", 1, Persist),
+    ok = config:set_integer("prometheus", "interval", 1, Persist),
+    ok = config:set_boolean(
+        "prometheus",
+        "additional_port",
+        WithAdditionalPort,
+        Persist
+    ),
+    % It's already started by default, so restart to pick up config
+    ok = application:stop(couch_prometheus),
+    ok = application:start(couch_prometheus),
+    Ctx.
 
-construct_url(Port) ->
+t_chttpd_port(Port) ->
+    {ok, RC, _, _} = test_request:get(node_local_url(Port), [?CONTENT_JSON, ?AUTH]),
+    ?assertEqual(200, RC).
+
+t_prometheus_port(_) ->
+    Url = node_local_url(?PROM_PORT),
+    {ok, RC1, _, _} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
+    ?assertEqual(200, RC1),
+    % Since this port doesn't require auth, this should work
+    {ok, RC2, _, _} = test_request:get(Url, [?CONTENT_JSON]),
+    ?assertEqual(200, RC2).
+
+t_reject_prometheus_port(Port) ->
+    Response = test_request:get(node_local_url(Port), [?CONTENT_JSON, ?AUTH]),
+    ?assertEqual({error, {conn_failed, {error, econnrefused}}}, Response).
+
+t_metric_updated(Port) ->
+    % The passage of time should increment this metric
+    Metric = "couchdb_uptime_seconds",
+    Url = node_local_url(Port),
+    % We may need to wait until the metric appears
+    InitialValue = test_util:wait(
+        fun() ->
+            Stats = get_stats(Url),
+            case metric_value(Stats, Metric) of
+                not_found -> wait;
+                Val -> Val
+            end
+        end
+    ),
+    test_util:wait(
+        fun() ->
+            NewValue = metric_value(get_stats(Url), Metric),
+            case NewValue > InitialValue of
+                true -> ok;
+                false -> wait
+            end
+        end
+    ).
+
+node_local_url(Port) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     lists:concat(["http://", Addr, ":", Port, "/_node/_local/_prometheus"]).
 
-create_db(Url) ->
-    {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
-    ?assert(Status =:= 201 orelse Status =:= 202).
+get_stats(Url) ->
+    {ok, _, _, Body} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
+    Body.
 
-delete_db(Url) ->
-    {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
-
-create_doc(Url, Id) ->
-    test_request:put(
-        Url ++ "/" ++ Id,
-        [?CONTENT_JSON, ?AUTH],
-        "{\"mr\": \"rockoartischocko\"}"
-    ).
-
-wait_for_metrics(Url, Value, Timeout) ->
-    test_util:wait(
-        fun() ->
-            {ok, _, _, Body} = test_request:get(
-                Url,
-                [?CONTENT_JSON, ?AUTH],
-                []
-            ),
-            case string:find(Body, Value) of
-                nomatch -> wait;
-                M -> M
-            end
-        end,
-        Timeout
-    ).
+metric_value(StatsBin, Metric) ->
+    % Prefix metric with newline to avoid matching lines starting with "# TYPE"
+    case string:find(StatsBin, "\n" ++ Metric, trailing) of
+        nomatch ->
+            not_found;
+        Leading ->
+            Trimmed = string:trim(Leading, leading),
+            [Line, _Rest] = string:split(Trimmed, "\n"),
+            [_MetricBin, Value] = string:split(Line, " "),
+            binary_to_integer(Value)
+    end.
