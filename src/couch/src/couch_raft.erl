@@ -261,7 +261,12 @@ handle_event({call, From}, #{type := 'ClientRequest'} = Msg, leader, Data) ->
 handle_event({call, From}, #{type := 'ClientRequest'}, _State, _Data) ->
     {keep_state_and_data, {reply, From, {error, not_leader}}};
 
-handle_event(state_timeout, new_election, State, Data) when State == follower; State == candidate ->
+handle_event(state_timeout, new_election, follower = State, Data) ->
+    #{term := Term} = Data,
+    couch_log:notice("~p election timeout in state ~p, term ~B", [id(Data), State, Term]),
+    persist({next_state, candidate, Data});
+
+handle_event(state_timeout, new_election, candidate = State, Data) ->
     #{term := Term} = Data,
     couch_log:notice("~p election timeout in state ~p, term ~B", [id(Data), State, Term]),
     persist({next_state, candidate, start_election(Data), state_timeout(State)});
@@ -381,6 +386,8 @@ nthterm(N, Data) ->
         end.
 
 persist({next_state, _NextState, NewData, _Actions} = HandleEventResult) ->
+    persist(NewData, HandleEventResult);
+persist({next_state, _NextState, NewData} = HandleEventResult) ->
     persist(NewData, HandleEventResult);
 persist({keep_state, NewData, _Actions} = HandleEventResult) ->
     persist(NewData, HandleEventResult).
