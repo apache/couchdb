@@ -77,7 +77,7 @@ html_context = {
     "rtd_ver": os.environ.get("READTHEDOCS_VERSION_NAME") or "latest",
 }
 
-http_index_shortname = 'API Reference'
+http_index_shortname = "API Reference"
 
 http_index_localname = "API Quick Reference"
 

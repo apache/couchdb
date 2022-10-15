@@ -117,6 +117,9 @@ pipeline {
       }
       steps {
         sh '''
+          make python-black
+        '''
+        sh '''
           (cd src/docs && make check)
         '''
       }
