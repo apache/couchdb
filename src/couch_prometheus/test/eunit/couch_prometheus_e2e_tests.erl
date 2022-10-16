@@ -81,6 +81,7 @@ setup_prometheus(WithAdditionalPort) ->
         WithAdditionalPort,
         Persist
     ),
+    ok = config:set("prometheus", "port", ?PROM_PORT, Persist),
     % It's already started by default, so restart to pick up config
     ok = application:stop(couch_prometheus),
     ok = application:start(couch_prometheus),
