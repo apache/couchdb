@@ -149,22 +149,23 @@ get_io_stats() ->
     ].
 
 get_message_queue_stats() ->
-    Queues = lists:map(
-        fun(Name) ->
-            case process_info(whereis(Name), message_queue_len) of
-                {message_queue_len, N} ->
-                    N;
-                _ ->
-                    0
-            end
-        end,
-        registered()
-    ),
+    QLenFun = fun(Name) -> message_queue_len(whereis(Name)) end,
+    Queues = lists:map(QLenFun, registered()),
     [
         to_prom(erlang_message_queues, gauge, lists:sum(Queues)),
         to_prom(erlang_message_queue_min, gauge, lists:min(Queues)),
         to_prom(erlang_message_queue_max, gauge, lists:max(Queues))
     ].
+
+message_queue_len(undefined) ->
+    0;
+message_queue_len(Pid) when is_pid(Pid) ->
+    case process_info(Pid, message_queue_len) of
+        {message_queue_len, N} ->
+            N;
+        _ ->
+            0
+    end.
 
 get_run_queue_stats() ->
     %% Workaround for https://bugs.erlang.org/browse/ERL-1355
