@@ -26,7 +26,8 @@
     start/3,
     start_link/3,
     stop/1,
-    call/2
+    call/2,
+    depose/1
 ]).
 
 % mandatory gen_statem callbacks
@@ -59,6 +60,10 @@ stop(ServerRef) ->
 call(ServerRef, Value) ->
     gen_statem:call(ServerRef, #{type => 'ClientRequest', value => Value}, ?CLIENT_TIMEOUT).
 
+depose(ServerRef) ->
+    gen_statem:call(ServerRef, depose, ?CLIENT_TIMEOUT).
+
+
 init(Data) ->
     {ok, follower, Data}.
 
@@ -77,10 +82,10 @@ handle_event(enter, _OldState, follower, Data) ->
     persist({keep_state, maps:without([nextIndex, matchIndex], Data#{votedFor => undefined, votesGranted => undefined, froms => #{}}),
         [state_timeout(follower) | Replies]});
 
-handle_event(enter, _OldState, candidate, Data) ->
-    #{term := Term} = Data,
-    couch_log:notice("~p became candidate in term ~B", [id(Data), Term]),
-    persist({keep_state, start_election(Data), state_timeout(candidate)});
+handle_event(enter, _OldState, candidate, Data0) ->
+    #{term := Term} = Data1 = start_election(Data0),
+    couch_log:notice("~p became candidate in term ~B and started an election for this term", [id(Data1), Term]),
+    persist({keep_state, Data1, state_timeout(candidate)});
 
 handle_event(enter, _OldState, leader, Data) ->
     #{store_module := StoreModule, cohort := Cohort, term := Term} = Data,
@@ -261,6 +266,16 @@ handle_event({call, From}, #{type := 'ClientRequest'} = Msg, leader, Data) ->
 handle_event({call, From}, #{type := 'ClientRequest'}, _State, _Data) ->
     {keep_state_and_data, {reply, From, {error, not_leader}}};
 
+handle_event({call, From}, depose, leader, Data) ->
+    #{term := Term} = Data,
+    couch_log:notice("~p deposed as leader in term ~p", [id(Data), Term]),
+    {next_state, follower, Data, {reply, From, true}};
+
+handle_event({call, From}, depose, _State, Data) ->
+    #{term := Term} = Data,
+    couch_log:notice("~p ignoring depose command as not leader in term ~B", [id(Data), Term]),
+    {keep_state_and_data, {reply, From, false}};
+
 handle_event(state_timeout, new_election, follower = State, Data) ->
     #{term := Term} = Data,
     couch_log:notice("~p election timeout in state ~p, term ~B", [id(Data), State, Term]),
@@ -268,7 +283,7 @@ handle_event(state_timeout, new_election, follower = State, Data) ->
 
 handle_event(state_timeout, new_election, candidate = State, Data) ->
     #{term := Term} = Data,
-    couch_log:notice("~p election timeout in state ~p, term ~B", [id(Data), State, Term]),
+    couch_log:notice("~p election timeout in state ~p, term ~B. Starting an election in term ~B", [id(Data), State, Term, Term + 1]),
     persist({next_state, candidate, start_election(Data), state_timeout(State)});
 
 handle_event(state_timeout, heartbeat, leader, Data) ->
@@ -346,7 +361,6 @@ update_state_machine(#{lastApplied := LastApplied, commitIndex := CommitIndex} =
 start_election(Data) ->
     #{term := Term, cohort := Cohort, store_module := StoreModule} = Data,
     ElectionTerm = Term + 1,
-    couch_log:notice("~p starting election in term ~B", [id(Data), ElectionTerm]),
     {LastLogIndex, LastLogTerm} = StoreModule:last(Data),
     RequestVote = #{
         type => 'RequestVoteRequest',
