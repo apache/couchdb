@@ -160,7 +160,7 @@ get_message_queue_stats() ->
 message_queue_len(undefined) ->
     0;
 message_queue_len(Pid) when is_pid(Pid) ->
-    case process_info(Pid, message_queue_len) of
+    case erlang:process_info(Pid, message_queue_len) of
         {message_queue_len, N} ->
             N;
         _ ->
@@ -197,3 +197,40 @@ update_refresh_timer() ->
     drain_refresh_messages(),
     RefreshTime = 1000 * config:get_integer("couch_prometheus", "interval", ?REFRESH_INTERVAL),
     erlang:send_after(RefreshTime, self(), refresh).
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+system_stats_test() ->
+    lists:foreach(
+        fun(Line) ->
+            ?assert(is_binary(Line)),
+            ?assert((starts_with(<<"couchdb_">>, Line) orelse starts_with(<<"# TYPE ">>, Line)))
+        end,
+        get_system_stats()
+    ).
+
+starts_with(Prefix, Line) when is_binary(Prefix), is_binary(Line) ->
+    binary:longest_common_prefix([Prefix, Line]) > 0.
+
+message_queue_len_test() ->
+    self() ! refresh,
+    ?assert(message_queue_len(self()) >= 1),
+    ?assertEqual(0, message_queue_len(undefined)),
+    {Pid, Ref} = spawn_monitor(fun() -> ok end),
+    receive
+        {'DOWN', Ref, process, Pid, _} ->
+            ok
+    end,
+    ?assertEqual(0, message_queue_len(Pid)).
+
+drain_refresh_messages_test() ->
+    self() ! refresh,
+    {messages, Mq0} = erlang:process_info(self(), messages),
+    ?assert(lists:member(refresh, Mq0)),
+    drain_refresh_messages(),
+    {messages, Mq1} = erlang:process_info(self(), messages),
+    ?assert(not lists:member(refresh, Mq1)).
+
+-endif.
