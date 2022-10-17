@@ -70,7 +70,8 @@ handle_call(Msg, _From, State) ->
 handle_cast(Msg, State) ->
     {stop, {unknown_cast, Msg}, State}.
 
-handle_info(refresh, State) ->
+handle_info(refresh, #st{refresh = OldRT} = State) ->
+    timer:cancel(OldRT),
     Metrics = refresh_metrics(),
     RT = update_refresh_timer(),
     {noreply, State#st{metrics = Metrics, refresh = RT}};
@@ -184,6 +185,14 @@ get_ets_stats() ->
     NumTabs = length(ets:all()),
     to_prom(erlang_ets_table, gauge, NumTabs).
 
+drain_refresh_messages() ->
+    receive
+        refresh -> drain_refresh_messages()
+    after 0 ->
+        ok
+    end.
+
 update_refresh_timer() ->
+    drain_refresh_messages(),
     RefreshTime = 1000 * config:get_integer("couch_prometheus", "interval", ?REFRESH_INTERVAL),
     erlang:send_after(RefreshTime, self(), refresh).
