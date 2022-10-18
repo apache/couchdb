@@ -389,3 +389,155 @@ Authentication Configuration
 
             [jwt_auth]
                 required_claims = exp,iat
+
+    .. config:option:: roles_claim_name :: Optional CouchDB roles claim in JWT token \
+        (deprecated)
+
+        .. warning::
+
+            ``roles_claim_name`` is deprecated in CouchDB 3.3, and will be removed later.
+            Please migrate to ``roles_claim_path``.
+
+        If presented, as a JSON array of strings, it is used as the CouchDB user's roles
+        list as long as the JWT token is valid. The default value for ``roles_claim_name``
+        is ``_couchdb.roles``.
+
+        .. note::
+            Values for ``roles_claim_name`` can only be top-level attributes in the JWT
+            token. If ``roles_claim_path`` is set, then ``roles_claim_name`` is ignored!
+
+        Let's assume, we have the following configuration:
+
+        .. code-block:: ini
+
+            [jwt_auth]
+            roles_claim_name = my-couchdb.roles
+
+        CouchDB will search for the attribute ``my-couchdb.roles`` in the JWT token.
+
+        .. code-block:: json
+
+            {
+                "my-couchdb.roles": [
+                    "role_1",
+                    "role_2"
+                ]
+            }
+
+    .. config:option:: roles_claim_path :: (Nested) CouchDB roles claim in JWT token
+
+        .. versionadded:: 3.3
+
+        This parameter was introduced to overcome disadvantages of ``roles_claim_name``,
+        because it is not possible with ``roles_claim_name`` to map nested role
+        attributes in the JWT token.
+
+        .. note::
+            If ``roles_claim_path`` is set, then ``roles_claim_name`` is ignored!
+
+        Now it is possible the read a nested roles claim from JWT tokens into CouchDB. As
+        always, there is some theory at the beginning to get things up and running. Don't
+        get scared now, it's really short and easy. Honestly!
+
+        There are only two characters with a special meaning. These are
+
+            - ``.`` for nesting json attributes and
+            - ``\.`` to skip nesting
+
+        That's it. Really.
+
+        Let's assume there is the following data-payload in the JWT token:
+
+        .. code-block:: json
+
+            {
+                "resource_access": {
+                    "security.settings": {
+                        "account": {
+                            "roles": [
+                                "manage-account",
+                                "view-profile"
+                            ]
+                        }
+                    }
+                }
+            }
+
+        Now, let's define the config variable ``roles_claim_path`` for this example. It
+        should look like this:
+
+        .. code-block:: ini
+
+            roles_claim_path = resource_access.security\.settings.account.roles
+
+        If an attribute has a ``.`` in the key like ``security.settings``, you have to
+        escape it in the config parameter with ``\.``. If you use a ``.`` then it gets
+        interpreted as a nested sub-key. Let's illustrate the behavior with a second
+        example. There is the following config parameter for ``roles_claim_name`` (by the
+        way it was the default value if you didn't configured it):
+
+        .. code-block:: ini
+
+            roles_claim_name = _couchdb.roles
+
+        .. note::
+            CouchDB doesn't set any default or implicit value for ``roles_claim_path``.
+
+        To migrate from ``roles_claim_name`` to ``roles_claim_path`` you need to change
+        the parameter name and escape the ``.`` to prevent CouchDB to read this as a
+        nested JSON key.
+
+        .. code-block:: ini
+
+            roles_claim_path = _couchdb\.roles
+
+        Let's assume your JWT token have the following data-payload for your couchdb
+        roles claim:
+
+        .. code-block:: json
+
+            {
+                "_couchdb.roles": [
+                    "accounting-role",
+                    "view-role"
+                ]
+            }
+
+        If you did everything right, the response from the ``_session`` endpoint should
+        look something like this:
+
+        .. code-block:: http
+
+            GET /_session HTTP/1.1
+            Host: localhost:5984
+            Authorization: Bearer <JWT token>
+
+        .. code-block:: http
+
+            HTTP/1.1 200 OK
+            Content-Type: application/json
+
+        .. code-block:: json
+
+            {
+                "ok": true,
+                "userCtx": {
+                    "name": "1234567890",
+                    "roles": [
+                        "accounting-role",
+                        "view-role"
+                    ]
+                },
+                "info": {
+                "authentication_handlers": [
+                    "jwt",
+                    "proxy",
+                    "cookie",
+                    "default"
+                ],
+                "authenticated": "jwt"
+                }
+            }
+
+        That's all, you are done with the migration from ``roles_claim_name`` to
+        ``roles_claim_path`` Easy, isn't it?

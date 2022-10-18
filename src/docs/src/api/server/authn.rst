@@ -394,9 +394,16 @@ signature.
 The ``sub`` claim is mandatory and is used as the CouchDB user's name if the JWT token
 is valid.
 
-A private claim called ``_couchdb.roles`` is optional. If presented,
-as a JSON array of strings, it is used as the CouchDB user's roles
+You can set the user roles claim name through the config setting
+:config:option:`roles_claim_name <jwt_auth/roles_claim_name>`. If you don't set
+an explicit value, then ``_couchdb.roles`` will be set as the default claim name.
+If presented, as a JSON array of strings, it is used as the CouchDB user's roles
 list as long as the JWT token is valid.
+
+.. warning::
+
+    ``roles_claim_name`` is deprecated in CouchDB 3.3, and will be removed later.
+    Please use :config:option:`roles_claim_path <jwt_auth/roles_claim_path>`.
 
 .. code-block:: ini
 
