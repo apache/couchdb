@@ -667,14 +667,7 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_docs">>], user_ctx = Ct
     end;
 db_req(#httpd{path_parts = [_, <<"_bulk_docs">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "POST");
-db_req(
-    #httpd{
-        method = 'POST',
-        path_parts = [_, <<"_bulk_get">>],
-        mochi_req = MochiReq
-    } = Req,
-    Db
-) ->
+db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_get">>]} = Req, Db) ->
     couch_stats:increment_counter([couchdb, httpd, bulk_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
@@ -682,88 +675,13 @@ db_req(
         undefined ->
             throw({bad_request, <<"Missing JSON list of 'docs'.">>});
         Docs ->
-            #doc_query_args{
-                options = Options0
-            } = bulk_get_parse_doc_query(Req),
+            #doc_query_args{options = Options0} = bulk_get_parse_doc_query(Req),
             Options = [{user_ctx, Req#httpd.user_ctx} | Options0],
-
-            AcceptJson = MochiReq:accepts_content_type("application/json"),
-            AcceptMixedMp = MochiReq:accepts_content_type("multipart/mixed"),
-            AcceptRelatedMp = MochiReq:accepts_content_type("multipart/related"),
-            AcceptMp = not AcceptJson andalso (AcceptMixedMp orelse AcceptRelatedMp),
-            case AcceptMp of
-                false ->
-                    {ok, Resp} = start_json_response(Req, 200),
-                    send_chunk(Resp, <<"{\"results\": [">>),
-                    lists:foldl(
-                        fun(Doc, Sep) ->
-                            {DocId, Results, Options1} = bulk_get_open_doc_revs(
-                                Db,
-                                Doc,
-                                Options
-                            ),
-                            bulk_get_send_docs_json(Resp, DocId, Results, Options1, Sep),
-                            <<",">>
-                        end,
-                        <<"">>,
-                        Docs
-                    ),
-                    send_chunk(Resp, <<"]}">>),
-                    end_json_response(Resp);
-                true ->
-                    OuterBoundary = bulk_get_multipart_boundary(),
-                    MpType =
-                        case AcceptMixedMp of
-                            true ->
-                                "multipart/mixed";
-                            _ ->
-                                "multipart/related"
-                        end,
-                    CType =
-                        {"Content-Type",
-                            MpType ++ "; boundary=\"" ++
-                                ?b2l(OuterBoundary) ++ "\""},
-                    {ok, Resp} = start_chunked_response(Req, 200, [CType]),
-                    lists:foldl(
-                        fun(Doc, _Pre) ->
-                            case bulk_get_open_doc_revs(Db, Doc, Options) of
-                                {_, {ok, []}, _Options1} ->
-                                    ok;
-                                {_, {ok, Results}, Options1} ->
-                                    send_docs_multipart_bulk_get(
-                                        Results,
-                                        Options1,
-                                        OuterBoundary,
-                                        Resp
-                                    );
-                                {DocId, {error, {RevId, Error, Reason}}, _Options1} ->
-                                    Json = ?JSON_ENCODE(
-                                        {[
-                                            {<<"id">>, DocId},
-                                            {<<"rev">>, RevId},
-                                            {<<"error">>, Error},
-                                            {<<"reason">>, Reason}
-                                        ]}
-                                    ),
-                                    couch_httpd:send_chunk(Resp, [
-                                        <<"\r\n--", OuterBoundary/binary>>,
-                                        <<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>,
-                                        Json
-                                    ])
-                            end
-                        end,
-                        <<"">>,
-                        Docs
-                    ),
-                    case Docs of
-                        [] ->
-                            ok;
-                        _ ->
-                            couch_httpd:send_chunk(
-                                Resp, <<"\r\n", "--", OuterBoundary/binary, "--\r\n">>
-                            )
-                    end,
-                    couch_httpd:last_chunk(Resp)
+            {ArgsRefs, ArgsMap} = bulk_get_parse_args(Db, Docs),
+            ResultsMap = bulk_get_docs(Db, ArgsMap, Options),
+            case bulk_get_is_multipart(Req) of
+                false -> bulk_get_ret_json(Req, ArgsRefs, ResultsMap, Options);
+                true -> bulk_get_ret_multipart(Req, ArgsRefs, ResultsMap, Options)
             end
     end;
 db_req(#httpd{path_parts = [_, <<"_bulk_get">>]} = Req, _Db) ->
@@ -1363,7 +1281,7 @@ send_docs_multipart_bulk_get(Results, Options0, OuterBoundary, Resp) ->
                 try
                     JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, Options)),
                     couch_httpd:send_chunk(Resp, <<"\r\n--", OuterBoundary/binary>>),
-                    case Atts of
+                    case non_stubbed_attachments(Atts) of
                         [] ->
                             couch_httpd:send_chunk(
                                 Resp, <<"\r\nContent-Type: application/json\r\n\r\n">>
@@ -2336,21 +2254,28 @@ monitor_attachments(Atts) when is_list(Atts) ->
             case couch_att:fetch(data, Att) of
                 {Fd, _} ->
                     [monitor(process, Fd) | Monitors];
-                stub ->
-                    Monitors;
                 Else ->
                     couch_log:error("~p from couch_att:fetch(data, ~p)", [Else, Att]),
                     Monitors
             end
         end,
         [],
-        Atts
+        non_stubbed_attachments(Atts)
     );
 monitor_attachments(Att) ->
     monitor_attachments([Att]).
 
 demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
+
+% Return attachments which are not stubs
+non_stubbed_attachments(Atts) when is_list(Atts) ->
+    lists:filter(
+        fun(Att) ->
+            couch_att:fetch(data, Att) =/= stub
+        end,
+        Atts
+    ).
 
 set_namespace(<<"_all_docs">>, Args) ->
     set_namespace(undefined, Args);
@@ -2362,6 +2287,175 @@ set_namespace(NS, #mrargs{} = Args) ->
     couch_mrview_util:set_extra(Args, namespace, NS).
 
 %% /db/_bulk_get stuff
+
+bulk_get_is_multipart(#httpd{mochi_req = MochiReq}) ->
+    Json = MochiReq:accepts_content_type("application/json"),
+    Mixed = MochiReq:accepts_content_type("multipart/mixed"),
+    Related = MochiReq:accepts_content_type("multipart/related"),
+    not Json andalso (Mixed orelse Related).
+
+bulk_get_docs(Db, #{} = ArgsMap, Options) ->
+    % Sort args by doc ID to hopefully make querying B-trees a bit faster
+    KeyFun = fun({Ref, {DocId, _, _}}) -> {DocId, Ref} end,
+    CmpFun = fun(A, B) -> KeyFun(A) =< KeyFun(B) end,
+    ArgsList = lists:sort(CmpFun, maps:to_list(ArgsMap)),
+    % Split out known errors. Later, before returning, recombine them back into
+    % the final result map.
+    PartFun = fun({_Ref, {_DocId, RevsOrError, _DocOpts}}) ->
+        case RevsOrError of
+            L when is_list(L) -> true;
+            all -> true;
+            {error, _} -> false
+        end
+    end,
+    {ValidArgs, ErrorArgs} = lists:partition(PartFun, ArgsList),
+    UseBatches = config:get_boolean("chttpd", "bulk_get_use_batches", true),
+    Responses =
+        case UseBatches of
+            true -> bulk_get_docs_batched(Db, ValidArgs, Options);
+            false -> bulk_get_docs_individually(Db, ValidArgs, Options)
+        end,
+    MapFun = fun({Ref, {DocId, Response, _}} = RespTuple) ->
+        case Response of
+            [] ->
+                % Remap empty reponses to errors. This is a peculiarity of the
+                % _bulk_get HTTP API. If revision was not specifed, `undefined`
+                % must be returned as the error revision ID.
+                #{Ref := {_, Revs, _}} = ArgsMap,
+                RevStr = bulk_get_rev_error(Revs),
+                Error = {RevStr, <<"not_found">>, <<"missing">>},
+                {Ref, {DocId, {error, Error}, []}};
+            [_ | _] = DocRevisions ->
+                chttpd_stats:incr_reads(length(DocRevisions)),
+                RespTuple;
+            _ ->
+                RespTuple
+        end
+    end,
+    % Recombine with the inital known errors and return as a map
+    maps:from_list(lists:map(MapFun, Responses) ++ ErrorArgs).
+
+bulk_get_docs_batched(Db, Args, Options) when is_list(Args) ->
+    % Args is [{Ref, {DocId, Revs, DocOpts}}, ...] but fabric:open_revs/3
+    % accepts [{{DocId, Revs}, DocOpts}, ...] so we need to transform them
+    ArgsFun = fun({_Ref, {DocId, Revs, DocOpts}}) ->
+        {{DocId, Revs}, DocOpts}
+    end,
+    OpenRevsArgs = lists:map(ArgsFun, Args),
+    case fabric:open_revs(Db, OpenRevsArgs, Options) of
+        {ok, Responses} ->
+            ZipFun = fun({Ref, {DocId, _Rev, DocOpts}}, Response) ->
+                {Ref, {DocId, Response, DocOpts ++ Options}}
+            end,
+            lists:zipwith(ZipFun, Args, Responses);
+        {error, Error} ->
+            % Distribute error to all request args, so it looks like they
+            % individually failed with that error
+            MapFun = fun({Ref, {DocId, Revs, _DocOpts}}) ->
+                RevStr = bulk_get_rev_error(Revs),
+                Tag = internal_fabric_error,
+                % This error will be emitted as json so make sure it's rendered
+                % to a string first.
+                Reason = couch_util:to_binary(Error),
+                {Ref, {DocId, {error, {RevStr, Tag, Reason}}, []}}
+            end,
+            lists:map(MapFun, Args)
+    end.
+
+bulk_get_docs_individually(Db, Args, Options) when is_list(Args) ->
+    MapFun = fun({Ref, {DocId, Revs, DocOpts}}) ->
+        case fabric:open_revs(Db, DocId, Revs, DocOpts ++ Options) of
+            {ok, Response} ->
+                {Ref, {DocId, Response, DocOpts}};
+            {error, Error} ->
+                RevStr = bulk_get_rev_error(Revs),
+                Tag = internal_fabric_error,
+                % This error will be emitted as json so make sure it's rendered
+                % to a string first.
+                Reason = couch_util:to_binary(Error),
+                {Ref, {DocId, {error, {RevStr, Tag, Reason}}, []}}
+        end
+    end,
+    lists:map(MapFun, Args).
+
+bulk_get_ret_json(#httpd{} = Req, ArgsRefs, ResultsMap, Options) ->
+    send_json(Req, 200, #{
+        <<"results">> => lists:map(
+            fun(Ref) ->
+                #{Ref := {DocId, Result, DocOpts}} = ResultsMap,
+                % We are about to encode the document into json and some of the
+                % provided general options might affect that so we make sure to
+                % combine all doc options and the general options together
+                AllOptions = DocOpts ++ Options,
+                #{
+                    <<"id">> => DocId,
+                    <<"docs">> => bulk_get_result(DocId, Result, AllOptions)
+                }
+            end,
+            ArgsRefs
+        )
+    }).
+
+bulk_get_result(DocId, {error, {Rev, Error, Reason}}, _Options) ->
+    [bulk_get_json_error_map(DocId, Rev, Error, Reason)];
+bulk_get_result(DocId, [_ | _] = DocRevs, Options) ->
+    MapFun = fun
+        ({ok, Doc}) ->
+            #{<<"ok">> => couch_doc:to_json_obj(Doc, Options)};
+        ({{Error, Reason}, RevId}) ->
+            Rev = couch_doc:rev_to_str(RevId),
+            bulk_get_json_error_map(DocId, Rev, Error, Reason)
+    end,
+    lists:map(MapFun, DocRevs).
+
+bulk_get_json_error_map(DocId, Rev, Error, Reason) ->
+    #{
+        <<"error">> => #{
+            <<"id">> => DocId,
+            <<"rev">> => Rev,
+            <<"error">> => Error,
+            <<"reason">> => Reason
+        }
+    }.
+
+bulk_get_ret_multipart(#httpd{} = Req, ArgsRefs, ResultsMap, Options) ->
+    MochiReq = Req#httpd.mochi_req,
+    Mixed = MochiReq:accepts_content_type("multipart/mixed"),
+    MpType =
+        case Mixed of
+            true -> "multipart/mixed";
+            false -> "multipart/related"
+        end,
+    Boundary = bulk_get_multipart_boundary(),
+    BoundaryCType = MpType ++ "; boundary=\"" ++ ?b2l(Boundary) ++ "\"",
+    CType = {"Content-Type", BoundaryCType},
+    {ok, Resp} = start_chunked_response(Req, 200, [CType]),
+    ForeachFun = fun(Ref) ->
+        #{Ref := {DocId, Result, DocOpts}} = ResultsMap,
+        case Result of
+            [_ | _] = DocRevs ->
+                AllOptions = DocOpts ++ Options,
+                send_docs_multipart_bulk_get(DocRevs, AllOptions, Boundary, Resp);
+            {error, {RevId, Error, Reason}} ->
+                EJson = bulk_get_json_error_map(DocId, RevId, Error, Reason),
+                Json = ?JSON_ENCODE(map_get(<<"error">>, EJson)),
+                ErrCType = <<"Content-Type: application/json">>,
+                Prefix = <<"\r\n", ErrCType/binary, "; error=\"true\"\r\n\r\n">>,
+                ErrorChunk = [<<"\r\n--", Boundary/binary>>, Prefix, Json],
+                couch_httpd:send_chunk(Resp, ErrorChunk)
+        end
+    end,
+    lists:foreach(ForeachFun, ArgsRefs),
+    case ArgsRefs of
+        [] ->
+            % Didn't send any docs, don't need to send a closing boundary
+            ok;
+        [_ | _] ->
+            % Sent at least one doc response, so also send the last boundary
+            EndBoundary = <<"\r\n", "--", Boundary/binary, "--\r\n">>,
+            couch_httpd:send_chunk(Resp, EndBoundary)
+    end,
+    couch_httpd:last_chunk(Resp).
 
 bulk_get_parse_doc_query(Req) ->
     lists:foldl(
@@ -2392,60 +2486,62 @@ throw_bad_query_param(Key) when is_binary(Key) ->
     Msg = <<"\"", Key/binary, "\" query parameter is not acceptable">>,
     throw({bad_request, Msg}).
 
-bulk_get_open_doc_revs(Db, {Props}, Options) ->
-    bulk_get_open_doc_revs1(Db, Props, Options, {});
-bulk_get_open_doc_revs(_Db, _Invalid, Options) ->
-    Error = {null, bad_request, <<"document must be a JSON object">>},
-    {null, {error, Error}, Options}.
+% Parse and tag bulk_get arguments. Return a list of argument tags in the same
+% order as they were provided and a map of #{tag => {DocId, RevOrError,
+% DocOpts}. That list is used to return them in the response in the exact same
+% order.
+%
+bulk_get_parse_args(Db, Docs) ->
+    Fun = fun(Doc, Acc) ->
+        Ref = make_ref(),
+        Arg = {_DocId, _RevOrError, _DocOpts} = bulk_get_parse_arg(Db, Doc),
+        {Ref, Acc#{Ref => Arg}}
+    end,
+    lists:mapfoldr(Fun, #{}, Docs).
 
-bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
+bulk_get_parse_arg(Db, {[_ | _] = Props}) ->
+    bulk_get_parse_doc_id(Db, Props);
+bulk_get_parse_arg(_Db, _Invalid) ->
+    Error = {null, bad_request, <<"document must be a JSON object">>},
+    {null, {error, Error}, []}.
+
+bulk_get_parse_doc_id(Db, [_ | _] = Props) ->
     case couch_util:get_value(<<"id">>, Props) of
         undefined ->
             Error = {null, bad_request, <<"document id missed">>},
-            {null, {error, Error}, Options};
+            {null, {error, Error}, []};
         DocId ->
             try
                 couch_db:validate_docid(Db, DocId),
-                bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
+                bulk_get_parse_revs(Props, DocId)
             catch
                 throw:{Error, Reason} ->
-                    {DocId, {error, {null, Error, Reason}}, Options}
+                    {DocId, {error, {null, Error, Reason}}, []}
             end
-    end;
-bulk_get_open_doc_revs1(Db, Props, Options, {DocId}) ->
+    end.
+
+bulk_get_parse_revs(Props, DocId) ->
     RevStr = couch_util:get_value(<<"rev">>, Props),
 
     case parse_field(<<"rev">>, RevStr) of
         {error, {RevStr, Error, Reason}} ->
-            {DocId, {error, {RevStr, Error, Reason}}, Options};
+            {DocId, {error, {RevStr, Error, Reason}}, []};
         {ok, undefined} ->
-            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, all});
+            bulk_get_parse_atts_since(Props, DocId, all);
         {ok, Rev} ->
-            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, [Rev]})
-    end;
-bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs}) ->
-    AttsSinceStr = couch_util:get_value(<<"atts_since">>, Props),
+            bulk_get_parse_atts_since(Props, DocId, [Rev])
+    end.
 
+bulk_get_parse_atts_since(Props, DocId, Revs) ->
+    AttsSinceStr = couch_util:get_value(<<"atts_since">>, Props),
     case parse_field(<<"atts_since">>, AttsSinceStr) of
         {error, {BadAttsSinceRev, Error, Reason}} ->
-            {DocId, {error, {BadAttsSinceRev, Error, Reason}}, Options};
+            {DocId, {error, {BadAttsSinceRev, Error, Reason}}, []};
         {ok, []} ->
-            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs, Options});
+            {DocId, Revs, []};
         {ok, RevList} ->
-            Options1 = [{atts_since, RevList}, attachments | Options],
-            bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs, Options1})
-    end;
-bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
-    case fabric:open_revs(Db, DocId, Revs, Options) of
-        {ok, []} ->
-            RevStr = couch_util:get_value(<<"rev">>, Props),
-            Error = {RevStr, <<"not_found">>, <<"missing">>},
-            {DocId, {error, Error}, Options};
-        {ok, Resps} = Results ->
-            chttpd_stats:incr_reads(length(Resps)),
-            {DocId, Results, Options};
-        Else ->
-            {DocId, Else, Options}
+            Options = [{atts_since, RevList}, attachments],
+            {DocId, Revs, Options}
     end.
 
 parse_field(<<"rev">>, undefined) ->
@@ -2477,47 +2573,12 @@ parse_atts_since([RevStr | Rest], Acc) ->
             Error
     end.
 
-bulk_get_send_docs_json(Resp, DocId, Results, Options, Sep) ->
-    Id = ?JSON_ENCODE(DocId),
-    send_chunk(Resp, [Sep, <<"{\"id\": ">>, Id, <<", \"docs\": [">>]),
-    bulk_get_send_docs_json1(Resp, DocId, Results, Options),
-    send_chunk(Resp, <<"]}">>).
-
-bulk_get_send_docs_json1(Resp, DocId, {error, {Rev, Error, Reason}}, _) ->
-    send_chunk(Resp, [bulk_get_json_error(DocId, Rev, Error, Reason)]);
-bulk_get_send_docs_json1(_Resp, _DocId, {ok, []}, _) ->
-    ok;
-bulk_get_send_docs_json1(Resp, DocId, {ok, Docs}, Options) ->
-    lists:foldl(
-        fun(Result, AccSeparator) ->
-            case Result of
-                {ok, Doc} ->
-                    JsonDoc = couch_doc:to_json_obj(Doc, Options),
-                    Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
-                    send_chunk(Resp, [AccSeparator, Json]);
-                {{Error, Reason}, RevId} ->
-                    RevStr = couch_doc:rev_to_str(RevId),
-                    Json = bulk_get_json_error(DocId, RevStr, Error, Reason),
-                    send_chunk(Resp, [AccSeparator, Json])
-            end,
-            <<",">>
-        end,
-        <<"">>,
-        Docs
-    ).
-
-bulk_get_json_error(DocId, Rev, Error, Reason) ->
-    ?JSON_ENCODE(
-        {[
-            {error,
-                {[
-                    {<<"id">>, DocId},
-                    {<<"rev">>, Rev},
-                    {<<"error">>, Error},
-                    {<<"reason">>, Reason}
-                ]}}
-        ]}
-    ).
+bulk_get_rev_error(all) ->
+    % When revision is not defined respond with `undefined` on error in the
+    % revision field.
+    <<"undefined">>;
+bulk_get_rev_error([{Pos, RevId} = Rev]) when is_integer(Pos), is_binary(RevId) ->
+    couch_doc:rev_to_str(Rev).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

@@ -232,6 +232,18 @@ HTTP Server Options
            upgrade, it is advisable to review the usage of these configuration
            settings.
 
+    .. config:option:: bulk_get_use_batches :: Use the optimized bulk_get implementation
+
+        .. versionadded:: 3.3
+
+        Set to false to revert to a previous ``_bulk_get`` implementation using
+        single doc fetches internally. Using batches should be faster, however
+        there may be bugs in the new new implemention, so expose this option to
+        allow reverting to the old behavior. ::
+
+            [chttpd]
+            bulk_get_use_batches = true
+
 .. config:section:: httpd :: HTTP Server Options
 
     .. versionchanged:: 3.2 These options were moved to [chttpd] section:
