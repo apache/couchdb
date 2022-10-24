@@ -295,8 +295,6 @@ init([N]) ->
     ),
     ok = config:listen_for_changes(?MODULE, N),
     ok = couch_file:init_delete_dir(RootDir),
-    % hash_admin_passwords(),
-    couch_password_server:hash(),
     ets:new(couch_dbs(N), [
         set,
         protected,
@@ -365,21 +363,20 @@ handle_config_change("couchdb", "max_dbs_open", _, _, N) ->
 handle_config_change("couchdb_engines", _, _, _, N) ->
     gen_server:call(couch_server(N), reload_engines),
     {ok, N};
-handle_config_change("admins", _, _, Persist, N) ->
-    % spawn here so couch event manager doesn't deadlock
-    % spawn(fun() -> couch_passwords_hasher:hash_admin_passwords(Persist) end),
-    couch_password_server:hash(),
+handle_config_change("admins", _, _, Persist, 1 = N) ->
+    % async hashing on couch_server with number 1 only
+    couch_password_hasher:hash(Persist),
     {ok, N};
-handle_config_change("httpd", "authentication_handlers", _, _, N) ->
+handle_config_change("httpd", "authentication_handlers", _, _, 1 = N) ->
     couch_httpd:stop(),
     {ok, N};
-handle_config_change("httpd", "bind_address", _, _, N) ->
+handle_config_change("httpd", "bind_address", _, _, 1 = N) ->
     couch_httpd:stop(),
     {ok, N};
-handle_config_change("httpd", "port", _, _, N) ->
+handle_config_change("httpd", "port", _, _, 1 = N) ->
     couch_httpd:stop(),
     {ok, N};
-handle_config_change("httpd", "max_connections", _, _, N) ->
+handle_config_change("httpd", "max_connections", _, _, 1 = N) ->
     couch_httpd:stop(),
     {ok, N};
 handle_config_change(_, _, _, _, N) ->

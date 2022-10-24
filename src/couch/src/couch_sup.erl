@@ -28,7 +28,6 @@ start_link() ->
     assert_no_monsters(),
     assert_admins(),
     maybe_launch_admin_annoyance_reporter(),
-    start_password_server(),
     write_pidfile(),
     notify_starting(),
 
@@ -169,8 +168,3 @@ write_file(FileName, Contents) ->
             couch_log:error("Failed ot write ~s :: ~s", Args),
             throw({error, Reason})
     end.
-
-start_password_server() ->
-    couch_log:info("Password Server Process is starting.~n", []),
-    couch_password_server:start_link(),
-    ok.

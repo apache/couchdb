@@ -10,17 +10,21 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_password_server).
+-module(couch_password_hasher).
 
 -behaviour(gen_server).
 
 -include_lib("couch/include/couch_db.hrl").
 
 -export([start_link/0]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-  code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    code_change/3
+]).
 
--export([hash/0]).
+-export([hash/1]).
 
 -record(state, {}).
 
@@ -28,48 +32,42 @@
 %%% Public functions
 %%%===================================================================
 
-hash() ->
-  gen_server:call(?MODULE, {hash_passwords}).
+-spec hash(Persist :: boolean()) -> Reply :: term().
+hash(Persist) ->
+    gen_server:cast(?MODULE, {hash_passwords, Persist}).
 
 %%%===================================================================
 %%% Spawning and gen_server implementation
 %%%===================================================================
 
 start_link() ->
-  gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_Args) ->
-  {ok, #state{}}.
+    hash_admin_passwords(true),
+    {ok, #state{}}.
 
-handle_call({hash_passwords}, _From, _State) ->
-  hash_admin_passwords();
-handle_call(_Request, _From, State = #state{}) ->
-  {reply, ok, State}.
+handle_call(Msg, _From, #state{} = State) ->
+    {stop, {invalid_call, Msg}, {invalid_call, Msg}, State}.
 
-handle_cast(_Request, State = #state{}) ->
-  {noreply, State}.
+handle_cast({hash_passwords, Persist}, State) ->
+    hash_admin_passwords(Persist),
+    {noreply, State};
+handle_cast(Msg, State) ->
+    {stop, {invalid_cast, Msg}, State}.
 
-handle_info(_Info, State = #state{}) ->
-  {noreply, State}.
-
-terminate(_Reason, _State = #state{}) ->
-  ok.
-
-code_change(_OldVsn, State = #state{}, _Extra) ->
-  {ok, State}.
+code_change(_OldVsn, #state{} = State, _Extra) ->
+    {ok, State}.
 
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
 
-hash_admin_passwords() ->
-  hash_admin_passwords(true).
-
 hash_admin_passwords(Persist) ->
-  lists:foreach(
-    fun({User, ClearPassword}) ->
-      HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
-      config:set("admins", User, ?b2l(HashedPassword), Persist)
-    end,
-    couch_passwords:get_unhashed_admins()
-  ).
+    lists:foreach(
+        fun({User, ClearPassword}) ->
+            HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
+            config:set("admins", User, ?b2l(HashedPassword), Persist)
+        end,
+        couch_passwords:get_unhashed_admins()
+    ).
