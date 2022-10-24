@@ -253,18 +253,6 @@ is_admin(User, ClearPwd) ->
 has_admins() ->
     config:get("admins") /= [].
 
-hash_admin_passwords() ->
-    hash_admin_passwords(true).
-
-hash_admin_passwords(Persist) ->
-    lists:foreach(
-        fun({User, ClearPassword}) ->
-            HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
-            config:set("admins", User, ?b2l(HashedPassword), Persist)
-        end,
-        couch_passwords:get_unhashed_admins()
-    ).
-
 close_db_if_idle(DbName) ->
     case ets:lookup(couch_dbs(DbName), DbName) of
         [#entry{}] ->
@@ -307,7 +295,8 @@ init([N]) ->
     ),
     ok = config:listen_for_changes(?MODULE, N),
     ok = couch_file:init_delete_dir(RootDir),
-    hash_admin_passwords(),
+    % hash_admin_passwords(),
+    couch_password_server:hash(),
     ets:new(couch_dbs(N), [
         set,
         protected,
@@ -378,7 +367,8 @@ handle_config_change("couchdb_engines", _, _, _, N) ->
     {ok, N};
 handle_config_change("admins", _, _, Persist, N) ->
     % spawn here so couch event manager doesn't deadlock
-    spawn(fun() -> hash_admin_passwords(Persist) end),
+    % spawn(fun() -> couch_passwords_hasher:hash_admin_passwords(Persist) end),
+    couch_password_server:hash(),
     {ok, N};
 handle_config_change("httpd", "authentication_handlers", _, _, N) ->
     couch_httpd:stop(),
