@@ -287,10 +287,7 @@ init([N]) ->
     config:enable_feature('access-ready'),
 
     % Mark if fips is enabled
-    case
-        erlang:function_exported(crypto, info_fips, 0) andalso
-            crypto:info_fips() == enabled
-    of
+    case crypto:info_fips() == enabled of
         true ->
             config:enable_feature('fips');
         false ->
