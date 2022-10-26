@@ -108,6 +108,7 @@ os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 SubDirs = [
     %% must be compiled first as it has a custom behavior
     "src/couch_epi",
+    "src/config",
     "src/couch_log",
     "src/chttpd",
     "src/couch",
@@ -141,7 +142,6 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           {tag, "2.2.1"}},
 {b64url,           "b64url",           {tag, "1.0.3"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
 {khash,            "khash",            {tag, "1.1.0"}},
