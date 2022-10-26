@@ -1,0 +1,629 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+% Reads CouchDB's ini file and gets queried for configuration parameters.
+% This module is initialized with a list of ini files that it consecutively
+% reads Key/Value pairs from and saves them in an ets table. If more an one
+% ini file is specified, the last one is used to write changes that are made
+% with store/2 back to that ini file.
+
+-module(config).
+-behaviour(gen_server).
+-vsn(1).
+
+-export([start_link/1, stop/0, reload/0]).
+
+-export([all/0]).
+-export([get/1, get/2, get/3]).
+-export([set/3, set/4, set/5]).
+-export([delete/2, delete/3, delete/4]).
+
+-export([get_integer/3, set_integer/3, set_integer/4]).
+-export([get_float/3, set_float/3, set_float/4]).
+-export([get_boolean/3, set_boolean/3, set_boolean/4]).
+
+-export([features/0, enable_feature/1, disable_feature/1]).
+
+-export([listen_for_changes/2]).
+-export([subscribe_for_changes/1]).
+-export([parse_ini_file/1]).
+
+-export([init/1, terminate/2, code_change/3]).
+-export([handle_call/3, handle_cast/2, handle_info/2]).
+
+-export([is_sensitive/2]).
+
+-define(FEATURES, "features").
+
+-define(TIMEOUT, 30000).
+-define(INVALID_SECTION, <<"Invalid configuration section">>).
+-define(INVALID_KEY, <<"Invalid configuration key">>).
+-define(INVALID_VALUE, <<"Invalid configuration value">>).
+
+-record(config, {
+    notify_funs = [],
+    ini_files = undefined,
+    write_filename = undefined
+}).
+
+start_link(IniFiles) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
+
+stop() ->
+    gen_server:cast(?MODULE, stop).
+
+reload() ->
+    gen_server:call(?MODULE, reload, ?TIMEOUT).
+
+all() ->
+    lists:sort(gen_server:call(?MODULE, all, infinity)).
+
+get_integer(Section, Key, Default) when is_integer(Default) ->
+    try
+        to_integer(get(Section, Key, Default))
+    catch
+        error:badarg ->
+            Default
+    end.
+
+set_integer(Section, Key, Value) ->
+    set_integer(Section, Key, Value, true).
+
+set_integer(Section, Key, Value, Persist) when is_integer(Value) ->
+    set(Section, Key, integer_to_list(Value), Persist);
+set_integer(_, _, _, _) ->
+    error(badarg).
+
+to_integer(List) when is_list(List) ->
+    list_to_integer(List);
+to_integer(Int) when is_integer(Int) ->
+    Int;
+to_integer(Bin) when is_binary(Bin) ->
+    list_to_integer(binary_to_list(Bin)).
+
+get_float(Section, Key, Default) when is_float(Default) ->
+    try
+        to_float(get(Section, Key, Default))
+    catch
+        error:badarg ->
+            Default
+    end.
+
+set_float(Section, Key, Value) ->
+    set_float(Section, Key, Value, true).
+
+set_float(Section, Key, Value, Persist) when is_float(Value) ->
+    set(Section, Key, float_to_list(Value), Persist);
+set_float(_, _, _, _) ->
+    error(badarg).
+
+to_float(List) when is_list(List) ->
+    list_to_float(List);
+to_float(Float) when is_float(Float) ->
+    Float;
+to_float(Int) when is_integer(Int) ->
+    list_to_float(integer_to_list(Int) ++ ".0");
+to_float(Bin) when is_binary(Bin) ->
+    list_to_float(binary_to_list(Bin)).
+
+get_boolean(Section, Key, Default) when is_boolean(Default) ->
+    try
+        to_boolean(get(Section, Key, Default))
+    catch
+        error:badarg ->
+            Default
+    end.
+
+set_boolean(Section, Key, Value) ->
+    set_boolean(Section, Key, Value, true).
+
+set_boolean(Section, Key, true, Persist) ->
+    set(Section, Key, "true", Persist);
+set_boolean(Section, Key, false, Persist) ->
+    set(Section, Key, "false", Persist);
+set_boolean(_, _, _, _) ->
+    error(badarg).
+
+to_boolean(List) when is_list(List) ->
+    case list_to_existing_atom(List) of
+        true ->
+            true;
+        false ->
+            false;
+        _ ->
+            error(badarg)
+    end;
+to_boolean(Bool) when is_boolean(Bool) ->
+    Bool.
+
+get(Section) when is_binary(Section) ->
+    ?MODULE:get(binary_to_list(Section));
+get(Section) when is_list(Section) ->
+    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
+    [{Key, Value} || [Key, Value] <- Matches].
+
+get(Section, Key) ->
+    ?MODULE:get(Section, Key, undefined).
+
+get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
+    ?MODULE:get(binary_to_list(Section), binary_to_list(Key), Default);
+get(Section, Key, Default) when is_list(Section), is_list(Key) ->
+    case ets:lookup(?MODULE, {Section, Key}) of
+        [] when Default == undefined -> Default;
+        [] when is_boolean(Default) -> Default;
+        [] when is_float(Default) -> Default;
+        [] when is_integer(Default) -> Default;
+        [] when is_list(Default) -> Default;
+        [] when is_atom(Default) -> Default;
+        [] -> error(badarg);
+        [{_, Match}] -> Match
+    end.
+
+set(Section, Key, Value) ->
+    ?MODULE:set(Section, Key, Value, true, nil).
+
+set(Sec, Key, Val, Opts) when is_binary(Sec) and is_binary(Key) ->
+    ?MODULE:set(binary_to_list(Sec), binary_to_list(Key), Val, Opts);
+set(Section, Key, Value, Persist) when is_boolean(Persist) ->
+    ?MODULE:set(Section, Key, Value, #{persist => Persist});
+set(Section, Key, Value, #{} = Opts) when
+    is_list(Section), is_list(Key), is_list(Value)
+->
+    gen_server:call(?MODULE, {set, Section, Key, Value, Opts}, ?TIMEOUT);
+set(Section, Key, Value, Reason) when
+    is_list(Section), is_list(Key), is_list(Value)
+->
+    ?MODULE:set(Section, Key, Value, #{persist => true, reason => Reason});
+set(_Sec, _Key, _Val, _Options) ->
+    error(badarg).
+
+set(Section, Key, Value, Persist, Reason) when
+    is_list(Section), is_list(Key), is_list(Value)
+->
+    ?MODULE:set(Section, Key, Value, #{persist => Persist, reason => Reason}).
+
+delete(Section, Key) when is_binary(Section) and is_binary(Key) ->
+    delete(binary_to_list(Section), binary_to_list(Key));
+delete(Section, Key) ->
+    delete(Section, Key, true, nil).
+
+delete(Section, Key, Persist) when is_boolean(Persist) ->
+    delete(Section, Key, Persist, nil);
+delete(Section, Key, Reason) ->
+    delete(Section, Key, true, Reason).
+
+delete(Sec, Key, Persist, Reason) when is_binary(Sec) and is_binary(Key) ->
+    delete(binary_to_list(Sec), binary_to_list(Key), Persist, Reason);
+delete(Section, Key, Persist, Reason) when is_list(Section), is_list(Key) ->
+    gen_server:call(
+        ?MODULE,
+        {delete, Section, Key, Persist, Reason},
+        ?TIMEOUT
+    ).
+
+features() ->
+    application:get_env(config, enabled_features, []).
+
+enable_feature(Feature) when is_atom(Feature) ->
+    application:set_env(
+        config,
+        enabled_features,
+        lists:usort([Feature | features()]),
+        [{persistent, true}]
+    ).
+
+disable_feature(Feature) when is_atom(Feature) ->
+    application:set_env(
+        config,
+        enabled_features,
+        features() -- [Feature],
+        [{persistent, true}]
+    ).
+
+listen_for_changes(CallbackModule, InitialState) ->
+    config_listener_mon:subscribe(CallbackModule, InitialState).
+
+subscribe_for_changes(Subscription) ->
+    config_notifier:subscribe(Subscription).
+
+init(IniFiles) ->
+    ets:new(?MODULE, [named_table, set, protected, {read_concurrency, true}]),
+    lists:map(
+        fun(IniFile) ->
+            {ok, ParsedIniValues} = parse_ini_file(IniFile),
+            ets:insert(?MODULE, ParsedIniValues)
+        end,
+        IniFiles
+    ),
+    WriteFile =
+        case IniFiles of
+            [_ | _] -> lists:last(IniFiles);
+            _ -> undefined
+        end,
+    debug_config(),
+    {ok, #config{ini_files = IniFiles, write_filename = WriteFile}}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+handle_call(all, _From, Config) ->
+    Resp = lists:sort((ets:tab2list(?MODULE))),
+    {reply, Resp, Config};
+handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
+    Persist = maps:get(persist, Opts, true),
+    Reason = maps:get(reason, Opts, nil),
+    IsSensitive = is_sensitive(Sec, Key),
+    case validate_config_update(Sec, Key, Val) of
+        {error, ValidationError} when IsSensitive ->
+            couch_log:error(
+                "~p: [~s] ~s = '****' rejected for reason ~p",
+                [?MODULE, Sec, Key, Reason]
+            ),
+            {reply, {error, ValidationError}, Config};
+        {error, ValidationError} ->
+            couch_log:error(
+                "~p: [~s] ~s = '~s' rejected for reason ~p",
+                [?MODULE, Sec, Key, Val, Reason]
+            ),
+            {reply, {error, ValidationError}, Config};
+        ok ->
+            true = ets:insert(?MODULE, {{Sec, Key}, Val}),
+            case IsSensitive of
+                false ->
+                    couch_log:notice(
+                        "~p: [~s] ~s set to ~s for reason ~p",
+                        [?MODULE, Sec, Key, Val, Reason]
+                    );
+                true ->
+                    couch_log:notice(
+                        "~p: [~s] ~s set to '****' for reason ~p",
+                        [?MODULE, Sec, Key, Reason]
+                    )
+            end,
+            ConfigWriteReturn =
+                case {Persist, Config#config.write_filename} of
+                    {true, undefined} ->
+                        ok;
+                    {true, FileName} ->
+                        config_writer:save_to_file({{Sec, Key}, Val}, FileName);
+                    _ ->
+                        ok
+                end,
+            case ConfigWriteReturn of
+                ok ->
+                    Event = {config_change, Sec, Key, Val, Persist},
+                    gen_event:sync_notify(config_event, Event),
+                    {reply, ok, Config};
+                {error, Else} ->
+                    {reply, {error, Else}, Config}
+            end
+    end;
+handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
+    true = ets:delete(?MODULE, {Sec, Key}),
+    couch_log:notice(
+        "~p: [~s] ~s deleted for reason ~p",
+        [?MODULE, Sec, Key, Reason]
+    ),
+    ConfigDeleteReturn =
+        case {Persist, Config#config.write_filename} of
+            {true, undefined} ->
+                ok;
+            {true, FileName} ->
+                config_writer:save_to_file({{Sec, Key}, ""}, FileName);
+            _ ->
+                ok
+        end,
+    case ConfigDeleteReturn of
+        ok ->
+            Event = {config_change, Sec, Key, deleted, Persist},
+            gen_event:sync_notify(config_event, Event),
+            {reply, ok, Config};
+        Else ->
+            {reply, Else, Config}
+    end;
+handle_call(reload, _From, Config) ->
+    DiskKVs = lists:foldl(
+        fun(IniFile, DiskKVs0) ->
+            {ok, ParsedIniValues} = parse_ini_file(IniFile),
+            lists:foldl(
+                fun({K, V}, DiskKVs1) ->
+                    dict:store(K, V, DiskKVs1)
+                end,
+                DiskKVs0,
+                ParsedIniValues
+            )
+        end,
+        dict:new(),
+        Config#config.ini_files
+    ),
+    % Update ets with anything we just read
+    % from disk
+    dict:fold(
+        fun({Sec, Key} = K, V, _) ->
+            VExisting = get(Sec, Key, V),
+            ets:insert(?MODULE, {K, V}),
+            case V =:= VExisting of
+                true ->
+                    ok;
+                false ->
+                    case is_sensitive(Sec, Key) of
+                        false ->
+                            couch_log:notice(
+                                "Reload detected config change ~s.~s = ~p",
+                                [Sec, Key, V]
+                            );
+                        true ->
+                            couch_log:notice(
+                                "Reload detected config change ~s.~s = '****'",
+                                [Sec, Key]
+                            )
+                    end,
+                    Event = {config_change, Sec, Key, V, true},
+                    gen_event:sync_notify(config_event, Event)
+            end
+        end,
+        nil,
+        DiskKVs
+    ),
+    % And remove anything in ets that wasn't
+    % on disk.
+    ets:foldl(
+        fun({{Sec, Key} = K, _}, _) ->
+            case dict:is_key(K, DiskKVs) of
+                true ->
+                    ok;
+                false ->
+                    couch_log:notice("Reload deleting in-memory config ~s.~s", [Sec, Key]),
+                    ets:delete(?MODULE, K),
+                    Event = {config_change, Sec, Key, deleted, true},
+                    gen_event:sync_notify(config_event, Event)
+            end
+        end,
+        nil,
+        ?MODULE
+    ),
+    {reply, ok, Config}.
+
+handle_cast(stop, State) ->
+    {stop, normal, State};
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(Info, State) ->
+    couch_log:error("config:handle_info Info: ~p~n", [Info]),
+    {noreply, State}.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+is_sensitive(Section, Key) ->
+    Sensitive = application:get_env(config, sensitive, #{}),
+    case maps:get(Section, Sensitive, false) of
+        all -> true;
+        Fields when is_list(Fields) -> lists:member(Key, Fields);
+        _ -> false
+    end.
+
+parse_ini_file(IniFile) ->
+    IniFilename = config_util:abs_pathname(IniFile),
+    IniBin =
+        case file:read_file(IniFilename) of
+            {ok, IniBin0} ->
+                IniBin0;
+            {error, enoent} ->
+                Fmt = "Couldn't find server configuration file ~s.",
+                Msg = list_to_binary(io_lib:format(Fmt, [IniFilename])),
+                couch_log:error("~s~n", [Msg]),
+                throw({startup_error, Msg})
+        end,
+
+    Lines = re:split(IniBin, "\r\n|\n|\r|\032", [{return, list}]),
+    {_, ParsedIniValues} =
+        lists:foldl(
+            fun(Line, {AccSectionName, AccValues}) ->
+                case string:strip(Line) of
+                    "[" ++ Rest ->
+                        case re:split(Rest, "\\]", [{return, list}]) of
+                            [NewSectionName, ""] ->
+                                {NewSectionName, AccValues};
+                            % end bracket not at end, ignore this line
+                            _Else ->
+                                {AccSectionName, AccValues}
+                        end;
+                    ";" ++ _Comment ->
+                        {AccSectionName, AccValues};
+                    Line2 ->
+                        case re:split(Line2, "\s?=\s?", [{return, list}]) of
+                            [Value] ->
+                                MultiLineValuePart =
+                                    case re:run(Line, "^ \\S", []) of
+                                        {match, _} ->
+                                            true;
+                                        _ ->
+                                            false
+                                    end,
+                                case {MultiLineValuePart, AccValues} of
+                                    {true, [{{_, ValueName}, PrevValue} | AccValuesRest]} ->
+                                        % remove comment
+                                        case re:split(Value, " ;|\t;", [{return, list}]) of
+                                            [[]] ->
+                                                % empty line
+                                                {AccSectionName, AccValues};
+                                            [LineValue | _Rest] ->
+                                                E = {
+                                                    {AccSectionName, ValueName},
+                                                    PrevValue ++ " " ++ LineValue
+                                                },
+                                                {AccSectionName, [E | AccValuesRest]}
+                                        end;
+                                    _ ->
+                                        {AccSectionName, AccValues}
+                                end;
+                            % line begins with "=", ignore
+                            ["" | _LineValues] ->
+                                {AccSectionName, AccValues};
+                            % yeehaw, got a line!
+                            [ValueName | LineValues] ->
+                                RemainingLine = config_util:implode(LineValues, "="),
+                                % removes comments
+                                case re:split(RemainingLine, " ;|\t;", [{return, list}]) of
+                                    [[]] ->
+                                        % empty line means delete this key
+                                        ets:delete(?MODULE, {AccSectionName, ValueName}),
+                                        {AccSectionName, AccValues};
+                                    [LineValue | _Rest] ->
+                                        LineValueWithoutLeadTrailWS = string:trim(LineValue),
+                                        {AccSectionName, [
+                                            {
+                                                {AccSectionName, ValueName},
+                                                LineValueWithoutLeadTrailWS
+                                            }
+                                            | AccValues
+                                        ]}
+                                end
+                        end
+                end
+            end,
+            {"", []},
+            Lines
+        ),
+    {ok, ParsedIniValues}.
+
+debug_config() ->
+    case ?MODULE:get("log", "level") of
+        "debug" ->
+            io:format("Configuration Settings:~n", []),
+            lists:foreach(
+                fun({{Mod, Key}, Val}) ->
+                    io:format("  [~s] ~s=~p~n", [Mod, Key, Val])
+                end,
+                lists:sort(ets:tab2list(?MODULE))
+            );
+        _ ->
+            ok
+    end.
+
+validate_config_update(Sec, Key, Val) ->
+    %% See https://erlang.org/doc/man/re.html &
+    %% https://pcre.org/original/doc/html/pcrepattern.html
+    %%
+    %%  only characters that are actually screen-visible are allowed
+    %%  tabs and spaces are allowed
+    %%  no  [ ] explicitly to avoid section header bypass
+    {ok, Forbidden} = re:compile("[\]\[]+", [dollar_endonly, unicode]),
+    %% Values are permitted [ ] characters as we use these in
+    %% places like mochiweb socket option lists
+    %% Values may also be empty to delete manual configuration
+    {ok, Printable} = re:compile(
+        "^[[:graph:]\t\s]*$",
+        [dollar_endonly, unicode]
+    ),
+    case
+        {
+            re:run(Sec, Printable),
+            re:run(Sec, Forbidden),
+            re:run(Key, Printable),
+            re:run(Key, Forbidden),
+            re:run(Val, Printable)
+        }
+    of
+        {{match, _}, nomatch, {match, _}, nomatch, {match, _}} -> ok;
+        {nomatch, _, _, _, _} -> {error, ?INVALID_SECTION};
+        {_, {match, _}, _, _, _} -> {error, ?INVALID_SECTION};
+        {_, _, nomatch, _, _} -> {error, ?INVALID_KEY};
+        {_, _, _, {match, _}, _} -> {error, ?INVALID_KEY};
+        {_, _, _, _, nomatch} -> {error, ?INVALID_VALUE}
+    end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+to_integer_test() ->
+    ?assertEqual(1, to_integer(1)),
+    ?assertEqual(1, to_integer(<<"1">>)),
+    ?assertEqual(1, to_integer("1")),
+    ?assertEqual(-1, to_integer("-01")),
+    ?assertEqual(0, to_integer("-0")),
+    ?assertEqual(0, to_integer("+0")),
+    ok.
+
+to_float_test() ->
+    ?assertEqual(1.0, to_float(1)),
+    ?assertEqual(1.0, to_float(<<"1.0">>)),
+    ?assertEqual(1.0, to_float("1.0")),
+    ?assertEqual(-1.1, to_float("-01.1")),
+    ?assertEqual(0.0, to_float("-0.0")),
+    ?assertEqual(0.0, to_float("+0.0")),
+    ok.
+
+validation_test() ->
+    ?assertEqual(ok, validate_config_update("section", "key", "value")),
+    ?assertEqual(ok, validate_config_update("delete", "empty_value", "")),
+    ?assertEqual(
+        {error, ?INVALID_SECTION},
+        validate_config_update("sect[ion", "key", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_SECTION},
+        validate_config_update("sect]ion", "key", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_SECTION},
+        validate_config_update("section\n", "key", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_SECTION},
+        validate_config_update("section\r", "key", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_SECTION},
+        validate_config_update("section\r\n", "key", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_KEY},
+        validate_config_update("section", "key\n", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_KEY},
+        validate_config_update("section", "key\r", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_KEY},
+        validate_config_update("section", "key\r\n", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_VALUE},
+        validate_config_update("section", "key", "value\n")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_VALUE},
+        validate_config_update("section", "key", "value\r")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_VALUE},
+        validate_config_update("section", "key", "value\r\n")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_KEY},
+        validate_config_update("section", "k[ey", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_KEY},
+        validate_config_update("section", "[key", "value")
+    ),
+    ?assertEqual(
+        {error, ?INVALID_KEY},
+        validate_config_update("section", "key]", "value")
+    ),
+    ok.
+
+-endif.
