@@ -360,6 +360,8 @@ get_priority(Channel, {Shard, GroupId}) ->
             end;
         {not_found, _Reason} ->
             0;
+        {database_does_not_exist, _Stack} ->
+            0;
         {error, Reason} ->
             couch_log:warning(
                 "Failed to get group_pid for ~p ~p ~p: ~p",
@@ -493,13 +495,19 @@ view_needs_upgrade(Props) ->
     end.
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("couch/include/couch_eunit.hrl").
 
 setup_all() ->
-    Ctx = test_util:start_couch([couch_log]),
-    meck:new([config, couch_index, couch_index_server], [passthrough]),
+    Ctx = setup_all_no_mock(),
     Pid = list_to_pid("<0.0.0>"),
     meck:expect(couch_index_server, get_index, 3, {ok, Pid}),
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    Ctx.
+
+setup_all_no_mock() ->
+    Ctx = test_util:start_couch([couch_log]),
+    meck:new([config, couch_index, couch_index_server], [passthrough]),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
     Ctx.
 
@@ -523,7 +531,7 @@ config_change_test_() ->
             fun() -> test_util:start_couch([smoosh]) end,
             fun test_util:stop_couch/1,
             [
-                fun t_restart_config_listener/1
+                ?TDEF_FE(t_restart_config_listener)
             ]
         }
     }.
@@ -538,108 +546,111 @@ get_priority_test_() ->
             fun setup/0,
             fun teardown/1,
             [
-                fun t_ratio_view/1,
-                fun t_slack_view/1,
-                fun t_no_data_view/1,
-                fun t_below_min_priority_view/1,
-                fun t_below_min_size_view/1,
-                fun t_timeout_view/1,
-                fun t_missing_view/1,
-                fun t_invalid_view/1
+                ?TDEF_FE(t_ratio_view),
+                ?TDEF_FE(t_slack_view),
+                ?TDEF_FE(t_no_data_view),
+                ?TDEF_FE(t_below_min_priority_view),
+                ?TDEF_FE(t_below_min_size_view),
+                ?TDEF_FE(t_timeout_view),
+                ?TDEF_FE(t_missing_view),
+                ?TDEF_FE(t_invalid_view)
+            ]
+        }
+    }.
+
+get_priority_no_mock_test_() ->
+    {
+        setup,
+        fun setup_all_no_mock/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                ?TDEF_FE(t_missing_db)
             ]
         }
     }.
 
 t_restart_config_listener(_) ->
-    ?_test(begin
-        ConfigMonitor = config_listener_mon(),
-        ?assert(is_process_alive(ConfigMonitor)),
-        test_util:stop_sync(ConfigMonitor),
-        ?assertNot(is_process_alive(ConfigMonitor)),
-        NewConfigMonitor = test_util:wait(fun() ->
-            case config_listener_mon() of
-                undefined -> wait;
-                Pid -> Pid
-            end
-        end),
-        ?assert(is_process_alive(NewConfigMonitor))
-    end).
+    ConfigMonitor = config_listener_mon(),
+    ?assert(is_process_alive(ConfigMonitor)),
+    test_util:stop_sync(ConfigMonitor),
+    ?assertNot(is_process_alive(ConfigMonitor)),
+    NewConfigMonitor = test_util:wait(fun() ->
+        case config_listener_mon() of
+            undefined -> wait;
+            Pid -> Pid
+        end
+    end),
+    ?assert(is_process_alive(NewConfigMonitor)).
 
 t_ratio_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index, get_info, fun(_) ->
-            {ok, [{sizes, {[{file, 5242880}, {active, 524288}]}}]}
-        end),
-        ?assertEqual(10.0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index, get_info, fun(_) ->
+        {ok, [{sizes, {[{file, 5242880}, {active, 524288}]}}]}
+    end),
+    ?assertEqual(10.0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
 
 t_slack_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index, get_info, fun(_) ->
-            {ok, [{sizes, {[{file, 1073741824}, {active, 536870911}]}}]}
-        end),
-        ?assertEqual(2.0000000037252903, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(536870913, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index, get_info, fun(_) ->
+        {ok, [{sizes, {[{file, 1073741824}, {active, 536870911}]}}]}
+    end),
+    ?assertEqual(2.0000000037252903, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(536870913, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
 
 t_no_data_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index, get_info, fun(_) ->
-            {ok, [{sizes, {[{file, 5242880}, {active, 0}]}}]}
-        end),
-        ?assertEqual(2.0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(536870912, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(2.0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index, get_info, fun(_) ->
+        {ok, [{sizes, {[{file, 5242880}, {active, 0}]}}]}
+    end),
+    ?assertEqual(2.0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(536870912, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(2.0, get_priority("upgrade_views", {Shard, GroupId})).
 
 t_below_min_priority_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index, get_info, fun(_) ->
-            {ok, [{sizes, {[{file, 5242880}, {active, 1048576}]}}]}
-        end),
-        ?assertEqual(5.0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index, get_info, fun(_) ->
+        {ok, [{sizes, {[{file, 5242880}, {active, 1048576}]}}]}
+    end),
+    ?assertEqual(5.0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
 
 t_below_min_size_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index, get_info, fun(_) ->
-            {ok, [{sizes, {[{file, 1048576}, {active, 512000}]}}]}
-        end),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index, get_info, fun(_) ->
+        {ok, [{sizes, {[{file, 1048576}, {active, 512000}]}}]}
+    end),
+    ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
 
 t_timeout_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index, get_info, fun(_) ->
-            exit({timeout, get_info})
-        end),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index, get_info, fun(_) ->
+        exit({timeout, get_info})
+    end),
+    ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
+
+t_missing_db(_) ->
+    ShardGroup = {<<"shards/80000000-ffffffff/db2.1666895357">>, <<"x">>},
+    ?assertEqual(0, get_priority("ratio_views", ShardGroup)),
+    ?assertEqual(0, get_priority("slack_views", ShardGroup)),
+    ?assertEqual(0, get_priority("upgrade_views", ShardGroup)).
 
 t_missing_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index_server, get_index, 3, {not_found, missing}),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index_server, get_index, 3, {not_found, missing}),
+    ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
 
 t_invalid_view({ok, Shard, GroupId}) ->
-    ?_test(begin
-        meck:expect(couch_index_server, get_index, 3, {error, undef}),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
-    end).
+    meck:expect(couch_index_server, get_index, 3, {error, undef}),
+    ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
+    ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId})).
 
 config_listener_mon() ->
     IsConfigMonitor = fun(P) ->
