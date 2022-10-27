@@ -21,7 +21,9 @@ init([]) ->
     Children =
         [
             {couch_task_status, {couch_task_status, start_link, []}, permanent, brutal_kill, worker,
-                [couch_task_status]}
+                [couch_task_status]},
+            {couch_password_hasher, {couch_password_hasher, start_link, []}, permanent, brutal_kill,
+                worker, [couch_password_hasher]}
         ] ++ couch_servers(),
     {ok, {{one_for_one, 10, 3600}, Children}}.
 
