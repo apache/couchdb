@@ -1,0 +1,10 @@
+%% This file is part of khash released under the MIT license.
+%% See the LICENSE file for more information.
+%% Copyright 2013 Cloudant, Inc <support@cloudant.com>
+
+{application, khash, [
+    {description, "A NIF wrapper for Kazlib's hash structure."},
+    {vsn, git},
+    {registered, []},
+    {applications, [kernel]}
+]}.

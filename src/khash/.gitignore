@@ -1,0 +1,10 @@
+/c_src/hash.d
+/c_src/khash.d
+c_src/*.o
+ebin/
+test/*.beam
+.eunit
+.rebar
+priv/*.so
+vc*.pdb
+compile_commands.json

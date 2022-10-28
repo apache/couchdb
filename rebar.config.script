@@ -110,6 +110,9 @@ SubDirs = [
     "src/couch_epi",
     "src/config",
     "src/couch_log",
+    "src/khash",
+    "src/b64url",
+    "src/ets_lru",
     "src/chttpd",
     "src/couch",
     "src/couch_event",
@@ -142,9 +145,6 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{b64url,           "b64url",           {tag, "1.0.3"}},
-{ets_lru,          "ets-lru",          {tag, "1.1.0"}},
-{khash,            "khash",            {tag, "1.1.0"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.8"}},
 
 %% %% Non-Erlang deps
