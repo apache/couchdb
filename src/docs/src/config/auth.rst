@@ -366,3 +366,31 @@ Authentication Configuration
 
             [jwt_auth]
                 required_claims = exp,iat
+
+.. config:option:: roles_claim_name :: Optional CouchDB roles claim in JWT token
+
+    If presented, as a JSON array of strings, it is used as the CouchDB user's roles
+    list as long as the JWT token is valid. The default value for ``roles_claim_name``
+    is ``_couchdb.roles``.
+
+    .. note::
+        Values for ``roles_claim_name`` can only be top-level attributes in the JWT
+        token.
+
+    Let's assume, we have the following configuration:
+
+    .. code-block:: ini
+
+        [jwt_auth]
+        roles_claim_name = my-couchdb.roles
+
+    CouchDB will search for the attribute ``my-couchdb.roles`` in the JWT token.
+
+    .. code-block:: json
+
+        {
+            "my-couchdb.roles": [
+                "role_1",
+                "role_2"
+            ]
+        }
