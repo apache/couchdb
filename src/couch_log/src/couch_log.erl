@@ -21,6 +21,7 @@
     critical/2,
     alert/2,
     emergency/2,
+    measures/2,
 
     set_level/1
 ]).
@@ -48,6 +49,9 @@ alert(Fmt, Args) -> log(alert, Fmt, Args).
 
 -spec emergency(string(), list()) -> ok.
 emergency(Fmt, Args) -> log(emergency, Fmt, Args).
+
+-spec measures(string(), list()) -> ok.
+measures(Fmt, Args) -> log(measures, Fmt, Args).
 
 -spec set_level(atom() | string() | integer()) -> true.
 set_level(Level) ->

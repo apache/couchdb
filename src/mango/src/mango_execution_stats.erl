@@ -21,6 +21,7 @@
     incr_results_returned/1,
     log_start/1,
     log_end/1,
+    log_stats/1,
     maybe_add_stats/4
 ]).
 
@@ -74,6 +75,9 @@ log_end(Stats) ->
 maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
     Stats1 = log_end(Stats0),
     couch_stats:update_histogram([mango, query_time], Stats1#execution_stats.executionTimeMs),
+    %% TODO: validate rows/reads assignments
+    chttpd_stats:incr_rows(Stats1#execution_stats.totalDocsExamined),
+    chttpd_stats:incr_reads(Stats1#execution_stats.totalQuorumDocsExamined),
 
     case couch_util:get_value(execution_stats, Opts) of
         true ->
@@ -84,3 +88,9 @@ maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
         _ ->
             UserAcc
     end.
+
+log_stats(Stats) ->
+    {JStats0} = mango_execution_stats:to_json(Stats),
+    Nonce = list_to_binary(couch_log_util:get_msg_id()),
+    JStats = {[{<<"nonce">>, Nonce} | JStats0]},
+    couch_log:measures("GOT MANGO EXEC STATS: ~s", [binary_to_list(jiffy:encode(JStats))]).

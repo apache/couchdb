@@ -17,6 +17,7 @@
 -export([
     init/0,
     reconfigure/0,
+    should_log_measures/1,
     get/1
 ]).
 
@@ -38,6 +39,14 @@ reconfigure() ->
 get(Key) ->
     ?MOD_NAME:get(Key).
 
+-spec should_log_measures(term()) -> boolean().
+should_log_measures(_LogEntry) ->
+    case ?MODULE:get(should_log_measures) of
+        true   -> true;
+        false  -> false;
+        _Other -> false
+    end.
+
 -spec entries() -> [string()].
 entries() ->
     [
@@ -45,6 +54,7 @@ entries() ->
         {level_int, "level", "info"},
         {max_message_size, "max_message_size", "16000"},
         {strip_last_msg, "strip_last_msg", "true"},
+        {should_log_measures, "should_log_measures", "true"},
         {filter_fields, "filter_fields", "[pid, registered_name, error_info, messages]"}
     ].
 
@@ -101,6 +111,12 @@ transform(strip_last_msg, "false") ->
     false;
 transform(strip_last_msg, _) ->
     true;
+transform(should_log_measures, "false") ->
+    false;
+transform(should_log_measures, "true") ->
+    true;
+transform(should_log_measures, _) ->
+    false;
 transform(filter_fields, FieldsStr) ->
     Default = [pid, registered_name, error_info, messages],
     case parse_term(FieldsStr) of

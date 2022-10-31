@@ -27,6 +27,13 @@
 -include("couch_log.hrl").
 
 -spec should_log(#log_entry{} | atom()) -> boolean().
+should_log(#log_entry{level = measures = Level}=Entry) ->
+    case couch_log_config:should_log_measures(Entry) of
+        true ->
+            true;
+        false ->
+            should_log(Level)
+    end;
 should_log(#log_entry{level = Level}) ->
     should_log(Level);
 should_log(Level) ->
@@ -53,6 +60,7 @@ level_to_integer(info) -> 2;
 level_to_integer(notice) -> 3;
 level_to_integer(warning) -> 4;
 level_to_integer(warn) -> 4;
+level_to_integer(measures) -> 4;
 level_to_integer(error) -> 5;
 level_to_integer(err) -> 5;
 level_to_integer(critical) -> 6;
@@ -66,6 +74,7 @@ level_to_integer("info") -> 2;
 level_to_integer("notice") -> 3;
 level_to_integer("warning") -> 4;
 level_to_integer("warn") -> 4;
+level_to_integer("measures") -> 4;
 level_to_integer("error") -> 5;
 level_to_integer("err") -> 5;
 level_to_integer("critical") -> 6;
@@ -95,6 +104,7 @@ level_to_atom("notice") -> notice;
 level_to_atom("4") -> warning;
 level_to_atom("warning") -> warning;
 level_to_atom("warn") -> warning;
+level_to_atom("measures") -> measures;
 level_to_atom("5") -> error;
 level_to_atom("error") -> error;
 level_to_atom("err") -> error;

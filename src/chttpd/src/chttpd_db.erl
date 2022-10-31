@@ -103,6 +103,7 @@ handle_request(#httpd{path_parts = [DbName | RestParts], method = Method} = Req)
             do_db_req(Req, fun db_req/2);
         {_, [SecondPart | _]} ->
             Handler = chttpd_handlers:db_handler(SecondPart, fun db_req/2),
+            io:format("HANDLING {~p} WITH: ~p~n", [SecondPart, Handler]),
             do_db_req(Req, Handler)
     end.
 
