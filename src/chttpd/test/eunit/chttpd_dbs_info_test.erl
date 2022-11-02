@@ -54,6 +54,15 @@ setup_with_shards_db_ddoc() ->
     {Suffix, Db1, Db2} = setup(),
     {Suffix, Db1, Db2, create_shards_db_ddoc(Suffix)}.
 
+setup_admin_only_false() ->
+    Ctx = setup(),
+    config:set("chttpd", "admin_only_all_dbs", "false", _Persist = false),
+    Ctx.
+
+teardown_admin_only_false(Ctx) ->
+    config:delete("chttpd", "admin_only_all_dbs", _Persist = false),
+    teardown(Ctx).
+
 teardown_with_shards_db_ddoc({Suffix, Db1, Db2, UrlDDoc}) ->
     ok = delete_shards_db_ddoc(UrlDDoc),
     teardown({Suffix, Db1, Db2}).
@@ -86,7 +95,8 @@ dbs_info_test_() ->
                     ?TDEF_FE(should_return_dbs_info_for_multiple_dbs),
                     ?TDEF_FE(should_return_error_for_exceeded_keys),
                     ?TDEF_FE(should_return_error_for_missing_keys),
-                    ?TDEF_FE(should_return_dbs_info_for_dbs_with_mixed_state)
+                    ?TDEF_FE(should_return_dbs_info_for_dbs_with_mixed_state),
+                    ?TDEF_FE(should_not_allow_non_admin_access)
                 ]
             }
         }
@@ -106,6 +116,25 @@ skip_limit_test_() ->
                 [
                     ?TDEF_FE(t_dbs_info_when_shards_db_design_doc_exist),
                     ?TDEF_FE(t_all_dbs_when_shards_db_design_doc_exist)
+                ]
+            }
+        }
+    }.
+
+admin_only_config_false_test_() ->
+    {
+        "chttpd admin only false tests",
+        {
+            setup,
+            fun start/0,
+            fun stop/1,
+            {
+                foreach,
+                fun setup_admin_only_false/0,
+                fun teardown_admin_only_false/1,
+                [
+                    ?TDEF_FE(t_dbs_info_allow_non_admin_access),
+                    ?TDEF_FE(t_all_dbs_allow_non_admin_access)
                 ]
             }
         }
@@ -251,6 +280,21 @@ should_return_dbs_info_for_dbs_with_mixed_state({_, Db1, _}) ->
     ?assertEqual(<<"noexisteddb">>, couch_util:get_value(<<"key">>, Db2Data)),
     ?assertEqual(undefined, couch_util:get_value(<<"info">>, Db2Data)).
 
+should_not_allow_non_admin_access({_, Db1, _}) ->
+    NewDoc = "{\"keys\": [\"" ++ Db1 ++ "\"]}",
+    ?assertMatch(
+        {ok, 401, _, _},
+        test_request:post(
+            dbs_info_url(), [?CONTENT_JSON], NewDoc
+        )
+    ),
+    ?assertMatch(
+        {ok, 401, _, _},
+        test_request:get(
+            dbs_info_url(), [?CONTENT_JSON]
+        )
+    ).
+
 t_dbs_info_when_shards_db_design_doc_exist({Suffix, _, Db2, _}) ->
     {ok, _, _, ResultBody} = test_request:get(
         dbs_info_url("limit=1&skip=1"), [?CONTENT_JSON, ?AUTH]
@@ -263,6 +307,30 @@ t_all_dbs_when_shards_db_design_doc_exist({_, _, Db2, _}) ->
         base_url("_all_dbs?limit=1&skip=1"), [?CONTENT_JSON, ?AUTH]
     ),
     ?assertEqual([?l2b(Db2)], jiffy:decode(ResultBody)).
+
+t_dbs_info_allow_non_admin_access({_, Db1, _}) ->
+    NewDoc = "{\"keys\": [\"" ++ Db1 ++ "\"]}",
+    ?assertMatch(
+        {ok, 200, _, _},
+        test_request:post(
+            dbs_info_url(), [?CONTENT_JSON], NewDoc
+        )
+    ),
+    ?assertMatch(
+        {ok, 200, _, _},
+        test_request:get(
+            dbs_info_url(), [?CONTENT_JSON]
+        )
+    ).
+
+t_all_dbs_allow_non_admin_access({_, _, _}) ->
+    Url = base_url() ++ "_all_dbs",
+    ?assertMatch(
+        {ok, 200, _, _},
+        test_request:get(
+            Url, [?CONTENT_JSON]
+        )
+    ).
 
 %% Utility functions
 testdb(Name, Suffix) ->
