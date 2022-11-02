@@ -34,12 +34,9 @@ authorize_request_int(#httpd{path_parts = []} = Req) ->
 authorize_request_int(#httpd{path_parts = [<<"favicon.ico">> | _]} = Req) ->
     Req;
 authorize_request_int(#httpd{path_parts = [<<"_all_dbs">> | _]} = Req) ->
-    case config:get_boolean("chttpd", "admin_only_all_dbs", true) of
-        true -> require_admin(Req);
-        false -> Req
-    end;
+    maybe_admin_only_dbs(Req);
 authorize_request_int(#httpd{path_parts = [<<"_dbs_info">> | _]} = Req) ->
-    Req;
+    maybe_admin_only_dbs(Req);
 authorize_request_int(#httpd{path_parts = [<<"_replicator">>], method = 'PUT'} = Req) ->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts = [<<"_replicator">>], method = 'DELETE'} = Req) ->
@@ -154,3 +151,9 @@ check_security(names, null, _) ->
     false;
 check_security(names, UserName, Names) ->
     lists:member(UserName, Names).
+
+maybe_admin_only_dbs(Req) ->
+    case config:get_boolean("chttpd", "admin_only_all_dbs", true) of
+        true -> require_admin(Req);
+        false -> Req
+    end.
