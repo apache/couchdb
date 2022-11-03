@@ -1,0 +1,371 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/3.3.x:
+
+============
+3.3.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/3.3.0:
+
+Version 3.3.0
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`3766`, :ghissue:`3970`, :ghissue:`3972`, :ghissue:`4093`,
+  :ghissue:`4102`, :ghissue:`4104`, :ghissue:`4110`, :ghissue:`4111`,
+  :ghissue:`4114`, :ghissue:`4245`, :ghissue:`4246`:, :ghissue:`4266`: Add
+  ``smoosh`` queue persistence. This allows resuming ``smoosh`` operations
+  after a node restart. This is disabled by default and can be enabled with
+  ``[smoosh] persist = true``. Optimise ``smoosh`` operations and increase
+  test coverage to 90%.
+
+* :ghissue:`3798`: Add ``libicu`` version and collation algorithm version to
+  ``/_node/_local/_versions``.
+
+* :ghissue:`3837`: The Erlang source tree is now auto-formatted with ``erlfmt``.
+
+* :ghissue:`3845`: Clean up the ``couch_ejson_compare`` C-module and squash
+  Microsoft compiler warnings.
+
+* :ghissue:`3832`: Add ``GET`` variant to ``_dbs_info`` endpoint, used to be
+  ``POST`` only.
+
+* :ghissue:`3864`: Improve ``erlang_ls`` configuration.
+
+* :ghissue:`3853`: Remove legacy ``ddoc_cache_opener`` ``gen_server`` and
+  speed up event routing.
+
+* :ghissue:`3879`: Remove use of ``ERL_OPTS`` environment variable. All
+  supported Erlang versions now use ``ERL_COMPILER_OPTIONS`` for the same
+  purpose.
+
+* :ghissue:`3883`: Add support for SpiderMonkey 91.
+
+* :ghissue:`3889`: Track ``libicu`` collator versions in the view header.
+
+* :ghissue:`3952`: Make the timeout for receiving requests from attachment
+  writers configurable.
+
+* :ghissue:`3927`: Include index signature in ``_search_info``.
+
+* :ghissue:`3963`: Optimtize key tree stemming by using maps instead of
+  sets. This greatly reduced memory usage for heavily conflicted docs in some
+  situations.
+
+* :ghissue:`3974`: Create new config options in ``[couchdb]`` and ``[smoosh]``
+  sections to enable finer control of compaction logging levels.
+
+* :ghissue:`3983`, :ghissue:`3984`, :ghissue:`3985`, :ghissue:`3987`,
+  :ghissue:`4033`: Add various functions to ``couch_debug`` module.
+
+* :ghissue:`4000`: Ensure ``Object.prototype.toSource()`` is always available.
+
+* :ghissue:`4018`: Update ``jiffy`` to 1.1.1 and ``b64url`` to 1.0.3.
+
+* :ghissue:`4021`: Reduce smoosh compaction log level to ``debug``.
+
+* :ghissue:`4041`: Allow and evaluate nested json claim roles in JWT token.
+
+* :ghissue:`4060`, :ghissue:`4290`: Add support for Erlang 25.
+
+* :ghissue:`4064`: Enable replicating purge requests between nodes. Also avoid
+  applying interactive purges more than once.
+
+* :ghissue:`4069`, :ghissue:`4084`: Drop support for Erlang < 23, update
+  ``vm.args`` settings to match. Review this if you have customized your
+  ``vm.args``.
+
+* :ghissue:`4083`: Support Elixir 13.
+
+* :ghissue:`4085`: Add an option to let ``custodian`` always use ``[cluster] n``
+  value.
+
+* :ghissue:`4095`: Implement ``winning_revs_only`` option for the replicator. It
+  replicates only the winning revisions from the source to the target,
+  effectively discarding conflicts.
+
+* :ghissue:`4135`: Separate search IO from file IO.
+
+* :ghissue:`4140`, :ghissue:`4162`: Upgrade hash algorithm for cookie auth (sha1
+  -> sha256). This introduces a new config setting ``hash_algorithms``. New cookie
+  values are hashed with sha256, sha1 hashes are still accepted. Admins can set
+  this to sha256 only. Sha1 will be disallowed in the next major release. Show
+  supported hash algorithms in ``/_node/_local/_versions`` endpoint.
+
+* :ghissue:`4179`: Don't double-encode changes sequence strings in the
+  replicator.
+
+* :ghissue:`4182`: Explicitly maintain a fully connected cluster. Previously, it
+  was possible for the nodes to disconnect, and for that state to persist until
+  the nodes restarted.
+
+* :ghissue:`4198`: Redact passwords in log file.
+
+* :ghissue:`4243`: Update ``mochiweb`` to 3.1.1.
+
+* :ghissue:`4254`: The ``_dbs_info`` access control is now configured with the
+  ``[couchdb] admin_only_all_dbs`` setting. Defaults to true. This was a
+  leftover from the 3.0.0 release.
+
+* :ghissue:`4264`: ``active`` database sizes is now limited to leaf nodes.
+  Previously, it included intermediate tree nodes, which had the effect that
+  deleting (large) documents did not decrease ``active`` database size. In
+  addition, ``smoosh`` now picks up databases where large documents are
+  deleted for compaction more eagerly, reclaiming the deleted space quicker.
+
+* :ghissue:`4270`: Shard splitting now uses its own ``reshard`` IO priority.
+  It can be configured to be safely run in the background with production
+  loads, or with maximum IO available, if admins prefer quicker progress.
+
+* :ghissue:`4274`: Improve validation of replicator job parameters & move
+  ``_replicator`` VDU design doc to internal BDU.
+
+* :ghissue:`4280`: Add ``CFLAGS`` and ``LDFLAGS`` to ICU build parameters.
+
+* :ghissue:`4284`: Remove all usage of global to avoid potential deadlocks
+  in replication jobs.
+
+* :ghissue:`4287`: Allow ``=`` in config key names.
+
+Performance
+-----------
+
+* :ghissue:`3860`: Add sharding to ``couch_index_server``, similar to
+  :ghissue:`3366`, avoids processing bottlenecks on servers with a lot of
+  concurrent view indexing going on.
+
+* :ghissue:`3891`: Avoid decoding JWT payloads when not necessary.
+
+* :ghissue:`4031`: Default ``[rexi] use_kill_all`` to ``true``. This improves
+  intra-cluster-node messaging. Set to false if you run a cluster with nodes
+  that have a version <3.0.0.
+
+* :ghissue:`4052`: Optimise ``couch_util:reorder_results/2,3``, which speeds up
+  ``_bulk_docs`` and ``_revs_diff``.
+
+* :ghissue:`4055`: Avoid using ``length/1`` guard for ``>0`` or ``==0`` tests in
+  ``couch_key_tree``.
+
+* :ghissue:`4056`: Optimise ``couch_key_tree:find_missing/2``. This speeds up
+  ``_revs_diff``.
+
+* :ghissue:`4059`: Reduce complexity of ``possible_ancestors`` from quadratic to
+  linear. This speeds up working with heavily conflicted documents
+  significantly.
+
+* :ghissue:`4091`: Optimise ``couch_util:to_hex/1``, this speeds up all
+  operations that need to encode a revision id into JSON (this is most
+  operations).
+
+* :ghissue:`4106`: Set ``io_priority`` in all IO paths. Introduces ``system``
+  ``io_priority``.
+
+* :ghissue:`4144`, :ghissue:`4172`: Implement ``_bulk_get`` support for the
+  replicator. Backward compatibility is ensured. This speeds up all
+  replications. Add option to disable new behaviour for legacy setups.
+
+* :ghissue:`4163`: Statistically skip ``_revs_diff`` in the replicator. This
+  improves performance for replications into empty targets.
+
+* :ghissue:`4177`: Remove the long deprecated ``bigcouch 0.4`` change sequence
+  support.
+
+* :ghissue:`4238`: Optimise ``_bulk_get`` endpoint. This speeds up replication
+  of 1M docs by ~2x. Individual ``_bulk_get`` requests are up to 8x faster.
+
+* :ghissue:`3517`: Add experimental fix for reduce performance regression due
+  to expensive repeated AST-transformations on newer SpiderMonkey versions.
+  Set ``COUCHDB_QUERY_SERVER_JAVASCRIPT`` env var to
+  ``COUCHDB_QUERY_SERVER_JAVASCRIPT="/opt/couchdb/bin/couchjs
+  /opt/couchdb/share/server/main-ast-bypass.js"``.
+
+Bugfixes
+--------
+
+* :ghissue:`3817`: Fix undefined function call in ``weatherreport``.
+
+* :ghissue:`3819`: Return ``400`` instead of ``500`` response code for known
+  invalid ``_bulk_docs`` with ``new_edits=false`` request.
+
+* :ghissue:`3861`: Add ``SameSite`` setting when clearing session cookies.
+
+* :ghissue:`3863`: Fix custom TLS distribution for Erlang 20.
+
+* :ghissue:`3870`: Always send all cookie attributes.
+
+* :ghissue:`3886`: Avoid changes feed rewind after shard move with no subsequent
+  db updates.
+
+* :ghissue:`3888`: Make ``_stats`` endpoint resilient against nodes that go
+  offline.
+
+* :ghissue:`3901`: Use db-creation time instead of ``0`` for
+  ``instance_start_time`` to help replicator recognise whether a peer database
+  was deleted and recreated.
+
+* :ghissue:`3909`: Fix ``new_edits:false`` and VDU ``function_clause``.
+
+* :ghissue:`3934`: Fix ``replicated_changes`` typo for purge doc updates.
+
+* :ghissue:`3940`: Ensure the multipart parser always monitors the worker and
+  make sure to wait for attachment uploads before responding.
+
+* :ghissue:`3950`: Ignore responses from timed-out or retried ``ibrowse`` calls.
+
+* :ghissue:`3969`: Fix ``skip`` and ``limit`` for ``_all_dbs`` and
+  ``_dbs_info``.
+
+* :ghissue:`3979`: Correctly respond with a ``500`` code when document updates
+  time out under heavy load.
+
+* :ghissue:`3992`: Show that Search is available if it was available
+  before. Avoid Search availability disappearing just because a Search node was
+  temporarily not available.
+
+* :ghissue:`3993`: Return a ``400`` error when decoding a JWT token fails,
+  rather than crashing and not responding at all.
+
+* :ghissue:`3990`: Prevent creation of ddocs with no name through Mango index
+  creation.
+
+* :ghissue:`4003`: Improve index building during shard splitting.
+
+* :ghissue:`4016`: Fix ``function_clause`` error for replicated changes with a
+  target VDU.
+
+* :ghissue:`4020`: Fix ``maybe_handle_error`` clauses.
+
+* :ghissue:`4037`: Fix ES{256,384,512} support for JWTs.
+
+* :ghissue:`4040`: Handle ``exit(shutdown)`` error in ``chttpd``.
+
+* :ghissue:`4043`: Fix purge request timeouts (5s -> infinity).
+
+* :ghissue:`4146`: The ``devcontainer`` has been updated.
+
+* :ghissue:`4050`: Handle ``all_dbs_active`` in ``fabric_doc_update``.
+
+* :ghissue:`4160`: Return a proper ``400`` error when an invalid object is sent
+  to ``_bulk_get``.
+
+* :ghissue:`4070`: Prevent ``error:function_clause`` in ``check_security/3`` if
+  roles claim is malformed.
+
+* :ghissue:`4075`: Fix ``couch_debug:opened_files*`` functions.
+
+* :ghissue:`4108`: Trim ``X-Auth-CouchDB-Roles`` header after reading.
+
+* :ghissue:`4153`: The ``require_valid_user`` setting is now under ``chttpd``.
+
+* :ghissue:`4161`: Fix ``content-type`` handling in ``_session``.
+
+* :ghissue:`4176`: Fix ``eventsource`` ``_changes`` feed.
+
+* :ghissue:`4197`: Support large (and impractical as-of-yet) ``q`` values. Fix
+  shard open timeouts for ``q > 64``.
+
+* :ghissue:`4199`: Fix spurious unlock in ``close_db_if_idle``.
+
+* :ghissue:`4230`: Avoid refresh messages piling up in prometheus server.
+
+* :ghissue:`4240`: Implement global password hasher process. This fixes a
+  race-condition when setting new admin passwords in quick succession on a
+  multicore server.
+
+* :ghissue:`4261`, :ghissue:`4271`: Clean up stale view checkpoints,
+  improve purge client cleanup logging
+
+* :ghissue:`4272`: Kill all ``couch_server_N`` if ``database_dir`` changes.
+
+Tests
+-----
+
+* :ghissue:`3825`: Eliminate Elixir compiler warnings.
+
+* :ghissue:`3830`: Reduce skipped Elixir integration tests.
+
+* :ghissue:`3890`: Handle ``not_found`` lookups removing ddoc cache key.
+
+* :ghissue:`3892`: Use Debian Stable for CI, add Erlang 24 to CI.
+
+* :ghissue:`3898`: Remove CI support for Ubuntu 16.04.
+
+* :ghissue:`3903`, :ghissue:`3914`: Refactor Jenkins to dynamically generate
+  stages. Drop ``MINIMUM_ERLANG_VERSION`` to 20, drop the packaging
+  ``ERLANG_VERSION`` to 23, add the ``weatherreport-test`` as a build step, and
+  add ``ARM`` and ``POWER`` back into the matrix.
+
+* :ghissue:`3921`:, :ghissue:`3923`: Execute various tests in clean
+  ``database_dir`` to avoid subsequent test flakiness.
+
+* :ghissue:`3968`: Ensure key tree rev stemming does’t take too much memory.
+
+* :ghissue:`3980`: Upgrade Mango test dependency ``nose`` to ``nose`` and fix
+  flaky-on-Windows tests.
+
+* :ghissue:`4006`: Remove CI support for Debian 9.
+
+* :ghissue:`4061`, :ghissue:`4082`: Update PPC CI builder.
+
+* :ghissue:`4096`: Fix flaky ``validate_doc_update`` Elixir test.
+
+* :ghissue:`4123`: Fix ``haproxy.cfg``.
+
+* :ghissue:`4126`: Return a ``400`` response for a single ``new_edits=false``
+  doc update without revision.
+
+* :ghissue:`4129`: Fix ``proxyauth_test`` and removed it from skip list.
+
+* :ghissue:`4132`: Address race condition in ``cpse_incref_decref`` test.
+
+* :ghissue:`4151`: Refactor replication tests to use clustered endpoints.
+
+* :ghissue:`4178`: Add test coverage to prevent junk in ``eventsource``.
+
+* :ghissue:`4188`: Enable eunit coverage for all applications instead of
+  enabling it per-application.
+
+* :ghissue:`4202`: Fix race condition in ddoc cache LRU test.
+
+* :ghissue:`4203`, :ghissue:`4205`: Reduce test log noise.
+
+* :ghissue:`4268`: Improve flaky ``_dbs_info`` test.
+
+Docs
+----
+
+* :ghissue:`4164`: The CouchDB documentation has been moved into the main
+  CouchDB repository.
+
+* :ghissue:`4174`: Update Sphinx to version 5.1.1
+
+* :ghissue:`4170`: Document the ``/_node/_local/_versions`` endpoint.
+
+Builds
+------
+
+* :ghissue:`4097`: Stop publication of nightly packages. They were not used
+  anywhere.
+
+Other
+-----
+
+* Added pumpkin spice to selected endpoints. — Thank you for reading the 3.3.0
+  release notes.
