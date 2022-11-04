@@ -31,7 +31,7 @@ nitpicky = True
 
 # should be over-written using rebar-inherited settings
 version = "3.2"
-release = "3.2.0"
+release = "3.2.2"
 
 project = "Apache CouchDB\u00ae"
 
