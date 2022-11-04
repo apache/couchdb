@@ -232,6 +232,16 @@ HTTP Server Options
            upgrade, it is advisable to review the usage of these configuration
            settings.
 
+    .. config:option:: admin_only_all_dbs :: Require admin for ``_all_dbs`` and ``_dbs_info``
+
+        .. versionadded:: 2.2 implemented for ``_all_dbs`` defaulting to ``false``
+        .. versionchanged:: 3.0 default switched to ``true``, applies to ``_all_dbs``
+
+        When set to ``true`` admin is required to access ``_all_dbs``. ::
+
+            [chttpd]
+            admin_only_all_dbs = true
+
 .. config:section:: httpd :: HTTP Server Options
 
     .. versionchanged:: 3.2 These options were moved to [chttpd] section:
