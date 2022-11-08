@@ -15,6 +15,7 @@
 -export([get_view/4, get_view_index_pid/4]).
 -export([get_local_purge_doc_id/1, get_value_from_options/2]).
 -export([verify_view_filename/1, get_signature_from_filename/1]).
+-export([get_signatures/1, get_purge_checkpoints/1, get_index_files/1]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
 -export([make_header/1]).
 -export([index_file/2, compaction_file/2, open_file/1]).
@@ -53,6 +54,11 @@
         true -> B
     end)
 ).
+-define(IS_HEX(C),
+    ((C >= $0 andalso C =< $9) orelse
+        (C >= $a andalso C =< $f) orelse
+        (C >= $A andalso C =< $F))
+).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -70,31 +76,78 @@ get_value_from_options(Key, Options) ->
     end.
 
 verify_view_filename(FileName) ->
-    FilePathList = filename:split(FileName),
-    PureFN = lists:last(FilePathList),
-    case filename:extension(PureFN) of
+    case filename:extension(FileName) of
         ".view" ->
-            Sig = filename:basename(PureFN),
-            case
-                [
-                    Ch
-                 || Ch <- Sig,
-                    not (((Ch >= $0) and (Ch =< $9)) orelse
-                        ((Ch >= $a) and (Ch =< $f)) orelse
-                        ((Ch >= $A) and (Ch =< $F)))
-                ] == []
-            of
-                true -> true;
-                false -> false
-            end;
+            Sig = get_signature_from_filename(FileName),
+            lists:all(fun(C) -> ?IS_HEX(C) end, Sig);
         _ ->
             false
     end.
 
-get_signature_from_filename(FileName) ->
-    FilePathList = filename:split(FileName),
-    PureFN = lists:last(FilePathList),
-    filename:basename(PureFN, ".view").
+get_signature_from_filename(Path) ->
+    filename:basename(filename:basename(Path, ".view"), ".compact").
+
+% Returns map of `Sig => true` elements with all the active signatures.
+% Sig is a hex-encoded binary.
+%
+get_signatures(DbName) when is_binary(DbName) ->
+    couch_util:with_db(DbName, fun get_signatures/1);
+get_signatures(Db) ->
+    DbName = couch_db:name(Db),
+    % get_design_docs/1 returns ejson for clustered shards, and
+    % #full_doc_info{}'s for other cases.
+    {ok, DDocs} = couch_db:get_design_docs(Db),
+    FoldFun = fun
+        ({[_ | _]} = EJsonDoc, Acc) ->
+            Doc = couch_doc:from_json_obj(EJsonDoc),
+            {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
+            Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
+            Acc#{Sig => true};
+        (#full_doc_info{} = FDI, Acc) ->
+            {ok, Doc} = couch_db:open_doc_int(Db, FDI, [ejson_body]),
+            {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
+            Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
+            Acc#{Sig => true}
+    end,
+    lists:foldl(FoldFun, #{}, DDocs).
+
+% Returns a map of `Sig => DocId` elements for all the purge view
+% checkpoint docs. Sig is a hex-encoded binary.
+%
+get_purge_checkpoints(DbName) when is_binary(DbName) ->
+    couch_util:with_db(DbName, fun get_purge_checkpoints/1);
+get_purge_checkpoints(Db) ->
+    FoldFun = fun(#doc{id = Id}, Acc) ->
+        case Id of
+            <<?LOCAL_DOC_PREFIX, "purge-mrview-", Sig/binary>> ->
+                {ok, Acc#{Sig => Id}};
+            _ ->
+                {stop, Acc}
+        end
+    end,
+    Opts = [{start_key, <<?LOCAL_DOC_PREFIX, "purge-mrview-">>}],
+    {ok, Signatures = #{}} = couch_db:fold_local_docs(Db, FoldFun, #{}, Opts),
+    Signatures.
+
+% Returns a map of `Sig => [FilePath, ...]` elements. Sig is a hex-encoded
+% binary and FilePaths are lists as they intended to be passed to couch_file
+% and file module functions.
+%
+get_index_files(DbName) when is_binary(DbName) ->
+    IdxDir = couch_index_util:index_dir(mrview, DbName),
+    WildcardPath = filename:join(IdxDir, "*"),
+    FoldFun = fun(F, Acc) ->
+        case verify_view_filename(F) of
+            true ->
+                Sig = ?l2b(get_signature_from_filename(F)),
+                maps:update_with(Sig, fun(Fs) -> [F | Fs] end, [F], Acc);
+            false ->
+                Acc
+        end
+    end,
+    lists:foldl(FoldFun, #{}, filelib:wildcard(WildcardPath));
+get_index_files(Db) ->
+    get_index_files(couch_db:name(Db)).
 
 get_view(Db, DDoc, ViewName, Args0) ->
     case get_view_index_state(Db, DDoc, ViewName, Args0) of

@@ -687,6 +687,11 @@ get_design_doc(#db{} = Db, DDocId0) ->
     DDocId = couch_util:normalize_ddoc_id(DDocId0),
     couch_db:open_doc_int(Db, DDocId, [ejson_body]).
 
+% Note: get_design_docs/1 for clustered db shards returns docs as ejson {[_ |
+% _]} and for simple node-local dbs it returns #full_docs_info{} records. To
+% obtain ejson docs in that case would need to call couch_db:open_doc_int(Db,
+% FDI, [ejson_body]) for each one of them.
+%
 get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
     DbName = mem3:dbname(ShardDbName),
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
