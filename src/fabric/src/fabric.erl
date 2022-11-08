@@ -65,7 +65,6 @@
     cleanup_index_files/1,
     cleanup_index_files_all_nodes/1,
     dbname/1,
-    inactive_index_files/1,
     db_uuids/1
 ]).
 
@@ -586,58 +585,34 @@ cleanup_index_files() ->
 -spec cleanup_index_files(dbname()) -> ok.
 cleanup_index_files(DbName) ->
     try
-        lists:foreach(
-            fun(File) ->
-                file:delete(File)
-            end,
-            inactive_index_files(DbName)
-        )
+        ShardNames = [mem3:name(S) || S <- mem3:local_shards(dbname(DbName))],
+        cleanup_local_indices_and_purge_checkpoints(ShardNames)
     catch
-        error:Error ->
-            couch_log:error(
-                "~p:cleanup_index_files. Error: ~p",
-                [?MODULE, Error]
-            ),
+        error:database_does_not_exist ->
             ok
     end.
 
-%% @doc inactive index files for a specific db
--spec inactive_index_files(dbname()) -> ok.
-inactive_index_files(DbName) ->
-    {ok, DesignDocs} = fabric:design_docs(DbName),
+cleanup_local_indices_and_purge_checkpoints([]) ->
+    ok;
+cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
+    AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
+    AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
+    Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
+    ok = cleanup_purges(Sigs, AllPurges, Dbs),
+    ok = cleanup_indices(Sigs, AllIndices).
 
-    ActiveSigs = maps:from_list(
-        lists:map(
-            fun(#doc{id = GroupId}) ->
-                {ok, Info} = fabric:get_view_group_info(DbName, GroupId),
-                {binary_to_list(couch_util:get_value(signature, Info)), nil}
-            end,
-            [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
-        )
-    ),
+cleanup_purges(Sigs, AllPurges, Dbs) ->
+    Fun = fun(DbPurges, Db) ->
+        couch_mrview_cleanup:cleanup_purges(Db, Sigs, DbPurges)
+    end,
+    lists:zipwith(Fun, AllPurges, Dbs),
+    ok.
 
-    FileList = lists:flatmap(
-        fun(#shard{name = ShardName}) ->
-            IndexDir = couch_index_util:index_dir(mrview, ShardName),
-            filelib:wildcard([IndexDir, "/*"])
-        end,
-        mem3:local_shards(dbname(DbName))
-    ),
-
-    if
-        ActiveSigs =:= [] ->
-            FileList;
-        true ->
-            %% <sig>.view and <sig>.compact.view where <sig> is in ActiveSigs
-            %% will be excluded from FileList because they are active view
-            %% files and should not be deleted.
-            lists:filter(
-                fun(FilePath) ->
-                    not maps:is_key(get_view_sig_from_filename(FilePath), ActiveSigs)
-                end,
-                FileList
-            )
-    end.
+cleanup_indices(Sigs, AllIndices) ->
+    Fun = fun(DbIndices) ->
+        couch_mrview_cleanup:cleanup_indices(Sigs, DbIndices)
+    end,
+    lists:foreach(Fun, AllIndices).
 
 %% @doc clean up index files for a specific db on all nodes
 -spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
@@ -790,9 +765,6 @@ kl_to_record(KeyList, RecName) ->
 
 set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
-
-get_view_sig_from_filename(FilePath) ->
-    filename:basename(filename:basename(FilePath, ".view"), ".compact").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
