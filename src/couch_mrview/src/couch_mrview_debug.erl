@@ -28,7 +28,12 @@
     view_report/1,
     view_report/2,
     index_view_report/1,
-    index_view_report/2
+    index_view_report/2,
+    active_signatures/1,
+    index_files/1,
+    stale_index_files/1,
+    purge_checkpoints/1,
+    stale_purge_checkpoints/1
 ]).
 
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -41,7 +46,12 @@ help() ->
         index_view_state,
         index_report,
         view_report,
-        index_view_report
+        index_view_report,
+        active_signatures,
+        index_files,
+        stale_index_files,
+        purge_checkpoints,
+        stale_purge_checkpoints
     ].
 
 -spec help(Function :: atom()) -> ok.
@@ -269,6 +279,56 @@ help(index_view_report) ->
 
     ---
     ", []);
+help(active_signatures) ->
+    io:format("
+    active_signatures(DbName)
+    -------------------------
+
+    DbName: Database name as list or binary
+
+    Returns the list of all view signatures.
+    ---
+    ", []);
+help(index_files) ->
+    io:format("
+    index_files(DbName)
+    -------------------------
+
+    DbName: Database name as list or binary
+
+    Returns the list of all view index files, both active and inactive.
+    ---
+    ", []);
+help(stale_index_files) ->
+    io:format("
+    stale_index_files(DbName)
+    -------------------------
+
+    DbName: Database name as list or binary
+
+    Returns the list of stale (inactive) index files.
+    ---
+    ", []);
+help(purge_checkpoints) ->
+    io:format("
+    purge_checkpoints(DbName)
+    -------------------------
+
+    DbName: Database name as list or binary
+
+    Returns the list of all the view purge checkpoint doc ids.
+    ---
+    ", []);
+help(stale_purge_checkpoints) ->
+    io:format("
+    stale_purge_checkpoints(DbName)
+    -------------------------
+
+    DbName: Database name as list or binary
+
+    Returns the list of stale (inactive) view purge checkpoint doc ids.
+    ---
+    ", []);
 help(Unknown) ->
     io:format("Unknown function: `~p`. Please try one of the following:~n", [Unknown]),
     [io:format("    - ~s~n", [Function]) || Function <- help()],
@@ -431,6 +491,70 @@ convert_collator_versions_to_strings(State) ->
         maps:get(collator_versions, State)
     ),
     maps:put(collator_versions, CollatorVersions, State).
+
+active_signatures(DbName) when is_list(DbName) ->
+    active_signatures(list_to_binary(DbName));
+active_signatures(DbName) when is_binary(DbName) ->
+    [binary_to_list(S) || S <- sigs(DbName)].
+
+index_files(DbName) when is_list(DbName) ->
+    index_files(list_to_binary(DbName));
+index_files(DbName) when is_binary(DbName) ->
+    ShardNames = shard_names(DbName),
+    Files = get_index_files(ShardNames, #{}),
+    [format_view_path(F) || F <- lists:sort(Files)].
+
+stale_index_files(DbName) when is_list(DbName) ->
+    index_files(list_to_binary(DbName));
+stale_index_files(DbName) when is_binary(DbName) ->
+    ShardNames = shard_names(DbName),
+    Files = get_index_files(ShardNames, get_sigs(ShardNames)),
+    [format_view_path(F) || F <- lists:sort(Files)].
+
+purge_checkpoints(DbName) when is_list(DbName) ->
+    purge_checkpoints(list_to_binary(DbName));
+purge_checkpoints(DbName) when is_binary(DbName) ->
+    ShardNames = shard_names(DbName),
+    Purges = get_purge_checkpoints(ShardNames, #{}),
+    [binary_to_list(DocId) || DocId <- lists:sort(Purges)].
+
+stale_purge_checkpoints(DbName) when is_list(DbName) ->
+    purge_checkpoints(list_to_binary(DbName));
+stale_purge_checkpoints(DbName) when is_binary(DbName) ->
+    ShardNames = shard_names(DbName),
+    Purges = get_purge_checkpoints(ShardNames, get_sigs(ShardNames)),
+    [binary_to_list(DocId) || DocId <- lists:sort(Purges)].
+
+get_purge_checkpoints([], #{}) ->
+    [];
+get_purge_checkpoints([_ | _] = Dbs, #{} = Sigs) ->
+    AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
+    Fun = fun(Purges, Acc) ->
+        Filtered = maps:without(maps:keys(Sigs), Purges),
+        maps:values(Filtered) ++ Acc
+    end,
+    lists:foldl(Fun, [], AllPurges).
+
+get_index_files([], #{}) ->
+    [];
+get_index_files([_ | _] = Dbs, #{} = Sigs) ->
+    AllIdxs = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
+    Fun = fun(Idxs, Acc) ->
+        Filtered = maps:without(maps:keys(Sigs), Idxs),
+        maps:values(Filtered) ++ Acc
+    end,
+    lists:foldl(Fun, [], AllIdxs).
+
+get_sigs([]) ->
+    #{};
+get_sigs([AnyShard | _]) ->
+    couch_mrview_util:get_signatures(AnyShard).
+
+shard_names(DbName) ->
+    [mem3:name(S) || S <- mem3:local_shards(DbName)].
+
+sigs(DbName) ->
+    lists:sort(maps:keys(get_sigs(shard_names(DbName)))).
 
 format_view_path(ViewFilePath) ->
     BaseDir = config:get("couchdb", "view_index_dir"),
