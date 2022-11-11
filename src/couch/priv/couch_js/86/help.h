@@ -16,7 +16,7 @@
 #include "config.h"
 
 static const char VERSION_TEMPLATE[] =
-    "%s - %s (SpiderMonkey 86)\n"
+    "%s - %s (SpiderMonkey %s)\n"
     "\n"
     "Licensed under the Apache License, Version 2.0 (the \"License\"); you may "
         "not use\n"
@@ -60,7 +60,8 @@ static const char USAGE_TEMPLATE[] =
             stdout,              \
             VERSION_TEMPLATE,    \
             basename,            \
-            PACKAGE_STRING)
+            PACKAGE_STRING,      \
+            JS_GetImplementationVersion())
 
 #define DISPLAY_VERSION couch_version(BASENAME)
 
