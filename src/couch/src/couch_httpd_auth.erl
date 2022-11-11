@@ -102,7 +102,7 @@ extract_roles(UserProps) ->
     Roles = couch_util:get_value(<<"roles">>, UserProps, []),
     case lists:member(<<"_admin">>, Roles) of
         true -> Roles;
-        _ -> [<<"_users">> | Roles]
+        _ -> Roles ++ [<<"_users">>]
     end.
 
 default_authentication_handler(Req) ->
@@ -206,7 +206,7 @@ proxy_auth_user(Req) ->
             Roles =
                 case header_value(Req, XHeaderRoles) of
                     undefined -> [];
-                    Else -> [<<"_users">> | re:split(Else, "\\s*,\\s*", [trim, {return, binary}])]
+                    Else -> re:split(Else, "\\s*,\\s*", [trim, {return, binary}]) ++ [<<"_users">>]
                 end,
             case
                 chttpd_util:get_chttpd_auth_config_boolean(
