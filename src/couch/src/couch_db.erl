@@ -326,6 +326,9 @@ open_doc(Db, Id, Options0) ->
             Else
     end.
 
+apply_open_options(Db, Options) ->
+    apply_open_options2(Db, Options).
+
 apply_open_options(Db, {ok, Doc}, Options) ->
     ok = validate_access(Db, Doc, Options),
     apply_open_options1({ok, Doc}, Options);
