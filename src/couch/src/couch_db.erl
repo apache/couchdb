@@ -383,7 +383,7 @@ open_doc_revs(Db, IdRevsOpts, Options) when is_list(IdRevsOpts) ->
     AllResults = open_doc_revs_int(Db, IdRevs, Options),
     % Apply document open options like {atts_since, ...} etc
     ResultsZipFun = fun(DocOpts, {ok, Results}) ->
-        [apply_open_options(R, DocOpts) || R <- Results]
+        [apply_open_options(Db, R, DocOpts) || R <- Results]
     end,
     lists:zipwith(ResultsZipFun, DocOptsOnly, AllResults).
 
