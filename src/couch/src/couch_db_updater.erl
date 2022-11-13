@@ -440,7 +440,7 @@ check_doc_atts(Db, Doc) ->
             end
     end.
 
-add_sizes(Type, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
+add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     % Maybe upgrade from disk_size only
     #size_info{
         active = ActiveSize,
@@ -448,14 +448,13 @@ add_sizes(Type, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     } = upgrade_sizes(Sizes),
     {ASAcc, ESAcc, AttsAcc} = Acc,
     NewASAcc = ActiveSize + ASAcc,
-    NewESAcc =
-        ESAcc +
-            if
-                Type == leaf -> ExternalSize;
-                true -> 0
-            end,
+    NewESAcc = ExternalSize + ESAcc,
     NewAttsAcc = lists:umerge(AttSizes, AttsAcc),
-    {NewASAcc, NewESAcc, NewAttsAcc}.
+    {NewASAcc, NewESAcc, NewAttsAcc};
+add_sizes(_, #leaf{atts = AttSizes}, Acc) ->
+    % For intermediate nodes external and active contribution is 0
+    {ASAcc, ESAcc, AttsAcc} = Acc,
+    {ASAcc, ESAcc, lists:umerge(AttSizes, AttsAcc)}.
 
 upgrade_sizes(#size_info{} = SI) ->
     SI;
