@@ -3,152 +3,486 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-%% ==========
-%% Setup
-%% ----------
-
-setup(ChannelType) ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    couch_db:close(Db),
-    {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
-    smoosh_channel:flush(ChannelPid),
-    ok = config:set("smoosh", "persist", "true", false),
-    ok = config:set(config_section(ChannelType), "min_size", "1", false),
-    ok = config:set(config_section(ChannelType), "min_priority", "1", false),
-    DbName.
-
-teardown(ChannelType, DbName) ->
-    ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-    ok = config:delete("smoosh", "persist", false),
-    ok = config:delete(config_section(DbName), "min_size", false),
-    ok = config:delete(config_section(DbName), "min_priority", false),
-    meck:unload(),
-    {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
-    smoosh_channel:flush(ChannelPid),
-    ok.
-
-config_section(ChannelType) ->
-    "smoosh." ++ ChannelType.
-
-%% ==========
-%% Tests
-%% ----------
-
 smoosh_test_() ->
     {
-        "Testing smoosh",
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
         {
-            setup,
-            fun() -> test_util:start_couch([smoosh]) end,
-            fun test_util:stop/1,
+            foreach,
+            fun setup/0,
+            fun teardown/1,
             [
-                channels_tests(),
-                persistence_tests()
+                ?TDEF_FE(t_default_channels),
+                ?TDEF_FE(t_channels_recreated_on_crash),
+                ?TDEF_FE(t_can_create_and_delete_channels),
+                ?TDEF_FE(t_db_is_enqueued_and_compacted),
+                ?TDEF_FE(t_view_is_enqueued_and_compacted),
+                ?TDEF_FE(t_index_cleanup_happens_by_default),
+                ?TDEF_FE(t_index_cleanup_can_be_disabled),
+                ?TDEF_FE(t_suspend_resume),
+                ?TDEF_FE(t_check_window_can_resume),
+                ?TDEF_FE(t_renqueue_on_crashes),
+                ?TDEF_FE(t_update_status_works),
+                ?TDEF_FE(t_checkpointing_works, 15),
+                ?TDEF_FE(t_ignore_checkpoint_resume_if_compacted_already),
+                ?TDEF_FE(t_access_cleaner_restarts),
+                ?TDEF_FE(t_event_handler_restarts),
+                ?TDEF_FE(t_manual_enqueue_api_works),
+                ?TDEF_FE(t_access_cleaner_works)
             ]
         }
     }.
 
-persistence_tests() ->
-    Tests = [
-        fun should_persist_queue/2,
-        fun should_call_recover/2,
-        fun should_not_call_recover/2
-    ],
-    {
-        "Various persistence tests",
+setup_all() ->
+    meck:new(smoosh_server, [passthrough]),
+    meck:new(smoosh_channel, [passthrough]),
+    meck:new(fabric, [passthrough]),
+    meck:new(couch_emsort, [passthrough]),
+    Ctx = test_util:start_couch([fabric]),
+    config:set("query_server_config", "commit_freq", "0", false),
+    Ctx.
+
+teardown_all(Ctx) ->
+    catch application:stop(smoosh),
+    config:delete("query_server_config", "commit_freq", false),
+    test_util:stop(Ctx),
+    meck:unload().
+
+setup() ->
+    config:set("smoosh", "persist", "false", false),
+    config:set("smoosh", "wait_secs", "0", false),
+    DbName = ?tempdb(),
+    fabric:create_db(DbName, [{q, 1}]),
+    {ok, _} = create_ddoc(DbName, <<"_design/foo">>, <<"bar">>),
+    {ok, _} = create_doc(DbName, <<"doc1">>, 1500000),
+    {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
+    application:start(smoosh),
+    wait_for_channels(),
+    flush(),
+    DbName.
+
+teardown(DbName) ->
+    catch flush(),
+    catch application:stop(smoosh),
+    fabric:delete_db(DbName),
+    meck:reset(smoosh_server),
+    meck:reset(smoosh_channel),
+    meck:reset(couch_emsort),
+    meck:reset(fabric),
+    config:delete("smoosh", "db_channels", false),
+    config:delete("smoosh.ratio_dbs", "min_priority", false),
+    config:delete("smoosh.ratio_views", "min_priority", false),
+    config:delete("smoosh", "view_channels", false),
+    config:delete("smoosh", "cleanup_channels", false),
+    config:delete("smoosh", "wait_secs", false),
+    config:delete("smoosh", "persist", false),
+    config:delete("smoosh", "cleanup_index_files", false).
+
+t_default_channels(_) ->
+    ?assertMatch(
         [
-            make_test_case("ratio_dbs", Tests)
-        ]
-    }.
+            {"index_cleanup", _},
+            {"ratio_dbs", _},
+            {"ratio_views", _},
+            {"slack_dbs", _},
+            {"slack_views", _},
+            {"upgrade_dbs", _},
+            {"upgrade_views", _}
+        ],
+        status()
+    ),
+    % If app hasn't started status won't crash
+    application:stop(smoosh),
+    ?assertEqual([], status()).
 
-channels_tests() ->
-    Tests = [
-        fun should_enqueue/2
-    ],
-    {
-        "Various channels tests",
-        [
-            make_test_case("ratio_dbs", Tests)
-        ]
-    }.
+t_channels_recreated_on_crash(_) ->
+    RatioDbsPid = get_channel_pid("ratio_dbs"),
+    meck:reset(smoosh_channel),
+    exit(RatioDbsPid, kill),
+    meck:wait(1, smoosh_channel, start_link, 1, 3000),
+    wait_for_channels(7),
+    ?assertMatch([_, {"ratio_dbs", _} | _], status()),
+    ?assertNotEqual(RatioDbsPid, get_channel_pid("ratio_dbs")).
 
-make_test_case(Type, Funs) ->
-    {foreachx, fun setup/1, fun teardown/2, [{Type, Fun} || Fun <- Funs]}.
+t_can_create_and_delete_channels(_) ->
+    config:set("smoosh", "db_channels", "mychan1", false),
+    config:set("smoosh", "view_channels", "mychan2", false),
+    config:set("smoosh", "cleanup_channels", "mychan3", false),
+    % 7 default ones + 3 new ones
+    wait_for_channels(10),
+    meck:reset(smoosh_channel),
+    config:delete("smoosh", "db_channels", false),
+    config:delete("smoosh", "view_channels", false),
+    config:delete("smoosh", "cleanup_channels", false),
+    wait_for_channels(7).
 
-should_enqueue(ChannelType, DbName) ->
-    ?_test(begin
-        ok = grow_db_file(DbName, 300),
-        ok = wait_enqueue(ChannelType, DbName),
-        ?assert(is_enqueued(ChannelType, DbName)),
-        ok
-    end).
+t_db_is_enqueued_and_compacted(DbName) ->
+    ?assertEqual({0, 0, 0}, sync_status("ratio_dbs")),
+    meck:reset(smoosh_channel),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    ok = wait_compact_start(),
+    ok = wait_normal_down().
 
-should_persist_queue(ChannelType, DbName) ->
-    ?_test(begin
-        {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
-        ok = grow_db_file(DbName, 300),
-        ok = wait_enqueue(ChannelType, DbName),
-        ok = smoosh_channel:persist(ChannelPid),
-        Q0 = channel_queue(ChannelType),
-        ok = application:stop(smoosh),
-        ok = application:start(smoosh),
-        Q1 = channel_queue(ChannelType),
-        % Assert that queues are not empty
-        ?assertNotEqual(Q0, smoosh_priority_queue:new(ChannelType)),
-        ?assertNotEqual(Q1, smoosh_priority_queue:new(ChannelType)),
-        ?assertEqual(Q0, Q1),
-        ok
-    end).
+t_view_is_enqueued_and_compacted(DbName) ->
+    % We don't want index cleanup to interfere for now
+    config:set("smoosh", "cleanup_index_files", "false", false),
+    % Ensure db is compacted
+    meck:reset(smoosh_channel),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_normal_down(),
+    % Check view
+    meck:reset(smoosh_channel),
+    {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
+    ok = wait_to_enqueue({DbName, <<"_design/foo">>}),
+    ok = wait_compact_start(),
+    ok = wait_normal_down().
 
-should_call_recover(_ChannelType, _DbName) ->
-    ?_test(begin
-        ok = application:stop(smoosh),
-        ok = config:set("smoosh", "persist", "true", false),
-        meck:new(smoosh_priority_queue, [passthrough]),
-        ok = application:start(smoosh),
-        timer:sleep(1000),
-        ?assertNotEqual(0, meck:num_calls(smoosh_priority_queue, recover, '_')),
-        ok
-    end).
+t_index_cleanup_happens_by_default(DbName) ->
+    ?assert(config:get_boolean("smoosh", "cleanup_index_files", true)),
+    % Db compacts
+    meck:reset(smoosh_channel),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_normal_down(),
+    % View should compact as well
+    meck:reset(fabric),
+    meck:reset(smoosh_channel),
+    {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
+    % View cleanup should have been invoked
+    meck:wait(fabric, cleanup_index_files, [DbName], 4000).
 
-should_not_call_recover(_ChannelType, _DbName) ->
-    ?_test(begin
-        ok = application:stop(smoosh),
-        ok = config:set("smoosh", "persist", "false", false),
-        meck:new(smoosh_priority_queue, [passthrough]),
-        ok = application:start(smoosh),
-        timer:sleep(1000),
-        ?assertEqual(0, meck:num_calls(smoosh_priority_queue, recover, '_')),
-        ok
-    end).
+t_index_cleanup_can_be_disabled(DbName) ->
+    config:set("smoosh", "cleanup_index_files", "false", false),
+    % Db compacts
+    meck:reset(smoosh_channel),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_normal_down(),
+    % View should compact as well
+    meck:reset(fabric),
+    meck:reset(smoosh_channel),
+    {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
+    ok = wait_compact_start(),
+    ok = wait_normal_down(),
+    % View cleanup was not called
+    timer:sleep(1000),
+    ?assertEqual(0, meck:num_calls(fabric, cleanup_index_files, 1)).
 
-grow_db_file(DbName, SizeInKb) ->
-    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-    Data = b64url:encode(crypto:strong_rand_bytes(SizeInKb * 1024)),
-    Body = {[{<<"value">>, Data}]},
-    Doc = #doc{id = <<"doc1">>, body = Body},
-    {ok, _} = couch_db:update_doc(Db, Doc, []),
-    couch_db:close(Db),
-    ok.
+t_suspend_resume(DbName) ->
+    ?assertEqual({0, 0, 0}, sync_status("ratio_dbs")),
+    meck:reset(smoosh_channel),
+    setup_db_compactor_intercept(),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    CompPid = wait_db_compactor_pid(),
+    ok = smoosh:suspend(),
+    ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
+    % Suspending twice should work too
+    ok = smoosh:suspend(),
+    ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
+    ok = smoosh:resume(),
+    ?assertNotEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    % Resuming twice should work too
+    ok = smoosh:resume(),
+    ?assertNotEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    CompPid ! continue,
+    ok = wait_normal_down().
 
-is_enqueued(ChannelType, DbName) ->
-    {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
-    smoosh_channel:is_key(ChannelPid, DbName).
+t_check_window_can_resume(DbName) ->
+    ?assertEqual({0, 0, 0}, sync_status("ratio_dbs")),
+    meck:reset(smoosh_channel),
+    setup_db_compactor_intercept(),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    CompPid = wait_db_compactor_pid(),
+    ok = smoosh:suspend(),
+    ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    get_channel_pid("ratio_dbs") ! check_window,
+    CompPid ! continue,
+    ok = wait_normal_down().
 
-wait_enqueue(ChannelType, DbName) ->
-    test_util:wait(
-        fun() ->
-            case is_enqueued(ChannelType, DbName) of
-                false ->
-                    wait;
-                true ->
-                    ok
-            end
+t_renqueue_on_crashes(DbName) ->
+    ?assertEqual({0, 0, 0}, sync_status("ratio_dbs")),
+    meck:reset(smoosh_channel),
+    setup_db_compactor_intercept(),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    CompPid = wait_db_compactor_pid(),
+    meck:reset(smoosh_channel),
+    CompPid ! {raise, error, boom},
+    ok = wait_to_enqueue(DbName),
+    CompPid2 = wait_db_compactor_pid(),
+    CompPid2 ! continue,
+    ok = wait_normal_down().
+
+t_update_status_works(DbName) ->
+    setup_db_compactor_intercept(),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    CompPid = wait_db_compactor_pid(),
+    % status should have 1 starting job, but it may have not been updated yet so
+    % we wait until update_status is called
+    wait_update_status(),
+    WaitFun = fun() ->
+        case {1, 0, 0} =:= status("ratio_dbs") of
+            true -> ok;
+            _ -> wait
+        end
+    end,
+    test_util:wait(WaitFun),
+    CompPid ! continue,
+    ok = wait_normal_down().
+
+t_checkpointing_works(DbName) ->
+    setup_db_compactor_intercept(),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    CompPid = wait_db_compactor_pid(),
+    ChanPid = get_channel_pid("ratio_dbs"),
+    config:set("smoosh", "persist", "true", false),
+    meck:reset(smoosh_channel),
+    ChanPid ! checkpoint,
+    % Wait for checkpoint process to exit
+    ok = wait_normal_down(),
+    % Stop smoosh and then crash the compaction
+    ok = application:stop(smoosh),
+    CompPid ! {raise, error, kapow},
+    % Smoosh should resume job and continue compacting
+    setup_db_compactor_intercept(),
+    meck:reset(smoosh_channel),
+    ok = application:start(smoosh),
+    CompPid2 = wait_db_compactor_pid(),
+    ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
+    CompPid2 ! continue,
+    ok = wait_normal_down().
+
+t_ignore_checkpoint_resume_if_compacted_already(DbName) ->
+    setup_db_compactor_intercept(),
+    {ok, _} = delete_doc(DbName, <<"doc1">>),
+    ok = wait_to_enqueue(DbName),
+    CompPid = wait_db_compactor_pid(),
+    ChanPid = get_channel_pid("ratio_dbs"),
+    config:set("smoosh", "persist", "true", false),
+    meck:reset(smoosh_channel),
+    ChanPid ! checkpoint,
+    % Wait for checkpoint process to exit
+    ok = wait_normal_down(),
+    % Stop smoosh and then let the compaction finish
+    ok = application:stop(smoosh),
+    Ref = erlang:monitor(process, CompPid),
+    CompPid ! continue,
+    receive
+        {'DOWN', Ref, _, _, normal} -> ok
+    end,
+    % Smoosh should resume job and *not* compact
+    setup_db_compactor_intercept(),
+    meck:reset(smoosh_channel),
+    ok = application:start(smoosh),
+    timer:sleep(500),
+    StartPat = {'_', {ok, '_'}},
+    ?assertEqual(0, meck:num_calls(smoosh_channel, handle_info, [StartPat, '_'])).
+
+t_access_cleaner_restarts(_) ->
+    ACPid = get_access_cleaner_pid(),
+    exit(ACPid, kill),
+    WaitFun = fun() ->
+        case get_access_cleaner_pid() of
+            Pid when Pid =/= ACPid -> ok;
+            _ -> wait
+        end
+    end,
+    test_util:wait(WaitFun),
+    ?assertNotEqual(ACPid, get_access_cleaner_pid()).
+
+t_event_handler_restarts(_) ->
+    EHPid = get_event_handler_pid(),
+    exit(EHPid, kill),
+    WaitFun = fun() ->
+        case get_event_handler_pid() of
+            Pid when Pid =/= EHPid -> ok;
+            _ -> wait
+        end
+    end,
+    test_util:wait(WaitFun),
+    ?assertNotEqual(EHPid, get_access_cleaner_pid()).
+
+t_manual_enqueue_api_works(DbName) ->
+    Shard = shard_name(DbName),
+
+    SmooshPid = whereis(smoosh_server),
+    RatioDbsPid = get_channel_pid("ratio_dbs"),
+    RatioViewsPid = get_channel_pid("ratio_views"),
+    CleanupPid = get_channel_pid("index_cleanup"),
+
+    % Lower min priority so that enqueued shards would try to compact
+    config:set("smoosh.ratio_dbs", "min_priority", "1", false),
+    config:set("smoosh.ratio_views", "min_priority", "1", false),
+
+    ?assertEqual(ok, smoosh_server:sync_enqueue(<<"invalid">>)),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({index_cleanup, <<"invalid">>})),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, <<"_design/invalid">>})),
+
+    ?assertEqual(ok, smoosh_server:sync_enqueue(Shard)),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({index_cleanup, Shard})),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, <<"_design/foo">>})),
+
+    ?assertEqual(ok, smoosh:enqueue(Shard)),
+    ?assertEqual(ok, smoosh:enqueue({index_cleanup, Shard})),
+    ?assertEqual(ok, smoosh:enqueue({Shard, <<"_design/foo">>})),
+
+    smoosh:enqueue_all_dbs(),
+    smoosh:enqueue_all_views(),
+
+    % Enqueuing the same items in a loop should work
+    lists:foreach(
+        fun(_) ->
+            ?assertEqual(ok, smoosh:enqueue(Shard)),
+            ?assertEqual(ok, smoosh:enqueue({index_cleanup, Shard})),
+            ?assertEqual(ok, smoosh:enqueue({Shard, <<"_design/foo">>}))
         end,
-        15000
-    ).
+        lists:seq(1, 1000)
+    ),
 
-channel_queue(ChannelType) ->
-    Q0 = smoosh_priority_queue:new(ChannelType),
-    smoosh_priority_queue:recover(Q0).
+    ?assertEqual(ok, smoosh_server:sync_enqueue(Shard)),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({index_cleanup, Shard})),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, <<"_design/foo">>})),
+
+    % Assert that channels and smoosh server didn't crash
+    ?assertEqual(SmooshPid, whereis(smoosh_server)),
+    ?assertEqual(RatioDbsPid, get_channel_pid("ratio_dbs")),
+    ?assertEqual(RatioViewsPid, get_channel_pid("ratio_views")),
+    ?assertEqual(CleanupPid, get_channel_pid("index_cleanup")).
+
+t_access_cleaner_works(_) ->
+    Now = erlang:monotonic_time(second),
+    ets:insert(smoosh_access, {<<"db1">>, Now - 3600}),
+    WaitFun = fun() ->
+        case ets:tab2list(smoosh_access) == [] of
+            true -> ok;
+            _ -> wait
+        end
+    end,
+    test_util:wait(WaitFun),
+    ?assertEqual([], ets:tab2list(smoosh_access)).
+
+create_doc(DbName, DocId, Size) ->
+    Data = b64url:encode(crypto:strong_rand_bytes(Size)),
+    Doc = #doc{id = DocId, body = {[{<<"value">>, Data}]}},
+    fabric:update_doc(DbName, Doc, [?ADMIN_CTX]).
+
+create_ddoc(DbName, DocId, ViewName) ->
+    MapFun = <<"function(doc) {emit(doc._id, doc.value);}">>,
+    DDoc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"language">>, <<"javascript">>},
+            {<<"autoupdate">>, false},
+            {<<"views">>,
+                {[
+                    {ViewName,
+                        {[
+                            {<<"map">>, MapFun}
+                        ]}}
+                ]}}
+        ]}
+    ),
+    fabric:update_doc(DbName, DDoc, [?ADMIN_CTX]).
+
+delete_doc(DbName, DDocId) ->
+    {ok, DDoc0} = fabric:open_doc(DbName, DDocId, [?ADMIN_CTX]),
+    DDoc = DDoc0#doc{deleted = true, body = {[]}},
+    fabric:update_doc(DbName, DDoc, [?ADMIN_CTX]).
+
+status() ->
+    {ok, Props} = smoosh:status(),
+    lists:keysort(1, Props).
+
+status(Channel) ->
+    case lists:keyfind(Channel, 1, status()) of
+        {_, Val} ->
+            Val,
+            Active = proplists:get_value(active, Val),
+            Starting = proplists:get_value(starting, Val),
+            WaitingInfo = proplists:get_value(waiting, Val),
+            Waiting = proplists:get_value(size, WaitingInfo),
+            {Active, Starting, Waiting};
+        false ->
+            false
+    end.
+
+sync_status(Channel) ->
+    Pid = get_channel_pid(Channel),
+    gen_server:call(Pid, get_status_table, infinity),
+    status(Channel).
+
+flush() ->
+    ok = smoosh_server:flush().
+
+get_channel_pid(Chan) ->
+    [{channel, _, Pid, _}] = ets:lookup(smoosh_server, Chan),
+    Pid.
+
+get_access_cleaner_pid() ->
+    {state, _, _, _, _, _, _, ACPid} = sys:get_state(smoosh_server),
+    ACPid.
+
+get_event_handler_pid() ->
+    {state, _, _, _, EHPid, _, _, _} = sys:get_state(smoosh_server),
+    EHPid.
+
+wait_for_channels() ->
+    % 3 default ratios + 3 default views + 1 index cleanup = 7
+    wait_for_channels(7).
+
+wait_for_channels(N) when is_integer(N), N >= 0 ->
+    WaitFun = fun() ->
+        case length(status()) of
+            N -> ok;
+            _ -> wait
+        end
+    end,
+    test_util:wait(WaitFun).
+
+wait_to_enqueue(DbName) when is_binary(DbName) ->
+    wait_enqueue(shard_name(DbName));
+wait_to_enqueue({DbName, View}) when is_binary(DbName) ->
+    wait_enqueue({shard_name(DbName), View});
+wait_to_enqueue({index_cleanup, DbName}) when is_binary(DbName) ->
+    wait_enqueue({index_cleanup, DbName}).
+
+wait_enqueue(Obj) ->
+    Enqueue = {enqueue, Obj, '_'},
+    meck:wait(smoosh_channel, handle_cast, [Enqueue, '_'], 4000).
+
+shard_name(DbName) ->
+    [Shard] = mem3:shards(DbName),
+    mem3:name(Shard).
+
+wait_compact_start() ->
+    StartOk = {'_', {ok, '_'}},
+    meck:wait(smoosh_channel, handle_info, [StartOk, '_'], 4000).
+
+wait_normal_down() ->
+    NormalDown = {'DOWN', '_', '_', '_', normal},
+    meck:wait(smoosh_channel, handle_info, [NormalDown, '_'], 4000).
+
+wait_update_status() ->
+    meck:wait(smoosh_channel, handle_info, [update_status, '_'], 4000).
+
+setup_db_compactor_intercept() ->
+    TestPid = self(),
+    meck:expect(couch_emsort, open, fun(Fd) ->
+        TestPid ! {compactor_paused, self()},
+        receive
+            continue -> meck:passthrough([Fd]);
+            {raise, Tag, Reason} -> meck:exception(Tag, Reason)
+        end
+    end).
+
+wait_db_compactor_pid() ->
+    receive
+        {compactor_paused, Pid} ->
+            Pid
+    end.
