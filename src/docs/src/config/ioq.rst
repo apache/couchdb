@@ -75,6 +75,10 @@ according to the settings described below.
 
         Disk IO issued by compaction jobs.
 
+    .. config:option:: reshard :: Bypass Disk IO for resharding jobs
+
+        Disk IO issued by resharding jobs.
+
     Without any configuration CouchDB will enqueue all classes of IO. The
     default.ini configuration file that ships with CouchDB activates a bypass
     for each of the interactive IO classes and only background IO goes into the
@@ -87,6 +91,7 @@ according to the settings described below.
         view_update = true
         shard_sync = false
         compaction = false
+        reshard = false
 
 Recommendations
 ===============

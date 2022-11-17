@@ -104,8 +104,7 @@ hastings_indices(DbName, Doc) ->
     end.
 
 build_index({?MRVIEW, DbName, MRSt} = Ctx, Try) ->
-    IdxName = couch_mrview_index:get(idx_name, MRSt),
-    ioq:set_io_priority({view_compact, DbName, IdxName}),
+    ioq:set_io_priority({reshard, DbName}),
     await_retry(
         couch_index_server:get_index(couch_mrview_index, MRSt),
         fun couch_index:get_state/2,

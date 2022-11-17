@@ -367,7 +367,7 @@ initial_copy_impl(#job{source = Source, target = Targets0} = Job) ->
     #shard{name = SourceName} = Source,
     Targets = [{R, N} || #shard{range = R, name = N} <- Targets0],
     TMap = maps:from_list(Targets),
-    ioq:set_io_priority({db_compact, SourceName}),
+    ioq:set_io_priority({reshard, SourceName}),
     LogMsg1 = "~p initial_copy started ~s",
     LogArgs1 = [?MODULE, shardsstr(Source, Targets0)],
     couch_log:notice(LogMsg1, LogArgs1),
