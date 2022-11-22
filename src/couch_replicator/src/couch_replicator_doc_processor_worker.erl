@@ -162,7 +162,7 @@ doc_processor_worker_test_() ->
 t_should_add_job() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         ?assertEqual({ok, ?R1}, maybe_start_replication(Id, Rep, nil)),
         ?assert(added_job())
     end).
@@ -172,7 +172,7 @@ t_already_running_same_docid() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
         mock_already_running(?DB, ?DOC1),
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         ?assertEqual({ok, ?R1}, maybe_start_replication(Id, Rep, nil)),
         ?assert(did_not_add_job())
     end).
@@ -182,7 +182,7 @@ t_already_running_transient() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
         mock_already_running(null, null),
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         ?assertMatch(
             {temporary_error, _},
             maybe_start_replication(
@@ -200,7 +200,7 @@ t_already_running_other_db_other_doc() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
         mock_already_running(<<"otherdb">>, <<"otherdoc">>),
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         ?assertMatch(
             {permanent_failure, _},
             maybe_start_replication(
@@ -217,7 +217,7 @@ t_already_running_other_db_other_doc() ->
 t_spawn_worker() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         WRef = make_ref(),
         meck:expect(couch_replicator_doc_processor, get_worker_ref, 1, WRef),
         Pid = spawn_worker(Id, Rep, 0, WRef),
@@ -236,7 +236,7 @@ t_spawn_worker() ->
 t_ignore_if_doc_deleted() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         meck:expect(couch_replicator_doc_processor, get_worker_ref, 1, nil),
         ?assertEqual(ignore, maybe_start_replication(Id, Rep, make_ref())),
         ?assertNot(added_job())
@@ -247,7 +247,7 @@ t_ignore_if_doc_deleted() ->
 t_ignore_if_worker_ref_does_not_match() ->
     ?_test(begin
         Id = {?DB, ?DOC1},
-        Rep = couch_replicator_docs:parse_rep_doc_without_id(change()),
+        Rep = couch_replicator_parse:parse_rep_doc_without_id(change()),
         meck:expect(
             couch_replicator_doc_processor,
             get_worker_ref,

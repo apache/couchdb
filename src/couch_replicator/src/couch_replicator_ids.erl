@@ -196,10 +196,10 @@ winning_revs_generates_new_id(_) ->
         {<<"source">>, <<"http://foo.example.bar">>},
         {<<"target">>, <<"http://bar.example.foo">>}
     ],
-    Rep1 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc1}),
+    Rep1 = couch_replicator_parse:parse_rep_doc_without_id({RepDoc1}),
     Id1 = replication_id(Rep1),
     RepDoc2 = RepDoc1 ++ [{<<"winning_revs_only">>, true}],
-    Rep2 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc2}),
+    Rep2 = couch_replicator_parse:parse_rep_doc_without_id({RepDoc2}),
     Id2 = replication_id(Rep2),
     ?assertNotEqual(Id1, Id2).
 
@@ -208,10 +208,10 @@ winning_revs_false_same_as_undefined(_) ->
         {<<"source">>, <<"http://foo.example.bar">>},
         {<<"target">>, <<"http://bar.example.foo">>}
     ],
-    Rep1 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc1}),
+    Rep1 = couch_replicator_parse:parse_rep_doc_without_id({RepDoc1}),
     Id1 = replication_id(Rep1),
     RepDoc2 = RepDoc1 ++ [{<<"winning_revs_only">>, false}],
-    Rep2 = couch_replicator_docs:parse_rep_doc_without_id({RepDoc2}),
+    Rep2 = couch_replicator_parse:parse_rep_doc_without_id({RepDoc2}),
     Id2 = replication_id(Rep2),
     ?assertEqual(Id1, Id2).
 

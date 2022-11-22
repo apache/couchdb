@@ -1118,7 +1118,7 @@ log_replication_start(#rep_state{rep_details = Rep} = RepState) ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 replication_start_error_test() ->
     ?assertEqual(
@@ -1144,13 +1144,26 @@ replication_start_error_test() ->
         replication_start_error({http_request_failed, "GET", "http://x/y", {error, {code, 503}}})
     ).
 
-scheduler_job_format_status_test() ->
+format_status_test_() ->
+    {
+        foreach,
+        fun meck_config/0,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_scheduler_job_format_status)
+        ]
+    }.
+
+meck_config() ->
+    meck:expect(config, get, fun(_, _, Default) -> Default end).
+
+t_scheduler_job_format_status(_) ->
     Source = <<"http://u:p@h1/d1">>,
     Target = <<"http://u:p@h2/d2">>,
     Rep = #rep{
         id = {"base", "+ext"},
-        source = couch_replicator_docs:parse_rep_db(Source, [], []),
-        target = couch_replicator_docs:parse_rep_db(Target, [], []),
+        source = couch_replicator_parse:parse_rep_db(Source, [], []),
+        target = couch_replicator_parse:parse_rep_db(Target, [], []),
         options = [{create_target, true}],
         doc_id = <<"mydoc">>,
         db_name = <<"mydb">>

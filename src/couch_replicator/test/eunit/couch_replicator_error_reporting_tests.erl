@@ -226,7 +226,7 @@ replicate(Source, Target) ->
             % Low connection timeout so _changes feed gets restarted quicker
             {<<"connection_timeout">>, 3000}
         ]},
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
+    {ok, Rep} = couch_replicator_parse:parse_rep_doc(RepObject, ?ADMIN_USER),
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),
     {ok, Rep#rep.id}.

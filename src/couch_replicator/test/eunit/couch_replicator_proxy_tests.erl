@@ -50,7 +50,7 @@ parse_rep_doc_without_proxy(_) ->
             {<<"source">>, <<"http://unproxied.com">>},
             {<<"target">>, <<"http://otherunproxied.com">>}
         ]},
-    Rep = couch_replicator_docs:parse_rep_doc(NoProxyDoc),
+    Rep = couch_replicator_parse:parse_rep_doc(NoProxyDoc),
     ?assertEqual((Rep#rep.source)#httpdb.proxy_url, undefined),
     ?assertEqual((Rep#rep.target)#httpdb.proxy_url, undefined).
 
@@ -62,7 +62,7 @@ parse_rep_doc_with_proxy(_) ->
             {<<"target">>, <<"http://otherunproxied.com">>},
             {<<"proxy">>, ProxyURL}
         ]},
-    Rep = couch_replicator_docs:parse_rep_doc(ProxyDoc),
+    Rep = couch_replicator_parse:parse_rep_doc(ProxyDoc),
     ?assertEqual((Rep#rep.source)#httpdb.proxy_url, binary_to_list(ProxyURL)),
     ?assertEqual((Rep#rep.target)#httpdb.proxy_url, binary_to_list(ProxyURL)).
 
@@ -76,7 +76,7 @@ parse_rep_source_target_proxy(_) ->
             {<<"source_proxy">>, SrcProxyURL},
             {<<"target_proxy">>, TgtProxyURL}
         ]},
-    Rep = couch_replicator_docs:parse_rep_doc(ProxyDoc),
+    Rep = couch_replicator_parse:parse_rep_doc(ProxyDoc),
     ?assertEqual(
         (Rep#rep.source)#httpdb.proxy_url,
         binary_to_list(SrcProxyURL)
@@ -96,7 +96,7 @@ mutually_exclusive_proxy_and_source_proxy(_) ->
         ]},
     ?assertThrow(
         {bad_rep_doc, _},
-        couch_replicator_docs:parse_rep_doc(ProxyDoc)
+        couch_replicator_parse:parse_rep_doc(ProxyDoc)
     ).
 
 mutually_exclusive_proxy_and_target_proxy(_) ->
@@ -109,5 +109,5 @@ mutually_exclusive_proxy_and_target_proxy(_) ->
         ]},
     ?assertThrow(
         {bad_rep_doc, _},
-        couch_replicator_docs:parse_rep_doc(ProxyDoc)
+        couch_replicator_parse:parse_rep_doc(ProxyDoc)
     ).

@@ -44,9 +44,7 @@
     notify_cluster_event/2
 ]).
 
--include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
--include_lib("mem3/include/mem3.hrl").
 
 -import(couch_replicator_utils, [
     get_json_value/2,
@@ -77,9 +75,8 @@
 
 % couch_multidb_changes API callbacks
 
-db_created(DbName, Server) ->
+db_created(_DbName, Server) ->
     couch_stats:increment_counter([couch_replicator, docs, dbs_created]),
-    couch_replicator_docs:ensure_rep_ddoc_exists(DbName),
     Server.
 
 db_deleted(DbName, Server) ->
@@ -89,7 +86,7 @@ db_deleted(DbName, Server) ->
 
 db_found(DbName, Server) ->
     couch_stats:increment_counter([couch_replicator, docs, dbs_found]),
-    couch_replicator_docs:ensure_rep_ddoc_exists(DbName),
+    couch_replicator_docs:delete_old_rep_ddoc(DbName),
     Server.
 
 db_change(DbName, {ChangeProps} = Change, Server) ->
@@ -169,7 +166,7 @@ process_updated({DbName, _DocId} = Id, JsonRepDoc) ->
     % should propagate to db_change function and will be recorded as permanent
     % failure in the document. User will have to update the documet to fix the
     % problem.
-    Rep0 = couch_replicator_docs:parse_rep_doc_without_id(JsonRepDoc),
+    Rep0 = couch_replicator_parse:parse_rep_doc_without_id(JsonRepDoc),
     Rep = Rep0#rep{db_name = DbName, start_time = os:timestamp()},
     Filter =
         case couch_replicator_filters:parse(Rep#rep.options) of

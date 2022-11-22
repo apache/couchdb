@@ -152,6 +152,40 @@ Replicator Database Configuration
 
         .. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
 
+    .. config:option:: valid_socket_options :: Erlang socket options
+
+        .. versionadded:: 3.3
+
+        Valid socket options. Options not in this list are ignored. Most of
+        those options are low level and setting some of them may lead to
+        unintended or unpredictable behavior. See `inet`_ Erlang docs for the
+        full list of options::
+
+            [replicator]
+            valid_socket_options = buffer,keepalive,nodelay,priority,recbuf,sndbuf
+
+        .. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
+
+     .. config:option:: valid_endpoint_protocols :: Replicator endpoint protocols
+
+        .. versionadded:: 3.3
+
+        Valid replication endpoint protocols. Replication jobs with endpoint
+        urls not in this list will fail to run::
+
+            [replicator]
+            valid_endpoint_protocols = http,https
+
+     .. config:option:: valid_proxy_protocols :: Replicator proxy protocols
+
+        .. versionadded:: 3.3
+
+        Valid replication proxy protocols. Replication jobs with proxy
+        urls not in this list will fail to run::
+
+            [replicator]
+            valid_proxy_protocols = http,https,socks5
+
     .. config:option:: checkpoint_interval :: Replication checkpoint interval
 
         .. versionadded:: 1.6
