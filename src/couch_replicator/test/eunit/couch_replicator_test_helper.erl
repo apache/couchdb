@@ -173,7 +173,7 @@ replicate(Source, Target) ->
     ).
 
 replicate({[_ | _]} = RepObject) ->
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
+    {ok, Rep} = couch_replicator_parse:parse_rep_doc(RepObject, ?ADMIN_USER),
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),
     Pid = get_pid(Rep#rep.id),
