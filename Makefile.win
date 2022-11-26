@@ -15,6 +15,7 @@
 # ***************************************************
 
 include version.mk
+-include install.mk
 
 SHELL=cmd.exe
 REBAR?=$(CURDIR)/bin/rebar.cmd
@@ -116,7 +117,9 @@ help:
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile $(COMPILE_OPTS)
+ifeq ($(with_spidermonkey), true)
 	@copy src\couch\priv\couchjs.exe bin
+endif
 
 
 .PHONY: docs
@@ -204,7 +207,7 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux dev\run dev\format_*.py src\mango\test src\docs\src\conf.py src\docs\ext .
 
--include install.mk
+
 
 ifeq ($(with_nouveau), false)
   exclude_nouveau=--exclude nouveau
@@ -364,7 +367,13 @@ release: all
 	@echo 'Installing CouchDB into rel\couchdb\ ...'
 	-@rmdir /s/q rel\couchdb >NUL 2>&1 || true
 	@$(REBAR) generate
-	@copy src\couch\priv\couchjs.exe rel\couchdb\bin
+ifeq ($(with_spidermonkey), true)
+	@mkdir rel\couchdb\server
+	@copy src\couch\priv\couchjs.exe rel\couchdb\bin\couchjs.exe
+	@copy share\server\main.js rel\couchdb\server\main.js
+	@copy share\server\main-ast-bypass.js rel\couchdb\server\main-ast-bypass.js
+	@copy share\server\main-coffee.js rel\couchdb\server\main-coffee.js
+endif
 
 ifeq ($(with_fauxton), 1)
 	-@mkdir rel\couchdb\share

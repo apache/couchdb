@@ -56,6 +56,28 @@ CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
         []
 end.
 
+JsEngine = case lists:keyfind(js_engine, 1, CouchConfig) of
+    {_, "spidermonkey"} ->
+        "spidermonkey";
+    {_, "quickjs"} ->
+        "quickjs";
+    {_, InvalidJsEngine} ->
+        io:format(standard_error, "Unsupported default JS engine ~p~n", [InvalidJsEngine]),
+        erlang:halt(1);
+    false ->
+        "spidermonkey"
+end.
+
+WithSpidermonkey = case {lists:keyfind(with_spidermonkey, 1, CouchConfig), JsEngine} of
+    {{_, "false"}, "spidermonkey"} ->
+         io:format(standard_error, "Spidermonkey is disabled, select another default js_enigine ~n", []),
+         erlang:halt(1);
+    {{_, "false"}, _} ->
+         false;
+    {_, _} ->
+         true
+end.
+
 SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
     {_, "1.8.5"} ->
         "1.8.5";
@@ -100,7 +122,10 @@ CouchJSConfig = case SMVsn of
 end.
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
 ConfigBin = iolist_to_binary(ConfigSrc).
-ok = CopyIfDifferent(CouchJSConfig, ConfigBin).
+case WithSpidermonkey of
+    true -> ok = CopyIfDifferent(CouchJSConfig, ConfigBin);
+    false -> ok
+end.
 
 MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
     {erlang_md5, true} ->
@@ -206,9 +231,12 @@ IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
-BaseSpecs = [
-        %% couchjs
-        {".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]},
+SpidermonkeySpecs = case WithSpidermonkey of
+    true -> [{".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]}];
+    false -> []
+end.
+
+BaseSpecs = SpidermonkeySpecs ++ [
         % ejson_compare
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
@@ -243,6 +271,8 @@ AddConfig = [
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
+        {d, 'COUCHDB_JS_ENGINE', JsEngine},
+        {d, 'COUCHDB_WITH_SPIDERMONKEY', WithSpidermonkey},
         {d, 'COUCHDB_SPIDERMONKEY_VERSION', SMVsn},
         {i, "../"}
     ] ++ MD5Config ++ ProperConfig},

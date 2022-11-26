@@ -7,11 +7,13 @@
 
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
+  -DisableSpiderMonkey       do not use SpiderMonkey as JS engine (default false)
   -EnableNouveau             enable the new experiemtal search module (default false)
   -EnableClouseau            enable the Clouseau search module (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
+  -JSEngine ENGINE           select JS engine to use (spidermonkey or quickjs) (default spidermonkey)
   -ClouseauVersion VSN       select the version of Clouseau to use (default 2.22.0)
   -ClouseauMethod MTH        method for Clouseau to deploy: git or dist (default dist)
   -ClouseauUri URI           location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.22.0/clouseau-2.22.0-dist.zip)
@@ -52,12 +54,15 @@ Param(
     [switch]$EnableClouseau = $false, # do not use Clouseau by default
     [switch]$SkipDeps = $false, # do not update erlang dependencies
     [switch]$DisableProper = $false, # a compilation pragma. proper is a kind of automated test suite
+    [switch]$DisableSpiderMonkey = $false, # do not use SpiderMonkey as JS engine
     [switch]$EnableErlangMD5 = $false, # don't use Erlang for md5 hash operations by default
 
     [ValidateNotNullOrEmpty()]
     [string]$CouchDBUser = [Environment]::UserName, # set the username to run as (defaults to current user)
     [ValidateNotNullOrEmpty()]
     [string]$SpiderMonkeyVersion = "91", # select the version of SpiderMonkey to use (default 91)
+    [ValidateNotNullOrEmpty()]
+    [string]$JSEngine = "spidermonkey", # select the JS engine (spidermonkey | quickjs) to use (default spidermonkey)
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
     [ValidateNotNullOrEmpty()]
@@ -145,6 +150,17 @@ $WithClouseau = $(If ($EnableClouseau) {1} else {0})
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 $WithProper = (-not $DisableProper).ToString().ToLower()
 $ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
+$WithSpiderMonkey = (-not $DisableSpiderMonkey).ToString().ToLower()
+
+if ($JSEngine -eq "quickjs") {
+    $WithSpiderMonkey = "false"
+}
+
+# If spidermonkey was disabled but JS_ENGINE set to "spidermonkey", reset it to "quickjs"
+if ( ($WithSpiderMonkey -eq "false" ) -and ($JsEngine -eq "spidermonkey" ) ) {
+   Write-Verbose "NOTICE: Spidermonkey was disabled, but JsEngine=spidermonkey. Setting JsEngine=quickjs"
+   $JsEngine = "quickjs"
+}
 
 Write-Verbose "==> configuring couchdb in rel\couchdb.config"
 $CouchDBConfig = @"
@@ -175,7 +191,9 @@ $CouchDBConfig = @"
 {log_file, ""}.
 {fauxton_root, "./share/www"}.
 {user, "$CouchDBUser"}.
+{js_engine, "$JSEngine"}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
+{with_spidermonkey, "$WithSpiderMonkey"}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
@@ -221,14 +239,19 @@ with_nouveau = $WithNouveau
 with_clouseau = $WithClouseau
 
 user = $CouchDBUser
+
+js_engine = $JSEngine
 spidermonkey_version = $SpiderMonkeyVersion
+with_spidermonkey = $WithSpiderMonkey
 "@
 $InstallMk | Out-File "$rootdir\install.mk" -encoding ascii
 
 $ConfigERL = @"
 {with_proper, $WithProper}.
 {erlang_md5, $ErlangMD5}.
+{js_engine, "$JSEngine"}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
+{with_spidermonkey, "$WithSpiderMonkey"}.
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
 

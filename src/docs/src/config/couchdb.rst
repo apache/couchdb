@@ -247,3 +247,14 @@ Base CouchDB Options
 
             [couchdb]
             write_xxhash_checksums = false
+
+    .. config:option:: js_engine :: Set default Javascript Engine.
+
+        .. versionchanged:: 3.4
+
+        Select the default Javascript engine. Available options are
+        ``spidermonkey`` and ``quickjs``. The default setting is
+        ``spidermonkey``::
+
+            [couchdb]
+            js_engine = spidermonkey
