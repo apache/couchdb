@@ -25,6 +25,7 @@ Configuration
     couch-peruser
     disk-monitor
     scanner
+    quickjs
     http
     auth
     compaction

@@ -81,7 +81,7 @@ var Couch = {
           throw [
             "error",
             "compilation_error",
-            "Module require('" +name+ "') raised error " + e.toSource()
+            "Module require('" +name+ "') raised error " + errstr(e)
           ];
         }
         ddoc._module_cache[newModule.id] = newModule.exports;
@@ -106,7 +106,7 @@ var Couch = {
       throw([
         "error",
         "compilation_error",
-        err.toSource() + " (" + source + ")"
+        errstr(err) + " (" + source + ")"
       ]);
     };
     if (typeof(functionObject) == "function") {
@@ -126,13 +126,18 @@ var Couch = {
   }
 };
 
+function errstr(e) {
+  // toSource() is a Spidermonkey "special"
+  return (e.toSource ? e.toSource() : e.toString());
+};
+
 // prints the object as JSON, and rescues and logs any JSON.stringify() related errors
 function respond(obj) {
   try {
     print(JSON.stringify(obj));
   } catch(e) {
     log("Error converting object to JSON: " + e.toString());
-    log("error on obj: "+ obj.toSource());
+    log("error on obj: "+ obj.toString());
   }
 };
 

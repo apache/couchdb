@@ -94,6 +94,7 @@ Scanner Options
             [couch_scanner_plugins]
             couch_scanner_plugin_ddoc_features = false
             couch_scanner_plugin_find = false
+            couch_quickjs_scanner_plugin = false
 
 .. config:section:: $plugin :: General Plugin Settings
 

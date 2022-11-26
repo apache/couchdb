@@ -186,6 +186,24 @@ defmodule ViewSandboxingTest do
     """
 
     resp = query(db_name, map_fun)
-    assert resp["total_rows"] == 0
+
+    case quickjs() do
+      true ->
+        # QuickJS uses runtime instances for isolation
+        assert resp["total_rows"] == 1
+      false ->
+        assert resp["total_rows"] == 0
+    end
+  end
+
+  defp quickjs() do
+    versions = Couch.get("/_node/_local/_versions")
+    assert versions.status_code == 200
+    case versions.body["javascript_engine"]["name"] do
+      "quickjs" ->
+        true
+      _ ->
+        false
+    end
   end
 end
