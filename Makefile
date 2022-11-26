@@ -15,7 +15,7 @@
 # *******************************************************
 
 include version.mk
-
+-include install.mk
 REBAR?=$(CURDIR)/bin/rebar
 REBAR3?=$(CURDIR)/bin/rebar3
 ERLFMT?=$(CURDIR)/bin/erlfmt
@@ -122,8 +122,9 @@ help:
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
+ifeq ($(with_spidermonkey), true)
 	@cp src/couch/priv/couchjs bin/
-
+endif
 
 .PHONY: docs
 # target: docs - Build documentation
@@ -227,7 +228,7 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
--include install.mk
+
 ifeq ($(with_nouveau), false)
   exclude_nouveau=--exclude nouveau
 endif
@@ -392,6 +393,9 @@ dist: all derived
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/man
 	@cp src/docs/build/man/apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)/share/docs/man/
 
+ifeq ($(with_spidermonkey), false)
+	@rm -rf apache-couchdb-$(COUCHDB_VERSION)/src/couch/priv/couch_js
+endif
 	@tar czf apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz apache-couchdb-$(COUCHDB_VERSION)
 	@echo "Done: apache-couchdb-$(COUCHDB_VERSION)$(IN_RC).tar.gz"
 
@@ -403,6 +407,14 @@ release: all
 	@rm -rf rel/couchdb
 	@$(REBAR) generate # make full erlang release
 	@cp bin/weatherreport rel/couchdb/bin/weatherreport
+
+ifeq ($(with_spidermonkey), true)
+	@mkdir rel/couchdb/server
+	@cp src/couch/priv/couchjs rel/couchdb/bin/couchjs
+	@cp share/server/main.js rel/couchdb/server/main.js
+	@cp share/server/main-ast-bypass.js rel/couchdb/server/main-ast-bypass.js
+	@cp share/server/main-coffee.js rel/couchdb/server/main-coffee.js
+endif
 
 ifeq ($(with_fauxton), 1)
 	@mkdir -p rel/couchdb/share/

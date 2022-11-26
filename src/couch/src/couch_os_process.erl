@@ -92,7 +92,7 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
             case ?JSON_DECODE(Line) of
                 [<<"log">>, Msg] when is_binary(Msg) ->
                     % we got a message to log. Log it and continue
-                    couch_log:info(
+                    couch_log:error(
                         "OS Process ~p Log :: ~s",
                         [OsProc#os_proc.port, Msg]
                     ),

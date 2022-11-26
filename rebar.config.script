@@ -113,6 +113,7 @@ SubDirs = [
     "src/b64url",
     "src/exxhash",
     "src/ets_lru",
+    "src/couch_quickjs",
     "src/chttpd",
     "src/couch",
     "src/couch_event",

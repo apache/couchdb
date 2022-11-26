@@ -190,7 +190,8 @@ defmodule ViewErrorsTest do
     # fires first. The first timeout is the couch_os_process
     # waiting for data back from couchjs. The second is the
     # gen_server call to couch_os_process.
-    assert resp.body["error"] == "os_process_error" or resp.body["error"] == "timeout"
+    err_name = resp.body["error"]
+    assert Enum.member?(["os_process_error", "timeout", "InternalError"], err_name)
   end
 
   @tag :with_db
