@@ -1,0 +1,5 @@
+/couchjs_mainjs*.c
+/couchjs_coffee*.c
+/couchjs_mainjs*.d
+/couchjs_coffee*.d
+

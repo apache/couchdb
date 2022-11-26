@@ -32,12 +32,14 @@ WITH_NOUVEAU="false"
 WITH_CLOUSEAU=0
 ERLANG_MD5="false"
 SKIP_DEPS=0
+WITH_SPIDERMONKEY="true"
 
 run_erlang() {
     erl -noshell -eval "$1" -eval "halt()."
 }
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
+JS_ENGINE=${JS_ENGINE:-"spidermonkey"}
 SM_VSN=${SM_VSN:-"91"}
 CLOUSEAU_MTH=${CLOUSEAU_MTH:-"dist"}
 CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases/download/%s/clouseau-%s-dist.zip"}
@@ -75,6 +77,8 @@ Options:
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
   --rebar3=PATH               use rebar3 by specified path
   --erlfmt=PATH               use erlfmt by specified path
+  --js-engine=ENGINE          use js engine: spidermonkey or quickjs, defaults to spidermonkey
+  --disable-spidermonkey      disable spidermonkey, don't try to build it
 EOF
 }
 
@@ -221,6 +225,28 @@ parse_opts() {
                 printf 'ERROR: "--spidermonkey-version" requires a non-empty argument.\n' >&2
                 exit 1
                 ;;
+            --js-engine)
+                if [ -n "$2" ]; then
+                    eval JS_ENGINE=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--js-engine" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --js-engine=?*)
+                eval JS_ENGINE=${1#*=}
+                ;;
+            --js-engine=)
+                printf 'ERROR: "--js-engine" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+            --disable-spidermonkey)
+                WITH_SPIDERMONKEY="false"
+                shift
+                continue
+                ;;
 
 	    --clouseau-version)
 		if [ -n "$2" ]; then
@@ -293,12 +319,12 @@ parse_opts() {
 
 parse_opts $@
 
-if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]; then
+if [ "${WITH_SPIDERMONKEY}" = "true" ] && [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]; then
   echo "ERROR: SpiderMonkey 60 is known broken on ARM 64 (aarch64). Use another version instead."
   exit 1
 fi
 
-if [ "${ERLANG_OS}" = "unix" ]; then
+if [ "${WITH_SPIDERMONKEY}" = "true" ] && [ "${ERLANG_OS}" = "unix" ]; then
     case "${SM_VSN}" in
         1.8.5)
             SM_HEADERS="js"
@@ -316,9 +342,22 @@ if [ "${ERLANG_OS}" = "unix" ]; then
     fi
 fi
 
+# If spidermonkey was disabled but JS_ENGINE set to "spidermonkey", reset it to "quickjs"
+if [ "${WITH_SPIDERMONKEY}" = "false" ] && [ "${JS_ENGINE}" = "spidermonkey" ]; then
+   echo "NOTICE: Spidermonkey was disabled, but JS_ENGINE=spidermonkey. Setting JS_ENGINE=quickjs"
+   JS_ENGINE="quickjs"
+fi
+
 # If we're in a release tarball and we don't have proper, then mark it as skipped
 if [ ! -d .git ] && [ "$WITH_PROPER" = "true" ] && [ ! -d src/proper ]; then
     WITH_PROPER="false"
+fi
+
+# If we're in a release tarball and we don't have spidermonkey, then mark it as skipped and enable quickjs
+if [ ! -d .git ] && [ "$WITH_SPIDERMONKEY" = "true" ] && [ ! -d src/couch/priv/couch_js ]; then
+    echo "NOTICE: Spidermonkey was disabled in release tarball. Setting JS_ENGINE=quickjs"
+    WITH_SPIDERMONKEY="false"
+    JS_ENGINE="quickjs"
 fi
 
 echo "==> configuring couchdb in rel/couchdb.config"
@@ -350,7 +389,9 @@ cat > rel/couchdb.config << EOF
 {log_file, "$LOG_FILE"}.
 {fauxton_root, "./share/www"}.
 {user, "$COUCHDB_USER"}.
+{js_engine, "$JS_ENGINE"}.
 {spidermonkey_version, "$SM_VSN"}.
+{with_spidermonkey, "$WITH_SPIDERMONKEY"}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
@@ -380,13 +421,17 @@ with_nouveau = $WITH_NOUVEAU
 with_clouseau = $WITH_CLOUSEAU
 
 user = $COUCHDB_USER
+js_engine = $JS_ENGINE
 spidermonkey_version = $SM_VSN
+with_spidermonkey = $WITH_SPIDERMONKEY
 EOF
 
 cat > $rootdir/config.erl << EOF
 {with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
+{js_engine, "$JS_ENGINE"}.
 {spidermonkey_version, "$SM_VSN"}.
+{with_spidermonkey, "$WITH_SPIDERMONKEY"}.
 EOF
 
 install_local_rebar() {

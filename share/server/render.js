@@ -347,7 +347,7 @@ var Render = (function() {
       throw(e);
     } else {
       var logMessage = "function raised error: " +
-                        e.toSource() + " \n" +
+                        errstr(e) + " \n" +
                        "stacktrace: " + e.stack;
       log(logMessage);
       throw(["error", errType || "render_error", logMessage]);
