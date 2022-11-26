@@ -1,0 +1,27 @@
+--- quickjs-master/quickjs.c	2022-03-06 13:00:24.000000000 -0500
++++ quickjs/quickjs.c	2023-03-20 22:52:22.000000000 -0400
+@@ -28692,10 +28692,24 @@
+     if (s->token.val == TOK_FUNCTION ||
+         (token_is_pseudo_keyword(s, JS_ATOM_async) &&
+          peek_token(s, TRUE) == TOK_FUNCTION)) {
++
++        if (peek_token(s, TRUE) == '(') {
++           /* Spidermonkey 1.8.5 mode: accept top function statements as expressions */
++           if (js_parse_expr(s))
++               return -1;
++           if (s->cur_func->eval_ret_idx >= 0) {
++               /* store the expression value so that it can be returned by eval() */
++               emit_op(s, OP_put_loc);
++               emit_u16(s, s->cur_func->eval_ret_idx);
++           } else {
++               emit_op(s, OP_drop); /* drop the result */
++           }
++        } else {
+         if (js_parse_function_decl(s, JS_PARSE_FUNC_STATEMENT,
+                                    JS_FUNC_NORMAL, JS_ATOM_NULL,
+                                    s->token.ptr, s->token.line_num))
+             return -1;
++        }
+     } else if (s->token.val == TOK_EXPORT && fd->module) {
+         if (js_parse_export(s))
+             return -1;

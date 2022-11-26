@@ -56,6 +56,18 @@ CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
         []
 end.
 
+JsEngine = case lists:keyfind(js_engine, 1, CouchConfig) of
+    {_, "spidermonkey"} ->
+        "spidermonkey";
+    {_, "quickjs"} ->
+        "quickjs";
+    {_, InvalidJsEngine} ->
+        io:format(standard_error, "Unsupported default JS engine ~p~n", [InvalidJsEngine]),
+        erlang:halt(1);
+    false ->
+        "spidermonkey"
+end.
+
 SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
     {_, "1.8.5"} ->
         "1.8.5";
@@ -243,6 +255,7 @@ AddConfig = [
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
+        {d, 'COUCHDB_JS_ENGINE', JsEngine},
         {d, 'COUCHDB_SPIDERMONKEY_VERSION', SMVsn},
         {i, "../"}
     ] ++ MD5Config ++ ProperConfig},

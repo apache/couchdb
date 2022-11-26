@@ -1,0 +1,14 @@
+/quickjs/examples/hello
+/quickjs/examples/hello_module
+/quickjs/examples/test_fib
+/quickjs/hello.c
+/quickjs/libquickjs.a
+/quickjs/libquickjs.lto.a
+/quickjs/qjs
+/quickjs/qjsc
+/quickjs/qjscalc
+/quickjs/qjscalc.c
+/quickjs/repl.c
+/quickjs/run-test262
+/quickjs/test_fib.c
+compile_commands.json

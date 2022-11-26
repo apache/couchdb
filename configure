@@ -36,6 +36,7 @@ run_erlang() {
 }
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
+JS_ENGINE=${JS_ENGINE:-"spidermonkey"}
 SM_VSN=${SM_VSN:-"91"}
 ARCH="$(uname -m)"
 ERLANG_VER="$(run_erlang 'io:put_chars(erlang:system_info(otp_release)).')"
@@ -66,6 +67,7 @@ Options:
   --generate-tls-dev-cert     generate a cert for TLS distribution (To enable TLS, change the vm.args file.)
   --rebar3=PATH               use rebar3 by specified path
   --erlfmt=PATH               use erlfmt by specified path
+  --js-engine=ENGINE          default js engine: spidermonkey or quickjs
 EOF
 }
 
@@ -221,6 +223,24 @@ parse_opts() {
                 exit 1
                 ;;
 
+            --js-engine)
+                if [ -n "$2" ]; then
+                    eval JS_ENGINE=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--js-engine" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --js-engine=?*)
+                eval JS_ENGINE=${1#*=}
+                ;;
+            --js-engine=)
+                printf 'ERROR: "--js-engine" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
             --generate-tls-dev-cert)
                 echo "WARNING: To enable TLS distribution, don't forget to customize vm.args file."
                 generate_tls_dev_cert
@@ -250,7 +270,7 @@ if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]; then
   exit 1
 fi
 
-if [ "${ERLANG_OS}" = "unix" ]; then
+if [ "${JS_ENGINE}" = "spidermonkey" ] && [ "${ERLANG_OS}" = "unix" ]; then
     case "${SM_VSN}" in
         1.8.5)
             SM_HEADERS="js"
@@ -292,6 +312,7 @@ cat > rel/couchdb.config << EOF
 {log_file, "$LOG_FILE"}.
 {fauxton_root, "./share/www"}.
 {user, "$COUCHDB_USER"}.
+{js_engine, "$JS_ENGINE"}.
 {spidermonkey_version, "$SM_VSN"}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
@@ -321,12 +342,14 @@ with_docs = $WITH_DOCS
 with_nouveau = $WITH_NOUVEAU
 
 user = $COUCHDB_USER
+js_engine = $JS_ENGINE
 spidermonkey_version = $SM_VSN
 EOF
 
 cat > $rootdir/config.erl << EOF
 {with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
+{js_engine, "$JS_ENGINE"}.
 {spidermonkey_version, "$SM_VSN"}.
 EOF
 

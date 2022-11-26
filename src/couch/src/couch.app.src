@@ -48,7 +48,8 @@
         ioq,
         couch_stats,
         hyper,
-        couch_dist
+        couch_dist,
+        couch_quickjs
     ]},
     {env, [
         {httpd_global_handlers, [

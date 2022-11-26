@@ -145,6 +145,7 @@ init([]) ->
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
     ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
     maybe_configure_erlang_native_servers(),
+    configure_js_engine(couch_server:get_js_engine()),
 
     {ok, #state{
         config = get_proc_config(),
@@ -539,6 +540,14 @@ maybe_configure_erlang_native_servers() ->
         _Else ->
             ok
     end.
+
+configure_js_engine(<<"quickjs">>) ->
+    ets:insert(?SERVERS, [
+        {"JAVASCRIPT", couch_quickjs:mainjs_cmd()},
+        {"COFFEESCRIPT", couch_quickjs:coffee_cmd()}
+    ]);
+configure_js_engine(<<"spidermonkey">>) ->
+    ok.
 
 new_proc_int(From, Lang) when is_binary(Lang) ->
     LangStr = binary_to_list(Lang),
