@@ -28,7 +28,8 @@
 -record(st, {
     idx,
     mod,
-    pid = nil
+    pid = nil,
+    start_ts = 0
 }).
 
 start_link(Index, Module) ->
@@ -60,7 +61,7 @@ handle_call({update, IdxState}, _From, #st{idx = Idx, mod = Mod} = State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     couch_log:info("Starting index update for db: ~s idx: ~s", Args),
     Pid = spawn_link(?MODULE, update, [Idx, Mod, IdxState]),
-    {reply, ok, State#st{pid = Pid}};
+    {reply, ok, State#st{pid = Pid, start_ts = erlang:system_time(seconds)}};
 handle_call({restart, IdxState}, _From, #st{idx = Idx, mod = Mod} = State) ->
     Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
     couch_log:info("Restarting index update for db: ~s idx: ~s", Args),
@@ -88,8 +89,9 @@ handle_cast(_Mesg, State) ->
 
 handle_info({'EXIT', _, {updated, Pid, IdxState}}, #st{pid = Pid} = State) ->
     Mod = State#st.mod,
-    Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState)],
-    couch_log:info("Index update finished for db: ~s idx: ~s", Args),
+    Index_time = erlang:system_time(seconds) - State#st.start_ts,
+    Args = [Mod:get(db_name, IdxState), Mod:get(idx_name, IdxState), Index_time],
+    couch_log:info("Index update finished for db: ~s idx: ~s time: ~p s", Args),
     ok = gen_server:cast(State#st.idx, {updated, IdxState}),
     {noreply, State#st{pid = undefined}};
 handle_info({'EXIT', _, {reset, Pid}}, #st{idx = Idx, pid = Pid} = State) ->
