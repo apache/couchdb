@@ -160,7 +160,7 @@ cluster_db_url(Path) ->
     <<(cluster_url())/binary, "/", Path/binary>>.
 
 get_pid(RepId) ->
-    Pid = global:whereis_name({couch_replicator_scheduler_job, RepId}),
+    [Pid] = couch_replicator_pg:pids(RepId),
     ?assert(is_pid(Pid)),
     Pid.
 
