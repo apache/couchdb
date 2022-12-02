@@ -239,13 +239,17 @@ t_checkpointing_works(DbName) ->
     setup_db_compactor_intercept(),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
     ok = wait_to_enqueue(DbName),
+    ?debugHere,
     CompPid = wait_db_compactor_pid(),
+    ?debugHere,
     ChanPid = get_channel_pid("ratio_dbs"),
     config:set("smoosh", "persist", "true", false),
     meck:reset(smoosh_channel),
     ChanPid ! checkpoint,
     % Wait for checkpoint process to exit
+    ?debugHere,
     ok = wait_normal_down(),
+    ?debugHere,
     % Stop smoosh and then crash the compaction
     ok = application:stop(smoosh),
     CompPid ! {raise, error, kapow},
@@ -253,10 +257,15 @@ t_checkpointing_works(DbName) ->
     setup_db_compactor_intercept(),
     meck:reset(smoosh_channel),
     ok = application:start(smoosh),
+    ?debugHere,
     CompPid2 = wait_db_compactor_pid(),
+    ?debugHere,
     ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
     CompPid2 ! continue,
-    ok = wait_normal_down().
+    ?debugHere,
+    ok = wait_normal_down(),
+    ?debugHere,
+    ok.
 
 t_ignore_checkpoint_resume_if_compacted_already(DbName) ->
     setup_db_compactor_intercept(),
