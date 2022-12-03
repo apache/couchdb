@@ -93,6 +93,9 @@ requirement for style and naming.
 Setting parameters via the configuration file
 =============================================
 
+.. versionchanged:: 3.3 added ability to have ``=`` in parameter names
+.. versionchanged:: 3.3 removed the undocumented ability to have multi-line values.
+
 The common way to set some parameters is to edit the ``local.ini`` file
 (location explained above).
 
@@ -116,6 +119,11 @@ The `parameter` specification contains two parts divided by the `equal` sign
 (``=``): the parameter name on the left side and the parameter value on the
 right one. The leading and following whitespace for ``=`` is an optional to
 improve configuration readability.
+
+Since version 3.3 it's possible to use ``=`` in parameter names, but only when
+the parameter and value are separated `` = ``, i.e. the equal sign is surrounded
+by at least one space on each side. This might be useful in the ``[jwt_keys]``
+section, where base64 encoded keys may contain some ``=`` characters.
 
 .. note::
     In case when you'd like to remove some parameter from the `default.ini`
