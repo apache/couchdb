@@ -91,7 +91,7 @@ get_stats() ->
         lists:foldl(Fun, {0, 0}, lists:seq(1, num_servers())),
     [{start_time, ?l2b(Time)}, {dbs_open, Open}].
 
-get_spidermonkey_version() -> list_to_binary(?COUCHDB_SPIDERMONKEY_VERSION).
+get_spidermonkey_version() -> list_to_binary(couch_spidermonkey:get_spidermonkey_version()).
 
 sup_start_link(N) ->
     gen_server:start_link({local, couch_server(N)}, couch_server, [N], []).

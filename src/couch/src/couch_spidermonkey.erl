@@ -1,20 +1,25 @@
-%%%-------------------------------------------------------------------
-%%% @author big-r
-%%% @copyright (C) 2022, <COMPANY>
-%%% @doc
-%%%
-%%% @end
-%%% Created : 13. Okt 2022 19:40
-%%%-------------------------------------------------------------------
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
 -module(couch_spidermonkey).
 
 -export([get_spidermonkey_version/0]).
+
 -nifs([get_spidermonkey_version/0]).
+
 -on_load(init/0).
 
 init() ->
   Dir = code:priv_dir(couch),
-  couch_log:info("Priv-Dir: ~p", [filename:join(Dir, ?MODULE)]),
   ok = erlang:load_nif(filename:join(Dir, ?MODULE), 0).
 
 get_spidermonkey_version() ->
