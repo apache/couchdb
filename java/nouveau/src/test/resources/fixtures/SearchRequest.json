@@ -1,0 +1,17 @@
+{
+    "query": "*:*",
+    "limit": 10,
+    "sort": null,
+    "counts": [
+        "bar"
+    ],
+    "ranges": {
+        "foo": [
+            {
+                "label": "0 to 100 inc",
+                "min": 0.0,
+                "max": 100.0
+            }
+        ]
+    }
+}

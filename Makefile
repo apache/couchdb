@@ -525,3 +525,19 @@ derived:
 	@echo "ON_TAG:                 $(ON_TAG)"
 	@echo "REL_TAG:                $(REL_TAG)"
 	@echo "SUB_VSN:                $(SUB_VSN)"
+
+################################################################################
+# Nouveau
+################################################################################
+
+.PHONY: nouveau
+nouveau:
+	@cd java/nouveau && mvn
+
+.PHONY: nouveau-clean
+nouveau-clean:
+	@cd java/nouveau && mvn clean
+
+.PHONY: nouveau-start
+nouveau-start: nouveau
+	@cd java/nouveau && java -jar target/nouveau-*.jar server nouveau.yaml
