@@ -58,11 +58,11 @@ var resolveModule = function(names, mod, root) {
 
 var Couch = {
   // moving this away from global so we can move to json2.js later
-  compileFunction : function(source, ddoc, name) {
+  compileFunction : function(source, ddoc, name, sandbox_option) {
     if (!source) throw(["error","not_found","missing function"]);
 
     var functionObject = null;
-    var sandbox = create_sandbox();
+    var sandbox = create_sandbox(sandbox_option);
 
     var require = function(name, module) {
       module = module || {};

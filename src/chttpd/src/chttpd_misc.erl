@@ -69,11 +69,14 @@ handle_welcome_req(Req, _) ->
 
 get_features() ->
     case dreyfus:available() of
-        true ->
-            [search | config:features()];
-        false ->
-            config:features()
-    end.
+        true -> [search];
+        false -> []
+    end ++
+        case nouveau:enabled() of
+            true -> [nouveau];
+            false -> []
+        end ++
+        config:features().
 
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, get_docroot()).

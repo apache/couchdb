@@ -1100,6 +1100,8 @@ error_info({error, <<"endpoint has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
 error_info({error, <<"proxy has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
+error_info({method_not_allowed, Reason}) ->
+    {405, <<"method_not_allowed">>, Reason};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
@@ -1118,6 +1120,8 @@ error_info(all_workers_died) ->
         "Nodes are unable to service this "
         "request due to overloading or maintenance mode."
     >>};
+error_info({internal_server_error, Reason}) ->
+    {500, <<"internal server error">>, Reason};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
 error_info(timeout) ->

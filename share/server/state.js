@@ -19,9 +19,9 @@ var State = {
     gc();
     print("true"); // indicates success
   },
-  addFun : function(newFun) {
+  addFun : function(newFun, option) {
     // Compile to a function and add it to funs array
-    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}));
+    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}, undefined, option));
     print("true");
   },
   addLib : function(lib) {

@@ -171,6 +171,16 @@ handle_cast({trigger_update, #job{name = {_, _, hastings}, server = GPid, seq = 
     Now = erlang:monotonic_time(),
     ets:insert(ken_workers, Job#job{worker_pid = Pid, lru = Now}),
     {noreply, State, 0};
+handle_cast({trigger_update, #job{name = {_, Index, nouveau}} = Job}, State) ->
+    % nouveau_index_manager:update_index will trigger a search index update.
+    {Pid, _} = erlang:spawn_monitor(
+        nouveau_index_manager,
+        update_index,
+        [Index]
+    ),
+    Now = erlang:monotonic_time(),
+    ets:insert(ken_workers, Job#job{worker_pid = Pid, lru = Now}),
+    {noreply, State, 0};
 % search index job names have 3 elements. See job record definition.
 handle_cast({trigger_update, #job{name = {_, _, _}, server = GPid, seq = Seq} = Job}, State) ->
     % dreyfus_index:await will trigger a search index update.
@@ -329,8 +339,9 @@ update_ddoc_indexes(Name, #doc{} = Doc, State) ->
         end,
     SearchUpdated = search_updated(Name, Doc, Seq, State),
     STUpdated = st_updated(Name, Doc, Seq, State),
-    case {ViewUpdated, SearchUpdated, STUpdated} of
-        {ok, ok, ok} -> ok;
+    NouveauUpdated = nouveau_updated(Name, Doc, Seq, State),
+    case {ViewUpdated, SearchUpdated, STUpdated, NouveauUpdated} of
+        {ok, ok, ok, ok} -> ok;
         _ -> resubmit
     end.
 
@@ -369,6 +380,19 @@ st_updated(Name, Doc, Seq, State) ->
 st_updated(_Name, _Doc, _Seq, _State) ->
     ok.
 -endif.
+
+nouveau_updated(Name, Doc, Seq, State) ->
+    case should_update(Doc, <<"indexes">>) of
+        true ->
+            try nouveau_util:design_doc_to_indexes(Name, Doc) of
+                SIndexes -> update_ddoc_nouveau_indexes(Name, SIndexes, Seq, State)
+            catch
+                _:_ ->
+                    ok
+            end;
+        false ->
+            ok
+    end.
 
 should_update(#doc{body = {Props}}, IndexType) ->
     case couch_util:get_value(<<"autoupdate">>, Props) of
@@ -451,6 +475,24 @@ update_ddoc_st_indexes(DbName, Indexes, Seq, State) ->
     end.
 -endif.
 
+update_ddoc_nouveau_indexes(DbName, Indexes, Seq, State) ->
+    if
+        Indexes =/= [] ->
+            % Spawn a job for each search index in the ddoc
+            lists:foldl(
+                fun(Index, Acc) ->
+                    case maybe_start_job({DbName, Index, nouveau}, nil, Seq, State) of
+                        resubmit -> resubmit;
+                        _ -> Acc
+                    end
+                end,
+                ok,
+                Indexes
+            );
+        true ->
+            ok
+    end.
+
 should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
     Threshold = list_to_integer(config("max_incremental_updates", "1000")),
     IncrementalChannels = list_to_integer(config("incremental_channels", "80")),
@@ -476,6 +518,9 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
                             {ok, MRSt} = couch_index:get_state(Pid, 0),
                             CurrentSeq = couch_mrview_index:get(update_seq, MRSt),
                             (Seq - CurrentSeq) < Threshold;
+                        % Nouveau has three elements
+                        {_, Index, nouveau} ->
+                            nouveau_index_updated:outdated(Index);
                         % Search name has three elements.
                         {_, _, _} ->
                             {ok, _IndexPid, CurrentSeq} = dreyfus_index:await(Pid, 0),
