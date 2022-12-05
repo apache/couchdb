@@ -93,4 +93,4 @@ log_stats(Stats) ->
     {JStats0} = mango_execution_stats:to_json(Stats),
     Nonce = list_to_binary(couch_log_util:get_msg_id()),
     JStats = {[{<<"nonce">>, Nonce} | JStats0]},
-    couch_log:measures("GOT MANGO EXEC STATS: ~s", [binary_to_list(jiffy:encode(JStats))]).
+    couch_log:measures("[ASDFMARKER] GOT MANGO EXEC STATS: ~s", [binary_to_list(jiffy:encode(JStats))]).
