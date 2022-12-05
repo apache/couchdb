@@ -190,7 +190,7 @@ CouchJSEnv = case SMVsn of
 end.
 
 SpiderEnv = case SMVsn of
-    "91" ->
+    _ ->
         [
             {"CXXFLAGS", JS_CFLAGS},
             {"LDFLAGS", JS_LDFLAGS}
