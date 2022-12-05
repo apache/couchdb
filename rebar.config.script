@@ -128,6 +128,7 @@ SubDirs = [
     "src/custodian",
     "src/ddoc_cache",
     "src/dreyfus",
+    "src/nouveau",
     "src/fabric",
     "src/global_changes",
     "src/ioq",
