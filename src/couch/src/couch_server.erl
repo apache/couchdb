@@ -416,10 +416,11 @@ all_databases(Fun, Acc0) ->
                 true,
                 fun(Filename, AccIn) ->
                     NormFilename = couch_util:normpath(Filename),
-                    case NormFilename -- NormRoot of
-                        [$/ | RelativeFilename] -> ok;
-                        RelativeFilename -> ok
-                    end,
+                    RelativeFilename =
+                        case NormFilename -- NormRoot of
+                            [$/ | FName] -> FName;
+                            FName -> FName
+                        end,
                     Ext = filename:extension(RelativeFilename),
                     case Fun(?l2b(filename:rootname(RelativeFilename, Ext)), AccIn) of
                         {ok, NewAcc} -> NewAcc;
