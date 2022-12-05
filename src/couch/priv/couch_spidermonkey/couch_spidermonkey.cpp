@@ -12,7 +12,7 @@
  * the License.
  */
 
-#include <string.h>
+#include <string>
 #include <jsapi.h>
 #include "erl_nif.h"
 
@@ -27,10 +27,16 @@ get_spidermonkey_version(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     // JS_GetImplementationVersion()
     // returns "JavaScript-CMAJOR.MINOR.PATCH"
     const string FULLVERSION = JS_GetImplementationVersion();
-    int full_len = FULLVERSION.length();
 
-    //trim off "JavaScript-C"
-    string result = FULLVERSION.substr(js_len, full_len-js_len);
+    string result;
+    size_t foundJSString = FULLVERSION.find(JAVASCRIPT);
+    if (foundJSString != string::npos) {
+        //trim off "JavaScript-C",
+        result = FULLVERSION.substr(js_len);
+    } else {
+        //something changed in JS_GetImplementationVersion(), return original
+        result = FULLVERSION;
+    }
 
     return enif_make_string(env, result.c_str(), ERL_NIF_LATIN1);
 }

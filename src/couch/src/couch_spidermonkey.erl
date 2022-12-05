@@ -19,8 +19,8 @@
 -on_load(init/0).
 
 init() ->
-  Dir = code:priv_dir(couch),
-  ok = erlang:load_nif(filename:join(Dir, ?MODULE), 0).
+    Dir = code:priv_dir(couch),
+    ok = erlang:load_nif(filename:join(Dir, ?MODULE), 0).
 
 get_spidermonkey_version() ->
-  exit(nif_library_not_loaded).
+    exit(nif_library_not_loaded).
