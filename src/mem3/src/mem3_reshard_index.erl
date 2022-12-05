@@ -103,7 +103,8 @@ hastings_indices(DbName, Doc) ->
             []
     end.
 
-build_index({?MRVIEW, _DbName, MRSt} = Ctx, Try) ->
+build_index({?MRVIEW, DbName, MRSt} = Ctx, Try) ->
+    ioq:set_io_priority({reshard, DbName}),
     await_retry(
         couch_index_server:get_index(couch_mrview_index, MRSt),
         fun couch_index:get_state/2,

@@ -48,6 +48,7 @@
 -define(INVALID_SECTION, <<"Invalid configuration section">>).
 -define(INVALID_KEY, <<"Invalid configuration key">>).
 -define(INVALID_VALUE, <<"Invalid configuration value">>).
+-define(DELETE, delete).
 
 -record(config, {
     notify_funs = [],
@@ -414,89 +415,73 @@ is_sensitive(Section, Key) ->
     end.
 
 parse_ini_file(IniFile) ->
-    IniFilename = config_util:abs_pathname(IniFile),
-    IniBin =
-        case file:read_file(IniFilename) of
-            {ok, IniBin0} ->
-                IniBin0;
-            {error, enoent} ->
-                Fmt = "Couldn't find server configuration file ~s.",
-                Msg = list_to_binary(io_lib:format(Fmt, [IniFilename])),
-                couch_log:error("~s~n", [Msg]),
-                throw({startup_error, Msg})
-        end,
+    IniBin = read_ini_file(IniFile),
+    ParsedIniValues = parse_ini(IniBin),
+    {ok, lists:filter(fun delete_keys/1, ParsedIniValues)}.
 
-    Lines = re:split(IniBin, "\r\n|\n|\r|\032", [{return, list}]),
-    {_, ParsedIniValues} =
-        lists:foldl(
-            fun(Line, {AccSectionName, AccValues}) ->
-                case string:strip(Line) of
-                    "[" ++ Rest ->
-                        case re:split(Rest, "\\]", [{return, list}]) of
-                            [NewSectionName, ""] ->
-                                {NewSectionName, AccValues};
-                            % end bracket not at end, ignore this line
-                            _Else ->
-                                {AccSectionName, AccValues}
-                        end;
-                    ";" ++ _Comment ->
-                        {AccSectionName, AccValues};
-                    Line2 ->
-                        case re:split(Line2, "\s?=\s?", [{return, list}]) of
-                            [Value] ->
-                                MultiLineValuePart =
-                                    case re:run(Line, "^ \\S", []) of
-                                        {match, _} ->
-                                            true;
-                                        _ ->
-                                            false
-                                    end,
-                                case {MultiLineValuePart, AccValues} of
-                                    {true, [{{_, ValueName}, PrevValue} | AccValuesRest]} ->
-                                        % remove comment
-                                        case re:split(Value, " ;|\t;", [{return, list}]) of
-                                            [[]] ->
-                                                % empty line
-                                                {AccSectionName, AccValues};
-                                            [LineValue | _Rest] ->
-                                                E = {
-                                                    {AccSectionName, ValueName},
-                                                    PrevValue ++ " " ++ LineValue
-                                                },
-                                                {AccSectionName, [E | AccValuesRest]}
-                                        end;
-                                    _ ->
-                                        {AccSectionName, AccValues}
-                                end;
-                            % line begins with "=", ignore
-                            ["" | _LineValues] ->
-                                {AccSectionName, AccValues};
-                            % yeehaw, got a line!
-                            [ValueName | LineValues] ->
-                                RemainingLine = config_util:implode(LineValues, "="),
-                                % removes comments
-                                case re:split(RemainingLine, " ;|\t;", [{return, list}]) of
-                                    [[]] ->
-                                        % empty line means delete this key
-                                        ets:delete(?MODULE, {AccSectionName, ValueName}),
-                                        {AccSectionName, AccValues};
-                                    [LineValue | _Rest] ->
-                                        LineValueWithoutLeadTrailWS = string:trim(LineValue),
-                                        {AccSectionName, [
-                                            {
-                                                {AccSectionName, ValueName},
-                                                LineValueWithoutLeadTrailWS
-                                            }
-                                            | AccValues
-                                        ]}
-                                end
-                        end
-                end
-            end,
-            {"", []},
-            Lines
-        ),
-    {ok, ParsedIniValues}.
+parse_ini(IniBin) when is_binary(IniBin) ->
+    Lines0 = re:split(IniBin, "\r\n|\n|\r|\032", [{return, list}]),
+    Lines1 = lists:map(fun remove_comments/1, Lines0),
+    Lines2 = lists:map(fun trim/1, Lines1),
+    Lines3 = lists:filter(fun(Line) -> Line =/= "" end, Lines2),
+    {_, IniValues} = lists:foldl(fun parse_fold/2, {"", []}, Lines3),
+    lists:reverse(IniValues).
+
+parse_fold("[" ++ Rest, {Section, KVs}) ->
+    % Check for end ] brackend, if not found or empty section skip the rest
+    case string:split(Rest, "]") of
+        ["", _] -> {Section, KVs};
+        [NewSection, ""] -> {NewSection, KVs};
+        _Else -> {Section, KVs}
+    end;
+parse_fold(_Line, {"" = Section, KVs}) ->
+    % Empty section don't parse any lines until we're in a section
+    {Section, KVs};
+parse_fold(Line, {Section, KVs}) ->
+    case string:split(Line, " = ") of
+        [K, V] when V =/= "" ->
+            % Key may have "=" in it. Also, assert we'll never have a
+            % deletion case here since we're working with a stripped line
+            {Section, [{{Section, trim(K)}, trim(V)} | KVs]};
+        [_] ->
+            % Failed to split on " = ", so try to split on "=".
+            % If the line starts with "=" or it's not a KV pair, ignore it.
+            % An empty value emit the `delete` atom as a marker.
+            case string:split(Line, "=") of
+                ["", _] -> {Section, KVs};
+                [K, ""] -> {Section, [{{Section, trim(K)}, ?DELETE} | KVs]};
+                [K, V] -> {Section, [{{Section, trim(K)}, trim(V)} | KVs]};
+                [_] -> {Section, KVs}
+            end
+    end.
+
+read_ini_file(IniFile) ->
+    IniFilename = config_util:abs_pathname(IniFile),
+    case file:read_file(IniFilename) of
+        {ok, IniBin0} ->
+            IniBin0;
+        {error, enoent} ->
+            Fmt = "Couldn't find server configuration file ~s.",
+            Msg = list_to_binary(io_lib:format(Fmt, [IniFilename])),
+            couch_log:error("~s~n", [Msg]),
+            throw({startup_error, Msg})
+    end.
+
+remove_comments(Line) ->
+    {NoComments, _Comments} = string:take(Line, [$;], true),
+    NoComments.
+
+% Specially handle the ?DELETE marker
+%
+delete_keys({{Section, Key}, ?DELETE}) ->
+    ets:delete(?MODULE, {Section, Key}),
+    false;
+delete_keys({{_, _}, _}) ->
+    true.
+
+trim(String) ->
+    % May look silly but we're using this quite a bit
+    string:trim(String).
 
 debug_config() ->
     case ?MODULE:get("log", "level") of
@@ -625,5 +610,102 @@ validation_test() ->
         validate_config_update("section", "key]", "value")
     ),
     ok.
+
+ini(List) when is_list(List) ->
+    parse_ini(list_to_binary(List)).
+
+parse_skip_test() ->
+    ?assertEqual([], ini("")),
+    ?assertEqual([], ini("k")),
+    ?assertEqual([], ini("\n")),
+    ?assertEqual([], ini("\r\n")),
+    ?assertEqual([], ini("[s]")),
+    ?assertEqual([], ini("\n[s]\n")),
+    ?assertEqual([], ini("[s ]")),
+    ?assertEqual([], ini("k1\nk2")),
+    ?assertEqual([], ini("=")),
+    ?assertEqual([], ini("==")),
+    ?assertEqual([], ini("===")),
+    ?assertEqual([], ini("= =")),
+    ?assertEqual([], ini(" = ")),
+    ?assertEqual([], ini(";")),
+    ?assertEqual([], ini(";;")),
+    ?assertEqual([], ini(" ;")),
+    ?assertEqual([], ini("k = v")),
+    ?assertEqual([], ini("[s]\n;k = v")),
+    ?assertEqual([], ini("[s\nk=v")),
+    ?assertEqual([], ini("s[\nk=v")),
+    ?assertEqual([], ini("s]\nk=v")),
+    ?assertEqual([], ini(";[s]\nk = v")),
+    ?assertEqual([], ini(" ; [s]\nk = v")),
+    ?assertEqual([], ini("[s]\n ; k = v")),
+    ?assertEqual([], ini("[]\nk = v")),
+    ?assertEqual([], ini(";[s]\n ")).
+
+parse_basic_test() ->
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk=v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\n\nk=v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\n\r\n\nk=v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\n;\nk=v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk = v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk= v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk  =v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk=  v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk=  v  ")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk  = v")),
+    ?assertEqual([{{"s", "k"}, "v"}], ini("[s]\nk = v ; c")).
+
+parse_extra_equal_sign_test() ->
+    ?assertEqual([{{"s", "k"}, "=v"}], ini("[s]\nk==v")),
+    ?assertEqual([{{"s", "k"}, "v="}], ini("[s]\nk=v=")),
+    ?assertEqual([{{"s", "k"}, "=v"}], ini("[s]\nk ==v")),
+    ?assertEqual([{{"s", "k"}, "==v"}], ini("[s]\nk===v")),
+    ?assertEqual([{{"s", "k"}, "v=v"}], ini("[s]\nk=v=v")),
+    ?assertEqual([{{"s", "k"}, "=v"}], ini("[s]\nk = =v")),
+    ?assertEqual([{{"s", "k"}, "=v"}], ini("[s]\nk= =v")),
+    ?assertEqual([{{"s", "k="}, "v"}], ini("[s]\nk= = v")),
+    ?assertEqual([{{"s", "=k="}, "v"}], ini("[s]\n=k= = v")),
+    ?assertEqual([{{"s", "==k=="}, "v"}], ini("[s]\n==k== = v")).
+
+parse_delete_test() ->
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=;")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk =")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk= ")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ;")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk  =;")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=\n")).
+
+parse_multiple_kvs_test() ->
+    ?assertEqual(
+        [
+            {{"s", "k1"}, "v1"},
+            {{"s", "k2"}, "v2"}
+        ],
+        ini("[s]\nk1=v1\nk2=v2")
+    ),
+    ?assertEqual(
+        [
+            {{"s", "k1"}, "v1"},
+            {{"s", "k2"}, "v2"}
+        ],
+        ini("[s]\nk1 = v1\nk2 = v2\n")
+    ),
+    ?assertEqual(
+        [
+            {{"s1", "k"}, "v"},
+            {{"s2", "k"}, "v"}
+        ],
+        ini("[s1]\nk=v\n;\n\n[s2]\nk=v")
+    ),
+    ?assertEqual(
+        [
+            {{"s", "k1"}, "v1"},
+            {{"s", "k2"}, "v2"}
+        ],
+        ini("[s]\nk1=v1\ngarbage\n= more garbage\nk2=v2")
+    ).
 
 -endif.

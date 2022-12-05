@@ -26,6 +26,29 @@
 #include "help.h"
 #include "util.h"
 
+const char*
+get_spidermonkey_version() {
+    const char *JAVASCRIPT = "JavaScript-C";
+    int js_len = strlen(JAVASCRIPT);
+
+    // JS_GetImplementationVersion()
+    // returns "JavaScript-CMAJOR.MINOR.PATCH"
+    const char *FULLVERSION = JS_GetImplementationVersion();
+    int fv_len = strlen(FULLVERSION);
+
+    const char* foundJSString = strstr(FULLVERSION,JAVASCRIPT);
+    if (foundJSString != NULL) {
+        //trim off "JavaScript-C",
+        char *buf = (char*) calloc(fv_len - js_len + 1, sizeof(char));
+        strncpy(buf, &FULLVERSION[js_len], fv_len - js_len);
+        buf[fv_len - js_len + 1] = '\0';
+        return buf;
+    } else {
+        //something changed in JS_GetImplementationVersion(), return original
+        return FULLVERSION;
+    }
+}
+
 std::string
 js_to_string(JSContext* cx, JS::HandleValue val)
 {
@@ -140,7 +163,7 @@ couch_parse_args(int argc, const char* argv[])
 
     while(i < argc) {
         if(strcmp("-h", argv[i]) == 0) {
-            DISPLAY_USAGE;
+            couch_usage(BASENAME);
             exit(0);
         } else if(strcmp("-V", argv[i]) == 0) {
             DISPLAY_VERSION;

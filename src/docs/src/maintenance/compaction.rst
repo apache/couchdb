@@ -93,6 +93,7 @@ configuration setting in the ``[smoosh]`` block. The default configuration is
     [smoosh]
     db_channels = upgrade_dbs,ratio_dbs,slack_dbs
     view_channels = upgrade_views,ratio_views,slack_views
+    cleanup_channels = index_cleanup
 
     [smoosh.ratio_dbs]
     priority = ratio
@@ -110,18 +111,23 @@ configuration setting in the ``[smoosh]`` block. The default configuration is
     priority = slack
     min_priority = 536870912
 
-The "upgrade" channels are a special pair of channels that only check whether
-the `disk_format_version` for the file matches the current version, and enqueue
-the file for compaction (which has the side effect of upgrading the file format)
-if that's not the case. There are several additional properties that can be
-configured for each channel; these are documented in the :ref:`configuration API
-<config/compactions>`
+The "upgrade" and "cleanup_channels" are special system channels. The "upgrade"
+ones check whether the ``disk_format_version`` for the file matches the current
+version, and enqueue the file for compaction (which has the side effect of
+upgrading the file format) if that's not the case. In addition to that, the
+``upgrade_views`` will enqueue views for compaction after the collation
+(libicu) library is upgraded. The "index_cleanup" channel is used for
+scheduling jobs used to remove stale index files and purge _local checkpoint
+document after design documents are updated.
+
+Here are several additional properties that can be configured for each channel;
+these are documented in the :ref:`configuration API <config/compactions>`
 
 Scheduling Windows
 ------------------
 
 Each compaction channel can be configured to run only during certain hours of
-the day. The channel-specific `from`, `to`, and `strict_window` configuration
+the day. The channel-specific ``from``, ``to``, and ``strict_window`` configuration
 settings control this behavior. For example
 
 .. code-block:: ini
@@ -131,7 +137,7 @@ settings control this behavior. For example
     to = 06:00
     strict_window = true
 
-where `overnight_channel` is the name of the channel you want to configure.
+where ``overnight_channel`` is the name of the channel you want to configure.
 
 Note: CouchDB determines time via the UTC (GMT) timezone, so these settings must be
 expressed as UTC (GMT).
@@ -220,9 +226,9 @@ Manual Database Compaction
 
 Database compaction compresses the database file by removing unused file
 sections created during updates. Old documents revisions are replaced with
-small amount of metadata called `tombstone` which are used for conflicts
+small amount of metadata called ``tombstone`` which are used for conflicts
 resolution during replication. The number of stored revisions
-(and their `tombstones`) can be configured by using the :get:`_revs_limit
+(and their ``tombstones``) can be configured by using the :get:`_revs_limit
 </{db}/_revs_limit>` URL endpoint.
 
 Compaction can be manually triggered per database and runs as a background
@@ -326,7 +332,7 @@ is actually running. To track the compaction progress you may query the
 Manual View Compaction
 ======================
 
-`Views` also need compaction. Unlike databases, views are compacted by groups
+Views also need compaction. Unlike databases, views are compacted by groups
 per `design document`. To start their compaction, send the HTTP
 :post:`/{db}/_compact/{ddoc}` request::
 

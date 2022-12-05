@@ -61,7 +61,7 @@ static const char USAGE_TEMPLATE[] =
             VERSION_TEMPLATE,    \
             basename,            \
             PACKAGE_STRING,      \
-            JS_GetImplementationVersion())
+            get_spidermonkey_version())
 
 #define DISPLAY_VERSION couch_version(BASENAME)
 

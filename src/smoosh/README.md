@@ -24,6 +24,8 @@ The main settings one interacts with are:
 databases.
 <dt>view_channels<dd>A comma-separated list of channel names for
 views.
+<dt>cleanup_channels<dd>A comma-separated list of channel names
+for cleaning old index files.
 <dt>staleness<dd>The number of minutes that the (expensive) priority
 calculation can be stale for before it is recalculated. Defaults to 5.
 </dl>
@@ -32,9 +34,7 @@ Sometimes it's necessary to use the following:
 
 <dl>
 <dt>cleanup_index_files</dt><dd>Whether smoosh cleans up the files
-for indexes that have been deleted. Defaults to false and probably
-shouldn't be changed unless the cluster is running low on disk space,
-and only after considering the ramifications.</dd>
+for indexes that have been deleted. Defaults to true but may be switched to false.</dd>
 <dt>wait_secs</dt><dd>The time a channel waits before starting compactions 
 to allow time to observe the system and make a smarter decision about what 
 to compact first. Hardly ever changed from the default. Default 30 (seconds).
@@ -68,11 +68,13 @@ properly managed by OTP yet.
 Compaction Scheduling Algorithm
 -------------------------------
 
-Smoosh decides whether to compact a database or view by evaluating the
-item against the selection criteria of each _channel_ in the order
-they are configured. By default there are two channels for databases
-("ratio_dbs" and "slack_dbs"), and two channels for views ("ratio_views"
-and "slack_views")
+Smoosh decides whether to compact a database or view by evaluating the item
+against the selection criteria of each _channel_ in the order they are
+configured. By default there are three channels for databases ("ratio_dbs",
+"slack_dbs" and "upgrade_dbs"), three channels for views ("ratio_views",
+"slack_views" and "upgrade_views"). The "cleanup_channels" has only the
+"index_cleanup" channel. That channel is for enqueueing stale index file
+cleanup jobs.
 
 Smoosh will enqueue the new item to the first channel that accepts
 it. If none accept it, the item is not enqueued for compaction.
@@ -80,18 +82,9 @@ it. If none accept it, the item is not enqueued for compaction.
 Notes on the data_size value
 ----------------------------
 
-Every database and view shard has a data_size value. In CouchDB this
-accurately reflects the post-compaction file size. In DbCore, it is
-the size of the file that we bill for. It excludes the b+tree and
-database footer overhead. We also bill customers for the uncompressed
-size of their documents, though we store them compressed on disk.
-These two systems were developed independently (ours predates
-CouchDB's) and DbCore only calculates the billing size value.
-
-Because of the way our data_size is currently calculated, it can
-sometimes be necessary to enqueue databases and views with very low
-ratios. Due to this, it is also currently impossible to tell how
-optimally compacted a cluster is.
+Every database and view shard has an active size value. In CouchDB this
+accurately reflects the post-compaction file size plus the b+tree metadata and
+database footer overhead.
 
 Example config commands
 -----------------------

@@ -343,8 +343,8 @@ terminate(Reason, Srv) ->
     ),
     ok.
 
-handle_config_change("couchdb", "database_dir", _, _, _) ->
-    exit(whereis(couch_server), config_change),
+handle_config_change("couchdb", "database_dir", _, _, N) ->
+    exit(couch_server(N), config_change),
     remove_handler;
 handle_config_change("couchdb", "update_lru_on_read", "true", _, N) ->
     gen_server:call(couch_server(N), {set_update_lru_on_read, true}),

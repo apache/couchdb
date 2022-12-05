@@ -61,6 +61,11 @@ Upgrade Notes
 
   ...and so on. Documentation has been updated to reflect this change.
 
+  .. warning::
+     The _node endpoint is for adminstrative purposes it is NOT
+     intended as an alternative to the regular endpoints ("GET
+     /dbname", "PUT /dbname/docid" and so on)
+
 * :ghissue:`2389`: CouchDB 3.0 now requires a server admin user to be defined at
   startup, or will print an error message and exit. If you do not have one, be sure
   to :ref:`create an admin user<config/admins>`. (The Admin Party is now over.)
