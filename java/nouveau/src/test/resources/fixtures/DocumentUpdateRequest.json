@@ -1,0 +1,22 @@
+{
+  "seq": 12,
+  "fields": [
+    {
+      "@type": "string",
+      "name": "stringfoo",
+      "value": "bar",
+      "stored": true
+    },
+    {
+      "@type": "text",
+      "name": "textfoo",
+      "value": "hello there",
+      "stored": true
+    },
+    {
+      "@type": "double_point",
+      "name": "doublefoo",
+      "value": 12
+    }
+  ]
+}

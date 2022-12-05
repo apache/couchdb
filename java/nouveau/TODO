@@ -1,0 +1,27 @@
+targeted dreyfus feature parity
+
+* pagination (bookmark I guess)
+* grouping
+* faceting
+* partitioned db support
+* ken integration
+* delete indexes on db deletion
+
+not targeted
+
+* stale=ok
+* highlighting
+* drilldown
+
+After reaching dreyfus parity, nouveau will diverge;
+
+* no javascript eval
+* ddoc will require an index schema, mapping couchdb document fields to lucene fields
+* spatial-extras and spatial3d support
+
+interim ideas
+
+* append type to field name, so `index("foo", 12.0")` becomes `new DoublePoint("foo<number>", 12.0)`
+* set a special Map to setPointsConfigMap() which examines that suffix and returns a PointsConfig for <number>
+
+* in nouveau branch of couchdb, remove dreyfus entirely and put nouveau at _search_analyze, _search, 

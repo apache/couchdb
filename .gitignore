@@ -14,7 +14,7 @@
 .rebar/
 .eunit/
 cover/
-core
+/core
 debian/
 log
 apache-couchdb-*/

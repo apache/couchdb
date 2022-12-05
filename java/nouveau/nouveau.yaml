@@ -1,0 +1,16 @@
+maxIndexesOpen: 100
+commitIntervalSeconds: 30
+idleSeconds: 60
+
+
+
+server:
+  applicationConnectors:
+    - type: h2c
+      port: 8080
+      maxConcurrentStreams: 1024
+      initialStreamRecvWindow: 65535
+  gzip:
+    includedMethods:
+      - GET
+      - POST
