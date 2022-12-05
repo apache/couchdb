@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-function create_sandbox() {
+function create_sandbox(sandbox_option) {
   try {
     // if possible, use evalcx (not always available)
     var sandbox = evalcx('');
@@ -25,7 +25,7 @@ function create_sandbox() {
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
-    sandbox.index = Dreyfus.index;
+    sandbox.index = sandbox_option === 'nouveau'? Nouveau.index : Dreyfus.index;
   } catch (e) {
     var sandbox = {};
   }
@@ -119,6 +119,7 @@ var Loop = function() {
     "add_lib"  : State.addLib,
     "map_doc"  : Views.mapDoc,
     "index_doc": Dreyfus.indexDoc,
+    "nouveau_index_doc": Nouveau.indexDoc,
     "reduce"   : Views.reduce,
     "rereduce" : Views.rereduce
   };
