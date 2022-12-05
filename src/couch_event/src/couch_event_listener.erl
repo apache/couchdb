@@ -175,14 +175,8 @@ do_terminate(Reason, #st{module = Module, state = State}) ->
         end,
     erlang:exit(Status).
 
-where({global, Name}) -> global:whereis_name(Name);
 where({local, Name}) -> whereis(Name).
 
-name_register({global, Name} = GN) ->
-    case global:register_name(Name, self()) of
-        yes -> true;
-        no -> {false, where(GN)}
-    end;
 name_register({local, Name} = LN) ->
     try register(Name, self()) of
         true -> true

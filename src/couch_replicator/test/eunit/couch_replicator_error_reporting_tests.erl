@@ -28,7 +28,9 @@ error_reporting_test_() ->
             ?TDEF_FE(t_fail_bulk_get, 15),
             ?TDEF_FE(t_fail_changes_queue),
             ?TDEF_FE(t_fail_changes_manager),
-            ?TDEF_FE(t_fail_changes_reader_proc)
+            ?TDEF_FE(t_fail_changes_reader_proc),
+            ?TDEF_FE(t_dont_start_duplicate_job),
+            ?TDEF_FE(t_stop_duplicate_job)
         ]
     }.
 
@@ -150,6 +152,34 @@ t_fail_changes_reader_proc({_Ctx, {Source, Target}}) ->
     ?assertEqual({changes_reader_died, kapow}, Result),
     couch_replicator_notifier:stop(Listener).
 
+t_dont_start_duplicate_job({_Ctx, {Source, Target}}) ->
+    meck:new(couch_replicator_pg, [passthrough]),
+    Pid = pid_from_another_node(),
+    meck:expect(couch_replicator_pg, should_start, fun(_, _) -> {no, Pid} end),
+    Rep = make_rep(Source, Target),
+    ExpectErr = {error, {already_started, Pid}},
+    ?assertEqual(ExpectErr, couch_replicator_scheduler_job:start_link(Rep)).
+
+t_stop_duplicate_job({_Ctx, {Source, Target}}) ->
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
+    RepPid = couch_replicator_test_helper:get_pid(RepId),
+    {ok, Listener} = rep_result_listener(RepId),
+    Pid = pid_from_another_node(),
+    meck:expect(couch_replicator_pg, should_run, fun(_, _) -> {no, Pid} end),
+    RepPid ! {'$gen_cast', checkpoint},
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual(duplicate_job, Result),
+    couch_replicator_notifier:stop(Listener).
+
+pid_from_another_node() ->
+    % Use a Pid serialized from a node named A@1
+    % (A@1)1> term_to_binary(self()).
+    Bin = <<131, 88, 100, 0, 3, 65, 64, 49, 0, 0, 0, 89, 0, 0, 0, 0, 99, 137, 147, 218>>,
+    Pid = binary_to_term(Bin),
+    ?assertEqual('A@1', node(Pid)),
+    Pid.
+
 mock_fail_req(Path, Return) ->
     meck:expect(
         ibrowse,
@@ -216,6 +246,12 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     end.
 
 replicate(Source, Target) ->
+    Rep = make_rep(Source, Target),
+    ok = couch_replicator_scheduler:add_job(Rep),
+    couch_replicator_scheduler:reschedule(),
+    {ok, Rep#rep.id}.
+
+make_rep(Source, Target) ->
     RepObject =
         {[
             {<<"source">>, url(Source)},
@@ -226,10 +262,8 @@ replicate(Source, Target) ->
             % Low connection timeout so _changes feed gets restarted quicker
             {<<"connection_timeout">>, 3000}
         ]},
-    {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
-    ok = couch_replicator_scheduler:add_job(Rep),
-    couch_replicator_scheduler:reschedule(),
-    {ok, Rep#rep.id}.
+    {ok, Rep} = couch_replicator_parse:parse_rep_doc(RepObject, ?ADMIN_USER),
+    Rep.
 
 url(DbName) ->
     couch_replicator_test_helper:cluster_db_url(DbName).

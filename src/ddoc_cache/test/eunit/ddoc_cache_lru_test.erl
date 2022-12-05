@@ -20,6 +20,8 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
+-define(EVENT_TIMEOUT, 2000).
+
 recover(<<"pause", _/binary>>) ->
     receive
         go -> ok
@@ -59,11 +61,11 @@ check_lru_test_() ->
         fun start_couch/0,
         fun stop_couch/1,
         with([
-            ?TDEF(check_multi_start),
-            ?TDEF(check_multi_open),
-            ?TDEF(check_capped_size),
-            ?TDEF(check_cache_refill),
-            ?TDEF(check_evict_and_exit)
+            ?TDEF(check_multi_start, 10),
+            ?TDEF(check_multi_open, 10),
+            ?TDEF(check_capped_size, 10),
+            ?TDEF(check_cache_refill, 10),
+            ?TDEF(check_evict_and_exit, 10)
         ])
     }.
 
@@ -80,7 +82,7 @@ check_multi_start(_) ->
         end,
         lists:seq(1, 10)
     ),
-    meck:wait(ddoc_cache_ev, event, [started, Key], 1000),
+    meck:wait(ddoc_cache_ev, event, [started, Key], ?EVENT_TIMEOUT),
     lists:foreach(
         fun({Pid, _Ref}) ->
             ?assert(is_process_alive(Pid))
@@ -114,7 +116,7 @@ check_multi_open(_) ->
     Client1 = spawn_monitor(fun() ->
         ddoc_cache_lru:open(Key)
     end),
-    meck:wait(ddoc_cache_ev, event, [started, Key], 1000),
+    meck:wait(ddoc_cache_ev, event, [started, Key], ?EVENT_TIMEOUT),
     Clients =
         [Client1] ++
             lists:map(
@@ -162,7 +164,7 @@ check_capped_size(_) ->
         fun(I) ->
             DbName = list_to_binary("big_" ++ integer_to_list(I)),
             ddoc_cache:open_custom(DbName, ?MODULE),
-            meck:wait(I, ddoc_cache_ev, event, [started, '_'], 1000),
+            meck:wait(I, ddoc_cache_ev, event, [started, '_'], ?EVENT_TIMEOUT),
             ?assert(cache_size() < MaxSize * 2)
         end,
         lists:seq(1, 25)
@@ -171,7 +173,7 @@ check_capped_size(_) ->
         fun(I) ->
             DbName = list_to_binary("big_" ++ integer_to_list(I)),
             ddoc_cache:open_custom(DbName, ?MODULE),
-            meck:wait(I, ddoc_cache_ev, event, [started, '_'], 1000),
+            meck:wait(I, ddoc_cache_ev, event, [started, '_'], ?EVENT_TIMEOUT),
             ?assert(cache_size() < MaxSize * 2)
         end,
         lists:seq(26, 100)
@@ -193,15 +195,15 @@ check_cache_refill({DbName, _}) ->
     lists:foreach(
         fun(I) ->
             Key = InitDDoc(I),
-            meck:wait(ddoc_cache_ev, event, [started, Key], 1000)
+            meck:wait(ddoc_cache_ev, event, [started, Key], ?EVENT_TIMEOUT)
         end,
         lists:seq(1, 5)
     ),
 
     ShardName = mem3:name(hd(mem3:shards(DbName))),
     {ok, _} = ddoc_cache_lru:handle_db_event(ShardName, deleted, foo),
-    meck:wait(ddoc_cache_ev, event, [evicted, DbName], 1000),
-    meck:wait(10, ddoc_cache_ev, event, [removed, '_'], 1000),
+    meck:wait(ddoc_cache_ev, event, [evicted, DbName], ?EVENT_TIMEOUT),
+    meck:wait(10, ddoc_cache_ev, event, [removed, '_'], ?EVENT_TIMEOUT),
     test_util:wait(
         fun() ->
             case ets:info(?CACHE, size) of
@@ -214,7 +216,7 @@ check_cache_refill({DbName, _}) ->
     lists:foreach(
         fun(I) ->
             Key = InitDDoc(I),
-            meck:wait(ddoc_cache_ev, event, [started, Key], 1000)
+            meck:wait(ddoc_cache_ev, event, [started, Key], ?EVENT_TIMEOUT)
         end,
         lists:seq(6, 10)
     ).
@@ -238,7 +240,7 @@ check_evict_and_exit(_) ->
     % Resume the LRU and ensure that it doesn't die
     erlang:resume_process(whereis(ddoc_cache_lru)),
 
-    meck:wait(ddoc_cache_ev, event, [evicted, <<"dbname">>], 1000),
+    meck:wait(ddoc_cache_ev, event, [evicted, <<"dbname">>], ?EVENT_TIMEOUT),
 
     % Make sure it can handle another message
     OtherKey = {ddoc_cache_entry_custom, {<<"otherdb">>, ?MODULE}},

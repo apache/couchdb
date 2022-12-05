@@ -81,21 +81,25 @@
     view = nil
 }).
 
-start_link(#rep{id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
+start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     RepChildId = BaseId ++ Ext,
     Source = couch_replicator_api_wrap:db_uri(Src),
     Target = couch_replicator_api_wrap:db_uri(Tgt),
-    ServerName = {global, {?MODULE, Rep#rep.id}},
-
-    case gen_server:start_link(ServerName, ?MODULE, Rep, []) of
-        {ok, Pid} ->
-            {ok, Pid};
-        {error, Reason} ->
-            couch_log:warning(
-                "failed to start replication `~s` (`~s` -> `~s`)",
-                [RepChildId, Source, Target]
-            ),
-            {error, Reason}
+    case couch_replicator_pg:should_start(Id, node()) of
+        yes ->
+            case gen_server:start_link({local, ?MODULE}, ?MODULE, Rep, []) of
+                {ok, Pid} ->
+                    couch_replicator_pg:join(Id, Pid),
+                    {ok, Pid};
+                {error, Reason} ->
+                    couch_log:warning(
+                        "failed to start replication `~s` (`~s` -> `~s`)",
+                        [RepChildId, Source, Target]
+                    ),
+                    {error, Reason}
+            end;
+        {no, OtherPid} ->
+            {error, {already_started, OtherPid}}
     end.
 
 init(InitArgs) ->
@@ -234,14 +238,19 @@ handle_call({report_seq_done, Seq, StatsInc}, From, State) ->
 handle_cast({sum_stats, Stats}, State) ->
     NewStats = couch_replicator_utils:sum_stats(State#rep_state.stats, Stats),
     {noreply, State#rep_state{stats = NewStats}};
-handle_cast(checkpoint, State) ->
-    case do_checkpoint(State) of
-        {ok, NewState} ->
-            couch_stats:increment_counter([couch_replicator, checkpoints, success]),
-            {noreply, NewState#rep_state{timer = start_timer(State)}};
-        Error ->
-            couch_stats:increment_counter([couch_replicator, checkpoints, failure]),
-            {stop, Error, State}
+handle_cast(checkpoint, #rep_state{rep_details = Rep} = State) ->
+    case couch_replicator_pg:should_run(Rep#rep.id, self()) of
+        yes ->
+            case do_checkpoint(State) of
+                {ok, NewState} ->
+                    couch_stats:increment_counter([couch_replicator, checkpoints, success]),
+                    {noreply, NewState#rep_state{timer = start_timer(State)}};
+                Error ->
+                    couch_stats:increment_counter([couch_replicator, checkpoints, failure]),
+                    {stop, Error, State}
+            end;
+        {no, OtherPid} ->
+            {stop, {shutdown, {duplicate_job, OtherPid}}, State}
     end;
 handle_cast(
     {report_seq, Seq},
@@ -367,6 +376,7 @@ terminate(shutdown, #rep_state{rep_details = #rep{id = RepId}} = State) ->
     terminate_cleanup(State1);
 terminate({shutdown, max_backoff}, {error, InitArgs}) ->
     #rep{id = {BaseId, Ext} = RepId} = InitArgs,
+    couch_replicator_pg:leave(RepId, self()),
     couch_stats:increment_counter([couch_replicator, failed_starts]),
     couch_log:warning("Replication `~s` reached max backoff ", [BaseId ++ Ext]),
     couch_replicator_notifier:notify({error, RepId, max_backoff});
@@ -378,6 +388,7 @@ terminate({shutdown, {error, Error}}, {error, Class, Stack, InitArgs}) ->
         doc_id = DocId,
         db_name = DbName
     } = InitArgs,
+    couch_replicator_pg:leave(RepId, self()),
     Source = couch_replicator_api_wrap:db_uri(Source0),
     Target = couch_replicator_api_wrap:db_uri(Target0),
     RepIdStr = BaseId ++ Ext,
@@ -406,6 +417,18 @@ terminate({shutdown, max_backoff}, State) ->
     ),
     terminate_cleanup(State),
     couch_replicator_notifier:notify({error, RepId, max_backoff});
+terminate({shutdown, {duplicate_job, OtherPid}}, State) ->
+    #rep_state{
+        source_name = Source,
+        target_name = Target,
+        rep_details = #rep{id = {BaseId, Ext} = RepId}
+    } = State,
+    couch_log:error(
+        "Replication `~s` (`~s` -> `~s`) with pid ~p was usurped by ~p on node ~p",
+        [BaseId ++ Ext, Source, Target, self(), OtherPid, node(OtherPid)]
+    ),
+    terminate_cleanup(State),
+    couch_replicator_notifier:notify({error, RepId, duplicate_job});
 terminate({shutdown, Reason}, State) ->
     % Unwrap so when reporting we don't have an extra {shutdown, ...} tuple
     % wrapped around the message
@@ -423,7 +446,8 @@ terminate(Reason, State) ->
     terminate_cleanup(State),
     couch_replicator_notifier:notify({error, RepId, Reason}).
 
-terminate_cleanup(State) ->
+terminate_cleanup(#rep_state{rep_details = #rep{id = RepId}} = State) ->
+    couch_replicator_pg:leave(RepId, self()),
     update_task(State),
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
@@ -1118,7 +1142,7 @@ log_replication_start(#rep_state{rep_details = Rep} = RepState) ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 replication_start_error_test() ->
     ?assertEqual(
@@ -1144,13 +1168,26 @@ replication_start_error_test() ->
         replication_start_error({http_request_failed, "GET", "http://x/y", {error, {code, 503}}})
     ).
 
-scheduler_job_format_status_test() ->
+format_status_test_() ->
+    {
+        foreach,
+        fun meck_config/0,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_scheduler_job_format_status)
+        ]
+    }.
+
+meck_config() ->
+    meck:expect(config, get, fun(_, _, Default) -> Default end).
+
+t_scheduler_job_format_status(_) ->
     Source = <<"http://u:p@h1/d1">>,
     Target = <<"http://u:p@h2/d2">>,
     Rep = #rep{
         id = {"base", "+ext"},
-        source = couch_replicator_docs:parse_rep_db(Source, [], []),
-        target = couch_replicator_docs:parse_rep_db(Target, [], []),
+        source = couch_replicator_parse:parse_rep_db(Source, [], []),
+        target = couch_replicator_parse:parse_rep_db(Target, [], []),
         options = [{create_target, true}],
         doc_id = <<"mydoc">>,
         db_name = <<"mydb">>

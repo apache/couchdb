@@ -76,6 +76,7 @@ bypass(Priority) ->
         read -> config:get_boolean("ioq.bypass", "read", true);
         write -> config:get_boolean("ioq.bypass", "write", true);
         view_update -> config:get_boolean("ioq.bypass", "view_update", true);
+        reshard -> config:get_boolean("ioq.bypass", "reshard", false);
         shard_sync -> config:get_boolean("ioq.bypass", "shard_sync", false);
         compaction -> config:get_boolean("ioq.bypass", "compaction", false);
         _ -> config:get("ioq.bypass", atom_to_list(Priority)) =:= "true"
@@ -103,6 +104,8 @@ io_class(_, {search, _}) ->
     search;
 io_class(_, {search, _, _}) ->
     search;
+io_class(_, {reshard, _}) ->
+    reshard;
 io_class(_, _) ->
     other.
 
@@ -181,6 +184,8 @@ terminate(_Reason, _State) ->
 enqueue_request(#request{priority = compaction} = Request, #state{} = State) ->
     State#state{background = queue:in(Request, State#state.background)};
 enqueue_request(#request{priority = shard_sync} = Request, #state{} = State) ->
+    State#state{background = queue:in(Request, State#state.background)};
+enqueue_request(#request{priority = reshard} = Request, #state{} = State) ->
     State#state{background = queue:in(Request, State#state.background)};
 enqueue_request(#request{} = Request, #state{} = State) ->
     State#state{interactive = queue:in(Request, State#state.interactive)}.

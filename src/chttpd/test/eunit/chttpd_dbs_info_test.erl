@@ -21,7 +21,7 @@
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
 start() ->
-    Ctx = chttpd_test_util:start_couch(),
+    Ctx = test_util:start_couch([inets, chttpd]),
     DbDir = config:get("couchdb", "database_dir"),
     Suffix = ?b2l(couch_uuids:random()),
     test_util:with_couch_server_restart(fun() ->
@@ -183,11 +183,15 @@ should_return_nothing_when_db_not_exist_for_get_dbs_info(_) ->
 
 should_return_500_time_out_when_time_is_not_enough_for_get_dbs_info(_) ->
     mock_timeout(),
-    {ok, Code, _, ResultBody} = test_request:get(
-        dbs_info_url("buffer_response=true"), [?CONTENT_JSON, ?AUTH]
-    ),
-    {Body} = jiffy:decode(ResultBody),
-    ?assertEqual(<<"timeout">>, couch_util:get_value(<<"error">>, Body)),
+    % Use httpc to avoid ibrowse returning {error, retry_later} in
+    % some cases, causing test_request to sleep and retry, resulting
+    % in timeout failures.
+    Auth = base64:encode_to_string(?USER ++ ":" ++ ?PASS),
+    Headers = [{"Authorization", "Basic " ++ Auth}],
+    Request = {dbs_info_url("buffer_response=true"), Headers},
+    {ok, {{_, Code, _}, _, Body}} = httpc:request(get, Request, [], []),
+    {Props} = jiffy:decode(Body),
+    ?assertEqual(<<"timeout">>, couch_util:get_value(<<"error">>, Props)),
     ?assertEqual(500, Code).
 
 should_return_db2_for_get_dbs_info_with_descending({Suffix, Db1, Db2}) ->

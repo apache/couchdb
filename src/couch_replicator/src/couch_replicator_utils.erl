@@ -13,7 +13,6 @@
 -module(couch_replicator_utils).
 
 -export([
-    parse_rep_doc/2,
     replication_id/2,
     sum_stats/2,
     is_deleted/1,
@@ -94,9 +93,6 @@ replication_id(Rep, Version) ->
 
 sum_stats(S1, S2) ->
     couch_replicator_stats:sum_stats(S1, S2).
-
-parse_rep_doc(Props, UserCtx) ->
-    couch_replicator_docs:parse_rep_doc(Props, UserCtx).
 
 -spec iso8601(erlang:timestamp()) -> binary().
 iso8601({_Mega, _Sec, _Micro} = Timestamp) ->
@@ -282,7 +278,7 @@ seq_encode(Seq) ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 remove_basic_auth_from_headers_test_() ->
     [
@@ -351,7 +347,7 @@ normalize_rep_test_() ->
                     {<<"doc_ids">>, [<<"a">>, <<"c">>, <<"b">>]},
                     {<<"other_field">>, <<"some_value">>}
                 ]},
-            Rep1 = couch_replicator_docs:parse_rep_doc_without_id(EJson1),
+            Rep1 = couch_replicator_parse:parse_rep_doc_without_id(EJson1),
             EJson2 =
                 {[
                     {<<"other_field">>, <<"unrelated">>},
@@ -360,7 +356,7 @@ normalize_rep_test_() ->
                     {<<"doc_ids">>, [<<"c">>, <<"a">>, <<"b">>]},
                     {<<"other_field2">>, <<"unrelated2">>}
                 ]},
-            Rep2 = couch_replicator_docs:parse_rep_doc_without_id(EJson2),
+            Rep2 = couch_replicator_parse:parse_rep_doc_without_id(EJson2),
             ?assertEqual(normalize_rep(Rep1), normalize_rep(Rep2))
         end)
     }.

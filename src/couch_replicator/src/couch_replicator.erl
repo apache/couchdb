@@ -25,10 +25,8 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
--define(DESIGN_DOC_CREATION_DELAY_MSEC, 1000).
 -define(REPLICATION_STATES, [
     % Just added to scheduler
     initializing,
@@ -58,7 +56,7 @@
     | {error, any()}
     | no_return().
 replicate(PostBody, Ctx) ->
-    {ok, Rep0} = couch_replicator_utils:parse_rep_doc(PostBody, Ctx),
+    {ok, Rep0} = couch_replicator_parse:parse_rep_doc(PostBody, Ctx),
     Rep = Rep0#rep{start_time = os:timestamp()},
     #rep{id = RepId, options = Options, user_ctx = UserCtx} = Rep,
     case get_value(cancel, Options, false) of
@@ -138,12 +136,16 @@ replication_states() ->
 
 -spec strip_url_creds(binary() | {[_]}) -> binary().
 strip_url_creds(Endpoint) ->
-    try couch_replicator_docs:parse_rep_db(Endpoint, [], []) of
+    try couch_replicator_parse:parse_rep_db(Endpoint, [], []) of
         #httpdb{url = Url} ->
             iolist_to_binary(couch_util:url_strip_password(Url))
     catch
         throw:{error, local_endpoints_not_supported} ->
             Endpoint;
+        throw:{error, _} ->
+            % Avoid exposing any part of the URL in case there is a password in
+            % the malformed endpoint URL
+            null;
         error:_ ->
             % Avoid exposing any part of the URL in case there is a password in
             % the malformed endpoint URL

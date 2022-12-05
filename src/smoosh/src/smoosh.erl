@@ -16,7 +16,7 @@
 -include_lib("mem3/include/mem3.hrl").
 
 -export([suspend/0, resume/0, enqueue/1, status/0]).
--export([enqueue_all_dbs/0, enqueue_all_dbs/1, enqueue_all_views/0]).
+-export([enqueue_all_dbs/0, enqueue_all_views/0]).
 
 suspend() ->
     smoosh_server:suspend().
@@ -30,9 +30,6 @@ enqueue(Object) ->
 sync_enqueue(Object) ->
     smoosh_server:sync_enqueue(Object).
 
-sync_enqueue(Object, Timeout) ->
-    smoosh_server:sync_enqueue(Object, Timeout).
-
 status() ->
     smoosh_server:status().
 
@@ -40,14 +37,6 @@ enqueue_all_dbs() ->
     fold_local_shards(
         fun(#shard{name = Name}, _Acc) ->
             sync_enqueue(Name)
-        end,
-        ok
-    ).
-
-enqueue_all_dbs(Timeout) ->
-    fold_local_shards(
-        fun(#shard{name = Name}, _Acc) ->
-            sync_enqueue(Name, Timeout)
         end,
         ok
     ).

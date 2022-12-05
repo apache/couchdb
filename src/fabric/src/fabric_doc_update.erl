@@ -114,19 +114,29 @@ handle_message({request_entity_too_large, Entity}, _, _) ->
     throw({request_entity_too_large, Entity}).
 
 before_doc_update(DbName, Docs, Opts) ->
+    % Use the same pattern as in couch_db:validate_doc_update/3. If the document was already
+    % checked during the interactive edit we don't want to spend time in the internal replicator
+    % revalidating everything.
+    UpdateType =
+        case get(io_priority) of
+            {internal_repl, _} ->
+                ?REPLICATED_CHANGES;
+            _ ->
+                ?INTERACTIVE_EDIT
+        end,
     case {fabric_util:is_replicator_db(DbName), fabric_util:is_users_db(DbName)} of
         {true, _} ->
             %% cluster db is expensive to create so we only do it if we have to
             Db = fabric_util:open_cluster_db(DbName, Opts),
             [
-                couch_replicator_docs:before_doc_update(Doc, Db, ?REPLICATED_CHANGES)
+                couch_replicator_docs:before_doc_update(Doc, Db, UpdateType)
              || Doc <- Docs
             ];
         {_, true} ->
             %% cluster db is expensive to create so we only do it if we have to
             Db = fabric_util:open_cluster_db(DbName, Opts),
             [
-                couch_users_db:before_doc_update(Doc, Db, ?INTERACTIVE_EDIT)
+                couch_users_db:before_doc_update(Doc, Db, UpdateType)
              || Doc <- Docs
             ];
         _ ->
