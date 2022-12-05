@@ -194,7 +194,8 @@ IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
           {"LDFLAGS", "$LDFLAGS"},
           {"CFLAGS", "$CFLAGS"}].
 IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include"},
-                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib"}].
+                {"LDFLAGS", "-L/usr/local/Cellar/spidermonkey/91.13.0_1/lib -L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib"},
+                {"CXXFLAGS", "-I/usr/local/Cellar/spidermonkey/91.13.0_1/include"}].
 IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
              {"LDFLAGS", "-L/usr/local/lib"}].
 IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
@@ -203,6 +204,9 @@ IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
+SpiderPath = "priv/couch_spidermonkey.so".
+SpiderSrc = ["priv/couch_spidermonkey/*.cpp"].
+
 BaseSpecs = [
         %% couchjs
         {".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]},
@@ -210,7 +214,12 @@ BaseSpecs = [
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
         {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
-        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
+        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]},
+        % couch_spidermonkey
+        {"darwin", SpiderPath, SpiderSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
+        {"linux",  SpiderPath, SpiderSrc, [{env, IcuEnv}]},
+        {"bsd",   SpiderPath, SpiderSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
+        {"win32",  SpiderPath, SpiderSrc, [{env, IcuWinEnv}]}
 ].
 
 SpawnSpec = [

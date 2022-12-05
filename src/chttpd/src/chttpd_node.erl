@@ -56,7 +56,8 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]}
         },
         javascript_engine => #{
             name => <<"spidermonkey">>,
-            version => couch_server:get_spidermonkey_version()
+            version => couch_server:get_spidermonkey_version(),
+            version_dyn => list_to_binary(couch_spidermonkey:get_spidermonkey_version())
         }
     });
 handle_node_req(#httpd{path_parts = [_, _Node, <<"_versions">>]} = Req) ->
