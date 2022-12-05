@@ -29,10 +29,10 @@ get_spidermonkey_version(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     const string FULLVERSION = JS_GetImplementationVersion();
     int full_len = FULLVERSION.length();
 
-    //ignore "JavaScript-C"
+    //trim off "JavaScript-C"
     string result = FULLVERSION.substr(js_len, full_len-js_len);
 
-    return enif_make_binary(env, result.c_str());
+    return enif_make_string(env, result.c_str(), ERL_NIF_LATIN1);
 }
 
 static ErlNifFunc nif_functions[] = {
