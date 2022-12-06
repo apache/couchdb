@@ -37,6 +37,7 @@ smoosh_test_() ->
 setup_all() ->
     meck:new(smoosh_server, [passthrough]),
     meck:new(smoosh_channel, [passthrough]),
+    meck:new(file, [unstick, passthrough]),
     meck:new(fabric, [passthrough]),
     meck:new(couch_emsort, [passthrough]),
     Ctx = test_util:start_couch([fabric]),
@@ -239,23 +240,24 @@ t_checkpointing_works(DbName) ->
     setup_db_compactor_intercept(),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
     ok = wait_to_enqueue(DbName),
-    ?debugHere,
     CompPid = wait_db_compactor_pid(),
-    ?debugHere,
     ChanPid = get_channel_pid("ratio_dbs"),
     config:set("smoosh", "persist", "true", false),
     meck:reset(smoosh_channel),
+    meck:reset(file),
     ChanPid ! checkpoint,
     % Wait for checkpoint process to exit
-    ?debugHere,
     ok = wait_normal_down(),
-    ?debugHere,
+    meck:wait(1, file, write_file, 3, 2000),
+    meck:wait(1, file, rename, 2, 2000),
     % Stop smoosh and then crash the compaction
     ok = application:stop(smoosh),
-    CompPid ! {raise, error, kapow},
-    % Smoosh should resume job and continue compacting
-    setup_db_compactor_intercept(),
-    meck:reset(smoosh_channel),
+    Ref = erlang:monitor(process, CompPid),
+    CompPid ! {raise, exit, kapow},
+    receive
+        {'DOWN', Ref, _, _, kapow} ->
+            ok
+    end,
     ok = application:start(smoosh),
     ?debugHere,
     CompPid2 = wait_db_compactor_pid(),
