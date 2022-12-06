@@ -16,6 +16,12 @@
 //  https://github.com/dmunch/couch-chakra/blob/master/js/normalizeFunction.js
 
 function rewriteFunInt(fun) {
+    // Skip lengthy AST transforms if the function passed can be
+    // safely wrapped in parenthesis.
+    if (fun.startsWith('function') && fun.endsWith('}')) {
+        return '(' + fun + ')'
+    }
+
     const ast = esprima.parse(fun);
     let idx = ast.body.length - 1;
     let decl = {};
