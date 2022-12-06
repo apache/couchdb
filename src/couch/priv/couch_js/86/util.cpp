@@ -163,7 +163,7 @@ couch_parse_args(int argc, const char* argv[])
 
     while(i < argc) {
         if(strcmp("-h", argv[i]) == 0) {
-            couch_usage(BASENAME);
+            DISPLAY_USAGE;
             exit(0);
         } else if(strcmp("-V", argv[i]) == 0) {
             DISPLAY_VERSION;
