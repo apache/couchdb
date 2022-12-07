@@ -12,33 +12,32 @@
  * the License.
  */
 
-#include <string>
+#include <string.h>
 #include <jsapi.h>
 #include "erl_nif.h"
-
-using namespace std;
 
 ERL_NIF_TERM
 get_spidermonkey_version(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    const string JAVASCRIPT = "JavaScript-C";
-    int js_len = JAVASCRIPT.length();
+    const char *JAVASCRIPT = "JavaScript-C";
+    int js_len = strlen(JAVASCRIPT);
 
     // JS_GetImplementationVersion()
     // returns "JavaScript-CMAJOR.MINOR.PATCH"
-    const string FULLVERSION = JS_GetImplementationVersion();
+    const char *FULLVERSION = JS_GetImplementationVersion();
+    int fv_len = strlen(FULLVERSION);
 
-    string result;
-    size_t foundJSString = FULLVERSION.find(JAVASCRIPT);
-    if (foundJSString != string::npos) {
+    const char* foundJSString = strstr(FULLVERSION,JAVASCRIPT);
+    if (foundJSString != NULL) {
         //trim off "JavaScript-C",
-        result = FULLVERSION.substr(js_len);
+        char *buf = (char*) malloc((fv_len - js_len + 1) * sizeof(char));
+        strncpy(buf, &FULLVERSION[js_len], fv_len - js_len);
+        buf[fv_len - js_len] = '\0';
+        return enif_make_string(env, buf, ERL_NIF_LATIN1);
     } else {
         //something changed in JS_GetImplementationVersion(), return original
-        result = FULLVERSION;
+        return enif_make_string(env, FULLVERSION, ERL_NIF_LATIN1);
     }
-
-    return enif_make_string(env, result.c_str(), ERL_NIF_LATIN1);
 }
 
 static ErlNifFunc nif_functions[] = {

@@ -48,6 +48,15 @@
 -kernel error_logger silent
 -sasl sasl_error_logger false
 
+# This will toggle to true in Erlang 25+. However since we don't use global
+# any longer, and have our own auto-connection module, we can keep the
+# existing global behavior to avoid surprises. See
+# https://github.com/erlang/otp/issues/6470#issuecomment-1337421210 for more
+# information about possible increased coordination and messages being sent on
+# disconnections when this setting is enabled.
+#
+-kernel prevent_overlapping_partitions false
+
 # Increase the pool of dirty IO schedulers from 10 to 16
 # Dirty IO schedulers are used for file IO.
 +SDio 16
