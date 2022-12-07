@@ -19,13 +19,13 @@ smoosh_test_() ->
                 ?TDEF_FE(t_db_is_enqueued_and_compacted),
                 ?TDEF_FE(t_view_is_enqueued_and_compacted),
                 ?TDEF_FE(t_index_cleanup_happens_by_default),
-                ?TDEF_FE(t_index_cleanup_can_be_disabled),
+                ?TDEF_FE(t_index_cleanup_can_be_disabled, 10),
                 ?TDEF_FE(t_suspend_resume),
                 ?TDEF_FE(t_check_window_can_resume),
                 ?TDEF_FE(t_renqueue_on_crashes),
                 ?TDEF_FE(t_update_status_works),
-                ?TDEF_FE(t_checkpointing_works, 15),
-                ?TDEF_FE(t_ignore_checkpoint_resume_if_compacted_already),
+                ?TDEF_FE(t_checkpointing_works, 10),
+                ?TDEF_FE(t_ignore_checkpoint_resume_if_compacted_already, 10),
                 ?TDEF_FE(t_access_cleaner_restarts),
                 ?TDEF_FE(t_event_handler_restarts),
                 ?TDEF_FE(t_manual_enqueue_api_works),
@@ -52,15 +52,16 @@ teardown_all(Ctx) ->
 
 setup() ->
     config:set("smoosh", "persist", "false", false),
-    config:set("smoosh", "wait_secs", "0", false),
+    config:set("smoosh", "wait_secs", "9999", false),
     DbName = ?tempdb(),
     fabric:create_db(DbName, [{q, 1}]),
     {ok, _} = create_ddoc(DbName, <<"_design/foo">>, <<"bar">>),
-    {ok, _} = create_doc(DbName, <<"doc1">>, 1500000),
+    {ok, _} = create_doc(DbName, <<"doc1">>, 1100000),
     {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
     application:start(smoosh),
     wait_for_channels(),
     flush(),
+    get_channel_pid("ratio_dbs") ! unpause,
     DbName.
 
 teardown(DbName) ->
@@ -123,8 +124,7 @@ t_db_is_enqueued_and_compacted(DbName) ->
     meck:reset(smoosh_channel),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
     ok = wait_to_enqueue(DbName),
-    ok = wait_compact_start(),
-    ok = wait_normal_down().
+    wait_compacted(DbName).
 
 t_view_is_enqueued_and_compacted(DbName) ->
     % We don't want index cleanup to interfere for now
@@ -132,41 +132,45 @@ t_view_is_enqueued_and_compacted(DbName) ->
     % Ensure db is compacted
     meck:reset(smoosh_channel),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
-    ok = wait_normal_down(),
+    wait_compacted(DbName),
     % Check view
     meck:reset(smoosh_channel),
+    get_channel_pid("ratio_views") ! unpause,
     {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
     ok = wait_to_enqueue({DbName, <<"_design/foo">>}),
-    ok = wait_compact_start(),
-    ok = wait_normal_down().
+    wait_view_compacted(DbName, <<"foo">>).
 
 t_index_cleanup_happens_by_default(DbName) ->
     ?assert(config:get_boolean("smoosh", "cleanup_index_files", true)),
     % Db compacts
     meck:reset(smoosh_channel),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
-    ok = wait_normal_down(),
+    wait_compacted(DbName),
     % View should compact as well
     meck:reset(fabric),
     meck:reset(smoosh_channel),
+    get_channel_pid("ratio_views") ! unpause,
+    get_channel_pid("index_cleanup") ! unpause,
     {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
     % View cleanup should have been invoked
-    meck:wait(fabric, cleanup_index_files, [DbName], 4000).
+    meck:wait(fabric, cleanup_index_files, [DbName], 4000),
+    wait_view_compacted(DbName, <<"foo">>).
 
 t_index_cleanup_can_be_disabled(DbName) ->
     config:set("smoosh", "cleanup_index_files", "false", false),
     % Db compacts
     meck:reset(smoosh_channel),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
-    ok = wait_normal_down(),
+    wait_compacted(DbName),
     % View should compact as well
     meck:reset(fabric),
     meck:reset(smoosh_channel),
+    get_channel_pid("ratio_views") ! unpause,
+    get_channel_pid("index_cleanup") ! unpause,
     {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
-    ok = wait_compact_start(),
-    ok = wait_normal_down(),
+    wait_view_compacted(DbName, <<"foo">>),
     % View cleanup was not called
-    timer:sleep(1000),
+    timer:sleep(500),
     ?assertEqual(0, meck:num_calls(fabric, cleanup_index_files, 1)).
 
 t_suspend_resume(DbName) ->
@@ -189,7 +193,7 @@ t_suspend_resume(DbName) ->
     ok = smoosh:resume(),
     ?assertNotEqual({status, suspended}, erlang:process_info(CompPid, status)),
     CompPid ! continue,
-    ok = wait_normal_down().
+    wait_compacted(DbName).
 
 t_check_window_can_resume(DbName) ->
     ?assertEqual({0, 0, 0}, sync_status("ratio_dbs")),
@@ -202,7 +206,7 @@ t_check_window_can_resume(DbName) ->
     ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
     get_channel_pid("ratio_dbs") ! check_window,
     CompPid ! continue,
-    ok = wait_normal_down().
+    wait_compacted(DbName).
 
 t_renqueue_on_crashes(DbName) ->
     ?assertEqual({0, 0, 0}, sync_status("ratio_dbs")),
@@ -216,7 +220,7 @@ t_renqueue_on_crashes(DbName) ->
     ok = wait_to_enqueue(DbName),
     CompPid2 = wait_db_compactor_pid(),
     CompPid2 ! continue,
-    ok = wait_normal_down().
+    wait_compacted(DbName).
 
 t_update_status_works(DbName) ->
     setup_db_compactor_intercept(),
@@ -234,22 +238,16 @@ t_update_status_works(DbName) ->
     end,
     test_util:wait(WaitFun),
     CompPid ! continue,
-    ok = wait_normal_down().
+    wait_compacted(DbName).
 
 t_checkpointing_works(DbName) ->
     setup_db_compactor_intercept(),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
     ok = wait_to_enqueue(DbName),
     CompPid = wait_db_compactor_pid(),
-    ChanPid = get_channel_pid("ratio_dbs"),
     config:set("smoosh", "persist", "true", false),
     meck:reset(smoosh_channel),
-    meck:reset(file),
-    ChanPid ! checkpoint,
-    % Wait for checkpoint process to exit
-    ok = wait_normal_down(),
-    meck:wait(1, file, write_file, 3, 2000),
-    meck:wait(1, file, rename, 2, 2000),
+    checkpoint(),
     % Stop smoosh and then crash the compaction
     ok = application:stop(smoosh),
     Ref = erlang:monitor(process, CompPid),
@@ -259,27 +257,21 @@ t_checkpointing_works(DbName) ->
             ok
     end,
     ok = application:start(smoosh),
-    ?debugHere,
+    wait_for_channels(),
+    get_channel_pid("ratio_dbs") ! unpause,
     CompPid2 = wait_db_compactor_pid(),
-    ?debugHere,
     ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
     CompPid2 ! continue,
-    ?debugHere,
-    ok = wait_normal_down(),
-    ?debugHere,
-    ok.
+    wait_compacted(DbName).
 
 t_ignore_checkpoint_resume_if_compacted_already(DbName) ->
     setup_db_compactor_intercept(),
     {ok, _} = delete_doc(DbName, <<"doc1">>),
     ok = wait_to_enqueue(DbName),
     CompPid = wait_db_compactor_pid(),
-    ChanPid = get_channel_pid("ratio_dbs"),
     config:set("smoosh", "persist", "true", false),
     meck:reset(smoosh_channel),
-    ChanPid ! checkpoint,
-    % Wait for checkpoint process to exit
-    ok = wait_normal_down(),
+    checkpoint(),
     % Stop smoosh and then let the compaction finish
     ok = application:stop(smoosh),
     Ref = erlang:monitor(process, CompPid),
@@ -287,10 +279,12 @@ t_ignore_checkpoint_resume_if_compacted_already(DbName) ->
     receive
         {'DOWN', Ref, _, _, normal} -> ok
     end,
+    wait_compacted(DbName),
     % Smoosh should resume job and *not* compact
-    setup_db_compactor_intercept(),
     meck:reset(smoosh_channel),
     ok = application:start(smoosh),
+    wait_for_channels(),
+    get_channel_pid("ratio_dbs") ! unpause,
     timer:sleep(500),
     StartPat = {'_', {ok, '_'}},
     ?assertEqual(0, meck:num_calls(smoosh_channel, handle_info, [StartPat, '_'])).
@@ -471,14 +465,6 @@ shard_name(DbName) ->
     [Shard] = mem3:shards(DbName),
     mem3:name(Shard).
 
-wait_compact_start() ->
-    StartOk = {'_', {ok, '_'}},
-    meck:wait(smoosh_channel, handle_info, [StartOk, '_'], 4000).
-
-wait_normal_down() ->
-    NormalDown = {'DOWN', '_', '_', '_', normal},
-    meck:wait(smoosh_channel, handle_info, [NormalDown, '_'], 4000).
-
 wait_update_status() ->
     meck:wait(smoosh_channel, handle_info, [update_status, '_'], 4000).
 
@@ -497,3 +483,46 @@ wait_db_compactor_pid() ->
         {compactor_paused, Pid} ->
             Pid
     end.
+
+checkpoint() ->
+    ChanPid = get_channel_pid("ratio_dbs"),
+    meck:reset(file),
+    ChanPid ! checkpoint,
+    meck:wait(1, file, write_file, 3, 2000),
+    meck:wait(1, file, rename, 2, 2000).
+
+file_size(DbName) ->
+    {ok, Info} = fabric:get_db_info(DbName),
+    {Sizes} = couch_util:get_value(sizes, Info),
+    couch_util:get_value(file, Sizes).
+
+view_file_size(DbName, DDoc) ->
+    {ok, ViewInfo} = fabric:get_view_group_info(DbName, DDoc),
+    {Sizes} = couch_util:get_value(sizes, ViewInfo),
+    couch_util:get_value(file, Sizes).
+
+wait_compacted(DbName) ->
+    wait_compacted(DbName, 32000).
+
+wait_compacted(DbName, MinSize) ->
+    WaitFun = fun() ->
+        Size = file_size(DbName),
+        case Size =< MinSize of
+            true -> ok;
+            false -> wait
+        end
+    end,
+    test_util:wait(WaitFun, 5000, 100).
+
+wait_view_compacted(DbName, DDoc) ->
+    wait_view_compacted(DbName, DDoc, 64000).
+
+wait_view_compacted(DbName, DDoc, MinSize) ->
+    WaitFun = fun() ->
+        Size = view_file_size(DbName, DDoc),
+        case Size =< MinSize of
+            true -> ok;
+            false -> wait
+        end
+    end,
+    test_util:wait(WaitFun, 5000, 200).
