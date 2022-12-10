@@ -68,10 +68,12 @@ main([]) ->
         _ ->
             [
                 "share/server/60/esprima.js",
-                "share/server/60/escodegen.js",
-                "share/server/60/rewrite_fun.js"
+                "share/server/60/escodegen.js"
             ]
     end,
+
+    RewriteFunFile = ["share/server/60/rewrite_fun.js"],
+    RewriteFunWithASTBypassFile = ["share/server/60/rewrite_fun_ast_bypass.js"],
 
     Pre = "(function () {\n",
     Post = "})();\n",
@@ -85,6 +87,12 @@ main([]) ->
             file:write_file(To, FinalBin)
     end,
 
-    ok = Concat(ExtraFiles ++ JsFiles, "share/server/main.js"),
+    case SMVsn of
+        "1.8.5" ->
+            ok = Concat(ExtraFiles ++ JsFiles, "share/server/main.js");
+        _ ->
+            ok = Concat(RewriteFunFile ++ ExtraFiles ++ JsFiles, "share/server/main.js"),
+            ok = Concat(RewriteFunWithASTBypassFile ++ ExtraFiles ++ JsFiles, "share/server/main_ast_bypass.js")
+    end,
     ok = Concat(ExtraFiles ++ CoffeeFiles, "share/server/main-coffee.js"),
     ok.
