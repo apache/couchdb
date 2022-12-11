@@ -92,7 +92,7 @@ main([]) ->
             ok = Concat(ExtraFiles ++ JsFiles, "share/server/main.js");
         _ ->
             ok = Concat(RewriteFunFile ++ ExtraFiles ++ JsFiles, "share/server/main.js"),
-            ok = Concat(RewriteFunWithASTBypassFile ++ ExtraFiles ++ JsFiles, "share/server/main_ast_bypass.js")
+            ok = Concat(RewriteFunWithASTBypassFile ++ ExtraFiles ++ JsFiles, "share/server/main-ast-bypass.js")
     end,
     ok = Concat(ExtraFiles ++ CoffeeFiles, "share/server/main-coffee.js"),
     ok.
