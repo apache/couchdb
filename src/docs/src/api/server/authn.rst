@@ -426,7 +426,7 @@ The ``jwt_keys`` section lists all the keys that this CouchDB server trusts. You
 should ensure that all nodes of your cluster have the same list.
 
 Since version 3.3 it's possible to use ``=`` in parameter names, but only when
-the parameter and value are separated `` = ``, i.e. the equal sign is
+the parameter and value are separated :literal:`\  = \ `, i.e. the equal sign is
 surrounded by at least one space on each side. This might be useful in the
 ``[jwt_keys]`` section where base64 encoded keys may contain the ``=``
 character.
