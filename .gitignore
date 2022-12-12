@@ -73,6 +73,7 @@ src/unicode_util_compat/
 src/file_system/
 src/rebar3/
 src/erlfmt/
+src/luerl/
 tmp/
 
 src/couch/*.o

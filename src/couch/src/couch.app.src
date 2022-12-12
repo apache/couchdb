@@ -37,6 +37,7 @@
         % Upstream deps
         ibrowse,
         mochiweb,
+        luerl,
 
         % ASF deps
         couch_epi,
