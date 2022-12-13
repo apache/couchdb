@@ -90,6 +90,7 @@ main([]) ->
     case SMVsn of
         "1.8.5" ->
             ok = Concat(ExtraFiles ++ JsFiles, "share/server/main.js");
+            ok = Concat(ExtraFiles ++ JsFiles, "share/server/main-ast-bypass.js");
         _ ->
             ok = Concat(RewriteFunFile ++ ExtraFiles ++ JsFiles, "share/server/main.js"),
             ok = Concat(RewriteFunWithASTBypassFile ++ ExtraFiles ++ JsFiles, "share/server/main-ast-bypass.js")
