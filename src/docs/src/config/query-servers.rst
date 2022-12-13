@@ -65,6 +65,19 @@ you can adjust the memory limitation (here, increasing to 512 MiB)::
 
 For more info about the available options, please consult ``couchjs -h``.
 
+.. note::
+    CouchDB versions 3.0.0 to 3.2.2 included a performance regression for
+    custom reduce functions. CouchDB 3.3.0 and later come with an experimental
+    fix to this issue that is included in a separate ``.js`` file.
+
+    To enable the fix, you need to define a custom ``COUCHDB_QUERY_SERVER_JAVASCRIPT``
+    environment variable as outlined above. The path to ``couchjs`` needs to
+    remain the same as you find it on your ``couchdb`` file, and the path to
+    ``main.js`` needs to be set to ``/path/to/couchdb/share/server/main-ast-bypass.js``.
+
+    With a default installation on Linux systems, this is going to be
+    ``COUCHDB_QUERY_SERVER_JAVASCRIPT="/opt/couchdb/bin/couchjs /opt/couchdb/share/server/main-ast-bypass.js"``
+
 .. _Mozilla SpiderMonkey: https://spidermonkey.dev/
 
 .. seealso::
