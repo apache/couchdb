@@ -38,6 +38,7 @@ rel/dev*
 rel/tmpdata
 share/server/main-coffee.js
 share/server/main.js
+share/server/main-ast-bypass.js
 share/www
 src/bear/
 src/certifi/

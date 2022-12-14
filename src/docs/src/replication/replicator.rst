@@ -417,13 +417,17 @@ retried and don't consume memory or CPU resources.
    database, a permissions error, etc. Repeated consecutive crashes
    result in an exponential backoff. This state is considered temporary
    (non-terminal) and replication jobs will be periodically retried.
-   Maximum backoff interval is around a day or so.
 
  * ``Completed``: This is a terminal, successful state for
    non-continuous replications. Once in this state the replication is
    "forgotten" by the scheduler and it doesn't consume any more CPU or
    memory resources. Continuous replication jobs will never reach this
    state.
+
+.. note:: Maximum backoff interval for states ``Error`` and ``Crashing``
+          is calculated based on the ``replicator.max_history`` option.
+          See :ref:`Replicator configuration section <config/replicator>`
+          for additional information.
 
 .. _Normal vs Continuous Replications:
 
