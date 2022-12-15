@@ -39,9 +39,9 @@ get_spidermonkey_version() {
     const char* foundJSString = strstr(FULLVERSION,JAVASCRIPT);
     if (foundJSString != NULL) {
         //trim off "JavaScript-C",
-        char *buf = (char*) calloc(fv_len - js_len + 1, sizeof(char));
+        char *buf = (char*) malloc((fv_len - js_len + 1) * sizeof(char));
         strncpy(buf, &FULLVERSION[js_len], fv_len - js_len);
-        buf[fv_len - js_len + 1] = '\0';
+        buf[fv_len - js_len] = '\0';
         return buf;
     } else {
         //something changed in JS_GetImplementationVersion(), return original
