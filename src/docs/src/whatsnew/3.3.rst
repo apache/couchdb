@@ -25,6 +25,18 @@
 Version 3.3.0
 =============
 
+Highlights
+----------
+
+* :ghissue:`4308`: Replicator was optimized and should be faster. It now uses
+  the `_bulk_get` endpoint on the source, and can statistically skip calling
+  `_revs_diff` on the target. Benchmark tests replicating 1M documents, 10KB
+  each, from UK to US East show a 3x speed improvement.
+
+.. figure:: ../../images/tea-erl-grey-hot-replicator.png
+  :align: center
+  :alt: Replicator, Tea! Earl Grey! Hot! (Because Picard said so)
+
 Features and Enhancements
 -------------------------
 
@@ -196,6 +208,10 @@ Performance
   ``COUCHDB_QUERY_SERVER_JAVASCRIPT="/opt/couchdb/bin/couchjs
   /opt/couchdb/share/server/main-ast-bypass.js"``.
 
+* :ghissue:`4262`: ``couchjs`` executable built against Spidermonkey >= 78 will
+  return the detailed ``major.minor.patch`` as opposed to just the ``major``
+  version as previously.
+
 Bugfixes
 --------
 
@@ -354,7 +370,7 @@ Docs
 * :ghissue:`4164`: The CouchDB documentation has been moved into the main
   CouchDB repository.
 
-* :ghissue:`4174`: Update Sphinx to version 5.1.1
+* :ghissue:`4307`, :ghissue:`4174`: Update Sphinx to version 5.3.0
 
 * :ghissue:`4170`: Document the ``/_node/_local/_versions`` endpoint.
 
