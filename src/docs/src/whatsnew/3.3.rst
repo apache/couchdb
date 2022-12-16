@@ -156,6 +156,10 @@ Features and Enhancements
 
 * :ghissue:`4287`: Allow ``=`` in config key names.
 
+* :ghissue:`4306`: Fauxton was updated to version v1.2.9. Changes since v1.2.8
+  can be found `here
+  <https://github.com/apache/couchdb-fauxton/releases/tag/v1.2.9>`_
+
 Performance
 -----------
 
