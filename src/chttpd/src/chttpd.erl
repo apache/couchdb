@@ -574,7 +574,7 @@ make_uri(Req, Raw) ->
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     Url = list_to_binary([
         "http://",
-        config:get("httpd", "bind_address"),
+        config:get("chttpd", "bind_address"),
         ":",
         Port,
         "/",
