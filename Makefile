@@ -151,7 +151,7 @@ escriptize: couch
 
 .PHONY: check
 # target: check - Test everything
-check: all python-black
+check: all
 	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test

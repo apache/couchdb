@@ -163,7 +163,7 @@ pipeline {
       }
     } // stage Build Docs
 
-    stage('Erlfmt') {
+    stage('Source Format Checks') {
       when {
         beforeOptions true
         expression { ONLY_DOCS_CHANGED == '0' }
@@ -185,6 +185,7 @@ pipeline {
           rm -rf apache-couchdb-*
           ./configure --skip-deps
           make erlfmt-check
+          make python-black
         '''
       }
       post {
