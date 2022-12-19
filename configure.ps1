@@ -109,7 +109,7 @@ $InstallDir="$LibDir\couchdb"
 $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
-$Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
+#$Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 
 Write-Verbose "==> configuring couchdb in rel\couchdb.config"
 $CouchDBConfig = @"
@@ -186,14 +186,14 @@ $ConfigERL = @"
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
 
-if (((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null) -or
-    ((Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue) -eq $null) -or
-    ((Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue) -eq $null)) {
+if (($null -eq (Get-Command "rebar.cmd" -ErrorAction SilentlyContinue)) -or
+    ($null -eq (Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue)) -or
+    ($null -eq (Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue))) {
   $env:Path += ";$rootdir\bin"
 }
 
 # check for rebar; if not found, build it and add it to our path
-if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
+if ($null -eq (Get-Command "rebar.cmd" -ErrorAction SilentlyContinue))
 {
    Write-Verbose "==> rebar.cmd not found; bootstrapping..."
    if (-Not (Test-Path "src\rebar"))
@@ -201,42 +201,42 @@ if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
       git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\src\rebar
    }
    cmd /c "cd src\rebar && $rootdir\src\rebar\bootstrap.bat"
-   cp $rootdir\src\rebar\rebar $rootdir\bin\rebar
-   cp $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
+   Copy-Item $rootdir\src\rebar\rebar $rootdir\bin\rebar
+   Copy-Item $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
    make -C $rootdir\src\rebar clean
 }
 
 # check for rebar3; if not found, build it and add it to our path
-if ((Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue) -eq $null)
+if ($null -eq (Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue))
 {
    Write-Verbose "==> rebar3.cmd not found; bootstrapping..."
    if (-Not (Test-Path "src\rebar3"))
    {
       git clone --depth 1 https://github.com/erlang/rebar3.git $rootdir\src\rebar3
    }
-   cd src\rebar3
+   Set-Location src\rebar3
    .\bootstrap.ps1
-   cp $rootdir\src\rebar3\rebar3 $rootdir\bin\rebar3
-   cp $rootdir\src\rebar3\rebar3.cmd $rootdir\bin\rebar3.cmd
-   cp $rootdir\src\rebar3\rebar3.ps1 $rootdir\bin\rebar3.ps1
+   Copy-Item $rootdir\src\rebar3\rebar3 $rootdir\bin\rebar3
+   Copy-Item $rootdir\src\rebar3\rebar3.cmd $rootdir\bin\rebar3.cmd
+   Copy-Item $rootdir\src\rebar3\rebar3.ps1 $rootdir\bin\rebar3.ps1
    make -C $rootdir\src\rebar3 clean
-   cd ..\..
+   Set-Location ..\..
 }
 
 # check for erlfmt; if not found, build it and add it to our path
-if ((Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue) -eq $null)
+if ($null -eq (Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue))
 {
    Write-Verbose "==> erlfmt.cmd not found; bootstrapping..."
    if (-Not (Test-Path "src\erlfmt"))
    {
       git clone --depth 1 https://github.com/WhatsApp/erlfmt.git $rootdir\src\erlfmt
    }
-   cd src\erlfmt
+   Set-Location src\erlfmt
    rebar3 as release escriptize
-   cp $rootdir\src\erlfmt\_build\release\bin\erlfmt $rootdir\bin\erlfmt
-   cp $rootdir\src\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
+   Copy-Item $rootdir\src\erlfmt\_build\release\bin\erlfmt $rootdir\bin\erlfmt
+   Copy-Item $rootdir\src\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
    make -C $rootdir\src\erlfmt clean
-   cd ..\..
+   Set-Location ..\..
 }
 
 # only update dependencies, when we are not in a release tarball
