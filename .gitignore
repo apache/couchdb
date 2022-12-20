@@ -7,6 +7,9 @@
 *.pyc
 *.swp
 *.pdb
+*.dll
+*.lib
+*.exp
 *~
 .venv
 .DS_Store
