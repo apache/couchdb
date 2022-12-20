@@ -154,7 +154,7 @@ DepDescs = [
 {folsom,           "folsom",           {tag, "CouchDB-0.8.4"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-7"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-5"}},
-{jiffy,            "jiffy",            {tag, "CouchDB-1.0.9-2"}},
+{jiffy,            "jiffy",            {tag, "1.1.1"}},
 {mochiweb,         "mochiweb",         {tag, "v3.1.1"}},
 {meck,             "meck",             {tag, "0.9.2"}},
 {recon,            "recon",            {tag, "2.5.2"}}
