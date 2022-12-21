@@ -275,8 +275,6 @@ pipeline {
         timeout(time: 15, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
           sh "./configure --spidermonkey-version 78"
-          sh 'make erlfmt-check'
-          sh 'make elixir-check-formatted'
           sh 'make dist'
         }
       }
