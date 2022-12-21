@@ -185,6 +185,7 @@ pipeline {
           rm -rf apache-couchdb-*
           ./configure --skip-deps
           make erlfmt-check
+          make elixir-source-checks
           make python-black
         '''
       }

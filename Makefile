@@ -185,7 +185,7 @@ exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
+exunit: couch elixir-init setup-eunit
 	@mix test --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
@@ -235,27 +235,27 @@ python-black-update: .venv/bin/black
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir: elixir-init elixir-check-formatted elixir-credo devclean
+elixir: elixir-init devclean
 	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
-elixir-init: MIX_ENV=test
+elixir-init: MIX_ENV=integration
 elixir-init: config.erl
 	@mix local.rebar --force rebar ./bin/rebar && mix local.rebar --force rebar3 ./bin/rebar3 && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: export MIX_ENV=integration
-elixir-cluster-without-quorum: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-cluster-without-quorum: elixir-init devclean
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 2 \
 		--no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-cluster-with-quorum
 elixir-cluster-with-quorum: export MIX_ENV=integration
-elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-cluster-with-quorum: elixir-init devclean
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
@@ -263,7 +263,7 @@ elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devc
 .PHONY: elixir-suite
 elixir-suite: export MIX_ENV=integration
 elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-suite: elixir-init devclean
 	@dev/run -n 1 -q -a adm:pass \
 		--enable-erlang-views \
 		--no-join \
@@ -271,14 +271,10 @@ elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
 
-.PHONY: elixir-check-formatted
-elixir-check-formatted: elixir-init
+.PHONY: elixir-source-checks
+elixir-source-checks: export MIX_ENV=integration
+elixir-source-checks: elixir-init
 	@mix format --check-formatted
-
-# Credo is a static code analysis tool for Elixir.
-# We use it in our tests
-.PHONY: elixir-credo
-elixir-credo: elixir-init
 	@mix credo
 
 .PHONY: build-report
