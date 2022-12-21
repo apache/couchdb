@@ -84,7 +84,7 @@ defmodule CouchDBTest.Mixfile do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps() do
-    [
+    deps_list = [
       {:junit_formatter, "~> 3.0", only: [:dev, :test, :integration]},
       {:httpotion, ">= 3.1.3", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.12", only: :test},
@@ -94,6 +94,16 @@ defmodule CouchDBTest.Mixfile do
       {:ibrowse, path: path("ibrowse"), override: true},
       {:credo, "~> 1.6.4", only: [:dev, :test, :integration], runtime: false}
     ]
+
+    # Some deps may be missing during source check
+    # Besides we don't want to spend time checking them anyway
+    List.foldl([:b64url, :jiffy, :jwtf, :ibrowse], deps_list, fn dep, acc ->
+      if File.dir?(acc[dep][:path]) do
+        acc
+      else
+        List.keydelete(acc, dep, 0)
+      end
+    end)
   end
 
   defp path(app) do
