@@ -471,18 +471,22 @@ Database authorization rules assign a user into one of two classes:
 Note that a database admin is not the same as a server admin -- the actions
 of a database admin are restricted to a specific database.
 
-When a database is first created, there are no members or admins.  HTTP
-requests that have no authentication credentials or have credentials for a
-normal user are treated as members, and those with server admin credentials
-are treated as database admins.  To change the default permissions, you must
-create a :ref:`_security <api/db/security>` document in the database::
+All databases are created as admin-only by default. That is, only database
+admins may read or write. The default behavior can be configured with the
+``[couchdb] default_security`` :ref:`option <config/couchdb>`. If you set that
+option to ``everyone``, HTTP requests that have no authentication credentials
+or have credentials for a normal user are treated as members, and those with
+server admin credentials are treated as database admins.
+
+You can also modify the permissions after the database is created by modifying the
+:ref:`security <api/db/security>` document in the database::
 
     > curl -X PUT http://localhost:5984/mydatabase/_security \
          -u anna:secret \
          -H "Content-Type: application/json" \
          -d '{"admins": { "names": [], "roles": [] }, "members": { "names": ["jan"], "roles": [] } }'
 
-The HTTP request to create the `_security` document must contain the
+The HTTP request to create or update the `_security` document must contain the
 credentials of a server admin.  CouchDB will respond with:
 
 .. code-block:: javascript
