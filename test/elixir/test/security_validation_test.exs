@@ -306,7 +306,7 @@ defmodule SecurityValidationTest do
     foo2 = Map.put(foo2, "value", "b")
     assert Couch.put("/#{db_name_b}/foo2", body: foo2, headers: spike).body["ok"]
 
-    result = replicate(db_name_b, db_name_a, headers: spike)
+    result = replicate(db_name_b, db_name_a, [{:userinfo, "spike:dog"}, {:headers, spike}])
     assert Enum.at(result["history"], 0)["docs_written"] == 1
     assert Enum.at(result["history"], 0)["doc_write_failures"] == 2
 

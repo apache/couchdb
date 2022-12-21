@@ -305,8 +305,8 @@ defmodule Couch.DBTest do
         userinfo
       end
 
-    src = set_user(src, userinfo)
-    tgt = set_user(tgt, userinfo)
+    src = set_user(get_absolute_url(src), userinfo)
+    tgt = set_user(get_absolute_url(tgt), userinfo)
 
     defaults = [headers: [], body: %{}, timeout: 30_000]
     options = defaults |> Keyword.merge(options) |> Enum.into(%{})
@@ -318,6 +318,18 @@ defmodule Couch.DBTest do
     resp = Couch.post("/_replicate", Enum.to_list(options))
     assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
     resp.body
+  end
+
+  defp get_absolute_url("http://" <> _ = uri) do
+    uri
+  end
+
+  defp get_absolute_url("/" <> _ = uri) do
+    Couch.process_url(uri)
+  end
+
+  defp get_absolute_url(uri) do
+    Couch.process_url("/" <> uri)
   end
 
   defp set_user(uri, userinfo) do
