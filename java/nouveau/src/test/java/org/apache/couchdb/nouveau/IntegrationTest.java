@@ -24,6 +24,7 @@ import javax.ws.rs.core.Response;
 
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import static org.apache.couchdb.nouveau.api.LuceneVersion.*;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 
@@ -56,7 +57,7 @@ public class IntegrationTest {
     public void indexTest() {
         final String url = "http://localhost:" + APP.getLocalPort();
         final String indexName = "foo";
-        final IndexDefinition indexDefinition = new IndexDefinition("standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition(LUCENE_9, "standard", null);
 
         // Clean up.
         Response response =
