@@ -160,6 +160,9 @@ Features and Enhancements
   can be found `here
   <https://github.com/apache/couchdb-fauxton/releases/tag/v1.2.9>`_
 
+* :ghissue:`4317`: Write "Relax" welcome message to standard out on
+  Windows.
+
 Performance
 -----------
 
@@ -314,6 +317,14 @@ Bugfixes
 
 * :ghissue:`4272`: Kill all ``couch_server_N`` if ``database_dir`` changes.
 
+* :ghissue:`4313`: Use ``chttpd`` config section when patching local
+  ``_replicate`` endpoints.
+
+* :ghissue:`4321`: Downgrade jiffy to allow building on Windows again.
+
+* :ghissue:`4329`, :ghissue:`4323`: Ignore build windows binaries in
+  git.
+
 Tests
 -----
 
@@ -368,6 +379,12 @@ Tests
 
 * :ghissue:`4268`: Improve flaky ``_dbs_info`` test.
 
+* :ghissue:`4319`: Fix offline ``configure`` and ``make release``.
+
+* :ghissue:`4328`: Fix ``eaddrnotavail`` in Elixir tests under Windows.
+
+* :ghissue:`4330`: Do not run source checks in main CI build.
+
 Docs
 ----
 
@@ -383,6 +400,12 @@ Builds
 
 * :ghissue:`4097`: Stop publication of nightly packages. They were not used
   anywhere.
+
+* :ghissue:`4322`: Reuse installed rebar and rebar3
+  for mix. Compatible with Elixir =< 13 only. Elixir 14 is not
+  supported yet.
+
+* :ghissue:`4326`: Move Elixir source checks to a separate build step.
 
 Other
 -----
