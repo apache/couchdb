@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.api;
 import java.util.Map;
 
 import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -23,6 +24,9 @@ import io.dropwizard.jackson.JsonSnakeCase;
 
 @JsonSnakeCase
 public class IndexDefinition {
+
+    @NotNull
+    private LuceneVersion luceneVersion;
 
     @NotEmpty
     private String defaultAnalyzer;
@@ -34,9 +38,15 @@ public class IndexDefinition {
         // Jackson deserialization
     }
 
-    public IndexDefinition(final String defaultAnalyzer, final Map<String, String> fieldAnalyzers) {
+    public IndexDefinition(final LuceneVersion luceneVersion, final String defaultAnalyzer, final Map<String, String> fieldAnalyzers) {
+        this.luceneVersion = luceneVersion;
         this.defaultAnalyzer = defaultAnalyzer;
         this.fieldAnalyzers = fieldAnalyzers;
+    }
+
+    @JsonProperty
+    public LuceneVersion getLuceneVersion() {
+        return luceneVersion;
     }
 
     @JsonProperty
@@ -63,8 +73,8 @@ public class IndexDefinition {
 
     @Override
     public String toString() {
-        return "IndexDefinition [defaultAnalyzer=" + defaultAnalyzer + ", fieldAnalyzers=" + fieldAnalyzers
-                + "]";
+        return "IndexDefinition [luceneVersion=" + luceneVersion + ", defaultAnalyzer=" + defaultAnalyzer +
+            ", fieldAnalyzers=" + fieldAnalyzers + "]";
     }
 
 }

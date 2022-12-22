@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.health;
 import java.io.IOException;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import static org.apache.couchdb.nouveau.api.LuceneVersion.*;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.IndexManager.Index;
 import com.codahale.metrics.health.HealthCheck;
@@ -40,7 +41,7 @@ public class IndexManagerHealthCheck extends HealthCheck {
             // Ignored, index might not exist yet.
         }
 
-        indexManager.create(name, new IndexDefinition("standard", null));
+        indexManager.create(name, new IndexDefinition(LUCENE_9, "standard", null));
         final Index index = indexManager.acquire(name);
         try {
             final IndexWriter writer = index.getWriter();
