@@ -32,7 +32,7 @@
 analyze(Text, Analyzer) when
     is_binary(Text), is_binary(Analyzer)
 ->
-    ReqBody = {[{<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
+    ReqBody = {[{<<"lucene_version">>, <<"LUCENE_9">>}, {<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
     Resp = send_if_enabled(
         nouveau_util:nouveau_url() ++ "/analyze", [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
     ),
