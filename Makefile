@@ -524,4 +524,4 @@ nouveau-clean:
 
 .PHONY: nouveau-start
 nouveau-start: nouveau
-	@cd java/nouveau && java -jar target/nouveau-*.jar server nouveau.yaml
+	@cd java/nouveau && mvn exec:exec -Dexec.executable="java"
