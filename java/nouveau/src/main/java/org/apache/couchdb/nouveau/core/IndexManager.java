@@ -58,6 +58,9 @@ import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.Scheduler;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.caffeine.MetricsStatsCounter;
+
 import io.dropwizard.lifecycle.Managed;
 
 public class IndexManager implements Managed {
@@ -241,6 +244,8 @@ public class IndexManager implements Managed {
 
     private SearcherFactory searcherFactory;
 
+    private MetricRegistry metricRegistry;
+
     private LoadingCache<String, Index> cache;
 
     public Index acquire(final String name) throws IOException {
@@ -351,9 +356,14 @@ public class IndexManager implements Managed {
         this.searcherFactory = searcherFactory;
     }
 
+    public void setMetricRegistry(final MetricRegistry metricRegistry) {
+        this.metricRegistry = metricRegistry;
+    }
+
     @Override
     public void start() throws IOException {
         cache = Caffeine.newBuilder()
+            .recordStats(() -> new MetricsStatsCounter(metricRegistry, "IndexManager"))
             .initialCapacity(maxIndexesOpen)
             .maximumSize(maxIndexesOpen)
             .expireAfterAccess(Duration.ofSeconds(idleSeconds))

@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.codahale.metrics.MetricRegistry;
+
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
@@ -37,6 +39,7 @@ public class IndexManagerTest {
     @BeforeEach
     public void setup() throws Exception {
         manager = new IndexManager();
+        manager.setMetricRegistry(new MetricRegistry());
         manager.setAnalyzerFactory(new AnalyzerFactory());
         manager.setCommitIntervalSeconds(5);
         manager.setObjectMapper(new ObjectMapper());
