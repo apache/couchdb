@@ -31,6 +31,9 @@ import org.apache.couchdb.nouveau.resources.SearchResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.afterburner.AfterburnerModule;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
+
 import io.dropwizard.Application;
 import io.dropwizard.setup.Environment;
 
@@ -47,6 +50,9 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
     @Override
     public void run(NouveauApplicationConfiguration configuration, Environment environment) throws Exception {
+        final MetricRegistry metricsRegistry = new MetricRegistry();
+        environment.jersey().register(new InstrumentedResourceMethodApplicationListener(metricsRegistry));
+
         final DocumentFactory documentFactory = new DocumentFactory();
         final AnalyzerFactory analyzerFactory = new AnalyzerFactory();
 
@@ -61,6 +67,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         objectMapper.registerModule(new LuceneModule());
 
         final IndexManager indexManager = new IndexManager();
+        indexManager.setMetricRegistry(metricsRegistry);
         indexManager.setRootDir(configuration.getRootDir());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
