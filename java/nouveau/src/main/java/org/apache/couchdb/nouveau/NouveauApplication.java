@@ -56,7 +56,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         final AnalyzerFactory analyzerFactory = new AnalyzerFactory();
 
         final ExecutorService searchExecutor =
-            environment.lifecycle().executorService("searches").build();
+            environment.lifecycle().executorService("nouveau-search-%d").build();
 
         final ParallelSearcherFactory searcherFactory = new ParallelSearcherFactory();
         searcherFactory.setExecutor(searchExecutor);
