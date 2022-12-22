@@ -134,6 +134,8 @@ handle_db_event(_DbName, _Event, State) ->
 
 handle_config_change("nouveau", "url", URL, _Persist, State) ->
     set_max_sessions(URL),
+    {ok, State};
+handle_config_change(_Section, _Key, _Value, _Persist, State) ->
     {ok, State}.
 
 handle_config_terminate(_Server, stop, _State) ->
