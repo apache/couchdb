@@ -29,7 +29,6 @@ import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.resources.SearchResource;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.module.afterburner.AfterburnerModule;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
@@ -63,7 +62,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         searcherFactory.setExecutor(searchExecutor);
 
         final ObjectMapper objectMapper = environment.getObjectMapper();
-        objectMapper.registerModule(new AfterburnerModule());
         objectMapper.registerModule(new LuceneModule());
 
         final IndexManager indexManager = new IndexManager();
