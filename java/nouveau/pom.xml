@@ -118,6 +118,20 @@
       <artifactId>jackson-module-afterburner</artifactId>
     </dependency>
 
+    <!-- Dropwizard metrics -->
+    <dependency>
+        <groupId>io.dropwizard.metrics</groupId>
+        <artifactId>metrics-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-caffeine</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.dropwizard.metrics</groupId>
+      <artifactId>metrics-jersey2</artifactId>
+    </dependency>
+
     <!-- Test -->
     <dependency>
       <groupId>io.dropwizard</groupId>
