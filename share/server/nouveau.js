@@ -62,6 +62,7 @@ var Nouveau = (function() {
           if (options.facet) {
             index_results.push({'@type': 'double_dv', 'name': name, 'value': value});
           }
+          break;
         default:
           throw({name: 'TypeError', message: 'value must be a string, a number or boolean not ' + typeof value});
         }
