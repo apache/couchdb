@@ -520,7 +520,7 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
                             (Seq - CurrentSeq) < Threshold;
                         % Nouveau has three elements
                         {_, Index, nouveau} ->
-                            nouveau_index_updated:outdated(Index);
+                            nouveau_index_updater:outdated(Index);
                         % Search name has three elements.
                         {_, _, _} ->
                             {ok, _IndexPid, CurrentSeq} = dreyfus_index:await(Pid, 0),
