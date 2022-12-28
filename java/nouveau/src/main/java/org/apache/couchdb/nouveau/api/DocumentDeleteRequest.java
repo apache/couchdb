@@ -25,7 +25,6 @@ public class DocumentDeleteRequest {
     @Min(1)
     private long seq;
 
-    @SuppressWarnings("unused")
     public DocumentDeleteRequest() {
         // Jackson deserialization
     }

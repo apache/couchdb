@@ -33,7 +33,6 @@ public class IndexDefinition {
 
     private Map<@NotEmpty String, @NotEmpty String> fieldAnalyzers;
 
-    @SuppressWarnings("unused")
     public IndexDefinition() {
         // Jackson deserialization
     }

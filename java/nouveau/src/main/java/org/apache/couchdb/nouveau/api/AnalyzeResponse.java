@@ -28,7 +28,6 @@ public class AnalyzeResponse {
     @NotNull
     private List<@NotEmpty String> tokens;
 
-    @SuppressWarnings("unused")
     public AnalyzeResponse() {
         // Jackson deserialization
     }

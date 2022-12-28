@@ -52,7 +52,6 @@ public class SearchRequest {
     @Max(100)
     private int topN = 10;
 
-    @SuppressWarnings("unused")
     public SearchRequest() {
         // Jackson deserialization
     }
