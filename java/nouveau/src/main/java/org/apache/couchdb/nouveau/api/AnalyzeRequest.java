@@ -32,7 +32,6 @@ public class AnalyzeRequest {
     @NotEmpty
     private String text;
 
-    @SuppressWarnings("unused")
     public AnalyzeRequest() {
         // Jackson deserialization
     }

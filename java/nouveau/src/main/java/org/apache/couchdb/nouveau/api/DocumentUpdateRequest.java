@@ -36,7 +36,6 @@ public class DocumentUpdateRequest {
     @NotEmpty
     private Collection<@NotNull IndexableField> fields;
 
-    @SuppressWarnings("unused")
     public DocumentUpdateRequest() {
         // Jackson deserialization
     }
