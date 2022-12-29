@@ -13,16 +13,17 @@
 
 package org.apache.couchdb.nouveau.health;
 
+import static org.apache.couchdb.nouveau.api.LuceneVersion.LUCENE_9;
+
 import java.io.IOException;
+import java.util.Collections;
 
+import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import static org.apache.couchdb.nouveau.api.LuceneVersion.*;
+import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexManager;
-import org.apache.couchdb.nouveau.core.IndexManager.Index;
-import com.codahale.metrics.health.HealthCheck;
 
-import org.apache.lucene.document.Document;
-import org.apache.lucene.index.IndexWriter;
+import com.codahale.metrics.health.HealthCheck;
 
 public class IndexManagerHealthCheck extends HealthCheck {
 
@@ -43,18 +44,12 @@ public class IndexManagerHealthCheck extends HealthCheck {
 
         indexManager.create(name, new IndexDefinition(LUCENE_9, "standard", null));
         final Index index = indexManager.acquire(name);
-        try {
-            final IndexWriter writer = index.getWriter();
-            try {
-                writer.addDocument(new Document());
-                writer.commit();
-                return Result.healthy();
-            } finally {
-                indexManager.deleteAll(name);
-            }
-        } finally {
-            indexManager.release(index);
-        }
+        final DocumentUpdateRequest request = new DocumentUpdateRequest(1, null, Collections.emptyList());
+        index.update("foo", request);
+        index.commit();
+        index.setDeleteOnClose(true);
+        indexManager.invalidate(name);
+        return Result.healthy();
     }
 
 }
