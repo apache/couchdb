@@ -50,7 +50,7 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '23.3.4.15'
+    LOW_ERLANG_VER = '23.3.4.18'
   }
 
   options {
@@ -242,7 +242,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '23.3.4.15', '24.3.4.2', '25.0.2'
+            values '23.3.4.18', '24.3.4.7', '25.2'
           }
           axis {
             name 'SM_VSN'
