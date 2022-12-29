@@ -13,8 +13,10 @@
 
 package org.apache.couchdb.nouveau;
 
+import static org.apache.couchdb.nouveau.api.LuceneVersion.LUCENE_9;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -24,10 +26,8 @@ import javax.ws.rs.core.Response;
 
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import static org.apache.couchdb.nouveau.api.LuceneVersion.*;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
-
 import org.apache.lucene.document.DoubleDocValuesField;
 import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.SortedSetDocValuesField;
@@ -54,7 +54,7 @@ public class IntegrationTest {
     );
 
     @Test
-    public void indexTest() {
+    public void indexTest() throws Exception{
         final String url = "http://localhost:" + APP.getLocalPort();
         final String indexName = "foo";
         final IndexDefinition indexDefinition = new IndexDefinition(LUCENE_9, "standard", null);
@@ -112,7 +112,7 @@ public class IntegrationTest {
     }
 
     @Test
-    public void healthCheckShouldSucceed() {
+    public void healthCheckShouldSucceed() throws IOException {
         final Response healthCheckResponse =
                 APP.client().target("http://localhost:" + APP.getAdminPort() + "/healthcheck")
                 .request()

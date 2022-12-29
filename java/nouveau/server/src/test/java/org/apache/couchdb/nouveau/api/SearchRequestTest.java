@@ -7,11 +7,11 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.couchdb.nouveau.core.ser.LuceneModule;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import org.apache.lucene.facet.range.DoubleRange;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class SearchRequestTest {
 

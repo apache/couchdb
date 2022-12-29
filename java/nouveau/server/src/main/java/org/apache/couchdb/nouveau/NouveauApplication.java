@@ -15,11 +15,9 @@ package org.apache.couchdb.nouveau;
 
 import java.util.concurrent.ExecutorService;
 
-import org.apache.couchdb.nouveau.core.AnalyzerFactory;
-import org.apache.couchdb.nouveau.core.DocumentFactory;
-import org.apache.couchdb.nouveau.core.FileAlreadyExistsExceptionMapper;
-import org.apache.couchdb.nouveau.core.FileNotFoundExceptionMapper;
 import org.apache.couchdb.nouveau.core.IndexManager;
+import org.apache.couchdb.nouveau.core.AnalyzerFactory;
+import org.apache.couchdb.nouveau.core.LuceneIndexFactory;
 import org.apache.couchdb.nouveau.core.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
 import org.apache.couchdb.nouveau.core.ser.LuceneModule;
@@ -28,10 +26,10 @@ import org.apache.couchdb.nouveau.health.IndexManagerHealthCheck;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.resources.SearchResource;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.jersey2.InstrumentedResourceMethodApplicationListener;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.Application;
 import io.dropwizard.setup.Environment;
@@ -52,7 +50,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         final MetricRegistry metricsRegistry = new MetricRegistry();
         environment.jersey().register(new InstrumentedResourceMethodApplicationListener(metricsRegistry));
 
-        final DocumentFactory documentFactory = new DocumentFactory();
         final AnalyzerFactory analyzerFactory = new AnalyzerFactory();
 
         final ExecutorService searchExecutor =
@@ -60,6 +57,10 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
         final ParallelSearcherFactory searcherFactory = new ParallelSearcherFactory();
         searcherFactory.setExecutor(searchExecutor);
+
+        final LuceneIndexFactory indexFactory = new LuceneIndexFactory();
+        indexFactory.setAnalyzerFactory(analyzerFactory);
+        indexFactory.setSearcherFactory(searcherFactory);
 
         final ObjectMapper objectMapper = environment.getObjectMapper();
         objectMapper.registerModule(new LuceneModule());
@@ -70,18 +71,16 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
-        indexManager.setAnalyzerFactory(analyzerFactory);
         indexManager.setObjectMapper(objectMapper);
-        indexManager.setSearcherFactory(searcherFactory);
+        indexManager.setAnalyzerFactory(analyzerFactory);
+        indexManager.setIndexFactory(indexFactory);
         environment.lifecycle().manage(indexManager);
 
-        environment.jersey().register(new FileNotFoundExceptionMapper());
-        environment.jersey().register(new FileAlreadyExistsExceptionMapper());
         environment.jersey().register(new UpdatesOutOfOrderExceptionMapper());
 
         final AnalyzeResource analyzeResource = new AnalyzeResource(analyzerFactory);
         environment.jersey().register(analyzeResource);
-        environment.jersey().register(new IndexResource(indexManager, documentFactory));
+        environment.jersey().register(new IndexResource(indexManager));
         environment.jersey().register(new SearchResource(indexManager));
 
         // health checks

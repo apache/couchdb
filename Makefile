@@ -532,7 +532,7 @@ derived:
 
 .PHONY: nouveau
 nouveau:
-	@cd java/nouveau/server && mvn
+	@cd java/nouveau/server && mvn test
 
 .PHONY: nouveau-clean
 nouveau-clean:
