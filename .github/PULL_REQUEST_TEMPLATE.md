@@ -19,12 +19,12 @@
 ## Testing recommendations
 
 <!-- Describe how we can test your changes.
-     Does it provides any behaviour that the end users
+     Does it provide any behaviour that the end users
      could notice? -->
 
 ## Related Issues or Pull Requests
 
-<!-- If your changes affects multiple components in different
+<!-- If your changes affect multiple components in different
      repositories please put links to those issues or pull requests here.  -->
 
 ## Checklist
@@ -33,3 +33,4 @@
 - [ ] Changes are covered by tests
 - [ ] Any new configurable parameters are documented in `rel/overlay/etc/default.ini`
 - [ ] Documentation changes were made in the `src/docs` folder
+- [ ] Documentation changes were backported (separated PR) to affected branches
