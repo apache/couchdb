@@ -8,8 +8,13 @@ server:
   applicationConnectors:
     - type: h2c
       port: 8080
+      bindHost: 127.0.0.1
       maxConcurrentStreams: 1024
       initialStreamRecvWindow: 65535
+  adminConnectors:
+    - type: h2c
+      port: 8081
+      bindHost: 127.0.0.1
   gzip:
     includedMethods:
       - GET
