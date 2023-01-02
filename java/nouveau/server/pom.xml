@@ -164,11 +164,6 @@
     </dependency>
   </dependencies>
 
-  <scm>
-    <developerConnection>scm:git:git@github.com:rnewson/nouveau.git</developerConnection>
-    <tag>HEAD</tag>
-  </scm>
-
   <build>
     <defaultGoal>package</defaultGoal>
     <plugins>
