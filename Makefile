@@ -350,6 +350,11 @@ dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
 
+.PHONY: find_bugs
+# target: xref - find unused exports etc
+find_bugs:
+	@$(REBAR) --keep-going --recursive xref $(DIALYZE_OPTS)
+
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:
