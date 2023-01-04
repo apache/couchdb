@@ -583,6 +583,13 @@ check_convert_options_fail_test() ->
         convert_options([{<<"query_params">>, 42}])
     ).
 
+rep_user_ctx_test() ->
+    RepDoc = {[{<<"user_ctx">>, {[]}}]},
+    ?assertEqual(
+        #user_ctx{name = null, roles = [], handler = undefined},
+        rep_user_ctx(RepDoc)
+    ).
+
 local_replication_endpoint_error_test_() ->
     {
         foreach,
