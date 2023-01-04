@@ -9,7 +9,7 @@
   -DisableDocs               request build process skip building documentation (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
-  -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (defaults to 1.8.5)
+  -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
 
   Installation directories:
   -Prefix PREFIX             install architecture-independent files in PREFIX
@@ -48,7 +48,7 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$CouchDBUser = [Environment]::UserName, # set the username to run as (defaults to current user)
     [ValidateNotNullOrEmpty()]
-    [string]$SpiderMonkeyVersion = "1.8.5", # select the version of SpiderMonkey to use (default 1.8.5)
+    [string]$SpiderMonkeyVersion = "91", # select the version of SpiderMonkey to use (default 91)
     [ValidateNotNullOrEmpty()]
     [string]$Prefix = "C:\Program Files\Apache\CouchDB", # install architecture-independent file location (default C:\Program Files\Apache\CouchDB)
     [ValidateNotNullOrEmpty()]
