@@ -490,7 +490,7 @@ get_json_value(Key, Obj) ->
     couch_replicator_utils:get_json_value(Key, Obj).
 
 get_json_value(Key, Obj, Default) ->
-    couch_replicator_util:get_json_value(Key, Obj, Default).
+    couch_replicator_utils:get_json_value(Key, Obj, Default).
 
 -ifdef(TEST).
 
