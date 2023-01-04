@@ -194,6 +194,7 @@ AddConfig = [
     {lib_dirs, ["src"]},
     {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}]},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
+    {xref_checks, [undefined_function_calls, undefined_functions]},
     {plugins, [eunit_plugin]},
     {dialyzer, [
         {plt_location, local},
