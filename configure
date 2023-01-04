@@ -31,7 +31,7 @@ ERLANG_MD5="false"
 SKIP_DEPS=0
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
-SM_VSN=${SM_VSN:-"1.8.5"}
+SM_VSN=${SM_VSN:-"91"}
 ARCH="$(uname -m)"
 ERLANG_VER="$(erl -eval 'io:put_chars(erlang:system_info(otp_release)), halt().' -noshell)"
 
