@@ -20,6 +20,21 @@
     :depth: 1
     :local:
 
+.. _release/3.3.1:
+
+Version 3.3.1
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`4343`, :ghissue:`4344`, :ghissue:`4345`: Fix ``undef`` when
+  parsing replication doc body with a ``user_ctx``.
+* :ghissue:`4346`: Add ``make`` target to find ``undef`` errors.
+* :ghissue:`4347`: Remove failed ``couch_plugins`` experiment, fixes more
+  ``undef`` errors.
+* :ghissue:`4348`: Fix ``undef`` error in ``weatherreport``.
+
 .. _release/3.3.0:
 
 Version 3.3.0
