@@ -1,0 +1,2 @@
+src/ioq.erl: Warning: ioq:get_disk_queues/0 is undefined function (Xref)
+src/weatherreport_check_ioq.erl:{95,1}: Warning: weatherreport_check_ioq:check_legacy_int/1 calls undefined function ioq:get_disk_queues/0 (Xref)

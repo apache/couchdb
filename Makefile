@@ -17,6 +17,7 @@
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
+REBAR3?=$(shell echo `pwd`/bin/rebar3)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
@@ -152,6 +153,7 @@ escriptize: couch
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) find-bugs
 	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
@@ -367,10 +369,11 @@ dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
 
-.PHONY: find_bugs
-# target: find_bugs - Find unused exports etc
-find_bugs:
-	@$(REBAR) --keep-going --recursive xref $(DIALYZE_OPTS)
+.PHONY: find-bugs
+# target: xref - find unused exports etc
+find-bugs:
+	@./build-aux/xref-helper.sh $(REBAR) $(DIALYZE_OPTS)
+
 
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
