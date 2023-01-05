@@ -50,7 +50,7 @@ meta = [
   'jammy': [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
-    image: "apache/couchdbci-ubuntu:jammy-erlang-default"
+    image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
   'buster': [
