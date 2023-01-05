@@ -85,7 +85,14 @@ check(Opts) ->
     end.
 
 -spec check_legacy(list()) -> [{atom(), term()}].
-check_legacy(_Opts) ->
+check_legacy(Opts) ->
+    case erlang:function_exported(ioq, get_disk_queues, 0) of
+        true -> check_legacy_int(Opts);
+        false -> [{warning, {ioq_requests_unknown, undef}}]
+    end.
+
+-spec check_legacy_int(list()) -> [{atom(), term()}].
+check_legacy_int(_Opts) ->
     case ioq:get_disk_queues() of
         Queues when is_list(Queues) ->
             Total = sum_queues(Queues, 0),
