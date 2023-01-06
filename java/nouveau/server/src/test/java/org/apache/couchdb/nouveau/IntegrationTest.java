@@ -33,8 +33,6 @@ import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.facet.range.DoubleRange;
 import org.apache.lucene.search.FieldDoc;
-import org.apache.lucene.search.TotalHits;
-import org.apache.lucene.search.TotalHits.Relation;
 import org.apache.lucene.util.BytesRef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -105,7 +103,8 @@ public class IntegrationTest {
 
         assertThat(response).extracting(Response::getStatus).isEqualTo(Response.Status.OK.getStatusCode());
         final SearchResults results = response.readEntity(SearchResults.class);
-        assertThat(results.getTotalHits()).isEqualTo(new TotalHits(10, Relation.EQUAL_TO));
+        assertThat(results.getTotalHits()).isEqualTo(10);
+        assertThat(results.getTotalHitsRelation()).isEqualTo("EQUAL_TO");
         assertThat(results.getCounts().size()).isEqualTo(1);
         assertThat(results.getCounts().get("bar").get("baz")).isEqualTo(10);
         assertThat(results.getRanges().get("baz").get("0 to 100 inc")).isEqualTo(1);
