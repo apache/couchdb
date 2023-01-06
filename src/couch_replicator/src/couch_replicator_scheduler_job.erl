@@ -87,7 +87,7 @@ start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     Target = couch_replicator_api_wrap:db_uri(Tgt),
     case couch_replicator_pg:should_start(Id, node()) of
         yes ->
-            case gen_server:start_link({local, ?MODULE}, ?MODULE, Rep, []) of
+            case gen_server:start_link(?MODULE, Rep, []) of
                 {ok, Pid} ->
                     couch_replicator_pg:join(Id, Pid),
                     {ok, Pid};
