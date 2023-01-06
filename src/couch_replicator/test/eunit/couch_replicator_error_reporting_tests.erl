@@ -30,6 +30,7 @@ error_reporting_test_() ->
             ?TDEF_FE(t_fail_changes_manager),
             ?TDEF_FE(t_fail_changes_reader_proc),
             ?TDEF_FE(t_dont_start_duplicate_job),
+            ?TDEF_FE(t_can_start_multiple_jobs),
             ?TDEF_FE(t_stop_duplicate_job)
         ]
     }.
@@ -159,6 +160,30 @@ t_dont_start_duplicate_job({_Ctx, {Source, Target}}) ->
     Rep = make_rep(Source, Target),
     ExpectErr = {error, {already_started, Pid}},
     ?assertEqual(ExpectErr, couch_replicator_scheduler_job:start_link(Rep)).
+
+t_can_start_multiple_jobs({_Ctx, {Source, Target1}}) ->
+    Target2 = couch_replicator_test_helper:setup_db(),
+    populate_db(Source, 1, 5),
+
+    {ok, RepId1} = replicate(Source, Target1),
+    {ok, RepId2} = replicate(Source, Target2),
+    RepPid1 = couch_replicator_test_helper:get_pid(RepId1),
+    RepPid2 = couch_replicator_test_helper:get_pid(RepId2),
+    ?assert(is_pid(RepPid1)),
+    ?assert(is_pid(RepPid2)),
+
+    ?assert(is_process_alive(RepPid1)),
+    ?assert(is_process_alive(RepPid2)),
+
+    wait_target_in_sync(Source, Target1),
+    wait_target_in_sync(Source, Target2),
+
+    ?assert(is_process_alive(RepPid1)),
+    ?assert(is_process_alive(RepPid2)),
+
+    exit(RepPid1, kill),
+    exit(RepPid2, kill),
+    couch_replicator_test_helper:teardown_db(Target2).
 
 t_stop_duplicate_job({_Ctx, {Source, Target}}) ->
     {ok, RepId} = replicate(Source, Target),
