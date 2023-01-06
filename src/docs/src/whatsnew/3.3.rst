@@ -34,6 +34,7 @@ Features and Enhancements
 * :ghissue:`4347`: Remove failed ``couch_plugins`` experiment, fixes more
   ``undef`` errors.
 * :ghissue:`4348`: Fix ``undef`` error in ``weatherreport``.
+* :ghissue:`4353`: Allow starting of more than one replication job. (D’OH!)
 
 .. _release/3.3.0:
 
