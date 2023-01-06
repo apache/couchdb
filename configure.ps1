@@ -138,6 +138,7 @@ $CouchDBConfig = @"
 {node_name, "-name couchdb@localhost"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
+{prometheus_port, 17986}.
 "@
 $CouchDBConfig | Out-File "$rootdir\rel\couchdb.config" -encoding ascii
 
