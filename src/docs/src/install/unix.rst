@@ -142,7 +142,7 @@ Dependencies
 
 You should have the following installed:
 
-* `Erlang OTP (20.x >= 20.3.8.11, 21.x >= 21.2.3, 22.x >= 22.0.5, 23.x, 24.x) <http://erlang.org/>`_
+* `Erlang OTP (23.x, 24.x, 25.x) <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
 * `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91) <https://spidermonkey.dev/>`_
