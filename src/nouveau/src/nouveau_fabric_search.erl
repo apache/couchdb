@@ -105,7 +105,10 @@ handle_message(Else, _Shard, _State) ->
 merge_search_results(A, B, #state{} = State) ->
     #{
         <<"total_hits">> => merge_total_hits(
-            maps:get(<<"total_hits">>, A, #{}), maps:get(<<"total_hits">>, B, #{})
+            maps:get(<<"total_hits">>, A, 0), maps:get(<<"total_hits">>, B, 0)
+        ),
+        <<"total_hits_relation">> => merge_total_hits_relation(
+            maps:get(<<"total_hits_relation">>, A, null), maps:get(<<"total_hits_relation">>, B, null)
         ),
         <<"hits">> => merge_hits(
             maps:get(<<"hits">>, A, []),
@@ -122,21 +125,12 @@ merge_search_results(A, B, #state{} = State) ->
     }.
 
 merge_total_hits(TotalHitsA, TotalHitsB) ->
-    ValueA = maps:get(<<"value">>, TotalHitsA, 0),
-    ValueB = maps:get(<<"value">>, TotalHitsB, 0),
-    RelationA = maps:get(<<"relation">>, TotalHitsA, <<"EQUAL_TO">>),
-    RelationB = maps:get(<<"relation">>, TotalHitsB, <<"EQUAL_TO">>),
-    MergedValue = ValueA + ValueB,
-    MergedRelation =
-        if
-            RelationA == <<"GREATER_THAN_OR_EQUAL_TO">> ->
-                <<"GREATER_THAN_OR_EQUAL_TO">>;
-            RelationB == <<"GREATER_THAN_OR_EQUAL_TO">> ->
-                <<"GREATER_THAN_OR_EQUAL_TO">>;
-            true ->
-                <<"EQUAL_TO">>
-        end,
-    #{<<"value">> => MergedValue, <<"relation">> => MergedRelation}.
+    TotalHitsA + TotalHitsB.
+
+merge_total_hits_relation(A, B) when A == <<"GREATER_THAN_OR_EQUAL_TO">>; B == <<"GREATER_THAN_OR_EQUAL_TO">> ->
+    <<"GREATER_THAN_OR_EQUAL_TO">>;
+merge_total_hits_relation(A, B) when A == <<"EQUAL_TO">>; B == <<"EQUAL_TO">> ->
+    <<"EQUAL_TO">>.
 
 merge_hits(HitsA, HitsB, Sort, Limit) ->
     MergedHits = lists:merge(merge_fun(Sort), HitsA, HitsB),
