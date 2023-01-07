@@ -15,6 +15,7 @@ from sphinx.roles import XRefRole
 from sphinx.domains import Domain, ObjType, Index
 from sphinx.directives import ObjectDescription
 from sphinx.util.nodes import make_refnode
+import html
 
 
 class ConfigObject(ObjectDescription):
@@ -62,7 +63,7 @@ class ConfigIndex(Index):
 
     def generate(self, docnames=None):
         content = dict(
-            (name, [(name, 1, info[0], name, "", "", info[1])])
+            (html.escape(name), [(name, 1, info[0], name, "", "", info[1])])
             for name, info in self.domain.data["section"].items()
         )
 
@@ -70,7 +71,7 @@ class ConfigIndex(Index):
         for idx, info in sorted(options.items()):
             path, descr = info
             section, name = idx.split("/", 1)
-            content[section].append(
+            content[html.escape(section)].append(
                 (name, 2, path, "%s/%s" % (section, name), "", "", descr)
             )
 
