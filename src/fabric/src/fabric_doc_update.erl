@@ -110,6 +110,8 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0);
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg});
+handle_message({forbidden, Msg}, _, _) ->
+    throw({forbidden, Msg});
 handle_message({request_entity_too_large, Entity}, _, _) ->
     throw({request_entity_too_large, Entity}).
 
@@ -351,7 +353,8 @@ doc_update_test_() ->
             fun extend_tree_forbid/0,
             fun other_errors_one_forbid/0,
             fun one_error_two_forbid/0,
-            fun one_success_two_forbid/0
+            fun one_success_two_forbid/0,
+            fun worker_before_doc_update_forbidden/0
         ]
     }.
 
@@ -750,6 +753,21 @@ one_success_two_forbid() ->
     ?assertEqual(
         {error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}]}, Reply
     ).
+
+worker_before_doc_update_forbidden() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Docs = [Doc1],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+    ?assertThrow({forbidden, <<"msg">>}, handle_message({forbidden, <<"msg">>}, hd(Shards), Acc)).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->
