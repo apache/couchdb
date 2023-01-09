@@ -244,7 +244,7 @@ elixir: elixir-init devclean
 .PHONY: elixir-init
 elixir-init: MIX_ENV=integration
 elixir-init: config.erl
-	@mix local.rebar --force rebar ./bin/rebar && mix local.rebar --force rebar3 ./bin/rebar3 && mix local.hex --force && mix deps.get
+	@mix local.rebar --force rebar3 ./bin/rebar3 && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: export MIX_ENV=integration
