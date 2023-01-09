@@ -24,9 +24,6 @@
 
 -export([start_link/1, init_p/2, init_p/3]).
 
-% for the stacktrace macro only so far
--include_lib("couch/include/couch_db.hrl").
-
 -include_lib("rexi/include/rexi.hrl").
 
 -record(job, {

@@ -38,7 +38,6 @@
 
 -compile({inline, [{doc_id_and_rev, 1}]}).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
