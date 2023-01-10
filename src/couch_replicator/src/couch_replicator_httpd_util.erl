@@ -158,7 +158,7 @@ docs_cb({meta, Meta}, #vacc{meta_sent = false, row_sent = false} = Acc) ->
     Parts =
         case couch_util:get_value(total, Meta) of
             undefined -> [];
-            Total -> [io_lib:format("\"total_rows\":~p", [adjust_total(Total)])]
+            Total -> [io_lib:format("\"total_rows\":~p", [Total])]
         end ++
             case couch_util:get_value(offset, Meta) of
                 undefined -> [];
@@ -193,9 +193,3 @@ row_to_json(Row) ->
     Doc0 = couch_util:get_value(doc, Row),
     Doc1 = update_db_name(Doc0),
     ?JSON_ENCODE(Doc1).
-
-%% Adjust Total as there is an automatically created validation design doc
-adjust_total(Total) when is_integer(Total), Total > 0 ->
-    Total - 1;
-adjust_total(Total) when is_integer(Total) ->
-    0.
