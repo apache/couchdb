@@ -297,17 +297,25 @@ queue_fetch_loop(#fetch_st{} = St) ->
         {changes, ChangesManager, Changes, ReportSeq} ->
             % Find missing revisions (POST to _revs_diff)
             {IdRevs, RdSt1} = find_missing(Changes, Target, Parent, RdSt),
-            {Docs, BgSt1} = bulk_get(UseBulkGet, Source, IdRevs, Parent, BgSt),
-            % Documents without attachments can be uploaded right away
+            % Filter out and handle design docs individually
+            DDocFilter = fun
+                ({<<?DESIGN_DOC_PREFIX, _/binary>>, _Rev}, _PAs) -> true;
+                ({_Id, _Rev}, _PAs) -> false
+            end,
+            DDocIdRevs = maps:filter(DDocFilter, IdRevs),
+            FetchFun = fun({Id, Rev}, PAs) ->
+                ok = gen_server:call(Parent, {fetch_doc, {Id, [Rev], PAs}}, infinity)
+            end,
+            maps:map(FetchFun, DDocIdRevs),
+            % IdRevs1 is all the docs without design docs. Bulk get those.
+            IdRevs1 = maps:without(maps:keys(DDocIdRevs), IdRevs),
+            {Docs, BgSt1} = bulk_get(UseBulkGet, Source, IdRevs1, Parent, BgSt),
             BatchFun = fun({_, #doc{} = Doc}) ->
                 ok = gen_server:call(Parent, {batch_doc, Doc}, infinity)
             end,
             lists:foreach(BatchFun, lists:sort(maps:to_list(Docs))),
-            % Fetch individually if _bulk_get failed or there are attachments
-            FetchFun = fun({Id, Rev}, PAs) ->
-                ok = gen_server:call(Parent, {fetch_doc, {Id, [Rev], PAs}}, infinity)
-            end,
-            maps:map(FetchFun, maps:without(maps:keys(Docs), IdRevs)),
+            % Invidually upload docs with attachments.
+            maps:map(FetchFun, maps:without(maps:keys(Docs), IdRevs1)),
             {ok, Stats} = gen_server:call(Parent, flush, infinity),
             ok = report_seq_done(Cp, ReportSeq, Stats),
             couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
