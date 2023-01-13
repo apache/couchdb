@@ -982,4 +982,29 @@ has_required_fields_or_nested_or_false_test() ->
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
+%% This test shows the shape match/2 expects for its arguments.
+match_demo_test_() ->
+    Doc =
+        {[
+            {<<"_id">>, <<"foo">>},
+            {<<"_rev">>, <<"bar">>},
+            {<<"user_id">>, 11}
+        ]},
+    Check = fun(Selector) ->
+        % Call match_int/2 to avoid ERROR for missing metric; this is confusing
+        % in the middle of test output.
+        match_int(mango_selector:normalize(Selector), Doc)
+    end,
+    [
+        % matching
+        ?_assertEqual(true, Check({[{<<"user_id">>, 11}]})),
+        ?_assertEqual(true, Check({[{<<"_id">>, <<"foo">>}]})),
+        ?_assertEqual(true, Check({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"bar">>}]})),
+        % non-matching
+        ?_assertEqual(false, Check({[{<<"user_id">>, 1234}]})),
+        % string 11 doesn't match number 11
+        ?_assertEqual(false, Check({[{<<"user_id">>, <<"11">>}]})),
+        ?_assertEqual(false, Check({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"quux">>}]}))
+    ].
+
 -endif.
