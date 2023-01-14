@@ -60,7 +60,7 @@ Run a basic test suite for CouchDB by browsing here:
 Getting started with developing
 -------------------------------
 
-For more detail, read the README-DEV.rst_ file in this directory.
+For more detail, read the READARTICLE-DEV.rst_ file in this directory.
 
 .. _README-DEV.rst: https://github.com/apache/couchdb/blob/master/README-DEV.rst
 
