@@ -229,6 +229,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     Arg = {add_key, bookmark, NewBookmark},
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
                     Stats0 = LastCursor#cursor.execution_stats,
+                    mango_execution_stats:log_stats(Stats0),
                     FinalUserAcc0 = mango_execution_stats:maybe_add_stats(
                         Opts, UserFun, Stats0, FinalUserAcc
                     ),
