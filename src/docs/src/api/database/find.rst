@@ -704,8 +704,8 @@ operators require the argument to be in a specific JSON format.
 |               |             |            | document. Non-array fields cannot |
 |               |             |            | match this condition.             |
 +---------------+-------------+------------+-----------------------------------+
-| Miscellaneous | ``$mod``    | [Divisor,  | Divisor and Remainder are both    |
-|               |             | Remainder] | positive or negative integers.    |
+| Miscellaneous | ``$mod``    | [Divisor,  | Divisor is a non-zero integer,    |
+|               |             | Remainder] | Remainder is any integer.         |
 |               |             |            | Non-integer values result in a    |
 |               |             |            | 404. Matches documents where      |
 |               |             |            | ``field % Divisor == Remainder``  |
