@@ -245,6 +245,7 @@ then
             ;;
         esac
 
+    # This list is taken from src/couch/rebar.config.script, please keep them in sync.
     if [ ! -d "/usr/include/${SM_HEADERS}" ] && \
         [ ! -d "/usr/local/include/${SM_HEADERS}" ] && \
         [ ! -d "/opt/homebrew/include/${SM_HEADERS}" ]
