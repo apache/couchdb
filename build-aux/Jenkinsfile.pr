@@ -183,7 +183,7 @@ pipeline {
       steps {
         sh '''
           rm -rf apache-couchdb-*
-          ./configure --skip-deps
+          ./configure --skip-deps --spidermonkey-version 78
           make erlfmt-check
           make elixir-source-checks
           make python-black
