@@ -532,12 +532,12 @@ derived:
 
 .PHONY: nouveau
 nouveau:
-	@cd java/nouveau && mvn
+	@cd java/nouveau/server && mvn
 
 .PHONY: nouveau-clean
 nouveau-clean:
-	@cd java/nouveau && mvn clean
+	@cd java/nouveau/server && mvn clean
 
 .PHONY: nouveau-start
 nouveau-start: nouveau
-	@cd java/nouveau && mvn exec:exec -Dexec.executable="java"
+	@cd java/nouveau/server && mvn exec:exec -Dexec.executable="java"
