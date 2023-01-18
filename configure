@@ -229,14 +229,12 @@ parse_opts() {
 
 parse_opts $@
 
-if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]
-then
+if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]; then
   echo "ERROR: SpiderMonkey 60 is known broken on ARM 64 (aarch64). Use another version instead."
   exit 1
 fi
 
-if [ "${ERLANG_OS}" = "unix" ]
-then
+if [ "${ERLANG_OS}" = "unix" ]; then
     case "${SM_VSN}" in
         1.8.5)
             SM_HEADERS="js"
@@ -248,8 +246,7 @@ then
     # This list is taken from src/couch/rebar.config.script, please keep them in sync.
     if [ ! -d "/usr/include/${SM_HEADERS}" ] && \
         [ ! -d "/usr/local/include/${SM_HEADERS}" ] && \
-        [ ! -d "/opt/homebrew/include/${SM_HEADERS}" ]
-    then
+        [ ! -d "/opt/homebrew/include/${SM_HEADERS}" ]; then
         echo "ERROR: SpiderMonkey ${SM_VSN} is not found. Please specify with --spidermonkey-version."
         exit 1
     fi
