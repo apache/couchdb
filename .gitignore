@@ -133,3 +133,5 @@ test/javascript/junit.xml
 
 .idea
 *.lock
+
+.tool-versions
