@@ -250,6 +250,11 @@ elixir-check-formatted: elixir-init
 elixir-credo: elixir-init
 	@mix credo
 
+.PHONY: build-report
+# target: build-report - Generate a build report
+build-report:
+	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
+
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
 check-qs:
