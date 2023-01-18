@@ -156,7 +156,7 @@ DepDescs = [
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.9-2"}},
 {mochiweb,         "mochiweb",         {tag, "v3.1.1"}},
 {meck,             "meck",             {tag, "0.9.2"}},
-{recon,            "recon",            {tag, "2.5.2"}}
+{recon,            "recon",            {tag, "2.5.3"}}
 ].
 
 WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
