@@ -17,17 +17,12 @@ import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import org.apache.lucene.facet.range.DoubleRange;
-import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.search.FieldDoc;
 
 public class LuceneModule extends SimpleModule {
 
     public LuceneModule() {
         super("lucene", Version.unknownVersion());
-
-        // IndexableField
-        addSerializer(IndexableField.class, new IndexableFieldSerializer());
-        addDeserializer(IndexableField.class, new IndexableFieldDeserializer());
 
         // DoubleRange
         addSerializer(DoubleRange.class, new DoubleRangeSerializer());
@@ -36,10 +31,6 @@ public class LuceneModule extends SimpleModule {
         // FieldDoc
         addSerializer(FieldDoc.class, new FieldDocSerializer());
         addDeserializer(FieldDoc.class, new FieldDocDeserializer());
-
-        // BytesRef - disabled until I'm sure I need it.
-        // addSerializer(BytesRef.class, new BytesRefSerializer());
-        // addDeserializer(BytesRef.class, new BytesRefDeserializer());
     }
 
 }

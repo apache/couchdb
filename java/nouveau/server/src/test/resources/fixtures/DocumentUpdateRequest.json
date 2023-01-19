@@ -16,7 +16,7 @@
     {
       "@type": "double_point",
       "name": "doublefoo",
-      "value": 12
+      "value": [12]
     }
   ]
 }

@@ -55,7 +55,7 @@ var Nouveau = (function() {
           }
           break;
         case 'number':
-          index_results.push({'@type': 'double_point', 'name': name, 'value': value});
+          index_results.push({'@type': 'double_point', 'name': name, 'value': [value]});
           if (options.store) {
             index_results.push({'@type': 'stored_double', 'name': name, 'value': value});
           }
@@ -73,34 +73,18 @@ var Nouveau = (function() {
       assertType('type', 'string', type);
 
       switch (type) {
-      case 'binary_dv':
-      case 'stored_binary':
       case 'sorted_set_dv':
       case 'sorted_dv':
         assertType('value', 'string', value);
         index_results.push({'@type': type, 'name': name, 'value': value});
         break;
       case 'double_point':
-      case 'float_dv':
-      case 'float_point':
-      case 'int_point':
-      case 'long_point':
-      case 'sorted_numeric_dv':
+        assertType('value', 'number', value);
+        index_results.push({'@type': type, 'name': name, 'value': [value]});
+        break;
       case 'double_dv':
         assertType('value', 'number', value);
         index_results.push({'@type': type, 'name': name, 'value': value});
-        break;
-      case 'latlon_dv':
-      case 'latlon_point':
-        assertType('value', 'number', arguments[3]);
-        assertType('value', 'number', arguments[4]);
-        index_results.push({'@type': type, 'name': name, 'lat': arguments[3], 'lon': arguments[4]});
-        break;
-      case 'xy_dv':
-      case 'xy_point':
-        assertType('value', 'number', arguments[3]);
-        assertType('value', 'number', arguments[4]);
-        index_results.push({'@type': type, 'name': name, 'x': arguments[3], 'y': arguments[4]});
         break;
       case 'string':
       case 'text':

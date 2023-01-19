@@ -28,9 +28,9 @@ import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
-import org.apache.lucene.document.DoubleDocValuesField;
-import org.apache.lucene.document.DoublePoint;
-import org.apache.lucene.document.SortedSetDocValuesField;
+import org.apache.couchdb.nouveau.api.document.DoubleDocValuesField;
+import org.apache.couchdb.nouveau.api.document.DoublePoint;
+import org.apache.couchdb.nouveau.api.document.SortedSetDocValuesField;
 import org.apache.lucene.facet.range.DoubleRange;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.util.BytesRef;
@@ -78,7 +78,7 @@ public class IntegrationTest {
                 List.of(
                     new DoublePoint("foo", i), 
                     new DoubleDocValuesField("baz", i),
-                    new SortedSetDocValuesField("bar", new BytesRef("baz"))));
+                    new SortedSetDocValuesField("bar", new byte[]{'b', 'a', 'z'})));
             response = 
                 APP.client().target(String.format("%s/index/%s/doc/doc%d", url, indexName, i))
                 .request()
@@ -107,7 +107,7 @@ public class IntegrationTest {
         assertThat(results.getTotalHitsRelation()).isEqualTo("EQUAL_TO");
         assertThat(results.getCounts().size()).isEqualTo(1);
         assertThat(results.getCounts().get("bar").get("baz")).isEqualTo(10);
-        assertThat(results.getRanges().get("baz").get("0 to 100 inc")).isEqualTo(1);
+        assertThat(results.getRanges().get("baz").get("0 to 100 inc")).isEqualTo(10);
     }
 
     @Test
