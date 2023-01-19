@@ -19,14 +19,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.couchdb.nouveau.api.document.DoublePoint;
+import org.apache.couchdb.nouveau.api.document.Field;
+import org.apache.couchdb.nouveau.api.document.StringField;
+import org.apache.couchdb.nouveau.api.document.TextField;
 import org.apache.couchdb.nouveau.core.ser.LuceneModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import org.apache.lucene.document.DoublePoint;
-import org.apache.lucene.document.Field.Store;
-import org.apache.lucene.document.StringField;
-import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.IndexableField;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -56,9 +55,9 @@ public class DocumentUpdateRequestTest {
     }
 
     private DocumentUpdateRequest asObject() {
-        final List<IndexableField> fields = new ArrayList<IndexableField>();
-        fields.add(new StringField("stringfoo", "bar", Store.YES));
-        fields.add(new TextField("textfoo", "hello there", Store.YES));
+        final List<Field> fields = new ArrayList<Field>();
+        fields.add(new StringField("stringfoo", "bar", true));
+        fields.add(new TextField("textfoo", "hello there", true));
         fields.add(new DoublePoint("doublefoo", 12));
         return new DocumentUpdateRequest(12, null, fields);
     }

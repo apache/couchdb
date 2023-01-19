@@ -17,11 +17,10 @@ import java.util.Collection;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
+
+import org.apache.couchdb.nouveau.api.document.Field;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import org.apache.lucene.index.IndexableField;
 
 import io.dropwizard.jackson.JsonSnakeCase;
 
@@ -34,13 +33,13 @@ public class DocumentUpdateRequest {
     private String partition;
 
     @NotEmpty
-    private Collection<@NotNull IndexableField> fields;
+    private Collection<Field> fields;
 
     public DocumentUpdateRequest() {
         // Jackson deserialization
     }
 
-    public DocumentUpdateRequest(long seq, String partition, Collection<IndexableField> fields) {
+    public DocumentUpdateRequest(long seq, String partition, Collection<Field> fields) {
         this.seq = seq;
         this.partition = partition;
         this.fields = fields;
@@ -61,7 +60,7 @@ public class DocumentUpdateRequest {
     }
 
     @JsonProperty
-    public Collection<IndexableField> getFields() {
+    public Collection<Field> getFields() {
         return fields;
     }
 

@@ -26,7 +26,6 @@ import javax.ws.rs.core.MediaType;
 
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
-import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.QueryParserException;
 
