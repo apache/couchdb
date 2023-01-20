@@ -198,6 +198,8 @@
         <configuration>
           <executable>java</executable>
           <arguments>
+            <arguments>-server</arguments>
+            <arguments>--enable-preview</arguments>
             <argument>-classpath</argument>
             <classpath/>
             <argument>org.apache.couchdb.nouveau.NouveauApplication</argument>
