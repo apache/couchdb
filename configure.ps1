@@ -103,6 +103,22 @@ If ($Test) {
     exit 0
 }
 
+# Use the MSVC linker to determine if the respective SpiderMonkey library
+# is available on the linker path.  This heuristic is taken from
+# src/couch/rebar.config.script, please keep them in sync.
+If ($SpiderMonkeyVersion -eq "1.8.5") {
+    $SpiderMonkeyLib = "mozjs185-1.0.lib"
+}
+else {
+    $SpiderMonkeyLib = "mozjs-$SpiderMonkeyVersion.lib"
+}
+
+&link $SpiderMonkeyLib /SUBSYSTEM:CONSOLE /NOENTRY /DLL /OUT:NUL *> $null
+If ($LASTEXITCODE -ne 0) {
+    Write-Output "ERROR: SpiderMonkey $SpiderMonkeyVersion is not found. Please specify with -SpiderMonkeyVersion."
+    exit 1
+}
+
 # Translate ./configure variables to CouchDB variables
 $PackageAuthorName="The Apache Software Foundation"
 $InstallDir="$LibDir\couchdb"
