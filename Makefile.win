@@ -82,9 +82,10 @@ skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse,local
 suites=
 tests=
 
-# no sed on Windows, hard code since apps\suites\tests are empty
-EUNIT_OPTS=skip_deps=$(skip_deps)
-DIALYZE_OPTS=skip_deps=$(skip_deps)
+# no sed on Windows (per default), but powershell
+COMPILE_OPTS=$(shell powershell -command "('apps=${apps} ') -replace '[a-z_]+= ', ' '")
+EUNIT_OPTS=$(shell powershell -command "('skip_deps=${skip_deps} suites=${suites} tests=${tests} ') -replace '[a-z]+= ', ' '")
+DIALYZE_OPTS=$(shell powershell -command "('apps=${apps} skip_deps=${skip_deps} ') -replace '[a-z]+= ', ' '")
 
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
@@ -133,9 +134,10 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
-	@$(MAKE) elixir
+	@$(MAKE) elixir-suite
 
 ifdef apps
 subdirs = $(apps)
@@ -146,30 +148,30 @@ endif
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell echo %cd%)
-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+eunit: export ERL_AFLAGS = $(shell echo "-config %cd%/rel/files/eunit.config")
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) setup_eunit 2> nul
-	@cmd /c "FOR %d IN ($(subdirs)) DO set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=%d"
+	@cmd /c "FOR %d IN ($(subdirs)) DO set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=%d || exit /b 1"
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests
 exunit: export BUILDDIR = $(shell echo %cd%)
 exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell echo %cd%)\src
-exunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+exunit: export ERL_AFLAGS = $(shell echo "-config %cd%/rel/files/eunit.config")
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --cover --trace $(EXUNIT_OPTS)
 
-setup-eunit: export BUILDDIR = $(shell pwd)
-setup-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+setup-eunit: export BUILDDIR = $(shell echo %cd%)
+setup-eunit: export ERL_AFLAGS = $(shell echo "-config %cd%/rel/files/eunit.config")
 setup-eunit:
 	@$(REBAR) setup_eunit 2> nul
 
-just-eunit: export BUILDDIR = $(shell pwd)
-just-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+just-eunit: export BUILDDIR = $(shell echo %cd%)
+just-eunit: export ERL_AFLAGS = $(shell echo "-config %cd%/rel/files/eunit.config")
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
@@ -361,7 +363,7 @@ install: release
 	@echo .
 	@echo     To install CouchDB into your system, copy the rel\couchdb
 	@echo     to your desired installation location. For example:
-	@echo     xcopy /E rel\couchdb C:\CouchDB\ 
+	@echo     xcopy /E rel\couchdb C:\CouchDB\
 	@echo .
 
 ################################################################################
