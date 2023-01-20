@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 
 import org.apache.couchdb.nouveau.api.After;
-import org.apache.lucene.util.BytesRef;
 
 public class AfterSerializer extends StdSerializer<After> {
 
