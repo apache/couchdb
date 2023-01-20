@@ -172,7 +172,7 @@ compare_order([_ | SortRest], [A | ARest], [B | BRest]) ->
     end.
 
 convert_item(Item) ->
-    case maps:get(<<"type">>, Item) of
+    case maps:get(<<"@type">>, Item) of
         <<"bytes">> ->
             base64:decode(maps:get(<<"value">>, Item));
         _ ->

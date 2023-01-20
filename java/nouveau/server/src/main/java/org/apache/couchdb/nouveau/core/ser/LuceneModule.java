@@ -17,7 +17,6 @@ import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 
 import org.apache.lucene.facet.range.DoubleRange;
-import org.apache.lucene.search.FieldDoc;
 
 public class LuceneModule extends SimpleModule {
 
@@ -27,10 +26,6 @@ public class LuceneModule extends SimpleModule {
         // DoubleRange
         addSerializer(DoubleRange.class, new DoubleRangeSerializer());
         addDeserializer(DoubleRange.class, new DoubleRangeDeserializer());
-
-        // FieldDoc
-        addSerializer(FieldDoc.class, new FieldDocSerializer());
-        addDeserializer(FieldDoc.class, new FieldDocDeserializer());
     }
 
 }

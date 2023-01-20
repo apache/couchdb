@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.document.DoublePoint;
 import org.apache.couchdb.nouveau.api.document.StoredDoubleField;
 import org.apache.couchdb.nouveau.api.document.StoredStringField;
@@ -105,23 +106,23 @@ public class LuceneModuleTest {
     }
 
     @Test
-    public void testSerializeFieldDoc() throws Exception {
-        final FieldDoc fieldDoc = new FieldDoc(1, 2.0f, new Object[] {
+    public void testSerializeAfter() throws Exception {
+        final After after = new After(
                 Float.valueOf(1),
                 Double.valueOf(2),
                 Integer.valueOf(3),
                 Long.valueOf(4),
                 "foo",
-                new BytesRef("bar") });
+                new byte[]{'b', 'a', 'r'});
 
-        final String expected = "[{\"type\":\"float\",\"value\":1.0},{\"type\":\"double\",\"value\":2.0},{\"type\":\"int\",\"value\":3},{\"type\":\"long\",\"value\":4},{\"type\":\"string\",\"value\":\"foo\"},{\"type\":\"bytes\",\"value\":\"YmFy\"}]";
-        final String actual = mapper.writeValueAsString(fieldDoc);
+        final String expected = "[{\"@type\":\"float\",\"value\":1.0},{\"@type\":\"double\",\"value\":2.0},{\"@type\":\"int\",\"value\":3},{\"@type\":\"long\",\"value\":4},{\"@type\":\"string\",\"value\":\"foo\"},{\"@type\":\"bytes\",\"value\":\"YmFy\"}]";
+        final String actual = mapper.writeValueAsString(after);
         assertEquals(expected, actual);
 
-        final FieldDoc fieldDoc2 = mapper.readValue(expected, FieldDoc.class);
+        final After after2 = mapper.readValue(expected, After.class);
 
-        for (int i = 0; i < fieldDoc.fields.length; i++) {
-            assertThat(fieldDoc.fields[i].getClass()).isEqualTo(fieldDoc2.fields[i].getClass());
+        for (int i = 0; i < after.getFields().length; i++) {
+            assertThat(after.getFields()[i].getClass()).isEqualTo(after2.getFields()[i].getClass());
         }
     }
 

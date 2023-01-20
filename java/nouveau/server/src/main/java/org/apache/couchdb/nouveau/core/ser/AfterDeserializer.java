@@ -22,32 +22,31 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 
-import org.apache.lucene.search.FieldDoc;
-import org.apache.lucene.util.BytesRef;
+import org.apache.couchdb.nouveau.api.After;
 
-public class FieldDocDeserializer extends StdDeserializer<FieldDoc> {
+public class AfterDeserializer extends StdDeserializer<After> {
 
-    public FieldDocDeserializer() {
+    public AfterDeserializer() {
         this(null);
     }
 
-    public FieldDocDeserializer(Class<?> vc) {
+    public AfterDeserializer(Class<?> vc) {
         super(vc);
     }
 
     @Override
-    public FieldDoc deserialize(final JsonParser parser, final DeserializationContext context)
+    public After deserialize(final JsonParser parser, final DeserializationContext context)
             throws IOException, JsonProcessingException {
         ArrayNode fieldNode = (ArrayNode) parser.getCodec().readTree(parser);
         final Object[] fields = new Object[fieldNode.size()];
         for (int i = 0; i < fields.length; i++) {
             final JsonNode field = fieldNode.get(i);
-            switch (field.get("type").asText()) {
+            switch (field.get("@type").asText()) {
                 case "string":
                     fields[i] = field.get("value").asText();
                     break;
                 case "bytes":
-                    fields[i] = new BytesRef(field.get("value").binaryValue());
+                    fields[i] = field.get("value").binaryValue();
                     break;
                 case "float":
                     fields[i] = field.get("value").floatValue();
@@ -65,8 +64,7 @@ public class FieldDocDeserializer extends StdDeserializer<FieldDoc> {
                     throw new IOException("Unsupported field value: " + field);
             }
         }
-        // TODO .doc should be Long.MAX_VALUE if we invert the sort
-        return new FieldDoc(0, Float.NaN, fields);
+        return new After(fields);
     }
 
 }

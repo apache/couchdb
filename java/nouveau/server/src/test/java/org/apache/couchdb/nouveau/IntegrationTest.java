@@ -24,6 +24,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
@@ -32,8 +33,6 @@ import org.apache.couchdb.nouveau.api.document.DoubleDocValuesField;
 import org.apache.couchdb.nouveau.api.document.DoublePoint;
 import org.apache.couchdb.nouveau.api.document.SortedSetDocValuesField;
 import org.apache.lucene.facet.range.DoubleRange;
-import org.apache.lucene.search.FieldDoc;
-import org.apache.lucene.util.BytesRef;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -76,10 +75,10 @@ public class IntegrationTest {
         for (int i = 0; i < 10; i++) {
             final DocumentUpdateRequest docUpdate = new DocumentUpdateRequest(i + 1, null,
                 List.of(
-                    new DoublePoint("foo", i), 
+                    new DoublePoint("foo", i),
                     new DoubleDocValuesField("baz", i),
                     new SortedSetDocValuesField("bar", new byte[]{'b', 'a', 'z'})));
-            response = 
+            response =
                 APP.client().target(String.format("%s/index/%s/doc/doc%d", url, indexName, i))
                 .request()
                 .put(Entity.entity(docUpdate, MediaType.APPLICATION_JSON_TYPE));
@@ -94,7 +93,7 @@ public class IntegrationTest {
         searchRequest.setCounts(List.of("bar"));
         searchRequest.setRanges(Map.of("baz", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))));
         searchRequest.setTopN(2);
-        searchRequest.setAfter(new FieldDoc(0, Float.NaN, new Object[]{1.0f, new BytesRef("a")}));
+        searchRequest.setAfter(new After(1.0f, new byte[]{'a'}));
 
         response =
                 APP.client().target(String.format("%s/index/%s/search", url, indexName))
