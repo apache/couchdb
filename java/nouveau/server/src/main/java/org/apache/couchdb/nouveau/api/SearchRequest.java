@@ -46,7 +46,7 @@ public class SearchRequest {
 
     private Map<@NotEmpty String, List<@NotNull DoubleRange>> ranges;
 
-    private FieldDoc after;
+    private After after;
 
     @Min(1)
     @Max(100)
@@ -131,12 +131,12 @@ public class SearchRequest {
         return topN;
     }
 
-    public void setAfter(final FieldDoc after) {
+    public void setAfter(final After after) {
         this.after = after;
     }
 
     @JsonProperty
-    public FieldDoc getAfter() {
+    public After getAfter() {
         return after;
     }
 

@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
+import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.SearchHit;
@@ -169,19 +170,23 @@ class LuceneIndex extends Index {
     private CollectorManager<?, ? extends TopDocs> hitCollector(final SearchRequest searchRequest) {
         final Sort sort = toSort(searchRequest);
 
-        final FieldDoc after = searchRequest.getAfter();
+        final After after = searchRequest.getAfter();
+        final FieldDoc fieldDoc;
         if (after != null) {
+            fieldDoc = toFieldDoc(after);
             if (getLastSortField(sort).getReverse()) {
-                after.doc = 0;
+                fieldDoc.doc = 0;
             } else {
-                after.doc = Integer.MAX_VALUE;
+                fieldDoc.doc = Integer.MAX_VALUE;
             }
+        } else {
+            fieldDoc = null;
         }
 
         return TopFieldCollector.createSharedManager(
                 sort,
                 searchRequest.getLimit(),
-                after,
+                fieldDoc,
                 1000);
     }
 
@@ -214,7 +219,8 @@ class LuceneIndex extends Index {
                 }
             }
 
-            hits.add(new SearchHit(doc.get("_id"), (FieldDoc) scoreDoc, fields));
+            final After after = toAfter(((FieldDoc)scoreDoc));
+            hits.add(new SearchHit(doc.get("_id"), after, fields));
         }
 
         searchResults.setTotalHits(topDocs.totalHits.value);
@@ -395,6 +401,26 @@ class LuceneIndex extends Index {
             return new TextField(f.name(), f.stringValue(), f.fieldType().stored());
         }
         throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
+    }
+
+    private FieldDoc toFieldDoc(final After after) {
+        final Object[] fields = Arrays.copyOf(after.getFields(), after.getFields().length);
+        for (int i = 0; i < fields.length; i++) {
+            if (fields[i] instanceof byte[]) {
+                fields[i] = new BytesRef((byte[])fields[i]);
+            }
+        }
+        return new FieldDoc(0, Float.NaN, fields);
+    }
+
+    private After toAfter(final FieldDoc fieldDoc) {
+        final Object[] fields = Arrays.copyOf(fieldDoc.fields, fieldDoc.fields.length);
+        for (int i = 0; i < fields.length; i++) {
+            if (fields[i] instanceof BytesRef) {
+                fields[i] = toBytes((BytesRef)fields[i]);
+            }
+        }
+        return new After(fields);
     }
 
     private static byte[] toBytes(final BytesRef bytesRef) {
