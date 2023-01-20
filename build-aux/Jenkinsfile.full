@@ -96,12 +96,17 @@ meta = [
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
-  // Skip freebsd builds for now as adviced by node owner
-  // 'freebsd': [
-  //   name: 'FreeBSD',
-  //   spidermonkey_vsn: '1.8.5',
-  //   gnu_make: 'gmake'
-  // ],
+  'freebsd-x86_64': [
+     name: 'FreeBSD',
+     spidermonkey_vsn: '91',
+     gnu_make: 'gmake'
+  ],
+
+  'freebsd-arm64': [
+     name: 'FreeBSD',
+     spidermonkey_vsn: '91',
+     gnu_make: 'gmake'
+  ],
 
  'macos': [
     name: 'macOS',
