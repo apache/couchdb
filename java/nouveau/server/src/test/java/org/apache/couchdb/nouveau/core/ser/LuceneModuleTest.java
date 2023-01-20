@@ -23,8 +23,6 @@ import org.apache.couchdb.nouveau.api.document.StoredDoubleField;
 import org.apache.couchdb.nouveau.api.document.StoredStringField;
 import org.apache.couchdb.nouveau.api.document.StringField;
 import org.apache.couchdb.nouveau.api.document.TextField;
-import org.apache.lucene.search.FieldDoc;
-import org.apache.lucene.util.BytesRef;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 

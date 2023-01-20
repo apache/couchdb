@@ -24,7 +24,6 @@ import javax.validation.constraints.NotNull;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import org.apache.lucene.facet.range.DoubleRange;
-import org.apache.lucene.search.FieldDoc;
 
 import io.dropwizard.jackson.JsonSnakeCase;
 
