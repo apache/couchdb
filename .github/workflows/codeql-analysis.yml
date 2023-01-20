@@ -63,7 +63,7 @@ jobs:
     #    uses a compiled language
 
     - run: |
-       mvn -B test-compile --file java/nouveau/pom.xml
+       mvn -B test-compile --file java/nouveau/server/pom.xml
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
