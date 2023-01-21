@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.couchdb.nouveau.core.ser.LuceneModule;
-import org.apache.lucene.facet.range.DoubleRange;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +18,6 @@ public class SearchRequestTest {
     @BeforeAll
     public static void setupMapper() {
         mapper = new ObjectMapper();
-        mapper.registerModule(new LuceneModule());
     }
 
     @Test

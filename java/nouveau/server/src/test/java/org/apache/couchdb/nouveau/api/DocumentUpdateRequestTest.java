@@ -23,7 +23,6 @@ import org.apache.couchdb.nouveau.api.document.DoublePoint;
 import org.apache.couchdb.nouveau.api.document.Field;
 import org.apache.couchdb.nouveau.api.document.StringField;
 import org.apache.couchdb.nouveau.api.document.TextField;
-import org.apache.couchdb.nouveau.core.ser.LuceneModule;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -36,7 +35,6 @@ public class DocumentUpdateRequestTest {
     @BeforeAll
     public static void setupMapper() {
         mapper = new ObjectMapper();
-        mapper.registerModule(new LuceneModule());
     }
 
     @Test

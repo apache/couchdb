@@ -20,7 +20,6 @@ import org.apache.couchdb.nouveau.core.AnalyzerFactory;
 import org.apache.couchdb.nouveau.core.LuceneIndexFactory;
 import org.apache.couchdb.nouveau.core.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
-import org.apache.couchdb.nouveau.core.ser.LuceneModule;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexManagerHealthCheck;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
@@ -63,7 +62,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexFactory.setSearcherFactory(searcherFactory);
 
         final ObjectMapper objectMapper = environment.getObjectMapper();
-        objectMapper.registerModule(new LuceneModule());
 
         final IndexManager indexManager = new IndexManager();
         indexManager.setMetricRegistry(metricsRegistry);
