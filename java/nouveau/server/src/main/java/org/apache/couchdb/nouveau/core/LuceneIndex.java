@@ -31,6 +31,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
+import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.SearchHit;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
@@ -53,7 +54,6 @@ import org.apache.lucene.facet.FacetsCollectorManager;
 import org.apache.lucene.facet.LabelAndValue;
 import org.apache.lucene.facet.StringDocValuesReaderState;
 import org.apache.lucene.facet.StringValueFacetCounts;
-import org.apache.lucene.facet.range.DoubleRange;
 import org.apache.lucene.facet.range.DoubleRangeFacetCounts;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -79,7 +79,6 @@ import org.apache.lucene.util.BytesRef;
 
 class LuceneIndex extends Index {
 
-    private static final DoubleRange[] EMPTY_DOUBLE_RANGE_ARRAY = new DoubleRange[0];
     private static final Sort DEFAULT_SORT = new Sort(SortField.FIELD_SCORE,
             new SortField("_id", SortField.Type.STRING));
     private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)(?:<(\\w+)>)?$");
@@ -246,12 +245,21 @@ class LuceneIndex extends Index {
             final Map<String, Map<String, Number>> rangesMap = new HashMap<String, Map<String, Number>>(
                     searchRequest.getRanges().size());
             for (final Entry<String, List<DoubleRange>> entry : searchRequest.getRanges().entrySet()) {
-                final DoubleRangeFacetCounts counts = new DoubleRangeFacetCounts(entry.getKey(), fc,
-                        entry.getValue().toArray(EMPTY_DOUBLE_RANGE_ARRAY));
+                final DoubleRangeFacetCounts counts = toDoubleRangeFacetCounts(fc, entry.getKey(), entry.getValue());
                 rangesMap.put(entry.getKey(), collectFacets(counts, searchRequest.getTopN(), entry.getKey()));
             }
             searchResults.setRanges(rangesMap);
         }
+    }
+
+    private DoubleRangeFacetCounts toDoubleRangeFacetCounts(final FacetsCollector fc, final String field, final List<DoubleRange> ranges) throws IOException {
+        final org.apache.lucene.facet.range.DoubleRange[] luceneRanges = new org.apache.lucene.facet.range.DoubleRange[ranges.size()];
+        for (int i = 0; i < luceneRanges.length; i++) {
+            final DoubleRange range = ranges.get(i);
+            luceneRanges[i] = new org.apache.lucene.facet.range.DoubleRange(
+                range.getLabel(), range.getMin(), range.isMinInclusive(), range.getMax(), range.isMaxInclusive());
+        }
+        return new DoubleRangeFacetCounts(field, fc, luceneRanges);
     }
 
     private Map<String, Number> collectFacets(final Facets facets, final int topN, final String dim)

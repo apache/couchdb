@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 import org.apache.couchdb.nouveau.api.After;
+import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.document.DoublePoint;
 import org.apache.couchdb.nouveau.api.document.StoredDoubleField;
 import org.apache.couchdb.nouveau.api.document.StoredStringField;
@@ -28,14 +29,13 @@ import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class LuceneModuleTest {
+public class SerializationTest {
 
     private static ObjectMapper mapper;
 
     @BeforeAll
     public static void setupMapper() {
         mapper = new ObjectMapper();
-        mapper.registerModule(new LuceneModule());
     }
 
     @Test
@@ -122,6 +122,35 @@ public class LuceneModuleTest {
         for (int i = 0; i < after.getFields().length; i++) {
             assertThat(after.getFields()[i].getClass()).isEqualTo(after2.getFields()[i].getClass());
         }
+    }
+
+    @Test
+    public void testSerializeDoubleRange() throws Exception {
+        final String expected = "{\"label\":\"foo\",\"min\":12.5,\"max\":52.1,\"min_inclusive\":false,\"max_inclusive\":false}";
+        final String actual = mapper.writeValueAsString(new DoubleRange("foo", 12.5, false, 52.1, false));
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testDeserializeDoubleRange() throws Exception {
+        final String expected = "{\"label\":\"foo\",\"min\":12.5,\"max\":52.1,\"min_inclusive\":false,\"max_inclusive\":false}";
+        final DoubleRange actual = mapper.readValue(expected, DoubleRange.class);
+        assertEquals("foo", actual.getLabel());
+        assertEquals(12.5, actual.getMin());
+        assertEquals(false, actual.isMinInclusive());
+        assertEquals(52.1, actual.getMax());
+        assertEquals(false, actual.isMaxInclusive());
+    }
+
+    @Test
+    public void testDeserializeDoubleRangeDefaults() throws Exception {
+        final String expected = "{\"label\":\"foo\",\"min\":12.5,\"max\":52.1}";
+        final DoubleRange actual = mapper.readValue(expected, DoubleRange.class);
+        assertEquals("foo", actual.getLabel());
+        assertEquals(12.5, actual.getMin());
+        assertEquals(true, actual.isMinInclusive());
+        assertEquals(52.1, actual.getMax());
+        assertEquals(true, actual.isMaxInclusive());
     }
 
 }

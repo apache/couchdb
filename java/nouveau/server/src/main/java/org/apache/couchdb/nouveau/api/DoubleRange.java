@@ -11,21 +11,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core.ser;
+package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.core.Version;
-import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.dropwizard.jackson.JsonSnakeCase;
 
-import org.apache.lucene.facet.range.DoubleRange;
+@JsonSnakeCase
+public class DoubleRange extends Range<Double> {
 
-public class LuceneModule extends SimpleModule {
+    public DoubleRange() {
+    }
 
-    public LuceneModule() {
-        super("lucene", Version.unknownVersion());
-
-        // DoubleRange
-        addSerializer(DoubleRange.class, new DoubleRangeSerializer());
-        addDeserializer(DoubleRange.class, new DoubleRangeDeserializer());
+    public DoubleRange(String name, Double min, boolean minInclusive, Double max, boolean maxInclusive) {
+        super(name, min, minInclusive, max, maxInclusive);
     }
 
 }
