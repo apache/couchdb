@@ -300,11 +300,11 @@ After uploading our design document, we can try out a partitioned query:
             }
         }
     }
-    shell> $ curl -X POST -H "Content-Type: application/json" http://127.0.0.1:5984/my_new_db -d @ddoc2.json
+    shell> $ curl -X POST -H "Content-Type: application/json" http://127.0.0.1:5984/my_new_db -d @ddoc.json
     {
         "ok": true,
-        "id": "_design/all_sensors",
-        "rev": "1-4a8188d80fab277fccf57bdd7154dec1"
+        "id": "_design/sensor-readings",
+        "rev": "1-13859808da293bd72fde3b31be97372a"
     }
     shell> curl http://127.0.0.1:5984/my_new_db/_partition/sensor-260/_design/sensor-readings/_view/by_sensor
     {"total_rows":4,"offset":0,"rows":[
