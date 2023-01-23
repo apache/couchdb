@@ -12,7 +12,6 @@
 
 -module(couch_changes).
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -export([
     handle_db_changes/3,
@@ -24,7 +23,8 @@
     handle_db_event/3,
     handle_view_event/3,
     send_changes_doc_ids/6,
-    send_changes_design_docs/6
+    send_changes_design_docs/6,
+    doc_ids_limit/0
 ]).
 
 -export([changes_enumerator/2]).
@@ -33,6 +33,8 @@
 -export([
     keep_sending_changes/3
 ]).
+
+-define(DEFAULT_MAX_IDS, 1000).
 
 -record(changes_acc, {
     db,
@@ -457,21 +459,19 @@ send_changes(Acc, Dir, FirstRound) ->
     end.
 
 can_optimize(true, {doc_ids, _Style, DocIds}) ->
-    MaxDocIds = config:get_integer(
-        "couchdb",
-        "changes_doc_ids_optimization_threshold",
-        100
-    ),
-    if
-        length(DocIds) =< MaxDocIds ->
-            {true, fun send_changes_doc_ids/6};
+    case length(DocIds) =< doc_ids_limit() of
         true ->
+            {true, fun send_changes_doc_ids/6};
+        false ->
             false
     end;
 can_optimize(true, {design_docs, _Style}) ->
     {true, fun send_changes_design_docs/6};
 can_optimize(_, _) ->
     false.
+
+doc_ids_limit() ->
+    config:get_integer("couchdb", "changes_doc_ids_optimization_threshold", ?DEFAULT_MAX_IDS).
 
 send_changes_doc_ids(Db, StartSeq, Dir, Fun, Acc0, {doc_ids, _Style, DocIds}) ->
     Results = couch_db:get_full_doc_infos(Db, DocIds),
