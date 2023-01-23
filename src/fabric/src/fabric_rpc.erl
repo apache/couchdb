@@ -116,36 +116,21 @@ changes(DbName, Options, StartVector, DbOptions) ->
             rexi:stream_last(Error)
     end.
 
-do_changes(Db, StartSeq, Enum, Acc0, Opts) ->
-    #fabric_changes_acc{
-        args = Args
-    } = Acc0,
-    #changes_args{
-        filter = Filter
-    } = Args,
+do_changes(Db, Seq, Enum, #fabric_changes_acc{args = Args} = Acc0, Opts) ->
+    #changes_args{filter_fun = Filter, dir = Dir} = Args,
+
     case Filter of
-        "_doc_ids" ->
-            % optimised code path, we’re looking up all doc_ids in the by-id instead of filtering
-            % the entire by-seq tree to find the doc_ids one by one
-            #changes_args{
-                filter_fun = {doc_ids, Style, DocIds},
-                dir = Dir
-            } = Args,
-            couch_changes:send_changes_doc_ids(
-                Db, StartSeq, Dir, Enum, Acc0, {doc_ids, Style, DocIds}
-            );
-        "_design_docs" ->
-            % optimised code path, we’re looking up all design_docs in the by-id instead of
-            % filtering the entire by-seq tree to find the design_docs one by one
-            #changes_args{
-                filter_fun = {design_docs, Style},
-                dir = Dir
-            } = Args,
-            couch_changes:send_changes_design_docs(
-                Db, StartSeq, Dir, Enum, Acc0, {design_docs, Style}
-            );
+        {doc_ids, _Style, DocIds} ->
+            case length(DocIds) =< couch_changes:doc_ids_limit() of
+                true ->
+                    couch_changes:send_changes_doc_ids(Db, Seq, Dir, Enum, Acc0, Filter);
+                false ->
+                    couch_db:fold_changes(Db, Seq, Enum, Acc0, Opts)
+            end;
+        {design_docs, _Style} ->
+            couch_changes:send_changes_design_docs(Db, Seq, Dir, Enum, Acc0, Filter);
         _ ->
-            couch_db:fold_changes(Db, StartSeq, Enum, Acc0, Opts)
+            couch_db:fold_changes(Db, Seq, Enum, Acc0, Opts)
     end.
 
 all_docs(DbName, Options, Args0) ->
