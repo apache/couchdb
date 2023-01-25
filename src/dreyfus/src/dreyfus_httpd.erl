@@ -42,6 +42,7 @@ handle_search_req(
 ) when
     Method == 'GET'; Method == 'POST'
 ->
+    verify_search_available(),
     DbName = couch_db:name(Db),
     Start = os:timestamp(),
     QueryArgs =
@@ -140,6 +141,7 @@ handle_info_req(
     Db,
     #doc{id = Id} = DDoc
 ) ->
+    verify_search_available(),
     DbName = couch_db:name(Db),
     case dreyfus_fabric_info:go(DbName, DDoc, IndexName, info) of
         {ok, IndexInfoList} ->
@@ -162,6 +164,7 @@ handle_info_req(Req, _Db, _DDoc) ->
 handle_disk_size_req(
     #httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req, Db, #doc{id = Id} = DDoc
 ) ->
+    verify_search_available(),
     DbName = couch_db:name(Db),
     case dreyfus_fabric_info:go(DbName, DDoc, IndexName, disk_size) of
         {ok, IndexInfoList} ->
@@ -188,10 +191,12 @@ handle_cleanup_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
 handle_analyze_req(#httpd{method = 'GET'} = Req) ->
+    verify_search_available(),
     Analyzer = couch_httpd:qs_value(Req, "analyzer"),
     Text = couch_httpd:qs_value(Req, "text"),
     analyze(Req, Analyzer, Text);
 handle_analyze_req(#httpd{method = 'POST'} = Req) ->
+    verify_search_available(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
     Analyzer = couch_util:get_value(<<"analyzer">>, Fields),
@@ -706,4 +711,12 @@ backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause, Error) ->
         false ->
             timer:sleep(RetryPause),
             handle_search_req(Req, Db, DDoc, RetryCount + 1, RetryPause * 2)
+    end.
+
+verify_search_available() ->
+    case dreyfus:available() of
+        true ->
+            ok;
+        false ->
+            throw({service_unavailable, <<"Search is not available">>})
     end.
