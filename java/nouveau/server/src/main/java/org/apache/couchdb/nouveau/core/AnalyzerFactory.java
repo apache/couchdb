@@ -15,12 +15,12 @@ package org.apache.couchdb.nouveau.core;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer;
@@ -79,85 +79,62 @@ public final class AnalyzerFactory {
         return new PerFieldAnalyzerWrapper(defaultAnalyzer, fieldAnalyzers);
     }
 
+    private enum KnownAnalyzer {
+
+        arabic(() -> new ArabicAnalyzer()),
+        armenian(() -> new ArmenianAnalyzer()),
+        basque(() -> new BasqueAnalyzer()),
+        bulgarian(() -> new BulgarianAnalyzer()),
+        catalan(() -> new CatalanAnalyzer()),
+        chinese(() -> new SmartChineseAnalyzer()),
+        cjk(() -> new CJKAnalyzer()),
+        classic(() -> new ClassicAnalyzer()),
+        czech(() -> new CzechAnalyzer()),
+        danish(() -> new DanishAnalyzer()),
+        dutch(() -> new DutchAnalyzer()),
+        email(() -> new UAX29URLEmailAnalyzer()),
+        english(() -> new EnglishAnalyzer()),
+        finnish(() -> new FinnishAnalyzer()),
+        french(() -> new FrenchAnalyzer()),
+        galician(() -> new GalicianAnalyzer()),
+        german(() -> new GermanAnalyzer()),
+        hindi(() -> new HindiAnalyzer()),
+        hungarian(() -> new HungarianAnalyzer()),
+        indonesian(() -> new IndonesianAnalyzer()),
+        irish(() -> new IrishAnalyzer()),
+        italian(() -> new ItalianAnalyzer()),
+        japanese(() -> new JapaneseAnalyzer()),
+        keyword(() -> new KeywordAnalyzer()),
+        latvian(() -> new LatvianAnalyzer()),
+        norwegian(() -> new NorwegianAnalyzer()),
+        persian(() -> new PersianAnalyzer()),
+        polish(() -> new PolishAnalyzer()),
+        portugese(() -> new PortugueseAnalyzer()),
+        romanian(() -> new RomanianAnalyzer()),
+        russian(() -> new RussianAnalyzer()),
+        simple(() -> new SimpleAnalyzer()),
+        spanish(() -> new SpanishAnalyzer()),
+        standard(() -> new StandardAnalyzer()),
+        swedish(() -> new SwedishAnalyzer()),
+        thai(() -> new ThaiAnalyzer()),
+        turkish(() -> new TurkishAnalyzer()),
+        whitespace(() -> new WhitespaceAnalyzer());
+
+        private final Supplier<? extends Analyzer> supplier;
+
+        private KnownAnalyzer(final Supplier<? extends Analyzer> supplier) {
+            this.supplier = supplier;
+        }
+
+        private Analyzer newInstance() {
+            return supplier.get();
+        }
+    }
+
     public Analyzer newAnalyzer(final String name) {
-        switch(name) {
-        case "keyword":
-            return new KeywordAnalyzer();
-        case "simple":
-            return new SimpleAnalyzer();
-        case "whitespace":
-            return new WhitespaceAnalyzer();
-        case "arabic":
-            return new ArabicAnalyzer();
-        case "bulgarian":
-            return new BulgarianAnalyzer();
-        case "catalan":
-            return new CatalanAnalyzer();
-        case "cjk":
-            return new CJKAnalyzer();
-        case "chinese":
-            return new SmartChineseAnalyzer();
-        case "czech":
-            return new CzechAnalyzer();
-        case "danish":
-            return new DanishAnalyzer();
-        case "german":
-            return new GermanAnalyzer();
-        case "english":
-            return new EnglishAnalyzer();
-        case "spanish":
-            return new SpanishAnalyzer();
-        case "basque":
-            return new BasqueAnalyzer();
-        case "persian":
-            return new PersianAnalyzer();
-        case "finnish":
-            return new FinnishAnalyzer();
-        case "french":
-            return new FrenchAnalyzer();
-        case "irish":
-            return new IrishAnalyzer();
-        case "galician":
-            return new GalicianAnalyzer();
-        case "hindi":
-            return new HindiAnalyzer();
-        case "hungarian":
-            return new HungarianAnalyzer();
-        case "armenian":
-            return new ArmenianAnalyzer();
-        case "indonesian":
-            return new IndonesianAnalyzer();
-        case "italian":
-            return new ItalianAnalyzer();
-        case "japanese":
-            return new JapaneseAnalyzer();
-        case "latvian":
-            return new LatvianAnalyzer();
-        case "dutch":
-            return new DutchAnalyzer();
-        case "norwegian":
-            return new NorwegianAnalyzer();
-        case "polish":
-            return new PolishAnalyzer();
-        case "portugese":
-            return new PortugueseAnalyzer();
-        case "romanian":
-            return new RomanianAnalyzer();
-        case "russian":
-            return new RussianAnalyzer();
-        case "classic":
-            return new ClassicAnalyzer();
-        case "standard":
-            return new StandardAnalyzer();
-        case "email":
-            return new UAX29URLEmailAnalyzer();
-        case "swedish":
-            return new SwedishAnalyzer();
-        case "thai":
-            return new ThaiAnalyzer();
-        case "turkish":
-            return new TurkishAnalyzer();
-        default:
+        try {
+            return KnownAnalyzer.valueOf(name).newInstance();
+        } catch (IllegalArgumentException e) {
             throw new WebApplicationException(name + " is not a valid analyzer name", Status.BAD_REQUEST);
         }
     }
