@@ -117,10 +117,9 @@ You can install Node.JS via the
 
 You can install the documentation dependencies by running:
 
-    sudo easy_install pip
-    sudo pip install --upgrade sphinx nose requests hypothesis
+    pip3 install --upgrade sphinx nose requests hypothesis
 
-You will need Homebrew installed to use the brew command.
+You will need Homebrew installed to use the `brew` command.
 
 Learn more about Homebrew at:
 
