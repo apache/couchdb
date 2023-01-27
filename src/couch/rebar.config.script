@@ -114,6 +114,9 @@ ProperConfig = case code:lib_dir(proper) of
     _ -> [{d, 'WITH_PROPER'}]
 end.
 
+% The include directories (parameters for the `-I` C compiler flag) are
+% considered in the `configure` script as a pre-check for their existence.
+% Please keep them in sync.
 {JS_CFLAGS, JS_LDFLAGS} = case os:type() of
     {win32, _} when SMVsn == "1.8.5" ->
         {
