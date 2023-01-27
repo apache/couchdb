@@ -51,14 +51,12 @@ To build Fauxton, you should have the following installed:
  * Node.JS (>=10.x)             (https://nodejs.org/)
    -- obtainable from NodeSource (https://github.com/nodesource/distributions)
 
-To build the documentation, you should have the following installed:
- * Python Sphinx (>=1.5)        (http://pypi.python.org/pypi/Sphinx)
- * Sphinx RT theme              (https://github.com/readthedocs/sphinx_rtd_theme)
-
 It is recommended that you install Erlang OTP 20.3.8.11 or above where
-possible. Sphinx and the RTD theme are only required for building the online
-documentation. You can disable Fauxton and/or the documentation builds by
-adding the --disable-fauxton and/or --disable-docs flag(s) to the configure script.
+possible.  Note that the latest Erlang OTP versions might not be supported
+properly and they may produce build errors.
+
+You can disable Fauxton and/or the documentation builds by adding the
+`--disable-fauxton` and/or `--disable-docs` flag(s) to the `configure` script.
 
 ### Debian-based Systems
 
@@ -68,17 +66,9 @@ You can install the dependencies by running:
         build-essential pkg-config erlang erlang-reltool \
         libicu-dev libmozjs-60-dev python3
 
-Your distribution may have libmozjs-68-dev instead of 60. Both are supported.
+Your distribution may have `libmozjs-68-dev` instead of 60. Both are supported.
 
 You can install Node.JS [NodeSource](https://github.com/nodesource/distributions#installation-instructions).
-
-You can install the documentation dependencies by running:
-
-    sudo apt-get --no-install-recommends -y install \
-        python-sphinx
-
-    sudo pip install --upgrade sphinx_rtd_theme nose requests hypothesis
-
 
 Be sure to update the version numbers to match your system's available
 packages.
@@ -93,12 +83,6 @@ You can install the dependencies by running:
         python3
 
 You can install Node.JS via [NodeSource](https://github.com/nodesource/distributions#rpminstall).
-
-The built-in packages for Sphinx in RHEL repositories are too old
-to run the documentation build process. Instead, use pip:
-
-    sudo yum install python-pip
-    sudo pip install --upgrade sphinx nose requests hypothesis
 
 ### Mac OS X
 
@@ -115,12 +99,7 @@ You can then install the other dependencies by running:
 You can install Node.JS via the
 [official Macintosh installer](https://nodejs.org/en/download/).
 
-You can install the documentation dependencies by running:
-
-    sudo easy_install pip
-    sudo pip install --upgrade sphinx nose requests hypothesis
-
-You will need Homebrew installed to use the brew command.
+You will need Homebrew installed to use the `brew` command.
 
 Learn more about Homebrew at:
 
@@ -144,8 +123,7 @@ You can install the remaining dependencies by running:
 
     pkg install openssl icu git bash autoconf \
         www/node npm libtool spidermonkey60 \
-        erlang lang/python py37-sphinx py37-pip
-    pip install --upgrade sphinx_rtd_theme nose requests hypothesis
+        erlang lang/python
 
 ## Installing
 
