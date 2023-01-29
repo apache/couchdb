@@ -13,8 +13,6 @@
 
 package org.apache.couchdb.nouveau.health;
 
-import static org.apache.couchdb.nouveau.api.LuceneVersion.LUCENE_9;
-
 import java.io.IOException;
 import java.util.Collections;
 
@@ -42,7 +40,7 @@ public class IndexManagerHealthCheck extends HealthCheck {
             // Ignored, index might not exist yet.
         }
 
-        indexManager.create(name, new IndexDefinition(LUCENE_9, "standard", null));
+        indexManager.create(name, new IndexDefinition("standard", null));
         final Index index = indexManager.acquire(name);
         final DocumentUpdateRequest request = new DocumentUpdateRequest(1, null, Collections.emptyList());
         index.update("foo", request);

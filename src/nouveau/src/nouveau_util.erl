@@ -63,10 +63,6 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
         false ->
             {error, {not_found, <<IndexName/binary, " not found.">>}};
         {IndexName, {Index}} ->
-            DefaultLuceneVersion = config:get("nouveau", "default_lucene_version", "LUCENE_9"),
-            LuceneVersion = couch_util:get_value(
-                <<"lucene_version">>, Index, ?l2b(DefaultLuceneVersion)
-            ),
             DefaultAnalyzer = couch_util:get_value(<<"default_analyzer">>, Index, <<"standard">>),
             FieldAnalyzers = couch_util:get_value(<<"field_analyzers">>, Index, #{}),
             case couch_util:get_value(<<"index">>, Index) of
@@ -78,14 +74,13 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
                             crypto:hash(
                                 sha256,
                                 term_to_binary(
-                                    {LuceneVersion, DefaultAnalyzer, FieldAnalyzers, Def}
+                                    {DefaultAnalyzer, FieldAnalyzers, Def}
                                 )
                             )
                         )
                     ),
                     {ok, #index{
                         dbname = DbName,
-                        lucene_version = LuceneVersion,
                         default_analyzer = DefaultAnalyzer,
                         field_analyzers = FieldAnalyzers,
                         ddoc_id = Id,

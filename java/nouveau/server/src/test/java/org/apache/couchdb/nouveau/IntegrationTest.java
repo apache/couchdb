@@ -13,7 +13,6 @@
 
 package org.apache.couchdb.nouveau;
 
-import static org.apache.couchdb.nouveau.api.LuceneVersion.LUCENE_9;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -54,7 +53,7 @@ public class IntegrationTest {
     public void indexTest() throws Exception{
         final String url = "http://localhost:" + APP.getLocalPort();
         final String indexName = "foo";
-        final IndexDefinition indexDefinition = new IndexDefinition(LUCENE_9, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition("standard", null);
 
         // Clean up.
         Response response =

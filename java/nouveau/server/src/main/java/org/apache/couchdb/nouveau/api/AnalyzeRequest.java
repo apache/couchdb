@@ -23,9 +23,6 @@ import io.dropwizard.jackson.JsonSnakeCase;
 @JsonSnakeCase
 public class AnalyzeRequest {
 
-    @NotNull
-    private LuceneVersion luceneVersion;
-
     @NotEmpty
     private String analyzer;
 
@@ -36,15 +33,9 @@ public class AnalyzeRequest {
         // Jackson deserialization
     }
 
-    public AnalyzeRequest(final LuceneVersion luceneVersion, final String analyzer, final String text) {
-        this.luceneVersion = luceneVersion;
+    public AnalyzeRequest(final String analyzer, final String text) {
         this.analyzer = analyzer;
         this.text = text;
-    }
-
-    @JsonProperty
-    public LuceneVersion getLuceneVersion() {
-        return luceneVersion;
     }
 
     @JsonProperty

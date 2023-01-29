@@ -18,7 +18,6 @@ import java.util.List;
 
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
-import static org.apache.couchdb.nouveau.api.LuceneVersion.*;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import com.codahale.metrics.health.HealthCheck;
 
@@ -32,7 +31,7 @@ public class AnalyzeHealthCheck extends HealthCheck {
 
     @Override
     protected Result check() throws Exception {
-        final AnalyzeRequest request = new AnalyzeRequest(LUCENE_9, "standard", "hello there");
+        final AnalyzeRequest request = new AnalyzeRequest("standard", "hello there");
         final AnalyzeResponse response = analyzeResource.analyzeText(request);
         final List<String> expected = Arrays.asList("hello", "there");
         final List<String> actual = response.getTokens();

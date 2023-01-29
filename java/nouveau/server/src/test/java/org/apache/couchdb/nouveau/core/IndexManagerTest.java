@@ -16,7 +16,6 @@ package org.apache.couchdb.nouveau.core;
 import java.nio.file.Path;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import static org.apache.couchdb.nouveau.api.LuceneVersion.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -56,7 +55,7 @@ public class IndexManagerTest {
 
     @Test
     public void testCreate() throws Exception {
-        final IndexDefinition def = new IndexDefinition(LUCENE_9, "standard", null);
+        final IndexDefinition def = new IndexDefinition("standard", null);
         manager.create("foo", def);
     }
 
