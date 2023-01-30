@@ -15,10 +15,17 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
+
+import javax.ws.rs.WebApplicationException;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 
-public interface IndexFactory {
+public interface Lucene {
+
+    List<String> analyze(final String analyzer, final String text) throws IOException;
+
+    void validate(final IndexDefinition indexDefinition) throws WebApplicationException;
 
     Index open(final Path path, final IndexDefinition indexDefinition) throws IOException;
 

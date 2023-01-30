@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core;
+package org.apache.couchdb.nouveau.core.lucene9;
 
 import java.io.IOException;
 import java.util.concurrent.Executor;
@@ -20,15 +20,11 @@ import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexReader;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.IndexSearcher;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherFactory;
 
-public class ParallelSearcherFactory extends SearcherFactory {
+class ParallelSearcherFactory extends SearcherFactory {
 
     private Executor executor;
 
-    public Executor getExecutor() {
-        return executor;
-    }
-
-    public void setExecutor(Executor executor) {
+    public ParallelSearcherFactory(Executor executor) {
         this.executor = executor;
     }
 

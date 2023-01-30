@@ -16,10 +16,8 @@ package org.apache.couchdb.nouveau;
 import java.util.concurrent.ExecutorService;
 
 import org.apache.couchdb.nouveau.core.IndexManager;
-import org.apache.couchdb.nouveau.core.AnalyzerFactory;
-import org.apache.couchdb.nouveau.core.LuceneIndexFactory;
-import org.apache.couchdb.nouveau.core.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
+import org.apache.couchdb.nouveau.core.lucene9.Lucene9;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexManagerHealthCheck;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
@@ -49,17 +47,11 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         final MetricRegistry metricsRegistry = new MetricRegistry();
         environment.jersey().register(new InstrumentedResourceMethodApplicationListener(metricsRegistry));
 
-        final AnalyzerFactory analyzerFactory = new AnalyzerFactory();
-
         final ExecutorService searchExecutor =
             environment.lifecycle().executorService("nouveau-search-%d").build();
 
-        final ParallelSearcherFactory searcherFactory = new ParallelSearcherFactory();
-        searcherFactory.setExecutor(searchExecutor);
-
-        final LuceneIndexFactory indexFactory = new LuceneIndexFactory();
-        indexFactory.setAnalyzerFactory(analyzerFactory);
-        indexFactory.setSearcherFactory(searcherFactory);
+        final Lucene9 lucene9 = new Lucene9();
+        lucene9.setExecutor(searchExecutor);
 
         final ObjectMapper objectMapper = environment.getObjectMapper();
 
@@ -70,13 +62,12 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
         indexManager.setObjectMapper(objectMapper);
-        indexManager.setAnalyzerFactory(analyzerFactory);
-        indexManager.setIndexFactory(indexFactory);
+        indexManager.setLucene(lucene9);
         environment.lifecycle().manage(indexManager);
 
         environment.jersey().register(new UpdatesOutOfOrderExceptionMapper());
 
-        final AnalyzeResource analyzeResource = new AnalyzeResource(analyzerFactory);
+        final AnalyzeResource analyzeResource = new AnalyzeResource(lucene9);
         environment.jersey().register(analyzeResource);
         environment.jersey().register(new IndexResource(indexManager));
         environment.jersey().register(new SearchResource(indexManager));

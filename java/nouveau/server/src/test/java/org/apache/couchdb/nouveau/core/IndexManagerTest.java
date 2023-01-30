@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.core;
 import java.nio.file.Path;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import org.apache.couchdb.nouveau.core.lucene9.Lucene9;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -41,7 +42,7 @@ public class IndexManagerTest {
     public void setup() throws Exception {
         manager = new IndexManager();
         manager.setMetricRegistry(new MetricRegistry());
-        manager.setAnalyzerFactory(new AnalyzerFactory());
+        manager.setLucene(new Lucene9());
         manager.setCommitIntervalSeconds(5);
         manager.setObjectMapper(new ObjectMapper());
         manager.setRootDir(tempDir);

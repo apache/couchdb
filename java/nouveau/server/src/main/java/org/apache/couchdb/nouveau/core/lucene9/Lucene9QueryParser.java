@@ -11,9 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core;
+package org.apache.couchdb.nouveau.core.lucene9;
 
 import org.apache.couchdb.nouveau.api.SearchRequest;
+import org.apache.couchdb.nouveau.core.QueryParser;
+import org.apache.couchdb.nouveau.core.QueryParserException;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.Term;
 import org.apache.couchdb.nouveau.lucene9.lucene.queryparser.flexible.core.QueryNodeException;
@@ -49,7 +51,7 @@ import org.apache.couchdb.nouveau.lucene9.lucene.search.BooleanQuery;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.Query;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.TermQuery;
 
-public class NouveauQueryParser extends QueryParserHelper implements QueryParser {
+class Lucene9QueryParser extends QueryParserHelper implements QueryParser {
 
     private static class NouveauQueryNodeProcessorPipeline extends QueryNodeProcessorPipeline {
 
@@ -83,7 +85,7 @@ public class NouveauQueryParser extends QueryParserHelper implements QueryParser
 
     private final String defaultField;
 
-    public NouveauQueryParser(final String defaultField, final Analyzer analyzer) {
+    public Lucene9QueryParser(final String defaultField, final Analyzer analyzer) {
         super(
                 new StandardQueryConfigHandler(),
                 new StandardSyntaxParser(),

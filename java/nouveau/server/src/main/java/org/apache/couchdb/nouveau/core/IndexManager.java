@@ -57,7 +57,7 @@ public final class IndexManager implements Managed {
             final Path path = indexPath(name);
             final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
                     IndexDefinition.class);
-            return indexFactory.open(path, indexDefinition);
+            return lucene.open(path, indexDefinition);
         }
 
         @Override
@@ -100,12 +100,10 @@ public final class IndexManager implements Managed {
     private Path rootDir;
 
     @NotNull
-    private AnalyzerFactory analyzerFactory;
+    private Lucene lucene;
 
     @NotNull
     private ObjectMapper objectMapper;
-
-    private IndexFactory indexFactory;
 
     private MetricRegistry metricRegistry;
 
@@ -127,7 +125,7 @@ public final class IndexManager implements Managed {
             throw new WebApplicationException("Index already exists", Status.EXPECTATION_FAILED);
         }
         // Validate index definiton
-        analyzerFactory.fromDefinition(indexDefinition);
+        lucene.validate(indexDefinition);
 
         // Persist definition
         final Path path = indexDefinitionPath(name);
@@ -208,16 +206,12 @@ public final class IndexManager implements Managed {
         this.rootDir = rootDir;
     }
 
-    public void setAnalyzerFactory(final AnalyzerFactory analyzerFactory) {
-        this.analyzerFactory = analyzerFactory;
+    public void setLucene(final Lucene lucene) {
+        this.lucene = lucene;
     }
 
     public void setObjectMapper(final ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
-    }
-
-    public void setIndexFactory(final IndexFactory indexFactory) {
-        this.indexFactory = indexFactory;
     }
 
     public void setMetricRegistry(final MetricRegistry metricRegistry) {
