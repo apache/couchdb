@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core;
+package org.apache.couchdb.nouveau.core.lucene9;
 
 import java.text.NumberFormat;
 import java.text.ParsePosition;
@@ -26,7 +26,7 @@ import org.apache.couchdb.nouveau.lucene9.lucene.queryparser.flexible.standard.n
 import org.apache.couchdb.nouveau.lucene9.lucene.queryparser.flexible.standard.nodes.PointRangeQueryNode;
 import org.apache.couchdb.nouveau.lucene9.lucene.queryparser.flexible.standard.nodes.TermRangeQueryNode;
 
-public class NumericRangeQueryProcessor extends QueryNodeProcessorImpl {
+class NumericRangeQueryProcessor extends QueryNodeProcessorImpl {
 
     // TODO don't like this is locale dependent.
     private final NumberFormat decimalFormat = NumberFormat.getInstance();

@@ -11,10 +11,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core;
+package org.apache.couchdb.nouveau.core.lucene9;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,6 +43,9 @@ import org.apache.couchdb.nouveau.api.document.StoredDoubleField;
 import org.apache.couchdb.nouveau.api.document.StoredStringField;
 import org.apache.couchdb.nouveau.api.document.StringField;
 import org.apache.couchdb.nouveau.api.document.TextField;
+import org.apache.couchdb.nouveau.core.Index;
+import org.apache.couchdb.nouveau.core.QueryParser;
+import org.apache.couchdb.nouveau.core.QueryParserException;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.document.Document;
 import org.apache.couchdb.nouveau.lucene9.lucene.document.Field.Store;
@@ -56,28 +58,23 @@ import org.apache.couchdb.nouveau.lucene9.lucene.facet.StringDocValuesReaderStat
 import org.apache.couchdb.nouveau.lucene9.lucene.facet.StringValueFacetCounts;
 import org.apache.couchdb.nouveau.lucene9.lucene.facet.range.DoubleRangeFacetCounts;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexWriter;
-import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexWriterConfig;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexableField;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.Term;
-import org.apache.couchdb.nouveau.lucene9.lucene.misc.store.DirectIODirectory;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.CollectorManager;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.FieldDoc;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.IndexSearcher;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.MultiCollectorManager;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.Query;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.ScoreDoc;
-import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherFactory;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherManager;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.Sort;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.SortField;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.TermQuery;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.TopDocs;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.TopFieldCollector;
-import org.apache.couchdb.nouveau.lucene9.lucene.store.Directory;
-import org.apache.couchdb.nouveau.lucene9.lucene.store.FSDirectory;
 import org.apache.couchdb.nouveau.lucene9.lucene.util.BytesRef;
 
-class LuceneIndex extends Index {
+class Lucene9Index extends Index {
 
     private static final Sort DEFAULT_SORT = new Sort(SortField.FIELD_SCORE,
             new SortField("_id", SortField.Type.STRING));
@@ -87,18 +84,7 @@ class LuceneIndex extends Index {
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
 
-    static Index open(final Path path, final Analyzer analyzer, final SearcherFactory searcherFactory)
-            throws IOException {
-        final Directory dir = new DirectIODirectory(FSDirectory.open(path));
-        final IndexWriterConfig config = new IndexWriterConfig(analyzer);
-        config.setUseCompoundFile(false);
-        final IndexWriter writer = new IndexWriter(dir, config);
-        final long updateSeq = getUpdateSeq(writer);
-        final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-        return new LuceneIndex(analyzer, writer, updateSeq, searcherManager);
-    }
-
-    private LuceneIndex(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
+    Lucene9Index(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
             final SearcherManager searcherManager) {
         super(updateSeq);
         this.analyzer = analyzer;
@@ -443,21 +429,8 @@ class LuceneIndex extends Index {
         return new Term("_id", docId);
     }
 
-    private static long getUpdateSeq(final IndexWriter writer) throws IOException {
-        final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
-        if (commitData == null) {
-            return 0L;
-        }
-        for (Map.Entry<String, String> entry : commitData) {
-            if (entry.getKey().equals("update_seq")) {
-                return Long.parseLong(entry.getValue());
-            }
-        }
-        return 0L;
-    }
-
     public QueryParser newQueryParser() {
-        return new NouveauQueryParser("default", analyzer);
+        return new Lucene9QueryParser("default", analyzer);
     }
 
 }

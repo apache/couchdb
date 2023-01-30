@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core;
+package org.apache.couchdb.nouveau.core.lucene9;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,7 +56,7 @@ import org.apache.couchdb.nouveau.lucene9.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.tr.TurkishAnalyzer;
 import org.junit.jupiter.api.Test;
 
-public class AnalyzerFactoryTest {
+public class Lucene9AnalyzerFactoryTest {
 
     @Test
     public void testkeyword() throws Exception {
@@ -249,8 +249,7 @@ public class AnalyzerFactoryTest {
     }
 
     private void assertAnalyzer(final String name, final Class<? extends Analyzer> clazz) throws Exception {
-        final AnalyzerFactory factory = new AnalyzerFactory();
-        assertThat(factory.newAnalyzer(name)).isInstanceOf(clazz);
+        assertThat(Lucene9AnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
     }
 
 }

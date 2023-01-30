@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.core;
+package org.apache.couchdb.nouveau.core.lucene9;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -62,12 +62,12 @@ import org.apache.couchdb.nouveau.lucene9.lucene.analysis.sv.SwedishAnalyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.tr.TurkishAnalyzer;
 
-public final class AnalyzerFactory {
+final class Lucene9AnalyzerFactory {
 
-    public AnalyzerFactory() {
+    public Lucene9AnalyzerFactory() {
     }
 
-    public Analyzer fromDefinition(final IndexDefinition indexDefinition) {
+    public static Analyzer fromDefinition(final IndexDefinition indexDefinition) {
         final Analyzer defaultAnalyzer = newAnalyzer(indexDefinition.getDefaultAnalyzer());
         if (!indexDefinition.hasFieldAnalyzers()) {
             return defaultAnalyzer;
@@ -131,7 +131,7 @@ public final class AnalyzerFactory {
         }
     }
 
-    public Analyzer newAnalyzer(final String name) {
+    public static Analyzer newAnalyzer(final String name) {
         try {
             return KnownAnalyzer.valueOf(name).newInstance();
         } catch (IllegalArgumentException e) {
