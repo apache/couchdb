@@ -44,38 +44,38 @@ import org.apache.couchdb.nouveau.api.document.StoredDoubleField;
 import org.apache.couchdb.nouveau.api.document.StoredStringField;
 import org.apache.couchdb.nouveau.api.document.StringField;
 import org.apache.couchdb.nouveau.api.document.TextField;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.Field.Store;
-import org.apache.lucene.facet.FacetResult;
-import org.apache.lucene.facet.Facets;
-import org.apache.lucene.facet.FacetsCollector;
-import org.apache.lucene.facet.FacetsCollectorManager;
-import org.apache.lucene.facet.LabelAndValue;
-import org.apache.lucene.facet.StringDocValuesReaderState;
-import org.apache.lucene.facet.StringValueFacetCounts;
-import org.apache.lucene.facet.range.DoubleRangeFacetCounts;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.misc.store.DirectIODirectory;
-import org.apache.lucene.search.CollectorManager;
-import org.apache.lucene.search.FieldDoc;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.MultiCollectorManager;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.SearcherFactory;
-import org.apache.lucene.search.SearcherManager;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.TopFieldCollector;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.util.BytesRef;
+import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
+import org.apache.couchdb.nouveau.lucene9.lucene.document.Document;
+import org.apache.couchdb.nouveau.lucene9.lucene.document.Field.Store;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.FacetResult;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.Facets;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.FacetsCollector;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.FacetsCollectorManager;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.LabelAndValue;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.StringDocValuesReaderState;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.StringValueFacetCounts;
+import org.apache.couchdb.nouveau.lucene9.lucene.facet.range.DoubleRangeFacetCounts;
+import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexWriter;
+import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexWriterConfig;
+import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexableField;
+import org.apache.couchdb.nouveau.lucene9.lucene.index.Term;
+import org.apache.couchdb.nouveau.lucene9.lucene.misc.store.DirectIODirectory;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.CollectorManager;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.FieldDoc;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.IndexSearcher;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.MultiCollectorManager;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.Query;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.ScoreDoc;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherFactory;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherManager;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.Sort;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.SortField;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.TermQuery;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.TopDocs;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.TopFieldCollector;
+import org.apache.couchdb.nouveau.lucene9.lucene.store.Directory;
+import org.apache.couchdb.nouveau.lucene9.lucene.store.FSDirectory;
+import org.apache.couchdb.nouveau.lucene9.lucene.util.BytesRef;
 
 class LuceneIndex extends Index {
 
@@ -253,10 +253,10 @@ class LuceneIndex extends Index {
     }
 
     private DoubleRangeFacetCounts toDoubleRangeFacetCounts(final FacetsCollector fc, final String field, final List<DoubleRange> ranges) throws IOException {
-        final org.apache.lucene.facet.range.DoubleRange[] luceneRanges = new org.apache.lucene.facet.range.DoubleRange[ranges.size()];
+        final org.apache.couchdb.nouveau.lucene9.lucene.facet.range.DoubleRange[] luceneRanges = new org.apache.couchdb.nouveau.lucene9.lucene.facet.range.DoubleRange[ranges.size()];
         for (int i = 0; i < luceneRanges.length; i++) {
             final DoubleRange range = ranges.get(i);
-            luceneRanges[i] = new org.apache.lucene.facet.range.DoubleRange(
+            luceneRanges[i] = new org.apache.couchdb.nouveau.lucene9.lucene.facet.range.DoubleRange(
                 range.getLabel(), range.getMin(), range.isMinInclusive(), range.getMax(), range.isMaxInclusive());
         }
         return new DoubleRangeFacetCounts(field, fc, luceneRanges);
@@ -317,12 +317,12 @@ class LuceneIndex extends Index {
         final Document result = new Document();
 
         // id
-        result.add(new org.apache.lucene.document.StringField("_id", docId, Store.YES));
-        result.add(new org.apache.lucene.document.SortedDocValuesField("_id", new BytesRef(docId)));
+        result.add(new org.apache.couchdb.nouveau.lucene9.lucene.document.StringField("_id", docId, Store.YES));
+        result.add(new org.apache.couchdb.nouveau.lucene9.lucene.document.SortedDocValuesField("_id", new BytesRef(docId)));
 
         // partition (optional)
         if (request.hasPartition()) {
-            result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
+            result.add(new org.apache.couchdb.nouveau.lucene9.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
         }
 
         for (Field field : request.getFields()) {
@@ -339,60 +339,60 @@ class LuceneIndex extends Index {
     private static IndexableField toIndexableField(final Field field) {
         if (field instanceof DoubleDocValuesField) {
             final DoubleDocValuesField f = (DoubleDocValuesField) field;
-            return new org.apache.lucene.document.DoubleDocValuesField(f.getName(), f.getValue());
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.DoubleDocValuesField(f.getName(), f.getValue());
         }
         if (field instanceof DoublePoint) {
             final DoublePoint f = (DoublePoint) field;
-            return new org.apache.lucene.document.DoublePoint(f.getName(), f.getValue());
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.DoublePoint(f.getName(), f.getValue());
         }
         if (field instanceof SortedDocValuesField) {
             final SortedDocValuesField f = (SortedDocValuesField) field;
-            return new org.apache.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue()));
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue()));
         }
         if (field instanceof SortedSetDocValuesField) {
             final SortedSetDocValuesField f = (SortedSetDocValuesField) field;
-            return new org.apache.lucene.document.SortedSetDocValuesField(f.getName(), new BytesRef(f.getValue()));
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.SortedSetDocValuesField(f.getName(), new BytesRef(f.getValue()));
         }
         if (field instanceof StoredDoubleField) {
             final StoredDoubleField f = (StoredDoubleField) field;
-            return new org.apache.lucene.document.StoredField(f.getName(), f.getValue());
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.StoredField(f.getName(), f.getValue());
         }
         if (field instanceof StoredStringField) {
             final StoredStringField f = (StoredStringField) field;
-            return new org.apache.lucene.document.StoredField(f.getName(), f.getValue());
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.StoredField(f.getName(), f.getValue());
         }
         if (field instanceof StringField) {
             final StringField f = (StringField) field;
-            return new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.StringField(f.getName(), f.getValue(),
                 f.isStored() ? Store.YES : Store.NO);
         }
         if (field instanceof TextField) {
             final StringField f = (StringField) field;
-            return new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
+            return new org.apache.couchdb.nouveau.lucene9.lucene.document.TextField(f.getName(), f.getValue(),
                 f.isStored() ? Store.YES : Store.NO);
         }
         throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
     }
 
     private static Field toField(final IndexableField field) {
-        if (field instanceof org.apache.lucene.document.DoubleDocValuesField) {
-            final org.apache.lucene.document.DoubleDocValuesField f = (org.apache.lucene.document.DoubleDocValuesField) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.DoubleDocValuesField) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.DoubleDocValuesField f = (org.apache.couchdb.nouveau.lucene9.lucene.document.DoubleDocValuesField) field;
             return new DoubleDocValuesField(f.name(), (double) f.numericValue());
         }
-        if (field instanceof org.apache.lucene.document.DoublePoint) {
-            final org.apache.lucene.document.DoublePoint f = (org.apache.lucene.document.DoublePoint) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.DoublePoint) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.DoublePoint f = (org.apache.couchdb.nouveau.lucene9.lucene.document.DoublePoint) field;
             return new DoublePoint(f.name(), (double) f.numericValue());
         }
-        if (field instanceof org.apache.lucene.document.SortedDocValuesField) {
-            final org.apache.lucene.document.SortedDocValuesField f = (org.apache.lucene.document.SortedDocValuesField) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.SortedDocValuesField) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.SortedDocValuesField f = (org.apache.couchdb.nouveau.lucene9.lucene.document.SortedDocValuesField) field;
             return new SortedDocValuesField(f.name(), toBytes(f.binaryValue()));
         }
-        if (field instanceof org.apache.lucene.document.SortedSetDocValuesField) {
-            final org.apache.lucene.document.SortedSetDocValuesField f = (org.apache.lucene.document.SortedSetDocValuesField) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.SortedSetDocValuesField) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.SortedSetDocValuesField f = (org.apache.couchdb.nouveau.lucene9.lucene.document.SortedSetDocValuesField) field;
             return new SortedSetDocValuesField(f.name(), toBytes(f.binaryValue()));
         }
-        if (field instanceof org.apache.lucene.document.StoredField) {
-            final org.apache.lucene.document.StoredField f = (org.apache.lucene.document.StoredField) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.StoredField) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.StoredField f = (org.apache.couchdb.nouveau.lucene9.lucene.document.StoredField) field;
             if (f.stringValue() != null) {
                 return new StoredStringField(f.name(), f.stringValue());
             }
@@ -400,12 +400,12 @@ class LuceneIndex extends Index {
                 return new StoredDoubleField(f.name(), (Double) f.numericValue());
             }
         }
-        if (field instanceof org.apache.lucene.document.StringField) {
-            final org.apache.lucene.document.StringField f = (org.apache.lucene.document.StringField) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.StringField) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.StringField f = (org.apache.couchdb.nouveau.lucene9.lucene.document.StringField) field;
             return new StringField(f.name(), f.stringValue(), f.fieldType().stored());
         }
-        if (field instanceof org.apache.lucene.document.TextField) {
-            final org.apache.lucene.document.StringField f = (org.apache.lucene.document.StringField) field;
+        if (field instanceof org.apache.couchdb.nouveau.lucene9.lucene.document.TextField) {
+            final org.apache.couchdb.nouveau.lucene9.lucene.document.StringField f = (org.apache.couchdb.nouveau.lucene9.lucene.document.StringField) field;
             return new TextField(f.name(), f.stringValue(), f.fieldType().stored());
         }
         throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);

@@ -33,9 +33,9 @@ import org.apache.couchdb.nouveau.api.AnalyzeResponse;
 import org.apache.couchdb.nouveau.core.AnalyzerFactory;
 import com.codahale.metrics.annotation.Timed;
 
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
+import org.apache.couchdb.nouveau.lucene9.lucene.analysis.TokenStream;
+import org.apache.couchdb.nouveau.lucene9.lucene.analysis.tokenattributes.CharTermAttribute;
 
 @Path("/analyze")
 @Consumes(MediaType.APPLICATION_JSON)
