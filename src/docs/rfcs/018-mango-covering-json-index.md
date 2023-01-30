@@ -87,6 +87,54 @@ This would take place within `mango_view_cursor.erl`. The key functions
 involved are the shard-level `view_cb/2`, the streaming result handler at the
 coordinator end (`handle_message/2`) and the `execute/3` function.
 
+## Mango JSON index selection
+
+A Mango JSON index is implemented as a view with a complex key. The first field
+in the index is the first entry in the complex key, the second field is the
+second key and so on. Even indexes with one field use a complex key with length
+`1`.
+
+When choosing a JSON index to use for a query, there are a couple of things that
+are important to covering indexes.
+
+Firstly, note there are certain predicate operators that can be used with an
+index, currently: `$lt`, $lte`, `$eq`, $gte` and `$gt`. These can easily be
+converted to key operations within a key ordered index. For an index to be
+chosen for a query, the first key within the indexes complex key MUST be used
+with a predicate operator that can be converted into an operation on the index.
+
+Secondly, a quirk of Mango indexes is that for a document to be included in an
+index it must contain all of the index's indexed fields. Documents without all
+the fields will not be included. This means that when we are choosing an index
+for a query, we must further choose an index where the predicates within the
+`selector` imply `$exists=true` for all fields in the index's key. Without that,
+we will have incomplete results.
+
+Why is this? Let's look at an index with these fields:
+
+```json
+["age", "name"]
+```
+
+Now we index two documents. The first document is included in the index while the second is not (because it doesn't include `name`):
+
+
+```json
+{"_id": "foo", "age": 39, "name": "mike"}
+
+{"_id": "bar", "age": 39, "pet": "cat"}
+```
+
+The `selector` `{"age": {"$gt": 30}}` should return both documents. However, if
+we use the index above, we'd miss out `bar` because it's not in the index.
+Therefore we can't use the index.
+
+On the other hand, the `selector` `{"age": {"$gt": 30}, "name":
+{"$exists"=true}}` requires that the `name` field exist so the index can be used
+because the query predicates can only match documents containing both `age` and
+`name`, just like the index. In both cases, note the predicate `"age": {"$gt":
+30}` implies `"age": {"$exists"=true}`.
+
 ## Phase 1: handle keys only covering indexes
 
 Within `execute/3` we will need to decide whether the view should be requested
@@ -94,13 +142,20 @@ to include documents. If the index is covering, this will not be required and
 so the `include_docs` argument to the view fabric call will be `false`. We'll
 need to add a helper method to return whether the index is covering.
 
-When selecting an index, we'll need to be careful of some subtleties. We will
-need to ensure that only fields in the `selector` and not `fields` are used when
-choosing an index. This is because we require all keys in the index to be fields
-within the selector -- with predicates implying `$exists=true` -- due to the
-fact that only documents that include _all_ fields in the index are added to the
-index. Therefore, if the selector doesn't imply all fields in the index's keys
-exist, then using that index risks returning an incomplete result set.
+When selecting an index, we'll need to ensure that only fields in the `selector`
+and not `fields` are used when choosing an index. This is because we need all
+fields in the `selector` to be present per [Mango JSON index
+selection](#mango-json-index-selection). This is because `fields` is only used
+after we generate the result set, and none of the field names in `fields` need
+to exist in result documents.
+
+As an example, an index `["age", "name"]` would still require the `selector` to
+imply `$exists=true` for both `age` and `name` even if the `fields` were just
+`["age"]` in order that correct results be returned.
+
+Of note, this means that if an index is unusable pre-covering-index support, it
+will continue to be unusable after this implementation: whether an index covers
+a query is only used to prefer one already usable index over another.
 
 Within `view_cb/2`, we'll need to know whether an index is covering. Without
 that, `view_cb/2` will interpret the lack of included documents as an indicator
@@ -160,9 +215,10 @@ We'll then need to update the Mango cursor methods mentioned above to take
 account of the values within the covering index code.
 
 One thing to be careful about is again index selection. We will still need all
-index keys to be present in the selector as above so need differentiate between
-the fields in index's keys and values when selecting an index to ensure we
-retain the correct behaviour.
+index keys to be present in the `selector` as above so need differentiate
+between the fields in index's keys and values when selecting an index to ensure
+we retain the correct behaviour per [Mango JSON index
+selection](#mango-json-index-selection).
 
 ## Mixed versions during cluster upgrades
 
