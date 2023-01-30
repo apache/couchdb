@@ -27,7 +27,6 @@
     <maven.compiler.target>11</maven.compiler.target>
     <argLine>-Duser.language=en -Duser.region=US -Duser.timezone=UTC</argLine>
     <dropwizard.version>2.1.4</dropwizard.version>
-    <lucene.version>9.4.2</lucene.version>
     <slf4j.version>1.7.32</slf4j.version>
     <junit5.version>5.8.2</junit5.version>
   </properties>
@@ -54,54 +53,14 @@
   <dependencies>
     <!-- Lucene -->
     <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-core</artifactId>
-      <version>${lucene.version}</version>
+      <groupId>org.apache.couchdb.nouveau</groupId>
+      <artifactId>shaded-lucene-4</artifactId>
+      <version>${project.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-grouping</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-queryparser</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-analysis-common</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-analysis-stempel</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-analysis-smartcn</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-analysis-kuromoji</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-facet</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-spatial-extras</artifactId>
-      <version>${lucene.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.lucene</groupId>
-      <artifactId>lucene-misc</artifactId>
-      <version>${lucene.version}</version>
+      <groupId>org.apache.couchdb.nouveau</groupId>
+      <artifactId>shaded-lucene-9</artifactId>
+      <version>${project.version}</version>
     </dependency>
 
     <!-- Dropwizard -->

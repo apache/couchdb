@@ -17,8 +17,8 @@ import java.io.IOException;
 import java.nio.file.Path;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.search.SearcherFactory;
+import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherFactory;
 
 public class LuceneIndexFactory implements IndexFactory {
 

@@ -16,9 +16,9 @@ package org.apache.couchdb.nouveau.core;
 import java.io.IOException;
 import java.util.concurrent.Executor;
 
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.SearcherFactory;
+import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexReader;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.IndexSearcher;
+import org.apache.couchdb.nouveau.lucene9.lucene.search.SearcherFactory;
 
 public class ParallelSearcherFactory extends SearcherFactory {
 
