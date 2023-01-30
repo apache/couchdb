@@ -105,8 +105,9 @@ exist, then using that index risks returning an incomplete result set.
 Within `view_cb/2`, we'll need to know whether an index is covering. Without
 that, `view_cb/2` will interpret the lack of included documents as an indicator
 that it should do nothing, while in fact we want it to fully process the result
-as it does when `include_docs` is used -- apart from when the user passes `r>=2` in the Mango query because then the coordinator reads and processes
-documents. (Aside: it'd be good to remove this `r` option to simplify things).
+as it does when `include_docs` is used -- apart from when the user passes `r>=2`
+in the Mango query because then the coordinator reads and processes documents.
+(Aside: it'd be good to remove this `r` option to simplify things).
 
 In `handle_message/2` the main work is ensuring that we handle mixed cluster
 version states -- ie, cluster state during upgrades.
@@ -162,6 +163,55 @@ One thing to be careful about is again index selection. We will still need all
 index keys to be present in the selector as above so need differentiate between
 the fields in index's keys and values when selecting an index to ensure we
 retain the correct behaviour.
+
+## Mixed versions during cluster upgrades
+
+The relevant scenarios here are an updated coordinator talking to outdated
+shards, and the opposite of an outdated coordinator talking to upgraded shards.
+A further wrinkle is that while a coordinator is either upgraded or not, the
+shards that the coordinator speaks to can be a mixture of upgraded and outdated.
+
+For the purposes of this discussion, we only need to worry about when a covering
+index is in play during a query; the code path outside that use-case should not
+change.
+
+From what I can tell, we can avoid special code paths for cluster upgrades
+specific to this work. Instead we accept that some queries will take longer
+during cluster upgrade mixed version operation. This is described below.
+
+### Updated coordinator, outdated shard
+
+In this case, the coordinator will note the covering index, and set the view
+query option `include_docs=false`. This means that the row passed to `view_cb/2`
+will not have a document included. In the function, `case ViewRow#view_row.doc
+of` will hit the `undefined` clause, meaning that the row is passed through
+unchanged, without the document. When the row reaches the coordinator and is
+passed to `doc_member_and_extract/2` from `handle_message/2`, the `case
+couch_util:get_value(doc, RowProps) of` will also hit its `undefined` clause.
+The coordinator will then perform a quorum read with `r=1` of the document and
+carry out the match and extract.
+
+This will slow down the processing of results at the coordinator for that row,
+but shouldn't alter the correctness of the result. So we shouldn't need a
+special code path to support this case. Which is nice.
+
+### Outdated coordinator, updated shard
+
+In this case, the coordinator won't be checking for covering indexes, meaning
+that `include_docs=true` will be set when `r<2` as today.
+
+I suspect we'll set an option in `viewcbargs` that contains the index field
+names and whether its a covering index. This means that an updated shard will be
+checking for those fields. When it can't find them, it'll fallback to the
+current behaviour in `view_cb/2`, meaning that it reads the document found via
+`include_docs=true`, execute `match_and_extract_doc/3` and return the row if it
+matches the query.
+
+The coordinator will received the final result document as today and assume it's
+correct, and forward it to the client.More work than needed will be carried out
+at the shard. But, again, this doesn't appear to require special code so long as
+we are careful.
+
 
 # Advantages and Disadvantages
 
