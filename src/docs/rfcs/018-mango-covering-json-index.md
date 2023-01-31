@@ -68,7 +68,7 @@ document are to be interpreted as described in
 
 - Mango: CouchDB's Mongo inspired querying system.
 - View / JSON index: Mango index that uses the same index as Cloudant views.
-- Coordinator: the erlang process that handles doing a distributed query across
+- Coordinator: the Erlang process that handles doing a distributed query across
     a CouchDB cluster.
 
 ---
@@ -98,7 +98,7 @@ When choosing a JSON index to use for a query, there are a couple of things that
 are important to covering indexes.
 
 Firstly, note there are certain predicate operators that can be used with an
-index, currently: `$lt`, $lte`, `$eq`, $gte` and `$gt`. These can easily be
+index, currently: `$lt`, `$lte`, `$eq`, $gte` and `$gt`. These can easily be
 converted to key operations within a key ordered index. For an index to be
 chosen for a query, the first key within the indexes complex key MUST be used
 with a predicate operator that can be converted into an operation on the index.
@@ -191,6 +191,9 @@ Behaviour requirements:
     field references in mango, `person.address.zip`.
 - There is no notation to include the whole document, that is, no equivalent of
     `emit(doc.name, doc)`.
+- `"include": []` is equivalent to omitting the `include` field.
+- Ordering of the fields in `include` is not important. They can be reordered
+    before storing if needed (eg, sorted).
 - It will be an error to include a field in both `fields` and `include`. This
     should be rejected by the `_index` call.
 - The `include` field would be rejected for `text` type indexes.
@@ -219,6 +222,40 @@ index keys to be present in the `selector` as above so need differentiate
 between the fields in index's keys and values when selecting an index to ensure
 we retain the correct behaviour per [Mango JSON index
 selection](#mango-json-index-selection).
+
+### Limits on included fields
+
+Adding "too much" data to indexes is likely to slow down index scans because
+there will be more data to process. We would also like to avoid users creating
+pathological cases just because they can. Therefore, limiting the data that can
+be stored seems wise. Saying that, for those that are willing to profile their
+workloads should have a get-out clause from limits.
+
+As an example, [postgres](https://www.postgresql.org/docs/current/limits.html) limits indexes to 32 columns. Its max field size is 1GB; I think we'd like something a little smaller!
+
+Therefore the feature will have the following limit enforcement settings:
+
+- `mango_json_index_include_fields_max` is the limit on the length of the
+    `include` list.
+- `mango_json_index_include_depth_max` is a limit on the depth of fields we will
+    pull out. Basically the maximum numbers of `.` in a path.
+- If the total number of bytes for values exceeds
+  `mango_json_index_include_size_bytes_max` then we will skip that document from
+  the index.
+
+I need to check whether these should be prefixed `mango_` given they would live
+in a `mango` configuration section.
+
+Defaults:
+
+- `mango_json_index_include_fields_max=16`
+- `mango_json_index_include_depth_max=8`
+- `mango_json_index_include_size_bytes_max=32768` (32kb)
+
+I have chosen power-of-two limits mostly because they feel like familiar
+numbers. Not a great reason, so these may be refined during code writing if I
+can work out suitable benchmarks.
+
 
 ## Mixed versions during cluster upgrades
 
@@ -257,14 +294,14 @@ In this case, the coordinator won't be checking for covering indexes, meaning
 that `include_docs=true` will be set when `r<2` as today.
 
 I suspect we'll set an option in `viewcbargs` that contains the index field
-names and whether its a covering index. This means that an updated shard will be
-checking for those fields. When it can't find them, it'll fallback to the
+names and whether it's a covering index. This means that an updated shard will
+be checking for those fields. When it can't find them, it'll fallback to the
 current behaviour in `view_cb/2`, meaning that it reads the document found via
 `include_docs=true`, execute `match_and_extract_doc/3` and return the row if it
 matches the query.
 
 The coordinator will received the final result document as today and assume it's
-correct, and forward it to the client.More work than needed will be carried out
+correct, and forward it to the client. More work than needed will be carried out
 at the shard. But, again, this doesn't appear to require special code so long as
 we are careful.
 
