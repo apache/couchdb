@@ -13,19 +13,16 @@
 
 package org.apache.couchdb.nouveau.api.document;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.jackson.JsonSnakeCase;
+public final class DoubleDocValuesField extends Field {
 
-@JsonSnakeCase
-public class DoubleDocValuesField extends Field {
+    private final double value;
 
-    private double value;
-
-    public DoubleDocValuesField() {
-    }
-
-    public DoubleDocValuesField(final String name, final double value) {
+    @JsonCreator
+    public DoubleDocValuesField(@JsonProperty("name") final String name,
+            @JsonProperty("value") final double value) {
         super(name);
         this.value = value;
     }
@@ -33,10 +30,6 @@ public class DoubleDocValuesField extends Field {
     @JsonProperty
     public double getValue() {
         return value;
-    }
-
-    public void setValue(double value) {
-        this.value = value;
     }
 
     @Override

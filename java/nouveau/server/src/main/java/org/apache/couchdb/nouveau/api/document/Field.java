@@ -37,10 +37,7 @@ import io.dropwizard.jackson.JsonSnakeCase;
 })
 public abstract class Field {
 
-    protected String name;
-
-    public Field() {
-    }
+    protected final String name;
 
     protected Field(final String name) {
         this.name = name;
@@ -49,10 +46,6 @@ public abstract class Field {
     @JsonProperty
     public String getName() {
         return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
     }
 
 }

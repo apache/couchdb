@@ -13,24 +13,22 @@
 
 package org.apache.couchdb.nouveau.api.document;
 
-public class StoredDoubleField extends Field {
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-    private double value;
+public final class StoredDoubleField extends Field {
 
-    public StoredDoubleField() {
-    }
+    private final double value;
 
-    public StoredDoubleField(String name, double value) {
+    @JsonCreator
+    public StoredDoubleField(@JsonProperty("name") final String name, @JsonProperty("value") final double value) {
         super(name);
         this.value = value;
     }
 
+    @JsonProperty
     public double getValue() {
         return value;
-    }
-
-    public void setValue(double value) {
-        this.value = value;
     }
 
     @Override

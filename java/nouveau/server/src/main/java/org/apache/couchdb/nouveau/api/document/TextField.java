@@ -15,19 +15,14 @@ package org.apache.couchdb.nouveau.api.document;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.jackson.JsonSnakeCase;
+public final class TextField extends Field {
 
-@JsonSnakeCase
-public class TextField extends Field {
+    private final String value;
 
-    private String value;
+    private final boolean stored;
 
-    private boolean stored;
-
-    public TextField() {
-    }
-
-    public TextField(final String name, final String value, final boolean stored) {
+    public TextField(@JsonProperty("name") final String name, @JsonProperty("value") final String value,
+            @JsonProperty("stored") final boolean stored) {
         super(name);
         this.value = value;
         this.stored = stored;
@@ -38,17 +33,9 @@ public class TextField extends Field {
         return value;
     }
 
-    public void setValue(String value) {
-        this.value = value;
-    }
-
     @JsonProperty
     public boolean isStored() {
         return stored;
-    }
-
-    public void setStored(boolean stored) {
-        this.stored = stored;
     }
 
     @Override

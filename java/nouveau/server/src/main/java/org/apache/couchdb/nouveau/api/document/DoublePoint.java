@@ -15,19 +15,15 @@ package org.apache.couchdb.nouveau.api.document;
 
 import java.util.Arrays;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.jackson.JsonSnakeCase;
+public final class DoublePoint extends Field {
 
-@JsonSnakeCase
-public class DoublePoint extends Field {
+    private final double[] value;
 
-    private double[] value;
-
-    public DoublePoint() {
-    }
-
-    public DoublePoint(final String name, final double... value) {
+    @JsonCreator
+    public DoublePoint(@JsonProperty("name") final String name, @JsonProperty("value") final double... value) {
         super(name);
         this.value = value;
     }
@@ -35,11 +31,6 @@ public class DoublePoint extends Field {
     @JsonProperty
     public double[] getValue() {
         return value;
-    }
-
-    @JsonProperty
-    public void setValue(double... value) {
-        this.value = value;
     }
 
     @Override
