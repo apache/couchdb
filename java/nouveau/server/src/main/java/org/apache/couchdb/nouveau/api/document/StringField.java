@@ -15,22 +15,19 @@ package org.apache.couchdb.nouveau.api.document;
 
 import javax.validation.constraints.NotNull;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.jackson.JsonSnakeCase;
-
-@JsonSnakeCase
-public class StringField extends Field {
+public final class StringField extends Field {
 
     @NotNull
-    private String value;
+    private final String value;
 
-    private boolean stored;
+    private final boolean stored;
 
-    public StringField() {
-    }
-
-    public StringField(final String name, final String value, final boolean stored) {
+    @JsonCreator
+    public StringField(@JsonProperty("name") final String name, @JsonProperty("value") final String value,
+            @JsonProperty("stored") final boolean stored) {
         super(name);
         this.value = value;
         this.stored = stored;
@@ -41,17 +38,9 @@ public class StringField extends Field {
         return value;
     }
 
-    public void setValue(String value) {
-        this.value = value;
-    }
-
     @JsonProperty
     public boolean isStored() {
         return stored;
-    }
-
-    public void setStored(boolean stored) {
-        this.stored = stored;
     }
 
     @Override

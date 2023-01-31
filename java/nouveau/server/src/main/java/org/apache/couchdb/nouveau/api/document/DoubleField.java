@@ -13,33 +13,31 @@
 
 package org.apache.couchdb.nouveau.api.document;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.jackson.JsonSnakeCase;
+public final class DoubleField extends Field {
 
-@JsonSnakeCase
-public class DoubleField extends Field {
+    private final double value;
 
-    private double value;
+    private final boolean stored;
 
-    private boolean stored;
+    @JsonCreator
+    public DoubleField(@JsonProperty("name") final String name,
+            @JsonProperty("value") final double value, @JsonProperty("stored") final boolean stored) {
+        super(name);
+        this.value = value;
+        this.stored = stored;
+    }
 
     @JsonProperty
     public double getValue() {
         return value;
     }
 
-    public void setValue(double value) {
-        this.value = value;
-    }
-
     @JsonProperty
     public boolean isStored() {
         return stored;
-    }
-
-    public void setStored(boolean stored) {
-        this.stored = stored;
     }
 
     @Override

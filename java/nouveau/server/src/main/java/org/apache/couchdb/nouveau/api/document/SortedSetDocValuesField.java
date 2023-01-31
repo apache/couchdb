@@ -14,19 +14,15 @@ package org.apache.couchdb.nouveau.api.document;
 
 import java.util.Arrays;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.jackson.JsonSnakeCase;
+public final class SortedSetDocValuesField extends Field {
 
-@JsonSnakeCase
-public class SortedSetDocValuesField extends Field {
+    private final byte[] value;
 
-    private byte[] value;
-
-    public SortedSetDocValuesField() {
-    }
-
-    public SortedSetDocValuesField(final String name, final byte[] value) {
+    @JsonCreator
+    public SortedSetDocValuesField(@JsonProperty("name") final String name, @JsonProperty("value") final byte[] value) {
         super(name);
         this.value = value;
     }
@@ -36,13 +32,9 @@ public class SortedSetDocValuesField extends Field {
         return value;
     }
 
-    public void setValue(byte[] value) {
-        this.value = value;
-    }
-
     @Override
     public String toString() {
         return "SortedSetDocValuesField [name=" + name + ", value=" + Arrays.toString(value) + "]";
-    }    
-    
+    }
+
 }
