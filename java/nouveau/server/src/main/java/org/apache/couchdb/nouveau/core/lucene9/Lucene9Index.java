@@ -44,8 +44,6 @@ import org.apache.couchdb.nouveau.api.document.StoredStringField;
 import org.apache.couchdb.nouveau.api.document.StringField;
 import org.apache.couchdb.nouveau.api.document.TextField;
 import org.apache.couchdb.nouveau.core.Index;
-import org.apache.couchdb.nouveau.core.QueryParser;
-import org.apache.couchdb.nouveau.core.QueryParserException;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.document.Document;
 import org.apache.couchdb.nouveau.lucene9.lucene.document.Field.Store;
@@ -60,6 +58,7 @@ import org.apache.couchdb.nouveau.lucene9.lucene.facet.range.DoubleRangeFacetCou
 import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexWriter;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.IndexableField;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.Term;
+import org.apache.couchdb.nouveau.lucene9.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.CollectorManager;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.FieldDoc;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.IndexSearcher;
@@ -127,8 +126,13 @@ class Lucene9Index extends Index {
     }
 
     @Override
-    public SearchResults doSearch(final SearchRequest request) throws IOException, QueryParserException {
-        final Query query = newQueryParser().parse(request);
+    public SearchResults doSearch(final SearchRequest request) throws IOException {
+        final Query query;
+        try {
+            query = newQueryParser().parse(request);
+        } catch (final QueryNodeException e) {
+            throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
+        }
 
         // Construct CollectorManagers.
         final MultiCollectorManager cm;
@@ -429,7 +433,7 @@ class Lucene9Index extends Index {
         return new Term("_id", docId);
     }
 
-    public QueryParser newQueryParser() {
+    public Lucene9QueryParser newQueryParser() {
         return new Lucene9QueryParser("default", analyzer);
     }
 

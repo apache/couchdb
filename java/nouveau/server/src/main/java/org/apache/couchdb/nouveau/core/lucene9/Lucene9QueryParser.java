@@ -14,8 +14,6 @@
 package org.apache.couchdb.nouveau.core.lucene9;
 
 import org.apache.couchdb.nouveau.api.SearchRequest;
-import org.apache.couchdb.nouveau.core.QueryParser;
-import org.apache.couchdb.nouveau.core.QueryParserException;
 import org.apache.couchdb.nouveau.lucene9.lucene.analysis.Analyzer;
 import org.apache.couchdb.nouveau.lucene9.lucene.index.Term;
 import org.apache.couchdb.nouveau.lucene9.lucene.queryparser.flexible.core.QueryNodeException;
@@ -51,7 +49,7 @@ import org.apache.couchdb.nouveau.lucene9.lucene.search.BooleanQuery;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.Query;
 import org.apache.couchdb.nouveau.lucene9.lucene.search.TermQuery;
 
-class Lucene9QueryParser extends QueryParserHelper implements QueryParser {
+class Lucene9QueryParser extends QueryParserHelper {
 
     private static class NouveauQueryNodeProcessorPipeline extends QueryNodeProcessorPipeline {
 
@@ -102,21 +100,17 @@ class Lucene9QueryParser extends QueryParserHelper implements QueryParser {
 
     public void setEnablePositionIncrements(boolean enabled) {
         getQueryConfigHandler().set(ConfigurationKeys.ENABLE_POSITION_INCREMENTS, enabled);
-      }
+    }
 
-    public Query parse(SearchRequest searchRequest) throws QueryParserException {
-        try {
-            final Query q = (Query) parse(searchRequest.getQuery(), defaultField);
-            if (searchRequest.hasPartition()) {
-                final BooleanQuery.Builder builder = new BooleanQuery.Builder();
-                builder.add(new TermQuery(new Term("_partition", searchRequest.getPartition())), Occur.MUST);
-                builder.add(q, Occur.MUST);
-                return builder.build();
-            }
-            return q;
-        } catch (QueryNodeException e) {
-            throw new QueryParserException(e);
+    public Query parse(SearchRequest searchRequest) throws QueryNodeException {
+        final Query q = (Query) parse(searchRequest.getQuery(), defaultField);
+        if (searchRequest.hasPartition()) {
+            final BooleanQuery.Builder builder = new BooleanQuery.Builder();
+            builder.add(new TermQuery(new Term("_partition", searchRequest.getPartition())), Occur.MUST);
+            builder.add(q, Occur.MUST);
+            return builder.build();
         }
+        return q;
     }
 
 }

@@ -55,11 +55,11 @@ public abstract class Index implements Closeable {
 
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
-    public final SearchResults search(final SearchRequest request) throws IOException, QueryParserException {
+    public final SearchResults search(final SearchRequest request) throws IOException {
         return doSearch(request);
     }
 
-    protected abstract SearchResults doSearch(final SearchRequest request) throws IOException, QueryParserException;
+    protected abstract SearchResults doSearch(final SearchRequest request) throws IOException;
 
     public final boolean commit() throws IOException {
         final long updateSeq;
