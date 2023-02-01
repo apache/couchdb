@@ -27,7 +27,6 @@ import javax.ws.rs.core.MediaType;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexManager;
-import org.apache.couchdb.nouveau.core.QueryParserException;
 
 import com.codahale.metrics.annotation.Timed;
 
@@ -46,7 +45,7 @@ public class SearchResource {
     @Timed
     @Path("/search")
     public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest searchRequest)
-            throws IOException, QueryParserException {
+            throws IOException {
         return indexManager.acquire(name).search(searchRequest);
     }
 
