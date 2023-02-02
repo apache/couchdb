@@ -56,7 +56,6 @@ class ConfigObject(ObjectDescription):
 
 
 class ConfigIndex(Index):
-
     name = "ref"
     localname = "Configuration Quick Reference"
     shortname = "Config Quick Reference"
@@ -79,7 +78,6 @@ class ConfigIndex(Index):
 
 
 class ConfigDomain(Domain):
-
     name = "config"
     label = "CONFIG"
 
