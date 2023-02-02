@@ -452,7 +452,6 @@ def boot_haproxy(ctx):
 
 
 def hack_default_ini(ctx, node, contents):
-
     contents = re.sub(
         "^\[httpd\]$",
         "[httpd]\nenable = true",
@@ -594,7 +593,6 @@ def check_node_alive(url):
 
 
 def set_boot_env(ctx):
-
     # fudge fauxton path
     if os.path.exists("src/fauxton/dist/release"):
         fauxton_root = "src/fauxton/dist/release"
