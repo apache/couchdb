@@ -18,7 +18,7 @@ TEST_COLLECTIONS = {
 
 def _attrs(elem):
     ret = {}
-    for (k, v) in elem.attributes.items():
+    for k, v in elem.attributes.items():
         ret[k.lower()] = v
     return ret
 
@@ -381,7 +381,7 @@ def main():
         args.collection = ["eunit", "exunit", "mango", "javascript"]
 
     collections = []
-    for (name, pattern) in TEST_COLLECTIONS.items():
+    for name, pattern in TEST_COLLECTIONS.items():
         if name.lower() not in args.collection:
             continue
         collections.append(TestCollection(name, pattern))

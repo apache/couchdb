@@ -16,7 +16,6 @@ import unittest
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class NoDefaultFieldTest(mango.UserDocsTextTests):
-
     DEFAULT_FIELD = False
 
     def test_basic(self):
@@ -32,7 +31,6 @@ class NoDefaultFieldTest(mango.UserDocsTextTests):
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class NoDefaultFieldWithAnalyzer(mango.UserDocsTextTests):
-
     DEFAULT_FIELD = {"enabled": False, "analyzer": "keyword"}
 
     def test_basic(self):
@@ -47,7 +45,6 @@ class NoDefaultFieldWithAnalyzer(mango.UserDocsTextTests):
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class DefaultFieldWithCustomAnalyzer(mango.UserDocsTextTests):
-
     DEFAULT_FIELD = {"enabled": True, "analyzer": "keyword"}
 
     def test_basic(self):

@@ -17,7 +17,6 @@ import user_docs
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class CustomFieldsTest(mango.UserDocsTextTests):
-
     FIELDS = [
         {"name": "favorites.[]", "type": "string"},
         {"name": "manager", "type": "boolean"},
@@ -163,7 +162,6 @@ class CustomFieldsTest(mango.UserDocsTextTests):
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class CustomFieldsExistsTest(mango.UserDocsTextTests):
-
     FIELDS = [
         {"name": "exists_field", "type": "string"},
         {"name": "exists_array.[]", "type": "string"},
