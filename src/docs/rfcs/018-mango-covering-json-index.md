@@ -66,7 +66,7 @@ document are to be interpreted as described in
 
 [TIP]:  # ( Provide a list of any unique terms or acronyms, and their definitions here.)
 
-- Mango: CouchDB's Mongo inspired querying system.
+- Mango: CouchDB's Mongo-inspired querying system.
 - View / JSON index: Mango index that uses the same index as Cloudant views.
 - Coordinator: the Erlang process that handles doing a distributed query across
     a CouchDB cluster.
@@ -98,7 +98,7 @@ When choosing a JSON index to use for a query, there are a couple of things that
 are important to covering indexes.
 
 Firstly, note there are certain predicate operators that can be used with an
-index, currently: `$lt`, `$lte`, `$eq`, $gte` and `$gt`. These can easily be
+index, currently: `$lt`, `$lte`, `$eq`, `$gte` and `$gt`. These can easily be
 converted to key operations within a key ordered index. For an index to be
 chosen for a query, the first key within the indexes complex key MUST be used
 with a predicate operator that can be converted into an operation on the index.
@@ -129,11 +129,11 @@ The `selector` `{"age": {"$gt": 30}}` should return both documents. However, if
 we use the index above, we'd miss out `bar` because it's not in the index.
 Therefore we can't use the index.
 
-On the other hand, the `selector` `{"age": {"$gt": 30}, "name":
-{"$exists"=true}}` requires that the `name` field exist so the index can be used
-because the query predicates can only match documents containing both `age` and
-`name`, just like the index. In both cases, note the predicate `"age": {"$gt":
-30}` implies `"age": {"$exists"=true}`.
+On the other hand, the `selector` `{"age": {"$gt": 30}, "name": {"$exists":
+true}}` requires that the `name` field exist so the index can be used because
+the query predicates can only match documents containing both `age` and `name`,
+just like the index. In both cases, note the predicate `"age": {"$gt": 30}`
+implies `"age": {"$exists": true}`.
 
 ## Phase 1: handle keys only covering indexes
 
@@ -188,10 +188,11 @@ Behaviour requirements:
     document in order that the document be included in the index. This is to
     allow the index to cover more queries.
 - Including a deeply nested field would follow the same pattern as for other
-    field references in mango, `person.address.zip`.
+    field references in Mango, `person.address.zip`.
 - There is no notation to include the whole document, that is, no equivalent of
     `emit(doc.name, doc)`.
-- `"include": []` is equivalent to omitting the `include` field.
+- `"include": []`,  `"include": null` and omitting the `include` field are all
+    equivalent.
 - Ordering of the fields in `include` is not important. They can be reordered
     before storing if needed (eg, sorted).
 - It will be an error to include a field in both `fields` and `include`. This
@@ -240,8 +241,8 @@ Therefore the feature will have the following limit enforcement settings:
 - `mango_json_index_include_depth_max` is a limit on the depth of fields we will
     pull out. Basically the maximum numbers of `.` in a path.
 - If the total number of bytes for values exceeds
-  `mango_json_index_include_size_bytes_max` then we will skip that document from
-  the index.
+    `mango_json_index_include_size_bytes_max` then we will skip that document
+    from the index.
 
 I need to check whether these should be prefixed `mango_` given they would live
 in a `mango` configuration section.
@@ -300,7 +301,7 @@ current behaviour in `view_cb/2`, meaning that it reads the document found via
 `include_docs=true`, execute `match_and_extract_doc/3` and return the row if it
 matches the query.
 
-The coordinator will received the final result document as today and assume it's
+The coordinator will receive the final result document as today and assume it's
 correct, and forward it to the client. More work than needed will be carried out
 at the shard. But, again, this doesn't appear to require special code so long as
 we are careful.
