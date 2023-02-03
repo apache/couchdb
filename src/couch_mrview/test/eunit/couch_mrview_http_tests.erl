@@ -33,5 +33,61 @@ mrview_http_test_() ->
                 undefined,
                 #mrargs{}
             )
+        ),
+
+        ?_assertEqual(
+            #mrargs{start_key = 1, end_key = 1, group_level = undefined, group = undefined},
+            couch_mrview_http:parse_params(
+                [{"key", "1"}],
+                undefined,
+                #mrargs{}
+            )
+        ),
+
+        ?_assertThrow(
+            {query_parse_error, <<"`key(s)` is incompatible with `start_key` and `end_key`">>},
+            couch_mrview_http:parse_params(
+                [{"key", "1"}, {"start_key", "2"}],
+                undefined,
+                #mrargs{}
+            )
+        ),
+
+        ?_assertThrow(
+            {query_parse_error, <<"`key(s)` is incompatible with `start_key` and `end_key`">>},
+            couch_mrview_http:parse_params(
+                [{"end_key", "5"}, {"key", "1"}],
+                undefined,
+                #mrargs{}
+            )
+        ),
+
+        ?_assertThrow(
+            {query_parse_error, <<"`key(s)` is incompatible with `start_key` and `end_key`">>},
+            couch_mrview_http:parse_params(
+                [{"keys", "[1]"}, {"end_key", "5"}],
+                undefined,
+                #mrargs{}
+            )
+        ),
+
+        ?_assertEqual(
+            #mrargs{start_key = 1, end_key = 1, group_level = undefined},
+            couch_mrview_http:parse_params(
+                [{"keys", "[1]"}],
+                undefined,
+                #mrargs{}
+            )
+        ),
+
+        ?_assertEqual(
+            #mrargs{
+                keys = [1, 2], start_key = undefined, end_key = undefined, group_level = undefined
+            },
+            couch_mrview_http:parse_params(
+                [{"keys", "[1, 2]"}],
+                undefined,
+                #mrargs{}
+            )
         )
     ].

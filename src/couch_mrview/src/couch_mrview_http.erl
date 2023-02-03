@@ -486,7 +486,12 @@ parse_params(Props, Keys, #mrargs{} = Args0, Options) ->
                 Args0;
             _ ->
                 % group_level set to undefined to detect if explicitly set by user
-                Args0#mrargs{keys = Keys, group = undefined, group_level = undefined}
+                case Keys of
+                    [_] ->
+                        Args0#mrargs{group = undefined, group_level = undefined};
+                    _ ->
+                        Args0#mrargs{keys = Keys, group = undefined, group_level = undefined}
+                end
         end,
     lists:foldl(
         fun({K, V}, Acc) ->
@@ -525,34 +530,147 @@ parse_param(Key, Val, Args, IsDecoded) ->
         "reduce" ->
             Args#mrargs{reduce = parse_boolean(Val)};
         "key" when IsDecoded ->
-            Args#mrargs{start_key = Val, end_key = Val};
+            case Args#mrargs.start_key =:= undefined andalso Args#mrargs.end_key =:= undefined of
+                true ->
+                    Args#mrargs{start_key = Val, end_key = Val};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "key" ->
-            JsonKey = ?JSON_DECODE(Val),
-            Args#mrargs{start_key = JsonKey, end_key = JsonKey};
+            case Args#mrargs.start_key =:= undefined andalso Args#mrargs.end_key =:= undefined of
+                true ->
+                    JsonKey = ?JSON_DECODE(Val),
+                    Args#mrargs{start_key = JsonKey, end_key = JsonKey};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "keys" when IsDecoded ->
-            Args#mrargs{keys = Val};
+            case Val of
+                [Val1] ->
+                    case
+                        Args#mrargs.start_key =:= undefined andalso
+                            Args#mrargs.end_key =:= undefined
+                    of
+                        true ->
+                            Args#mrargs{start_key = Val1, end_key = Val1};
+                        _ ->
+                            throw(
+                                {query_parse_error,
+                                    <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                            )
+                    end;
+                _ ->
+                    Args#mrargs{keys = Val}
+            end;
         "keys" ->
-            Args#mrargs{keys = ?JSON_DECODE(Val)};
+            Val1 = ?JSON_DECODE(Val),
+            case Val1 of
+                [Val2] ->
+                    case
+                        Args#mrargs.start_key =:= undefined andalso
+                            Args#mrargs.end_key =:= undefined
+                    of
+                        true ->
+                            Args#mrargs{start_key = Val2, end_key = Val2};
+                        _ ->
+                            throw(
+                                {query_parse_error,
+                                    <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                            )
+                    end;
+                _ ->
+                    Args#mrargs{keys = Val1}
+            end;
         "startkey" when IsDecoded ->
-            Args#mrargs{start_key = Val};
+            case Args#mrargs.start_key =:= undefined of
+                true ->
+                    Args#mrargs{start_key = Val};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "start_key" when IsDecoded ->
-            Args#mrargs{start_key = Val};
+            case Args#mrargs.start_key =:= undefined of
+                true ->
+                    Args#mrargs{start_key = Val};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "startkey" ->
-            Args#mrargs{start_key = ?JSON_DECODE(Val)};
+            case Args#mrargs.start_key =:= undefined of
+                true ->
+                    Args#mrargs{start_key = ?JSON_DECODE(Val)};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "start_key" ->
-            Args#mrargs{start_key = ?JSON_DECODE(Val)};
+            case Args#mrargs.start_key =:= undefined of
+                true ->
+                    Args#mrargs{start_key = ?JSON_DECODE(Val)};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "startkey_docid" ->
             Args#mrargs{start_key_docid = couch_util:to_binary(Val)};
         "start_key_doc_id" ->
             Args#mrargs{start_key_docid = couch_util:to_binary(Val)};
         "endkey" when IsDecoded ->
-            Args#mrargs{end_key = Val};
+            case Args#mrargs.end_key =:= undefined of
+                true ->
+                    Args#mrargs{end_key = Val};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "end_key" when IsDecoded ->
-            Args#mrargs{end_key = Val};
+            case Args#mrargs.end_key =:= undefined of
+                true ->
+                    Args#mrargs{end_key = Val};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "endkey" ->
-            Args#mrargs{end_key = ?JSON_DECODE(Val)};
+            case Args#mrargs.end_key =:= undefined of
+                true ->
+                    Args#mrargs{end_key = ?JSON_DECODE(Val)};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "end_key" ->
-            Args#mrargs{end_key = ?JSON_DECODE(Val)};
+            case Args#mrargs.end_key =:= undefined of
+                true ->
+                    Args#mrargs{end_key = ?JSON_DECODE(Val)};
+                _ ->
+                    throw(
+                        {query_parse_error,
+                            <<"`key(s)` is incompatible with `start_key` and `end_key`">>}
+                    )
+            end;
         "endkey_docid" ->
             Args#mrargs{end_key_docid = couch_util:to_binary(Val)};
         "end_key_doc_id" ->

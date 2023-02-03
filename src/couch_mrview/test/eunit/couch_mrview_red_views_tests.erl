@@ -40,6 +40,7 @@ reduce_views_test_() ->
                 [
                     fun should_reduce_basic/1,
                     fun should_reduce_key_range/1,
+                    fun raise_error_keys_without_group/1,
                     fun should_reduce_with_group_level/1,
                     fun should_reduce_with_group_exact/1
                 ]
@@ -64,6 +65,12 @@ should_reduce_key_range(Db) ->
             {row, [{key, null}, {value, 6}]}
         ]},
     ?_assertEqual(Expect, Result).
+
+raise_error_keys_without_group(Db) ->
+    ?_assertThrow(
+        {query_parse_error, <<"Multi-key fetches for reduce views must use `group=true`">>},
+        run_query(Db, [{keys, [[0, 2], [0, 4]]}])
+    ).
 
 should_reduce_with_group_level(Db) ->
     Result = run_query(Db, [{group_level, 1}]),
