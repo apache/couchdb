@@ -18,17 +18,14 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,15 +49,15 @@ public final class IndexManager implements Managed {
     private class IndexLoader implements CacheLoader<String, Index> {
 
         @Override
-        public @Nullable Index load(@NonNull String name) throws Exception {
+        public Index load(String name) throws Exception {
             final Path path = indexPath(name);
             final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
                     IndexDefinition.class);
-            return lucene.open(path, indexDefinition);
+            return luceneFor(indexDefinition).open(path, indexDefinition);
         }
 
         @Override
-        public @Nullable Index reload(@NonNull String name, @NonNull Index index) throws Exception {
+        public Index reload(String name, Index index) throws Exception {
             if (index.commit()) {
                 LOGGER.info("{} committed.", name);
             }
@@ -86,22 +83,16 @@ public final class IndexManager implements Managed {
         }
     }
 
-    @Min(1)
     private int maxIndexesOpen;
 
-    @Min(1)
     private int commitIntervalSeconds;
 
-    @Min(1)
     private int idleSeconds;
 
-    @NotEmpty
     private Path rootDir;
 
-    @NotNull
-    private Lucene lucene;
+    private Map<Integer, Lucene> lucenes;
 
-    @NotNull
     private ObjectMapper objectMapper;
 
     private MetricRegistry metricRegistry;
@@ -124,7 +115,7 @@ public final class IndexManager implements Managed {
             throw new WebApplicationException("Index already exists", Status.EXPECTATION_FAILED);
         }
         // Validate index definiton
-        lucene.validate(indexDefinition);
+        luceneFor(indexDefinition).validate(indexDefinition);
 
         // Persist definition
         final Path path = indexDefinitionPath(name);
@@ -178,7 +169,6 @@ public final class IndexManager implements Managed {
         this.maxIndexesOpen = maxIndexesOpen;
     }
 
-    @JsonProperty
     public int getCommitIntervalSeconds() {
         return commitIntervalSeconds;
     }
@@ -187,7 +177,6 @@ public final class IndexManager implements Managed {
         this.commitIntervalSeconds = commitIntervalSeconds;
     }
 
-    @JsonProperty
     public int getIdleSeconds() {
         return idleSeconds;
     }
@@ -196,7 +185,6 @@ public final class IndexManager implements Managed {
         this.idleSeconds = idleSeconds;
     }
 
-    @JsonProperty
     public Path getRootDir() {
         return rootDir;
     }
@@ -205,8 +193,8 @@ public final class IndexManager implements Managed {
         this.rootDir = rootDir;
     }
 
-    public void setLucene(final Lucene lucene) {
-        this.lucene = lucene;
+    public void setLucenes(final Map<Integer, Lucene> lucenes) {
+        this.lucenes = lucenes;
     }
 
     public void setObjectMapper(final ObjectMapper objectMapper) {
@@ -256,6 +244,15 @@ public final class IndexManager implements Managed {
         }
         throw new WebApplicationException(name + " attempts to escape from index root directory",
                 Status.BAD_REQUEST);
+    }
+
+    private Lucene luceneFor(final IndexDefinition indexDefinition) {
+        final int luceneMajor = indexDefinition.getLuceneMajor();
+        final Lucene result = lucenes.get(luceneMajor);
+        if (result == null) {
+            throw new WebApplicationException("Lucene major version " + luceneMajor + " not valid", Status.BAD_REQUEST);
+        }
+        return result;
     }
 
 }

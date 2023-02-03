@@ -13,7 +13,9 @@
 
 package org.apache.couchdb.nouveau;
 
+import java.net.URL;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 import javax.validation.constraints.Min;
 
@@ -32,7 +34,9 @@ public class NouveauApplicationConfiguration extends Configuration {
     @Min(30)
     private int idleSeconds = -1;
 
-    private Path rootDir = Path.of("target/indexes");
+    private Path rootDir = null;
+
+    private URL[] luceneBundlePaths;
 
     @JsonProperty
     public void setMaxIndexesOpen(int maxIndexesOpen) {
@@ -68,6 +72,22 @@ public class NouveauApplicationConfiguration extends Configuration {
 
     public Path getRootDir() {
         return rootDir;
+    }
+
+    @JsonProperty
+    public void setLuceneBundlePaths(final URL... luceneBundlePaths) {
+        this.luceneBundlePaths = luceneBundlePaths;
+    }
+
+    public URL[] getLuceneBundlePaths() {
+        return luceneBundlePaths;
+    }
+
+    @Override
+    public String toString() {
+        return "NouveauApplicationConfiguration [maxIndexesOpen=" + maxIndexesOpen + ", commitIntervalSeconds="
+                + commitIntervalSeconds + ", idleSeconds=" + idleSeconds + ", rootDir=" + rootDir
+                + ", luceneBundlePaths=" + Arrays.toString(luceneBundlePaths) + "]";
     }
 
 }

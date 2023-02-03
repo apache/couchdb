@@ -16,6 +16,9 @@ package org.apache.couchdb.nouveau;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -35,25 +38,41 @@ import org.apache.couchdb.nouveau.api.document.SortedSetDocValuesField;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-import io.dropwizard.configuration.ResourceConfigurationSourceProvider;
 import io.dropwizard.testing.junit5.DropwizardAppExtension;
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class IntegrationTest {
 
-    private static final String CONFIG = "test-nouveau.yaml";
+    static NouveauApplicationConfiguration CONFIG;
+    static DropwizardAppExtension<NouveauApplicationConfiguration> APP;
 
-    static final DropwizardAppExtension<NouveauApplicationConfiguration> APP = new DropwizardAppExtension<>(
-            NouveauApplication.class, CONFIG,
-            new ResourceConfigurationSourceProvider()
-    );
+    static {
+        CONFIG = new NouveauApplicationConfiguration();
+        CONFIG.setCommitIntervalSeconds(30);
+        CONFIG.setMaxIndexesOpen(10);
+        CONFIG.setIdleSeconds(60);
+        CONFIG.setRootDir(Path.of("target/indexes"));
+
+        // yuck
+        final String path =
+            String.format("file://%s/.m2/repository/org/apache/couchdb/nouveau/lucene9/1.0-SNAPSHOT/lucene9-1.0-SNAPSHOT-dist.jar",
+            System.getProperty("user.home"));
+
+        try {
+            CONFIG.setLuceneBundlePaths(new URL(path));
+        } catch (MalformedURLException e) {
+            throw new Error(e);
+        }
+
+        APP = new DropwizardAppExtension<>(NouveauApplication.class, CONFIG);
+    }
 
     @Test
     public void indexTest() throws Exception{
         final String url = "http://localhost:" + APP.getLocalPort();
         final String indexName = "foo";
-        final IndexDefinition indexDefinition = new IndexDefinition("standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition(9, "standard", null);
 
         // Clean up.
         Response response =

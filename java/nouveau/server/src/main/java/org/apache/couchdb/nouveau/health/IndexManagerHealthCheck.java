@@ -40,7 +40,7 @@ public class IndexManagerHealthCheck extends HealthCheck {
             // Ignored, index might not exist yet.
         }
 
-        indexManager.create(name, new IndexDefinition("standard", null));
+        indexManager.create(name, new IndexDefinition(9, "standard", null));
         final Index index = indexManager.acquire(name);
         final DocumentUpdateRequest request = new DocumentUpdateRequest(1, null, Collections.emptyList());
         index.update("foo", request);
