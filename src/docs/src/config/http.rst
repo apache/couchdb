@@ -238,13 +238,13 @@ HTTP Server Options
 
         Set to false to revert to a previous ``_bulk_get`` implementation using
         single doc fetches internally. Using batches should be faster, however
-        there may be bugs in the new new implemention, so expose this option to
+        there may be bugs in the new implementation, so expose this option to
         allow reverting to the old behavior. ::
 
             [chttpd]
             bulk_get_use_batches = true
 
-    .. config:option:: admin_only_all_dbs :: Require admin for ``_all_dbs`` and ``_dbs_info``
+    .. config:option:: admin_only_all_dbs :: Require admin for `_all_dbs` and `_dbs_info`
 
         .. versionadded:: 2.2 implemented for ``_all_dbs`` defaulting to ``false``
         .. versionchanged:: 3.0 default switched to ``true``, applies to ``_all_dbs``
@@ -255,6 +255,40 @@ HTTP Server Options
 
             [chttpd]
             admin_only_all_dbs = true
+
+    .. config:option:: enable_key_exclusivity :: Enable exclusivity for `key`
+
+        .. versionadded:: 3.3
+
+        Set to ``false`` to allow combining query parameters: ``key`` / a single
+        element ``keys`` with ``start_key`` (``startkey``) and ``end_key``
+        (``endkey``).
+        Different orders of parameters may result in different responses.
+        The last parameter wins.
+
+        .. code-block:: bash
+
+            shell> curl http://adm:pass@127.0.0.1:5984/db/_all_docs'?endkey="b"&key="a"'
+            {"total_rows":2,"offset":0,"rows":[
+            {"id":"a","key":"a","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}}]}
+
+            shell> curl http://adm:pass@127.0.0.1:5984/db/_all_docs'?key="a"&endkey="b"'
+            {"total_rows":2,"offset":0,"rows":[
+            {"id":"a","key":"a","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}},
+            {"id":"b","key":"b","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}}]}
+
+            shell> curl http://adm:pass@127.0.0.1:5984/db/_all_docs'?endkey="a"&key="b"'
+            {"total_rows":2,"offset":1,"rows":[
+            {"id":"b","key":"b","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}}]}
+
+            shell> curl http://adm:pass@127.0.0.1:5984/db/_all_docs'?key="b"&endkey="a"'
+            {"total_rows":2,"offset":1,"rows":[]}
+
+        Set to ``true`` to enable ``key``'s exclusivity.
+        If they are used together, throw 400 ``query_parse_error``. ::
+
+            [chttpd]
+            enable_key_exclusivity = true
 
 .. config:section:: httpd :: HTTP Server Options
 

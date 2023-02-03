@@ -43,6 +43,10 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
+-define(ERROR_KEY_INCOMPATIBLE,
+    {query_parse_error, <<"`key` and `keys` are incompatible with `start_key` and `end_key`">>}
+).
+
 handle_all_docs_req(#httpd{method = 'GET'} = Req, Db) ->
     all_docs_req(Req, Db, undefined);
 handle_all_docs_req(#httpd{method = 'POST'} = Req, Db) ->
@@ -486,8 +490,25 @@ parse_params(Props, Keys, #mrargs{} = Args0, Options) ->
                 Args0;
             _ ->
                 % group_level set to undefined to detect if explicitly set by user
-                Args0#mrargs{keys = Keys, group = undefined, group_level = undefined}
+                case Keys of
+                    [_] ->
+                        Args0#mrargs{group = undefined, group_level = undefined};
+                    _ ->
+                        Args0#mrargs{keys = Keys, group = undefined, group_level = undefined}
+                end
         end,
+
+    PropsKeys = proplists:get_keys(Props),
+    case config:get_boolean("chttpd", "enable_key_exclusivity", false) of
+        true ->
+            case check_key_incompatible(PropsKeys) of
+                true -> throw(?ERROR_KEY_INCOMPATIBLE);
+                false -> ok
+            end;
+        false ->
+            ok
+    end,
+
     lists:foldl(
         fun({K, V}, Acc) ->
             parse_param(K, V, Acc, IsDecoded)
@@ -530,9 +551,20 @@ parse_param(Key, Val, Args, IsDecoded) ->
             JsonKey = ?JSON_DECODE(Val),
             Args#mrargs{start_key = JsonKey, end_key = JsonKey};
         "keys" when IsDecoded ->
-            Args#mrargs{keys = Val};
+            case Val of
+                [Val1] ->
+                    Args#mrargs{start_key = Val1, end_key = Val1};
+                _ ->
+                    Args#mrargs{keys = Val}
+            end;
         "keys" ->
-            Args#mrargs{keys = ?JSON_DECODE(Val)};
+            Val1 = ?JSON_DECODE(Val),
+            case Val1 of
+                [Val2] ->
+                    Args#mrargs{start_key = Val2, end_key = Val2};
+                _ ->
+                    Args#mrargs{keys = Val1}
+            end;
         "startkey" when IsDecoded ->
             Args#mrargs{start_key = Val};
         "start_key" when IsDecoded ->
@@ -665,6 +697,19 @@ parse_pos_int(Val) ->
             Msg = io_lib:format(Fmt, [Val]),
             throw({query_parse_error, ?l2b(Msg)})
     end.
+
+check_key_incompatible(PropsKeys) ->
+    HasKey = lists:member("key", PropsKeys),
+    HasKeys = lists:member("keys", PropsKeys),
+    HasStartEndKey = lists:any(
+        fun(K) ->
+            lists:member(K, ["start_key", "startkey", "end_key", "endkey"])
+        end,
+        PropsKeys
+    ),
+    (HasKey andalso HasKeys) orelse
+        (HasKey andalso HasStartEndKey) orelse
+        (HasKeys andalso HasStartEndKey).
 
 check_view_etag(Sig, Acc0, Req) ->
     ETag = chttpd:make_etag(Sig),

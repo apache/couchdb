@@ -19,45 +19,47 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
--define(DDOC,
-    "{\"_id\": \"_design/bar\", \"views\": {\"baz\":\n"
-    "               {\"map\": \"function(doc) {emit(doc._id, doc._id);}\"}}}"
-).
 
--define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
--define(i2l(I), integer_to_list(I)).
+-define(DOCS, #{
+    <<"docs">> => [
+        #{<<"_id">> => <<"a">>, <<"key">> => <<"a">>, <<"value">> => 1},
+        #{<<"_id">> => <<"b">>, <<"key">> => <<"b">>, <<"value">> => 2},
+        #{<<"_id">> => <<"c">>, <<"key">> => <<"c">>, <<"value">> => 3}
+    ]
+}).
+-define(DDOC, #{
+    <<"_id">> => <<"_design/ddoc">>,
+    <<"views">> => #{
+        <<"map">> => #{<<"map">> => <<"function(doc) { emit(doc.key, doc.value) }">>},
+        <<"map_reduce">> => #{
+            <<"map">> => <<"function(doc) { emit(doc.key, doc.value) }">>,
+            <<"reduce">> => <<"_sum">>
+        }
+    }
+}).
+-define(ERROR_KEY_INCOMPATIBLE, #{
+    <<"error">> := <<"query_parse_error">>,
+    <<"reason">> := <<"`key` and `keys` are incompatible with `start_key` and `end_key`">>
+}).
+
 % seconds
 -define(TIMEOUT, 60).
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
-    TmpDb = ?tempdb(),
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
-    Url = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
-    create_db(Url),
-    Url.
+    Db = ?tempdb(),
+    ok = create_db(Db),
+    ok = create_docs(Db),
+    ok = create_ddoc(Db),
+    Db.
 
-teardown(Url) ->
-    delete_db(Url),
+teardown(Db) ->
+    ok = fabric:delete_db(Db),
+    ok = config:delete("chttpd", "enable_key_exclusivity", _Persist = false),
     ok = config:delete("admins", ?USER, _Persist = false).
 
-create_db(Url) ->
-    {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
-    ?assert(Status =:= 201 orelse Status =:= 202).
-
-create_doc(Url, Id) ->
-    test_request:put(
-        Url ++ "/" ++ Id,
-        [?CONTENT_JSON, ?AUTH],
-        "{\"mr\": \"rockoartischocko\"}"
-    ).
-
-delete_db(Url) ->
-    {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
-
-all_view_test_() ->
+view_test_() ->
     {
         "chttpd view tests",
         {
@@ -69,86 +71,251 @@ all_view_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_succeed_on_view_with_queries_keys/1,
-                    fun should_succeed_on_view_with_queries_limit_skip/1,
-                    fun should_succeed_on_view_with_multiple_queries/1
+                    ?TDEF_FE(t_view_with_queries_keys, ?TIMEOUT),
+                    ?TDEF_FE(t_view_with_queries_limit_skip, ?TIMEOUT),
+                    ?TDEF_FE(t_view_with_multiple_queries, ?TIMEOUT),
+                    ?TDEF_FE(t_view_with_key_and_end_key),
+                    ?TDEF_FE(t_key_exclusivity_view_with_key_and_end_key),
+                    ?TDEF_FE(t_view_with_single_keys_and_start_key),
+                    ?TDEF_FE(t_key_exclusivity_view_with_single_keys_and_start_key),
+                    ?TDEF_FE(t_view_with_keys_and_start_key),
+                    ?TDEF_FE(t_key_exclusivity_view_with_keys_and_start_key),
+                    ?TDEF_FE(t_view_map_reduce_with_key),
+                    ?TDEF_FE(t_view_map_reduce_with_single_keys),
+                    ?TDEF_FE(t_view_map_reduce_with_single_keys_and_group),
+                    ?TDEF_FE(t_view_map_reduce_with_keys),
+                    ?TDEF_FE(t_view_map_reduce_with_keys_and_group)
                 ]
             }
         }
     }.
 
-should_succeed_on_view_with_queries_keys(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            {ok, _, _, _} = test_request:put(
-                Url ++ "/_design/bar",
-                [?CONTENT_JSON, ?AUTH],
-                ?DDOC
-            ),
-            QueryDoc =
-                "{\"queries\": [{\"keys\": [ \"testdoc3\",\n"
-                "            \"testdoc8\"]}]}",
-            {ok, _, _, RespBody} = test_request:post(
-                Url ++ "/_design/bar/" ++
-                    "_view/baz/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
+all_docs_test_() ->
+    {
+        "chttpd all docs tests",
+        {
+            setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    ?TDEF_FE(t_all_docs_with_key_and_end_key),
+                    ?TDEF_FE(t_key_exclusivity_all_docs_with_key_and_end_key),
+                    ?TDEF_FE(t_all_docs_with_single_keys_and_start_key),
+                    ?TDEF_FE(t_key_exclusivity_all_docs_with_single_keys_and_start_key),
+                    ?TDEF_FE(t_all_docs_with_keys_and_start_key),
+                    ?TDEF_FE(t_key_exclusivity_all_docs_with_keys_and_start_key)
+                ]
+            }
+        }
+    }.
 
-should_succeed_on_view_with_queries_limit_skip(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            {ok, _, _, _} = test_request:put(
-                Url ++ "/_design/bar",
-                [?CONTENT_JSON, ?AUTH],
-                ?DDOC
-            ),
-            QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++ "/_design/bar/" ++
-                    "_view/baz/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
+t_view_with_queries_keys(Db) ->
+    QueryDoc = #{<<"queries">> => [#{<<"keys">> => [<<"a">>, <<"c">>]}]},
+    {Code, Res} = req(post, url(Db, "_design/ddoc/_view/map/queries"), QueryDoc),
+    ?assertMatch(
+        #{
+            <<"results">> := [
+                #{
+                    <<"total_rows">> := 3,
+                    <<"offset">> := 1,
+                    <<"rows">> := [#{<<"id">> := <<"a">>}, #{<<"id">> := <<"c">>}]
+                }
+            ]
+        },
+        Res
+    ),
+    ?assertEqual(200, Code).
 
-should_succeed_on_view_with_multiple_queries(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            {ok, _, _, _} = test_request:put(
-                Url ++ "/_design/bar",
-                [?CONTENT_JSON, ?AUTH],
-                ?DDOC
-            ),
-            QueryDoc =
-                "{\"queries\": [{\"keys\": [ \"testdoc3\",\n"
-                "            \"testdoc8\"]}, {\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++ "/_design/bar/" ++
-                    "_view/baz/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson1} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
-            {InnerJson2} = lists:nth(2, ResultJsonBody),
-            ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-        end)}.
+t_view_with_queries_limit_skip(Db) ->
+    QueryDoc = #{<<"queries">> => [#{<<"limit">> => 1, <<"skip">> => 1}]},
+    {Code, Res} = req(post, url(Db, "_design/ddoc/_view/map/queries/"), QueryDoc),
+    ?assertMatch(
+        #{
+            <<"results">> := [
+                #{<<"total_rows">> := 3, <<"offset">> := 1, <<"rows">> := [#{<<"id">> := <<"b">>}]}
+            ]
+        },
+        Res
+    ),
+    ?assertEqual(200, Code).
+
+t_view_with_multiple_queries(Db) ->
+    QueryDoc = #{
+        <<"queries">> => [#{<<"keys">> => [<<"a">>, <<"c">>], <<"limit">> => 1, <<"skip">> => 1}]
+    },
+    {Code, Res} = req(post, url(Db, "_design/ddoc/_view/map/queries/"), QueryDoc),
+    ?assertMatch(
+        #{
+            <<"results">> := [
+                #{<<"total_rows">> := 3, <<"offset">> := 2, <<"rows">> := [#{<<"id">> := <<"c">>}]}
+            ]
+        },
+        Res
+    ),
+    ?assertEqual(200, Code).
+
+t_view_with_key_and_end_key(Db) ->
+    test_helper_key_and_end_key(Db, "_design/ddoc/_view/map").
+
+t_all_docs_with_key_and_end_key(Db) ->
+    test_helper_key_and_end_key(Db, "_all_docs").
+
+test_helper_key_and_end_key(Db, Path) ->
+    {Code1, Res1} = req(get, url(Db, Path, "key=\"a\"&endkey=\"b\"")),
+    {Code2, Res2} = req(get, url(Db, Path, "endkey=\"b\"&key=\"a\"")),
+    ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"a">>}, #{<<"id">> := <<"b">>}]}, Res1),
+    ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"a">>}]}, Res2),
+    ?assertEqual(200, Code1),
+    ?assertEqual(200, Code2).
+
+t_key_exclusivity_view_with_key_and_end_key(Db) ->
+    test_helper_key_exclusivity_key_and_end_key(Db, "_design/ddoc/_view/map").
+
+t_key_exclusivity_all_docs_with_key_and_end_key(Db) ->
+    test_helper_key_exclusivity_key_and_end_key(Db, "_all_docs").
+
+test_helper_key_exclusivity_key_and_end_key(Db, Path) ->
+    ok = config:set_boolean("chttpd", "enable_key_exclusivity", true, _Persist = false),
+    {Code1, Res1} = req(get, url(Db, Path, "key=\"a\"&endkey=\"b\"")),
+    {Code2, Res2} = req(get, url(Db, Path, "endkey=\"b\"&key=\"a\"")),
+    ?assertMatch(?ERROR_KEY_INCOMPATIBLE, Res1),
+    ?assertMatch(?ERROR_KEY_INCOMPATIBLE, Res2),
+    ?assertEqual(400, Code1),
+    ?assertEqual(400, Code2).
+
+t_view_with_single_keys_and_start_key(Db) ->
+    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map?keys=[\"a\"]&startkey=\"b\"")),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> :=
+                <<"No rows can match your key range, reverse your start_key and end_key or set descending=true">>
+        },
+        Res
+    ),
+    ?assertEqual(400, Code).
+
+t_all_docs_with_single_keys_and_start_key(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs?keys=[\"a\"]&startkey=\"b\"")),
+    ?assertMatch(?ERROR_KEY_INCOMPATIBLE, Res),
+    ?assertEqual(400, Code).
+
+t_key_exclusivity_view_with_single_keys_and_start_key(Db) ->
+    test_helper_key_exclusivity_single_keys_and_start_key(Db, "_design/ddoc/_view/map").
+
+t_key_exclusivity_all_docs_with_single_keys_and_start_key(Db) ->
+    test_helper_key_exclusivity_single_keys_and_start_key(Db, "_all_docs").
+
+test_helper_key_exclusivity_single_keys_and_start_key(Db, Path) ->
+    ok = config:set_boolean("chttpd", "enable_key_exclusivity", true, _Persist = false),
+    {Code, Res} = req(get, url(Db, Path, "keys=[\"a\"]&startkey=\"b\"")),
+    ?assertMatch(?ERROR_KEY_INCOMPATIBLE, Res),
+    ?assertEqual(400, Code).
+
+t_view_with_keys_and_start_key(Db) ->
+    test_helper_keys_and_start_key(Db, "_design/ddoc/_view/map").
+
+t_all_docs_with_keys_and_start_key(Db) ->
+    test_helper_keys_and_start_key(Db, "_all_docs").
+
+test_helper_keys_and_start_key(Db, Path) ->
+    {Code, Res} = req(get, url(Db, Path, "keys=[\"a\",\"b\"]&start_key=\"b\"")),
+    ?assertMatch(?ERROR_KEY_INCOMPATIBLE, Res),
+    ?assertEqual(400, Code).
+
+t_key_exclusivity_view_with_keys_and_start_key(Db) ->
+    test_helper_key_exclusivity_keys_and_start_key(Db, "_design/ddoc/_view/map").
+
+t_key_exclusivity_all_docs_with_keys_and_start_key(Db) ->
+    test_helper_key_exclusivity_keys_and_start_key(Db, "_all_docs").
+
+test_helper_key_exclusivity_keys_and_start_key(Db, Path) ->
+    ok = config:set_boolean("chttpd", "enable_key_exclusivity", true, _Persist = false),
+    {Code, Res} = req(get, url(Db, Path, "keys=[\"a\",\"b\"]&start_key=\"b\"")),
+    ?assertMatch(?ERROR_KEY_INCOMPATIBLE, Res),
+    ?assertEqual(400, Code).
+
+t_view_map_reduce_with_key(Db) ->
+    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map_reduce?key=\"a\"")),
+    ?assertMatch(#{<<"rows">> := [#{<<"key">> := null, <<"value">> := 1}]}, Res),
+    ?assertEqual(200, Code).
+
+t_view_map_reduce_with_single_keys(Db) ->
+    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map_reduce?keys=[\"a\"]")),
+    ?assertMatch(#{<<"rows">> := [#{<<"key">> := null, <<"value">> := 1}]}, Res),
+    ?assertEqual(200, Code).
+
+t_view_map_reduce_with_single_keys_and_group(Db) ->
+    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map_reduce?keys=[\"a\"]&group=true")),
+    ?assertMatch(#{<<"rows">> := [#{<<"key">> := <<"a">>, <<"value">> := 1}]}, Res),
+    ?assertEqual(200, Code).
+
+t_view_map_reduce_with_keys(Db) ->
+    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map_reduce?keys=[\"a\",\"b\"]")),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> := <<"Multi-key fetches for reduce views must use `group=true`">>
+        },
+        Res
+    ),
+    ?assertEqual(400, Code).
+
+t_view_map_reduce_with_keys_and_group(Db) ->
+    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map_reduce?keys=[\"a\",\"b\"]&group=true")),
+    ?assertMatch(
+        #{
+            <<"rows">> := [
+                #{<<"key">> := <<"a">>, <<"value">> := 1},
+                #{<<"key">> := <<"b">>, <<"value">> := 2}
+            ]
+        },
+        Res
+    ),
+    ?assertEqual(200, Code).
+
+%%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
+url(Db) ->
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
+    lists:concat(["http://", Addr, ":", Port, "/", ?b2l(Db)]).
+
+url(Db, Path) ->
+    url(Db) ++ "/" ++ Path.
+
+url(Db, Path, Parameters) ->
+    url(Db) ++ "/" ++ Path ++ "?" ++ Parameters.
+
+create_db(Db) ->
+    case req(put, url(Db)) of
+        {201, #{}} -> ok;
+        Error -> error({failed_to_create_test_db, Db, Error})
+    end.
+
+create_docs(Db) ->
+    case req(post, url(Db) ++ "/_bulk_docs", ?DOCS) of
+        {201, _} -> ok;
+        Error -> error({failed_to_create_docs, Db, Error})
+    end.
+
+create_ddoc(Db) ->
+    case req(post, url(Db), ?DDOC) of
+        {201, _} -> ok;
+        Error -> error({failed_to_create_ddocs, Db, Error})
+    end.
+
+req(Method, Url) ->
+    Headers = [?CONTENT_JSON, ?AUTH],
+    {ok, Code, _, Res} = test_request:request(Method, Url, Headers),
+    {Code, jiffy:decode(Res, [return_maps])}.
+
+req(Method, Url, #{} = Body) ->
+    req(Method, Url, jiffy:encode(Body));
+req(Method, Url, Body) ->
+    Headers = [?CONTENT_JSON, ?AUTH],
+    {ok, Code, _, Res} = test_request:request(Method, Url, Headers, Body),
+    {Code, jiffy:decode(Res, [return_maps])}.
