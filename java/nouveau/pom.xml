@@ -27,12 +27,57 @@
     <maven.compiler.target>11</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <dropwizard.version>2.1.4</dropwizard.version>
+    <junit5.version>5.8.2</junit5.version>
+    <slf4j.version>1.7.32</slf4j.version>
   </properties>
 
+  <dependencyManagement>
+	<dependencies>
+	  <dependency>
+		<groupId>org.junit</groupId>
+		<artifactId>junit-bom</artifactId>
+		<version>${junit5.version}</version>
+		<type>pom</type>
+		<scope>import</scope>
+	  </dependency>
+      <dependency>
+        <groupId>io.dropwizard</groupId>
+        <artifactId>dropwizard-dependencies</artifactId>
+        <version>${dropwizard.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+	</dependencies>
+  </dependencyManagement>
+
   <modules>
-    <module>shaded-lucene-4</module>
-    <module>shaded-lucene-9</module>
+    <module>api</module>
+    <module>lucene9</module>
     <module>server</module>
+    <module>shaded-lucene-4</module>
   </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+		  <artifactId>maven-surefire-plugin</artifactId>
+		  <version>2.22.2</version>
+	    </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>3.4.2</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.5.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
 
 </project>

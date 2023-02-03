@@ -15,6 +15,7 @@ package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -22,7 +23,9 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
@@ -35,15 +38,19 @@ import com.codahale.metrics.annotation.Timed;
 @Produces(MediaType.APPLICATION_JSON)
 public class AnalyzeResource {
 
-    private final Lucene lucene;
+    private final Map<Integer, Lucene> lucenes;
 
-    public AnalyzeResource(Lucene lucene) {
-        this.lucene = lucene;
+    public AnalyzeResource(Map<Integer, Lucene> lucenes) {
+        this.lucenes = lucenes;
     }
 
     @POST
     @Timed
     public AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest analyzeRequest) throws IOException {
+        final Lucene lucene = lucenes.get(analyzeRequest.getLuceneMajor());
+        if (lucene == null) {
+            throw new WebApplicationException("Lucene major version " + analyzeRequest.getLuceneMajor() + " not valid", Status.BAD_REQUEST);
+        }
         final List<String> tokens = lucene.analyze(analyzeRequest.getAnalyzer(), analyzeRequest.getText());
         return new AnalyzeResponse(tokens);
     }

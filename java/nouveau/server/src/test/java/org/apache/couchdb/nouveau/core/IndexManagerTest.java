@@ -13,10 +13,15 @@
 
 package org.apache.couchdb.nouveau.core;
 
+import java.lang.reflect.Method;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.core.lucene9.Lucene9;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -30,8 +35,12 @@ import com.codahale.metrics.MetricRegistry;
 
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 
+import static org.mockito.Mockito.*;
+
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class IndexManagerTest {
+
+    private static final int LUCENE_MAJOR = 9;
 
     @TempDir
     static Path tempDir;
@@ -42,7 +51,7 @@ public class IndexManagerTest {
     public void setup() throws Exception {
         manager = new IndexManager();
         manager.setMetricRegistry(new MetricRegistry());
-        manager.setLucene(new Lucene9());
+        manager.setLucenes(Map.of(LUCENE_MAJOR, mock(Lucene.class)));
         manager.setCommitIntervalSeconds(5);
         manager.setObjectMapper(new ObjectMapper());
         manager.setRootDir(tempDir);
@@ -56,7 +65,7 @@ public class IndexManagerTest {
 
     @Test
     public void testCreate() throws Exception {
-        final IndexDefinition def = new IndexDefinition("standard", null);
+        final IndexDefinition def = new IndexDefinition(LUCENE_MAJOR, "standard", null);
         manager.create("foo", def);
     }
 

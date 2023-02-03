@@ -31,7 +31,7 @@ public class AnalyzeHealthCheck extends HealthCheck {
 
     @Override
     protected Result check() throws Exception {
-        final AnalyzeRequest request = new AnalyzeRequest("standard", "hello there");
+        final AnalyzeRequest request = new AnalyzeRequest(9, "standard", "hello there");
         final AnalyzeResponse response = analyzeResource.analyzeText(request);
         final List<String> expected = Arrays.asList("hello", "there");
         final List<String> actual = response.getTokens();
