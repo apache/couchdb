@@ -7,12 +7,12 @@ You can view the latest rendered build of this content at:
 
 # Building the docs
 
-Install Python3 and pip. Then:
+Install Python 3 and pip. Then:
 
 ```sh
 $ python3 -m venv .venv
 $ source .venv/bin/activate
-$ pip install -r requirements.txt
+$ pip3 install -r requirements.txt
 $ make html # builds the docs
 $ make check # syntax checks the docs
 ```
