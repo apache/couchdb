@@ -225,6 +225,8 @@ save_rep_doc(DbName, Doc) ->
 -spec before_doc_update(#doc{}, Db :: any(), couch_db:update_type()) -> #doc{}.
 before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db, _UpdateType) ->
     Doc;
+before_doc_update(#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc, _Db, _UpdateType) ->
+    Doc;
 before_doc_update(#doc{} = Doc, _Db, ?REPLICATED_CHANGES) ->
     % Skip internal replicator updates
     Doc;

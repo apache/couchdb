@@ -154,6 +154,8 @@ cluster_url() ->
     Args = [?USERNAME, ?PASSWORD, Addr, Port],
     ?l2b(io_lib:format(Fmt, Args)).
 
+cluster_db_url(Path) when is_list(Path) ->
+    cluster_db_url(list_to_binary(Path));
 cluster_db_url(<<"/", _/binary>> = Path) ->
     <<(cluster_url())/binary, Path/binary>>;
 cluster_db_url(Path) ->
@@ -200,7 +202,9 @@ teardown_db(DbName) ->
 test_setup() ->
     Ctx = test_util:start_couch([fabric, mem3, chttpd, couch_replicator]),
     Hashed = couch_passwords:hash_admin_password(?PASSWORD),
-    ok = config:set("admins", ?USERNAME, ?b2l(Hashed), _Persist = false),
+    Persist = false,
+    ok = config:set("admins", ?USERNAME, ?b2l(Hashed), Persist),
+    ok = config:set("replicator", "cluster_start_period", "0", Persist),
     Source = setup_db(),
     Target = setup_db(),
     {Ctx, {Source, Target}}.
@@ -209,5 +213,7 @@ test_teardown({Ctx, {Source, Target}}) ->
     meck:unload(),
     teardown_db(Source),
     teardown_db(Target),
-    config:delete("admins", ?USERNAME, _Persist = false),
+    Persist = false,
+    config:delete("admins", ?USERNAME, Persist),
+    config:delete("replicator", "cluster_start_period", Persist),
     ok = test_util:stop_couch(Ctx).
