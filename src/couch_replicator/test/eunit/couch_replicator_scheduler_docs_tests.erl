@@ -15,57 +15,95 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-scheduler_docs_test_() ->
+-define(JSON, {"Content-Type", "application/json"}).
+
+setup_replicator_db(Prefix) ->
+    RepDb =
+        case Prefix of
+            <<>> -> <<"_replicator">>;
+            <<_/binary>> -> <<Prefix/binary, "/_replicator">>
+        end,
+    Opts = [{q, 1}, {n, 1}, ?ADMIN_CTX],
+    case fabric:create_db(RepDb, Opts) of
+        ok -> ok;
+        {error, file_exists} -> ok
+    end,
+    RepDb.
+
+setup_main_replicator_db() ->
+    {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
+    RepDb = setup_replicator_db(<<>>),
+    {Ctx, {RepDb, Source, Target}}.
+
+setup_prefixed_replicator_db() ->
+    {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
+    RepDb = setup_replicator_db(?tempdb()),
+    {Ctx, {RepDb, Source, Target}}.
+
+teardown({Ctx, {RepDb, Source, Target}}) ->
+    ok = fabric:delete_db(RepDb, [?ADMIN_CTX]),
+    couch_replicator_test_helper:test_teardown({Ctx, {Source, Target}}).
+
+scheduler_docs_test_main_db_test_() ->
     {
         foreach,
-        fun() ->
-            Ctx = couch_replicator_test_helper:test_setup(),
-            ok = config:set("replicator", "cluster_start_period", "0", false),
-            Opts = [{q, 1}, {n, 1}, ?ADMIN_CTX],
-            case fabric:create_db(<<"_replicator">>, Opts) of
-                ok -> ok;
-                {error, file_exists} -> ok
-            end,
-            Ctx
-        end,
-        fun(Ctx) ->
-            ok = config:delete("replicator", "cluster_start_period"),
-            ok = fabric:delete_db(<<"_replicator">>, [?ADMIN_CTX]),
-            couch_replicator_test_helper:test_teardown(Ctx)
-        end,
+        fun setup_main_replicator_db/0,
+        fun teardown/1,
         [
             ?TDEF_FE(t_scheduler_docs_total_rows, 10)
         ]
     }.
 
-t_scheduler_docs_total_rows({_Ctx, {Source, Target}}) ->
+scheduler_docs_test_prefixed_db_test_() ->
+    {
+        foreach,
+        fun setup_prefixed_replicator_db/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_scheduler_docs_total_rows, 10)
+        ]
+    }.
+
+replicator_bdu_test_main_db_test_() ->
+    {
+        setup,
+        fun setup_prefixed_replicator_db/0,
+        fun teardown/1,
+        with([
+            ?TDEF(t_local_docs_can_be_written),
+            ?TDEF(t_design_docs_can_be_written),
+            ?TDEF(t_malformed_docs_are_rejected)
+        ])
+    }.
+
+replicator_bdu_test_prefixed_db_test_() ->
+    {
+        setup,
+        fun setup_prefixed_replicator_db/0,
+        fun teardown/1,
+        with([
+            ?TDEF(t_local_docs_can_be_written),
+            ?TDEF(t_design_docs_can_be_written),
+            ?TDEF(t_malformed_docs_are_rejected)
+        ])
+    }.
+
+t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
     SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
     TargetUrl = couch_replicator_test_helper:cluster_db_url(Target),
-    RepDoc = jiffy:encode(
-        {[
-            {<<"source">>, SourceUrl},
-            {<<"target">>, TargetUrl}
-        ]}
-    ),
-    RepDocUrl = couch_replicator_test_helper:cluster_db_url(
-        list_to_binary("/_replicator/" ++ ?docid())
-    ),
-    {ok, 201, _, _} = test_request:put(binary_to_list(RepDocUrl), [], RepDoc),
+    RepDoc = #{<<"source">> => SourceUrl, <<"target">> => TargetUrl},
+    RepDocUrl = rep_doc_url(RepDb, ?docid()),
+    {201, _} = req(put, RepDocUrl, RepDoc),
     SchedulerDocsUrl =
-        couch_replicator_test_helper:cluster_db_url(<<"/_scheduler/docs">>),
+        case RepDb of
+            <<"_replicator">> -> url(<<"/_scheduler/docs">>);
+            <<_/binary>> -> url(<<"/_scheduler/docs/", RepDb/binary>>)
+        end,
     Body = test_util:wait(
         fun() ->
-            case test_request:get(binary_to_list(SchedulerDocsUrl), []) of
-                {ok, 200, _, JsonBody} ->
-                    Decoded = jiffy:decode(JsonBody, [return_maps]),
-                    case maps:get(<<"docs">>, Decoded) of
-                        [] ->
-                            wait;
-                        _ ->
-                            Decoded
-                    end;
-                _ ->
-                    wait
+            case req(get, SchedulerDocsUrl) of
+                {200, #{<<"docs">> := [_ | _]} = Decoded} -> Decoded;
+                {_, #{}} -> wait
             end
         end,
         10000,
@@ -75,3 +113,46 @@ t_scheduler_docs_total_rows({_Ctx, {Source, Target}}) ->
     TotalRows = maps:get(<<"total_rows">>, Body),
     ?assertEqual(TotalRows, length(Docs)),
     ok.
+
+t_local_docs_can_be_written({_Ctx, {RepDb, _, _}}) ->
+    DocUrl1 = rep_doc_url(RepDb, <<"_local/doc1">>),
+    ?assertMatch({201, _}, req(put, DocUrl1, #{})),
+    DocUrl2 = rep_doc_url(RepDb, <<"_local/doc2">>),
+    ?assertMatch({201, _}, req(put, DocUrl2, #{<<"foo">> => <<"bar">>})).
+
+t_design_docs_can_be_written({_Ctx, {RepDb, _, _}}) ->
+    DocUrl1 = rep_doc_url(RepDb, <<"_design/ddoc1">>),
+    ?assertMatch({201, _}, req(put, DocUrl1, #{})),
+    DocUrl2 = rep_doc_url(RepDb, <<"_design/ddoc2">>),
+    ?assertMatch({201, _}, req(put, DocUrl2, #{<<"foo">> => <<"bar">>})).
+
+t_malformed_docs_are_rejected({_Ctx, {RepDb, _, _}}) ->
+    % couch_replicator_parse holds most of the BDU validation logic
+    % Here we just test that the BDU works with a few basic cases
+    DocUrl1 = rep_doc_url(RepDb, <<"rep1">>),
+    ?assertMatch({403, _}, req(put, DocUrl1, #{})),
+    DocUrl2 = rep_doc_url(RepDb, <<"rep2">>),
+    ?assertMatch({403, _}, req(put, DocUrl2, #{<<"foo">> => <<"bar">>})).
+
+rep_doc_url(RepDb, DocId) when is_binary(RepDb) ->
+    rep_doc_url(binary_to_list(RepDb), DocId);
+rep_doc_url(RepDb, DocId) when is_binary(DocId) ->
+    rep_doc_url(RepDb, binary_to_list(DocId));
+rep_doc_url(RepDb, DocId) when is_list(RepDb), is_list(DocId) ->
+    UrlQuotedRepDb = mochiweb_util:quote_plus(RepDb),
+    url(UrlQuotedRepDb ++ "/" ++ DocId).
+
+url(UrlPath) ->
+    binary_to_list(couch_replicator_test_helper:cluster_db_url(UrlPath)).
+
+req(Method, Url) ->
+    Headers = [?JSON],
+    {ok, Code, _, Res} = test_request:request(Method, Url, Headers),
+    {Code, jiffy:decode(Res, [return_maps])}.
+
+req(Method, Url, #{} = Body) ->
+    req(Method, Url, jiffy:encode(Body));
+req(Method, Url, Body) ->
+    Headers = [?JSON],
+    {ok, Code, _, Res} = test_request:request(Method, Url, Headers, Body),
+    {Code, jiffy:decode(Res, [return_maps])}.
