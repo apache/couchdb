@@ -351,7 +351,7 @@ refresh_validate_doc_funs(Db0) ->
             {ok, DesignDoc} = couch_db:open_doc_int(
                 Db, DesignDocInfo, [ejson_body]
             ),
-            case couch_doc:get_validate_doc_fun(DesignDoc) of
+            case couch_doc:get_validate_doc_fun(Db, DesignDoc) of
                 nil -> [];
                 Fun -> [Fun]
             end

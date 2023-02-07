@@ -990,7 +990,7 @@ load_validation_funs(#db{main_pid = Pid} = Db) ->
     DDocs = lists:map(OpenDocs, DDocInfos),
     Funs = lists:flatmap(
         fun(DDoc) ->
-            case couch_doc:get_validate_doc_fun(DDoc) of
+            case couch_doc:get_validate_doc_fun(Db, DDoc) of
                 nil -> [];
                 Fun -> [Fun]
             end

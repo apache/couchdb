@@ -85,6 +85,7 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
         JsonDoc = couch_query_servers:json_doc(Doc),
         [<<"resp">>, ExternalResp] =
             couch_query_servers:ddoc_prompt(
+                Db,
                 DDoc,
                 [<<"shows">>, ShowName],
                 [JsonDoc, JsonReq]
@@ -142,7 +143,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
-    UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
+    UpdateResp = couch_query_servers:ddoc_prompt(Db, DDoc, Cmd, [JsonDoc, JsonReq]),
     JsonResp =
         case UpdateResp of
             [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
@@ -219,7 +220,7 @@ handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
     end,
     Args = Args0#mrargs{preflight_fun = ETagFun},
     couch_httpd:etag_maybe(Req, fun() ->
-        couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
+        couch_query_servers:with_ddoc_proc(Db, DDoc, fun(QServer) ->
             Acc = #lacc{db = Db, req = Req, qserver = QServer, lname = LName},
             case VName of
                 <<"_all_docs">> ->

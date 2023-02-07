@@ -29,7 +29,7 @@ recover(DbName) ->
     {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
     Funs = lists:flatmap(
         fun(DDoc) ->
-            case couch_doc:get_validate_doc_fun(DDoc) of
+            case couch_doc:get_validate_doc_fun(DbName, DDoc) of
                 nil -> [];
                 Fun -> [Fun]
             end
