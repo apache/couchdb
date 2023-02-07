@@ -17,6 +17,10 @@
 
 -export([
     start_link/0,
+    get_proc/3,
+    get_proc/1,
+    ret_proc/1,
+    os_proc_idle/1,
     get_proc_count/0,
     get_stale_proc_count/0,
     new_proc/1,
@@ -45,11 +49,13 @@
 -define(WAITERS, couch_proc_manager_waiters).
 -define(OPENING, couch_proc_manager_opening).
 -define(SERVERS, couch_proc_manager_servers).
+-define(COUNTERS, couch_proc_manager_counters).
+-define(IDLE_BY_DB, couch_proc_manager_idle_by_db).
+-define(IDLE_ACCESS, couch_proc_manager_idle_access).
 -define(RELISTEN_DELAY, 5000).
 
 -record(state, {
     config,
-    counts,
     threshold_ts,
     hard_limit,
     soft_limit
@@ -59,31 +65,44 @@
 -type revision() :: {integer(), binary()}.
 
 -record(client, {
-    timestamp :: os:timestamp() | '_',
-    from :: undefined | {pid(), reference()}  | '_',
+    wait_key :: {binary(), integer(), gen_server:reply_tag()} | '_',
+    from :: undefined | {pid(), gen_server:reply_tag()} | '_',
     lang :: binary() | '_',
-    ddoc :: #doc{} | '_',
+    ddoc :: undefined | #doc{} | '_',
+    db_key :: undefined | binary(),
     ddoc_key :: undefined | {DDocId :: docid(), Rev :: revision()} | '_'
-}).
-
--record(proc_int, {
-    pid,
-    lang,
-    client,
-    ddoc_keys = [],
-    prompt_fun,
-    set_timeout_fun,
-    stop_fun,
-    t0 = os:timestamp()
 }).
 
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+get_proc(#doc{body = {Props}} = DDoc, DbKey, {_DDocId, _Rev} = DDocKey) ->
+    LangStr = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
+    Lang = couch_util:to_binary(LangStr),
+    Client = #client{lang = Lang, ddoc = DDoc, db_key = DbKey, ddoc_key = DDocKey},
+    Timeout = get_os_process_timeout(),
+    gen_server:call(?MODULE, {get_proc, Client}, Timeout).
+
+get_proc(LangStr) ->
+    Lang = couch_util:to_binary(LangStr),
+    Client = #client{lang = Lang},
+    Timeout = get_os_process_timeout(),
+    gen_server:call(?MODULE, {get_proc, Client}, Timeout).
+
+ret_proc(#proc{} = Proc) ->
+    gen_server:call(?MODULE, {ret_proc, Proc}, infinity).
+
+os_proc_idle(Proc) when is_pid(Proc) ->
+    gen_server:cast(?MODULE, {os_proc_idle, Proc}).
 
 get_proc_count() ->
-    gen_server:call(?MODULE, get_proc_count).
+    try
+        ets:info(?PROCS, size) + ets:info(?OPENING, size)
+    catch
+        error:badarg ->
+            0
+    end.
 
 
 get_stale_proc_count() ->
@@ -102,11 +121,27 @@ init([]) ->
     process_flag(trap_exit, true),
     ok = config:listen_for_changes(?MODULE, undefined),
 
-    TableOpts = [public, named_table, ordered_set],
-    ets:new(?PROCS, TableOpts ++ [{keypos, #proc_int.pid}]),
-    ets:new(?WAITERS, TableOpts ++ [{keypos, #client.timestamp}]),
-    ets:new(?OPENING, [public, named_table, set]),
-    ets:new(?SERVERS, [public, named_table, set]),
+    % Main process table. Pid -> #proc{}
+    ets:new(?PROCS, [named_table, {read_concurrency, true}, {keypos, #proc.pid}]),
+
+    % #client{} waiters ordered by {Lang, timestamp(), Ref}
+    ets:new(?WAITERS, [named_table, ordered_set, {keypos, #client.wait_key}]),
+
+    % Async process openers. Pid -> #client{}
+    ets:new(?OPENING, [named_table]),
+
+    % Configured language servers Lang -> Start MFA | Command
+    ets:new(?SERVERS, [named_table]),
+
+    % Idle Pids. Ordered to allow partial key lookups {Lang, DbKey, Pid} -> DDocs
+    ets:new(?IDLE_BY_DB, [named_table, ordered_set]),
+
+    % Idle Db tagged pids ordered by last use. {Lang, timestamp(), Pid} -> true
+    ets:new(?IDLE_ACCESS, [named_table, ordered_set]),
+
+    % Lang -> number of procs spawn for that lang
+    ets:new(?COUNTERS, [named_table]),
+
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_QUERY_SERVER_")),
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
     ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
@@ -114,99 +149,82 @@ init([]) ->
 
     {ok, #state{
         config = get_proc_config(),
-        counts = dict:new(),
-        threshold_ts = os:timestamp(),
+        threshold_ts = timestamp(),
         hard_limit = get_hard_limit(),
         soft_limit = get_soft_limit()
     }}.
 
 
 terminate(_Reason, _State) ->
-    ets:foldl(fun(#proc_int{pid=P}, _) ->
-        couch_util:shutdown_sync(P)
-    end, 0, ?PROCS),
-    ok.
+    foreach_proc(fun(#proc{pid = P}) -> couch_util:shutdown_sync(P) end).
 
 
-handle_call(get_proc_count, _From, State) ->
-    NumProcs = ets:info(?PROCS, size),
-    NumOpening = ets:info(?OPENING, size),
-    {reply, NumProcs + NumOpening, State};
 
 handle_call(get_stale_proc_count, _From, State) ->
     #state{threshold_ts = T0} = State,
-    MatchSpec = [{#proc_int{t0='$1', _='_'}, [{'<', '$1', {T0}}], [true]}],
+    MatchSpec = [{#proc{threshold_ts = '$1', _ = '_'}, [{'<', '$1', T0}], [true]}],
     {reply, ets:select_count(?PROCS, MatchSpec), State};
+handle_call({get_proc, #client{} = Client}, From, State) ->
+    add_waiting_client(Client#client{from = From}),
+    ok = flush_waiters(State, Client#client.lang),
+    {noreply, State};
+handle_call({ret_proc, #proc{} = Proc}, From, State) ->
+    #proc{client = Ref, pid = Pid} = Proc,
 
-handle_call({get_proc, #doc{body={Props}}=DDoc, DDocKey}, From, State) ->
-    LangStr = couch_util:get_value(<<"language">>, Props, <<"javascript">>),
-    Lang = couch_util:to_binary(LangStr),
-    Client = #client{from=From, lang=Lang, ddoc=DDoc, ddoc_key=DDocKey},
-    add_waiting_client(Client),
-    {noreply, flush_waiters(State, Lang)};
 
-handle_call({get_proc, LangStr}, From, State) ->
-    Lang = couch_util:to_binary(LangStr),
-    Client = #client{from=From, lang=Lang},
-    add_waiting_client(Client),
-    {noreply, flush_waiters(State, Lang)};
-
-handle_call({ret_proc, #proc{client=Ref} = Proc}, _From, State) ->
     erlang:demonitor(Ref, [flush]),
-    NewState = case ets:lookup(?PROCS, Proc#proc.pid) of
-        [#proc_int{}=ProcInt] ->
-            return_proc(State, ProcInt);
+    gen_server:reply(From, true),
+    case ets:lookup(?PROCS, Pid) of
+        [#proc{} = ProcInt] ->
+            ok = return_proc(State, ProcInt);
         [] ->
             % Proc must've died and we already
             % cleared it out of the table in
             % the handle_info clause.
-            State
+            ok
     end,
-    {reply, true, NewState};
+    {noreply, State};
 
 handle_call(set_threshold_ts, _From, State) ->
-    FoldFun = fun
-        (#proc_int{client = undefined} = Proc, StateAcc) ->
-            remove_proc(StateAcc, Proc);
-        (_, StateAcc) ->
-            StateAcc
+    Fun = fun
+        (#proc{client = undefined} = Proc) -> ok = remove_proc(Proc);
+        (_) -> ok
     end,
-    NewState = ets:foldl(FoldFun, State, ?PROCS),
-    {reply, ok, NewState#state{threshold_ts = os:timestamp()}};
+    ok = foreach_proc(Fun),
+    {reply, ok, State#state{threshold_ts = timestamp()}};
 
 handle_call(terminate_stale_procs, _From, #state{threshold_ts = Ts1} = State) ->
-    FoldFun = fun
-        (#proc_int{client = undefined, t0 = Ts2} = Proc, StateAcc) ->
+    Fun = fun
+        (#proc{client = undefined, threshold_ts = Ts2} = Proc) ->
             case Ts1 > Ts2 of
-                true ->
-                    remove_proc(StateAcc, Proc);
-                false ->
-                    StateAcc
+                true -> ok = remove_proc(Proc);
+                false -> ok
             end;
-        (_, StateAcc) ->
-            StateAcc
+        (_) ->
+            ok
     end,
-    NewState = ets:foldl(FoldFun, State, ?PROCS),
-    {reply, ok, NewState};
+    foreach_proc(Fun),
+    {reply, ok, State};
 
 handle_call(_Call, _From, State) ->
     {reply, ignored, State}.
 
-
-handle_cast({os_proc_idle, Pid}, #state{counts=Counts}=State) ->
-    NewState = case ets:lookup(?PROCS, Pid) of
-        [#proc_int{client=undefined, lang=Lang}=Proc] ->
-            case dict:find(Lang, Counts) of
-                {ok, Count} when Count >= State#state.soft_limit ->
-                    couch_log:info("Closing idle OS Process: ~p", [Pid]),
-                    remove_proc(State, Proc);
-                {ok, _} ->
-                    State
+handle_cast({os_proc_idle, Pid}, #state{soft_limit = SoftLimit} = State) ->
+    case ets:lookup(?PROCS, Pid) of
+        [#proc{client = undefined, db_key = DbKey, lang = Lang} = Proc] ->
+            IsOverSoftLimit = get_count(Lang) >= SoftLimit,
+            IsTagged = DbKey =/= undefined,
+            case IsOverSoftLimit orelse IsTagged of
+                true ->
+                    couch_log:debug("Closing tagged or idle OS Process: ~p", [Pid]),
+                    ok = remove_proc(Proc);
+                false ->
+                    ok
             end;
         _ ->
             State
     end,
-    {noreply, NewState};
+    {noreply, State};
 
 handle_cast(reload_config, State) ->
     NewState = State#state{
@@ -215,47 +233,59 @@ handle_cast(reload_config, State) ->
         soft_limit = get_soft_limit()
     },
     maybe_configure_erlang_native_servers(),
-    {noreply, flush_waiters(NewState)};
-
+    lists:foreach(
+        fun({Lang, _}) ->
+            ok = flush_waiters(NewState, Lang)
+        end,
+        ets:tab2list(?COUNTERS)
+    ),
+    {noreply, NewState};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
 handle_info(shutdown, State) ->
     {stop, shutdown, State};
-
+handle_info({'EXIT', Pid, {spawn_ok, Proc0, undefined = _From}}, State) ->
+    % Use ets:take/2 to assert that opener existed before removing. Also assert that
+    % the pid matches and the the client was a bogus client
+    [{Pid, #client{from = undefined}}] = ets:take(?OPENING, Pid),
+    Proc = Proc0#proc{client = undefined},
+    link(Proc#proc.pid),
+    ets:insert(?PROCS, Proc),
+    insert_idle_by_db(Proc),
+    {noreply, State};
 handle_info({'EXIT', Pid, {spawn_ok, Proc0, {ClientPid,_} = From}}, State) ->
-    ets:delete(?OPENING, Pid),
-    link(Proc0#proc_int.pid),
+    % Use ets:take/2 to assert that opener existed before removing
+    [{Pid, #client{}}] = ets:take(?OPENING, Pid),
+    link(Proc0#proc.pid),
     Proc = assign_proc(ClientPid, Proc0),
     gen_server:reply(From, {ok, Proc, State#state.config}),
     {noreply, State};
 
 handle_info({'EXIT', Pid, spawn_error}, State) ->
-    [{Pid, #client{lang=Lang}}] = ets:lookup(?OPENING, Pid),
-    ets:delete(?OPENING, Pid),
-    NewState = State#state{
-        counts = dict:update_counter(Lang, -1, State#state.counts)
-    },
-    {noreply, flush_waiters(NewState, Lang)};
+    % Assert when removing that we always expect the opener to have been there
+    [{Pid, #client{lang = Lang}}] = ets:take(?OPENING, Pid),
+    dec_count(Lang),
+    ok = flush_waiters(State, Lang),
+    {noreply, State};
 
 handle_info({'EXIT', Pid, Reason}, State) ->
     couch_log:info("~p ~p died ~p", [?MODULE, Pid, Reason]),
     case ets:lookup(?PROCS, Pid) of
-        [#proc_int{} = Proc] ->
-            NewState = remove_proc(State, Proc),
-            {noreply, flush_waiters(NewState, Proc#proc_int.lang)};
+        [#proc{} = Proc] ->
+            ok = remove_proc(Proc),
+            ok = flush_waiters(State, Proc#proc.lang);
         [] ->
-            {noreply, State}
-    end;
-
-handle_info({'DOWN', Ref, _, _, _Reason}, State0) ->
-    case ets:match_object(?PROCS, #proc_int{client=Ref, _='_'}) of
-        [#proc_int{} = Proc] ->
-            {noreply, return_proc(State0, Proc)};
-        [] ->
-            {noreply, State0}
-    end;
+            ok
+    end,
+    {noreply, State};
+handle_info({'DOWN', Ref, _, _, _Reason}, #state{} = State) ->
+    case ets:match_object(?PROCS, #proc{client = Ref, _ = '_'}) of
+        [#proc{} = Proc] -> ok = return_proc(State, Proc);
+        [] -> ok
+    end,
+    {noreply, State};
 
 
 handle_info(restart_config_listener, State) ->
@@ -284,73 +314,97 @@ handle_config_change("query_server_config", _, _, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, undefined}.
 
-
-find_proc(#client{lang = Lang, ddoc_key = undefined}) ->
-    Pred = fun(_) ->
-        true
-    end,
-    find_proc(Lang, Pred);
-find_proc(#client{lang = Lang, ddoc = DDoc, ddoc_key = DDocKey} = Client) ->
-    Pred = fun(#proc_int{ddoc_keys = DDocKeys}) ->
-        lists:member(DDocKey, DDocKeys)
-    end,
-    case find_proc(Lang, Pred) of
+find_proc(#client{ddoc_key = undefined} = Client, _CanSpawn) ->
+    #client{lang = Lang} = Client,
+    % Find an unowned process first, if that fails find an owned one
+    case find_proc(Lang, undefined, '_') of
+        {ok, Proc} ->
+            {ok, Proc};
         not_found ->
-            case find_proc(Client#client{ddoc_key=undefined}) of
+            case find_proc(Lang, '_', '_') of
                 {ok, Proc} ->
-                    teach_ddoc(DDoc, DDocKey, Proc);
+                    {ok, Proc};
                 Else ->
                     Else
             end;
         Else ->
             Else
-    end.
-
-find_proc(Lang, Fun) ->
-    try iter_procs(Lang, Fun)
-    catch ?STACKTRACE(error, Reason, StackTrace)
-        couch_log:error("~p ~p ~p", [?MODULE, Reason, StackTrace]),
-        {error, Reason}
-    end.
-
-
-iter_procs(Lang, Fun) when is_binary(Lang) ->
-    Pattern = #proc_int{lang=Lang, client=undefined, _='_'},
-    MSpec = [{Pattern, [], ['$_']}],
-    case ets:select_reverse(?PROCS, MSpec, 25) of
-        '$end_of_table' ->
-            not_found;
-        Continuation ->
-            iter_procs_int(Continuation, Fun)
-    end.
-
-
-iter_procs_int({[], Continuation0}, Fun) ->
-    case ets:select_reverse(Continuation0) of
-        '$end_of_table' ->
-            not_found;
-        Continuation1 ->
-            iter_procs_int(Continuation1, Fun)
     end;
-iter_procs_int({[Proc | Rest], Continuation}, Fun) ->
-    case Fun(Proc) of
-        true ->
+find_proc(#client{} = Client, CanSpawn) ->
+    #client{
+        lang = Lang,
+        ddoc = DDoc,
+        db_key = DbKey,
+        ddoc_key = DDocKey
+    } = Client,
+    case find_proc(Lang, DbKey, DDocKey) of
+        not_found ->
+            % Find a ddoc process used by the same db at least
+            case find_proc(Lang, DbKey, '_') of
+                {ok, Proc} ->
+                    teach_ddoc(DDoc, DbKey, DDocKey, Proc);
+                not_found ->
+                    % Pick a process not used by any ddoc
+                    case find_proc(Lang, undefined, '_') of
+                        {ok, Proc} ->
+                            replenish_untagged_pool(Lang, CanSpawn),
+                            teach_ddoc(DDoc, DbKey, DDocKey, Proc);
+                        Else ->
+                            Else
+                    end;
+                Else ->
+                    Else
+            end;
+        {ok, Proc} ->
             {ok, Proc};
-        false ->
-            iter_procs_int({Rest, Continuation}, Fun)
+        Else ->
+            Else
     end.
 
+find_proc(Lang, DbPat, DDocKey) when
+    DbPat =:= '_' orelse DbPat =:= undefined orelse is_binary(DbPat),
+    DDocKey =:= '_' orelse is_tuple(DDocKey)
+->
+    Pattern = {{Lang, DbPat, '$1'}, '$2'},
+    Guards =
+        case DDocKey of
+            '_' -> [];
+            {_, _} -> [{map_get, {const, DDocKey}, '$2'}]
+        end,
+    MSpec = [{Pattern, Guards, ['$1']}],
+    case ets:select_reverse(?IDLE_BY_DB, MSpec, 1) of
 
-spawn_proc(State, Client) ->
+        '$end_of_table' ->
+            not_found;
+        {[Pid], _Continuation} when is_pid(Pid) ->
+            [#proc{client = undefined} = Proc] = ets:lookup(?PROCS, Pid),
+            % Once it's found it's not idle any longer and it might be
+            % "tought" a new ddoc, so its db_key might change
+            remove_idle_by_db(Proc),
+            remove_idle_access(Proc),
+            {ok, Proc}
+    end.
+
+spawn_proc(#client{} = Client) ->
     Pid = spawn_link(?MODULE, new_proc, [Client]),
     ets:insert(?OPENING, {Pid, Client}),
-    Counts = State#state.counts,
-    Lang = Client#client.lang,
-    State#state{
-        counts = dict:update_counter(Lang, 1, Counts)
-    }.
+    inc_count(Client#client.lang).
 
-
+% This instance was spawned without a client to replenish
+% the untagged pool asynchronously
+new_proc(#client{from = undefined} = Client) ->
+    #client{lang = Lang} = Client,
+    Resp = try
+            case new_proc_int(undefined, Lang) of
+                {ok, Proc} ->
+                    {spawn_ok, Proc, undefined};
+                _Error ->
+                    spawn_error
+            end
+        catch _:_ ->
+            spawn_error
+        end,
+    exit(Resp);
 new_proc(#client{ddoc=undefined, ddoc_key=undefined}=Client) ->
     #client{from=From, lang=Lang} = Client,
     Resp = try
@@ -365,13 +419,17 @@ new_proc(#client{ddoc=undefined, ddoc_key=undefined}=Client) ->
         spawn_error
     end,
     exit(Resp);
-
-new_proc(Client) ->
-    #client{from=From, lang=Lang, ddoc=DDoc, ddoc_key=DDocKey} = Client,
-    Resp = try
-        case new_proc_int(From, Lang) of
+new_proc(#client{} = Client) ->
+    #client{
+        from = From,
+        lang = Lang,
+        ddoc = DDoc,
+        db_key = DbKey,
+        ddoc_key = DDocKey
+    } = Client,
+    Resp = try case new_proc_int(From, Lang) of
         {ok, NewProc} ->
-            {ok, Proc} = teach_ddoc(DDoc, DDocKey, NewProc),
+                    {ok, Proc} = teach_ddoc(DDoc, DbKey, DDocKey, NewProc),
             {spawn_ok, Proc, From};
         Error ->
             gen_server:reply(From, {error, Error}),
@@ -381,6 +439,64 @@ new_proc(Client) ->
         spawn_error
     end,
     exit(Resp).
+
+replenish_untagged_pool(Lang, _CanSpawn = true) ->
+    % After an untagged instance is tagged, we try to replenish
+    % the untagged pool asynchronously. Here we are using a "bogus"
+    % #client{} with an undefined from field.
+    ok = spawn_proc(#client{lang = Lang, from = undefined});
+replenish_untagged_pool(_Lang, _CanSpawn = false) ->
+    ok.
+
+reap_idle(Num, <<_/binary>> = Lang) when is_integer(Num), Num >= 1 ->
+    case ets:match_object(?IDLE_ACCESS, {{Lang, '_', '_'}, '_'}, Num) of
+        '$end_of_table' ->
+            0;
+        {Objects = [_ | _], _} ->
+            ok = reap_idle(Objects),
+            length(Objects)
+    end.
+
+reap_idle([]) ->
+    ok;
+reap_idle([{{_Lang, _Ts, Pid}, true} | Rest]) ->
+    case ets:lookup(?PROCS, Pid) of
+        % Do an extra assert that client is undefined
+        [#proc{client = undefined} = Proc] ->
+            ok = remove_proc(Proc);
+        [] ->
+            ok
+    end,
+    reap_idle(Rest).
+
+insert_idle_access(#proc{db_key = undefined}, _Ts) ->
+    % Only tagged proc are index in ?IDLE_ACCESS
+    ok;
+insert_idle_access(#proc{db_key = <<_/binary>>} = Proc, Ts) ->
+    #proc{lang = Lang, pid = Pid} = Proc,
+    % Lang is used for partially bound key access
+    % Pid is for uniqueness as time is not strictly monotonic
+    true = ets:insert_new(?IDLE_ACCESS, {{Lang, Ts, Pid}, true}),
+    ok.
+
+remove_idle_access(#proc{db_key = undefined}) ->
+    % Only tagged procs are indexed in ?IDLE_ACCESS
+    ok;
+remove_idle_access(#proc{db_key = <<_/binary>>} = Proc) ->
+    #proc{last_use_ts = Ts, lang = Lang, pid = Pid} = Proc,
+    true = ets:delete(?IDLE_ACCESS, {Lang, Ts, Pid}),
+    ok.
+
+insert_idle_by_db(#proc{} = Proc) ->
+    #proc{lang = Lang, pid = Pid, db_key = Db, ddoc_keys = #{} = DDocs} = Proc,
+    % An extra assert that only expect to insert a new object
+    true = ets:insert_new(?IDLE_BY_DB, {{Lang, Db, Pid}, DDocs}),
+    ok.
+
+remove_idle_by_db(#proc{} = Proc) ->
+    #proc{lang = Lang, pid = Pid, db_key = Db} = Proc,
+    true = ets:delete(?IDLE_BY_DB, {Lang, Db, Pid}),
+    ok.
 
 split_string_if_longer(String, Pos) ->
     case length(String) > Pos of
@@ -435,7 +551,10 @@ new_proc_int(From, Lang) when is_binary(Lang) ->
     LangStr = binary_to_list(Lang),
     case get_query_server(LangStr) of
     undefined ->
-        gen_server:reply(From, {unknown_query_language, Lang});
+            case From of
+                undefined -> ok;
+                {_, _} -> gen_server:reply(From, {unknown_query_language, Lang})
+            end;
     {M, F, A} ->
         {ok, Pid} = apply(M, F, A),
         make_proc(Pid, Lang, M);
@@ -444,102 +563,98 @@ new_proc_int(From, Lang) when is_binary(Lang) ->
         make_proc(Pid, Lang, couch_os_process)
     end.
 
-
-teach_ddoc(DDoc, {DDocId, _Rev}=DDocKey, #proc_int{ddoc_keys=Keys}=Proc) ->
+teach_ddoc(DDoc, DbKey, {DDocId, _Rev} = DDocKey, #proc{ddoc_keys = #{} = Keys} = Proc) ->
     % send ddoc over the wire
     % we only share the rev with the client we know to update code
     % but it only keeps the latest copy, per each ddoc, around.
-    true = couch_query_servers:proc_prompt(
-        export_proc(Proc),
-        [<<"ddoc">>, <<"new">>, DDocId, couch_doc:to_json_obj(DDoc, [])]),
+    JsonDoc = couch_doc:to_json_obj(DDoc, []),
+    Prompt = [<<"ddoc">>, <<"new">>, DDocId, JsonDoc],
+    true = couch_query_servers:proc_prompt(Proc, Prompt),
     % we should remove any other ddocs keys for this docid
     % because the query server overwrites without the rev
-    Keys2 = [{D,R} || {D,R} <- Keys, D /= DDocId],
+    Keys2 = maps:filter(fun({Id, _}, true) -> Id =/= DDocId end, Keys),
+
     % add ddoc to the proc
-    {ok, Proc#proc_int{ddoc_keys=[DDocKey|Keys2]}}.
+    {ok, Proc#proc{db_key = DbKey, ddoc_keys = Keys2#{DDocKey => true}}}.
 
 
 make_proc(Pid, Lang, Mod) when is_binary(Lang) ->
-    Proc = #proc_int{
+    Proc = #proc{
         lang = Lang,
         pid = Pid,
         prompt_fun = {Mod, prompt},
         set_timeout_fun = {Mod, set_timeout},
-        stop_fun = {Mod, stop}
+        stop_fun = {Mod, stop},
+        threshold_ts = timestamp(),
+        last_use_ts = timestamp()
     },
     unlink(Pid),
     {ok, Proc}.
 
-
-assign_proc(Pid, #proc_int{client=undefined}=Proc0) when is_pid(Pid) ->
-    Proc = Proc0#proc_int{client = erlang:monitor(process, Pid)},
+assign_proc(Pid, #proc{client = undefined} = Proc0) when is_pid(Pid) ->
+    Proc = Proc0#proc{client = erlang:monitor(process, Pid)},
+    % It's important to insert the proc here instead of doing an update_element
+    % as we might have updated the db_key or ddoc_keys in teach_ddoc/4
     ets:insert(?PROCS, Proc),
-    export_proc(Proc);
-assign_proc(#client{}=Client, #proc_int{client=undefined}=Proc) ->
+    Proc;
+assign_proc(#client{} = Client, #proc{client = undefined} = Proc) ->
     {Pid, _} = Client#client.from,
     assign_proc(Pid, Proc).
 
-
-return_proc(#state{} = State, #proc_int{} = ProcInt) ->
-    #proc_int{pid = Pid, lang = Lang} = ProcInt,
-    NewState = case is_process_alive(Pid) of true ->
-        case ProcInt#proc_int.t0 < State#state.threshold_ts of
-            true ->
-                remove_proc(State, ProcInt);
-            false ->
-                gen_server:cast(Pid, garbage_collect),
-                true = ets:update_element(?PROCS, Pid, [
-                    {#proc_int.client, undefined}
-                ]),
-                State
-        end;
-    false ->
-        remove_proc(State, ProcInt)
+return_proc(#state{} = State, #proc{} = Proc) ->
+    #proc{pid = Pid, lang = Lang} = Proc,
+    case is_process_alive(Pid) of
+        true ->
+            case Proc#proc.threshold_ts < State#state.threshold_ts of
+                true ->
+                    ok = remove_proc(Proc);
+                false ->
+                    gen_server:cast(Pid, garbage_collect),
+                    Ts = timestamp(),
+                    true = ets:update_element(?PROCS, Pid, [
+                        {#proc.client, undefined},
+                        {#proc.last_use_ts, Ts}
+                    ]),
+                    Proc1 = Proc#proc{client = undefined, last_use_ts = Ts},
+                    insert_idle_access(Proc1, Ts),
+                    insert_idle_by_db(Proc1)
+            end;
+        false ->
+            ok = remove_proc(Proc)
     end,
-    flush_waiters(NewState, Lang).
+    ok = flush_waiters(State, Lang).
 
-
-remove_proc(State, #proc_int{}=Proc) ->
-    ets:delete(?PROCS, Proc#proc_int.pid),
-    case is_process_alive(Proc#proc_int.pid) of true ->
-        unlink(Proc#proc_int.pid),
-        gen_server:cast(Proc#proc_int.pid, stop);
-    false ->
-        ok
+remove_proc(#proc{pid = Pid} = Proc) ->
+    remove_idle_access(Proc),
+    remove_idle_by_db(Proc),
+    ets:delete(?PROCS, Pid),
+    case is_process_alive(Pid) of
+        true->
+            unlink(Pid),
+            gen_server:cast(Pid, stop);
+        false ->
+            ok
     end,
-    Counts = State#state.counts,
-    Lang = Proc#proc_int.lang,
-    State#state{
-        counts = dict:update_counter(Lang, -1, Counts)
-    }.
+    dec_count(Proc#proc.lang).
 
 
--spec export_proc(#proc_int{}) -> #proc{}.
-export_proc(#proc_int{} = ProcInt) ->
-    ProcIntList = tuple_to_list(ProcInt),
-    ProcLen = record_info(size, proc),
-    [_ | Data] = lists:sublist(ProcIntList, ProcLen),
-    list_to_tuple([proc | Data]).
 
-
-flush_waiters(State) ->
-    dict:fold(fun(Lang, Count, StateAcc) ->
-        case Count < State#state.hard_limit of
-            true ->
-                flush_waiters(StateAcc, Lang);
-            false ->
-                StateAcc
-        end
-    end, State, State#state.counts).
-
-
-flush_waiters(State, Lang) ->
-    CanSpawn = can_spawn(State, Lang),
+flush_waiters(#state{} = State, Lang) ->
+    #state{hard_limit = HardLimit, config = {[_ | _] = Cfg}} = State,
+    TimeoutMSec = couch_util:get_value(<<"timeout">>, Cfg),
+    Timeout = erlang:convert_time_unit(TimeoutMSec, millisecond, native),
+    StaleLimit = timestamp() - Timeout,
     case get_waiting_client(Lang) of
+        #client{wait_key = {_, T, _}} = Client when is_integer(T), T < StaleLimit ->
+            % Client waited too long and the gen_server call timeout
+            % likey fired already, don't bother allocating a process for it
+            remove_waiting_client(Client),
+            flush_waiters(State, Lang);
         #client{from = From} = Client ->
-            case find_proc(Client) of
-                {ok, ProcInt} ->
-                    Proc = assign_proc(Client, ProcInt),
+            CanSpawn = get_count(Lang) < HardLimit,
+            case find_proc(Client, CanSpawn) of
+                {ok, Proc0} ->
+                    Proc = assign_proc(Client, Proc0),
                     gen_server:reply(From, {ok, Proc, State#state.config}),
                     remove_waiting_client(Client),
                     flush_waiters(State, Lang);
@@ -548,44 +663,56 @@ flush_waiters(State, Lang) ->
                     remove_waiting_client(Client),
                     flush_waiters(State, Lang);
                 not_found when CanSpawn ->
-                    NewState = spawn_proc(State, Client),
+                    ok = spawn_proc(Client),
                     remove_waiting_client(Client),
-                    flush_waiters(NewState, Lang);
+                    flush_waiters(State, Lang);
                 not_found ->
-                    State
+                    % 10% of limit
+                    ReapBatch = round(HardLimit * 0.1 + 1),
+                    case reap_idle(ReapBatch, Lang) of
+                        N when is_integer(N), N > 0 ->
+                            % We may have room available to spawn
+                            case get_count(Lang) < HardLimit of
+                                true ->
+                                    ok = spawn_proc(Client),
+                                    remove_waiting_client(Client),
+                                    flush_waiters(State, Lang);
+                                false ->
+                                    ok
+                            end;
+                        0 ->
+                            ok
+                    end
             end;
         undefined ->
-            State
+            ok
     end.
 
-
-add_waiting_client(Client) ->
-    ets:insert(?WAITERS, Client#client{timestamp=os:timestamp()}).
+add_waiting_client(#client{from = {_Pid, Tag}, lang = Lang} = Client) ->
+    % Use Lang in the key first since we can look it up using a partially bound
+    % in get_waiting_client/2. Use the reply tag to provide uniqueness.
+    Key = {Lang, timestamp(), Tag},
+    true = ets:insert_new(?WAITERS, Client#client{wait_key = Key}).
 
 -spec get_waiting_client(Lang :: binary()) -> undefined | #client{}.
 get_waiting_client(Lang) ->
-    case ets:match_object(?WAITERS, #client{lang=Lang, _='_'}, 1) of
+    % Use a partially bound key (Lang) to avoid scanning unrelated procs
+    Key = {Lang, '_', '_'},
+    case ets:match_object(?WAITERS, #client{wait_key = Key, _ = '_'}, 1) of
         '$end_of_table' ->
             undefined;
         {[#client{}=Client], _} ->
             Client
     end.
 
+remove_waiting_client(#client{wait_key = Key}) ->
+    ets:delete(?WAITERS, Key).
 
-remove_waiting_client(#client{timestamp = Timestamp}) ->
-    ets:delete(?WAITERS, Timestamp).
-
-
-can_spawn(#state{hard_limit = HardLimit, counts = Counts}, Lang) ->
-    case dict:find(Lang, Counts) of
-        {ok, Count} -> Count < HardLimit;
-        error -> true
-    end.
 
 
 get_proc_config() ->
     Limit = config:get_boolean("query_server_config", "reduce_limit", true),
-    Timeout = config:get_integer("couchdb", "os_process_timeout", 5000),
+    Timeout = get_os_process_timeout(),
     {[
         {<<"reduce_limit">>, Limit},
         {<<"timeout">>, Timeout}
@@ -593,9 +720,37 @@ get_proc_config() ->
 
 
 get_hard_limit() ->
-    LimStr = config:get("query_server_config", "os_process_limit", "100"),
-    list_to_integer(LimStr).
+    config:get_integer("query_server_config", "os_process_limit", 100).
 
 
 get_soft_limit() ->
     config:get_integer("query_server_config", "os_process_soft_limit", 100).
+
+get_os_process_timeout() ->
+    config:get_integer("couchdb", "os_process_timeout", 5000).
+
+timestamp() ->
+    erlang:monotonic_time().
+
+foreach_proc(Fun) when is_function(Fun, 1) ->
+    FoldFun = fun(#proc{} = Proc, ok) ->
+        Fun(Proc),
+        ok
+    end,
+    ok = ets:foldl(FoldFun, ok, ?PROCS).
+
+inc_count(Lang) ->
+    ets:update_counter(?COUNTERS, Lang, 1, {Lang, 0}),
+    ok.
+
+dec_count(Lang) ->
+    ets:update_counter(?COUNTERS, Lang, -1, {Lang, 0}),
+    ok.
+
+get_count(Lang) ->
+    case ets:lookup(?COUNTERS, Lang) of
+        [{_, Count}] when is_integer(Count) ->
+            Count;
+        [] ->
+            0
+    end.

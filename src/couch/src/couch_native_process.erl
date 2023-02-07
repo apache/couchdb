@@ -115,7 +115,7 @@ handle_cast(_Msg, State) ->
     {noreply, State, State#evstate.idle}.
 
 handle_info(timeout, State) ->
-    gen_server:cast(couch_proc_manager, {os_proc_idle, self()}),
+    couch_proc_manager:os_proc_idle(self()),
     erlang:garbage_collect(),
     {noreply, State, State#evstate.idle};
 handle_info({'EXIT',_,normal}, State) ->

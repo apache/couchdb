@@ -229,7 +229,7 @@ handle_cast(Msg, #os_proc{idle=Idle}=OsProc) ->
     {noreply, OsProc, Idle}.
 
 handle_info(timeout, #os_proc{idle=Idle}=OsProc) ->
-    gen_server:cast(couch_proc_manager, {os_proc_idle, self()}),
+    couch_proc_manager:os_proc_idle(self()),
     erlang:garbage_collect(),
     {noreply, OsProc, Idle};
 handle_info({Port, {exit_status, 0}}, #os_proc{port=Port}=OsProc) ->
