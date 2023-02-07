@@ -14,16 +14,16 @@
 
 -export([try_compile/4]).
 -export([start_doc_map/3, map_doc_raw/2, stop_doc_map/1, raw_to_ejson/1]).
--export([reduce/3, rereduce/3, validate_doc_update/5]).
+-export([reduce/3, rereduce/3, validate_doc_update/6]).
 -export([filter_docs/5]).
--export([filter_view/3]).
+-export([filter_view/4]).
 -export([finalize/2]).
 -export([rewrite/3]).
 
--export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
+-export([with_ddoc_proc/3, proc_prompt/2, ddoc_prompt/4, ddoc_proc_prompt/3, json_doc/1]).
 
 % For 210-os-proc-pool.t
--export([get_os_process/1, get_ddoc_process/2, ret_os_process/1]).
+-export([get_os_process/1, get_ddoc_process/3, ret_os_process/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -386,17 +386,19 @@ approx_count_distinct(rereduce, Reds) ->
     hyper:union([Filter || [_, Filter] <- Reds]).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
--spec validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
+-spec validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
+    Db :: term(),
     DDoc :: ddoc(),
     EditDoc :: doc(),
     DiskDoc :: doc() | nil,
     Ctx :: user_ctx(),
     SecObj :: sec_obj().
 
-validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
+validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),
     Resp = ddoc_prompt(
+        Db,
         DDoc,
         [<<"validate_doc_update">>],
         [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]
@@ -428,7 +430,7 @@ rewrite(Req, Db, DDoc) ->
         F =/= <<"id">>
     ],
     JsonReq = chttpd_external:json_req_obj(Req, Db, null, Fields),
-    case couch_query_servers:ddoc_prompt(DDoc, [<<"rewrites">>], [JsonReq]) of
+    case ddoc_prompt(Db, DDoc, [<<"rewrites">>], [JsonReq]) of
         {[{<<"forbidden">>, Message}]} ->
             throw({forbidden, Message});
         {[{<<"unauthorized">>, Message}]} ->
@@ -520,10 +522,10 @@ json_doc(nil, _) ->
 json_doc(Doc, Options) ->
     couch_doc:to_json_obj(Doc, Options).
 
-filter_view(DDoc, VName, Docs) ->
+filter_view(Db, DDoc, VName, Docs) ->
     Options = json_doc_options(),
     JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
-    [true, Passes] = ddoc_prompt(DDoc, [<<"views">>, VName, <<"map">>], [JsonDocs]),
+    [true, Passes] = ddoc_prompt(Db, DDoc, [<<"views">>, VName, <<"map">>], [JsonDocs]),
     {ok, Passes}.
 
 filter_docs(Req, Db, DDoc, FName, Docs) ->
@@ -537,18 +539,19 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
     Options = json_doc_options(),
     JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
     try
-        {ok, filter_docs_int(DDoc, FName, JsonReq, JsonDocs)}
+        {ok, filter_docs_int(Db, DDoc, FName, JsonReq, JsonDocs)}
     catch
         throw:{os_process_error, {exit_status, 1}} ->
             %% batch used too much memory, retry sequentially.
             Fun = fun(JsonDoc) ->
-                filter_docs_int(DDoc, FName, JsonReq, [JsonDoc])
+                filter_docs_int(Db, DDoc, FName, JsonReq, [JsonDoc])
             end,
             {ok, lists:flatmap(Fun, JsonDocs)}
     end.
 
-filter_docs_int(DDoc, FName, JsonReq, JsonDocs) ->
+filter_docs_int(Db, DDoc, FName, JsonReq, JsonDocs) ->
     [true, Passes] = ddoc_prompt(
+        Db,
         DDoc,
         [<<"filters">>, FName],
         [JsonDocs, JsonReq]
@@ -558,15 +561,16 @@ filter_docs_int(DDoc, FName, JsonReq, JsonDocs) ->
 ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) ->
     proc_prompt(Proc, [<<"ddoc">>, DDocId, FunPath, Args]).
 
-ddoc_prompt(DDoc, FunPath, Args) ->
-    with_ddoc_proc(DDoc, fun({Proc, DDocId}) ->
+ddoc_prompt(Db, DDoc, FunPath, Args) ->
+    with_ddoc_proc(Db, DDoc, fun({Proc, DDocId}) ->
         proc_prompt(Proc, [<<"ddoc">>, DDocId, FunPath, Args])
     end).
 
-with_ddoc_proc(#doc{id = DDocId, revs = {Start, [DiskRev | _]}} = DDoc, Fun) ->
+with_ddoc_proc(Db, #doc{id = DDocId, revs = {Start, [DiskRev | _]}} = DDoc, Fun) ->
     Rev = couch_doc:rev_to_str({Start, DiskRev}),
+    DbKey = db_key(Db),
     DDocKey = {DDocId, Rev},
-    Proc = get_ddoc_process(DDoc, DDocKey),
+    Proc = get_ddoc_process(DDoc, DbKey, DDocKey),
     try Fun({Proc, DDocId}) of
         Resp ->
             ok = ret_os_process(Proc),
@@ -576,6 +580,22 @@ with_ddoc_proc(#doc{id = DDocId, revs = {Start, [DiskRev | _]}} = DDoc, Fun) ->
             catch proc_stop(Proc),
             erlang:raise(Tag, Err, Stack)
     end.
+
+db_key(DbName) when is_binary(DbName) ->
+    Name = mem3:dbname(DbName),
+    case config:get("query_server_config", "db_tag", "name") of
+        "prefix" ->
+            case binary:split(Name, <<"/">>) of
+                [Prefix, _] when byte_size(Prefix) > 0 -> Prefix;
+                _ -> Name
+            end;
+        "none" ->
+            undefined;
+        _ ->
+            Name
+    end;
+db_key(Db) ->
+    db_key(couch_db:name(Db)).
 
 proc_prompt(Proc, Args) ->
     case proc_prompt_raw(Proc, Args) of
@@ -672,12 +692,9 @@ proc_set_timeout(Proc, Timeout) ->
     {Mod, Func} = Proc#proc.set_timeout_fun,
     apply(Mod, Func, [Proc#proc.pid, Timeout]).
 
-get_os_process_timeout() ->
-    config:get_integer("couchdb", "os_process_timeout", 5000).
-
-get_ddoc_process(#doc{} = DDoc, DDocKey) ->
+get_ddoc_process(#doc{} = DDoc, DbKey, DDocKey) ->
     % remove this case statement
-    case gen_server:call(couch_proc_manager, {get_proc, DDoc, DDocKey}, get_os_process_timeout()) of
+    case couch_proc_manager:get_proc(DDoc, DbKey, DDocKey) of
         {ok, Proc, {QueryConfig}} ->
             % process knows the ddoc
             case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
@@ -686,14 +703,14 @@ get_ddoc_process(#doc{} = DDoc, DDocKey) ->
                     Proc;
                 _ ->
                     catch proc_stop(Proc),
-                    get_ddoc_process(DDoc, DDocKey)
+                    get_ddoc_process(DDoc, DbKey, DDocKey)
             end;
         Error ->
             throw(Error)
     end.
 
 get_os_process(Lang) ->
-    case gen_server:call(couch_proc_manager, {get_proc, Lang}, get_os_process_timeout()) of
+    case couch_proc_manager:get_proc(Lang) of
         {ok, Proc, {QueryConfig}} ->
             case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
                 true ->
@@ -708,7 +725,7 @@ get_os_process(Lang) ->
     end.
 
 ret_os_process(Proc) ->
-    true = gen_server:call(couch_proc_manager, {ret_proc, Proc}, infinity),
+    true = couch_proc_manager:ret_proc(Proc),
     catch unlink(Proc#proc.pid),
     ok.
 
@@ -719,7 +736,8 @@ throw_stat_error(Else) ->
     throw({invalid_value, iolist_to_binary(io_lib:format(?STATERROR, [Else]))}).
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("couch/include/couch_eunit.hrl").
 
 builtin_sum_rows_negative_test() ->
     A = [{[{<<"a">>, 1}]}, {[{<<"a">>, 2}]}, {[{<<"a">>, 3}]}],
@@ -931,5 +949,43 @@ force_utf8_test() ->
         end,
         NotOk
     ).
+
+db_key_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_db_key_default),
+            ?TDEF_FE(t_db_key_prefix),
+            ?TDEF_FE(t_db_key_none)
+        ]
+    }.
+
+setup() ->
+    meck:new(config, [passthrough]),
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    ok.
+
+teardown(_) ->
+    meck:unload().
+
+t_db_key_default(_) ->
+    ?assertEqual(<<"foo">>, db_key(<<"foo">>)),
+    ?assertEqual(<<"foo/bar">>, db_key(<<"foo/bar">>)),
+    ?assertEqual(<<"foo/bar">>, db_key(<<"shards/00000000-3fffffff/foo/bar.1415960794">>)).
+
+t_db_key_prefix(_) ->
+    meck:expect(config, get, fun(_, "db_tag", _) -> "prefix" end),
+    ?assertEqual(<<"foo">>, db_key(<<"foo">>)),
+    ?assertEqual(<<"foo">>, db_key(<<"foo/bar">>)),
+    ?assertEqual(<<"foo">>, db_key(<<"shards/00000000-3fffffff/foo/bar.1415960794">>)),
+    ?assertEqual(<<"/foo">>, db_key(<<"/foo">>)).
+
+t_db_key_none(_) ->
+    meck:expect(config, get, fun(_, "db_tag", _) -> "none" end),
+    ?assertEqual(undefined, db_key(<<"foo">>)),
+    ?assertEqual(undefined, db_key(<<"foo/bar">>)),
+    ?assertEqual(undefined, db_key(<<"shards/00000000-3fffffff/foo/bar.1415960794">>)).
 
 -endif.

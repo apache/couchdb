@@ -107,7 +107,7 @@ should_return_object_on_false() ->
 
 should_split_large_batches() ->
     Req = {json_req, {[]}},
-    Db = undefined,
+    Db = <<"somedb">>,
     DDoc = #doc{
         id = <<"_design/foo">>,
         revs = {0, [<<"bork bork bork">>]},
