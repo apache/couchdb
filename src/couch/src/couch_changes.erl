@@ -252,7 +252,7 @@ filter(_Db, DocInfo, {design_docs, Style}) ->
     end;
 filter(Db, DocInfo, {view, Style, DDoc, VName}) ->
     Docs = open_revs(Db, DocInfo, Style),
-    {ok, Passes} = couch_query_servers:filter_view(DDoc, VName, Docs),
+    {ok, Passes} = couch_query_servers:filter_view(Db, DDoc, VName, Docs),
     filter_revs(Passes, Docs);
 filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}) ->
     Req =
