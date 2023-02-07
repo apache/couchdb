@@ -189,11 +189,14 @@
 -record(proc, {
     pid,
     lang,
-    client = nil,
-    ddoc_keys = [],
+    client,
+    db_key,
+    ddoc_keys = #{},
     prompt_fun,
     set_timeout_fun,
-    stop_fun
+    stop_fun,
+    threshold_ts,
+    last_use_ts
 }).
 
 -record(leaf,  {

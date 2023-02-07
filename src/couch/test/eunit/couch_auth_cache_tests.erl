@@ -345,5 +345,6 @@ validate(DiskDoc, NewDoc) ->
 
 validate(DiskDoc, NewDoc, JSONCtx) ->
     {ok, DDoc0} = couch_auth_cache:auth_design_doc(<<"_design/anything">>),
+    Db = <<"validate_couch_auth_cache_tests">>,
     DDoc = DDoc0#doc{revs = {1, [<<>>]}},
-    couch_query_servers:validate_doc_update(DDoc, NewDoc, DiskDoc, JSONCtx, []).
+    couch_query_servers:validate_doc_update(Db, DDoc, NewDoc, DiskDoc, JSONCtx, []).

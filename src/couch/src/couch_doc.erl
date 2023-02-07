@@ -16,7 +16,7 @@
 -export([from_json_obj/1, from_json_obj_validate/1]).
 -export([from_json_obj/2, from_json_obj_validate/2]).
 -export([to_json_obj/2, has_stubs/1, merge_stubs/2]).
--export([validate_docid/1, validate_docid/2, get_validate_doc_fun/1]).
+-export([validate_docid/1, validate_docid/2, get_validate_doc_fun/2]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_from_multi_part_stream/4]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
@@ -400,15 +400,15 @@ is_deleted(Tree) ->
     end.
 
 
-get_validate_doc_fun({Props}) ->
-    get_validate_doc_fun(couch_doc:from_json_obj({Props}));
-get_validate_doc_fun(#doc{body={Props}}=DDoc) ->
+get_validate_doc_fun(Db, {Props}) ->
+    get_validate_doc_fun(Db, couch_doc:from_json_obj({Props}));
+get_validate_doc_fun(Db, #doc{body={Props}}=DDoc) ->
     case couch_util:get_value(<<"validate_doc_update">>, Props) of
     undefined ->
         nil;
     _Else ->
         fun(EditDoc, DiskDoc, Ctx, SecObj) ->
-            couch_query_servers:validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj)
+            couch_query_servers:validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj)
         end
     end.
 
