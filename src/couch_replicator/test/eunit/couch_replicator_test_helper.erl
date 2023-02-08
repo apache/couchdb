@@ -174,6 +174,8 @@ replicate(Source, Target) ->
         ]}
     ).
 
+replicate(#{} = RepObject) ->
+    replicate(jiffy:decode(jiffy:encode(RepObject)));
 replicate({[_ | _]} = RepObject) ->
     {ok, Rep} = couch_replicator_parse:parse_rep_doc(RepObject, ?ADMIN_USER),
     ok = couch_replicator_scheduler:add_job(Rep),

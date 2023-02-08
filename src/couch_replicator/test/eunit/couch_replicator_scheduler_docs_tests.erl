@@ -88,6 +88,17 @@ replicator_bdu_test_prefixed_db_test_() ->
         ])
     }.
 
+t_replicator_doc_state_fields_test_() ->
+    {
+        setup,
+        fun setup_prefixed_replicator_db/0,
+        fun teardown/1,
+        with([
+            ?TDEF(t_doc_fields_are_updated, 10),
+            ?TDEF(t_doc_fields_are_ignored, 10)
+        ])
+    }.
+
 t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
     SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
     TargetUrl = couch_replicator_test_helper:cluster_db_url(Target),
@@ -133,6 +144,73 @@ t_malformed_docs_are_rejected({_Ctx, {RepDb, _, _}}) ->
     ?assertMatch({403, _}, req(put, DocUrl1, #{})),
     DocUrl2 = rep_doc_url(RepDb, <<"rep2">>),
     ?assertMatch({403, _}, req(put, DocUrl2, #{<<"foo">> => <<"bar">>})).
+
+t_doc_fields_are_updated({_Ctx, {RepDb, Source, Target}}) ->
+    SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
+    TargetUrl = couch_replicator_test_helper:cluster_db_url(Target),
+    RepDoc = #{
+        <<"source">> => SourceUrl,
+        <<"target">> => TargetUrl,
+        <<"_replication_id">> => <<"foo3">>,
+        <<"_replication_state">> => <<"triggered">>,
+        <<"_replication_state_time">> => <<"foo5">>,
+        <<"_replication_state_reason">> => <<"foo6">>
+    },
+    RepDocUrl = rep_doc_url(RepDb, ?docid()),
+    {201, _} = req(put, RepDocUrl, RepDoc),
+    StateDoc = test_util:wait(
+        fun() ->
+            case req(get, RepDocUrl) of
+                {200, #{<<"_replication_state">> := <<"completed">>} = StDoc} -> StDoc;
+                {_, #{}} -> wait
+            end
+        end,
+        10000,
+        1000
+    ),
+    ?assertMatch(
+        #{
+            <<"_replication_state">> := <<"completed">>,
+            <<"_replication_state_time">> := <<_/binary>>,
+            <<"_replication_stats">> := #{}
+        },
+        StateDoc
+    ),
+    #{<<"_replication_state_time">> := StateTime} = StateDoc,
+    ?assertNotEqual(<<"foo5">>, StateTime),
+    ?assertNot(is_map_key(<<"_replicator_state_reason">>, StateDoc)),
+    ?assertNot(is_map_key(<<"_replication_id">>, StateDoc)).
+
+t_doc_fields_are_ignored({_Ctx, {RepDb, Source, Target}}) ->
+    SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
+    TargetUrl = couch_replicator_test_helper:cluster_db_url(Target),
+    RepDoc = #{
+        <<"source">> => SourceUrl,
+        <<"target">> => TargetUrl,
+        <<"replication_id">> => <<"foo1">>,
+        <<"id">> => <<"foo2">>,
+        <<"other_junk">> => true
+    },
+    RepDocUrl = rep_doc_url(RepDb, ?docid()),
+    {201, _} = req(put, RepDocUrl, RepDoc),
+    StateDoc = test_util:wait(
+        fun() ->
+            case req(get, RepDocUrl) of
+                {200, #{<<"_replication_state">> := <<"completed">>} = StDoc} -> StDoc;
+                {_, #{}} -> wait
+            end
+        end,
+        10000,
+        1000
+    ),
+    ?assertMatch(
+        #{
+            <<"replication_id">> := <<"foo1">>,
+            <<"id">> := <<"foo2">>,
+            <<"other_junk">> := true
+        },
+        StateDoc
+    ).
 
 rep_doc_url(RepDb, DocId) when is_binary(RepDb) ->
     rep_doc_url(binary_to_list(RepDb), DocId);
