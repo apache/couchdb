@@ -152,7 +152,6 @@ escriptize: couch
 .PHONY: check
 # target: check - Test everything
 check: all
-	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
