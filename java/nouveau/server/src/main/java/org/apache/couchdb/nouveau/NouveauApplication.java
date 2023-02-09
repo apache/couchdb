@@ -27,7 +27,6 @@ import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexManagerHealthCheck;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
-import org.apache.couchdb.nouveau.resources.SearchResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,7 +106,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         final AnalyzeResource analyzeResource = new AnalyzeResource(lucenes);
         environment.jersey().register(analyzeResource);
         environment.jersey().register(new IndexResource(indexManager));
-        environment.jersey().register(new SearchResource(indexManager));
 
         // health checks
         environment.healthChecks().register("analyzeResource", new AnalyzeHealthCheck(analyzeResource));

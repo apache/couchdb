@@ -20,6 +20,7 @@ import javax.validation.constraints.NotNull;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -30,6 +31,8 @@ import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.SearchRequest;
+import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexManager;
 
 import com.codahale.metrics.annotation.Timed;
@@ -73,6 +76,14 @@ public class IndexResource {
     @Path("/doc/{docId}")
     public void updateDoc(@PathParam("name") String name, @PathParam("docId") String docId, @NotNull @Valid final DocumentUpdateRequest request) throws IOException {
         indexManager.acquire(name).update(docId, request);
+    }
+
+    @POST
+    @Timed
+    @Path("/search")
+    public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest searchRequest)
+            throws IOException {
+        return indexManager.acquire(name).search(searchRequest);
     }
 
 }
