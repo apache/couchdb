@@ -22,6 +22,7 @@ PYTHON=python.exe
 ERLFMT?=$(CURDIR)\bin\erlfmt.cmd
 MAKE=make -f Makefile.win
 # REBAR?=$(shell where rebar.cmd)
+ROOT=$(CURDIR)
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -240,6 +241,17 @@ elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test\elixir\test\config\suite.elixir --exclude test\elixir\test\config\skip.elixir'
+
+src\dreyfus\test\elixir\deps:
+	@cd src\dreyfus\test\elixir && mix deps.get
+
+.PHONY: dreyfus-test
+# target: dreyfus-test - Run Dreyfus tests, requires a running Clouseau instance
+dreyfus-test: export MIX_ENV=integration
+dreyfus-test: elixir-init devclean src\dreyfus\test\elixir\deps
+	@cd src\dreyfus\test\elixir && $(ROOT)\dev\run -n 1 -q -a adm:pass \
+		--locald-config test\config\test-config.ini \
+		--no-eval 'mix test --trace $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init
