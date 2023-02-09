@@ -18,6 +18,7 @@ include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
+ROOT=$(shell pwd)
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -269,6 +270,17 @@ elixir-suite: elixir-init devclean
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
+
+src/dreyfus/test/elixir/deps:
+	@cd src/dreyfus/test/elixir && mix deps.get
+
+.PHONY: dreyfus-test
+# target: dreyfus-test - Run Dreyfus tests, requires a running Clouseau instance
+dreyfus-test: export MIX_ENV=integration
+dreyfus-test: elixir-init devclean src/dreyfus/test/elixir/deps
+	@cd src/dreyfus/test/elixir && $(ROOT)/dev/run -n 1 -q -a adm:pass \
+		--locald-config test/config/test-config.ini \
+		--no-eval 'mix test --trace $(EXUNIT_OPTS)'
 
 .PHONY: elixir-source-checks
 elixir-source-checks: export MIX_ENV=integration

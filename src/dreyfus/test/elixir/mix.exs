@@ -23,7 +23,7 @@ defmodule Foo.Mixfile do
     [
       # {:dep_from_hexpm, "~> 0.3.0"},
       {:httpotion, "~> 3.0"},
-      {:jiffy, "~> 0.14.11"}
+      {:jiffy, path: Path.expand("../../../jiffy", __DIR__)}
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
     ]
   end
