@@ -18,7 +18,7 @@
 -include("nouveau.hrl").
 
 -export([
-    analyze/2,
+    analyze/3,
     index_info/1,
     create_index/2,
     delete_path/1,
@@ -29,10 +29,10 @@
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
 
-analyze(Text, Analyzer) when
-    is_binary(Text), is_binary(Analyzer)
+analyze(LuceneMajor, Text, Analyzer) when
+    is_integer(LuceneMajor), is_binary(Text), is_binary(Analyzer)
 ->
-    ReqBody = {[{<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
+    ReqBody = {[{<<"lucene_major">>, LuceneMajor}, {<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
     Resp = send_if_enabled(
         nouveau_util:nouveau_url() ++ "/analyze", [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
     ),
@@ -45,8 +45,8 @@ analyze(Text, Analyzer) when
         {error, Reason} ->
             send_error(Reason)
     end;
-analyze(_, _) ->
-    {error, {bad_request, <<"'text' and 'analyzer' fields must be non-empty strings">>}}.
+analyze(_, _, _) ->
+    {error, {bad_request, <<"'lucene_major' must be a number and 'text' and 'analyzer' fields must be non-empty strings">>}}.
 
 index_info(IndexName) when
     is_binary(IndexName)

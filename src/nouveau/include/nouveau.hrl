@@ -14,6 +14,7 @@
 -record(index, {
     dbname,
     ddoc_id,
+    lucene_major,
     default_analyzer,
     field_analyzers,
     def,

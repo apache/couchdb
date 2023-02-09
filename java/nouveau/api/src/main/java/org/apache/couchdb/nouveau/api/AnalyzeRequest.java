@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.api;
 
 import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -22,7 +23,8 @@ import io.dropwizard.jackson.JsonSnakeCase;
 @JsonSnakeCase
 public class AnalyzeRequest {
 
-    private int luceneMajor = 9;
+    @NotNull
+    private Integer luceneMajor;
 
     @NotEmpty
     private String analyzer;
