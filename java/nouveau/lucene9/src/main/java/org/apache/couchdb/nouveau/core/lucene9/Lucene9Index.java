@@ -57,6 +57,7 @@ import org.apache.lucene.facet.StringValueFacetCounts;
 import org.apache.lucene.facet.range.DoubleRangeFacetCounts;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.search.CollectorManager;
@@ -197,9 +198,10 @@ class Lucene9Index extends Index {
     private void collectHits(final IndexSearcher searcher, final TopDocs topDocs, final SearchResults searchResults)
             throws IOException {
         final List<SearchHit> hits = new ArrayList<SearchHit>(topDocs.scoreDocs.length);
+        final StoredFields storedFields = searcher.storedFields();
 
         for (final ScoreDoc scoreDoc : topDocs.scoreDocs) {
-            final Document doc = searcher.doc(scoreDoc.doc);
+            final Document doc = storedFields.document(scoreDoc.doc);
 
             final List<Field> fields = new ArrayList<Field>(doc.getFields().size());
             for (IndexableField field : doc.getFields()) {
