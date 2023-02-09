@@ -225,6 +225,21 @@ following command::
 
     make list-js-suites
 
+There is an additional Elixir-based integration test suite for
+Dreyfus, which is not run automatically by the ``check`` target but it
+could be done manually via the corresponding target::
+
+    make dreyfus-test
+
+Note that this requires a running Clouseau instance with the name
+`clouseau@127.0.0.1`.  The easiest way to get it is to clone the
+[`cloudant-labs/clouseau`](https://github.com/cloudant-labs/clouseau)
+repository and launch it run there once all the prerequisites (JDK,
+Scala, and Maven) have been installed successfully, e.g.::
+
+    git clone https://github.com/cloudant-labs/clouseau
+    mvn -f clouseau/pom.xml scala:run
+
 Code analyzer could be run by::
 
     make dialyze
