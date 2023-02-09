@@ -15,7 +15,7 @@
   </parent>
 
   <properties>
-    <lucene.version>9.4.2</lucene.version>
+    <lucene.version>9.5.0</lucene.version>
   </properties>
 
   <dependencies>
