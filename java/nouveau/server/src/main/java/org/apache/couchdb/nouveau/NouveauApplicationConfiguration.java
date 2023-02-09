@@ -18,6 +18,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 
 import javax.validation.constraints.Min;
+import javax.validation.constraints.NotEmpty;
+import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -34,8 +36,10 @@ public class NouveauApplicationConfiguration extends Configuration {
     @Min(30)
     private int idleSeconds = -1;
 
+    @NotNull
     private Path rootDir = null;
 
+    @NotEmpty
     private URL[] luceneBundlePaths;
 
     @JsonProperty
