@@ -177,11 +177,13 @@ To run all the tests use run::
 
     make check
 
-You can also run each test suite individually via ``eunit`` and ``javascript``
-targets::
+You can also run each test suite individually via the ``eunit``, ``mango-test``,
+``elixir-suite``, and ``weatherreport-test`` targets::
 
     make eunit
-    make javascript
+    make mango-test
+    make elixit-suite
+    make weatherreport-test
 
 If you need to run specific Erlang tests, you can pass special "options"
 to make targets::
