@@ -205,26 +205,6 @@ options::
 
     make eunit EUNIT_OPTS="apps=couch,chttpd"
 
-JavaScript tests accepts only `suites` option, but in the same way::
-
-    # Run all JavaScript tests
-    make javascript
-
-    # Run only basic and design_options tests
-    make javascript suites="basic design_options"
-
-    # Ignore specific test suites via command line
-    make javascript ignore_js_suites="all_docs bulk_docs"
-
-    # Ignore specific test suites in makefile
-    ignore_js_suites=all_docs,bulk_docs
-
-Note that tests on the command line are delimited here by whitespace,
-not by comma.You can get list of all possible test targets with the
-following command::
-
-    make list-js-suites
-
 There is an additional Elixir-based integration test suite for
 Dreyfus, which is not run automatically by the ``check`` target but it
 could be done manually via the corresponding target::
