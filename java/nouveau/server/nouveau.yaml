@@ -2,6 +2,9 @@ maxIndexesOpen: 100
 commitIntervalSeconds: 30
 idleSeconds: 60
 
+luceneBundlePaths:
+  - file://${HOME}/.m2/repository/org/apache/couchdb/nouveau/lucene9/1.0-SNAPSHOT/lucene9-1.0-SNAPSHOT-dist.jar
+
 server:
   applicationConnectors:
     - type: h2c

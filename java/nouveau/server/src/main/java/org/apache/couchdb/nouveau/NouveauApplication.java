@@ -38,6 +38,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
+import io.dropwizard.configuration.EnvironmentVariableSubstitutor;
+import io.dropwizard.configuration.SubstitutingSourceProvider;
+import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
 public class NouveauApplication extends Application<NouveauApplicationConfiguration> {
@@ -51,6 +54,16 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
     @Override
     public String getName() {
         return "Nouveau";
+    }
+
+    @Override
+    public void initialize(Bootstrap<NouveauApplicationConfiguration> bootstrap) {
+        // Enable variable substitution with environment variables
+        bootstrap.setConfigurationSourceProvider(
+                new SubstitutingSourceProvider(bootstrap.getConfigurationSourceProvider(),
+                                                   new EnvironmentVariableSubstitutor(false)
+                )
+        );
     }
 
     @Override
@@ -70,8 +83,13 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
                     bundle.run(configuration, environment);
                     final Lucene lucene = ((LuceneBundle)bundle).getLucene();
                     lucenes.put(lucene.getMajor(), lucene);
+                    LOGGER.info("Loaded bundle for Lucene {}", lucene.getMajor());
                 }
             }
+        }
+
+        if (lucenes.isEmpty()) {
+            throw new IllegalStateException("No Lucene bundles configured");
         }
 
         final IndexManager indexManager = new IndexManager();
