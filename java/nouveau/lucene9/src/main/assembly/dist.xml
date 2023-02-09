@@ -23,12 +23,4 @@ the License.
       <scope>provided</scope>
     </dependencySet>
   </dependencySets>
-
-  <!--
-      <dependencySets>
-      <dependencySet>
-      <scope>provided</scope>
-      </dependencySet>
-      </dependencySets>
-  -->
 </assembly>
