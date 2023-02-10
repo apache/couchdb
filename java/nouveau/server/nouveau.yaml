@@ -4,6 +4,7 @@ idleSeconds: 60
 rootDir: target/indexes
 
 luceneBundlePaths:
+  - file://${HOME}/.m2/repository/org/apache/couchdb/nouveau/lucene4/1.0-SNAPSHOT/lucene4-1.0-SNAPSHOT-dist.jar
   - file://${HOME}/.m2/repository/org/apache/couchdb/nouveau/lucene9/1.0-SNAPSHOT/lucene9-1.0-SNAPSHOT-dist.jar
 
 server:
