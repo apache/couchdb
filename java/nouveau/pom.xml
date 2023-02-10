@@ -53,9 +53,9 @@
 
   <modules>
     <module>api</module>
+    <module>lucene4</module>
     <module>lucene9</module>
     <module>server</module>
-    <module>shaded-lucene-4</module>
   </modules>
 
   <build>
