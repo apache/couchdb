@@ -130,7 +130,10 @@ merge_total_hits(TotalHitsA, TotalHitsB) ->
 merge_total_hits_relation(A, B) when A == <<"GREATER_THAN_OR_EQUAL_TO">>; B == <<"GREATER_THAN_OR_EQUAL_TO">> ->
     <<"GREATER_THAN_OR_EQUAL_TO">>;
 merge_total_hits_relation(A, B) when A == <<"EQUAL_TO">>; B == <<"EQUAL_TO">> ->
-    <<"EQUAL_TO">>.
+    <<"EQUAL_TO">>;
+merge_total_hits_relation(null, null) ->
+    null. %% not supported in selected Lucene version.
+
 
 merge_hits(HitsA, HitsB, Sort, Limit) ->
     MergedHits = lists:merge(merge_fun(Sort), HitsA, HitsB),
