@@ -35,6 +35,7 @@ import org.apache.couchdb.nouveau.api.SearchHit;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.document.DoubleDocValuesField;
+import org.apache.couchdb.nouveau.api.document.DoubleField;
 import org.apache.couchdb.nouveau.api.document.DoublePoint;
 import org.apache.couchdb.nouveau.api.document.Field;
 import org.apache.couchdb.nouveau.api.document.SortedDocValuesField;
@@ -322,68 +323,76 @@ class Lucene9Index extends Index {
             if (field.getName().startsWith("_")) {
                 continue;
             }
-            result.add(toIndexableField(field));
+            addIndexableFields(result, field);
         }
 
         return result;
     }
 
-    private static IndexableField toIndexableField(final Field field) {
+    private static void addIndexableFields(final Document doc, final Field field) {
         if (field instanceof DoubleDocValuesField) {
             final DoubleDocValuesField f = (DoubleDocValuesField) field;
-            return new org.apache.lucene.document.DoubleDocValuesField(f.getName(), f.getValue());
-        }
-        if (field instanceof DoublePoint) {
+            doc.add(new org.apache.lucene.document.DoubleDocValuesField(f.getName(), f.getValue()));
+            return;
+        } else if (field instanceof DoubleField) {
+            final DoubleField f = (DoubleField) field;
+            doc.add(new org.apache.lucene.document.DoubleField(f.getName(), f.getValue()));
+            if (f.isStored()) {
+                doc.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
+            }
+            return;
+        } else if (field instanceof DoublePoint) {
             final DoublePoint f = (DoublePoint) field;
-            return new org.apache.lucene.document.DoublePoint(f.getName(), f.getValue());
-        }
-        if (field instanceof SortedDocValuesField) {
+            doc.add(new org.apache.lucene.document.DoublePoint(f.getName(), f.getValue()));
+            return;
+        } else if (field instanceof SortedDocValuesField) {
             final SortedDocValuesField f = (SortedDocValuesField) field;
-            return new org.apache.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue()));
-        }
-        if (field instanceof SortedSetDocValuesField) {
+            doc.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue())));
+            return;
+        } else if (field instanceof SortedSetDocValuesField) {
             final SortedSetDocValuesField f = (SortedSetDocValuesField) field;
-            return new org.apache.lucene.document.SortedSetDocValuesField(f.getName(), new BytesRef(f.getValue()));
-        }
-        if (field instanceof StoredDoubleField) {
+            doc.add(new org.apache.lucene.document.SortedSetDocValuesField(f.getName(), new BytesRef(f.getValue())));
+            return;
+        } else if (field instanceof StoredDoubleField) {
             final StoredDoubleField f = (StoredDoubleField) field;
-            return new org.apache.lucene.document.StoredField(f.getName(), f.getValue());
-        }
-        if (field instanceof StoredStringField) {
+            doc.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
+            return;
+        } else if (field instanceof StoredStringField) {
             final StoredStringField f = (StoredStringField) field;
-            return new org.apache.lucene.document.StoredField(f.getName(), f.getValue());
-        }
-        if (field instanceof StringField) {
+            doc.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
+            return;
+        } else if (field instanceof StringField) {
             final StringField f = (StringField) field;
-            return new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
-                f.isStored() ? Store.YES : Store.NO);
-        }
-        if (field instanceof TextField) {
+            doc.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
+                f.isStored() ? Store.YES : Store.NO));
+            return;
+        } else if (field instanceof TextField) {
             final StringField f = (StringField) field;
-            return new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
-                f.isStored() ? Store.YES : Store.NO);
+            doc.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
+                f.isStored() ? Store.YES : Store.NO));
+            return;
+        } else {
+            throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
         }
-        throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
     }
 
     private static Field toField(final IndexableField field) {
         if (field instanceof org.apache.lucene.document.DoubleDocValuesField) {
             final org.apache.lucene.document.DoubleDocValuesField f = (org.apache.lucene.document.DoubleDocValuesField) field;
             return new DoubleDocValuesField(f.name(), (double) f.numericValue());
-        }
-        if (field instanceof org.apache.lucene.document.DoublePoint) {
+        } else if (field instanceof org.apache.lucene.document.DoubleField) {
+            final org.apache.lucene.document.DoubleField f = (org.apache.lucene.document.DoubleField) field;
+            return new DoublePoint(f.name(), (double) f.numericValue());
+        } else if (field instanceof org.apache.lucene.document.DoublePoint) {
             final org.apache.lucene.document.DoublePoint f = (org.apache.lucene.document.DoublePoint) field;
             return new DoublePoint(f.name(), (double) f.numericValue());
-        }
-        if (field instanceof org.apache.lucene.document.SortedDocValuesField) {
+        } else if (field instanceof org.apache.lucene.document.SortedDocValuesField) {
             final org.apache.lucene.document.SortedDocValuesField f = (org.apache.lucene.document.SortedDocValuesField) field;
             return new SortedDocValuesField(f.name(), toBytes(f.binaryValue()));
-        }
-        if (field instanceof org.apache.lucene.document.SortedSetDocValuesField) {
+        } else if (field instanceof org.apache.lucene.document.SortedSetDocValuesField) {
             final org.apache.lucene.document.SortedSetDocValuesField f = (org.apache.lucene.document.SortedSetDocValuesField) field;
             return new SortedSetDocValuesField(f.name(), toBytes(f.binaryValue()));
-        }
-        if (field instanceof org.apache.lucene.document.StoredField) {
+        } else if (field instanceof org.apache.lucene.document.StoredField) {
             final org.apache.lucene.document.StoredField f = (org.apache.lucene.document.StoredField) field;
             if (f.stringValue() != null) {
                 return new StoredStringField(f.name(), f.stringValue());
@@ -391,12 +400,10 @@ class Lucene9Index extends Index {
             if (f.numericValue() != null && f.numericValue() instanceof Double) {
                 return new StoredDoubleField(f.name(), (Double) f.numericValue());
             }
-        }
-        if (field instanceof org.apache.lucene.document.StringField) {
+        } else if (field instanceof org.apache.lucene.document.StringField) {
             final org.apache.lucene.document.StringField f = (org.apache.lucene.document.StringField) field;
             return new StringField(f.name(), f.stringValue(), f.fieldType().stored());
-        }
-        if (field instanceof org.apache.lucene.document.TextField) {
+        } else if (field instanceof org.apache.lucene.document.TextField) {
             final org.apache.lucene.document.StringField f = (org.apache.lucene.document.StringField) field;
             return new TextField(f.name(), f.stringValue(), f.fieldType().stored());
         }
