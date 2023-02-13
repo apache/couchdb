@@ -31,6 +31,7 @@
 -include_lib("fabric/include/fabric.hrl").
 
 -include("mango_cursor.hrl").
+-include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
 
 -define(HEARTBEAT_INTERVAL_IN_USEC, 4000000).
@@ -230,6 +231,11 @@ composite_prefix([Col | Rest], Ranges) ->
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
+-type range() :: {binary(), any(), binary(), any()} | empty.
+
+-spec choose_best_index(IndexRanges) -> Selection when
+    IndexRanges :: nonempty_list({#idx{}, [range()], integer()}),
+    Selection :: {#idx{}, [range()]}.
 choose_best_index(IndexRanges) ->
     Cmp = fun({IdxA, _PrefixA, PrefixDifferenceA}, {IdxB, _PrefixB, PrefixDifferenceB}) ->
         case PrefixDifferenceA - PrefixDifferenceB of
