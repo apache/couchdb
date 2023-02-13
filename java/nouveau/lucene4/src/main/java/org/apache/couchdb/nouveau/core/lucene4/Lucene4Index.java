@@ -76,7 +76,7 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.util.BytesRef;
 
-class Lucene9Index extends Index {
+class Lucene4Index extends Index {
 
     private static final Sort DEFAULT_SORT = new Sort(SortField.FIELD_SCORE,
             new SortField("_id", SortField.Type.STRING));
@@ -87,7 +87,7 @@ class Lucene9Index extends Index {
     private final SearcherManager searcherManager;
     private volatile boolean isOpen = true;
 
-    Lucene9Index(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
+    Lucene4Index(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
             final SearcherManager searcherManager) {
         super(updateSeq);
         this.analyzer = analyzer;

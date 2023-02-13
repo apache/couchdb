@@ -85,7 +85,7 @@ final class Lucene4 implements Lucene {
         final IndexWriter writer = new IndexWriter(dir, config);
         final long updateSeq = getUpdateSeq(writer);
         final SearcherManager searcherManager = new SearcherManager(writer, true, searcherFactory);
-        return new Lucene9Index(analyzer, writer, updateSeq, searcherManager);
+        return new Lucene4Index(analyzer, writer, updateSeq, searcherManager);
     }
 
     private static long getUpdateSeq(final IndexWriter writer) throws IOException {
