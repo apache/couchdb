@@ -23,7 +23,7 @@
     handle_message/2,
     handle_all_docs_message/2,
     composite_indexes/2,
-    choose_best_index/2
+    choose_best_index/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -51,7 +51,7 @@ viewcbargs_get(fields, Args) when is_map(Args) ->
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
     Composited = composite_indexes(Indexes, FieldRanges),
-    {Index, IndexRanges} = choose_best_index(Db, Composited),
+    {Index, IndexRanges} = choose_best_index(Composited),
 
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
@@ -230,7 +230,7 @@ composite_prefix([Col | Rest], Ranges) ->
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
-choose_best_index(_DbName, IndexRanges) ->
+choose_best_index(IndexRanges) ->
     Cmp = fun({IdxA, _PrefixA, PrefixDifferenceA}, {IdxB, _PrefixB, PrefixDifferenceB}) ->
         case PrefixDifferenceA - PrefixDifferenceB of
             N when N < 0 -> true;
