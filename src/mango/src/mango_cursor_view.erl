@@ -630,4 +630,83 @@ match_and_extract_doc_nomatch_fields_test() ->
     ?assertEqual(no_match, Match),
     ?assertEqual(undefined, FinalDoc).
 
+%% Query planner tests:
+%% - there should be no comparison for a singleton list, with a trivial result
+choose_best_index_with_singleton_test() ->
+    ?assertEqual({index, ranges}, choose_best_index([{index, ranges, undefined}])).
+
+%% - choose the index with the lowest difference between its prefix and field ranges
+choose_best_index_lowest_difference_test() ->
+    IndexRanges =
+        [
+            {index1, ranges1, 3},
+            {index2, ranges2, 2},
+            {index3, ranges3, 1}
+        ],
+    ?assertEqual({index3, ranges3}, choose_best_index(IndexRanges)).
+
+%% - if that is equal, choose the index with the least number of fields in the index
+choose_best_index_least_number_of_fields_test() ->
+    Index = json_index(dbname, design_document, index_name),
+    [Index1, Index2, Index3] = [with_dummy_columns(Index, N) || N <- [6, 3, 9]],
+    IndexRanges =
+        [
+            {Index1, ranges1, 1},
+            {Index2, ranges2, 1},
+            {Index3, ranges3, 1}
+        ],
+    ?assertEqual({Index2, ranges2}, choose_best_index(IndexRanges)).
+
+%% - otherwise, choose alphabetically based on the index properties:
+choose_best_index_lowest_index_triple_test() ->
+    WithSomeColumns = fun(Idx) -> with_dummy_columns(Idx, 3) end,
+
+    % - database name
+    Index1 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/c">>, <<"B">>)),
+    Index2 = WithSomeColumns(json_index(<<"db_b">>, <<"_design/b">>, <<"C">>)),
+    Index3 = WithSomeColumns(json_index(<<"db_c">>, <<"_design/a">>, <<"A">>)),
+    IndexRanges1 =
+        [
+            {Index1, ranges1, 1},
+            {Index2, ranges2, 1},
+            {Index3, ranges3, 1}
+        ],
+    ?assertEqual({Index1, ranges1}, choose_best_index(IndexRanges1)),
+
+    % - if that is equal, design document name
+    Index4 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/c">>, <<"B">>)),
+    Index5 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/b">>, <<"C">>)),
+    Index6 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/a">>, <<"A">>)),
+    IndexRanges2 =
+        [
+            {Index4, ranges4, 1},
+            {Index5, ranges5, 1},
+            {Index6, ranges6, 1}
+        ],
+    ?assertEqual({Index6, ranges6}, choose_best_index(IndexRanges2)),
+
+    % - otherwise, index name
+    Index7 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/a">>, <<"B">>)),
+    Index8 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/a">>, <<"C">>)),
+    Index9 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/a">>, <<"A">>)),
+    IndexRanges3 =
+        [
+            {Index7, ranges7, 1},
+            {Index8, ranges8, 1},
+            {Index9, ranges9, 1}
+        ],
+    ?assertEqual({Index9, ranges9}, choose_best_index(IndexRanges3)).
+
+json_index(DbName, DesignDoc, Name) ->
+    #idx{
+        dbname = DbName,
+        ddoc = DesignDoc,
+        name = Name,
+        type = <<"json">>
+    }.
+
+with_dummy_columns(Index, Count) ->
+    Columns =
+        {[{<<"field", (integer_to_binary(I))/binary>>, undefined} || I <- lists:seq(1, Count)]},
+    Index#idx{def = {[{<<"fields">>, Columns}]}}.
 -endif.
