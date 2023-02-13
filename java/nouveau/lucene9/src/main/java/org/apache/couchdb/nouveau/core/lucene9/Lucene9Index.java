@@ -446,4 +446,10 @@ class Lucene9Index extends Index {
         return new Lucene9QueryParser("default", analyzer);
     }
 
+    @Override
+    public String toString() {
+        return "Lucene9Index [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager
+                + "]";
+    }
+
 }
