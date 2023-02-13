@@ -22,8 +22,6 @@
     handle_message/2
 ]).
 
--include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("mango_cursor.hrl").
 
 create(Db, Indexes, Selector, Opts) ->
