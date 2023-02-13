@@ -538,6 +538,12 @@ nouveau:
 nouveau-clean:
 	@cd java/nouveau/server && mvn clean
 
+.PHONY: nouveau-install
+nouveau-install:
+	@cd java/nouveau/api && mvn install
+	@cd java/nouveau/lucene4 && mvn install
+	@cd java/nouveau/lucene9 && mvn install
+
 .PHONY: nouveau-start
-nouveau-start: nouveau
+nouveau-start: nouveau-install
 	@cd java/nouveau/server && mvn exec:exec -Dexec.executable="java"
