@@ -82,7 +82,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
                     bundle.run(configuration, environment);
                     final Lucene lucene = ((LuceneBundle)bundle).getLucene();
                     lucenes.put(lucene.getMajor(), lucene);
-                    LOGGER.info("Loaded bundle for Lucene {}", lucene.getMajor());
+                    LOGGER.info("Loaded bundle for Lucene {} from {}", lucene.getMajor(), luceneBundlePath);
                 }
             }
         }

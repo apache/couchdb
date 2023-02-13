@@ -53,7 +53,9 @@ public final class IndexManager implements Managed {
             final Path path = indexPath(name);
             final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
                     IndexDefinition.class);
-            return luceneFor(indexDefinition).open(path, indexDefinition);
+            final Index result = luceneFor(indexDefinition).open(path, indexDefinition);
+            LOGGER.info("Opened {}", result);
+            return result;
         }
 
         @Override
