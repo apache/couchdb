@@ -40,8 +40,15 @@ setup_prefixed_replicator_db() ->
     RepDb = setup_replicator_db(?tempdb()),
     {Ctx, {RepDb, Source, Target}}.
 
+setup_prefixed_replicator_db_with_update_docs_true() ->
+    {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
+    config:set("replicator", "update_docs", "true", _Persist = false),
+    RepDb = setup_replicator_db(?tempdb()),
+    {Ctx, {RepDb, Source, Target}}.
+
 teardown({Ctx, {RepDb, Source, Target}}) ->
     ok = fabric:delete_db(RepDb, [?ADMIN_CTX]),
+    config:delete("replicator", "update_docs", _Persist = false),
     couch_replicator_test_helper:test_teardown({Ctx, {Source, Target}}).
 
 scheduler_docs_test_main_db_test_() ->
@@ -92,6 +99,17 @@ t_replicator_doc_state_fields_test_() ->
     {
         setup,
         fun setup_prefixed_replicator_db/0,
+        fun teardown/1,
+        with([
+            ?TDEF(t_doc_fields_are_updated, 10),
+            ?TDEF(t_doc_fields_are_ignored, 10)
+        ])
+    }.
+
+t_replicator_doc_state_fields_update_docs_true_test_() ->
+    {
+        setup,
+        fun setup_prefixed_replicator_db_with_update_docs_true/0,
         fun teardown/1,
         with([
             ?TDEF(t_doc_fields_are_updated, 10),
@@ -179,7 +197,14 @@ t_doc_fields_are_updated({_Ctx, {RepDb, Source, Target}}) ->
     #{<<"_replication_state_time">> := StateTime} = StateDoc,
     ?assertNotEqual(<<"foo5">>, StateTime),
     ?assertNot(is_map_key(<<"_replicator_state_reason">>, StateDoc)),
-    ?assertNot(is_map_key(<<"_replication_id">>, StateDoc)).
+    case config:get_boolean("replicator", "update_docs", false) of
+        true ->
+            ?assertMatch(#{<<"_replication_id">> := <<_/binary>>}, StateDoc),
+            #{<<"_replication_id">> := RepId} = StateDoc,
+            ?assertNotEqual(<<"foo3">>, RepId);
+        false ->
+            ?assertNot(is_map_key(<<"_replication_id">>, StateDoc))
+    end.
 
 t_doc_fields_are_ignored({_Ctx, {RepDb, Source, Target}}) ->
     SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
