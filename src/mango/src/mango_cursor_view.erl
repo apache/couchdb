@@ -225,7 +225,7 @@ composite_prefix([Col | Rest], Ranges) ->
 % Prefix and the FieldRanges. If that is equal, then
 % choose the index with the least number of
 % fields in the index. If we still cannot break the tie,
-% then choose alphabetically based on ddocId.
+% then choose alphabetically based on (dbname, ddocid, view_name).
 % Return the first element's Index and IndexRanges.
 %
 % In the future we can look into doing a cached parallel
@@ -247,9 +247,12 @@ choose_best_index(IndexRanges) ->
                     M when M < 0 ->
                         true;
                     M when M == 0 ->
-                        % We have no other way to choose, so at this point
-                        % select the index based on (dbname, ddocid, view_name) triple
-                        IdxA =< IdxB;
+                        % Restrict the comparison to the (dbname, ddocid, view_name)
+                        % triple -- in case of their equivalence, the original order
+                        % will be maintained.
+                        #idx{dbname = DbNameA, ddoc = DDocA, name = NameA} = IdxA,
+                        #idx{dbname = DbNameB, ddoc = DDocB, name = NameB} = IdxB,
+                        {DbNameA, DDocA, NameA} =< {DbNameB, DDocB, NameB};
                     _ ->
                         false
                 end;
