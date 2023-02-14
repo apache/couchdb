@@ -1,0 +1,32 @@
+%{
+  "PartitionSearchTest": [
+    "Cannot do global query with partition view",
+    "Cannot do partition query with global search ddoc",
+    "Only returns docs in partition not those in shard",
+    "Simple query returns partitioned search results",
+    "Works with bookmarks and limit",
+    "Works with limit using POST for on non-partitioned db",
+    "Works with limit using POST for partitioned db",
+    "normal search on non-partitioned dbs still work",
+    "normal search on non-partitioned dbs with limit",
+    "normal search on non-partitioned dbs with over limit",
+    "normal search on non-partitioned dbs without limit",
+    "rejects conflicting partition values",
+    "restricted parameters are not allowed in query or body"
+  ],
+  "SearchTest": [
+    "clean up search index with invalid design document",
+    "drilldown multiple keys multiple values for POST",
+    "drilldown multiple keys single values for GET",
+    "drilldown multiple keys single values for POST",
+    "drilldown multiple query definitions for GET",
+    "drilldown multiple query definitions for POST",
+    "drilldown single key multiple values for GET",
+    "drilldown single key multiple values for POST",
+    "drilldown single key single value for GET",
+    "drilldown single key single value for POST",
+    "drilldown three keys single values for POST",
+    "search returns all items for GET",
+    "search returns all items for POST"
+  ]
+}
