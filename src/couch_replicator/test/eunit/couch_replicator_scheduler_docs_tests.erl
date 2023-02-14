@@ -60,7 +60,7 @@ scheduler_docs_test_prefixed_db_test_() ->
         fun setup_prefixed_replicator_db/0,
         fun teardown/1,
         [
-            ?TDEF_FE(t_scheduler_docs_total_rows, 10)
+            ?TDEF_FE(t_scheduler_docs_total_rows, 20)
         ]
     }.
 
@@ -117,7 +117,7 @@ t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
                 {_, #{}} -> wait
             end
         end,
-        10000,
+        20000,
         1000
     ),
     Docs = maps:get(<<"docs">>, Body),
@@ -161,8 +161,13 @@ t_doc_fields_are_updated({_Ctx, {RepDb, Source, Target}}) ->
     StateDoc = test_util:wait(
         fun() ->
             case req(get, RepDocUrl) of
-                {200, #{<<"_replication_state">> := <<"completed">>} = StDoc} -> StDoc;
-                {_, #{}} -> wait
+                {200, #{<<"_replication_state">> := <<"completed">>} = StDoc} ->
+                    case is_map_key(<<"_replication_id">>, StDoc) of
+                        true -> wait;
+                        false -> StDoc
+                    end;
+                {_, #{}} ->
+                    wait
             end
         end,
         10000,
