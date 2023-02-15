@@ -219,6 +219,7 @@ public final class IndexManager implements Managed {
                 .refreshAfterWrite(Duration.ofSeconds(commitIntervalSeconds))
                 .scheduler(Scheduler.systemScheduler())
                 .removalListener(indexRemovalListener)
+                .evictionListener(indexRemovalListener)
                 .build(new IndexLoader());
     }
 
