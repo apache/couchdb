@@ -12,9 +12,9 @@
 
 .. _api/db/shards:
 
-===============
-``/db/_shards``
-===============
+=================
+``/{db}/_shards``
+=================
 
 .. versionadded:: 2.0
 
@@ -42,7 +42,7 @@
 
     .. code-block:: http
 
-        GET /db/_shards HTTP/1.1
+        GET /{db}/_shards HTTP/1.1
         Accept: */*
         Host: localhost:5984
 
@@ -105,7 +105,7 @@
 .. _api/db/shards/doc:
 
 ==============================
-``/db/_shards/doc``
+``/{db}/_shards/doc``
 ==============================
 
 .. http:get:: /{db}/_shards/{docid}
@@ -161,9 +161,9 @@
 
 .. _api/db/sync_shards:
 
-=====================
-``/db/_sync_shards``
-=====================
+======================
+``/{db}/_sync_shards``
+======================
 
 .. versionadded:: 2.3.1
 
@@ -196,7 +196,7 @@
 
     .. code-block:: http
 
-        POST /db/_sync_shards HTTP/1.1
+        POST /{db}/_sync_shards HTTP/1.1
         Host: localhost:5984
         Accept: */*
 

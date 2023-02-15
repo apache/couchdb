@@ -13,15 +13,15 @@
 .. _api/db/_find:
 
 ================
-``/db/_find``
+``/{db}/_find``
 ================
 
 .. http:post:: /{db}/_find
     :synopsis: Find documents within a given database
 
     Find documents using a declarative JSON querying syntax.
-    Queries will use custom indexes, specified using the :ref:`_index <api/db/find/index>`
-    endpoint, if available.
+    Queries will use custom indexes, specified using the
+    :ref:`_index <api/db/find/index>` endpoint, if available.
     Otherwise, they use the built-in :ref:`_all_docs <api/db/all_docs>` index, which
     can be arbitrarily slow.
 
@@ -946,7 +946,7 @@ The execution statistics currently include:
 .. _api/db/find/index:
 
 ================
-``/db/_index``
+``/{db}/_index``
 ================
 
 .. _api/db/find/index-post:
@@ -1013,7 +1013,7 @@ built using MapReduce Views.
 
     .. code-block:: http
 
-        POST /db/_index HTTP/1.1
+        POST /{db}/_index HTTP/1.1
         Content-Type: application/json
         Content-Length: 116
         Host: localhost:5984
@@ -1051,7 +1051,7 @@ Example index creation using all available query parameters
 
     .. code-block:: http
 
-        POST /db/_index HTTP/1.1
+        POST /{db}/_index HTTP/1.1
         Content-Type: application/json
         Content-Length: 396
         Host: localhost:5984
@@ -1114,7 +1114,7 @@ where  ``"status": { "$ne": "archived" }`` at index time using the
 
 .. code-block:: http
 
-        POST /db/_index HTTP/1.1
+        POST /{db}/_index HTTP/1.1
         Content-Type: application/json
         Content-Length: 144
         Host: localhost:5984
@@ -1166,7 +1166,7 @@ it easier to take advantage of future improvements to query planning
 .. http:get:: /{db}/_index
     :synopsis: List all indexes.
 
-    When you make a ``GET`` request to ``/db/_index``, you get a list of all
+    When you make a ``GET`` request to ``/{db}/_index``, you get a list of all
     indexes in the database. In addition to the information available through
     this API, indexes are also stored in design documents <index-functions>.
     Design documents are regular documents that have an ID starting with
@@ -1189,7 +1189,7 @@ it easier to take advantage of future improvements to query planning
     Format of index objects:
         -  **ddoc**: ID of the design document the index belongs to. This ID
             can be used to retrieve the design document containing the index,
-            by making a ``GET`` request to ``/db/ddoc``, where ``ddoc`` is the
+            by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
             value of this field.
         -  **name**: Name of the index.
         -  **type**: Type of the index. Currently "json" is the only
@@ -1201,7 +1201,7 @@ it easier to take advantage of future improvements to query planning
 
     .. code-block:: http
 
-        GET /db/_index HTTP/1.1
+        GET /{db}/_index HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -1269,7 +1269,7 @@ it easier to take advantage of future improvements to query planning
 
     .. code-block:: http
 
-        DELETE /db/_index/_design/a5f4711fc9448864a13c81dc71e660b524d7410c/json/foo-index HTTP/1.1
+        DELETE /{db}/_index/_design/a5f4711fc9448864a13c81dc71e660b524d7410c/json/foo-index HTTP/1.1
         Accept: */*
         Host: localhost:5984
 
@@ -1290,9 +1290,9 @@ it easier to take advantage of future improvements to query planning
 
 .. _api/db/find/explain:
 
-================
-``/db/_explain``
-================
+==================
+``/{db}/_explain``
+==================
 
 .. http:post:: /{db}/_explain
     :synopsis: Identify which index is being used by a particular query.

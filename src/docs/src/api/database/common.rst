@@ -12,9 +12,9 @@
 
 .. _api/db:
 
-=======
-``/db``
-=======
+=========
+``/{db}``
+=========
 
 .. http:head:: /{db}
     :synopsis: Checks the database existence
@@ -175,7 +175,7 @@
 
     .. code-block:: http
 
-        PUT /db HTTP/1.1
+        PUT /{db} HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -188,7 +188,7 @@
         Content-Length: 12
         Content-Type: application/json
         Date: Mon, 12 Aug 2013 08:01:45 GMT
-        Location: http://localhost:5984/db
+        Location: http://localhost:5984/{db}
         Server: CouchDB (Erlang/OTP)
 
         {
@@ -202,7 +202,7 @@
 
     .. code-block:: http
 
-        PUT /db HTTP/1.1
+        PUT /{db} HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -277,7 +277,7 @@
 
     .. code-block:: http
 
-        DELETE /db HTTP/1.1
+        DELETE /{db} HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -335,7 +335,7 @@
 
     .. code-block:: http
 
-        POST /db HTTP/1.1
+        POST /{db} HTTP/1.1
         Accept: application/json
         Content-Length: 81
         Content-Type: application/json
@@ -355,7 +355,7 @@
         Content-Length: 95
         Content-Type: application/json
         Date: Tue, 13 Aug 2013 15:19:25 GMT
-        Location: http://localhost:5984/db/ab39fe0993049b84cfa81acd6ebad09d
+        Location: http://localhost:5984/{db}/ab39fe0993049b84cfa81acd6ebad09d
         Server: CouchDB (Erlang/OTP)
 
         {
@@ -375,7 +375,7 @@ document with the ID ``FishStew``.
 
     .. code-block:: http
 
-        POST /db HTTP/1.1
+        POST /{db} HTTP/1.1
         Accept: application/json
         Content-Length: 98
         Content-Type: application/json
@@ -397,7 +397,7 @@ document with the ID ``FishStew``.
         Content-Type: application/json
         Date: Tue, 13 Aug 2013 15:19:25 GMT
         ETag: "1-9c65296036141e575d32ba9c034dd3ee"
-        Location: http://localhost:5984/db/FishStew
+        Location: http://localhost:5984/{db}/FishStew
         Server: CouchDB (Erlang/OTP)
 
         {
@@ -436,7 +436,7 @@ immediately.
 
 .. code-block:: http
 
-    POST /db?batch=ok HTTP/1.1
+    POST /{db}?batch=ok HTTP/1.1
     Accept: application/json
     Content-Length: 98
     Content-Type: application/json
@@ -457,7 +457,7 @@ immediately.
     Content-Length: 28
     Content-Type: application/json
     Date: Tue, 13 Aug 2013 15:19:25 GMT
-    Location: http://localhost:5984/db/FishStew
+    Location: http://localhost:5984/{db}/FishStew
     Server: CouchDB (Erlang/OTP)
 
     {

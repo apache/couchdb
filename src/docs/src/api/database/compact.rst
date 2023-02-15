@@ -12,9 +12,9 @@
 
 .. _api/db/compact:
 
-================
-``/db/_compact``
-================
+==================
+``/{db}/_compact``
+==================
 
 .. http:post:: /{db}/_compact
     :synopsis: Starts a compaction for the database
@@ -60,7 +60,7 @@
 
     .. code-block:: http
 
-        POST /db/_compact HTTP/1.1
+        POST /{db}/_compact HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -82,9 +82,9 @@
 
 .. _api/db/compact/ddoc:
 
-===========================
-``/db/_compact/design-doc``
-===========================
+=============================
+``/{db}/_compact/design-doc``
+=============================
 
 .. http:post:: /{db}/_compact/{ddoc}
     :synopsis: Starts a compaction for all the views in the selected
@@ -114,7 +114,7 @@
 
     .. code-block:: http
 
-        POST /db/_compact/posts HTTP/1.1
+        POST /{db}/_compact/posts HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -141,9 +141,9 @@
 
 .. _api/db/ensure_full_commit:
 
-===========================
-``/db/_ensure_full_commit``
-===========================
+=============================
+``/{db}/_ensure_full_commit``
+=============================
 
 .. http:post:: /{db}/_ensure_full_commit
     :synopsis: Deprecated endpoint to support CouchDB versions < 3.0
@@ -173,7 +173,7 @@
 
     .. code-block:: http
 
-        POST /db/_ensure_full_commit HTTP/1.1
+        POST /{db}/_ensure_full_commit HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -196,9 +196,9 @@
 
 .. _api/db/view_cleanup:
 
-=====================
-``/db/_view_cleanup``
-=====================
+=======================
+``/{db}/_view_cleanup``
+=======================
 
 .. http:post:: /{db}/_view_cleanup
     :synopsis: Removes view files that are not used by any design document
@@ -225,7 +225,7 @@
 
     .. code-block:: http
 
-        POST /db/_view_cleanup HTTP/1.1
+        POST /{db}/_view_cleanup HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984

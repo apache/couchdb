@@ -12,9 +12,9 @@
 
 .. _api/db/purge:
 
-==============
-``/db/_purge``
-==============
+================
+``/{db}/_purge``
+================
 
 .. http:post:: /{db}/_purge
     :synopsis: Purges documents entirely from database
@@ -55,7 +55,7 @@
 
     .. code-block:: http
 
-        POST /db/_purge HTTP/1.1
+        POST /{db}/_purge HTTP/1.1
         Accept: application/json
         Content-Length: 76
         Content-Type: application/json
@@ -178,7 +178,7 @@ following behavior:
 .. _api/db/_purged_infos_limit:
 
 ==============================
-``/db/_purged_infos_limit``
+``/{db}/_purged_infos_limit``
 ==============================
 
 .. http:get:: /{db}/_purged_infos_limit
@@ -199,7 +199,7 @@ following behavior:
 
     .. code-block:: http
 
-        GET /db/_purged_infos_limit HTTP/1.1
+        GET /{db}/_purged_infos_limit HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -249,7 +249,7 @@ following behavior:
 
     .. code-block:: http
 
-        PUT /db/_purged_infos_limit HTTP/1.1
+        PUT /{db}/_purged_infos_limit HTTP/1.1
         Accept: application/json
         Content-Length: 4
         Content-Type: application/json
@@ -274,9 +274,9 @@ following behavior:
 
 .. _api/db/missing_revs:
 
-=====================
-``/db/_missing_revs``
-=====================
+=======================
+``/{db}/_missing_revs``
+=======================
 
 .. http:post:: /{db}/_missing_revs
     :synopsis: By given list of document revisions returns the document
@@ -301,7 +301,7 @@ following behavior:
 
     .. code-block:: http
 
-        POST /db/_missing_revs HTTP/1.1
+        POST /{db}/_missing_revs HTTP/1.1
         Accept: application/json
         Content-Length: 76
         Content-Type: application/json
@@ -335,9 +335,9 @@ following behavior:
 
 .. _api/db/revs_diff:
 
-==================
-``/db/_revs_diff``
-==================
+====================
+``/{db}/_revs_diff``
+====================
 
 .. http:post:: /{db}/_revs_diff
     :synopsis: By given list of document revisions returns differences between
@@ -380,7 +380,7 @@ following behavior:
 
     .. code-block:: http
 
-        POST /db/_revs_diff HTTP/1.1
+        POST /{db}/_revs_diff HTTP/1.1
         Accept: application/json
         Content-Length: 113
         Content-Type: application/json
@@ -419,9 +419,9 @@ following behavior:
 
 .. _api/db/revs_limit:
 
-===================
-``/db/_revs_limit``
-===================
+=====================
+``/{db}/_revs_limit``
+=====================
 
 .. http:get:: /{db}/_revs_limit
     :synopsis: Returns the limit of historical revisions to store for
@@ -440,7 +440,7 @@ following behavior:
 
     .. code-block:: http
 
-        GET /db/_revs_limit HTTP/1.1
+        GET /{db}/_revs_limit HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -480,7 +480,7 @@ following behavior:
 
     .. code-block:: http
 
-        PUT /db/_revs_limit HTTP/1.1
+        PUT /{db}/_revs_limit HTTP/1.1
         Accept: application/json
         Content-Length: 5
         Content-Type: application/json

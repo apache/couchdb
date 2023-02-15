@@ -32,9 +32,9 @@ For clarity, the form below is used in the URL paths:
 
 .. code-block:: none
 
-    GET /db
+    GET /{db}
 
-Where ``db`` is the name of any database.
+Where ``{db}`` is the name of any database.
 
 .. toctree::
     common
