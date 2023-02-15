@@ -109,7 +109,7 @@ help:
 	@egrep "^# target: " Makefile \
 		| sed -e 's/^# target: //g' \
 		| sort \
-		| awk '{printf("    %-20s", $$1); $$1=$$2=""; print "-" $$0}'
+		| awk '{printf("    %-21s", $$1); $$1=$$2=""; print "-" $$0}'
 
 
 ################################################################################
@@ -177,7 +177,7 @@ eunit: couch
 
 
 .PHONY: exunit
-# target: exunit - Run ExUnit tests
+# target: exunit - Run ExUnit tests, use EXUNIT_OPTS to provide custom options
 exunit: export BUILDDIR = $(shell pwd)
 exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell pwd)/src
@@ -204,9 +204,11 @@ soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
+# target: erlfmt-check - Check source code formatting
 erlfmt-check:
 	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py
 
+# target: erlfmt-format - Apply source code format standards automatically
 erlfmt-format:
 	ERLFMT_PATH=$(ERLFMT) python3 dev/format_all.py
 
@@ -214,7 +216,7 @@ erlfmt-format:
 	@python3 -m venv .venv
 	@.venv/bin/pip3 install black || touch .venv/bin/black
 
-# Python code formatter - only runs if we're on Python 3.6 or greater
+# target: python-black - Python code formatter, runs only on Python >= 3.6
 python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
@@ -260,6 +262,7 @@ elixir-cluster-with-quorum: elixir-init devclean
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-suite
+# target: elixir-suite - Run Elixir-based integration tests
 elixir-suite: export MIX_ENV=integration
 elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir-suite: elixir-init devclean
@@ -279,13 +282,14 @@ elixir-search: elixir-init devclean
 		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
 
 .PHONY: elixir-source-checks
+# target: elixir-source-checks - Check source code formatting of Elixir test files
 elixir-source-checks: export MIX_ENV=integration
 elixir-source-checks: elixir-init
 	@mix format --check-formatted
 	@mix credo
 
 .PHONY: build-report
-# target: build-report - Generate and upload a build report
+# target: build-report - Generate a build report
 build-report:
 	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
 	#build-aux/logfile-uploader.py
@@ -358,7 +362,7 @@ dialyze: .rebar
 
 
 .PHONY: find_bugs
-# target: xref - find unused exports etc
+# target: find_bugs - Find unused exports etc
 find_bugs:
 	@$(REBAR) --keep-going --recursive xref $(DIALYZE_OPTS)
 
@@ -424,7 +428,7 @@ endif
 	@echo
 
 .PHONY: install
-# target: install- install CouchDB :)
+# target: install - Install CouchDB :)
 install: release
 	@echo
 	@echo "Notice: There is no 'make install' command for CouchDB 2.x+."
