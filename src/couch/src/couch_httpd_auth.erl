@@ -201,18 +201,21 @@ proxy_auth_user(Req) ->
                         undefined ->
                             Req#httpd{user_ctx = #user_ctx{name = ?l2b(UserName), roles = Roles}};
                         Secret ->
-                            ExpectedToken = couch_util:to_hex(
-                                couch_util:hmac(sha, Secret, UserName)
-                            ),
-                            case header_value(Req, XHeaderToken) of
-                                Token when Token == ExpectedToken ->
+                            HashAlgorithms = couch_util:get_config_hash_algorithms(),
+                            Token = header_value(Req, XHeaderToken),
+                            VerifyTokens = fun(HashAlg) ->
+                                Hmac = couch_util:hmac(HashAlg, Secret, UserName),
+                                couch_passwords:verify(couch_util:to_hex(Hmac), Token)
+                            end,
+                            case lists:any(VerifyTokens, HashAlgorithms) of
+                                true ->
                                     Req#httpd{
                                         user_ctx = #user_ctx{
                                             name = ?l2b(UserName),
                                             roles = Roles
                                         }
                                     };
-                                _ ->
+                                false ->
                                     nil
                             end
                     end;
