@@ -231,7 +231,8 @@ composite_prefix([Col | Rest], Ranges) ->
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
--type range() :: {binary(), any(), binary(), any()} | empty.
+-type comparator() :: '$lt' | '$lte' | '$eq' | '$gte' | '$gt'.
+-type range() :: {comparator(), any(), comparator(), any()} | empty.
 
 -spec choose_best_index(IndexRanges) -> Selection when
     IndexRanges :: nonempty_list({#idx{}, [range()], integer()}),
