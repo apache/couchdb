@@ -101,6 +101,12 @@ TEST_OPTS=-c startup_jitter=0 -c default_security=admin_local
 all: couch fauxton docs
 
 
+.PHONY: help
+# target: help - Print this help
+help:
+	@powershell -Command 'Select-String Makefile.win -Pattern "^# target: (?<name>.*) - (?<description>.*)" | ForEach-Object { ("{0,-22} - {1}" -f $$_.Matches[0].Groups["name"], $$_.Matches[0].Groups["description"]) } | Sort'
+
+
 ################################################################################
 # Building
 ################################################################################
@@ -155,7 +161,7 @@ eunit: couch
 	@cmd /c "FOR %d IN ($(subdirs)) DO set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=%d || exit /b 1"
 
 .PHONY: exunit
-# target: exunit - Run ExUnit tests
+# target: exunit - Run ExUnit tests, use EXUNIT_OPTS to provide custom options
 exunit: export BUILDDIR = $(shell echo %cd%)
 exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell echo %cd%)\src
@@ -174,10 +180,12 @@ just-eunit: export ERL_AFLAGS = $(shell echo "-config %cd%/rel/files/eunit.confi
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+# target: erlfmt-check - Check source code formatting
 erlfmt-check: export ERLFMT_PATH := $(ERLFMT)
 erlfmt-check:
 	@$(PYTHON) dev\format_check.py
 
+# target: erlfmt-format - Apply source code format standards automatically
 erlfmt-format: export ERLFMT_PATH := $(ERLFMT)
 erlfmt-format:
 	@$(PYTHON) dev\format_all.py
@@ -186,7 +194,7 @@ erlfmt-format:
 	@$(PYTHON) -m venv .venv
 	@.venv\Scripts\pip3.exe install black || copy /b .venv\Scripts\black.exe +,,
 
-# Python code formatter - only runs if we're on Python 3.6 or greater
+# target: python-black - Python code formatter, runs only on Python >= 3.6
 python-black: .venv/bin/black
 	@$(PYTHON) -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
@@ -231,9 +239,10 @@ elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devc
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-suite
+# target: elixir-suite - Run Elixir-based integration tests
 elixir-suite: export MIX_ENV=integration
 elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-suite: elixir-init devclean
 	@dev\run -n 1 -q -a adm:pass \
 		--enable-erlang-views \
 		--no-join \
@@ -249,14 +258,11 @@ elixir-search: elixir-init devclean
 		--locald-config test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
 
-.PHONY: elixir-check-formatted
-elixir-check-formatted: elixir-init
+.PHONY: elixir-source-checks
+# target: elixir-source-checks - Check source code formatting of Elixir test files
+elixir-source-checks: export MIX_ENV=integration
+elixir-source-checks: elixir-init
 	@mix format --check-formatted
-
-# Credo is a static code analysis tool for Elixir.
-# We use it in our tests
-.PHONY: elixir-credo
-elixir-credo: elixir-init
 	@mix credo
 
 .PHONY: build-report
@@ -269,8 +275,20 @@ build-report:
 check-qs:
 	@QS_LANG=js rspec test\view_server\query_server_spec.rb
 
+.PHONY: list-eunit-apps
+# target: list-eunit-apps - List EUnit target apps
+list-eunit-apps:
+	@powershell -Command 'Get-ChildItem -Path src -Recurse -Filter "*_tests?.erl" | Resolve-Path -Relative | ForEach-Object { $$_.Split("\") | Select -Skip 2 -First 1 } | Sort -Unique'
+
+
+.PHONY: list-eunit-suites
+# target: list-eunit-suites - List EUnit target test suites
+list-eunit-suites:
+	@powershell -Command 'Get-ChildItem -Path src -Recurse -Filter "*_tests?.erl" | ForEach-Object { "{0}" -f $$_.BaseName } | Sort'
+
 
 .PHONY: mango-test
+# target: mango-test - Run Mango tests
 mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src\mango && \
@@ -301,6 +319,10 @@ check-plt:
 dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
+.PHONY: find_bugs
+# target: find_bugs - Find unused exports etc
+find_bugs:
+	@$(REBAR) --keep-going --recursive xref $(DIALYZE_OPTS)
 
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
@@ -363,7 +385,7 @@ endif
 	@echo .
 
 .PHONY: install
-# target: install- install CouchDB :)
+# target: install - Install CouchDB :)
 install: release
 	@echo .
 	@echo Notice: There is no 'make install' command for CouchDB 2.x+.
