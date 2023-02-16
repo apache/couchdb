@@ -398,7 +398,7 @@ Authentication Configuration
             ``roles_claim_name`` is deprecated in CouchDB 3.3, and will be removed later.
             Please migrate to ``roles_claim_path``.
 
-        If presented, as a JSON array of strings, it is used as the CouchDB user's roles
+        If presented, it is used as the CouchDB user's roles
         list as long as the JWT token is valid. The default value for ``roles_claim_name``
         is ``_couchdb.roles``.
 
