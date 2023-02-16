@@ -302,7 +302,7 @@ check-qs:
 .PHONY: list-eunit-apps
 # target: list-eunit-apps - List EUnit target apps
 list-eunit-apps:
-	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl \
+	@find ./src -type f -name *_test.erl -o -name *_tests.erl \
 		| cut -d '/' -f 3 \
 		| sort -u
 
@@ -310,7 +310,7 @@ list-eunit-apps:
 .PHONY: list-eunit-suites
 # target: list-eunit-suites - List EUnit target test suites
 list-eunit-suites:
-	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
+	@find ./src -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
