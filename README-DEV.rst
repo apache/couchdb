@@ -182,7 +182,7 @@ You can also run each test suite individually via the ``eunit``, ``mango-test``,
 
     make eunit
     make mango-test
-    make elixit-suite
+    make elixir-suite
     make weatherreport-test
 
 If you need to run specific Erlang tests, you can pass special "options"
