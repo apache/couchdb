@@ -105,7 +105,7 @@
 .. _api/db/shards/doc:
 
 ==============================
-``/{db}/_shards/doc``
+``/{db}/_shards/{docid}``
 ==============================
 
 .. http:get:: /{db}/_shards/{docid}

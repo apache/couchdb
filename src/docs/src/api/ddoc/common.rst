@@ -94,9 +94,9 @@
 
 .. _api/ddoc/attachment:
 
-===================================
-``/{db}/_design/{ddoc}/attachment``
-===================================
+==================================
+``/{db}/_design/{ddoc}/{attname}``
+==================================
 
 .. http:head:: /{db}/_design/{ddoc}/{attname}
     :synopsis: Returns bare information in the HTTP Headers for the attachment
