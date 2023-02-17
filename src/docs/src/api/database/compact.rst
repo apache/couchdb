@@ -82,9 +82,9 @@
 
 .. _api/db/compact/ddoc:
 
-=============================
-``/{db}/_compact/design-doc``
-=============================
+=========================
+``/{db}/_compact/{ddoc}``
+=========================
 
 .. http:post:: /{db}/_compact/{ddoc}
     :synopsis: Starts a compaction for all the views in the selected
