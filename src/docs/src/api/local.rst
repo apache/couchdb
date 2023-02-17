@@ -27,7 +27,7 @@ Local documents have the following limitations:
 
 - Local documents are not output by views, or the :ref:`api/db/all_docs` view.
 
-From CouchDB 2.0, Local documents can be listed by using the /db/_local_docs
+From CouchDB 2.0, Local documents can be listed by using the :ref:`api/db/_local_docs`
 endpoint.
 
 Local documents can be used when you want to store configuration or
@@ -38,24 +38,24 @@ A list of the available methods and URL paths are provided below:
 +--------+------------------------+--------------------------------------------+
 | Method | Path                   | Description                                |
 +========+========================+============================================+
-| GET,   | /db/_local_docs        | Returns a list of all the                  |
+| GET,   | /{db}/_local_docs      | Returns a list of all the                  |
 | POST   |                        | non-replicated documents in the database   |
 +--------+------------------------+--------------------------------------------+
-| GET    | /db/_local/id          | Returns the latest revision of the         |
+| GET    | /{db}/_local/{docid}   | Returns the latest revision of the         |
 |        |                        | non-replicated document                    |
 +--------+------------------------+--------------------------------------------+
-| PUT    | /db/_local/id          | Inserts a new version of the               |
+| PUT    | /{db}/_local/{docid}   | Inserts a new version of the               |
 |        |                        | non-replicated document                    |
 +--------+------------------------+--------------------------------------------+
-| DELETE | /db/_local/id          | Deletes the non-replicated document        |
+| DELETE | /{db}/_local/{docid}   | Deletes the non-replicated document        |
 +--------+------------------------+--------------------------------------------+
-| COPY   | /db/_local/id          | Copies the non-replicated document         |
+| COPY   | /{db}/_local/{docid}   | Copies the non-replicated document         |
 +--------+------------------------+--------------------------------------------+
 
-.. _api/local/doc:
+.. _api/db/_local_docs:
 
-``/db/_local_docs``
-===================
+``/{db}/_local_docs``
+=====================
 
 .. http:get:: /{db}/_local_docs
     :synopsis: Returns a built-in view of all local (non-replicating) documents
@@ -115,7 +115,7 @@ A list of the available methods and URL paths are provided below:
 
     .. code-block:: http
 
-        GET /db/_local_docs HTTP/1.1
+        GET /{db}/_local_docs HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -184,7 +184,7 @@ A list of the available methods and URL paths are provided below:
 
     .. code-block:: http
 
-        POST /db/_local_docs HTTP/1.1
+        POST /{db}/_local_docs HTTP/1.1
         Accept: application/json
         Content-Length: 70
         Content-Type: application/json
@@ -223,8 +223,10 @@ A list of the available methods and URL paths are provided below:
             "offset" : null
         }
 
-``/db/_local/id``
-=================
+.. _api/db/_local/doc:
+
+``/{db}/_local/{docid}``
+========================
 
 .. http:get:: /{db}/_local/{docid}
     :synopsis: Returns the latest revision of the local document
