@@ -12,9 +12,9 @@
 
 .. _api/doc/attachment:
 
-======================
-``/db/doc/attachment``
-======================
+===========================
+``/{db}/{docid}/{attname}``
+===========================
 
 .. http:head:: /{db}/{docid}/{attname}
     :synopsis: Returns bare information in the HTTP Headers for the attachment

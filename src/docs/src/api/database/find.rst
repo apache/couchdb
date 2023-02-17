@@ -13,7 +13,7 @@
 .. _api/db/_find:
 
 ================
-``/db/_find``
+``/{db}/_find``
 ================
 
 .. http:post:: /{db}/_find
@@ -946,7 +946,7 @@ The execution statistics currently include:
 .. _api/db/find/index:
 
 ================
-``/db/_index``
+``/{db}/_index``
 ================
 
 .. _api/db/find/index-post:
@@ -1166,7 +1166,7 @@ it easier to take advantage of future improvements to query planning
 .. http:get:: /{db}/_index
     :synopsis: List all indexes.
 
-    When you make a ``GET`` request to ``/db/_index``, you get a list of all
+    When you make a ``GET`` request to ``/{db}/_index``, you get a list of all
     indexes in the database. In addition to the information available through
     this API, indexes are also stored in design documents <index-functions>.
     Design documents are regular documents that have an ID starting with
@@ -1189,7 +1189,7 @@ it easier to take advantage of future improvements to query planning
     Format of index objects:
         -  **ddoc**: ID of the design document the index belongs to. This ID
             can be used to retrieve the design document containing the index,
-            by making a ``GET`` request to ``/db/ddoc``, where ``ddoc`` is the
+            by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
             value of this field.
         -  **name**: Name of the index.
         -  **type**: Type of the index. Currently "json" is the only
@@ -1290,9 +1290,9 @@ it easier to take advantage of future improvements to query planning
 
 .. _api/db/find/explain:
 
-================
-``/db/_explain``
-================
+==================
+``/{db}/_explain``
+==================
 
 .. http:post:: /{db}/_explain
     :synopsis: Identify which index is being used by a particular query.

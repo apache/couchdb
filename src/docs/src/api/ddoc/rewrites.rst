@@ -13,7 +13,7 @@
 .. _api/ddoc/rewrite:
 
 ========================================
-``/db/_design/design-doc/_rewrite/path``
+``/{db}/_design/{ddoc}/_rewrite/{path}``
 ========================================
 
 .. warning::

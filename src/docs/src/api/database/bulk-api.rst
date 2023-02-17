@@ -442,8 +442,8 @@ Sending multiple queries to a database
     }
 
 .. Note::
-    The multiple queries are also supported in /db/_local_docs/queries and
-    /db/_design_docs/queries (similar to /db/_all_docs/queries).
+    The multiple queries are also supported in /{db}/_local_docs/queries and
+    /{db}/_design_docs/queries (similar to /{db}/_all_docs/queries).
 
 .. _api/db/bulk_get:
 

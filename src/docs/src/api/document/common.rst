@@ -12,9 +12,9 @@
 
 .. _api/doc:
 
-===========
-``/db/doc``
-===========
+=================
+``/{db}/{docid}``
+=================
 
 .. http:head:: /{db}/{docid}
     :synopsis: Returns bare information in the HTTP Headers for the document

@@ -12,9 +12,9 @@
 
 .. _api/db/changes:
 
-================
-``/db/_changes``
-================
+==================
+``/{db}/_changes``
+==================
 
 .. http:get:: /{db}/_changes
     :synopsis: Returns changes for the given database

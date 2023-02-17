@@ -58,7 +58,7 @@ _admins -> _security
 ^^^^^^^^^^^^^^^^^^^^
 
 The `/db/_admins` handler has been removed and replaced with a
-:ref:`/db/_security <api/db/security>` object. Any existing `_admins` will be
+:ref:`/{db}/_security <api/db/security>` object. Any existing `_admins` will be
 dropped and need to be added to the security object again. The reason for this
 is that the old system made no distinction between names and roles, while the
 new one does, so there is no way to automatically upgrade the old admins list.

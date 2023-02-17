@@ -12,9 +12,9 @@
 
 .. _api/db/security:
 
-=================
-``/db/_security``
-=================
+===================
+``/{db}/_security``
+===================
 
 .. http:get:: /{db}/_security
     :synopsis: Returns the special security object for the database

@@ -12,9 +12,9 @@
 
 .. _api/db/purge:
 
-==============
-``/db/_purge``
-==============
+================
+``/{db}/_purge``
+================
 
 .. http:post:: /{db}/_purge
     :synopsis: Purges documents entirely from database
@@ -178,7 +178,7 @@ following behavior:
 .. _api/db/_purged_infos_limit:
 
 ==============================
-``/db/_purged_infos_limit``
+``/{db}/_purged_infos_limit``
 ==============================
 
 .. http:get:: /{db}/_purged_infos_limit
@@ -274,9 +274,9 @@ following behavior:
 
 .. _api/db/missing_revs:
 
-=====================
-``/db/_missing_revs``
-=====================
+=======================
+``/{db}/_missing_revs``
+=======================
 
 .. http:post:: /{db}/_missing_revs
     :synopsis: By given list of document revisions returns the document
@@ -335,9 +335,9 @@ following behavior:
 
 .. _api/db/revs_diff:
 
-==================
-``/db/_revs_diff``
-==================
+====================
+``/{db}/_revs_diff``
+====================
 
 .. http:post:: /{db}/_revs_diff
     :synopsis: By given list of document revisions returns differences between
@@ -419,9 +419,9 @@ following behavior:
 
 .. _api/db/revs_limit:
 
-===================
-``/db/_revs_limit``
-===================
+=====================
+``/{db}/_revs_limit``
+=====================
 
 .. http:get:: /{db}/_revs_limit
     :synopsis: Returns the limit of historical revisions to store for

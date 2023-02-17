@@ -12,9 +12,9 @@
 
 .. _api/db:
 
-=======
-``/db``
-=======
+=========
+``/{db}``
+=========
 
 .. http:head:: /{db}
     :synopsis: Checks the database existence
