@@ -12,9 +12,9 @@
 
 .. _api/ddoc/view:
 
-==========================================
-``/db/_design/design-doc/_view/view-name``
-==========================================
+=====================================
+``/{db}/_design/{ddoc}/_view/{view}``
+=====================================
 
 .. http:get:: /{db}/_design/{ddoc}/_view/{view}
     :synopsis: Returns results for the specified stored view

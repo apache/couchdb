@@ -23,10 +23,10 @@ partition.
 See the guide for
 :ref:`getting started with partitioned databases <partitioned-dbs>`
 
-``/db/_partition/partition``
-============================
+``/{db}/_partition/{partition_id}``
+===================================
 
-.. http:get:: /{db}/_partition/{partition}
+.. http:get:: /{db}/_partition/{partition_id}
     :synopsis: Returns document and size info for the given partition
 
     This endpoint returns information describing the provided partition.
@@ -65,14 +65,14 @@ See the guide for
           }
         }
 
-``/db/_partition/partition/_all_docs``
-======================================
+``/{db}/_partition/{partition_id}/_all_docs``
+=============================================
 
-.. http:get:: /{db}/_partition/{partition}/_all_docs
+.. http:get:: /{db}/_partition/{partition_id}/_all_docs
     :synopsis: Return all docs in the specified partition
 
     :param db: Database name
-    :param partition: Partition name
+    :param partition_id: Partition name
 
     This endpoint is a convenience endpoint for automatically setting
     bounds on the provided partition range. Similar results can be had
@@ -119,14 +119,14 @@ See the guide for
 
 .. _api/partitioned/views:
 
-``/db/_partition/partition/_design/design-doc/_view/view-name``
+``/{db}/_partition/{partition_id}/_design/{ddoc}/_view/{view}``
 ===============================================================
 
-.. http:get:: /{db}/_partition/{partition}/_design/{ddoc}/_view/{view}
+.. http:get:: /{db}/_partition/{partition_id}/_design/{ddoc}/_view/{view}
     :synopsis: Execute a partitioned query
 
     :param db: Database name
-    :param partition: Partition name
+    :param partition_id: Partition name
     :param ddoc: Design document id
     :param view: View name
 
@@ -196,8 +196,8 @@ See the guide for
         }
 .. _api/partitioned/find:
 
-``/db/_partition/partition_id/_find``
-=====================================
+``/{db}/_partition/{partition_id}/_find``
+=========================================
 
 .. http:post:: /{db}/_partition/{partition_id}/_find
     :synopsis: Query the partition specified by ``partition_id``
@@ -215,8 +215,8 @@ See the guide for
     of the returned data.
 .. _api/partitioned/explain:
 
-``/db/_partition/partition_id/_explain``
-========================================
+``/{db}/_partition/{partition_id}/_explain``
+============================================
 
 .. http:post:: /{db}/_partition/{partition_id}/_explain
     :synopsis: Find index that is used with a query

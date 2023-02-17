@@ -12,9 +12,9 @@
 
 .. _api/ddoc:
 
-==========================
-``/db/_design/design-doc``
-==========================
+========================
+``/{db}/_design/{ddoc}``
+========================
 
 .. http:head:: /{db}/_design/{ddoc}
     :synopsis: Returns bare information in the HTTP Headers for
@@ -94,9 +94,9 @@
 
 .. _api/ddoc/attachment:
 
-=====================================
-``/db/_design/design-doc/attachment``
-=====================================
+===================================
+``/{db}/_design/{ddoc}/attachment``
+===================================
 
 .. http:head:: /{db}/_design/{ddoc}/{attname}
     :synopsis: Returns bare information in the HTTP Headers for the attachment
@@ -136,9 +136,9 @@
 
 .. _api/ddoc/info:
 
-================================
-``/db/_design/design-doc/_info``
-================================
+==============================
+``/{db}/_design/{ddoc}/_info``
+==============================
 
 .. http:get:: /{db}/_design/{ddoc}/_info
     :synopsis: Returns view index information for the specified design document

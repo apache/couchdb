@@ -12,9 +12,9 @@
 
 .. _api/ddoc/search:
 
-=============================================
-``/db/_design/design-doc/_search/index-name``
-=============================================
+========================================
+``/{db}/_design/{ddoc}/_search/{index}``
+========================================
 
 .. warning::
     Search endpoints require a running search plugin connected to each cluster
@@ -124,9 +124,9 @@
     For more information about how search works, see the
     :ref:`Search User Guide<ddoc/search>`.
 
-==================================================
-``/db/_design/design-doc/_search_info/index-name``
-==================================================
+=============================================
+``/{db}/_design/{ddoc}/_search_info/{index}``
+=============================================
 
 .. warning::
     Search endpoints require a running search plugin connected to each cluster
