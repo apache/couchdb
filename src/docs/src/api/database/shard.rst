@@ -42,7 +42,7 @@
 
     .. code-block:: http
 
-        GET /{db}/_shards HTTP/1.1
+        GET /db/_shards HTTP/1.1
         Accept: */*
         Host: localhost:5984
 
@@ -196,7 +196,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_sync_shards HTTP/1.1
+        POST /db/_sync_shards HTTP/1.1
         Host: localhost:5984
         Accept: */*
 

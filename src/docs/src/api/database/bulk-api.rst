@@ -36,7 +36,7 @@
 
     .. code-block:: http
 
-        GET /{db}/_all_docs HTTP/1.1
+        GET /db/_all_docs HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -105,7 +105,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_all_docs HTTP/1.1
+        POST /db/_all_docs HTTP/1.1
         Accept: application/json
         Content-Length: 70
         Content-Type: application/json
@@ -210,7 +210,7 @@
 
     .. code-block:: http
 
-        GET /{db}/_design_docs HTTP/1.1
+        GET /db/_design_docs HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -279,7 +279,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_design_docs HTTP/1.1
+        POST /db/_design_docs HTTP/1.1
         Accept: application/json
         Content-Length: 70
         Content-Type: application/json
@@ -359,7 +359,7 @@ Sending multiple queries to a database
 
 .. code-block:: http
 
-    POST /{db}/_all_docs/queries HTTP/1.1
+    POST /db/_all_docs/queries HTTP/1.1
     Content-Type: application/json
     Accept: application/json
     Host: localhost:5984
@@ -483,7 +483,7 @@ Sending multiple queries to a database
 
     .. code-block:: http
 
-        POST /{db}/_bulk_get HTTP/1.1
+        POST /db/_bulk_get HTTP/1.1
         Accept: application/json
         Content-Type:application/json
         Host: localhost:5984
@@ -599,7 +599,7 @@ Sending multiple queries to a database
 
     .. code-block:: http
 
-        POST /{db}/_bulk_get HTTP/1.1
+        POST /db/_bulk_get HTTP/1.1
         Accept: application/json
         Content-Type:application/json
         Host: localhost:5984
@@ -691,7 +691,7 @@ Sending multiple queries to a database
 
     .. code-block:: http
 
-        POST /{db}/_bulk_docs HTTP/1.1
+        POST /db/_bulk_docs HTTP/1.1
         Accept: application/json
         Content-Length: 109
         Content-Type:application/json

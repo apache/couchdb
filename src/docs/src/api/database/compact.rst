@@ -60,7 +60,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_compact HTTP/1.1
+        POST /db/_compact HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -114,7 +114,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_compact/posts HTTP/1.1
+        POST /db/_compact/posts HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -173,7 +173,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_ensure_full_commit HTTP/1.1
+        POST /db/_ensure_full_commit HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
@@ -225,7 +225,7 @@
 
     .. code-block:: http
 
-        POST /{db}/_view_cleanup HTTP/1.1
+        POST /db/_view_cleanup HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984

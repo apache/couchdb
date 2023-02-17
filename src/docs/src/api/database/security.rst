@@ -85,7 +85,7 @@
 
     .. code-block:: http
 
-        GET /{db}/_security HTTP/1.1
+        GET /db/_security HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -147,7 +147,7 @@
 
     .. code-block:: http
 
-        PUT /{db}/_security HTTP/1.1
+        PUT /db/_security HTTP/1.1
         Accept: application/json
         Content-Length: 121
         Content-Type: application/json

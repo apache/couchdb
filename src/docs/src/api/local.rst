@@ -115,7 +115,7 @@ A list of the available methods and URL paths are provided below:
 
     .. code-block:: http
 
-        GET /{db}/_local_docs HTTP/1.1
+        GET /db/_local_docs HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -184,7 +184,7 @@ A list of the available methods and URL paths are provided below:
 
     .. code-block:: http
 
-        POST /{db}/_local_docs HTTP/1.1
+        POST /db/_local_docs HTTP/1.1
         Accept: application/json
         Content-Length: 70
         Content-Type: application/json

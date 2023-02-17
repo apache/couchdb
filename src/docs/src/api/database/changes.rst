@@ -133,7 +133,7 @@
 
     .. code-block:: http
 
-        GET /{db}/_changes?style=all_docs HTTP/1.1
+        GET /db/_changes?style=all_docs HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -494,7 +494,7 @@ to the ``filter`` parameter, specifying the design document name and
 
 .. code-block:: http
 
-    GET /{db}/_changes?filter=design_doc/filtername HTTP/1.1
+    GET /db/_changes?filter=design_doc/filtername HTTP/1.1
 
 Additionally, a couple of built-in filters are available and described
 below.

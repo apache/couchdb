@@ -20,8 +20,8 @@
     :synopsis: Find documents within a given database
 
     Find documents using a declarative JSON querying syntax.
-    Queries will use custom indexes, specified using the
-    :ref:`_index <api/db/find/index>` endpoint, if available.
+    Queries will use custom indexes, specified using the :ref:`_index <api/db/find/index>`
+    endpoint, if available.
     Otherwise, they use the built-in :ref:`_all_docs <api/db/all_docs>` index, which
     can be arbitrarily slow.
 
@@ -1013,7 +1013,7 @@ built using MapReduce Views.
 
     .. code-block:: http
 
-        POST /{db}/_index HTTP/1.1
+        POST /db/_index HTTP/1.1
         Content-Type: application/json
         Content-Length: 116
         Host: localhost:5984
@@ -1051,7 +1051,7 @@ Example index creation using all available query parameters
 
     .. code-block:: http
 
-        POST /{db}/_index HTTP/1.1
+        POST /db/_index HTTP/1.1
         Content-Type: application/json
         Content-Length: 396
         Host: localhost:5984
@@ -1114,7 +1114,7 @@ where  ``"status": { "$ne": "archived" }`` at index time using the
 
 .. code-block:: http
 
-        POST /{db}/_index HTTP/1.1
+        POST /db/_index HTTP/1.1
         Content-Type: application/json
         Content-Length: 144
         Host: localhost:5984
@@ -1201,7 +1201,7 @@ it easier to take advantage of future improvements to query planning
 
     .. code-block:: http
 
-        GET /{db}/_index HTTP/1.1
+        GET /db/_index HTTP/1.1
         Accept: application/json
         Host: localhost:5984
 
@@ -1269,7 +1269,7 @@ it easier to take advantage of future improvements to query planning
 
     .. code-block:: http
 
-        DELETE /{db}/_index/_design/a5f4711fc9448864a13c81dc71e660b524d7410c/json/foo-index HTTP/1.1
+        DELETE /db/_index/_design/a5f4711fc9448864a13c81dc71e660b524d7410c/json/foo-index HTTP/1.1
         Accept: */*
         Host: localhost:5984
 
