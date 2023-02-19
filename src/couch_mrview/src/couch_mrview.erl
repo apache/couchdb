@@ -531,36 +531,45 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         user_acc = UAcc1,
         last_go = Go
     }};
-map_fold(#doc{id = <<"_local/", _/binary>>} = Doc, _Offset, #mracc{} = Acc) ->
-    #mracc{
-        limit = Limit,
-        callback = Callback,
-        user_acc = UAcc0,
-        args = Args
-    } = Acc,
-    #doc{
-        id = DocId,
-        revs = {Pos, [RevId | _]}
-    } = Doc,
-    Rev = {Pos, RevId},
-    Row =
-        [
-            {id, DocId},
-            {key, DocId},
-            {value, {[{rev, couch_doc:rev_to_str(Rev)}]}}
-        ] ++
-            if
-                not Args#mrargs.include_docs -> [];
-                true -> [{doc, couch_doc:to_json_obj(Doc, Args#mrargs.doc_options)}]
-            end,
-    {Go, UAcc1} = Callback({row, Row}, UAcc0),
-    {Go, Acc#mracc{
-        limit = Limit - 1,
-        reduce_fun = undefined,
-        doc_info = undefined,
-        user_acc = UAcc1,
-        last_go = Go
-    }}.
+map_fold(#doc{id = <<"_local/", IdTail/binary>>} = Doc, _Offset, #mracc{} = Acc) ->
+    IncludeSys = couch_util:get_value(include_system, Acc#mracc.args#mrargs.extra),
+
+    case {IncludeSys, IdTail} of
+        {false, <<"purge-", _/binary>>} ->
+            {ok, Acc};
+        {false, <<"shard-sync", _/binary>>} ->
+            {ok, Acc};
+        _ ->
+            #mracc{
+                limit = Limit,
+                callback = Callback,
+                user_acc = UAcc0,
+                args = Args
+            } = Acc,
+            #doc{
+                id = DocId,
+                revs = {Pos, [RevId | _]}
+            } = Doc,
+            Rev = {Pos, RevId},
+            Row =
+                [
+                    {id, DocId},
+                    {key, DocId},
+                    {value, {[{rev, couch_doc:rev_to_str(Rev)}]}}
+                ] ++
+                    if
+                        not Args#mrargs.include_docs -> [];
+                        true -> [{doc, couch_doc:to_json_obj(Doc, Args#mrargs.doc_options)}]
+                    end,
+            {Go, UAcc1} = Callback({row, Row}, UAcc0),
+            {Go, Acc#mracc{
+                limit = Limit - 1,
+                reduce_fun = undefined,
+                doc_info = undefined,
+                user_acc = UAcc1,
+                last_go = Go
+            }}
+    end.
 
 red_fold(Db, {NthRed, _Lang, View} = RedView, Args, Callback, UAcc) ->
     Finalizer =

@@ -938,10 +938,11 @@ all_docs_view(Req, Db, Keys, OP) ->
     Args1 = Args0#mrargs{view_type = map},
     Args2 = fabric_util:validate_all_docs_args(Db, Args1),
     Args3 = set_namespace(OP, Args2),
+    Args4 = set_include_sysdocs(OP, Req, Args3),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db = Db, req = Req, threshold = Max},
-    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args3),
+    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args4),
     {ok, Resp#vacc.resp}.
 
 view_cb({row, Row} = Msg, Acc) ->
@@ -2285,6 +2286,12 @@ set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
 set_namespace(NS, #mrargs{} = Args) ->
     couch_mrview_util:set_extra(Args, namespace, NS).
+
+set_include_sysdocs(<<"_local_docs">>, Req, Args) ->
+    Val = chttpd:qs_value(Req, "include_system", "false") == "true",
+    couch_mrview_util:set_extra(Args, include_system, Val);
+set_include_sysdocs(_OP, _Req, Args) ->
+    Args.
 
 %% /db/_bulk_get stuff
 
