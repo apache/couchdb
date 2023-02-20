@@ -239,6 +239,32 @@ Scala, and Maven) have been installed successfully, e.g.::
     git clone https://github.com/cloudant-labs/clouseau
     mvn -f clouseau/pom.xml scala:run
 
+Mango Integration Tests
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Tests for the Mango interface can be run individually with the help of
+the ``mango-test`` target and they can be narrowed down to specific
+test suites via the ``MANGO_TEST_OPTS`` variable::
+
+    make mango-test \
+      MANGO_TEST_OPTS="--pretty-assert --verbose 03-operator-test"
+
+The value of the ``MANGO_TEST_OPTS`` variable will be passed down to
+the `Nose 2 <https://nose2.io/>`_ testing framework which is used for
+the implementation.  Consult its documentation for more information.
+
+Tests that rely on text indexes are run only if the ``search`` feature
+is reported to be available (i.e. a working Clouseau instance is
+connected), otherwise they will be skipped.
+
+Note that the databases that are created during the tests will be all
+removed after each of the suites completed.  However, with the help of
+the ``MANGO_TESTS_KEEP_DBS`` environment variable, it can be requested
+to keep those databases around for further investigation::
+
+    MANGO_TESTS_KEEP_DBS=please \
+      make mango-test MANGO_TEST_OPTS='03-operator-test'
+
 Static Code Analysis
 ~~~~~~~~~~~~~~~~~~~~
 
