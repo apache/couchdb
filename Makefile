@@ -328,7 +328,11 @@ mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose2'
+	@cd src/mango && \
+		../../dev/run "$(TEST_OPTS)" \
+		-n 1 \
+		--admin=adm:pass \
+		'COUCH_USER=adm COUCH_PASS=pass .venv/bin/python3 -m nose2 $(MANGO_TEST_OPTS)'
 
 
 .PHONY: weatherreport-test
