@@ -66,6 +66,10 @@ class OperatorTests:
         docs = self.db.find({"emptybang": {"$allMatch": {"foo": {"$eq": 2}}}})
         self.assertEqual(len(docs), 0)
 
+    @unittest.skipUnless(
+        not mango.has_text_service(),
+        "text indexes do not support the $keyMapMatch operator",
+    )
     def test_keymap_match(self):
         amdocs = [
             {"foo": {"aa": "bar", "bb": "bang"}},
