@@ -1,9 +1,9 @@
 Apache CouchDB DEVELOPERS
 =========================
 
-Before you start here, read `INSTALL.Unix` (or `INSTALL.Windows`) and
-follow the setup instructions including the installation of all the
-listed dependencies for your system.
+Before you start here, read `<INSTALL.Unix.md>`_ (or
+`<INSTALL.Windows.md>`_) and follow the setup instructions including
+the installation of all the listed dependencies for your system.
 
 Only follow these instructions if you are building from a source checkout.
 
@@ -31,7 +31,7 @@ You need the following optionally to build releases:
 You need the following optionally to build Fauxton:
 
 * `nodejs                 <http://nodejs.org/>`_
-* `npm                    <https://www.npmjs.com/>`_               
+* `npm                    <https://www.npmjs.com/>`_
 
 You will need these optional dependencies installed if:
 
@@ -46,8 +46,10 @@ However, you do not need them if:
 If you intend to build Fauxton, you will also need to install its
 dependencies. After running ``./configure`` to download all of the
 dependent repositories, you can read about required dependencies in
-`src/fauxton/readme.md`. Typically, installing npm and node.js are
-sufficient to enable a Fauxton build.
+`its readme
+<https://github.com/apache/couchdb-fauxton/blob/main/readme.md>`_. Typically,
+installing ``npm`` and node.js are sufficient to enable a Fauxton
+build.
 
 Here is a list of *optional* dependencies for various operating systems.
 Installation will be easiest, when you install them all.
@@ -68,16 +70,20 @@ or `Visual Studio Code <https://code.visualstudio.com/docs/remote/containers>`_.
 .. image:: https://img.shields.io/static/v1?label=Remote%20-%20Containers&message=Open&color=blue&logo=visualstudiocode
     :target: https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/apache/couchdb
 
-If you already have VS Code and Docker installed, you can click the badge above or 
-`here <https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/apache/couchdb>`_ 
-to get started. Clicking these links will cause VS Code to automatically install the 
-Remote - Containers extension if needed, clone the source code into a container volume, 
-and spin up a dev container for use.
+If you already have VS Code and Docker installed, you can click the
+badge above or `here
+<https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/apache/couchdb>`_
+to get started. Clicking these links will cause VS Code to
+automatically install the Remote - Containers extension if needed,
+clone the source code into a container volume, and spin up a dev
+container for use.
 
-This ``devcontainer`` will automatically run ``./configure && make`` the first time it is created.  
-While this may take some extra time to spin up, this tradeoff means you will be able to 
-run things like ``./dev/run``, ``./dev/run --admin=admin:admin``,  ``./dev/run --with-admin-party-please``, 
-and ``make check`` straight away.  Subsequent startups should be quick.
+This ``devcontainer`` will automatically run ``./configure && make``
+the first time it is created.  While this may take some extra time to
+spin up, this tradeoff means you will be able to run things like
+``./dev/run``, ``./dev/run --admin=admin:admin``, ``./dev/run
+--with-admin-party-please``, and ``make check`` straight away.
+Subsequent startups should be quick.
 
 
 Debian-based (inc. Ubuntu) Systems
@@ -108,8 +114,7 @@ Centos 7 and RHEL 7
 Mac OS X
 ~~~~~~~~
 
-Install `Homebrew <https://github.com/mxcl/homebrew>`_, if you do not have 
-it already.
+Install `Homebrew <https://brew.sh/>`_, if you do not have it already.
 
 Unless you want to install the optional dependencies, skip to the next section.
 
@@ -136,8 +141,9 @@ FreeBSD
 Windows
 ~~~~~~~
 
-Follow the instructions in `INSTALL.Windows` and build all components from
-source, using the same Visual C++ compiler and runtime.
+Follow the instructions in `<INSTALL.Windows.md>`_ and build all
+components from source, using the same Visual C++ compiler and
+runtime.
 
 Configuring
 -----------
@@ -185,6 +191,9 @@ You can also run each test suite individually via the ``eunit``, ``mango-test``,
     make elixir-suite
     make weatherreport-test
 
+Erlang Unit Tests
+~~~~~~~~~~~~~~~~~
+
 If you need to run specific Erlang tests, you can pass special "options"
 to make targets::
 
@@ -200,27 +209,38 @@ to make targets::
     # Ignore tests for specified apps
     make eunit skip_deps=couch_log,couch_epi
 
-The ``apps``, ``suites``, ``tests`` and ``skip_deps`` could be combined in any 
-way. These are mimics to ``rebar eunit`` arguments. If you're not satisfied by 
-these, you can use EUNIT_OPT environment variable to specify exact `rebar eunit`
-options::
+The ``apps``, ``suites``, ``tests`` and ``skip_deps`` could be
+combined in any way. These are mimics to ``rebar eunit`` arguments. If
+you're not satisfied by these, you can use the ``EUNIT_OPTS`` variable
+to specify exact ``rebar eunit`` options::
 
     make eunit EUNIT_OPTS="apps=couch,chttpd"
 
-There is an additional Elixir-based integration test suite for
-Dreyfus, which is not run automatically by the ``check`` target but it
-could be done manually via the corresponding target::
+Elixir Integration Tests
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+All the Elixir-based integration tests could be by the `elixir-suite`
+target::
+
+    make elixir-suite
+
+There is an additional suite for Dreyfus, which is not run
+automatically by either the ``elixir-suite`` or the ``check`` target
+but it could be done manually via the corresponding target::
 
     make elixir-search
 
 Note that this requires a running Clouseau instance with the name
-`clouseau@127.0.0.1`.  The easiest way to get it is to clone the
-[`cloudant-labs/clouseau`](https://github.com/cloudant-labs/clouseau)
+``clouseau@127.0.0.1``.  The easiest way to get it is to clone the
+`cloudant-labs/clouseau <https://github.com/cloudant-labs/clouseau>`_
 repository and launch it run there once all the prerequisites (JDK,
 Scala, and Maven) have been installed successfully, e.g.::
 
     git clone https://github.com/cloudant-labs/clouseau
     mvn -f clouseau/pom.xml scala:run
+
+Static Code Analysis
+~~~~~~~~~~~~~~~~~~~~
 
 Code analyzer could be run by::
 
@@ -233,7 +253,8 @@ If you need to analyze only specific apps, you can specify them in familiar way
 
 See ``make help`` for more info and useful commands.
 
-Please report any problems to the developer's mailing list.
+Please report any problems to the `developer's mailing list
+<https://lists.apache.org/list.html?dev@couchdb.apache.org>`_.
 
 Releasing
 ---------
@@ -257,13 +278,13 @@ built by running::
 
     make release
 
-The release can then be found in the rel/couchdb directory.
+The release can then be found in the ``rel/couchdb`` directory.
 
 Microsoft Windows
 ~~~~~~~~~~~~~~~~~
 
 The release tarball and Erlang CouchDB release commands work on
 Microsoft Windows the same as they do on Unix-like systems. To create
-a full installer, the separate couchdb-glazier repository is required.
-Full instructions are available in that repository's README file.
-
+a full installer, the separate `couchdb-glazier repository
+<https://github.com/apache/couchdb-glazier>`_ is required.  Full
+instructions are available in that repository's ``README`` file.
