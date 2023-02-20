@@ -84,7 +84,7 @@ and another one for views.
 Channel Configuration
 ---------------------
 
-Channels are defined using ``[smoosh.<channel_name>]`` configuration blocks, and
+Channels are defined using ``[smoosh.{channel-name}]`` configuration blocks, and
 activated by naming the channel in the ``db_channels`` or ``view_channels``
 configuration setting in the ``[smoosh]`` block. The default configuration is
 

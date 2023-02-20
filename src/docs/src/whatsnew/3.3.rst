@@ -64,7 +64,7 @@ Features and Enhancements
   test coverage to 90%.
 
 * :ghissue:`3798`: Add ``libicu`` version and collation algorithm version to
-  ``/_node/_local/_versions``.
+  ``/_node/{node-name}/_versions``.
 
 * :ghissue:`3837`: The Erlang source tree is now auto-formatted with ``erlfmt``.
 
@@ -134,7 +134,7 @@ Features and Enhancements
   -> sha256). This introduces a new config setting ``hash_algorithms``. New cookie
   values are hashed with sha256, sha1 hashes are still accepted. Admins can set
   this to sha256 only. Sha1 will be disallowed in the next major release. Show
-  supported hash algorithms in ``/_node/_local/_versions`` endpoint.
+  supported hash algorithms in ``/_node/{node-name}/_versions`` endpoint.
 
 * :ghissue:`4179`: Don't double-encode changes sequence strings in the
   replicator.
@@ -408,7 +408,7 @@ Docs
 
 * :ghissue:`4307`, :ghissue:`4174`: Update Sphinx to version 5.3.0
 
-* :ghissue:`4170`: Document the ``/_node/_local/_versions`` endpoint.
+* :ghissue:`4170`: Document the ``/_node/{node-name}/_versions`` endpoint.
 
 Builds
 ------
