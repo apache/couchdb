@@ -99,7 +99,7 @@ following parameters.
         observe the system and make a smarter decision about what to compact
         first. Hardly ever changed from the default of 30 (seconds).
 
-.. config:section:: smoosh.<channel> :: Per-channel configuration
+.. config:section:: smoosh.{channel-name} :: Per-channel configuration
 
 The following settings control the resource allocation for a given compaction
 channel.

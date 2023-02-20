@@ -99,8 +99,8 @@ Upgrade Notes
   a reverse proxy server in front of CouchDB (such as haproxy) to proxy access to other
   services or domains alongside CouchDB.
 * :ghissue:`1543`: The node-local (default port 5986) ``/_restart`` endpoint has been
-  replaced by the clustered (default port 5984) endpoint ``/_node/$node/_restart`` and
-  ``/_node/_local/_restart`` endpoints. The node-local endpoint has been removed.
+  replaced by the clustered (default port 5984) endpoint ``/_node/{node-name}/_restart``
+  and ``/_node/_local/_restart`` endpoints. The node-local endpoint has been removed.
 * :ghissue:`1764`: All python scripts shipped with CouchDB, including ``couchup`` and the
   ``dev/run`` development cluster script, now specify and require Python 3.x.
 * :ghissue:`1396`: CouchDB is now compatible with Erlang 21.x.

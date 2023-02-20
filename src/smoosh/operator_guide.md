@@ -115,14 +115,14 @@ file are no longer live; this includes old btree nodes and document bodies.
 Compaction takes this file and writes a new file that only contains live data.
 
 `total_data` is the number of bytes in the file as reported by `ls -al
-filename`. In `db_info` reponse this is the `sizes.file` value.
+filename`. In `db_info` response this is the `sizes.file` value.
 
 ### Defining a channel
 
 Defining a channel is done via normal dbcore configuration, with some
 convention as to the parameter names.
 
-Channel configuration is defined using `smoosh.$channel_name` top level config
+Channel configuration is defined using `smoosh.{channel-name}` top level config
 options. Defining a channel is just setting the various options you want
 for the channel, then bringing it into smoosh's sets of active channels by
 adding it to either `db_channels` or `view_channels`.

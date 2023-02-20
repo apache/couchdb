@@ -57,7 +57,7 @@ Features and Enhancements
   sequences.
 
 * :ghissue:`3798`: ICU driver and collator algorithm versions are
-  returned in the ``_node/$node/_versions`` result.
+  returned in the ``_node/{node-name}/_versions`` result.
 
 * :ghissue:`3801`: Users with the ``_metrics`` role can now read
   ``_prometheus`` metrics.
