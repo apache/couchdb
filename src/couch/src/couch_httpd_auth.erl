@@ -261,7 +261,7 @@ get_roles_claim(Claims) ->
     RolesClaimPath = config:get(
         "jwt_auth", "roles_claim_path"
     ),
-    Result =
+    Roles =
         case RolesClaimPath of
             undefined ->
                 couch_util:get_value(
@@ -283,6 +283,13 @@ get_roles_claim(Claims) ->
                     end,
                 TokenizedJsonPath = tokenize_json_path(RolesClaimPath, MatchPositions),
                 couch_util:get_nested_json_value({Claims}, TokenizedJsonPath)
+        end,
+    Result =
+        case is_list(Roles) of
+            true ->
+                Roles;
+            false ->
+                re:split(Roles, "\\s*,\\s*", [trim, {return, binary}])
         end,
     case lists:all(fun erlang:is_binary/1, Result) of
         true ->

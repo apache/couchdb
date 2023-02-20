@@ -397,8 +397,31 @@ is valid.
 You can set the user roles claim name through the config setting
 :config:option:`roles_claim_name <jwt_auth/roles_claim_name>`. If you don't set
 an explicit value, then ``_couchdb.roles`` will be set as the default claim name.
-If presented, as a JSON array of strings, it is used as the CouchDB user's roles
+If presented, it is used as the CouchDB user's roles
 list as long as the JWT token is valid.
+
+.. note::
+
+    Before CouchDB v3.3.2 it was only possible to define roles as a JSON
+    array of strings. Now you can also use a comma-seperated list to define
+    the user roles in your JWT token. The following declarations
+    are equal:
+
+    JSON array of strings:
+
+    .. code-block:: json
+
+        {
+            "_couchdb.roles": ["accounting-role", "view-role"]
+        }
+
+    JSON comma-seperated strings:
+
+    .. code-block:: json
+
+        {
+            "_couchdb.roles": "accounting-role, view-role"
+        }
 
 .. warning::
 
