@@ -531,13 +531,11 @@ map_fold({{Key, Id}, Val}, _Offset, Acc) ->
         user_acc = UAcc1,
         last_go = Go
     }};
-map_fold(#doc{id = <<"_local/", IdTail/binary>>} = Doc, _Offset, #mracc{} = Acc) ->
+map_fold(#doc{id = <<"_local/", _/binary>>} = Doc, _Offset, #mracc{} = Acc) ->
     IncludeSys = couch_util:get_value(include_system, Acc#mracc.args#mrargs.extra),
 
-    case {IncludeSys, IdTail} of
-        {false, <<"purge-", _/binary>>} ->
-            {ok, Acc};
-        {false, <<"shard-sync", _/binary>>} ->
+    case should_skip_local_document(IncludeSys, Doc) of
+        true ->
             {ok, Acc};
         _ ->
             #mracc{
@@ -569,6 +567,25 @@ map_fold(#doc{id = <<"_local/", IdTail/binary>>} = Doc, _Offset, #mracc{} = Acc)
                 user_acc = UAcc1,
                 last_go = Go
             }}
+    end.
+
+should_skip_local_document(_IncludeSys = false, #doc{
+    id = <<"_local/purge-", _/binary>>, body = {Props}
+}) ->
+    contains_fields([<<"purge_seq">>], Props);
+should_skip_local_document(_IncludeSys = false, #doc{
+    id = <<"_local/shard-sync", _/binary>>, body = {Props}
+}) ->
+    contains_fields([<<"target_uuid">>, <<"seq">>], Props);
+should_skip_local_document(_IncludeSys, _Doc) ->
+    false.
+
+contains_fields([], _Props) ->
+    true;
+contains_fields([Field | Fields], Props) ->
+    case couch_util:get_value(Field, Props) of
+        undefined -> false;
+        _ -> contains_fields(Fields, Props)
     end.
 
 red_fold(Db, {NthRed, _Lang, View} = RedView, Args, Callback, UAcc) ->
