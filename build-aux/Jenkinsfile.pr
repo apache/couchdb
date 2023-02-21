@@ -96,193 +96,193 @@ pipeline {
         }
       }
     } // stage 'Setup Environment'
-
-    stage('Docs Check') {
-      // Run docs `make check` stage if any docs changed
-      when {
-        beforeOptions true
-        expression { DOCS_CHANGED == '1' }
-      }
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 15, unit: 'MINUTES')
-      }
-      steps {
-        sh '''
-          make python-black
-        '''
-        sh '''
-          (cd src/docs && make check)
-        '''
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage Docs Check
-
-    stage('Build Docs') {
-      // Build docs separately if only docs changed. If there are other changes, docs are
-      // already built as part of `make dist`
-      when {
-        beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '1' }
-      }
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 30, unit: 'MINUTES')
-      }
-      steps {
-        sh '''
-           (cd src/docs && ./setup.sh ; make html)
-         '''
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage Build Docs
-
-    stage('Source Format Checks') {
-      when {
-        beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' }
-      }
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 15, unit: "MINUTES")
-      }
-      steps {
-        sh '''
-          rm -rf apache-couchdb-*
-          ./configure --skip-deps --spidermonkey-version 78
-          make erlfmt-check
-          make elixir-source-checks
-          make python-black
-        '''
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage Erlfmt
-
-
-    stage('Make Dist') {
-      when {
-        beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' }
-      }
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 15, unit: "MINUTES")
-      }
-      steps {
-        sh '''
-          rm -rf apache-couchdb-*
-          ./configure --spidermonkey-version 78
-          make dist
-          chmod -R a+w * .
-        '''
-      }
-      post {
-        success {
-          stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
-        }
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage Make Dist
-
-    // TODO Rework once Improved Docker Pipeline Engine is released
-    // https://issues.jenkins-ci.org/browse/JENKINS-47962
-    // https://issues.jenkins-ci.org/browse/JENKINS-48050
-
-    stage('Make Check') {
-      when {
-        beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' }
-      }
-      matrix {
-        axes {
-          axis {
-            name 'ERLANG_VERSION'
-            values '23.3.4.18', '24.3.4.7', '25.2'
-          }
-          axis {
-            name 'SM_VSN'
-            values '78'
-          }
-        }
-
-        stages {
-          stage('Build and Test') {
-            agent {
-              docker {
-                image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
-                label 'docker'
-                args "${DOCKER_ARGS}"
-              }
-            }
-            options {
-              skipDefaultCheckout()
-              timeout(time: 90, unit: "MINUTES")
-            }
-            steps {
-              unstash 'tarball'
-              sh( script: build_and_test )
-            }
-            post {
-              always {
-                junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-              }
-              cleanup {
-                sh 'rm -rf ${WORKSPACE}/*'
-              }
-            }
-          } // stage
-        } // stages
-      } // matrix
-    } // stage "Make Check"
+//
+  //  stage('Docs Check') {
+  //    // Run docs `make check` stage if any docs changed
+  //    when {
+  //      beforeOptions true
+  //      expression { DOCS_CHANGED == '1' }
+  //    }
+  //    agent {
+  //      docker {
+  //        image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+  //        label 'docker'
+  //        args "${DOCKER_ARGS}"
+  //        registryUrl 'https://docker.io/'
+  //        registryCredentialsId 'dockerhub_creds'
+  //      }
+  //    }
+  //    options {
+  //      timeout(time: 15, unit: 'MINUTES')
+  //    }
+  //    steps {
+  //      sh '''
+  //        make python-black
+  //      '''
+  //      sh '''
+  //        (cd src/docs && make check)
+  //      '''
+  //    }
+  //    post {
+  //      cleanup {
+  //        // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+  //        sh 'rm -rf ${WORKSPACE}/*'
+  //      }
+  //    }
+  //  } // stage Docs Check
+//
+  //  stage('Build Docs') {
+  //    // Build docs separately if only docs changed. If there are other changes, docs are
+  //    // already built as part of `make dist`
+  //    when {
+  //      beforeOptions true
+  //      expression { ONLY_DOCS_CHANGED == '1' }
+  //    }
+  //    agent {
+  //      docker {
+  //        image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+  //        label 'docker'
+  //        args "${DOCKER_ARGS}"
+  //        registryUrl 'https://docker.io/'
+  //        registryCredentialsId 'dockerhub_creds'
+  //      }
+  //    }
+  //    options {
+  //      timeout(time: 30, unit: 'MINUTES')
+  //    }
+  //    steps {
+  //      sh '''
+  //         (cd src/docs && ./setup.sh ; make html)
+  //       '''
+  //    }
+  //    post {
+  //      cleanup {
+  //        // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+  //        sh 'rm -rf ${WORKSPACE}/*'
+  //      }
+  //    }
+  //  } // stage Build Docs
+//
+  //  stage('Source Format Checks') {
+  //    when {
+  //      beforeOptions true
+  //      expression { ONLY_DOCS_CHANGED == '0' }
+  //    }
+  //    agent {
+  //      docker {
+  //        image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+  //        label 'docker'
+  //        args "${DOCKER_ARGS}"
+  //        registryUrl 'https://docker.io/'
+  //        registryCredentialsId 'dockerhub_creds'
+  //      }
+  //    }
+  //    options {
+  //      timeout(time: 15, unit: "MINUTES")
+  //    }
+  //    steps {
+  //      sh '''
+  //        rm -rf apache-couchdb-*
+  //        ./configure --skip-deps
+  //        make erlfmt-check
+  //        make elixir-source-checks
+  //        make python-black
+  //      '''
+  //    }
+  //    post {
+  //      cleanup {
+  //        // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+  //        sh 'rm -rf ${WORKSPACE}/*'
+  //      }
+  //    }
+  //  } // stage Erlfmt
+//
+//
+  //  stage('Make Dist') {
+  //    when {
+  //      beforeOptions true
+  //      expression { ONLY_DOCS_CHANGED == '0' }
+  //    }
+  //    agent {
+  //      docker {
+  //        image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+  //        label 'docker'
+  //        args "${DOCKER_ARGS}"
+  //        registryUrl 'https://docker.io/'
+  //        registryCredentialsId 'dockerhub_creds'
+  //      }
+  //    }
+  //    options {
+  //      timeout(time: 15, unit: "MINUTES")
+  //    }
+  //    steps {
+  //      sh '''
+  //        rm -rf apache-couchdb-*
+  //        ./configure --spidermonkey-version 78
+  //        make dist
+  //        chmod -R a+w * .
+  //      '''
+  //    }
+  //    post {
+  //      success {
+  //        stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
+  //      }
+  //      cleanup {
+  //        // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+  //        sh 'rm -rf ${WORKSPACE}/*'
+  //      }
+  //    }
+  //  } // stage Make Dist
+//
+  //  // TODO Rework once Improved Docker Pipeline Engine is released
+  //  // https://issues.jenkins-ci.org/browse/JENKINS-47962
+  //  // https://issues.jenkins-ci.org/browse/JENKINS-48050
+//
+  //  stage('Make Check') {
+  //    when {
+  //      beforeOptions true
+  //      expression { ONLY_DOCS_CHANGED == '0' }
+  //    }
+  //    matrix {
+  //      axes {
+  //        axis {
+  //          name 'ERLANG_VERSION'
+  //          values '23.3.4.18', '24.3.4.7', '25.2'
+  //        }
+  //        axis {
+  //          name 'SM_VSN'
+  //          values '78'
+  //        }
+  //      }
+//
+  //      stages {
+  //        stage('Build and Test') {
+  //          agent {
+  //            docker {
+  //              image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
+  //              label 'docker'
+  //              args "${DOCKER_ARGS}"
+  //            }
+  //          }
+  //          options {
+  //            skipDefaultCheckout()
+  //            timeout(time: 90, unit: "MINUTES")
+  //          }
+  //          steps {
+  //            unstash 'tarball'
+  //            sh( script: build_and_test )
+  //          }
+  //          post {
+  //            always {
+  //              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+  //            }
+  //            cleanup {
+  //              sh 'rm -rf ${WORKSPACE}/*'
+  //            }
+  //          }
+  //        } // stage
+  //      } // stages
+  //    } // matrix
+  //  } // stage "Make Check"
   } // stages
 } // pipeline

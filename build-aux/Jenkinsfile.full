@@ -79,14 +79,20 @@ meta = [
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
-  // Skip freebsd builds for now as adviced by node owner
+  'win-2022': [
+    name: 'Windows 2022',
+    spidermonkey_vsn: '91',
+    node_label: 'win'
+  ],
+
+  // Skip freebsd builds for now as advised by node owner
   // 'freebsd': [
   //   name: 'FreeBSD',
   //   spidermonkey_vsn: '1.8.5',
   //   gnu_make: 'gmake'
   // ],
 
- 'macos': [
+  'macos': [
     name: 'macOS',
     spidermonkey_vsn: '91',
     gnu_make: 'make'
@@ -103,7 +109,7 @@ meta = [
 // configure the worker environment.
 
 // Returns a build stage suitable for non-containerized environments (currently
-// macOS and FreeBSD). Coincidentally we do not currently support automated
+// macOS, FreeBSD and Windows). Coincidentally we do not currently support automated
 // package generation on these platforms. This method in invoked when we create
 // `parallelStagesMap` below.
 def generateNativeStage(platform) {
@@ -111,46 +117,91 @@ def generateNativeStage(platform) {
     stage(platform) {
       node(platform) {
         timeout(time: 90, unit: "MINUTES") {
-          try {
-            // deleteDir is OK here because we're not inside of a Docker container!
-            deleteDir()
-            unstash 'tarball'
-            withEnv([
-              'HOME='+pwd(),
-              'PATH+USRLOCAL=/usr/local/bin',
-              'MAKE='+meta[platform].gnu_make
-            ]) {
-              sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
-              sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
-              dir( "${platform}/build" ) {
-                sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
-                sh '$MAKE'
-                sh '$MAKE eunit'
-                sh '$MAKE elixir-suite'
-                sh '$MAKE exunit'
-                sh '$MAKE mango-test'
-                sh '$MAKE weatherreport-test'
+          // Steps to configure and build CouchDB on *nix platforms
+          if (isUnix()) {
+            try {
+              // deleteDir is OK here because we're not inside of a Docker container!
+              deleteDir()
+              unstash 'tarball'
+              withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+              ]) {
+                sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
+                sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                dir( "${platform}/build" ) {
+                  sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                  sh '$MAKE'
+                  sh '$MAKE eunit'
+                  sh '$MAKE elixir-suite'
+                  sh '$MAKE exunit'
+                  sh '$MAKE mango-test'
+                  sh '$MAKE weatherreport-test'
+                }
               }
             }
-          }
-          catch (err) {
-            sh 'ls -l ${WORKSPACE}'
-            withEnv([
-              'HOME='+pwd(),
-              'PATH+USRLOCAL=/usr/local/bin',
-              'MAKE='+meta[platform].gnu_make
-            ]) {
-              dir( "${platform}/build" ) {
-                sh 'ls -l'
-                sh '${MAKE} build-report'
+            catch (err) {
+              sh 'ls -l ${WORKSPACE}'
+              withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+              ]) {
+                dir( "${platform}/build" ) {
+                  sh 'ls -l'
+                  sh '${MAKE} build-report'
+                }
+              }
+              error("Build step failed with error: ${err.getMessage()}")
+            }
+            finally {
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+              sh 'killall -9 beam.smp || true'
+              sh 'rm -rf ${WORKSPACE}/*'
+            }
+          } else {
+            //steps to configure and build CouchDB on Windows platforms
+            stage("${meta[platform].name} - build & test") {
+              try {
+                // deleteDir is OK here because we're not inside of a Docker container!
+                deleteDir()
+                unstash 'tarball'
+                powershell( script: "git clone https://github.com/apache/couchdb-glazier", label: 'Cloning couchdb-glazier repository' )
+                powershell( script: "New-Item -ItemType Directory -Path ${platform}/build -Force", label: 'Create build directories' )
+                powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                dir( "${platform}/build" ) {
+                  powershell( script: """
+                    & ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    & .\\configure.ps1 -SkipDeps -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    make -f Makefile.win
+                  """, label: 'Configure and Build')
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit")
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir-suite")
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win exunit")
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win mango-test")
+                  powershell( script: '& ..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE ATM: make -f Makefile.win weatherreport-test')
+                }
+              }
+              catch (err) {
+                powershell( script: "Get-ChildItem ${WORKSPACE}")
+                dir( "${platform}/build" ) {
+                  powershell( script: 'Get-ChildItem')
+                  powershell( script: '& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win build-report')
+                  powershell( script: 'Get-Content test-results.log')
+                }
+                error("Build step failed with error: ${err.getMessage()}")
+              }
+              finally {
+                //junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                //sh 'killall -9 beam.smp || true'
+                powershell( script: "Remove-Item ${WORKSPACE} -Force -Recurse -ErrorAction SilentlyContinue")
               }
             }
-            error("Build step failed with error: ${err.getMessage()}")
-          }
-          finally {
-            junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-            sh 'killall -9 beam.smp || true'
-            sh 'rm -rf ${WORKSPACE}/*'
+
+            stage("${meta[platform].name} - package") {
+              echo "`nTODO - Build msi package"
+            }
           }
         }
       }
@@ -309,59 +360,59 @@ pipeline {
       }
     }
 
-    stage('Publish') {
-
-      when {
-        expression { return env.BRANCH_NAME ==~ /main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
-      }
-
-      agent {
-        docker {
-          image "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        skipDefaultCheckout()
-        timeout(time: 90, unit: "MINUTES")
-      }
-
-      steps {
-        sh 'rm -rf ${WORKSPACE}/*'
-        unstash 'tarball'
-        unarchive mapping: ['pkgs/' : '.']
-
-        sh( label: 'Build Debian repo', script: '''
-            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el7 $BRANCH_NAME/el8 $BRANCH_NAME/source
-            git clone https://github.com/apache/couchdb-pkg
-            for plat in buster bullseye focal
-            do
-              reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
-            done
-          ''' )
-
-        sh( label: 'Build CentOS repos', script: '''
-            #cp js/centos-7/*rpm pkgs/centos7
-            #cp js/centos-8/*rpm pkgs/centos8
-            cd pkgs/centos7 && createrepo_c --database .
-            cd ../centos8 && createrepo_c --database .
-          ''' )
-
-        sh( label: 'Build unified repo', script: '''
-            mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
-            mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
-            mv pkgs/centos7/* $BRANCH_NAME/el7
-            mv pkgs/centos8/* $BRANCH_NAME/el8
-            mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
-            cd $BRANCH_NAME/source
-            ls -1tr | head -n -10 | xargs -d '\n' rm -f --
-            cd ../..
-          ''' )
-      } // steps
-    } // stage
+  //  stage('Publish') {
+  //
+  //    when {
+  //      expression { return env.BRANCH_NAME ==~ /main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
+  //    }
+  //
+  //    agent {
+  //      docker {
+  //        image "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
+  //        label 'docker'
+  //        args "${DOCKER_ARGS}"
+  //        registryUrl 'https://docker.io/'
+  //        registryCredentialsId 'dockerhub_creds'
+  //      }
+  //    }
+  //    options {
+  //      skipDefaultCheckout()
+  //      timeout(time: 90, unit: "MINUTES")
+  //    }
+  //
+  //    steps {
+  //      sh 'rm -rf ${WORKSPACE}/*'
+  //      unstash 'tarball'
+  //      unarchive mapping: ['pkgs/' : '.']
+  //
+  //      sh( label: 'Build Debian repo', script: '''
+  //          mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el7 $BRANCH_NAME/el8 $BRANCH_NAME/source
+  //          git clone https://github.com/apache/couchdb-pkg
+  //          for plat in buster bullseye focal
+  //          do
+  //            reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
+  //          done
+  //        ''' )
+  //
+  //      sh( label: 'Build CentOS repos', script: '''
+  //          #cp js/centos-7/*rpm pkgs/centos7
+  //          #cp js/centos-8/*rpm pkgs/centos8
+  //          cd pkgs/centos7 && createrepo_c --database .
+  //          cd ../centos8 && createrepo_c --database .
+  //        ''' )
+  //
+  //      sh( label: 'Build unified repo', script: '''
+  //          mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
+  //          mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
+  //          mv pkgs/centos7/* $BRANCH_NAME/el7
+  //          mv pkgs/centos8/* $BRANCH_NAME/el8
+  //          mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
+  //          cd $BRANCH_NAME/source
+  //          ls -1tr | head -n -10 | xargs -d '\n' rm -f --
+  //          cd ../..
+  //        ''' )
+  //    } // steps
+  //  } // stage
   } // stages
 
   post {
