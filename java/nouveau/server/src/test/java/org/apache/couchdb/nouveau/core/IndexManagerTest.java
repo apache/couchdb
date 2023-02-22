@@ -20,6 +20,8 @@ import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 
@@ -30,8 +32,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.codahale.metrics.MetricRegistry;
 
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 
@@ -47,10 +47,13 @@ public class IndexManagerTest {
 
     private IndexManager manager;
 
+    private ScheduledExecutorService scheduler;
+
     @BeforeEach
     public void setup() throws Exception {
+        scheduler = Executors.newScheduledThreadPool(1);
         manager = new IndexManager();
-        manager.setMetricRegistry(new MetricRegistry());
+        manager.setScheduler(scheduler);
         manager.setLucenes(Map.of(LUCENE_MAJOR, mock(Lucene.class)));
         manager.setCommitIntervalSeconds(5);
         manager.setObjectMapper(new ObjectMapper());
@@ -61,6 +64,7 @@ public class IndexManagerTest {
     @AfterEach
     public void cleanup() throws Exception {
         manager.stop();
+        scheduler.shutdown();
     }
 
     @Test

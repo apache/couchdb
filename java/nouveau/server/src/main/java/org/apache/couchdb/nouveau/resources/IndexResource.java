@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -33,6 +34,7 @@ import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
+import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexManager;
 
 import com.codahale.metrics.annotation.Timed;
@@ -50,8 +52,14 @@ public class IndexResource {
 
     @GET
     @SuppressWarnings("resource")
-    public IndexInfo indexInfo(@PathParam("name") String name) throws IOException {
-        return indexManager.acquire(name).info();
+    public IndexInfo indexInfo(@PathParam("name") String name)
+            throws IOException, InterruptedException, ExecutionException {
+        final Index index = indexManager.acquire(name);
+        try {
+            return index.info();
+        } finally {
+            indexManager.release(name, index);
+        }
     }
 
     @DELETE
@@ -60,30 +68,50 @@ public class IndexResource {
     }
 
     @PUT
-    public void createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition) throws IOException {
+    public void createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
+            throws IOException {
         indexManager.create(name, indexDefinition);
     }
 
     @DELETE
     @Timed
     @Path("/doc/{docId}")
-    public void deleteDoc(@PathParam("name") String name, @PathParam("docId") String docId, @NotNull @Valid final DocumentDeleteRequest request) throws IOException {
-        indexManager.acquire(name).delete(docId, request);
+    public void deleteDoc(@PathParam("name") String name, @PathParam("docId") String docId,
+            @NotNull @Valid final DocumentDeleteRequest request)
+            throws IOException, InterruptedException, ExecutionException {
+        final Index index = indexManager.acquire(name);
+        try {
+            index.delete(docId, request);
+        } finally {
+            indexManager.release(name, index);
+        }
     }
 
     @PUT
     @Timed
     @Path("/doc/{docId}")
-    public void updateDoc(@PathParam("name") String name, @PathParam("docId") String docId, @NotNull @Valid final DocumentUpdateRequest request) throws IOException {
-        indexManager.acquire(name).update(docId, request);
+    public void updateDoc(@PathParam("name") String name, @PathParam("docId") String docId,
+            @NotNull @Valid final DocumentUpdateRequest request)
+            throws IOException, InterruptedException, ExecutionException {
+        final Index index = indexManager.acquire(name);
+        try {
+            index.update(docId, request);
+        } finally {
+            indexManager.release(name, index);
+        }
     }
 
     @POST
     @Timed
     @Path("/search")
-    public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest searchRequest)
-            throws IOException {
-        return indexManager.acquire(name).search(searchRequest);
+    public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest request)
+            throws IOException, InterruptedException, ExecutionException {
+        final Index index = indexManager.acquire(name);
+        try {
+            return index.search(request);
+        } finally {
+            indexManager.release(name, index);
+        }
     }
 
 }

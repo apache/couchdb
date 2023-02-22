@@ -15,22 +15,20 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
 
 public class IOUtils {
 
     // From https://www.baeldung.com/java-delete-directory
     public static void rm(final Path path) throws IOException {
-        Files.walk(path)
-                .sorted(Comparator.reverseOrder())
-                .map(Path::toFile)
-                .forEach(File::delete);
-
-        if (Files.exists(path)) {
-            throw new IOException(path + " still exists");
+        File[] allContents = path.toFile().listFiles();
+        if (allContents != null) {
+            for (final File file : allContents) {
+                rm(file.toPath());
+            }
+        }
+        if (!path.toFile().delete()) {
+            throw new IOException("failed to delete " + path);
         }
     }
-
 }

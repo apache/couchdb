@@ -18,6 +18,7 @@ import java.net.URLClassLoader;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.Lucene;
@@ -91,8 +92,14 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
             throw new IllegalStateException("No Lucene bundles configured");
         }
 
+        final ScheduledExecutorService indexManagerScheduler =
+            environment.lifecycle()
+            .scheduledExecutorService("index-manager-scheduler-%d")
+            .threads(10)
+            .build();
+
         final IndexManager indexManager = new IndexManager();
-        indexManager.setMetricRegistry(metricsRegistry);
+        indexManager.setScheduler(indexManagerScheduler);
         indexManager.setRootDir(configuration.getRootDir());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());

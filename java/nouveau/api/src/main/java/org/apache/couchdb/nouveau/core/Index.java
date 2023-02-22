@@ -28,6 +28,8 @@ public abstract class Index implements Closeable {
 
     private boolean deleteOnClose = false;
 
+    private int refCount = 1;
+
     protected Index(final long updateSeq) {
         this.updateSeq = updateSeq;
     }
@@ -71,8 +73,9 @@ public abstract class Index implements Closeable {
 
     protected abstract boolean doCommit(final long updateSeq) throws IOException;
 
+    @Override
     public final void close() throws IOException {
-        doClose();
+        decRef();
     }
 
     protected abstract void doClose() throws IOException;
@@ -96,6 +99,28 @@ public abstract class Index implements Closeable {
     protected final void incrementUpdateSeq(final long updateSeq) throws IOException {
         assertUpdateSeqIsLower(updateSeq);
         this.updateSeq = updateSeq;
+    }
+
+    public final synchronized void incRef() {
+        // zero is forever.
+        if (refCount > 0) {
+            refCount++;
+        }
+    }
+
+    public final synchronized int getRefCount() {
+        return refCount;
+    }
+
+    public final boolean decRef() throws IOException {
+        boolean close;
+        synchronized (this) {
+            close = --refCount == 0;
+        }
+        if (close) {
+            doClose();
+        }
+        return close;
     }
 
 }

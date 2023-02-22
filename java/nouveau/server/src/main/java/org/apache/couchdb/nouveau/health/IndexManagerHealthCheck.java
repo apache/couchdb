@@ -46,7 +46,6 @@ public class IndexManagerHealthCheck extends HealthCheck {
         index.update("foo", request);
         index.commit();
         index.setDeleteOnClose(true);
-        indexManager.invalidate(name);
         return Result.healthy();
     }
 

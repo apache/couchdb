@@ -113,8 +113,12 @@ class Lucene9Index extends Index {
 
     @Override
     public boolean doCommit(final long updateSeq) throws IOException {
+        if (!writer.hasUncommittedChanges()) {
+            return false;
+        }
         writer.setLiveCommitData(Collections.singletonMap("update_seq", Long.toString(updateSeq)).entrySet());
-        return writer.commit() != -1;
+        writer.commit();
+        return true;
     }
 
     @Override
