@@ -17,73 +17,31 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
 import java.util.stream.Stream;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.benmanes.caffeine.cache.CacheLoader;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
-import com.github.benmanes.caffeine.cache.RemovalCause;
-import com.github.benmanes.caffeine.cache.RemovalListener;
-import com.github.benmanes.caffeine.cache.Scheduler;
 
 import io.dropwizard.lifecycle.Managed;
 
 public final class IndexManager implements Managed {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexManager.class);
-
-    private class IndexLoader implements CacheLoader<String, Index> {
-
-        @Override
-        public Index load(String name) throws Exception {
-            final Path path = indexPath(name);
-            final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
-                    IndexDefinition.class);
-            final Index result = luceneFor(indexDefinition).open(path, indexDefinition);
-            LOGGER.debug("Opened {}", result);
-            return result;
-        }
-
-        @Override
-        public Index reload(String name, Index index) throws Exception {
-            if (index.commit()) {
-                LOGGER.info("{} committed.", name);
-            }
-            return index;
-        }
-
-    }
-
-    private class IndexRemovalListener implements RemovalListener<String, Index> {
-
-        public void onRemoval(String name, Index index, RemovalCause cause) {
-            try {
-                if (index.isOpen()) {
-                    LOGGER.info("{} closing.", name);
-                    index.close();
-                    if (index.isDeleteOnClose()) {
-                        IOUtils.rm(indexRootPath(name));
-                    }
-                }
-            } catch (final IOException e) {
-                LOGGER.error(index + " threw exception when closing", e);
-            }
-        }
-    }
 
     private int maxIndexesOpen;
 
@@ -97,19 +55,95 @@ public final class IndexManager implements Managed {
 
     private ObjectMapper objectMapper;
 
-    private MetricRegistry metricRegistry;
+    private ScheduledExecutorService scheduler;
 
-    private LoadingCache<String, Index> cache;
+    private Map<String, Index> cache;
+
+    private Map<String, ScheduledFuture<?>> commitFutures;
+
+    private Object[] objectLocks;
 
     public Index acquire(final String name) throws IOException {
         if (!exists(name)) {
             throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
         }
-        return cache.get(name);
+
+        // Optimistic check.
+        synchronized (cache) {
+            final Index result = cache.get(name);
+            if (result != null) {
+                result.incRef();
+                return result;
+            }
+        }
+
+        synchronized (objectLock(name)) {
+            // non-first threads to get here need to check again.
+            synchronized (cache) {
+                final Index result = cache.get(name);
+                if (result != null) {
+                    result.incRef();
+                    return result;
+                }
+            }
+
+            LOGGER.info("Opening {}", name);
+            final Path path = indexPath(name);
+            final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
+                    IndexDefinition.class);
+            final Index result = luceneFor(indexDefinition).open(path, indexDefinition);
+
+            final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(() -> {
+                try {
+                    if (result.commit()) {
+                        LOGGER.info("Committed {}", name);
+                    }
+                } catch (final IOException e) {
+                    LOGGER.error("I/O exception when committing " + name, e);
+                }
+            }, commitIntervalSeconds, commitIntervalSeconds, SECONDS);
+
+            synchronized (cache) {
+                cache.put(name, result);
+                commitFutures.put(name, f);
+                result.incRef();
+                return result;
+            }
+        }
     }
 
-    public void invalidate(final String name) {
-        cache.invalidate(name);
+    public void release(final String name, final Index index) throws IOException {
+        synchronized (objectLock(name)) {
+            ScheduledFuture<?> f = null;
+            synchronized (cache) {
+                if (index.getRefCount() == 1) {
+                    cache.remove(name, index);
+                    f = commitFutures.remove(name);
+                }
+            }
+            if (f != null) {
+                f.cancel(false);
+                if (index.commit()) {
+                    LOGGER.debug("Committed {}", name);
+                }
+            }
+            doRelease(name, index);
+        }
+    }
+
+    private void doRelease(final String name, final Index index) throws IOException {
+        index.decRef();
+        if (!index.isOpen()) {
+            LOGGER.info("Closed {}", name);
+            if (index.isDeleteOnClose()) {
+                IOUtils.rm(indexRootPath(name));
+                LOGGER.info("Deleted {}", name);
+            }
+        }
+    }
+
+    private Object objectLock(final String name) {
+        return objectLocks[Math.abs(name.hashCode()) % objectLocks.length];
     }
 
     public void create(final String name, IndexDefinition indexDefinition) throws IOException {
@@ -153,12 +187,16 @@ public final class IndexManager implements Managed {
     }
 
     private void deleteIndex(final String name) throws IOException {
-        final Index index = cache.getIfPresent(name);
+        final Index index;
+        synchronized (cache) {
+            index = cache.get(name);
+        }
         if (index == null) {
             IOUtils.rm(indexRootPath(name));
         } else {
-            index.setDeleteOnClose(true);
-            cache.invalidate(name);
+            try (index) {
+                index.setDeleteOnClose(true);
+            }
         }
     }
 
@@ -203,29 +241,46 @@ public final class IndexManager implements Managed {
         this.objectMapper = objectMapper;
     }
 
-    public void setMetricRegistry(final MetricRegistry metricRegistry) {
-        this.metricRegistry = metricRegistry;
+    public void setScheduler(final ScheduledExecutorService scheduler) {
+        this.scheduler = scheduler;
     }
 
     @Override
     public void start() throws IOException {
-        final IndexRemovalListener indexRemovalListener = new IndexRemovalListener();
-        cache = Caffeine.newBuilder()
-                .recordStats(() -> new MetricsStatsCounter(metricRegistry, "IndexManager"))
-                .initialCapacity(maxIndexesOpen)
-                .maximumSize(maxIndexesOpen)
-                .expireAfterAccess(Duration.ofSeconds(idleSeconds))
-                .expireAfterWrite(Duration.ofSeconds(idleSeconds))
-                .refreshAfterWrite(Duration.ofSeconds(commitIntervalSeconds))
-                .scheduler(Scheduler.systemScheduler())
-                .removalListener(indexRemovalListener)
-                .evictionListener(indexRemovalListener)
-                .build(new IndexLoader());
+        objectLocks = new Object[maxIndexesOpen / 10];
+        for (int i = 0; i < objectLocks.length; i++) {
+            objectLocks[i] = new Object();
+        }
+
+        commitFutures = new HashMap<String, ScheduledFuture<?>>(maxIndexesOpen);
+
+        cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true) {
+
+            @Override
+            protected boolean removeEldestEntry(java.util.Map.Entry<String, Index> eldest) {
+                final boolean result = size() > maxIndexesOpen;
+                if (result) {
+                    LOGGER.info("Evicting {}", eldest.getKey());
+                    try {
+                        doRelease(eldest.getKey(), eldest.getValue());
+                    } catch (final IOException e) {
+                        throw new RuntimeIOException(e); // bleh.
+                    }
+                }
+                return result;
+            }
+
+        };
     }
 
     @Override
-    public void stop() {
-        cache.invalidateAll();
+    public void stop() throws IOException {
+        synchronized (cache) {
+            for (final Index index : cache.values()) {
+                index.close();
+            }
+            cache.clear();
+        }
     }
 
     private boolean isIndex(final Path path) {
