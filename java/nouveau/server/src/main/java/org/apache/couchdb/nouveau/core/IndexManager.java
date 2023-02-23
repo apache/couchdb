@@ -61,6 +61,8 @@ public final class IndexManager implements Managed {
 
     private Map<String, ScheduledFuture<?>> commitFutures;
 
+    // index open and closes occur under one of these object locks, determined
+    // by the hashCode of the index's name.
     private Object[] objectLocks;
 
     public Index acquire(final String name) throws IOException {
