@@ -12,6 +12,9 @@
 
 -module(chttpd_auth_tests).
 
+-define(WORKING_HASHES, "sha256, sha512, sha, blake2s").
+-define(FAILING_HASHES, "md4, md5, ripemd160").
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -23,6 +26,27 @@ setup() ->
 
 teardown(_Url) ->
     ok.
+
+setup_proxy_auth() ->
+    {StartCtx, ProxyCfgFile} = start_couch_with_cfg("{chttpd_auth, proxy_authentication_handler}"),
+    config:set("chttpd", "require_valid_user", "false", false),
+    config:set("chttpd_auth", "hash_algorithms", ?WORKING_HASHES, false),
+    config:set("chttpd_auth", "proxy_use_secret", "true", false),
+    config:set("chttpd_auth", "secret", "the_secret", false),
+    HashesShouldWork = re:split(?WORKING_HASHES, "\\s*,\\s*", [
+        trim, {return, binary}
+    ]),
+    HashesShouldFail = re:split(?FAILING_HASHES, "\\s*,\\s*", [trim, {return, binary}]),
+    SupportedHashAlgorithms = crypto:supports(hashs),
+    {{StartCtx, ProxyCfgFile}, HashesShouldWork, HashesShouldFail, SupportedHashAlgorithms}.
+
+teardown_proxy_auth({{Ctx, ProxyCfgFile}, _, _, _}) ->
+    ok = file:delete(ProxyCfgFile),
+    config:delete("chttpd_auth", "hash_algorithms", false),
+    config:delete("chttpd_auth", "secret", false),
+    config:delete("chttpd_auth", "proxy_use_secret", false),
+    config:delete("chttpd", "require_valid_user", false),
+    test_util:stop_couch(Ctx).
 
 require_valid_user_exception_test_() ->
     {
@@ -40,6 +64,20 @@ require_valid_user_exception_test_() ->
                     fun should_handle_require_valid_user_except_up_on_non_up_routes/1
                 ]
             }
+        }
+    }.
+
+proxy_auth_test_() ->
+    {
+        "Testing hash algorithms for proxy auth",
+        {
+            setup,
+            fun setup_proxy_auth/0,
+            fun teardown_proxy_auth/1,
+            with([
+                ?TDEF(test_hash_algorithms_with_proxy_auth_should_work),
+                ?TDEF(test_hash_algorithms_with_proxy_auth_should_fail)
+            ])
         }
     }.
 
@@ -125,3 +163,52 @@ should_handle_require_valid_user_except_up_on_non_up_routes(_Url) ->
         set_require_user_except_for_up_true(),
         ?assertThrow(ExpectAuth, chttpd_auth:party_mode_handler(NonUpRequest))
     end).
+
+% Helper functions
+base_url() ->
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
+    "http://" ++ Addr ++ ":" ++ Port.
+
+append_to_cfg_chain(Cfg) ->
+    CfgDir = filename:dirname(lists:last(?CONFIG_CHAIN)),
+    CfgFile = filename:join([CfgDir, "chttpd_proxy_auth_cfg.ini"]),
+    CfgSect = io_lib:format("[chttpd]~nauthentication_handlers = ~s~n", [Cfg]),
+    ok = file:write_file(CfgFile, CfgSect),
+    ?CONFIG_CHAIN ++ [CfgFile].
+
+start_couch_with_cfg(Cfg) ->
+    CfgChain = append_to_cfg_chain(Cfg),
+    StartCtx = test_util:start_couch(CfgChain, [chttpd]),
+    ProxyCfgFile = lists:last(CfgChain),
+    {StartCtx, ProxyCfgFile}.
+
+% Test functions
+test_hash_algorithm([]) ->
+    ok;
+test_hash_algorithm([DefaultHashAlgorithm | DecodingHashAlgorithmsList] = _) ->
+    Secret = chttpd_util:get_chttpd_auth_config("secret"),
+    Token = couch_util:to_hex(couch_util:hmac(DefaultHashAlgorithm, Secret, "PROXY-USER")),
+    Headers = [
+        {"X-Auth-CouchDB-UserName", "PROXY-USER"},
+        {"X-Auth-CouchDB-Roles", "PROXY-USER-ROLE1, PROXY-USER-ROLE2"},
+        {"X-Auth-CouchDB-Token", Token}
+    ],
+    {ok, _, _, ReqBody} = test_request:get(base_url() ++ "/_session", Headers),
+    IsAuthenticatedViaProxy = couch_util:get_nested_json_value(
+        jiffy:decode(ReqBody), [<<"info">>, <<"authenticated">>]
+    ),
+    ?assertEqual(IsAuthenticatedViaProxy, <<"proxy">>),
+    test_hash_algorithm(DecodingHashAlgorithmsList).
+
+test_hash_algorithms_with_proxy_auth_should_work(
+    {_Ctx, WorkingHashes, _FailingHashes, SupportedHashAlgorithms} = _
+) ->
+    Hashes = couch_util:verify_hash_names(WorkingHashes, SupportedHashAlgorithms),
+    test_hash_algorithm(Hashes).
+
+test_hash_algorithms_with_proxy_auth_should_fail(
+    {_Ctx, _WorkingHashes, FailingHashes, SupportedHashAlgorithms} = _
+) ->
+    Hashes = couch_util:verify_hash_names(FailingHashes, SupportedHashAlgorithms),
+    ?assertThrow({not_found, _}, test_hash_algorithm(Hashes)).
