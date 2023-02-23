@@ -457,7 +457,7 @@ surrounded by at least one space on each side. This might be useful in the
 character.
 
 JWT tokens that do not include a ``kid`` claim will be validated against the
-``$alg:_default`` key.
+``{alg}:_default`` key.
 
 It is mandatory to specify the algorithm associated with every key for security
 reasons (notably presenting a HMAC-signed token using an RSA or EC public key
