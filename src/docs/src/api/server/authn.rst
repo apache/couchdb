@@ -291,22 +291,24 @@ remotely authenticated user. By default, the client just needs to pass specific
 headers to CouchDB with related requests:
 
 - :config:option:`X-Auth-CouchDB-UserName <chttpd_auth/x_auth_username>`:
-  username;
+  username
 - :config:option:`X-Auth-CouchDB-Roles <chttpd_auth/x_auth_roles>`:
-  comma-separated (``,``) list of user roles;
+  comma-separated (``,``) list of user roles
 - :config:option:`X-Auth-CouchDB-Token <chttpd_auth/x_auth_token>`:
   authentication token. When
   :config:option:`proxy_use_secret <chttpd_auth/proxy_use_secret>`
   is set (which is strongly recommended!), this header provides an HMAC of the
   username to authenticate and the secret token to prevent requests from
-  untrusted sources. (Use the SHA1 of the username and sign with the secret)
+  untrusted sources. (Use one of the configured hash algorithms in
+  :config:option:`chttpd_auth/hash_algorithms <chttpd_auth/hash_algorithms>`
+  and sign the username with the secret)
 
 **Creating the token (example with openssl)**:
 
 .. code-block:: sh
 
-    echo -n "foo" | openssl dgst -sha1 -hmac "the_secret"
-    # (stdin)= 22047ebd7c4ec67dfbcbad7213a693249dbfbf86
+    echo -n "foo" | openssl dgst -sha256 -hmac "the_secret"
+    # (stdin)= 3f0786e96b20b0102b77f1a49c041be6977cfb3bf78c41a12adc121cd9b4e68a
 
 **Request**:
 
@@ -318,7 +320,7 @@ headers to CouchDB with related requests:
     Content-Type: application/json; charset=utf-8
     X-Auth-CouchDB-Roles: users,blogger
     X-Auth-CouchDB-UserName: foo
-    X-Auth-CouchDB-Token: 22047ebd7c4ec67dfbcbad7213a693249dbfbf86
+    X-Auth-CouchDB-Token: 3f0786e96b20b0102b77f1a49c041be6977cfb3bf78c41a12adc121cd9b4e68a
 
 **Response**:
 
@@ -351,7 +353,7 @@ headers to CouchDB with related requests:
         }
     }
 
-Note that you don't need to request :ref:`session <api/auth/session>`
+Note that you don't need to request a :ref:`session <api/auth/session>`
 to be authenticated by this method if all required HTTP headers are provided.
 
 .. _api/auth/jwt:

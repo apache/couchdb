@@ -196,14 +196,22 @@ Authentication Configuration
             [chttpd_auth]
             authentication_redirect = /_utils/session.html
 
-    .. config:option:: hash_algorithms :: Supported hash algorithms for cookie auth
+    .. config:option:: hash_algorithms :: Supported hash algorithms for cookie and \
+            proxy auth
 
         .. versionadded:: 3.3
 
-        Sets the HMAC hash algorithm used for cookie authentication. You can provide a
-        comma-separated list of hash algorithms. New cookie sessions or
+        .. note::
+            Until CouchDB version 3.3.1, :ref:`api/auth/proxy` used only the hash
+            algorithm ``sha1`` as validation of
+            :config:option:`X-Auth-CouchDB-Token <chttpd_auth/x_auth_token>`.
+
+        Sets the HMAC hash algorithm used for cookie and proxy authentication. You can
+        provide a comma-separated list of hash algorithms. New cookie sessions or
         session updates are calculated with the first hash algorithm. All values in the
-        list can be used to decode the cookie session. ::
+        list can be used to decode the cookie session and the token
+        :config:option:`X-Auth-CouchDB-Token <chttpd_auth/x_auth_token>` for
+        :ref:`api/auth/proxy`. ::
 
             [chttpd_auth]
             hash_algorithms = sha256, sha
