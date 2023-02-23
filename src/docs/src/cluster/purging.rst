@@ -65,7 +65,7 @@ Local Purge Checkpoint Documents
 ====================================
 Indexes and internal replications of the database with purges create and
 periodically update local checkpoint purge documents:
-``_local/purge-$type-$hash``. These documents report the last ``purge_seq``
+``_local/purge-{type}-{hash}``. These documents report the last ``purge_seq``
 processed by them and the timestamp of the last processing. An example of a
 local checkpoint purge document:
 
