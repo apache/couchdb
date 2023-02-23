@@ -540,9 +540,7 @@ nouveau-clean:
 
 .PHONY: nouveau-install
 nouveau-install:
-	@cd java/nouveau/api && mvn install
-	@cd java/nouveau/lucene4 && mvn install
-	@cd java/nouveau/lucene9 && mvn install
+	@cd java/nouveau && mvn install
 
 .PHONY: nouveau-start
 nouveau-start: nouveau-install
