@@ -65,7 +65,7 @@ Database Per User Options
     .. config:option:: q :: Sharding value for per-user databases
 
     If set, specify the sharding value for per-user databases. If unset, the
-    cluster default value will be used.
+    cluster default value will be used. ::
 
         [couch_peruser]
         q = 1
