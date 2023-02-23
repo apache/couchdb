@@ -60,7 +60,7 @@ init(_) ->
     ets:new(?BY_DBSIG, [set, named_table]),
     ets:new(?BY_REF, [set, named_table]),
     couch_event:link_listener(?MODULE, handle_db_event, nil, [all_dbs]),
-    set_max_sessions(nouveau_util:nouveau_url()),
+    configure_ibrowse(nouveau_util:nouveau_url()),
     ok = config:listen_for_changes(?MODULE, nil),
     {ok, nil}.
 
@@ -133,7 +133,7 @@ handle_db_event(_DbName, _Event, State) ->
     {ok, State}.
 
 handle_config_change("nouveau", "url", URL, _Persist, State) ->
-    set_max_sessions(URL),
+    configure_ibrowse(URL),
     {ok, State};
 handle_config_change(_Section, _Key, _Value, _Persist, State) ->
     {ok, State}.
@@ -147,6 +147,9 @@ handle_config_terminate(_Server, _Reason, _State) ->
         restart_config_listener
     ).
 
-set_max_sessions(URL) ->
+configure_ibrowse(URL) ->
     #{host := Host, port := Port} = uri_string:parse(URL),
-    ibrowse:set_max_sessions(Host, Port, nouveau_util:max_sessions()).
+    ibrowse:set_max_sessions(Host, Port,
+        config:get_integer("nouveau", "max_sessions", 100)),
+    ibrowse:set_max_pipeline_size(Host, Port,
+        config:get_integer("nouveau", "max_pipeline_size", 1000)).

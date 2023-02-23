@@ -22,8 +22,7 @@
     index_path/1,
     design_doc_to_indexes/2,
     design_doc_to_index/3,
-    nouveau_url/0,
-    max_sessions/0
+    nouveau_url/0
 ]).
 
 index_path(Path) when is_binary(Path) ->
@@ -101,6 +100,3 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
 
 nouveau_url() ->
     config:get("nouveau", "url", "http://127.0.0.1:8080").
-
-max_sessions() ->
-    config:get_integer("nouveau", "max_sessions", 1000).
