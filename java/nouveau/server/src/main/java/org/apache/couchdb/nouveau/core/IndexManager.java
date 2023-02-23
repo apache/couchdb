@@ -87,7 +87,7 @@ public final class IndexManager implements Managed {
                 }
             }
 
-            LOGGER.info("Opening {}", name);
+            LOGGER.debug("Opening {}", name);
             final Path path = indexPath(name);
             final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
                     IndexDefinition.class);
@@ -96,7 +96,7 @@ public final class IndexManager implements Managed {
             final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(() -> {
                 try {
                     if (result.commit()) {
-                        LOGGER.info("Committed {}", name);
+                        LOGGER.debug("Committed {}", name);
                     }
                 } catch (final IOException e) {
                     LOGGER.error("I/O exception when committing " + name, e);
@@ -134,10 +134,10 @@ public final class IndexManager implements Managed {
     private void doRelease(final String name, final Index index) throws IOException {
         index.decRef();
         if (!index.isOpen()) {
-            LOGGER.info("Closed {}", name);
+            LOGGER.debug("Closed {}", name);
             if (index.isDeleteOnClose()) {
                 IOUtils.rm(indexRootPath(name));
-                LOGGER.info("Deleted {}", name);
+                LOGGER.debug("Deleted {}", name);
             }
         }
     }
@@ -260,7 +260,7 @@ public final class IndexManager implements Managed {
             protected boolean removeEldestEntry(java.util.Map.Entry<String, Index> eldest) {
                 final boolean result = size() > maxIndexesOpen;
                 if (result) {
-                    LOGGER.info("Evicting {}", eldest.getKey());
+                    LOGGER.debug("Evicting {}", eldest.getKey());
                     try {
                         doRelease(eldest.getKey(), eldest.getValue());
                     } catch (final IOException e) {
