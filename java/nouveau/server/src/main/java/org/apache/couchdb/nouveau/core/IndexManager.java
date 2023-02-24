@@ -18,6 +18,7 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -65,7 +66,7 @@ public final class IndexManager implements Managed {
 
     private Map<String, Index> cache;
 
-    private Map<String, ScheduledFuture<?>> commitFutures;
+    private Map<String, Collection<ScheduledFuture<?>>> scheduledFutures;
 
     // index open and closes occur under one of these object locks, determined
     // by the hashCode of the index's name.
@@ -118,11 +119,23 @@ public final class IndexManager implements Managed {
                     LOGGER.error("I/O exception when committing " + name, e);
                 }
             };
-            final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(committer, commitIntervalSeconds, commitIntervalSeconds, SECONDS);
+            final ScheduledFuture<?> committerFuture = scheduler.scheduleWithFixedDelay(committer, commitIntervalSeconds, commitIntervalSeconds, SECONDS);
+
+            final Runnable idler = () -> {
+                if (newIndex.secondsSinceLastUse() >= idleSeconds) {
+                    try {
+                        LOGGER.info("closing idle {}", name);
+                        release(name, newIndex);
+                    } catch (IOException e) {
+                        LOGGER.error("I/O exception when closing idle " + name, e);
+                    }
+                }
+            };
+            final ScheduledFuture<?> idlerFuture = scheduler.scheduleWithFixedDelay(idler, idleSeconds, idleSeconds, SECONDS);
 
             synchronized (cache) {
                 cache.put(name, newIndex);
-                commitFutures.put(name, f);
+                scheduledFutures.put(name, List.of(committerFuture, idlerFuture));
             }
             newIndex.incRef();
             return newIndex;
@@ -134,15 +147,17 @@ public final class IndexManager implements Managed {
     public void release(final String name, final Index index) throws IOException {
         writeLock(name).lock();
         try {
-            ScheduledFuture<?> f = null;
+            Collection<ScheduledFuture<?>> futures = null;
             synchronized (cache) {
                 if (index.getRefCount() == 1) {
                     cache.remove(name);
-                    f = commitFutures.remove(name);
+                    futures = scheduledFutures.remove(name);
                 }
             }
-            if (f != null) {
-                f.cancel(false);
+            if (futures != null) {
+                for (ScheduledFuture<?> future : futures) {
+                    future.cancel(false);
+                }
                 if (index.commit()) {
                     LOGGER.info("committed {}", name);
                 }
@@ -289,7 +304,7 @@ public final class IndexManager implements Managed {
             locks[i] = new ReentrantReadWriteLock();
         }
 
-        commitFutures = new HashMap<String, ScheduledFuture<?>>(maxIndexesOpen);
+        scheduledFutures = new HashMap<String, Collection<ScheduledFuture<?>>>(maxIndexesOpen);
 
         cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true);
 
