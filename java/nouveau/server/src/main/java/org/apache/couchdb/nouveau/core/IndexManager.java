@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -206,17 +205,21 @@ public final class IndexManager implements Managed {
     }
 
     private void deleteIndex(final String name) throws IOException {
-        final Index index;
-        synchronized (cache) {
-            index = cache.get(name);
-        }
-        if (index == null) {
-            IOUtils.rm(indexRootPath(name));
-        } else {
-            try (index) {
-                index.setDeleteOnClose(true);
-                // TODO cause it to close
+        lock(name).writeLock().lock();
+        try {
+            final Index index;
+            synchronized (cache) {
+                index = cache.remove(name);
             }
+
+            if (index == null) {
+                IOUtils.rm(indexRootPath(name));
+            } else {
+                index.setDeleteOnClose(true);
+                doRelease(name, index);
+            }
+        } finally {
+            lock(name).writeLock().unlock();
         }
     }
 
