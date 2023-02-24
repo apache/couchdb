@@ -15,6 +15,7 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
@@ -30,11 +31,14 @@ public abstract class Index implements Closeable {
 
     private int refCount = 1;
 
+    private long lastUsed = now();
+
     protected Index(final long updateSeq) {
         this.updateSeq = updateSeq;
     }
 
     public final IndexInfo info() throws IOException {
+        updateLastUsed();
         final int numDocs = doNumDocs();
         return new IndexInfo(updateSeq, numDocs);
     }
@@ -43,6 +47,7 @@ public abstract class Index implements Closeable {
 
     public final synchronized void update(final String docId, final DocumentUpdateRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
+        updateLastUsed();
         doUpdate(docId, request);
         incrementUpdateSeq(request.getSeq());
     }
@@ -51,6 +56,7 @@ public abstract class Index implements Closeable {
 
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
+        updateLastUsed();
         doDelete(docId, request);
         incrementUpdateSeq(request.getSeq());
     }
@@ -58,6 +64,7 @@ public abstract class Index implements Closeable {
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults search(final SearchRequest request) throws IOException {
+        updateLastUsed();
         return doSearch(request);
     }
 
@@ -101,6 +108,10 @@ public abstract class Index implements Closeable {
         this.updateSeq = updateSeq;
     }
 
+    private synchronized void updateLastUsed() {
+        this.lastUsed = now();
+    }
+
     public final synchronized void incRef() {
         // zero is forever.
         if (refCount > 0) {
@@ -121,6 +132,14 @@ public abstract class Index implements Closeable {
             doClose();
         }
         return close;
+    }
+
+    public synchronized long secondsSinceLastUse() {
+        return TimeUnit.NANOSECONDS.toMillis(now() - lastUsed);
+    }
+
+    private long now() {
+        return System.nanoTime();
     }
 
 }
