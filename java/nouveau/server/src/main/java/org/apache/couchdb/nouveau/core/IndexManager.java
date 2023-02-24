@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -76,7 +77,7 @@ public final class IndexManager implements Managed {
         }
 
         // Optimistic check.
-        lock(name).readLock().lock();
+        readLock(name).lock();
         try {
             synchronized (cache) {
                 final Index result = cache.get(name);
@@ -86,10 +87,10 @@ public final class IndexManager implements Managed {
                 }
             }
         } finally {
-            lock(name).readLock().unlock();
+            readLock(name).unlock();
         }
 
-        lock(name).writeLock().lock();
+        writeLock(name).lock();
         try {
             // non-first threads to get here need to check again.
             synchronized (cache) {
@@ -123,12 +124,12 @@ public final class IndexManager implements Managed {
                 return result;
             }
         } finally {
-            lock(name).writeLock().unlock();
+            writeLock(name).unlock();
         }
     }
 
     public void release(final String name, final Index index) throws IOException {
-        lock(name).writeLock().lock();
+        writeLock(name).lock();
         try {
             ScheduledFuture<?> f = null;
             synchronized (cache) {
@@ -145,7 +146,7 @@ public final class IndexManager implements Managed {
             }
             doRelease(name, index);
         } finally {
-            lock(name).writeLock().unlock();
+            writeLock(name).unlock();
         }
     }
 
@@ -160,7 +161,15 @@ public final class IndexManager implements Managed {
         }
     }
 
-    private ReadWriteLock lock(final String name) {
+    private Lock writeLock(final String name) {
+        return rwl(name).writeLock();
+    }
+
+    private Lock readLock(final String name) {
+        return rwl(name).readLock();
+    }
+
+    private ReadWriteLock rwl(final String name) {
         return locks[Math.abs(name.hashCode()) % locks.length];
     }
 
@@ -205,7 +214,7 @@ public final class IndexManager implements Managed {
     }
 
     private void deleteIndex(final String name) throws IOException {
-        lock(name).writeLock().lock();
+        writeLock(name).lock();
         try {
             final Index index;
             synchronized (cache) {
@@ -219,7 +228,7 @@ public final class IndexManager implements Managed {
                 doRelease(name, index);
             }
         } finally {
-            lock(name).writeLock().unlock();
+            writeLock(name).unlock();
         }
     }
 
@@ -288,7 +297,7 @@ public final class IndexManager implements Managed {
                     final Iterator<Entry<String, Index>> it = cache.entrySet().iterator();
                     for (int i = 0; i < surplus; i++) {
                         final Entry<String, Index> entry = it.next();
-                        lock(entry.getKey()).writeLock().lock();
+                        writeLock(entry.getKey()).lock();
                         it.remove();
                         evicted.add(entry);
                     }
@@ -301,7 +310,7 @@ public final class IndexManager implements Managed {
                 } catch (final IOException e) {
                     LOGGER.error("I/O exception when evicting " + entry.getKey(), e);
                 } finally {
-                    lock(entry.getKey()).writeLock().unlock();
+                    writeLock(entry.getKey()).unlock();
                 }
             }
         }, 5, 5, SECONDS);
