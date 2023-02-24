@@ -109,7 +109,7 @@ public final class IndexManager implements Managed {
                     IndexDefinition.class);
             final Index newIndex = luceneFor(indexDefinition).open(path, indexDefinition);
 
-            final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(() -> {
+            final Runnable committer = () -> {
                 try {
                     if (newIndex.commit()) {
                         LOGGER.info("committed {}", name);
@@ -117,7 +117,8 @@ public final class IndexManager implements Managed {
                 } catch (final IOException e) {
                     LOGGER.error("I/O exception when committing " + name, e);
                 }
-            }, commitIntervalSeconds, commitIntervalSeconds, SECONDS);
+            };
+            final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(committer, commitIntervalSeconds, commitIntervalSeconds, SECONDS);
 
             synchronized (cache) {
                 cache.put(name, newIndex);
@@ -292,7 +293,7 @@ public final class IndexManager implements Managed {
 
         cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true);
 
-        scheduler.scheduleWithFixedDelay(() -> {
+        final Runnable lruEnforcer = () -> {
             final List<Entry<String, Index>> evictees = new ArrayList<Entry<String, Index>>();
             synchronized (cache) {
                 final int surplus = cache.size() - maxIndexesOpen;
@@ -311,7 +312,8 @@ public final class IndexManager implements Managed {
                     LOGGER.error("error evicting " +evictee.getKey(), e);
                 }
             }
-        }, 5, 5, SECONDS);
+        };
+        scheduler.scheduleWithFixedDelay(lruEnforcer, 5, 5, SECONDS);
     }
 
     @Override
