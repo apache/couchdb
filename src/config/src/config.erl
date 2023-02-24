@@ -229,6 +229,17 @@ is_enabled(Feature) when is_atom(Feature) ->
     Map = persistent_term:get({?MODULE, ?FEATURES}, #{}),
     maps:get(Feature, Map, false).
 
+% Some features like FIPS mode must be enabled earlier before couch, couch_epi
+% start up
+%
+enable_early_features() ->
+    % Mark FIPS if enabled
+    case crypto:info_fips() == enabled of
+        true ->
+            enable_feature(fips);
+        false ->
+            ok
+    end.
 
 listen_for_changes(CallbackModule, InitialState) ->
     config_listener_mon:subscribe(CallbackModule, InitialState).
@@ -237,6 +248,7 @@ subscribe_for_changes(Subscription) ->
     config_notifier:subscribe(Subscription).
 
 init(IniFiles) ->
+    enable_early_features(),
     ets:new(?MODULE, [named_table, set, protected, {read_concurrency, true}]),
     lists:map(
         fun(IniFile) ->

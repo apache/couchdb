@@ -99,3 +99,14 @@
 #-proto_dist couch
 #-couch_dist no_tls '"clouseau@127.0.0.1"'
 #-ssl_dist_optfile <path/to/couch_ssl_dist.conf>
+
+# Enable FIPS mode
+#   https://www.erlang.org/doc/apps/crypto/fips.html
+#   Ensure that:
+#    - Erlang is built with --enable-fips configuration option
+#    - Crypto library (e.g. OpenSSL) supports this mode
+#
+# When the mode is successfully enabled "Welcome" message should show `fips`
+# in the features list.
+#
+#-crypto fips_mode true
