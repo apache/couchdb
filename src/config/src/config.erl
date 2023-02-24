@@ -31,7 +31,7 @@
 -export([get_float/3, set_float/3, set_float/4]).
 -export([get_boolean/3, set_boolean/3, set_boolean/4]).
 
--export([features/0, enable_feature/1, disable_feature/1]).
+-export([features/0, enable_feature/1, disable_feature/1, is_enabled/1]).
 
 -export([listen_for_changes/2]).
 -export([subscribe_for_changes/1]).
@@ -42,7 +42,7 @@
 
 -export([is_sensitive/2]).
 
--define(FEATURES, "features").
+-define(FEATURES, features).
 
 -define(TIMEOUT, 30000).
 -define(INVALID_SECTION, <<"Invalid configuration section">>).
@@ -212,23 +212,23 @@ delete(Section, Key, Persist, Reason) when is_list(Section), is_list(Key) ->
     ).
 
 features() ->
-    application:get_env(config, enabled_features, []).
+    Map = persistent_term:get({?MODULE, ?FEATURES}, #{}),
+    lists:sort(maps:keys(Map)).
 
 enable_feature(Feature) when is_atom(Feature) ->
-    application:set_env(
-        config,
-        enabled_features,
-        lists:usort([Feature | features()]),
-        [{persistent, true}]
-    ).
+    Map = persistent_term:get({?MODULE, ?FEATURES}, #{}),
+    Map1 = Map#{Feature => true},
+    persistent_term:put({?MODULE, ?FEATURES}, Map1).
 
 disable_feature(Feature) when is_atom(Feature) ->
-    application:set_env(
-        config,
-        enabled_features,
-        features() -- [Feature],
-        [{persistent, true}]
-    ).
+    Map = persistent_term:get({?MODULE, ?FEATURES}, #{}),
+    Map1 = maps:remove(Feature, Map),
+    persistent_term:put({?MODULE, ?FEATURES}, Map1).
+
+is_enabled(Feature) when is_atom(Feature) ->
+    Map = persistent_term:get({?MODULE, ?FEATURES}, #{}),
+    maps:get(Feature, Map, false).
+
 
 listen_for_changes(CallbackModule, InitialState) ->
     config_listener_mon:subscribe(CallbackModule, InitialState).
