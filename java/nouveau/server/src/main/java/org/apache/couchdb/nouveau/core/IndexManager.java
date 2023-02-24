@@ -79,12 +79,13 @@ public final class IndexManager implements Managed {
         // Optimistic check.
         readLock(name).lock();
         try {
+            final Index result;
             synchronized (cache) {
-                final Index result = cache.get(name);
-                if (result != null) {
-                    result.incRef();
-                    return result;
-                }
+                result = cache.get(name);
+            }
+            if (result != null) {
+                result.incRef();
+                return result;
             }
         } finally {
             readLock(name).unlock();
@@ -92,24 +93,25 @@ public final class IndexManager implements Managed {
 
         writeLock(name).lock();
         try {
+            final Index existingIndex;
             // non-first threads to get here need to check again.
             synchronized (cache) {
-                final Index result = cache.get(name);
-                if (result != null) {
-                    result.incRef();
-                    return result;
-                }
+                existingIndex = cache.get(name);
+            }
+            if (existingIndex != null) {
+                existingIndex.incRef();
+                return existingIndex;
             }
 
             LOGGER.info("opening {}", name);
             final Path path = indexPath(name);
             final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
                     IndexDefinition.class);
-            final Index result = luceneFor(indexDefinition).open(path, indexDefinition);
+            final Index newIndex = luceneFor(indexDefinition).open(path, indexDefinition);
 
             final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(() -> {
                 try {
-                    if (result.commit()) {
+                    if (newIndex.commit()) {
                         LOGGER.info("committed {}", name);
                     }
                 } catch (final IOException e) {
@@ -118,11 +120,11 @@ public final class IndexManager implements Managed {
             }, commitIntervalSeconds, commitIntervalSeconds, SECONDS);
 
             synchronized (cache) {
-                cache.put(name, result);
+                cache.put(name, newIndex);
                 commitFutures.put(name, f);
-                result.incRef();
-                return result;
             }
+            newIndex.incRef();
+            return newIndex;
         } finally {
             writeLock(name).unlock();
         }
@@ -220,7 +222,6 @@ public final class IndexManager implements Managed {
             synchronized (cache) {
                 index = cache.remove(name);
             }
-
             if (index == null) {
                 IOUtils.rm(indexRootPath(name));
             } else {
