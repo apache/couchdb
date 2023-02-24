@@ -17,11 +17,18 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import java.util.stream.Stream;
@@ -30,7 +37,6 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,7 +69,7 @@ public final class IndexManager implements Managed {
 
     // index open and closes occur under one of these object locks, determined
     // by the hashCode of the index's name.
-    private Object[] objectLocks;
+    private ReadWriteLock[] locks;
 
     public Index acquire(final String name) throws IOException {
         if (!exists(name)) {
@@ -71,15 +77,21 @@ public final class IndexManager implements Managed {
         }
 
         // Optimistic check.
-        synchronized (cache) {
-            final Index result = cache.get(name);
-            if (result != null) {
-                result.incRef();
-                return result;
+        lock(name).readLock().lock();
+        try {
+            synchronized (cache) {
+                final Index result = cache.get(name);
+                if (result != null) {
+                    result.incRef();
+                    return result;
+                }
             }
+        } finally {
+            lock(name).readLock().unlock();
         }
 
-        synchronized (objectLock(name)) {
+        lock(name).writeLock().lock();
+        try {
             // non-first threads to get here need to check again.
             synchronized (cache) {
                 final Index result = cache.get(name);
@@ -89,7 +101,7 @@ public final class IndexManager implements Managed {
                 }
             }
 
-            LOGGER.debug("Opening {}", name);
+            LOGGER.info("opening {}", name);
             final Path path = indexPath(name);
             final IndexDefinition indexDefinition = objectMapper.readValue(indexDefinitionPath(name).toFile(),
                     IndexDefinition.class);
@@ -98,7 +110,7 @@ public final class IndexManager implements Managed {
             final ScheduledFuture<?> f = scheduler.scheduleWithFixedDelay(() -> {
                 try {
                     if (result.commit()) {
-                        LOGGER.debug("Committed {}", name);
+                        LOGGER.info("committed {}", name);
                     }
                 } catch (final IOException e) {
                     LOGGER.error("I/O exception when committing " + name, e);
@@ -111,11 +123,14 @@ public final class IndexManager implements Managed {
                 result.incRef();
                 return result;
             }
+        } finally {
+            lock(name).writeLock().unlock();
         }
     }
 
     public void release(final String name, final Index index) throws IOException {
-        synchronized (objectLock(name)) {
+        lock(name).writeLock().lock();
+        try {
             ScheduledFuture<?> f = null;
             synchronized (cache) {
                 if (index.getRefCount() == 1) {
@@ -126,26 +141,28 @@ public final class IndexManager implements Managed {
             if (f != null) {
                 f.cancel(false);
                 if (index.commit()) {
-                    LOGGER.debug("Committed {}", name);
+                    LOGGER.info("committed {}", name);
                 }
             }
             doRelease(name, index);
+        } finally {
+            lock(name).writeLock().unlock();
         }
     }
 
     private void doRelease(final String name, final Index index) throws IOException {
         index.decRef();
         if (!index.isOpen()) {
-            LOGGER.debug("Closed {}", name);
+            LOGGER.info("closed {}", name);
             if (index.isDeleteOnClose()) {
                 IOUtils.rm(indexRootPath(name));
-                LOGGER.debug("Deleted {}", name);
+                LOGGER.info("deleted {}", name);
             }
         }
     }
 
-    private Object objectLock(final String name) {
-        return objectLocks[Math.abs(name.hashCode()) % objectLocks.length];
+    private ReadWriteLock lock(final String name) {
+        return locks[Math.abs(name.hashCode()) % locks.length];
     }
 
     public void create(final String name, IndexDefinition indexDefinition) throws IOException {
@@ -198,6 +215,7 @@ public final class IndexManager implements Managed {
         } else {
             try (index) {
                 index.setDeleteOnClose(true);
+                // TODO cause it to close
             }
         }
     }
@@ -249,30 +267,41 @@ public final class IndexManager implements Managed {
 
     @Override
     public void start() throws IOException {
-        objectLocks = new Object[maxIndexesOpen / 10];
-        for (int i = 0; i < objectLocks.length; i++) {
-            objectLocks[i] = new Object();
+        final int lockCount = Math.max(1000, maxIndexesOpen / 10);
+        locks = new ReadWriteLock[lockCount];
+        for (int i = 0; i < locks.length; i++) {
+            locks[i] = new ReentrantReadWriteLock();
         }
 
         commitFutures = new HashMap<String, ScheduledFuture<?>>(maxIndexesOpen);
 
-        cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true) {
+        cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true);
 
-            @Override
-            protected boolean removeEldestEntry(java.util.Map.Entry<String, Index> eldest) {
-                final boolean result = size() > maxIndexesOpen;
-                if (result) {
-                    LOGGER.debug("Evicting {}", eldest.getKey());
-                    try {
-                        doRelease(eldest.getKey(), eldest.getValue());
-                    } catch (final IOException e) {
-                        throw new RuntimeIOException(e); // bleh.
+        scheduler.scheduleWithFixedDelay(() -> {
+            final List<Entry<String, Index>> evicted = new ArrayList<Entry<String, Index>>();
+            synchronized (cache) {
+                final int surplus = cache.size() - maxIndexesOpen;
+                if (surplus > 0) {
+                    final Iterator<Entry<String, Index>> it = cache.entrySet().iterator();
+                    for (int i = 0; i < surplus; i++) {
+                        final Entry<String, Index> entry = it.next();
+                        lock(entry.getKey()).writeLock().lock();
+                        it.remove();
+                        evicted.add(entry);
                     }
                 }
-                return result;
             }
-
-        };
+            for (Entry<String, Index> entry : evicted) {
+                LOGGER.info("evicting {}", entry.getKey());
+                try {
+                    doRelease(entry.getKey(), entry.getValue());
+                } catch (final IOException e) {
+                    LOGGER.error("I/O exception when evicting " + entry.getKey(), e);
+                } finally {
+                    lock(entry.getKey()).writeLock().unlock();
+                }
+            }
+        }, 5, 5, SECONDS);
     }
 
     @Override
