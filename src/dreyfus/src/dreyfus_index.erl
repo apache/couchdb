@@ -362,7 +362,7 @@ index_name(#index{dbname = DbName, ddoc_id = DDocId, name = IndexName}) ->
 
 args_to_proplist(#index_query_args{} = Args) ->
     [
-        {'query', Args#index_query_args.q},
+        {query, Args#index_query_args.q},
         {partition, Args#index_query_args.partition},
         {limit, Args#index_query_args.limit},
         {refresh, Args#index_query_args.stale =:= false},
@@ -381,7 +381,7 @@ args_to_proplist(#index_query_args{} = Args) ->
 
 args_to_proplist2(#index_query_args{} = Args) ->
     [
-        {'query', Args#index_query_args.q},
+        {query, Args#index_query_args.q},
         {field, Args#index_query_args.grouping#grouping.by},
         {refresh, Args#index_query_args.stale =:= false},
         {groups, Args#index_query_args.grouping#grouping.groups},

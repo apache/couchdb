@@ -73,7 +73,7 @@ explain(Cursor) ->
         opts = Opts
     } = Cursor,
     [
-        {'query', mango_selector_text:convert(Selector)},
+        {query, mango_selector_text:convert(Selector)},
         {partition, get_partition(Opts, null)},
         {sort, sort_query(Opts, Selector)}
     ].

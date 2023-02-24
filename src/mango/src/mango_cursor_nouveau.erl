@@ -69,7 +69,7 @@ explain(Cursor) ->
         opts = Opts
     } = Cursor,
     [
-        {'query', mango_selector_text:convert(Selector)},
+        {query, mango_selector_text:convert(Selector)},
         {partition, get_partition(Opts, null)},
         {sort, sort_query(Opts, Selector)}
     ].
@@ -86,7 +86,7 @@ execute(Cursor, UserFun, UserAcc) ->
     } = Cursor,
     Query = mango_selector_text:convert(Selector),
     QueryArgs = #{
-        'query' => Query,
+        query => Query,
         partition => get_partition(Opts, null),
         sort => sort_query(Opts, Selector)
     },
