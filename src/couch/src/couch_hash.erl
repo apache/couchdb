@@ -10,10 +10,20 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+% This module is enable use of the built-in Erlang MD5 hashing function for
+% non-cryptographic usage when in FIPS mode.
+%
+% For more details see:
+%   https://www.erlang.org/doc/apps/crypto/fips.html#avoid-md5-for-hashing
+
 -module(couch_hash).
 
 -export([md5_hash/1, md5_hash_final/1, md5_hash_init/0, md5_hash_update/2]).
 
+% The ERLANG_MD5 define is set at compile time by --erlang-md5 configure flag
+% This is deprecated. Instead, FIPS mode is now detected automatically and the
+% build-in Erlang function will be used when FIPS mode is enabled.
+%
 -ifdef(ERLANG_MD5).
 
 md5_hash(Data) ->
@@ -31,15 +41,27 @@ md5_hash_update(Context, Data) ->
 -else.
 
 md5_hash(Data) ->
-    crypto:hash(md5, Data).
+    case config:is_enabled(fips) of
+        true -> erlang:md5(Data);
+        false -> crypto:hash(md5, Data)
+    end.
 
 md5_hash_final(Context) ->
-    crypto:hash_final(Context).
+    case config:is_enabled(fips) of
+        true -> erlang:md5_final(Context);
+        false -> crypto:hash_final(Context)
+    end.
 
 md5_hash_init() ->
-    crypto:hash_init(md5).
+    case config:is_enabled(fips) of
+        true -> erlang:md5_init();
+        false -> crypto:hash_init(md5)
+    end.
 
 md5_hash_update(Context, Data) ->
-    crypto:hash_update(Context, Data).
+    case config:is_enabled(fips) of
+        true -> erlang:md5_update(Context, Data);
+        false -> crypto:hash_update(Context, Data)
+    end.
 
 -endif.

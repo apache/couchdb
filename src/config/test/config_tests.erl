@@ -651,11 +651,14 @@ should_enable_features() ->
 
     ?assertEqual(ok, config:enable_feature(snek)),
     ?assertEqual([snek], config:features()),
+    ?assert(config:is_enabled(snek)),
 
     ?assertEqual(ok, config:enable_feature(snek)),
     ?assertEqual([snek], config:features()),
 
     ?assertEqual(ok, config:enable_feature(dogo)),
+    ?assert(config:is_enabled(dogo)),
+    ?assert(config:is_enabled(snek)),
     ?assertEqual([dogo, snek], config:features()).
 
 should_disable_features() ->
@@ -666,9 +669,11 @@ should_disable_features() ->
     ?assertEqual([snek], config:features()),
 
     ?assertEqual(ok, config:disable_feature(snek)),
+    ?assertNot(config:is_enabled(snek)),
     ?assertEqual([], config:features()),
 
     ?assertEqual(ok, config:disable_feature(snek)),
+    ?assertNot(config:is_enabled(snek)),
     ?assertEqual([], config:features()).
 
 should_keep_features_on_config_restart() ->
@@ -678,6 +683,7 @@ should_keep_features_on_config_restart() ->
     config:enable_feature(snek),
     ?assertEqual([snek], config:features()),
     with_process_restart(config),
+    ?assert(config:is_enabled(snek)),
     ?assertEqual([snek], config:features()).
 
 should_notify_on_config_reload(Subscription, {_Apps, Pid}) ->
