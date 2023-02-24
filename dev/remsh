@@ -23,6 +23,12 @@ if [ -z $HOST ]; then
     HOST="127.0.0.1"
 fi
 
+if [ -n "$COOKIE" ]; then
+    _cookie_flag="-setcookie $COOKIE"
+else
+    _cookie_flag=""
+fi
+
 NAME="remsh$$@$HOST"
 NODE="node$NODE@$HOST"
-erl -name $NAME -remsh $NODE -hidden
+erl -name $NAME -remsh $NODE -hidden ${_cookie_flag}
