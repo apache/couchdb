@@ -136,7 +136,7 @@ public final class IndexManager implements Managed {
             ScheduledFuture<?> f = null;
             synchronized (cache) {
                 if (index.getRefCount() == 1) {
-                    cache.remove(name, index);
+                    cache.remove(name);
                     f = commitFutures.remove(name);
                 }
             }
@@ -216,9 +216,9 @@ public final class IndexManager implements Managed {
     }
 
     private void deleteIndex(final String name) throws IOException {
-        writeLock(name).lock();
+        final Index index;
+        readLock(name).lock();
         try {
-            final Index index;
             synchronized (cache) {
                 index = cache.remove(name);
             }
@@ -226,10 +226,12 @@ public final class IndexManager implements Managed {
                 IOUtils.rm(indexRootPath(name));
             } else {
                 index.setDeleteOnClose(true);
-                doRelease(name, index);
             }
         } finally {
-            writeLock(name).unlock();
+            readLock(name).unlock();
+        }
+        if (index != null) {
+            release(name, index);
         }
     }
 
@@ -291,27 +293,22 @@ public final class IndexManager implements Managed {
         cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true);
 
         scheduler.scheduleWithFixedDelay(() -> {
-            final List<Entry<String, Index>> evicted = new ArrayList<Entry<String, Index>>();
+            final List<Entry<String, Index>> evictees = new ArrayList<Entry<String, Index>>();
             synchronized (cache) {
                 final int surplus = cache.size() - maxIndexesOpen;
                 if (surplus > 0) {
                     final Iterator<Entry<String, Index>> it = cache.entrySet().iterator();
                     for (int i = 0; i < surplus; i++) {
-                        final Entry<String, Index> entry = it.next();
-                        writeLock(entry.getKey()).lock();
-                        it.remove();
-                        evicted.add(entry);
+                        evictees.add(it.next());
                     }
                 }
             }
-            for (Entry<String, Index> entry : evicted) {
-                LOGGER.info("evicting {}", entry.getKey());
+            for (Entry<String, Index> evictee : evictees) {
+                LOGGER.info("evicting {}", evictee.getKey());
                 try {
-                    doRelease(entry.getKey(), entry.getValue());
+                    release(evictee.getKey(), evictee.getValue());
                 } catch (final IOException e) {
-                    LOGGER.error("I/O exception when evicting " + entry.getKey(), e);
-                } finally {
-                    writeLock(entry.getKey()).unlock();
+                    LOGGER.error("error evicting " +evictee.getKey(), e);
                 }
             }
         }, 5, 5, SECONDS);
