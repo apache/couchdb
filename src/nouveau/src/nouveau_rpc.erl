@@ -41,4 +41,4 @@ search(DbName, #index{} = Index0, QueryArgs) ->
     end,
 
     %% Run the search
-    rexi:reply(nouveau_api:search(index_path(Index1), QueryArgs)).
+    rexi:reply(nouveau_api:search(Index1, QueryArgs)).

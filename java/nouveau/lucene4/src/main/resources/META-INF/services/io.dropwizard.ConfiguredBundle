@@ -13,4 +13,4 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-org.apache.couchdb.nouveau.core.lucene4.Lucene4Bundle
+org.apache.couchdb.nouveau.lucene4.Lucene4Bundle

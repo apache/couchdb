@@ -13,12 +13,9 @@
 
 package org.apache.couchdb.nouveau;
 
-import java.net.URL;
 import java.nio.file.Path;
-import java.util.Arrays;
 
 import javax.validation.constraints.Min;
-import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -28,19 +25,16 @@ import io.dropwizard.Configuration;
 public class NouveauApplicationConfiguration extends Configuration {
 
     @Min(10)
-    private int maxIndexesOpen = -1;
+    private int maxIndexesOpen = 10;
 
     @Min(10)
-    private int commitIntervalSeconds = -1;
+    private int commitIntervalSeconds = 10;
 
     @Min(30)
-    private int idleSeconds = -1;
+    private int idleSeconds = 30;
 
     @NotNull
     private Path rootDir = null;
-
-    @NotEmpty
-    private URL[] luceneBundlePaths;
 
     @JsonProperty
     public void setMaxIndexesOpen(int maxIndexesOpen) {
@@ -76,22 +70,6 @@ public class NouveauApplicationConfiguration extends Configuration {
 
     public Path getRootDir() {
         return rootDir;
-    }
-
-    @JsonProperty
-    public void setLuceneBundlePaths(final URL... luceneBundlePaths) {
-        this.luceneBundlePaths = luceneBundlePaths;
-    }
-
-    public URL[] getLuceneBundlePaths() {
-        return luceneBundlePaths;
-    }
-
-    @Override
-    public String toString() {
-        return "NouveauApplicationConfiguration [maxIndexesOpen=" + maxIndexesOpen + ", commitIntervalSeconds="
-                + commitIntervalSeconds + ", idleSeconds=" + idleSeconds + ", rootDir=" + rootDir
-                + ", luceneBundlePaths=" + Arrays.toString(luceneBundlePaths) + "]";
     }
 
 }

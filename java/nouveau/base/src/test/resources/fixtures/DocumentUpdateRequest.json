@@ -1,0 +1,22 @@
+{
+  "seq": 12,
+  "fields": [
+    {
+      "@type": "string",
+      "name": "stringfoo",
+      "value": "bar",
+      "store": true
+    },
+    {
+      "@type": "text",
+      "name": "textfoo",
+      "value": "hello there",
+      "store": true
+    },
+    {
+      "@type": "double",
+      "name": "doublefoo",
+      "value": 12
+    }
+  ]
+}

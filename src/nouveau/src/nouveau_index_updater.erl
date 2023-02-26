@@ -58,7 +58,10 @@ update(#index{} = Index) ->
 
                 Proc = get_os_process(Index#index.def_lang),
                 try
-                    true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
+                    %% jamming the version in is a bit ugly, could make this a json object but
+                    %% is that really any better?
+                    SandboxOption = <<"nouveau", (integer_to_binary(Index#index.lucene_major))/binary>>,
+                    true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, SandboxOption]),
                     Acc0 = {Db, Index, Proc, 0, TotalChanges},
                     {ok, _} = couch_db:fold_changes(Db, CurSeq, fun load_docs/2, Acc0, [])
                 after
@@ -81,16 +84,16 @@ load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges}) ->
 
     case Del of
         true ->
-            ok = nouveau_api:delete_doc(index_path(Index), Id, Seq);
+            ok = nouveau_api:delete_doc(Index, Id, Seq);
         false ->
             {ok, Doc} = couch_db:open_doc(Db, DI, []),
             Json = couch_doc:to_json_obj(Doc, []),
             [Fields | _] = proc_prompt(Proc, [<<"nouveau_index_doc">>, Json]),
             case Fields of
                 [] ->
-                    ok = nouveau_api:delete_doc(index_path(Index), Id, Seq);
+                    ok = nouveau_api:delete_doc(Index, Id, Seq);
                 _ ->
-                    ok = nouveau_api:update_doc(index_path(Index), Id, Seq, Fields)
+                    ok = nouveau_api:update_doc(Index, Id, Seq, Fields)
             end
     end,
     {ok, {Db, Index, Proc, ChangesDone + 1, TotalChanges}}.
@@ -100,7 +103,7 @@ open_or_create_index(#index{} = Index) ->
         {ok, UpdateSeq} ->
             {ok, UpdateSeq};
         {error, {not_found, _}} ->
-            case nouveau_api:create_index(index_path(Index), index_definition(Index)) of
+            case nouveau_api:create_index(Index, index_definition(Index)) of
                 ok ->
                     {ok, 0};
                 {error, Reason} ->
@@ -119,7 +122,7 @@ get_db_seq(#index{} = Index) ->
     end.
 
 get_index_seq(#index{} = Index) ->
-    case nouveau_api:index_info(index_path(Index)) of
+    case nouveau_api:index_info(Index) of
         {ok, {Fields}} ->
             {ok, couch_util:get_value(<<"update_seq">>, Fields)};
         {error, Reason} ->

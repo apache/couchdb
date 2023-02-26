@@ -20,10 +20,10 @@
 
   <dependencies>
 
-    <!-- API -->
+    <!-- Base -->
     <dependency>
       <groupId>org.apache.couchdb.nouveau</groupId>
-      <artifactId>api</artifactId>
+      <artifactId>base</artifactId>
       <version>${project.version}</version>
     </dependency>
 
@@ -31,6 +31,11 @@
     <dependency>
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
     </dependency>
 
     <!-- Lucene -->

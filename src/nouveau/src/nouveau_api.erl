@@ -32,9 +32,10 @@
 analyze(LuceneMajor, Text, Analyzer) when
     is_integer(LuceneMajor), is_binary(Text), is_binary(Analyzer)
 ->
-    ReqBody = {[{<<"lucene_major">>, LuceneMajor}, {<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
+    ReqBody = {[{<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
     Resp = send_if_enabled(
-        nouveau_util:nouveau_url() ++ "/analyze", [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
+        io_lib:format("~s/~B/analyze", [nouveau_util:nouveau_url(), LuceneMajor]),
+        [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
     ),
     case Resp of
         {ok, "200", _, RespBody} ->
@@ -48,10 +49,8 @@ analyze(LuceneMajor, Text, Analyzer) when
 analyze(_, _, _) ->
     {error, {bad_request, <<"'lucene_major' must be a number and 'text' and 'analyzer' fields must be non-empty strings">>}}.
 
-index_info(IndexName) when
-    is_binary(IndexName)
-->
-    Resp = send_if_enabled(index_url(IndexName), [], get),
+index_info(#index{} = Index) ->
+    Resp = send_if_enabled(index_url(Index), [], get),
     case Resp of
         {ok, "200", _, RespBody} ->
             {ok, jiffy:decode(RespBody)};
@@ -61,11 +60,9 @@ index_info(IndexName) when
             send_error(Reason)
     end.
 
-create_index(IndexName, IndexDefinition) when
-    is_binary(IndexName)
-->
+create_index(#index{} = Index, IndexDefinition) ->
     Resp = send_if_enabled(
-        index_url(IndexName), [?JSON_CONTENT_TYPE], put, jiffy:encode(IndexDefinition)
+        index_url(Index), [?JSON_CONTENT_TYPE], put, jiffy:encode(IndexDefinition)
     ),
     case Resp of
         {ok, "204", _, _} ->
@@ -79,7 +76,7 @@ create_index(IndexName, IndexDefinition) when
 delete_path(Path) when
     is_binary(Path)
 ->
-    Resp = send_if_enabled(index_url(Path), [?JSON_CONTENT_TYPE], delete, []),
+    Resp = send_if_enabled(index_path(Path), [?JSON_CONTENT_TYPE], delete, []),
     case Resp of
         {ok, "204", _, _} ->
             ok;
@@ -89,12 +86,12 @@ delete_path(Path) when
             send_error(Reason)
     end.
 
-delete_doc(IndexName, DocId, UpdateSeq) when
-    is_binary(IndexName), is_binary(DocId)
+delete_doc(#index{} = Index, DocId, UpdateSeq) when
+    is_binary(DocId), is_integer(UpdateSeq)
 ->
     ReqBody = {[{<<"seq">>, UpdateSeq}]},
     Resp = send_if_enabled(
-        doc_url(IndexName, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
+        doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
     ),
     case Resp of
         {ok, "204", _, _} ->
@@ -105,12 +102,12 @@ delete_doc(IndexName, DocId, UpdateSeq) when
             send_error(Reason)
     end.
 
-update_doc(IndexName, DocId, UpdateSeq, Fields) when
-    is_binary(IndexName), is_binary(DocId), is_integer(UpdateSeq), is_list(Fields)
+update_doc(#index{} = Index, DocId, UpdateSeq, Fields) when
+    is_binary(DocId), is_integer(UpdateSeq), is_list(Fields)
 ->
     ReqBody = {[{<<"seq">>, UpdateSeq}, {<<"fields">>, Fields}]},
     Resp = send_if_enabled(
-        doc_url(IndexName, DocId), [?JSON_CONTENT_TYPE], put, jiffy:encode(ReqBody)
+        doc_url(Index, DocId), [?JSON_CONTENT_TYPE], put, jiffy:encode(ReqBody)
     ),
     case Resp of
         {ok, "204", _, _} ->
@@ -121,11 +118,9 @@ update_doc(IndexName, DocId, UpdateSeq, Fields) when
             send_error(Reason)
     end.
 
-search(IndexName, QueryArgs) when
-    is_binary(IndexName)
-->
+search(#index{} = Index, QueryArgs) ->
     Resp = send_if_enabled(
-        search_url(IndexName), [?JSON_CONTENT_TYPE], post, jiffy:encode(QueryArgs)
+        search_url(Index), [?JSON_CONTENT_TYPE], post, jiffy:encode(QueryArgs)
     ),
     case Resp of
         {ok, "200", _, RespBody} ->
@@ -138,21 +133,38 @@ search(IndexName, QueryArgs) when
 
 %% private functions
 
-index_url(IndexName) ->
+%% duplicate name :(
+index_path(Path) ->
     lists:flatten(
         io_lib:format(
             "~s/index/~s",
-            [nouveau_util:nouveau_url(), couch_util:url_encode(IndexName)]
+            [
+                nouveau_util:nouveau_url(),
+                couch_util:url_encode(Path)
+            ]
         )
     ).
 
-doc_url(IndexName, DocId) ->
+index_url(#index{} = Index) ->
     lists:flatten(
         io_lib:format(
-            "~s/index/~s/doc/~s",
+            "~s/~B/index/~s",
             [
                 nouveau_util:nouveau_url(),
-                couch_util:url_encode(IndexName),
+                Index#index.lucene_major,
+                couch_util:url_encode(nouveau_util:index_path(Index))
+            ]
+        )
+    ).
+
+doc_url(#index{} = Index, DocId) ->
+    lists:flatten(
+        io_lib:format(
+            "~s/~B/index/~s/doc/~s",
+            [
+                nouveau_util:nouveau_url(),
+                Index#index.lucene_major,
+                couch_util:url_encode(nouveau_util:index_path(Index)),
                 couch_util:url_encode(DocId)
             ]
         )
