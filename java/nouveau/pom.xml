@@ -52,7 +52,7 @@
   </dependencyManagement>
 
   <modules>
-    <module>api</module>
+    <module>base</module>
     <module>lucene4</module>
     <module>lucene9</module>
     <module>server</module>

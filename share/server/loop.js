@@ -25,12 +25,23 @@ function create_sandbox(sandbox_option) {
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
-    sandbox.index = sandbox_option === 'nouveau'? Nouveau.index : Dreyfus.index;
+    sandbox.index = choose_index_function(sandbox_option);
   } catch (e) {
     var sandbox = {};
   }
   return sandbox;
 };
+
+function choose_index_function(sandbox_option) {
+  switch(sandbox_option) {
+    case 'nouveau4':
+      return Nouveau.index4;
+    case 'nouveau9':
+      return Nouveau.index9;
+    default:
+      return Dreyfus.index;
+  }
+}
 
 function create_filter_sandbox() {
   var sandbox = create_sandbox();
@@ -48,7 +59,7 @@ var DDoc = (function() {
     "lists"     : Render.list,
     "shows"    : Render.show,
     "filters"   : Filter.filter,
-    "views"     : Filter.filter_view, 
+    "views"     : Filter.filter_view,
     "updates"  : Render.update,
     "validate_doc_update" : Validate.validate,
     "rewrites"  : Render.rewrite

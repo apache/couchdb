@@ -351,8 +351,7 @@ convert_to_nouveau_string_field([Name, Value, []]) when is_binary(Name), is_bina
     {[
         {<<"@type">>, <<"string">>},
         {<<"name">>, Name},
-        {<<"value">>, Value},
-        {<<"stored">>, false}
+        {<<"value">>, Value}
     ]}.
 
 convert_nouveau_fields([]) ->
@@ -362,24 +361,17 @@ convert_nouveau_fields([{Name, <<"string">>, Value} | Rest]) ->
         {[
             {<<"@type">>, <<"text">>},
             {<<"name">>, Name},
-            {<<"value">>, Value},
-            {<<"stored">>, false}
+            {<<"value">>, Value}
         ]},
     [Field | convert_nouveau_fields(Rest)];
 convert_nouveau_fields([{Name, <<"number">>, Value} | Rest]) ->
-    PointField =
+    Field =
         {[
-            {<<"@type">>, <<"double_point">>},
+            {<<"@type">>, <<"double">>},
             {<<"name">>, Name},
             {<<"value">>, Value}
         ]},
-    DocValuesField =
-        {[
-            {<<"@type">>, <<"double_dv">>},
-            {<<"name">>, Name},
-            {<<"value">>, Value}
-        ]},
-    [PointField, DocValuesField | convert_nouveau_fields(Rest)];
+    [Field | convert_nouveau_fields(Rest)];
 convert_nouveau_fields([{Name, <<"boolean">>, true} | Rest]) ->
     Field =
         {[

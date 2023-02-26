@@ -28,10 +28,10 @@
 
   <dependencies>
 
-    <!-- API -->
+    <!-- Base -->
     <dependency>
       <groupId>org.apache.couchdb.nouveau</groupId>
-      <artifactId>api</artifactId>
+      <artifactId>base</artifactId>
       <version>${project.version}</version>
     </dependency>
 
@@ -135,6 +135,8 @@
           <executable>java</executable>
           <arguments>
             <arguments>-server</arguments>
+            <argument>-Dnouveau.bundle.4=file://${user.home}/.m2/repository/org/apache/couchdb/nouveau/lucene4/${project.version}/lucene4-${project.version}-dist.jar</argument>
+            <argument>-Dnouveau.bundle.9=file://${user.home}/.m2/repository/org/apache/couchdb/nouveau/lucene9/${project.version}/lucene9-${project.version}-dist.jar</argument>
             <argument>-classpath</argument>
             <classpath/>
             <argument>org.apache.couchdb.nouveau.NouveauApplication</argument>
