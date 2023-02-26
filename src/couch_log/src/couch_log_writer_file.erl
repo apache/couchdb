@@ -107,8 +107,11 @@ maybe_reopen(St) ->
     } = St,
     Now = os:timestamp(),
     case timer:now_diff(Now, LastCheck) > ?CHECK_INTERVAL of
-        true -> reopen(St);
-        false -> {ok, St}
+        true ->
+            NewSt = St#st{last_check = Now},
+            reopen(NewSt);
+        false ->
+            {ok, St}
     end.
 
 reopen(St) ->
