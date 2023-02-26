@@ -29,7 +29,7 @@
     last_check
 }).
 
--define(CHECK_INTERVAL, 30000000).
+-define(CHECK_INTERVAL, 30000).
 
 -ifdef(TEST).
 -export([
