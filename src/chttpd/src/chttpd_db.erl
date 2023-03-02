@@ -308,9 +308,11 @@ handle_compact_req(#httpd{method = 'POST'} = Req, Db) ->
 handle_compact_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
-handle_view_cleanup_req(Req, Db) ->
+handle_view_cleanup_req(#httpd{method = 'POST'} = Req, Db) ->
     ok = fabric:cleanup_index_files_all_nodes(Db),
-    send_json(Req, 202, {[{ok, true}]}).
+    send_json(Req, 202, {[{ok, true}]});
+handle_view_cleanup_req(Req, _Db) ->
+    send_method_not_allowed(Req, "POST").
 
 handle_partition_req(#httpd{path_parts = [_, _]} = _Req, _Db) ->
     throw({bad_request, invalid_partition_req});
