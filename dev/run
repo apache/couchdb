@@ -686,8 +686,8 @@ def set_boot_env(ctx):
     qs_javascript = toposixpath("%s %s" % (couchjs, mainjs))
     qs_coffescript = toposixpath("%s %s" % (couchjs, coffeejs))
 
-    qs_deno = toposixpath("%s %s" % ("deno run --allow-write", denojs))
-
+    deno_cmd = f"deno run --allow-write=- --allow-read=-,{denojs}"
+    qs_deno = toposixpath("%s %s" % (deno_cmd, denojs))
     os.environ["COUCHDB_QUERY_SERVER_JAVASCRIPT"] = qs_javascript
     os.environ["COUCHDB_QUERY_SERVER_COFFEESCRIPT"] = qs_coffescript
 
