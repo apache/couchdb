@@ -104,8 +104,12 @@ defmodule UsersDbTest do
   test "users db", context do
     db_name = context[:db_name]
     # test that the users db is born with the auth ddoc
-    ddoc = Couch.get("/#{@users_db_name}/_design/_auth")
-    assert ddoc.body["validate_doc_update"] != nil
+    get_ddoc = fn ->
+         ddoc = Couch.get("/#{@users_db_name}/_design/_auth")
+         ddoc.body["validate_doc_update"]
+    end
+    retry_until(fn -> get_ddoc.() != nil end)
+    assert get_ddoc.() != nil
 
     jchris_user_doc =
       prepare_user_doc([
