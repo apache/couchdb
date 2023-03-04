@@ -195,7 +195,7 @@ drain_refresh_messages() ->
 
 update_refresh_timer() ->
     drain_refresh_messages(),
-    RefreshTime = 1000 * config:get_integer("couch_prometheus", "interval", ?REFRESH_INTERVAL),
+    RefreshTime = 1000 * config:get_integer("prometheus", "interval", ?REFRESH_INTERVAL),
     erlang:send_after(RefreshTime, self(), refresh).
 
 -ifdef(TEST).
