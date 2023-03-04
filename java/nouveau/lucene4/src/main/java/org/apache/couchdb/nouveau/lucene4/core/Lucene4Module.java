@@ -29,6 +29,7 @@ public class Lucene4Module extends SimpleModule {
         addDeserializer(IndexableField.class, new IndexableFieldDeserializer());
 
         // Query
+        addSerializer(Query.class, new QuerySerializer());
         addDeserializer(Query.class, new QueryDeserializer());
     }
 
