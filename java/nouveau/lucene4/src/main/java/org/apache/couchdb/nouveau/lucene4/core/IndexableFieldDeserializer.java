@@ -16,6 +16,8 @@ package org.apache.couchdb.nouveau.lucene4.core;
 import java.io.IOException;
 
 import org.apache.lucene.document.DoubleField;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.document.StringField;
@@ -55,6 +57,10 @@ class IndexableFieldDeserializer extends StdDeserializer<IndexableField> {
                 return new StringField(name, node.get("value").asText(), asStore(node));
             case "text":
                 return new TextField(name, node.get("value").asText(), asStore(node));
+            case "sorted_dv":
+                return new SortedDocValuesField(name, bytesRef(node));
+            case "sorted_set_dv":
+                return new SortedSetDocValuesField(name, bytesRef(node));
             case "stored":
                 if (node.get("value").isDouble()) {
                     return new StoredField(name, node.get("value").asDouble());
@@ -77,6 +83,14 @@ class IndexableFieldDeserializer extends StdDeserializer<IndexableField> {
             return node.get("stored").asBoolean() ? Store.YES : Store.NO;
         }
         return Store.NO;
+    }
+
+    private BytesRef bytesRef(final JsonNode node) throws IOException {
+        final JsonNode value = node.get("value");
+        if (node.has("encoded") && node.get("encoded").asBoolean()) {
+            return new BytesRef(value.binaryValue());
+        }
+        return new BytesRef(value.asText());
     }
 
 }

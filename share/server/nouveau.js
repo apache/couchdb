@@ -68,7 +68,7 @@ var Nouveau = (function () {
           case 'string':
             index_results.push({ '@type': 'text', 'name': name, 'value': value, 'stored': options.store || false });
             if (options.facet) {
-              // EEK SortedSetDocValuesFacetFields wtf omg
+              index_results.push({ '@type': 'sorted_set_dv', 'name': '$facets_sorted_doc_values', 'value': name + '\u001F' + value});
             }
             break;
         }
