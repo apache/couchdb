@@ -85,6 +85,8 @@ setup_prometheus(WithAdditionalPort) ->
     % It's already started by default, so restart to pick up config
     ok = application:stop(couch_prometheus),
     ok = application:start(couch_prometheus),
+    % Flush so that stats aggregator starts using the new, shorter interval
+    couch_stats_aggregator:flush(),
     Ctx.
 
 t_chttpd_port(Port) ->
