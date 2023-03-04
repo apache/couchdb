@@ -291,6 +291,12 @@ test_limits([{max_lifetime, N}], {ok, LRU}) ->
             "Entry was expired",
             ?_test(begin
                 timer:sleep(round(N * 1.5)),
+                test_util:wait(fun() ->
+                    case ets_lru:lookup(LRU, foo) of
+                        not_found -> ok;
+                        _ -> wait
+                    end
+                end),
                 ?assertEqual(not_found, ets_lru:lookup(LRU, foo))
             end)
         }
