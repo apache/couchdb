@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.lucene9.core;
 
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.search.Query;
 
 import com.fasterxml.jackson.core.Version;
 
@@ -27,6 +28,10 @@ public class Lucene9Module extends SimpleModule {
         // IndexableField
         addDeserializer(IndexableField.class, new IndexableFieldDeserializer());
         addDeserializer(IndexableField.class, new IndexableFieldDeserializer());
+
+        // Query
+        addSerializer(Query.class, new QuerySerializer());
+        addDeserializer(Query.class, new QueryDeserializer());
     }
 
 }
