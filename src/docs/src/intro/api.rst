@@ -613,8 +613,8 @@ easy to make)::
 
 Now we can use the database `albums-replica` as a replication target::
 
-    curl -vX POST http://admin:password@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://127.0.0.1:5984/albums","target":"http://127.0.0.1:5984/albums-replica"}' \
+    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://adm:pass@127.0.0.1:5984/albums","target":"http://adm:pass@127.0.0.1:5984/albums-replica"}' \
          -H "Content-Type: application/json"
 
 .. note::
@@ -632,22 +632,27 @@ easily):
 .. code-block:: javascript
 
     {
+        "ok": true,
+        "session_id": "30bb4ac013ca69369c0f32be78864d6e",
+        "source_last_seq": "2-g1AAAACTeJzLYWBgYMpgTmHgz8tPSTV0MDQy1zMAQsMckEQiQ1L9____szKYExlzgQLsBiaphqYpSZjKcRqRxwIkGRqA1H8Uk4wszJIskg0wdWUBAFHwJD4",
+        "replication_id_version": 4,
         "history": [
             {
+                "session_id": "30bb4ac013ca69369c0f32be78864d6e",
+                "start_time": "Sun, 05 Mar 2023 20:30:26 GMT",
+                "end_time": "Sun, 05 Mar 2023 20:30:29 GMT",
                 "start_last_seq": 0,
+                "end_last_seq": "2-g1AAAACTeJzLYWBgYMpgTmHgz8tPSTV0MDQy1zMAQsMckEQiQ1L9____szKYExlzgQLsBiaphqYpSZjKcRqRxwIkGRqA1H8Uk4wszJIskg0wdWUBAFHwJD4",
+                "recorded_seq": "2-g1AAAACTeJzLYWBgYMpgTmHgz8tPSTV0MDQy1zMAQsMckEQiQ1L9____szKYExlzgQLsBiaphqYpSZjKcRqRxwIkGRqA1H8Uk4wszJIskg0wdWUBAFHwJD4",
+                "missing_checked": 2,
                 "missing_found": 2,
                 "docs_read": 2,
-                "end_last_seq": 5,
-                "missing_checked": 2,
                 "docs_written": 2,
                 "doc_write_failures": 0,
-                "end_time": "Sat, 11 Jul 2009 17:36:21 GMT",
-                "start_time": "Sat, 11 Jul 2009 17:36:20 GMT"
+                "bulk_get_docs": 2,
+                "bulk_get_attempts": 2
             }
-        ],
-        "source_last_seq": 5,
-        "session_id": "924e75e914392343de89c99d29d06671",
-        "ok": true
+        ]
     }
 
 CouchDB maintains a *session history* of replications. The response for a
@@ -660,8 +665,8 @@ replication replicates the database only as it was at the point in time
 when replication was started. So, any additions, modifications,
 or deletions subsequent to the start of replication will not be replicated.
 
-We'll punt on the details again -- the ``"ok": true`` at the end tells us all
-went well. If you now have a look at the albums-replica database,
+We'll punt on the details again -- the ``"ok": true`` at the beginning tells
+us all went well. If you now have a look at the albums-replica database,
 you should see all the documents that you created in the albums database.
 Neat, eh?
 
@@ -676,8 +681,8 @@ and target members of our replication request are actually links (like in
 HTML) and so far we've seen links relative to the server we're working on
 (hence local). You can also specify a remote database as the target::
 
-    curl -vX POST http://admin:password@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://127.0.0.1:5984/albums","target":"http://example.org:5984/albums-replica"}' \
+    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://adm:pass@127.0.0.1:5984/albums","target":"http://user:password@example.org:5984/albums-replica"}' \
          -H "Content-Type:application/json"
 
 Using a *local source* and a *remote target* database is called *push
@@ -695,16 +700,16 @@ You can also use a *remote source* and a *local target* to do a *pull
 replication*. This is great for getting the latest changes from a server that
 is used by others::
 
-    curl -vX POST http://admin:password@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://example.org:5984/albums-replica","target":"http://127.0.0.1:5984/albums"}' \
+    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://user:password@example.org:5984/albums-replica","target":"http://adm:pass@127.0.0.1:5984/albums"}' \
          -H "Content-Type:application/json"
 
 Finally, you can run remote replication, which is mostly useful for management
 operations::
 
-    curl -vX POST http://admin:password@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://example.org:5984/albums","target":"http://example.org:5984/albums-replica"}' \
-         -H"Content-Type: application/json"
+    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://user:password@example.org:5984/albums","target":"http://user:password@example.org:5984/albums-replica"}' \
+         -H "Content-Type: application/json"
 
 .. note::
     **CouchDB and REST**

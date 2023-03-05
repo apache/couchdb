@@ -56,17 +56,17 @@ Let's say you POST the following document into ``_replicator``:
 
     {
         "_id": "my_rep",
-        "source": "http://myserver.com/foo",
+        "source": "http://user:password@myserver.com/foo",
         "target": {
             "url": "http://localhost:5984/bar",
             "auth": {
                 "basic": {
-                    "username": "user",
+                    "username": "adm",
                     "password": "pass"
                 }
             }
         },
-        "create_target":  true,
+        "create_target": true,
         "continuous": true
     }
 
@@ -181,17 +181,17 @@ For example, POST-ing this document
 
     {
         "_id": "my_rep_crashing",
-        "source": "http://myserver.com/missing",
+        "source": "http://user:password@myserver.com/missing",
         "target": {
             "url": "http://localhost:5984/bar",
             "auth": {
                 "basic": {
-                    "username": "user",
+                    "username": "adm",
                     "password": "pass"
                 }
             }
         },
-        "create_target":  true,
+        "create_target": true,
         "continuous": true
     }
 
@@ -252,16 +252,16 @@ normal.
 Documents describing the same replication
 =========================================
 
-Lets suppose 2 documents are added to the ``_replicator`` database in
+Let's suppose 2 documents are added to the ``_replicator`` database in
 the following order:
 
 .. code-block:: javascript
 
     {
         "_id": "my_rep",
-        "source": "http://myserver.com/foo",
-        "target":  "http://user:pass@localhost:5984/bar",
-        "create_target":  true,
+        "source": "http://user:password@myserver.com/foo",
+        "target": "http://adm:pass@localhost:5984/bar",
+        "create_target": true,
         "continuous": true
     }
 
@@ -271,9 +271,9 @@ and
 
     {
         "_id": "my_rep_dup",
-        "source": "http://myserver.com/foo",
-        "target":  "http://user:pass@localhost:5984/bar",
-        "create_target":  true,
+        "source": "http://user:password@myserver.com/foo",
+        "target": "http://adm:pass@localhost:5984/bar",
+        "create_target": true,
         "continuous": true
     }
 
@@ -517,34 +517,34 @@ which represent pull replications from servers A and B:
 
     {
         "_id": "rep_from_A",
-        "source":  "http://aserver.com:5984/foo",
+        "source": "http://user:password@aserver.com:5984/foo",
         "target": {
             "url": "http://localhost:5984/foo_a",
             "auth": {
                 "basic": {
-                    "username": "user",
+                    "username": "adm",
                     "password": "pass"
                 }
             }
         },
-        "continuous":  true
+        "continuous": true
     }
 
 .. code-block:: javascript
 
     {
         "_id": "rep_from_B",
-        "source":  "http://bserver.com:5984/foo",
+        "source": "http://user:password@bserver.com:5984/foo",
         "target": {
             "url": "http://localhost:5984/foo_b",
             "auth": {
                 "basic": {
-                    "username": "user",
+                    "username": "adm",
                     "password": "pass"
                 }
             }
         },
-        "continuous":  true
+        "continuous": true
     }
 
 Now without stopping and restarting CouchDB, add another replicator
@@ -552,11 +552,11 @@ database. For example ``another/_replicator``:
 
 .. code-block:: bash
 
-    $ curl -X PUT http://user:pass@localhost:5984/another%2F_replicator/
+    $ curl -X PUT http://adm:pass@localhost:5984/another%2F_replicator/
     {"ok":true}
 
 .. note::
-   A / character in a database name, when used in a URL, should be escaped.
+   A ``/`` (%2F) character in a database name, when used in a URL, should be escaped.
 
 Then add a replication document to the new replicator database:
 
@@ -564,9 +564,9 @@ Then add a replication document to the new replicator database:
 
     {
         "_id": "rep_from_X",
-        "source":  "http://xserver.com:5984/foo",
-        "target":  "http://user:pass@localhost:5984/foo_x",
-        "continuous":  true
+        "source": "http://user:password@xserver.com:5984/foo",
+        "target": "http://adm:pass@localhost:5984/foo_x",
+        "continuous": true
     }
 
 From now on, there are three replications active in the system: two
@@ -576,7 +576,7 @@ Then remove the additional replicator database:
 
 .. code-block:: bash
 
-    $ curl -X DELETE http://user:pass@localhost:5984/another%2F_replicator/
+    $ curl -X DELETE http://adm:pass@localhost:5984/another%2F_replicator/
     {"ok":true}
 
 After this operation, replication pulling from server X will be stopped
@@ -633,18 +633,18 @@ following pull replication documents in it:
 
     {
          "_id": "rep_from_A",
-         "source":  "http://aserver.com:5984/foo",
-         "target":  "http://user:pass@localhost:5984/foo_a",
-         "continuous":  true
+         "source": "http://user:password@aserver.com:5984/foo",
+         "target": "http://adm:pass@localhost:5984/foo_a",
+         "continuous": true
     }
 
 .. code-block:: javascript
 
     {
          "_id": "rep_from_B",
-         "source":  "http://bserver.com:5984/foo",
-         "target":  "http://user:pass@localhost:5984/foo_b",
-         "continuous":  true
+         "source": "http://user:password@bserver.com:5984/foo",
+         "target": "http://adm:pass@localhost:5984/foo_b",
+         "continuous": true
     }
 
 Now you would like to have the same pull replications going on in server
@@ -697,9 +697,9 @@ Example delegated replication document:
 
     {
         "_id": "my_rep",
-        "source":  "http://bserver.com:5984/foo",
-        "target":  "http://user:pass@localhost:5984/bar",
-        "continuous":  true,
+        "source": "http://user:password@bserver.com:5984/foo",
+        "target": "http://adm:pass@localhost:5984/bar",
+        "continuous": true,
         "user_ctx": {
             "name": "joe",
             "roles": ["erlanger", "researcher"]
@@ -770,7 +770,7 @@ There are multiple ways to specify usernames and passwords for replication endpo
     .. code-block:: javascript
 
         {
-            "target":  "http://user:pass@localhost:5984/bar"
+            "target": "http://adm:pass@localhost:5984/bar"
             ...
         }
 

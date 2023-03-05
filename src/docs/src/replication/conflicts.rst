@@ -270,7 +270,7 @@ Here's how to use it to find all conflicts in a database:
 
 .. code-block:: bash
 
-    $ curl -X POST http://127.0.0.1/dbname/_find \
+    $ curl -X POST http://adm:pass@127.0.0.1:5984/dbname/_find \
         -d '{"selector": {"_conflicts": { "$exists": true}}, "conflicts": true}' \
         -Hcontent-type:application/json
 
@@ -289,7 +289,7 @@ index to speed the query:
 
 .. code-block:: bash
 
-    $ curl -X POST http://127.0.0.1/dbname/_index \
+    $ curl -X POST http://adm:pass@127.0.0.1:5984/dbname/_index \
         -d '{"index":{"fields": ["_conflicts"]}}' \
         -Hcontent-type:application/json
 
@@ -307,7 +307,7 @@ to determine for each document whether it is in a conflicting state:
 
 .. code-block:: bash
 
-    $ curl 'http://127.0.0.1:5984/conflict_test/_all_docs?include_docs=true&conflicts=true'
+    $ curl 'http://adm:pass@127.0.0.1:5984/conflict_test/_all_docs?include_docs=true&conflicts=true'
 
 .. code-block:: javascript
 
@@ -330,7 +330,7 @@ to determine for each document whether it is in a conflicting state:
 
 .. code-block:: bash
 
-    $ curl 'http://127.0.0.1:5984/conflict_test/test?conflicts=true'
+    $ curl 'http://adm:pass@127.0.0.1:5984/conflict_test/test?conflicts=true'
 
 .. code-block:: javascript
 
