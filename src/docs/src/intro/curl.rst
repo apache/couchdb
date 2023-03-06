@@ -60,8 +60,7 @@ clarity):
         shell> curl 'http://couchdb:5984/_uuids?count=5'
 
 .. note::
-    On Microsoft Windows, use double-quotes anywhere you see single-quotes in
-    the following examples. Use doubled double-quotes ("") anywhere you see
+    On Microsoft Windows, use doubled double-quotes ("") anywhere you see
     single double-quotes. For example, if you see:
 
     .. code-block:: bash
