@@ -76,6 +76,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
                 .build();
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
+        indexManager.setLockCount(configuration.getLockCount());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());
