@@ -56,6 +56,8 @@ public final class IndexManager implements Managed {
 
     private int idleSeconds;
 
+    private int lockCount;
+
     private Path rootDir;
 
     private ObjectMapper objectMapper;
@@ -280,6 +282,14 @@ public final class IndexManager implements Managed {
         this.idleSeconds = idleSeconds;
     }
 
+    public int getLockCount() {
+        return lockCount;
+    }
+
+    public void setLockCount(int lockCount) {
+        this.lockCount = lockCount;
+    }
+
     public Path getRootDir() {
         return rootDir;
     }
@@ -299,7 +309,6 @@ public final class IndexManager implements Managed {
     @Override
     @SuppressWarnings("rawtypes")
     public void start() throws IOException {
-        final int lockCount = Math.max(1000, maxIndexesOpen / 10);
         locks = new ReadWriteLock[lockCount];
         for (int i = 0; i < locks.length; i++) {
             locks[i] = new ReentrantReadWriteLock();
