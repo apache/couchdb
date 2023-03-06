@@ -15,24 +15,11 @@ package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.POST;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
 
-import com.codahale.metrics.annotation.Timed;
-
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
 public abstract class BaseAnalyzeResource {
 
-    @POST
-    @Timed
-    public abstract AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest analyzeRequest) throws IOException;
+    public abstract AnalyzeResponse analyzeText(AnalyzeRequest analyzeRequest) throws IOException;
 
 }

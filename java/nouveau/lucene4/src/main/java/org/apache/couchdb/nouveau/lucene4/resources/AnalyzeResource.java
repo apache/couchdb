@@ -19,9 +19,13 @@ import java.util.List;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.MediaType;
 
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
@@ -31,10 +35,20 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
+import com.codahale.metrics.annotation.ExceptionMetered;
+import com.codahale.metrics.annotation.Metered;
+import com.codahale.metrics.annotation.ResponseMetered;
+
 @Path("/4/analyze")
+@Metered
+@ResponseMetered
+@ExceptionMetered(cause = IOException.class)
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
 public class AnalyzeResource extends BaseAnalyzeResource {
 
     @Override
+    @POST
     public AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest request) throws IOException {
         try {
             final List<String> tokens = tokenize(Lucene4AnalyzerFactory.newAnalyzer(request.getAnalyzer()),
