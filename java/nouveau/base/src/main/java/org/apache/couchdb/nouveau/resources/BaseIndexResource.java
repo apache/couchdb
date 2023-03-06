@@ -17,15 +17,6 @@ import java.io.IOException;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.PUT;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
 
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
@@ -37,10 +28,6 @@ import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.couchdb.nouveau.core.IndexManager;
 
-import com.codahale.metrics.annotation.Timed;
-
-@Consumes(MediaType.APPLICATION_JSON)
-@Produces(MediaType.APPLICATION_JSON)
 public abstract class BaseIndexResource<T> {
 
     protected final IndexManager indexManager;
@@ -49,9 +36,8 @@ public abstract class BaseIndexResource<T> {
         this.indexManager = indexManager;
     }
 
-    @GET
     @SuppressWarnings("unchecked")
-    public final IndexInfo indexInfo(@PathParam("name") String name)
+    public IndexInfo indexInfo(String name)
             throws Exception {
         final Index<T> index = indexManager.acquire(name, indexLoader());
         try {
@@ -61,22 +47,17 @@ public abstract class BaseIndexResource<T> {
         }
     }
 
-    @DELETE
-    public final void deletePath(@PathParam("name") String path) throws IOException {
+    public void deletePath(String path) throws IOException {
         indexManager.deleteAll(path);
     }
 
-    @PUT
-    public final void createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
+    public void createIndex(String name, @NotNull @Valid IndexDefinition indexDefinition)
             throws IOException {
         indexManager.create(name, indexDefinition);
     }
 
-    @DELETE
-    @Timed
-    @Path("/doc/{docId}")
     @SuppressWarnings("unchecked")
-    public final void deleteDoc(@PathParam("name") String name, @PathParam("docId") String docId,
+    public void deleteDoc(String name, String docId,
             @NotNull @Valid final DocumentDeleteRequest request)
             throws Exception {
         final Index<T> index = indexManager.acquire(name, indexLoader());
@@ -87,11 +68,8 @@ public abstract class BaseIndexResource<T> {
         }
     }
 
-    @PUT
-    @Timed
-    @Path("/doc/{docId}")
     @SuppressWarnings("unchecked")
-    public final void updateDoc(@PathParam("name") String name, @PathParam("docId") String docId,
+    public void updateDoc(String name, String docId,
             @NotNull @Valid final DocumentUpdateRequest<T> request)
             throws Exception {
         final Index<T> index = indexManager.acquire(name, indexLoader());
@@ -102,11 +80,8 @@ public abstract class BaseIndexResource<T> {
         }
     }
 
-    @POST
-    @Timed
-    @Path("/search")
     @SuppressWarnings("unchecked")
-    public final SearchResults<T> searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest request)
+    public SearchResults<T> searchIndex(String name, @NotNull @Valid SearchRequest request)
             throws Exception {
         final Index<T> index = indexManager.acquire(name, indexLoader());
         try {
