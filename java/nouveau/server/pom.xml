@@ -56,10 +56,6 @@
     </dependency>
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-caffeine</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
       <artifactId>metrics-jersey2</artifactId>
     </dependency>
 

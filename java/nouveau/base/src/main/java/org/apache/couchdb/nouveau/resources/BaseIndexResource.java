@@ -24,7 +24,6 @@ import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
-import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.couchdb.nouveau.core.IndexManager;
 
@@ -39,12 +38,9 @@ public abstract class BaseIndexResource<T> {
     @SuppressWarnings("unchecked")
     public IndexInfo indexInfo(String name)
             throws Exception {
-        final Index<T> index = indexManager.acquire(name, indexLoader());
-        try {
+        return indexManager.with(name, indexLoader(), (index) -> {
             return index.info();
-        } finally {
-            indexManager.release(name, index);
-        }
+        });
     }
 
     public void deletePath(String path) throws IOException {
@@ -60,35 +56,28 @@ public abstract class BaseIndexResource<T> {
     public void deleteDoc(String name, String docId,
             @NotNull @Valid final DocumentDeleteRequest request)
             throws Exception {
-        final Index<T> index = indexManager.acquire(name, indexLoader());
-        try {
+        indexManager.with(name, indexLoader(), (index) -> {
             index.delete(docId, request);
-        } finally {
-            indexManager.release(name, index);
-        }
+            return null;
+        });
     }
 
     @SuppressWarnings("unchecked")
     public void updateDoc(String name, String docId,
             @NotNull @Valid final DocumentUpdateRequest<T> request)
             throws Exception {
-        final Index<T> index = indexManager.acquire(name, indexLoader());
-        try {
+        indexManager.with(name, indexLoader(), (index) -> {
             index.update(docId, request);
-        } finally {
-            indexManager.release(name, index);
-        }
+            return null;
+        });
     }
 
     @SuppressWarnings("unchecked")
     public SearchResults<T> searchIndex(String name, @NotNull @Valid SearchRequest request)
             throws Exception {
-        final Index<T> index = indexManager.acquire(name, indexLoader());
-        try {
+        return indexManager.with(name, indexLoader(), (index) -> {
             return index.search(request);
-        } finally {
-            indexManager.release(name, index);
-        }
+        });
     }
 
     protected abstract IndexLoader<T> indexLoader();

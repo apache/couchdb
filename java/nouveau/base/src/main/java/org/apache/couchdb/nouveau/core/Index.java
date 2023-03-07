@@ -26,28 +26,23 @@ import org.apache.couchdb.nouveau.api.SearchResults;
 public abstract class Index<T> implements Closeable {
 
     private long updateSeq;
-
     private boolean deleteOnClose = false;
-
-    private int refCount = 1;
-
-    private long lastUsed = now();
+    private long lastCommit = now();
 
     protected Index(final long updateSeq) {
         this.updateSeq = updateSeq;
     }
 
     public final IndexInfo info() throws IOException {
-        updateLastUsed();
         final int numDocs = doNumDocs();
         return new IndexInfo(updateSeq, numDocs);
     }
 
     protected abstract int doNumDocs() throws IOException;
 
-    public final synchronized void update(final String docId, final DocumentUpdateRequest<T> request) throws IOException {
+    public final synchronized void update(final String docId, final DocumentUpdateRequest<T> request)
+            throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
-        updateLastUsed();
         doUpdate(docId, request);
         incrementUpdateSeq(request.getSeq());
     }
@@ -56,7 +51,6 @@ public abstract class Index<T> implements Closeable {
 
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
-        updateLastUsed();
         doDelete(docId, request);
         incrementUpdateSeq(request.getSeq());
     }
@@ -64,7 +58,6 @@ public abstract class Index<T> implements Closeable {
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults<T> search(final SearchRequest request) throws IOException {
-        updateLastUsed();
         return doSearch(request);
     }
 
@@ -75,14 +68,19 @@ public abstract class Index<T> implements Closeable {
         synchronized (this) {
             updateSeq = this.updateSeq;
         }
-        return doCommit(updateSeq);
+        boolean result = doCommit(updateSeq);
+        final long now = now();
+        synchronized (this) {
+            this.lastCommit = now;
+        }
+        return result;
     }
 
     protected abstract boolean doCommit(final long updateSeq) throws IOException;
 
     @Override
     public final void close() throws IOException {
-        decRef();
+        doClose();
     }
 
     protected abstract void doClose() throws IOException;
@@ -98,44 +96,24 @@ public abstract class Index<T> implements Closeable {
     }
 
     protected final void assertUpdateSeqIsLower(final long updateSeq) throws UpdatesOutOfOrderException {
+        assert Thread.holdsLock(this);
         if (!(updateSeq > this.updateSeq)) {
             throw new UpdatesOutOfOrderException();
         }
     }
 
     protected final void incrementUpdateSeq(final long updateSeq) throws IOException {
+        assert Thread.holdsLock(this);
         assertUpdateSeqIsLower(updateSeq);
         this.updateSeq = updateSeq;
     }
 
-    private synchronized void updateLastUsed() {
-        this.lastUsed = now();
-    }
-
-    public final synchronized void incRef() {
-        // zero is forever.
-        if (refCount > 0) {
-            refCount++;
-        }
-    }
-
-    public final synchronized int getRefCount() {
-        return refCount;
-    }
-
-    public final boolean decRef() throws IOException {
-        boolean close;
+    public long secondsSinceLastCommit() {
+        final long lastCommit;
         synchronized (this) {
-            close = --refCount == 0;
+            lastCommit = this.lastCommit;
         }
-        if (close) {
-            doClose();
-        }
-        return close;
-    }
-
-    public synchronized long secondsSinceLastUse() {
-        return TimeUnit.NANOSECONDS.toMillis(now() - lastUsed);
+        return TimeUnit.NANOSECONDS.toMillis(now() - lastCommit);
     }
 
     private long now() {
