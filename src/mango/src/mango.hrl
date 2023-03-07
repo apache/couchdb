@@ -11,3 +11,12 @@
 % the License.
 
 -define(MANGO_ERROR(R), throw({mango_error, ?MODULE, R})).
+
+-type abstract_text_selector() :: {'op_and', [abstract_text_selector()]}
+				| {'op_or', [abstract_text_selector()]}
+				| {'op_not', {abstract_text_selector(), abstract_text_selector()}}
+				| {'op_not', {_, 'false'}}
+				| {'op_field', {iolist() | binary(), _}}
+				| {'op_fieldname', {_, _}}
+				| {'op_null', {_, _}}
+				| {'op_default', _}.

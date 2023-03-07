@@ -29,6 +29,10 @@
 -include("mango.hrl").
 -include("mango_idx.hrl").
 
+-ifdef(TEST).
+-import(test_util, [as_selector/1]).
+-endif.
+
 validate_new(#idx{} = Idx, Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
     maybe_reject_index_all_req(Def, Db),
@@ -127,6 +131,14 @@ columns(Idx) ->
                 )
     end.
 
+% Mind that `is_usable/3` is not about "what fields can be answered by
+% the index" but instead more along the lines of "this index will
+% ensure that all the documents that should be returned for the query
+% will be, because we checked that all the bits of the query that
+% imply `$exists` for a field are used when we check that the indexing
+% process will have included all the relevant documents in the index".
+-spec is_usable(#idx{}, SelectorObject, _) -> boolean() when
+    SelectorObject :: any().
 is_usable(_, Selector, _) when Selector =:= {[]} ->
     false;
 is_usable(Idx, Selector, _) ->
@@ -303,10 +315,15 @@ construct_analyzer({Props}) ->
             ]}
     end.
 
+-spec indexable_fields(SelectorObject) -> Fields when
+    SelectorObject :: any(),
+    Fields :: [binary()].
 indexable_fields(Selector) ->
     TupleTree = mango_selector_text:convert([], Selector),
     indexable_fields([], TupleTree).
 
+-spec indexable_fields(Fields, abstract_text_selector()) -> Fields when
+    Fields :: [binary()].
 indexable_fields(Fields, {op_and, Args}) when is_list(Args) ->
     lists:foldl(
         fun(Arg, Fields0) -> indexable_fields(Fields0, Arg) end,
@@ -454,4 +471,117 @@ warn_index_all({Idx, Db}) ->
         ?assertThrow({test_error, logged_warning}, validate_new(Idx, Db))
     end).
 
+indexable_fields_test() ->
+    ?assertEqual(
+        [<<"$default">>, <<"field1:boolean">>, <<"field2:number">>],
+        indexable_fields(
+            as_selector(
+                #{
+                    <<"$default">> => #{<<"$text">> => <<"text">>},
+                    <<"field1">> => true,
+                    <<"field2">> => 42,
+                    <<"field3">> => #{<<"$regex">> => <<".*">>}
+                }
+            )
+        )
+    ),
+    ?assertEqual(
+        [<<"f1:string">>, <<"f2:string">>, <<"f3:string">>, <<"f4:string">>, <<"f5:string">>],
+        lists:sort(
+            indexable_fields(
+                as_selector(
+                    #{
+                        <<"$and">> =>
+                            [
+                                #{<<"f1">> => <<"v1">>},
+                                #{<<"f2">> => <<"v2">>}
+                            ],
+                        <<"$or">> =>
+                            [
+                                #{<<"f3">> => <<"v3">>},
+                                #{<<"f4">> => <<"v4">>}
+                            ],
+                        <<"$not">> => #{<<"f5">> => <<"v5">>}
+                    }
+                )
+            )
+        )
+    ),
+
+    ?assertEqual(
+        [],
+        indexable_fields(
+            as_selector(
+                #{
+                    <<"field1">> => null,
+                    <<"field2">> => #{<<"$size">> => 3},
+                    <<"field3">> => #{<<"$type">> => <<"type">>}
+                }
+            )
+        )
+    ),
+    ?assertEqual(
+        [],
+        indexable_fields(
+            as_selector(
+                #{
+                    <<"$and">> =>
+                        [
+                            #{<<"f1">> => null},
+                            #{<<"f2">> => null}
+                        ],
+                    <<"$or">> =>
+                        [
+                            #{<<"f3">> => null},
+                            #{<<"f4">> => null}
+                        ],
+                    <<"$not">> => #{<<"f5">> => null}
+                }
+            )
+        )
+    ).
+
+is_usable_test() ->
+    ?assertNot(is_usable(undefined, {[]}, undefined)),
+
+    AllFieldsIndex = #idx{def = {[{<<"fields">>, <<"all_fields">>}]}},
+    ?assert(is_usable(AllFieldsIndex, undefined, undefined)),
+
+    Field1 = {[{<<"name">>, <<"field1">>}, {<<"type">>, <<"string">>}]},
+    Field2 = {[{<<"name">>, <<"field2">>}, {<<"type">>, <<"number">>}]},
+    Index = #idx{def = {[{<<"fields">>, [Field1, Field2]}]}},
+    ?assert(is_usable(Index, as_selector(#{<<"field1">> => <<"value">>}), undefined)),
+    ?assertNot(is_usable(Index, as_selector(#{<<"field1">> => 42}), undefined)),
+    ?assertNot(is_usable(Index, as_selector(#{<<"field3">> => true}), undefined)),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field1">> => #{<<"$type">> => <<"string">>}}), undefined)
+    ),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field1">> => #{<<"$type">> => <<"boolean">>}}), undefined)
+    ),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field3">> => #{<<"$type">> => <<"boolean">>}}), undefined)
+    ),
+    ?assert(is_usable(Index, as_selector(#{<<"field1">> => #{<<"$exists">> => true}}), undefined)),
+    ?assert(is_usable(Index, as_selector(#{<<"field1">> => #{<<"$exists">> => false}}), undefined)),
+    ?assert(is_usable(Index, as_selector(#{<<"field3">> => #{<<"$exists">> => true}}), undefined)),
+    ?assert(is_usable(Index, as_selector(#{<<"field3">> => #{<<"$exists">> => false}}), undefined)),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field1">> => #{<<"$regex">> => <<".*">>}}), undefined)
+    ),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field2">> => #{<<"$regex">> => <<".*">>}}), undefined)
+    ),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field3">> => #{<<"$regex">> => <<".*">>}}), undefined)
+    ),
+    ?assertNot(
+        is_usable(Index, as_selector(#{<<"field1">> => #{<<"$nin">> => [1, 2, 3]}}), undefined)
+    ),
+    ?assert(
+        is_usable(Index, as_selector(#{<<"field2">> => #{<<"$nin">> => [1, 2, 3]}}), undefined)
+    ),
+    ?assertNot(
+        is_usable(Index, as_selector(#{<<"field3">> => #{<<"$nin">> => [1, 2, 3]}}), undefined)
+    ).
 -endif.

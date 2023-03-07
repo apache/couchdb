@@ -21,13 +21,23 @@
 
 -include("mango.hrl").
 
+-ifdef(TEST).
+-import(test_util, [as_selector/1]).
+-endif.
+
 %% Regex for <<"\\.">>
 -define(PERIOD, "\\.").
 
+-spec convert(SelectorObject) -> LuceneQueryString when
+    SelectorObject :: any(),
+    LuceneQueryString :: binary().
 convert(Object) ->
     TupleTree = convert([], Object),
     iolist_to_binary(to_query(TupleTree)).
 
+-spec convert(CurrentPath, SelectorObject) -> abstract_text_selector() when
+    CurrentPath :: [binary()],
+    SelectorObject :: any().
 convert(Path, {[{<<"$and">>, Args}]}) ->
     Parts = [convert(Path, Arg) || Arg <- Args],
     {op_and, Parts};
@@ -208,6 +218,8 @@ to_query_nested(Args) ->
     FilterFun = fun(A) -> A =/= [] andalso A =/= "()" end,
     lists:filter(FilterFun, QueryArgs).
 
+-spec to_query(abstract_text_selector()) -> LuceneQueryStringPieces when
+    LuceneQueryStringPieces :: [binary()].
 to_query({op_and, []}) ->
     [];
 to_query({op_and, Args}) when is_list(Args) ->
@@ -418,3 +430,429 @@ replace_array_indexes([Part | Rest], NewPartsAcc, HasIntAcc) ->
         [NewPart | NewPartsAcc],
         HasInt or HasIntAcc
     ).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+convert_fields_test() ->
+    ?assertEqual(
+        {op_null, {[[<<"field">>], <<":">>, <<"null">>], <<"true">>}},
+        convert([], as_selector(#{<<"field">> => null}))
+    ),
+    ?assertEqual(
+        {op_field, {[[<<"field">>], <<":">>, <<"boolean">>], <<"true">>}},
+        convert([], as_selector(#{<<"field">> => true}))
+    ),
+    ?assertEqual(
+        {op_field, {[[<<"field">>], <<":">>, <<"number">>], <<"42">>}},
+        convert([], as_selector(#{<<"field">> => 42}))
+    ),
+    ?assertEqual(
+        {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"value\"">>}},
+        convert([], as_selector(#{<<"field">> => <<"value">>}))
+    ),
+    ?assertEqual(
+        {op_and, [
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":length">>], <<"3">>}},
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"1">>}},
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"2">>}},
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"3">>}}
+        ]},
+        convert([], as_selector(#{<<"field">> => [1, 2, 3]}))
+    ),
+    ?assertEqual(
+        {op_field, {
+            [[<<"field1">>, <<".">>, <<"field2">>], <<":">>, <<"string">>], <<"\"value\"">>
+        }},
+        convert([], as_selector(#{<<"field1">> => #{<<"field2">> => <<"value">>}}))
+    ),
+    ?assertEqual(
+        {op_and, [
+            {op_field, {[[<<"field2">>], <<":">>, <<"string">>], <<"\"value2\"">>}},
+            {op_field, {[[<<"field1">>], <<":">>, <<"string">>], <<"\"value1\"">>}}
+        ]},
+        convert([], as_selector(#{<<"field1">> => <<"value1">>, <<"field2">> => <<"value2">>}))
+    ).
+
+convert_default_test() ->
+    ?assertEqual(
+        {op_default, <<"\"text\"">>},
+        convert([], as_selector(#{<<"$default">> => #{<<"$text">> => <<"text">>}}))
+    ).
+
+convert_lt_test() ->
+    ?assertEqual(
+        {op_field,
+            {[[<<"field">>], <<":">>, <<"number">>], [<<"[-Infinity TO ">>, <<"42">>, <<"}">>]}},
+        convert([], as_selector(#{<<"field">> => #{<<"$lt">> => 42}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$lt">> => [1, 2, 3]}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$lt">> => null}}))
+    ).
+
+convert_lte_test() ->
+    ?assertEqual(
+        {op_field,
+            {[[<<"field">>], <<":">>, <<"number">>], [<<"[-Infinity TO ">>, <<"42">>, <<"]">>]}},
+        convert([], as_selector(#{<<"field">> => #{<<"$lte">> => 42}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$lte">> => [1, 2, 3]}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$lte">> => null}}))
+    ).
+
+convert_eq_test() ->
+    ?assertEqual(
+        {op_field, {[[<<"field">>], <<":">>, <<"number">>], <<"42">>}},
+        convert([], as_selector(#{<<"field">> => #{<<"$eq">> => 42}}))
+    ),
+    ?assertEqual(
+        {op_and, [
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":length">>], <<"3">>}},
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"1">>}},
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"2">>}},
+            {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"3">>}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$eq">> => [1, 2, 3]}}))
+    ),
+    ?assertEqual(
+        {op_null, {[[<<"field">>], <<":">>, <<"null">>], <<"true">>}},
+        convert([], as_selector(#{<<"field">> => #{<<"$eq">> => null}}))
+    ).
+
+convert_ne_test() ->
+    ?assertEqual(
+        {op_not, {
+            {op_or, [
+                {op_fieldname, {[[<<"field">>], ":"], "*"}},
+                {op_fieldname, {[[<<"field">>]], ".*"}}
+            ]},
+            {op_field, {[[<<"field">>], <<":">>, <<"number">>], <<"42">>}}
+        }},
+        convert([], as_selector(#{<<"field">> => #{<<"$ne">> => 42}}))
+    ).
+
+convert_gte_test() ->
+    ?assertEqual(
+        {op_field,
+            {[[<<"field">>], <<":">>, <<"number">>], [<<"[">>, <<"42">>, <<" TO Infinity]">>]}},
+        convert([], as_selector(#{<<"field">> => #{<<"$gte">> => 42}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$gte">> => [1, 2, 3]}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$gte">> => null}}))
+    ).
+
+convert_gt_test() ->
+    ?assertEqual(
+        {op_field,
+            {[[<<"field">>], <<":">>, <<"number">>], [<<"{">>, <<"42">>, <<" TO Infinity]">>]}},
+        convert([], as_selector(#{<<"field">> => #{<<"$gt">> => 42}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$gt">> => [1, 2, 3]}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$gt">> => null}}))
+    ).
+
+convert_all_test() ->
+    ?assertEqual(
+        {op_and, [
+            {op_field, {
+                [[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"string">>], <<"\"value1\"">>
+            }},
+            {op_field, {
+                [[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"string">>], <<"\"value2\"">>
+            }}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$all">> => [<<"value1">>, <<"value2">>]}}))
+    ).
+
+convert_elemMatch_test() ->
+    ?assertEqual(
+        {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"string">>], <<"\"value\"">>}},
+        convert(
+            [], as_selector(#{<<"field">> => #{<<"$elemMatch">> => #{<<"$eq">> => <<"value">>}}})
+        )
+    ).
+
+convert_allMatch_test() ->
+    ?assertEqual(
+        {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"string">>], <<"\"value\"">>}},
+        convert(
+            [], as_selector(#{<<"field">> => #{<<"$allMatch">> => #{<<"$eq">> => <<"value">>}}})
+        )
+    ).
+
+convert_keyMapMatch_test() ->
+    ?assertThrow(
+        {mango_error, mango_selector_text, {invalid_operator, <<"$keyMapMatch">>}},
+        convert(
+            [], as_selector(#{<<"field">> => #{<<"$keyMapMatch">> => #{<<"key">> => <<"value">>}}})
+        )
+    ).
+
+convert_in_test() ->
+    ?assertEqual(
+        {op_or, []},
+        convert([], as_selector(#{<<"field">> => #{<<"$in">> => []}}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_or, [
+                {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"value1\"">>}},
+                {op_field, {
+                    [[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"string">>], <<"\"value1\"">>
+                }}
+            ]},
+            {op_or, [
+                {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"value2\"">>}},
+                {op_field, {
+                    [[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"string">>], <<"\"value2\"">>
+                }}
+            ]}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$in">> => [<<"value1">>, <<"value2">>]}}))
+    ).
+
+convert_nin_test() ->
+    ?assertEqual(
+        {op_not, {
+            {op_or, [
+                {op_fieldname, {[[<<"field">>], ":"], "*"}},
+                {op_fieldname, {[[<<"field">>]], ".*"}}
+            ]},
+            {op_or, []}
+        }},
+        convert([], as_selector(#{<<"field">> => #{<<"$nin">> => []}}))
+    ),
+    ?assertEqual(
+        {op_not, {
+            {op_or, [
+                {op_fieldname, {[[<<"field">>], ":"], "*"}},
+                {op_fieldname, {[[<<"field">>]], ".*"}}
+            ]},
+            {op_or, [
+                {op_or, [
+                    {op_field, {[[<<"field">>], <<":">>, <<"number">>], <<"1">>}},
+                    {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"1">>}}
+                ]},
+                {op_or, [
+                    {op_field, {[[<<"field">>], <<":">>, <<"number">>], <<"2">>}},
+                    {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":">>, <<"number">>], <<"2">>}}
+                ]}
+            ]}
+        }},
+        convert([], as_selector(#{<<"field">> => #{<<"$nin">> => [1, 2]}}))
+    ).
+
+convert_exists_test() ->
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$exists">> => true}}))
+    ),
+    ?assertEqual(
+        {op_not, {
+            {op_or, [
+                {op_fieldname, {[[<<"field">>], ":"], "*"}},
+                {op_fieldname, {[[<<"field">>]], ".*"}}
+            ]},
+            false
+        }},
+        convert([], as_selector(#{<<"field">> => #{<<"$exists">> => false}}))
+    ).
+
+convert_type_test() ->
+    ?assertEqual(
+        {op_or, [
+            {op_fieldname, {[[<<"field">>], ":"], "*"}},
+            {op_fieldname, {[[<<"field">>]], ".*"}}
+        ]},
+        convert([], as_selector(#{<<"field">> => #{<<"$type">> => <<"string">>}}))
+    ).
+
+convert_mod_test() ->
+    ?assertEqual(
+        {op_fieldname, {[[<<"field">>], ":"], "number"}},
+        convert([], as_selector(#{<<"field">> => #{<<"$mod">> => [2, 0]}}))
+    ).
+
+convert_regex_test() ->
+    ?assertEqual(
+        {op_fieldname, {[[<<"field">>], ":"], "string"}},
+        convert([], as_selector(#{<<"field">> => #{<<"$regex">> => <<".*">>}}))
+    ).
+
+convert_size_test() ->
+    ?assertEqual(
+        {op_field, {[[<<"field">>, <<".">>, <<"[]">>], <<":length">>], <<"6">>}},
+        convert([], as_selector(#{<<"field">> => #{<<"$size">> => 6}}))
+    ).
+
+convert_not_test() ->
+    ?assertEqual(
+        {op_not, {
+            {op_or, [
+                {op_fieldname, {[[<<"field">>], ":"], "*"}},
+                {op_fieldname, {[[<<"field">>]], ".*"}}
+            ]},
+            {op_fieldname, {[[<<"field">>], ":"], "number"}}
+        }},
+        convert([], as_selector(#{<<"field">> => #{<<"$not">> => #{<<"$mod">> => [2, 0]}}}))
+    ).
+
+convert_and_test() ->
+    ?assertEqual(
+        {op_and, []},
+        convert([], as_selector(#{<<"$and">> => []}))
+    ),
+    ?assertEqual(
+        {op_and, [{op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"value\"">>}}]},
+        convert([], as_selector(#{<<"$and">> => [#{<<"field">> => <<"value">>}]}))
+    ),
+    ?assertEqual(
+        {op_and, [
+            {op_field, {[[<<"field1">>], <<":">>, <<"string">>], <<"\"value1\"">>}},
+            {op_field, {[[<<"field2">>], <<":">>, <<"string">>], <<"\"value2\"">>}}
+        ]},
+        convert(
+            [],
+            as_selector(#{
+                <<"$and">> => [#{<<"field1">> => <<"value1">>}, #{<<"field2">> => <<"value2">>}]
+            })
+        )
+    ).
+
+convert_or_test() ->
+    ?assertEqual(
+        {op_or, []},
+        convert([], as_selector(#{<<"$or">> => []}))
+    ),
+    ?assertEqual(
+        {op_or, [{op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"value\"">>}}]},
+        convert([], as_selector(#{<<"$or">> => [#{<<"field">> => <<"value">>}]}))
+    ),
+    ?assertEqual(
+        {op_or, [
+            {op_field, {[[<<"field1">>], <<":">>, <<"string">>], <<"\"value1\"">>}},
+            {op_field, {[[<<"field2">>], <<":">>, <<"string">>], <<"\"value2\"">>}}
+        ]},
+        convert(
+            [],
+            as_selector(#{
+                <<"$or">> => [#{<<"field1">> => <<"value1">>}, #{<<"field2">> => <<"value2">>}]
+            })
+        )
+    ).
+
+convert_nor_test() ->
+    ?assertEqual(
+        {op_and, []},
+        convert([], as_selector(#{<<"$nor">> => []}))
+    ),
+    ?assertEqual(
+        {op_and, [
+            {op_not, {
+                {op_or, [
+                    {op_fieldname, {[[<<"field">>], ":"], "*"}},
+                    {op_fieldname, {[[<<"field">>]], ".*"}}
+                ]},
+                {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"value\"">>}}
+            }}
+        ]},
+        convert([], as_selector(#{<<"$nor">> => [#{<<"field">> => <<"value">>}]}))
+    ),
+    ?assertEqual(
+        {op_and, [
+            {op_not, {
+                {op_or, [
+                    {op_fieldname, {[[<<"field1">>], ":"], "*"}},
+                    {op_fieldname, {[[<<"field1">>]], ".*"}}
+                ]},
+                {op_field, {[[<<"field1">>], <<":">>, <<"string">>], <<"\"value1\"">>}}
+            }},
+            {op_not, {
+                {op_or, [
+                    {op_fieldname, {[[<<"field2">>], ":"], "*"}},
+                    {op_fieldname, {[[<<"field2">>]], ".*"}}
+                ]},
+                {op_field, {[[<<"field2">>], <<":">>, <<"string">>], <<"\"value2\"">>}}
+            }}
+        ]},
+        convert(
+            [],
+            as_selector(#{
+                <<"$nor">> => [#{<<"field1">> => <<"value1">>}, #{<<"field2">> => <<"value2">>}]
+            })
+        )
+    ).
+
+to_query_test() ->
+    F = fun(S) -> iolist_to_binary(to_query(S)) end,
+    Input = {<<"name">>, <<"value">>},
+    ?assertEqual(<<"(name:value)">>, F({op_field, Input})),
+    ?assertEqual(
+        <<"(name1.name2_3atype:value)">>,
+        F({op_field, {[[<<"name1">>, <<".">>, <<"name2">>], <<":">>, <<"type">>], <<"value">>}})
+    ),
+    ?assertEqual(<<"(name:value)">>, F({op_null, Input})),
+    ?assertEqual(<<"($fieldnames:name_3a.*)">>, F({op_fieldname, {<<"name">>, <<"_3a.*">>}})),
+    Arg1 = {op_default, <<"value">>},
+    ?assertEqual(<<"($default:value)">>, F(Arg1)),
+    Arg2 = {op_field, Input},
+    ?assertEqual(<<"($fieldnames:/.*/  AND NOT ((name:value)))">>, F({op_not, {Arg2, false}})),
+    ?assertEqual(<<"((name:value))">>, F({op_not, {Arg2, {op_and, []}}})),
+    ?assertEqual(<<"">>, F({op_and, []})),
+    ?assertEqual(<<"(($default:value))">>, F({op_and, [Arg1]})),
+    ?assertEqual(<<"(($default:value) AND (name:value))">>, F({op_and, [Arg1, Arg2]})),
+    ?assertEqual(
+        <<"(($default:value) AND (name:value))">>, F({op_and, [Arg1, {op_and, []}, Arg2]})
+    ),
+    ?assertEqual(<<"">>, F({op_or, []})),
+    ?assertEqual(<<"(($default:value))">>, F({op_or, [Arg1]})),
+    ?assertEqual(<<"(($default:value) OR (name:value))">>, F({op_or, [Arg1, Arg2]})),
+    ?assertEqual(<<"(($default:value) OR (name:value))">>, F({op_or, [Arg1, Arg2, {op_or, []}]})).
+-endif.
