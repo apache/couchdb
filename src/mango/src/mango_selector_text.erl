@@ -19,7 +19,6 @@
     append_sort_type/2
 ]).
 
--include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
 %% Regex for <<"\\.">>
