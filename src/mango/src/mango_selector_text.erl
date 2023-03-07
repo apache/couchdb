@@ -231,8 +231,6 @@ to_query({op_not, {ExistsQuery, Arg}}) when is_tuple(Arg) ->
 %% For $exists:false
 to_query({op_not, {ExistsQuery, false}}) ->
     ["($fieldnames:/.*/ ", " AND NOT (", to_query(ExistsQuery), "))"];
-to_query({op_insert, Arg}) when is_binary(Arg) ->
-    ["(", Arg, ")"];
 %% We escape : and / for now for values and all lucene chars for fieldnames
 %% This needs to be resolved.
 to_query({op_field, {Name, Value}}) ->
