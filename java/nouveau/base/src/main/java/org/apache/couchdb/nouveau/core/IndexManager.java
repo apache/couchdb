@@ -13,6 +13,7 @@
 
 package org.apache.couchdb.nouveau.core;
 
+import static com.codahale.metrics.MetricRegistry.name;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.IOException;
@@ -41,6 +42,8 @@ import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -63,6 +66,8 @@ public final class IndexManager implements Managed {
     private ObjectMapper objectMapper;
 
     private ScheduledExecutorService scheduler;
+
+    private MetricRegistry metricRegistry;
 
     @SuppressWarnings("rawtypes")
     private Map<String, Index> cache;
@@ -306,6 +311,10 @@ public final class IndexManager implements Managed {
         this.scheduler = scheduler;
     }
 
+    public void setMetricRegistry(final MetricRegistry metricRegistry) {
+        this.metricRegistry = metricRegistry;
+    }
+
     @Override
     @SuppressWarnings("rawtypes")
     public void start() throws IOException {
@@ -317,6 +326,14 @@ public final class IndexManager implements Managed {
         scheduledFutures = new HashMap<String, Collection<ScheduledFuture<?>>>(maxIndexesOpen);
 
         cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true);
+        metricRegistry.register(name(IndexManager.class, "cache"), new Gauge<Integer>() {
+            @Override
+            public Integer getValue() {
+                synchronized (cache) {
+                    return cache.size();
+                }
+            }
+        });
 
         final Runnable lruEnforcer = () -> {
             final List<Entry<String, Index>> evictees = new ArrayList<Entry<String, Index>>();
