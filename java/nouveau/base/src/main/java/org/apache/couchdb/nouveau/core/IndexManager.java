@@ -14,31 +14,20 @@
 package org.apache.couchdb.nouveau.core;
 
 import static com.codahale.metrics.MetricRegistry.name;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import org.apache.couchdb.nouveau.core.IndexCache.CacheFunction;
+import org.apache.couchdb.nouveau.core.IndexCache.CacheLoader;
+import org.apache.couchdb.nouveau.core.IndexCache.CacheUnloader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,140 +54,26 @@ public final class IndexManager implements Managed {
 
     private ObjectMapper objectMapper;
 
-    private ScheduledExecutorService scheduler;
-
     private MetricRegistry metricRegistry;
 
     @SuppressWarnings("rawtypes")
-    private Map<String, Index> cache;
-
-    private Map<String, Collection<ScheduledFuture<?>>> scheduledFutures;
-
-    // index open and closes occur under one of these object locks, determined
-    // by the hashCode of the index's name.
-    private ReadWriteLock[] locks;
+    private IndexCache<String, Index> cache;
 
     @SuppressWarnings("rawtypes")
-    public Index acquire(final String name, final IndexLoader loader) throws IOException {
+    public <R> R with(final String name, final IndexLoader loader, final CacheFunction<Index, R> fun)
+            throws IOException {
         if (!exists(name)) {
             throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
         }
 
-        // Optimistic check.
-        readLock(name).lock();
-        try {
-            final Index result;
-            synchronized (cache) {
-                result = cache.get(name);
-            }
-            if (result != null) {
-                result.incRef();
-                return result;
-            }
-        } finally {
-            readLock(name).unlock();
-        }
+        final CacheLoader<String, Index> cacheLoader = (n) -> {
+            LOGGER.info("opening {}", n);
+            final Path path = indexPath(n);
+            final IndexDefinition indexDefinition = loadIndexDefinition(n);
+            return loader.apply(path, indexDefinition);
+        };
 
-        writeLock(name).lock();
-        try {
-            final Index existingIndex;
-            // non-first threads to get here need to check again.
-            synchronized (cache) {
-                existingIndex = cache.get(name);
-            }
-            if (existingIndex != null) {
-                existingIndex.incRef();
-                return existingIndex;
-            }
-
-            LOGGER.info("opening {}", name);
-            final Path path = indexPath(name);
-            final IndexDefinition indexDefinition = loadIndexDefinition(name);
-            final Index newIndex = loader.apply(path, indexDefinition);
-
-            final Runnable committer = () -> {
-                try {
-                    if (newIndex.commit()) {
-                        LOGGER.info("committed {}", name);
-                    }
-                } catch (final IOException e) {
-                    LOGGER.error("I/O exception when committing " + name, e);
-                }
-            };
-            final ScheduledFuture<?> committerFuture = scheduler.scheduleWithFixedDelay(committer,
-                    commitIntervalSeconds, commitIntervalSeconds, SECONDS);
-
-            final Runnable idler = () -> {
-                if (newIndex.secondsSinceLastUse() >= idleSeconds) {
-                    try {
-                        LOGGER.info("closing idle {}", name);
-                        release(name, newIndex);
-                    } catch (IOException e) {
-                        LOGGER.error("I/O exception when closing idle " + name, e);
-                    }
-                }
-            };
-            final ScheduledFuture<?> idlerFuture = scheduler.scheduleWithFixedDelay(idler, idleSeconds, idleSeconds,
-                    SECONDS);
-
-            synchronized (cache) {
-                cache.put(name, newIndex);
-                scheduledFutures.put(name, List.of(committerFuture, idlerFuture));
-            }
-            newIndex.incRef();
-            return newIndex;
-        } finally {
-            writeLock(name).unlock();
-        }
-    }
-
-    @SuppressWarnings("rawtypes")
-    public void release(final String name, final Index index) throws IOException {
-        writeLock(name).lock();
-        try {
-            Collection<ScheduledFuture<?>> futures = null;
-            synchronized (cache) {
-                if (index.getRefCount() == 1) {
-                    cache.remove(name);
-                    futures = scheduledFutures.remove(name);
-                }
-            }
-            if (futures != null) {
-                for (ScheduledFuture<?> future : futures) {
-                    future.cancel(false);
-                }
-                if (index.commit()) {
-                    LOGGER.info("committed {}", name);
-                }
-            }
-            doRelease(name, index);
-        } finally {
-            writeLock(name).unlock();
-        }
-    }
-
-    @SuppressWarnings("rawtypes")
-    private void doRelease(final String name, final Index index) throws IOException {
-        index.decRef();
-        if (!index.isOpen()) {
-            LOGGER.info("closed {}", name);
-            if (index.isDeleteOnClose()) {
-                IOUtils.rm(indexRootPath(name));
-                LOGGER.info("deleted {}", name);
-            }
-        }
-    }
-
-    private Lock writeLock(final String name) {
-        return rwl(name).writeLock();
-    }
-
-    private Lock readLock(final String name) {
-        return rwl(name).readLock();
-    }
-
-    private ReadWriteLock rwl(final String name) {
-        return locks[Math.abs(name.hashCode()) % locks.length];
+        return cache.with(name, cacheLoader, cacheUnloader(), fun);
     }
 
     public void create(final String name, IndexDefinition indexDefinition) throws IOException {
@@ -243,23 +118,7 @@ public final class IndexManager implements Managed {
 
     @SuppressWarnings("rawtypes")
     private void deleteIndex(final String name) throws IOException {
-        final Index index;
-        readLock(name).lock();
-        try {
-            synchronized (cache) {
-                index = cache.remove(name);
-            }
-            if (index == null) {
-                IOUtils.rm(indexRootPath(name));
-            } else {
-                index.setDeleteOnClose(true);
-            }
-        } finally {
-            readLock(name).unlock();
-        }
-        if (index != null) {
-            release(name, index);
-        }
+        cache.remove(name, cacheUnloader());
     }
 
     @JsonProperty
@@ -307,10 +166,6 @@ public final class IndexManager implements Managed {
         this.objectMapper = objectMapper;
     }
 
-    public void setScheduler(final ScheduledExecutorService scheduler) {
-        this.scheduler = scheduler;
-    }
-
     public void setMetricRegistry(final MetricRegistry metricRegistry) {
         this.metricRegistry = metricRegistry;
     }
@@ -318,55 +173,22 @@ public final class IndexManager implements Managed {
     @Override
     @SuppressWarnings("rawtypes")
     public void start() throws IOException {
-        locks = new ReadWriteLock[lockCount];
-        for (int i = 0; i < locks.length; i++) {
-            locks[i] = new ReentrantReadWriteLock();
-        }
-
-        scheduledFutures = new HashMap<String, Collection<ScheduledFuture<?>>>(maxIndexesOpen);
-
-        cache = new LinkedHashMap<String, Index>(maxIndexesOpen, 0.75f, true);
+        cache = new IndexCache.Builder<String, Index>()
+                .setMaxItems(maxIndexesOpen)
+                .setLockCount(lockCount)
+                .build();
         metricRegistry.register(name(IndexManager.class, "cache"), new Gauge<Integer>() {
             @Override
             public Integer getValue() {
-                synchronized (cache) {
-                    return cache.size();
-                }
+                return cache.size();
             }
         });
-
-        final Runnable lruEnforcer = () -> {
-            final List<Entry<String, Index>> evictees = new ArrayList<Entry<String, Index>>();
-            synchronized (cache) {
-                final int surplus = cache.size() - maxIndexesOpen;
-                if (surplus > 0) {
-                    final Iterator<Entry<String, Index>> it = cache.entrySet().iterator();
-                    for (int i = 0; i < surplus; i++) {
-                        evictees.add(it.next());
-                    }
-                }
-            }
-            for (Entry<String, Index> evictee : evictees) {
-                LOGGER.info("evicting {}", evictee.getKey());
-                try {
-                    release(evictee.getKey(), evictee.getValue());
-                } catch (final IOException e) {
-                    LOGGER.error("error evicting " + evictee.getKey(), e);
-                }
-            }
-        };
-        scheduler.scheduleWithFixedDelay(lruEnforcer, 5, 5, SECONDS);
     }
 
     @Override
     @SuppressWarnings("rawtypes")
     public void stop() throws IOException {
-        synchronized (cache) {
-            for (final Index index : cache.values()) {
-                index.close();
-            }
-            cache.clear();
-        }
+        cache.close(cacheUnloader());
     }
 
     private boolean isIndex(final Path path) {
@@ -392,6 +214,18 @@ public final class IndexManager implements Managed {
         }
         throw new WebApplicationException(name + " attempts to escape from index root directory",
                 Status.BAD_REQUEST);
+    }
+
+    @SuppressWarnings("rawtypes")
+    private CacheUnloader<String, Index> cacheUnloader() {
+        return (name, index) -> {
+            index.close();
+            LOGGER.info("closed {}", name);
+            if (index.isDeleteOnClose()) {
+                IOUtils.rm(indexRootPath(name));
+                LOGGER.info("deleted {}", name);
+            }
+        };
     }
 
 }

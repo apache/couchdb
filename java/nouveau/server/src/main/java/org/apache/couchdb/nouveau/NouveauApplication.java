@@ -17,7 +17,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ServiceLoader;
-import java.util.concurrent.ScheduledExecutorService;
 
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
@@ -69,11 +68,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
     public void run(NouveauApplicationConfiguration configuration, Environment environment) throws Exception {
         environment.jersey().register(new UpdatesOutOfOrderExceptionMapper());
 
-        // Configure index manager
-        final ScheduledExecutorService indexManagerScheduler = environment.lifecycle()
-                .scheduledExecutorService("index-manager-scheduler-%d")
-                .threads(10)
-                .build();
+        // configure index manager
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
         indexManager.setLockCount(configuration.getLockCount());
@@ -81,7 +76,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setMetricRegistry(environment.metrics());
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());
-        indexManager.setScheduler(indexManagerScheduler);
         environment.lifecycle().manage(indexManager);
     }
 
