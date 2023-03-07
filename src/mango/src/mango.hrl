@@ -19,4 +19,5 @@
 				| {'op_field', {iolist() | binary(), _}}
 				| {'op_fieldname', {_, _}}
 				| {'op_null', {_, _}}
-				| {'op_default', _}.
+				| {'op_default', _}
+				| {'op_regex', binary()}.

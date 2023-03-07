@@ -375,6 +375,11 @@ indexable_fields(Fields, {op_fieldname, {_, _}}) ->
 %% Similar idea to op_fieldname but with fieldname:null
 indexable_fields(Fields, {op_null, {_, _}}) ->
     Fields;
+%% Regular expression matching should be an exception to the rule
+%% above because the type of the associated field is exact, it must be
+%% a string.
+indexable_fields(Fields, {op_regex, Name}) ->
+    [iolist_to_binary([Name, ":string"]) | Fields];
 indexable_fields(Fields, {op_default, _}) ->
     [<<"$default">> | Fields].
 
@@ -473,7 +478,7 @@ warn_index_all({Idx, Db}) ->
 
 indexable_fields_test() ->
     ?assertEqual(
-        [<<"$default">>, <<"field1:boolean">>, <<"field2:number">>],
+        [<<"$default">>, <<"field1:boolean">>, <<"field2:number">>, <<"field3:string">>],
         indexable_fields(
             as_selector(
                 #{
@@ -569,10 +574,10 @@ is_usable_test() ->
     ?assert(
         is_usable(Index, as_selector(#{<<"field1">> => #{<<"$regex">> => <<".*">>}}), undefined)
     ),
-    ?assert(
+    ?assertNot(
         is_usable(Index, as_selector(#{<<"field2">> => #{<<"$regex">> => <<".*">>}}), undefined)
     ),
-    ?assert(
+    ?assertNot(
         is_usable(Index, as_selector(#{<<"field3">> => #{<<"$regex">> => <<".*">>}}), undefined)
     ),
     ?assertNot(

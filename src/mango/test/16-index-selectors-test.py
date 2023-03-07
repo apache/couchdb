@@ -171,6 +171,21 @@ class IndexSelectorJson(mango.DbPerClass):
         docs = self.db.find(selector, use_index="oldschool")
         self.assertEqual(len(docs), 3)
 
+    def test_uses_partial_index_with_non_indexable_selector(self):
+        partial_selector = {"location": {"$gte": "FRA"}}
+        selector = {"location": {"$exists": True}}
+        self.db.create_index(
+            ["location"],
+            partial_filter_selector=partial_selector,
+            ddoc="Selected",
+            name="Selected",
+        )
+        resp = self.db.find(selector, explain=True, use_index="Selected")
+        self.assertEqual(resp["index"]["name"], "Selected")
+        docs = self.db.find(selector, use_index="Selected")
+        self.assertEqual(len(docs), 3)
+
+
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class IndexSelectorText(mango.DbPerClass):
     def setUp(self):
@@ -261,3 +276,17 @@ class IndexSelectorText(mango.DbPerClass):
         self.db.create_text_index(fields=[{"name": "location", "type": "string"}])
         index = self.db.list_indexes()[1]
         self.assertEqual("partial_filter_selector" in index["def"], False)
+
+    def test_uses_partial_index_with_non_indexable_selector(self):
+        partial_selector = {"location": {"$gte": "FRA"}}
+        selector = {"location": {"$exists": True}}
+        self.db.create_text_index(
+            ["location"],
+            partial_filter_selector=partial_selector,
+            ddoc="Selected",
+            name="Selected",
+        )
+        resp = self.db.find(selector, explain=True, use_index="Selected")
+        self.assertEqual(resp["index"]["name"], "Selected")
+        docs = self.db.find(selector, use_index="Selected")
+        self.assertEqual(len(docs), 3)

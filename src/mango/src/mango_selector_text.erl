@@ -158,8 +158,11 @@ convert(Path, {[{<<"$mod">>, _}]}) ->
 % instead a custom implementation. The syntax is therefore different, so we do
 % would get different behavior than our view indexes. To be consistent, we will
 % simply return docs for fields that exist and then run our match filter.
+%
+% It has a dedicated type so that `mango_idx_text:indexable_fields/1`
+% could handle this case properly.
 convert(Path, {[{<<"$regex">>, _}]}) ->
-    field_exists_query(Path, "string");
+    {op_regex, path_str(Path)};
 convert(Path, {[{<<"$size">>, Arg}]}) ->
     {op_field, {make_field([<<"[]">> | Path], length), value_str(Arg)}};
 % All other operators are internal assertion errors for
@@ -254,6 +257,10 @@ to_query({op_null, {Name, Value}}) ->
 to_query({op_fieldname, {Name, Wildcard}}) ->
     NameBin = iolist_to_binary(Name),
     ["($fieldnames:", mango_util:lucene_escape_user(NameBin), Wildcard, ")"];
+%% This is for indexable_fields
+to_query({op_regex, Name}) ->
+    NameBin = iolist_to_binary([Name, ":"]),
+    ["($fieldnames:", mango_util:lucene_escape_user(NameBin), "string)"];
 to_query({op_default, Value}) ->
     ["($default:", Value, ")"].
 
@@ -722,7 +729,7 @@ convert_mod_test() ->
 
 convert_regex_test() ->
     ?assertEqual(
-        {op_fieldname, {[[<<"field">>], ":"], "string"}},
+        {op_regex, [<<"field">>]},
         convert([], as_selector(#{<<"field">> => #{<<"$regex">> => <<".*">>}}))
     ).
 
@@ -839,6 +846,7 @@ to_query_test() ->
         F({op_field, {[[<<"name1">>, <<".">>, <<"name2">>], <<":">>, <<"type">>], <<"value">>}})
     ),
     ?assertEqual(<<"(name:value)">>, F({op_null, Input})),
+    ?assertEqual(<<"($fieldnames:name_3astring)">>, F({op_regex, <<"name">>})),
     ?assertEqual(<<"($fieldnames:name_3a.*)">>, F({op_fieldname, {<<"name">>, <<"_3a.*">>}})),
     Arg1 = {op_default, <<"value">>},
     ?assertEqual(<<"($default:value)">>, F(Arg1)),
