@@ -48,7 +48,7 @@ def get_source_paths():
     ):
         path = pathlib.Path(item)
         if path.parent != curdir:
-            yield str(path.parent.joinpath("*.erl"))
+            yield str(path.parent.joinpath("*.erl").as_posix())
             curdir = path.parent
     if curdir is not None:
-        yield str(curdir.joinpath("*.erl"))
+        yield str(curdir.joinpath("*.erl").as_posix())
