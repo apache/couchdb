@@ -29,14 +29,14 @@
 
     :<header Content-Type: - :mimetype:`application/json`
 
-    :<json json selector: JSON object describing criteria used to select
+    :<json object selector: JSON object describing criteria used to select
         documents. More information provided in the section on :ref:`selector
         syntax <find/selectors>`. *Required*
     :<json number limit: Maximum number of results returned. Default is ``25``.
         *Optional*
     :<json number skip: Skip the first 'n' results, where 'n' is the value
         specified. *Optional*
-    :<json json sort: JSON array following :ref:`sort syntax <find/sort>`.
+    :<json array sort: JSON array following :ref:`sort syntax <find/sort>`.
         *Optional*
     :<json array fields: JSON array specifying which fields of each object
         should be returned. If it is omitted, the entire object is returned.
@@ -72,7 +72,7 @@
         :ref:`execution statistics <find/statistics>` in the query response.
         *Optional, default:* ``false``
 
-    :>header Content-Type: :mimetype:`application/json`
+    :>header Content-Type: - :mimetype:`application/json`
     :>header Transfer-Encoding: ``chunked``
 
     :>json object docs: Array of documents matching the search. In each matching
@@ -173,7 +173,7 @@ Selector Basics
 
 Elementary selector syntax requires you to specify one or more fields, and the
 corresponding values required for those fields. This selector matches all
-documents whose "director" field has the value "Lars von Trier".
+documents whose ``"director"`` field has the value ``"Lars von Trier"``.
 
 .. code-block:: javascript
 
@@ -181,16 +181,16 @@ documents whose "director" field has the value "Lars von Trier".
         "director": "Lars von Trier"
     }
 
-    A simple selector, inspecting specific fields
+A simple selector, inspecting specific fields:
 
 .. code-block:: javascript
 
     "selector": {
-      "title": "Live And Let Die"
+        "title": "Live And Let Die"
     },
     "fields": [
-      "title",
-      "cast"
+        "title",
+        "cast"
     ]
 
 You can create more complex selector expressions by combining operators.
@@ -249,7 +249,7 @@ names into a single name.
 Operators
 ---------
 
-Operators are identified by the use of a dollar sign ($) prefix in the name
+Operators are identified by the use of a dollar sign (``$``) prefix in the name
 field.
 
 There are two core types of operators in the selector syntax:
@@ -265,7 +265,9 @@ Every explicit operator has the form:
 
 .. code-block:: javascript
 
-    {"$operator": argument}
+    {
+        "$operator": argument
+    }
 
 A selector without an explicit operator is considered to have an implicit
 operator. The exact implicit operator is determined by the structure of the
@@ -286,7 +288,7 @@ it, is considered to be an equality condition. The implicit equality test
 applies also for fields and subfields.
 
 Any JSON object that is not the argument to a condition operator is an implicit
-$and operator on each field.
+``$and`` operator on each field.
 
 In the below example, we use an operator to match any document, where the
 ``"year"`` field has a value greater than ``2010``:
@@ -322,7 +324,7 @@ In the next example using subfields, the required field ``"imdb"`` in a matching
 document must also have a subfield ``"rating"`` and the subfield must have a
 value equal to ``8``.
 
-Example of implicit operator applied to a subfield test
+Example of implicit operator applied to a subfield test:
 
 .. code-block:: javascript
 
@@ -342,7 +344,7 @@ Again, you can make the equality operator explicit.
         }
     }
 
-An example of the ``$eq`` operator used with full text indexing
+An example of the ``$eq`` operator used with full text indexing:
 
 .. code-block:: javascript
 
@@ -360,7 +362,7 @@ An example of the ``$eq`` operator used with full text indexing
       ]
     }
 
-An example of  the ``$eq`` operator used with database indexed on the field ``"year"``
+An example of the ``$eq`` operator used with database indexed on the field ``"year"``:
 
 .. code-block:: javascript
 
@@ -391,7 +393,7 @@ In this example, the field ``"director"`` must be present and contain the value
 
 You can make both the ``$and`` operator and the equality operator explicit.
 
-    Example of using explicit ``$and`` and ``$eq`` operators
+Example of using explicit ``$and`` and ``$eq`` operators:
 
 .. code-block:: javascript
 
@@ -464,7 +466,8 @@ The list of combination operators:
 .. _find/and:
 
 **The** ``$and`` **operator**
-    ``$and`` operator used with two fields
+
+``$and`` operator used with two fields:
 
 .. code-block:: javascript
 
@@ -482,9 +485,9 @@ The list of combination operators:
         ]
       },
       "fields": [
-        "year",
-        "title",
-        "cast"
+          "year",
+          "title",
+          "cast"
       ]
     }
 
@@ -669,7 +672,7 @@ operators require the argument to be in a specific JSON format.
 | Operator type | Operator    | Argument   | Purpose                           |
 +===============+=============+============+===================================+
 | (In)equality  | ``$lt``     | Any JSON   | The field is less than the        |
-|               |             |            | argument                          |
+|               |             |            | argument.                         |
 +---------------+-------------+------------+-----------------------------------+
 |               | ``$lte``    | Any JSON   | The field is less than or equal to|
 |               |             |            | the argument.                     |
@@ -725,7 +728,7 @@ operators require the argument to be in a specific JSON format.
 |               |             |            | implemented, see the see the      |
 |               |             |            | `Erlang Regular Expression        |
 |               |             |            | <http://erlang.org/doc            |
-|               |             |            | /man/re.html>`_                   |
+|               |             |            | /man/re.html>`_.                  |
 +---------------+-------------+------------+-----------------------------------+
 
 .. warning::
@@ -789,7 +792,7 @@ the database performs a full scan of the primary index:
         }
 
 .. warning::
-    It's always recommended that you create an appropriate index when deploying
+    It is always recommended that you create an appropriate index when deploying
     in production.
 
 Most selector expressions work exactly as you would expect for the given
@@ -816,7 +819,7 @@ Example, sorting by 2 fields:
 
     .. code-block:: javascript
 
-        [{"fieldName1": "desc"}, {"fieldName2": "desc" }]
+        [{"fieldName1": "desc"}, {"fieldName2": "desc"}]
 
 Example, sorting by 2 fields, assuming default direction for both :
 
@@ -831,7 +834,7 @@ To use sorting, ensure that:
 
 -  At least one of the sort fields is included in the selector.
 -  There is an index already defined, with all the sort fields in the same
-    order.
+   order.
 -  Each object in the sort array has a single key.
 
 If an object in the sort array does not have a single key, the resulting sort
@@ -843,7 +846,11 @@ directions must be either all ascending or all descending.
 For field names in text search sorts, it is sometimes necessary for a
 field type to be specified, for example:
 
-``{ "<fieldname>:string": "asc"}``
+.. code-block:: javascript
+
+    {
+        "<fieldname>:string": "asc"
+    }
 
 If possible, an attempt is made to discover the field type based on the
 selector. In ambiguous cases the field type must be provided explicitly.
@@ -853,7 +860,7 @@ This is an important difference between text and view indexes. Sorting
 behavior for fields with different data types might change in future
 versions.
 
-    A simple query, using sorting:
+A simple query, using sorting:
 
 .. code-block:: javascript
 
@@ -870,7 +877,7 @@ It is possible to specify exactly which fields are returned for a document when
 selecting from a database. The two advantages are:
 
 -  Your results are limited to only those parts of the document that are
-    required for your application.
+   required for your application.
 -  A reduction in the size of the response.
 
 The fields returned are specified as an array.
@@ -881,12 +888,12 @@ is included.
 
 Example of selective retrieval of fields from matching documents:
 
-    .. code-block:: javascript
+.. code-block:: javascript
 
-        {
-            "selector": { "Actor_name": "Robert De Niro" },
-            "fields": ["Actor_name", "Movie_year", "_id", "_rev"]
-        }
+   {
+       "selector": { "Actor_name": "Robert De Niro" },
+       "fields": ["Actor_name", "Movie_year", "_id", "_rev"]
+   }
 
 Pagination
 ==========
@@ -899,7 +906,7 @@ response to your next request. Remember to keep the `selector` the same,
 otherwise you will receive unexpected results. To paginate backwards,
 you can use a previous bookmark to return the previous set of results.
 
-Note that the presence of a bookmark doesn't guarantee that there are
+Note that the presence of a bookmark does not guarantee that there are
 more results. You can to test whether you have reached the end of the
 result set by comparing the number of results returned with the page
 size requested - if results returned < `limit`, there are no more.
@@ -965,7 +972,7 @@ built using MapReduce Views.
 
     :<header Content-Type: - :mimetype:`application/json`
 
-    :query json index: JSON object describing the index to create.
+    :query object index: JSON object describing the index to create.
     :query string ddoc: Name of the design document in which the index will be
         created. By default, each index will be created in its own design
         document.
@@ -974,9 +981,9 @@ built using MapReduce Views.
         indexes in the same document (similar to views). *Optional*
     :query string name: Name of the index. If no name is provided, a name will
         be generated automatically. *Optional*
-    :query string type: Can be ``"json"`` or ``"text"``. Defaults to json.
+    :query string type: Can be ``"json"`` or ``"text"``. Defaults to ``"json"``.
         Geospatial indexes will be supported in the future. *Optional*
-        Text indexes are supported via a third party library *Optional*
+        Text indexes are supported via a third-party library. *Optional*
     :query boolean partitioned: Determines whether a JSON index is partitioned
         or global. The default value of ``partitioned`` is the ``partitioned``
         property of the database. To create a global index on a
@@ -985,7 +992,7 @@ built using MapReduce Views.
         for the  ``"partitioned"`` field on an unpartitioned database, an
         error occurs.
 
-    :>header Content-Type: :mimetype:`application/json`
+    :>header Content-Type: - :mimetype:`application/json`
     :>header Transfer-Encoding: ``chunked``
 
     :>json string result: Flag to show whether the index was created or one
@@ -999,13 +1006,13 @@ built using MapReduce Views.
     :code 404: Database not found
     :code 500: Execution error
 
-    The `Index object` is a JSON object with the following fields:
+    The `index` parameter is a JSON object with the following fields:
 
-    :json array fields: array of field names following the :ref:`sort
-       syntax <find/sort>`. Nested fields are also allowed, e.g. `"person.name"`.
-    :json json partial_filter_selector: A :ref:`selector <find/selectors>`
-       to apply to documents at indexing time, creating a
-       :ref:`partial index <find/partial_indexes>`. *Optional*
+    - **fields** (`array`): Array of field names following the :ref:`sort
+      syntax <find/sort>`. Nested fields are also allowed, e.g. `"person.name"`.
+    - **partial_filter_selector** (`object`): A :ref:`selector <find/selectors>`
+      to apply to documents at indexing time, creating a
+      :ref:`partial index <find/partial_indexes>`. *Optional*
 
     Example of creating a new index for a field called ``foo``:
 
@@ -1045,7 +1052,7 @@ The returned JSON confirms the index has been created:
             "name":"foo-index"
         }
 
-Example index creation using all available query parameters
+Example index creation using all available query parameters:
 
     **Request**:
 
@@ -1079,7 +1086,7 @@ Example index creation using all available query parameters
         }
 
 By default, a JSON index will include all documents that have the indexed fields
-present, including those which have null values.
+present, including those which have ``null`` values.
 
 .. _find/partial_indexes:
 
@@ -1087,7 +1094,7 @@ Partial Indexes
 ===============
 
 Partial indexes allow documents to be filtered at indexing time, potentially
-offering significant performance improvements for query selectors that don't
+offering significant performance improvements for query selectors that do not
 map cleanly to a range query on an index.
 
 Let's look at an example query:
@@ -1095,12 +1102,12 @@ Let's look at an example query:
 .. code-block:: javascript
 
     {
-      "selector": {
-        "status": {
-          "$ne": "archived"
-        },
-        "type": "user"
-      }
+        "selector": {
+            "status": {
+                "$ne": "archived"
+            },
+            "type": "user"
+        }
     }
 
 Without a partial index, this requires a full index scan to find all the
@@ -1138,16 +1145,16 @@ by a ``"use_index"`` field, so we need to modify the original query:
 .. code-block:: javascript
 
     {
-      "selector": {
-        "status": {
-          "$ne": "archived"
+        "selector": {
+            "status": {
+                "$ne": "archived"
+            },
+            "type": "user"
         },
-        "type": "user"
-      },
-      "use_index": "type-not-archived"
+        "use_index": "type-not-archived"
     }
 
-Technically, we don't need to include the filter on the ``"status"`` field
+Technically, we do not need to include the filter on the ``"status"`` field
 in the query selector - the partial index ensures this is always true -
 but including it makes the intent of the selector clearer and will make
 it easier to take advantage of future improvements to query planning
@@ -1168,34 +1175,35 @@ it easier to take advantage of future improvements to query planning
 
     When you make a ``GET`` request to ``/{db}/_index``, you get a list of all
     indexes in the database. In addition to the information available through
-    this API, indexes are also stored in design documents <index-functions>.
+    this API, indexes are also stored in design documents as :ref:`views <viewfun>`.
     Design documents are regular documents that have an ID starting with
     ``_design/``. Design documents can be retrieved and modified in the same
     way as any other document, although this is not necessary when using Mango.
 
     :param db: Database name.
 
-    :>header Content-Type: :mimetype:`application/json`
+    :>header Content-Type: - :mimetype:`application/json`
     :>header Transfer-Encoding: ``chunked``
 
-    :>json number total_rows: Number of indexes
-    :>json object indexes: Array of index definitions
+    :>json number total_rows: Number of indexes.
+    :>json array indexes: Array of index definitions (see below).
 
     :code 200: Success
     :code 400: Invalid request
     :code 401: Read permission required
     :code 500: Execution error
 
-    Format of index objects:
-        -  **ddoc**: ID of the design document the index belongs to. This ID
-            can be used to retrieve the design document containing the index,
-            by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
-            value of this field.
-        -  **name**: Name of the index.
-        -  **type**: Type of the index. Currently "json" is the only
-            supported type.
-        -  **def**: Definition of the index, containing the indexed fields
-            and the sort order: ascending or descending.
+    Index definitions are JSON objects with the following fields:
+
+    -  **ddoc** (`string`): ID of the design document the index belongs to. This ID
+       can be used to retrieve the design document containing the index,
+       by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
+       value of this field.
+    -  **name** (`string`): Name of the index.
+    -  **type** (`string`): Type of the index. Currently ``"json"`` is the only
+       supported type.
+    -  **def** (`object`): Definition of the index, containing the indexed fields
+       and the sort order: ascending or descending.
 
     **Request**:
 
@@ -1248,14 +1256,14 @@ it easier to take advantage of future improvements to query planning
 
 .. _api/db/find/index-delete:
 
-.. http:delete:: /{db}/_index/{designdoc}/json/{name}
+.. http:delete:: /{db}/_index/{design_doc}/json/{name}
     :synopsis: Delete an index
 
     :param db: Database name.
-    :param designdoc: Design document name.
+    :param design_doc: Design document name.
     :param name: Index name.
 
-    :>header Content-Type: :mimetype:`application/json`
+    :>header Content-Type: - :mimetype:`application/json`
 
     :>json string ok: `"true"` if successful.
 
@@ -1302,19 +1310,19 @@ it easier to take advantage of future improvements to query planning
 
     :param db: Database name
 
-    :<header Content-Type: :mimetype:`application/json`
+    :<header Content-Type: - :mimetype:`application/json`
 
-    :>header Content-Type: :mimetype:`application/json`
+    :>header Content-Type: - :mimetype:`application/json`
     :>header Transfer-Encoding: ``chunked``
 
-    :>json string dbname: Name of database
-    :>json object index: Index used to fulfill the query
-    :>json object selector: Query selector used
-    :>json object opts: Query options used
-    :>json number limit: Limit parameter used
-    :>json number skip: Skip parameter used
-    :>json array fields: Fields to be returned by the query
-    :>json object range: Range parameters passed to the underlying view
+    :>json string dbname: Name of database.
+    :>json object index: Index used to fulfill the query.
+    :>json object selector: Query selector used.
+    :>json object opts: Query options used.
+    :>json number limit: Limit parameter used.
+    :>json number skip: Skip parameter used.
+    :>json array fields: Fields to be returned by the query.
+    :>json object range: Range parameters passed to the underlying view.
 
     :code 200: Request completed successfully
     :code 400: Invalid request
@@ -1409,8 +1417,8 @@ it easier to take advantage of future improvements to query planning
 Index selection
 ===============
 
-`_find` chooses which index to use for responding to a query, unless you specify
-an index at query time.
+:ref:`_find <api/db/_find>` chooses which index to use for responding
+to a query, unless you specify an index at query time.
 
 The query planner looks at the selector section and finds the index with the
 closest match to operators and fields used in the query. If there are two
@@ -1420,6 +1428,6 @@ If there are still two or more candidate indexes,
 the index with the first alphabetical name is chosen.
 
 .. note::
-    It's good practice to specify indexes explicitly in your queries. This
+    It is good practice to specify indexes explicitly in your queries. This
     prevents existing queries being affected by new indexes that might get added
     in a production environment.
