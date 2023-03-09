@@ -204,19 +204,19 @@ soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
-# target: erlfmt-check - Check source code formatting
+# target: erlfmt-check - Check Erlang source code formatting
 erlfmt-check:
-	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py
+	@ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py
 
-# target: erlfmt-format - Apply source code format standards automatically
+# target: erlfmt-format - Apply Erlang source code format standards automatically
 erlfmt-format:
-	ERLFMT_PATH=$(ERLFMT) python3 dev/format_all.py
+	@ERLFMT_PATH=$(ERLFMT) python3 dev/format_all.py
 
 .venv/bin/black:
 	@python3 -m venv .venv
 	@.venv/bin/pip3 install black || touch .venv/bin/black
 
-# target: python-black - Python code formatter, runs only on Python >= 3.6
+# target: python-black - Check Python code formatting (requires Python >= 3.6)
 python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
@@ -225,6 +225,7 @@ python-black: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/jiffy|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux/*.py dev/run dev/format_*.py src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
+# target: python-black-update - Apply Python source code format standards automatically (requires Python >= 3.6)
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"

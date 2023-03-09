@@ -174,7 +174,14 @@ To format the ``erl`` files in ``src``, run ``make erlfmt-format``.
 To use ``erlfmt`` for specific files only, use the executable ``bin/erlfmt``
 that is installed by ``configure``.
 
+Python files throughout the repository should conform to (PEP
+8-compliant) formatting rules as specified by black_.  Similarly to
+``erlfmt``, the related checks are run for every PR in the CI.  The
+same checks could also be run locally via ``make python-black``.
+Files can be automatically formatted by ``make python-black-update``.
+
 .. _erlfmt: https://github.com/WhatsApp/erlfmt
+.. _black: https://github.com/psf/black
 
 Testing
 -------
