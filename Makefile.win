@@ -181,12 +181,12 @@ just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
 # target: erlfmt-check - Check Erlang source code formatting
-erlfmt-check: export ERLFMT_PATH := $(ERLFMT)
+erlfmt-check: export ERLFMT_PATH = $(ERLFMT)
 erlfmt-check:
 	@$(PYTHON) dev\format_check.py
 
 # target: erlfmt-format - Apply Erlang source code format standards automatically
-erlfmt-format: export ERLFMT_PATH := $(ERLFMT)
+erlfmt-format: export ERLFMT_PATH = $(ERLFMT)
 erlfmt-format:
 	@$(PYTHON) dev\format_all.py
 
