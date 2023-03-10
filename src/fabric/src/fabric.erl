@@ -404,9 +404,7 @@ all_docs(DbName, Callback, Acc, QueryArgs) ->
 
 %% @doc retrieves all docs. Additional query parameters, such as `limit',
 %%      `start_key' and `end_key', `descending', and `include_docs', can
-%%      also be passed to further constrain the query. See <a href=
-%%      "http://wiki.apache.org/couchdb/HTTP_Document_API#All_Documents">
-%%      all_docs</a> for details
+%%      also be passed to further constrain the query.
 -spec all_docs(
     dbname(),
     [{atom(), any()}],
@@ -451,9 +449,6 @@ query_view(DbName, DDoc, ViewName, Callback, Acc, QueryArgs) ->
     query_view(DbName, [], DDoc, ViewName, Callback, Acc, QueryArgs).
 
 %% @doc execute a given view.
-%%      There are many additional query args that can be passed to a view,
-%%      see <a href="http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options">
-%%      query args</a> for details.
 -spec query_view(
     dbname(),
     [{atom(), any()}] | [],
