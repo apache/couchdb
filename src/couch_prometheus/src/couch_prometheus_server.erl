@@ -108,7 +108,6 @@ get_couchdb_stats() ->
 get_system_stats() ->
     lists:flatten([
         get_uptime_stat(),
-        get_vm_stats(),
         get_io_stats(),
         get_message_queue_stats(),
         get_run_queue_stats(),
