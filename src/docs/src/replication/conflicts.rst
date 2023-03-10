@@ -424,72 +424,87 @@ And here is an example of this in Ruby using the low-level `RestClient`_:
 
 .. code-block:: ruby
 
-    require 'rubygems'
-    require 'rest_client'
-    require 'json'
-    DB="http://127.0.0.1:5984/conflict_test"
+    require "rubygems"
+    require "rest_client"
+    require "json"
+
+    DB = "http://adm:pass@127.0.0.1:5984/db"
 
     # Write multiple documents
-    def writem(docs)
-        JSON.parse(RestClient.post("#{DB}/_bulk_docs", {
-            "docs" => docs,
-        }.to_json))
+    def writem(docs, new_edits)
+      JSON.parse(
+        RestClient.post(
+          "#{DB}/_bulk_docs",
+          {:docs => docs, :new_edits => new_edits}.to_json,
+          {content_type: :json, accept: :json}
+        )
+      )
     end
 
     # Write one document, return the rev
-    def write1(doc, id=nil, rev=nil)
-        doc['_id'] = id if id
-        doc['_rev'] = rev if rev
-        writem([doc]).first['rev']
+    def write1(doc, id = nil, rev = nil)
+      doc["_id"] = id if id
+      doc["_rev"] = rev if rev
+
+      if rev
+        writem([doc], false)
+      else
+        writem([doc], true).first["rev"]
+      end
     end
 
     # Read a document, return *all* revs
     def read1(id)
-        retries = 0
-        loop do
-            # FIXME: escape id
-            res = [JSON.parse(RestClient.get("#{DB}/#{id}?conflicts=true"))]
-            if revs = res.first.delete('_conflicts')
-                begin
-                    revs.each do |rev|
-                        res << JSON.parse(RestClient.get("#{DB}/#{id}?rev=#{rev}"))
-                    end
-                rescue
-                    retries += 1
-                    raise if retries >= 5
-                    next
-                end
+      retries = 0
+      loop do
+        # FIXME: escape id
+        res = [JSON.parse(RestClient.get("#{DB}/#{id}?conflicts=true"))]
+
+        if revs = res.first.delete("_conflicts")
+          begin
+            revs.each do |rev|
+              res << JSON.parse(RestClient.get("#{DB}/#{id}?rev=#{rev}"))
             end
-            return res
+
+          rescue
+            retries += 1
+            raise if retries >= 5
+            next
+          end
         end
+
+        return res
+      end
     end
 
     # Create DB
-    RestClient.delete DB rescue nil
-    RestClient.put DB, {}.to_json
+    RestClient.delete(DB) rescue nil
+    RestClient.put(DB, {}.to_json)
 
     # Write a document
-    rev1 = write1({"hello"=>"xxx"},"test")
-    p read1("test")
+    rev1 = write1({"hello" => "xxx"}, "test")
+    p(read1("test"))
 
     # Make three conflicting versions
-    write1({"hello"=>"foo"},"test",rev1)
-    write1({"hello"=>"bar"},"test",rev1)
-    write1({"hello"=>"baz"},"test",rev1)
+    (1..3).each do |num|
+      write1({"hello" => "foo"}, "test", rev1 + num.to_s)
+      write1({"hello" => "bar"}, "test", rev1 + num.to_s)
+      write1({"hello" => "baz"}, "test", rev1 + num.to_s)
+    end
 
     res = read1("test")
-    p res
+    p(res)
 
     # Now let's replace these three with one
-    res.first['hello'] = "foo+bar+baz"
-    res.each_with_index do |r,i|
-        unless i == 0
-            r.replace({'_id'=>r['_id'], '_rev'=>r['_rev'], '_deleted'=>true})
-        end
+    res.first["hello"] = "foo+bar+baz"
+    res.each_with_index do |r, i|
+      unless i == 0
+        r.replace({"_id" => r["_id"], "_rev" => r["_rev"], "_deleted" => true})
+      end
     end
-    writem(res)
 
-    p read1("test")
+    writem(res, true)
+    p(read1("test"))
 
 An application written this way never has to deal with a ``PUT 409``, and is
 automatically multi-master capable.
