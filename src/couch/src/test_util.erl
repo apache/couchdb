@@ -37,6 +37,8 @@
 
 -export([shuffle/1]).
 
+-export([as_selector/1]).
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_db_int.hrl").
@@ -488,3 +490,7 @@ shuffle(List) ->
     Paired = [{couch_rand:uniform(), I} || I <- List],
     Sorted = lists:sort(Paired),
     [I || {_, I} <- Sorted].
+
+%% Create a valid Mango selector from an Erlang map.
+as_selector(Map) ->
+    mango_selector:normalize(jiffy:decode(jiffy:encode(Map))).

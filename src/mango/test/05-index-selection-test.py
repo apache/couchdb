@@ -334,3 +334,28 @@ class MultiTextIndexSelectionTests(mango.UserDocsTests):
     def test_use_index_works(self):
         resp = self.db.find({"$text": "a query"}, use_index="foo", explain=True)
         self.assertEqual(resp["index"]["ddoc"], "_design/foo")
+
+
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
+class RegexVsTextIndexTest(mango.DbPerClass):
+    @classmethod
+    def setUpClass(klass):
+        super(RegexVsTextIndexTest, klass).setUpClass()
+
+    def test_regex_works_with_text_index(self):
+        doc = {"currency": "HUF", "location": "EUROPE"}
+        self.db.save_docs([doc], w=3)
+
+        selector = {"currency": {"$regex": "HUF"}}
+        docs = self.db.find(selector)
+        assert docs == [doc]
+
+        # Now that it is confirmed to be working, try again the
+        # previous query with a text index on `location`.  This
+        # attempt should succeed as well.
+        self.db.create_text_index(
+            name="TextIndexByLocation", fields=[{"name": "location", "type": "string"}]
+        )
+
+        docs = self.db.find(selector)
+        assert docs == [doc]
