@@ -39,7 +39,8 @@ e2e_test_() ->
                 [
                     ?TDEF_FE(t_chttpd_port),
                     ?TDEF_FE(t_prometheus_port),
-                    ?TDEF_FE(t_metric_updated)
+                    ?TDEF_FE(t_metric_updated),
+                    ?TDEF_FE(t_no_duplicate_metrics)
                 ]
             }
         }
@@ -104,6 +105,21 @@ t_prometheus_port(_) ->
 t_reject_prometheus_port(Port) ->
     Response = test_request:get(node_local_url(Port), [?CONTENT_JSON, ?AUTH]),
     ?assertEqual({error, {conn_failed, {error, econnrefused}}}, Response).
+
+t_no_duplicate_metrics(Port) ->
+    Url = node_local_url(Port),
+    Stats = get_stats(Url),
+    Lines = re:split(Stats, "\n"),
+    % Filter the result to only the lines containing the metric
+    % definition, not the values. These lines always start with
+    % a # character.
+    MetricDefs = lists:filter(fun(S) -> string:find(S, "#") =:= S end, Lines),
+    ?assertNotEqual(erlang:length(MetricDefs), 0),
+    Diff = get_duplicates(MetricDefs),
+    ?assertEqual(erlang:length(Diff), 0).
+
+get_duplicates(List) ->
+    List -- sets:to_list(sets:from_list(List)).
 
 t_metric_updated(Port) ->
     % The passage of time should increment this metric
