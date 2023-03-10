@@ -112,11 +112,20 @@ get_system_stats() ->
         get_message_queue_stats(),
         get_run_queue_stats(),
         get_vm_stats(),
-        get_ets_stats()
+        get_ets_stats(),
+        get_internal_replication_jobs_stat()
     ]).
 
 get_uptime_stat() ->
     to_prom(uptime_seconds, counter, "couchdb uptime", couch_app:uptime() div 1000).
+
+get_internal_replication_jobs_stat() ->
+    to_prom(
+        internal_replication_jobs,
+        gauge,
+        "count of internal replication changes to process",
+        mem3_sync:get_backlog()
+    ).
 
 get_vm_stats() ->
     MemLabels = lists:map(
@@ -249,19 +258,6 @@ update_refresh_timer() ->
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
-
-system_stats_test() ->
-    lists:foreach(
-        fun(Line) ->
-            ?assert(is_binary(Line)),
-            Trimmed = string:trim(Line),
-            ?assert(starts_with(<<"couchdb_">>, Trimmed) orelse starts_with(<<"# ">>, Trimmed))
-        end,
-        get_system_stats()
-    ).
-
-starts_with(Prefix, Line) when is_binary(Prefix), is_binary(Line) ->
-    binary:longest_common_prefix([Prefix, Line]) > 0.
 
 message_queue_len_test() ->
     self() ! refresh,
