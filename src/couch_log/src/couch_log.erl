@@ -21,6 +21,7 @@
     critical/2,
     alert/2,
     emergency/2,
+    report/2,
     report/4,
     set_level/1
 ]).
@@ -49,8 +50,18 @@ alert(Fmt, Args) -> log(alert, Fmt, Args).
 -spec emergency(string(), list()) -> ok.
 emergency(Fmt, Args) -> log(emergency, Fmt, Args).
 
+-spec report(string(), map()) -> ok.
+report(ReportId, Meta) when is_map(Meta) ->
+    report(ReportId, "", [], Meta).
+
 -spec report(string(), string(), list(), map()) -> ok.
-report(ReportId, Fmt, Args, Meta) when is_map(Meta) ->
+report(ReportId, Fmt, Args, Meta0) when is_map(Meta0) ->
+    Meta = case maps:is_key(type, Meta0) of
+        true ->
+            Meta0;
+        false ->
+            Meta0#{type => ReportId}
+    end,
     couch_stats:increment_counter([couch_log, level, report]),
     Entry = couch_log_formatter:format(report, self(), ReportId, Fmt, Args, Meta),
     %%ok = couch_log_server:report(Entry).

@@ -380,6 +380,17 @@ format_args([H | T], FmtAcc, ArgsAcc) ->
     {Str, _} = couch_log_trunc_io:print(H, 100),
     format_args(T, ["~s" | FmtAcc], [Str | ArgsAcc]).
 
+maybe_truncate("", [], Meta, TruncateMeta) ->
+    MaxMsgSize = couch_log_config:get(max_message_size),
+    case format_meta(Meta) of
+        "" ->
+            "";
+        MetaStr when TruncateMeta and length(MetaStr) > MaxMsgSize ->
+            %% TODO: what to do when meta formatted data is too large?
+            error(what_to_do_here);
+        MetaStr ->
+            ["[", MetaStr, "]"]
+    end;
 maybe_truncate(Fmt, Args, Meta, TruncateMeta) ->
     MaxMsgSize = couch_log_config:get(max_message_size),
     case format_meta(Meta) of
@@ -388,7 +399,9 @@ maybe_truncate(Fmt, Args, Meta, TruncateMeta) ->
         MetaStr when TruncateMeta ->
             couch_log_trunc_io:format(["[", MetaStr, "] " | Fmt], Args, MaxMsgSize);
         MetaStr ->
-            ["[", MetaStr, "] " | couch_log_trunc_io:format(Fmt, Args, MaxMsgSize)]
+            %% Subtract 3 for open/close bracket and space added below
+            MsgLength = length(MetaStr) + 3,
+            ["[", MetaStr, "] " | couch_log_trunc_io:format(Fmt, Args, MaxMsgSize - MsgLength)]
     end.
 
 maybe_truncate(Msg) ->
@@ -482,5 +495,7 @@ to_str(_K, Term) when is_tuple(Term) ->
     "";
 to_str(_K, Term) when is_map(Term) ->
     "";
+to_str(K, Term) when is_binary(Term) ->
+    io_lib:format("~s=\"~s\"", [K, Term]);
 to_str(K, Term) ->
     io_lib:format("~s=\"~p\"", [K, Term]).

@@ -93,9 +93,10 @@ do_write(Entry, St) ->
         pid = Pid,
         msg = Msg,
         msg_id = MsgId,
+        type = Type,
         time_stamp = TimeStamp
     } = couch_log_util:maybe_format_type(Entry),
-    Fmt = "<~B>~B ~s ~s ~s ~p ~s - ",
+    Fmt = "<~B>~B ~s ~s ~s ~p ~p ~s - ",
     Args = [
         St#st.facility bor get_level(Level),
         ?SYSLOG_VERSION,
@@ -103,6 +104,7 @@ do_write(Entry, St) ->
         St#st.hostname,
         St#st.appid,
         Pid,
+        Type,
         MsgId
     ],
     Pre = io_lib:format(Fmt, Args),

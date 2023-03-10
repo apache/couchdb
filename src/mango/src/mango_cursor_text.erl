@@ -127,9 +127,11 @@ execute(Cursor, UserFun, UserAcc) ->
             JsonBM = dreyfus_bookmark:pack(FinalBM),
             Arg = {add_key, bookmark, JsonBM},
             {_Go, FinalUserAcc} = UserFun(Arg, LastUserAcc),
-            FinalUserAcc0 = mango_execution_stats:maybe_add_stats(
+            {FinalUserAcc0, Stats1} = mango_execution_stats:maybe_add_stats(
                 Opts, UserFun, Stats0, FinalUserAcc
             ),
+            %% This needs Stats1 as log_end is called in maybe_add_stats
+            mango_execution_stats:log_stats(Stats1),
             FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats0, FinalUserAcc0),
             {ok, FinalUserAcc1}
     end.
