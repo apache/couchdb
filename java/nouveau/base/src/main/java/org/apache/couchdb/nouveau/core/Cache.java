@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -45,17 +44,8 @@ public final class Cache<K, V> {
 
     public static class Builder<K, V> {
 
-        private int idleSeconds = -1;
         private int maxItems = 10;
         private int lockCount = -1;
-
-        public Builder<K, V> setIdleSeconds(final int idleSeconds) {
-            if (idleSeconds < 1) {
-                throw new IllegalArgumentException("idleSeconds must be at least 1");
-            }
-            this.idleSeconds = idleSeconds;
-            return this;
-        }
 
         public Builder<K, V> setMaxItems(final int maxItems) {
             if (maxItems < 1) {
@@ -74,50 +64,23 @@ public final class Cache<K, V> {
         }
 
         public Cache<K, V> build() {
-            return new Cache<K, V>(maxItems, idleSeconds, lockCount == -1 ? maxItems * 10 : lockCount);
-        }
-
-    }
-
-    private static class CachedValue<V> {
-
-        private final V value;
-        private long lastUsed;
-
-        private CachedValue(final V value) {
-            this.value = value;
-            this.lastUsed = now();
-        }
-
-        private void updateLastUsed() {
-            this.lastUsed = now();
-        }
-
-        private boolean isIdle(final long idle, final TimeUnit unit) {
-            Objects.requireNonNull(unit);
-            return lastUsed < now() - unit.toNanos(idle);
-        }
-
-        private long now() {
-            return System.nanoTime();
+            return new Cache<K, V>(maxItems, lockCount == -1 ? maxItems * 10 : lockCount);
         }
 
     }
 
     private final int maxItems;
-    private final int idleSeconds;
-    private final Map<K, CachedValue<V>> cache;
+    private final Map<K, V> cache;
     private final ReadWriteLock[] locks;
 
     private Cache(
-            final int maxItems, final int idleSeconds, final int lockCount) {
+            final int maxItems, final int lockCount) {
         this.maxItems = maxItems;
-        this.idleSeconds = idleSeconds;
         this.locks = new ReadWriteLock[lockCount];
         for (int i = 0; i < locks.length; i++) {
             this.locks[i] = new ReentrantReadWriteLock();
         }
-        this.cache = new LinkedHashMap<K, CachedValue<V>>(maxItems, 0.75f, true);
+        this.cache = new LinkedHashMap<K, V>(maxItems, 0.75f, true);
     }
 
     public <R> R with(K key, final CacheLoader<K, V> loader, final CacheUnloader<K, V> unloader,
@@ -147,8 +110,7 @@ public final class Cache<K, V> {
             rwl.writeLock().lock();
             try {
                 if (!containsKey(key)) {
-                    final V value = loader.load(key);
-                    put(key, new CachedValue<V>(value));
+                    put(key, loader.load(key));
                 }
                 rwl.readLock().lock();
             } finally {
@@ -156,7 +118,7 @@ public final class Cache<K, V> {
             }
         }
         try {
-            return function.apply(get(key).value);
+            return function.apply(get(key));
         } finally {
             rwl.readLock().unlock();
         }
@@ -169,11 +131,11 @@ public final class Cache<K, V> {
         final ReadWriteLock rwl = rwl(key);
         rwl.writeLock().lock();
         try {
-            final CachedValue<V> cachedValue = remove(key);
-            if (cachedValue == null) {
+            final V value = remove(key);
+            if (value == null) {
                 return false;
             }
-            unloader.unload(key, cachedValue.value);
+            unloader.unload(key, value);
             return true;
         } finally {
             rwl.writeLock().unlock();
@@ -203,21 +165,21 @@ public final class Cache<K, V> {
         }
     }
 
-    private CachedValue<V> get(final K key) {
+    private V get(final K key) {
         synchronized (cache) {
             return cache.get(key);
         }
     }
 
-    private CachedValue<V> remove(final K key) {
+    private V remove(final K key) {
         synchronized (cache) {
             return cache.remove(key);
         }
     }
 
-    private CachedValue<V> put(final K key, final CachedValue<V> cachedValue) {
+    private V put(final K key, final V value) {
         synchronized (cache) {
-            return cache.put(key, cachedValue);
+            return cache.put(key, value);
         }
     }
 

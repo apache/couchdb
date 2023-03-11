@@ -19,6 +19,8 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import javax.ws.rs.WebApplicationException;
@@ -56,11 +58,13 @@ public final class IndexManager implements Managed {
 
     private MetricRegistry metricRegistry;
 
+    private ScheduledExecutorService scheduler;
+
     @SuppressWarnings("rawtypes")
     private Cache<String, Index> cache;
 
     @SuppressWarnings("rawtypes")
-    public <R> R with(final String name, final IndexLoader loader, final CacheFunction<Index, R> fun)
+    public <R> R with(final String name, final IndexLoader loader, final CacheFunction<Index, R> userFun)
             throws IOException {
         if (!exists(name)) {
             throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
@@ -71,6 +75,13 @@ public final class IndexManager implements Managed {
             final Path path = indexPath(n);
             final IndexDefinition indexDefinition = loadIndexDefinition(n);
             return loader.apply(path, indexDefinition);
+        };
+
+        final CacheFunction<Index, R> fun = (index) -> {
+            if (index.needsCommit(commitIntervalSeconds, TimeUnit.SECONDS)) {
+                scheduleCommit(name, loader);
+            }
+            return userFun.apply(index);
         };
 
         return cache.with(name, cacheLoader, cacheUnloader(), fun);
@@ -154,6 +165,10 @@ public final class IndexManager implements Managed {
         this.lockCount = lockCount;
     }
 
+    public void setScheduler(ScheduledExecutorService scheduler) {
+        this.scheduler = scheduler;
+    }
+
     public Path getRootDir() {
         return rootDir;
     }
@@ -183,6 +198,10 @@ public final class IndexManager implements Managed {
                 return cache.size();
             }
         });
+
+        //
+        // scheduler.scheduleWithFixedDelay(idler, idleSeconds, idleSeconds,
+        // TimeUnit.SECONDS);
     }
 
     @Override
@@ -219,13 +238,32 @@ public final class IndexManager implements Managed {
     @SuppressWarnings("rawtypes")
     private CacheUnloader<String, Index> cacheUnloader() {
         return (name, index) -> {
+            if (!index.isDeleteOnClose()) {
+                LOGGER.info("committing and closing {}", name);
+                index.commit();
+            } else {
+                LOGGER.info("closing {}", name);
+            }
             index.close();
-            LOGGER.info("closed {}", name);
             if (index.isDeleteOnClose()) {
                 IOUtils.rm(indexRootPath(name));
-                LOGGER.info("deleted {}", name);
+                LOGGER.info("deleted on close {}", name);
             }
         };
+    }
+
+    private void scheduleCommit(final String name, final IndexLoader<?> loader) {
+        scheduler.execute(() -> {
+            try {
+                with(name, loader, (index) -> {
+                    LOGGER.info("committing {}", name);
+                    index.commit();
+                    return null;
+                });
+            } catch (final IOException e) {
+                LOGGER.warn("I/O exception while committing " + name, e);
+            }
+        });
     }
 
 }
