@@ -33,8 +33,8 @@ public class NouveauApplicationConfiguration extends Configuration {
     @Min(30)
     private int idleSeconds = 30;
 
-    @Min(1)
-    private int lockCount = 1;
+    @Min(-1)
+    private int lockCount = -1;
 
     @NotNull
     private Path rootDir = null;
