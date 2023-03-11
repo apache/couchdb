@@ -64,7 +64,6 @@ report(ReportId, Fmt, Args, Meta0) when is_map(Meta0) ->
     end,
     couch_stats:increment_counter([couch_log, level, report]),
     Entry = couch_log_formatter:format(report, self(), ReportId, Fmt, Args, Meta),
-    %%ok = couch_log_server:report(Entry).
     ok = couch_log_server:log(Entry).
 
 -spec set_level(atom() | string() | integer()) -> true.
