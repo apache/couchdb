@@ -191,7 +191,6 @@ public final class IndexCache<K, V> {
     public void close(final CacheUnloader<K, V> unloader) throws IOException {
         for (K key : cache.keySet()) {
             remove(key, unloader);
-            cache.clear();
         }
         cache.clear();
     }
