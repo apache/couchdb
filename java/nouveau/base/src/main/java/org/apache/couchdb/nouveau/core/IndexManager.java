@@ -25,9 +25,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.core.IndexCache.CacheFunction;
-import org.apache.couchdb.nouveau.core.IndexCache.CacheLoader;
-import org.apache.couchdb.nouveau.core.IndexCache.CacheUnloader;
+import org.apache.couchdb.nouveau.core.Cache.CacheFunction;
+import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
+import org.apache.couchdb.nouveau.core.Cache.CacheUnloader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +57,7 @@ public final class IndexManager implements Managed {
     private MetricRegistry metricRegistry;
 
     @SuppressWarnings("rawtypes")
-    private IndexCache<String, Index> cache;
+    private Cache<String, Index> cache;
 
     @SuppressWarnings("rawtypes")
     public <R> R with(final String name, final IndexLoader loader, final CacheFunction<Index, R> fun)
@@ -173,7 +173,7 @@ public final class IndexManager implements Managed {
     @Override
     @SuppressWarnings("rawtypes")
     public void start() throws IOException {
-        cache = new IndexCache.Builder<String, Index>()
+        cache = new Cache.Builder<String, Index>()
                 .setMaxItems(maxIndexesOpen)
                 .setLockCount(lockCount)
                 .build();
