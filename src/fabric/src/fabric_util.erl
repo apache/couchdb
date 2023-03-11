@@ -81,7 +81,7 @@ all_docs_timeout() ->
     timeout("all_docs", "10000").
 
 attachments_timeout() ->
-    timeout("attachments", "600000").
+    timeout("attachments", "60000").
 
 view_timeout(Args) ->
     PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
