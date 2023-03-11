@@ -18,8 +18,8 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.couchdb.nouveau.core.IndexCache.CacheLoader;
-import org.apache.couchdb.nouveau.core.IndexCache.CacheUnloader;
+import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
+import org.apache.couchdb.nouveau.core.Cache.CacheUnloader;
 import org.eclipse.jetty.io.RuntimeIOException;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -50,7 +50,7 @@ public class IndexCacheTest {
             }
         };
 
-        final IndexCache<String, String> cache = new IndexCache.Builder<String, String>()
+        final Cache<String, String> cache = new Cache.Builder<String, String>()
                 .setMaxItems(10)
                 .build();
 
