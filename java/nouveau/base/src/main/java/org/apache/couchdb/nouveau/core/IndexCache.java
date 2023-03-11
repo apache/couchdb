@@ -49,11 +49,11 @@ public final class IndexCache<K, V> {
 
         private int idleSeconds = -1;
         private int maxItems = 10;
-        private int lockCount = 100;
+        private int lockCount = -1;
 
         public Builder<K, V> setIdleSeconds(final int idleSeconds) {
             if (idleSeconds < 1) {
-                throw new IllegalArgumentException("idleSeconds must be at least one");
+                throw new IllegalArgumentException("idleSeconds must be at least 1");
             }
             this.idleSeconds = idleSeconds;
             return this;
@@ -61,22 +61,22 @@ public final class IndexCache<K, V> {
 
         public Builder<K, V> setMaxItems(final int maxItems) {
             if (maxItems < 1) {
-                throw new IllegalArgumentException("maxItems must be at least one");
+                throw new IllegalArgumentException("maxItems must be at least 1");
             }
             this.maxItems = maxItems;
             return this;
         }
 
         public Builder<K, V> setLockCount(final int lockCount) {
-            if (lockCount < 1) {
-                throw new IllegalArgumentException("lockCount must be at least one");
+            if (lockCount != -1 && lockCount < 1) {
+                throw new IllegalArgumentException("lockCount must be at -1 for ergonomic default or greater than 1 for explicit setting");
             }
             this.lockCount = lockCount;
             return this;
         }
 
         public IndexCache<K, V> build() {
-            return new IndexCache<K, V>(maxItems, idleSeconds, lockCount);
+            return new IndexCache<K, V>(maxItems, idleSeconds, lockCount == -1 ? maxItems * 10 : lockCount);
         }
 
     }

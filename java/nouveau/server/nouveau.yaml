@@ -1,7 +1,7 @@
 maxIndexesOpen: 100
 commitIntervalSeconds: 30
 idleSeconds: 60
-lockCount: 10
+lockCount: -1
 rootDir: target/indexes
 
 server:
