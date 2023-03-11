@@ -21,6 +21,8 @@ import java.util.ServiceLoader;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
 
+import com.github.benmanes.caffeine.cache.Scheduler;
+
 import io.dropwizard.Application;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -74,6 +76,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setLockCount(configuration.getLockCount());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setMetricRegistry(environment.metrics());
+        indexManager.setScheduler(environment.lifecycle().scheduledExecutorService("index-manager-%d").threads(5).build());
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());
         environment.lifecycle().manage(indexManager);

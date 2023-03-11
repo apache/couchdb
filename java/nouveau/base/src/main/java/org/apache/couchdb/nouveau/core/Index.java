@@ -28,6 +28,7 @@ public abstract class Index<T> implements Closeable {
     private long updateSeq;
     private boolean deleteOnClose = false;
     private long lastCommit = now();
+    private long lastUsed = now();
 
     protected Index(final long updateSeq) {
         this.updateSeq = updateSeq;
@@ -44,6 +45,7 @@ public abstract class Index<T> implements Closeable {
             throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
         doUpdate(docId, request);
+        updateLastUsed();
         incrementUpdateSeq(request.getSeq());
     }
 
@@ -52,12 +54,14 @@ public abstract class Index<T> implements Closeable {
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
         doDelete(docId, request);
+        updateLastUsed();
         incrementUpdateSeq(request.getSeq());
     }
 
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults<T> search(final SearchRequest request) throws IOException {
+        updateLastUsed();
         return doSearch(request);
     }
 
@@ -108,12 +112,25 @@ public abstract class Index<T> implements Closeable {
         this.updateSeq = updateSeq;
     }
 
-    public long secondsSinceLastCommit() {
-        final long lastCommit;
+    public boolean needsCommit(final long duration, final TimeUnit unit) {
+        final long commitNeededSince = now() - unit.toNanos(duration);
         synchronized (this) {
-            lastCommit = this.lastCommit;
+            return this.lastCommit < commitNeededSince;
         }
-        return TimeUnit.NANOSECONDS.toMillis(now() - lastCommit);
+    }
+
+    public void updateLastUsed() {
+        final long now = now();
+        synchronized (this) {
+            this.lastUsed = now;
+        }
+    }
+
+    public boolean isIdle(final long duration, final TimeUnit unit) {
+        final long idleSince = now() - unit.toNanos(duration);
+        synchronized (this) {
+            return this.lastUsed < idleSince;
+        }
     }
 
     private long now() {
