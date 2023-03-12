@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map.Entry;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -199,9 +200,18 @@ public final class IndexManager implements Managed {
             }
         });
 
-        //
-        // scheduler.scheduleWithFixedDelay(idler, idleSeconds, idleSeconds,
-        // TimeUnit.SECONDS);
+        Runnable idler = () -> {
+            for (final Entry<String, Index> entry : cache.entrySet()) {
+                if (entry.getValue().isIdle(idleSeconds, TimeUnit.SECONDS)) {
+                    try {
+                        cache.remove(entry.getKey(), cacheUnloader());
+                    } catch (final IOException e) {
+                        LOGGER.warn("I/O exception while closing " + entry.getKey(), e);
+                    }
+                }
+            }
+        };
+        scheduler.scheduleWithFixedDelay(idler, idleSeconds, idleSeconds, TimeUnit.SECONDS);
     }
 
     @Override
