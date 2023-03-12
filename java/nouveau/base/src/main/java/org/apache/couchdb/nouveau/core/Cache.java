@@ -14,9 +14,13 @@
 package org.apache.couchdb.nouveau.core;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.Map.Entry;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -153,6 +157,12 @@ public final class Cache<K, V> {
             remove(key, unloader);
         }
         cache.clear();
+    }
+
+    public Set<Entry<K, V>> entrySet() {
+        synchronized (cache) {
+            return Collections.unmodifiableSet(new HashSet<Entry<K,V>>(cache.entrySet()));
+        }
     }
 
     private ReadWriteLock rwl(final K key) {
