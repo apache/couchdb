@@ -28,11 +28,6 @@ var Filter = (function() {
         respond([true, results]);
       },
       filter_view : function(fun, ddoc, args) {
-        // recompile
-        var sandbox = create_filter_sandbox();
-        var source = fun.toSource();
-        fun = evalcx(source, sandbox);
-
         var results = [];
         var docs = args[0];
         for (var i=0; i < docs.length; i++) {
