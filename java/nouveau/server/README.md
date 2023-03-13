@@ -58,16 +58,20 @@ URL="http://foo:bar@127.0.0.1:15984/foo"
 curl -X DELETE "$URL"
 curl -X PUT "$URL?n=3&q=16"
 
-curl -X PUT "$URL/_design/foo" -d '{"nouveau":{"bar":{"default_analyzer":"standard", "field_analyzers":{"foo":"english"}, "index":"function(doc) { index(\"foo\", \"bar\", \"string\"); index(\"foo\", \"bar\", \"stored_string\"); }"}}}'
+curl -X PUT "$URL/_design/foo" -d '{"nouveau":{"bar":{"lucene_major": 9, "default_analyzer":"standard", "field_analyzers":{"foo":"english"}, "index":"function(doc) { index(\"string\", \"foo\", \"bar\"); }"}}}'
 
 # curl "$URL/_index" -Hcontent-type:application/json -d '{"type":"nouveau", "index": {"fields": [{"name": "bar", "type":"number"}]}}'
 
-for I in {1..100}; do
+for I in {1..5}; do
     DOCID=$RANDOM
     DOCID=$[ $DOCID % 100000 ]
     BAR=$RANDOM
     BAR=$[ $BAR % 100000 ]
     curl -X PUT "$URL/doc$DOCID" -d "{\"bar\": $BAR}"
+done
+
+while true; do
+    curl 'foo:bar@localhost:15984/foo/_design/foo/_nouveau/bar?q=*:*'
 done
 ```
 
