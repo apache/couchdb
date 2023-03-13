@@ -177,24 +177,27 @@ get_io_stats() ->
     ].
 
 get_message_queue_stats() ->
-    QLenFun = fun(Name) -> message_queue_len(whereis(Name)) end,
-    Queues = lists:map(QLenFun, registered()),
+    QFun = fun(Name) -> {Name, message_queue_len(whereis(Name))} end,
+    Queues = lists:map(QFun, registered()),
+    QueueLens = lists:map(fun({_, Len}) -> Len end, Queues),
+    QueueLenByLabel = lists:map(fun({Name, Len}) -> {[{queue_name, Name}], Len} end, Queues),
     [
         to_prom(
-            erlang_message_queues, gauge, "total size of all message queues", lists:sum(Queues)
+            erlang_message_queues, gauge, "total size of all message queues", lists:sum(QueueLens)
         ),
         to_prom(
             erlang_message_queue_min,
             gauge,
             "minimum size across all message queues",
-            lists:min(Queues)
+            lists:min(QueueLens)
         ),
         to_prom(
             erlang_message_queue_max,
             gauge,
             "maximum size across all message queues",
-            lists:max(Queues)
-        )
+            lists:max(QueueLens)
+        ),
+        to_prom(erlang_message_queue_size, gauge, "size of message queue", QueueLenByLabel)
     ].
 
 message_queue_len(undefined) ->

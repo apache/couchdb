@@ -109,9 +109,13 @@ type_def(Metric, Type, Desc) ->
         to_bin(io_lib:format("# TYPE ~s ~s", [Name, Type]))
     ].
 
-to_prom(Metric, Type, Desc, Data) ->
+% support creating a metric series with multiple label/values.
+% Instances is of the form [{[{LabelName, LabelValue}], Value}, ...]
+to_prom(Metric, Type, Desc, Instances) when is_list(Instances) ->
     TypeStr = type_def(Metric, Type, Desc),
-    [TypeStr] ++ to_prom(Metric, Data).
+    [TypeStr] ++ lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);
+to_prom(Metric, Type, Desc, Data) ->
+    to_prom(Metric, Type, Desc, [Data]).
 
 to_prom(Metric, Instances) when is_list(Instances) ->
     lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);
