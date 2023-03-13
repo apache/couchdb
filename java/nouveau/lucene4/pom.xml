@@ -27,6 +27,16 @@
       <version>${project.version}</version>
     </dependency>
 
+      <!-- Base tests -->
+    <dependency>
+      <groupId>org.apache.couchdb.nouveau</groupId>
+      <artifactId>base</artifactId>
+      <version>${project.version}</version>
+      <classifier>tests</classifier>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+
     <!-- Dropwizard -->
     <dependency>
       <groupId>io.dropwizard</groupId>
