@@ -35,7 +35,6 @@ public abstract class BaseIndexResource<T> {
         this.indexManager = indexManager;
     }
 
-    @SuppressWarnings("unchecked")
     public IndexInfo indexInfo(String name)
             throws Exception {
         return indexManager.with(name, indexLoader(), (index) -> {
@@ -52,7 +51,6 @@ public abstract class BaseIndexResource<T> {
         indexManager.create(name, indexDefinition);
     }
 
-    @SuppressWarnings("unchecked")
     public void deleteDoc(String name, String docId,
             @NotNull @Valid final DocumentDeleteRequest request)
             throws Exception {

@@ -15,7 +15,6 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
@@ -62,7 +61,6 @@ public class IndexCacheTest {
 
         final Thread[] threads = new Thread[nThreads + 1];
         for (int i = 0; i < nThreads; i++) {
-            final String workerName = "worker-" + i;
             threads[i] = new Thread(() -> {
                 final Random testRandom = new Random();
                 try {
