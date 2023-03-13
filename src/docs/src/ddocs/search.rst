@@ -31,14 +31,12 @@ To create a search index, you add a JavaScript function to a design document in 
 database. An index builds after processing one search request or after the server detects
 a document update. The ``index`` function takes the following parameters:
 
-1.  Field name - The name of the field you want to use when you query the index. If you
-set this parameter to ``default``, then this field is queried if no field is specified in
-the query syntax.
-
-2.  Data that you want to index, for example, ``doc.address.country``.
-
-3.  (Optional) The third parameter includes the following fields: ``boost``, ``facet``,
-``index``, and ``store``. These fields are described in more detail later.
+#. Field name - The name of the field you want to use when you query the index.
+   If you set this parameter to ``default``, then this field is queried if no field is
+   specified in the query syntax.
+#. Data that you want to index, for example, ``doc.address.country``.
+#. (Optional) The third parameter includes the following fields: ``boost``, ``facet``,
+   ``index``, and ``store``. These fields are described in more detail later.
 
 By default, a search index response returns 25 rows. The number of rows that is returned
 can be changed by using the ``limit`` parameter. Each response includes a ``bookmark``
@@ -96,64 +94,64 @@ in the ``index`` field to index that data.
 
 The ``index`` function takes three parameters, where the third parameter is optional.
 
-The first parameter is the name of the field you intend to use when querying the index,
-and which is specified in the Lucene syntax portion of subsequent queries.
-An example appears in the following query:
+#. The first parameter is the name of the field you intend to use when querying the index,
+   and which is specified in the Lucene syntax portion of subsequent queries.
+   An example appears in the following query:
 
-.. code-block:: javascript
+   .. code-block:: javascript
 
-    query=color:red
+        query=color:red
 
-The Lucene field name ``color`` is the first parameter of the ``index`` function.
+   The Lucene field name ``color`` is the first parameter of the ``index`` function.
 
-The ``query`` parameter can be abbreviated to ``q``,
-so another way of writing the query is as follows:
+   The ``query`` parameter can be abbreviated to ``q``,
+   so another way of writing the query is as follows:
 
-.. code-block:: javascript
+   .. code-block:: javascript
 
-    q=color:red
+       q=color:red
 
-If the special value ``"default"`` is used when you define the name,
-you do not have to specify a field name at query time.
-The effect is that the query can be simplified:
+   If the special value ``"default"`` is used when you define the name,
+   you do not have to specify a field name at query time.
+   The effect is that the query can be simplified:
 
-.. code-block:: javascript
+   .. code-block:: javascript
 
-    query=red
+       query=red
 
-The second parameter is the data to be indexed. Keep the following information
-in mind when you index your data:
+#. The second parameter is the data to be indexed. Keep the following information
+   in mind when you index your data:
 
-- This data must be only a string, number, or boolean. Other types will cause
-  an error to be thrown by the index function call.
+   - This data must be only a string, number, or boolean. Other types will cause
+     an error to be thrown by the index function call.
 
-- If an error is thrown when running your function, for this reason or others,
-  the document will not be added to that search index.
+   - If an error is thrown when running your function, for this reason or others,
+     the document will not be added to that search index.
 
-The third, optional, parameter is a JavaScript object with the following fields:
+#. The third, optional, parameter is a JavaScript object with the following fields:
 
-*Index function (optional parameter)*
+   *Index function (optional parameter)*
 
-* **boost** - A number that specifies the relevance in search results. Content that is
-  indexed with a boost value greater than 1 is more relevant than content that is
-  indexed without a boost value. Content with a boost value less than one is not so
-  relevant. Value is a positive floating point number. Default is 1 (no boosting).
+   * **boost** - A number that specifies the relevance in search results. Content that is
+     indexed with a boost value greater than 1 is more relevant than content that is
+     indexed without a boost value. Content with a boost value less than one is not so
+     relevant. Value is a positive floating point number. Default is 1 (no boosting).
 
-* **facet** - Creates a faceted index. See :ref:`Faceting <ddoc/search/faceting>`.
-  Values are ``true`` or ``false``. Default is ``false``.
+   * **facet** - Creates a faceted index. See :ref:`Faceting <ddoc/search/faceting>`.
+     Values are ``true`` or ``false``. Default is ``false``.
 
-* **index** - Whether the data is indexed, and if so, how. If set to ``false``, the data
-  cannot be used for searches, but can still be retrieved from the index if ``store`` is
-  set to ``true``. See :ref:`Analyzers <ddoc/search/analyzers>`.
-  Values are ``true`` or ``false``. Default is ``true``
+   * **index** - Whether the data is indexed, and if so, how. If set to ``false``, the
+     data cannot be used for searches, but can still be retrieved from the index if
+     ``store`` is set to ``true``. See :ref:`Analyzers <ddoc/search/analyzers>`.
+     Values are ``true`` or ``false``. Default is ``true``
 
-* **store** - If ``true``, the value is returned in the search result; otherwise,
-  the value is not returned. Values are ``true`` or ``false``. Default is ``false``.
+   * **store** - If ``true``, the value is returned in the search result; otherwise,
+     the value is not returned. Values are ``true`` or ``false``. Default is ``false``.
 
-.. note::
+   .. note::
 
-    If you do not set the ``store`` parameter,
-    the index data results for the document are not returned in response to a query.
+       If you do not set the ``store`` parameter,
+       the index data results for the document are not returned in response to a query.
 
 *Example search index function:*
 
