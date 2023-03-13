@@ -13,7 +13,6 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import static io.dropwizard.testing.FixtureHelpers.fixture;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
@@ -37,14 +36,14 @@ public class SearchRequestTest {
     public void testSerialisation() throws Exception {
         SearchRequest request = asObject();
         final String expected = mapper.writeValueAsString(
-                mapper.readValue(fixture("fixtures/SearchRequest.json"), SearchRequest.class));
+                mapper.readValue(getClass().getResource("/fixtures/SearchRequest.json"), SearchRequest.class));
         assertThat(mapper.writeValueAsString(request)).isEqualTo(expected);
     }
 
     @Test
     public void testDeserialisation() throws Exception {
         SearchRequest request = asObject();
-        assertThat(mapper.readValue(fixture("fixtures/SearchRequest.json"), SearchRequest.class).toString())
+        assertThat(mapper.readValue(getClass().getResource("/fixtures/SearchRequest.json"), SearchRequest.class).toString())
                 .isEqualTo(request.toString());
     }
 
