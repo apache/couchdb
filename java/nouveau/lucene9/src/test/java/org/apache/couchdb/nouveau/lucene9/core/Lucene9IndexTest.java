@@ -16,6 +16,8 @@ package org.apache.couchdb.nouveau.lucene9.core;
 import org.apache.couchdb.nouveau.core.BaseIndexTest;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
@@ -37,6 +39,10 @@ public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
             final SearcherManager searcherManager = new SearcherManager(writer, null);
             return new Lucene9Index(analyzer, writer, 0L, searcherManager);
         };
+    }
+
+    protected IndexableField stringField(final String name, final String value) {
+        return new StringField(name, value, Store.NO);
     }
 
 }
