@@ -27,6 +27,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A generic cache with an enforced maximum entry system.
+ *
+ * A striped lock is used to ensure that no caller will observe
+ * the entries while they are loading or unloading.
+ */
+
 public final class Cache<K, V> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Cache.class);

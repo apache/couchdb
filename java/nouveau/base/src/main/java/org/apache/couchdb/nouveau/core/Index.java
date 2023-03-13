@@ -23,6 +23,17 @@ import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 
+/**
+ * An index that reflects a single `.couch` file shard of some
+ * database.
+ *
+ * The class only permits sequential modification (updates and deletes)
+ * but allows concurrent searching.
+ *
+ * This class also expects a monotonically incrementing update sequence
+ * associated with each modification.
+ */
+
 public abstract class Index<T> implements Closeable {
 
     private long updateSeq;
