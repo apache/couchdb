@@ -41,6 +41,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.dropwizard.lifecycle.Managed;
 
+/**
+ * The central class of Nouveau, responsible for loading and unloading Lucene
+ * indexes and making them available for query.
+ */
+
 public final class IndexManager implements Managed {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexManager.class);
