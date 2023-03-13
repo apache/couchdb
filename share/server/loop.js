@@ -87,7 +87,10 @@ var DDoc = (function() {
                        " on design doc " + ddocId]);
               }
               if (typeof fun != "function") {
-                fun = Couch.compileFunction(fun, ddoc, funPath.join('.'));
+                // For filter_view we want the emit() function to be overridden
+                // and just toggle a flag instead of accumulating rows
+                var sandbox = (cmd === "views") ? create_filter_sandbox() : create_sandbox();
+                fun = Couch.compileFunction(fun, ddoc, funPath.join('.'), sandbox);
                 // cache the compiled fun on the ddoc
                 point[funPath[i]] = fun;
               };
