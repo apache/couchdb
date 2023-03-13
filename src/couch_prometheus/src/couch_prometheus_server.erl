@@ -16,7 +16,7 @@
 
 -import(couch_prometheus_util, [
     couch_to_prom/3,
-    to_prom/3,
+    to_prom/4,
     to_prom_summary/2
 ]).
 
@@ -116,7 +116,7 @@ get_system_stats() ->
     ]).
 
 get_uptime_stat() ->
-    to_prom(uptime_seconds, counter, couch_app:uptime() div 1000).
+    to_prom(uptime_seconds, counter, "couchdb uptime", couch_app:uptime() div 1000).
 
 get_vm_stats() ->
     MemLabels = lists:map(
@@ -131,29 +131,70 @@ get_vm_stats() ->
     ProcCount = erlang:system_info(process_count),
     ProcLimit = erlang:system_info(process_limit),
     [
-        to_prom(erlang_memory_bytes, gauge, MemLabels),
-        to_prom(erlang_gc_collections_total, counter, NumGCs),
-        to_prom(erlang_gc_words_reclaimed_total, counter, WordsReclaimed),
-        to_prom(erlang_context_switches_total, counter, CtxSwitches),
-        to_prom(erlang_reductions_total, counter, Reds),
-        to_prom(erlang_processes, gauge, ProcCount),
-        to_prom(erlang_process_limit, gauge, ProcLimit)
+        to_prom(
+            erlang_memory_bytes,
+            gauge,
+            "size of memory dynamically allocated by the Erlang emulator",
+            MemLabels
+        ),
+        to_prom(
+            erlang_gc_collections_total,
+            counter,
+            "number of garbage collections by the Erlang emulator",
+            NumGCs
+        ),
+        to_prom(
+            erlang_gc_words_reclaimed_total,
+            counter,
+            "number of words reclaimed by garbage collections",
+            WordsReclaimed
+        ),
+        to_prom(
+            erlang_context_switches_total, counter, "total number of context switches", CtxSwitches
+        ),
+        to_prom(erlang_reductions_total, counter, "total number of reductions", Reds),
+        to_prom(erlang_processes, gauge, "the number of Erlang processes", ProcCount),
+        to_prom(
+            erlang_process_limit,
+            gauge,
+            "the maximum number of simultaneously existing Erlang processes",
+            ProcLimit
+        )
     ].
 
 get_io_stats() ->
     {{input, In}, {output, Out}} = erlang:statistics(io),
     [
-        to_prom(erlang_io_recv_bytes_total, counter, In),
-        to_prom(erlang_io_sent_bytes_total, counter, Out)
+        to_prom(
+            erlang_io_recv_bytes_total,
+            counter,
+            "the total number of bytes received through ports",
+            In
+        ),
+        to_prom(
+            erlang_io_sent_bytes_total, counter, "the total number of bytes output to ports", Out
+        )
     ].
 
 get_message_queue_stats() ->
     QLenFun = fun(Name) -> message_queue_len(whereis(Name)) end,
     Queues = lists:map(QLenFun, registered()),
     [
-        to_prom(erlang_message_queues, gauge, lists:sum(Queues)),
-        to_prom(erlang_message_queue_min, gauge, lists:min(Queues)),
-        to_prom(erlang_message_queue_max, gauge, lists:max(Queues))
+        to_prom(
+            erlang_message_queues, gauge, "total size of all message queues", lists:sum(Queues)
+        ),
+        to_prom(
+            erlang_message_queue_min,
+            gauge,
+            "minimum size across all message queues",
+            lists:min(Queues)
+        ),
+        to_prom(
+            erlang_message_queue_max,
+            gauge,
+            "maximum size across all message queues",
+            lists:max(Queues)
+        )
     ].
 
 message_queue_len(undefined) ->
@@ -177,13 +218,18 @@ get_run_queue_stats() ->
                 {lists:sum(SQs), DCQ}
         end,
     [
-        to_prom(erlang_scheduler_queues, gauge, Normal),
-        to_prom(erlang_dirty_cpu_scheduler_queues, gauge, Dirty)
+        to_prom(erlang_scheduler_queues, gauge, "the total size of all normal run queues", Normal),
+        to_prom(
+            erlang_dirty_cpu_scheduler_queues,
+            gauge,
+            "the total size of all dirty CPU scheduler run queues",
+            Dirty
+        )
     ].
 
 get_ets_stats() ->
     NumTabs = length(ets:all()),
-    to_prom(erlang_ets_table, gauge, NumTabs).
+    to_prom(erlang_ets_table, gauge, "number of ETS tables", NumTabs).
 
 drain_refresh_messages() ->
     receive
@@ -205,7 +251,8 @@ system_stats_test() ->
     lists:foreach(
         fun(Line) ->
             ?assert(is_binary(Line)),
-            ?assert((starts_with(<<"couchdb_">>, Line) orelse starts_with(<<"# TYPE ">>, Line)))
+            Trimmed = string:trim(Line),
+            ?assert(starts_with(<<"couchdb_">>, Trimmed) orelse starts_with(<<"# ">>, Trimmed))
         end,
         get_system_stats()
     ).
