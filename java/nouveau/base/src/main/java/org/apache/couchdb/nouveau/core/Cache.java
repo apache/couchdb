@@ -24,9 +24,6 @@ import java.util.Map.Entry;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 /**
  * A generic cache with an enforced maximum entry system.
  *
@@ -35,8 +32,6 @@ import org.slf4j.LoggerFactory;
  */
 
 public final class Cache<K, V> {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(Cache.class);
 
     @FunctionalInterface
     public interface CacheLoader<K, V> {

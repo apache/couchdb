@@ -21,8 +21,6 @@ import java.util.ServiceLoader;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
 
-import com.github.benmanes.caffeine.cache.Scheduler;
-
 import io.dropwizard.Application;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.setup.Bootstrap;

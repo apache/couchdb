@@ -133,7 +133,6 @@ public final class IndexManager implements Managed {
         }
     }
 
-    @SuppressWarnings("rawtypes")
     private void deleteIndex(final String name) throws IOException {
         cache.remove(name, cacheUnloader());
     }
@@ -220,7 +219,6 @@ public final class IndexManager implements Managed {
     }
 
     @Override
-    @SuppressWarnings("rawtypes")
     public void stop() throws IOException {
         cache.close(cacheUnloader());
     }
