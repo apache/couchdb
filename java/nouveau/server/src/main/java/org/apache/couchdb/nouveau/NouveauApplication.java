@@ -22,7 +22,6 @@ import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
 
 import io.dropwizard.Application;
-import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
@@ -49,13 +48,11 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
                 try {
                     ClassLoader classLoader = URLClassLoader
                             .newInstance(new URL[] { new URL(System.getProperty(name)) });
-                    final ServiceLoader<ConfiguredBundle> bundleLoader = ServiceLoader.load(ConfiguredBundle.class,
+                    final ServiceLoader<LuceneBundle> bundleLoader = ServiceLoader.load(LuceneBundle.class,
                             classLoader);
-                    for (final ConfiguredBundle<NouveauApplicationConfiguration> bundle : bundleLoader) {
-                        if (bundle instanceof LuceneBundle) {
-                            ((LuceneBundle)bundle).setIndexManager(indexManager);
-                            bootstrap.addBundle(bundle);
-                        }
+                    for (final LuceneBundle bundle : bundleLoader) {
+                        bundle.setIndexManager(indexManager);
+                        bootstrap.addBundle(bundle);
                     }
                 } catch (final MalformedURLException e) {
                     throw new Error(e);
