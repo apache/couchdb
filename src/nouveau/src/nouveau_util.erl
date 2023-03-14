@@ -19,15 +19,15 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([
-    index_path/1,
+    index_name/1,
     design_doc_to_indexes/2,
     design_doc_to_index/3,
     nouveau_url/0
 ]).
 
-index_path(Path) when is_binary(Path) ->
+index_name(Path) when is_binary(Path) ->
     <<(node_prefix())/binary, "/", Path/binary>>;
-index_path(#index{} = Index) ->
+index_name(#index{} = Index) ->
     <<(node_prefix())/binary, "/", (Index#index.dbname)/binary, "/", (Index#index.sig)/binary>>.
 
 node_prefix() ->

@@ -115,6 +115,7 @@ public final class IndexManager implements Managed {
 
     public void deleteAll(final String path) throws IOException {
         final Path rootPath = indexRootPath(path);
+        LOGGER.info("deleting indexes below {}", rootPath);
         if (!rootPath.toFile().exists()) {
             return;
         }
@@ -123,7 +124,8 @@ public final class IndexManager implements Managed {
         try {
             stream.forEach((p) -> {
                 try {
-                    deleteIndex(rootDir.relativize(p).toString());
+                    final String relativeName = rootDir.relativize(p).toString();
+                    deleteIndex(relativeName);
                 } catch (Exception e) {
                     LOGGER.error("I/O exception deleting " + p, e);
                 }
@@ -134,7 +136,12 @@ public final class IndexManager implements Managed {
     }
 
     private void deleteIndex(final String name) throws IOException {
-        cache.remove(name, cacheUnloader());
+        // cache.remove will delete only if the index is currently open.
+        boolean removed = cache.remove(name, cacheUnloadAndDelete());
+        if (!removed) {
+            LOGGER.info("deleting index {}", name);
+            IOUtils.rm(indexRootPath(name));
+        }
     }
 
     @JsonProperty
@@ -262,6 +269,14 @@ public final class IndexManager implements Managed {
                 IOUtils.rm(indexRootPath(name));
                 LOGGER.info("deleted on close {}", name);
             }
+        };
+    }
+
+    @SuppressWarnings("rawtypes")
+    private CacheUnloader<String, Index> cacheUnloadAndDelete() {
+        return (name, index) -> {
+            index.setDeleteOnClose(true);
+            cacheUnloader().unload(name, index);
         };
     }
 
