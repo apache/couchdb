@@ -542,6 +542,10 @@ nouveau-clean:
 nouveau-install:
 	@cd java/nouveau && mvn install
 
+.PHONY: nouveau-install-no-tests
+nouveau-install-no-tests:
+	@cd java/nouveau && mvn -Dmaven.test.skip=true install
+
 .PHONY: nouveau-start
-nouveau-start: nouveau-install
+nouveau-start: nouveau-install-no-tests
 	@cd java/nouveau/server && mvn exec:exec -Dexec.executable="java"
