@@ -135,17 +135,23 @@ public final class Cache<K, V> {
         Objects.requireNonNull(unloader);
 
         final ReadWriteLock rwl = rwl(key);
-        rwl.writeLock().lock();
-        try {
-            final V value = remove(key);
-            if (value == null) {
-                return false;
+        rwl.readLock().lock();
+        if (containsKey(key)) {
+            rwl.readLock().unlock();
+            rwl.writeLock().lock();
+            try {
+                final V value = remove(key);
+                if (value == null) {
+                    return false;
+                }
+                unloader.unload(key, value);
+                return true;
+            } finally {
+                rwl.writeLock().unlock();
             }
-            unloader.unload(key, value);
-            return true;
-        } finally {
-            rwl.writeLock().unlock();
         }
+        rwl.readLock().unlock();
+        return false;
     }
 
     public int size() {
