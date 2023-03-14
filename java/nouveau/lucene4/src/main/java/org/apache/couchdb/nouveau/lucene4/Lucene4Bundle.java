@@ -19,6 +19,7 @@ import org.apache.couchdb.nouveau.LuceneBundle;
 import org.apache.couchdb.nouveau.NouveauApplicationConfiguration;
 import org.apache.couchdb.nouveau.lucene4.core.Lucene4Module;
 import org.apache.couchdb.nouveau.lucene4.core.ParallelSearcherFactory;
+import org.apache.couchdb.nouveau.lucene4.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.lucene4.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.lucene4.resources.IndexResource;
 import org.apache.lucene.search.SearcherFactory;
@@ -29,6 +30,9 @@ public final class Lucene4Bundle extends LuceneBundle {
 
     @Override
     public void run(final NouveauApplicationConfiguration configuration, final Environment environment) throws Exception {
+
+        // Health checks
+        environment.healthChecks().register("analyze4", new AnalyzeHealthCheck());
 
         // Serialization classes
         environment.getObjectMapper().registerModule(new Lucene4Module());
