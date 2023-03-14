@@ -22,7 +22,7 @@ import org.apache.couchdb.nouveau.resources.BaseAnalyzeResource;
 
 import com.codahale.metrics.health.HealthCheck;
 
-public class BaseAnalyzeHealthCheck extends HealthCheck {
+public abstract class BaseAnalyzeHealthCheck extends HealthCheck {
 
     private BaseAnalyzeResource analyzeResource;
 

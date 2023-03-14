@@ -21,7 +21,7 @@
     analyze/3,
     index_info/1,
     create_index/2,
-    delete_path/1,
+    delete_path/2,
     delete_doc/3,
     update_doc/4,
     search/2
@@ -73,10 +73,10 @@ create_index(#index{} = Index, IndexDefinition) ->
             send_error(Reason)
     end.
 
-delete_path(Path) when
-    is_binary(Path)
+delete_path(LuceneMajor, Path) when
+    is_integer(LuceneMajor), is_binary(Path)
 ->
-    Resp = send_if_enabled(index_path(Path), [?JSON_CONTENT_TYPE], delete, []),
+    Resp = send_if_enabled(index_path(LuceneMajor, Path), [?JSON_CONTENT_TYPE], delete, []),
     case Resp of
         {ok, "204", _, _} ->
             ok;
@@ -133,13 +133,13 @@ search(#index{} = Index, QueryArgs) ->
 
 %% private functions
 
-%% duplicate name :(
-index_path(Path) ->
+index_path(LuceneMajor, Path) ->
     lists:flatten(
         io_lib:format(
-            "~s/index/~s",
+            "~s/~B/index/~s",
             [
                 nouveau_util:nouveau_url(),
+                LuceneMajor,
                 couch_util:url_encode(Path)
             ]
         )
@@ -152,7 +152,7 @@ index_url(#index{} = Index) ->
             [
                 nouveau_util:nouveau_url(),
                 Index#index.lucene_major,
-                couch_util:url_encode(nouveau_util:index_path(Index))
+                couch_util:url_encode(nouveau_util:index_name(Index))
             ]
         )
     ).
@@ -164,7 +164,7 @@ doc_url(#index{} = Index, DocId) ->
             [
                 nouveau_util:nouveau_url(),
                 Index#index.lucene_major,
-                couch_util:url_encode(nouveau_util:index_path(Index)),
+                couch_util:url_encode(nouveau_util:index_name(Index)),
                 couch_util:url_encode(DocId)
             ]
         )
