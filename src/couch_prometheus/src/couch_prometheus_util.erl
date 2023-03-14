@@ -146,9 +146,9 @@ path_to_name(Path) ->
 
 counter_metric(Path) ->
     Name = path_to_name(Path),
-    case string:find(Name, <<"_total">>, trailing) of
-        nomatch -> to_bin(io_lib:format("~s_total", [Name]));
-        _ -> Name
+    case lists:suffix("_total", Name) of
+        true -> to_bin(Name);
+        _ -> to_bin(io_lib:format("~s_total", [Name]))
     end.
 
 to_bin(Data) when is_list(Data) ->
@@ -171,62 +171,64 @@ val(Key, Stats) ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
-to_prom_test_() ->
-    [
-        ?_assertEqual(
-            <<"couchdb_ddoc_cache 10">>,
-            test_to_prom_output(ddoc_cache, counter, 10)
-        ),
-        ?_assertEqual(
-            <<"couchdb_httpd_status_codes{code=\"200\"} 3">>,
-            test_to_prom_output(httpd_status_codes, counter, {[{code, 200}], 3})
-        ),
-        ?_assertEqual(
-            <<"couchdb_temperature_celsius 36">>,
-            test_to_prom_output(temperature_celsius, gauge, 36)
-        ),
-        ?_assertEqual(
-            <<"couchdb_mango_query_time_seconds{quantile=\"0.75\"} 4.5">>,
-            test_to_prom_sum_output([mango_query_time], [
-                {value, [
-                    {min, 0.0},
-                    {max, 0.0},
-                    {arithmetic_mean, 0.0},
-                    {geometric_mean, 0.0},
-                    {harmonic_mean, 0.0},
-                    {median, 0.0},
-                    {variance, 0.0},
-                    {standard_deviation, 0.0},
-                    {skewness, 0.0},
-                    {kurtosis, 0.0},
-                    {percentile, [
-                        {50, 0.0},
-                        {75, 4500},
-                        {90, 0.0},
-                        {95, 0.0},
-                        {99, 0.0},
-                        {999, 0.0}
-                    ]},
-                    {histogram, [
-                        {0, 0}
-                    ]},
-                    {n, 0}
+to_prom_counter_test() ->
+    ?assertEqual(
+        <<"couchdb_ddoc_cache 10">>,
+        test_to_prom_output(ddoc_cache, counter, 10)
+    ),
+    ?assertEqual(
+        <<"couchdb_httpd_status_codes{code=\"200\"} 3">>,
+        test_to_prom_output(httpd_status_codes, counter, {[{code, 200}], 3})
+    ).
+
+to_prom_gauge_test() ->
+    ?assertEqual(
+        <<"couchdb_temperature_celsius 36">>,
+        test_to_prom_output(temperature_celsius, gauge, 36)
+    ).
+
+to_prom_summary_test() ->
+    ?assertEqual(
+        <<"couchdb_mango_query_time_seconds{quantile=\"0.75\"} 4.5">>,
+        test_to_prom_summary_output([mango_query_time], [
+            {value, [
+                {min, 0.0},
+                {max, 0.0},
+                {arithmetic_mean, 0.0},
+                {geometric_mean, 0.0},
+                {harmonic_mean, 0.0},
+                {median, 0.0},
+                {variance, 0.0},
+                {standard_deviation, 0.0},
+                {skewness, 0.0},
+                {kurtosis, 0.0},
+                {percentile, [
+                    {50, 0.0},
+                    {75, 4500},
+                    {90, 0.0},
+                    {95, 0.0},
+                    {99, 0.0},
+                    {999, 0.0}
                 ]},
-                {type, histogram},
-                {desc, <<"length of time processing a mango query">>}
-            ])
-        )
-    ].
+                {histogram, [
+                    {0, 0}
+                ]},
+                {n, 0}
+            ]},
+            {type, histogram},
+            {desc, <<"length of time processing a mango query">>}
+        ])
+    ).
 
 counter_metric_test_() ->
     [
         ?_assertEqual(
-            "document_purges_total",
+            <<"document_purges_total">>,
             counter_metric([document_purges, total])
         ),
         ?_assertEqual(
-            "document_purges_total",
-            counter_metric([document_purges, total])
+            <<"document_purges_total">>,
+            counter_metric([document_purges])
         )
     ].
 
@@ -234,7 +236,7 @@ test_to_prom_output(Metric, Type, Val) ->
     Out = to_prom(Metric, Type, Val),
     lists:nth(2, Out).
 
-test_to_prom_sum_output(Metric, Info) ->
+test_to_prom_summary_output(Metric, Info) ->
     Out = to_prom_summary(Metric, Info),
     lists:nth(3, Out).
 
