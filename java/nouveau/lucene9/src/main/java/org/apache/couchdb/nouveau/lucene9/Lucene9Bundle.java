@@ -20,6 +20,7 @@ import org.apache.couchdb.nouveau.NouveauApplicationConfiguration;
 import org.apache.couchdb.nouveau.lucene9.core.Lucene9Module;
 import org.apache.couchdb.nouveau.lucene9.core.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.lucene9.health.AnalyzeHealthCheck;
+import org.apache.couchdb.nouveau.lucene9.health.IndexHealthCheck;
 import org.apache.couchdb.nouveau.lucene9.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.lucene9.resources.IndexResource;
 import org.apache.lucene.search.SearcherFactory;
@@ -29,10 +30,8 @@ import io.dropwizard.setup.Environment;
 public final class Lucene9Bundle extends LuceneBundle {
 
     @Override
-    public void run(final NouveauApplicationConfiguration configuration, final Environment environment) throws Exception {
-
-        // Health checks
-        environment.healthChecks().register("analyze9", new AnalyzeHealthCheck());
+    public void run(final NouveauApplicationConfiguration configuration, final Environment environment)
+            throws Exception {
 
         // Serialization classes
         environment.getObjectMapper().registerModule(new Lucene9Module());
@@ -43,7 +42,12 @@ public final class Lucene9Bundle extends LuceneBundle {
         // IndexResource
         final ExecutorService executorService = environment.lifecycle().executorService("nouveau-lucene9-%d").build();
         final SearcherFactory searcherFactory = new ParallelSearcherFactory(executorService);
-        environment.jersey().register(new IndexResource(indexManager, searcherFactory));
+        final IndexResource indexResource = new IndexResource(indexManager, searcherFactory);
+        environment.jersey().register(indexResource);
+
+        // Health checks
+        environment.healthChecks().register("analyze9", new AnalyzeHealthCheck());
+        environment.healthChecks().register("index9", new IndexHealthCheck(indexResource));
     }
 
 }
