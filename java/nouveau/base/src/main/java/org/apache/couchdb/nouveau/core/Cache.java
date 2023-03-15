@@ -21,8 +21,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
+
+import static com.codahale.metrics.MetricRegistry.name;
 
 /**
  * A generic cache with an enforced maximum entry system.
@@ -52,6 +58,7 @@ public final class Cache<K, V> {
 
         private int maxItems = 10;
         private int lockCount = -1;
+        private MetricRegistry metricRegistry;
 
         public Builder<K, V> setMaxItems(final int maxItems) {
             if (maxItems < 1) {
@@ -63,25 +70,37 @@ public final class Cache<K, V> {
 
         public Builder<K, V> setLockCount(final int lockCount) {
             if (lockCount != -1 && lockCount < 1) {
-                throw new IllegalArgumentException("lockCount must be at -1 for ergonomic default or greater than 1 for explicit setting");
+                throw new IllegalArgumentException(
+                        "lockCount must be at -1 for ergonomic default or greater than 1 for explicit setting");
             }
             this.lockCount = lockCount;
             return this;
         }
 
+        public Builder<K, V> setMetricRegistry(final MetricRegistry metricRegistry) {
+            this.metricRegistry = Objects.requireNonNull(metricRegistry);
+            return this;
+        }
+
         public Cache<K, V> build() {
-            return new Cache<K, V>(maxItems, lockCount == -1 ? maxItems * 10 : lockCount);
+            return new Cache<K, V>(maxItems, lockCount == -1 ? maxItems * 10 : lockCount, metricRegistry);
         }
 
     }
 
     private final int maxItems;
     private final Map<K, V> cache;
+    private final Timer readLockAcquisitionTimer;
+    private final Timer writeLockAcquisitionTimer;
     private final ReadWriteLock[] locks;
 
     private Cache(
-            final int maxItems, final int lockCount) {
+            final int maxItems, final int lockCount, final MetricRegistry metricRegistry) {
         this.maxItems = maxItems;
+
+        readLockAcquisitionTimer = metricRegistry.timer(name(Cache.class, "readLockAcquire"));
+        writeLockAcquisitionTimer = metricRegistry.timer(name(Cache.class, "writeLockAcquire"));
+
         this.locks = new ReadWriteLock[lockCount];
         for (int i = 0; i < locks.length; i++) {
             this.locks[i] = new ReentrantReadWriteLock();
@@ -110,15 +129,15 @@ public final class Cache<K, V> {
         }
 
         final ReadWriteLock rwl = rwl(key);
-        rwl.readLock().lock();
+        acquireReadLock(rwl);
         if (!containsKey(key)) {
             rwl.readLock().unlock();
-            rwl.writeLock().lock();
+            acquireWriteLock(rwl);
             try {
                 if (!containsKey(key)) {
                     put(key, loader.load(key));
                 }
-                rwl.readLock().lock();
+                acquireReadLock(rwl);
             } finally {
                 rwl.writeLock().unlock();
             }
@@ -135,10 +154,10 @@ public final class Cache<K, V> {
         Objects.requireNonNull(unloader);
 
         final ReadWriteLock rwl = rwl(key);
-        rwl.readLock().lock();
+        acquireReadLock(rwl);
         if (containsKey(key)) {
             rwl.readLock().unlock();
-            rwl.writeLock().lock();
+            acquireWriteLock(rwl);
             try {
                 final V value = remove(key);
                 if (value == null) {
@@ -169,8 +188,24 @@ public final class Cache<K, V> {
 
     public Set<Entry<K, V>> entrySet() {
         synchronized (cache) {
-            return Collections.unmodifiableSet(new HashSet<Entry<K,V>>(cache.entrySet()));
+            return Collections.unmodifiableSet(new HashSet<Entry<K, V>>(cache.entrySet()));
         }
+    }
+
+    private Lock acquireReadLock(final ReadWriteLock rwl) {
+        final Lock result = rwl.readLock();
+        try (final Timer.Context context = readLockAcquisitionTimer.time()) {
+            result.lock();
+        }
+        return result;
+    }
+
+    private Lock acquireWriteLock(final ReadWriteLock rwl) {
+        final Lock result = rwl.writeLock();
+        try (final Timer.Context context = writeLockAcquisitionTimer.time()) {
+            result.lock();
+        }
+        return result;
     }
 
     private ReadWriteLock rwl(final K key) {
