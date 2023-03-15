@@ -203,6 +203,7 @@ public final class IndexManager implements Managed {
         cache = new Cache.Builder<String, Index>()
                 .setMaxItems(maxIndexesOpen)
                 .setLockCount(lockCount)
+                .setMetricRegistry(metricRegistry)
                 .build();
         metricRegistry.register(name(IndexManager.class, "cache"), new Gauge<Integer>() {
             @Override

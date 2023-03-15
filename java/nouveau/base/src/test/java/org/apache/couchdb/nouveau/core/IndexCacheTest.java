@@ -24,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.codahale.metrics.MetricRegistry;
+
 public class IndexCacheTest {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexCacheTest.class);
@@ -51,6 +53,7 @@ public class IndexCacheTest {
 
         final Cache<String, String> cache = new Cache.Builder<String, String>()
                 .setMaxItems(10)
+                .setMetricRegistry(new MetricRegistry())
                 .build();
 
         final int nThreads = 20;
