@@ -39,11 +39,23 @@ import static com.codahale.metrics.MetricRegistry.name;
 
 public final class Cache<K, V> {
 
+    // For opening an expensive resource
     @FunctionalInterface
     public interface CacheLoader<K, V> {
         V load(final K key) throws IOException;
     }
 
+    // Called before unloading to give clients an opportunity to
+    // do something expensive (as long as the cached item is still usable while
+    // doing so).
+    // Occurs under a non-exclusive read lock.
+    @FunctionalInterface
+    public interface CachePreunloader<K, V> {
+        void preunload(final K key, final V value) throws IOException;
+    }
+
+    // For closing an open resource as cheaply as possible.
+    // Occurs under an exclusive write lock.
     @FunctionalInterface
     public interface CacheUnloader<K, V> {
         void unload(final K key, final V value) throws IOException;
@@ -108,7 +120,10 @@ public final class Cache<K, V> {
         this.cache = new LinkedHashMap<K, V>(maxItems, 0.75f, true);
     }
 
-    public <R> R with(K key, final CacheLoader<K, V> loader, final CacheUnloader<K, V> unloader,
+    public <R> R with(K key,
+            final CacheLoader<K, V> loader,
+            final CachePreunloader<K, V> preunloader,
+            final CacheUnloader<K, V> unloader,
             final CacheFunction<V, R> function) throws IOException {
         Objects.requireNonNull(key);
         Objects.requireNonNull(loader);
@@ -124,7 +139,7 @@ public final class Cache<K, V> {
                 }
             }
             if (evictee != null) {
-                remove(evictee, unloader);
+                remove(evictee, preunloader, unloader);
             }
         }
 
@@ -149,14 +164,19 @@ public final class Cache<K, V> {
         }
     }
 
-    public boolean remove(final K key, final CacheUnloader<K, V> unloader) throws IOException {
+    public boolean remove(final K key, final CachePreunloader<K, V> preunloader, final CacheUnloader<K, V> unloader)
+            throws IOException {
         Objects.requireNonNull(key);
         Objects.requireNonNull(unloader);
 
         final ReadWriteLock rwl = rwl(key);
         acquireReadLock(rwl);
         if (containsKey(key)) {
-            rwl.readLock().unlock();
+            try {
+                preunloader.preunload(key, get(key));
+            } finally {
+                rwl.readLock().unlock();
+            }
             acquireWriteLock(rwl);
             try {
                 final V value = remove(key);
@@ -179,9 +199,9 @@ public final class Cache<K, V> {
         }
     }
 
-    public void close(final CacheUnloader<K, V> unloader) throws IOException {
+    public void close(final CachePreunloader<K, V> preunloader, final CacheUnloader<K, V> unloader) throws IOException {
         for (K key : cache.keySet()) {
-            remove(key, unloader);
+            remove(key, preunloader, unloader);
         }
         cache.clear();
     }

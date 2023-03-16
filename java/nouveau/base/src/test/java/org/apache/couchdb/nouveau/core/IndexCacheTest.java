@@ -18,6 +18,7 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
+import org.apache.couchdb.nouveau.core.Cache.CachePreunloader;
 import org.apache.couchdb.nouveau.core.Cache.CacheUnloader;
 import org.eclipse.jetty.io.RuntimeIOException;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,10 @@ public class IndexCacheTest {
                 // ignored
             }
             return "loaded";
+        };
+
+        final CachePreunloader<String, String> preunloader = (key, value) -> {
+            // do nothing
         };
 
         final CacheUnloader<String, String> unloader = (key, value) -> {
@@ -69,7 +74,7 @@ public class IndexCacheTest {
                 try {
                     for (int j = 0; j < loop; j++) {
                         if (testRandom.nextBoolean()) {
-                            cache.with("foo-" + testRandom.nextInt(keys), loader, unloader, (v) -> {
+                            cache.with("foo-" + testRandom.nextInt(keys), loader, preunloader, unloader, (v) -> {
                                 if ("loaded".equals(v)) {
                                     successes.incrementAndGet();
                                 } else {
@@ -79,7 +84,7 @@ public class IndexCacheTest {
                                 return null;
                             });
                         } else {
-                            cache.remove("foo-" + testRandom.nextInt(keys), unloader);
+                            cache.remove("foo-" + testRandom.nextInt(keys), preunloader, unloader);
                             successes.incrementAndGet();
                         }
                     }
