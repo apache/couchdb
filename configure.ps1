@@ -44,6 +44,8 @@ Param(
     [switch]$DisableFauxton = $false, # do not build Fauxton
     [switch]$DisableDocs = $false, # do not build any documentation or manpages
     [switch]$SkipDeps = $false, # do not update erlang dependencies
+    [switch]$DisableProper = $false, # a compilation pragma. proper is a kind of automated test suite
+    [switch]$EnableErlangMD5 = $false, # don't use Erlang for md5 hash operations by default
 
     [ValidateNotNullOrEmpty()]
     [string]$CouchDBUser = [Environment]::UserName, # set the username to run as (defaults to current user)
@@ -126,6 +128,8 @@ $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
+$WithProper = (-not $DisableProper).ToString().ToLower()
+$ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
 
 Write-Verbose "==> configuring couchdb in rel\couchdb.config"
 $CouchDBConfig = @"
@@ -199,6 +203,8 @@ spidermonkey_version = $SpiderMonkeyVersion
 $InstallMk | Out-File "$rootdir\install.mk" -encoding ascii
 
 $ConfigERL = @"
+{with_proper, $WithProper}.
+{erlang_md5, $ErlangMD5}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
