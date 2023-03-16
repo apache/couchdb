@@ -113,6 +113,7 @@ public final class Lucene9AnalyzerFactory {
         romanian(() -> new RomanianAnalyzer()),
         russian(() -> new RussianAnalyzer()),
         simple(() -> new SimpleAnalyzer()),
+        simple_asciifolding(() -> new SimpleAsciiFoldingAnalyzer()),
         spanish(() -> new SpanishAnalyzer()),
         standard(() -> new StandardAnalyzer()),
         swedish(() -> new SwedishAnalyzer()),

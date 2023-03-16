@@ -112,6 +112,7 @@ public final class Lucene4AnalyzerFactory {
         romanian(() -> new RomanianAnalyzer(Utils.LUCENE_VERSION)),
         russian(() -> new RussianAnalyzer(Utils.LUCENE_VERSION)),
         simple(() -> new SimpleAnalyzer(Utils.LUCENE_VERSION)),
+        simple_asciifolding(() -> new SimpleAsciiFoldingAnalyzer(Utils.LUCENE_VERSION)),
         spanish(() -> new SpanishAnalyzer(Utils.LUCENE_VERSION)),
         standard(() -> new StandardAnalyzer(Utils.LUCENE_VERSION)),
         swedish(() -> new SwedishAnalyzer(Utils.LUCENE_VERSION)),
