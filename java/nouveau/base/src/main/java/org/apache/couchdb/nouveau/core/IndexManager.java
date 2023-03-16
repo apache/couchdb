@@ -30,6 +30,7 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.core.Cache.CacheFunction;
 import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
+import org.apache.couchdb.nouveau.core.Cache.CachePreunloader;
 import org.apache.couchdb.nouveau.core.Cache.CacheUnloader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +91,7 @@ public final class IndexManager implements Managed {
             return userFun.apply(index);
         };
 
-        return cache.with(name, cacheLoader, cacheUnloader(), fun);
+        return cache.with(name, cacheLoader, cachePreunloader(), cacheUnloader(), fun);
     }
 
     public void create(final String name, IndexDefinition indexDefinition) throws IOException {
@@ -137,7 +138,7 @@ public final class IndexManager implements Managed {
 
     private void deleteIndex(final String name) throws IOException {
         // cache.remove will delete only if the index is currently open.
-        boolean removed = cache.remove(name, cacheUnloadAndDelete());
+        boolean removed = cache.remove(name, cachePreunloader(), cacheUnloadAndDelete());
         if (!removed) {
             LOGGER.info("deleting index {}", name);
             IOUtils.rm(indexRootPath(name));
@@ -216,7 +217,7 @@ public final class IndexManager implements Managed {
             for (final Entry<String, Index> entry : cache.entrySet()) {
                 if (entry.getValue().isIdle(idleSeconds, TimeUnit.SECONDS)) {
                     try {
-                        cache.remove(entry.getKey(), cacheUnloader());
+                        cache.remove(entry.getKey(), cachePreunloader(), cacheUnloader());
                     } catch (final IOException e) {
                         LOGGER.warn("I/O exception while closing " + entry.getKey(), e);
                     }
@@ -228,7 +229,7 @@ public final class IndexManager implements Managed {
 
     @Override
     public void stop() throws IOException {
-        cache.close(cacheUnloader());
+        cache.close(cachePreunloader(), cacheUnloader());
     }
 
     private boolean isIndex(final Path path) {
@@ -257,14 +258,19 @@ public final class IndexManager implements Managed {
     }
 
     @SuppressWarnings("rawtypes")
-    private CacheUnloader<String, Index> cacheUnloader() {
+    private CachePreunloader<String, Index> cachePreunloader() {
         return (name, index) -> {
             if (!index.isDeleteOnClose()) {
-                LOGGER.info("committing and closing {}", name);
+                LOGGER.info("committing before close {}", name);
                 index.commit();
-            } else {
-                LOGGER.info("closing {}", name);
             }
+        };
+    }
+
+    @SuppressWarnings("rawtypes")
+    private CacheUnloader<String, Index> cacheUnloader() {
+        return (name, index) -> {
+            LOGGER.info("closing {}", name);
             index.close();
             if (index.isDeleteOnClose()) {
                 IOUtils.rm(indexRootPath(name));

@@ -115,7 +115,7 @@ public class Lucene9Index extends Index<IndexableField> {
 
     @Override
     public void doClose() throws IOException {
-        writer.close();
+        writer.rollback();
     }
 
     @Override
