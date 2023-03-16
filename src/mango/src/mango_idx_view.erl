@@ -26,7 +26,9 @@
 
     indexable_fields/1,
     field_ranges/1,
-    field_ranges/2
+    field_ranges/2,
+
+    covers/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -520,4 +522,18 @@ can_use_sort([Col | RestCols], SortFields, Selector) ->
     case mango_selector:is_constant_field(Selector, Col) of
         true -> can_use_sort(RestCols, SortFields, Selector);
         false -> false
+    end.
+
+% There is no information available about the full set of fields which
+% comes the following consequences: an index cannot (reliably) cover
+% an "all fields" type of query and nested fields are out of scope.
+covers(_, all_fields) ->
+    false;
+covers(Idx, Fields) ->
+    case mango_idx:def(Idx) of
+        all_docs ->
+            false;
+        _ ->
+            Available = [<<"_id">> | columns(Idx)],
+            sets:is_subset(sets:from_list(Fields), sets:from_list(Available))
     end.
