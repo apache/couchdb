@@ -15,6 +15,7 @@ package org.apache.couchdb.nouveau.core;
 
 import static com.codahale.metrics.MetricRegistry.name;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -134,6 +135,15 @@ public final class IndexManager implements Managed {
         } finally {
             stream.close();
         }
+
+        // Clean any newly empty directories.
+        Path p = rootPath;
+        do {
+            final File f = p.toFile();
+            if (f.isDirectory() && f.list().length == 0) {
+                f.delete();
+            }
+        } while ((p = p.getParent()) != null && !rootDir.equals(p));
     }
 
     private void deleteIndex(final String name) throws IOException {
