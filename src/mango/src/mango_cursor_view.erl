@@ -39,15 +39,19 @@
 % viewcbargs wraps up the arguments that view_cb uses into a single
 % entry in the mrargs.extra list. We use a Map to allow us to later
 % add fields without having old messages causing errors/crashes.
-viewcbargs_new(Selector, Fields) ->
+viewcbargs_new(Selector, Fields, CoveringIndex) ->
     #{
         selector => Selector,
-        fields => Fields
+        fields => Fields,
+        covering_index => CoveringIndex
     }.
+
 viewcbargs_get(selector, Args) when is_map(Args) ->
     maps:get(selector, Args, undefined);
 viewcbargs_get(fields, Args) when is_map(Args) ->
-    maps:get(fields, Args, undefined).
+    maps:get(fields, Args, undefined);
+viewcbargs_get(covering_index, Args) when is_map(Args) ->
+    maps:get(covering_index, Args, undefined).
 
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
@@ -73,13 +77,11 @@ create(Db, Indexes, Selector, Opts) ->
         bookmark = Bookmark
     }}.
 
-explain(Cursor) ->
-    #cursor{
-        opts = Opts
-    } = Cursor,
-
+explain(#cursor{opts = Opts} = Cursor) ->
     BaseArgs = base_args(Cursor),
-    Args = apply_opts(Opts, BaseArgs),
+    Args0 = apply_opts(Opts, BaseArgs),
+    #cursor{index = Index, fields = Fields} = Cursor,
+    Args = consider_index_coverage(Index, Fields, Args0),
 
     [
         {mrargs,
@@ -94,7 +96,8 @@ explain(Cursor) ->
                 {stable, Args#mrargs.stable},
                 {update, Args#mrargs.update},
                 {conflicts, Args#mrargs.conflicts}
-            ]}}
+            ]}},
+        {covered, mango_idx_view:covers(Index, Fields)}
     ].
 
 % replace internal values that cannot
@@ -125,6 +128,13 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
                     mango_idx:end_key(Idx, Cursor#cursor.ranges)
                 }
         end,
+    CoveringIndex =
+        case mango_idx_view:covers(Idx, Fields) of
+            true ->
+                Idx;
+            false ->
+                undefined
+        end,
     #mrargs{
         view_type = map,
         reduce = false,
@@ -137,7 +147,7 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
             {callback, {?MODULE, view_cb}},
             % TODO remove selector. It supports older nodes during version upgrades.
             {selector, Selector},
-            {callback_args, viewcbargs_new(Selector, Fields)},
+            {callback_args, viewcbargs_new(Selector, Fields, CoveringIndex)},
 
             {ignore_partition_query_limit, true}
         ]
@@ -157,7 +167,8 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             BaseArgs = base_args(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
             Args0 = apply_opts(Opts, BaseArgs),
-            Args = mango_json_bookmark:update_args(Bookmark, Args0),
+            Args1 = consider_index_coverage(Idx, Cursor#cursor.fields, Args0),
+            Args = mango_json_bookmark:update_args(Bookmark, Args1),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result =
@@ -280,29 +291,25 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
     % or in the new record in `callback_args`. This is to support mid-upgrade
     % clusters where the non-upgraded coordinator nodes will send the older style.
     % TODO remove this in a couple of couchdb versions.
-    {Selector, Fields} =
+    {Selector, Fields, CoveringIndex} =
         case couch_util:get_value(callback_args, Options) of
             % old style
             undefined ->
-                {couch_util:get_value(selector, Options), undefined};
+                {couch_util:get_value(selector, Options), undefined, undefined};
             % new style - assume a viewcbargs
             Args = #{} ->
-                {viewcbargs_get(selector, Args), viewcbargs_get(fields, Args)}
+                {
+                    viewcbargs_get(selector, Args),
+                    viewcbargs_get(fields, Args),
+                    viewcbargs_get(covering_index, Args)
+                }
         end,
-    case ViewRow#view_row.doc of
-        null ->
-            maybe_send_mango_ping();
-        undefined ->
-            % include_docs=false. Use quorum fetch at coordinator
-            ok = rexi:stream2(ViewRow),
-            set_mango_msg_timestamp();
-        Doc ->
-            % We slightly abuse the doc field in the view response here,
+    Process =
+        fun(Doc) ->
+            % slightly abuse the doc field in the view response here,
             % because we may return something other than the full document:
             % we may have projected the requested `fields` from the query.
             % However, this oddness is confined to being visible in this module.
-            put(mango_docs_examined, get(mango_docs_examined) + 1),
-            couch_stats:increment_counter([mango, docs_examined]),
             case match_and_extract_doc(Doc, Selector, Fields) of
                 {match, FinalDoc} ->
                     FinalViewRow = ViewRow#view_row{doc = FinalDoc},
@@ -311,6 +318,21 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
                 {no_match, undefined} ->
                     maybe_send_mango_ping()
             end
+        end,
+    case {ViewRow#view_row.doc, CoveringIndex} of
+        {null, _} ->
+            maybe_send_mango_ping();
+        {undefined, Index = #idx{}} ->
+            Doc = derive_doc_from_index(Index, ViewRow),
+            Process(Doc);
+        {undefined, _} ->
+            % include_docs=false. Use quorum fetch at coordinator
+            ok = rexi:stream2(ViewRow),
+            set_mango_msg_timestamp();
+        {Doc, _} ->
+            put(mango_docs_examined, get(mango_docs_examined) + 1),
+            couch_stats:increment_counter([mango, docs_examined]),
+            Process(Doc)
     end,
     {ok, Acc};
 view_cb(complete, Acc) ->
@@ -337,6 +359,14 @@ match_and_extract_doc(Doc, Selector, Fields) ->
         false ->
             {no_match, undefined}
     end.
+
+derive_doc_from_index(Index, #view_row{id = DocId, key = Keys}) ->
+    Columns = mango_idx:columns(Index),
+    lists:foldr(
+        fun({Column, Key}, Doc) -> mango_doc:set_field(Doc, Column, Key) end,
+        mango_doc:set_field({[]}, <<"_id">>, DocId),
+        lists:zip(Columns, Keys)
+    ).
 
 maybe_send_mango_ping() ->
     Current = os:timestamp(),
@@ -481,6 +511,10 @@ apply_opts([{partition, Partition} | Rest], Args) when is_binary(Partition) ->
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).
+
+consider_index_coverage(Index, Fields, #mrargs{include_docs = IncludeDocs0} = Args) ->
+    IncludeDocs = IncludeDocs0 andalso (not mango_idx_view:covers(Index, Fields)),
+    Args#mrargs{include_docs = IncludeDocs}.
 
 doc_member_and_extract(Cursor, RowProps) ->
     Db = Cursor#cursor.db,
