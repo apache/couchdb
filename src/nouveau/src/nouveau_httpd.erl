@@ -65,9 +65,9 @@ handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} =
         {ok, SearchResults} ->
             RespBody = #{
                 <<"bookmark">> => nouveau_bookmark:pack(maps:get(bookmark, SearchResults)),
-                <<"total_hits">> => maps:get(<<"total_hits">>, SearchResults),
-                <<"total_hits_relation">> => maps:get(<<"total_hits_relation">>, SearchResults),
-                <<"hits">> => maps:get(<<"hits">>, SearchResults),
+                <<"total_rows">> => maps:get(<<"total_hits">>, SearchResults),
+                <<"total_rows_relation">> => maps:get(<<"total_hits_relation">>, SearchResults),
+                <<"rows">> => maps:get(<<"hits">>, SearchResults),
                 <<"counts">> => maps:get(<<"counts">>, SearchResults, null),
                 <<"ranges">> => maps:get(<<"ranges">>, SearchResults, null)
             },
