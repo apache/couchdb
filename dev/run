@@ -304,6 +304,7 @@ def setup_configs(ctx):
             ),
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
+            "clouseau_name": "clouseau%d@127.0.0.1" % (idx + 1),
             "backend_port": backend_port,
             "prometheus_port": prometheus_port,
             "uuid": "fake_uuid_for_dev",
