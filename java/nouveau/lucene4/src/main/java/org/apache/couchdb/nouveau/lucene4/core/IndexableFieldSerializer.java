@@ -15,11 +15,9 @@ package org.apache.couchdb.nouveau.lucene4.core;
 
 import java.io.IOException;
 
-import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.util.BytesRef;
 
-import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
@@ -37,9 +35,6 @@ class IndexableFieldSerializer extends StdSerializer<IndexableField> {
     @Override
     public void serialize(final IndexableField field, final JsonGenerator gen, final SerializerProvider provider)
             throws IOException {
-        if (!(field instanceof StoredField)) {
-            throw new JsonGenerationException(field.getClass() + " not supported", gen);
-        }
         gen.writeStartObject();
         gen.writeStringField("@type", "stored");
         gen.writeStringField("name", field.name());
