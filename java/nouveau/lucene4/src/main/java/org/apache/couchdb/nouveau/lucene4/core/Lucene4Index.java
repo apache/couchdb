@@ -188,7 +188,15 @@ public class Lucene4Index extends Index<IndexableField> {
     }
 
     private FacetsCollector countsCollector(final IndexReader reader, List<String> counts) throws IOException {
-        var state = new SortedSetDocValuesReaderState(reader);
+        final SortedSetDocValuesReaderState state;
+        try {
+            state = new SortedSetDocValuesReaderState(reader);
+        } catch (final IllegalArgumentException e) {
+            if (e.getMessage().contains("was not indexed with SortedSetDocValues")) {
+                return null;
+            }   
+            throw e;
+        }
         final FacetRequest[] facetRequests = new FacetRequest[counts.size()];
         for (int i = 0; i < facetRequests.length; i++) {
             facetRequests[i] = new CountFacetRequest(new CategoryPath(counts.get(i)), Integer.MAX_VALUE);
@@ -261,6 +269,9 @@ public class Lucene4Index extends Index<IndexableField> {
     }
 
     private Map<String,Map<String,Number>> convertFacets(final FacetsCollector fc) throws IOException {
+        if (fc == null) {
+            return null;
+        }
         final Map<String,Map<String,Number>> result = new HashMap<String,Map<String,Number>>();
         for (final FacetResult facetResult : fc.getFacetResults()) {
             final FacetResultNode node = facetResult.getFacetResultNode();
