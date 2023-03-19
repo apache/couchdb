@@ -64,7 +64,7 @@ go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     of
         {ok, SearchResults} ->
             NewBookmark = nouveau_bookmark:update(DbName, Bookmark, SearchResults),
-            {ok, SearchResults#{bookmark => NewBookmark}};
+            {ok, simplify_hits(SearchResults#{bookmark => NewBookmark})};
         {error, Reason} ->
             {error, Reason}
     after
@@ -138,6 +138,25 @@ merge_total_hits_relation(null, null) ->
 merge_hits(HitsA, HitsB, Sort, Limit) ->
     MergedHits = lists:merge(merge_fun(Sort), HitsA, HitsB),
     lists:sublist(MergedHits, Limit).
+
+simplify_hits(SearchResults) ->
+    #{<<"hits">> := Hits} = SearchResults,
+    SearchResults#{<<"hits">> => lists:map(fun simplify_hit/1, Hits)}.
+
+simplify_hit(#{} = Hit) ->
+    #{<<"fields">> := Fields} = Hit,
+    Hit#{<<"fields">> => simplify_fields(Fields)}.
+
+simplify_fields(Fields) when is_list(Fields) ->
+    Fun = fun(Field, Acc) ->
+        {Key, Value} = simplify_field(Field),
+        Acc#{Key => Value}
+    end,
+    lists:foldl(Fun, #{}, Fields).
+
+simplify_field(#{<<"@type">> := <<"stored">>} = Field) ->
+    #{<<"name">> := Key, <<"value">> := Value} = Field,
+    {Key, Value}.
 
 merge_fun(Sort) ->
     fun(HitA, HitB) ->
