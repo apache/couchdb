@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.lucene9.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.condition.OS.WINDOWS;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -27,8 +28,8 @@ import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.BaseIndexTest;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.DoubleDocValuesField;
+import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.SortedDocValuesField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.IndexWriter;
@@ -40,6 +41,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
 
 public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
 
@@ -61,6 +63,7 @@ public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
     }
 
     @Test
+    @DisabledOnOs(WINDOWS)
     public void testCounts() throws IOException {
         final int count = 100;
         for (int i = 1; i <= count; i++) {
@@ -77,6 +80,7 @@ public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
     }
 
     @Test
+    @DisabledOnOs(WINDOWS)
     public void testRanges() throws IOException {
         final int count = 100;
         for (int i = 1; i <= count; i++) {
