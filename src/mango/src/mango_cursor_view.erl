@@ -30,15 +30,38 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric.hrl").
 
+-include("mango.hrl").
 -include("mango_cursor.hrl").
 -include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
 
 -define(HEARTBEAT_INTERVAL_IN_USEC, 4000000).
 
+-type cursor_options() :: [{term(), term()}].
+-type message() ::
+    {meta, _}
+    | {row, row_properties()}
+    | {execution_stats, shard_stats()}
+    | {stop, #cursor{}}
+    | {complete, #cursor{}}
+    | {error, any()}.
+
 % viewcbargs wraps up the arguments that view_cb uses into a single
 % entry in the mrargs.extra list. We use a Map to allow us to later
 % add fields without having old messages causing errors/crashes.
+
+-type viewcbargs() ::
+    #{
+        selector => selector(),
+        fields => fields(),
+        covering_index => maybe(#idx{})
+    }.
+
+-spec viewcbargs_new(Selector, Fields, CoveringIndex) -> ViewCBArgs when
+    Selector :: selector(),
+    Fields :: fields(),
+    CoveringIndex :: maybe(#idx{}),
+    ViewCBArgs :: viewcbargs().
 viewcbargs_new(Selector, Fields, CoveringIndex) ->
     #{
         selector => Selector,
@@ -46,6 +69,9 @@ viewcbargs_new(Selector, Fields, CoveringIndex) ->
         covering_index => CoveringIndex
     }.
 
+-spec viewcbargs_get(Key, Args) -> maybe(term()) when
+    Key :: selector | fields | covering_index,
+    Args :: viewcbargs().
 viewcbargs_get(selector, Args) when is_map(Args) ->
     maps:get(selector, Args, undefined);
 viewcbargs_get(fields, Args) when is_map(Args) ->
@@ -53,6 +79,11 @@ viewcbargs_get(fields, Args) when is_map(Args) ->
 viewcbargs_get(covering_index, Args) when is_map(Args) ->
     maps:get(covering_index, Args, undefined).
 
+-spec create(Db, Indexes, Selector, Options) -> {ok, #cursor{}} when
+    Db :: database(),
+    Indexes :: [#idx{}],
+    Selector :: selector(),
+    Options :: cursor_options().
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
     Composited = composite_indexes(Indexes, FieldRanges),
@@ -77,6 +108,7 @@ create(Db, Indexes, Selector, Opts) ->
         bookmark = Bookmark
     }}.
 
+-spec explain(#cursor{}) -> nonempty_list(term()).
 explain(#cursor{opts = Opts} = Cursor) ->
     BaseArgs = base_args(Cursor),
     Args0 = apply_opts(Opts, BaseArgs),
@@ -117,6 +149,7 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
+-spec base_args(#cursor{}) -> #mrargs{}.
 base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) ->
     {StartKey, EndKey} =
         case Cursor#cursor.ranges of
@@ -153,6 +186,10 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
         ]
     }.
 
+-spec execute(#cursor{}, UserFunction, UserAccumulator) -> Result when
+    UserFunction :: fun(),
+    UserAccumulator :: any(),
+    Result :: {ok, UserAccumulator} | {error, any()}.
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
     Cursor = Cursor0#cursor{
         user_fun = UserFun,
@@ -201,11 +238,15 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             end
     end.
 
+-type comparator() :: '$lt' | '$lte' | '$eq' | '$gte' | '$gt'.
+-type range() :: {comparator(), any(), comparator(), any()} | empty.
+
 % Any of these indexes may be a composite index. For each
 % index find the most specific set of fields for each
 % index. Ie, if an index has columns a, b, c, d, then
 % check FieldRanges for a, b, c, and d and return
 % the longest prefix of columns found.
+-spec composite_indexes([#idx{}], [{field(), range()}]) -> [{#idx{}, [range()], integer()}].
 composite_indexes(Indexes, FieldRanges) ->
     lists:foldl(
         fun(Idx, Acc) ->
@@ -221,6 +262,7 @@ composite_indexes(Indexes, FieldRanges) ->
         Indexes
     ).
 
+-spec composite_prefix([field()], [{field(), range()}]) -> [range()].
 composite_prefix([], _) ->
     [];
 composite_prefix([Col | Rest], Ranges) ->
@@ -242,9 +284,6 @@ composite_prefix([Col | Rest], Ranges) ->
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
--type comparator() :: '$lt' | '$lte' | '$eq' | '$gte' | '$gt'.
--type range() :: {comparator(), any(), comparator(), any()} | empty.
-
 -spec choose_best_index(IndexRanges) -> Selection when
     IndexRanges :: nonempty_list({#idx{}, [range()], integer()}),
     Selection :: {#idx{}, [range()]}.
@@ -275,6 +314,11 @@ choose_best_index(IndexRanges) ->
     {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
     {SelectedIndex, SelectedIndexRanges}.
 
+-spec view_cb
+    (Message, #mrargs{}) -> Response when
+        Message :: {meta, any()} | {row, row_properties()} | complete,
+        Response :: {ok, #mrargs{}};
+    (ok, ddoc_updated) -> any().
 view_cb({meta, Meta}, Acc) ->
     % Map function starting
     put(mango_docs_examined, 0),
@@ -346,11 +390,11 @@ view_cb(ok, ddoc_updated) ->
 
 %% match_and_extract_doc checks whether Doc matches Selector. If it does,
 %% extract Fields and return {match, FinalDoc}; otherwise return {no_match, undefined}.
--spec match_and_extract_doc(
-    Doc :: term(),
-    Selector :: term(),
-    Fields :: [string()] | undefined | all_fields
-) -> {match | no_match, term() | undefined}.
+-spec match_and_extract_doc(Doc, Selector, Fields) -> Result when
+    Doc :: ejson(),
+    Selector :: selector(),
+    Fields :: maybe(fields()),
+    Result :: {match, term()} | {no_match, undefined}.
 match_and_extract_doc(Doc, Selector, Fields) ->
     case mango_selector:match(Selector, Doc) of
         true ->
@@ -360,6 +404,7 @@ match_and_extract_doc(Doc, Selector, Fields) ->
             {no_match, undefined}
     end.
 
+-spec derive_doc_from_index(#idx{}, #view_row{}) -> term().
 derive_doc_from_index(Index, #view_row{id = DocId, key = Keys}) ->
     Columns = mango_idx:columns(Index),
     lists:foldr(
@@ -368,6 +413,7 @@ derive_doc_from_index(Index, #view_row{id = DocId, key = Keys}) ->
         lists:zip(Columns, Keys)
     ).
 
+-spec maybe_send_mango_ping() -> ok | term().
 maybe_send_mango_ping() ->
     Current = os:timestamp(),
     LastPing = get(mango_last_msg_timestamp),
@@ -381,9 +427,14 @@ maybe_send_mango_ping() ->
             set_mango_msg_timestamp()
     end.
 
+-spec set_mango_msg_timestamp() -> term().
 set_mango_msg_timestamp() ->
     put(mango_last_msg_timestamp, os:timestamp()).
 
+-spec handle_message(message(), #cursor{}) -> Response when
+    Response ::
+        {ok, #cursor{}}
+        | {error, any()}.
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
 handle_message({row, Props}, Cursor) ->
@@ -414,6 +465,10 @@ handle_message(complete, Cursor) ->
 handle_message({error, Reason}, _Cursor) ->
     {error, Reason}.
 
+-spec handle_all_docs_message(message(), #cursor{}) -> Response when
+    Response ::
+        {ok, #cursor{}}
+        | {error, any()}.
 handle_all_docs_message({row, Props}, Cursor) ->
     case is_design_doc(Props) of
         true -> {ok, Cursor};
@@ -422,6 +477,8 @@ handle_all_docs_message({row, Props}, Cursor) ->
 handle_all_docs_message(Message, Cursor) ->
     handle_message(Message, Cursor).
 
+-spec handle_doc(#cursor{}, doc()) -> Response when
+    Response :: {ok, #cursor{}} | {stop, #cursor{}}.
 handle_doc(#cursor{skip = S} = C, _) when S > 0 ->
     {ok, C#cursor{skip = S - 1}};
 handle_doc(#cursor{limit = L, execution_stats = Stats} = C, Doc) when L > 0 ->
@@ -436,6 +493,7 @@ handle_doc(#cursor{limit = L, execution_stats = Stats} = C, Doc) when L > 0 ->
 handle_doc(C, _Doc) ->
     {stop, C}.
 
+-spec ddocid(#idx{}) -> binary().
 ddocid(Idx) ->
     case mango_idx:ddoc(Idx) of
         <<"_design/", Rest/binary>> ->
@@ -444,6 +502,7 @@ ddocid(Idx) ->
             Else
     end.
 
+-spec apply_opts(cursor_options(), #mrargs{}) -> #mrargs{}.
 apply_opts([], Args) ->
     Args;
 apply_opts([{r, RStr} | Rest], Args) ->
@@ -512,10 +571,16 @@ apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).
 
+-spec consider_index_coverage(#idx{}, fields(), #mrargs{}) -> #mrargs{}.
 consider_index_coverage(Index, Fields, #mrargs{include_docs = IncludeDocs0} = Args) ->
     IncludeDocs = IncludeDocs0 andalso (not mango_idx_view:covers(Index, Fields)),
     Args#mrargs{include_docs = IncludeDocs}.
 
+-spec doc_member_and_extract(#cursor{}, row_properties()) -> Result when
+    Result ::
+        {ok | no_match, term(), {execution_stats, shard_stats()}}
+        | {no_match, null, {execution_stats, shard_stats()}}
+        | any().
 doc_member_and_extract(Cursor, RowProps) ->
     Db = Cursor#cursor.db,
     Opts = Cursor#cursor.opts,
@@ -554,12 +619,14 @@ doc_member_and_extract(Cursor, RowProps) ->
             {no_match, null, {execution_stats, ExecutionStats}}
     end.
 
+-spec is_design_doc(row_properties()) -> boolean().
 is_design_doc(RowProps) ->
     case couch_util:get_value(id, RowProps) of
         <<"_design/", _/binary>> -> true;
         _ -> false
     end.
 
+-spec update_bookmark_keys(#cursor{}, row_properties()) -> #cursor{}.
 update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
     Id = couch_util:get_value(id, Props),
     Key = couch_util:get_value(key, Props),
