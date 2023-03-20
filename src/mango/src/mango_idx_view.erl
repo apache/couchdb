@@ -527,6 +527,7 @@ can_use_sort([Col | RestCols], SortFields, Selector) ->
 % There is no information available about the full set of fields which
 % comes the following consequences: an index cannot (reliably) cover
 % an "all fields" type of query and nested fields are out of scope.
+-spec covers(#idx{}, fields()) -> boolean().
 covers(_, all_fields) ->
     false;
 covers(Idx, Fields) ->
