@@ -15,56 +15,78 @@
 -export([
     couch_to_prom/3,
     to_bin/1,
-    to_prom/3,
+    to_prom/4,
     to_prom_summary/2
 ]).
 
 -include("couch_prometheus.hrl").
 
 couch_to_prom([couch_log, level, alert], Info, _All) ->
-    to_prom(couch_log_requests_total, counter, {[{level, alert}], val(Info)});
+    to_prom(couch_log_requests_total, counter, "number of logged messages", {
+        [{level, alert}], val(Info)
+    });
 couch_to_prom([couch_log, level, Level], Info, _All) ->
     to_prom(couch_log_requests_total, {[{level, Level}], val(Info)});
 couch_to_prom([couch_replicator, checkpoints, failure], Info, _All) ->
-    to_prom(couch_replicator_checkpoints_failure_total, counter, val(Info));
+    to_prom(couch_replicator_checkpoints_failure_total, counter, desc(Info), val(Info));
 couch_to_prom([couch_replicator, checkpoints, success], Info, All) ->
     Total = val(Info) + val([couch_replicator, checkpoints, failure], All),
-    to_prom(couch_replicator_checkpoints_total, counter, Total);
+    to_prom(couch_replicator_checkpoints_total, counter, "number of checkpoint saves", Total);
 couch_to_prom([couch_replicator, responses, failure], Info, _All) ->
-    to_prom(couch_replicator_responses_failure_total, counter, val(Info));
+    to_prom(couch_replicator_responses_failure_total, counter, desc(Info), val(Info));
 couch_to_prom([couch_replicator, responses, success], Info, All) ->
     Total = val(Info) + val([couch_replicator, responses, failure], All),
-    to_prom(couch_replicator_responses_total, counter, Total);
+    to_prom(
+        couch_replicator_responses_total,
+        counter,
+        "number of HTTP responses received by the replicator",
+        Total
+    );
 couch_to_prom([couch_replicator, stream_responses, failure], Info, _All) ->
-    to_prom(couch_replicator_stream_responses_failure_total, counter, val(Info));
+    to_prom(couch_replicator_stream_responses_failure_total, counter, desc(Info), val(Info));
 couch_to_prom([couch_replicator, stream_responses, success], Info, All) ->
     Total = val(Info) + val([couch_replicator, stream_responses, failure], All),
-    to_prom(couch_replicator_stream_responses_total, counter, Total);
+    to_prom(
+        couch_replicator_stream_responses_total,
+        counter,
+        "number of streaming HTTP responses received by the replicator",
+        Total
+    );
 couch_to_prom([couchdb, auth_cache_hits], Info, All) ->
     Total = val(Info) + val([couchdb, auth_cache_misses], All),
-    to_prom(auth_cache_requests_total, counter, Total);
+    to_prom(auth_cache_requests_total, counter, "number of authentication cache requests", Total);
 couch_to_prom([couchdb, auth_cache_misses], Info, _All) ->
-    to_prom(auth_cache_misses_total, counter, val(Info));
+    to_prom(auth_cache_misses_total, counter, desc(Info), val(Info));
+% force a # TYPE and # HELP definition for httpd_request_methods
 couch_to_prom([couchdb, httpd_request_methods, 'COPY'], Info, _All) ->
-    to_prom(httpd_request_methods, counter, {[{method, 'COPY'}], val(Info)});
+    to_prom(httpd_request_methods, counter, "number of HTTP requests by method", {
+        [{method, 'COPY'}], val(Info)
+    });
 couch_to_prom([couchdb, httpd_request_methods, Method], Info, _All) ->
     to_prom(httpd_request_methods, {[{method, Method}], val(Info)});
+% force a # TYPE and # HELP definition for httpd_status_codes
+couch_to_prom([couchdb, httpd_status_codes, 200], Info, _All) ->
+    to_prom(httpd_status_codes, counter, "number of HTTP responses by status code", {
+        [{code, 200}], val(Info)
+    });
 couch_to_prom([couchdb, httpd_status_codes, Code], Info, _All) ->
     to_prom(httpd_status_codes, {[{code, Code}], val(Info)});
 couch_to_prom([ddoc_cache, hit], Info, All) ->
     Total = val(Info) + val([ddoc_cache, miss], All),
-    to_prom(ddoc_cache_requests_total, counter, Total);
+    to_prom(ddoc_cache_requests_total, counter, "number of design doc cache requests", Total);
 couch_to_prom([ddoc_cache, miss], Info, _All) ->
-    to_prom(ddoc_cache_requests_failures_total, counter, val(Info));
+    to_prom(ddoc_cache_requests_failures_total, counter, desc(Info), val(Info));
 couch_to_prom([ddoc_cache, recovery], Info, _All) ->
-    to_prom(ddoc_cache_requests_recovery_total, counter, val(Info));
+    to_prom(ddoc_cache_requests_recovery_total, counter, desc(Info), val(Info));
 couch_to_prom([fabric, read_repairs, failure], Info, _All) ->
-    to_prom(fabric_read_repairs_failures_total, counter, val(Info));
+    to_prom(fabric_read_repairs_failures_total, counter, desc(Info), val(Info));
 couch_to_prom([fabric, read_repairs, success], Info, All) ->
     Total = val(Info) + val([fabric, read_repairs, failure], All),
-    to_prom(fabric_read_repairs_total, counter, Total);
+    to_prom(fabric_read_repairs_total, counter, "number of fabric read repairs", Total);
 couch_to_prom([rexi, streams, timeout, init_stream], Info, _All) ->
-    to_prom(rexi_streams_timeout_total, counter, {[{stage, init_stream}], val(Info)});
+    to_prom(rexi_streams_timeout_total, counter, "number of rexi stream timeouts", {
+        [{stage, init_stream}], val(Info)
+    });
 couch_to_prom([rexi_streams, timeout, Stage], Info, _All) ->
     to_prom(rexi_streams_timeout_total, {[{stage, Stage}], val(Info)});
 couch_to_prom([couchdb | Rest], Info, All) ->
@@ -73,15 +95,22 @@ couch_to_prom(Path, Info, _All) ->
     case lists:keyfind(type, 1, Info) of
         {type, counter} ->
             Metric = counter_metric(Path),
-            to_prom(Metric, counter, val(Info));
+            to_prom(Metric, counter, desc(Info), val(Info));
         {type, gauge} ->
-            to_prom(path_to_name(Path), gauge, val(Info));
+            to_prom(path_to_name(Path), gauge, desc(Info), val(Info));
         {type, histogram} ->
             to_prom_summary(Path, Info)
     end.
 
-to_prom(Metric, Type, Data) ->
-    TypeStr = to_bin(io_lib:format("# TYPE ~s ~s", [to_prom_name(Metric), Type])),
+type_def(Metric, Type, Desc) ->
+    Name = to_prom_name(Metric),
+    [
+        to_bin(io_lib:format("\n# HELP ~s ~s\r", [Name, Desc])),
+        to_bin(io_lib:format("# TYPE ~s ~s", [Name, Type]))
+    ].
+
+to_prom(Metric, Type, Desc, Data) ->
+    TypeStr = type_def(Metric, Type, Desc),
     [TypeStr] ++ to_prom(Metric, Data).
 
 to_prom(Metric, Instances) when is_list(Instances) ->
@@ -130,7 +159,7 @@ to_prom_summary(Path, Info) ->
     SumStat = to_prom(SumMetric, Count * Mean),
     CountMetric = path_to_name(Path ++ ["seconds", "count"]),
     CountStat = to_prom(CountMetric, Count),
-    to_prom(Metric, summary, Quantiles) ++ [SumStat, CountStat].
+    to_prom(Metric, summary, desc(Info), Quantiles) ++ [SumStat, CountStat].
 
 to_prom_name(Metric) ->
     to_bin(io_lib:format("couchdb_~s", [Metric])).
@@ -168,23 +197,31 @@ val(Key, Stats) ->
     {Key, Data} = lists:keyfind(Key, 1, Stats),
     val(Data).
 
+desc(Info) ->
+    {desc, V} = lists:keyfind(desc, 1, Info),
+    V.
+
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
 to_prom_counter_test() ->
-    ?assertEqual(
-        <<"couchdb_ddoc_cache 10">>,
-        test_to_prom_output(ddoc_cache, counter, 10)
-    ),
-    ?assertEqual(
-        <<"couchdb_httpd_status_codes{code=\"200\"} 3">>,
-        test_to_prom_output(httpd_status_codes, counter, {[{code, 200}], 3})
-    ).
+    [
+        ?assertEqual(
+            <<"couchdb_ddoc_cache 10">>,
+            test_to_prom_output(ddoc_cache, counter, "size of ddoc cache", 10)
+        ),
+        ?assertEqual(
+            <<"couchdb_httpd_status_codes{code=\"200\"} 3">>,
+            test_to_prom_output(httpd_status_codes, counter, "HTTP request status by code", {
+                [{code, 200}], 3
+            })
+        )
+    ].
 
 to_prom_gauge_test() ->
     ?assertEqual(
         <<"couchdb_temperature_celsius 36">>,
-        test_to_prom_output(temperature_celsius, gauge, 36)
+        test_to_prom_output(temperature_celsius, gauge, "temp", 36)
     ).
 
 to_prom_summary_test() ->
@@ -232,8 +269,8 @@ counter_metric_test_() ->
         )
     ].
 
-test_to_prom_output(Metric, Type, Val) ->
-    Out = to_prom(Metric, Type, Val),
+test_to_prom_output(Metric, Type, Desc, Val) ->
+    Out = to_prom(Metric, Type, Desc, Val),
     lists:nth(2, Out).
 
 test_to_prom_summary_output(Metric, Info) ->
