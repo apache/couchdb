@@ -534,6 +534,10 @@ derived:
 nouveau-test:
 	@cd java/nouveau && mvn test
 
+.PHONY: nouveau-all-test
+nouveau-all-test:
+	@cd java/nouveau && mvn test -PallTests
+
 .PHONY: nouveau-clean
 nouveau-clean:
 	@cd java/nouveau && mvn clean

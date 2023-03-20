@@ -21,6 +21,7 @@ import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
 import org.apache.couchdb.nouveau.core.Cache.CachePreunloader;
 import org.apache.couchdb.nouveau.core.Cache.CacheUnloader;
 import org.eclipse.jetty.io.RuntimeIOException;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,7 @@ public class IndexCacheTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexCacheTest.class);
 
     @Test
+    @Tag("SlowTest")
     public void testCache() throws Exception {
         final Random cacheRandom = new Random();
 

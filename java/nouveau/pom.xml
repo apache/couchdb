@@ -30,6 +30,7 @@
     <dropwizard.version>2.1.5</dropwizard.version>
     <junit5.version>5.8.2</junit5.version>
     <slf4j.version>1.7.32</slf4j.version>
+    <project.tests.exclude>SlowTest</project.tests.exclude>
   </properties>
 
   <dependencyManagement>
@@ -65,6 +66,9 @@
           <groupId>org.apache.maven.plugins</groupId>
 		  <artifactId>maven-surefire-plugin</artifactId>
 		  <version>2.22.2</version>
+          <configuration>
+            <excludedGroups>${project.tests.exclude}</excludedGroups>
+          </configuration>
 	    </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -89,5 +93,14 @@
       </plugins>
     </pluginManagement>
   </build>
+
+  <profiles>
+    <profile>
+      <id>allTests</id>
+      <properties>
+        <project.tests.exclude></project.tests.exclude>
+      </properties>
+    </profile>
+  </profiles>
 
 </project>
