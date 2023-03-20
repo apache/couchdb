@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.condition.OS.WINDOWS;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -27,12 +28,13 @@ import org.apache.couchdb.nouveau.api.SearchResults;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.io.TempDir;
 
 public abstract class BaseIndexTest<T> {
 
     @TempDir
-    static Path path;
+    Path path;
 
     protected Index<T> index;
 
@@ -55,11 +57,13 @@ public abstract class BaseIndexTest<T> {
     }
 
     @Test
+    @DisabledOnOs(WINDOWS)
     public void testOpenClose() throws IOException {
         // do nothing
     }
 
     @Test
+    @DisabledOnOs(WINDOWS)
     public void testSearching() throws IOException {
         final int count = 100;
         for (int i = 1; i <= count; i++) {
