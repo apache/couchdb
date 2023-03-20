@@ -134,7 +134,7 @@ get_vm_stats() ->
         to_prom(
             erlang_memory_bytes,
             gauge,
-            "size of memory dynamically allocated by the Erlang emulator",
+            "size of memory (in bytes) dynamically allocated by the Erlang emulator",
             MemLabels
         ),
         to_prom(
