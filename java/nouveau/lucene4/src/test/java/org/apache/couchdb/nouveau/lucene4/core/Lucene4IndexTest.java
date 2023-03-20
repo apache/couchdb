@@ -21,12 +21,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
+import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.BaseIndexTest;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Field.Store;
+import org.apache.lucene.document.DoubleDocValuesField;
 import org.apache.lucene.document.SortedDocValuesField;
 import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.document.StringField;
@@ -71,6 +73,25 @@ public class Lucene4IndexTest extends BaseIndexTest<IndexableField> {
         request.setCounts(List.of("bar"));
         final SearchResults<IndexableField> results = index.search(request);
         assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", (double) count)));
+    }
+
+    @Test
+    public void testRanges() throws IOException {
+        final int count = 100;
+        for (int i = 1; i <= count; i++) {
+            final Collection<IndexableField> fields = List.of(new DoubleDocValuesField("bar", i));
+            final DocumentUpdateRequest<IndexableField> request = new DocumentUpdateRequest<IndexableField>(i, null,
+                    fields);
+            index.update("doc" + i, request);
+        }
+        final SearchRequest request = new SearchRequest();
+        request.setQuery("*:*");
+        request.setRanges(Map.of("bar",
+                List.of(new DoubleRange("low", 0.0, true, (double) count / 2, true),
+                        new DoubleRange("high", (double) count / 2, true, (double) count, true))));
+        final SearchResults<IndexableField> results = index.search(request);
+        assertThat(results.getRanges()).isEqualTo(
+                Map.of("bar", Map.of("low", (double) count / 2, "high", (double) count / 2 + 1)));
     }
 
 }
