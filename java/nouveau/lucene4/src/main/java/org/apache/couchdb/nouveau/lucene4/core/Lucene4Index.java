@@ -194,7 +194,7 @@ public class Lucene4Index extends Index<IndexableField> {
         } catch (final IllegalArgumentException e) {
             if (e.getMessage().contains("was not indexed with SortedSetDocValues")) {
                 return null;
-            }   
+            }
             throw e;
         }
         final FacetRequest[] facetRequests = new FacetRequest[counts.size()];
@@ -276,7 +276,9 @@ public class Lucene4Index extends Index<IndexableField> {
         for (final FacetResult facetResult : fc.getFacetResults()) {
             final FacetResultNode node = facetResult.getFacetResultNode();
             final Map<String, Number> m = result.computeIfAbsent(node.label.components[0], (k) -> new HashMap<String, Number>());
-            m.put(node.label.components[1], node.value);
+            for (final FacetResultNode n : node.subResults) {
+                m.put(n.label.components[1], n.value);
+            }
         }
         return result;
     }
