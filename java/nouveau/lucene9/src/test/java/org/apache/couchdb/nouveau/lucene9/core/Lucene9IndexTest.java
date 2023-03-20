@@ -13,11 +13,22 @@
 
 package org.apache.couchdb.nouveau.lucene9.core;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
+import org.apache.couchdb.nouveau.api.SearchRequest;
+import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.BaseIndexTest;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.Field.Store;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.StringField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
@@ -25,6 +36,8 @@ import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
+import org.junit.jupiter.api.Test;
 
 public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
 
@@ -43,6 +56,21 @@ public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
 
     protected IndexableField stringField(final String name, final String value) {
         return new StringField(name, value, Store.NO);
+    }
+
+    @Test
+    public void testCounts() throws IOException {
+        final int count = 100;
+        for (int i = 1; i <= count; i++) {
+            final Collection<IndexableField> fields = List.of(new SortedDocValuesField("bar", new BytesRef("baz")));
+            final DocumentUpdateRequest<IndexableField> request = new DocumentUpdateRequest<IndexableField>(i, null, fields);
+            index.update("doc" + i, request);
+        }
+        final SearchRequest request = new SearchRequest();
+        request.setQuery("*:*");
+        request.setCounts(List.of("bar"));
+        final SearchResults<IndexableField> results = index.search(request);
+        assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
     }
 
 }

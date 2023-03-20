@@ -34,7 +34,11 @@ public abstract class BaseIndexTest<T> {
     @TempDir
     static Path path;
 
-    private Index<T> index;
+    protected Index<T> index;
+
+    protected abstract IndexLoader<T> indexLoader();
+
+    protected abstract T stringField(final String name, final String value);
 
     @BeforeEach
     public void setup() throws IOException {
@@ -56,21 +60,17 @@ public abstract class BaseIndexTest<T> {
     }
 
     @Test
-    public void testIndexing() throws IOException {
+    public void testSearching() throws IOException {
         final int count = 100;
         for (int i = 1; i <= count; i++) {
             final Collection<T> fields = List.of(stringField("foo", "bar"));
             final DocumentUpdateRequest<T> request = new DocumentUpdateRequest<T>(i, null, fields);
-            index.doUpdate("doc" + i, request);
+            index.update("doc" + i, request);
         }
         final SearchRequest request = new SearchRequest();
         request.setQuery("*:*");
         final SearchResults<T> results = index.search(request);
         assertThat(results.getTotalHits()).isEqualTo(count);
     }
-
-    protected abstract IndexLoader<T> indexLoader();
-
-    protected abstract T stringField(final String name, final String value);
 
 }
