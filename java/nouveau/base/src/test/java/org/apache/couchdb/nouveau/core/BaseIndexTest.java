@@ -14,7 +14,6 @@
 package org.apache.couchdb.nouveau.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.condition.OS.WINDOWS;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -25,56 +24,50 @@ import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.io.TempDir;
 
 public abstract class BaseIndexTest<T> {
-
-    @TempDir
-    Path path;
-
-    protected Index<T> index;
 
     protected abstract IndexLoader<T> indexLoader();
 
     protected abstract T stringField(final String name, final String value);
 
-    @BeforeEach
-    public void setup() throws IOException {
+    protected final Index<T> setup(final Path path) throws IOException {
         final IndexDefinition indexDefinition = new IndexDefinition();
         indexDefinition.setDefaultAnalyzer("standard");
         final Index<T> index = indexLoader().apply(path, indexDefinition);
         index.setDeleteOnClose(true);
-        this.index = index;
+        return index;
     }
 
-    @AfterEach
-    public void cleanup() throws IOException {
+    protected final void cleanup(final Index<T> index) throws IOException {
         index.close();
     }
 
     @Test
-    @DisabledOnOs(WINDOWS)
-    public void testOpenClose() throws IOException {
-        // do nothing
+    public void testOpenClose(@TempDir Path path) throws IOException {
+        final Index<T> index = setup(path);
+        cleanup(index);
     }
 
     @Test
-    @DisabledOnOs(WINDOWS)
-    public void testSearching() throws IOException {
-        final int count = 100;
-        for (int i = 1; i <= count; i++) {
-            final Collection<T> fields = List.of(stringField("foo", "bar"));
-            final DocumentUpdateRequest<T> request = new DocumentUpdateRequest<T>(i, null, fields);
-            index.update("doc" + i, request);
+    public void testSearching(@TempDir Path path) throws IOException {
+        final Index<T> index = setup(path);
+        try {
+            final int count = 100;
+            for (int i = 1; i <= count; i++) {
+                final Collection<T> fields = List.of(stringField("foo", "bar"));
+                final DocumentUpdateRequest<T> request = new DocumentUpdateRequest<T>(i, null, fields);
+                index.update("doc" + i, request);
+            }
+            final SearchRequest request = new SearchRequest();
+            request.setQuery("*:*");
+            final SearchResults<T> results = index.search(request);
+            assertThat(results.getTotalHits()).isEqualTo(count);
+        } finally {
+            cleanup(index);
         }
-        final SearchRequest request = new SearchRequest();
-        request.setQuery("*:*");
-        final SearchResults<T> results = index.search(request);
-        assertThat(results.getTotalHits()).isEqualTo(count);
     }
 
 }
