@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -82,9 +83,9 @@ public class Lucene4Index extends Index<IndexableField> {
     public Lucene4Index(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
             final SearcherManager searcherManager) {
         super(updateSeq);
-        this.analyzer = analyzer;
-        this.writer = writer;
-        this.searcherManager = searcherManager;
+        this.analyzer = Objects.requireNonNull(analyzer);
+        this.writer = Objects.requireNonNull(writer);
+        this.searcherManager = Objects.requireNonNull(searcherManager);
     }
 
     @Override
