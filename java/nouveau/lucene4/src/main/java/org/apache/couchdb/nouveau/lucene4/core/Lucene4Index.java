@@ -118,8 +118,11 @@ public class Lucene4Index extends Index<IndexableField> {
 
     @Override
     public void doClose() throws IOException {
-        searcherManager.close();
-        writer.rollback();
+        try {
+            searcherManager.close();
+        } finally {
+            writer.rollback();
+        }
         synchronized (this) {
             isOpen = false;
         }
