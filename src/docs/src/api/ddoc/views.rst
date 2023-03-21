@@ -151,6 +151,7 @@
     parameters
 .. versionchanged:: 2.0.0 added ``sorted`` parameter
 .. versionchanged:: 2.1.0 added ``stable`` and ``update`` parameters
+.. versionchanged:: 3.3.1 treat single-element ``keys`` as ``key``
 
 .. warning::
     Using the ``attachments`` parameter to include attachments in view results
@@ -250,7 +251,7 @@ View indexes are updated incrementally in the following situations:
 - A document in the database has been updated.
 
 View indexes are rebuilt entirely when the view definition changes. To achieve
-this, a 'fingerprint' of the view definition is created when the design
+this, a ``fingerprint`` of the view definition is created when the design
 document is updated. If the fingerprint changes, then the view indexes are
 entirely rebuilt. This ensures that changes to the view definitions are
 reflected in the view indexes.
@@ -592,32 +593,33 @@ Sorting order and startkey/endkey
 ---------------------------------
 
 The sorting direction is applied before the filtering applied using the
-``startkey`` and ``endkey`` query arguments. For example the following query:
+``startkey`` and ``endkey`` query arguments. For example the following query
+will operate correctly when listing all the matching entries between
+``carrots`` and ``egg``:
 
 .. code-block:: http
 
-    GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?startkey=%22carrots%22&endkey=%22egg%22 HTTP/1.1
+    GET http://couchdb:5984/recipes/_design/recipes/_view/by_ingredient?startkey="carrots"&endkey="egg" HTTP/1.1
     Accept: application/json
 
-will operate correctly when listing all the matching entries between
-``carrots`` and ``egg``. If the order of output is reversed with the
-``descending`` query argument, the view request will return no entries:
+If the order of output is reversed with the ``descending`` query argument,
+the view request will get a 400 Bad Request response:
 
 .. code-block:: http
 
-    GET /recipes/_design/recipes/_view/by_ingredient?descending=true&startkey=%22carrots%22&endkey=%22egg%22 HTTP/1.1
+    GET /recipes/_design/recipes/_view/by_ingredient?descending=true&startkey="carrots"&endkey="egg" HTTP/1.1
     Accept: application/json
     Host: localhost:5984
 
     {
-        "total_rows" : 26453,
-        "rows" : [],
-        "offset" : 21882
+        "error": "query_parse_error",
+        "reason": "No rows can match your key range, reverse your start_key and end_key or set descending=false",
+        "ref": 3986383855
     }
 
-The results will be empty because the entries in the view are reversed before
-the key filter is applied, and therefore the ``endkey`` of “egg” will be seen
-before the ``startkey`` of “carrots”, resulting in an empty list.
+The result will be an error because the entries in the view are reversed before
+the key filter is applied, so the ``endkey`` of "egg" will be seen before the
+``startkey`` of "carrots".
 
 Instead, you should reverse the values supplied to the ``startkey`` and
 ``endkey`` parameters to match the descending sorting applied to the keys.
@@ -625,9 +627,64 @@ Changing the previous example to:
 
 .. code-block:: http
 
-    GET /recipes/_design/recipes/_view/by_ingredient?descending=true&startkey=%22egg%22&endkey=%22carrots%22 HTTP/1.1
+    GET /recipes/_design/recipes/_view/by_ingredient?descending=true&startkey="egg"&endkey="carrots" HTTP/1.1
     Accept: application/json
     Host: localhost:5984
+
+Using key, keys, start_key and end_key
+---------------------------------------
+
+``key``: Behaves like setting ``start_key=$key&end_key=$key``.
+
+``keys``: there are some differences between single-element ``keys`` and
+multi-element ``keys``. For single-element ``keys``, treat it as a ``key``.
+
+.. code-block:: bash
+
+    $ curl -X POST http://adm:pass@127.0.0.1:5984/db/_bulk_docs \
+           -H 'Content-Type: application/json' \
+           -d '{"docs":[{"_id":"a","key":"a","value":1},{"_id":"b","key":"b","value":2},{"_id":"c","key":"c","value":3}]}'
+    $ curl -X POST http://adm:pass@127.0.0.1:5984/db \
+           -H 'Content-Type: application/json' \
+           -d '{"_id":"_design/ddoc","views":{"reduce":{"map":"function(doc) { emit(doc.key, doc.value) }","reduce":"_sum"}}}'
+
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?key="a"'
+    {"rows":[{"key":null,"value":1}]}
+
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?keys="[\"a\"]"'
+    {"rows":[{"key":null,"value":1}]}
+
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?keys=\["a","b"\]'
+    {"error":"query_parse_error","reason":"Multi-key fetches for reduce views must use `group=true`"}
+
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?keys=\["a","c"\]&group=true'
+    {"rows":[{"key":"a","value":1},{"key":"c","value":3}]}
+
+``keys`` is incompatible with ``key``, ``start_key`` and ``end_key``,
+but it's possible to use ``key`` with ``start_key`` and ``end_key``.
+Different orders of query parameters may result in different responses.
+Precedence is the order in which query parameters are specified. Usually,
+the last argument wins.
+
+.. code-block:: bash
+
+    # start_key=a and end_key=b
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?key="a"&endkey="b"'
+    {"rows":[{"key":null,"value":3}]}
+
+    # start_key=a and end_key=a
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?endkey="b"&key="a"'
+    {"rows":[{"key":null,"value":1}]}
+
+    # start_key=a and end_key=a
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?endkey="b"&keys=\["a"\]'
+    {"rows":[{"key":null,"value":1}]}
+
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?endkey="b"&keys=\["a","b"\]'
+    {"error":"query_parse_error","reason":"Multi-key fetches for reduce views must use `group=true`"}
+
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?endkey="b"&keys=\["a","b"\]&group=true'
+    {"error":"query_parse_error","reason":"`keys` is incompatible with `key`, `start_key` and `end_key`"}
 
 .. _api/ddoc/view/sorting/raw:
 

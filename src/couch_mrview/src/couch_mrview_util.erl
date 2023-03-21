@@ -564,7 +564,7 @@ validate_args(Args) ->
         {red, exact, _} ->
             ok;
         {red, _, KeyList} when is_list(KeyList) ->
-            Msg = <<"Multi-key fetchs for reduce views must use `group=true`">>,
+            Msg = <<"Multi-key fetches for reduce views must use `group=true`">>,
             mrverror(Msg);
         _ ->
             ok
@@ -581,13 +581,12 @@ validate_args(Args) ->
             ok;
         {[], _, _} ->
             ok;
+        {[Key], Key, Key} ->
+            ok;
         {[_ | _], undefined, undefined} ->
             ok;
         _ ->
-            mrverror(<<
-                "`keys` is incompatible with `key`"
-                ", `start_key` and `end_key`"
-            >>)
+            mrverror(<<"`keys` is incompatible with `key`, `start_key` and `end_key`">>)
     end,
 
     case Args#mrargs.start_key_docid of
