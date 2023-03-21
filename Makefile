@@ -536,7 +536,7 @@ nouveau-test:
 
 .PHONY: nouveau-all-test
 nouveau-all-test:
-	@cd java/nouveau && mvn test -PallTests
+	@cd java/nouveau && mvn test -P allTests
 
 .PHONY: nouveau-clean
 nouveau-clean:
@@ -548,8 +548,8 @@ nouveau-install:
 
 .PHONY: nouveau-install-no-tests
 nouveau-install-no-tests:
-	@cd java/nouveau && mvn -Dmaven.test.skip=true install
+	@cd java/nouveau && mvn -D maven.test.skip=true install
 
 .PHONY: nouveau-start
 nouveau-start: nouveau-install-no-tests
-	@cd java/nouveau/server && mvn exec:exec -Dexec.executable="java"
+	@cd java/nouveau/server && mvn exec:exec -D exec.executable="java"
