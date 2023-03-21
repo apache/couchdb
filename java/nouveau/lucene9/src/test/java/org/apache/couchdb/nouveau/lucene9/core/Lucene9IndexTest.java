@@ -14,9 +14,9 @@
 package org.apache.couchdb.nouveau.lucene9.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.condition.OS.WINDOWS;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +26,7 @@ import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.BaseIndexTest;
+import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.DoubleDocValuesField;
@@ -41,7 +42,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.io.TempDir;
 
 public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
 
@@ -63,40 +64,48 @@ public class Lucene9IndexTest extends BaseIndexTest<IndexableField> {
     }
 
     @Test
-    @DisabledOnOs(WINDOWS)
-    public void testCounts() throws IOException {
-        final int count = 100;
-        for (int i = 1; i <= count; i++) {
-            final Collection<IndexableField> fields = List.of(new SortedDocValuesField("bar", new BytesRef("baz")));
-            final DocumentUpdateRequest<IndexableField> request = new DocumentUpdateRequest<IndexableField>(i, null,
-                    fields);
-            index.update("doc" + i, request);
+    public void testCounts(@TempDir Path path) throws IOException {
+        Index<IndexableField> index = setup(path);
+        try {
+            final int count = 100;
+            for (int i = 1; i <= count; i++) {
+                final Collection<IndexableField> fields = List.of(new SortedDocValuesField("bar", new BytesRef("baz")));
+                final DocumentUpdateRequest<IndexableField> request = new DocumentUpdateRequest<IndexableField>(i, null,
+                        fields);
+                index.update("doc" + i, request);
+            }
+            final SearchRequest request = new SearchRequest();
+            request.setQuery("*:*");
+            request.setCounts(List.of("bar"));
+            final SearchResults<IndexableField> results = index.search(request);
+            assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
+        } finally {
+            cleanup(index);
         }
-        final SearchRequest request = new SearchRequest();
-        request.setQuery("*:*");
-        request.setCounts(List.of("bar"));
-        final SearchResults<IndexableField> results = index.search(request);
-        assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
     }
 
     @Test
-    @DisabledOnOs(WINDOWS)
-    public void testRanges() throws IOException {
-        final int count = 100;
-        for (int i = 1; i <= count; i++) {
-            final Collection<IndexableField> fields = List.of(new DoubleDocValuesField("bar", i));
-            final DocumentUpdateRequest<IndexableField> request = new DocumentUpdateRequest<IndexableField>(i, null,
-                    fields);
-            index.update("doc" + i, request);
+    public void testRanges(@TempDir Path path) throws IOException {
+        Index<IndexableField> index = setup(path);
+        try {
+            final int count = 100;
+            for (int i = 1; i <= count; i++) {
+                final Collection<IndexableField> fields = List.of(new DoubleDocValuesField("bar", i));
+                final DocumentUpdateRequest<IndexableField> request = new DocumentUpdateRequest<IndexableField>(i, null,
+                        fields);
+                index.update("doc" + i, request);
+            }
+            final SearchRequest request = new SearchRequest();
+            request.setQuery("*:*");
+            request.setRanges(Map.of("bar",
+                    List.of(new DoubleRange("low", 0.0, true, (double) count / 2, true),
+                            new DoubleRange("high", (double) count / 2, true, (double) count, true))));
+            final SearchResults<IndexableField> results = index.search(request);
+            assertThat(results.getRanges()).isEqualTo(
+                    Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
+        } finally {
+            cleanup(index);
         }
-        final SearchRequest request = new SearchRequest();
-        request.setQuery("*:*");
-        request.setRanges(Map.of("bar",
-                List.of(new DoubleRange("low", 0.0, true, (double) count / 2, true),
-                        new DoubleRange("high", (double) count / 2, true, (double) count, true))));
-        final SearchResults<IndexableField> results = index.search(request);
-        assertThat(results.getRanges()).isEqualTo(
-                Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
     }
 
 }
