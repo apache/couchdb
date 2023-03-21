@@ -35,6 +35,7 @@ import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.SearchHit;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
+import org.apache.couchdb.nouveau.core.IOUtils;
 import org.apache.couchdb.nouveau.core.Index;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
@@ -117,18 +118,19 @@ public class Lucene4Index extends Index<IndexableField> {
 
     @Override
     public void doClose() throws IOException {
-        try {
-            try {
-                searcherManager.close();
-            } finally {
-                writer.rollback();
-            }
-        } finally {
-            var dir = writer.getDirectory();
-            for (final String name : dir.listAll()) {
-                dir.deleteFile(name);
-            }
-        }
+        IOUtils.runAll(
+                () -> {
+                    searcherManager.close();
+                },
+                () -> {
+                    writer.rollback();
+                },
+                () -> {
+                    var dir = writer.getDirectory();
+                    for (final String name : dir.listAll()) {
+                        dir.deleteFile(name);
+                    }
+                });
     }
 
     @Override
