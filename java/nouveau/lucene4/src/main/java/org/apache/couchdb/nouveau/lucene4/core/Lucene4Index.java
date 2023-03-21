@@ -78,7 +78,6 @@ public class Lucene4Index extends Index<IndexableField> {
     private final Analyzer analyzer;
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
-    private volatile boolean isOpen = true;
 
     public Lucene4Index(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
             final SearcherManager searcherManager) {
@@ -123,14 +122,6 @@ public class Lucene4Index extends Index<IndexableField> {
         } finally {
             writer.rollback();
         }
-        synchronized (this) {
-            isOpen = false;
-        }
-    }
-
-    @Override
-    public boolean isOpen() {
-        return isOpen;
     }
 
     @Override
@@ -389,8 +380,7 @@ public class Lucene4Index extends Index<IndexableField> {
 
     @Override
     public String toString() {
-        return "Lucene4Index [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager
-                + ", isOpen=" + isOpen + "]";
+        return "Lucene4Index [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager + "]";
     }
 
 }

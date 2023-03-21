@@ -100,8 +100,6 @@ public abstract class Index<T> implements Closeable {
 
     protected abstract void doClose() throws IOException;
 
-    public abstract boolean isOpen();
-
     public boolean isDeleteOnClose() {
         return deleteOnClose;
     }

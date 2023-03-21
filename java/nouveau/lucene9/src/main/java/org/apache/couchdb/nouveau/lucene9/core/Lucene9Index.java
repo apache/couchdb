@@ -124,11 +124,6 @@ public class Lucene9Index extends Index<IndexableField> {
     }
 
     @Override
-    public boolean isOpen() {
-        return writer.isOpen();
-    }
-
-    @Override
     public SearchResults<IndexableField> doSearch(final SearchRequest request) throws IOException {
         final Query query;
         try {
