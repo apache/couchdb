@@ -63,7 +63,7 @@ is for a 3 node CouchDB cluster:
         http-check disable-on-404
         server couchdb1 x.x.x.x:5984 check inter 5s
         server couchdb2 x.x.x.x:5984 check inter 5s
-        server couchdb2 x.x.x.x:5984 check inter 5s
+        server couchdb3 x.x.x.x:5984 check inter 5s
 
 .. _HAProxy: http://haproxy.org/
 .. _code repository: https://github.com/apache/couchdb/blob/main/rel/haproxy.cfg
