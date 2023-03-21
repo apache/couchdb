@@ -118,9 +118,16 @@ public class Lucene4Index extends Index<IndexableField> {
     @Override
     public void doClose() throws IOException {
         try {
-            searcherManager.close();
+            try {
+                searcherManager.close();
+            } finally {
+                writer.rollback();
+            }
         } finally {
-            writer.rollback();
+            var dir = writer.getDirectory();
+            for (final String name : dir.listAll()) {
+                dir.deleteFile(name);
+            }
         }
     }
 

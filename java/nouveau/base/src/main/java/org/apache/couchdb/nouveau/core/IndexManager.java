@@ -282,10 +282,6 @@ public final class IndexManager implements Managed {
         return (name, index) -> {
             LOGGER.info("closing {}", name);
             index.close();
-            if (index.isDeleteOnClose()) {
-                IOUtils.rm(indexRootPath(name));
-                LOGGER.info("deleted on close {}", name);
-            }
         };
     }
 
