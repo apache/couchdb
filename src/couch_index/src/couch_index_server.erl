@@ -312,11 +312,7 @@ handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated, DDocId}, St) ->
         try
             mem3:local_shards(mem3:dbname(DbName))
         catch
-            Class:Msg ->
-                couch_log:warning(
-                    "~p got ~p:~p when fetching local shards for ~p",
-                    [?MODULE, Class, Msg, DbName]
-                ),
+            error:database_does_not_exist ->
                 []
         end,
     DbShards = [mem3:name(Sh) || Sh <- LocalShards],
