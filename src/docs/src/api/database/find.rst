@@ -1317,6 +1317,9 @@ it easier to take advantage of future improvements to query planning
     :>header Content-Type: - :mimetype:`application/json`
     :>header Transfer-Encoding: ``chunked``
 
+    :>json boolean covered: Tell if the query could be answered only
+        by relying on the data stored in the index.  When ``true``, no
+        documents are fetched, which results in a faster response.
     :>json string dbname: Name of database.
     :>json object index: Index used to fulfill the query.
     :>json object selector: Query selector used.
@@ -1364,6 +1367,7 @@ it easier to take advantage of future improvements to query planning
         Transfer-Encoding: chunked
 
         {
+            "covered": false,
             "dbname": "movies",
             "index": {
                 "ddoc": "_design/0d61d9177426b1e2aa8d0fe732ec6e506f5d443c",
