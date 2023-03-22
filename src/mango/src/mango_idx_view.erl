@@ -538,3 +538,27 @@ covers(Idx, Fields) ->
             Available = [<<"_id">> | columns(Idx)],
             sets:is_subset(sets:from_list(Fields), sets:from_list(Available))
     end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+covers_all_fields_test() ->
+    ?assertNot(covers(undefined, all_fields)).
+
+covers_all_docs_test() ->
+    ?assertNot(covers(#idx{def = all_docs}, undefined)).
+
+covers_empty_index_test() ->
+    Index = #idx{def = {[{<<"fields">>, {[]}}]}},
+    ?assert(covers(Index, [])),
+    ?assert(covers(Index, [<<"_id">>])).
+
+covers_regular_index_test() ->
+    Index = #idx{def = {[{<<"fields">>, {[{field1, undefined}, {field2, undefined}]}}]}},
+    ?assert(covers(Index, [])),
+    ?assert(covers(Index, [<<"_id">>])),
+    ?assert(covers(Index, [field1])),
+    ?assert(covers(Index, [field2, field1])),
+    ?assert(covers(Index, [<<"_id">>, field1, field2])),
+    ?assertNot(covers(Index, [field3, field1, field2])).
+-endif.

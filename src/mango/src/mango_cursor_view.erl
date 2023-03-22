@@ -640,7 +640,794 @@ update_bookmark_keys(Cursor, _Props) ->
 %%%%%%%% module tests below %%%%%%%%
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+
+viewcbargs_test() ->
+    ViewCBArgs = viewcbargs_new(selector, fields, index),
+    ?assertEqual(selector, viewcbargs_get(selector, ViewCBArgs)),
+    ?assertEqual(fields, viewcbargs_get(fields, ViewCBArgs)),
+    ?assertEqual(index, viewcbargs_get(covering_index, ViewCBArgs)),
+    ?assertError(function_clause, viewcbargs_get(something_else, ViewCBArgs)).
+
+maybe_replace_max_json_test() ->
+    ?assertEqual([], maybe_replace_max_json([])),
+    ?assertEqual(<<"<MAX>">>, maybe_replace_max_json(?MAX_STR)),
+    ?assertEqual(
+        [val1, val2, <<"<MAX>">>, val3], maybe_replace_max_json([val1, val2, ?MAX_JSON_OBJ, val3])
+    ),
+    ?assertEqual(something, maybe_replace_max_json(something)).
+
+base_opts_test() ->
+    Index =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{field1, undefined}, {field2, undefined}]}}]}
+        },
+    Fields = [field1, field2],
+    Cursor =
+        #cursor{
+            index = Index,
+            selector = selector,
+            fields = Fields,
+            ranges = [{'$gte', start_key, '$lte', end_key}]
+        },
+    Extra =
+        [
+            {callback, {mango_cursor_view, view_cb}},
+            {selector, selector},
+            {callback_args, #{
+                selector => selector,
+                fields => Fields,
+                covering_index => Index
+            }},
+            {ignore_partition_query_limit, true}
+        ],
+    MRArgs =
+        #mrargs{
+            view_type = map,
+            reduce = false,
+            start_key = [start_key],
+            end_key = [end_key, ?MAX_JSON_OBJ],
+            include_docs = true,
+            extra = Extra
+        },
+    ?assertEqual(MRArgs, base_args(Cursor)),
+
+    % non-covering index
+    Cursor1 = Cursor#cursor{fields = all_fields},
+    Extra1 =
+        [
+            {callback, {mango_cursor_view, view_cb}},
+            {selector, selector},
+            {callback_args, #{
+                selector => selector,
+                fields => all_fields,
+                covering_index => undefined
+            }},
+            {ignore_partition_query_limit, true}
+        ],
+    MRArgs1 = MRArgs#mrargs{extra = Extra1},
+    ?assertEqual(MRArgs1, base_args(Cursor1)).
+
+apply_opts_empty_test() ->
+    ?assertEqual(args, apply_opts([], args)).
+
+apply_opts_r_test() ->
+    Args = #mrargs{},
+    ArgsWithDocs = Args#mrargs{include_docs = true},
+    ?assertEqual(ArgsWithDocs, apply_opts([{r, "1"}], Args)),
+    ArgsWithoutDocs = Args#mrargs{include_docs = false},
+    ?assertEqual(ArgsWithoutDocs, apply_opts([{r, "3"}], Args)).
+
+apply_opts_conflicts_test() ->
+    Args = #mrargs{},
+    ArgsWithConflicts = Args#mrargs{conflicts = true},
+    ?assertEqual(ArgsWithConflicts, apply_opts([{conflicts, true}], Args)),
+    ArgsWithoutConflicts = Args#mrargs{conflicts = undefined},
+    ?assertEqual(ArgsWithoutConflicts, apply_opts([{conflicts, false}], Args)).
+
+apply_opts_sort_test() ->
+    Args =
+        #mrargs{
+            start_key = start_key,
+            start_key_docid = start_key_docid,
+            end_key = end_key,
+            end_key_docid = end_key_docid
+        },
+    ?assertEqual(Args, apply_opts([{sort, {[]}}], Args)),
+    ?assertEqual(Args, apply_opts([{sort, {[{field1, <<"asc">>}]}}], Args)),
+    ?assertEqual(Args, apply_opts([{sort, {[{field1, <<"asc">>}, {field2, <<"desc">>}]}}], Args)),
+    ArgsWithSort =
+        Args#mrargs{
+            direction = rev,
+            start_key = end_key,
+            start_key_docid = end_key_docid,
+            end_key = start_key,
+            end_key_docid = start_key_docid
+        },
+    ?assertEqual(ArgsWithSort, apply_opts([{sort, {[{field1, <<"desc">>}]}}], Args)).
+
+apply_opts_stale_test() ->
+    Args = #mrargs{},
+    ArgsWithStale = Args#mrargs{stable = true, update = false},
+    ?assertEqual(ArgsWithStale, apply_opts([{stale, ok}], Args)).
+
+apply_opts_stable_test() ->
+    Args = #mrargs{},
+    ArgsWithStable = Args#mrargs{stable = true},
+    ?assertEqual(ArgsWithStable, apply_opts([{stable, true}], Args)),
+    ArgsWithoutStable = Args#mrargs{stable = false},
+    ?assertEqual(ArgsWithoutStable, apply_opts([{stable, false}], Args)).
+
+apply_opts_update_test() ->
+    Args = #mrargs{},
+    ArgsWithUpdate = Args#mrargs{update = true},
+    ?assertEqual(ArgsWithUpdate, apply_opts([{update, true}], Args)),
+    ArgsWithoutUpdate = Args#mrargs{update = false},
+    ?assertEqual(ArgsWithoutUpdate, apply_opts([{update, false}], Args)).
+
+apply_opts_partition_test() ->
+    Args = #mrargs{},
+    ArgsWithPartition = Args#mrargs{extra = [{partition, <<"partition">>}]},
+    ?assertEqual(ArgsWithPartition, apply_opts([{partition, <<"partition">>}], Args)),
+    ArgsWithoutPartition = Args#mrargs{extra = []},
+    ?assertEqual(ArgsWithoutPartition, apply_opts([{partition, <<>>}], Args)).
+
+consider_index_coverage_positive_test() ->
+    Index =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[]}}]}
+        },
+    Fields = [<<"_id">>],
+    MRArgs = #mrargs{include_docs = true},
+    MRArgsRef = MRArgs#mrargs{include_docs = false},
+    ?assertEqual(MRArgsRef, consider_index_coverage(Index, Fields, MRArgs)),
+    MRArgs1 = #mrargs{include_docs = false},
+    ?assertEqual(MRArgsRef, consider_index_coverage(Index, Fields, MRArgs1)).
+
+consider_index_coverage_negative_test() ->
+    Index = undefined,
+    Fields = all_fields,
+    MRArgs = #mrargs{include_docs = true},
+    ?assertEqual(MRArgs, consider_index_coverage(Index, Fields, MRArgs)),
+    MRArgs1 = #mrargs{include_docs = false},
+    ?assertEqual(MRArgs1, consider_index_coverage(Index, Fields, MRArgs1)).
+
+derive_doc_from_index_test() ->
+    Index =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{<<"field1">>, undefined}, {<<"field2">>, undefined}]}}]}
+        },
+    DocId = doc_id,
+    Keys = [key1, key2],
+    ViewRow = #view_row{id = DocId, key = Keys},
+    Doc = {[{<<"_id">>, DocId}, {<<"field2">>, key2}, {<<"field1">>, key1}]},
+    ?assertEqual(Doc, derive_doc_from_index(Index, ViewRow)).
+
+composite_indexes_test() ->
+    ?assertEqual([], composite_indexes([], [])),
+    Index1 =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{field1, undefined}, {field2, undefined}]}}]}
+        },
+    Index2 =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{field1, undefined}, {field3, undefined}, {field4, range4}]}}]}
+        },
+    Index3 =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{field3, undefined}, {field4, undefined}]}}]}
+        },
+    Indexes = [Index1, Index2, Index3],
+    Ranges = [{field1, range1}, {field3, range3}, {field4, range4}],
+    Result = [
+        {Index3, [range3, range4], 1}, {Index2, [range1, range3, range4], 0}, {Index1, [range1], 2}
+    ],
+    ?assertEqual(Result, composite_indexes(Indexes, Ranges)).
+
+create_test() ->
+    Index = #idx{type = <<"json">>, def = {[{<<"fields">>, {[]}}]}},
+    Indexes = [Index],
+    Ranges = [],
+    Selector = {[]},
+    Options = [{limit, limit}, {skip, skip}, {fields, fields}, {bookmark, bookmark}],
+    Cursor =
+        #cursor{
+            db = db,
+            index = Index,
+            ranges = Ranges,
+            selector = Selector,
+            opts = Options,
+            limit = limit,
+            skip = skip,
+            fields = fields,
+            bookmark = bookmark
+        },
+    ?assertEqual({ok, Cursor}, create(db, Indexes, Selector, Options)).
+
+explain_test() ->
+    Cursor =
+        #cursor{
+            ranges = [empty],
+            fields = all_fields,
+            opts = []
+        },
+    Response =
+        [
+            {mrargs,
+                {[
+                    {include_docs, true},
+                    {view_type, map},
+                    {reduce, false},
+                    {partition, null},
+                    {start_key, null},
+                    {end_key, null},
+                    {direction, fwd},
+                    {stable, false},
+                    {update, true},
+                    {conflicts, undefined}
+                ]}},
+            {covered, false}
+        ],
+    ?assertEqual(Response, explain(Cursor)).
+
+execute_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(foo, [non_strict]),
+            meck:new(fabric)
+        end,
+        fun(_) ->
+            meck:unload(fabric),
+            meck:unload(foo)
+        end,
+        [
+            ?TDEF_FE(t_execute_empty),
+            ?TDEF_FE(t_execute_ok_all_docs),
+            ?TDEF_FE(t_execute_ok_query_view),
+            ?TDEF_FE(t_execute_error)
+        ]
+    }.
+
+t_execute_empty(_) ->
+    Cursor = #cursor{ranges = [empty]},
+    meck:expect(fabric, all_docs, ['_', '_', '_', '_', '_'], meck:val(error)),
+    meck:expect(fabric, query_view, ['_', '_', '_', '_', '_', '_'], meck:val(error)),
+    ?assertEqual({ok, accumulator}, execute(Cursor, undefined, accumulator)),
+    ?assertNot(meck:called(fabric, all_docs, '_')),
+    ?assertNot(meck:called(fabric, query_view, '_')).
+
+t_execute_ok_all_docs(_) ->
+    Bookmark = bookmark,
+    UserFnParameters = [{add_key, bookmark, Bookmark}, accumulator],
+    meck:expect(foo, bar, UserFnParameters, meck:val({undefined, updated_accumulator})),
+    Index = #idx{type = <<"json">>, def = all_docs},
+    Selector = {[]},
+    Fields = all_fields,
+    Cursor =
+        #cursor{
+            index = Index,
+            db = db,
+            selector = Selector,
+            fields = Fields,
+            ranges = [{'$gte', start_key, '$lte', end_key}],
+            opts = [{user_ctx, user_ctx}],
+            bookmark = nil
+        },
+    Cursor1 =
+        Cursor#cursor{
+            user_acc = accumulator,
+            user_fun = fun foo:bar/2,
+            execution_stats = '_'
+        },
+    Cursor2 =
+        Cursor1#cursor{
+            bookmark = Bookmark,
+            bookmark_docid = undefined,
+            bookmark_key = undefined,
+            execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
+        },
+    Extra =
+        [
+            {callback, {mango_cursor_view, view_cb}},
+            {selector, Selector},
+            {callback_args, #{
+                selector => Selector,
+                fields => Fields,
+                covering_index => undefined
+            }},
+            {ignore_partition_query_limit, true}
+        ],
+    Args =
+        #mrargs{
+            view_type = map,
+            reduce = false,
+            start_key = [start_key],
+            end_key = [end_key, ?MAX_JSON_OBJ],
+            include_docs = true,
+            extra = Extra
+        },
+    Parameters = [
+        db, [{user_ctx, user_ctx}], fun mango_cursor_view:handle_all_docs_message/2, Cursor1, Args
+    ],
+    meck:expect(fabric, all_docs, Parameters, meck:val({ok, Cursor2})),
+    ?assertEqual({ok, updated_accumulator}, execute(Cursor, fun foo:bar/2, accumulator)),
+    ?assert(meck:called(fabric, all_docs, '_')).
+
+t_execute_ok_query_view(_) ->
+    Bookmark = bookmark,
+    UserFnParameters = [{add_key, bookmark, Bookmark}, accumulator],
+    meck:expect(foo, bar, UserFnParameters, meck:val({undefined, updated_accumulator})),
+    Index =
+        #idx{
+            type = <<"json">>,
+            ddoc = <<"_design/ghibli">>,
+            name = index_name,
+            def = {[{<<"fields">>, {[{field1, undefined}]}}]}
+        },
+    Selector = {[]},
+    Fields = all_fields,
+    Cursor =
+        #cursor{
+            index = Index,
+            db = db,
+            selector = Selector,
+            fields = Fields,
+            ranges = [{'$gte', start_key, '$lte', end_key}],
+            opts = [{user_ctx, user_ctx}],
+            bookmark = nil
+        },
+    Cursor1 =
+        Cursor#cursor{
+            user_acc = accumulator,
+            user_fun = fun foo:bar/2,
+            execution_stats = '_'
+        },
+    Cursor2 =
+        Cursor1#cursor{
+            bookmark = Bookmark,
+            bookmark_docid = undefined,
+            bookmark_key = undefined,
+            execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
+        },
+    Extra =
+        [
+            {callback, {mango_cursor_view, view_cb}},
+            {selector, Selector},
+            {callback_args, #{
+                selector => Selector,
+                fields => Fields,
+                covering_index => undefined
+            }},
+            {ignore_partition_query_limit, true}
+        ],
+    Args =
+        #mrargs{
+            view_type = map,
+            reduce = false,
+            start_key = [start_key],
+            end_key = [end_key, ?MAX_JSON_OBJ],
+            include_docs = true,
+            extra = Extra
+        },
+    Parameters = [
+        db,
+        [{user_ctx, user_ctx}],
+        <<"ghibli">>,
+        index_name,
+        fun mango_cursor_view:handle_message/2,
+        Cursor1,
+        Args
+    ],
+    meck:expect(fabric, query_view, Parameters, meck:val({ok, Cursor2})),
+    ?assertEqual({ok, updated_accumulator}, execute(Cursor, fun foo:bar/2, accumulator)),
+    ?assert(meck:called(fabric, query_view, '_')).
+
+t_execute_error(_) ->
+    Cursor =
+        #cursor{
+            index = #idx{type = <<"json">>, ddoc = <<"_design/ghibli">>, name = index_name},
+            db = db,
+            selector = {[]},
+            fields = all_fields,
+            ranges = [{'$gte', start_key, '$lte', end_key}],
+            opts = [{user_ctx, user_ctx}],
+            bookmark = nil
+        },
+    Parameters = [
+        db, '_', <<"ghibli">>, index_name, fun mango_cursor_view:handle_message/2, '_', '_'
+    ],
+    meck:expect(fabric, query_view, Parameters, meck:val({error, reason})),
+    ?assertEqual({error, reason}, execute(Cursor, undefined, accumulator)).
+
+view_cb_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(rexi)
+        end,
+        fun(_) ->
+            meck:unload(rexi)
+        end,
+        [
+            ?TDEF_FE(t_view_cb_meta),
+            ?TDEF_FE(t_view_cb_row_matching_regular_doc),
+            ?TDEF_FE(t_view_cb_row_non_matching_regular_doc),
+            ?TDEF_FE(t_view_cb_row_null_doc),
+            ?TDEF_FE(t_view_cb_row_missing_doc_triggers_quorum_fetch),
+            ?TDEF_FE(t_view_cb_row_matching_covered_doc),
+            ?TDEF_FE(t_view_cb_row_non_matching_covered_doc),
+            ?TDEF_FE(t_view_cb_row_backwards_compatible),
+            ?TDEF_FE(t_view_cb_complete),
+            ?TDEF_FE(t_view_cb_ok)
+        ]
+    }.
+
+t_view_cb_meta(_) ->
+    meck:expect(rexi, stream2, [{meta, meta}], meck:val(ok)),
+    ?assertEqual({ok, accumulator}, view_cb({meta, meta}, accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_matching_regular_doc(_) ->
+    Row = [{id, id}, {key, key}, {doc, doc}],
+    Result = #view_row{id = id, key = key, doc = doc},
+    meck:expect(rexi, stream2, [Result], meck:val(ok)),
+    Accumulator =
+        #mrargs{
+            extra = [
+                {callback_args, #{
+                    selector => {[]},
+                    fields => all_fields,
+                    covering_index => undefined
+                }}
+            ]
+        },
+    put(mango_docs_examined, 0),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_non_matching_regular_doc(_) ->
+    Doc = {[]},
+    Row = [{id, id}, {key, key}, {doc, Doc}],
+    meck:expect(rexi, stream2, ['_'], undefined),
+    Accumulator =
+        #mrargs{
+            extra = [
+                {callback_args, #{
+                    selector => {[{<<"field">>, {[{<<"$exists">>, true}]}}]},
+                    fields => all_fields,
+                    covering_index => undefined
+                }}
+            ]
+        },
+    put(mango_docs_examined, 0),
+    put(mango_last_msg_timestamp, os:timestamp()),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assertNot(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_null_doc(_) ->
+    Row = [{id, id}, {key, key}, {doc, null}],
+    meck:expect(rexi, stream2, ['_'], undefined),
+    Accumulator =
+        #mrargs{
+            extra = [
+                {callback_args, #{
+                    selector => {[]},
+                    fields => all_fields,
+                    covering_index => undefined
+                }}
+            ]
+        },
+    put(mango_last_msg_timestamp, os:timestamp()),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assertNot(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_missing_doc_triggers_quorum_fetch(_) ->
+    Row = [{id, id}, {key, key}, {doc, undefined}],
+    ViewRow = #view_row{id = id, key = key, doc = undefined},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    Accumulator =
+        #mrargs{
+            extra = [
+                {callback_args, #{
+                    selector => {[]},
+                    fields => all_fields,
+                    covering_index => undefined
+                }}
+            ]
+        },
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_matching_covered_doc(_) ->
+    Keys = [key1, key2],
+    Row = [{id, id}, {key, Keys}, {doc, undefined}],
+    Doc = {[{<<"field1">>, key1}, {<<"field2">>, key2}]},
+    Result = #view_row{id = id, key = Keys, doc = Doc},
+    Fields = [<<"field1">>, <<"field2">>],
+    Index =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{<<"field1">>, undefined}, {<<"field2">>, undefined}]}}]}
+        },
+    meck:expect(rexi, stream2, [Result], meck:val(ok)),
+    Accumulator =
+        #mrargs{
+            extra = [
+                {callback_args, #{
+                    selector => {[]},
+                    fields => Fields,
+                    covering_index => Index
+                }}
+            ]
+        },
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_non_matching_covered_doc(_) ->
+    Row = [{id, id}, {key, [key1, key2]}, {doc, undefined}],
+    Fields = [<<"field1">>, <<"field2">>],
+    Index =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{<<"field1">>, undefined}, {<<"field2">>, undefined}]}}]}
+        },
+    meck:expect(rexi, stream2, ['_'], undefined),
+    Accumulator =
+        #mrargs{
+            extra = [
+                {callback_args, #{
+                    selector => {[{<<"field">>, {[{<<"$exists">>, true}]}}]},
+                    fields => Fields,
+                    covering_index => Index
+                }}
+            ]
+        },
+    put(mango_last_msg_timestamp, os:timestamp()),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assertNot(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_backwards_compatible(_) ->
+    Row = [{id, id}, {key, key}, {doc, null}],
+    meck:expect(rexi, stream2, ['_'], undefined),
+    Accumulator = #mrargs{extra = [{selector, {[]}}]},
+    put(mango_last_msg_timestamp, os:timestamp()),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assertNot(meck:called(rexi, stream2, '_')).
+
+t_view_cb_complete(_) ->
+    meck:expect(rexi, stream2, [{execution_stats, {docs_examined, '_'}}], meck:val(ok)),
+    meck:expect(rexi, stream_last, [complete], meck:val(ok)),
+    ?assertEqual({ok, accumulator}, view_cb(complete, accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')),
+    ?assert(meck:called(rexi, stream_last, '_')).
+
+t_view_cb_ok(_) ->
+    meck:expect(rexi, reply, [{ok, ddoc_updated}], meck:val(ok)),
+    view_cb(ok, ddoc_updated),
+    ?assert(meck:called(rexi, reply, '_')).
+
+maybe_send_mango_ping_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(rexi)
+        end,
+        fun(_) ->
+            meck:unload(rexi)
+        end,
+        [
+            ?TDEF_FE(t_maybe_send_mango_ping_nop),
+            ?TDEF_FE(t_maybe_send_mango_ping_happens)
+        ]
+    }.
+
+t_maybe_send_mango_ping_nop(_) ->
+    put(mango_last_msg_timestamp, os:timestamp()),
+    meck:expect(rexi, ping, [], meck:val(error)),
+    ?assertEqual(ok, maybe_send_mango_ping()),
+    ?assertNot(meck:called(rexi, ping, '_')).
+
+t_maybe_send_mango_ping_happens(_) ->
+    put(mango_last_msg_timestamp, {0, 0, 0}),
+    meck:expect(rexi, ping, [], meck:val(ok)),
+    maybe_send_mango_ping(),
+    ?assert(meck:called(rexi, ping, '_')),
+    Timestamp = get(mango_last_msg_timestamp),
+    ?assertNotEqual(Timestamp, {0, 0, 0}).
+
+ddocid_test() ->
+    ?assertEqual(<<"name">>, ddocid(#idx{ddoc = <<"_design/name">>})),
+    ?assertEqual(something_else, ddocid(#idx{ddoc = something_else})).
+
+is_design_doc_test() ->
+    ?assert(is_design_doc([{id, <<"_design/name">>}])),
+    ?assertNot(is_design_doc([{id, something_else}])).
+
+handle_message_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(foo, [non_strict])
+        end,
+        fun(_) ->
+            meck:unload(foo)
+        end,
+        [
+            ?TDEF_FE(t_handle_message_meta),
+            ?TDEF_FE(t_handle_message_row_ok_above_limit),
+            ?TDEF_FE(t_handle_message_row_ok_at_limit),
+            ?TDEF_FE(t_handle_message_row_ok_skip),
+            ?TDEF_FE(t_handle_message_row_ok_triggers_quorum_fetch_match),
+            ?TDEF_FE(t_handle_message_row_ok_triggers_quorum_fetch_no_match),
+            ?TDEF_FE(t_handle_message_row_no_match),
+            ?TDEF_FE(t_handle_message_row_error),
+            ?TDEF_FE(t_handle_message_execution_stats),
+            ?TDEF_FE(t_handle_message_complete),
+            ?TDEF_FE(t_handle_message_error)
+        ]
+    }.
+
+t_handle_message_meta(_) ->
+    ?assertEqual({ok, cursor}, handle_message({meta, undefined}, cursor)).
+
+t_handle_message_row_ok_above_limit(_) ->
+    Doc = {[{<<"field1">>, value1}, {<<"field2">>, value2}]},
+    meck:expect(foo, bar, [{row, Doc}, accumulator], meck:val({go, updated_accumulator})),
+    Cursor =
+        #cursor{
+            execution_stats = #execution_stats{resultsReturned = 0},
+            fields = all_fields,
+            limit = 9,
+            user_acc = accumulator,
+            user_fun = fun foo:bar/2
+        },
+    Row = [{id, id}, {key, key}, {doc, Doc}],
+    Cursor1 =
+        Cursor#cursor{
+            execution_stats = #execution_stats{resultsReturned = 1},
+            limit = 8,
+            user_acc = updated_accumulator,
+            bookmark_docid = id,
+            bookmark_key = key
+        },
+    ?assertEqual({go, Cursor1}, handle_message({row, Row}, Cursor)).
+
+t_handle_message_row_ok_at_limit(_) ->
+    Cursor =
+        #cursor{
+            execution_stats = #execution_stats{resultsReturned = n},
+            fields = all_fields,
+            limit = 0
+        },
+    Row = [{doc, {[]}}],
+    ?assertEqual({stop, Cursor}, handle_message({row, Row}, Cursor)).
+
+t_handle_message_row_ok_skip(_) ->
+    Cursor =
+        #cursor{
+            execution_stats = #execution_stats{resultsReturned = n},
+            fields = all_fields,
+            skip = 8
+        },
+    Row = [{doc, {[]}}],
+    Cursor1 = Cursor#cursor{skip = 7},
+    ?assertEqual({ok, Cursor1}, handle_message({row, Row}, Cursor)).
+
+t_handle_message_row_ok_triggers_quorum_fetch_match(_) ->
+    Doc = #doc{id = id, body = {[{<<"field">>, something}]}},
+    Object = {[{<<"_id">>, id}, {<<"field">>, something}]},
+    meck:expect(foo, bar, [{row, Object}, accumulator], meck:val({go, updated_accumulator})),
+    Cursor =
+        #cursor{
+            db = db,
+            opts = opts,
+            execution_stats =
+                #execution_stats{
+                    totalQuorumDocsExamined = 0,
+                    resultsReturned = 0
+                },
+            fields = all_fields,
+            selector = {[{<<"field">>, {[{<<"$exists">>, true}]}}]},
+            user_fun = fun foo:bar/2,
+            user_acc = accumulator,
+            limit = 1
+        },
+    Row = [{id, id}, {doc, undefined}],
+    Cursor1 =
+        Cursor#cursor{
+            execution_stats =
+                #execution_stats{
+                    totalQuorumDocsExamined = 1,
+                    resultsReturned = 1
+                },
+            user_acc = updated_accumulator,
+            limit = 0,
+            bookmark_docid = id
+        },
+    meck:expect(mango_util, defer, [fabric, open_doc, [db, id, opts]], meck:val({ok, Doc})),
+    ?assertEqual({go, Cursor1}, handle_message({row, Row}, Cursor)),
+    ?assert(meck:called(mango_util, defer, '_')),
+    meck:delete(mango_util, defer, 3).
+
+t_handle_message_row_ok_triggers_quorum_fetch_no_match(_) ->
+    Cursor =
+        #cursor{
+            db = db,
+            opts = opts,
+            execution_stats = #execution_stats{totalQuorumDocsExamined = 0},
+            fields = all_fields,
+            selector = {[{<<"field">>, {[{<<"$exists">>, true}]}}]}
+        },
+    Row = [{id, id}, {doc, undefined}],
+    Cursor1 =
+        Cursor#cursor{
+            execution_stats = #execution_stats{totalQuorumDocsExamined = 1}
+        },
+    Doc = #doc{id = id, body = {[]}},
+    meck:expect(mango_util, defer, [fabric, open_doc, [db, id, opts]], meck:val({ok, Doc})),
+    ?assertEqual({ok, Cursor1}, handle_message({row, Row}, Cursor)),
+    ?assert(meck:called(mango_util, defer, '_')),
+    meck:delete(mango_util, defer, 3).
+
+t_handle_message_row_no_match(_) ->
+    Cursor =
+        #cursor{
+            execution_stats = #execution_stats{resultsReturned = n}
+        },
+    Row = [{doc, null}],
+    ?assertEqual({ok, Cursor}, handle_message({row, Row}, Cursor)).
+
+t_handle_message_row_error(_) ->
+    Cursor =
+        #cursor{
+            db = db,
+            opts = opts,
+            execution_stats = #execution_stats{totalQuorumDocsExamined = 0}
+        },
+    Row = [{id, id}, {doc, undefined}],
+    meck:expect(mango_util, defer, [fabric, open_doc, [db, id, opts]], meck:val(error)),
+    meck:expect(couch_log, error, ['_', [mango_cursor_view, error]], meck:val(ok)),
+    ?assertEqual({ok, Cursor}, handle_message({row, Row}, Cursor)),
+    ?assert(meck:called(mango_util, defer, '_')),
+    ?assert(meck:called(couch_log, error, '_')),
+    meck:delete(mango_util, defer, 3),
+    meck:delete(couch_log, error, 2).
+
+t_handle_message_execution_stats(_) ->
+    ShardStats = {docs_examined, 42},
+    ExecutionStats = #execution_stats{totalDocsExamined = 11},
+    ExecutionStats1 = #execution_stats{totalDocsExamined = 53},
+    Cursor = #cursor{execution_stats = ExecutionStats},
+    Cursor1 = #cursor{execution_stats = ExecutionStats1},
+    ?assertEqual({ok, Cursor1}, handle_message({execution_stats, ShardStats}, Cursor)).
+
+t_handle_message_complete(_) ->
+    ?assertEqual({ok, cursor}, handle_message(complete, cursor)).
+
+t_handle_message_error(_) ->
+    ?assertEqual({error, reason}, handle_message({error, reason}, undefined)).
+
+handle_all_docs_message_ddoc_test() ->
+    Row = [{id, <<"_design/foobar">>}],
+    ?assertEqual({ok, cursor}, handle_all_docs_message({row, Row}, cursor)).
+
+handle_all_docs_message_row_test() ->
+    Cursor =
+        #cursor{
+            execution_stats = #execution_stats{resultsReturned = n}
+        },
+    Row = [{doc, null}],
+    ?assertEqual({ok, Cursor}, handle_all_docs_message({row, Row}, Cursor)).
+
+handle_all_docs_message_regular_test() ->
+    ?assertEqual(handle_message(complete, cursor), handle_all_docs_message(complete, cursor)).
 
 %% Test the doc_member_and_extract bypasses the selector check if it receives
 %% a document in RowProps.doc.
@@ -821,4 +1608,12 @@ with_dummy_columns(Index, Count) ->
     Columns =
         {[{<<"field", (integer_to_binary(I))/binary>>, undefined} || I <- lists:seq(1, Count)]},
     Index#idx{def = {[{<<"fields">>, Columns}]}}.
+
+update_bookmark_keys_test() ->
+    Cursor0 = #cursor{limit = 0},
+    ?assertEqual(Cursor0, update_bookmark_keys(Cursor0, undefined)),
+    Cursor1 = #cursor{limit = 1},
+    Row = [{id, id}, {key, key}],
+    UpdatedCursor1 = Cursor1#cursor{bookmark_docid = id, bookmark_key = key},
+    ?assertEqual(UpdatedCursor1, update_bookmark_keys(Cursor1, Row)).
 -endif.
