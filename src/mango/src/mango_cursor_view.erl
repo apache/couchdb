@@ -742,13 +742,20 @@ choose_best_index_with_singleton_test() ->
 
 %% - choose the index with the lowest difference between its prefix and field ranges
 choose_best_index_lowest_difference_test() ->
-    IndexRanges =
+    IndexRanges1 =
         [
             {index1, ranges1, 3},
             {index2, ranges2, 2},
             {index3, ranges3, 1}
         ],
-    ?assertEqual({index3, ranges3}, choose_best_index(IndexRanges)).
+    ?assertEqual({index3, ranges3}, choose_best_index(IndexRanges1)),
+    IndexRanges2 =
+        [
+            {index1, ranges1, 3},
+            {index2, ranges2, 1},
+            {index3, ranges3, 2}
+        ],
+    ?assertEqual({index2, ranges2}, choose_best_index(IndexRanges2)).
 
 %% - if that is equal, choose the index with the least number of fields in the index
 choose_best_index_least_number_of_fields_test() ->
