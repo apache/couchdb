@@ -14,7 +14,7 @@
 // the License.
 
 // Erlang version embedded in binary packages
-ERLANG_VERSION = '24.3.4.9'
+ERLANG_VERSION = '24.3.4.10'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
