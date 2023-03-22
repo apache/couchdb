@@ -109,7 +109,8 @@ check_all_indexers_exit_on_ddoc_change({_Ctx, DbName}) ->
                     couch_db:name(DbShard),
                     {ddoc_updated, DDocID},
                     {st, "", couch_index_server:server_name(I), couch_index_server:by_sig(I),
-                        couch_index_server:by_pid(I), couch_index_server:by_db(I)}
+                        couch_index_server:by_pid(I), couch_index_server:by_db(I),
+                        couch_index_server:openers(I)}
                 )
             end,
             seq()

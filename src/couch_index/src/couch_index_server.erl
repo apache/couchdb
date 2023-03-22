@@ -22,7 +22,7 @@
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % Sharding functions
--export([num_servers/0, server_name/1, by_sig/1, by_pid/1, by_db/1]).
+-export([num_servers/0, server_name/1, by_sig/1, by_pid/1, by_db/1, openers/1]).
 -export([aggregate_queue_len/0, names/0]).
 
 % Exported for callbacks
@@ -41,7 +41,8 @@
     server_name,
     by_sig,
     by_pid,
-    by_db
+    by_db,
+    openers
 }).
 
 start_link(N) ->
@@ -129,6 +130,7 @@ init([N]) ->
     ets:new(by_sig(N), [protected, set, named_table]),
     ets:new(by_pid(N), [private, set, named_table]),
     ets:new(by_db(N), [protected, bag, named_table]),
+    ets:new(openers(N), [protected, set, named_table]),
     RootDir = couch_index_util:root_dir(),
     % We only need one of the index servers to nuke this on startup.
     case N of
@@ -140,7 +142,8 @@ init([N]) ->
         server_name = server_name(N),
         by_sig = by_sig(N),
         by_pid = by_pid(N),
-        by_db = by_db(N)
+        by_db = by_db(N),
+        openers = openers(N)
     },
     ok = config:listen_for_changes(?MODULE, St),
     couch_event:link_listener(?MODULE, handle_db_event, St, [all_dbs]),
@@ -154,7 +157,8 @@ terminate(_Reason, State) ->
 handle_call({get_index, {_Mod, _IdxState, DbName, Sig} = Args}, From, State) ->
     case ets:lookup(State#st.by_sig, {DbName, Sig}) of
         [] ->
-            spawn_link(fun() -> new_index(Args) end),
+            Pid = spawn_link(fun() -> new_index(Args) end),
+            ets:insert(State#st.openers, {Pid, {DbName, Sig}}),
             ets:insert(State#st.by_sig, {{DbName, Sig}, [From]}),
             {noreply, State};
         [{_, Waiters}] when is_list(Waiters) ->
@@ -163,15 +167,17 @@ handle_call({get_index, {_Mod, _IdxState, DbName, Sig} = Args}, From, State) ->
         [{_, Pid}] when is_pid(Pid) ->
             {reply, {ok, Pid}, State}
     end;
-handle_call({async_open, {DbName, DDocId, Sig}, {ok, Pid}}, _From, State) ->
+handle_call({async_open, {DbName, DDocId, Sig}, {ok, Pid}}, {OpenerPid, _}, State) ->
     [{_, Waiters}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
     [gen_server:reply(From, {ok, Pid}) || From <- Waiters],
     link(Pid),
+    ets:delete(State#st.openers, OpenerPid),
     add_to_ets(DbName, Sig, DDocId, Pid, State),
     {reply, ok, State};
-handle_call({async_error, {DbName, _DDocId, Sig}, Error}, _From, State) ->
+handle_call({async_error, {DbName, _DDocId, Sig}, Error}, {OpenerPid, _}, State) ->
     [{_, Waiters}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
     [gen_server:reply(From, Error) || From <- Waiters],
+    ets:delete(State#st.openers, OpenerPid),
     ets:delete(State#st.by_sig, {DbName, Sig}),
     {reply, ok, State};
 handle_call({reset_indexes, DbName}, _From, State) ->
@@ -198,16 +204,25 @@ handle_cast({rem_from_ets, [DbName]}, State) ->
     {noreply, State}.
 
 handle_info({'EXIT', Pid, Reason}, Server) ->
+    Cleanup = fun(DbName, Sig) ->
+        DDocIds = [
+            DDocId
+         || {_, {DDocId, _}} <-
+                ets:match_object(Server#st.by_db, {DbName, {'$1', Sig}})
+        ],
+        rem_from_ets(DbName, Sig, DDocIds, Pid, Server)
+    end,
     case ets:lookup(Server#st.by_pid, Pid) of
         [{Pid, {DbName, Sig}}] ->
-            DDocIds = [
-                DDocId
-             || {_, {DDocId, _}} <-
-                    ets:match_object(Server#st.by_db, {DbName, {'$1', Sig}})
-            ],
-            rem_from_ets(DbName, Sig, DDocIds, Pid, Server);
+            Cleanup(DbName, Sig);
         [] when Reason /= normal ->
-            exit(Reason);
+            case ets:lookup(Server#st.openers, Pid) of
+                [{Pid, {DbName, Sig}}] ->
+                    ets:delete(Server#st.openers, Pid),
+                    Cleanup(DbName, Sig);
+                [] ->
+                    exit(Reason)
+            end;
         _Else ->
             ok
     end,
@@ -403,6 +418,9 @@ by_pid(Arg) ->
 
 by_db(Arg) ->
     name("couchdb_indexes_by_db", Arg).
+
+openers(Arg) ->
+    name("couchdb_indexes_openers", Arg).
 
 name(BaseName, Arg) when is_list(Arg) ->
     name(BaseName, ?l2b(Arg));
