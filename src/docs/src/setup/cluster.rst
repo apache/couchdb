@@ -277,7 +277,7 @@ should show all of the nodes in your cluster:
       ]
     }
 
-The ``all_nodes`` section is the list of *expected* nodes; the ``cluster_nodes``
+The ``cluster_nodes`` section is the list of *expected* nodes; the ``all_nodes``
 section is the list of *actually connected* nodes. Be sure the two lists match.
 
 Now your cluster is ready and available! You can send requests to any one of
