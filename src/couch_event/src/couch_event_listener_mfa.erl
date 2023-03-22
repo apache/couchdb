@@ -76,13 +76,26 @@ terminate(_Reason, _MFA) ->
     ok.
 
 handle_event(DbName, Event, #st{mod = Mod, func = Func, state = State} = St) ->
-    case (catch Mod:Func(DbName, Event, State)) of
-        {ok, NewState} ->
-            {ok, St#st{state = NewState}};
-        stop ->
-            {stop, normal, St};
-        Else ->
-            erlang:error(Else)
+    try
+        case Mod:Func(DbName, Event, State) of
+            {ok, NewState} ->
+                {ok, St#st{state = NewState}};
+            stop ->
+                {stop, normal, St};
+            Else ->
+                couch_log:error("~p: else in handle_event for db ~p, event ~p, else ~p", [?MODULE, DbName, Event, Else]),
+                erlang:error(Else)
+        end
+    catch
+        error:Reason:Stack ->
+            couch_log:error("~p: error in handle_event for db ~p, event ~p, reason ~p, stack ~p", [?MODULE, DbName, Event, Reason, Stack]),
+            erlang:error(Reason);
+        exit:Reason:Stack ->
+            couch_log:error("~p: exit in handle_event for db ~p, event ~p, reason ~p, stack ~p", [?MODULE, DbName, Event, Reason, Stack]),
+            erlang:exit(Reason);
+        throw:Reason:Stack ->
+            couch_log:error("~p: throw in handle_event for db ~p, event ~p, reason ~p, stack ~p", [?MODULE, DbName, Event, Reason, Stack]),
+            erlang:throw(Reason)
     end.
 
 handle_cast(shutdown, St) ->
