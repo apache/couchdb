@@ -192,6 +192,9 @@ handle_cast({add_to_ets, [Pid, DbName, DDocId, Sig]}, State) ->
     {noreply, State};
 handle_cast({rem_from_ets, [DbName, DDocId, Sig]}, State) ->
     ets:delete_object(State#st.by_db, {DbName, {DDocId, Sig}}),
+    {noreply, State};
+handle_cast({rem_from_ets, [DbName]}, State) ->
+    rem_from_ets(DbName, State),
     {noreply, State}.
 
 handle_info({'EXIT', Pid, Reason}, Server) ->
@@ -298,6 +301,27 @@ rem_from_ets(DbName, Sig, DDocIds, Pid, #st{} = St) ->
         DDocIds
     ).
 
+rem_from_ets(DbName, #st{} = State) ->
+    SigDDocIds = lists:foldl(
+        fun({_, {DDocId, Sig}}, DDict) ->
+            dict:append(Sig, DDocId, DDict)
+        end,
+        dict:new(),
+        ets:lookup(State#st.by_db, DbName)
+    ),
+    Fun = fun({Sig, DDocIds}) ->
+        [{_, Pid}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
+        unlink(Pid),
+        receive
+            {'EXIT', Pid, _} ->
+                ok
+        after 0 ->
+            ok
+        end,
+        rem_from_ets(DbName, Sig, DDocIds, Pid, State)
+    end,
+    lists:foreach(Fun, dict:to_list(SigDDocIds)).
+
 handle_db_event(DbName, created, St) ->
     gen_server:cast(St#st.server_name, {reset_indexes, DbName}),
     {ok, St};
@@ -305,44 +329,50 @@ handle_db_event(DbName, deleted, St) ->
     gen_server:cast(St#st.server_name, {reset_indexes, DbName}),
     {ok, St};
 handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated, DDocId}, St) ->
-    DDocResult = couch_util:with_db(DbName, fun(Db) ->
-        couch_db:open_doc(Db, DDocId, [ejson_body, ?ADMIN_CTX])
-    end),
-    LocalShards =
-        try
-            mem3:local_shards(mem3:dbname(DbName))
-        catch
-            error:database_does_not_exist ->
-                []
-        end,
-    DbShards = [mem3:name(Sh) || Sh <- LocalShards],
-    lists:foreach(
-        fun(DbShard) ->
-            lists:foreach(
-                fun({_DbShard, {_DDocId, Sig}}) ->
-                    % check if there are other ddocs with the same Sig for the same db
-                    SigDDocs = ets:match_object(St#st.by_db, {DbShard, {'$1', Sig}}),
-                    if
-                        length(SigDDocs) > 1 ->
-                            % remove records from by_db for this DDoc
-                            Args = [DbShard, DDocId, Sig],
-                            gen_server:cast(St#st.server_name, {rem_from_ets, Args});
-                        true ->
-                            % single DDoc with this Sig - close couch_index processes
-                            case ets:lookup(St#st.by_sig, {DbShard, Sig}) of
-                                [{_, IndexPid}] ->
-                                    (catch gen_server:cast(IndexPid, {ddoc_updated, DDocResult}));
-                                [] ->
-                                    []
-                            end
-                    end
-                end,
-                ets:match_object(St#st.by_db, {DbShard, {DDocId, '$1'}})
-            )
-        end,
-        DbShards
-    ),
-    {ok, St};
+    %% this handle_db_event function must not crash (or it takes down the couch_index_server)
+    try
+        DDocResult = couch_util:with_db(DbName, fun(Db) ->
+            couch_db:open_doc(Db, DDocId, [ejson_body, ?ADMIN_CTX])
+        end),
+        LocalShards = mem3:local_shards(mem3:dbname(DbName)),
+        DbShards = [mem3:name(Sh) || Sh <- LocalShards],
+        lists:foreach(
+            fun(DbShard) ->
+                lists:foreach(
+                    fun({_DbShard, {_DDocId, Sig}}) ->
+                        % check if there are other ddocs with the same Sig for the same db
+                        SigDDocs = ets:match_object(St#st.by_db, {DbShard, {'$1', Sig}}),
+                        if
+                            length(SigDDocs) > 1 ->
+                                % remove records from by_db for this DDoc
+                                Args = [DbShard, DDocId, Sig],
+                                gen_server:cast(St#st.server_name, {rem_from_ets, Args});
+                            true ->
+                                % single DDoc with this Sig - close couch_index processes
+                                case ets:lookup(St#st.by_sig, {DbShard, Sig}) of
+                                    [{_, IndexPid}] ->
+                                        (catch gen_server:cast(
+                                            IndexPid, {ddoc_updated, DDocResult}
+                                        ));
+                                    [] ->
+                                        []
+                                end
+                        end
+                    end,
+                    ets:match_object(St#st.by_db, {DbShard, {DDocId, '$1'}})
+                )
+            end,
+            DbShards
+        ),
+        {ok, St}
+    catch
+        Class:Reason:Stack ->
+            couch_log:warning("~p: handle_db_event ~p for db ~p, reason ~p, stack ~p", [
+                ?MODULE, Class, DbName, Reason, Stack
+            ]),
+            gen_server:cast(St#st.server_name, {rem_from_ets, [DbName]}),
+            {ok, St}
+    end;
 handle_db_event(DbName, {ddoc_updated, DDocId}, St) ->
     lists:foreach(
         fun({_DbName, {_DDocId, Sig}}) ->
