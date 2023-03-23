@@ -31,12 +31,14 @@ build_eunit_config(Config0, AppFile) ->
     ViewIndexDir = Cwd ++ "/tmp/data",
     StateDir = Cwd ++ "/tmp/data",
     TmpDataDir = Cwd ++ "/tmp/tmp_data",
+    LogDir = Cwd ++ "/tmp",
     cleanup_dirs([DataDir, TmpDataDir]),
     Config1 = rebar_config:set_global(Config0, template, "setup_eunit"),
     Config2 = rebar_config:set_global(Config1, prefix, Cwd),
     Config3 = rebar_config:set_global(Config2, data_dir, DataDir),
     Config4 = rebar_config:set_global(Config3, view_index_dir, ViewIndexDir),
-    Config = rebar_config:set_global(Config4, state_dir, StateDir),
+    Config5 = rebar_config:set_global(Config4, log_dir, LogDir),
+    Config = rebar_config:set_global(Config5, state_dir, StateDir),
     rebar_templater:create(Config, AppFile).
 
 cleanup_dirs(Dirs) ->
