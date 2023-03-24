@@ -30,23 +30,17 @@ Nouveau is an experimental search extension for CouchDB 3.x.
 * direct I/O used for segment merging (so we don't evict useful data from disk cache)
 * It's new and shiny.
 
-## Erlang side
-
-You'll need to run a fork of couchdb: https://github.com/rnewson/couchdb-nouveau
-
 ## Getting started
+
+Configure CouchDB with `--enable-nouveau'
 
 Build Nouveau with;
 
-`mvn package`
+`make`
 
 Run Nouvea with;
 
-`java -jar target/nouveau-*.jar server nouveau.yaml`
-
-Now run CouchDB using the 'nouveau' branch of my fork at https://github.com/rnewson/couchdb-nouveau;
-
-`make && dev/run --admin=foo:bar`
+`dev/run --admin=foo:bar --with-nouveau`
 
 Make a database with some data and an index definition;
 
@@ -75,7 +69,7 @@ while true; do
 done
 ```
 
-In order not to collide with `dreyfus` I've hooked Nouveau in with some uglier paths for now;
+In order not to collide with `dreyfus` I've hooked Nouveau in with new paths;
 
 `curl 'foo:bar@localhost:15984/foo/_design/foo/_nouveau/bar?q=*:*'`
 

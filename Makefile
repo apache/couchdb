@@ -100,7 +100,7 @@ TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs escriptize
+all: couch fauxton docs escriptize nouveau
 
 
 .PHONY: help
@@ -151,7 +151,8 @@ escriptize: couch
 
 .PHONY: check
 # target: check - Test everything
-check: all
+check: all nouveau-test
+	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
@@ -465,6 +466,9 @@ clean:
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
+	ifeq ($(with_nouveau), 1)
+		@cd java/nouveau && mvn clean
+	endif
 
 
 .PHONY: distclean
@@ -530,26 +534,15 @@ derived:
 # Nouveau
 ################################################################################
 
-.PHONY: nouveau-test
-nouveau-test:
-	@cd java/nouveau && mvn test
-
-.PHONY: nouveau-all-test
-nouveau-all-test:
-	@cd java/nouveau && mvn test -P allTests
-
-.PHONY: nouveau-clean
-nouveau-clean:
-	@cd java/nouveau && mvn clean
-
-.PHONY: nouveau-install
-nouveau-install:
-	@cd java/nouveau && mvn install
-
-.PHONY: nouveau-install-no-tests
-nouveau-install-no-tests:
+.PHONY: nouveau
+# Build nouveau
+nouveau:
+ifeq ($(with_nouveau), 1)
 	@cd java/nouveau && mvn -D maven.test.skip=true install
+endif
 
-.PHONY: nouveau-start
-nouveau-start: nouveau-install-no-tests
-	@cd java/nouveau/server && mvn exec:exec -D exec.executable="java"
+.PHONY: nouveau-test
+nouveau-test: nouveau
+ifeq ($(with_nouveau), 1)
+	@cd java/nouveau && mvn test -P allTests
+endif
