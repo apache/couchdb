@@ -13,6 +13,8 @@
 
 package org.apache.couchdb.nouveau.api;
 
+import java.util.Arrays;
+
 import org.apache.couchdb.nouveau.core.ser.AfterDeserializer;
 import org.apache.couchdb.nouveau.core.ser.AfterSerializer;
 
@@ -45,15 +47,7 @@ public class After {
 
     @Override
     public String toString() {
-        final StringBuilder result = new StringBuilder();
-        result.append("After [fields=");
-        for (final Object o : fields) {
-            result.append(o);
-            result.append('(');
-            result.append(o.getClass().getSimpleName());
-            result.append(") ");
-        }
-        return result.toString();
+        return "After [fields=" + Arrays.toString(fields) + "]";
     }
 
 }
