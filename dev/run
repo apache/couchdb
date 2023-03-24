@@ -231,7 +231,7 @@ def get_args_parser():
         dest="with_nouveau",
         default=False,
         action="store_true",
-        help="Start Nouveau server"
+        help="Start Nouveau server",
     )
     return parser
 
@@ -460,6 +460,7 @@ def boot_haproxy(ctx):
         " ".join(cmd), shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env
     )
 
+
 def boot_nouveau(ctx):
     if not ctx["with_nouveau"]:
         return
@@ -467,7 +468,12 @@ def boot_nouveau(ctx):
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
-        cmd, cwd='nouveau/server', shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT
+        cmd,
+        cwd="nouveau/server",
+        shell=True,
+        stdin=sp.PIPE,
+        stdout=log,
+        stderr=sp.STDOUT,
     )
 
 
