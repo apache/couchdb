@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-function create_sandbox(sandbox_option) {
+function create_sandbox() {
   try {
     // if possible, use evalcx (not always available)
     var sandbox = evalcx('');
@@ -25,29 +25,35 @@ function create_sandbox(sandbox_option) {
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
-    sandbox.index = choose_index_function(sandbox_option);
   } catch (e) {
     var sandbox = {};
   }
   return sandbox;
 };
 
-function choose_index_function(sandbox_option) {
-  switch(sandbox_option) {
-    case 'nouveau4':
-      return Nouveau.index4;
-    case 'nouveau9':
-      return Nouveau.index9;
-    default:
-      return Dreyfus.index;
-  }
-}
-
 function create_filter_sandbox() {
   var sandbox = create_sandbox();
   sandbox.emit = Filter.emit;
   return sandbox;
 };
+
+function create_dreyfus_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.index = Dreyfus.index;
+  return sandbox;
+}
+
+function create_nouveau4_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.index = Nouveau.index4;
+  return sandbox;
+}
+
+function create_nouveau9_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.index = Nouveau.index9;
+  return sandbox;
+}
 
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n

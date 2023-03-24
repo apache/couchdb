@@ -21,7 +21,18 @@ var State = {
   },
   addFun : function(newFun, option) {
     // Compile to a function and add it to funs array
-    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}, undefined, undefined, option));
+    switch (option) {
+      case 'nouveau4':
+        var sandbox = create_nouveau4_sandbox();
+        break;
+      case 'nouveau9':
+        var sandbox = create_nouveau9_sandbox();
+        break;
+      default:
+        var sandbox = create_dreyfus_sandbox();
+        break;
+    }
+    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}, undefined, sandbox, option));
     print("true");
   },
   addLib : function(lib) {
