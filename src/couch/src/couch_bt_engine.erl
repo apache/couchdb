@@ -62,6 +62,7 @@
 
     serialize_doc/2,
     write_doc_body/2,
+    write_doc_body/3,
     write_doc_infos/3,
     purge_docs/3,
     copy_purge_infos/2,
@@ -109,7 +110,8 @@
 -export([
     update_header/2,
     copy_security/2,
-    copy_props/2
+    copy_props/2,
+    open_generation_files/3
 ]).
 
 -include_lib("kernel/include/file.hrl").
@@ -170,7 +172,19 @@ init(FilePath, Options) ->
                         Header0
                 end
         end,
-    {ok, init_state(FilePath, Fd, Header, Options)}.
+
+    Generations = couch_bt_engine_header:generations(Header),
+
+    Fds0 = maybe_open_generation_files(FilePath, Generations , Options),
+    Fds = [Fd] ++ Fds0,
+    {ok, init_state(FilePath, Fds, Header, Options)}.
+
+maybe_open_generation_files(FilePath, Generations, Options) ->
+    case lists:member(compacting, Options) of
+        true -> [];
+        false -> open_generation_files(FilePath, Generations, Options)
+    end.
+
 
 terminate(_Reason, St) ->
     % If the reason we died is because our fd disappeared
@@ -394,8 +408,9 @@ open_local_docs(#st{} = St, DocIds) ->
         Results
     ).
 
-read_doc_body(#st{} = St, #doc{} = Doc) ->
-    {ok, {Body, Atts}} = couch_file:pread_term(St#st.fd, Doc#doc.body),
+read_doc_body(#st{} = St, #doc{body = {Generation, Ptr}} = Doc) ->
+    Fd = get_fd(St#st.fds, Generation),
+    {ok, {Body, Atts}} = couch_file:pread_term(Fd, Ptr),
     Doc#doc{
         body = Body,
         atts = Atts
@@ -433,12 +448,22 @@ serialize_doc(#st{} = St, #doc{} = Doc) ->
         meta = [{comp_body, Body} | Doc#doc.meta]
     }.
 
+get_fd(Fds, Gen) ->
+    % The one time zero-indexing would be useful *shakes fist*
+    lists:nth(Gen + 1, Fds).
+
+write_doc_body(St, #doc{} = Doc, NewGeneration) ->
+    Fd = get_fd(St#st.fds, NewGeneration),
+    {ok, Ptr, Written} = couch_file:append_raw_chunk(Fd, Doc#doc.body),
+    {ok, Doc#doc{body = {NewGeneration, Ptr}}, Written}.
+
 write_doc_body(St, #doc{} = Doc) ->
     #st{
         fd = Fd
     } = St,
     {ok, Ptr, Written} = couch_file:append_raw_chunk(Fd, Doc#doc.body),
-    {ok, Doc#doc{body = Ptr}, Written}.
+    % New doc bodies start with generation 0
+    {ok, Doc#doc{body = {0, Ptr}}, Written}.
 
 write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
     #st{
@@ -637,7 +662,7 @@ start_compaction(St, DbName, Options, Parent) ->
     {ok, St, Pid}.
 
 finish_compaction(OldState, DbName, Options, CompactFilePath) ->
-    {ok, NewState1} = ?MODULE:init(CompactFilePath, Options),
+    {ok, NewState1} = ?MODULE:init(CompactFilePath, [compacting | Options]),
     OldSeq = get_update_seq(OldState),
     NewSeq = get_update_seq(NewState1),
     case OldSeq == NewSeq of
@@ -848,7 +873,27 @@ open_db_file(FilePath, Options) ->
             throw(Error)
     end.
 
-init_state(FilePath, Fd, Header0, Options) ->
+open_generation_file(FilePath, Generation, Options) ->
+    GenFilePath = string:replace(FilePath, ".couch",
+        "." ++ integer_to_list(Generation)++ ".couch", trailing),
+    couch_log:error("~n open_generation_file(FilePath: ~p) GenFilePath: ~p~n", [FilePath, GenFilePath]),
+    case catch open_db_file(GenFilePath, [nologifmissing | Options]) of
+        {ok, Db} ->
+            Db;
+        {not_found, no_db_file} ->
+            {ok, Fd} = couch_file:open(GenFilePath, [create]),
+            Fd
+    end.
+
+open_generation_files(_FilePath, 0, _Options) ->
+    [];
+open_generation_files(FilePath, Generations, Options) ->
+    lists:map(fun (Generation) ->
+        open_generation_file(FilePath, Generation, Options)
+    end, lists:seq(1, Generations)).
+
+init_state(FilePath, Fds, Header0, Options) ->
+    [Fd | _] = Fds,
     ok = couch_file:sync(Fd),
 
     Compression = couch_compress:get_compression_method(),
@@ -907,7 +952,8 @@ init_state(FilePath, Fd, Header0, Options) ->
         local_tree = LocalTree,
         compression = Compression,
         purge_tree = PurgeTree,
-        purge_seq_tree = PurgeSeqTree
+        purge_seq_tree = PurgeSeqTree,
+        fds = Fds
     },
 
     % If this is a new database we've just created a
@@ -1168,6 +1214,13 @@ fold_docs_reduce_to_count(Reds) ->
     FinalRed = couch_btree:final_reduce(RedFun, Reds),
     element(1, FinalRed).
 
+open_missing_generation_files(FilePath, Fds) when length(Fds) =:= ?MAX_GENERATION ->
+    Fds;
+open_missing_generation_files(FilePath, Fds) ->
+    NextGeneration = length(Fds),
+    Fd = open_generation_file(FilePath, NextGeneration, []),
+    Fds ++ [Fd].
+
 finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     #st{
         filepath = FilePath,
@@ -1211,14 +1264,23 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     % the compaction file.
     couch_file:delete(RootDir, FilePath ++ ".compact.meta"),
 
+    % maybe open new generation file
+    OldFds = OldSt#st.fds,
+    Fds = open_missing_generation_files(FilePath, OldFds),
+
     % We're finished with our old state
     decref(OldSt),
 
     % And return our finished new state
+
+    NewSt3 = NewSt2#st{
+        filepath = FilePath,
+        fds = Fds
+    },
+    couch_log:error("~n fninish_compaction_int NewSt2: ~p OldFDs ~p, Fds ~p~n", [NewSt3, OldFds, Fds]),
+
     {ok,
-        NewSt2#st{
-            filepath = FilePath
-        },
+        NewSt3,
         undefined}.
 
 is_file(Path) ->

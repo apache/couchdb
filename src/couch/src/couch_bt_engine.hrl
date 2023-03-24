@@ -23,5 +23,9 @@
     local_tree,
     compression,
     purge_tree,
-    purge_seq_tree
+    purge_seq_tree,
+    fds = [],
+    max_generation = 0
 }).
+
+-define(MAX_GENERATION, 3).
