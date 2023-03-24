@@ -32,7 +32,7 @@ var State = {
         var sandbox = create_dreyfus_sandbox();
         break;
     }
-    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}, undefined, sandbox, option));
+    State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}, undefined, sandbox));
     print("true");
   },
   addLib : function(lib) {
