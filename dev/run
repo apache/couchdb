@@ -316,6 +316,7 @@ def setup_configs(ctx):
             "backend_port": backend_port,
             "prometheus_port": prometheus_port,
             "uuid": "fake_uuid_for_dev",
+            "with_nouveau": str(ctx["with_nouveau"]).lower(),
             "_default": "",
         }
         write_config(ctx, node, env)
