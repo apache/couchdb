@@ -1470,11 +1470,15 @@ peer(MochiReq) ->
     Socket = MochiReq:get(socket),
     case mochiweb_socket:peername(Socket) of
         {ok, {{O1, O2, O3, O4}, Port}} ->
-            io_lib:format("~B.~B.~B.~B:~B",
-                          [O1, O2, O3, O4, Port]);
+            io_lib:format(
+                "~B.~B.~B.~B:~B",
+                [O1, O2, O3, O4, Port]
+            );
         {ok, {{O1, O2, O3, O4, O5, O6, O7, O8}, Port}} ->
-            io_lib:format("~B.~B.~B.~B.~B.~B.~B.~B:~B",
-                          [O1, O2, O3, O4, O5, O6, O7, O8, Port]);
+            io_lib:format(
+                "~B.~B.~B.~B.~B.~B.~B.~B:~B",
+                [O1, O2, O3, O4, O5, O6, O7, O8, Port]
+            );
         {error, _Reason} ->
             MochiReq:get(peer)
     end.

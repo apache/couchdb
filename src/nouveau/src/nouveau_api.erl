@@ -35,7 +35,9 @@ analyze(LuceneMajor, Text, Analyzer) when
     ReqBody = {[{<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
     Resp = send_if_enabled(
         io_lib:format("~s/~B/analyze", [nouveau_util:nouveau_url(), LuceneMajor]),
-        [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
+        [?JSON_CONTENT_TYPE],
+        post,
+        jiffy:encode(ReqBody)
     ),
     case Resp of
         {ok, "200", _, RespBody} ->
@@ -47,7 +49,9 @@ analyze(LuceneMajor, Text, Analyzer) when
             send_error(Reason)
     end;
 analyze(_, _, _) ->
-    {error, {bad_request, <<"'lucene_major' must be a number and 'text' and 'analyzer' fields must be non-empty strings">>}}.
+    {error,
+        {bad_request,
+            <<"'lucene_major' must be a number and 'text' and 'analyzer' fields must be non-empty strings">>}}.
 
 index_info(#index{} = Index) ->
     Resp = send_if_enabled(index_url(Index), [], get),

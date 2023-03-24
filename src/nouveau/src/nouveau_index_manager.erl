@@ -151,7 +151,13 @@ handle_config_terminate(_Server, _Reason, _State) ->
 
 configure_ibrowse(URL) ->
     #{host := Host, port := Port} = uri_string:parse(URL),
-    ibrowse:set_max_sessions(Host, Port,
-        config:get_integer("nouveau", "max_sessions", 100)),
-    ibrowse:set_max_pipeline_size(Host, Port,
-        config:get_integer("nouveau", "max_pipeline_size", 1000)).
+    ibrowse:set_max_sessions(
+        Host,
+        Port,
+        config:get_integer("nouveau", "max_sessions", 100)
+    ),
+    ibrowse:set_max_pipeline_size(
+        Host,
+        Port,
+        config:get_integer("nouveau", "max_pipeline_size", 1000)
+    ).
