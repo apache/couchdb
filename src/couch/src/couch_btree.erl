@@ -37,8 +37,8 @@ less(#btree{less = Less}, A, B) ->
     Less(A, B).
 
 % pass in 'nil' for State if a new Btree.
-open(State, Fds) ->
-    {ok, #btree{root = State, fds = Fds}}.
+open(State, Fd) ->
+    {ok, #btree{root = State, fd = Fd}}.
 
 set_options(Bt, []) ->
     Bt;
@@ -53,8 +53,8 @@ set_options(Bt, [{reduce, Reduce} | Rest]) ->
 set_options(Bt, [{compression, Comp} | Rest]) ->
     set_options(Bt#btree{compression = Comp}, Rest).
 
-open(State, Fds, Options) ->
-    {ok, set_options(#btree{root = State, fds = Fds}, Options)}.
+open(State, Fd, Options) ->
+    {ok, set_options(#btree{root = State, fd = Fd}, Options)}.
 
 get_state(#btree{root = Root}) ->
     Root.
@@ -114,7 +114,7 @@ size(#btree{root = nil}) ->
 size(#btree{root = {_P, _Red}}) ->
     % pre 1.2 format
     nil;
-size(#btree{root = {_P, _Red, Size, _Gen}}) ->
+size(#btree{root = {_P, _Red, Size}}) ->
     Size.
 
 get_group_fun(Bt, Options) ->
@@ -310,7 +310,8 @@ lookup(#btree{root = Root, less = Less} = Bt, Keys) ->
 lookup(_Bt, nil, Keys) ->
     {ok, [{Key, not_found} || Key <- Keys]};
 lookup(Bt, Node, Keys) ->
-    {NodeType, NodeList} = get_node(Bt, Node),
+    Pointer = element(1, Node),
+    {NodeType, NodeList} = get_node(Bt, Pointer),
     case NodeType of
         kp_node ->
             lookup_kpnode(Bt, list_to_tuple(NodeList), 1, Keys, []);
@@ -419,7 +420,8 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
             nil ->
                 {kv_node, []};
             _Tuple ->
-                get_node(Bt, RootPointerInfo)
+                Pointer = element(1, RootPointerInfo),
+                get_node(Bt, Pointer)
         end,
     NodeTuple = list_to_tuple(NodeList),
 
@@ -468,17 +470,11 @@ reduce_tree_size(kp_node, _NodeSize, [{_K, {_P, _Red, nil}} | _]) ->
 reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
     reduce_tree_size(kp_node, NodeSize + Sz, NodeList).
 
-get_fd(Fds, Gen) ->
-    % The one time zero-indexing would be useful *shakes fist*
-    lists:nth(Gen + 1, Fds).
-
-get_node(#btree{fds = Fds}, {Pos, _, _, Gen}) ->
-    Fd = get_fd(Fds, Gen),
-    {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, Pos),
+get_node(#btree{fd = Fd}, NodePos) ->
+    {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
     {NodeType, NodeList}.
 
-write_node(#btree{fds = Fds, compression = Comp} = Bt, NodeType, NodeList) ->
-    Fd = get_fd(Fds, 0),
+write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     % split up nodes into smaller sizes
     Chunks = chunkify(NodeList),
     % now write out each chunk and return the KeyPointer pairs for those nodes
@@ -492,8 +488,7 @@ group_kps(_Bt, _NodeType, [], []) ->
 group_kps(Bt, NodeType, [Chunk | RestChunks], [{Ptr, Size} | RestPtrSizes]) ->
     {LastKey, _} = lists:last(Chunk),
     SubTreeSize = reduce_tree_size(NodeType, Size, Chunk),
-    % Every node starts at gen 0
-    KP = {LastKey, {Ptr, reduce_node(Bt, NodeType, Chunk), SubTreeSize, 0}},
+    KP = {LastKey, {Ptr, reduce_node(Bt, NodeType, Chunk), SubTreeSize}},
     [KP | group_kps(Bt, NodeType, RestChunks, RestPtrSizes)].
 
 write_node(Bt, _OldNode, NodeType, [], NewList) ->
@@ -766,7 +761,8 @@ reduce_stream_node(
     Fun,
     Acc
 ) ->
-    case get_node(Bt, Node) of
+    P = element(1, Node),
+    case get_node(Bt, P) of
         {kp_node, NodeList} ->
             NodeList2 = adjust_dir(Dir, NodeList),
             reduce_stream_kp_node(
@@ -1069,7 +1065,8 @@ adjust_dir(rev, List) ->
     lists:reverse(List).
 
 stream_node(Bt, Reds, Node, StartKey, InRange, Dir, Fun, Acc) ->
-    {NodeType, NodeList} = get_node(Bt, Node),
+    Pointer = element(1, Node),
+    {NodeType, NodeList} = get_node(Bt, Pointer),
     case NodeType of
         kp_node ->
             stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc);
@@ -1078,7 +1075,8 @@ stream_node(Bt, Reds, Node, StartKey, InRange, Dir, Fun, Acc) ->
     end.
 
 stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc) ->
-    {NodeType, NodeList} = get_node(Bt, Node),
+    Pointer = element(1, Node),
+    {NodeType, NodeList} = get_node(Bt, Pointer),
     case NodeType of
         kp_node ->
             stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc);

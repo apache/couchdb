@@ -848,9 +848,6 @@ open_db_file(FilePath, Options) ->
             throw(Error)
     end.
 
-open_generation_files(FilePath, Generations) ->
-    [].
-
 init_state(FilePath, Fd, Header0, Options) ->
     ok = couch_file:sync(Fd),
 
@@ -860,12 +857,8 @@ init_state(FilePath, Fd, Header0, Options) ->
     Header2 = set_default_security_object(Fd, Header1, Compression, Options),
     Header = upgrade_purge_info(Fd, Header2),
 
-    Generations = couch_bt_engine_header:generations(Header),
-    Fds0 = open_generation_files(FilePath, Generations),
-    Fds = [Fd] ++ Fds0,
-
     IdTreeState = couch_bt_engine_header:id_tree_state(Header),
-    {ok, IdTree} = couch_btree:open(IdTreeState, Fds, [
+    {ok, IdTree} = couch_btree:open(IdTreeState, Fd, [
         {split, fun ?MODULE:id_tree_split/1},
         {join, fun ?MODULE:id_tree_join/2},
         {reduce, fun ?MODULE:id_tree_reduce/2},
@@ -873,7 +866,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     ]),
 
     SeqTreeState = couch_bt_engine_header:seq_tree_state(Header),
-    {ok, SeqTree} = couch_btree:open(SeqTreeState, Fds, [
+    {ok, SeqTree} = couch_btree:open(SeqTreeState, Fd, [
         {split, fun ?MODULE:seq_tree_split/1},
         {join, fun ?MODULE:seq_tree_join/2},
         {reduce, fun ?MODULE:seq_tree_reduce/2},
@@ -881,21 +874,21 @@ init_state(FilePath, Fd, Header0, Options) ->
     ]),
 
     LocalTreeState = couch_bt_engine_header:local_tree_state(Header),
-    {ok, LocalTree} = couch_btree:open(LocalTreeState, Fds, [
+    {ok, LocalTree} = couch_btree:open(LocalTreeState, Fd, [
         {split, fun ?MODULE:local_tree_split/1},
         {join, fun ?MODULE:local_tree_join/2},
         {compression, Compression}
     ]),
 
     PurgeTreeState = couch_bt_engine_header:purge_tree_state(Header),
-    {ok, PurgeTree} = couch_btree:open(PurgeTreeState, Fds, [
+    {ok, PurgeTree} = couch_btree:open(PurgeTreeState, Fd, [
         {split, fun ?MODULE:purge_tree_split/1},
         {join, fun ?MODULE:purge_tree_join/2},
         {reduce, fun ?MODULE:purge_tree_reduce/2}
     ]),
 
     PurgeSeqTreeState = couch_bt_engine_header:purge_seq_tree_state(Header),
-    {ok, PurgeSeqTree} = couch_btree:open(PurgeSeqTreeState, Fds, [
+    {ok, PurgeSeqTree} = couch_btree:open(PurgeSeqTreeState, Fd, [
         {split, fun ?MODULE:purge_seq_tree_split/1},
         {join, fun ?MODULE:purge_seq_tree_join/2},
         {reduce, fun ?MODULE:purge_tree_reduce/2}

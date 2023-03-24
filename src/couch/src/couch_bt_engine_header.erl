@@ -38,8 +38,7 @@
     revs_limit/1,
     uuid/1,
     epochs/1,
-    compacted_seq/1,
-    generations/1
+    compacted_seq/1
 ]).
 
 % This should be updated anytime a header change happens that requires more
@@ -70,8 +69,7 @@
     epochs,
     compacted_seq,
     purge_infos_limit = 1000,
-    props_ptr,
-    generations = 0
+    props_ptr
 }).
 
 -define(PARTITION_DISK_VERSION, 8).
@@ -178,9 +176,6 @@ compacted_seq(Header) ->
 
 purge_infos_limit(Header) ->
     get_field(Header, purge_infos_limit).
-
-generations(Header) ->
-    get_field(Header, generations).
 
 get_field(Header, Field) ->
     get_field(Header, Field, undefined).
