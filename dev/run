@@ -226,6 +226,13 @@ def get_args_parser():
         default=[],
         help="Path to config to place in 'local.d'. Can be repeated",
     )
+    parser.add_option(
+        "--with-nouveau",
+        dest="with_nouveau",
+        default=False,
+        action="store_true",
+        help="Start Nouveau server"
+    )
     return parser
 
 
@@ -255,6 +262,7 @@ def setup_context(opts, args):
         "procs": [],
         "auto_ports": opts.auto_ports,
         "locald_configs": opts.locald_configs,
+        "with_nouveau": opts.with_nouveau,
     }
 
 
@@ -451,6 +459,16 @@ def boot_haproxy(ctx):
         " ".join(cmd), shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env
     )
 
+def boot_nouveau(ctx):
+    if not ctx["with_nouveau"]:
+        return
+    cmd = 'mvn exec:exec -D exec.executable="java"'
+    logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
+    log = open(logfname, "w")
+    return sp.Popen(
+        cmd, cwd='java/nouveau/server', shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT
+    )
+
 
 def hack_default_ini(ctx, node, contents):
     contents = re.sub(
@@ -552,6 +570,9 @@ def boot_nodes(ctx):
     haproxy_proc = boot_haproxy(ctx)
     if haproxy_proc is not None:
         ctx["procs"].append(haproxy_proc)
+    nouveau_proc = boot_nouveau(ctx)
+    if nouveau_proc is not None:
+        ctx["procs"].append(nouveau_proc)
 
 
 def ensure_all_nodes_alive(ctx):
