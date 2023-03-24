@@ -60,7 +60,8 @@ update(#index{} = Index) ->
                 try
                     %% jamming the version in is a bit ugly, could make this a json object but
                     %% is that really any better?
-                    SandboxOption = <<"nouveau", (integer_to_binary(Index#index.lucene_major))/binary>>,
+                    SandboxOption =
+                        <<"nouveau", (integer_to_binary(Index#index.lucene_major))/binary>>,
                     true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, SandboxOption]),
                     Acc0 = {Db, Index, Proc, 0, TotalChanges},
                     {ok, _} = couch_db:fold_changes(Db, CurSeq, fun load_docs/2, Acc0, [])

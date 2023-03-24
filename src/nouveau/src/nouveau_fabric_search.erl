@@ -108,7 +108,8 @@ merge_search_results(A, B, #state{} = State) ->
             maps:get(<<"total_hits">>, A, 0), maps:get(<<"total_hits">>, B, 0)
         ),
         <<"total_hits_relation">> => merge_total_hits_relation(
-            maps:get(<<"total_hits_relation">>, A, null), maps:get(<<"total_hits_relation">>, B, null)
+            maps:get(<<"total_hits_relation">>, A, null),
+            maps:get(<<"total_hits_relation">>, B, null)
         ),
         <<"hits">> => merge_hits(
             maps:get(<<"hits">>, A, []),
@@ -127,13 +128,15 @@ merge_search_results(A, B, #state{} = State) ->
 merge_total_hits(TotalHitsA, TotalHitsB) ->
     TotalHitsA + TotalHitsB.
 
-merge_total_hits_relation(A, B) when A == <<"GREATER_THAN_OR_EQUAL_TO">>; B == <<"GREATER_THAN_OR_EQUAL_TO">> ->
+merge_total_hits_relation(A, B) when
+    A == <<"GREATER_THAN_OR_EQUAL_TO">>; B == <<"GREATER_THAN_OR_EQUAL_TO">>
+->
     <<"GREATER_THAN_OR_EQUAL_TO">>;
 merge_total_hits_relation(A, B) when A == <<"EQUAL_TO">>; B == <<"EQUAL_TO">> ->
     <<"EQUAL_TO">>;
 merge_total_hits_relation(null, null) ->
-    null. %% not supported in selected Lucene version.
-
+    %% not supported in selected Lucene version.
+    null.
 
 merge_hits(HitsA, HitsB, Sort, Limit) ->
     MergedHits = lists:merge(merge_fun(Sort), HitsA, HitsB),
