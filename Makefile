@@ -467,7 +467,7 @@ clean:
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
 	ifeq ($(with_nouveau), 1)
-		@cd java/nouveau && mvn clean
+		@cd nouveau && mvn clean
 	endif
 
 
@@ -538,11 +538,11 @@ derived:
 # Build nouveau
 nouveau:
 ifeq ($(with_nouveau), 1)
-	@cd java/nouveau && mvn -D maven.test.skip=true install
+	@cd nouveau && mvn -D maven.test.skip=true install
 endif
 
 .PHONY: nouveau-test
 nouveau-test: nouveau
 ifeq ($(with_nouveau), 1)
-	@cd java/nouveau && mvn test -P allTests
+	@cd nouveau && mvn test -P allTests
 endif

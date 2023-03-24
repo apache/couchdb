@@ -467,7 +467,7 @@ def boot_nouveau(ctx):
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
-        cmd, cwd='java/nouveau/server', shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT
+        cmd, cwd='nouveau/server', shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT
     )
 
 
