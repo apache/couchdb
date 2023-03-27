@@ -22,6 +22,7 @@ Nouveau is an experimental search extension for CouchDB 3.x.
 * POST support for _nouveau
 * No support for results grouping
 * No support to configure stop words for analyzers
+* No work done on Makefile.win or Windows generally
 
 ## Why is this better than dreyfus/clouseau?
 
