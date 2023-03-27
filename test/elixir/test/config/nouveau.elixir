@@ -1,0 +1,6 @@
+%{
+  "NouveauTest": [
+    "search returns all items for GET",
+    "search returns all items for POST"
+  ]
+}
