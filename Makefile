@@ -543,7 +543,12 @@ ifeq ($(with_nouveau), 1)
 endif
 
 .PHONY: nouveau-test
+nouveau-test: export MIX_ENV=integration
+nouveau-test: elixir-init devclean
 nouveau-test: nouveau
 ifeq ($(with_nouveau), 1)
 	@cd nouveau && mvn test -P allTests
+	@dev/run -n 1 -q -a adm:pass --with-nouveau \
+		--locald-config test/config/test-config.ini \
+		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
 endif

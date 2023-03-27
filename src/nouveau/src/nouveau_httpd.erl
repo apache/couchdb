@@ -74,7 +74,9 @@ handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} =
             send_json(Req, 200, RespBody);
         {error, Reason} ->
             send_error(Req, Reason)
-    end.
+    end;
+handle_search_req(Req, _Db, _DDoc) ->
+    send_method_not_allowed(Req, "GET").
 
 handle_info_req(_Req, _Db, _DDoc) ->
     check_if_enabled(),
