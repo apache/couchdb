@@ -151,12 +151,13 @@ escriptize: couch
 
 .PHONY: check
 # target: check - Test everything
-check: all nouveau-test
+check: all
 	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
 	@$(MAKE) weatherreport-test
+	@$(MAKE) nouveau-test
 
 ifdef apps
 subdirs = $(apps)
