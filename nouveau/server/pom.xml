@@ -117,32 +117,6 @@
       </plugin>
 
       <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>3.1.0</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <executable>java</executable>
-          <arguments>
-            <arguments>-server</arguments>
-            <argument>-Dnouveau.bundle.4=file://${user.home}/.m2/repository/org/apache/couchdb/nouveau/lucene4/${project.version}/lucene4-${project.version}-dist.jar</argument>
-            <argument>-Dnouveau.bundle.9=file://${user.home}/.m2/repository/org/apache/couchdb/nouveau/lucene9/${project.version}/lucene9-${project.version}-dist.jar</argument>
-            <argument>-classpath</argument>
-            <classpath/>
-            <argument>org.apache.couchdb.nouveau.NouveauApplication</argument>
-            <argument>server</argument>
-            <argument>nouveau.yaml</argument>
-         </arguments>
-        </configuration>
-      </plugin>
-
-      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
 		<artifactId>maven-surefire-plugin</artifactId>
 	  </plugin>
