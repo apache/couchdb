@@ -161,13 +161,6 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
                     mango_idx:end_key(Idx, Cursor#cursor.ranges)
                 }
         end,
-    CoveringIndex =
-        case mango_idx_view:covers(Idx, Fields) of
-            true ->
-                Idx;
-            false ->
-                undefined
-        end,
     #mrargs{
         view_type = map,
         reduce = false,
@@ -180,7 +173,7 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
             {callback, {?MODULE, view_cb}},
             % TODO remove selector. It supports older nodes during version upgrades.
             {selector, Selector},
-            {callback_args, viewcbargs_new(Selector, Fields, CoveringIndex)},
+            {callback_args, viewcbargs_new(Selector, Fields, undefined)},
 
             {ignore_partition_query_limit, true}
         ]
@@ -572,9 +565,25 @@ apply_opts([{_, _} | Rest], Args) ->
     apply_opts(Rest, Args).
 
 -spec consider_index_coverage(#idx{}, fields(), #mrargs{}) -> #mrargs{}.
-consider_index_coverage(Index, Fields, #mrargs{include_docs = IncludeDocs0} = Args) ->
-    IncludeDocs = IncludeDocs0 andalso (not mango_idx_view:covers(Index, Fields)),
-    Args#mrargs{include_docs = IncludeDocs}.
+consider_index_coverage(Index, Fields, #mrargs{include_docs = IncludeDocs} = Args) ->
+    Covering = mango_idx_view:covers(Index, Fields),
+    Args0 = Args#mrargs{include_docs = IncludeDocs andalso (not Covering)},
+    case
+        {
+            Args0#mrargs.include_docs,
+            Covering,
+            couch_util:get_value(callback_args, Args#mrargs.extra)
+        }
+    of
+        {false, true, ViewCBArgs} when ViewCBArgs =/= undefined ->
+            VCBSelector = viewcbargs_get(selector, ViewCBArgs),
+            VCBFields = viewcbargs_get(fields, ViewCBArgs),
+            ViewCBArgs0 = viewcbargs_new(VCBSelector, VCBFields, Index),
+            Extra = couch_util:set_value(callback_args, Args#mrargs.extra, ViewCBArgs0),
+            Args0#mrargs{extra = Extra};
+        _ ->
+            Args0
+    end.
 
 -spec doc_member_and_extract(#cursor{}, row_properties()) -> Result when
     Result ::
@@ -678,7 +687,7 @@ base_opts_test() ->
             {callback_args, #{
                 selector => selector,
                 fields => Fields,
-                covering_index => Index
+                covering_index => undefined
             }},
             {ignore_partition_query_limit, true}
         ],
@@ -691,23 +700,7 @@ base_opts_test() ->
             include_docs = true,
             extra = Extra
         },
-    ?assertEqual(MRArgs, base_args(Cursor)),
-
-    % non-covering index
-    Cursor1 = Cursor#cursor{fields = all_fields},
-    Extra1 =
-        [
-            {callback, {mango_cursor_view, view_cb}},
-            {selector, selector},
-            {callback_args, #{
-                selector => selector,
-                fields => all_fields,
-                covering_index => undefined
-            }},
-            {ignore_partition_query_limit, true}
-        ],
-    MRArgs1 = MRArgs#mrargs{extra = Extra1},
-    ?assertEqual(MRArgs1, base_args(Cursor1)).
+    ?assertEqual(MRArgs, base_args(Cursor)).
 
 apply_opts_empty_test() ->
     ?assertEqual(args, apply_opts([], args)).
@@ -780,10 +773,18 @@ consider_index_coverage_positive_test() ->
             def = {[{<<"fields">>, {[]}}]}
         },
     Fields = [<<"_id">>],
-    MRArgs = #mrargs{include_docs = true},
-    MRArgsRef = MRArgs#mrargs{include_docs = false},
+    MRArgs =
+        #mrargs{
+            include_docs = true,
+            extra = [{callback_args, viewcbargs_new(selector, fields, undefined)}]
+        },
+    MRArgsRef =
+        MRArgs#mrargs{
+            include_docs = false,
+            extra = [{callback_args, viewcbargs_new(selector, fields, Index)}]
+        },
     ?assertEqual(MRArgsRef, consider_index_coverage(Index, Fields, MRArgs)),
-    MRArgs1 = #mrargs{include_docs = false},
+    MRArgs1 = MRArgs#mrargs{include_docs = false},
     ?assertEqual(MRArgsRef, consider_index_coverage(Index, Fields, MRArgs1)).
 
 consider_index_coverage_negative_test() ->
@@ -792,7 +793,15 @@ consider_index_coverage_negative_test() ->
     MRArgs = #mrargs{include_docs = true},
     ?assertEqual(MRArgs, consider_index_coverage(Index, Fields, MRArgs)),
     MRArgs1 = #mrargs{include_docs = false},
-    ?assertEqual(MRArgs1, consider_index_coverage(Index, Fields, MRArgs1)).
+    ?assertEqual(MRArgs1, consider_index_coverage(Index, Fields, MRArgs1)),
+    % no extra attributes hence no effect
+    Index1 =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[]}}]}
+        },
+    MRArgs2 = #mrargs{include_docs = false},
+    ?assertEqual(MRArgs1, consider_index_coverage(Index1, [<<"_id">>], MRArgs2)).
 
 derive_doc_from_index_test() ->
     Index =
