@@ -17,7 +17,7 @@
 ================
 
 .. http:post:: /{db}/_find
-    :synopsis: Find documents within a given database
+    :synopsis: Find documents within a given database.
 
     Find documents using a declarative JSON querying syntax.
     Queries will use custom indexes, specified using the :ref:`_index <api/db/find/index>`
@@ -785,8 +785,7 @@ the database performs a full scan of the primary index:
         Transfer-Encoding: chunked
 
         {
-            "warning":"no matching index found, create an index to optimize
-            query time",
+            "warning":"no matching index found, create an index to optimize query time",
             "docs":[
             ]
         }
@@ -1200,6 +1199,8 @@ it easier to take advantage of future improvements to query planning
        by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
        value of this field.
     -  **name** (`string`): Name of the index.
+    -  **partitioned** (`boolean`): Partitioned (``true``) or global
+       (``false``) index.
     -  **type** (`string`): Type of the index. Currently ``"json"`` is the only
        supported type.
     -  **def** (`object`): Definition of the index, containing the indexed fields
@@ -1242,6 +1243,7 @@ it easier to take advantage of future improvements to query planning
             {
                 "ddoc": "_design/a5f4711fc9448864a13c81dc71e660b524d7410c",
                 "name": "foo-index",
+                "partitioned": false,
                 "type": "json",
                 "def": {
                     "fields": [
@@ -1257,7 +1259,7 @@ it easier to take advantage of future improvements to query planning
 .. _api/db/find/index-delete:
 
 .. http:delete:: /{db}/_index/{design_doc}/json/{name}
-    :synopsis: Delete an index
+    :synopsis: Delete an index.
 
     :param db: Database name.
     :param design_doc: Design document name.
@@ -1306,7 +1308,7 @@ it easier to take advantage of future improvements to query planning
     :synopsis: Identify which index is being used by a particular query.
 
     Shows which index is being used by the query.  Parameters are the same as
-    :ref:`_find <api/db/_find>`
+    :ref:`_find <api/db/_find>`.
 
     :param db: Database name
 
@@ -1319,10 +1321,11 @@ it easier to take advantage of future improvements to query planning
     :>json object index: Index used to fulfill the query.
     :>json object selector: Query selector used.
     :>json object opts: Query options used.
+    :>json object mrargs: Arguments passed to the underlying view.
     :>json number limit: Limit parameter used.
     :>json number skip: Skip parameter used.
     :>json array fields: Fields to be returned by the query.
-    :>json object range: Range parameters passed to the underlying view.
+    :>json boolean partitioned: The database is partitioned or not.
 
     :code 200: Request completed successfully
     :code 400: Invalid request
@@ -1365,6 +1368,7 @@ it easier to take advantage of future improvements to query planning
             "index": {
                 "ddoc": "_design/0d61d9177426b1e2aa8d0fe732ec6e506f5d443c",
                 "name": "0d61d9177426b1e2aa8d0fe732ec6e506f5d443c",
+                "partitioned": false,
                 "type": "json",
                 "def": {
                     "fields": [
@@ -1394,7 +1398,29 @@ it easier to take advantage of future improvements to query planning
                 "r": [
                     49
                 ],
-                "conflicts": false
+                "conflicts": false,
+                "execution_stats": false,
+                "partition": "",
+                "stable": false,
+                "stale": false,
+                "update": true,
+                "use_index": []
+            },
+            "mrargs": {
+                "conflicts": "undefined",
+                "direction": "fwd",
+                "end_key": [
+                    "<MAX>"
+                ],
+                "include_docs": true,
+                "partition": null,
+                "reduce": false,
+                "stable": false,
+                "start_key": [
+                    2010
+                ],
+                "update": true,
+                "view_type": "map"
             },
             "limit": 2,
             "skip": 0,
@@ -1404,14 +1430,7 @@ it easier to take advantage of future improvements to query planning
                 "year",
                 "title"
             ],
-            "range": {
-                "start_key": [
-                    2010
-                ],
-                "end_key": [
-                    {}
-                ]
-            }
+            "partitioned": false
         }
 
 Index selection
