@@ -300,6 +300,10 @@ indexable({[{<<"$gt">>, _}]}) ->
     true;
 indexable({[{<<"$gte">>, _}]}) ->
     true;
+% This is required to improve index selection for covering indexes.
+% Making `$exists` indexable should not cause problems in other cases.
+indexable({[{<<"$exists">>, _}]}) ->
+    true;
 % All other operators are currently not indexable.
 % This is also a subtle assertion that we don't
 % call indexable/1 on a field name.
@@ -541,6 +545,96 @@ covers(Idx, Fields) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+indexable_fields_of(Selector) ->
+    indexable_fields(test_util:as_selector(Selector)).
+
+indexable_fields_empty_test() ->
+    ?assertEqual([], indexable_fields_of(#{})).
+
+indexable_fields_and_test() ->
+    Selector = #{<<"$and">> => [#{<<"field1">> => undefined, <<"field2">> => undefined}]},
+    ?assertEqual([<<"field1">>, <<"field2">>], indexable_fields_of(Selector)).
+
+indexable_fields_or_test() ->
+    Selector = #{<<"$or">> => [#{<<"field1">> => undefined, <<"field2">> => undefined}]},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_nor_test() ->
+    Selector = #{<<"$nor">> => [#{<<"field1">> => undefined, <<"field2">> => undefined}]},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_all_test() ->
+    Selector = #{<<"field">> => #{<<"$all">> => []}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_elemMatch_test() ->
+    Selector = #{<<"field">> => #{<<"$elemMatch">> => #{}}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_allMatch_test() ->
+    Selector = #{<<"field">> => #{<<"$allMatch">> => #{}}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_keyMapMatch_test() ->
+    Selector = #{<<"field">> => #{<<"$keyMapMatch">> => #{}}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_in_test() ->
+    Selector = #{<<"field">> => #{<<"$in">> => []}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_nin_test() ->
+    Selector = #{<<"field">> => #{<<"$nin">> => []}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_not_test() ->
+    Selector = #{<<"field">> => #{<<"$not">> => #{}}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_lt_test() ->
+    Selector = #{<<"field">> => #{<<"$lt">> => undefined}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_lte_test() ->
+    Selector = #{<<"field">> => #{<<"$lte">> => undefined}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_eq_test() ->
+    Selector = #{<<"field">> => #{<<"$eq">> => undefined}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_ne_test() ->
+    Selector = #{<<"field">> => #{<<"$ne">> => undefined}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_gte_test() ->
+    Selector = #{<<"field">> => #{<<"$gte">> => undefined}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_gt_test() ->
+    Selector = #{<<"field">> => #{<<"$gt">> => undefined}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_mod_test() ->
+    Selector = #{<<"field">> => #{<<"$mod">> => [0, 0]}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_regex_test() ->
+    Selector = #{<<"field">> => #{<<"$regex">> => undefined}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_exists_test() ->
+    Selector = #{<<"field">> => #{<<"$exists">> => true}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_type_test() ->
+    Selector = #{<<"field">> => #{<<"$type">> => undefined}},
+    ?assertEqual([], indexable_fields_of(Selector)).
+
+indexable_fields_size_test() ->
+    Selector = #{<<"field">> => #{<<"$size">> => 0}},
+    ?assertEqual([], indexable_fields_of(Selector)).
 
 covers_all_fields_test() ->
     ?assertNot(covers(undefined, all_fields)).
