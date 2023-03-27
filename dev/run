@@ -24,6 +24,7 @@ import optparse
 import os
 import posixpath
 import re
+import signal
 import socket
 import subprocess as sp
 import sys
@@ -464,11 +465,40 @@ def boot_haproxy(ctx):
 def boot_nouveau(ctx):
     if not ctx["with_nouveau"]:
         return
-    cmd = 'mvn exec:exec -D exec.executable="java"'
+
+    # generate classpath (the least stupid way Maven can do this apparently)
+    classpath_file = os.path.join(ctx["devdir"], "lib", "nouveau.classpath")
+    p = sp.Popen(
+        "mvn --quiet dependency:build-classpath -D mdep.outputFile=%s" % classpath_file,
+        cwd="nouveau/server",
+        shell=True,
+    )
+    p.wait()
+    with open(classpath_file, "r") as f:
+        classpath = f.read()
+    classpath += ":target/classes"
+
+    home = os.environ["HOME"]
+    version = "1.0-SNAPSHOT"
+
+    cmd = [
+        "java",
+        "-server",
+        "-Dnouveau.bundle.4=file://%s/.m2/repository/org/apache/couchdb/nouveau/lucene4/%s/lucene4-%s-dist.jar"
+        % (home, version, version),
+        "-Dnouveau.bundle.9=file://%s/.m2/repository/org/apache/couchdb/nouveau/lucene9/%s/lucene9-%s-dist.jar"
+        % (home, version, version),
+        "-classpath",
+        classpath,
+        "org.apache.couchdb.nouveau.NouveauApplication",
+        "server",
+        "nouveau.yaml",
+    ]
+
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
-        cmd,
+        " ".join(cmd),
         cwd="nouveau/server",
         shell=True,
         stdin=sp.PIPE,
@@ -535,6 +565,11 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
 
 
 def startup(ctx):
+    def handler(signalno, frame):
+        kill_processes(ctx)
+        sys.exit()
+
+    signal.signal(signal.SIGTERM, handler)
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)
@@ -551,7 +586,8 @@ def startup(ctx):
 def kill_processes(ctx):
     for proc in ctx["procs"]:
         if proc and proc.returncode is None:
-            proc.kill()
+            proc.terminate()
+    ctx["procs"] = []
 
 
 def degrade_cluster(ctx):
