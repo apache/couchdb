@@ -17,10 +17,11 @@
 -module(couch_log_formatter).
 
 -export([
-    format/6,
     format/4,
     format/3,
     format/1,
+
+    format_report/3,
 
     format_reason/1,
     format_mfa/1,
@@ -32,27 +33,38 @@
 
 -define(DEFAULT_TRUNCATION, 1024).
 
+-define(REPORT_LEVEL, report).
+
+format_report(Pid, Type, Meta) ->
+    MaxMsgSize = couch_log_config:get(max_message_size),
+    Msg = case format_meta(Meta) of
+        "" ->
+            "";
+        MetaStr ->
+            ["[", MetaStr, "]"]
+    end,
+    case length(Msg) > MaxMsgSize of
+        true ->
+            {error, emsgtoolong};
+        false ->
+            Entry = #log_entry{
+                level = couch_log_util:level_to_atom(?REPORT_LEVEL),
+                pid = Pid,
+                msg = Msg,
+                msg_id = couch_log_util:get_msg_id(),
+                time_stamp = couch_log_util:iso8601_timestamp(),
+                type = Type
+            },
+            {ok, Entry}
+    end.
+
 format(Level, Pid, Fmt, Args) ->
-    format(Level, Pid, undefined, Fmt, Args, #{}).
-
-format(report = Level, Pid, Type, Fmt, Args, Meta) ->
     #log_entry{
         level = couch_log_util:level_to_atom(Level),
         pid = Pid,
-        msg = maybe_truncate(Fmt, Args, Meta, false),
+        msg = maybe_truncate(Fmt, Args),
         msg_id = couch_log_util:get_msg_id(),
-        time_stamp = couch_log_util:iso8601_timestamp(),
-        type = Type
-    };
-
-format(Level, Pid, Type, Fmt, Args, Meta) ->
-    #log_entry{
-        level = couch_log_util:level_to_atom(Level),
-        pid = Pid,
-        msg = maybe_truncate(Fmt, Args, Meta, true),
-        msg_id = couch_log_util:get_msg_id(),
-        time_stamp = couch_log_util:iso8601_timestamp(),
-        type = Type
+        time_stamp = couch_log_util:iso8601_timestamp()
     }.
 
 format(Level, Pid, Msg) ->
@@ -380,29 +392,9 @@ format_args([H | T], FmtAcc, ArgsAcc) ->
     {Str, _} = couch_log_trunc_io:print(H, 100),
     format_args(T, ["~s" | FmtAcc], [Str | ArgsAcc]).
 
-maybe_truncate("", [], Meta, TruncateMeta) ->
+maybe_truncate(Fmt, Args) ->
     MaxMsgSize = couch_log_config:get(max_message_size),
-    case format_meta(Meta) of
-        "" ->
-            "";
-        MetaStr when TruncateMeta and length(MetaStr) > MaxMsgSize ->
-            %% TODO: what to do when meta formatted data is too large?
-            error(what_to_do_here);
-        MetaStr ->
-            ["[", MetaStr, "]"]
-    end;
-maybe_truncate(Fmt, Args, Meta, TruncateMeta) ->
-    MaxMsgSize = couch_log_config:get(max_message_size),
-    case format_meta(Meta) of
-        "" ->
-            couch_log_trunc_io:format(Fmt, Args, MaxMsgSize);
-        MetaStr when TruncateMeta ->
-            couch_log_trunc_io:format(["[", MetaStr, "] " | Fmt], Args, MaxMsgSize);
-        MetaStr ->
-            %% Subtract 3 for open/close bracket and space added below
-            MsgLength = length(MetaStr) + 3,
-            ["[", MetaStr, "] " | couch_log_trunc_io:format(Fmt, Args, MaxMsgSize - MsgLength)]
-    end.
+    couch_log_trunc_io:format(Fmt, Args, MaxMsgSize).
 
 maybe_truncate(Msg) ->
     MaxMsgSize = couch_log_config:get(max_message_size),
