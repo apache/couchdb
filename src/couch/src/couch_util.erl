@@ -23,7 +23,7 @@
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1, json_decode/2]).
 -export([verify/2, simple_call/2, shutdown_sync/1]).
--export([get_value/2, get_value/3]).
+-export([get_value/2, get_value/3, set_value/3]).
 -export([reorder_results/2, reorder_results/3]).
 -export([url_strip_password/1]).
 -export([encode_doc_id/1]).
@@ -262,6 +262,9 @@ get_value(Key, List, Default) ->
         false ->
             Default
     end.
+
+set_value(Key, List, Value) ->
+    lists:keyreplace(Key, 1, List, {Key, Value}).
 
 get_nested_json_value({Props}, [Key | Keys]) ->
     case couch_util:get_value(Key, Props, nil) of
