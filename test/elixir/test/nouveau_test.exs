@@ -26,7 +26,7 @@ defmodule NouveauTest do
         fruits: %{
           default_analyzer: "standard",
           lucene_major: 9,
-          index: "function (doc) {\n  index(\"item\", doc.item, {store: true, facet: true});\n  index(\"place\", doc.place, {facet: true});\n  index(\"state\", doc.state, {facet: true});\n}"
+          index: "function (doc) {\n  index(\"item\", doc.item, {facet: true});\n  index(\"place\", doc.place, {facet: true});\n  index(\"state\", doc.state, {facet: true});\n}"
         }
       }
     }
@@ -54,7 +54,7 @@ defmodule NouveauTest do
 
   def get_items (resp) do
     %{:body => %{"rows" => rows}} = resp
-    Enum.map(rows, fn row -> row["fields"]["item"] end)
+    Enum.map(rows, fn row -> row["doc"]["item"] end)
   end
 
   @tag :with_db
