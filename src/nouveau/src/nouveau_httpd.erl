@@ -52,6 +52,7 @@ handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} =
     Counts = ?JSON_DECODE(chttpd:qs_value(Req, "counts", "null")),
     Update = chttpd:qs_value(Req, "update", "true"),
     Bookmark = chttpd:qs_value(Req, "bookmark"),
+    IncludeDocs = parse_bool_param("include_docs", chttpd:qs_value(Req, "include_docs", "false")),
     QueryArgs = #{
         query => Query,
         limit => Limit,
@@ -67,7 +68,9 @@ handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} =
                 <<"bookmark">> => nouveau_bookmark:pack(maps:get(bookmark, SearchResults)),
                 <<"total_rows">> => maps:get(<<"total_hits">>, SearchResults),
                 <<"total_rows_relation">> => maps:get(<<"total_hits_relation">>, SearchResults),
-                <<"rows">> => maps:get(<<"hits">>, SearchResults),
+                <<"rows">> => include_docs(
+                    DbName, maps:get(<<"hits">>, SearchResults), IncludeDocs
+                ),
                 <<"counts">> => maps:get(<<"counts">>, SearchResults, null),
                 <<"ranges">> => maps:get(<<"ranges">>, SearchResults, null)
             },
@@ -81,6 +84,23 @@ handle_search_req(Req, _Db, _DDoc) ->
 handle_info_req(_Req, _Db, _DDoc) ->
     check_if_enabled(),
     ok.
+
+include_docs(_DbName, Hits, false) ->
+    Hits;
+include_docs(DbName, Hits, true) ->
+    Ids = [maps:get(<<"id">>, Hit) || Hit <- Hits],
+    {ok, Docs} = nouveau_fabric:get_json_docs(DbName, Ids),
+    lists:zipwith(fun(Hit, Doc) -> Hit#{<<"doc">> => Doc} end, Hits, Docs).
+
+parse_bool_param(_, Val) when is_boolean(Val) ->
+    Val;
+parse_bool_param(_, "true") ->
+    true;
+parse_bool_param(_, "false") ->
+    false;
+parse_bool_param(Name, Val) ->
+    Msg = io_lib:format("Invalid value for ~s: ~p", [Name, Val]),
+    throw({query_parse_error, ?l2b(Msg)}).
 
 check_if_enabled() ->
     case nouveau:enabled() of

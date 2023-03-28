@@ -18,7 +18,6 @@ Nouveau is an experimental search extension for CouchDB 3.x.
 
 ## What doesn't work yet?
 
-* include_docs=true
 * POST support for _nouveau
 * No support for results grouping
 * No support to configure stop words for analyzers

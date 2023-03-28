@@ -27,11 +27,11 @@ callback({meta, _}, Acc) ->
 callback({error, Reason}, _Acc) ->
     {error, Reason};
 callback({row, Row}, Acc) ->
-    case lists:keyfind(value, 1, Row) of
-        {value, not_found} ->
+    case lists:keyfind(doc, 1, Row) of
+        false ->
             {ok, [not_found | Acc]};
-        {value, _} ->
-            {ok, [lists:keyfind(doc, 1, Row) | Acc]}
+        {doc, Doc} ->
+            {ok, [Doc | Acc]}
     end;
 callback(complete, Acc) ->
     {ok, lists:reverse(Acc)};
