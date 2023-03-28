@@ -22,6 +22,7 @@
 -define(MRVIEW, mrview).
 -define(DREYFUS, dreyfus).
 -define(HASTINGS, hastings).
+-define(NOUVEAU, nouveau).
 
 -include_lib("mem3/include/mem3.hrl").
 
@@ -61,6 +62,7 @@ fabric_design_docs(DbName) ->
 
 indices(DbName, Doc) ->
     mrview_indices(DbName, Doc) ++
+        nouveau_indices(DbName, Doc) ++
         [dreyfus_indices(DbName, Doc) || has_app(dreyfus)] ++
         [hastings_indices(DbName, Doc) || has_app(hastings)].
 
@@ -79,6 +81,22 @@ mrview_indices(DbName, Doc) ->
             Msg = "~p couldn't get mrview index ~p ~p ~p:~p",
             couch_log:error(Msg, [?MODULE, DbName, Doc, Tag, Err]),
             []
+    end.
+
+nouveau_indices(DbName, Doc) ->
+    case nouveau:enabled() of
+        false ->
+            [];
+        true ->
+            try
+                Indices = nouveau_util:design_doc_to_indexes(DbName, Doc),
+                [{?NOUVEAU, DbName, Index} || Index <- Indices]
+            catch
+                Tag:Err ->
+                    Msg = "~p couldn't get nouveau indices ~p ~p ~p:~p",
+                    couch_log:error(Msg, [?MODULE, DbName, Doc, Tag, Err]),
+                    []
+            end
     end.
 
 dreyfus_indices(DbName, Doc) ->
@@ -111,6 +129,9 @@ build_index({?MRVIEW, DbName, MRSt} = Ctx, Try) ->
         Ctx,
         Try
     );
+build_index({?NOUVEAU, _DbName, DIndex} = Ctx, Try) ->
+    UpdateFun = fun() -> nouveau_index_updater:update(DIndex) end,
+    retry_loop(Ctx, UpdateFun, Try);
 build_index({?DREYFUS, DbName, DIndex} = Ctx, Try) ->
     await_retry(
         dreyfus_index_manager:get_index(DbName, DIndex),
@@ -127,16 +148,25 @@ build_index({?HASTINGS, DbName, HIndex} = Ctx, Try) ->
     ).
 
 await_retry({ok, Pid}, AwaitIndex, {_, DbName, _} = Ctx, Try) ->
-    try AwaitIndex(Pid, get_update_seq(DbName)) of
-        {ok, _} -> ok;
-        {ok, _, _} -> ok;
-        AwaitError -> maybe_retry(Ctx, AwaitError, Try)
+    UpdateFun = fun() ->
+        case AwaitIndex(Pid, get_update_seq(DbName)) of
+            {ok, _} -> ok;
+            {ok, _, _} -> ok;
+            AwaitError -> AwaitError
+        end
+    end,
+    retry_loop(Ctx, UpdateFun, Try);
+await_retry(OpenError, _AwaitIndex, Ctx, Try) ->
+    maybe_retry(Ctx, OpenError, Try).
+
+retry_loop(Ctx, UpdateFun, Try) ->
+    try UpdateFun() of
+        ok -> ok;
+        UpdateError -> maybe_retry(Ctx, UpdateError, Try)
     catch
         _:CatchError ->
             maybe_retry(Ctx, CatchError, Try)
-    end;
-await_retry(OpenError, _AwaitIndex, Ctx, Try) ->
-    maybe_retry(Ctx, OpenError, Try).
+    end.
 
 maybe_retry(Ctx, killed = Error, Try) ->
     retry(Ctx, Error, Try);
