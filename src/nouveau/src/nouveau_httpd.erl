@@ -45,23 +45,40 @@ handle_analyze_req(Req) ->
 handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
     check_if_enabled(),
     DbName = couch_db:name(Db),
-    Query = ?l2b(chttpd:qs_value(Req, "q")),
-    Limit = list_to_integer(chttpd:qs_value(Req, "limit", "25")),
-    Sort = ?JSON_DECODE(chttpd:qs_value(Req, "sort", "null")),
-    Ranges = ?JSON_DECODE(chttpd:qs_value(Req, "ranges", "null")),
-    Counts = ?JSON_DECODE(chttpd:qs_value(Req, "counts", "null")),
-    Update = chttpd:qs_value(Req, "update", "true"),
-    Bookmark = chttpd:qs_value(Req, "bookmark"),
-    IncludeDocs = parse_bool_param("include_docs", chttpd:qs_value(Req, "include_docs", "false")),
     QueryArgs = #{
-        query => Query,
-        limit => Limit,
-        sort => Sort,
-        ranges => Ranges,
-        counts => Counts,
-        update => Update,
-        bookmark => Bookmark
+        query => ?l2b(chttpd:qs_value(Req, "q")),
+        limit => list_to_integer(chttpd:qs_value(Req, "limit", "25")),
+        sort => ?JSON_DECODE(chttpd:qs_value(Req, "sort", "null")),
+        ranges => ?JSON_DECODE(chttpd:qs_value(Req, "ranges", "null")),
+        counts => ?JSON_DECODE(chttpd:qs_value(Req, "counts", "null")),
+        update => ?JSON_DECODE(chttpd:qs_value(Req, "update", "true")),
+        bookmark => chttpd:qs_value(Req, "bookmark"),
+        include_docs => parse_bool_param(
+            "include_docs", chttpd:qs_value(Req, "include_docs", "false")
+        )
     },
+    handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs);
+handle_search_req(#httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
+    check_if_enabled(),
+    couch_httpd:validate_ctype(Req, "application/json"),
+    DbName = couch_db:name(Db),
+    ReqBody = chttpd:json_body(Req, [return_maps]),
+    QueryArgs = #{
+        query => maps:get(<<"q">>, ReqBody, undefined),
+        limit => maps:get(<<"limit">>, ReqBody, 25),
+        sort => maps:get(<<"sort">>, ReqBody, null),
+        ranges => maps:get(<<"ranges">>, ReqBody, null),
+        counts => maps:get(<<"counts">>, ReqBody, null),
+        update => maps:get(<<"update">>, ReqBody, true),
+        bookmark => maps:get(<<"bookmark">>, ReqBody, undefined),
+        include_docs => maps:get(<<"include_docs">>, ReqBody, false)
+    },
+    handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs);
+handle_search_req(Req, _Db, _DDoc) ->
+    send_method_not_allowed(Req, "GET, POST").
+
+handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs) ->
+    IncludeDocs = maps:get(include_docs, QueryArgs, false),
     case nouveau_fabric_search:go(DbName, DDoc, IndexName, QueryArgs) of
         {ok, SearchResults} ->
             RespBody = #{
@@ -77,9 +94,7 @@ handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} =
             send_json(Req, 200, RespBody);
         {error, Reason} ->
             send_error(Req, Reason)
-    end;
-handle_search_req(Req, _Db, _DDoc) ->
-    send_method_not_allowed(Req, "GET").
+    end.
 
 handle_info_req(_Req, _Db, _DDoc) ->
     check_if_enabled(),

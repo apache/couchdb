@@ -24,6 +24,7 @@
 
 -define(JSON_ENCODE(V), couch_util:json_encode(V)).
 -define(JSON_DECODE(V), couch_util:json_decode(V)).
+-define(JSON_DECODE(V, O), couch_util:json_decode(V, O)).
 
 -define(IS_OLD_RECORD(V, R), (tuple_size(V) /= tuple_size(R))).
 

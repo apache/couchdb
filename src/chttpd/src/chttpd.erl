@@ -39,6 +39,7 @@
     error_info/1,
     parse_form/1,
     json_body/1,
+    json_body/2,
     json_body_obj/1,
     body/1,
     doc_etag/1,
@@ -789,14 +790,17 @@ body(#httpd{mochi_req = MochiReq, req_body = ReqBody}) ->
 validate_ctype(Req, Ctype) ->
     couch_httpd:validate_ctype(Req, Ctype).
 
-json_body(#httpd{req_body = undefined} = Httpd) ->
+json_body(#httpd{} = Httpd) ->
+    json_body(Httpd, []).
+
+json_body(#httpd{req_body = undefined} = Httpd, JsonDecodeOptions) ->
     case body(Httpd) of
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
-            ?JSON_DECODE(maybe_decompress(Httpd, Body))
+            ?JSON_DECODE(maybe_decompress(Httpd, Body), JsonDecodeOptions)
     end;
-json_body(#httpd{req_body = ReqBody}) ->
+json_body(#httpd{req_body = ReqBody}, _JsonDecodeOptions) ->
     ReqBody.
 
 json_body_obj(Httpd) ->

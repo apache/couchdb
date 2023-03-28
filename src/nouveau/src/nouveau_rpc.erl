@@ -23,7 +23,7 @@
 search(DbName, #index{} = Index0, QueryArgs) ->
     %% Incorporate the shard name into the record.
     Index1 = Index0#index{dbname = DbName},
-    Update = maps:get(update, QueryArgs, "true") == "true",
+    Update = maps:get(update, QueryArgs, true),
 
     %% check if index is up to date
     case Update andalso nouveau_index_updater:outdated(Index1) of
