@@ -70,4 +70,17 @@ defmodule NouveauTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
   end
 
+  @tag :with_db
+  test "search returns all items for POST", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_nouveau/fruits"
+    resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
+    assert resp.status_code == 200
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
+  end
+
 end
