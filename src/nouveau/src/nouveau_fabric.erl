@@ -16,9 +16,6 @@
 -module(nouveau_fabric).
 -export([get_json_docs/2]).
 
--include_lib("couch/include/couch_db.hrl").
--include_lib("mem3/include/mem3.hrl").
-
 get_json_docs(DbName, DocIds) ->
     fabric:all_docs(DbName, fun callback/2, [], [{keys, DocIds}, {include_docs, true}]).
 
