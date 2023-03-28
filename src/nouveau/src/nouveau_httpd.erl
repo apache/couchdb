@@ -91,6 +91,8 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs) ->
                 <<"counts">> => maps:get(<<"counts">>, SearchResults, null),
                 <<"ranges">> => maps:get(<<"ranges">>, SearchResults, null)
             },
+            RowCount = length(maps:get(<<"rows">>, RespBody)),
+            incr_stats(RowCount, IncludeDocs),
             send_json(Req, 200, RespBody);
         {error, Reason} ->
             send_error(Req, Reason)
@@ -106,6 +108,12 @@ include_docs(DbName, Hits, true) ->
     Ids = [maps:get(<<"id">>, Hit) || Hit <- Hits],
     {ok, Docs} = nouveau_fabric:get_json_docs(DbName, Ids),
     lists:zipwith(fun(Hit, Doc) -> Hit#{<<"doc">> => Doc} end, Hits, Docs).
+
+incr_stats(RowCount, false) ->
+    chttpd_stats:incr_rows(RowCount);
+incr_stats(RowCount, true) ->
+    chttpd_stats:incr_reads(RowCount),
+    incr_stats(RowCount, false).
 
 parse_bool_param(_, Val) when is_boolean(Val) ->
     Val;
