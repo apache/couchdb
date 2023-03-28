@@ -229,7 +229,7 @@ public final class Cache<K, V> {
     }
 
     private ReadWriteLock rwl(final K key) {
-        return locks[Math.abs(key.hashCode()) % locks.length];
+        return locks[Math.floorMod(key.hashCode(), locks.length)];
     }
 
     private boolean containsKey(final K key) {
