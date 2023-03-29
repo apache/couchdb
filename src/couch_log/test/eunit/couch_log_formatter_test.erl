@@ -25,15 +25,20 @@ truncate_test() ->
     Entry = couch_log_formatter:format(info, self(), Msg),
     ?assert(length(Entry#log_entry.msg) =< 16000).
 
+format_report_etoolong_test() ->
+    Payload = lists:flatten(["a" || _ <- lists:seq(1, 1048576)]),
+    Resp = couch_log_formatter:format_report(self(), report123, #{
+        msg => Payload
+    }),
+    ?assertEqual({error, emsgtoolong}, Resp).
+
 format_report_test() ->
-    MsgFmt = "This is a reason: ~r",
-    Reason = {foo, [{x, k, 3}, {c, d, 2}]},
-    Entry = couch_log_formatter:format(report, self(), report123, MsgFmt, [Reason], #{
+    {ok, Entry} = couch_log_formatter:format_report(self(), report123, #{
         foo => 123,
         bar => "barStr",
         baz => baz
     }),
-    Formatted = "[foo=\"123\" baz=\"baz\" bar=\"barStr\"] This is a reason: foo at x:k/3 <= c:d/2",
+    Formatted = "[foo=\"123\" baz=\"baz\" bar=\"barStr\"]",
     ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
 
 format_reason_test() ->
