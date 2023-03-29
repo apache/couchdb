@@ -28,7 +28,8 @@ couch_js_test_() ->
                 fun should_roundtrip_modified_utf8/0,
                 fun should_replace_broken_utf16/0,
                 fun should_allow_js_string_mutations/0,
-                {timeout, 60000, fun should_exit_on_oom/0}
+                {timeout, 60000, fun should_exit_on_oom/0},
+                {timeout, 60000, fun should_exit_on_internal_error/0}
             ]
         }
     }.
@@ -235,6 +236,41 @@ should_exit_on_oom() ->
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
     true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
     trigger_oom(Proc).
+
+%% erlfmt-ignore
+should_exit_on_internal_error() ->
+    % A different way to trigger OOM which previously used to
+    % throw an InternalError on SM. Check that we still exit on that
+    % type of error
+    Src = <<"
+        function(doc) {
+            function mkstr(l) {
+                var r = 'r';
+                while (r.length < l) {r = r + r;}
+                return r;
+            }
+            var s = mkstr(96*1024*1024);
+            var a = [s,s,s,s,s,s,s,s];
+            var j = JSON.stringify(a);
+            emit(42, j.length);}
+    ">>,
+    Proc = couch_query_servers:get_os_process(<<"javascript">>),
+    true = couch_query_servers:proc_prompt(Proc, [<<"reset">>]),
+    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    Doc = {[]},
+    try
+        couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc])
+    catch
+        % Expect either an internal error thrown if it catches it and
+        % emits an error log before dying
+        throw:{<<"InternalError">>, _} ->
+            ok;
+        % It may fail and just exit the process. That's expected as well
+        throw:{os_process_error, _} ->
+            ok
+    end,
+    % Expect the process to be dead
+    ?assertThrow({os_process_error, _}, couch_query_servers:proc_prompt(Proc, [<<"reset">>])).
 
 trigger_oom(Proc) ->
     Status =
