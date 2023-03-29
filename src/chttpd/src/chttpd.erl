@@ -1100,6 +1100,8 @@ error_info({error, <<"endpoint has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
 error_info({error, <<"proxy has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
+error_info({gone, Reason}) ->
+    {410, <<"gone">>, Reason};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
