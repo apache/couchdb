@@ -27,7 +27,7 @@ init() ->
 terminate(_, _St) ->
     ok.
 
-write(#log_entry{type=Type}=Entry, St) ->
+write(#log_entry{type = Type} = Entry, St) ->
     #log_entry{
         level = Level,
         pid = Pid,

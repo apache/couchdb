@@ -465,9 +465,16 @@ supervisor_name(Name) -> Name.
 format_meta(Meta) ->
     %% https://www.rfc-editor.org/rfc/rfc5424.html#section-6.3
     %% iut="3" eventSource="Application" eventID="1011"
-    string:join(maps:fold(fun(K, V, Acc) ->
-        [to_str(K, V) | Acc]
-    end, [], Meta), " ").
+    string:join(
+        maps:fold(
+            fun(K, V, Acc) ->
+                [to_str(K, V) | Acc]
+            end,
+            [],
+            Meta
+        ),
+        " "
+    ).
 
 %% passing complex terms as meta value is a mistake so we are going
 %% to eat it, because we cannot bubble up errors from logger

@@ -89,15 +89,16 @@ maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
     %% TODO: add docs vs quorum docs
     chttpd_stats:incr_reads(Stats1#execution_stats.totalDocsExamined),
 
-    FinalAcc = case couch_util:get_value(execution_stats, Opts) of
-        true ->
-            JSONValue = to_json(Stats1),
-            Arg = {add_key, execution_stats, JSONValue},
-            {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
-            FinalUserAcc;
-        _ ->
-            UserAcc
-    end,
+    FinalAcc =
+        case couch_util:get_value(execution_stats, Opts) of
+            true ->
+                JSONValue = to_json(Stats1),
+                Arg = {add_key, execution_stats, JSONValue},
+                {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
+                FinalUserAcc;
+            _ ->
+                UserAcc
+        end,
     {FinalAcc, Stats1}.
 
 log_stats(Stats) ->

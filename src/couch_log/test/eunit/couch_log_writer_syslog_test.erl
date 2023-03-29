@@ -121,8 +121,6 @@ check_format() ->
     ?assert(meck:called(gen_udp, close, 1)),
     ?assert(meck:validate(gen_udp)).
 
-
-
 facility_test() ->
     Names = [
         "kern",
