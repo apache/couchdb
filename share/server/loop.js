@@ -130,6 +130,14 @@ var Loop = function() {
       quit(-1);
     } else if (type == "error") {
       respond(e);
+    } else if (e.name == "InternalError") {
+      // If the internal error is caught by handleViewError it will be
+      // re-thrown as a ["fatal", ...] error, and we already handle that above.
+      // Here we handle the case when the error is thrown outside of
+      // handleViewError, for instance when serializing the rows to be sent
+      // back to the user
+      respond(["error", e.name, e.message]);
+      quit(-1);
     } else if (e.error && e.reason) {
       // compatibility with old error format
       respond(["error", e.error, e.reason]);
