@@ -26,9 +26,11 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 
 ## What doesn't work yet?
 
-* No support for results grouping
-* No support to configure stop words for analyzers
-* No work done on Makefile.win or Windows generally
+* results grouping
+* configurable stop words for analyzers
+* Makefile.win or Windows generally
+* `_search_cleanup`
+* `_search_info`
 
 I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
