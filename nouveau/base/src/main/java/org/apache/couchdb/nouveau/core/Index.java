@@ -47,10 +47,13 @@ public abstract class Index<T> implements Closeable {
 
     public final IndexInfo info() throws IOException {
         final int numDocs = doNumDocs();
-        return new IndexInfo(updateSeq, numDocs);
+        final long diskSize = doDiskSize();
+        return new IndexInfo(updateSeq, numDocs, diskSize);
     }
 
     protected abstract int doNumDocs() throws IOException;
+
+    protected abstract long doDiskSize() throws IOException;
 
     public final synchronized void update(final String docId, final DocumentUpdateRequest<T> request)
             throws IOException {

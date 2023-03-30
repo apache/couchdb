@@ -68,6 +68,7 @@ import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldCollector;
+import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 
 public class Lucene4Index extends Index<IndexableField> {
@@ -91,6 +92,16 @@ public class Lucene4Index extends Index<IndexableField> {
     @Override
     public int doNumDocs() throws IOException {
         return writer.numDocs();
+    }
+
+    @Override
+    public long doDiskSize() throws IOException {
+        final Directory dir = writer.getDirectory();
+        long result = 0;
+        for (final String name : dir.listAll()) {
+            result += dir.fileLength(name);
+        }
+        return result;
     }
 
     @Override
