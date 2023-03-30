@@ -13,7 +13,9 @@
 
 package org.apache.couchdb.nouveau.lucene9.core;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -98,7 +100,11 @@ public class Lucene9Index extends Index<IndexableField> {
         final Directory dir = writer.getDirectory();
         long result = 0;
         for (final String name : dir.listAll()) {
-            result += dir.fileLength(name);
+            try {
+                result += dir.fileLength(name);
+            } catch (final FileNotFoundException | NoSuchFileException e) {
+                // deleted while we were looping.
+            }
         }
         return result;
     }
