@@ -136,9 +136,11 @@ public class Lucene9Index extends Index<IndexableField> {
                     writer.rollback();
                 },
                 () -> {
-                    var dir = writer.getDirectory();
-                    for (final String name : dir.listAll()) {
-                        dir.deleteFile(name);
+                    if (isDeleteOnClose()) {
+                        var dir = writer.getDirectory();
+                        for (final String name : dir.listAll()) {
+                            dir.deleteFile(name);
+                        }
                     }
                 });
     }
