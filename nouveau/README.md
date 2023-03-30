@@ -1,35 +1,43 @@
 # nouveau
-Lucene 9 + DropWizard = Maybe a good search option for Apache CouchDB?
 
-Nouveau is an experimental search extension for CouchDB 3.x.
+Nouveau is a modern replacement for dreyfus/clouseau and is built on;
+
+1) the Dropwizard framework (https://dropwizard.io)
+2) Java 11+
+3) Lucene 9
+4) Lucene 4 is simultaneously supported for migration purposes
+
+Nouveau transforms Apache CouchDB databases into Apache Lucene indexes at the shard level and then merges the results together.
+
+This work is currently EXPERIMENTAL and may change in ways that invalidate any existing Nouveau index.
 
 ## What works?
 
 * you can define a default analyzer and different analyzers by field name.
-* sorting on text and numbers
+* sorting on text and numbers (and combinations of fields)
 * classic lucene query syntax
 * count and range facets
 * cursor support for paginating efficiently through large results sets
 * indexes automatically deleted if database is deleted (as long as nouveau is running!)
 * integration with ken
-* update=false
-* support for stale=ok
 * integration with mango
+* integration with resharding
+* update=false
 
 ## What doesn't work yet?
 
-* POST support for _nouveau
 * No support for results grouping
 * No support to configure stop words for analyzers
 * No work done on Makefile.win or Windows generally
+
+I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
 ## Why is this better than dreyfus/clouseau?
 
 * No scalang (or Scala!)
 * Supports any version of Java that Lucene 9 supports
-* memory-mapped I/O for performance
+* memory-mapped I/O for performance (which works best on Java 19)
 * direct I/O used for segment merging (so we don't evict useful data from disk cache)
-* It's new and shiny.
 
 ## Getting started
 
@@ -90,7 +98,8 @@ curl 'foo:bar@localhost:15984/foo/_design/foo/_nouveau/bar?q=*:*&limit=1&ranges=
 
 ## Index function
 
-To ease migration nouveau functions can use the 'index' function exactly as it exists in dreyfus, but the function also supports a new style.
+To ease migration nouveau functions can use the 'index' function exactly as it exists in dreyfus, but the function also supports a new style where
+the intended Lucene field type is the first argument.
 
 | Arguments                                          | Effect
 | :------------------------------------------------- | :-----
