@@ -24,17 +24,25 @@ public class IndexInfo {
 
     private int numDocs;
 
+    private long diskSize;
+
     public IndexInfo() {
     }
 
-    public IndexInfo(final long updateSeq, final int numDocs) {
+    public IndexInfo(final long updateSeq, final int numDocs, final long diskSize) {
         this.updateSeq = updateSeq;
         this.numDocs = numDocs;
+        this.diskSize = diskSize;
     }
 
     @JsonProperty
     public int getNumDocs() {
         return numDocs;
+    }
+
+    @JsonProperty
+    public long getDiskSize() {
+        return diskSize;
     }
 
     @JsonProperty
@@ -44,7 +52,7 @@ public class IndexInfo {
 
     @Override
     public String toString() {
-        return "IndexInfo [numDocs=" + numDocs + ", updateSeq=" + updateSeq + "]";
+        return "IndexInfo [updateSeq=" + updateSeq + ", numDocs=" + numDocs + ", diskSize=" + diskSize + "]";
     }
 
 }
