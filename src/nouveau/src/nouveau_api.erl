@@ -57,7 +57,7 @@ index_info(#index{} = Index) ->
     Resp = send_if_enabled(index_url(Index), [], get),
     case Resp of
         {ok, "200", _, RespBody} ->
-            {ok, jiffy:decode(RespBody)};
+            {ok, jiffy:decode(RespBody, [return_maps])};
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
         {error, Reason} ->

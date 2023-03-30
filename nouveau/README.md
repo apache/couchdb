@@ -23,6 +23,7 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * integration with mango
 * integration with resharding
 * update=false
+* `_nouveau_info`
 
 ## What doesn't work yet?
 
@@ -30,7 +31,6 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * configurable stop words for analyzers
 * Makefile.win or Windows generally
 * `_search_cleanup`
-* `_search_info`
 
 I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
