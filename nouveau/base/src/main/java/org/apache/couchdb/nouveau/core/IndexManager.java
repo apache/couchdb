@@ -271,8 +271,9 @@ public final class IndexManager implements Managed {
     private CachePreunloader<String, Index> cachePreunloader() {
         return (name, index) -> {
             if (!index.isDeleteOnClose()) {
-                LOGGER.info("committing before close {}", name);
-                index.commit();
+                if (index.commit()) {
+                    LOGGER.info("committed before close {}", name);
+                }
             }
         };
     }
@@ -297,8 +298,9 @@ public final class IndexManager implements Managed {
         scheduler.execute(() -> {
             try {
                 with(name, loader, (index) -> {
-                    LOGGER.info("committing {}", name);
-                    index.commit();
+                    if (index.commit()) {
+                        LOGGER.info("committed {}", name);
+                    }
                     return null;
                 });
             } catch (final IOException e) {
