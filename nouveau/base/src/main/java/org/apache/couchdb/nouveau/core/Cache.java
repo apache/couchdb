@@ -200,10 +200,13 @@ public final class Cache<K, V> {
     }
 
     public void close(final CachePreunloader<K, V> preunloader, final CacheUnloader<K, V> unloader) throws IOException {
-        for (K key : cache.keySet()) {
+        final Set<K> keys;
+        synchronized (cache) {
+            keys = new HashSet<K>(cache.keySet());
+        }
+        for (final K key : keys) {
             remove(key, preunloader, unloader);
         }
-        cache.clear();
     }
 
     public Set<Entry<K, V>> entrySet() {
