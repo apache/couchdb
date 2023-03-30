@@ -27,7 +27,7 @@
     <maven.compiler.target>11</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <dropwizard.version>2.1.5</dropwizard.version>
+    <dropwizard.version>2.1.6</dropwizard.version>
     <junit5.version>5.8.2</junit5.version>
     <slf4j.version>1.7.32</slf4j.version>
     <project.tests.exclude>SlowTest</project.tests.exclude>
