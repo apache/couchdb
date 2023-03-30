@@ -37,10 +37,11 @@
 
 format_report(Pid, Type, Meta) ->
     MaxMsgSize = couch_log_config:get(max_message_size),
-    Msg = case format_meta(Meta) of
-        ""   -> "";
-        Msg0 -> ["[", Msg0, "]"]
-    end,
+    Msg =
+        case format_meta(Meta) of
+            "" -> "";
+            Msg0 -> ["[", Msg0, "]"]
+        end,
     case iolist_size(Msg) > MaxMsgSize of
         true ->
             {error, emsgtoolong};
