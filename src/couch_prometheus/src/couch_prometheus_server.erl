@@ -113,7 +113,8 @@ get_system_stats() ->
         get_run_queue_stats(),
         get_vm_stats(),
         get_ets_stats(),
-        get_internal_replication_jobs_stat()
+        get_internal_replication_jobs_stat(),
+        get_membership_stat()
     ]).
 
 get_uptime_stat() ->
@@ -126,6 +127,17 @@ get_internal_replication_jobs_stat() ->
         "count of internal replication changes to process",
         mem3_sync:get_backlog()
     ).
+
+get_membership_stat() ->
+    % expected nodes
+    ClusterNodes = mem3:nodes(),
+    % connected nodes
+    AllNodes = nodes([this, visible]),
+    Labels = [
+        {[{nodes, "cluster_nodes"}], length(ClusterNodes)},
+        {[{nodes, "all_nodes"}], length(AllNodes)}
+    ],
+    to_prom(membership, gauge, "count of nodes in the cluster", Labels).
 
 get_vm_stats() ->
     MemLabels = lists:map(
