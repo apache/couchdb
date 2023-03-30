@@ -94,10 +94,6 @@ environments.)
 
 .. warning::
 
-    Tricks with ``/etc/hosts`` and ``libresolv`` don't work with Erlang.
-    Either properly set up DNS and use fully-qualified domain names, or
-    use IP addresses. DNS and FQDNs are preferred.
-
     Changing the name later is somewhat cumbersome (i.e. moving shards), which
     is why you will want to set it once and not have to change it.
 
