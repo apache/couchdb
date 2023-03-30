@@ -124,8 +124,8 @@ get_db_seq(#index{} = Index) ->
 
 get_index_seq(#index{} = Index) ->
     case nouveau_api:index_info(Index) of
-        {ok, {Fields}} ->
-            {ok, couch_util:get_value(<<"update_seq">>, Fields)};
+        {ok, #{<<"update_seq">> := Seq}} ->
+            {ok, Seq};
         {error, Reason} ->
             {error, Reason}
     end.

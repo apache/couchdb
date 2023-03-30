@@ -98,9 +98,32 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs) ->
             send_error(Req, Reason)
     end.
 
-handle_info_req(_Req, _Db, _DDoc) ->
+handle_info_req(
+    #httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req,
+    Db,
+    #doc{id = Id} = DDoc
+) ->
     check_if_enabled(),
-    ok.
+    DbName = couch_db:name(Db),
+    case nouveau_fabric_info:go(DbName, DDoc, IndexName) of
+        {ok, IndexInfo} ->
+            send_json(
+                Req,
+                200,
+                {[
+                    {name, <<Id/binary, "/", IndexName/binary>>},
+                    {search_index, IndexInfo}
+                ]}
+            );
+        {error, Reason} ->
+            send_error(Req, Reason)
+    end;
+handle_info_req(#httpd{path_parts = [_, _, _, _, _]} = Req, _Db, _DDoc) ->
+    check_if_enabled(),
+    send_method_not_allowed(Req, "GET");
+handle_info_req(Req, _Db, _DDoc) ->
+    check_if_enabled(),
+    send_error(Req, {bad_request, "path not recognized"}).
 
 include_docs(_DbName, Hits, false) ->
     Hits;

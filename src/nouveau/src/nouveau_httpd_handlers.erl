@@ -28,6 +28,6 @@ db_handler(_) ->
 design_handler(<<"_nouveau">>) ->
     fun nouveau_httpd:handle_search_req/3;
 design_handler(<<"_nouveau_info">>) ->
-    nomatch;
+    fun nouveau_httpd:handle_info_req/3;
 design_handler(_) ->
     no_match.

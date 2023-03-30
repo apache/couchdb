@@ -15,7 +15,7 @@
 
 -module(nouveau_rpc).
 
--export([search/3]).
+-export([search/3, info/2]).
 
 -include("nouveau.hrl").
 -import(nouveau_util, [index_path/1]).
@@ -42,3 +42,8 @@ search(DbName, #index{} = Index0, QueryArgs) ->
 
     %% Run the search
     rexi:reply(nouveau_api:search(Index1, QueryArgs)).
+
+info(DbName, #index{} = Index0) ->
+    %% Incorporate the shard name into the record.
+    Index1 = Index0#index{dbname = DbName},
+    rexi:reply(nouveau_api:index_info(Index1)).
