@@ -17,8 +17,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response.Status;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.lucene.analysis.Analyzer;

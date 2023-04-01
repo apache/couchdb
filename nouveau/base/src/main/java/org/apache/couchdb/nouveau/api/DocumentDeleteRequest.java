@@ -13,7 +13,7 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

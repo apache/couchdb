@@ -15,12 +15,12 @@ package org.apache.couchdb.nouveau;
 
 import java.nio.file.Path;
 
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import io.dropwizard.Configuration;
+import io.dropwizard.core.Configuration;
 
 public class NouveauApplicationConfiguration extends Configuration {
 

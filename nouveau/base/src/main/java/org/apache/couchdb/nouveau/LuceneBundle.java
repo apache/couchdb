@@ -15,7 +15,7 @@ package org.apache.couchdb.nouveau;
 
 import org.apache.couchdb.nouveau.core.IndexManager;
 
-import io.dropwizard.ConfiguredBundle;
+import io.dropwizard.core.ConfiguredBundle;
 
 public class LuceneBundle implements ConfiguredBundle<NouveauApplicationConfiguration> {
 
