@@ -18,7 +18,12 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("nouveau.hrl").
 
--export([handle_analyze_req/1, handle_search_req/3, handle_info_req/3]).
+-export([
+    handle_analyze_req/1,
+    handle_search_req/3,
+    handle_info_req/3,
+    handle_cleanup_req/2
+]).
 
 -import(chttpd, [
     send_method_not_allowed/2,
@@ -124,6 +129,13 @@ handle_info_req(#httpd{path_parts = [_, _, _, _, _]} = Req, _Db, _DDoc) ->
 handle_info_req(Req, _Db, _DDoc) ->
     check_if_enabled(),
     send_error(Req, {bad_request, "path not recognized"}).
+
+handle_cleanup_req(#httpd{method = 'POST'} = Req, Db) ->
+    couch_httpd:validate_ctype(Req, "application/json"),
+    ok = nouveau_fabric_cleanup:go(couch_db:name(Db)),
+    send_json(Req, 202, {[{ok, true}]});
+handle_cleanup_req(Req, _Db) ->
+    send_method_not_allowed(Req, "POST").
 
 include_docs(_DbName, Hits, false) ->
     Hits;

@@ -22,6 +22,7 @@
     index_info/1,
     create_index/2,
     delete_path/2,
+    delete_path/3,
     delete_doc/3,
     update_doc/4,
     search/2
@@ -77,10 +78,15 @@ create_index(#index{} = Index, IndexDefinition) ->
             send_error(Reason)
     end.
 
-delete_path(LuceneMajor, Path) when
-    is_integer(LuceneMajor), is_binary(Path)
+delete_path(LuceneMajor, Path) ->
+    delete_path(LuceneMajor, Path, []).
+
+delete_path(LuceneMajor, Path, Exclusions) when
+    is_integer(LuceneMajor), is_binary(Path), is_list(Exclusions)
 ->
-    Resp = send_if_enabled(index_path(LuceneMajor, Path), [?JSON_CONTENT_TYPE], delete, []),
+    Resp = send_if_enabled(
+        index_path(LuceneMajor, Path), [?JSON_CONTENT_TYPE], delete, jiffy:encode(Exclusions)
+    ),
     case Resp of
         {ok, "204", _, _} ->
             ok;

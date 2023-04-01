@@ -19,3 +19,7 @@ server:
     includedMethods:
       - GET
       - POST
+  requestLog:
+    appenders:
+      - type: console
+        target: stderr
