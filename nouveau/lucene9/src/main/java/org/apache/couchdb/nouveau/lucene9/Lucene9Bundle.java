@@ -25,7 +25,7 @@ import org.apache.couchdb.nouveau.lucene9.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.lucene9.resources.IndexResource;
 import org.apache.lucene.search.SearcherFactory;
 
-import io.dropwizard.setup.Environment;
+import io.dropwizard.core.setup.Environment;
 
 public final class Lucene9Bundle extends LuceneBundle {
 

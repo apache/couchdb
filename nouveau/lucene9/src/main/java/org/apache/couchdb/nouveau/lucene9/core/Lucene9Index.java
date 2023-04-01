@@ -27,8 +27,8 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Response.Status;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
