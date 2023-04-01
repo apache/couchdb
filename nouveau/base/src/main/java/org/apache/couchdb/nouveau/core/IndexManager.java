@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -115,20 +116,26 @@ public final class IndexManager implements Managed {
         return Files.exists(indexDefinitionPath(name));
     }
 
-    public void deleteAll(final String path) throws IOException {
-        final Path rootPath = indexRootPath(path);
-        LOGGER.info("deleting indexes below {}", rootPath);
-        if (!rootPath.toFile().exists()) {
+    public void deleteAll(final String path, final List<String> exclusions) throws IOException {
+        LOGGER.info("deleting indexes below {} (excluding {})", path,
+            exclusions == null ? "nothing" : exclusions);
+
+        final Path indexRootPath = indexRootPath(path);
+        if (!indexRootPath.toFile().exists()) {
             return;
         }
-        Stream<Path> stream = Files.find(rootPath, 100,
-                (p, attr) -> attr.isDirectory() && isIndex(p));
+        Stream<Path> stream = Files.find(indexRootPath, 100,
+            (p, attr) -> attr.isDirectory() && isIndex(p));
         try {
             stream.forEach((p) -> {
+                final String relativeToExclusions = indexRootPath.relativize(p).toString();
+                if (exclusions != null && exclusions.indexOf(relativeToExclusions) != -1) {
+                    return;
+                }
+                final String relativeName = rootDir.relativize(p).toString();
                 try {
-                    final String relativeName = rootDir.relativize(p).toString();
                     deleteIndex(relativeName);
-                } catch (Exception e) {
+                } catch (final IOException e) {
                     LOGGER.error("I/O exception deleting " + p, e);
                 }
             });
@@ -137,7 +144,7 @@ public final class IndexManager implements Managed {
         }
 
         // Clean any newly empty directories.
-        Path p = rootPath;
+        Path p = indexRootPath;
         do {
             final File f = p.toFile();
             if (f.isDirectory() && f.list().length == 0) {

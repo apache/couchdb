@@ -15,7 +15,11 @@
 
 -module(nouveau_rpc).
 
--export([search/3, info/2]).
+-export([
+    search/3,
+    info/2,
+    cleanup/2
+]).
 
 -include("nouveau.hrl").
 -import(nouveau_util, [index_path/1]).
@@ -47,3 +51,8 @@ info(DbName, #index{} = Index0) ->
     %% Incorporate the shard name into the record.
     Index1 = Index0#index{dbname = DbName},
     rexi:reply(nouveau_api:index_info(Index1)).
+
+cleanup(DbName, Exclusions) ->
+    nouveau_api:delete_path(4, nouveau_util:index_name(DbName), Exclusions),
+    nouveau_api:delete_path(9, nouveau_util:index_name(DbName), Exclusions),
+    rexi:reply(ok).

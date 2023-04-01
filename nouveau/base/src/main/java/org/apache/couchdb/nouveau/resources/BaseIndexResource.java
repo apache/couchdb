@@ -14,6 +14,8 @@
 package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
 import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
@@ -42,8 +44,8 @@ public abstract class BaseIndexResource<T> {
         });
     }
 
-    public void deletePath(String path) throws IOException {
-        indexManager.deleteAll(path);
+    public void deletePath(String path, @Valid List<String> exclusions) throws IOException {
+        indexManager.deleteAll(path, exclusions);
     }
 
     public void createIndex(String name, @NotNull @Valid IndexDefinition indexDefinition)

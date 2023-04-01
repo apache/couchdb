@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.lucene9.resources;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 import javax.validation.Valid;
@@ -85,8 +86,8 @@ public class IndexResource extends BaseIndexResource<IndexableField> {
 
     @DELETE
     @Override
-    public void deletePath(@PathParam("name") String path) throws IOException {
-        super.deletePath(path);
+    public void deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
+        super.deletePath(path, exclusions);
     }
 
     @GET

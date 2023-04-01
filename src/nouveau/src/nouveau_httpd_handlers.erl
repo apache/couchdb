@@ -22,6 +22,8 @@ url_handler(<<"_nouveau_analyze">>) ->
 url_handler(_) ->
     no_match.
 
+db_handler(<<"_nouveau_cleanup">>) ->
+    fun nouveau_httpd:handle_cleanup_req/2;
 db_handler(_) ->
     no_match.
 

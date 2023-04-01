@@ -41,7 +41,7 @@ public abstract class BaseIndexHealthCheck<T> extends HealthCheck {
     protected Result check() throws Exception {
         final String name = generateIndexName();
         try {
-            indexResource.deletePath(name);
+            indexResource.deletePath(name, null);
         } catch (IOException e) {
             // Ignored, index might not exist yet.
         }
@@ -59,7 +59,7 @@ public abstract class BaseIndexHealthCheck<T> extends HealthCheck {
                 return Result.healthy();
             }
         } finally {
-            indexResource.deletePath(name);
+            indexResource.deletePath(name, null);
         }
         return Result.unhealthy(name);
     }
