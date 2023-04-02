@@ -62,7 +62,9 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
         false ->
             {error, {not_found, <<IndexName/binary, " not found.">>}};
         {IndexName, {Index}} ->
-            DefaultLuceneMajor = config:get_integer("nouveau", "default_lucene_major", 9),
+            DefaultLuceneMajor = config:get_integer(
+                "nouveau", "default_lucene_major", ?DEFAULT_LUCENE_MAJOR
+            ),
             LuceneMajor = couch_util:get_value(
                 <<"lucene_major">>, Index, DefaultLuceneMajor
             ),

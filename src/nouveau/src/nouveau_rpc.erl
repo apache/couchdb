@@ -53,6 +53,10 @@ info(DbName, #index{} = Index0) ->
     rexi:reply(nouveau_api:index_info(Index1)).
 
 cleanup(DbName, Exclusions) ->
-    nouveau_api:delete_path(4, nouveau_util:index_name(DbName), Exclusions),
-    nouveau_api:delete_path(9, nouveau_util:index_name(DbName), Exclusions),
+    lists:foreach(
+        fun(Major) ->
+            nouveau_api:delete_path(Major, nouveau_util:index_name(DbName), Exclusions)
+        end,
+        ?LUCENE_MAJORS
+    ),
     rexi:reply(ok).
