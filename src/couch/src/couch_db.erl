@@ -103,6 +103,7 @@
     with_stream/3,
     open_write_stream/2,
     open_read_stream/2,
+    open_read_stream/3,
     is_active_stream/2,
 
     fold_docs/3,
@@ -1681,6 +1682,9 @@ open_write_stream(Db, Options) ->
 
 open_read_stream(Db, AttState) ->
     couch_db_engine:open_read_stream(Db, AttState).
+
+open_read_stream(Db, AttState, Generation) ->
+    couch_db_engine:open_read_stream(Db, AttState, Generation).
 
 is_active_stream(Db, StreamEngine) ->
     couch_db_engine:is_active_stream(Db, StreamEngine).

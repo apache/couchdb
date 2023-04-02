@@ -91,7 +91,8 @@
     %%     identity, gzip
     %% additional values to support in the future:
     %%     deflate, compress
-    encoding = identity :: identity | gzip
+    encoding = identity :: identity | gzip,
+    generation = 0 :: non_neg_integer()
 }).
 
 %% Extensible Attachment Type
@@ -175,9 +176,21 @@
     Enc :: identity | gzip
 }.
 
+-type disk_att_v4() :: {
+    Name :: binary(),
+    Type :: binary(),
+    Sp :: any(),
+    AttLen :: non_neg_integer(),
+    DiskLen :: non_neg_integer(),
+    RevPos :: non_neg_integer(),
+    Md5 :: binary(),
+    Enc :: identity | gzip,
+    Generation :: non_neg_integer()
+}.
+
 -type disk_att_v3() :: {Base :: tuple(), Extended :: list()}.
 
--type disk_att() :: disk_att_v1() | disk_att_v2() | disk_att_v3().
+-type disk_att() :: disk_att_v1() | disk_att_v2() | disk_att_v3() | disk_att_v4().
 
 -type att() :: #att{} | attachment() | disk_att().
 
@@ -222,6 +235,8 @@ fetch(data, #att{data = Data}) ->
     Data;
 fetch(encoding, #att{encoding = Encoding}) ->
     Encoding;
+fetch(generation, #att{generation = Generation}) ->
+    Generation;
 fetch(_, _) ->
     undefined.
 
@@ -256,6 +271,8 @@ store(data, Data, Att) ->
     Att#att{data = Data};
 store(encoding, Encoding, Att) ->
     Att#att{encoding = Encoding};
+store(generation, Generation, Att) ->
+    Att#att{generation = Generation};
 store(Field, Value, Att) ->
     store(Field, Value, upgrade(Att)).
 
@@ -338,10 +355,11 @@ to_disk_term(#att{} = Att) ->
         fetch(disk_len, Att),
         fetch(revpos, Att),
         fetch(md5, Att),
-        fetch(encoding, Att)
+        fetch(encoding, Att),
+        fetch(generation, Att)
     };
 to_disk_term(Att) ->
-    BaseProps = [name, type, data, att_len, disk_len, revpos, md5, encoding],
+    BaseProps = [name, type, data, att_len, disk_len, revpos, md5, encoding, generation],
     {Extended, Base} = lists:foldl(
         fun
             (data, {Props, Values}) ->
@@ -376,6 +394,20 @@ from_disk_term(StreamSrc, {Base, Extended}) when
     is_tuple(Base), is_list(Extended)
 ->
     store(Extended, from_disk_term(StreamSrc, Base));
+from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, DiskLen, RevPos, Md5, Enc, Generation}) ->
+    couch_log:error("~n from_disk_term-2 Generation: ~p~n", [Generation]),
+    {ok, Stream} = open_stream(StreamSrc, Sp, Generation),
+    #att{
+        name = Name,
+        type = Type,
+        att_len = AttLen,
+        disk_len = DiskLen,
+        md5 = Md5,
+        revpos = RevPos,
+        data = {stream, Stream},
+        encoding = upgrade_encoding(Enc),
+        generation = Generation
+    };
 from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, DiskLen, RevPos, Md5, Enc}) ->
     {ok, Stream} = open_stream(StreamSrc, Sp),
     #att{
@@ -779,9 +811,11 @@ validate_attachment_size(_AttName, _AttSize, _MAxAttSize) ->
     ok.
 
 open_stream(StreamSrc, Data) ->
+    open_stream(StreamSrc, Data, 0).
+open_stream(StreamSrc, Data, Generation) ->
     case couch_db:is_db(StreamSrc) of
         true ->
-            couch_db:open_read_stream(StreamSrc, Data);
+            couch_db:open_read_stream(StreamSrc, Generation, Data);
         false ->
             case is_function(StreamSrc, 1) of
                 true ->
