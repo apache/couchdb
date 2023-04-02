@@ -467,9 +467,9 @@ clean:
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
-	ifeq ($(with_nouveau), 1)
-		@cd nouveau && mvn clean
-	endif
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && mvn clean
+endif
 
 
 .PHONY: distclean
