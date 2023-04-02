@@ -20,6 +20,7 @@ import java.util.ServiceLoader;
 
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
+import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
 
 import io.dropwizard.core.Application;
 import io.dropwizard.core.setup.Bootstrap;
@@ -75,6 +76,9 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());
         environment.lifecycle().manage(indexManager);
+
+        // configure tasks
+        environment.admin().addTask(new CloseAllIndexesTask(indexManager));
     }
 
 }
