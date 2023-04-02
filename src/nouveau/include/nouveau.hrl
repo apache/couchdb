@@ -22,3 +22,7 @@
     name,
     sig=nil
 }).
+
+-define(DEFAULT_LUCENE_MAJOR, 9).
+
+-define(LUCENE_MAJORS, [4, 9]).
