@@ -24,13 +24,13 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * integration with resharding
 * update=false
 * `_nouveau_info`
+* `_search_cleanup`
 
 ## What doesn't work yet?
 
 * results grouping
 * configurable stop words for analyzers
 * Makefile.win or Windows generally
-* `_search_cleanup`
 
 I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
