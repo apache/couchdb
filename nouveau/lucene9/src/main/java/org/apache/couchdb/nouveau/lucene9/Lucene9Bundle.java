@@ -13,7 +13,7 @@
 
 package org.apache.couchdb.nouveau.lucene9;
 
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 
 import org.apache.couchdb.nouveau.LuceneBundle;
 import org.apache.couchdb.nouveau.NouveauApplicationConfiguration;
@@ -40,8 +40,7 @@ public final class Lucene9Bundle extends LuceneBundle {
         environment.jersey().register(new AnalyzeResource());
 
         // IndexResource
-        final ExecutorService executorService = environment.lifecycle().executorService("nouveau-lucene9-%d").build();
-        final SearcherFactory searcherFactory = new ParallelSearcherFactory(executorService);
+        final SearcherFactory searcherFactory = new ParallelSearcherFactory(ForkJoinPool.commonPool());
         final IndexResource indexResource = new IndexResource(indexManager, searcherFactory);
         environment.jersey().register(indexResource);
 
