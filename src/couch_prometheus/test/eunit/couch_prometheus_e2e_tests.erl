@@ -40,7 +40,8 @@ e2e_test_() ->
                     ?TDEF_FE(t_chttpd_port),
                     ?TDEF_FE(t_prometheus_port),
                     ?TDEF_FE(t_metric_updated),
-                    ?TDEF_FE(t_no_duplicate_metrics)
+                    ?TDEF_FE(t_no_duplicate_metrics),
+                    ?TDEF_FE(t_starts_with_couchdb)
                 ]
             }
         }
@@ -70,7 +71,7 @@ reject_test_() ->
     }.
 
 setup_prometheus(WithAdditionalPort) ->
-    Ctx = test_util:start_couch([chttpd]),
+    Ctx = test_util:start_couch([mem3, chttpd, couch_prometheus]),
     Persist = false,
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, binary_to_list(Hashed), Persist),
@@ -143,6 +144,33 @@ t_metric_updated(Port) ->
                 false -> wait
             end
         end
+    ).
+
+t_starts_with_couchdb(Port) ->
+    Url = node_local_url(Port),
+    Stats = get_stats(Url),
+    Lines = re:split(Stats, "\n"),
+    lists:foreach(
+        fun(Line) ->
+            ?assert(is_binary(Line)),
+            Trimmed = string:trim(Line),
+            Expect = "^(#|couchdb_|$)",
+            case re:run(Trimmed, Expect) of
+                {match, _} ->
+                    ok;
+                nomatch ->
+                    erlang:error(
+                        {assertRegexp_failed, [
+                            {module, ?MODULE},
+                            {line, ?LINE},
+                            {regexp, (Trimmed)},
+                            {expected_to_match, Expect},
+                            {result, nomatch}
+                        ]}
+                    )
+            end
+        end,
+        Lines
     ).
 
 node_local_url(Port) ->

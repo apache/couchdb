@@ -71,6 +71,19 @@ couch_to_prom([couchdb, httpd_status_codes, 200], Info, _All) ->
     });
 couch_to_prom([couchdb, httpd_status_codes, Code], Info, _All) ->
     to_prom(httpd_status_codes, {[{code, Code}], val(Info)});
+% Convert to gauge in prometheus type. This is required because
+% prometheus assumes that counters are cumulative and should be
+% rated by default, whereas folsom (the library CouchDB uses for
+% metrics) allows counters to be decremented as well. Folsom supports
+% gauges but does not track their state to allow increment/decrement.
+% Basically, anywhere we use couch_stats:decrement_count we should
+% be converting to a prometheus gauge.
+couch_to_prom([couchdb, open_databases], Info, _All) ->
+    to_prom(open_databases, gauge, desc(Info), val(Info));
+couch_to_prom([couchdb, open_os_files], Info, _All) ->
+    to_prom(open_os_files, gauge, desc(Info), val(Info));
+couch_to_prom([couchdb, httpd, clients_requesting_changes], Info, _All) ->
+    to_prom(httpd_clients_requesting_changes, gauge, desc(Info), val(Info));
 couch_to_prom([ddoc_cache, hit], Info, All) ->
     Total = val(Info) + val([ddoc_cache, miss], All),
     to_prom(ddoc_cache_requests_total, counter, "number of design doc cache requests", Total);
@@ -109,9 +122,13 @@ type_def(Metric, Type, Desc) ->
         to_bin(io_lib:format("# TYPE ~s ~s", [Name, Type]))
     ].
 
-to_prom(Metric, Type, Desc, Data) ->
+% support creating a metric series with multiple label/values.
+% Instances is of the form [{[{LabelName, LabelValue}], Value}, ...]
+to_prom(Metric, Type, Desc, Instances) when is_list(Instances) ->
     TypeStr = type_def(Metric, Type, Desc),
-    [TypeStr] ++ to_prom(Metric, Data).
+    [TypeStr] ++ lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);
+to_prom(Metric, Type, Desc, Data) ->
+    to_prom(Metric, Type, Desc, [Data]).
 
 to_prom(Metric, Instances) when is_list(Instances) ->
     lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);

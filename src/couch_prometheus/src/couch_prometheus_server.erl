@@ -112,11 +112,32 @@ get_system_stats() ->
         get_message_queue_stats(),
         get_run_queue_stats(),
         get_vm_stats(),
-        get_ets_stats()
+        get_ets_stats(),
+        get_internal_replication_jobs_stat(),
+        get_membership_stat()
     ]).
 
 get_uptime_stat() ->
     to_prom(uptime_seconds, counter, "couchdb uptime", couch_app:uptime() div 1000).
+
+get_internal_replication_jobs_stat() ->
+    to_prom(
+        internal_replication_jobs,
+        gauge,
+        "count of internal replication changes to process",
+        mem3_sync:get_backlog()
+    ).
+
+get_membership_stat() ->
+    % expected nodes
+    ClusterNodes = mem3:nodes(),
+    % connected nodes
+    AllNodes = nodes([this, visible]),
+    Labels = [
+        {[{nodes, "cluster_nodes"}], length(ClusterNodes)},
+        {[{nodes, "all_nodes"}], length(AllNodes)}
+    ],
+    to_prom(membership, gauge, "count of nodes in the cluster", Labels).
 
 get_vm_stats() ->
     MemLabels = lists:map(
@@ -177,24 +198,27 @@ get_io_stats() ->
     ].
 
 get_message_queue_stats() ->
-    QLenFun = fun(Name) -> message_queue_len(whereis(Name)) end,
-    Queues = lists:map(QLenFun, registered()),
+    QFun = fun(Name) -> {Name, message_queue_len(whereis(Name))} end,
+    Queues = lists:map(QFun, registered()),
+    QueueLens = lists:map(fun({_, Len}) -> Len end, Queues),
+    QueueLenByLabel = lists:map(fun({Name, Len}) -> {[{queue_name, Name}], Len} end, Queues),
     [
         to_prom(
-            erlang_message_queues, gauge, "total size of all message queues", lists:sum(Queues)
+            erlang_message_queues, gauge, "total size of all message queues", lists:sum(QueueLens)
         ),
         to_prom(
             erlang_message_queue_min,
             gauge,
             "minimum size across all message queues",
-            lists:min(Queues)
+            lists:min(QueueLens)
         ),
         to_prom(
             erlang_message_queue_max,
             gauge,
             "maximum size across all message queues",
-            lists:max(Queues)
-        )
+            lists:max(QueueLens)
+        ),
+        to_prom(erlang_message_queue_size, gauge, "size of message queue", QueueLenByLabel)
     ].
 
 message_queue_len(undefined) ->
@@ -246,19 +270,6 @@ update_refresh_timer() ->
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
-
-system_stats_test() ->
-    lists:foreach(
-        fun(Line) ->
-            ?assert(is_binary(Line)),
-            Trimmed = string:trim(Line),
-            ?assert(starts_with(<<"couchdb_">>, Trimmed) orelse starts_with(<<"# ">>, Trimmed))
-        end,
-        get_system_stats()
-    ).
-
-starts_with(Prefix, Line) when is_binary(Prefix), is_binary(Line) ->
-    binary:longest_common_prefix([Prefix, Line]) > 0.
 
 message_queue_len_test() ->
     self() ! refresh,
