@@ -15,6 +15,7 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
@@ -39,10 +40,37 @@ public abstract class Index<T> implements Closeable {
     private long updateSeq;
     private boolean deleteOnClose = false;
     private long lastCommit = now();
-    private long lastUsed = now();
+    private volatile boolean closed;
+    private final Semaphore permits = new Semaphore(Integer.MAX_VALUE);
 
     protected Index(final long updateSeq) {
         this.updateSeq = updateSeq;
+    }
+
+    public final boolean tryAcquire() {
+        if (permits.tryAcquire() == false) {
+            return false;
+        }
+        if (closed) {
+            permits.release();
+            return false;
+        }
+        return true;
+    }
+
+    public final boolean tryAcquire(long timeout, TimeUnit unit) throws InterruptedException {
+        if (permits.tryAcquire(timeout, unit) == false) {
+            return false;
+        }
+        if (closed) {
+            permits.release();
+            return false;
+        }
+        return true;
+    }
+
+    public final void release() {
+        permits.release();
     }
 
     public final IndexInfo info() throws IOException {
@@ -59,7 +87,6 @@ public abstract class Index<T> implements Closeable {
             throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
         doUpdate(docId, request);
-        updateLastUsed();
         incrementUpdateSeq(request.getSeq());
     }
 
@@ -68,14 +95,12 @@ public abstract class Index<T> implements Closeable {
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
         doDelete(docId, request);
-        updateLastUsed();
         incrementUpdateSeq(request.getSeq());
     }
 
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults<T> search(final SearchRequest request) throws IOException {
-        updateLastUsed();
         return doSearch(request);
     }
 
@@ -86,10 +111,12 @@ public abstract class Index<T> implements Closeable {
         synchronized (this) {
             updateSeq = this.updateSeq;
         }
-        boolean result = doCommit(updateSeq);
-        final long now = now();
-        synchronized (this) {
-            this.lastCommit = now;
+        final boolean result = doCommit(updateSeq);
+        if (result) {
+            final long now = now();
+            synchronized (this) {
+                this.lastCommit = now;
+            }
         }
         return result;
     }
@@ -98,7 +125,16 @@ public abstract class Index<T> implements Closeable {
 
     @Override
     public final void close() throws IOException {
-        doClose();
+        synchronized (this) {
+            closed = true;
+        }
+        // Ensures exclusive access to the index before closing.
+        permits.acquireUninterruptibly(Integer.MAX_VALUE);
+        try {
+            doClose();
+        } finally {
+            permits.release(Integer.MAX_VALUE);
+        }
     }
 
     protected abstract void doClose() throws IOException;
@@ -108,7 +144,9 @@ public abstract class Index<T> implements Closeable {
     }
 
     public void setDeleteOnClose(final boolean deleteOnClose) {
-        this.deleteOnClose = deleteOnClose;
+        synchronized (this) {
+            this.deleteOnClose = deleteOnClose;
+        }
     }
 
     protected final void assertUpdateSeqIsLower(final long updateSeq) throws UpdatesOutOfOrderException {
@@ -128,20 +166,6 @@ public abstract class Index<T> implements Closeable {
         final long commitNeededSince = now() - unit.toNanos(duration);
         synchronized (this) {
             return this.lastCommit < commitNeededSince;
-        }
-    }
-
-    public void updateLastUsed() {
-        final long now = now();
-        synchronized (this) {
-            this.lastUsed = now;
-        }
-    }
-
-    public boolean isIdle(final long duration, final TimeUnit unit) {
-        final long idleSince = now() - unit.toNanos(duration);
-        synchronized (this) {
-            return this.lastUsed < idleSince;
         }
     }
 

@@ -20,29 +20,30 @@ import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response.Status;
-
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.core.Cache.CacheFunction;
-import org.apache.couchdb.nouveau.core.Cache.CacheLoader;
-import org.apache.couchdb.nouveau.core.Cache.CachePreunloader;
-import org.apache.couchdb.nouveau.core.Cache.CacheUnloader;
+import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.github.benmanes.caffeine.cache.Scheduler;
 
 import io.dropwizard.lifecycle.Managed;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 
 /**
  * The central class of Nouveau, responsible for loading and unloading Lucene
@@ -50,6 +51,11 @@ import io.dropwizard.lifecycle.Managed;
  */
 
 public final class IndexManager implements Managed {
+
+    @FunctionalInterface
+    public interface IndexFunction<V, R> {
+        R apply(final V value) throws IOException;
+    }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexManager.class);
 
@@ -73,27 +79,54 @@ public final class IndexManager implements Managed {
     private Cache<String, Index> cache;
 
     @SuppressWarnings("rawtypes")
-    public <R> R with(final String name, final IndexLoader loader, final CacheFunction<Index, R> userFun)
-            throws IOException {
-        if (!exists(name)) {
-            throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
-        }
-
-        final CacheLoader<String, Index> cacheLoader = (n) -> {
-            LOGGER.info("opening {}", n);
-            final Path path = indexPath(n);
-            final IndexDefinition indexDefinition = loadIndexDefinition(n);
-            return loader.apply(path, indexDefinition);
-        };
-
-        final CacheFunction<Index, R> fun = (index) -> {
-            if (index.needsCommit(commitIntervalSeconds, TimeUnit.SECONDS)) {
-                scheduleCommit(name, loader);
+    public <R> R with(final String name, final IndexLoader loader, final IndexFunction<Index, R> indexFun)
+            throws IOException, InterruptedException {
+        while (true) {
+            if (!exists(name)) {
+                throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
             }
-            return userFun.apply(index);
-        };
 
-        return cache.with(name, cacheLoader, cachePreunloader(), cacheUnloader(), fun);
+            final Index index;
+            try {
+                index = cache.get(name, (n) -> {
+                    LOGGER.info("opening {}", n);
+                    final Path path = indexPath(n);
+                    try {
+                        final IndexDefinition indexDefinition = loadIndexDefinition(n);
+                        return loader.apply(path, indexDefinition);
+                    } catch (final IOException e) {
+                        throw new RuntimeIOException(e);
+                    }
+                });
+            } catch (final RuntimeIOException e) {
+                throw (IOException) e.getCause();
+            }
+
+            if (index.tryAcquire(1, TimeUnit.SECONDS)) {
+                try {
+                    final R result = indexFun.apply(index);
+                    if (index.needsCommit(commitIntervalSeconds, TimeUnit.SECONDS)) {
+                        scheduler.execute(() -> {
+                            if (index.tryAcquire()) {
+                                try {
+                                    LOGGER.info("committing {}", name);
+                                    try {
+                                        index.commit();
+                                    } catch (final IOException e) {
+                                        LOGGER.warn("I/O exception while committing " + name, e);
+                                    }
+                                } finally {
+                                    index.release();
+                                }
+                            }
+                        });
+                    }
+                    return result;
+                } finally {
+                    index.release();
+                }
+            }
+        }
     }
 
     public void create(final String name, IndexDefinition indexDefinition) throws IOException {
@@ -153,11 +186,13 @@ public final class IndexManager implements Managed {
         } while ((p = p.getParent()) != null && !rootDir.equals(p));
     }
 
+    @SuppressWarnings("rawtypes")
     private void deleteIndex(final String name) throws IOException {
-        // cache.remove will delete only if the index is currently open.
-        boolean removed = cache.remove(name, cachePreunloader(), cacheUnloadAndDelete());
-        if (!removed) {
-            LOGGER.info("deleting index {}", name);
+        final Index index = cache.asMap().remove(name);
+        if (index != null) {
+            index.setDeleteOnClose(true);
+            close(name, index);
+        } else {
             IOUtils.rm(indexRootPath(name));
         }
     }
@@ -216,37 +251,26 @@ public final class IndexManager implements Managed {
     }
 
     @Override
-    @SuppressWarnings("rawtypes")
     public void start() throws IOException {
-        cache = new Cache.Builder<String, Index>()
-                .setMaxItems(maxIndexesOpen)
-                .setLockCount(lockCount)
-                .setMetricRegistry(metricRegistry)
+        cache = Caffeine.newBuilder()
+                .recordStats(() -> new MetricsStatsCounter(metricRegistry, name(IndexManager.class, "cache")))
+                .initialCapacity(maxIndexesOpen)
+                .maximumSize(maxIndexesOpen)
+                .expireAfterAccess(Duration.ofSeconds(idleSeconds))
+                .scheduler(Scheduler.systemScheduler())
+                .evictionListener(new IndexEvictionListener())
                 .build();
-        metricRegistry.register(name(IndexManager.class, "cache"), new Gauge<Integer>() {
-            @Override
-            public Integer getValue() {
-                return cache.size();
-            }
-        });
-
-        Runnable idler = () -> {
-            for (final Entry<String, Index> entry : cache.entrySet()) {
-                if (entry.getValue().isIdle(idleSeconds, TimeUnit.SECONDS)) {
-                    try {
-                        cache.remove(entry.getKey(), cachePreunloader(), cacheUnloader());
-                    } catch (final IOException e) {
-                        LOGGER.warn("I/O exception while closing " + entry.getKey(), e);
-                    }
-                }
-            }
-        };
-        scheduler.scheduleWithFixedDelay(idler, idleSeconds, idleSeconds, TimeUnit.SECONDS);
     }
 
     @Override
-    public void stop() throws IOException {
-        cache.close(cachePreunloader(), cacheUnloader());
+    public void stop() throws IOException, InterruptedException {
+        final var it = cache.asMap().entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            LOGGER.info("closing {} during shutdown", e.getKey());
+            close(e.getKey(), e.getValue());
+            it.remove();
+        }
     }
 
     private boolean isIndex(final Path path) {
@@ -275,45 +299,40 @@ public final class IndexManager implements Managed {
     }
 
     @SuppressWarnings("rawtypes")
-    private CachePreunloader<String, Index> cachePreunloader() {
-        return (name, index) -> {
-            if (!index.isDeleteOnClose()) {
-                if (index.commit()) {
-                    LOGGER.info("committed before close {}", name);
-                }
-            }
-        };
-    }
+    private class IndexEvictionListener implements RemovalListener<String, Index> {
 
-    @SuppressWarnings("rawtypes")
-    private CacheUnloader<String, Index> cacheUnloader() {
-        return (name, index) -> {
-            LOGGER.info("closing {}", name);
-            index.close();
-        };
-    }
-
-    @SuppressWarnings("rawtypes")
-    private CacheUnloader<String, Index> cacheUnloadAndDelete() {
-        return (name, index) -> {
-            index.setDeleteOnClose(true);
-            cacheUnloader().unload(name, index);
-        };
-    }
-
-    private void scheduleCommit(final String name, final IndexLoader<?> loader) {
-        scheduler.execute(() -> {
+        public void onRemoval(String name, Index index, RemovalCause cause) {
+            LOGGER.info("closing {} for cause {}", name, cause);
             try {
-                with(name, loader, (index) -> {
-                    if (index.commit()) {
-                        LOGGER.info("committed {}", name);
-                    }
-                    return null;
-                });
+                close(name, index);
             } catch (final IOException e) {
-                LOGGER.warn("I/O exception while committing " + name, e);
+                LOGGER.error("I/O exception when evicting " + name, e);
             }
-        });
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private void close(final String name, final Index index) throws IOException {
+        IOUtils.runAll(
+                () -> {
+                    if (index.tryAcquire()) {
+                        try {
+                            if (!index.isDeleteOnClose() && index.commit()) {
+                                LOGGER.info("committed {} before close", name);
+                            }
+                        } finally {
+                            index.release();
+                        }
+                    }
+                },
+                () -> {
+                    index.close();
+                },
+                () -> {
+                    if (index.isDeleteOnClose()) {
+                        IOUtils.rm(indexRootPath(name));
+                    }
+                });
     }
 
 }
