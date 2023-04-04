@@ -31,7 +31,12 @@
 ]).
 
 handle_search_req(Req, Db, DDoc) ->
-    handle_search_req(Req, Db, DDoc, 0, 500).
+    couch_stats:increment_counter([dreyfus, active_searches]),
+    try
+        handle_search_req(Req, Db, DDoc, 0, 500)
+    after
+        couch_stats:decrement_counter([dreyfus, active_searches])
+    end.
 
 handle_search_req(
     #httpd{method = Method, path_parts = [_, _, _, _, IndexName]} = Req,
