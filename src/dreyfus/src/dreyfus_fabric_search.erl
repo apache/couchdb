@@ -27,7 +27,8 @@
     counters,
     start_args,
     replacements,
-    ring_opts
+    ring_opts,
+    await_time = 0
 }).
 
 go(DbName, GroupId, IndexName, QueryArgs) when is_binary(GroupId) ->
@@ -125,7 +126,7 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
         )
     of
         {ok, Result} ->
-            #state{top_docs = TopDocs} = Result,
+            #state{top_docs = TopDocs, await_time = AwaitTime} = Result,
             #top_docs{
                 total_hits = TotalHits,
                 hits = Hits,
@@ -134,11 +135,11 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
             } = TopDocs,
             case RawBookmark of
                 true ->
-                    {ok, Bookmark, TotalHits, Hits, Counts, Ranges};
+                    {ok, Bookmark, TotalHits, Hits, Counts, Ranges, AwaitTime};
                 false ->
                     Bookmark1 = dreyfus_bookmark:update(Sort, Bookmark, Hits),
                     Hits1 = remove_sortable(Hits),
-                    {ok, Bookmark1, TotalHits, Hits1, Counts, Ranges}
+                    {ok, Bookmark1, TotalHits, Hits1, Counts, Ranges, AwaitTime}
             end;
         {error, Reason} ->
             {error, Reason}
@@ -178,6 +179,17 @@ handle_message({ok, {top_docs, UpdateSeq, TotalHits, Hits}}, Shard, State) ->
         hits = Hits
     },
     handle_message({ok, TopDocs}, Shard, State);
+handle_message({await_time, Time}, Shard, State) ->
+    case fabric_dict:lookup_element(Shard, State#state.counters) of
+        undefined ->
+            %% already heard from someone else in this range
+            {ok, State};
+        nil ->
+            State1 = State#state{
+                await_time = max(Time, State#state.await_time)
+            },
+            {ok, State1}
+    end;
 handle_message(Error, Worker, State0) ->
     State = upgrade_state(State0),
     case

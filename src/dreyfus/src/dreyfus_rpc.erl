@@ -48,9 +48,12 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
                 {ok, Pid} ->
+                    T0 = erlang:monotonic_time(),
                     case dreyfus_index:await(Pid, MinSeq) of
                         {ok, IndexPid, _Seq} ->
+                            T1 = erlang:monotonic_time(),
                             Result = dreyfus_index:Fun(IndexPid, QueryArgs),
+                            rexi:reply({await_time, T1 - T0}),
                             rexi:reply(Result);
                         % obsolete clauses, remove after upgrade
                         ok ->

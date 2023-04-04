@@ -26,7 +26,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -import(chttpd, [
     send_method_not_allowed/2,
-    send_json/2, send_json/3,
+    send_json/2, send_json/3, send_json/4,
     send_error/2
 ]).
 
@@ -68,7 +68,7 @@ handle_search_req(
                                 {rows, Hits}
                             ]}
                         );
-                    {ok, Bookmark0, TotalHits, Hits0, Counts0, Ranges0} ->
+                    {ok, Bookmark0, TotalHits, Hits0, Counts0, Ranges0, AwaitTime} ->
                         Hits = hits_to_json(DbName, IncludeDocs, Hits0),
                         Bookmark = dreyfus_bookmark:pack(Bookmark0),
                         Counts =
@@ -85,13 +85,21 @@ handle_search_req(
                                 _ ->
                                     [{ranges, facets_to_json(Ranges0)}]
                             end,
-                        send_json(Req, 200, {
+                        AwaitTimeMs = erlang:convert_time_unit(AwaitTime, native, millisecond),
+                        send_json(
+                            Req,
+                            200,
                             [
-                                {total_rows, TotalHits},
-                                {bookmark, Bookmark},
-                                {rows, Hits}
-                            ] ++ Counts ++ Ranges
-                        });
+                                {"x-cloudant-await-time", integer_to_list(AwaitTimeMs)}
+                            ],
+                            {
+                                [
+                                    {total_rows, TotalHits},
+                                    {bookmark, Bookmark},
+                                    {rows, Hits}
+                                ] ++ Counts ++ Ranges
+                            }
+                        );
                     {error, Reason} ->
                         handle_error(Req, Db, DDoc, RetryCount, RetryPause, Reason)
                 end;
