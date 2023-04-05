@@ -105,7 +105,7 @@ go2(DbName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
             fun handle_message/3,
             State,
             fabric_util:view_timeout(Args),
-            1000 * 60 * 60
+            fabric_util:timeout("view_permsg", "3600000")
         )
     of
         {ok, NewState} ->

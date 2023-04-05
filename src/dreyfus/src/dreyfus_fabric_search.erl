@@ -120,8 +120,8 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
             #shard.ref,
             fun handle_message/3,
             State,
-            infinity,
-            1000 * 60 * 60
+            fabric_util:timeout("search", "infinity"),
+            fabric_util:timeout("search_permsg", "3600000")
         )
     of
         {ok, Result} ->
