@@ -113,3 +113,13 @@ the intended Lucene field type is the first argument.
 | index("text", "foo", "bar");                       | adds a TextField.
 | index("text", "foo", "bar", {"store":true});       | adds a TextField with Store.YES
 | index("string", "foo", "bar");                     | adds a StringField.
+
+
+## Deployment options
+
+All indexes are prefix with their erlang hostname so you can deploy a
+single nouveau server per cluster if this meets your needs. You can
+also configure a different nouveau server for each couchdb node too.
+
+There is no need to co-locate the nouveau server with the couchdb
+cluster, though this is a common option.
