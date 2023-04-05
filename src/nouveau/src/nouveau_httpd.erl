@@ -16,7 +16,6 @@
 -module(nouveau_httpd).
 
 -include_lib("couch/include/couch_db.hrl").
--include("nouveau.hrl").
 
 -export([
     handle_analyze_req/1,
@@ -30,6 +29,9 @@
     send_json/2, send_json/3,
     send_error/2
 ]).
+
+-define(RETRY_LIMIT, 20).
+-define(RETRY_SLEEP, 500).
 
 handle_analyze_req(#httpd{method = 'POST'} = Req) ->
     check_if_enabled(),
@@ -47,8 +49,20 @@ handle_analyze_req(#httpd{method = 'POST'} = Req) ->
 handle_analyze_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
-handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
+handle_search_req(Req, Db, DDoc) ->
     check_if_enabled(),
+    couch_stats:increment_counter([nouveau, active_searches]),
+    T0 = erlang:monotonic_time(),
+    try
+        handle_search_req_int(Req, Db, DDoc)
+    after
+        T1 = erlang:monotonic_time(),
+        couch_stats:decrement_counter([nouveau, active_searches]),
+        RequestTime = erlang:convert_time_unit(T1 - T0, native, millisecond),
+        couch_stats:update_histogram([nouveau, search_latency], RequestTime)              
+    end.
+
+handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
     DbName = couch_db:name(Db),
     QueryArgs = #{
         query => ?l2b(chttpd:qs_value(Req, "q")),
@@ -62,9 +76,8 @@ handle_search_req(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} =
             "include_docs", chttpd:qs_value(Req, "include_docs", "false")
         )
     },
-    handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs);
-handle_search_req(#httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
-    check_if_enabled(),
+    handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
+handle_search_req_int(#httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     DbName = couch_db:name(Db),
     ReqBody = chttpd:json_body(Req, [return_maps]),
@@ -78,11 +91,11 @@ handle_search_req(#httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} 
         bookmark => maps:get(<<"bookmark">>, ReqBody, undefined),
         include_docs => maps:get(<<"include_docs">>, ReqBody, false)
     },
-    handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs);
-handle_search_req(Req, _Db, _DDoc) ->
+    handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
+handle_search_req_int(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET, POST").
 
-handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs) ->
+handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
     IncludeDocs = maps:get(include_docs, QueryArgs, false),
     case nouveau_fabric_search:go(DbName, DDoc, IndexName, QueryArgs) of
         {ok, SearchResults} ->
@@ -99,6 +112,9 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs) ->
             RowCount = length(maps:get(<<"rows">>, RespBody)),
             incr_stats(RowCount, IncludeDocs),
             send_json(Req, 200, RespBody);
+        {error, {service_unavailable, _}} when Retry > 1 ->
+            timer:sleep(?RETRY_SLEEP),
+            handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, Retry - 1);
         {error, Reason} ->
             send_error(Req, Reason)
     end.
