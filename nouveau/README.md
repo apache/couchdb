@@ -33,6 +33,7 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * Makefile.win or Windows generally
 * retry loop to mask JVM reboots
 * couch_stat metrics (including new active searches)
+* clouseau index importing (using the index snapshot feature of clouseau)
 
 I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
