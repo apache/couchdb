@@ -40,6 +40,8 @@ all_docs_test_() ->
                 [
                     fun should_query/1,
                     fun should_query_with_range/1,
+                    fun should_query_with_range_and_same_keys/1,
+                    fun raise_error_query_with_range_and_different_keys/1,
                     fun should_query_with_range_rev/1,
                     fun should_query_with_limit_and_skip/1,
                     fun should_query_with_include_docs/1,
@@ -78,6 +80,20 @@ should_query_with_range(Db) ->
             mk_row(<<"5">>, <<"1-aaac5d460fd40f9286e57b9bf12e23d2">>)
         ]},
     ?_assertEqual(Expect, Result).
+
+should_query_with_range_and_same_keys(Db) ->
+    Result = run_query(Db, [{keys, [<<"3">>]}, {start_key, <<"3">>}, {end_key, <<"3">>}]),
+    Expect =
+        {ok, [
+            {meta, [{total, 11}, {offset, 0}]},
+            mk_row(<<"3">>, <<"1-7fbf84d56f8017880974402d60f5acd6">>)
+        ]},
+    ?_assertEqual(Expect, Result).
+
+raise_error_query_with_range_and_different_keys(Db) ->
+    Error = {query_parse_error, <<"`keys` is incompatible with `key`, `start_key` and `end_key`">>},
+    ?_assertThrow(Error, run_query(Db, [{keys, [<<"1">>]}, {start_key, <<"5">>}])),
+    ?_assertThrow(Error, run_query(Db, [{keys, [<<"5">>]}, {start_key, <<"5">>}])).
 
 should_query_with_range_rev(Db) ->
     Result = run_query(Db, [

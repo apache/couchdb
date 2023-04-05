@@ -486,7 +486,12 @@ parse_params(Props, Keys, #mrargs{} = Args0, Options) ->
                 Args0;
             _ ->
                 % group_level set to undefined to detect if explicitly set by user
-                Args0#mrargs{keys = Keys, group = undefined, group_level = undefined}
+                case Keys of
+                    [_] ->
+                        Args0#mrargs{group = undefined, group_level = undefined};
+                    _ ->
+                        Args0#mrargs{keys = Keys, group = undefined, group_level = undefined}
+                end
         end,
     lists:foldl(
         fun({K, V}, Acc) ->
@@ -513,8 +518,24 @@ parse_body_and_query(Req, Keys) ->
 
 parse_body_and_query(Req, {Props}, Keys) ->
     Args = #mrargs{keys = Keys, group = undefined, group_level = undefined},
-    BodyArgs = parse_params(Props, Keys, Args, [decoded]),
-    parse_params(chttpd:qs(Req), Keys, BodyArgs, [keep_group_level]).
+    BodyArgs0 = parse_params(Props, Keys, Args, [decoded]),
+    BodyArgs1 =
+        case is_view(Req) of
+            true -> treat_single_keys_as_key(BodyArgs0);
+            false -> BodyArgs0
+        end,
+    parse_params(chttpd:qs(Req), Keys, BodyArgs1, [keep_group_level]).
+
+is_view(#httpd{path_parts = [_, _, _, <<"_view">> | _]}) ->
+    true;
+is_view(#httpd{}) ->
+    false.
+
+treat_single_keys_as_key(#mrargs{keys = Keys} = BodyArgs) ->
+    case Keys of
+        [_] -> BodyArgs#mrargs{keys = undefined};
+        _ -> BodyArgs
+    end.
 
 parse_param(Key, Val, Args, IsDecoded) when is_binary(Key) ->
     parse_param(binary_to_list(Key), Val, Args, IsDecoded);
@@ -530,9 +551,15 @@ parse_param(Key, Val, Args, IsDecoded) ->
             JsonKey = ?JSON_DECODE(Val),
             Args#mrargs{start_key = JsonKey, end_key = JsonKey};
         "keys" when IsDecoded ->
-            Args#mrargs{keys = Val};
+            case Val of
+                [SingleKey] -> Args#mrargs{start_key = SingleKey, end_key = SingleKey};
+                _ -> Args#mrargs{keys = Val}
+            end;
         "keys" ->
-            Args#mrargs{keys = ?JSON_DECODE(Val)};
+            case ?JSON_DECODE(Val) of
+                [SingleKey] -> Args#mrargs{start_key = SingleKey, end_key = SingleKey};
+                Keys -> Args#mrargs{keys = Keys}
+            end;
         "startkey" when IsDecoded ->
             Args#mrargs{start_key = Val};
         "start_key" when IsDecoded ->
