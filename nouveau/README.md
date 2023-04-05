@@ -31,6 +31,8 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * results grouping
 * configurable stop words for analyzers
 * Makefile.win or Windows generally
+* retry loop to mask JVM reboots
+* couch_stat metrics (including new active searches)
 
 I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
