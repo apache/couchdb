@@ -25,7 +25,7 @@
     remove_down_workers/2, remove_down_workers/3,
     doc_id_and_rev/1
 ]).
--export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1]).
+-export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1, timeout/2]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
 -export([open_cluster_db/1, open_cluster_db/2]).
