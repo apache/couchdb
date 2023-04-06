@@ -101,16 +101,16 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
         {ok, SearchResults} ->
             RespBody = #{
                 <<"bookmark">> => nouveau_bookmark:pack(maps:get(bookmark, SearchResults)),
-                <<"total_rows">> => maps:get(<<"total_hits">>, SearchResults),
-                <<"total_rows_relation">> => maps:get(<<"total_hits_relation">>, SearchResults),
-                <<"rows">> => include_docs(
+                <<"total_hits">> => maps:get(<<"total_hits">>, SearchResults),
+                <<"total_hits_relation">> => maps:get(<<"total_hits_relation">>, SearchResults),
+                <<"hits">> => include_docs(
                     DbName, maps:get(<<"hits">>, SearchResults), IncludeDocs
                 ),
                 <<"counts">> => maps:get(<<"counts">>, SearchResults, null),
                 <<"ranges">> => maps:get(<<"ranges">>, SearchResults, null)
             },
-            RowCount = length(maps:get(<<"rows">>, RespBody)),
-            incr_stats(RowCount, IncludeDocs),
+            HitCount = length(maps:get(<<"hits">>, RespBody)),
+            incr_stats(HitCount, IncludeDocs),
             send_json(Req, 200, RespBody);
         {error, {service_unavailable, _}} when Retry > 1 ->
             timer:sleep(?RETRY_SLEEP),
@@ -160,11 +160,11 @@ include_docs(DbName, Hits, true) ->
     {ok, Docs} = nouveau_fabric:get_json_docs(DbName, Ids),
     lists:zipwith(fun(Hit, Doc) -> Hit#{<<"doc">> => Doc} end, Hits, Docs).
 
-incr_stats(RowCount, false) ->
-    chttpd_stats:incr_rows(RowCount);
-incr_stats(RowCount, true) ->
-    chttpd_stats:incr_reads(RowCount),
-    incr_stats(RowCount, false).
+incr_stats(HitCount, false) ->
+    chttpd_stats:incr_rows(HitCount);
+incr_stats(HitCount, true) ->
+    chttpd_stats:incr_reads(HitCount),
+    incr_stats(HitCount, false).
 
 parse_bool_param(_, Val) when is_boolean(Val) ->
     Val;
