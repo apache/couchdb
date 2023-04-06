@@ -17,12 +17,12 @@ import java.util.concurrent.ForkJoinPool;
 
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
-import org.apache.couchdb.nouveau.lucene9.core.Lucene9Module;
-import org.apache.couchdb.nouveau.lucene9.core.ParallelSearcherFactory;
-import org.apache.couchdb.nouveau.lucene9.health.AnalyzeHealthCheck;
-import org.apache.couchdb.nouveau.lucene9.health.IndexHealthCheck;
-import org.apache.couchdb.nouveau.lucene9.resources.AnalyzeResource;
-import org.apache.couchdb.nouveau.lucene9.resources.IndexResource;
+import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
+import org.apache.couchdb.nouveau.health.IndexHealthCheck;
+import org.apache.couchdb.nouveau.lucene9.Lucene9Module;
+import org.apache.couchdb.nouveau.lucene9.ParallelSearcherFactory;
+import org.apache.couchdb.nouveau.resources.AnalyzeResource;
+import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
 import org.apache.lucene.search.SearcherFactory;
 
@@ -61,7 +61,8 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         environment.getObjectMapper().registerModule(new Lucene9Module());
 
         // AnalyzeResource
-        environment.jersey().register(new AnalyzeResource());
+        final AnalyzeResource analyzeResource = new AnalyzeResource();
+        environment.jersey().register(analyzeResource);
 
         // IndexResource
         final SearcherFactory searcherFactory = new ParallelSearcherFactory(ForkJoinPool.commonPool());
@@ -69,8 +70,8 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         environment.jersey().register(indexResource);
 
         // Health checks
-        environment.healthChecks().register("analyze9", new AnalyzeHealthCheck());
-        environment.healthChecks().register("index9", new IndexHealthCheck(indexResource));
+        environment.healthChecks().register("analyze", new AnalyzeHealthCheck(analyzeResource));
+        environment.healthChecks().register("index", new IndexHealthCheck(indexResource));
 
         // configure tasks
         environment.admin().addTask(new CloseAllIndexesTask(indexManager));

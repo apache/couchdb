@@ -23,7 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.dropwizard.jackson.JsonSnakeCase;
 
 @JsonSnakeCase
-public class DocumentUpdateRequest<T> {
+public class DocumentUpdateRequest {
 
     @Min(1)
     private long seq;
@@ -31,13 +31,13 @@ public class DocumentUpdateRequest<T> {
     private String partition;
 
     @NotEmpty
-    private Collection<T> fields;
+    private Collection<Field> fields;
 
     public DocumentUpdateRequest() {
         // Jackson deserialization
     }
 
-    public DocumentUpdateRequest(long seq, String partition, Collection<T> fields) {
+    public DocumentUpdateRequest(long seq, String partition, Collection<Field> fields) {
         this.seq = seq;
         this.partition = partition;
         this.fields = fields;
@@ -58,7 +58,7 @@ public class DocumentUpdateRequest<T> {
     }
 
     @JsonProperty
-    public Collection<T> getFields() {
+    public Collection<Field> getFields() {
         return fields;
     }
 

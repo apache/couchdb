@@ -37,10 +37,9 @@ handle_analyze_req(#httpd{method = 'POST'} = Req) ->
     check_if_enabled(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
-    LuceneMajor = couch_util:get_value(<<"lucene_major">>, Fields),
     Analyzer = couch_util:get_value(<<"analyzer">>, Fields),
     Text = couch_util:get_value(<<"text">>, Fields),
-    case nouveau_api:analyze(LuceneMajor, Text, Analyzer) of
+    case nouveau_api:analyze(Text, Analyzer) of
         {ok, Tokens} ->
             send_json(Req, 200, {[{<<"tokens">>, Tokens}]});
         {error, Reason} ->

@@ -5,7 +5,6 @@ Nouveau is a modern replacement for dreyfus/clouseau and is built on;
 1) the Dropwizard framework (https://dropwizard.io)
 2) Java 11+
 3) Lucene 9
-4) Lucene 4 is simultaneously supported for migration purposes
 
 Nouveau transforms Apache CouchDB databases into Apache Lucene indexes at the shard level and then merges the results together.
 
@@ -67,7 +66,7 @@ URL="http://foo:bar@127.0.0.1:15984/foo"
 curl -X DELETE "$URL"
 curl -X PUT "$URL?n=3&q=16"
 
-curl -X PUT "$URL/_design/foo" -d '{"nouveau":{"bar":{"lucene_major": 9, "default_analyzer":"standard", "field_analyzers":{"foo":"english"}, "index":"function(doc) { index(\"string\", \"foo\", \"bar\"); }"}}}'
+curl -X PUT "$URL/_design/foo" -d '{"nouveau":{"bar":{"default_analyzer":"standard", "field_analyzers":{"foo":"english"}, "index":"function(doc) { index(\"string\", \"foo\", \"bar\"); }"}}}'
 
 # curl "$URL/_index" -Hcontent-type:application/json -d '{"type":"nouveau", "index": {"fields": [{"name": "bar", "type":"number"}]}}'
 

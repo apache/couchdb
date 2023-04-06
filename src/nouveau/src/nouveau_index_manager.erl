@@ -127,12 +127,7 @@ handle_info(_Msg, State) ->
 
 handle_db_event(DbName, deleted, State) ->
     couch_log:notice("Deleting indexes for ~s as database was deleted", [DbName]),
-    lists:foreach(
-        fun(Major) ->
-            nouveau_api:delete_path(Major, nouveau_util:index_name(DbName))
-        end,
-        ?LUCENE_MAJORS
-    ),
+    nouveau_api:delete_path(nouveau_util:index_name(DbName)),
     {ok, State};
 handle_db_event(_DbName, _Event, State) ->
     {ok, State}.

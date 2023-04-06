@@ -15,6 +15,7 @@ package org.apache.couchdb.nouveau.lucene9.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer;

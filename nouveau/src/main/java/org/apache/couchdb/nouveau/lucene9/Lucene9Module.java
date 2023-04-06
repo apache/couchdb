@@ -11,9 +11,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9.core;
+package org.apache.couchdb.nouveau.lucene9;
 
-import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.search.Query;
 
 import com.fasterxml.jackson.core.Version;
@@ -24,10 +23,6 @@ public class Lucene9Module extends SimpleModule {
 
     public Lucene9Module() {
         super("lucene9", Version.unknownVersion());
-
-        // IndexableField
-        addSerializer(IndexableField.class, new IndexableFieldSerializer());
-        addDeserializer(IndexableField.class, new IndexableFieldDeserializer());
 
         // Query
         addSerializer(Query.class, new QuerySerializer());

@@ -18,11 +18,11 @@
 -include("nouveau.hrl").
 
 -export([
-    analyze/3,
+    analyze/2,
     index_info/1,
     create_index/2,
+    delete_path/1,
     delete_path/2,
-    delete_path/3,
     delete_doc/3,
     update_doc/4,
     search/2
@@ -30,12 +30,12 @@
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
 
-analyze(LuceneMajor, Text, Analyzer) when
-    is_integer(LuceneMajor), is_binary(Text), is_binary(Analyzer)
+analyze(Text, Analyzer) when
+    is_binary(Text), is_binary(Analyzer)
 ->
     ReqBody = {[{<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
     Resp = send_if_enabled(
-        io_lib:format("~s/~B/analyze", [nouveau_util:nouveau_url(), LuceneMajor]),
+        io_lib:format("~s/analyze", [nouveau_util:nouveau_url()]),
         [?JSON_CONTENT_TYPE],
         post,
         jiffy:encode(ReqBody)
@@ -49,10 +49,10 @@ analyze(LuceneMajor, Text, Analyzer) when
         {error, Reason} ->
             send_error(Reason)
     end;
-analyze(_, _, _) ->
+analyze(_, _) ->
     {error,
         {bad_request,
-            <<"'lucene_major' must be a number and 'text' and 'analyzer' fields must be non-empty strings">>}}.
+            <<"'text' and 'analyzer' fields must be non-empty strings">>}}.
 
 index_info(#index{} = Index) ->
     Resp = send_if_enabled(index_url(Index), [], get),
@@ -78,14 +78,14 @@ create_index(#index{} = Index, IndexDefinition) ->
             send_error(Reason)
     end.
 
-delete_path(LuceneMajor, Path) ->
-    delete_path(LuceneMajor, Path, []).
+delete_path(Path) ->
+    delete_path(Path, []).
 
-delete_path(LuceneMajor, Path, Exclusions) when
-    is_integer(LuceneMajor), is_binary(Path), is_list(Exclusions)
+delete_path(Path, Exclusions) when
+    is_binary(Path), is_list(Exclusions)
 ->
     Resp = send_if_enabled(
-        index_path(LuceneMajor, Path), [?JSON_CONTENT_TYPE], delete, jiffy:encode(Exclusions)
+        index_path(Path), [?JSON_CONTENT_TYPE], delete, jiffy:encode(Exclusions)
     ),
     case Resp of
         {ok, "204", _, _} ->
@@ -143,13 +143,12 @@ search(#index{} = Index, QueryArgs) ->
 
 %% private functions
 
-index_path(LuceneMajor, Path) ->
+index_path(Path) ->
     lists:flatten(
         io_lib:format(
-            "~s/~B/index/~s",
+            "~s/index/~s",
             [
                 nouveau_util:nouveau_url(),
-                LuceneMajor,
                 couch_util:url_encode(Path)
             ]
         )
@@ -158,10 +157,9 @@ index_path(LuceneMajor, Path) ->
 index_url(#index{} = Index) ->
     lists:flatten(
         io_lib:format(
-            "~s/~B/index/~s",
+            "~s/index/~s",
             [
                 nouveau_util:nouveau_url(),
-                Index#index.lucene_major,
                 couch_util:url_encode(nouveau_util:index_name(Index))
             ]
         )
@@ -170,10 +168,9 @@ index_url(#index{} = Index) ->
 doc_url(#index{} = Index, DocId) ->
     lists:flatten(
         io_lib:format(
-            "~s/~B/index/~s/doc/~s",
+            "~s/index/~s/doc/~s",
             [
                 nouveau_util:nouveau_url(),
-                Index#index.lucene_major,
                 couch_util:url_encode(nouveau_util:index_name(Index)),
                 couch_util:url_encode(DocId)
             ]

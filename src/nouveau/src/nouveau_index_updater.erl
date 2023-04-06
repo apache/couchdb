@@ -58,11 +58,7 @@ update(#index{} = Index) ->
 
                 Proc = get_os_process(Index#index.def_lang),
                 try
-                    %% jamming the version in is a bit ugly, could make this a json object but
-                    %% is that really any better?
-                    SandboxOption =
-                        <<"nouveau", (integer_to_binary(Index#index.lucene_major))/binary>>,
-                    true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, SandboxOption]),
+                    true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
                     Acc0 = {Db, Index, Proc, 0, TotalChanges},
                     {ok, _} = couch_db:fold_changes(Db, CurSeq, fun load_docs/2, Acc0, [])
                 after
@@ -132,7 +128,6 @@ get_index_seq(#index{} = Index) ->
 
 index_definition(#index{} = Index) ->
     #{
-        <<"lucene_major">> => Index#index.lucene_major,
         <<"default_analyzer">> => Index#index.default_analyzer,
         <<"field_analyzers">> => Index#index.field_analyzers
     }.

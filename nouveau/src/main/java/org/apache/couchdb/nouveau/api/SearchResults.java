@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.dropwizard.jackson.JsonSnakeCase;
 
 @JsonSnakeCase
-public class SearchResults<T> {
+public class SearchResults {
 
     @Min(0)
     private long totalHits;
@@ -33,7 +33,7 @@ public class SearchResults<T> {
     private String totalHitsRelation;
 
     @NotNull
-    private List<@NotNull SearchHit<T>> hits;
+    private List<@NotNull SearchHit> hits;
 
     private Map<@NotNull String, Map<@NotNull String, Number>> counts;
 
@@ -59,12 +59,12 @@ public class SearchResults<T> {
         this.totalHitsRelation = totalHitsRelation;
     }
 
-    public void setHits(final List<SearchHit<T>> hits) {
+    public void setHits(final List<SearchHit> hits) {
         this.hits = hits;
     }
 
     @JsonProperty
-    public List<SearchHit<T>> getHits() {
+    public List<SearchHit> getHits() {
         return hits;
     }
 

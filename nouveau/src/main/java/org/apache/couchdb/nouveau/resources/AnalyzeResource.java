@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9.resources;
+package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,8 +29,7 @@ import jakarta.ws.rs.core.MediaType;
 
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
-import org.apache.couchdb.nouveau.lucene9.core.Lucene9AnalyzerFactory;
-import org.apache.couchdb.nouveau.resources.BaseAnalyzeResource;
+import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
@@ -39,15 +38,14 @@ import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.ResponseMetered;
 
-@Path("/9/analyze")
+@Path("/analyze")
 @Metered
 @ResponseMetered
 @ExceptionMetered(cause = IOException.class)
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class AnalyzeResource extends BaseAnalyzeResource {
+public final class AnalyzeResource {
 
-    @Override
     @POST
     public AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest request) throws IOException {
         try {

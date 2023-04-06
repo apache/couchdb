@@ -18,15 +18,15 @@ import java.util.List;
 
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
-import org.apache.couchdb.nouveau.resources.BaseAnalyzeResource;
+import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 
 import com.codahale.metrics.health.HealthCheck;
 
-public abstract class BaseAnalyzeHealthCheck extends HealthCheck {
+public final class AnalyzeHealthCheck extends HealthCheck {
 
-    private BaseAnalyzeResource analyzeResource;
+    private AnalyzeResource analyzeResource;
 
-    protected BaseAnalyzeHealthCheck(final BaseAnalyzeResource analyzeResource) {
+    public AnalyzeHealthCheck(final AnalyzeResource analyzeResource) {
         this.analyzeResource = analyzeResource;
     }
 

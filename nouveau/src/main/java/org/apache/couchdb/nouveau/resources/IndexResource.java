@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9.resources;
+package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
 import java.util.List;
@@ -37,9 +37,8 @@ import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.couchdb.nouveau.core.IndexManager;
-import org.apache.couchdb.nouveau.lucene9.core.Lucene9AnalyzerFactory;
-import org.apache.couchdb.nouveau.lucene9.core.Lucene9Index;
-import org.apache.couchdb.nouveau.resources.BaseIndexResource;
+import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
+import org.apache.couchdb.nouveau.lucene9.Lucene9Index;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -54,68 +53,72 @@ import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.ResponseMetered;;
 
-@Path("/9/index/{name}")
+@Path("/index/{name}")
 @Metered
 @ResponseMetered
 @ExceptionMetered(cause = IOException.class)
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class IndexResource extends BaseIndexResource<IndexableField> {
+public final class IndexResource {
 
+    private final IndexManager indexManager;
     private final SearcherFactory searcherFactory;
 
     public IndexResource(final IndexManager indexManager, final SearcherFactory searcherFactory) {
-        super(indexManager);
+        this.indexManager = indexManager;
         this.searcherFactory = searcherFactory;
     }
 
     @PUT
-    @Override
     public void createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
             throws IOException {
-        super.createIndex(name, indexDefinition);
+        indexManager.create(name, indexDefinition);
     }
 
     @DELETE
     @Path("/doc/{docId}")
-    @Override
     public void deleteDoc(@PathParam("name") String name, @PathParam("docId") String docId,
             @NotNull @Valid DocumentDeleteRequest request) throws Exception {
-        super.deleteDoc(name, docId, request);
+        indexManager.with(name, indexLoader(), (index) -> {
+            index.delete(docId, request);
+            return null;
+        });
     }
 
     @DELETE
-    @Override
     public void deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
-        super.deletePath(path, exclusions);
+        indexManager.deleteAll(path, exclusions);
     }
 
     @GET
-    @Override
     public IndexInfo indexInfo(@PathParam("name") String name) throws Exception {
-        return super.indexInfo(name);
+        return indexManager.with(name, indexLoader(), (index) -> {
+            return index.info();
+        });
     }
 
     @POST
     @Path("/search")
-    @Override
-    public SearchResults<IndexableField> searchIndex(@PathParam("name") String name,
+    public SearchResults searchIndex(@PathParam("name") String name,
             @NotNull @Valid SearchRequest request)
             throws Exception {
-        return super.searchIndex(name, request);
+        return indexManager.with(name, indexLoader(), (index) -> {
+            return index.search(request);
+        });
     }
 
     @PUT
     @Path("/doc/{docId}")
-    @Override
     public void updateDoc(@PathParam("name") String name, @PathParam("docId") String docId,
-            @NotNull @Valid DocumentUpdateRequest<IndexableField> request)
+            @NotNull @Valid DocumentUpdateRequest request)
             throws Exception {
-        super.updateDoc(name, docId, request);
+        indexManager.with(name, indexLoader(), (index) -> {
+            index.update(docId, request);
+            return null;
+        });
     }
 
-    @Override
-    protected IndexLoader<IndexableField> indexLoader() {
+    private IndexLoader indexLoader() {
         return (path, indexDefinition) -> {
             final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
             final Directory dir = new DirectIODirectory(FSDirectory.open(path));

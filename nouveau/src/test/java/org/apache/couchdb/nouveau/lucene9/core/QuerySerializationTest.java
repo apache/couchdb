@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.lucene9.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.apache.couchdb.nouveau.lucene9.Lucene9Module;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;

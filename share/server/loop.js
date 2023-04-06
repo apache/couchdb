@@ -43,15 +43,9 @@ function create_dreyfus_sandbox() {
   return sandbox;
 }
 
-function create_nouveau4_sandbox() {
+function create_nouveau_sandbox() {
   var sandbox = create_sandbox();
-  sandbox.index = Nouveau.index4;
-  return sandbox;
-}
-
-function create_nouveau9_sandbox() {
-  var sandbox = create_sandbox();
-  sandbox.index = Nouveau.index9;
+  sandbox.index = Nouveau.index;
   return sandbox;
 }
 

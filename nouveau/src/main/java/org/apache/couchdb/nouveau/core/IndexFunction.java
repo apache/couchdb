@@ -18,6 +18,6 @@ import java.io.IOException;
 @FunctionalInterface
 public interface IndexFunction {
 
-    <T> T with(final Index<?> index) throws IOException;
+    <T> T with(final Index index) throws IOException;
 
 }

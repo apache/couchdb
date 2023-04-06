@@ -14,7 +14,6 @@
 -record(index, {
     dbname,
     ddoc_id,
-    lucene_major,
     default_analyzer,
     field_analyzers,
     def,
@@ -22,7 +21,3 @@
     name,
     sig=nil
 }).
-
--define(DEFAULT_LUCENE_MAJOR, 9).
-
--define(LUCENE_MAJORS, [4, 9]).

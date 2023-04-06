@@ -19,8 +19,8 @@ import java.nio.file.Path;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 
 @FunctionalInterface
-public interface IndexLoader<T> {
+public interface IndexLoader {
 
-    Index<T> apply(final Path path, final IndexDefinition indexDefinition) throws IOException;
+    Index apply(final Path path, final IndexDefinition indexDefinition) throws IOException;
 
 }

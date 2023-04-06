@@ -14,47 +14,43 @@
 package org.apache.couchdb.nouveau.health;
 
 import java.io.IOException;
+import java.util.Collections;
 
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
-import org.apache.couchdb.nouveau.resources.BaseIndexResource;
+import org.apache.couchdb.nouveau.resources.IndexResource;
 
 import com.codahale.metrics.health.HealthCheck;
 
-public abstract class BaseIndexHealthCheck<T> extends HealthCheck {
+public final class IndexHealthCheck extends HealthCheck {
 
-    private final BaseIndexResource<T> indexResource;
+    private final IndexResource indexResource;
 
-    protected BaseIndexHealthCheck(final BaseIndexResource<T> indexResource) {
+    public IndexHealthCheck(final IndexResource indexResource) {
         this.indexResource = indexResource;
     }
 
-    protected abstract String generateIndexName();
-
-    protected abstract DocumentUpdateRequest<T> generateDocumentUpdateRequest();
-
-    protected abstract int getLuceneMajor();
-
     @Override
     protected Result check() throws Exception {
-        final String name = generateIndexName();
+        final String name = "___test9";
         try {
             indexResource.deletePath(name, null);
         } catch (IOException e) {
             // Ignored, index might not exist yet.
         }
 
-        indexResource.createIndex(name, new IndexDefinition(getLuceneMajor(), "standard", null));
+        indexResource.createIndex(name, new IndexDefinition("standard", null));
         try {
-            final DocumentUpdateRequest<T> documentUpdateRequest = generateDocumentUpdateRequest();
+            final DocumentUpdateRequest documentUpdateRequest =
+                new DocumentUpdateRequest(1, null, Collections.emptyList());
             indexResource.updateDoc(name, "foo", documentUpdateRequest);
 
             final SearchRequest searchRequest = new SearchRequest();
             searchRequest.setQuery("_id:foo");
 
-            final SearchResults<T> searchResults = indexResource.searchIndex(name, searchRequest);
+            final SearchResults searchResults = indexResource.searchIndex(name, searchRequest);
             if (searchResults.getTotalHits() == 1) {
                 return Result.healthy();
             }

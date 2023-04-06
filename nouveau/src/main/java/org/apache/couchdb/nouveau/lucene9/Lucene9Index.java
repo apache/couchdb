@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9.core;
+package org.apache.couchdb.nouveau.lucene9;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -33,16 +33,19 @@ import jakarta.ws.rs.core.Response.Status;
 import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
+import org.apache.couchdb.nouveau.api.DoubleField;
 import org.apache.couchdb.nouveau.api.DoubleRange;
+import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.SearchHit;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
+import org.apache.couchdb.nouveau.api.StoredField;
+import org.apache.couchdb.nouveau.api.StringField;
+import org.apache.couchdb.nouveau.api.TextField;
 import org.apache.couchdb.nouveau.core.IOUtils;
 import org.apache.couchdb.nouveau.core.Index;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.SortedDocValuesField;
-import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.facet.FacetResult;
 import org.apache.lucene.facet.Facets;
@@ -72,7 +75,7 @@ import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 
-public class Lucene9Index extends Index<IndexableField> {
+public class Lucene9Index extends Index {
 
     private static final Sort DEFAULT_SORT = new Sort(SortField.FIELD_SCORE,
             new SortField("_id", SortField.Type.STRING));
@@ -110,7 +113,7 @@ public class Lucene9Index extends Index<IndexableField> {
     }
 
     @Override
-    public void doUpdate(final String docId, final DocumentUpdateRequest<IndexableField> request) throws IOException {
+    public void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException {
         final Term docIdTerm = docIdTerm(docId);
         final Document doc = toDocument(docId, request);
         writer.updateDocument(docIdTerm, doc);
@@ -152,7 +155,7 @@ public class Lucene9Index extends Index<IndexableField> {
     }
 
     @Override
-    public SearchResults<IndexableField> doSearch(final SearchRequest request) throws IOException {
+    public SearchResults doSearch(final SearchRequest request) throws IOException {
         final Query query;
         try {
             query = newQueryParser().parse(request);
@@ -210,9 +213,9 @@ public class Lucene9Index extends Index<IndexableField> {
         return sortFields[sortFields.length - 1];
     }
 
-    private SearchResults<IndexableField> toSearchResults(final SearchRequest searchRequest, final IndexSearcher searcher,
+    private SearchResults toSearchResults(final SearchRequest searchRequest, final IndexSearcher searcher,
             final Object[] reduces) throws IOException {
-        final SearchResults<IndexableField> result = new SearchResults<IndexableField>();
+        final SearchResults result = new SearchResults();
         collectHits(searcher, (TopDocs) reduces[0], result);
         if (reduces.length == 2) {
             collectFacets(searchRequest, searcher, (FacetsCollector) reduces[1], result);
@@ -220,23 +223,30 @@ public class Lucene9Index extends Index<IndexableField> {
         return result;
     }
 
-    private void collectHits(final IndexSearcher searcher, final TopDocs topDocs, final SearchResults<IndexableField> searchResults)
+    private void collectHits(final IndexSearcher searcher, final TopDocs topDocs, final SearchResults searchResults)
             throws IOException {
-        final List<SearchHit<IndexableField>> hits = new ArrayList<SearchHit<IndexableField>>(topDocs.scoreDocs.length);
+        final List<SearchHit> hits = new ArrayList<SearchHit>(topDocs.scoreDocs.length);
         final StoredFields storedFields = searcher.storedFields();
 
         for (final ScoreDoc scoreDoc : topDocs.scoreDocs) {
             final Document doc = storedFields.document(scoreDoc.doc);
 
-            final List<IndexableField> fields = new ArrayList<IndexableField>(doc.getFields().size());
+            final List<StoredField> fields = new ArrayList<StoredField>(doc.getFields().size());
             for (IndexableField field : doc.getFields()) {
-                if (!field.name().equals("_id")) {
-                    fields.add(field);
+                if (field.name().equals("_id")) {
+                    continue;
+                }
+                if (field.stringValue() != null) {
+                    fields.add(new StoredField(field.name(), field.stringValue()));
+                } else if (field.numericValue() != null) {
+                    fields.add(new StoredField(field.name(), (double) field.numericValue()));
+                } else if (field.binaryValue() != null) {
+                    fields.add(new StoredField(field.name(), toBytes(field.binaryValue())));
                 }
             }
 
             final After after = toAfter(((FieldDoc) scoreDoc));
-            hits.add(new SearchHit<IndexableField>(doc.get("_id"), after, fields));
+            hits.add(new SearchHit(doc.get("_id"), after, fields));
         }
 
         searchResults.setTotalHits(topDocs.totalHits.value);
@@ -245,7 +255,7 @@ public class Lucene9Index extends Index<IndexableField> {
     }
 
     private void collectFacets(final SearchRequest searchRequest, final IndexSearcher searcher,
-            final FacetsCollector fc, final SearchResults<IndexableField> searchResults) throws IOException {
+            final FacetsCollector fc, final SearchResults searchResults) throws IOException {
         if (searchRequest.hasCounts()) {
             final Map<String, Map<String, Number>> countsMap = new HashMap<String, Map<String, Number>>(
                     searchRequest.getCounts().size());
@@ -332,24 +342,56 @@ public class Lucene9Index extends Index<IndexableField> {
         return new SortField(m.group(2), type, reverse);
     }
 
-    private static Document toDocument(final String docId, final DocumentUpdateRequest<IndexableField> request) throws IOException {
+    private static Document toDocument(final String docId, final DocumentUpdateRequest request) throws IOException {
         final Document result = new Document();
 
         // id
-        result.add(new StringField("_id", docId, Store.YES));
-        result.add(new SortedDocValuesField("_id", new BytesRef(docId)));
+        result.add(new org.apache.lucene.document.StringField("_id", docId, Store.YES));
+        result.add(new org.apache.lucene.document.SortedDocValuesField("_id", new BytesRef(docId)));
 
         // partition (optional)
         if (request.hasPartition()) {
-            result.add(new StringField("_partition", request.getPartition(), Store.NO));
+            result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
         }
 
-        for (IndexableField field : request.getFields()) {
+        for (Field field : request.getFields()) {
             // Underscore-prefix is reserved.
-            if (field.name().startsWith("_")) {
+            if (field.getName().startsWith("_")) {
                 continue;
             }
-            result.add(field);
+            if (field instanceof TextField) {
+                var f = (TextField) field;
+                result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(), f.isStored() ? Store.YES : Store.NO));
+            } else if (field instanceof StringField) {
+                var f = (StringField) field;
+                result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(), f.isStored() ? Store.YES : Store.NO));
+                if (f.isFacet()) {
+                    result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue())));
+                }
+            } else if (field instanceof DoubleField) {
+                var f = (DoubleField) field;
+                result.add(new org.apache.lucene.document.DoublePoint(f.getName(), f.getValue()));
+                if (f.isStored()) {
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
+                }
+                if (f.isFacet()) {
+                    result.add(new org.apache.lucene.document.DoubleDocValuesField(f.getName(), f.getValue()));
+                }
+            } else if (field instanceof StoredField) {
+                var f = (StoredField) field;
+                var val = f.getValue();
+                if (val instanceof String) {
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) f.getValue()));
+                } else if (val instanceof Double) {
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (Double) f.getValue()));
+                } else if (val instanceof byte[]) {
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) f.getValue()));
+                } else {
+                    throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
+                }
+            } else {
+                throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
+            }
         }
 
         return result;

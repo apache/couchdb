@@ -35,7 +35,7 @@ import org.apache.couchdb.nouveau.api.SearchResults;
  * associated with each modification.
  */
 
-public abstract class Index<T> implements Closeable {
+public abstract class Index implements Closeable {
 
     private long updateSeq;
     private boolean deleteOnClose = false;
@@ -83,14 +83,14 @@ public abstract class Index<T> implements Closeable {
 
     protected abstract long doDiskSize() throws IOException;
 
-    public final synchronized void update(final String docId, final DocumentUpdateRequest<T> request)
+    public final synchronized void update(final String docId, final DocumentUpdateRequest request)
             throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
         doUpdate(docId, request);
         incrementUpdateSeq(request.getSeq());
     }
 
-    protected abstract void doUpdate(final String docId, final DocumentUpdateRequest<T> request) throws IOException;
+    protected abstract void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException;
 
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
@@ -100,11 +100,11 @@ public abstract class Index<T> implements Closeable {
 
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
-    public final SearchResults<T> search(final SearchRequest request) throws IOException {
+    public final SearchResults search(final SearchRequest request) throws IOException {
         return doSearch(request);
     }
 
-    protected abstract SearchResults<T> doSearch(final SearchRequest request) throws IOException;
+    protected abstract SearchResults doSearch(final SearchRequest request) throws IOException;
 
     public final boolean commit() throws IOException {
         final long updateSeq;

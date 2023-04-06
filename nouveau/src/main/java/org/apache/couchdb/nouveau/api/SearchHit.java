@@ -21,7 +21,7 @@ import jakarta.validation.constraints.NotNull;
 import io.dropwizard.jackson.JsonSnakeCase;
 
 @JsonSnakeCase
-public class SearchHit<T> {
+public class SearchHit {
 
     @NotEmpty
     private String id;
@@ -30,12 +30,12 @@ public class SearchHit<T> {
     private After order;
 
     @NotNull
-    private Collection<@NotNull T> fields;
+    private Collection<@NotNull StoredField> fields;
 
     public SearchHit() {
     }
 
-    public SearchHit(final String id, final After order, final Collection<T> fields) {
+    public SearchHit(final String id, final After order, final Collection<StoredField> fields) {
         this.id = id;
         this.order = order;
         this.fields = fields;
@@ -49,7 +49,7 @@ public class SearchHit<T> {
         return order;
     }
 
-    public Collection<T> getFields() {
+    public Collection<StoredField> getFields() {
         return fields;
     }
 

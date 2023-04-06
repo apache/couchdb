@@ -22,11 +22,8 @@ var State = {
   addFun : function(newFun, option) {
     // Compile to a function and add it to funs array
     switch (option) {
-      case 'nouveau4':
-        var sandbox = create_nouveau4_sandbox();
-        break;
-      case 'nouveau9':
-        var sandbox = create_nouveau9_sandbox();
+      case 'nouveau':
+        var sandbox = create_nouveau_sandbox();
         break;
       default:
         var sandbox = create_dreyfus_sandbox();
