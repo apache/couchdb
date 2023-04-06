@@ -1372,7 +1372,6 @@ it easier to take advantage of future improvements to query planning
                 }
             },
             "opts": {
-                "use_index": [],
                 "bookmark": "nil",
                 "limit": 2,
                 "skip": 0,
