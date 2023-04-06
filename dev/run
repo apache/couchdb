@@ -466,31 +466,12 @@ def boot_nouveau(ctx):
     if not ctx["with_nouveau"]:
         return
 
-    # generate classpath (the least stupid way Maven can do this apparently)
-    classpath_file = os.path.join(ctx["devdir"], "lib", "nouveau.classpath")
-    p = sp.Popen(
-        "mvn --quiet dependency:build-classpath -D mdep.outputFile=%s" % classpath_file,
-        cwd="nouveau/server",
-        shell=True,
-    )
-    p.wait()
-    with open(classpath_file, "r") as f:
-        classpath = f.read()
-    classpath += ":target/classes"
-
-    home = os.environ["HOME"]
     version = "1.0-SNAPSHOT"
-
     cmd = [
         "java",
         "-server",
-        "-Dnouveau.bundle.4=file://%s/.m2/repository/org/apache/couchdb/nouveau/lucene4/%s/lucene4-%s-dist.jar"
-        % (home, version, version),
-        "-Dnouveau.bundle.9=file://%s/.m2/repository/org/apache/couchdb/nouveau/lucene9/%s/lucene9-%s-dist.jar"
-        % (home, version, version),
-        "-classpath",
-        classpath,
-        "org.apache.couchdb.nouveau.NouveauApplication",
+        "-jar",
+        "target/server-%s-dist.jar" % version,
         "server",
         "nouveau.yaml",
     ]
@@ -499,7 +480,7 @@ def boot_nouveau(ctx):
     log = open(logfname, "w")
     return sp.Popen(
         " ".join(cmd),
-        cwd="nouveau/server",
+        cwd="nouveau",
         shell=True,
         stdin=sp.PIPE,
         stdout=log,
