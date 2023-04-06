@@ -59,7 +59,7 @@ handle_search_req(Req, Db, DDoc) ->
         T1 = erlang:monotonic_time(),
         couch_stats:decrement_counter([nouveau, active_searches]),
         RequestTime = erlang:convert_time_unit(T1 - T0, native, millisecond),
-        couch_stats:update_histogram([nouveau, search_latency], RequestTime)              
+        couch_stats:update_histogram([nouveau, search_latency], RequestTime)
     end.
 
 handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
