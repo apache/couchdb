@@ -14,7 +14,6 @@
 package org.apache.couchdb.nouveau.resources;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 import jakarta.validation.Valid;
