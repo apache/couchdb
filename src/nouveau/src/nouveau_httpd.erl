@@ -113,6 +113,7 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
             incr_stats(HitCount, IncludeDocs),
             send_json(Req, 200, RespBody);
         {error, {service_unavailable, _}} when Retry > 1 ->
+            couch_log:warning("search unavailable, retrying (~p of ~p)", [?RETRY_LIMIT - Retry + 1, ?RETRY_LIMIT]),
             timer:sleep(?RETRY_SLEEP),
             handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, Retry - 1);
         {error, Reason} ->

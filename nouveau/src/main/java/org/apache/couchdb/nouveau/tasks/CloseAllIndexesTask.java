@@ -26,7 +26,7 @@ public class CloseAllIndexesTask extends Task {
     private final IndexManager indexManager;
 
     public CloseAllIndexesTask(final IndexManager indexManager) {
-        super("close_all_indexes");
+        super("close-all-indexes");
         this.indexManager = indexManager;
     }
 
