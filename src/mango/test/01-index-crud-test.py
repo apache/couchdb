@@ -88,6 +88,10 @@ class IndexCrudTests(mango.DbPerClass):
             else:
                 raise AssertionError("bad create index")
 
+    def test_bad_url(self):
+        r = self.db.sess.get(self.db.path("_index/foo"))
+        self.assertEqual(r.status_code, 405)
+
     def test_create_idx_01(self):
         fields = ["foo", "bar"]
         ret = self.db.create_index(fields, name="idx_01")
