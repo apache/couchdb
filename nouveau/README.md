@@ -25,6 +25,7 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * update=false
 * `_nouveau_info`
 * `_search_cleanup`
+* /openapi.{json.yaml}
 
 ## What doesn't work yet?
 

@@ -31,6 +31,7 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <project.tests.exclude>SlowTest</project.tests.exclude>
     <slf4j.version>1.7.32</slf4j.version>
+    <swagger.version>2.2.8</swagger.version>
   </properties>
 
   <dependencyManagement>
@@ -122,6 +123,19 @@
       <groupId>org.apache.lucene</groupId>
       <artifactId>lucene-misc</artifactId>
       <version>${lucene.version}</version>
+    </dependency>
+
+
+    <!-- Swagger -->
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-jaxrs2-jakarta</artifactId>
+      <version>${swagger.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.swagger.core.v3</groupId>
+      <artifactId>swagger-jaxrs2-servlet-initializer-v2</artifactId>
+      <version>${swagger.version}</version>
     </dependency>
 
     <!-- Test -->

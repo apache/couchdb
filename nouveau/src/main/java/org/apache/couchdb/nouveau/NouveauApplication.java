@@ -28,6 +28,7 @@ import org.apache.lucene.search.SearcherFactory;
 
 import io.dropwizard.core.Application;
 import io.dropwizard.core.setup.Environment;
+import io.swagger.v3.jaxrs2.integration.resources.OpenApiResource;
 
 public class NouveauApplication extends Application<NouveauApplicationConfiguration> {
 
@@ -73,6 +74,9 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
         // configure tasks
         environment.admin().addTask(new CloseAllIndexesTask(indexManager));
+
+        // Swagger
+        environment.jersey().register(new OpenApiResource());
     }
 
 }
