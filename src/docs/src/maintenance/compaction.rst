@@ -334,9 +334,24 @@ Manual View Compaction
 
 Views also need compaction. Unlike databases, views are compacted by groups
 per `design document`. To start their compaction, send the HTTP
-:post:`/{db}/_compact/{ddoc}` request::
+:post:`/{db}/_compact/{ddoc}` request:
 
-    curl -H "Content-Type: application/json" -X POST http://localhost:5984/dbname/_compact/designname
+**Design Document**:
+
+.. code-block:: json
+
+    {
+        "_id": "_design/ddoc-name",
+        "views": {
+            "view-name": {
+                "map": "function(doc) { emit(doc.key, doc.value) }"
+            }
+        }
+    }
+
+.. code-block:: bash
+
+    curl -H "Content-Type: application/json" -X POST http://localhost:5984/dbname/_compact/ddoc-name
 
 .. code-block:: javascript
 
