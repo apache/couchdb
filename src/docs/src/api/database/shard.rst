@@ -132,12 +132,9 @@
 
     .. code-block:: http
 
-        HTTP/1.1 200 OK
-        Cache-Control: must-revalidate
-        Content-Length: 94
-        Content-Type: application/json
-        Date: Fri, 18 Jan 2019 20:08:07 GMT
-        Server: CouchDB/2.3.0-9d4cb03c2 (Erlang OTP/19)
+        GET /db/_shards/docid HTTP/1.1
+        Accept: */*
+        Host: localhost:5984
 
     **Response**:
 

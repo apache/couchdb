@@ -94,7 +94,7 @@
     It may be that compacting a large view can return more storage than
     compacting the actual db. Thus, you can use this in place of the full
     database compaction if you know a specific set of view indexes have been
-    affected by a recent database change.
+    affected by a recent database change. See :ref:`compact/views` for details.
 
     :param db: Database name
     :param ddoc: Design document name
@@ -114,7 +114,7 @@
 
     .. code-block:: http
 
-        POST /db/_compact/posts HTTP/1.1
+        POST /db/_compact/ddoc HTTP/1.1
         Accept: application/json
         Content-Type: application/json
         Host: localhost:5984
