@@ -533,6 +533,7 @@ apply_limit(ViewPartitioned, Args) ->
 
 validate_all_docs_args(Db, Args0) ->
     Args = validate_args(Args0),
+    check_range_all_docs(Args),
 
     DbPartitioned = couch_db:is_partitioned(Db),
     Partition = get_extra(Args, partition),
@@ -781,6 +782,26 @@ apply_all_docs_partition(#mrargs{} = Args, Partition) ->
         start_key = SK1,
         end_key = EK1
     }.
+
+check_range_all_docs(#mrargs{direction = Dir, start_key = SK, end_key = EK}) ->
+    case {Dir, SK, EK} of
+        {_, undefined, _} ->
+            ok;
+        {_, _, undefined} ->
+            ok;
+        {fwd, SK, EK} when SK > EK ->
+            mrverror(
+                <<"No rows can match your key range, reverse your ",
+                    "start_key and end_key or set descending=true">>
+            );
+        {rev, SK, EK} when SK < EK ->
+            mrverror(
+                <<"No rows can match your key range, reverse your ",
+                    "start_key and end_key or set descending=false">>
+            );
+        _ ->
+            ok
+    end.
 
 check_range(#mrargs{start_key = undefined}, _Cmp) ->
     ok;

@@ -42,6 +42,12 @@
     <<"error">> := <<"query_parse_error">>,
     <<"reason">> := <<"`keys` is incompatible with `key`, `start_key` and `end_key`">>
 }).
+-define(ERROR_KEY_RANGE, #{
+    <<"error">> := <<"query_parse_error">>,
+    <<"reason">> :=
+        <<"No rows can match your key range, reverse your ",
+            "start_key and end_key or set descending=true">>
+}).
 
 % seconds
 -define(TIMEOUT, 60).
@@ -163,26 +169,17 @@ t_view_with_multiple_queries(Db) ->
     ?assertEqual(200, Code).
 
 t_view_with_key_and_start_key(Db) ->
-    {Code1, Res1} = req(get, url(Db, "_design/ddoc/_view/map", "key=\"a\"&startkey=\"b\"")),
-    {Code2, Res2} = req(get, url(Db, "_design/ddoc/_view/map", "startkey=\"b\"&key=\"a\"")),
-    ?assertMatch(
-        #{
-            <<"error">> := <<"query_parse_error">>,
-            <<"reason">> :=
-                <<"No rows can match your key range, reverse your start_key and end_key or set descending=true">>
-        },
-        Res1
-    ),
-    ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"a">>}]}, Res2),
-    ?assertEqual(400, Code1),
-    ?assertEqual(200, Code2).
+    test_helper_key_and_start_key(Db, "_design/ddoc/_view/map").
 
 t_all_docs_with_key_and_start_key(Db) ->
-    {Code1, Res1} = req(get, url(Db, "_all_docs", "key=\"a\"&startkey=\"b\"")),
-    {Code2, Res2} = req(get, url(Db, "_all_docs", "startkey=\"b\"&key=\"a\"")),
-    ?assertMatch(#{<<"rows">> := []}, Res1),
+    test_helper_key_and_start_key(Db, "_all_docs").
+
+test_helper_key_and_start_key(Db, Path) ->
+    {Code1, Res1} = req(get, url(Db, Path, "key=\"a\"&startkey=\"b\"")),
+    {Code2, Res2} = req(get, url(Db, Path, "startkey=\"b\"&key=\"a\"")),
+    ?assertMatch(?ERROR_KEY_RANGE, Res1),
     ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"a">>}]}, Res2),
-    ?assertEqual(200, Code1),
+    ?assertEqual(400, Code1),
     ?assertEqual(200, Code2).
 
 t_view_with_key_and_end_key(Db) ->
@@ -200,31 +197,35 @@ test_helper_key_and_end_key(Db, Path) ->
     ?assertEqual(200, Code2).
 
 t_view_with_single_keys_and_start_key(Db) ->
-    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map?keys=[\"a\"]&startkey=\"b\"")),
-    ?assertMatch(
-        #{
-            <<"error">> := <<"query_parse_error">>,
-            <<"reason">> :=
-                <<"No rows can match your key range, reverse your start_key and end_key or set descending=true">>
-        },
-        Res
-    ),
-    ?assertEqual(400, Code).
+    test_helper_single_keys_and_start_key(Db, "_design/ddoc/_view/map").
 
 t_all_docs_with_single_keys_and_start_key(Db) ->
-    {Code, Res} = req(get, url(Db, "_all_docs?keys=[\"a\"]&startkey=\"b\"")),
-    ?assertMatch(?ERROR_KEYS_INCOMPATIBLE, Res),
-    ?assertEqual(400, Code).
+    test_helper_single_keys_and_start_key(Db, "_all_docs").
+
+test_helper_single_keys_and_start_key(Db, Path) ->
+    {Code1, Res1} = req(get, url(Db, Path, "keys=[\"a\"]&startkey=\"b\"")),
+    {Code2, Res2} = req(get, url(Db, Path, "startkey=\"b\"&keys=[\"a\"]")),
+    case Path of
+        "_all_docs" -> ?assertMatch(?ERROR_KEYS_INCOMPATIBLE, Res1);
+        _ -> ?assertMatch(?ERROR_KEY_RANGE, Res1)
+    end,
+    ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"a">>}]}, Res2),
+    ?assertEqual(400, Code1),
+    ?assertEqual(200, Code2).
 
 t_view_with_keys_and_start_key(Db) ->
-    {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map", "keys=[\"a\",\"b\"]&start_key=\"b\"")),
-    ?assertMatch(?ERROR_KEYS_INCOMPATIBLE, Res),
-    ?assertEqual(400, Code).
+    test_helper_keys_and_start_key(Db, "_design/ddoc/_view/map").
 
 t_all_docs_with_keys_and_start_key(Db) ->
-    {Code, Res} = req(get, url(Db, "_all_docs", "keys=[\"a\",\"b\"]&start_key=\"b\"")),
-    ?assertMatch(?ERROR_KEYS_INCOMPATIBLE, Res),
-    ?assertEqual(400, Code).
+    test_helper_keys_and_start_key(Db, "_all_docs").
+
+test_helper_keys_and_start_key(Db, Path) ->
+    {Code1, Res1} = req(get, url(Db, Path, "keys=[\"a\",\"b\"]&start_key=\"b\"")),
+    {Code2, Res2} = req(get, url(Db, Path, "startkey=\"b\"&keys=[\"a\",\"b\"]")),
+    ?assertMatch(?ERROR_KEYS_INCOMPATIBLE, Res1),
+    ?assertMatch(?ERROR_KEYS_INCOMPATIBLE, Res2),
+    ?assertEqual(400, Code1),
+    ?assertEqual(400, Code2).
 
 t_view_with_key_non_existent_docs(Db) ->
     {Code, Res} = req(get, url(Db, "_design/ddoc/_view/map", "key=\"not_exist\"")),
