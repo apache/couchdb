@@ -18,7 +18,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import io.dropwizard.jackson.JsonSnakeCase;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotEmpty;
 
 @JsonSnakeCase
 @JsonTypeInfo(
@@ -40,7 +40,7 @@ public abstract class Field {
     }
 
     @JsonProperty
-    @NotNull
+    @NotEmpty
     public String getName() {
         return name;
     }

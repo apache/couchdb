@@ -20,6 +20,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -33,8 +34,7 @@ public class SearchRequest {
 
     private String partition;
 
-    @Min(1)
-    @Max(200)
+    @Positive
     private int limit = 25;
 
     private List<@NotEmpty String> sort;

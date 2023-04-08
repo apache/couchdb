@@ -16,14 +16,18 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import io.dropwizard.jackson.JsonSnakeCase;
+import jakarta.validation.constraints.PositiveOrZero;
 
 @JsonSnakeCase
 public class IndexInfo {
 
+    @PositiveOrZero
     private long updateSeq;
 
+    @PositiveOrZero
     private int numDocs;
 
+    @PositiveOrZero
     private long diskSize;
 
     public IndexInfo() {

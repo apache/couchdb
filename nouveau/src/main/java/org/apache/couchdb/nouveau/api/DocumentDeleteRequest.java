@@ -13,7 +13,7 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -22,7 +22,7 @@ import io.dropwizard.jackson.JsonSnakeCase;
 @JsonSnakeCase
 public class DocumentDeleteRequest {
 
-    @Min(1)
+    @Positive
     private long seq;
 
     public DocumentDeleteRequest() {
@@ -30,6 +30,9 @@ public class DocumentDeleteRequest {
     }
 
     public DocumentDeleteRequest(long seq) {
+        if (seq < 1)  {
+            throw new IllegalArgumentException("seq must be 1 or greater");
+        }
         this.seq = seq;
     }
 

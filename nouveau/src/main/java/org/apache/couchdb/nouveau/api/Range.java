@@ -15,14 +15,20 @@ package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+
 public class Range<T> {
 
+    @NotEmpty
     private String label;
 
+    @NotNull
     private T min;
 
     private boolean minInclusive = true;
 
+    @NotNull
     private T max;
 
     private boolean maxInclusive = true;

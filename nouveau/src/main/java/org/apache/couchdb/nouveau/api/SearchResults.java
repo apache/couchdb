@@ -16,8 +16,8 @@ package org.apache.couchdb.nouveau.api;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -26,7 +26,7 @@ import io.dropwizard.jackson.JsonSnakeCase;
 @JsonSnakeCase
 public class SearchResults {
 
-    @Min(0)
+    @PositiveOrZero
     private long totalHits;
 
     @NotNull

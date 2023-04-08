@@ -15,8 +15,8 @@ package org.apache.couchdb.nouveau.api;
 
 import java.util.Collection;
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Positive;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -25,7 +25,7 @@ import io.dropwizard.jackson.JsonSnakeCase;
 @JsonSnakeCase
 public class DocumentUpdateRequest {
 
-    @Min(1)
+    @Positive
     private long seq;
 
     private String partition;
