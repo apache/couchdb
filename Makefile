@@ -427,6 +427,12 @@ else
 endif
 endif
 
+ifeq ($(with_nouveau), 1)
+	@mkdir -p rel/couchdb/nouveau/
+	@cp nouveau/target/server-*-dist.jar rel/couchdb/nouveau/
+	@cp nouveau/nouveau.yaml rel/couchdb/nouveau/
+endif
+
 	@echo "... done"
 	@echo
 	@echo "    You can now copy the rel/couchdb directory anywhere on your system."
@@ -539,7 +545,7 @@ derived:
 # Build nouveau
 nouveau:
 ifeq ($(with_nouveau), 1)
-	@cd nouveau && mvn -D maven.test.skip=true install
+	@cd nouveau && mvn -D maven.test.skip=true
 endif
 
 .PHONY: nouveau-test
