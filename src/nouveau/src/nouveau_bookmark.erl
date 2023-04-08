@@ -42,7 +42,7 @@ range_of(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
     [#shard{range = Range} | _] = mem3_shards:for_docid(DbName, DocId),
     Range;
 range_of(DbName, Order) when is_binary(DbName), is_list(Order) ->
-    #{<<"type">> := <<"bytes">>, <<"value">> := EncodedDocId} = lists:last(Order),
+    #{<<"@type">> := <<"bytes">>, <<"value">> := EncodedDocId} = lists:last(Order),
     range_of(DbName, base64:decode(EncodedDocId)).
 
 unpack(_DbName, Empty) when Empty == undefined; Empty == nil; Empty == null ->

@@ -290,4 +290,4 @@ get_json_docs(DbName, Hits) ->
     ),
     % TODO: respect R query parameter (same as json indexes)
     {ok, Docs} = nouveau_fabric:get_json_docs(DbName, Ids),
-    lists:zipwith(fun(Hit, {doc, Doc}) -> {Hit, Doc} end, Hits, Docs).
+    lists:zip(Hits, Docs).
