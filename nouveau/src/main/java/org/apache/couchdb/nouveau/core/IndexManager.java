@@ -75,10 +75,8 @@ public final class IndexManager implements Managed {
 
     private ScheduledExecutorService scheduler;
 
-    @SuppressWarnings("rawtypes")
     private Cache<String, Index> cache;
 
-    @SuppressWarnings("rawtypes")
     public <R> R with(final String name, final IndexLoader loader, final IndexFunction<Index, R> indexFun)
             throws IOException, InterruptedException {
         while (true) {
@@ -186,7 +184,6 @@ public final class IndexManager implements Managed {
         } while ((p = p.getParent()) != null && !rootDir.equals(p));
     }
 
-    @SuppressWarnings("rawtypes")
     private void deleteIndex(final String name) throws IOException {
         final Index index = cache.asMap().remove(name);
         if (index != null) {
@@ -298,7 +295,6 @@ public final class IndexManager implements Managed {
                 Status.BAD_REQUEST);
     }
 
-    @SuppressWarnings("rawtypes")
     private class IndexEvictionListener implements RemovalListener<String, Index> {
 
         public void onRemoval(String name, Index index, RemovalCause cause) {
@@ -311,7 +307,6 @@ public final class IndexManager implements Managed {
         }
     }
 
-    @SuppressWarnings("rawtypes")
     private void close(final String name, final Index index) throws IOException {
         IOUtils.runAll(
                 () -> {
