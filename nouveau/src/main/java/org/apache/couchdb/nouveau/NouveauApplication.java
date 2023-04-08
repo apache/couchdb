@@ -49,7 +49,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         final IndexManager indexManager = new IndexManager();
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
-        indexManager.setLockCount(configuration.getLockCount());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setMetricRegistry(environment.metrics());
         indexManager.setScheduler(environment.lifecycle().scheduledExecutorService("index-manager-%d").threads(5).build());

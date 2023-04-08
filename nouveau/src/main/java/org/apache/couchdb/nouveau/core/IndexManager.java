@@ -65,8 +65,6 @@ public final class IndexManager implements Managed {
 
     private int idleSeconds;
 
-    private int lockCount;
-
     private Path rootDir;
 
     private ObjectMapper objectMapper;
@@ -217,14 +215,6 @@ public final class IndexManager implements Managed {
 
     public void setIdleSeconds(int idleSeconds) {
         this.idleSeconds = idleSeconds;
-    }
-
-    public int getLockCount() {
-        return lockCount;
-    }
-
-    public void setLockCount(int lockCount) {
-        this.lockCount = lockCount;
     }
 
     public void setScheduler(ScheduledExecutorService scheduler) {
