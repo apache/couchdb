@@ -16,7 +16,7 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * sorting on text and numbers (and combinations of fields)
 * classic lucene query syntax
 * count and range facets
-* cursor support for paginating efficiently through large results sets
+* bookmark support for paginating efficiently through large results sets
 * indexes automatically deleted if database is deleted (as long as nouveau is running!)
 * integration with ken
 * integration with mango
@@ -31,9 +31,6 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * results grouping
 * configurable stop words for analyzers
 * Makefile.win or Windows generally
-* retry loop to mask JVM reboots
-* couch_stat metrics (including new active searches)
-* clouseau index importing (using the index snapshot feature of clouseau)
 
 I don't intend to add grouping support, it seems barely used. Would accept a tidy contribution, though.
 
@@ -103,18 +100,13 @@ curl 'foo:bar@localhost:15984/foo/_design/foo/_nouveau/bar?q=*:*&limit=1&ranges=
 
 ## Index function
 
-To ease migration nouveau functions can use the 'index' function exactly as it exists in dreyfus, but the function also supports a new style where
-the intended Lucene field type is the first argument.
-
-| Arguments                                          | Effect
-| :------------------------------------------------- | :-----
-| index("foo", "bar");                               | adds a TextField.
-| index("foo", "bar", {"store":true});               | adds a TextField and a StoredField.
-| index("foo", "bar", {"store":true, "facet":true}); | adds a TextField, a StoredField and a SortedSetDocValuesField.
-| index("text", "foo", "bar");                       | adds a TextField.
-| index("text", "foo", "bar", {"store":true});       | adds a TextField with Store.YES
-| index("string", "foo", "bar");                     | adds a StringField.
-
+| Arguments                                                       | Effect
+| :-------------------------------------------------------------- | :-----
+| index("text", "foo", "bar", {"stored": true});                  | analyzes value for full-text searching, optionally stores the value
+| index("string", "foo", "bar", {"stored": true, "facet": true}); | indexes value as single token, optionally stores value and/or adds facet
+| index("double", "foo", 12.0, {"stored": true, "facet": true});  | indexes value, optionally stores value and/or adds facet
+| index("stored", "foo", "bar");                                  | stores a number, returned with hits
+| index("stored", "foo", 12.0);                                   | stores a string, returned with hits
 
 ## Deployment options
 
