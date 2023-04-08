@@ -27,6 +27,7 @@ replications.
     ddocs
     views/index
     search
+    nouveau
 
 *Note*: Previously, the functionality provided by CouchDB's design documents,
 in combination with document attachments, was referred to as "CouchApps." The

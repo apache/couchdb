@@ -241,6 +241,34 @@ CouchDB's search subsystem can be configured via the ``dreyfus`` configuration s
         this config setting is not defined, CouchDB will use the value of ``max_limit``
         instead. If neither is defined, the default is ``2000``.
 
+Nouveau
+=======
+
+CouchDB's experimental search subsystem can be configured via the
+``nouveau`` configuration section.
+
+.. config:section:: nouveau :: Nouveau Server Configuration
+
+    .. config:option:: enable :: Whether nouveau is enabled
+
+        Set to ``true`` to enable Nouveau. If disabled, all nouveau
+        endpoints return 404 Not Found.  Defaults to ``false``.
+
+    .. config:option:: url :: Nouveau Server location
+
+        The URL to a running nouveau server. Defaults to
+        ``http://127.0.0.1:8080``.
+
+    .. config:option:: max_sessions :: Maximum number of ibrowse sessions
+
+        Nouveau will configure ibrowse max_sessions to this value for
+        the configured ``url``.  Defaults to ``100``.
+
+    .. config:option:: max_pipeline_size :: Max pipeline size
+
+        Nouveau will configure ibrowse max_pipeline_size to this value
+        for the configured ``url``.  Defaults to ``1000``.
+
 .. _config/mango:
 
 Mango

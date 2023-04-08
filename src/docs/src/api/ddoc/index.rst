@@ -31,5 +31,6 @@ from your database.
     common
     views
     search
+    nouveau
     render
     rewrites

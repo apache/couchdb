@@ -37,4 +37,14 @@ sent for everything in /_utils.
 
 Then restart CouchDB.
 
+Nouveau Server (new Apache Lucene integration)
+==============================================
+
+Enable nouveau in config and run the Java service.
+
+    .. code-block:: ini
+
+        [nouveau]
+        enable = true
+
 Have fun!
