@@ -63,33 +63,31 @@ handle_search_req(Req, Db, DDoc) ->
 
 handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
     DbName = couch_db:name(Db),
-    QueryArgs = #{
-        query => ?l2b(chttpd:qs_value(Req, "q")),
-        limit => list_to_integer(chttpd:qs_value(Req, "limit", "25")),
-        sort => ?JSON_DECODE(chttpd:qs_value(Req, "sort", "null")),
-        ranges => ?JSON_DECODE(chttpd:qs_value(Req, "ranges", "null")),
-        counts => ?JSON_DECODE(chttpd:qs_value(Req, "counts", "null")),
-        update => ?JSON_DECODE(chttpd:qs_value(Req, "update", "true")),
+    QueryArgs = validate_query_args(#{
+        query => chttpd:qs_value(Req, "q"),
+        limit => chttpd:qs_value(Req, "limit"),
+        sort => chttpd:qs_value(Req, "sort"),
+        ranges => chttpd:qs_value(Req, "ranges"),
+        counts => chttpd:qs_value(Req, "counts"),
+        update => chttpd:qs_value(Req, "update"),
         bookmark => chttpd:qs_value(Req, "bookmark"),
-        include_docs => parse_bool_param(
-            "include_docs", chttpd:qs_value(Req, "include_docs", "false")
-        )
-    },
+        include_docs => chttpd:qs_value(Req, "include_docs")
+    }),
     handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
 handle_search_req_int(#httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     DbName = couch_db:name(Db),
     ReqBody = chttpd:json_body(Req, [return_maps]),
-    QueryArgs = #{
+    QueryArgs = validate_query_args(#{
         query => maps:get(<<"q">>, ReqBody, undefined),
-        limit => maps:get(<<"limit">>, ReqBody, 25),
-        sort => maps:get(<<"sort">>, ReqBody, null),
-        ranges => maps:get(<<"ranges">>, ReqBody, null),
-        counts => maps:get(<<"counts">>, ReqBody, null),
-        update => maps:get(<<"update">>, ReqBody, true),
+        limit => maps:get(<<"limit">>, ReqBody, undefined),
+        sort => json_or_undefined(<<"sort">>, ReqBody),
+        ranges => json_or_undefined(<<"ranges">>, ReqBody),
+        counts => json_or_undefined(<<"counts">>, ReqBody),
+        update => maps:get(<<"update">>, ReqBody, undefined),
         bookmark => maps:get(<<"bookmark">>, ReqBody, undefined),
-        include_docs => maps:get(<<"include_docs">>, ReqBody, false)
-    },
+        include_docs => maps:get(<<"include_docs">>, ReqBody, undefined)
+    }),
     handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
 handle_search_req_int(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET, POST").
@@ -166,15 +164,98 @@ incr_stats(HitCount, true) ->
     chttpd_stats:incr_reads(HitCount),
     incr_stats(HitCount, false).
 
-parse_bool_param(_, Val) when is_boolean(Val) ->
-    Val;
-parse_bool_param(_, "true") ->
+validate_query_args(#{} = QueryArgs) ->
+    maps:map(fun validate_query_arg/2, QueryArgs).
+
+validate_query_arg(query, undefined) ->
+    throw({query_parse_error, <<"q parameter is mandatory">>});
+validate_query_arg(query, Val) when is_list(Val); is_binary(Val) ->
+    couch_util:to_binary(Val);
+validate_query_arg(limit, undefined) ->
+    25;
+validate_query_arg(limit, Limit) when is_integer(Limit), Limit > 0 ->
+    Limit;
+validate_query_arg(limit, Limit) when is_integer(Limit) ->
+    throw({query_parse_error, <<"limit parameter must be greater than zero">>});
+validate_query_arg(limit, List) when is_list(List) ->
+    try
+        list_to_integer(List)
+    catch
+        error:badarg ->
+            throw({query_parse_error, <<"limit parameter must be an integer">>})
+    end;
+validate_query_arg(sort, undefined) ->
+    null;
+validate_query_arg(sort, {json, Sort}) ->
+    ok = is_list_of_strings(<<"counts">>, Sort),
+    Sort;
+validate_query_arg(sort, Sort) ->
+    validate_query_arg(sort, {json, ?JSON_DECODE(Sort, [return_maps])});
+validate_query_arg(ranges, undefined) ->
+    null;
+validate_query_arg(ranges, {json, Ranges}) when is_map(Ranges) ->
+    maps:foreach(fun is_valid_range/2, Ranges),
+    Ranges;
+validate_query_arg(ranges, Ranges) ->
+    validate_query_arg(ranges, {json, ?JSON_DECODE(Ranges, [return_maps])});
+validate_query_arg(counts, undefined) ->
+    null;
+validate_query_arg(counts, {json, Counts}) when is_list(Counts) ->
+    ok = is_list_of_strings(<<"counts">>, Counts),
+    Counts;
+validate_query_arg(counts, Counts) ->
+    validate_query_arg(counts, {json, ?JSON_DECODE(Counts, [return_maps])});
+validate_query_arg(update, undefined)  ->
     true;
-parse_bool_param(_, "false") ->
+validate_query_arg(update, Bool) when is_boolean(Bool) ->
+    Bool;
+validate_query_arg(update, "false") ->
     false;
-parse_bool_param(Name, Val) ->
-    Msg = io_lib:format("Invalid value for ~s: ~p", [Name, Val]),
+validate_query_arg(update, "true") ->
+    true;
+validate_query_arg(bookmark, undefined) ->
+    null;
+validate_query_arg(bookmark, Bookmark) ->
+    Bookmark;
+validate_query_arg(include_docs, Bool) when is_boolean(Bool) ->
+    Bool;
+validate_query_arg(include_docs, undefined) ->
+    false;
+validate_query_arg(include_docs, "false") ->
+    false;
+validate_query_arg(include_docs, "true") ->
+    true;
+validate_query_arg(Key, Val) ->
+    Msg = io_lib:format("Invalid value for ~p: ~p", [Key, Val]),
     throw({query_parse_error, ?l2b(Msg)}).
+
+json_or_undefined(Key, Map) when is_binary(Key), is_map(Map) ->
+    case maps:get(Key, Map, undefined) of
+        undefined ->
+            undefined;
+        Val ->
+            {json, Val}
+    end.
+
+is_list_of_strings(Name, Val) when is_list(Val) ->
+    AllBinaries = lists:all(fun is_binary/1, Val),
+    if
+        AllBinaries -> ok;
+        true -> throw({query_parser_error, <<"all items in ", Name/binary, " parameter must be strings">>})
+    end;
+is_list_of_strings(Name, _Val) ->
+    throw({query_parser_error, <<Name/binary, " parameter must be a list of strings">>}).
+
+is_valid_range(FieldName, _Ranges) when not is_binary(FieldName) ->
+    throw({query_parse_error, <<"range keys must be strings">>});
+is_valid_range(_FieldName, Ranges) when not is_list(Ranges) ->
+    throw({query_parse_error, <<"range values must be lists of objects">>});
+is_valid_range(FieldName, Ranges) when is_binary(FieldName), is_list(Ranges) ->
+    AllMaps = lists:all(fun is_map/1, Ranges),
+    if
+        AllMaps -> ok;
+        true -> throw({query_parser_error, <<"all values in ranges parameter must be objects">>})
+    end.
 
 check_if_enabled() ->
     case nouveau:enabled() of
