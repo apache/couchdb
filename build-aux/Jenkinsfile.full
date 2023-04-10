@@ -73,6 +73,13 @@ meta = [
     node_label: 'ppc64le'
   ],
 
+  'bullseye-s390x': [
+    name: 'Debian 11 s390x',
+    spidermonkey_vsn: '78',
+    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    node_label: 's390x'
+  ],
+
   'bullseye': [
     name: 'Debian 11',
     spidermonkey_vsn: '78',
