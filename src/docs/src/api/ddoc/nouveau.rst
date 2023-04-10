@@ -58,16 +58,15 @@
         and optional ``min_inclusive`` and ``max_inclusive`` properties (defaulting to
         ``true`` if not specified).
         Example: ``{"bar":[{"label":"cheap","min":0,"max":100}]}``
-    :query json sort: Specifies the sort order of the results. In a grouped search (when
-        ``group_field`` is used), this parameter specifies the sort order within a group.
+    :query json sort: Specifies the sort order of the results.
         The default sort order is relevance. A JSON string of the form
         ``"fieldname<type>"`` or ``"-fieldname<type>"`` for descending order, where
-        fieldname is the name of a string or number field, and ``type`` is either a
-        number, a string, or a JSON array of strings. The ``type`` part is optional, and
-        defaults to number. Some examples are ``"foo"``, ``"-foo"``, ``"bar<string>"``,
-        ``"-foo<number>"`` and [``"-foo<number>"``, ``"bar<string>"``]. String fields that
-        are used for sorting must not be analyzed fields. Fields that are used for sorting
-        must be indexed by the same indexer that is used for the search query.
+        fieldname is the name of a string or number field, and ``type`` is either
+        ``number`` or ``string``. You can use a single string to sort by one field
+        or an array of strings to sort by several fields in the same order as the
+        array.
+        Some examples are ``"relevance"``, ``"bar<string>"``,
+        ``"-foo<number>"`` and [``"-foo<number>"``, ``"bar<string>"``].
     :query boolean update: Set to ``false`` to allow the use of an out-of-date index.
 
     :>header Content-Type: - :mimetype:`application/json`

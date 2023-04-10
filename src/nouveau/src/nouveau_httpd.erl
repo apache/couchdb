@@ -186,6 +186,8 @@ validate_query_arg(limit, List) when is_list(List) ->
     end;
 validate_query_arg(sort, undefined) ->
     null;
+validate_query_arg(sort, {json, Sort}) when is_binary(Sort) ->
+    [Sort];
 validate_query_arg(sort, {json, Sort}) ->
     ok = is_list_of_strings(<<"counts">>, Sort),
     Sort;

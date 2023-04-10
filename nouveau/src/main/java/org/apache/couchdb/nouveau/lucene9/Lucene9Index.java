@@ -79,7 +79,7 @@ public class Lucene9Index extends Index {
 
     private static final Sort DEFAULT_SORT = new Sort(SortField.FIELD_SCORE,
             new SortField("_id", SortField.Type.STRING));
-    private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)(?:<(\\w+)>)?$");
+    private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)(?:<(\\w+)>)$");
 
     private final Analyzer analyzer;
     private final IndexWriter writer;
@@ -329,15 +329,26 @@ public class Lucene9Index extends Index {
     }
 
     private SortField convertSortField(final String sortString) {
+        if ("relevance".equals(sortString)) {
+            return SortField.FIELD_SCORE;
+        }
         final Matcher m = SORT_FIELD_RE.matcher(sortString);
         if (!m.matches()) {
             throw new WebApplicationException(
                     sortString + " is not a valid sort parameter", Status.BAD_REQUEST);
         }
         final boolean reverse = "-".equals(m.group(1));
-        SortField.Type type = SortField.Type.DOUBLE;
-        if ("string".equals(m.group(3))) {
-            type = SortField.Type.STRING;
+        SortField.Type type;
+        switch (m.group(3)) {
+            case "string":
+                type = SortField.Type.STRING;
+                break;
+            case "number":
+                type = SortField.Type.DOUBLE;
+                break;
+            default:
+                throw new WebApplicationException(
+                        m.group(3) + " is not a valid sort type", Status.BAD_REQUEST);
         }
         return new SortField(m.group(2), type, reverse);
     }
