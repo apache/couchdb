@@ -74,7 +74,9 @@ handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName
         include_docs => chttpd:qs_value(Req, "include_docs")
     }),
     handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
-handle_search_req_int(#httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc) ->
+handle_search_req_int(
+    #httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc
+) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     DbName = couch_db:name(Db),
     ReqBody = chttpd:json_body(Req, [return_maps]),
@@ -110,7 +112,9 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
             incr_stats(HitCount, IncludeDocs),
             send_json(Req, 200, RespBody);
         {error, {service_unavailable, _}} when Retry > 1 ->
-            couch_log:warning("search unavailable, retrying (~p of ~p)", [?RETRY_LIMIT - Retry + 1, ?RETRY_LIMIT]),
+            couch_log:warning("search unavailable, retrying (~p of ~p)", [
+                ?RETRY_LIMIT - Retry + 1, ?RETRY_LIMIT
+            ]),
             timer:sleep(?RETRY_SLEEP),
             handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, Retry - 1);
         {error, Reason} ->
@@ -207,7 +211,7 @@ validate_query_arg(counts, {json, Counts}) when is_list(Counts) ->
     Counts;
 validate_query_arg(counts, Counts) ->
     validate_query_arg(counts, {json, ?JSON_DECODE(Counts, [return_maps])});
-validate_query_arg(update, undefined)  ->
+validate_query_arg(update, undefined) ->
     true;
 validate_query_arg(update, Bool) when is_boolean(Bool) ->
     Bool;
@@ -242,8 +246,12 @@ json_or_undefined(Key, Map) when is_binary(Key), is_map(Map) ->
 is_list_of_strings(Name, Val) when is_list(Val) ->
     AllBinaries = lists:all(fun is_binary/1, Val),
     if
-        AllBinaries -> ok;
-        true -> throw({query_parser_error, <<"all items in ", Name/binary, " parameter must be strings">>})
+        AllBinaries ->
+            ok;
+        true ->
+            throw(
+                {query_parser_error, <<"all items in ", Name/binary, " parameter must be strings">>}
+            )
     end;
 is_list_of_strings(Name, _Val) ->
     throw({query_parser_error, <<Name/binary, " parameter must be a list of strings">>}).

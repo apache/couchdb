@@ -50,9 +50,7 @@ analyze(Text, Analyzer) when
             send_error(Reason)
     end;
 analyze(_, _) ->
-    {error,
-        {bad_request,
-            <<"'text' and 'analyzer' fields must be non-empty strings">>}}.
+    {error, {bad_request, <<"'text' and 'analyzer' fields must be non-empty strings">>}}.
 
 index_info(#index{} = Index) ->
     Resp = send_if_enabled(index_url(Index), [], get),
