@@ -26,13 +26,13 @@ public final class TextField extends Field {
     @NotNull
     private final String value;
 
-    private final boolean stored;
+    private final boolean store;
 
     public TextField(@JsonProperty("name") final String name, @JsonProperty("value") final String value,
-            @JsonProperty("stored") final boolean stored) {
+            @JsonProperty("store") final boolean store) {
         super(name);
         this.value = Objects.requireNonNull(value);
-        this.stored = stored;
+        this.store = store;
     }
 
     @JsonProperty
@@ -41,13 +41,13 @@ public final class TextField extends Field {
     }
 
     @JsonProperty
-    public boolean isStored() {
-        return stored;
+    public boolean isStore() {
+        return store;
     }
 
     @Override
     public String toString() {
-        return "TextField [name=" + name + ", value=" + value + ", stored=" + stored + "]";
+        return "TextField [name=" + name + ", value=" + value + ", store=" + store + "]";
     }
 
 }

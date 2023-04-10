@@ -26,15 +26,15 @@ public final class StringField extends Field {
     @NotNull
     private final String value;
 
-    private final boolean stored;
+    private final boolean store;
 
     private final boolean facet;
 
     public StringField(@JsonProperty("name") final String name, @JsonProperty("value") final String value,
-            @JsonProperty("stored") final boolean stored, @JsonProperty("facet") final boolean facet) {
+            @JsonProperty("store") final boolean store, @JsonProperty("facet") final boolean facet) {
         super(name);
         this.value = Objects.requireNonNull(value);
-        this.stored = stored;
+        this.store = store;
         this.facet = facet;
     }
 
@@ -44,8 +44,8 @@ public final class StringField extends Field {
     }
 
     @JsonProperty
-    public boolean isStored() {
-        return stored;
+    public boolean isStore() {
+        return store;
     }
 
     @JsonProperty
@@ -55,7 +55,7 @@ public final class StringField extends Field {
 
     @Override
     public String toString() {
-        return "StringField [name=" + name + ", value=" + value + ", stored=" + stored + ", facet=" + facet + "]";
+        return "StringField [name=" + name + ", value=" + value + ", store=" + store + ", facet=" + facet + "]";
     }
 
 }

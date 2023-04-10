@@ -361,17 +361,17 @@ public class Lucene9Index extends Index {
             }
             if (field instanceof TextField) {
                 var f = (TextField) field;
-                result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(), f.isStored() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
                 var f = (StringField) field;
-                result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(), f.isStored() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
                 if (f.isFacet()) {
                     result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue())));
                 }
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
                 result.add(new org.apache.lucene.document.DoublePoint(f.getName(), f.getValue()));
-                if (f.isStored()) {
+                if (f.isStore()) {
                     result.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
                 }
                 if (f.isFacet()) {

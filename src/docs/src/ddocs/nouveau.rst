@@ -40,7 +40,7 @@ a document update. The ``index`` function takes the following parameters:
    specified in the query syntax.
 #. Data that you want to index, for example, ``doc.address.country``.
 #. (Optional) The third parameter includes the following fields: ``facet``,
-   and ``stored``. These fields are described in more detail later.
+   and ``store``. These fields are described in more detail later.
 
 By default, a nouveau index response returns 25 rows. The number of hits that are returned
 can be changed by using the ``limit`` parameter. Each response includes a ``bookmark``
@@ -122,12 +122,12 @@ The ``index`` function takes four parameters, where the third parameter is optio
    * **facet** - Creates a faceted index. See :ref:`Faceting <ddoc/search/faceting>`.
      Values are ``true`` or ``false``. Default is ``false``.
 
-   * **stored** - If ``true``, the value is returned in the search result; otherwise,
+   * **store** - If ``true``, the value is returned in the search result; otherwise,
      the value is not returned. Values are ``true`` or ``false``. Default is ``false``.
 
    .. note::
 
-       If you do not set the ``stored`` parameter,
+       If you do not set the ``store`` parameter,
        the index data results for the document are not returned in response to a query.
 
 *Example search index function:*
@@ -136,16 +136,16 @@ The ``index`` function takes four parameters, where the third parameter is optio
 
     function(doc) {
         if (typeof(doc.min_length) == 'number') {
-            index("double", "min_length", doc.min_length, {"stored": true});
+            index("double", "min_length", doc.min_length, {"store": true});
         }
         if (typeof(doc.diet) == 'string') {
-            index("string", "diet", doc.diet, {"stored": true});
+            index("string", "diet", doc.diet, {"store": true});
         }
         if (typeof(doc.latin_name) == 'string') {
-            index("string", "latin_name", doc.latin_name, {"stored": true});
+            index("string", "latin_name", doc.latin_name, {"store": true});
         }
         if (typeof(doc.class) == 'string') {
-            index("string", "class", doc.class, {"stored": true});
+            index("string", "class", doc.class, {"store": true});
         }
     }
 
@@ -162,7 +162,7 @@ most common runtime errors are described below;
 .. warning:: example of bad code
 .. code-block:: javascript
 
-    index("min_length", doc.min_length, {"stored": true});
+    index("min_length", doc.min_length, {"store": true});
 
 For documents without a `min_length` value, this index call will
 pass ``undefined`` as the value. This will be rejected by nouveau's
@@ -174,7 +174,7 @@ validation function and the document will not be indexed.
 .. code-block:: javascript
 
     if (doc.foo.bar) {
-        index("bar", doc.foo.bar, {"stored": true});
+        index("bar", doc.foo.bar, {"store": true});
     }
 
 This bad example fails in a different way if ``doc.foo`` doesn't
@@ -183,7 +183,7 @@ exist; the evaluation of ``doc.foo.bar`` throws an exception.
 .. code-block:: javascript
 
     if (doc.foo && typeof(doc.foo) == 'object' && typeof(doc.foo.bar == 'string')) {
-        index("bar", doc.foo.bar, {"stored": true});
+        index("bar", doc.foo.bar, {"store": true});
     }
 
 This example correctly checks that ``doc.foo`` is an object and its
@@ -195,7 +195,7 @@ This example correctly checks that ``doc.foo`` is an object and its
 .. code-block:: javascript
 
     if (doc.min_length) {
-      index("min_length", doc.min_length, {"stored": true});
+      index("min_length", doc.min_length, {"store": true});
     }
 
 We correct the previous mistake so documents without min_length are
@@ -206,7 +206,7 @@ exist) but we've acccidentally prevented the indexing of the
 .. code-block:: javascript
 
     if (typeof(doc.min_length == 'number')) {
-      index("min_length", doc.min_length, {"stored": true});
+      index("min_length", doc.min_length, {"store": true});
     }
 
 This good example ensures we index any document where ``min_length`` is a number.

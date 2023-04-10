@@ -57,7 +57,7 @@ var Nouveau = (function () {
             '@type': type,
             'name': name,
             'value': value,
-            'stored': options.stored,
+            'store': options.store,
             'facet': options.facet
           });
           break;
@@ -69,7 +69,7 @@ var Nouveau = (function () {
             '@type': type,
             'name': name,
             'value': value,
-            'stored': options.stored
+            'store': options.store
           });
           break;
         case 'stored':

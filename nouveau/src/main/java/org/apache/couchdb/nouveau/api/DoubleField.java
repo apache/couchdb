@@ -24,15 +24,15 @@ public class DoubleField extends Field {
     @NotNull
     private final Double value;
 
-    private final boolean stored;
+    private final boolean store;
 
     private final boolean facet;
 
     public DoubleField(@JsonProperty("name") final String name, @JsonProperty("value") final Double value,
-            @JsonProperty("stored") final boolean stored, @JsonProperty("facet") final boolean facet) {
+            @JsonProperty("store") final boolean store, @JsonProperty("facet") final boolean facet) {
         super(name);
         this.value = value;
-        this.stored = stored;
+        this.store = store;
         this.facet = facet;
     }
 
@@ -42,8 +42,8 @@ public class DoubleField extends Field {
     }
 
     @JsonProperty
-    public boolean isStored() {
-        return stored;
+    public boolean isStore() {
+        return store;
     }
 
     @JsonProperty
@@ -53,7 +53,7 @@ public class DoubleField extends Field {
 
     @Override
     public String toString() {
-        return "DoubleField [name=" + name + ", value=" + value + ", stored=" + stored + ", facet=" + facet + "]";
+        return "DoubleField [name=" + name + ", value=" + value + ", store=" + store + ", facet=" + facet + "]";
     }
 
 }
