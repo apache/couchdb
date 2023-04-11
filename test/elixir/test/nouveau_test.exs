@@ -25,7 +25,6 @@ defmodule NouveauTest do
       nouveau: %{
         fruits: %{
           default_analyzer: "standard",
-          lucene_major: 9,
           index: "function (doc) {\n  index(\"item\", doc.item, {facet: true});\n  index(\"place\", doc.place, {facet: true});\n  index(\"state\", doc.state, {facet: true});\n}"
         }
       }
