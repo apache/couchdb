@@ -40,6 +40,8 @@ all_docs_test_() ->
                 [
                     fun should_query/1,
                     fun should_query_with_range/1,
+                    fun should_query_with_non_string_key/1,
+                    fun should_query_with_non_string_keys/1,
                     fun should_query_with_range_and_same_keys/1,
                     fun raise_error_query_with_range_and_different_keys/1,
                     fun should_query_with_range_rev/1,
@@ -81,6 +83,25 @@ should_query_with_range(Db) ->
         ]},
     ?_assertEqual(Expect, Result).
 
+should_query_with_non_string_key(Db) ->
+    Expect = {ok, [{meta, [{total, 11}, {offset, 0}]}]},
+    [
+        ?_assertEqual(Expect, run_query(Db, [{start_key, Key}, {end_key, Key}]))
+     || Key <- [1, a, [1, "2"], #{id => 1}]
+    ].
+
+should_query_with_non_string_keys(Db) ->
+    [
+        ?_assertEqual(
+            {ok, [
+                {meta, [{total, 11}, {offset, 0}]},
+                {row, [{id, error}, {key, Key}, {value, not_found}]}
+            ]},
+            run_query(Db, [{keys, [Key]}])
+        )
+     || Key <- [1, a, [1, "2"], #{id => 1}]
+    ].
+
 should_query_with_range_and_same_keys(Db) ->
     Result = run_query(Db, [{keys, [<<"3">>]}, {start_key, <<"3">>}, {end_key, <<"3">>}]),
     Expect =
@@ -92,8 +113,10 @@ should_query_with_range_and_same_keys(Db) ->
 
 raise_error_query_with_range_and_different_keys(Db) ->
     Error = {query_parse_error, <<"`keys` is incompatible with `key`, `start_key` and `end_key`">>},
-    ?_assertThrow(Error, run_query(Db, [{keys, [<<"1">>]}, {start_key, <<"5">>}])),
-    ?_assertThrow(Error, run_query(Db, [{keys, [<<"5">>]}, {start_key, <<"5">>}])).
+    [
+        ?_assertThrow(Error, run_query(Db, [{keys, [<<"1">>]}, {start_key, <<"5">>}])),
+        ?_assertThrow(Error, run_query(Db, [{keys, [<<"5">>]}, {start_key, <<"5">>}]))
+    ].
 
 should_query_with_range_rev(Db) ->
     Result = run_query(Db, [
