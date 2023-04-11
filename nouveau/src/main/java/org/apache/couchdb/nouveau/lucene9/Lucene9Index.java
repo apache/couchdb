@@ -343,7 +343,7 @@ public class Lucene9Index extends Index {
             case "string":
                 type = SortField.Type.STRING;
                 break;
-            case "number":
+            case "double":
                 type = SortField.Type.DOUBLE;
                 break;
             default:
