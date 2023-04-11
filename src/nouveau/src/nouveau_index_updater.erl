@@ -90,7 +90,16 @@ load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges}) ->
                 [] ->
                     ok = nouveau_api:delete_doc(Index, Id, Seq);
                 _ ->
-                    ok = nouveau_api:update_doc(Index, Id, Seq, Fields)
+                    case nouveau_api:update_doc(Index, Id, Seq, Fields) of
+                        ok ->
+                            ok;
+                        {error, Reason} ->
+                            couch_log:error(
+                                "~p: failed to index ~s, reason ~p",
+                                [?MODULE, Id, Reason]
+                            ),
+                            exit({error, Reason})
+                    end
             end
     end,
     {ok, {Db, Index, Proc, ChangesDone + 1, TotalChanges}}.
