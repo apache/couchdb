@@ -903,12 +903,12 @@ all_docs_key_opts(#mrargs{keys = Keys, direction = Dir} = Args, Extra) ->
         Keys
     ).
 
-ad_skey_opts(#mrargs{start_key = SKey}) when is_binary(SKey) ->
+ad_skey_opts(#mrargs{start_key = SKey}) when SKey =/= undefined ->
     [{start_key, SKey}];
 ad_skey_opts(#mrargs{start_key_docid = SKeyDocId}) ->
     [{start_key, SKeyDocId}].
 
-ad_ekey_opts(#mrargs{end_key = EKey} = Args) when is_binary(EKey) ->
+ad_ekey_opts(#mrargs{end_key = EKey} = Args) when EKey =/= undefined ->
     Type =
         if
             Args#mrargs.inclusive_end -> end_key;
