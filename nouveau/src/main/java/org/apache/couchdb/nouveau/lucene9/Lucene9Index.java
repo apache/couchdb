@@ -236,12 +236,12 @@ public class Lucene9Index extends Index {
                 if (field.name().equals("_id")) {
                     continue;
                 }
-                if (field.stringValue() != null) {
-                    fields.add(new StoredField(field.name(), field.stringValue()));
-                } else if (field.numericValue() != null) {
+                if (field.numericValue() != null) {
                     fields.add(new StoredField(field.name(), (double) field.numericValue()));
                 } else if (field.binaryValue() != null) {
                     fields.add(new StoredField(field.name(), toBytes(field.binaryValue())));
+                } else if (field.stringValue() != null) {
+                    fields.add(new StoredField(field.name(), field.stringValue()));
                 }
             }
 
