@@ -237,7 +237,7 @@ public class Lucene9Index extends Index {
                     continue;
                 }
                 if (field.numericValue() != null) {
-                    fields.add(new StoredField(field.name(), (double) field.numericValue()));
+                    fields.add(new StoredField(field.name(), field.numericValue().doubleValue()));
                 } else if (field.binaryValue() != null) {
                     fields.add(new StoredField(field.name(), toBytes(field.binaryValue())));
                 } else if (field.stringValue() != null) {
@@ -392,11 +392,11 @@ public class Lucene9Index extends Index {
                 var f = (StoredField) field;
                 var val = f.getValue();
                 if (val instanceof String) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) f.getValue()));
-                } else if (val instanceof Double) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (Double) f.getValue()));
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) val));
+                } else if (val instanceof Number) {
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number)val).doubleValue()));
                 } else if (val instanceof byte[]) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) f.getValue()));
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
                 } else {
                     throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
                 }

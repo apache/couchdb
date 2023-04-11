@@ -22,39 +22,21 @@ public final class StoredField extends Field {
     @NotNull
     private final Object value;
 
-    private final boolean encoded;
-
-    public StoredField(@JsonProperty("name") final String name, @JsonProperty("value") final String value) {
+    public StoredField(@JsonProperty("name") final String name, @JsonProperty("value") final Object value) {
         super(name);
+        if (!(value instanceof String || value instanceof Number || value instanceof byte[])) {
+            throw new IllegalArgumentException(value + " must be a string, number or byte array");
+        }
         this.value = value;
-        this.encoded = false;
     }
 
-    public StoredField(@JsonProperty("name") final String name, @JsonProperty("value") final double value) {
-        super(name);
-        this.value = value;
-        this.encoded = false;
-    }
-
-    public StoredField(@JsonProperty("name") final String name, @JsonProperty("value") final byte[] value) {
-        super(name);
-        this.value = value;
-        this.encoded = true;
-    }
-
-    @JsonProperty
     public Object getValue() {
         return value;
     }
 
-    @JsonProperty
-    public boolean isEncoded() {
-        return encoded;
-    }
-
     @Override
     public String toString() {
-        return "StoredField [value=" + value + ", encoded=" + encoded + "]";
+        return "StoredField [name=" + name + ", value=" + value + "]";
     }
 
 }
