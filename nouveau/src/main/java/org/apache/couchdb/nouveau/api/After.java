@@ -23,9 +23,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
-import io.dropwizard.jackson.JsonSnakeCase;
-
-@JsonSnakeCase
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonSerialize(using = AfterSerializer.class)
 @JsonDeserialize(using = AfterDeserializer.class)

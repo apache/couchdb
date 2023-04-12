@@ -16,9 +16,8 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-import io.dropwizard.jackson.JsonSnakeCase;
 
-@JsonSnakeCase
+
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class DoubleRange extends Range<Double> {
 

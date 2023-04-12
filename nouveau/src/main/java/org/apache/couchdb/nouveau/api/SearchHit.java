@@ -18,10 +18,10 @@ import java.util.Collection;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-import io.dropwizard.jackson.JsonSnakeCase;
+
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
-@JsonSnakeCase
+
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class SearchHit {
 
