@@ -14,12 +14,19 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
+import io.dropwizard.jackson.JsonSnakeCase;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
+@JsonSnakeCase
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public final class StoredField extends Field {
 
     @NotNull
+    @Schema(oneOf = {String.class, Double.class, byte[].class})
     private final Object value;
 
     public StoredField(@JsonProperty("name") final String name, @JsonProperty("value") final Object value) {

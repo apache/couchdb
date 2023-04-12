@@ -15,13 +15,15 @@ package org.apache.couchdb.nouveau.api;
 
 import java.util.Map;
 
-import jakarta.validation.constraints.NotEmpty;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import io.dropwizard.jackson.JsonSnakeCase;
+import jakarta.validation.constraints.NotEmpty;
 
 @JsonSnakeCase
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class IndexDefinition {
 
     @NotEmpty

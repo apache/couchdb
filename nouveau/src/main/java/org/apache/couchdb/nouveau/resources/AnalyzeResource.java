@@ -17,16 +17,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response.Status;
-import jakarta.ws.rs.core.MediaType;
-
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
 import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
@@ -37,6 +27,16 @@ import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.ResponseMetered;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response.Status;
 
 @Path("/analyze")
 @Metered

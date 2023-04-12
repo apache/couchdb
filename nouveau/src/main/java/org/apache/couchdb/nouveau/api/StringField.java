@@ -16,11 +16,14 @@ package org.apache.couchdb.nouveau.api;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
 import io.dropwizard.jackson.JsonSnakeCase;
 import jakarta.validation.constraints.NotNull;
 
 @JsonSnakeCase
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public final class StringField extends Field {
 
     @NotNull

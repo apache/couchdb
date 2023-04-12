@@ -13,12 +13,11 @@
 
 package org.apache.couchdb.nouveau.core;
 
+import io.dropwizard.jersey.errors.ErrorMessage;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.ext.ExceptionMapper;
-
-import io.dropwizard.jersey.errors.ErrorMessage;
 
 public class UpdatesOutOfOrderExceptionMapper implements ExceptionMapper<UpdatesOutOfOrderException> {
 

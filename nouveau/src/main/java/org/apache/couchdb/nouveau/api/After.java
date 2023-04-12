@@ -18,12 +18,15 @@ import java.util.Arrays;
 import org.apache.couchdb.nouveau.core.ser.AfterDeserializer;
 import org.apache.couchdb.nouveau.core.ser.AfterSerializer;
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 import io.dropwizard.jackson.JsonSnakeCase;
 
 @JsonSnakeCase
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonSerialize(using = AfterSerializer.class)
 @JsonDeserialize(using = AfterDeserializer.class)
 public class After {

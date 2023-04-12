@@ -15,14 +15,14 @@ package org.apache.couchdb.nouveau.core.ser;
 
 import java.io.IOException;
 
+import org.apache.couchdb.nouveau.api.After;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-
-import org.apache.couchdb.nouveau.api.After;
 
 public class AfterDeserializer extends StdDeserializer<After> {
 

@@ -16,21 +16,25 @@ package org.apache.couchdb.nouveau.api;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.lucene.search.TotalHits.Relation;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+
+import io.dropwizard.jackson.JsonSnakeCase;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import io.dropwizard.jackson.JsonSnakeCase;
-
 @JsonSnakeCase
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class SearchResults {
 
     @PositiveOrZero
     private long totalHits;
 
     @NotNull
-    private String totalHitsRelation;
+    private Relation totalHitsRelation;
 
     @NotNull
     private List<@NotNull SearchHit> hits;
@@ -51,12 +55,12 @@ public class SearchResults {
         return totalHits;
     }
 
-    public String getTotalHitsRelation() {
+    public Relation getTotalHitsRelation() {
         return totalHitsRelation;
     }
 
-    public void setTotalHitsRelation(String totalHitsRelation) {
-        this.totalHitsRelation = totalHitsRelation;
+    public void setTotalHitsRelation(Relation relation) {
+        this.totalHitsRelation = relation;
     }
 
     public void setHits(final List<SearchHit> hits) {

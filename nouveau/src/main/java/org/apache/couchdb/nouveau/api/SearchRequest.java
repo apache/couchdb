@@ -16,17 +16,19 @@ package org.apache.couchdb.nouveau.api;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+
+import io.dropwizard.jackson.JsonSnakeCase;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import io.dropwizard.jackson.JsonSnakeCase;
-
 @JsonSnakeCase
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class SearchRequest {
 
     @NotNull

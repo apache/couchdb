@@ -22,13 +22,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response.Status;
 
 import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
@@ -74,6 +71,9 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
+
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 
 public class Lucene9Index extends Index {
 
@@ -250,7 +250,7 @@ public class Lucene9Index extends Index {
         }
 
         searchResults.setTotalHits(topDocs.totalHits.value);
-        searchResults.setTotalHitsRelation(topDocs.totalHits.relation.name());
+        searchResults.setTotalHitsRelation(topDocs.totalHits.relation);
         searchResults.setHits(hits);
     }
 
