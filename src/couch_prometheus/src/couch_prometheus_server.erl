@@ -198,8 +198,7 @@ get_io_stats() ->
     ].
 
 get_message_queue_stats() ->
-    QFun = fun(Name) -> {Name, message_queue_len(whereis(Name))} end,
-    Queues = lists:map(QFun, registered()),
+    Queues = chttpd_node:message_queues(),
     QueueLens = lists:map(fun({_, Len}) -> Len end, Queues),
     QueueLenByLabel = lists:map(fun({Name, Len}) -> {[{queue_name, Name}], Len} end, Queues),
     [
@@ -221,33 +220,16 @@ get_message_queue_stats() ->
         to_prom(erlang_message_queue_size, gauge, "size of message queue", QueueLenByLabel)
     ].
 
-message_queue_len(undefined) ->
-    0;
-message_queue_len(Pid) when is_pid(Pid) ->
-    case erlang:process_info(Pid, message_queue_len) of
-        {message_queue_len, N} ->
-            N;
-        _ ->
-            0
-    end.
-
 get_run_queue_stats() ->
     %% Workaround for https://bugs.erlang.org/browse/ERL-1355
-    {Normal, Dirty} =
-        case erlang:system_info(dirty_cpu_schedulers) > 0 of
-            false ->
-                {statistics(run_queue), 0};
-            true ->
-                [DCQ | SQs] = lists:reverse(statistics(run_queue_lengths)),
-                {lists:sum(SQs), DCQ}
-        end,
+    {SQ, DCQ} = chttpd_node:run_queues(),
     [
-        to_prom(erlang_scheduler_queues, gauge, "the total size of all normal run queues", Normal),
+        to_prom(erlang_scheduler_queues, gauge, "the total size of all normal run queues", SQ),
         to_prom(
             erlang_dirty_cpu_scheduler_queues,
             gauge,
             "the total size of all dirty CPU scheduler run queues",
-            Dirty
+            DCQ
         )
     ].
 
@@ -270,17 +252,6 @@ update_refresh_timer() ->
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
-
-message_queue_len_test() ->
-    self() ! refresh,
-    ?assert(message_queue_len(self()) >= 1),
-    ?assertEqual(0, message_queue_len(undefined)),
-    {Pid, Ref} = spawn_monitor(fun() -> ok end),
-    receive
-        {'DOWN', Ref, process, Pid, _} ->
-            ok
-    end,
-    ?assertEqual(0, message_queue_len(Pid)).
 
 drain_refresh_messages_test() ->
     self() ! refresh,
