@@ -287,7 +287,7 @@ get_stats() ->
     {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
     {{input, Input}, {output, Output}} = statistics(io),
 
-    {CF, CDU} = db_pid_stats(),
+    {CF, CDU} = db_pid_stats_formatted(),
     MessageQueuesHist = [
         {couch_file, {CF}},
         {couch_db_updater, {CDU}}
@@ -315,6 +315,10 @@ get_stats() ->
         {distribution, {get_distribution_stats()}}
     ].
 
+db_pid_stats_formatted() ->
+    {CF, CDU} = db_pid_stats(),
+    {format_pid_stats(CF), format_pid_stats(CDU)}.
+
 db_pid_stats() ->
     {monitors, M} = process_info(whereis(couch_stats_process_tracker), monitors),
     Candidates = [Pid || {process, Pid} <- M],
@@ -323,7 +327,7 @@ db_pid_stats() ->
     {CouchFiles, CouchDbUpdaters}.
 
 db_pid_stats(Mod, Candidates) ->
-    Mailboxes = lists:foldl(
+    lists:foldl(
         fun(Pid, Acc) ->
             case process_info(Pid, [message_queue_len, dictionary]) of
                 undefined ->
@@ -343,8 +347,7 @@ db_pid_stats(Mod, Candidates) ->
         end,
         [],
         Candidates
-    ),
-    format_pid_stats(Mailboxes).
+    ).
 
 format_pid_stats([]) ->
     [];

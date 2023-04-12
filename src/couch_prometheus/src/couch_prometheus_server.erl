@@ -17,6 +17,7 @@
 -import(couch_prometheus_util, [
     couch_to_prom/3,
     to_prom/4,
+    to_prom/2,
     to_prom_summary/2
 ]).
 
@@ -110,6 +111,7 @@ get_system_stats() ->
         get_uptime_stat(),
         get_io_stats(),
         get_message_queue_stats(),
+        get_db_pid_stats(),
         get_run_queue_stats(),
         get_vm_stats(),
         get_ets_stats(),
@@ -219,6 +221,37 @@ get_message_queue_stats() ->
         ),
         to_prom(erlang_message_queue_size, gauge, "size of message queue", QueueLenByLabel)
     ].
+
+get_db_pid_stats() ->
+    {CF, CDU} = chttpd_node:db_pid_stats(),
+    [
+        pid_to_prom_summary(
+            "erlang_message_queue_couch_file",
+            "size of message queue across couch_file processes",
+            CF
+        ),
+        pid_to_prom_summary(
+            "erlang_message_queue_couch_db_updater",
+            "size of message queue across couch_db_updater processes",
+            CDU
+        )
+    ].
+
+pid_to_prom_summary(_, _, []) ->
+    [];
+pid_to_prom_summary(Metric, Desc, Mailboxes) ->
+    Sorted = lists:sort(Mailboxes),
+    Count = length(Sorted),
+    Quantiles = [
+        {[{quantile, <<"0.5">>}], lists:nth(round(Count * 0.5), Sorted)},
+        {[{quantile, <<"0.9">>}], lists:nth(round(Count * 0.9), Sorted)},
+        {[{quantile, <<"0.99">>}], lists:nth(round(Count * 0.99), Sorted)}
+    ],
+    SumStat = to_prom(Metric ++ ["_sum"], lists:sum(Sorted)),
+    CountStat = to_prom(Metric ++ ["_count"], length(Sorted)),
+    MinStat = to_prom(Metric ++ ["_min"], hd(Sorted)),
+    MaxStat = to_prom(Metric ++ ["_max"], lists:last(Sorted)),
+    to_prom(Metric, summary, Desc, Quantiles) ++ [SumStat, CountStat, MinStat, MaxStat].
 
 get_run_queue_stats() ->
     %% Workaround for https://bugs.erlang.org/browse/ERL-1355
