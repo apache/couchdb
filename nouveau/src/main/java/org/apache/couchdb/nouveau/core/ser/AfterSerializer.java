@@ -14,6 +14,11 @@
 package org.apache.couchdb.nouveau.core.ser;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 
 import org.apache.couchdb.nouveau.api.After;
 
@@ -34,6 +39,7 @@ public class AfterSerializer extends StdSerializer<After> {
     @Override
     public void serialize(final After after, final JsonGenerator gen, final SerializerProvider provider)
             throws IOException {
+        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
         // We ignore fieldDoc.score as it will be in the fields array if we're sorting for relevance.
         // We ignore fieldDoc.doc as _id is always the last field and is unique.
         gen.writeStartArray();
@@ -45,9 +51,15 @@ public class AfterSerializer extends StdSerializer<After> {
                 gen.writeStringField("value", (String) o);
             } else if (o instanceof byte[]) {
                 final byte[] bytes = (byte[]) o;
-                gen.writeStringField("@type", "bytes");
-                gen.writeFieldName("value");
-                gen.writeBinary(bytes);
+                try {
+                    final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap(bytes));
+                    gen.writeStringField("@type", "string");
+                    gen.writeStringField("value", buf.toString());
+                } catch (final CharacterCodingException e) {
+                    gen.writeStringField("@type", "bytes");
+                    gen.writeFieldName("value");
+                    gen.writeBinary(bytes);
+                }
             } else if (o instanceof Float) {
                 gen.writeStringField("@type", "float");
                 gen.writeNumberField("value", (Float) o);

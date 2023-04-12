@@ -14,6 +14,7 @@
 package org.apache.couchdb.nouveau.core.ser;
 
 import java.io.IOException;
+import java.nio.charset.Charset;
 
 import org.apache.couchdb.nouveau.api.After;
 
@@ -43,7 +44,7 @@ public class AfterDeserializer extends StdDeserializer<After> {
             final JsonNode field = fieldNode.get(i);
             switch (field.get("@type").asText()) {
                 case "string":
-                    fields[i] = field.get("value").asText();
+                    fields[i] = field.get("value").asText().getBytes(Charset.forName("UTF-8"));
                     break;
                 case "bytes":
                     fields[i] = field.get("value").binaryValue();

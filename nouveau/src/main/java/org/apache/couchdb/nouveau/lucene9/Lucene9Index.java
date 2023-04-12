@@ -15,6 +15,11 @@ package org.apache.couchdb.nouveau.lucene9;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -365,6 +370,8 @@ public class Lucene9Index extends Index {
             result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
         }
 
+        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
+
         for (Field field : request.getFields()) {
             // Underscore-prefix is reserved.
             if (field.getName().startsWith("_")) {
@@ -396,7 +403,12 @@ public class Lucene9Index extends Index {
                 } else if (val instanceof Number) {
                     result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number)val).doubleValue()));
                 } else if (val instanceof byte[]) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
+                    try {
+                        final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap((byte[])val));
+                        result.add(new org.apache.lucene.document.StoredField(f.getName(), buf.toString()));
+                    } catch (final CharacterCodingException e) {
+                        result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
+                    }
                 } else {
                     throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
                 }
