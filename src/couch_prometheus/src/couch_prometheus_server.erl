@@ -116,7 +116,8 @@ get_system_stats() ->
         get_vm_stats(),
         get_ets_stats(),
         get_internal_replication_jobs_stat(),
-        get_membership_stat()
+        get_membership_stat(),
+        get_distribution_stats()
     ]).
 
 get_uptime_stat() ->
@@ -263,6 +264,140 @@ get_run_queue_stats() ->
             gauge,
             "the total size of all dirty CPU scheduler run queues",
             DCQ
+        )
+    ].
+
+% gets the socket stat for the specified socket,
+% inverting the result from inet:getstat/1 to
+% return a map keyed on the stat_option and
+% with a value representing the node and stat value
+% e.g.
+% #{
+%    recv_oct => [{[{node="node2@127.0.0.1"}], 30609}]
+%    recv_cnt => [{[{node="node2@127.0.0.1"}], 123}]
+% ...
+% }
+% where there is an error fetching the socket stats,
+% return no result for the specified node.
+-spec get_sock_stats({Node, Socket}, MapAcc) ->
+    #{OptionValue := [{[{node, Node}], Value}]}
+when
+    Node :: node(),
+    Socket :: inet:socket(),
+    OptionValue :: inet:stat_option(),
+    Value :: integer(),
+    MapAcc :: #{OptionValue := [{[{node, Node}], Value}]}.
+get_sock_stats({Node, Socket}, MapAcc) ->
+    try inet:getstat(Socket) of
+        {ok, Stats} ->
+            % For each Key/Value pair in Stats, append
+            % an entry for the current Node to the result.
+            % This relies on lists:foldl returning the final
+            % accumulated map
+            lists:foldl(
+                fun({StatOption, Value}, Map0) ->
+                    maps:update_with(StatOption, fun(V) -> V ++ [{[{node, Node}], Value}] end, Map0)
+                end,
+                MapAcc,
+                Stats
+            )
+    catch
+        _:_ ->
+            % no result
+            MapAcc
+    end.
+
+get_distribution_stats() ->
+    % each distribution metric has a different type,
+    % so expose each as a different metric with the erlang
+    % node as a label.
+    % This is the inverse of the structure returned by
+    % inet:getstat/1.
+
+    % This fold accumulates a map keyed on the socket
+    % stat_option (https://www.erlang.org/doc/man/inet.html#getstat-2)
+    % where the value is a list of labels/value pairs for that stat
+    % e.g.
+    % recv_oct => [{[{node="node2@127.0.0.1"}], 30609}, {[{node="node3@127.0.0.1"}], 28392}]
+    % recv_cnt => [{[{node="node2@127.0.0.1"}], 123}, {[{node="node3@127.0.0.1"}], 134}]
+    DefaultMap = #{
+        recv_oct => [],
+        recv_cnt => [],
+        recv_max => [],
+        recv_avg => [],
+        recv_dvi => [],
+        send_oct => [],
+        send_cnt => [],
+        send_max => [],
+        send_avg => [],
+        send_pend => []
+    },
+    NodeStats = erlang:system_info(dist_ctrl),
+    DistStats = lists:foldl(
+        fun get_sock_stats/2,
+        DefaultMap,
+        NodeStats
+    ),
+    [
+        to_prom(
+            erlang_distribution_recv_oct_bytes_total,
+            counter,
+            "Number of bytes received by the socket.",
+            maps:get(recv_oct, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_recv_cnt_packets_total,
+            counter,
+            "number of packets received by the socket.",
+            maps:get(recv_cnt, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_recv_max_bytes,
+            gauge,
+            "size of the largest packet, in bytes, received by the socket.",
+            maps:get(recv_max, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_recv_avg_bytes,
+            gauge,
+            "average size of packets, in bytes, received by the socket.",
+            maps:get(recv_avg, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_recv_dvi_bytes,
+            gauge,
+            "average packet size deviation, in bytes, received by the socket.",
+            maps:get(recv_dvi, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_send_oct_bytes_total,
+            counter,
+            "Number of bytes sent by the socket.",
+            maps:get(send_oct, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_send_cnt_packets_total,
+            counter,
+            "number of packets sent by the socket.",
+            maps:get(send_cnt, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_send_max_bytes,
+            gauge,
+            "size of the largest packet, in bytes, sent by the socket.",
+            maps:get(send_max, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_send_avg_bytes,
+            gauge,
+            "average size of packets, in bytes, sent by the socket.",
+            maps:get(send_avg, DistStats)
+        ),
+        to_prom(
+            erlang_distribution_send_pend_bytes,
+            gauge,
+            "number of bytes waiting to be sent by the socket.",
+            maps:get(send_pend, DistStats)
         )
     ].
 
