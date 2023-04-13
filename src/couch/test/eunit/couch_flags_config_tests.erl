@@ -96,7 +96,7 @@ latest_overide_wins() ->
      || {Rules, Expected} <- Cases
     ].
 
-flags({{_Pattern}, {_Pattern, _Size, Flags}}) ->
+flags({{_}, {_, _Size, Flags}}) ->
     Flags.
 
 test_id(Items, ExpectedResult) ->
