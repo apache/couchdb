@@ -16,10 +16,11 @@ package org.apache.couchdb.nouveau.api;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -44,7 +45,7 @@ public class SearchRequest {
 
     private Map<@NotEmpty String, List<@NotNull DoubleRange>> ranges;
 
-    private After after;
+    private PrimitiveWrapper<?>[] after;
 
     @Min(1)
     @Max(100)
@@ -129,12 +130,12 @@ public class SearchRequest {
         return topN;
     }
 
-    public void setAfter(final After after) {
+    public void setAfter(final PrimitiveWrapper<?>[] after) {
         this.after = after;
     }
 
     @JsonProperty
-    public After getAfter() {
+    public PrimitiveWrapper<?>[] getAfter() {
         return after;
     }
 

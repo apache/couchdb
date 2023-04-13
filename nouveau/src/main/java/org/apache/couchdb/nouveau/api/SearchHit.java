@@ -14,10 +14,12 @@
 package org.apache.couchdb.nouveau.api;
 
 import java.util.Collection;
+import java.util.Objects;
+
+import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -29,7 +31,7 @@ public class SearchHit {
     private String id;
 
     @NotNull
-    private After order;
+    private PrimitiveWrapper<?>[] order;
 
     @NotNull
     private Collection<@NotNull StoredField> fields;
@@ -37,17 +39,17 @@ public class SearchHit {
     public SearchHit() {
     }
 
-    public SearchHit(final String id, final After order, final Collection<StoredField> fields) {
+    public SearchHit(final String id, final PrimitiveWrapper<?>[] order, final Collection<StoredField> fields) {
         this.id = id;
-        this.order = order;
-        this.fields = fields;
+        this.order = Objects.requireNonNull(order);
+        this.fields = Objects.requireNonNull(fields);
     }
 
     public String getId() {
         return id;
     }
 
-    public After getOrder() {
+    public PrimitiveWrapper<?>[] getOrder() {
         return order;
     }
 

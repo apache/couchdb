@@ -32,7 +32,6 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.couchdb.nouveau.api.After;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.DoubleField;
@@ -46,6 +45,13 @@ import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.api.TextField;
 import org.apache.couchdb.nouveau.core.IOUtils;
 import org.apache.couchdb.nouveau.core.Index;
+import org.apache.couchdb.nouveau.core.ser.ByteArrayWrapper;
+import org.apache.couchdb.nouveau.core.ser.DoubleWrapper;
+import org.apache.couchdb.nouveau.core.ser.FloatWrapper;
+import org.apache.couchdb.nouveau.core.ser.IntWrapper;
+import org.apache.couchdb.nouveau.core.ser.LongWrapper;
+import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
+import org.apache.couchdb.nouveau.core.ser.StringWrapper;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
@@ -193,7 +199,7 @@ public class Lucene9Index extends Index {
     private CollectorManager<?, ? extends TopDocs> hitCollector(final SearchRequest searchRequest) {
         final Sort sort = toSort(searchRequest);
 
-        final After after = searchRequest.getAfter();
+        final PrimitiveWrapper<?>[] after = searchRequest.getAfter();
         final FieldDoc fieldDoc;
         if (after != null) {
             fieldDoc = toFieldDoc(after);
@@ -250,7 +256,7 @@ public class Lucene9Index extends Index {
                 }
             }
 
-            final After after = toAfter(((FieldDoc) scoreDoc));
+            final PrimitiveWrapper<?>[] after = toAfter(((FieldDoc) scoreDoc));
             hits.add(new SearchHit(doc.get("_id"), after, fields));
         }
 
@@ -420,24 +426,49 @@ public class Lucene9Index extends Index {
         return result;
     }
 
-    private FieldDoc toFieldDoc(final After after) {
-        final Object[] fields = Arrays.copyOf(after.getFields(), after.getFields().length);
-        for (int i = 0; i < fields.length; i++) {
+    private FieldDoc toFieldDoc(final Object[] after) {
+        final Object[] fields = new Object[after.length];
+        for (int i = 0; i < after.length; i++) {
+            if (after[i] instanceof PrimitiveWrapper<?>) {
+                fields[i] = ((PrimitiveWrapper<?>)after[i]).getValue();
+            }
             if (fields[i] instanceof byte[]) {
                 fields[i] = new BytesRef((byte[]) fields[i]);
+            }
+            if (fields[i] instanceof String) {
+                fields[i] = new BytesRef((String) fields[i]);
             }
         }
         return new FieldDoc(0, Float.NaN, fields);
     }
 
-    private After toAfter(final FieldDoc fieldDoc) {
-        final Object[] fields = Arrays.copyOf(fieldDoc.fields, fieldDoc.fields.length);
+    private PrimitiveWrapper<?>[] toAfter(final FieldDoc fieldDoc) {
+        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
+        final PrimitiveWrapper<?>[] fields = new PrimitiveWrapper<?>[fieldDoc.fields.length];
         for (int i = 0; i < fields.length; i++) {
-            if (fields[i] instanceof BytesRef) {
-                fields[i] = toBytes((BytesRef) fields[i]);
+            if (fieldDoc.fields[i] instanceof String) {
+                fields[i] = new StringWrapper((String)fieldDoc.fields[i]);
+            } else if (fieldDoc.fields[i] instanceof BytesRef) {
+                var bytes = toBytes((BytesRef) fieldDoc.fields[i]);
+                try {
+                    final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap(bytes));
+                    fields[i] = new StringWrapper(buf.toString());
+                } catch (final CharacterCodingException e) {
+                    fields[i] = new ByteArrayWrapper(bytes);
+                }
+            } else if (fieldDoc.fields[i] instanceof Double) {
+                fields[i] = new DoubleWrapper((double) fieldDoc.fields[i]);
+            } else if (fieldDoc.fields[i] instanceof Integer) {
+                fields[i] = new IntWrapper((int) fieldDoc.fields[i]);
+            } else if (fieldDoc.fields[i] instanceof Long) {
+                fields[i] = new LongWrapper((long) fieldDoc.fields[i]);
+            } else if (fieldDoc.fields[i] instanceof Float) {
+                fields[i] = new FloatWrapper((float) fieldDoc.fields[i]);
+            } else {
+                throw new WebApplicationException(fieldDoc.fields[i].getClass() + " is not valid", Status.BAD_REQUEST);
             }
         }
-        return new After(fields);
+        return fields;
     }
 
     private static byte[] toBytes(final BytesRef bytesRef) {
