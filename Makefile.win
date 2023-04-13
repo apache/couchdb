@@ -192,7 +192,7 @@ erlfmt-format:
 
 .venv/bin/black:
 	@$(PYTHON) -m venv .venv
-	@.venv\Scripts\pip3.exe install black || copy /b .venv\Scripts\black.exe +,,
+	@.venv\Scripts\pip3.exe install black==23.3.0 || copy /b .venv\Scripts\black.exe +,,
 
 # target: python-black - Check Python code formatting (requires Python >= 3.6)
 python-black: .venv/bin/black
