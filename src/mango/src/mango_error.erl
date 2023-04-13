@@ -74,6 +74,25 @@ info(mango_cursor_text, {text_search_error, {error, Error}}) ->
         <<"text_search_error">>,
         fmt("~p", [Error])
     };
+info(mango_cursor_nouveau, multiple_nouveau_indexes) ->
+    {
+        400,
+        <<"multiple_nouveau_indexes">>,
+        <<"You must specify an index with the `use_index` parameter.">>
+    };
+info(mango_cursor_nouveau, {nouveau_search_error, {error, {Type, Msg}}})
+  when is_binary(Msg) ->
+    {
+        500,
+        <<"nouveau_search_error">>,
+        fmt("~p: ~s", [Type, Msg])
+    };
+info(mango_cursor_nouveau, {nouveau_search_error, {error, Error}}) ->
+    {
+        500,
+        <<"nouveau_search_error">>,
+        fmt("~p", [Error])
+    };
 info(mango_fields, {invalid_fields_json, BadFields}) ->
     {
         400,

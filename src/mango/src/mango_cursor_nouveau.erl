@@ -44,7 +44,7 @@ create(Db, Indexes, Selector, Opts) ->
             [Index0] ->
                 Index0;
             _ ->
-                ?MANGO_ERROR(multiple_text_indexes)
+                ?MANGO_ERROR(multiple_nouveau_indexes)
         end,
 
     NouveauLimit = get_nouveau_limit(),
@@ -155,7 +155,7 @@ search_docs(CAcc) ->
         {ok, SearchResults} ->
             {ok, SearchResults};
         {error, Reason} ->
-            ?MANGO_ERROR({text_search_error, {error, Reason}})
+            ?MANGO_ERROR({nouveau_search_error, {error, Reason}})
     end.
 
 handle_hits(CAcc, []) ->
