@@ -19,7 +19,6 @@ import java.util.List;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
-import org.apache.lucene.queryparser.flexible.core.QueryNodeParseException;
 import org.apache.lucene.queryparser.flexible.core.QueryParserHelper;
 import org.apache.lucene.queryparser.flexible.core.nodes.FieldQueryNode;
 import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
@@ -116,8 +115,14 @@ public final class NouveauQueryParser extends QueryParserHelper {
 
             if (node instanceof FieldQueryNode && !(node.getParent() instanceof RangeQueryNode)) {
                 final var fieldNode = (FieldQueryNode) node;
-                var number = toNumber(fieldNode.getFieldAsString(), fieldNode.getTextAsString(), numberFormat);
-                if (number == null) {
+                String text = fieldNode.getTextAsString();
+                if (text.length() == 0) {
+                    return node;
+                }
+                final Number number;
+                try {
+                    number = numberFormat.parse(text).doubleValue();
+                } catch (final ParseException e) {
                     return node;
                 }
                 final var lowerNode = new PointQueryNode(fieldNode.getField(), number, numberFormat);
@@ -129,11 +134,26 @@ public final class NouveauQueryParser extends QueryParserHelper {
                 final var termRangeNode = (TermRangeQueryNode) node;
                 final var lower = termRangeNode.getLowerBound();
                 final var upper = termRangeNode.getUpperBound();
-                final var lowerNumber = toNumber(lower.getFieldAsString(), lower.getTextAsString(), numberFormat);
-                final var upperNumber = toNumber(upper.getFieldAsString(), upper.getTextAsString(), numberFormat);
-                if (lowerNumber == null || upperNumber == null) {
-                    return node;
+                final var lowerText = lower.getTextAsString();
+                final var upperText = upper.getTextAsString();
+                Number lowerNumber = null, upperNumber = null;
+
+                if (lowerText.length() > 0 && !lowerText.equals("-Infinity")) {
+                    try {
+                        lowerNumber = numberFormat.parse(lowerText).doubleValue();
+                    } catch (final ParseException e) {
+                        return node;
+                    }
                 }
+
+                if (upperText.length() > 0 && !upperText.equals("Infinity")) {
+                    try {
+                        upperNumber = numberFormat.parse(upperText).doubleValue();
+                    } catch (final ParseException e) {
+                        return node;
+                    }
+                }
+
                 final var lowerNode = new PointQueryNode(termRangeNode.getField(), lowerNumber, numberFormat);
                 final var upperNode = new PointQueryNode(termRangeNode.getField(), upperNumber, numberFormat);
                 final var lowerInclusive = termRangeNode.isLowerInclusive();
@@ -154,22 +174,6 @@ public final class NouveauQueryParser extends QueryParserHelper {
         @Override
         protected List<QueryNode> setChildrenOrder(final List<QueryNode> children) throws QueryNodeException {
             return children;
-        }
-
-        /**
-         * Returns null if the value is not a number, indicating we should fallback to
-         * regular term / termrange query.
-         */
-        private Number toNumber(final String field, final String value, final NumberFormat numberFormat)
-                throws QueryNodeParseException {
-            if (value.length() == 0) {
-                return null;
-            }
-            try {
-                return numberFormat.parse(value).doubleValue();
-            } catch (final ParseException e) {
-                return null;
-            }
         }
 
     }
