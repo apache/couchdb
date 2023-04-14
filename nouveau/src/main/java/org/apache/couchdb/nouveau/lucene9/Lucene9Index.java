@@ -494,7 +494,6 @@ public class Lucene9Index extends Index {
         } catch (final QueryNodeException e) {
             throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
         }
-
         return result;
     }
 
