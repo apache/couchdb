@@ -94,10 +94,6 @@ load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges}) ->
                         ok ->
                             ok;
                         {error, Reason} ->
-                            couch_log:error(
-                                "~p: failed to index ~s, reason ~p",
-                                [?MODULE, Id, Reason]
-                            ),
                             exit({error, Reason})
                     end
             end
