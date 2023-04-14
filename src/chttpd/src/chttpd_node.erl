@@ -16,7 +16,9 @@
 -export([
     handle_node_req/1,
     get_stats/0,
-    run_queues/0
+    run_queues/0,
+    message_queues/0,
+    db_pid_stats/0
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -284,14 +286,13 @@ get_stats() ->
     ],
     {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
     {{input, Input}, {output, Output}} = statistics(io),
-    {CF, CDU} = db_pid_stats(),
-    MessageQueues0 = [
+
+    {CF, CDU} = db_pid_stats_formatted(),
+    MessageQueuesHist = [
         {couch_file, {CF}},
-        {couch_db_updater, {CDU}},
-        {couch_server, couch_server:aggregate_queue_len()},
-        {index_server, couch_index_server:aggregate_queue_len()}
+        {couch_db_updater, {CDU}}
     ],
-    MessageQueues = MessageQueues0 ++ message_queues(registered()),
+    MessageQueues = message_queues(),
     {SQ, DCQ} = run_queues(),
     [
         {uptime, couch_app:uptime() div 1000},
@@ -309,10 +310,14 @@ get_stats() ->
         {stale_proc_count, couch_proc_manager:get_stale_proc_count()},
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
-        {message_queues, {MessageQueues}},
+        {message_queues, {MessageQueuesHist ++ MessageQueues}},
         {internal_replication_jobs, mem3_sync:get_backlog()},
         {distribution, {get_distribution_stats()}}
     ].
+
+db_pid_stats_formatted() ->
+    {CF, CDU} = db_pid_stats(),
+    {format_pid_stats(CF), format_pid_stats(CDU)}.
 
 db_pid_stats() ->
     {monitors, M} = process_info(whereis(couch_stats_process_tracker), monitors),
@@ -322,7 +327,7 @@ db_pid_stats() ->
     {CouchFiles, CouchDbUpdaters}.
 
 db_pid_stats(Mod, Candidates) ->
-    Mailboxes = lists:foldl(
+    lists:foldl(
         fun(Pid, Acc) ->
             case process_info(Pid, [message_queue_len, dictionary]) of
                 undefined ->
@@ -342,8 +347,7 @@ db_pid_stats(Mod, Candidates) ->
         end,
         [],
         Candidates
-    ),
-    format_pid_stats(Mailboxes).
+    ).
 
 format_pid_stats([]) ->
     [];
@@ -385,15 +389,22 @@ get_distribution_stats() ->
         erlang:system_info(dist_ctrl)
     ).
 
-message_queues(Registered) ->
-    lists:map(
+-spec message_queues() ->
+    [{Name :: atom(), Length :: pos_integer()}].
+message_queues() ->
+    MessageQueuesAgg = [
+        {couch_server, couch_server:aggregate_queue_len()},
+        {index_server, couch_index_server:aggregate_queue_len()}
+    ],
+    MessageQueuesReg = lists:map(
         fun(Name) ->
             Type = message_queue_len,
             {Type, Length} = process_info(whereis(Name), Type),
             {Name, Length}
         end,
-        Registered
-    ).
+        registered()
+    ),
+    MessageQueuesAgg ++ MessageQueuesReg.
 
 %% Workaround for https://bugs.erlang.org/browse/ERL-1355
 run_queues() ->

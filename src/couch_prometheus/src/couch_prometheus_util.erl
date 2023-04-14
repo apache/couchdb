@@ -16,6 +16,7 @@
     couch_to_prom/3,
     to_bin/1,
     to_prom/4,
+    to_prom/2,
     to_prom_summary/2
 ]).
 
@@ -124,6 +125,8 @@ type_def(Metric, Type, Desc) ->
 
 % support creating a metric series with multiple label/values.
 % Instances is of the form [{[{LabelName, LabelValue}], Value}, ...]
+to_prom(_Metric, _Type, _Desc, []) ->
+    [];
 to_prom(Metric, Type, Desc, Instances) when is_list(Instances) ->
     TypeStr = type_def(Metric, Type, Desc),
     [TypeStr] ++ lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);
