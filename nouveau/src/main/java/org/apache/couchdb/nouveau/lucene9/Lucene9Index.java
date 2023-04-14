@@ -68,6 +68,8 @@ import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.CollectorManager;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.IndexSearcher;
@@ -167,29 +169,24 @@ public class Lucene9Index extends Index {
 
     @Override
     public SearchResults doSearch(final SearchRequest request) throws IOException {
-        final Query query;
-        try {
-            query = newQueryParser().parse(request);
-        } catch (final QueryNodeException e) {
-            throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
-        }
+        final Query query = parse(request);
 
         // Construct CollectorManagers.
         final MultiCollectorManager cm;
         final CollectorManager<?, ? extends TopDocs> hits = hitCollector(request);
+        if (request.hasCounts() || request.hasRanges()) {
+            cm = new MultiCollectorManager(hits, new FacetsCollectorManager());
+        } else {
+            cm = new MultiCollectorManager(hits);
+        }
 
         searcherManager.maybeRefreshBlocking();
 
         final IndexSearcher searcher = searcherManager.acquire();
         try {
-            if (request.hasCounts() || request.hasRanges()) {
-                cm = new MultiCollectorManager(hits, new FacetsCollectorManager());
-            } else {
-                cm = new MultiCollectorManager(hits);
-            }
             final Object[] reduces = searcher.search(query, cm);
             return toSearchResults(request, searcher, reduces);
-        } catch (IllegalStateException e) {
+        } catch (final IllegalStateException e) {
             throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
         } finally {
             searcherManager.release(searcher);
@@ -483,8 +480,22 @@ public class Lucene9Index extends Index {
         return new Term("_id", docId);
     }
 
-    public Lucene9QueryParser newQueryParser() {
-        return new Lucene9QueryParser("default", analyzer);
+    private Query parse(final SearchRequest request) {
+        var queryParser = new NouveauQueryParser(analyzer);
+        Query result;
+        try {
+            result = queryParser.parse(request.getQuery(), "default");
+            if (request.hasPartition()) {
+                final BooleanQuery.Builder builder = new BooleanQuery.Builder();
+                builder.add(new TermQuery(new Term("_partition", request.getPartition())), Occur.MUST);
+                builder.add(result, Occur.MUST);
+                result = builder.build();
+            }
+        } catch (final QueryNodeException e) {
+            throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
+        }
+
+        return result;
     }
 
     @Override

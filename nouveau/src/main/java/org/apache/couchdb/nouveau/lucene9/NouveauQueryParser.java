@@ -1,0 +1,177 @@
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package org.apache.couchdb.nouveau.lucene9;
+
+import java.text.NumberFormat;
+import java.text.ParseException;
+import java.util.List;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
+import org.apache.lucene.queryparser.flexible.core.QueryNodeParseException;
+import org.apache.lucene.queryparser.flexible.core.QueryParserHelper;
+import org.apache.lucene.queryparser.flexible.core.nodes.FieldQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.RangeQueryNode;
+import org.apache.lucene.queryparser.flexible.core.processors.NoChildOptimizationQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.core.processors.QueryNodeProcessorImpl;
+import org.apache.lucene.queryparser.flexible.core.processors.QueryNodeProcessorPipeline;
+import org.apache.lucene.queryparser.flexible.core.processors.RemoveDeletedQueryNodesProcessor;
+import org.apache.lucene.queryparser.flexible.standard.builders.StandardQueryTreeBuilder;
+import org.apache.lucene.queryparser.flexible.standard.config.PointsConfig;
+import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler;
+import org.apache.lucene.queryparser.flexible.standard.config.StandardQueryConfigHandler.ConfigurationKeys;
+import org.apache.lucene.queryparser.flexible.standard.nodes.PointQueryNode;
+import org.apache.lucene.queryparser.flexible.standard.nodes.PointRangeQueryNode;
+import org.apache.lucene.queryparser.flexible.standard.nodes.TermRangeQueryNode;
+import org.apache.lucene.queryparser.flexible.standard.parser.StandardSyntaxParser;
+import org.apache.lucene.queryparser.flexible.standard.processors.AllowLeadingWildcardProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.AnalyzerQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.BooleanQuery2ModifierNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.BooleanSingleChildOptimizationQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.BoostQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.DefaultPhraseSlopQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.FuzzyQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.IntervalQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.MatchAllDocsQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.MultiFieldQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.MultiTermRewriteMethodProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.OpenRangeQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.PhraseSlopQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.RegexpQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.RemoveEmptyNonLeafQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.TermRangeQueryNodeProcessor;
+import org.apache.lucene.queryparser.flexible.standard.processors.WildcardQueryNodeProcessor;
+import org.apache.lucene.search.Query;
+
+public final class NouveauQueryParser extends QueryParserHelper {
+
+    public NouveauQueryParser(final Analyzer analyzer) {
+        super(
+                new StandardQueryConfigHandler(),
+                new StandardSyntaxParser(),
+                new NouveauQueryNodeProcessorPipeline(),
+                new StandardQueryTreeBuilder());
+        getQueryConfigHandler().set(ConfigurationKeys.ENABLE_POSITION_INCREMENTS, true);
+        getQueryConfigHandler().set(ConfigurationKeys.ANALYZER, analyzer);
+    }
+
+    @Override
+    public Query parse(String query, String defaultField) throws QueryNodeException {
+        return (Query) super.parse(query, defaultField);
+    }
+
+    /**
+     * Same pipeline as StandardQueryParser but we substitute
+     * PointQueryNodeProcessor and PointRangeQueryNodeProcessor for
+     * NouveauPointProcessor below.
+     */
+    public static class NouveauQueryNodeProcessorPipeline extends QueryNodeProcessorPipeline {
+
+        public NouveauQueryNodeProcessorPipeline() {
+            super(null);
+            add(new WildcardQueryNodeProcessor());
+            add(new MultiFieldQueryNodeProcessor());
+            add(new FuzzyQueryNodeProcessor());
+            add(new RegexpQueryNodeProcessor());
+            add(new MatchAllDocsQueryNodeProcessor());
+            add(new OpenRangeQueryNodeProcessor());
+            add(new NouveauPointProcessor());
+            add(new TermRangeQueryNodeProcessor());
+            add(new AllowLeadingWildcardProcessor());
+            add(new AnalyzerQueryNodeProcessor());
+            add(new PhraseSlopQueryNodeProcessor());
+            add(new BooleanQuery2ModifierNodeProcessor());
+            add(new NoChildOptimizationQueryNodeProcessor());
+            add(new RemoveDeletedQueryNodesProcessor());
+            add(new RemoveEmptyNonLeafQueryNodeProcessor());
+            add(new BooleanSingleChildOptimizationQueryNodeProcessor());
+            add(new DefaultPhraseSlopQueryNodeProcessor());
+            add(new BoostQueryNodeProcessor());
+            add(new MultiTermRewriteMethodProcessor());
+            add(new IntervalQueryNodeProcessor());
+        }
+    }
+
+    /**
+     * If it looks like a number, treat it as a number.
+     */
+    public static class NouveauPointProcessor extends QueryNodeProcessorImpl {
+
+        @Override
+        protected QueryNode postProcessNode(final QueryNode node) throws QueryNodeException {
+            final var numberFormat = NumberFormat.getInstance();
+            final var pointsConfig = new PointsConfig(numberFormat, Double.class);
+
+            if (node instanceof FieldQueryNode && !(node.getParent() instanceof RangeQueryNode)) {
+                final var fieldNode = (FieldQueryNode) node;
+                var number = toNumber(fieldNode.getFieldAsString(), fieldNode.getTextAsString(), numberFormat);
+                if (number == null) {
+                    return node;
+                }
+                final var lowerNode = new PointQueryNode(fieldNode.getField(), number, numberFormat);
+                final var upperNode = new PointQueryNode(fieldNode.getField(), number, numberFormat);
+                return new PointRangeQueryNode(lowerNode, upperNode, true, true, pointsConfig);
+            }
+
+            if (node instanceof TermRangeQueryNode) {
+                final var termRangeNode = (TermRangeQueryNode) node;
+                final var lower = termRangeNode.getLowerBound();
+                final var upper = termRangeNode.getUpperBound();
+                final var lowerNumber = toNumber(lower.getFieldAsString(), lower.getTextAsString(), numberFormat);
+                final var upperNumber = toNumber(upper.getFieldAsString(), upper.getTextAsString(), numberFormat);
+                if (lowerNumber == null || upperNumber == null) {
+                    return node;
+                }
+                final var lowerNode = new PointQueryNode(termRangeNode.getField(), lowerNumber, numberFormat);
+                final var upperNode = new PointQueryNode(termRangeNode.getField(), upperNumber, numberFormat);
+                final var lowerInclusive = termRangeNode.isLowerInclusive();
+                final var upperInclusive = termRangeNode.isUpperInclusive();
+
+                return new PointRangeQueryNode(
+                        lowerNode, upperNode, lowerInclusive, upperInclusive, pointsConfig);
+            }
+
+            return node;
+        }
+
+        @Override
+        protected QueryNode preProcessNode(final QueryNode node) throws QueryNodeException {
+            return node;
+        }
+
+        @Override
+        protected List<QueryNode> setChildrenOrder(final List<QueryNode> children) throws QueryNodeException {
+            return children;
+        }
+
+        /**
+         * Returns null if the value is not a number, indicating we should fallback to
+         * regular term / termrange query.
+         */
+        private Number toNumber(final String field, final String value, final NumberFormat numberFormat)
+                throws QueryNodeParseException {
+            if (value.length() == 0) {
+                return null;
+            }
+            try {
+                return numberFormat.parse(value).doubleValue();
+            } catch (final ParseException e) {
+                return null;
+            }
+        }
+
+    }
+
+}
