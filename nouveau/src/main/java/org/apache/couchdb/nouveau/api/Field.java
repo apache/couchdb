@@ -19,8 +19,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Pattern;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonTypeInfo(
@@ -35,6 +34,7 @@ import jakarta.validation.constraints.NotEmpty;
 })
 public abstract class Field {
 
+    @Pattern(regexp = "^\\$?[a-zA-Z][a-zA-Z0-9_]*$")
     protected final String name;
 
     protected Field(final String name) {
@@ -42,7 +42,6 @@ public abstract class Field {
     }
 
     @JsonProperty
-    @NotEmpty
     public String getName() {
         return name;
     }

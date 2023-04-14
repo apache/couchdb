@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Positive;
 
@@ -32,6 +32,7 @@ public class DocumentUpdateRequest {
     private String partition;
 
     @NotEmpty
+    @Valid
     private Collection<Field> fields;
 
     public DocumentUpdateRequest() {
