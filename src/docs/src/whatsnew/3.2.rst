@@ -20,6 +20,22 @@
     :depth: 1
     :local:
 
+.. _release/3.2.3:
+
+Version 3.2.3
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`4529`: In Javascript process manager, use a database tag in
+  addition to a ddoc ID to quickly find processes. This should improve
+  performance.
+
+* :ghissue:`4509`, :ghissue:`4405`: Make remsh work with quoted cookie values.
+
+* Fix for `CVE-2023-26268 <https://docs.couchdb.org/en/stable/cve/2023-26268.html>`_.
+
 .. _release/3.2.2:
 
 Version 3.2.2
