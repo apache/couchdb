@@ -16,7 +16,8 @@
     normalize/1,
     match/2,
     has_required_fields/2,
-    is_constant_field/2
+    is_constant_field/2,
+    fields/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -638,6 +639,14 @@ is_constant_field([{[{Field, {[{Cond, _Val}]}}]} | _Rest], Field) ->
 is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
     is_constant_field(Rest, Field).
 
+-spec fields(selector()) -> fields().
+fields({[{<<"$", _/binary>>, Args}]}) when is_list(Args) ->
+    lists:flatmap(fun fields/1, Args);
+fields({[{Field, _Cond}]}) ->
+    [Field];
+fields({[]}) ->
+    [].
+
 %%%%%%%% module tests below %%%%%%%%
 
 -ifdef(TEST).
@@ -1006,5 +1015,43 @@ match_demo_test_() ->
         ?_assertEqual(false, Check({[{<<"user_id">>, <<"11">>}]})),
         ?_assertEqual(false, Check({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"quux">>}]}))
     ].
+
+fields_of(Selector) ->
+    fields(test_util:as_selector(Selector)).
+
+fields_empty_test() ->
+    ?assertEqual([], fields_of(#{})).
+
+fields_primitive_test() ->
+    Selector = #{<<"field">> => undefined},
+    ?assertEqual([<<"field">>], fields_of(Selector)).
+
+fields_nested_test() ->
+    Selector = #{<<"field1">> => #{<<"field2">> => undefined}},
+    ?assertEqual([<<"field1.field2">>], fields_of(Selector)).
+
+fields_and_test() ->
+    Selector1 = #{<<"$and">> => []},
+    ?assertEqual([], fields_of(Selector1)),
+    Selector2 = #{
+        <<"$and">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
+    },
+    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
+
+fields_or_test() ->
+    Selector1 = #{<<"$or">> => []},
+    ?assertEqual([], fields_of(Selector1)),
+    Selector2 = #{
+        <<"$or">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
+    },
+    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
+
+fields_nor_test() ->
+    Selector1 = #{<<"$nor">> => []},
+    ?assertEqual([], fields_of(Selector1)),
+    Selector2 = #{
+        <<"$nor">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
+    },
+    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
 
 -endif.
