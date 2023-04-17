@@ -25,7 +25,6 @@
 -export([add_all_shards/1]).
 -export([set_batch_size/1]).
 -export([set_delay/1]).
--export([set_limit/1]).
 -export([set_prune_interval/1]).
 
 % exports for spawn
@@ -44,7 +43,6 @@
 -record(state, {
     q = queue:new(),
     dbworker = nil,
-    limit = 20,
     delay = 5000,
     batch_size = 1,
     prune_interval = 60000,
@@ -103,12 +101,6 @@ set_batch_size(BS) when is_integer(BS), BS > 0 ->
 set_delay(Delay) when is_integer(Delay), Delay >= 0 ->
     gen_server:call(?MODULE, {set_delay, Delay}).
 
-%% @doc Changes the configured value for a limit.
-%% Returns previous value.
--spec set_limit(pos_integer()) -> pos_integer().
-set_limit(Limit) when is_integer(Limit), Limit > 0 ->
-    gen_server:call(?MODULE, {set_limit, Limit}).
-
 %% @doc Changes the configured value for a prune interval.
 %% Returns previous value.
 -spec set_prune_interval(pos_integer()) -> pos_integer().
@@ -122,8 +114,7 @@ init(_) ->
     ets:new(ken_pending, [named_table]),
     ets:new(ken_resubmit, [named_table]),
     ets:new(ken_workers, [named_table, public, {keypos, #job.name}]),
-    Limit = list_to_integer(config("limit", "20")),
-    {ok, #state{pruned_last = erlang:monotonic_time(), limit = Limit}}.
+    {ok, #state{pruned_last = erlang:monotonic_time()}}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -132,8 +123,6 @@ handle_call({set_batch_size, BS}, _From, #state{batch_size = Old} = State) ->
     {reply, Old, State#state{batch_size = BS}, 0};
 handle_call({set_delay, Delay}, _From, #state{delay = Old} = State) ->
     {reply, Old, State#state{delay = Delay}, 0};
-handle_call({set_limit, Limit}, _From, #state{limit = Old} = State) ->
-    {reply, Old, State#state{limit = Limit}, 0};
 handle_call({set_prune_interval, Interval}, _From, State) ->
     Old = State#state.prune_interval,
     {reply, Old, State#state{prune_interval = Interval}, 0};

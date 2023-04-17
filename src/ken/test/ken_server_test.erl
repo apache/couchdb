@@ -14,12 +14,10 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%% hardcoded defaults: limit: 20; batch: 1; delay: 5000; prune: 60000
+%% hardcoded defaults: batch: 1; delay: 5000; prune: 60000
 default_test_() ->
     {inorder,
         {setup, fun setup_default/0, fun teardown/1, [
-            set_builder("returns default", set_limit, 12, 20),
-            set_builder("keeps set", set_limit, 6, 12),
             set_builder("returns default", set_batch_size, 3, 1),
             set_builder("keeps set", set_batch_size, 6, 3),
             set_builder("returns default", set_delay, 7000, 5000),
@@ -31,8 +29,6 @@ default_test_() ->
 exception_test_() ->
     {inorder,
         {foreach, fun setup_default/0, fun teardown/1, [
-            exception_builder("exception on zero", set_limit, 0),
-            exception_builder("exception on negative", set_limit, -12),
             exception_builder("exception on zero", set_batch_size, 0),
             exception_builder("exception on negative", set_batch_size, -12),
             set_builder("no exception on zero", set_delay, 0, 5000),
@@ -44,8 +40,8 @@ exception_test_() ->
 config_test_() ->
     {inorder,
         {setup, fun setup_config/0, fun teardown/1, [
-            set_builder("reads config", set_limit, 24, 42),
-            set_builder("keeps set", set_limit, 6, 24)
+            set_builder("reads config", set_delay, 5099, 5000),
+            set_builder("keeps set", set_delay, 5042, 5099)
         ]}}.
 
 setup_default() ->
