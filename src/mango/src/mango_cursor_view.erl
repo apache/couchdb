@@ -108,11 +108,18 @@ create(Db, Indexes, Selector, Opts) ->
         bookmark = Bookmark
     }}.
 
+-spec required_fields(#cursor{}) -> fields().
+required_fields(#cursor{fields = all_fields}) ->
+    all_fields;
+required_fields(#cursor{fields = Fields, selector = Selector}) ->
+    lists:usort(Fields ++ mango_selector:fields(Selector)).
+
 -spec explain(#cursor{}) -> nonempty_list(term()).
 explain(#cursor{opts = Opts} = Cursor) ->
     BaseArgs = base_args(Cursor),
     Args0 = apply_opts(Opts, BaseArgs),
-    #cursor{index = Index, fields = Fields} = Cursor,
+    #cursor{index = Index} = Cursor,
+    Fields = required_fields(Cursor),
     Args = consider_index_coverage(Index, Fields, Args0),
 
     [
@@ -197,7 +204,8 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             BaseArgs = base_args(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
             Args0 = apply_opts(Opts, BaseArgs),
-            Args1 = consider_index_coverage(Idx, Cursor#cursor.fields, Args0),
+            Fields = required_fields(Cursor),
+            Args1 = consider_index_coverage(Idx, Fields, Args0),
             Args = mango_json_bookmark:update_args(Bookmark, Args1),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
@@ -858,6 +866,39 @@ create_test() ->
             bookmark = bookmark
         },
     ?assertEqual({ok, Cursor}, create(db, Indexes, Selector, Options)).
+
+to_selector(Map) ->
+    test_util:as_selector(Map).
+
+required_fields_all_fields_test() ->
+    Cursor = #cursor{fields = all_fields},
+    ?assertEqual(all_fields, required_fields(Cursor)).
+
+required_fields_disjoint_fields_test() ->
+    Fields1 = [<<"field1">>, <<"field2">>, <<"field3">>],
+    Selector1 = to_selector(#{}),
+    Cursor1 = #cursor{fields = Fields1, selector = Selector1},
+    ?assertEqual([<<"field1">>, <<"field2">>, <<"field3">>], required_fields(Cursor1)),
+    Fields2 = [<<"field1">>, <<"field2">>],
+    Selector2 = to_selector(#{<<"field3">> => undefined, <<"field4">> => undefined}),
+    Cursor2 = #cursor{fields = Fields2, selector = to_selector(Selector2)},
+    ?assertEqual(
+        [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor2)
+    ).
+
+required_fields_overlapping_fields_test() ->
+    Fields1 = [<<"field1">>, <<"field2">>, <<"field3">>],
+    Selector1 = to_selector(#{<<"field3">> => undefined, <<"field4">> => undefined}),
+    Cursor1 = #cursor{fields = Fields1, selector = Selector1},
+    ?assertEqual(
+        [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor1)
+    ),
+    Fields2 = [<<"field3">>, <<"field1">>, <<"field2">>],
+    Selector2 = to_selector(#{<<"field4">> => undefined, <<"field1">> => undefined}),
+    Cursor2 = #cursor{fields = Fields2, selector = Selector2},
+    ?assertEqual(
+        [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor2)
+    ).
 
 explain_test() ->
     Cursor =

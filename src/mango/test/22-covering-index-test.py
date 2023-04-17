@@ -21,8 +21,8 @@ class CoveringIndexTests(mango.UserDocsTests):
         self.assertEqual(resp["mrargs"]["include_docs"], False)
         self.assertEqual(resp["covered"], True)
 
-    def is_not_covered(self, selector, fields):
-        resp = self.db.find(selector, fields=fields, explain=True)
+    def is_not_covered(self, selector, fields, use_index=None):
+        resp = self.db.find(selector, fields=fields, use_index=use_index, explain=True)
         self.assertEqual(resp["mrargs"]["include_docs"], True)
         self.assertEqual(resp["covered"], False)
 
@@ -73,6 +73,20 @@ class CoveringIndexTests(mango.UserDocsTests):
 
     def test_index_does_not_cover_query_partial_selector(self):
         self.is_not_covered({"name.last": "Hernandez"}, ["name.first"])
+
+    def test_index_does_not_cover_selector_with_more_fields(self):
+        self.is_not_covered(
+            {
+                "$and": [
+                    {"age": {"$ne": 23}},
+                    {"twitter": {"$not": {"$regex": "^@.*[0-9]+$"}}},
+                    {"location.address.number": {"$gt": 4288}},
+                    {"location.city": {"$ne": "Pico Rivera"}},
+                ]
+            },
+            ["twitter"],
+            use_index="twitter",
+        )
 
     def test_covering_index_provides_correct_answer_id(self):
         docs = self.db.find({"age": {"$gte": 32}}, fields=["_id"])
