@@ -27,8 +27,8 @@ defmodule NouveauTest do
           default_analyzer: "standard",
           index: """
             function (doc) {
-              index("string", "foo", doc.foo, {store: true, facet: true});
-              index("double", "bar", doc.bar, {store: true, facet: true});
+              index("string", "foo", doc.foo, {store: true});
+              index("double", "bar", doc.bar, {store: true});
             }
           """
         }

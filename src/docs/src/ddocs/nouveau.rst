@@ -39,8 +39,7 @@ a document update. The ``index`` function takes the following parameters:
    If you set this parameter to ``default``, then this field is queried if no field is
    specified in the query syntax.
 #. Data that you want to index, for example, ``doc.address.country``.
-#. (Optional) The third parameter includes the following fields: ``facet``,
-   and ``store``. These fields are described in more detail later.
+#. (Optional) The third parameter includes the following field: ``store``.
 
 By default, a nouveau index response returns 25 rows. The number of hits that are returned
 can be changed by using the ``limit`` parameter. Each response includes a ``bookmark``
@@ -118,9 +117,6 @@ The ``index`` function takes four parameters, where the third parameter is optio
 #. The fourth, optional, parameter is a JavaScript object with the following fields:
 
    *Index function (optional parameter)*
-
-   * **facet** - Creates a faceted index. See :ref:`Faceting <ddoc/search/faceting>`.
-     Values are ``true`` or ``false``. Default is ``false``.
 
    * **store** - If ``true``, the value is returned in the search result; otherwise,
      the value is not returned. Values are ``true`` or ``false``. Default is ``false``.
@@ -410,12 +406,6 @@ Query Parameters
 A full list of query parameters can be found in the
 :ref:`API Reference <api/ddoc/nouveau>`.
 
-You must enable :ref:`faceting <ddoc/nouveau/faceting>` before you can use the
-following parameters:
-
-- ``counts``
-- ``ranges``
-
 .. note::
     Do not combine the ``bookmark`` and ``update`` options. These options
     constrain the choice of shard replicas to use for the response. When used
@@ -588,17 +578,15 @@ Faceting
 
 Nouveau Search also supports faceted searching, enabling discovery of aggregate
 information about matches quickly and easily. You can match all documents by using the
-special ``?q=*:*`` query syntax, and use the returned facets to refine your query. To
-indicate that a field must be indexed for faceted queries, set ``{"facet": true}`` in its
-options.
+special ``?q=*:*`` query syntax, and use the returned facets to refine your query.
 
-*Example of search query, specifying that faceted search is enabled:*
+*Example of search query:*
 
 .. code-block:: javascript
 
     function(doc) {
-        index("string", "type", doc.type, {"facet": true});
-        index("double", "price", doc.price, {"facet": true});
+        index("string", "type", doc.type);
+        index("double", "price", doc.price);
     }
 
 To use facets, all the documents in the index must include all the fields that have
@@ -614,8 +602,8 @@ using a single ``if`` statement.
 .. code-block:: javascript
 
     if (typeof doc.town == "string" && typeof doc.name == "string") {
-        index("string", "town", doc.town, {facet: true});
-        index("string", "name", doc.name, {facet: true});
+        index("string", "town", doc.town);
+        index("string", "name", doc.name);
        }
 
 Counts

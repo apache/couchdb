@@ -79,6 +79,8 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.SortedNumericSortField;
+import org.apache.lucene.search.SortedSetSortField;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TopFieldCollector;
@@ -348,19 +350,15 @@ public class Lucene9Index extends Index {
                     sortString + " is not a valid sort parameter", Status.BAD_REQUEST);
         }
         final boolean reverse = "-".equals(m.group(1));
-        SortField.Type type;
         switch (m.group(3)) {
             case "string":
-                type = SortField.Type.STRING;
-                break;
+                return new SortField(m.group(2), SortField.Type.STRING, reverse);
             case "double":
-                type = SortField.Type.DOUBLE;
-                break;
+                return new SortedNumericSortField(m.group(2), SortField.Type.DOUBLE, reverse);
             default:
                 throw new WebApplicationException(
                         m.group(3) + " is not a valid sort type", Status.BAD_REQUEST);
         }
-        return new SortField(m.group(2), type, reverse);
     }
 
     private static Document toDocument(final String docId, final DocumentUpdateRequest request) throws IOException {
@@ -387,21 +385,17 @@ public class Lucene9Index extends Index {
                 result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
                         f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
+                // TODO use KeywordField when available.
                 var f = (StringField) field;
                 result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
                         f.isStore() ? Store.YES : Store.NO));
-                if (f.isFacet()) {
-                    result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(),
-                            new BytesRef(f.getValue())));
-                }
+                result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(),
+                        new BytesRef(f.getValue())));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
-                result.add(new org.apache.lucene.document.DoublePoint(f.getName(), f.getValue()));
+                result.add(new org.apache.lucene.document.DoubleField(f.getName(), f.getValue()));
                 if (f.isStore()) {
                     result.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
-                }
-                if (f.isFacet()) {
-                    result.add(new org.apache.lucene.document.DoubleDocValuesField(f.getName(), f.getValue()));
                 }
             } else if (field instanceof StoredField) {
                 var f = (StoredField) field;

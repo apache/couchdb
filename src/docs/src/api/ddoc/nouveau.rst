@@ -43,16 +43,15 @@
         confirming the end of the result list.
     :query json counts: An array of names of string fields for which counts
         are requested. The response contains counts for each unique value of this field
-        name among the documents that match the search query. :ref:`Faceting
-        <ddoc/nouveau/faceting>` must be enabled for this parameter to function.
+        name among the documents that match the search query.
     :query boolean include_docs: Include the full content of the documents in the
         response.
     :query number limit: Limit the number of the returned documents to the specified
         number. For a grouped search, this parameter limits the number of documents per
         group.
     :query string query: Required. The Lucene query string.
-    :query json ranges: This field defines ranges for faceted, numeric search fields. The
-        value is a JSON object where the fields names are faceted numeric search fields,
+    :query json ranges: This field defines ranges for numeric search fields. The
+        value is a JSON object where the fields names are numeric search fields,
         and the values of the fields are arrays of JSON objects. The objects must have a
         ``label``, ``min`` and ``max`` value (of type string, number, number respectively),
         and optional ``min_inclusive`` and ``max_inclusive`` properties (defaulting to
@@ -84,10 +83,6 @@
     :code 400: Invalid request
     :code 401: Read permission required
     :code 404: Specified database, design document or view is missed
-
-.. note::
-    You must enable :ref:`faceting <ddoc/nouveau/faceting>` before you can use the
-    ``counts`` and ``ranges`` parameters.
 
 .. note::
     Faceting is not supported on partitioned searches, so the following
