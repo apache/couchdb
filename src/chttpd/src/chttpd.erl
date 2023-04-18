@@ -1083,6 +1083,8 @@ error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
     {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
+error_info({expectation_failed, Reason}) ->
+    {417, <<"expectation_failed">>, Reason};
 error_info({error, {illegal_database_name, Name}}) ->
     Message =
         <<"Name: '", Name/binary, "'. Only lowercase characters (a-z), ",

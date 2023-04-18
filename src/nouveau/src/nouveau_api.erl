@@ -184,6 +184,8 @@ jaxrs_error("404", Body) ->
     {not_found, message(Body)};
 jaxrs_error("405", Body) ->
     {method_not_allowed, message(Body)};
+jaxrs_error("417", Body) ->
+    {expectation_failed, message(Body)};
 jaxrs_error("422", Body) ->
     {bad_request, lists:join(" and ", errors(Body))};
 jaxrs_error("500", Body) ->
