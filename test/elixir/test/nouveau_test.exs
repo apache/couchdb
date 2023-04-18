@@ -194,4 +194,20 @@ defmodule NouveauTest do
     assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
   end
 
+  @tag :with_db
+  test "ranges (open)", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "*:*", ranges: %{bar: [
+      %{label: "cheap", max: 42},
+      %{label: "expensive", min: 42, min_inclusive: false}]},
+      include_docs: true})
+    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    %{:body => %{"ranges" => ranges}} = resp
+    assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
+  end
+
 end

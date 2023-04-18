@@ -294,7 +294,9 @@ public class Lucene9Index extends Index {
         for (int i = 0; i < luceneRanges.length; i++) {
             final DoubleRange range = ranges.get(i);
             luceneRanges[i] = new org.apache.lucene.facet.range.DoubleRange(
-                    range.getLabel(), range.getMin(), range.isMinInclusive(), range.getMax(), range.isMaxInclusive());
+                    range.getLabel(), range.getMin() != null ? range.getMin() : Double.NEGATIVE_INFINITY,
+                    range.isMinInclusive(), range.getMax() != null ? range.getMax() : Double.POSITIVE_INFINITY,
+                    range.isMaxInclusive());
         }
         return new DoubleRangeFacetCounts(field, fc, luceneRanges);
     }
@@ -382,12 +384,15 @@ public class Lucene9Index extends Index {
             }
             if (field instanceof TextField) {
                 var f = (TextField) field;
-                result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
+                        f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
                 var f = (StringField) field;
-                result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
+                        f.isStore() ? Store.YES : Store.NO));
                 if (f.isFacet()) {
-                    result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(), new BytesRef(f.getValue())));
+                    result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(),
+                            new BytesRef(f.getValue())));
                 }
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
@@ -404,10 +409,10 @@ public class Lucene9Index extends Index {
                 if (val instanceof String) {
                     result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) val));
                 } else if (val instanceof Number) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number)val).doubleValue()));
+                    result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number) val).doubleValue()));
                 } else if (val instanceof byte[]) {
                     try {
-                        final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap((byte[])val));
+                        final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap((byte[]) val));
                         result.add(new org.apache.lucene.document.StoredField(f.getName(), buf.toString()));
                     } catch (final CharacterCodingException e) {
                         result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
@@ -427,7 +432,7 @@ public class Lucene9Index extends Index {
         final Object[] fields = new Object[after.length];
         for (int i = 0; i < after.length; i++) {
             if (after[i] instanceof PrimitiveWrapper<?>) {
-                fields[i] = ((PrimitiveWrapper<?>)after[i]).getValue();
+                fields[i] = ((PrimitiveWrapper<?>) after[i]).getValue();
             }
             if (fields[i] instanceof byte[]) {
                 fields[i] = new BytesRef((byte[]) fields[i]);
@@ -444,7 +449,7 @@ public class Lucene9Index extends Index {
         final PrimitiveWrapper<?>[] fields = new PrimitiveWrapper<?>[fieldDoc.fields.length];
         for (int i = 0; i < fields.length; i++) {
             if (fieldDoc.fields[i] instanceof String) {
-                fields[i] = new StringWrapper((String)fieldDoc.fields[i]);
+                fields[i] = new StringWrapper((String) fieldDoc.fields[i]);
             } else if (fieldDoc.fields[i] instanceof BytesRef) {
                 var bytes = toBytes((BytesRef) fieldDoc.fields[i]);
                 try {
