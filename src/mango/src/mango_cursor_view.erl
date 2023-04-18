@@ -114,14 +114,19 @@ required_fields(#cursor{fields = all_fields}) ->
 required_fields(#cursor{fields = Fields, selector = Selector}) ->
     lists:usort(Fields ++ mango_selector:fields(Selector)).
 
--spec explain(#cursor{}) -> nonempty_list(term()).
-explain(#cursor{opts = Opts} = Cursor) ->
+-spec apply_cursor_opts(#cursor{}) -> {#mrargs{}, boolean()}.
+apply_cursor_opts(#cursor{} = Cursor) ->
+    #cursor{index = Index, opts = Opts} = Cursor,
     BaseArgs = base_args(Cursor),
     Args0 = apply_opts(Opts, BaseArgs),
-    #cursor{index = Index} = Cursor,
     Fields = required_fields(Cursor),
     Args = consider_index_coverage(Index, Fields, Args0),
+    Covered = mango_idx_view:covers(Index, Fields),
+    {Args, Covered}.
 
+-spec explain(#cursor{}) -> nonempty_list(term()).
+explain(Cursor) ->
+    {Args, Covered} = apply_cursor_opts(Cursor),
     [
         {mrargs,
             {[
@@ -136,7 +141,7 @@ explain(#cursor{opts = Opts} = Cursor) ->
                 {update, Args#mrargs.update},
                 {conflicts, Args#mrargs.conflicts}
             ]}},
-        {covered, mango_idx_view:covers(Index, Fields)}
+        {covered, Covered}
     ].
 
 % replace internal values that cannot
@@ -201,12 +206,9 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             % empty indicates unsatisfiable ranges, so don't perform search
             {ok, UserAcc};
         _ ->
-            BaseArgs = base_args(Cursor),
+            {Args0, _Covered} = apply_cursor_opts(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
-            Args0 = apply_opts(Opts, BaseArgs),
-            Fields = required_fields(Cursor),
-            Args1 = consider_index_coverage(Idx, Fields, Args0),
-            Args = mango_json_bookmark:update_args(Bookmark, Args1),
+            Args = mango_json_bookmark:update_args(Bookmark, Args0),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result =
@@ -573,24 +575,25 @@ apply_opts([{_, _} | Rest], Args) ->
     apply_opts(Rest, Args).
 
 -spec consider_index_coverage(#idx{}, fields(), #mrargs{}) -> #mrargs{}.
-consider_index_coverage(Index, Fields, #mrargs{include_docs = IncludeDocs} = Args) ->
+consider_index_coverage(Index, Fields, #mrargs{include_docs = IncludeDocs0} = Args0) ->
     Covering = mango_idx_view:covers(Index, Fields),
-    Args0 = Args#mrargs{include_docs = IncludeDocs andalso (not Covering)},
+    Args = Args0#mrargs{include_docs = IncludeDocs0 andalso (not Covering)},
+    #mrargs{include_docs = IncludeDocs, extra = Extra0} = Args,
     case
         {
-            Args0#mrargs.include_docs,
+            IncludeDocs,
             Covering,
-            couch_util:get_value(callback_args, Args#mrargs.extra)
+            couch_util:get_value(callback_args, Extra0)
         }
     of
-        {false, true, ViewCBArgs} when ViewCBArgs =/= undefined ->
-            VCBSelector = viewcbargs_get(selector, ViewCBArgs),
-            VCBFields = viewcbargs_get(fields, ViewCBArgs),
-            ViewCBArgs0 = viewcbargs_new(VCBSelector, VCBFields, Index),
-            Extra = couch_util:set_value(callback_args, Args#mrargs.extra, ViewCBArgs0),
-            Args0#mrargs{extra = Extra};
+        {false, true, ViewCBArgs0} when ViewCBArgs0 =/= undefined ->
+            VCBSelector = viewcbargs_get(selector, ViewCBArgs0),
+            VCBFields = viewcbargs_get(fields, ViewCBArgs0),
+            ViewCBArgs = viewcbargs_new(VCBSelector, VCBFields, Index),
+            Extra = couch_util:set_value(callback_args, Extra0, ViewCBArgs),
+            Args#mrargs{extra = Extra};
         _ ->
-            Args0
+            Args
     end.
 
 -spec doc_member_and_extract(#cursor{}, row_properties()) -> Result when
