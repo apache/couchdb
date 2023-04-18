@@ -1,6 +1,14 @@
 %{
   "NouveauTest": [
     "search returns all items for GET",
-    "search returns all items for POST"
+    "search returns all items for POST",
+    "search returns all items (paginated)",
+    "search for foo:bar",
+    "sort by string field (asc)",
+    "sort by string field (desc)",
+    "sort by numeric field (asc)",
+    "sort by numeric field (desc)",
+    "counts",
+    "ranges"
   ]
 }
