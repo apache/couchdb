@@ -226,6 +226,12 @@ def get_args_parser():
         default=[],
         help="Path to config to place in 'local.d'. Can be repeated",
     )
+    parser.add_option(
+        "--erlang-cookie",
+        metavar="COOKIE_STRING",
+        dest="erlang_cookie",
+        help="Set Erlang cookie explicitly for inter-node communication",
+    )
     return parser
 
 
@@ -255,6 +261,7 @@ def setup_context(opts, args):
         "procs": [],
         "auto_ports": opts.auto_ports,
         "locald_configs": opts.locald_configs,
+        "erlang_cookie": opts.erlang_cookie,
     }
 
 
@@ -290,6 +297,7 @@ def setup_configs(ctx):
         cluster_port, backend_port, prometheus_port = get_ports(
             ctx, idx + ctx["node_number"]
         )
+        cookie = ctx["erlang_cookie"]
         env = {
             "prefix": toposixpath(ctx["rootdir"]),
             "package_author_name": "The Apache Software Foundation",
@@ -303,6 +311,7 @@ def setup_configs(ctx):
                 ensure_dir_exists(ctx["devdir"], "lib", node, "data")
             ),
             "node_name": "-name %s@127.0.0.1" % node,
+            "erlang_cookie": "-setcookie %s" % cookie if cookie else "",
             "cluster_port": cluster_port,
             "backend_port": backend_port,
             "prometheus_port": prometheus_port,

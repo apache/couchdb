@@ -23,7 +23,13 @@ if [ -z $HOST ]; then
     HOST="127.0.0.1"
 fi
 
+if [ -n "$COOKIE" ]; then
+    _cookie_flag="-setcookie $COOKIE"
+else
+    _cookie_flag=""
+fi
+
 NAME="remsh$$@$HOST"
 NODE="node$NODE@$HOST"
 rootdir="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
-erl -name $NAME -remsh $NODE -hidden -proto_dist inet_tls -ssl_dist_optfile "${rootdir}/couch_ssl_dist.conf"
+erl -name $NAME -remsh $NODE -hidden -proto_dist inet_tls -ssl_dist_optfile "${rootdir}/couch_ssl_dist.conf" ${_cookie_flag}

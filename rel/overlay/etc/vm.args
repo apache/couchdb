@@ -38,8 +38,7 @@
 {{node_name}}
 
 # All nodes must share the same magic cookie for distributed Erlang to work.
-# Uncomment the following line and append a securely generated random value.
-# -setcookie
+{{erlang_cookie}}
 
 # Which interfaces should the node listen on?
 -kernel inet_dist_use_interface {127,0,0,1}
