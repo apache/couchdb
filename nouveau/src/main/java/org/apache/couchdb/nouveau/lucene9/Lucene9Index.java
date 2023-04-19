@@ -55,6 +55,8 @@ import org.apache.couchdb.nouveau.core.ser.StringWrapper;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.facet.FacetResult;
 import org.apache.lucene.facet.Facets;
 import org.apache.lucene.facet.FacetsCollector;
@@ -366,7 +368,7 @@ public class Lucene9Index extends Index {
 
         // id
         result.add(new org.apache.lucene.document.StringField("_id", docId, Store.YES));
-        result.add(new org.apache.lucene.document.SortedDocValuesField("_id", new BytesRef(docId)));
+        result.add(new SortedDocValuesField("_id", new BytesRef(docId)));
 
         // partition (optional)
         if (request.hasPartition()) {
@@ -389,7 +391,7 @@ public class Lucene9Index extends Index {
                 var f = (StringField) field;
                 result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
                         f.isStore() ? Store.YES : Store.NO));
-                result.add(new org.apache.lucene.document.SortedSetDocValuesField(f.getName(),
+                result.add(new SortedSetDocValuesField(f.getName(),
                         new BytesRef(f.getValue())));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
