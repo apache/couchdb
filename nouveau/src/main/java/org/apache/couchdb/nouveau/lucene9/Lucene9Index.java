@@ -352,7 +352,7 @@ public class Lucene9Index extends Index {
         final boolean reverse = "-".equals(m.group(1));
         switch (m.group(3)) {
             case "string":
-                return new SortField(m.group(2), SortField.Type.STRING, reverse);
+                return new SortedSetSortField(m.group(2), reverse);
             case "double":
                 return new SortedNumericSortField(m.group(2), SortField.Type.DOUBLE, reverse);
             default:
@@ -389,7 +389,7 @@ public class Lucene9Index extends Index {
                 var f = (StringField) field;
                 result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
                         f.isStore() ? Store.YES : Store.NO));
-                result.add(new org.apache.lucene.document.SortedDocValuesField(f.getName(),
+                result.add(new org.apache.lucene.document.SortedSetDocValuesField(f.getName(),
                         new BytesRef(f.getValue())));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
