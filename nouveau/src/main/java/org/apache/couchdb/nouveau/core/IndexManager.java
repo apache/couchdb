@@ -167,19 +167,17 @@ public final class IndexManager implements Managed {
                 } catch (final IOException e) {
                     LOGGER.error("I/O exception deleting " + p, e);
                 }
+                // Clean any newly empty directories.
+                do {
+                    final File f = p.toFile();
+                    if (f.isDirectory() && f.list().length == 0) {
+                        f.delete();
+                    }
+                } while ((p = p.getParent()) != null && !rootDir.equals(p));
             });
         } finally {
             stream.close();
         }
-
-        // Clean any newly empty directories.
-        Path p = indexRootPath;
-        do {
-            final File f = p.toFile();
-            if (f.isDirectory() && f.list().length == 0) {
-                f.delete();
-            }
-        } while ((p = p.getParent()) != null && !rootDir.equals(p));
     }
 
     private void deleteIndex(final String name) throws IOException {
