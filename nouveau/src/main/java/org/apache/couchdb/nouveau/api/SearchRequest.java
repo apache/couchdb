@@ -95,6 +95,10 @@ public class SearchRequest {
         return sort;
     }
 
+    public void setSort(List<String> sort) {
+        this.sort = sort;
+    }
+
     public boolean hasCounts() {
         return counts != null;
     }

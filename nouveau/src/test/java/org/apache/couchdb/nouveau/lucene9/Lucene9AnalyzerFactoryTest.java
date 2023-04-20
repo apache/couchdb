@@ -11,11 +11,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9.core;
+package org.apache.couchdb.nouveau.lucene9;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
+import java.lang.reflect.Method;
+import java.util.Map;
+
+import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer;
@@ -45,6 +49,7 @@ import org.apache.lucene.analysis.id.IndonesianAnalyzer;
 import org.apache.lucene.analysis.it.ItalianAnalyzer;
 import org.apache.lucene.analysis.ja.JapaneseAnalyzer;
 import org.apache.lucene.analysis.lv.LatvianAnalyzer;
+import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.analysis.nl.DutchAnalyzer;
 import org.apache.lucene.analysis.no.NorwegianAnalyzer;
 import org.apache.lucene.analysis.pl.PolishAnalyzer;
@@ -56,6 +61,8 @@ import org.apache.lucene.analysis.sv.SwedishAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tr.TurkishAnalyzer;
 import org.junit.jupiter.api.Test;
+
+import jakarta.ws.rs.WebApplicationException;
 
 public class Lucene9AnalyzerFactoryTest {
 
@@ -249,8 +256,28 @@ public class Lucene9AnalyzerFactoryTest {
         assertAnalyzer("turkish", TurkishAnalyzer.class);
     }
 
+    @Test
+    public void testFieldAnalyzers() throws Exception {
+        final IndexDefinition indexDefinition = new IndexDefinition("standard",
+            Map.of("english", "english", "thai", "thai", "email", "email"));
+        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
+        assertThat(analyzer).isInstanceOf(PerFieldAnalyzerWrapper.class);
+        final Method m = PerFieldAnalyzerWrapper.class.getDeclaredMethod("getWrappedAnalyzer", String.class);
+        m.setAccessible(true);
+        assertThat(m.invoke(analyzer, "english")).isInstanceOf(EnglishAnalyzer.class);
+        assertThat(m.invoke(analyzer, "thai")).isInstanceOf(ThaiAnalyzer.class);
+        assertThat(m.invoke(analyzer, "email")).isInstanceOf(UAX29URLEmailAnalyzer.class);
+        assertThat(m.invoke(analyzer, "other")).isInstanceOf(StandardAnalyzer.class);
+    }
+
+    @Test
+    public void testUnknownAnalyzer() throws Exception {
+        assertThrows(WebApplicationException.class, () -> Lucene9AnalyzerFactory.newAnalyzer("foo"));
+    }
+
     private void assertAnalyzer(final String name, final Class<? extends Analyzer> clazz) throws Exception {
         assertThat(Lucene9AnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
+        assertThat(Lucene9AnalyzerFactory.fromDefinition(new IndexDefinition(name, null))).isInstanceOf(clazz);
     }
 
 }

@@ -11,12 +11,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9.core;
+package org.apache.couchdb.nouveau.lucene9;
 
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.apache.couchdb.nouveau.lucene9.Lucene9Module;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;

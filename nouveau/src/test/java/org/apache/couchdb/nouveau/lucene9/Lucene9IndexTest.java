@@ -23,11 +23,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.DoubleField;
 import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
@@ -76,6 +78,26 @@ public class Lucene9IndexTest {
             }
             final SearchRequest request = new SearchRequest();
             request.setQuery("*:*");
+            final SearchResults results = index.search(request);
+            assertThat(results.getTotalHits()).isEqualTo(count);
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testSort(@TempDir Path path) throws IOException {
+        final Index index = setup(path);
+        try {
+            final int count = 100;
+            for (int i = 1; i <= count; i++) {
+                final Collection<Field> fields = List.of(new StringField("foo", "bar", false, false));
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(i, null, fields);
+                index.update("doc" + i, request);
+            }
+            final SearchRequest request = new SearchRequest();
+            request.setQuery("*:*");
+            request.setSort(List.of("foo<string>"));
             final SearchResults results = index.search(request);
             assertThat(results.getTotalHits()).isEqualTo(count);
         } finally {
@@ -138,6 +160,49 @@ public class Lucene9IndexTest {
             // Should be prevented from going down to 1.
             assertThrows(UpdatesOutOfOrderException.class,
                     () -> index.update("foo", new DocumentUpdateRequest(1, null, fields)));
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testInfo(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            IndexInfo info = index.info();
+            assertThat(info.getDiskSize()).isEqualTo(0);
+            assertThat(info.getNumDocs()).isEqualTo(0);
+            assertThat(info.getUpdateSeq()).isEqualTo(0);
+
+            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false, true));
+            index.update("foo", new DocumentUpdateRequest(2, null, fields));
+            index.commit();
+
+            info = index.info();
+            assertThat(info.getDiskSize()).isGreaterThan(0);
+            assertThat(info.getNumDocs()).isEqualTo(1);
+            assertThat(info.getUpdateSeq()).isEqualTo(2);
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testDelete(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false, true));
+            index.update("foo", new DocumentUpdateRequest(2, null, fields));
+            index.commit();
+
+            IndexInfo info = index.info();
+            assertThat(info.getNumDocs()).isEqualTo(1);
+
+            index.delete("foo", new DocumentDeleteRequest(3));
+            index.commit();
+
+            info = index.info();
+            assertThat(info.getNumDocs()).isEqualTo(0);
         } finally {
             cleanup(index);
         }

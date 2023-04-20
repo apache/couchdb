@@ -64,7 +64,7 @@ import jakarta.ws.rs.core.Response.Status;
 
 public final class Lucene9AnalyzerFactory {
 
-    public Lucene9AnalyzerFactory() {
+    private Lucene9AnalyzerFactory() {
     }
 
     public static Analyzer fromDefinition(final IndexDefinition indexDefinition) {
