@@ -14,10 +14,12 @@
 package org.apache.couchdb.nouveau.lucene9;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +33,7 @@ import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexLoader;
+import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderException;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -118,6 +121,23 @@ public class Lucene9IndexTest {
             final SearchResults results = index.search(request);
             assertThat(results.getRanges()).isEqualTo(
                     Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testOutOfOrder(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            final Collection<Field> fields = Collections.emptyList();
+
+            // Go to 2.
+            index.update("foo", new DocumentUpdateRequest(2, null, fields));
+
+            // Should be prevented from going down to 1.
+            assertThrows(UpdatesOutOfOrderException.class,
+                    () -> index.update("foo", new DocumentUpdateRequest(1, null, fields)));
         } finally {
             cleanup(index);
         }
