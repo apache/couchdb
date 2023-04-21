@@ -493,6 +493,8 @@ to_str(_K, Term) when is_tuple(Term) ->
     "";
 to_str(_K, Term) when is_map(Term) ->
     "";
+to_str(K, Term) when is_number(Term) ->
+    io_lib:format("~s=~p", [K, Term]);
 to_str(K, Term) when is_binary(Term) ->
     io_lib:format("~s=\"~s\"", [K, Term]);
 to_str(K, Term) ->
