@@ -80,8 +80,9 @@ info(mango_cursor_nouveau, multiple_nouveau_indexes) ->
         <<"multiple_nouveau_indexes">>,
         <<"You must specify an index with the `use_index` parameter.">>
     };
-info(mango_cursor_nouveau, {nouveau_search_error, {error, {Type, Msg}}})
-  when is_binary(Msg) ->
+info(mango_cursor_nouveau, {nouveau_search_error, {error, {Type, Msg}}}) when
+    is_binary(Msg)
+->
     {
         500,
         <<"nouveau_search_error">>,

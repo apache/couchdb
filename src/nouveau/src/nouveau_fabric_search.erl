@@ -62,12 +62,13 @@ go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     },
     try
         rexi_utils:recv(
-          Workers,
-          #shard.ref,
-          fun handle_message/3,
-          State,
-          fabric_util:timeout("nouveau", "infinity"),
-          fabric_util:timeout("nouveau_permsg", "3600000"))
+            Workers,
+            #shard.ref,
+            fun handle_message/3,
+            State,
+            fabric_util:timeout("nouveau", "infinity"),
+            fabric_util:timeout("nouveau_permsg", "3600000")
+        )
     of
         {ok, SearchResults} ->
             NewBookmark = nouveau_bookmark:update(DbName, Bookmark, SearchResults),
