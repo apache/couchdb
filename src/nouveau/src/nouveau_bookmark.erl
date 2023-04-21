@@ -28,10 +28,10 @@ update(DbName, PreviousBookmark, SearchResults) when is_binary(PreviousBookmark)
 update(DbName, {EJson}, SearchResults) when is_list(EJson) ->
     update(DbName, from_ejson({EJson}), SearchResults);
 update(DbName, PreviousBookmark, SearchResults) when is_map(PreviousBookmark) ->
-    Hits = maps:get(<<"hits">>, SearchResults),
+    #{<<"hits">> := Hits} = SearchResults,
     NewBookmark0 = lists:foldl(
-        fun(Hit, Acc) ->
-            maps:put(range_of(DbName, maps:get(<<"id">>, Hit)), maps:get(<<"order">>, Hit), Acc)
+        fun(#{<<"id">> := Id, <<"order">> := Order}, Acc) ->
+            Acc#{range_of(DbName, Id) => Order}
         end,
         new(),
         Hits

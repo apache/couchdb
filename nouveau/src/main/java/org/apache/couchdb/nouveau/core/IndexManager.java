@@ -105,7 +105,7 @@ public final class IndexManager implements Managed {
                         scheduler.execute(() -> {
                             if (index.tryAcquire()) {
                                 try {
-                                    LOGGER.info("committing {}", name);
+                                    LOGGER.debug("committing {}", name);
                                     try {
                                         index.commit();
                                     } catch (final IOException e) {
@@ -301,7 +301,7 @@ public final class IndexManager implements Managed {
                     if (index.tryAcquire()) {
                         try {
                             if (!index.isDeleteOnClose() && index.commit()) {
-                                LOGGER.info("committed {} before close", name);
+                                LOGGER.debug("committed {} before close", name);
                             }
                         } finally {
                             index.release();

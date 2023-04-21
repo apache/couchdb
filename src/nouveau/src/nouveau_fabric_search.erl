@@ -37,8 +37,9 @@ go(DbName, GroupId, IndexName, QueryArgs0) when is_binary(GroupId) ->
 go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     {ok, Index} = nouveau_util:design_doc_to_index(DbName, DDoc, IndexName),
     Shards = mem3:shards(DbName),
-    Bookmark = nouveau_bookmark:unpack(DbName, maps:get(bookmark, QueryArgs0)),
-    QueryArgs1 = maps:remove(bookmark, QueryArgs0),
+    {PackedBookmark, #{limit := Limit, sort := Sort} = QueryArgs1} =
+        maps:take(bookmark, QueryArgs0),
+    Bookmark = nouveau_bookmark:unpack(DbName, PackedBookmark),
     Counters0 = lists:map(
         fun(#shard{} = Shard) ->
             After = maps:get(Shard#shard.range, Bookmark, null),
@@ -54,13 +55,19 @@ go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     Workers = fabric_dict:fetch_keys(Counters),
     RexiMon = fabric_util:create_monitors(Workers),
     State = #state{
-        limit = maps:get(limit, QueryArgs0),
-        sort = maps:get(sort, QueryArgs0),
+        limit = Limit,
+        sort = Sort,
         counters = Counters,
         search_results = #{}
     },
     try
-        rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, State, infinity, 1000 * 60 * 60)
+        rexi_utils:recv(
+          Workers,
+          #shard.ref,
+          fun handle_message/3,
+          State,
+          fabric_util:timeout("nouveau", "infinity"),
+          fabric_util:timeout("nouveau_permsg", "3600000"))
     of
         {ok, SearchResults} ->
             NewBookmark = nouveau_bookmark:update(DbName, Bookmark, SearchResults),

@@ -1,5 +1,7 @@
 %{
   "NouveauTest": [
+    "search analyze",
+    "search info",
     "search returns all items for GET",
     "search returns all items for POST",
     "search returns all items (paginated)",

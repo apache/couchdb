@@ -52,6 +52,35 @@ defmodule NouveauTest do
     bookmark
   end
 
+  test "search analyze", context do
+    url = "/_nouveau_analyze"
+    resp = Couch.post(url,
+      headers: ["Content-Type": "application/json"],
+      body: %{analyzer: "standard", text: "hello there"})
+    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert resp.body ==  %{"tokens" => ["hello", "there"]}
+  end
+
+  @tag :with_db
+  test "search info", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    # query it so it builds
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+
+    url = "/#{db_name}/_design/foo/_nouveau_info/bar"
+    resp = Couch.get(url)
+    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    info = Map.get(resp.body, "search_index")
+    assert Map.get(info, "disk_size") > 0
+    assert Map.get(info, "num_docs") > 0
+    assert Map.get(info, "update_seq") > 0
+  end
+
   @tag :with_db
   test "search returns all items for GET", context do
     db_name = context[:db_name]

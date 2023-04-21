@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.resources;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
@@ -64,8 +65,8 @@ public final class IndexResource {
     private final SearcherFactory searcherFactory;
 
     public IndexResource(final IndexManager indexManager, final SearcherFactory searcherFactory) {
-        this.indexManager = indexManager;
-        this.searcherFactory = searcherFactory;
+        this.indexManager = Objects.requireNonNull(indexManager);
+        this.searcherFactory = Objects.requireNonNull(searcherFactory);
     }
 
     @PUT

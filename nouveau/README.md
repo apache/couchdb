@@ -49,7 +49,7 @@ Build Nouveau with;
 
 `make`
 
-Run Nouvea with;
+Run Nouveau with;
 
 `dev/run --admin=foo:bar --with-nouveau`
 
@@ -87,7 +87,7 @@ In order not to collide with `dreyfus` I've hooked Nouveau in with new paths;
 This will cause Nouveau to build indexes for each copy (N) and each
 shard range (Q) and then perform a search and return the results. Lots
 of query syntax is working as is sorting on strings and numbers
-(`sort=["fieldnamehere&lt;string&gt;"] or sort=["fieldnamehere&lt;number&gt;"],
+(`sort=["fieldnamehere&lt;string&gt;"] or sort=["fieldnamehere&lt;number&gt;"`],
 defaulting to number).
 
 Facet support

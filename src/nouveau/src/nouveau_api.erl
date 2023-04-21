@@ -35,7 +35,7 @@ analyze(Text, Analyzer) when
 ->
     ReqBody = {[{<<"text">>, Text}, {<<"analyzer">>, Analyzer}]},
     Resp = send_if_enabled(
-        io_lib:format("~s/analyze", [nouveau_util:nouveau_url()]),
+        nouveau_util:nouveau_url() ++ "/analyze",
         [?JSON_CONTENT_TYPE],
         post,
         jiffy:encode(ReqBody)
