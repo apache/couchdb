@@ -434,7 +434,7 @@ revtree_cb({Pos, RevId}, Leaf, leaf, Acc) ->
 
 % This is copied almost verbatim from the compactor
 process_attachment(
-    {Name, Type, BinSp, AttLen, RevPos, ExpectedMd5},
+    {Name, Type, BinSp, AttLen, RevPos, ExpectedDigest},
     SourceDb,
     TargetDb
 ) ->
@@ -445,10 +445,10 @@ process_attachment(
     {NewStream, AttLen, AttLen, ActualDigest, _IdentityDigest} =
         couch_stream:close(DstStream),
     {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-    couch_util:check_md5(ExpectedMd5, ActualDigest),
-    {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
+    couch_util:check_digest(ExpectedDigest, ActualDigest),
+    {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedDigest, identity};
 process_attachment(
-    {Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}, SourceDb, TargetDb
+    {Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedDigest, Enc1}, SourceDb, TargetDb
 ) ->
     {ok, SrcStream} = couch_db_engine:open_read_stream(SourceDb, BinSp),
     {ok, DstStream} = couch_db_engine:open_write_stream(TargetDb, []),
@@ -456,7 +456,7 @@ process_attachment(
     {NewStream, AttLen, _, ActualDigest, _IdentityDigest} =
         couch_stream:close(DstStream),
     {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-    couch_util:check_md5(ExpectedMd5, ActualDigest),
+    couch_util:check_digest(ExpectedDigest, ActualDigest),
     Enc =
         case Enc1 of
             % 0110 upgrade code
@@ -465,7 +465,7 @@ process_attachment(
             false -> identity;
             _ -> Enc1
         end,
-    {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}.
+    {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedDigest, Enc}.
 
 get_engine(Db) ->
     {ok, DbInfoProps} = couch_db:get_db_info(Db),

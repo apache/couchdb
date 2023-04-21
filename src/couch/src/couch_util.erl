@@ -38,7 +38,7 @@
 -export([process_dict_get/2, process_dict_get/3]).
 -export([unique_monotonic_integer/0]).
 -export([check_config_blacklist/1]).
--export([check_md5/2]).
+-export([check_digest/2]).
 -export([set_mqd_off_heap/1]).
 -export([set_process_priority/2]).
 -export([hmac/3]).
@@ -712,9 +712,9 @@ validate_callback_exists(Module, Function, Arity) ->
             throw({error, {undefined_callback, CallbackStr, {Module, Function, Arity}}})
     end.
 
-check_md5(_NewSig, <<>>) -> ok;
-check_md5(Sig, Sig) -> ok;
-check_md5(_, _) -> throw(md5_mismatch).
+check_digest(_NewSig, <<>>) -> ok;
+check_digest(Sig, Sig) -> ok;
+check_digest(_, _) -> throw(digest_mismatch).
 
 set_mqd_off_heap(Module) ->
     case config:get_boolean("off_heap_mqd", atom_to_list(Module), true) of

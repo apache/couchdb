@@ -1631,7 +1631,7 @@ with_stream(Db, Att, Fun) ->
                 [{buffer_size, BufferSize}]
         end,
     {ok, OutputStream} = open_write_stream(Db, Options),
-    ReqMd5 =
+    ReqDigest =
         case Fun(OutputStream) of
             {md5, FooterMd5} ->
                 case InMd5 of
@@ -1641,13 +1641,13 @@ with_stream(Db, Att, Fun) ->
             _ ->
                 InMd5
         end,
-    {StreamEngine, Len, IdentityLen, Md5, IdentityMd5} =
+    {StreamEngine, Len, IdentityLen, Md5, IdentityDigest} =
         couch_stream:close(OutputStream),
-    couch_util:check_md5(IdentityMd5, ReqMd5),
+    couch_util:check_digest(IdentityDigest, ReqDigest),
     {AttLen, DiskLen, NewEnc} =
         case Enc of
             identity ->
-                case {Md5, IdentityMd5} of
+                case {Md5, IdentityDigest} of
                     {Same, Same} ->
                         {Len, IdentityLen, identity};
                     _ ->

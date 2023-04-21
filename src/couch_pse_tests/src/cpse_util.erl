@@ -392,8 +392,8 @@ prep_atts(Db, [{FileName, Data} | Rest]) ->
     [Att | prep_atts(Db, Rest)].
 
 write_att(Stream, FileName, OrigData, <<>>) ->
-    {StreamEngine, Len, Len, Md5, Md5} = couch_stream:close(Stream),
-    couch_util:check_md5(Md5, couch_hash:digest(OrigData)),
+    {StreamEngine, Len, Len, Digest, Digest} = couch_stream:close(Stream),
+    couch_util:check_digest(Digest, couch_hash:digest(OrigData)),
     Len = size(OrigData),
     couch_att:new([
         {name, FileName},
@@ -401,7 +401,7 @@ write_att(Stream, FileName, OrigData, <<>>) ->
         {data, {stream, StreamEngine}},
         {att_len, Len},
         {disk_len, Len},
-        {md5, Md5},
+        {md5, Digest},
         {encoding, identity}
     ]);
 write_att(Stream, FileName, OrigData, Data) ->

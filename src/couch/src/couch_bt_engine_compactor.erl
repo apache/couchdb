@@ -517,7 +517,7 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
     % copy the bin values
     NewBinInfos = lists:map(
         fun
-            ({Name, Type, BinSp, AttLen, RevPos, ExpectedMd5}) ->
+            ({Name, Type, BinSp, AttLen, RevPos, ExpectedDigest}) ->
                 % 010 UPGRADE CODE
                 {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
                 {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
@@ -525,16 +525,16 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
                 {NewStream, AttLen, AttLen, ActualDigest, _IdentityDigest} =
                     couch_stream:close(DstStream),
                 {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-                couch_util:check_md5(ExpectedMd5, ActualDigest),
-                {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
-            ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
+                couch_util:check_digest(ExpectedDigest, ActualDigest),
+                {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedDigest, identity};
+            ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedDigest, Enc1}) ->
                 {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
                 {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
                 ok = couch_stream:copy(SrcStream, DstStream),
                 {NewStream, AttLen, _, ActualDigest, _IdentityDigest} =
                     couch_stream:close(DstStream),
                 {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-                couch_util:check_md5(ExpectedMd5, ActualDigest),
+                couch_util:check_digest(ExpectedDigest, ActualDigest),
                 Enc =
                     case Enc1 of
                         true ->
@@ -546,7 +546,7 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
                         _ ->
                             Enc1
                     end,
-                {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
+                {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedDigest, Enc}
         end,
         BinInfos
     ),
