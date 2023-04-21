@@ -90,20 +90,20 @@ foldl({Engine, EngineState}, Fun, Acc) ->
 
 foldl(Engine, <<>>, Fun, Acc) ->
     foldl(Engine, Fun, Acc);
-foldl(Engine, Md5, UserFun, UserAcc) ->
-    InitAcc = {couch_hash:md5_hash_init(), UserFun, UserAcc},
-    {Md5Acc, _, OutAcc} = foldl(Engine, fun foldl_md5/2, InitAcc),
-    Md5 = couch_hash:md5_hash_final(Md5Acc),
+foldl(Engine, Digest, UserFun, UserAcc) ->
+    InitAcc = {couch_hash:digest_init(), UserFun, UserAcc},
+    {DigestAcc, _, OutAcc} = foldl(Engine, fun foldl_digest/2, InitAcc),
+    Digest = couch_hash:digest_final(DigestAcc),
     OutAcc.
 
-foldl_decode(Engine, Md5, Enc, UserFun, UserAcc1) ->
+foldl_decode(Engine, Digest, Enc, UserFun, UserAcc1) ->
     {DecDataFun, DecEndFun} =
         case Enc of
             gzip -> ungzip_init();
             identity -> identity_enc_dec_funs()
         end,
     InitAcc = {DecDataFun, UserFun, UserAcc1},
-    {_, _, UserAcc2} = foldl(Engine, Md5, fun foldl_decode/2, InitAcc),
+    {_, _, UserAcc2} = foldl(Engine, Digest, fun foldl_decode/2, InitAcc),
     DecEndFun(),
     UserAcc2.
 
@@ -118,9 +118,9 @@ range_foldl(Engine, From, To, UserFun, UserAcc) when To >= From ->
             UserAcc3
     end.
 
-foldl_md5(Bin, {Md5Acc, UserFun, UserAcc}) ->
-    NewMd5Acc = couch_hash:md5_hash_update(Md5Acc, Bin),
-    {NewMd5Acc, UserFun, UserFun(Bin, UserAcc)}.
+foldl_digest(Bin, {DigestAcc, UserFun, UserAcc}) ->
+    NewDigestAcc = couch_hash:digest_update(DigestAcc, Bin),
+    {NewDigestAcc, UserFun, UserFun(Bin, UserAcc)}.
 
 foldl_decode(EncBin, {DecFun, UserFun, UserAcc}) ->
     case DecFun(EncBin) of
@@ -189,8 +189,8 @@ init({Engine, OpenerPid, OpenerPriority, Options}) ->
     {ok, #stream{
         engine = Engine,
         opener_monitor = erlang:monitor(process, OpenerPid),
-        md5 = couch_hash:md5_hash_init(),
-        identity_md5 = couch_hash:md5_hash_init(),
+        md5 = couch_hash:digest_init(),
+        identity_md5 = couch_hash:digest_init(),
         encoding_fun = EncodingFun,
         end_encoding_fun = EndEncodingFun,
         max_buffer = couch_util:get_value(
@@ -217,7 +217,7 @@ handle_call({write, Bin}, _From, Stream) ->
     if
         BinSize + BufferLen > Max ->
             WriteBin = lists:reverse(Buffer, [Bin]),
-            IdenMd5_2 = couch_hash:md5_hash_update(IdenMd5, WriteBin),
+            IdenMd5_2 = couch_hash:digest_update(IdenMd5, WriteBin),
             case EncodingFun(WriteBin) of
                 [] ->
                     % case where the encoder did some internal buffering
@@ -228,7 +228,7 @@ handle_call({write, Bin}, _From, Stream) ->
                 WriteBin2 ->
                     NewEngine = do_write(Engine, WriteBin2),
                     WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
-                    Md5_2 = couch_hash:md5_hash_update(Md5, WriteBin2)
+                    Md5_2 = couch_hash:digest_update(Md5, WriteBin2)
             end,
 
             {reply, ok,
@@ -263,17 +263,17 @@ handle_call(close, _From, Stream) ->
     } = Stream,
 
     WriteBin = lists:reverse(Buffer),
-    IdenMd5Final = couch_hash:md5_hash_final(couch_hash:md5_hash_update(IdenMd5, WriteBin)),
+    IdenDigestFinal = couch_hash:digest_final(couch_hash:digest_update(IdenMd5, WriteBin)),
     WriteBin2 = EncodingFun(WriteBin) ++ EndEncodingFun(),
-    Md5Final = couch_hash:md5_hash_final(couch_hash:md5_hash_update(Md5, WriteBin2)),
+    Md5Final = couch_hash:digest_final(couch_hash:digest_update(Md5, WriteBin2)),
     Result =
         case WriteBin2 of
             [] ->
-                {do_finalize(Engine), WrittenLen, IdenLen, Md5Final, IdenMd5Final};
+                {do_finalize(Engine), WrittenLen, IdenLen, Md5Final, IdenDigestFinal};
             _ ->
                 NewEngine = do_write(Engine, WriteBin2),
                 StreamLen = WrittenLen + iolist_size(WriteBin2),
-                {do_finalize(NewEngine), StreamLen, IdenLen, Md5Final, IdenMd5Final}
+                {do_finalize(NewEngine), StreamLen, IdenLen, Md5Final, IdenDigestFinal}
         end,
     erlang:demonitor(MonRef),
     {stop, normal, Result, Stream}.

@@ -400,9 +400,9 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Md5 = couch_hash:md5_hash(Bin),
+    Digest = couch_hash:digest(Bin),
     % now we assemble the final header binary and write to disk
-    FinalBin = <<Md5/binary, Bin/binary>>,
+    FinalBin = <<Digest/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
 
 init_status_error(ReturnPid, Ref, Error) ->
@@ -674,9 +674,9 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
                 {ok, Missing} = file:pread(Fd, ReadStart, ReadLen),
                 <<RestBlock/binary, Missing/binary>>
         end,
-    <<Md5Sig:16/binary, HeaderBin/binary>> =
+    <<DigestSig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
-    Md5Sig = couch_hash:md5_hash(HeaderBin),
+    DigestSig = couch_hash:digest(HeaderBin),
     {ok, HeaderBin}.
 
 %% Read multiple block locations using a single file:pread/2.
@@ -855,7 +855,7 @@ monitored_by_pids() ->
 verify_md5(_Fd, _Pos, IoList, <<>>) ->
     IoList;
 verify_md5(Fd, Pos, IoList, Md5) ->
-    case couch_hash:md5_hash(IoList) of
+    case couch_hash:digest(IoList) of
         Md5 -> IoList;
         _ -> report_md5_error(Fd, Pos)
     end.

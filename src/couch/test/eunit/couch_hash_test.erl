@@ -37,16 +37,16 @@ teardown(Ctx) ->
     test_util:stop_couch(Ctx).
 
 t_fips_disabled(_) ->
-    ?assertEqual(?XY_HASH, couch_hash:md5_hash(<<"xy">>)),
-    H = couch_hash:md5_hash_init(),
-    H1 = couch_hash:md5_hash_update(H, <<"x">>),
-    H2 = couch_hash:md5_hash_update(H1, <<"y">>),
-    ?assertEqual(?XY_HASH, couch_hash:md5_hash_final(H2)).
+    ?assertEqual(?XY_HASH, couch_hash:digest(<<"xy">>)),
+    H = couch_hash:digest_init(),
+    H1 = couch_hash:digest_update(H, <<"x">>),
+    H2 = couch_hash:digest_update(H1, <<"y">>),
+    ?assertEqual(?XY_HASH, couch_hash:digest_final(H2)).
 
 t_fips_enabled(_) ->
     config:enable_feature(fips),
-    ?assertEqual(?XY_HASH, couch_hash:md5_hash(<<"xy">>)),
-    H = couch_hash:md5_hash_init(),
-    H1 = couch_hash:md5_hash_update(H, <<"x">>),
-    H2 = couch_hash:md5_hash_update(H1, <<"y">>),
-    ?assertEqual(?XY_HASH, couch_hash:md5_hash_final(H2)).
+    ?assertEqual(?XY_HASH, couch_hash:digest(<<"xy">>)),
+    H = couch_hash:digest_init(),
+    H1 = couch_hash:digest_update(H, <<"x">>),
+    H2 = couch_hash:digest_update(H1, <<"y">>),
+    ?assertEqual(?XY_HASH, couch_hash:digest_final(H2)).

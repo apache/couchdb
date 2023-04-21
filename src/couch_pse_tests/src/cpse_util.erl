@@ -366,11 +366,11 @@ gen_write(Db, {Action, {DocId, Body, Atts}}) ->
     }}.
 
 gen_rev(A, DocId, {Pos, Rev}, Body, Atts) when A == update; A == delete ->
-    NewRev = couch_hash:md5_hash(term_to_binary({DocId, Rev, Body, Atts})),
+    NewRev = couch_hash:digest(term_to_binary({DocId, Rev, Body, Atts})),
     {Pos + 1, [NewRev, Rev]};
 gen_rev(conflict, DocId, _, Body, Atts) ->
     UUID = couch_uuids:random(),
-    NewRev = couch_hash:md5_hash(term_to_binary({DocId, UUID, Body, Atts})),
+    NewRev = couch_hash:digest(term_to_binary({DocId, UUID, Body, Atts})),
     {1, [NewRev]}.
 
 prep_atts(_Db, []) ->
@@ -393,7 +393,7 @@ prep_atts(Db, [{FileName, Data} | Rest]) ->
 
 write_att(Stream, FileName, OrigData, <<>>) ->
     {StreamEngine, Len, Len, Md5, Md5} = couch_stream:close(Stream),
-    couch_util:check_md5(Md5, couch_hash:md5_hash(OrigData)),
+    couch_util:check_md5(Md5, couch_hash:digest(OrigData)),
     Len = size(OrigData),
     couch_att:new([
         {name, FileName},

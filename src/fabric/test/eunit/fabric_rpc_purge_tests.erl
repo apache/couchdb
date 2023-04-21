@@ -217,7 +217,7 @@ create_update(Doc, NewVsn) ->
         body = {Props}
     } = Doc,
     NewProps = lists:keyreplace(<<"vsn">>, 1, Props, {<<"vsn">>, NewVsn}),
-    NewRev = couch_hash:md5_hash(term_to_binary({DocId, Rev, {NewProps}})),
+    NewRev = couch_hash:digest(term_to_binary({DocId, Rev, {NewProps}})),
     Doc#doc{
         revs = {Pos + 1, [NewRev | Revs]},
         body = {NewProps}

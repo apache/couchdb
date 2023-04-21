@@ -745,7 +745,7 @@ rev_etag({Start, DiskRev}) ->
     <<$", Rev/binary, $">>.
 
 make_etag(Term) ->
-    <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
+    <<SigInt:128/integer>> = couch_hash:digest(term_to_binary(Term)),
     iolist_to_binary([$", io_lib:format("~.36B", [SigInt]), $"]).
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->

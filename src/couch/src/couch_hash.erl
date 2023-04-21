@@ -18,7 +18,7 @@
 
 -module(couch_hash).
 
--export([md5_hash/1, md5_hash_final/1, md5_hash_init/0, md5_hash_update/2]).
+-export([digest/1, digest_final/1, digest_init/0, digest_update/2]).
 
 % The ERLANG_MD5 define is set at compile time by --erlang-md5 configure flag
 % This is deprecated. Instead, FIPS mode is now detected automatically and the
@@ -26,39 +26,39 @@
 %
 -ifdef(ERLANG_MD5).
 
-md5_hash(Data) ->
+digest(Data) ->
     erlang:md5(Data).
 
-md5_hash_final(Context) ->
+digest_final(Context) ->
     erlang:md5_final(Context).
 
-md5_hash_init() ->
+digest_init() ->
     erlang:md5_init().
 
-md5_hash_update(Context, Data) ->
+digest_update(Context, Data) ->
     erlang:md5_update(Context, Data).
 
 -else.
 
-md5_hash(Data) ->
+digest(Data) ->
     case config:is_enabled(fips) of
         true -> erlang:md5(Data);
         false -> crypto:hash(md5, Data)
     end.
 
-md5_hash_final(Context) ->
+digest_final(Context) ->
     case config:is_enabled(fips) of
         true -> erlang:md5_final(Context);
         false -> crypto:hash_final(Context)
     end.
 
-md5_hash_init() ->
+digest_init() ->
     case config:is_enabled(fips) of
         true -> erlang:md5_init();
         false -> crypto:hash_init(md5)
     end.
 
-md5_hash_update(Context, Data) ->
+digest_update(Context, Data) ->
     case config:is_enabled(fips) of
         true -> erlang:md5_update(Context, Data);
         false -> crypto:hash_update(Context, Data)

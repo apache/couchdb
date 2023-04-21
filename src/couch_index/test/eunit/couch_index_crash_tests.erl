@@ -223,7 +223,7 @@ failing_index(Error) ->
         (idx_name, {_DbName, DDoc}) ->
             DDoc#doc.id;
         (signature, {_DbName, DDoc}) ->
-            couch_hash:md5_hash(term_to_binary(DDoc));
+            couch_hash:digest(term_to_binary(DDoc));
         (update_seq, Seq) ->
             Seq
     end),

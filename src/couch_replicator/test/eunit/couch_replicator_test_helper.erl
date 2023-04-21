@@ -134,18 +134,18 @@ find_att([Att | Rest], Name) ->
 att_md5(Att) ->
     Md50 = couch_att:foldl(
         Att,
-        fun(Chunk, Acc) -> couch_hash:md5_hash_update(Acc, Chunk) end,
-        couch_hash:md5_hash_init()
+        fun(Chunk, Acc) -> couch_hash:digest_update(Acc, Chunk) end,
+        couch_hash:digest_init()
     ),
-    couch_hash:md5_hash_final(Md50).
+    couch_hash:digest_final(Md50).
 
 att_decoded_md5(Att) ->
     Md50 = couch_att:foldl_decode(
         Att,
-        fun(Chunk, Acc) -> couch_hash:md5_hash_update(Acc, Chunk) end,
-        couch_hash:md5_hash_init()
+        fun(Chunk, Acc) -> couch_hash:digest_update(Acc, Chunk) end,
+        couch_hash:digest_init()
     ),
-    couch_hash:md5_hash_final(Md50).
+    couch_hash:digest_final(Md50).
 
 cluster_url() ->
     Fmt = "http://~s:~s@~s:~b",
