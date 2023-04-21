@@ -522,19 +522,19 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
                 {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
                 {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
                 ok = couch_stream:copy(SrcStream, DstStream),
-                {NewStream, AttLen, AttLen, ActualMd5, _IdentityMd5} =
+                {NewStream, AttLen, AttLen, ActualDigest, _IdentityDigest} =
                     couch_stream:close(DstStream),
                 {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-                couch_util:check_md5(ExpectedMd5, ActualMd5),
+                couch_util:check_md5(ExpectedMd5, ActualDigest),
                 {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
             ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
                 {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
                 {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
                 ok = couch_stream:copy(SrcStream, DstStream),
-                {NewStream, AttLen, _, ActualMd5, _IdentityMd5} =
+                {NewStream, AttLen, _, ActualDigest, _IdentityDigest} =
                     couch_stream:close(DstStream),
                 {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-                couch_util:check_md5(ExpectedMd5, ActualMd5),
+                couch_util:check_md5(ExpectedMd5, ActualDigest),
                 Enc =
                     case Enc1 of
                         true ->

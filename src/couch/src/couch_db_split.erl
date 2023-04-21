@@ -442,10 +442,10 @@ process_attachment(
     {ok, SrcStream} = couch_db_engine:open_read_stream(SourceDb, BinSp),
     {ok, DstStream} = couch_db_engine:open_write_stream(TargetDb, []),
     ok = couch_stream:copy(SrcStream, DstStream),
-    {NewStream, AttLen, AttLen, ActualMd5, _IdentityMd5} =
+    {NewStream, AttLen, AttLen, ActualDigest, _IdentityDigest} =
         couch_stream:close(DstStream),
     {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-    couch_util:check_md5(ExpectedMd5, ActualMd5),
+    couch_util:check_md5(ExpectedMd5, ActualDigest),
     {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
 process_attachment(
     {Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}, SourceDb, TargetDb
@@ -453,10 +453,10 @@ process_attachment(
     {ok, SrcStream} = couch_db_engine:open_read_stream(SourceDb, BinSp),
     {ok, DstStream} = couch_db_engine:open_write_stream(TargetDb, []),
     ok = couch_stream:copy(SrcStream, DstStream),
-    {NewStream, AttLen, _, ActualMd5, _IdentityMd5} =
+    {NewStream, AttLen, _, ActualDigest, _IdentityDigest} =
         couch_stream:close(DstStream),
     {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-    couch_util:check_md5(ExpectedMd5, ActualMd5),
+    couch_util:check_md5(ExpectedMd5, ActualDigest),
     Enc =
         case Enc1 of
             % 0110 upgrade code

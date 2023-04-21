@@ -50,10 +50,10 @@
     buffer_len = 0,
     max_buffer,
     written_len = 0,
-    md5,
-    % md5 of the content without any transformation applied (e.g. compression)
+    digest,
+    % digest of the content without any transformation applied (e.g. compression)
     % needed for the attachment upload integrity check (ticket 558)
-    identity_md5,
+    identity_digest,
     identity_len = 0,
     encoding_fun,
     end_encoding_fun
@@ -189,8 +189,8 @@ init({Engine, OpenerPid, OpenerPriority, Options}) ->
     {ok, #stream{
         engine = Engine,
         opener_monitor = erlang:monitor(process, OpenerPid),
-        md5 = couch_hash:digest_init(),
-        identity_md5 = couch_hash:digest_init(),
+        digest = couch_hash:digest_init(),
+        identity_digest = couch_hash:digest_init(),
         encoding_fun = EncodingFun,
         end_encoding_fun = EndEncodingFun,
         max_buffer = couch_util:get_value(
@@ -209,26 +209,26 @@ handle_call({write, Bin}, _From, Stream) ->
         buffer_len = BufferLen,
         buffer_list = Buffer,
         max_buffer = Max,
-        md5 = Md5,
-        identity_md5 = IdenMd5,
+        digest = Digest,
+        identity_digest = IdenDigest,
         identity_len = IdenLen,
         encoding_fun = EncodingFun
     } = Stream,
     if
         BinSize + BufferLen > Max ->
             WriteBin = lists:reverse(Buffer, [Bin]),
-            IdenMd5_2 = couch_hash:digest_update(IdenMd5, WriteBin),
+            IdenDigest_2 = couch_hash:digest_update(IdenDigest, WriteBin),
             case EncodingFun(WriteBin) of
                 [] ->
                     % case where the encoder did some internal buffering
                     % (zlib does it for example)
                     NewEngine = Engine,
                     WrittenLen2 = WrittenLen,
-                    Md5_2 = Md5;
+                    Digest_2 = Digest;
                 WriteBin2 ->
                     NewEngine = do_write(Engine, WriteBin2),
                     WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
-                    Md5_2 = couch_hash:digest_update(Md5, WriteBin2)
+                    Digest_2 = couch_hash:digest_update(Digest, WriteBin2)
             end,
 
             {reply, ok,
@@ -237,8 +237,8 @@ handle_call({write, Bin}, _From, Stream) ->
                     written_len = WrittenLen2,
                     buffer_list = [],
                     buffer_len = 0,
-                    md5 = Md5_2,
-                    identity_md5 = IdenMd5_2,
+                    digest = Digest_2,
+                    identity_digest = IdenDigest_2,
                     identity_len = IdenLen + BinSize
                 },
                 hibernate};
@@ -255,25 +255,25 @@ handle_call(close, _From, Stream) ->
         opener_monitor = MonRef,
         written_len = WrittenLen,
         buffer_list = Buffer,
-        md5 = Md5,
-        identity_md5 = IdenMd5,
+        digest = Digest,
+        identity_digest = IdenDigest,
         identity_len = IdenLen,
         encoding_fun = EncodingFun,
         end_encoding_fun = EndEncodingFun
     } = Stream,
 
     WriteBin = lists:reverse(Buffer),
-    IdenDigestFinal = couch_hash:digest_final(couch_hash:digest_update(IdenMd5, WriteBin)),
+    IdenDigestFinal = couch_hash:digest_final(couch_hash:digest_update(IdenDigest, WriteBin)),
     WriteBin2 = EncodingFun(WriteBin) ++ EndEncodingFun(),
-    Md5Final = couch_hash:digest_final(couch_hash:digest_update(Md5, WriteBin2)),
+    DigestFinal = couch_hash:digest_final(couch_hash:digest_update(Digest, WriteBin2)),
     Result =
         case WriteBin2 of
             [] ->
-                {do_finalize(Engine), WrittenLen, IdenLen, Md5Final, IdenDigestFinal};
+                {do_finalize(Engine), WrittenLen, IdenLen, DigestFinal, IdenDigestFinal};
             _ ->
                 NewEngine = do_write(Engine, WriteBin2),
                 StreamLen = WrittenLen + iolist_size(WriteBin2),
-                {do_finalize(NewEngine), StreamLen, IdenLen, Md5Final, IdenDigestFinal}
+                {do_finalize(NewEngine), StreamLen, IdenLen, DigestFinal, IdenDigestFinal}
         end,
     erlang:demonitor(MonRef),
     {stop, normal, Result, Stream}.
