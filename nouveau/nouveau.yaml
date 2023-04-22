@@ -1,0 +1,24 @@
+maxIndexesOpen: 100
+commitIntervalSeconds: 30
+idleSeconds: 60
+rootDir: target/indexes
+
+server:
+  applicationConnectors:
+    - type: h2c
+      port: 8080
+      bindHost: 127.0.0.1
+      maxConcurrentStreams: 1024
+      initialStreamRecvWindow: 65535
+  adminConnectors:
+    - type: h2c
+      port: 8081
+      bindHost: 127.0.0.1
+  gzip:
+    includedMethods:
+      - GET
+      - POST
+  requestLog:
+    appenders:
+      - type: console
+        target: stderr

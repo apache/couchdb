@@ -2045,7 +2045,7 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 
     Tests the results of Lucene analyzer tokenization on sample text.
 
-    :param field: Type of analyzer
+    :param analyzer: Type of analyzer
     :param text:  Analyzer token you want to test
     :code 200: Request completed successfully
     :code 400: Request body is wrong (malformed or missing one of the mandatory fields)
@@ -2056,6 +2056,53 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 .. code-block:: http
 
     POST /_search_analyze HTTP/1.1
+    Host: localhost:5984
+    Content-Type: application/json
+
+    {"analyzer":"english", "text":"running"}
+
+**Response**:
+
+.. code-block:: javascript
+
+    {
+        "tokens": [
+            "run"
+        ]
+    }
+
+.. _api/server/nouveau_analyze:
+
+==========================================
+``/_nouveau_analyze``
+==========================================
+
+.. warning::
+    Nouveau is an experimental feature. Future releases might change how the endpoints
+    work and might invalidate existing indexes.
+
+.. warning::
+    Nouveau endpoints require a running nouveau server.
+    See :ref:`Nouveau Server Installation <install/nouveau>` for details.
+
+.. versionadded:: 4.0
+
+.. http:post:: /_nouveau_analyze
+    :synopsis: Tests the results of analyzer tokenization
+
+    Tests the results of Lucene analyzer tokenization on sample text.
+
+    :param analyzer: Name of analyzer
+    :param text:  Analyzer token you want to test
+    :code 200: Request completed successfully
+    :code 400: Request body is wrong (malformed or missing one of the mandatory fields)
+    :code 500: A server error (or other kind of error) occurred
+
+**Request**:
+
+.. code-block:: http
+
+    POST /_nouveau_analyze HTTP/1.1
     Host: localhost:5984
     Content-Type: application/json
 

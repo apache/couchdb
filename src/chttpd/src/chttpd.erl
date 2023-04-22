@@ -39,6 +39,7 @@
     error_info/1,
     parse_form/1,
     json_body/1,
+    json_body/2,
     json_body_obj/1,
     body/1,
     doc_etag/1,
@@ -249,7 +250,7 @@ handle_request_int(MochiReq) ->
                 P
         end,
 
-    Peer = MochiReq:get(peer),
+    Peer = peer(MochiReq),
 
     Method1 =
         case MochiReq:get(method) of
@@ -789,14 +790,17 @@ body(#httpd{mochi_req = MochiReq, req_body = ReqBody}) ->
 validate_ctype(Req, Ctype) ->
     couch_httpd:validate_ctype(Req, Ctype).
 
-json_body(#httpd{req_body = undefined} = Httpd) ->
+json_body(#httpd{} = Httpd) ->
+    json_body(Httpd, []).
+
+json_body(#httpd{req_body = undefined} = Httpd, JsonDecodeOptions) ->
     case body(Httpd) of
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
-            ?JSON_DECODE(maybe_decompress(Httpd, Body))
+            ?JSON_DECODE(maybe_decompress(Httpd, Body), JsonDecodeOptions)
     end;
-json_body(#httpd{req_body = ReqBody}) ->
+json_body(#httpd{req_body = ReqBody}, _JsonDecodeOptions) ->
     ReqBody.
 
 json_body_obj(Httpd) ->
@@ -1079,6 +1083,8 @@ error_info({bad_ctype, Reason}) ->
     {415, <<"bad_content_type">>, Reason};
 error_info(requested_range_not_satisfiable) ->
     {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
+error_info({expectation_failed, Reason}) ->
+    {417, <<"expectation_failed">>, Reason};
 error_info({error, {illegal_database_name, Name}}) ->
     Message =
         <<"Name: '", Name/binary, "'. Only lowercase characters (a-z), ",
@@ -1100,6 +1106,8 @@ error_info({error, <<"endpoint has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
 error_info({error, <<"proxy has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
+error_info({method_not_allowed, Reason}) ->
+    {405, <<"method_not_allowed">>, Reason};
 error_info({gone, Reason}) ->
     {410, <<"gone">>, Reason};
 error_info({missing_stub, Reason}) ->
@@ -1120,6 +1128,8 @@ error_info(all_workers_died) ->
         "Nodes are unable to service this "
         "request due to overloading or maintenance mode."
     >>};
+error_info({internal_server_error, Reason}) ->
+    {500, <<"internal_server_error">>, Reason};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
 error_info(timeout) ->
@@ -1461,6 +1471,23 @@ get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
     couch_util:url_encode(User);
 get_user(#httpd{user_ctx = undefined}) ->
     "undefined".
+
+peer(MochiReq) ->
+    Socket = MochiReq:get(socket),
+    case mochiweb_socket:peername(Socket) of
+        {ok, {{O1, O2, O3, O4}, Port}} ->
+            io_lib:format(
+                "~B.~B.~B.~B:~B",
+                [O1, O2, O3, O4, Port]
+            );
+        {ok, {{O1, O2, O3, O4, O5, O6, O7, O8}, Port}} ->
+            io_lib:format(
+                "~B.~B.~B.~B.~B.~B.~B.~B:~B",
+                [O1, O2, O3, O4, O5, O6, O7, O8, Port]
+            );
+        {error, _Reason} ->
+            MochiReq:get(peer)
+    end.
 
 -ifdef(TEST).
 

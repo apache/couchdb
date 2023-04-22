@@ -27,5 +27,6 @@ Installation
     snap
     kubernetes
     search
+    nouveau
     upgrading
     troubleshooting

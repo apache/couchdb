@@ -27,6 +27,7 @@ REBAR3_BRANCH="main"
 WITH_PROPER="true"
 WITH_FAUXTON=1
 WITH_DOCS=1
+WITH_NOUVEAU=0
 ERLANG_MD5="false"
 SKIP_DEPS=0
 
@@ -56,6 +57,7 @@ Options:
   -u | --user USER            set the username to run as (defaults to $COUCHDB_USER)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
+  --enable-nouveau            enable the new experimental search module
   --erlang-md5                use erlang for md5 hash operations
   --dev                       alias for --disable-docs --disable-fauxton
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
@@ -112,6 +114,12 @@ parse_opts() {
                 continue
                 ;;
 
+            --enable-nouveau)
+                WITH_NOUVEAU=1
+                shift
+                continue
+                ;;
+
             --erlang-md5)
                 ERLANG_MD5="true"
                 shift
@@ -121,6 +129,7 @@ parse_opts() {
             --dev)
                 WITH_DOCS=0
                 WITH_FAUXTON=0
+                WITH_NOUVEAU=1
                 shift
                 continue
                 ;;
@@ -302,6 +311,7 @@ package_author_name = $PACKAGE_AUTHOR_NAME
 
 with_fauxton = $WITH_FAUXTON
 with_docs = $WITH_DOCS
+with_nouveau = $WITH_NOUVEAU
 
 user = $COUCHDB_USER
 spidermonkey_version = $SM_VSN

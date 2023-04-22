@@ -62,7 +62,7 @@ handle_call({prompt, [<<"reset">>]}, _From, St) ->
     {reply, true, St#st{indexes = []}};
 handle_call({prompt, [<<"reset">>, _QueryConfig]}, _From, St) ->
     {reply, true, St#st{indexes = []}};
-handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
+handle_call({prompt, [<<"add_fun">>, IndexInfo | _IgnoreRest]}, _From, St) ->
     Indexes =
         case validate_index_info(IndexInfo) of
             true ->
@@ -82,6 +82,15 @@ handle_call({prompt, [<<"rereduce">>, RedSrcs, _]}, _From, St) ->
 handle_call({prompt, [<<"index_doc">>, Doc]}, _From, St) ->
     Vals =
         case index_doc(St, mango_json:to_binary(Doc)) of
+            [] ->
+                [[]];
+            Else ->
+                Else
+        end,
+    {reply, Vals, St};
+handle_call({prompt, [<<"nouveau_index_doc">>, Doc]}, _From, St) ->
+    Vals =
+        case nouveau_index_doc(St, mango_json:to_binary(Doc)) of
             [] ->
                 [[]];
             Else ->
@@ -110,6 +119,9 @@ map_doc(#st{indexes = Indexes}, Doc) ->
 
 index_doc(#st{indexes = Indexes}, Doc) ->
     lists:map(fun(Idx) -> get_text_entries(Idx, Doc) end, Indexes).
+
+nouveau_index_doc(#st{indexes = Indexes}, Doc) ->
+    lists:map(fun(Idx) -> get_nouveau_entries(Idx, Doc) end, Indexes).
 
 get_index_entries({IdxProps}, Doc) ->
     {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
@@ -142,6 +154,15 @@ get_text_entries({IdxProps}, Doc) ->
     case should_index(Selector, Doc) of
         true ->
             get_text_entries0(IdxProps, Doc);
+        false ->
+            []
+    end.
+
+get_nouveau_entries({IdxProps}, Doc) ->
+    Selector = get_index_partial_filter_selector(IdxProps),
+    case should_index(Selector, Doc) of
+        true ->
+            get_nouveau_entries0(IdxProps, Doc);
         false ->
             []
     end.
@@ -307,14 +328,78 @@ make_text_field_name([P | Rest], Type) ->
     Escaped = [mango_util:lucene_escape_field(N) || N <- Parts],
     iolist_to_binary(mango_util:join(".", Escaped)).
 
+get_nouveau_entries0(IdxProps, Doc) ->
+    DefaultEnabled = get_default_enabled(IdxProps),
+    IndexArrayLengths = get_index_array_lengths(IdxProps),
+    FieldsList = get_text_field_list(IdxProps),
+    TAcc = #tacc{
+        index_array_lengths = IndexArrayLengths,
+        fields = FieldsList
+    },
+    Fields0 = get_text_field_values(Doc, TAcc),
+    Fields =
+        if
+            not DefaultEnabled -> Fields0;
+            true -> add_default_text_field(Fields0)
+        end,
+    FieldNames0 = get_field_names(Fields),
+    FieldNames1 = lists:map(fun convert_to_nouveau_string_field/1, FieldNames0),
+    Converted = convert_nouveau_fields(Fields),
+    FieldNames1 ++ Converted.
+
+convert_to_nouveau_string_field([Name, Value, []]) when is_binary(Name), is_binary(Value) ->
+    {[
+        {<<"@type">>, <<"string">>},
+        {<<"name">>, Name},
+        {<<"value">>, Value}
+    ]}.
+
+convert_nouveau_fields([]) ->
+    [];
+convert_nouveau_fields([{Name, <<"string">>, Value} | Rest]) ->
+    Field =
+        {[
+            {<<"@type">>, <<"text">>},
+            {<<"name">>, Name},
+            {<<"value">>, Value}
+        ]},
+    [Field | convert_nouveau_fields(Rest)];
+convert_nouveau_fields([{Name, <<"number">>, Value} | Rest]) ->
+    Field =
+        {[
+            {<<"@type">>, <<"double">>},
+            {<<"name">>, Name},
+            {<<"value">>, Value}
+        ]},
+    [Field | convert_nouveau_fields(Rest)];
+convert_nouveau_fields([{Name, <<"boolean">>, true} | Rest]) ->
+    Field =
+        {[
+            {<<"@type">>, <<"string">>},
+            {<<"name">>, Name},
+            {<<"value">>, <<"true">>}
+        ]},
+    [Field | convert_nouveau_fields(Rest)];
+convert_nouveau_fields([{Name, <<"boolean">>, false} | Rest]) ->
+    Field =
+        {[
+            {<<"@type">>, <<"string">>},
+            {<<"name">>, Name},
+            {<<"value">>, <<"false">>}
+        ]},
+    [Field | convert_nouveau_fields(Rest)].
+
 validate_index_info(IndexInfo) ->
     IdxTypes =
         case dreyfus:available() of
-            true ->
-                [mango_idx_view, mango_idx_text];
-            false ->
-                [mango_idx_view]
-        end,
+            true -> [mango_idx_text];
+            false -> []
+        end ++
+            case nouveau:enabled() of
+                true -> [mango_idx_nouveau];
+                false -> []
+            end ++
+            [mango_idx_view],
     Results = lists:foldl(
         fun(IdxType, Results0) ->
             try

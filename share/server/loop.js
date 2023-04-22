@@ -25,7 +25,6 @@ function create_sandbox() {
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
-    sandbox.index = Dreyfus.index;
   } catch (e) {
     var sandbox = {};
   }
@@ -38,6 +37,18 @@ function create_filter_sandbox() {
   return sandbox;
 };
 
+function create_dreyfus_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.index = Dreyfus.index;
+  return sandbox;
+}
+
+function create_nouveau_sandbox() {
+  var sandbox = create_sandbox();
+  sandbox.index = Nouveau.index;
+  return sandbox;
+}
+
 // Commands are in the form of json arrays:
 // ["commandname",..optional args...]\n
 //
@@ -48,7 +59,7 @@ var DDoc = (function() {
     "lists"     : Render.list,
     "shows"    : Render.show,
     "filters"   : Filter.filter,
-    "views"     : Filter.filter_view, 
+    "views"     : Filter.filter_view,
     "updates"  : Render.update,
     "validate_doc_update" : Validate.validate,
     "rewrites"  : Render.rewrite
@@ -119,6 +130,7 @@ var Loop = function() {
     "add_lib"  : State.addLib,
     "map_doc"  : Views.mapDoc,
     "index_doc": Dreyfus.indexDoc,
+    "nouveau_index_doc": Nouveau.indexDoc,
     "reduce"   : Views.reduce,
     "rereduce" : Views.rereduce
   };

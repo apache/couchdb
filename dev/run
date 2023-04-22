@@ -24,6 +24,7 @@ import optparse
 import os
 import posixpath
 import re
+import signal
 import socket
 import subprocess as sp
 import sys
@@ -226,6 +227,13 @@ def get_args_parser():
         default=[],
         help="Path to config to place in 'local.d'. Can be repeated",
     )
+    parser.add_option(
+        "--with-nouveau",
+        dest="with_nouveau",
+        default=False,
+        action="store_true",
+        help="Start Nouveau server",
+    )
     return parser
 
 
@@ -255,6 +263,7 @@ def setup_context(opts, args):
         "procs": [],
         "auto_ports": opts.auto_ports,
         "locald_configs": opts.locald_configs,
+        "with_nouveau": opts.with_nouveau,
     }
 
 
@@ -304,9 +313,11 @@ def setup_configs(ctx):
             ),
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
+            "clouseau_name": "clouseau%d@127.0.0.1" % (idx + 1),
             "backend_port": backend_port,
             "prometheus_port": prometheus_port,
             "uuid": "fake_uuid_for_dev",
+            "with_nouveau": str(ctx["with_nouveau"]).lower(),
             "_default": "",
         }
         write_config(ctx, node, env)
@@ -451,6 +462,32 @@ def boot_haproxy(ctx):
     )
 
 
+def boot_nouveau(ctx):
+    if not ctx["with_nouveau"]:
+        return
+
+    version = "1.0-SNAPSHOT"
+    cmd = [
+        "java",
+        "-server",
+        "-jar",
+        "target/server-%s-dist.jar" % version,
+        "server",
+        "nouveau.yaml",
+    ]
+
+    logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
+    log = open(logfname, "w")
+    return sp.Popen(
+        " ".join(cmd),
+        cwd="nouveau",
+        shell=True,
+        stdin=sp.PIPE,
+        stdout=log,
+        stderr=sp.STDOUT,
+    )
+
+
 def hack_default_ini(ctx, node, contents):
     contents = re.sub(
         "^\[httpd\]$",
@@ -509,6 +546,11 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
 
 
 def startup(ctx):
+    def handler(signalno, frame):
+        kill_processes(ctx)
+        sys.exit()
+
+    signal.signal(signal.SIGTERM, handler)
     atexit.register(kill_processes, ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)
@@ -525,7 +567,8 @@ def startup(ctx):
 def kill_processes(ctx):
     for proc in ctx["procs"]:
         if proc and proc.returncode is None:
-            proc.kill()
+            proc.terminate()
+    ctx["procs"] = []
 
 
 def degrade_cluster(ctx):
@@ -551,6 +594,9 @@ def boot_nodes(ctx):
     haproxy_proc = boot_haproxy(ctx)
     if haproxy_proc is not None:
         ctx["procs"].append(haproxy_proc)
+    nouveau_proc = boot_nouveau(ctx)
+    if nouveau_proc is not None:
+        ctx["procs"].append(nouveau_proc)
 
 
 def ensure_all_nodes_alive(ctx):

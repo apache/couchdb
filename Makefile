@@ -100,7 +100,7 @@ TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs escriptize
+all: couch fauxton docs escriptize nouveau
 
 
 .PHONY: help
@@ -152,10 +152,12 @@ escriptize: couch
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
 	@$(MAKE) weatherreport-test
+	@$(MAKE) nouveau-test
 
 ifdef apps
 subdirs = $(apps)
@@ -425,6 +427,12 @@ else
 endif
 endif
 
+ifeq ($(with_nouveau), 1)
+	@mkdir -p rel/couchdb/nouveau/
+	@cp nouveau/target/server-*-dist.jar rel/couchdb/nouveau/
+	@cp nouveau/nouveau.yaml rel/couchdb/nouveau/
+endif
+
 	@echo "... done"
 	@echo
 	@echo "    You can now copy the rel/couchdb directory anywhere on your system."
@@ -465,6 +473,9 @@ clean:
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && mvn clean
+endif
 
 
 .PHONY: distclean
@@ -525,3 +536,33 @@ derived:
 	@echo "ON_TAG:                 $(ON_TAG)"
 	@echo "REL_TAG:                $(REL_TAG)"
 	@echo "SUB_VSN:                $(SUB_VSN)"
+
+################################################################################
+# Nouveau
+################################################################################
+
+.PHONY: nouveau
+# Build nouveau
+nouveau:
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && mvn -D maven.test.skip=true
+endif
+
+.PHONY: nouveau-test
+nouveau-test: nouveau-test-maven nouveau-test-elixir
+
+.PHONY: nouveau-test-maven
+nouveau-test-maven: couch nouveau
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && mvn test -P allTests
+endif
+
+.PHONY: nouveau-test-elixir
+nouveau-test-elixir: export MIX_ENV=integration
+nouveau-test-elixir: elixir-init devclean
+nouveau-test-elixir: couch nouveau
+ifeq ($(with_nouveau), 1)
+	@dev/run -n 1 -q -a adm:pass --with-nouveau \
+		--locald-config test/config/test-config.ini \
+		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
+endif
