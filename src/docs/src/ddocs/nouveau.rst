@@ -12,16 +12,17 @@
 
 .. _ddoc/nouveau:
 
-.. warning::
-    Nouveau is an experimental feature. Future releases might change how the endpoints
-    work and might invalidate existing indexes.
-
 =======
 Nouveau
 =======
 
+.. warning::
+    Nouveau is an experimental feature. Future releases might change how the endpoints
+    work and might invalidate existing indexes.
+
 Nouveau indexes enable you to query a database by using the
-`Lucene Query Parser Syntax. <http://lucene.apache.org/core/9_5_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#Overview>`_
+`Lucene Query Parser Syntax. <https://lucene.apache.org/core/9_5_0/queryparser/
+org/apache/lucene/queryparser/classic/package-summary.html#Overview>`_
 A nouveau index uses one, or multiple, fields from your documents. You can use a nouveau
 index to run queries to find documents based on the content they contain.
 
@@ -419,7 +420,8 @@ When more than one result might be returned, it is possible for them to be sorte
 default, the sorting order is determined by 'relevance'.
 
 Relevance is measured according to `Apache Lucene Scoring
-<https://lucene.apache.org/core/9_5_0/core/org/apache/lucene/search/package-summary.html>`_.
+<https://lucene.apache.org/core/9_5_0/core/org/apache/
+lucene/search/package-summary.html>`_.
 As an example, if you search a simple database for the word
 ``example``, two documents might contain the word. If one document
 mentions the word ``example`` 10 times, but the second document
@@ -471,7 +473,8 @@ Query syntax
 ============
 
 The CouchDB search query syntax is based on the
-`Lucene syntax. <https://lucene.apache.org/core/9_5_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html>`_
+`Lucene syntax. <https://lucene.apache.org/core/9_5_0/queryparser/org/apache/
+lucene/queryparser/classic/package-summary.html>`_
 Search queries take the form of ``name:value`` unless the name is omitted, in which case
 they use the default field, as demonstrated in the following examples:
 
@@ -569,7 +572,8 @@ The response to a search query contains an ``order`` field for each of the resul
 specified in the ``sort`` parameter. See the
 :ref:`sort parameter <api/ddoc/search>`. If no ``sort`` parameter is included
 in the query, then the ``order`` field contains the `Lucene relevance score
-<https://lucene.apache.org/core/9_5_0/core/org/apache/lucene/search/package-summary.html>`_.
+<https://lucene.apache.org/core/9_5_0/core/org/apache/
+lucene/search/package-summary.html>`_.
 
 .. _ddoc/nouveau/faceting:
 

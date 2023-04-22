@@ -52,10 +52,10 @@
     :query string query: Required. The Lucene query string.
     :query json ranges: This field defines ranges for numeric search fields. The
         value is a JSON object where the fields names are numeric search fields,
-        and the values of the fields are arrays of JSON objects. The objects must have a
-        ``label``, ``min`` and ``max`` value (of type string, number, number respectively),
-        and optional ``min_inclusive`` and ``max_inclusive`` properties (defaulting to
-        ``true`` if not specified).
+        and the values of the fields are arrays of JSON objects. The objects
+        must have a ``label``, ``min`` and ``max`` value (of type string,
+        number, number respectively), and optional ``min_inclusive`` and
+        ``max_inclusive`` properties (defaulting to ``true`` if not specified).
         Example: ``{"bar":[{"label":"cheap","min":0,"max":100}]}``
     :query json sort: Specifies the sort order of the results.
         The default sort order is relevance. A JSON string of the form
