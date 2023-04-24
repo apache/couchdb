@@ -20,7 +20,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-./configure
+./configure --enable-nouveau
 make check || (make build-report && false)
 '''
 

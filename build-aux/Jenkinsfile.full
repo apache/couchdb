@@ -130,7 +130,7 @@ def generateNativeStage(platform) {
               sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
               sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
               dir( "${platform}/build" ) {
-                sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn} --enable-nouveau"
                 sh '$MAKE'
                 sh '$MAKE eunit'
                 sh '$MAKE elixir-suite'
@@ -183,7 +183,7 @@ def generateContainerStage(platform) {
                   sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
                   dir( "${platform}/build" ) {
-                    sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                    sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn} --enable-nouveau"
                     sh 'make'
                     sh 'make eunit'
                     sh 'make elixir-suite'
@@ -280,7 +280,7 @@ pipeline {
       steps {
         timeout(time: 15, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-          sh "./configure --spidermonkey-version 78"
+          sh "./configure --spidermonkey-version 78 --enable-nouveau"
           sh 'make dist'
         }
       }
