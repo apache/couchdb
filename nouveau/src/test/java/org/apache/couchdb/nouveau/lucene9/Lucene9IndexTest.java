@@ -72,7 +72,7 @@ public class Lucene9IndexTest {
         try {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
-                final Collection<Field> fields = List.of(new StringField("foo", "bar", false, false));
+                final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i, null, fields);
                 index.update("doc" + i, request);
             }
@@ -91,7 +91,7 @@ public class Lucene9IndexTest {
         try {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
-                final Collection<Field> fields = List.of(new StringField("foo", "bar", false, false));
+                final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i, null, fields);
                 index.update("doc" + i, request);
             }
@@ -111,7 +111,7 @@ public class Lucene9IndexTest {
         try {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
-                final Collection<Field> fields = List.of(new StringField("bar", "baz", false, true));
+                final Collection<Field> fields = List.of(new StringField("bar", "baz", false));
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i, null, fields);
                 index.update("doc" + i, request);
             }
@@ -131,7 +131,7 @@ public class Lucene9IndexTest {
         try {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
-                final Collection<Field> fields = List.of(new DoubleField("bar", (double) i, false, true));
+                final Collection<Field> fields = List.of(new DoubleField("bar", (double) i, false));
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i, null, fields);
                 index.update("doc" + i, request);
             }
@@ -174,7 +174,7 @@ public class Lucene9IndexTest {
             assertThat(info.getNumDocs()).isEqualTo(0);
             assertThat(info.getUpdateSeq()).isEqualTo(0);
 
-            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false, true));
+            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
             index.update("foo", new DocumentUpdateRequest(2, null, fields));
             index.commit();
 
@@ -191,7 +191,7 @@ public class Lucene9IndexTest {
     public void testDelete(@TempDir Path path) throws IOException {
         Index index = setup(path);
         try {
-            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false, true));
+            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
             index.update("foo", new DocumentUpdateRequest(2, null, fields));
             index.commit();
 

@@ -102,9 +102,9 @@ curl 'foo:bar@localhost:15984/foo/_design/foo/_nouveau/bar?q=*:*&limit=1&ranges=
 
 | Arguments                                                       | Effect
 | :-------------------------------------------------------------- | :-----
-| index("text", "foo", "bar", {"store": true});                  | analyzes value for full-text searching, optionally stores the value
-| index("string", "foo", "bar", {"store": true, "facet": true}); | indexes value as single token, optionally stores value and/or adds facet
-| index("double", "foo", 12.0, {"store": true, "facet": true});  | indexes value, optionally stores value and/or adds facet
+| index("text", "foo", "bar", {"store": true});                   | analyzes value for full-text searching, optionally stores the value
+| index("string", "foo", "bar", {"store": true});                 | indexes value as single token, optionally stores value
+| index("double", "foo", 12.0, {"store": true});                  | indexes value, optionally stores value
 | index("stored", "foo", "bar");                                  | stores a number, returned with hits
 | index("stored", "foo", 12.0);                                   | stores a string, returned with hits
 

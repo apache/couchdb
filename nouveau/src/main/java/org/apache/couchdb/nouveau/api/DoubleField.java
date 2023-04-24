@@ -17,7 +17,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-
 import jakarta.validation.constraints.NotNull;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -28,14 +27,11 @@ public class DoubleField extends Field {
 
     private final boolean store;
 
-    private final boolean facet;
-
     public DoubleField(@JsonProperty("name") final String name, @JsonProperty("value") final Double value,
-            @JsonProperty("store") final boolean store, @JsonProperty("facet") final boolean facet) {
+            @JsonProperty("store") final boolean store) {
         super(name);
         this.value = value;
         this.store = store;
-        this.facet = facet;
     }
 
     @JsonProperty
@@ -48,14 +44,9 @@ public class DoubleField extends Field {
         return store;
     }
 
-    @JsonProperty
-    public boolean isFacet() {
-        return facet;
-    }
-
     @Override
     public String toString() {
-        return "DoubleField [name=" + name + ", value=" + value + ", store=" + store + ", facet=" + facet + "]";
+        return "DoubleField [name=" + name + ", value=" + value + ", store=" + store + "]";
     }
 
 }
