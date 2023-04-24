@@ -26,7 +26,7 @@ truncate_test() ->
     ?assert(length(Entry#log_entry.msg) =< 16000).
 
 format_report_etoolong_test() ->
-    Payload = lists:flatten(["a" || _ <- lists:seq(1, 1048576)]),
+    Payload = lists:flatten(lists:duplicate(1048576, "a")),
     Resp = couch_log_formatter:format_report(self(), report123, #{
         msg => Payload
     }),
