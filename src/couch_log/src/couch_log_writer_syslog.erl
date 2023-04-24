@@ -74,7 +74,7 @@ terminate(_Reason, St) ->
     gen_udp:close(St#st.socket).
 
 write(#log_entry{level = report} = Entry, #st{enterprise_number = undefined} = St) ->
-    do_write(Entry#log_entry{level = error}, St);
+    do_write(Entry#log_entry{level = St#st.report_level}, St);
 write(#log_entry{level = report, type = Type} = Entry0, #st{report_level = Level} = St) ->
     % append @${enterprise_number} to the type to conform with
     % https://www.rfc-editor.org/rfc/rfc5424.html#page-15
