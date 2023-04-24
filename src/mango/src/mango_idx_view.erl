@@ -406,6 +406,10 @@ range(_, _, LCmp, Low, HCmp, High) ->
 % operators but its all straight forward once you figure out how
 % we're basically just narrowing our logical ranges.
 
+range({[{<<"$lt">>, Arg}]}, '$eq', N, '$eq', N) when
+    (N >= Arg)
+->
+    empty;
 range({[{<<"$lt">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
@@ -466,6 +470,10 @@ range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High) ->
         max ->
             empty
     end;
+range({[{<<"$gt">>, Arg}]}, '$eq', N, '$eq', N) when
+    (Arg >= N)
+->
+    empty;
 range({[{<<"$gt">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
