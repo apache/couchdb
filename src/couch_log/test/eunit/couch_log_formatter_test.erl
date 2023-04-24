@@ -38,7 +38,7 @@ format_report_test() ->
         bar => "barStr",
         baz => baz
     }),
-    Formatted = "[foo=\"123\" baz=\"baz\" bar=\"barStr\"]",
+    Formatted = "[foo=123 baz=\"baz\" bar=\"barStr\"]",
     ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
 
 format_reason_test() ->
