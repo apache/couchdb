@@ -70,7 +70,7 @@ handle_message({ok, Info}, Worker, {Counters, Acc0}) ->
         nil ->
             C1 = fabric_dict:store(Worker, ok, Counters),
             C2 = fabric_view:remove_overlapping_shards(Worker, C1),
-            Acc1 = maps:merge_with(fun merge_info/3, Info, Acc0),
+            Acc1 = nouveau_maps:merge_with(fun merge_info/3, Info, Acc0),
             case fabric_dict:any(nil, C2) of
                 true ->
                     {ok, {C2, Acc1}};

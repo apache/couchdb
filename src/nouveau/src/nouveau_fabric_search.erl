@@ -217,5 +217,5 @@ merge_facets(FacetsA, null, _Limit) ->
 merge_facets(null, FacetsB, _Limit) ->
     FacetsB;
 merge_facets(FacetsA, FacetsB, _Limit) ->
-    Combiner = fun(_, V1, V2) -> maps:merge_with(fun(_, V3, V4) -> V3 + V4 end, V1, V2) end,
-    maps:merge_with(Combiner, FacetsA, FacetsB).
+    Combiner = fun(_, V1, V2) -> nouveau_maps:merge_with(fun(_, V3, V4) -> V3 + V4 end, V1, V2) end,
+    nouveau_maps:merge_with(Combiner, FacetsA, FacetsB).
