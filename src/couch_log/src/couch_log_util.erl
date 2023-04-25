@@ -152,9 +152,7 @@ string_p1(_) ->
 
 maybe_format_type(#log_entry{type = undefined} = Entry) ->
     Entry;
-maybe_format_type(#log_entry{type = Type, msg = [$[ | Msg]} = Entry) ->
+maybe_format_type(#log_entry{type = Type, msg = ["[" | Msg]} = Entry) ->
     Entry#log_entry{msg = ["[", Type, " " | Msg]};
-maybe_format_type(#log_entry{type = Type, msg = [_ | _] = Msg} = Entry) ->
-    Entry#log_entry{msg = [Type, " " | Msg]};
 maybe_format_type(#log_entry{} = Entry) ->
     Entry.

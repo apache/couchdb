@@ -50,14 +50,7 @@ alert(Fmt, Args) -> log(alert, Fmt, Args).
 emergency(Fmt, Args) -> log(emergency, Fmt, Args).
 
 -spec report(string(), map()) -> true | false.
-report(ReportId, Meta0) when is_map(Meta0) ->
-    Meta =
-        case maps:is_key(type, Meta0) of
-            true ->
-                Meta0;
-            false ->
-                Meta0#{type => ReportId}
-        end,
+report(ReportId, Meta) when is_map(Meta) ->
     couch_stats:increment_counter([couch_log, level, report]),
     case couch_log_formatter:format_report(self(), ReportId, Meta) of
         {error, emsgtoolong} ->

@@ -78,7 +78,7 @@ write(#log_entry{level = report} = Entry, #st{enterprise_number = undefined} = S
 write(#log_entry{level = report, type = Type} = Entry0, #st{report_level = Level} = St) ->
     % append @${enterprise_number} to the type to conform with
     % https://www.rfc-editor.org/rfc/rfc5424.html#page-15
-    TypeSDID = lists:flatten(io_lib:format("~s@~s", [Type, St#st.enterprise_number])),
+    TypeSDID = lists:flatten(io_lib:format("~s-DB@~s", [Type, St#st.enterprise_number])),
     Entry = Entry0#log_entry{
         type = TypeSDID,
         level = Level
