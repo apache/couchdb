@@ -20,6 +20,55 @@
     :depth: 1
     :local:
 
+.. _release/3.3.2:
+
+Version 3.3.2
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`4529`: In Javascript process manager, use a database tag in
+  addition to a ddoc ID to quickly find processes. This should improve
+  performance.
+
+* :ghissue:`4509`, :ghissue:`4405`: Make remsh work with quoted cookie values.
+
+* :ghissue:`4473`: Avoid re-compiling filter view functions. This could speed
+  up Javascript filter functions.
+
+* :ghissue:`4412`: Remove Javascript json2 script and the try/except clause
+  around seal.
+
+* :ghissue:`4513`: Allow configurable timeouts for ``_view`` and ``_search``.
+  Search timeouts can be specified as ``[fabric] search_timeout`` and
+  ``[fabric] search_permsg``. View per-message timeout can be configured as
+  ``[fabric] view_permsg_timeout``.
+
+* :ghissue:`4438`: Proxy auth can now use one of the configured hash algorithms
+  from chttpd_auth/hash_algorithms to decode authentication tokens.
+
+* :ghissue:`4370`: Ensure design docs are uploaded individually when
+  replicating with ``_bulk_get``. This restores previous behavior before
+  version 3.3.0.
+
+* :ghissue:`4416`: Allow ``_local`` doc writes to the replicator dbs.
+  Previously this issue prevented replicating the replicator db itself, since
+  checkpointing was not working properly.
+
+* :ghissue:`4363`: Fix replication ``_scheduler/docs`` ``"total_rows"`` value.
+
+* :ghissue:`4380`: Be more defensive about SpiderMonkey location. An error
+  should be emitted early if the Spidermonkey library cannot be found.
+
+* :ghissue:`4388`: Bump recon to 2.5.3. See the `changelog
+  <https://ferd.github.io/recon/changelog.html#2-5-3>`_ for more details.
+
+* :ghissue:`4476`, :ghissue:`4515`, :ghissue:`4490`, :ghissue:`4350`,
+  :ghissue:`4379`: Various documentation cleanups and fixes.
+
+* Fix for `CVE-2023-26268 <https://docs.couchdb.org/en/latest/cve/2023-26268.html>`_.
+
 .. _release/3.3.1:
 
 Version 3.3.1
