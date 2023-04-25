@@ -125,8 +125,13 @@ public final class IndexManager implements Managed {
         }
     }
 
-    public void create(final String name, IndexDefinition indexDefinition) throws IOException {
+    public void create(final String name, IndexDefinition newIndexDefinition) throws IOException {
         if (exists(name)) {
+            final IndexDefinition currentIndexDefinition = loadIndexDefinition(name);
+            if (newIndexDefinition.equals(currentIndexDefinition)) {
+                // Idempotent success.
+                return;
+            }
             throw new WebApplicationException("Index already exists", Status.EXPECTATION_FAILED);
         }
         // Validate index definiton
@@ -134,11 +139,12 @@ public final class IndexManager implements Managed {
 
         // Persist definition
         final Path path = indexDefinitionPath(name);
+
         if (Files.exists(path)) {
             throw new FileAlreadyExistsException(name + " already exists");
         }
         Files.createDirectories(path.getParent());
-        objectMapper.writeValue(path.toFile(), indexDefinition);
+        objectMapper.writeValue(path.toFile(), newIndexDefinition);
     }
 
     public boolean exists(final String name) {
