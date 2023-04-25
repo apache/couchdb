@@ -57,7 +57,7 @@ init() ->
                         undefined
                 end
         end,
-    Level = list_to_atom(config:get("log", "syslog_report_level", "info")),
+    Level = list_to_atom(config:get("log", "report_level", "info")),
     {ok, #st{
         socket = Socket,
         host = Host,
