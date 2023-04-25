@@ -34,7 +34,7 @@ Features and Enhancements
 
 * :ghissue:`4509`, :ghissue:`4405`: Make remsh work with quoted cookie values.
 
-* Fix for `CVE-2023-26268 <https://docs.couchdb.org/en/stable/cve/2023-26268.html>`_.
+* Fix for `CVE-2023-26268 <https://docs.couchdb.org/en/3.2.3-docs/cve/2023-26268.html>`_.
 
 .. _release/3.2.2:
 
