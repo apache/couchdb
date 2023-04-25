@@ -26,42 +26,49 @@ meta = [
   'centos7': [
     name: 'CentOS 7',
     spidermonkey_vsn: '1.8.5',
+    enable_nouveau: true,
     image: "apache/couchdbci-centos:7-erlang-${ERLANG_VERSION}"
   ],
 
   'centos8': [
     name: 'CentOS 8',
     spidermonkey_vsn: '60',
+    enable_nouveau: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
   'bionic': [
     name: 'Ubuntu 18.04',
     spidermonkey_vsn: '1.8.5',
+    enable_nouveau: true,
     image: "apache/couchdbci-ubuntu:bionic-erlang-${ERLANG_VERSION}"
   ],
 
   'focal': [
     name: 'Ubuntu 20.04',
     spidermonkey_vsn: '68',
+    enable_nouveau: true,
     image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
   'jammy': [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
+    enable_nouveau: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
   'buster': [
     name: 'Debian 10',
     spidermonkey_vsn: '60',
+    enable_nouveau: true,
     image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
   ],
 
   'bullseye-arm64': [
     name: 'Debian 11 ARM',
     spidermonkey_vsn: '78',
+    enable_nouveau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 'arm64v8'
   ],
@@ -69,6 +76,7 @@ meta = [
   'bullseye-ppc64': [
     name: 'Debian 11 POWER',
     spidermonkey_vsn: '78',
+    enable_nouveau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 'ppc64le'
   ],
@@ -76,6 +84,7 @@ meta = [
   'bullseye-s390x': [
     name: 'Debian 11 s390x',
     spidermonkey_vsn: '78',
+    enable_nouveau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 's390x'
   ],
@@ -83,6 +92,7 @@ meta = [
   'bullseye': [
     name: 'Debian 11',
     spidermonkey_vsn: '78',
+    enable_nouveau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
@@ -96,9 +106,18 @@ meta = [
  'macos': [
     name: 'macOS',
     spidermonkey_vsn: '91',
+    enable_nouveau: false,
     gnu_make: 'make'
   ]
 ]
+
+def String configure(config) {
+  result = "./configure --skip-deps --spidermonkey-version ${config.spidermonkey_vsn}"
+  if (config.enable_nouveau) {
+    result += " --enable-nouveau"
+  }
+  return result
+}
 
 // Credit to https://stackoverflow.com/a/69222555 for this technique.
 // We can use the scripted pipeline syntax to dynamically generate stages,
@@ -130,13 +149,14 @@ def generateNativeStage(platform) {
               sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
               sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
               dir( "${platform}/build" ) {
-                sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                sh "${configure(meta[platform])}"
                 sh '$MAKE'
                 sh '$MAKE eunit'
                 sh '$MAKE elixir-suite'
                 sh '$MAKE exunit'
                 sh '$MAKE mango-test'
                 sh '$MAKE weatherreport-test'
+                sh '$MAKE nouveau-test'
               }
             }
           }
@@ -183,13 +203,14 @@ def generateContainerStage(platform) {
                   sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
                   dir( "${platform}/build" ) {
-                    sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                    sh "${configure(meta[platform])}"
                     sh 'make'
                     sh 'make eunit'
                     sh 'make elixir-suite'
                     sh 'make exunit'
                     sh 'make mango-test'
                     sh 'make weatherreport-test'
+                    sh 'make nouveau-test'
                   }
                 }
                 catch (err) {
@@ -280,7 +301,7 @@ pipeline {
       steps {
         timeout(time: 15, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-          sh "./configure --spidermonkey-version 78"
+          sh "./configure --spidermonkey-version 78 --enable-nouveau"
           sh 'make dist'
         }
       }
