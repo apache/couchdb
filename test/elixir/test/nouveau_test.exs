@@ -22,6 +22,7 @@ defmodule NouveauTest do
 
   def create_ddoc(db_name, opts \\ %{}) do
     default_ddoc = %{
+      autoupdate: false,
       nouveau: %{
         bar: %{
           default_analyzer: "standard",
