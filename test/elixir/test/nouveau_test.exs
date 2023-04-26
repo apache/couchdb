@@ -42,9 +42,29 @@ defmodule NouveauTest do
     assert Map.has_key?(resp.body, "ok") == true
   end
 
+  def create_mango_index(db_name) do
+    body = %{
+      type: "nouveau",
+      index: %{
+        fields: [
+          %{name: "foo", type: "string"},
+          %{name: "bar", type: "number"}
+        ]
+      }
+    }
+
+    resp = Couch.post("/#{db_name}/_index", body: body)
+    assert resp.status_code in [200]
+  end
+
   def get_ids(resp) do
     %{:body => %{"hits" => hits}} = resp
     Enum.map(hits, fn hit -> hit["doc"]["_id"] end)
+  end
+
+  def get_mango_ids(resp) do
+    %{:body => %{"docs" => docs}} = resp
+    Enum.map(docs, fn doc -> doc["_id"] end)
   end
 
   def get_bookmark(resp) do
@@ -237,6 +257,32 @@ defmodule NouveauTest do
     assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
     %{:body => %{"ranges" => ranges}} = resp
     assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
+  end
+
+  @tag :with_db
+  test "mango search by number", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_mango_index(db_name)
+
+    url = "/#{db_name}/_find"
+    resp = Couch.post(url, body: %{selector: %{bar: %{"$gt": 5}}})
+    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    ids = get_mango_ids(resp)
+    assert ids == ["doc2", "doc3", "doc4"]
+  end
+
+  @tag :with_db
+  test "mango search by string", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_mango_index(db_name)
+
+    url = "/#{db_name}/_find"
+    resp = Couch.post(url, body: %{selector: %{foo: %{"$eq": "foo"}}})
+    assert resp.status_code == 200, "error #{db_name} #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    ids = get_mango_ids(resp)
+    assert ids == ["doc4"]
   end
 
 end

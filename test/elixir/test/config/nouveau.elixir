@@ -12,6 +12,8 @@
     "sort by numeric field (desc)",
     "counts",
     "ranges",
-    "ranges (open)"
+    "ranges (open)",
+    "mango search by number",
+    "mango search by string"
   ]
 }
