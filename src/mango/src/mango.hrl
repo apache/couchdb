@@ -30,6 +30,14 @@
 -type selector() :: any().
 -type ejson() :: {[{atom(), any()}]}.
 
--type shard_stats() :: {docs_examined, non_neg_integer()}.
+-type shard_stats() :: shard_stats_v1() | shard_stats_v2().
+
+-type shard_stats_v1() :: {docs_examined, non_neg_integer()}.
+-type shard_stats_v2() ::
+    #{
+         docs_examined => non_neg_integer(),
+         keys_examined => non_neg_integer()
+    }.
+
 -type row_property_key() :: id | key | value | doc.
 -type row_properties() :: [{row_property_key(), any()}].

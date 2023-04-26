@@ -79,6 +79,26 @@ viewcbargs_get(fields, Args) when is_map(Args) ->
 viewcbargs_get(covering_index, Args) when is_map(Args) ->
     maps:get(covering_index, Args, undefined).
 
+% This is not yet in use intentionally.
+-spec shard_stats(DocsExamined, KeysExamined) -> ShardStats when
+    DocsExamined :: non_neg_integer(),
+    KeysExamined :: non_neg_integer(),
+    ShardStats :: shard_stats_v2().
+shard_stats(DocsExamined, KeysExamined) ->
+    #{
+        docs_examined => DocsExamined,
+        keys_examined => KeysExamined
+    }.
+
+-spec shard_stats_get(Key, Args) -> Stat when
+    Key :: docs_examined | keys_examined,
+    Args :: shard_stats_v2(),
+    Stat :: non_neg_integer().
+shard_stats_get(docs_examined, Args) when is_map(Args) ->
+    maps:get(docs_examined, Args, 0);
+shard_stats_get(keys_examined, Args) when is_map(Args) ->
+    maps:get(keys_examined, Args, 0).
+
 -spec create(Db, Indexes, Selector, Options) -> {ok, #cursor{}} when
     Db :: database(),
     Indexes :: [#idx{}],
@@ -325,10 +345,13 @@ choose_best_index(IndexRanges) ->
 view_cb({meta, Meta}, Acc) ->
     % Map function starting
     put(mango_docs_examined, 0),
+    put(mango_keys_examined, 0),
     set_mango_msg_timestamp(),
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
 view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
+    put(mango_keys_examined, get(mango_keys_examined) + 1),
+    couch_stats:increment_counter([mango, keys_examined]),
     ViewRow = #view_row{
         id = couch_util:get_value(id, Row),
         key = couch_util:get_value(key, Row),
@@ -457,12 +480,21 @@ handle_message({row, Props}, Cursor) ->
             couch_log:error("~s :: Error loading doc: ~p", [?MODULE, Error]),
             {ok, Cursor}
     end;
-handle_message({execution_stats, ShardStats}, #cursor{execution_stats = Stats} = Cursor) ->
-    {docs_examined, DocsExamined} = ShardStats,
-    Cursor1 = Cursor#cursor{
+% TODO: remove clause couchdb 4 -- mixed-version upgrade support
+handle_message(
+    {execution_stats, {docs_examined, DocsExamined}}, #cursor{execution_stats = Stats} = Cursor0
+) ->
+    Cursor = Cursor0#cursor{
         execution_stats = mango_execution_stats:incr_docs_examined(Stats, DocsExamined)
     },
-    {ok, Cursor1};
+    {ok, Cursor};
+handle_message({execution_stats, ShardStats}, #cursor{execution_stats = Stats0} = Cursor0) ->
+    DocsExamined = shard_stats_get(docs_examined, ShardStats),
+    KeysExamined = shard_stats_get(keys_examined, ShardStats),
+    Stats1 = mango_execution_stats:incr_docs_examined(Stats0, DocsExamined),
+    Stats = mango_execution_stats:incr_keys_examined(Stats1, KeysExamined),
+    Cursor = Cursor0#cursor{execution_stats = Stats},
+    {ok, Cursor};
 handle_message(complete, Cursor) ->
     {ok, Cursor};
 handle_message({error, Reason}, _Cursor) ->
@@ -668,6 +700,12 @@ viewcbargs_test() ->
     ?assertEqual(fields, viewcbargs_get(fields, ViewCBArgs)),
     ?assertEqual(index, viewcbargs_get(covering_index, ViewCBArgs)),
     ?assertError(function_clause, viewcbargs_get(something_else, ViewCBArgs)).
+
+shard_stats_test() ->
+    ShardStats = shard_stats(docs_examined, keys_examined),
+    ?assertEqual(docs_examined, shard_stats_get(docs_examined, ShardStats)),
+    ?assertEqual(keys_examined, shard_stats_get(keys_examined, ShardStats)),
+    ?assertError(function_clause, shard_stats_get(something_else, ShardStats)).
 
 maybe_replace_max_json_test() ->
     ?assertEqual([], maybe_replace_max_json([])),
@@ -943,6 +981,7 @@ execute_test_() ->
         [
             ?TDEF_FE(t_execute_empty),
             ?TDEF_FE(t_execute_ok_all_docs),
+            ?TDEF_FE(t_execute_ok_all_docs_with_execution_stats),
             ?TDEF_FE(t_execute_ok_query_view),
             ?TDEF_FE(t_execute_error)
         ]
@@ -1082,6 +1121,78 @@ t_execute_ok_query_view(_) ->
     ?assertEqual({ok, updated_accumulator}, execute(Cursor, fun foo:bar/2, accumulator)),
     ?assert(meck:called(fabric, query_view, '_')).
 
+t_execute_ok_all_docs_with_execution_stats(_) ->
+    Bookmark = bookmark,
+    Stats =
+        {[
+            {total_keys_examined, 0},
+            {total_docs_examined, 0},
+            {total_quorum_docs_examined, 0},
+            {results_returned, 0},
+            {execution_time_ms, '_'}
+        ]},
+    UserFnDefinition =
+        [
+            {[{add_key, bookmark, Bookmark}, accumulator], {undefined, updated_accumulator1}},
+            {
+                [{add_key, execution_stats, Stats}, updated_accumulator1],
+                {undefined, updated_accumulator2}
+            }
+        ],
+    meck:expect(foo, bar, UserFnDefinition),
+    Index = #idx{type = <<"json">>, def = all_docs},
+    Selector = {[]},
+    Fields = all_fields,
+    Cursor =
+        #cursor{
+            index = Index,
+            db = db,
+            selector = Selector,
+            fields = Fields,
+            ranges = [{'$gte', start_key, '$lte', end_key}],
+            opts = [{user_ctx, user_ctx}, {execution_stats, true}],
+            bookmark = nil
+        },
+    Cursor1 =
+        Cursor#cursor{
+            user_acc = accumulator,
+            user_fun = fun foo:bar/2,
+            execution_stats = '_'
+        },
+    Cursor2 =
+        Cursor1#cursor{
+            bookmark = Bookmark,
+            bookmark_docid = undefined,
+            bookmark_key = undefined,
+            execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
+        },
+    Extra =
+        [
+            {callback, {mango_cursor_view, view_cb}},
+            {selector, Selector},
+            {callback_args, #{
+                selector => Selector,
+                fields => Fields,
+                covering_index => undefined
+            }},
+            {ignore_partition_query_limit, true}
+        ],
+    Args =
+        #mrargs{
+            view_type = map,
+            reduce = false,
+            start_key = [start_key],
+            end_key = [end_key, ?MAX_JSON_OBJ],
+            include_docs = true,
+            extra = Extra
+        },
+    Parameters = [
+        db, [{user_ctx, user_ctx}], fun mango_cursor_view:handle_all_docs_message/2, Cursor1, Args
+    ],
+    meck:expect(fabric, all_docs, Parameters, meck:val({ok, Cursor2})),
+    ?assertEqual({ok, updated_accumulator2}, execute(Cursor, fun foo:bar/2, accumulator)),
+    ?assert(meck:called(fabric, all_docs, '_')).
+
 t_execute_error(_) ->
     Cursor =
         #cursor{
@@ -1142,6 +1253,7 @@ t_view_cb_row_matching_regular_doc(_) ->
             ]
         },
     put(mango_docs_examined, 0),
+    put(mango_keys_examined, 0),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assert(meck:called(rexi, stream2, '_')).
 
@@ -1160,6 +1272,7 @@ t_view_cb_row_non_matching_regular_doc(_) ->
             ]
         },
     put(mango_docs_examined, 0),
+    put(mango_keys_examined, 0),
     put(mango_last_msg_timestamp, os:timestamp()),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assertNot(meck:called(rexi, stream2, '_')).
@@ -1177,6 +1290,7 @@ t_view_cb_row_null_doc(_) ->
                 }}
             ]
         },
+    put(mango_keys_examined, 0),
     put(mango_last_msg_timestamp, os:timestamp()),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assertNot(meck:called(rexi, stream2, '_')).
@@ -1195,6 +1309,7 @@ t_view_cb_row_missing_doc_triggers_quorum_fetch(_) ->
                 }}
             ]
         },
+    put(mango_keys_examined, 0),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assert(meck:called(rexi, stream2, '_')).
 
@@ -1220,6 +1335,7 @@ t_view_cb_row_matching_covered_doc(_) ->
                 }}
             ]
         },
+    put(mango_keys_examined, 0),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assert(meck:called(rexi, stream2, '_')).
 
@@ -1242,6 +1358,7 @@ t_view_cb_row_non_matching_covered_doc(_) ->
                 }}
             ]
         },
+    put(mango_keys_examined, 0),
     put(mango_last_msg_timestamp, os:timestamp()),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assertNot(meck:called(rexi, stream2, '_')).
@@ -1250,6 +1367,7 @@ t_view_cb_row_backwards_compatible(_) ->
     Row = [{id, id}, {key, key}, {doc, null}],
     meck:expect(rexi, stream2, ['_'], undefined),
     Accumulator = #mrargs{extra = [{selector, {[]}}]},
+    put(mango_keys_examined, 0),
     put(mango_last_msg_timestamp, os:timestamp()),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assertNot(meck:called(rexi, stream2, '_')).
@@ -1321,7 +1439,8 @@ handle_message_test_() ->
             ?TDEF_FE(t_handle_message_row_ok_triggers_quorum_fetch_no_match),
             ?TDEF_FE(t_handle_message_row_no_match),
             ?TDEF_FE(t_handle_message_row_error),
-            ?TDEF_FE(t_handle_message_execution_stats),
+            ?TDEF_FE(t_handle_message_execution_stats_v1),
+            ?TDEF_FE(t_handle_message_execution_stats_v2),
             ?TDEF_FE(t_handle_message_complete),
             ?TDEF_FE(t_handle_message_error)
         ]
@@ -1453,10 +1572,18 @@ t_handle_message_row_error(_) ->
     meck:delete(mango_util, defer, 3),
     meck:delete(couch_log, error, 2).
 
-t_handle_message_execution_stats(_) ->
+t_handle_message_execution_stats_v1(_) ->
     ShardStats = {docs_examined, 42},
     ExecutionStats = #execution_stats{totalDocsExamined = 11},
     ExecutionStats1 = #execution_stats{totalDocsExamined = 53},
+    Cursor = #cursor{execution_stats = ExecutionStats},
+    Cursor1 = #cursor{execution_stats = ExecutionStats1},
+    ?assertEqual({ok, Cursor1}, handle_message({execution_stats, ShardStats}, Cursor)).
+
+t_handle_message_execution_stats_v2(_) ->
+    ShardStats = shard_stats(42, 53),
+    ExecutionStats = #execution_stats{totalDocsExamined = 11, totalKeysExamined = 22},
+    ExecutionStats1 = #execution_stats{totalDocsExamined = 53, totalKeysExamined = 75},
     Cursor = #cursor{execution_stats = ExecutionStats},
     Cursor1 = #cursor{execution_stats = ExecutionStats1},
     ?assertEqual({ok, Cursor1}, handle_message({execution_stats, ShardStats}, Cursor)).
