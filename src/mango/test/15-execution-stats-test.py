@@ -20,7 +20,7 @@ class ExecutionStatsTests(mango.UserDocsTests):
     def test_simple_json_index(self):
         resp = self.db.find({"age": {"$lt": 35}}, return_raw=True, executionStats=True)
         self.assertEqual(len(resp["docs"]), 3)
-        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 3)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
@@ -38,7 +38,7 @@ class ExecutionStatsTests(mango.UserDocsTests):
             {"age": {"$lt": 35}}, return_raw=True, r=3, executionStats=True
         )
         self.assertEqual(len(resp["docs"]), 3)
-        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 3)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 3)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
@@ -59,6 +59,19 @@ class ExecutionStatsTests(mango.UserDocsTests):
         )
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
         self.assertEqual(resp["execution_stats"]["results_returned"], 0)
+
+    def test_covering_json_index(self):
+        resp = self.db.find(
+            {"age": {"$lt": 35}},
+            fields=["_id", "age"],
+            return_raw=True,
+            executionStats=True,
+        )
+        self.assertEqual(len(resp["docs"]), 3)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 3)
+        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["results_returned"], 3)
 
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")

@@ -145,7 +145,7 @@ Example response when finding documents using an index:
                 }
             ],
             "execution_stats": {
-                "total_keys_examined": 0,
+                "total_keys_examined": 200,
                 "total_docs_examined": 200,
                 "total_quorum_docs_examined": 0,
                 "results_returned": 2,
@@ -925,7 +925,6 @@ The execution statistics currently include:
 | Field                          | Description                                |
 +================================+============================================+
 | ``total_keys_examined``        | Number of index keys examined.             |
-|                                | Currently always 0.                        |
 +--------------------------------+--------------------------------------------+
 | ``total_docs_examined``        | Number of documents fetched from the       |
 |                                | database / index, equivalent to using      |
