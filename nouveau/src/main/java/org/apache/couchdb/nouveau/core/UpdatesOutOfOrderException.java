@@ -15,10 +15,11 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.IOException;
 
-public class UpdatesOutOfOrderException extends IOException {
+public final class UpdatesOutOfOrderException extends IOException {
 
-    public UpdatesOutOfOrderException() {
-        super("Updates applied in the wrong order");
+    public UpdatesOutOfOrderException(final long currentSeq, final long attemptedSeq) {
+        super(String.format("Updates applied in the wrong order (current seq: %d, attempted seq: %d)",
+            currentSeq, attemptedSeq));
     }
 
 }

@@ -152,7 +152,7 @@ public abstract class Index implements Closeable {
     protected final void assertUpdateSeqIsLower(final long updateSeq) throws UpdatesOutOfOrderException {
         assert Thread.holdsLock(this);
         if (!(updateSeq > this.updateSeq)) {
-            throw new UpdatesOutOfOrderException();
+            throw new UpdatesOutOfOrderException(this.updateSeq, updateSeq);
         }
     }
 
