@@ -265,6 +265,12 @@ should_exit_on_internal_error() ->
         % emits an error log before dying
         throw:{<<"InternalError">>, _} ->
             ok;
+        % gen_server may die before replying
+        exit:{noproc, {gen_server,call, _}} ->
+            ok;
+        % or it may die with an epipe if it crashes while we send/recv data to it
+        exit:{epipe, {gen_server, call, _}} ->
+            ok;
         % It may fail and just exit the process. That's expected as well
         throw:{os_process_error, _} ->
             ok
