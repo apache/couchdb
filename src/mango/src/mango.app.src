@@ -20,7 +20,8 @@
         couch_epi,
         config,
         couch_log,
-        fabric
+        fabric,
+        nouveau
     ]},
     {mod, {mango_app, []}}
 ]}.
