@@ -295,10 +295,10 @@ elixir-source-checks: elixir-init
 # target: build-report - Generate a build report
 build-report:
 	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log || true
-	tail -n1000 ./dev/logs/node1.log || true
-	tail -n1000 ./dev/logs/nouveau.log || true
-	tail -n1000 ./tmp/couch.log || true
-	tail test-results.log || true
+	cat ./dev/logs/node1.log || true
+	cat ./dev/logs/nouveau.log || true
+	cat ./tmp/couch.log || true
+	cat test-results.log || true
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)

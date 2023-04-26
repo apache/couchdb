@@ -3,6 +3,9 @@ commitIntervalSeconds: 30
 idleSeconds: 60
 rootDir: target/indexes
 
+logging:
+  level: WARN
+
 server:
   applicationConnectors:
     - type: h2c
