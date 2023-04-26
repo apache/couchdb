@@ -401,7 +401,7 @@ write_att(Stream, FileName, OrigData, <<>>) ->
         {data, {stream, StreamEngine}},
         {att_len, Len},
         {disk_len, Len},
-        {md5, Digest},
+        {digest, Digest},
         {encoding, identity}
     ]);
 write_att(Stream, FileName, OrigData, Data) ->

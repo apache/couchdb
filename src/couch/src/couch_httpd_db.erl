@@ -984,13 +984,13 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
         [] ->
             throw({not_found, "Document is missing attachment"});
         [Att] ->
-            [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch(
-                [type, encoding, disk_len, att_len, md5], Att
+            [Type, Enc, DiskLen, AttLen, Digest] = couch_att:fetch(
+                [type, encoding, disk_len, att_len, digest], Att
             ),
             Etag =
-                case Md5 of
+                case Digest of
                     <<>> -> couch_httpd:doc_etag(Doc);
-                    _ -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
+                    _ -> "\"" ++ ?b2l(base64:encode(Digest)) ++ "\""
                 end,
             ReqAcceptsAttEnc = lists:member(
                 atom_to_list(Enc),
@@ -1078,7 +1078,7 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
                                         Headers ++
                                             if
                                                 Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
-                                                    [{"Content-MD5", base64:encode(Md5)}];
+                                                    [{"Content-MD5", base64:encode(Digest)}];
                                                 true ->
                                                     []
                                             end,
@@ -1175,7 +1175,7 @@ db_attachment_req(
                         {type, MimeType},
                         {data, Data},
                         {att_len, AttLen},
-                        {md5, get_digest_header(Req)},
+                        {digest, get_digest_header(Req)},
                         {encoding, Encoding}
                     ])
                 ]
@@ -1263,7 +1263,7 @@ get_digest_header(Req) ->
         {_, chunked, _} ->
             case re:run(Trailer, "\\bContent-MD5\\b", [caseless]) of
                 {match, _} ->
-                    md5_in_footer;
+                    digest_in_footer;
                 _ ->
                     <<>>
             end;

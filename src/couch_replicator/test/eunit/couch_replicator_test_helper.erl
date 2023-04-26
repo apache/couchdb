@@ -115,8 +115,8 @@ compare_docs(Doc1, Doc2) ->
             couch_att:fetch(type, AttTarget)
         ),
         ?assertEqual(
-            couch_att:fetch(md5, Att),
-            couch_att:fetch(md5, AttTarget)
+            couch_att:fetch(digest, Att),
+            couch_att:fetch(digest, AttTarget)
         )
     end,
     lists:foreach(FunCompareAtts, Atts1).

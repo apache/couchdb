@@ -76,7 +76,7 @@
     %% differs from att_len when encoding /= identity
     disk_len :: non_neg_integer(),
 
-    md5 = <<>> :: binary(),
+    digest = <<>> :: binary(),
     revpos = 0 :: non_neg_integer(),
     data ::
         stub
@@ -122,7 +122,7 @@
 %% This is a digest of the original attachment data as uploaded by the client.
 %% it's useful for checking validity of contents against other attachment data
 %% as well as quick digest computation of the enclosing document.
--type md5_prop() :: {md5, binary()}.
+-type digest_prop() :: {digest, binary()}.
 
 -type revpos_prop() :: {revpos, 0}.
 
@@ -149,7 +149,7 @@
     | type_prop()
     | att_len_prop()
     | disk_len_prop()
-    | md5_prop()
+    | digest_prop()
     | revpos_prop()
     | data_prop()
     | encoding_prop()
@@ -161,7 +161,7 @@
     Sp :: any(),
     AttLen :: non_neg_integer(),
     RevPos :: non_neg_integer(),
-    Md5 :: binary()
+    Digest :: binary()
 }.
 
 -type disk_att_v2() :: {
@@ -171,7 +171,7 @@
     AttLen :: non_neg_integer(),
     DiskLen :: non_neg_integer(),
     RevPos :: non_neg_integer(),
-    Md5 :: binary(),
+    Digest :: binary(),
     Enc :: identity | gzip
 }.
 
@@ -214,7 +214,7 @@ fetch(att_len, #att{att_len = AttLen}) ->
     AttLen;
 fetch(disk_len, #att{disk_len = DiskLen}) ->
     DiskLen;
-fetch(md5, #att{md5 = Digest}) ->
+fetch(digest, #att{digest = Digest}) ->
     Digest;
 fetch(revpos, #att{revpos = RevPos}) ->
     RevPos;
@@ -248,8 +248,8 @@ store(att_len, AttLen, Att) ->
     Att#att{att_len = AttLen};
 store(disk_len, DiskLen, Att) ->
     Att#att{disk_len = DiskLen};
-store(md5, Digest, Att) ->
-    Att#att{md5 = Digest};
+store(digest, Digest, Att) ->
+    Att#att{digest = Digest};
 store(revpos, RevPos, Att) ->
     Att#att{revpos = RevPos};
 store(data, Data, Att) ->
@@ -337,11 +337,11 @@ to_disk_term(#att{} = Att) ->
         fetch(att_len, Att),
         fetch(disk_len, Att),
         fetch(revpos, Att),
-        fetch(md5, Att),
+        fetch(digest, Att),
         fetch(encoding, Att)
     };
 to_disk_term(Att) ->
-    BaseProps = [name, type, data, att_len, disk_len, revpos, md5, encoding],
+    BaseProps = [name, type, data, att_len, disk_len, revpos, digest, encoding],
     {Extended, Base} = lists:foldl(
         fun
             (data, {Props, Values}) ->
@@ -376,26 +376,26 @@ from_disk_term(StreamSrc, {Base, Extended}) when
     is_tuple(Base), is_list(Extended)
 ->
     store(Extended, from_disk_term(StreamSrc, Base));
-from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, DiskLen, RevPos, Md5, Enc}) ->
+from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, DiskLen, RevPos, Digest, Enc}) ->
     {ok, Stream} = open_stream(StreamSrc, Sp),
     #att{
         name = Name,
         type = Type,
         att_len = AttLen,
         disk_len = DiskLen,
-        md5 = Md5,
+        digest = Digest,
         revpos = RevPos,
         data = {stream, Stream},
         encoding = upgrade_encoding(Enc)
     };
-from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, RevPos, Md5}) ->
+from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, RevPos, Digest}) ->
     {ok, Stream} = open_stream(StreamSrc, Sp),
     #att{
         name = Name,
         type = Type,
         att_len = AttLen,
         disk_len = AttLen,
-        md5 = Md5,
+        digest = Digest,
         revpos = RevPos,
         data = {stream, Stream}
     };
@@ -406,7 +406,7 @@ from_disk_term(StreamSrc, {Name, {Type, Sp, AttLen}}) ->
         type = Type,
         att_len = AttLen,
         disk_len = AttLen,
-        md5 = <<>>,
+        digest = <<>>,
         revpos = 0,
         data = {stream, Stream}
     }.
@@ -435,7 +435,7 @@ stub_from_json(Att, Props) ->
     RevPos = couch_util:get_value(<<"revpos">>, Props),
     store(
         [
-            {md5, Digest},
+            {digest, Digest},
             {revpos, RevPos},
             {data, stub},
             {disk_len, DiskLen},
@@ -451,7 +451,7 @@ follow_from_json(Att, Props) ->
     RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
     store(
         [
-            {md5, Digest},
+            {digest, Digest},
             {revpos, RevPos},
             {data, follows},
             {disk_len, DiskLen},
@@ -497,20 +497,20 @@ encoded_lengths_from_json(Props) ->
 
 digest_from_json(Props) ->
     case couch_util:get_value(<<"digest">>, Props) of
-        <<"md5-", EncodedMd5/binary>> -> base64:decode(EncodedMd5);
+        <<"md5-", EncodedDigest/binary>> -> base64:decode(EncodedDigest);
         _ -> <<>>
     end.
 
 to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
-    [Name, Data, DiskLen, AttLen, Enc, Type, RevPos, Md5] = fetch(
-        [name, data, disk_len, att_len, encoding, type, revpos, md5], Att
+    [Name, Data, DiskLen, AttLen, Enc, Type, RevPos, InDigest] = fetch(
+        [name, data, disk_len, att_len, encoding, type, revpos, digest], Att
     ),
     Props = [
         {<<"content_type">>, Type},
         {<<"revpos">>, RevPos}
     ],
     DigestProp =
-        case base64:encode(Md5) of
+        case base64:encode(InDigest) of
             <<>> -> [];
             Digest -> [{<<"digest">>, <<"md5-", Digest/binary>>}]
         end,
@@ -572,8 +572,8 @@ flush_data(Db, Fun, Att) when is_function(Fun) ->
                             case mochiweb_headers:get_value("Content-MD5", F) of
                                 undefined ->
                                     ok;
-                                Md5 ->
-                                    {md5, base64:decode(Md5)}
+                                Digest ->
+                                    {digest, base64:decode(Digest)}
                             end;
                         ({Length, Chunk}, Total0) ->
                             Total = Total0 + Length,
@@ -645,8 +645,8 @@ foldl(Att, Fun, Acc) ->
 foldl(Bin, _Att, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
 foldl({stream, StreamEngine}, Att, Fun, Acc) ->
-    Md5 = fetch(md5, Att),
-    couch_stream:foldl(StreamEngine, Md5, Fun, Acc);
+    Digest = fetch(digest, Att),
+    couch_stream:foldl(StreamEngine, Digest, Fun, Acc);
 foldl(DataFun, Att, Fun, Acc) when is_function(DataFun) ->
     Len = fetch(att_len, Att),
     fold_streamed_data(DataFun, Len, Fun, Acc);
@@ -677,7 +677,7 @@ foldl_decode(Att, Fun, Acc) ->
     case fetch([data, encoding], Att) of
         [{stream, StreamEngine}, Enc] ->
             couch_stream:foldl_decode(
-                StreamEngine, fetch(md5, Att), Enc, Fun, Acc
+                StreamEngine, fetch(digest, Att), Enc, Fun, Acc
             );
         [Fun2, identity] ->
             fold_streamed_data(Fun2, fetch(att_len, Att), Fun, Acc)
@@ -737,7 +737,7 @@ downgrade(Att) ->
         type = fetch(type, Att),
         att_len = fetch(att_len, Att),
         disk_len = fetch(disk_len, Att),
-        md5 = fetch(md5, Att),
+        digest = fetch(digest, Att),
         revpos = fetch(revpos, Att),
         data = fetch(data, Att),
         encoding = fetch(encoding, Att)
@@ -839,7 +839,7 @@ attachment_disk_term_test_() ->
         {type, <<"application/octet-stream">>},
         {att_len, 0},
         {disk_len, 0},
-        {md5, <<212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126>>},
+        {digest, <<212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126>>},
         {revpos, 4},
         {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
         {encoding, identity}
@@ -883,13 +883,13 @@ attachment_json_term_test_() ->
         {type, <<"application/json">>},
         {att_len, 14},
         {disk_len, 14},
-        {md5, <<"@#mYCWWE3&q#2OvaI5$">>},
+        {digest, <<"@#mYCWWE3&q#2OvaI5$">>},
         {revpos, 1},
         {data, stub},
         {encoding, identity}
     ]),
     ResultFollows = ResultStub#att{data = follows},
-    ResultInline = ResultStub#att{md5 = <<>>, data = <<"{\"answer\": 42}">>},
+    ResultInline = ResultStub#att{digest = <<>>, data = <<"{\"answer\": 42}">>},
     {"JSON term tests", [
         ?_assertEqual(ResultStub, stub_from_json(Att, Props)),
         ?_assertEqual(ResultFollows, follow_from_json(Att, Props)),
@@ -911,7 +911,7 @@ test_non_upgrading_fields(Attachment) ->
         {type, "text/very-very-plain"},
         {att_len, 1024},
         {disk_len, 42},
-        {md5, <<"md5-hashhashhash">>},
+        {digest, <<"md5-hashhashhash">>},
         {revpos, 4},
         {data, stub},
         {encoding, gzip}
@@ -933,7 +933,7 @@ test_upgrading_fields(Attachment) ->
     ?assertMatch(X when is_list(X), UpdatedHeadersUndefined).
 
 test_legacy_defaults(Attachment) ->
-    ?assertEqual(<<>>, fetch(md5, Attachment)),
+    ?assertEqual(<<>>, fetch(digest, Attachment)),
     ?assertEqual(0, fetch(revpos, Attachment)),
     ?assertEqual(identity, fetch(encoding, Attachment)).
 

@@ -1637,15 +1637,15 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
         atts = Atts
     } = Doc = couch_doc_open(Db, DocId, Rev, Options),
     Att = get_existing_attachment(Atts, FileName),
-    [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch(
-        [type, encoding, disk_len, att_len, md5], Att
+    [Type, Enc, DiskLen, AttLen, Digest] = couch_att:fetch(
+        [type, encoding, disk_len, att_len, digest], Att
     ),
     Refs = monitor_attachments(Att),
     try
         Etag =
-            case Md5 of
+            case Digest of
                 <<>> -> chttpd:doc_etag(Doc);
-                _ -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
+                _ -> "\"" ++ ?b2l(base64:encode(Digest)) ++ "\""
             end,
         ReqAcceptsAttEnc = lists:member(
             atom_to_list(Enc),
@@ -1734,7 +1734,7 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
                                             Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
                                                 [
                                                     {"Content-MD5",
-                                                        base64:encode(couch_att:fetch(md5, Att))}
+                                                        base64:encode(couch_att:fetch(digest, Att))}
                                                 ];
                                             true ->
                                                 []
@@ -1802,7 +1802,7 @@ db_attachment_req(#httpd{method = Method, user_ctx = Ctx} = Req, Db, DocId, File
                         {type, MimeType},
                         {data, Data},
                         {att_len, ContentLen},
-                        {md5, couch_httpd_db:get_digest_header(Req)},
+                        {digest, couch_httpd_db:get_digest_header(Req)},
                         {encoding, Encoding}
                     ])
                 ]

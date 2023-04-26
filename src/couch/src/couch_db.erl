@@ -1242,10 +1242,10 @@ prep_and_validate_replicated_updates(
 new_revid(#doc{body = Body, revs = {OldStart, OldRevs}, atts = Atts, deleted = Deleted}) ->
     DigestedAtts = lists:foldl(
         fun(Att, Acc) ->
-            [N, T, M] = couch_att:fetch([name, type, md5], Att),
-            case M == <<>> of
+            [N, T, D] = couch_att:fetch([name, type, digest], Att),
+            case D == <<>> of
                 true -> Acc;
-                false -> [{N, T, M} | Acc]
+                false -> [{N, T, D} | Acc]
             end
         end,
         [],
@@ -1253,7 +1253,7 @@ new_revid(#doc{body = Body, revs = {OldStart, OldRevs}, atts = Atts, deleted = D
     ),
     case DigestedAtts of
         Atts2 when length(Atts) =/= length(Atts2) ->
-            % We must have old style non-md5 attachments
+            % We must have old style non-digest attachments
             ?l2b(integer_to_list(couch_util:rand32()));
         Atts2 ->
             OldRev =
@@ -1610,7 +1610,7 @@ compressible_att_type(MimeType) ->
 % trailer, we're free to ignore this inconsistency and
 % pretend that no Content-MD5 exists.
 with_stream(Db, Att, Fun) ->
-    [InMd5, Type, Enc] = couch_att:fetch([md5, type, encoding], Att),
+    [InDigest, Type, Enc] = couch_att:fetch([digest, type, encoding], Att),
     BufferSize = config:get_integer(
         "couchdb",
         "attachment_stream_buffer_size",
@@ -1633,21 +1633,21 @@ with_stream(Db, Att, Fun) ->
     {ok, OutputStream} = open_write_stream(Db, Options),
     ReqDigest =
         case Fun(OutputStream) of
-            {md5, FooterMd5} ->
-                case InMd5 of
-                    md5_in_footer -> FooterMd5;
-                    _ -> InMd5
+            {digest, FooterDigest} ->
+                case InDigest of
+                    digest_in_footer -> FooterDigest;
+                    _ -> InDigest
                 end;
             _ ->
-                InMd5
+                InDigest
         end,
-    {StreamEngine, Len, IdentityLen, Md5, IdentityDigest} =
+    {StreamEngine, Len, IdentityLen, Digest, IdentityDigest} =
         couch_stream:close(OutputStream),
     couch_util:check_digest(IdentityDigest, ReqDigest),
     {AttLen, DiskLen, NewEnc} =
         case Enc of
             identity ->
-                case {Md5, IdentityDigest} of
+                case {Digest, IdentityDigest} of
                     {Same, Same} ->
                         {Len, IdentityLen, identity};
                     _ ->
@@ -1670,7 +1670,7 @@ with_stream(Db, Att, Fun) ->
             {data, {stream, StreamEngine}},
             {att_len, AttLen},
             {disk_len, DiskLen},
-            {md5, Md5},
+            {digest, Digest},
             {encoding, NewEnc}
         ],
         Att
