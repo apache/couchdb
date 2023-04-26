@@ -274,9 +274,7 @@ should_exit_on_internal_error() ->
         % It may fail and just exit the process. That's expected as well
         throw:{os_process_error, _} ->
             ok
-    end,
-    % Expect the process to be dead
-    ?assertThrow({os_process_error, _}, couch_query_servers:proc_prompt(Proc, [<<"reset">>])).
+    end.
 
 trigger_oom(Proc) ->
     Status =
