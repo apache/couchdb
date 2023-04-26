@@ -72,12 +72,17 @@ defmodule NouveauTest do
     bookmark
   end
 
+  def assert_status_code(resp, code) do
+    assert resp.status_code == code,
+      "status code: #{resp.status_code}, resp body: #{:jiffy.encode(resp.body)}"
+  end
+
   test "search analyze", context do
     url = "/_nouveau_analyze"
     resp = Couch.post(url,
       headers: ["Content-Type": "application/json"],
       body: %{analyzer: "standard", text: "hello there"})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     assert resp.body ==  %{"tokens" => ["hello", "there"]}
   end
 
@@ -90,11 +95,11 @@ defmodule NouveauTest do
     # query it so it builds
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
 
     url = "/#{db_name}/_design/foo/_nouveau_info/bar"
     resp = Couch.get(url)
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     info = Map.get(resp.body, "search_index")
     assert Map.get(info, "disk_size") > 0
     assert Map.get(info, "num_docs") > 0
@@ -109,7 +114,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     # nouveau sorts by _id as tie-breaker
     assert ids == ["doc1", "doc2", "doc3", "doc4"]
@@ -123,7 +128,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc1", "doc2", "doc3", "doc4"]
   end
@@ -138,13 +143,13 @@ defmodule NouveauTest do
 
     # page 1
     resp = Couch.post(url, body: %{q: "*:*", limit: 2, include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc1", "doc2"]
 
     # page 2
     resp = Couch.post(url, body: %{q: "*:*", limit: 2, bookmark: get_bookmark(resp), include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc3", "doc4"]
   end
@@ -157,7 +162,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "foo:bar", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc3"]
   end
@@ -170,7 +175,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "*:*", sort: "foo<string>", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc3", "doc1", "doc4", "doc2"]
   end
@@ -183,7 +188,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "*:*", sort: "-foo<string>", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc2", "doc4", "doc1", "doc3"]
   end
@@ -196,7 +201,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "*:*", sort: "bar<double>", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc1", "doc3", "doc4", "doc2"]
   end
@@ -209,7 +214,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "*:*", sort: "-bar<double>", include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc2", "doc4", "doc3", "doc1"]
   end
@@ -222,7 +227,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
     resp = Couch.post(url, body: %{q: "*:*", counts: ["foo"], include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     %{:body => %{"counts" => counts}} = resp
     assert counts == %{"foo" => %{"bar" => 1, "baz" => 1, "foo" => 1, "foobar" => 1}}
   end
@@ -238,7 +243,7 @@ defmodule NouveauTest do
       %{label: "cheap", min: 0, max: 42},
       %{label: "expensive", min: 42, min_inclusive: false, max: 1000}]},
       include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     %{:body => %{"ranges" => ranges}} = resp
     assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
   end
@@ -254,7 +259,7 @@ defmodule NouveauTest do
       %{label: "cheap", max: 42},
       %{label: "expensive", min: 42, min_inclusive: false}]},
       include_docs: true})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     %{:body => %{"ranges" => ranges}} = resp
     assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
   end
@@ -267,7 +272,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_find"
     resp = Couch.post(url, body: %{selector: %{bar: %{"$gt": 5}}})
-    assert resp.status_code == 200, "error #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_mango_ids(resp)
     assert ids == ["doc2", "doc3", "doc4"]
   end
@@ -280,7 +285,7 @@ defmodule NouveauTest do
 
     url = "/#{db_name}/_find"
     resp = Couch.post(url, body: %{selector: %{foo: %{"$eq": "foo"}}})
-    assert resp.status_code == 200, "error #{db_name} #{resp.status_code} #{:jiffy.encode(resp.body)}"
+    assert_status_code(resp, 200)
     ids = get_mango_ids(resp)
     assert ids == ["doc4"]
   end
