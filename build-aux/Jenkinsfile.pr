@@ -20,7 +20,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-./configure
+./configure --enable-nouveau
 make check || (make build-report && false)
 '''
 
@@ -218,7 +218,7 @@ pipeline {
       steps {
         sh '''
           rm -rf apache-couchdb-*
-          ./configure --spidermonkey-version 78
+          ./configure --spidermonkey-version 78 --enable-nouveau
           make dist
           chmod -R a+w * .
         '''
