@@ -84,20 +84,20 @@ compare_docs(Doc1, Doc2) ->
     FunCompareAtts = fun(Att) ->
         AttName = couch_att:fetch(name, Att),
         {ok, AttTarget} = find_att(Atts2, AttName),
-        SourceMd5 = att_md5(Att),
-        TargetMd5 = att_md5(AttTarget),
+        SourceDigest = att_digest(Att),
+        TargetDigest = att_digest(AttTarget),
         case AttName of
             <<"att1">> ->
                 ?assertEqual(gzip, couch_att:fetch(encoding, Att)),
                 ?assertEqual(gzip, couch_att:fetch(encoding, AttTarget)),
-                DecSourceMd5 = att_decoded_md5(Att),
-                DecTargetMd5 = att_decoded_md5(AttTarget),
-                ?assertEqual(DecSourceMd5, DecTargetMd5);
+                DecSourceDigest = att_decoded_digest(Att),
+                DecTargetDigest = att_decoded_digest(AttTarget),
+                ?assertEqual(DecSourceDigest, DecTargetDigest);
             _ ->
                 ?assertEqual(identity, couch_att:fetch(encoding, AttTarget)),
                 ?assertEqual(identity, couch_att:fetch(encoding, AttTarget))
         end,
-        ?assertEqual(SourceMd5, TargetMd5),
+        ?assertEqual(SourceDigest, TargetDigest),
         ?assert(is_integer(couch_att:fetch(disk_len, Att))),
         ?assert(is_integer(couch_att:fetch(att_len, Att))),
         ?assert(is_integer(couch_att:fetch(disk_len, AttTarget))),
@@ -131,21 +131,21 @@ find_att([Att | Rest], Name) ->
             find_att(Rest, Name)
     end.
 
-att_md5(Att) ->
-    Md50 = couch_att:foldl(
+att_digest(Att) ->
+    Digests = couch_att:foldl(
         Att,
         fun(Chunk, Acc) -> couch_hash:digest_update(Acc, Chunk) end,
         couch_hash:digest_init()
     ),
-    couch_hash:digest_final(Md50).
+    couch_hash:digest_final(Digests).
 
-att_decoded_md5(Att) ->
-    Md50 = couch_att:foldl_decode(
+att_decoded_digest(Att) ->
+    Digests = couch_att:foldl_decode(
         Att,
         fun(Chunk, Acc) -> couch_hash:digest_update(Acc, Chunk) end,
         couch_hash:digest_init()
     ),
-    couch_hash:digest_final(Md50).
+    couch_hash:digest_final(Digests).
 
 cluster_url() ->
     Fmt = "http://~s:~s@~s:~b",
