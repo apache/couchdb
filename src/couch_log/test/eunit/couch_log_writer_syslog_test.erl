@@ -97,7 +97,7 @@ check_format() ->
         Entry = #log_entry{
             level = report,
             pid = list_to_pid("<0.1.0>"),
-            msg = "[foo=1] stuff",
+            msg = ["[", "foo=1", "]"],
             msg_id = "msg_id",
             time_stamp = "time_stamp",
             type = report123
@@ -117,7 +117,7 @@ check_format() ->
     ?assertEqual("couchdb", AppId),
     ?assertEqual("msg_id", MsgId),
     ?assert(is_pid(catch list_to_pid(Pid))),
-    ?assertEqual("[report123@12345 foo=1] stuff\n", string:join(Rest, " ")),
+    ?assertEqual("[report123-DB@12345 foo=1]\n", string:join(Rest, " ")),
     ?assert(meck:called(gen_udp, close, 1)),
     ?assert(meck:validate(gen_udp)).
 
