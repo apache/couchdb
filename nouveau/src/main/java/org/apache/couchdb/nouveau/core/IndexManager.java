@@ -17,13 +17,14 @@ import static com.codahale.metrics.MetricRegistry.name;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 
 import org.apache.couchdb.nouveau.api.IndexDefinition;
@@ -75,6 +76,8 @@ public final class IndexManager implements Managed {
 
     private Cache<String, Index> cache;
 
+    private StripedLock<String> lock;
+
     public <R> R with(final String name, final IndexLoader loader, final IndexFunction<Index, R> indexFun)
             throws IOException, InterruptedException {
         while (true) {
@@ -125,26 +128,35 @@ public final class IndexManager implements Managed {
         }
     }
 
-    public void create(final String name, IndexDefinition newIndexDefinition) throws IOException {
+    public void create(final String name, IndexDefinition indexDefinition) throws IOException {
         if (exists(name)) {
-            final IndexDefinition currentIndexDefinition = loadIndexDefinition(name);
-            if (newIndexDefinition.equals(currentIndexDefinition)) {
-                // Idempotent success.
+            assertSame(indexDefinition, loadIndexDefinition(name));
+            return;
+        }
+
+        final Lock lock = this.lock.writeLock(name);
+        lock.lock();
+        try {
+            if (exists(name)) {
+                assertSame(indexDefinition, loadIndexDefinition(name));
                 return;
             }
-            throw new WebApplicationException("Index already exists", Status.EXPECTATION_FAILED);
+            final Path dstFile = indexDefinitionPath(name);
+            Files.createDirectories(dstFile.getParent());
+            final Path tmpFile = Files.createTempFile(dstFile.getParent(), null, null);
+            boolean success = false;
+            try {
+                objectMapper.writeValue(tmpFile.toFile(), indexDefinition);
+                Files.move(tmpFile, dstFile, StandardCopyOption.ATOMIC_MOVE);
+                success = true;
+            } finally {
+                if (!success) {
+                    Files.delete(tmpFile);
+                }
+            }
+        } finally {
+            lock.unlock();
         }
-        // Validate index definiton
-        // TODO luceneFor(indexDefinition).validate(indexDefinition);
-
-        // Persist definition
-        final Path path = indexDefinitionPath(name);
-
-        if (Files.exists(path)) {
-            throw new FileAlreadyExistsException(name + " already exists");
-        }
-        Files.createDirectories(path.getParent());
-        objectMapper.writeValue(path.toFile(), newIndexDefinition);
     }
 
     public boolean exists(final String name) {
@@ -251,6 +263,7 @@ public final class IndexManager implements Managed {
                 .scheduler(Scheduler.systemScheduler())
                 .evictionListener(new IndexEvictionListener())
                 .build();
+        lock = new StripedLock<String>(100);
     }
 
     @Override
@@ -322,6 +335,12 @@ public final class IndexManager implements Managed {
                         IOUtils.rm(indexRootPath(name));
                     }
                 });
+    }
+
+    private void assertSame(final IndexDefinition a, final IndexDefinition b) {
+        if (!a.equals(b)) {
+            throw new WebApplicationException("Index already exists", Status.EXPECTATION_FAILED);
+        }
     }
 
 }
