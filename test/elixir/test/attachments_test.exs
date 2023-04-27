@@ -431,9 +431,9 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
-  test "md5 header for attachments", context do
+  test "digest header for attachments", context do
     db_name = context[:db_name]
-    md5 = "MntvB0NYESObxH4VRDUycw=="
+    digest = "MntvB0NYESObxH4VRDUycw=="
 
     bin_data = "foo bar"
 
@@ -441,7 +441,7 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/bin_doc8/attachment.txt",
         body: bin_data,
-        headers: ["Content-Type": "application/octet-stream", "Content-MD5": md5],
+        headers: ["Content-Type": "application/octet-stream", "Content-MD5": digest],
         query: %{w: 3}
       )
 
@@ -450,7 +450,7 @@ defmodule AttachmentsTest do
 
     resp = Couch.get("/#{db_name}/bin_doc8/attachment.txt")
     assert resp.status_code == 200
-    assert md5 == resp.headers["Content-MD5"]
+    assert digest == resp.headers["Content-MD5"]
   end
 
   @tag :with_db

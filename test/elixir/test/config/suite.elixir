@@ -36,7 +36,7 @@
     "etags for attachments",
     "implicit doc creation allows creating docs with a reserved id. COUCHDB-565",
     "large attachments COUCHDB-366",
-    "md5 header for attachments",
+    "digest header for attachments",
     "reads attachment successfully",
     "saves attachment successfully",
     "saves binary",
