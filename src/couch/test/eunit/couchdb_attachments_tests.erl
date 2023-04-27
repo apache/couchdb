@@ -87,28 +87,28 @@ attachments_test_() ->
             fun start/0,
             fun test_util:stop_couch/1,
             [
-                attachments_md5_tests(),
+                attachments_digest_tests(),
                 attachments_compression_tests()
             ]
         }
     }.
 
-attachments_md5_tests() ->
+attachments_digest_tests() ->
     {
-        "Attachments MD5 tests",
+        "Attachments Digest tests",
         {
             foreach,
             fun setup/0,
             fun teardown/1,
             [
-                fun should_upload_attachment_without_md5/1,
-                fun should_upload_attachment_by_chunks_without_md5/1,
-                fun should_upload_attachment_with_valid_md5_header/1,
-                fun should_upload_attachment_by_chunks_with_valid_md5_header/1,
-                fun should_upload_attachment_by_chunks_with_valid_md5_trailer/1,
-                fun should_reject_attachment_with_invalid_md5/1,
-                fun should_reject_chunked_attachment_with_invalid_md5/1,
-                fun should_reject_chunked_attachment_with_invalid_md5_trailer/1
+                fun should_upload_attachment_without_digest/1,
+                fun should_upload_attachment_by_chunks_without_digest/1,
+                fun should_upload_attachment_with_valid_digest_header/1,
+                fun should_upload_attachment_by_chunks_with_valid_digest_header/1,
+                fun should_upload_attachment_by_chunks_with_valid_digest_trailer/1,
+                fun should_reject_attachment_with_invalid_digest/1,
+                fun should_reject_chunked_attachment_with_invalid_digest/1,
+                fun should_reject_chunked_attachment_with_invalid_digest_trailer/1
             ]
         }
     }.
@@ -177,7 +177,7 @@ created_attachments_compression_tests(Mod, Funs) ->
         }
     ].
 
-should_upload_attachment_without_md5({Host, DbName}) ->
+should_upload_attachment_without_digest({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         Body = "We all live in a yellow submarine!",
@@ -191,7 +191,7 @@ should_upload_attachment_without_md5({Host, DbName}) ->
         ?assertEqual(true, get_json(Json, [<<"ok">>]))
     end).
 
-should_upload_attachment_by_chunks_without_md5({Host, DbName}) ->
+should_upload_attachment_by_chunks_without_digest({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
@@ -207,7 +207,7 @@ should_upload_attachment_by_chunks_without_md5({Host, DbName}) ->
         ?assertEqual(true, get_json(Json, [<<"ok">>]))
     end).
 
-should_upload_attachment_with_valid_md5_header({Host, DbName}) ->
+should_upload_attachment_with_valid_digest_header({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         Body = "We all live in a yellow submarine!",
@@ -222,7 +222,7 @@ should_upload_attachment_with_valid_md5_header({Host, DbName}) ->
         ?assertEqual(true, get_json(Json, [<<"ok">>]))
     end).
 
-should_upload_attachment_by_chunks_with_valid_md5_header({Host, DbName}) ->
+should_upload_attachment_by_chunks_with_valid_digest_header({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
@@ -239,7 +239,7 @@ should_upload_attachment_by_chunks_with_valid_md5_header({Host, DbName}) ->
         ?assertEqual(true, get_json(Json, [<<"ok">>]))
     end).
 
-should_upload_attachment_by_chunks_with_valid_md5_trailer({Host, DbName}) ->
+should_upload_attachment_by_chunks_with_valid_digest_trailer({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
@@ -261,7 +261,7 @@ should_upload_attachment_by_chunks_with_valid_md5_trailer({Host, DbName}) ->
         ?assertEqual(true, get_json(Json, [<<"ok">>]))
     end).
 
-should_reject_attachment_with_invalid_md5({Host, DbName}) ->
+should_reject_attachment_with_invalid_digest({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         Body = "We all live in a yellow submarine!",
@@ -279,7 +279,7 @@ should_reject_attachment_with_invalid_md5({Host, DbName}) ->
         )
     end).
 
-should_reject_chunked_attachment_with_invalid_md5({Host, DbName}) ->
+should_reject_chunked_attachment_with_invalid_digest({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
@@ -299,7 +299,7 @@ should_reject_chunked_attachment_with_invalid_md5({Host, DbName}) ->
         )
     end).
 
-should_reject_chunked_attachment_with_invalid_md5_trailer({Host, DbName}) ->
+should_reject_chunked_attachment_with_invalid_digest_trailer({Host, DbName}) ->
     ?_test(begin
         AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
         AttData = <<"We all live in a yellow submarine!">>,
