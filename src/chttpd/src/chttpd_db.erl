@@ -1802,7 +1802,7 @@ db_attachment_req(#httpd{method = Method, user_ctx = Ctx} = Req, Db, DocId, File
                         {type, MimeType},
                         {data, Data},
                         {att_len, ContentLen},
-                        {md5, get_md5_header(Req)},
+                        {md5, couch_httpd_db:get_digest_header(Req)},
                         {encoding, Encoding}
                     ])
                 ]
@@ -1943,26 +1943,6 @@ parse_ranges([{From, To} | Rest], Len, Acc) ->
 
 make_content_range(From, To, Len) ->
     ?l2b(io_lib:format("bytes ~B-~B/~B", [From, To, Len])).
-
-get_md5_header(Req) ->
-    ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
-    Length = couch_httpd:body_length(Req),
-    Trailer = couch_httpd:header_value(Req, "Trailer"),
-    case {ContentMD5, Length, Trailer} of
-        _ when is_list(ContentMD5) orelse is_binary(ContentMD5) ->
-            base64:decode(ContentMD5);
-        {_, chunked, undefined} ->
-            <<>>;
-        {_, chunked, _} ->
-            case re:run(Trailer, "\\bContent-MD5\\b", [caseless]) of
-                {match, _} ->
-                    md5_in_footer;
-                _ ->
-                    <<>>
-            end;
-        _ ->
-            <<>>
-    end.
 
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).

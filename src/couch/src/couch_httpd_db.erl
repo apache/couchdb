@@ -17,6 +17,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([
+    get_digest_header/1,
     handle_request/1,
     handle_compact_req/2,
     handle_design_req/2,
@@ -1174,7 +1175,7 @@ db_attachment_req(
                         {type, MimeType},
                         {data, Data},
                         {att_len, AttLen},
-                        {md5, get_md5_header(Req)},
+                        {md5, get_digest_header(Req)},
                         {encoding, Encoding}
                     ])
                 ]
@@ -1250,13 +1251,13 @@ parse_ranges([{From, none} | Rest], Len, Acc) ->
 parse_ranges([{From, To} | Rest], Len, Acc) ->
     parse_ranges(Rest, Len, [{From, To}] ++ Acc).
 
-get_md5_header(Req) ->
-    ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
+get_digest_header(Req) ->
+    ContentDigest = couch_httpd:header_value(Req, "Content-MD5"),
     Length = couch_httpd:body_length(Req),
     Trailer = couch_httpd:header_value(Req, "Trailer"),
-    case {ContentMD5, Length, Trailer} of
-        _ when is_list(ContentMD5) orelse is_binary(ContentMD5) ->
-            base64:decode(ContentMD5);
+    case {ContentDigest, Length, Trailer} of
+        _ when is_list(ContentDigest) orelse is_binary(ContentDigest) ->
+            base64:decode(ContentDigest);
         {_, chunked, undefined} ->
             <<>>;
         {_, chunked, _} ->
