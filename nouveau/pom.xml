@@ -64,10 +64,6 @@
       <groupId>io.dropwizard</groupId>
       <artifactId>dropwizard-http2</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.module</groupId>
-      <artifactId>jackson-module-afterburner</artifactId>
-    </dependency>
 
     <!-- Dropwizard metrics -->
     <dependency>
