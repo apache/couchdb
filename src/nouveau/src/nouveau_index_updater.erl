@@ -86,11 +86,18 @@ load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges}) ->
             {ok, Doc} = couch_db:open_doc(Db, DI, []),
             Json = couch_doc:to_json_obj(Doc, []),
             [Fields | _] = proc_prompt(Proc, [<<"nouveau_index_doc">>, Json]),
+            Partition =
+                case couch_db:is_partitioned(Db) of
+                    true ->
+                        couch_partition:from_docid(Id);
+                    false ->
+                        null
+                end,
             case Fields of
                 [] ->
                     ok = nouveau_api:delete_doc(Index, Id, Seq);
                 _ ->
-                    case nouveau_api:update_doc(Index, Id, Seq, Fields) of
+                    case nouveau_api:update_doc(Index, Id, Seq, Partition, Fields) of
                         ok ->
                             ok;
                         {error, Reason} ->

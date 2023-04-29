@@ -36,7 +36,7 @@ go(DbName, GroupId, IndexName, QueryArgs0) when is_binary(GroupId) ->
     go(DbName, DDoc, IndexName, QueryArgs0);
 go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     {ok, Index} = nouveau_util:design_doc_to_index(DbName, DDoc, IndexName),
-    Shards = mem3:shards(DbName),
+    Shards = get_shards(DbName, QueryArgs0),
     {PackedBookmark, #{limit := Limit, sort := Sort} = QueryArgs1} =
         maps:take(bookmark, QueryArgs0),
     Bookmark = nouveau_bookmark:unpack(DbName, PackedBookmark),
@@ -219,3 +219,9 @@ merge_facets(null, FacetsB, _Limit) ->
 merge_facets(FacetsA, FacetsB, _Limit) ->
     Combiner = fun(_, V1, V2) -> nouveau_maps:merge_with(fun(_, V3, V4) -> V3 + V4 end, V1, V2) end,
     nouveau_maps:merge_with(Combiner, FacetsA, FacetsB).
+
+get_shards(DbName, #{partition := Partition}) when is_binary(Partition) ->
+    PartitionId = couch_partition:shard_key(Partition),
+    mem3:shards(DbName, PartitionId);
+get_shards(DbName, _QueryArgs) ->
+    mem3:shards(DbName).
