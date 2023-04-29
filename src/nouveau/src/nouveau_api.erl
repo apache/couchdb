@@ -24,7 +24,7 @@
     delete_path/1,
     delete_path/2,
     delete_doc/3,
-    update_doc/4,
+    update_doc/5,
     search/2
 ]).
 
@@ -110,10 +110,17 @@ delete_doc(#index{} = Index, DocId, UpdateSeq) when
             send_error(Reason)
     end.
 
-update_doc(#index{} = Index, DocId, UpdateSeq, Fields) when
-    is_binary(DocId), is_integer(UpdateSeq), is_list(Fields)
+update_doc(#index{} = Index, DocId, UpdateSeq, Partition, Fields) when
+    is_binary(DocId),
+    is_integer(UpdateSeq),
+    (is_binary(Partition) orelse Partition == null),
+    is_list(Fields)
 ->
-    ReqBody = {[{<<"seq">>, UpdateSeq}, {<<"fields">>, Fields}]},
+    ReqBody = #{
+        seq => UpdateSeq,
+        partition => Partition,
+        fields => Fields
+    },
     Resp = send_if_enabled(
         doc_url(Index, DocId), [?JSON_CONTENT_TYPE], put, jiffy:encode(ReqBody)
     ),

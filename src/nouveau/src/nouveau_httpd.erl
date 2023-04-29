@@ -65,6 +65,7 @@ handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName
     DbName = couch_db:name(Db),
     QueryArgs = validate_query_args(#{
         query => chttpd:qs_value(Req, "q"),
+        partition => chttpd:qs_value(Req, "partition"),
         limit => chttpd:qs_value(Req, "limit"),
         sort => chttpd:qs_value(Req, "sort"),
         ranges => chttpd:qs_value(Req, "ranges"),
@@ -82,6 +83,7 @@ handle_search_req_int(
     ReqBody = chttpd:json_body(Req, [return_maps]),
     QueryArgs = validate_query_args(#{
         query => maps:get(<<"q">>, ReqBody, undefined),
+        partition => chttpd:qs_value(Req, "partition"),
         limit => maps:get(<<"limit">>, ReqBody, undefined),
         sort => json_or_undefined(<<"sort">>, ReqBody),
         ranges => json_or_undefined(<<"ranges">>, ReqBody),
@@ -174,6 +176,10 @@ validate_query_args(#{} = QueryArgs) ->
 validate_query_arg(query, undefined) ->
     throw({query_parse_error, <<"q parameter is mandatory">>});
 validate_query_arg(query, Val) when is_list(Val); is_binary(Val) ->
+    couch_util:to_binary(Val);
+validate_query_arg(partition, undefined) ->
+    null;
+validate_query_arg(partition, Val) when is_list(Val); is_binary(Val) ->
     couch_util:to_binary(Val);
 validate_query_arg(limit, undefined) ->
     25;

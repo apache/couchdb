@@ -20,6 +20,19 @@ defmodule NouveauTest do
     assert resp.status_code in [201]
   end
 
+  def create_partitioned_search_docs(db_name) do
+    resp = Couch.post("/#{db_name}/_bulk_docs",
+      headers: ["Content-Type": "application/json"],
+      body: %{:docs => [
+                %{"_id" => "foo:doc4", "foo" => "foo", "bar" => 42},
+                %{"_id" => "bar:doc3", "foo" => "bar", "bar" => 12.0},
+                %{"_id" => "foo:doc1", "foo" => "baz", "bar" => 0},
+                %{"_id" => "bar:doc2", "foo" => "foobar", "bar" => 100},
+      ]}
+    )
+    assert resp.status_code in [201]
+  end
+
   def create_ddoc(db_name, opts \\ %{}) do
     default_ddoc = %{
       nouveau: %{
@@ -288,6 +301,63 @@ defmodule NouveauTest do
     assert_status_code(resp, 200)
     ids = get_mango_ids(resp)
     assert ids == ["doc4"]
+  end
+
+  @tag :with_partitioned_db
+  test "search GET (partitioned)", context do
+    db_name = context[:db_name]
+    create_partitioned_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_partition/foo/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    assert ids == ["foo:doc1", "foo:doc4"]
+
+    url = "/#{db_name}/_partition/bar/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    assert ids == ["bar:doc2", "bar:doc3"]
+  end
+
+  @tag :with_partitioned_db
+  test "search POST (partitioned)", context do
+    db_name = context[:db_name]
+    create_partitioned_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_partition/foo/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    assert ids == ["foo:doc1", "foo:doc4"]
+
+    url = "/#{db_name}/_partition/bar/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    assert ids == ["bar:doc2", "bar:doc3"]
+  end
+
+  @tag :with_partitioned_db
+  test "mango (partitioned)", context do
+    db_name = context[:db_name]
+    create_partitioned_search_docs(db_name)
+    create_mango_index(db_name)
+
+    url = "/#{db_name}/_partition/foo/_find"
+    resp = Couch.post(url, body: %{selector: %{foo: %{"$eq": "foo"}}})
+    assert_status_code(resp, 200)
+    ids = get_mango_ids(resp)
+    assert ids == ["foo:doc4"]
+
+    url = "/#{db_name}/_partition/bar/_find"
+    resp = Couch.post(url, body: %{selector: %{foo: %{"$eq": "bar"}}})
+    assert_status_code(resp, 200)
+    ids = get_mango_ids(resp)
+    assert ids == ["bar:doc3"]
   end
 
 end
