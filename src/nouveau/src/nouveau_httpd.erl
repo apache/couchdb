@@ -206,7 +206,7 @@ validate_query_arg(sort, Sort) ->
 validate_query_arg(ranges, undefined) ->
     null;
 validate_query_arg(ranges, {json, Ranges}) when is_map(Ranges) ->
-    nouveau_maps:foreach(fun is_valid_range/2, Ranges),
+    maps:foreach(fun is_valid_range/2, Ranges),
     Ranges;
 validate_query_arg(ranges, Ranges) ->
     validate_query_arg(ranges, {json, ?JSON_DECODE(Ranges, [return_maps])});

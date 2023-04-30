@@ -93,12 +93,12 @@ check_setup(true) ->
         ok -> ok;
         {error, Error2} -> throw({fail, "write", Error2})
     end,
-    delete_file(Path).
+    file:delete(Path, [raw]).
 
 write(#{} = QData, Path) when is_list(Path), map_size(QData) == 0 ->
     % Save a few bytes by deleting the persisted queue data if
     % there are no waiting/starting or active jobs
-    delete_file(Path);
+    file:delete(Path, [raw]);
 write(#{} = QData, Path) when is_list(Path) ->
     Bin = term_to_binary(QData, [compressed, {minor_version, 2}]),
     TmpPath = tmp_path(Path),
@@ -132,13 +132,6 @@ file_path(Name) ->
 state_dir() ->
     Dir = config:get("smoosh", "state_dir", "."),
     filename:absname(Dir).
-
-delete_file(Path) ->
-    % On Erlang 24+ we can avoid using the file server
-    case erlang:function_exported(file, delete, 2) of
-        true -> file:delete(Path, [raw]);
-        false -> file:delete(Path)
-    end.
 
 -ifdef(TEST).
 
