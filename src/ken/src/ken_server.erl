@@ -371,7 +371,7 @@ st_updated(_Name, _Doc, _Seq, _State) ->
 -endif.
 
 nouveau_updated(Name, Doc, Seq, State) ->
-    case should_update(Doc, <<"indexes">>) of
+    case should_update(Doc, <<"nouveau">>) of
         true ->
             try nouveau_util:design_doc_to_indexes(Name, Doc) of
                 SIndexes -> update_ddoc_nouveau_indexes(Name, SIndexes, Seq, State)
