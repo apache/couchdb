@@ -17,6 +17,18 @@
       "@type": "double",
       "name": "doublefoo",
       "value": 12
+    },
+    {
+      "@type": "xy",
+      "name": "xy",
+      "x": 12.0,
+      "y": 12.0
+    },
+    {
+      "@type": "latlon",
+      "name": "latlon",
+      "lajt": 12.0,
+      "lon": 12.0
     }
   ]
 }

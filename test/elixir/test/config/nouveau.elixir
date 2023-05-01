@@ -17,6 +17,7 @@
     "mango search by string",
     "search GET (partitioned)",
     "search POST (partitioned)",
-    "mango (partitioned)"
+    "mango (partitioned)",
+    "geo search xy"
   ]
 }

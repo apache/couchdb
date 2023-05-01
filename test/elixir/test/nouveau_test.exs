@@ -360,4 +360,44 @@ defmodule NouveauTest do
     assert ids == ["bar:doc3"]
   end
 
+  @tag :with_db
+  test "geo search xy", context do
+    db_name = context[:db_name]
+
+    # create docs
+    resp = Couch.post("/#{db_name}/_bulk_docs",
+      headers: ["Content-Type": "application/json"],
+      body: %{:docs => [
+                %{"_id" => "doc1", "x" => 12, "y" => 100},
+                %{"_id" => "doc2", "x" => 100, "y" => 12},
+      ]}
+    )
+    assert resp.status_code in [201]
+
+    # create geo ddoc
+    ddoc = %{
+      nouveau: %{
+        bar: %{
+          default_analyzer: "standard",
+          index: """
+            function (doc) {
+              index("xy", "position", doc.x, doc.y);
+            }
+          """
+        }
+      }
+    }
+    resp = Couch.put("/#{db_name}/_design/foo", body: ddoc)
+    assert resp.status_code in [201]
+    assert Map.has_key?(resp.body, "ok") == true
+
+    # search for it
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "position: %11,13,99,101", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    # nouveau sorts by _id as tie-breaker
+    assert ids == ["doc1"]
+  end
+
 end

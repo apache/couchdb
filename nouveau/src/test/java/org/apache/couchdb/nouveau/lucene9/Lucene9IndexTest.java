@@ -30,9 +30,12 @@ import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.LatLonField;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
+import org.apache.couchdb.nouveau.api.StoredField;
 import org.apache.couchdb.nouveau.api.StringField;
+import org.apache.couchdb.nouveau.api.XYField;
 import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderException;
@@ -72,7 +75,14 @@ public class Lucene9IndexTest {
         try {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
-                final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
+                final Collection<Field> fields = List.of(
+                    new StringField("foo", "bar", true),
+                    new DoubleField("bar", 12.0, true),
+                    new StoredField("baz", "bar"),
+                    new StoredField("foobar", 12.0),
+                    new XYField("foobaz", 12.f, 12.0f),
+                    new LatLonField("bazbar", 12.0, 12.0)
+                );
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i, null, fields);
                 index.update("doc" + i, request);
             }

@@ -28,9 +28,11 @@ import jakarta.validation.constraints.Pattern;
     property = "@type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = DoubleField.class, name = "double"),
+    @JsonSubTypes.Type(value = LatLonField.class, name = "latlon"),
     @JsonSubTypes.Type(value = StoredField.class, name = "stored"),
     @JsonSubTypes.Type(value = StringField.class, name = "string"),
     @JsonSubTypes.Type(value = TextField.class, name = "text"),
+    @JsonSubTypes.Type(value = XYField.class, name = "xy"),
 })
 public abstract class Field {
 

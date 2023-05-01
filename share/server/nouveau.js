@@ -83,6 +83,30 @@ var Nouveau = (function () {
             'value': value
           });
           break;
+        case 'xy':
+          var x = arguments[2];
+          var y = arguments[3];
+          assertType('x', 'number', x);
+          assertType('y', 'number', y);
+          index_results.push({
+            '@type': type,
+            'name': name,
+            'x': x,
+            'y': y
+          });
+          break;
+        case 'latlon':
+            var lat = arguments[2];
+            assertType('lat', 'number', lat);
+            var lon = arguments[3];
+            assertType('lon', 'number', lon);
+            index_results.push({
+              '@type': type,
+              'name': name,
+              'lat': lat,
+              'lon': lon
+            });
+            break;
         default:
           throw ({ name: 'TypeError', message: type + ' not supported' });
       }

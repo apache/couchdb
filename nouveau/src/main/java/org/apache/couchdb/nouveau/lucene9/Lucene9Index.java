@@ -37,12 +37,14 @@ import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.DoubleField;
 import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.Field;
+import org.apache.couchdb.nouveau.api.LatLonField;
 import org.apache.couchdb.nouveau.api.SearchHit;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StoredField;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.api.TextField;
+import org.apache.couchdb.nouveau.api.XYField;
 import org.apache.couchdb.nouveau.core.IOUtils;
 import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.ser.ByteArrayWrapper;
@@ -416,6 +418,14 @@ public class Lucene9Index extends Index {
                 } else {
                     throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
                 }
+            } else if (field instanceof XYField) {
+                var f = (XYField) field;
+                result.add(new org.apache.lucene.document.XYPointField(f.getName(), f.getX(), f.getY()));
+                result.add(new org.apache.lucene.document.XYDocValuesField(f.getName(), f.getX(), f.getY()));
+            } else if (field instanceof LatLonField) {
+                var f = (LatLonField) field;
+                result.add(new org.apache.lucene.document.LatLonPoint(f.getName(), f.getLat(), f.getLon()));
+                result.add(new org.apache.lucene.document.LatLonDocValuesField(f.getName(), f.getLat(), f.getLon()));
             } else {
                 throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
             }
