@@ -1,0 +1,61 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2023-26268:
+
+=========================================================================
+CVE-2023-26268: Apache CouchDB: Information sharing via couchjs processes
+=========================================================================
+
+:Date: 02.05.2023
+
+:Affected: 3.2.2 and below
+
+:Severity: Medium
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+Design documents with matching document IDs, from databases on the same
+cluster, may share a mutable Javascript environment when using these design
+document functions:
+
+  * validate_doc_update
+  * list
+  * filter
+  * filter views (using view functions as filters)
+  * rewrite
+  * update
+
+This doesn't affect map/reduce or search (Dreyfus) index functions.
+
+Mitigation
+==========
+
+CouchDB :ref:`3.2.3 <release/3.2.3>` and onwards matches Javascript execution
+processes by database names in addition to design document IDs when processing
+the affected design document functions.
+
+Workarounds
+===========
+
+Avoid using design documents from untrusted sources which may attempt to cache
+or store data in the Javascript environment.
+
+Credit
+======
+
+This issue was identified by `Nick Vatamaniuc`_
+
+.. _Nick Vatamaniuc: https://home.apache.org/phonebook.html?uid=vatamane
