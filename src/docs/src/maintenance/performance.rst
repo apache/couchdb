@@ -248,8 +248,8 @@ go from 21GB to 4GB with 10 million documents (the raw JSON text when from
 Inserting with sequential (and at least sorted) ids is faster than random ids.
 Consequently you should consider generating ids yourself, allocating them
 sequentially and using an encoding scheme that consumes fewer bytes.
-For example, something that takes 16 hex digits to represent can be done in
-4 base 62 digits (10 numerals, 26 lower case, 26 upper case).
+For example, 8 bytes will take 16 hex digits to represent, and those same
+8 bytes can be encoded in only 11 digits/chars in base64url (no padding).
 
 Views
 =====
