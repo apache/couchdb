@@ -1599,16 +1599,6 @@ compressible_att_type(MimeType) ->
         [T || T <- TypeExpList, T /= []]
     ).
 
-% From RFC 2616 3.6.1 - Chunked Transfer Coding
-%
-%   In other words, the origin server is willing to accept
-%   the possibility that the trailer fields might be silently
-%   discarded along the path to the client.
-%
-% I take this to mean that if "Trailers: Content-MD5\r\n"
-% is present in the request, but there is no Content-MD5
-% trailer, we're free to ignore this inconsistency and
-% pretend that no Content-MD5 exists.
 with_stream(Db, Att, Fun) ->
     [InMd5, Type, Enc] = couch_att:fetch([md5, type, encoding], Att),
     BufferSize = config:get_integer(
@@ -1631,19 +1621,10 @@ with_stream(Db, Att, Fun) ->
                 [{buffer_size, BufferSize}]
         end,
     {ok, OutputStream} = open_write_stream(Db, Options),
-    ReqMd5 =
-        case Fun(OutputStream) of
-            {md5, FooterMd5} ->
-                case InMd5 of
-                    md5_in_footer -> FooterMd5;
-                    _ -> InMd5
-                end;
-            _ ->
-                InMd5
-        end,
+    Fun(OutputStream),
     {StreamEngine, Len, IdentityLen, Md5, IdentityMd5} =
         couch_stream:close(OutputStream),
-    couch_util:check_md5(IdentityMd5, ReqMd5),
+    couch_util:check_md5(IdentityMd5, InMd5),
     {AttLen, DiskLen, NewEnc} =
         case Enc of
             identity ->
