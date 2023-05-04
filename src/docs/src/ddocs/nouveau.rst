@@ -375,14 +375,14 @@ Specify your search by using the ``q`` parameter.
 
 .. code-block:: http
 
-    GET /$DATABASE/_partition/$PARTITION_KEY/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&query="*:*"&limit=1 HTTP/1.1
+    GET /$DATABASE/_partition/$PARTITION_KEY/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&q=*:*&limit=1 HTTP/1.1
     Content-Type: application/json
 
 *Example of using HTTP to query a global index:*
 
 .. code-block:: http
 
-    GET /$DATABASE/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&query="*:*"&limit=1 HTTP/1.1
+    GET /$DATABASE/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&q=*:*&limit=1 HTTP/1.1
     Content-Type: application/json
 
 *Example of using the command line to query a partitioned index:*
@@ -390,14 +390,14 @@ Specify your search by using the ``q`` parameter.
 .. code-block:: sh
 
     curl https://$HOST:5984/$DATABASE/_partition/$PARTITION_KEY/_design/$DDOC/
-    _nouveau/$INDEX_NAME?include_docs=true\&query="*:*"\&limit=1 \
+    _nouveau/$INDEX_NAME?include_docs=true\&q=*:*\&limit=1 \
 
 *Example of using the command line to query a global index:*
 
 .. code-block:: sh
 
     curl https://$HOST:5984/$DATABASE/_design/$DDOC/_nouveau/$INDEX_NAME?
-    include_docs=true\&query="*:*"\&limit=1 \
+    include_docs=true\&q=*:*\&limit=1 \
 
 .. _ddoc/nouveau/query_parameters:
 
