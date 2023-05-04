@@ -20,6 +20,7 @@
 couch_log_config_test_() ->
     {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
         ?T(check_level),
+        ?T(check_report_level),
         ?T(check_max_message_size),
         ?T(check_bad_level),
         ?T(check_bad_max_message_size),
@@ -28,6 +29,23 @@ couch_log_config_test_() ->
         ?T(check_filter_fields),
         ?T(check_bad_filter_fields)
     ]}.
+
+check_report_level() ->
+    % Default report_level is info
+    ?assertEqual(info, couch_log_config:get(report_level)),
+    couch_log_test_util:with_config_listener(fun() ->
+        config:set("log", "report_level", "emerg"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(emergency, couch_log_config:get(report_level)),
+
+        config:set("log", "report_level", "debug"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(debug, couch_log_config:get(report_level)),
+
+        config:delete("log", "report_level"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(info, couch_log_config:get(report_level))
+    end).
 
 check_level() ->
     % Default level is info

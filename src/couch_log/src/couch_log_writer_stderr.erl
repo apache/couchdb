@@ -27,14 +27,14 @@ init() ->
 terminate(_, _St) ->
     ok.
 
-write(Entry, St) ->
+write(#log_entry{type = Type} = Entry, St) ->
     #log_entry{
         level = Level,
         pid = Pid,
         msg = Msg,
         msg_id = MsgId,
         time_stamp = TimeStamp
-    } = Entry,
+    } = couch_log_util:maybe_format_type(Entry),
     Fmt = "[~s] ~s ~s ~p ~s ",
     Args = [
         couch_log_util:level_to_string(Level),
