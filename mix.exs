@@ -145,6 +145,7 @@ defmodule CouchDBTest.Mixfile do
       "ssl_verify_fun",
       "unicode_util_compat",
       "b64url",
+      "exxhash",
       "bear",
       "mochiweb",
       "snappy",
