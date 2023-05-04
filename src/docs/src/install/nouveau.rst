@@ -27,6 +27,16 @@ the loopback network.
 
 Nouveau server is runtime-compatible with Java 11 or higher.
 
+Enable Nouveau
+==============
+
+You need to enable nouveau in CouchDB configuration;
+
+    .. code-block:: ini
+
+        [nouveau]
+        enable = true
+
 Installation of Binary Packages
 ===============================
 
