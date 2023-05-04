@@ -40,6 +40,7 @@
 
         % ASF deps
         couch_epi,
+        exxhash,
         config,
         b64url,
         couch_log,
