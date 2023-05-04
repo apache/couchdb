@@ -102,13 +102,7 @@ attachments_md5_tests() ->
             fun teardown/1,
             [
                 fun should_upload_attachment_without_md5/1,
-                fun should_upload_attachment_by_chunks_without_md5/1,
-                fun should_upload_attachment_with_valid_md5_header/1,
-                fun should_upload_attachment_by_chunks_with_valid_md5_header/1,
-                fun should_upload_attachment_by_chunks_with_valid_md5_trailer/1,
-                fun should_reject_attachment_with_invalid_md5/1,
-                fun should_reject_chunked_attachment_with_invalid_md5/1,
-                fun should_reject_chunked_attachment_with_invalid_md5_trailer/1
+                fun should_upload_attachment_by_chunks_without_md5/1
             ]
         }
     }.
@@ -205,120 +199,6 @@ should_upload_attachment_by_chunks_without_md5({Host, DbName}) ->
         {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
         ?assertEqual(201, Code),
         ?assertEqual(true, get_json(Json, [<<"ok">>]))
-    end).
-
-should_upload_attachment_with_valid_md5_header({Host, DbName}) ->
-    ?_test(begin
-        AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
-        Body = "We all live in a yellow submarine!",
-        Headers = [
-            {"Content-Length", "34"},
-            {"Content-Type", "text/plain"},
-            {"Content-MD5", ?b2l(base64:encode(couch_hash:md5_hash(Body)))},
-            {"Host", Host}
-        ],
-        {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
-        ?assertEqual(201, Code),
-        ?assertEqual(true, get_json(Json, [<<"ok">>]))
-    end).
-
-should_upload_attachment_by_chunks_with_valid_md5_header({Host, DbName}) ->
-    ?_test(begin
-        AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
-        AttData = <<"We all live in a yellow submarine!">>,
-        <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = [chunked_body([Part1, Part2]), "\r\n"],
-        Headers = [
-            {"Content-Type", "text/plain"},
-            {"Content-MD5", ?b2l(base64:encode(couch_hash:md5_hash(AttData)))},
-            {"Host", Host},
-            {"Transfer-Encoding", "chunked"}
-        ],
-        {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
-        ?assertEqual(201, Code),
-        ?assertEqual(true, get_json(Json, [<<"ok">>]))
-    end).
-
-should_upload_attachment_by_chunks_with_valid_md5_trailer({Host, DbName}) ->
-    ?_test(begin
-        AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
-        AttData = <<"We all live in a yellow submarine!">>,
-        <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = [
-            chunked_body([Part1, Part2]),
-            "Content-MD5: ",
-            base64:encode(couch_hash:md5_hash(AttData)),
-            "\r\n\r\n"
-        ],
-        Headers = [
-            {"Content-Type", "text/plain"},
-            {"Host", Host},
-            {"Trailer", "Content-MD5"},
-            {"Transfer-Encoding", "chunked"}
-        ],
-        {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
-        ?assertEqual(201, Code),
-        ?assertEqual(true, get_json(Json, [<<"ok">>]))
-    end).
-
-should_reject_attachment_with_invalid_md5({Host, DbName}) ->
-    ?_test(begin
-        AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
-        Body = "We all live in a yellow submarine!",
-        Headers = [
-            {"Content-Length", "34"},
-            {"Content-Type", "text/plain"},
-            {"Content-MD5", ?b2l(base64:encode(<<"foobar!">>))},
-            {"Host", Host}
-        ],
-        {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
-        ?assertEqual(400, Code),
-        ?assertEqual(
-            <<"content_md5_mismatch">>,
-            get_json(Json, [<<"error">>])
-        )
-    end).
-
-should_reject_chunked_attachment_with_invalid_md5({Host, DbName}) ->
-    ?_test(begin
-        AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
-        AttData = <<"We all live in a yellow submarine!">>,
-        <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = [chunked_body([Part1, Part2]), "\r\n"],
-        Headers = [
-            {"Content-Type", "text/plain"},
-            {"Content-MD5", ?b2l(base64:encode(<<"foobar!">>))},
-            {"Host", Host},
-            {"Transfer-Encoding", "chunked"}
-        ],
-        {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
-        ?assertEqual(400, Code),
-        ?assertEqual(
-            <<"content_md5_mismatch">>,
-            get_json(Json, [<<"error">>])
-        )
-    end).
-
-should_reject_chunked_attachment_with_invalid_md5_trailer({Host, DbName}) ->
-    ?_test(begin
-        AttUrl = string:join(["", DbName, ?docid(), "readme.txt"], "/"),
-        AttData = <<"We all live in a yellow submarine!">>,
-        <<Part1:21/binary, Part2:13/binary>> = AttData,
-        Body = [
-            chunked_body([Part1, Part2]),
-            "Content-MD5: ",
-            base64:encode(<<"foobar!">>),
-            "\r\n\r\n"
-        ],
-        Headers = [
-            {"Content-Type", "text/plain"},
-            {"Host", Host},
-            {"Trailer", "Content-MD5"},
-            {"Transfer-Encoding", "chunked"}
-        ],
-        {ok, Code, Json} = request("PUT", AttUrl, Headers, Body),
-        ?assertEqual(400, Code),
-        ?assertEqual(<<"content_md5_mismatch">>, get_json(Json, [<<"error">>]))
     end).
 
 should_get_att_without_accept_gzip_encoding(_, {Data, {_, _, AttUrl}}) ->

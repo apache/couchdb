@@ -1073,15 +1073,7 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
                                 ->
                                     send_ranges_multipart(Req, Type, Len, Att, Ranges);
                                 _ ->
-                                    Headers1 =
-                                        Headers ++
-                                            if
-                                                Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
-                                                    [{"Content-MD5", base64:encode(Md5)}];
-                                                true ->
-                                                    []
-                                            end,
-                                    {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
+                                    {ok, Resp} = start_response_length(Req, 200, Headers, Len),
                                     AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                             end
                     end
@@ -1174,7 +1166,6 @@ db_attachment_req(
                         {type, MimeType},
                         {data, Data},
                         {att_len, AttLen},
-                        {md5, get_md5_header(Req)},
                         {encoding, Encoding}
                     ])
                 ]
@@ -1249,26 +1240,6 @@ parse_ranges([{From, none} | Rest], Len, Acc) ->
     parse_ranges([{From, Len - 1}] ++ Rest, Len, Acc);
 parse_ranges([{From, To} | Rest], Len, Acc) ->
     parse_ranges(Rest, Len, [{From, To}] ++ Acc).
-
-get_md5_header(Req) ->
-    ContentMD5 = couch_httpd:header_value(Req, "Content-MD5"),
-    Length = couch_httpd:body_length(Req),
-    Trailer = couch_httpd:header_value(Req, "Trailer"),
-    case {ContentMD5, Length, Trailer} of
-        _ when is_list(ContentMD5) orelse is_binary(ContentMD5) ->
-            base64:decode(ContentMD5);
-        {_, chunked, undefined} ->
-            <<>>;
-        {_, chunked, _} ->
-            case re:run(Trailer, "\\bContent-MD5\\b", [caseless]) of
-                {match, _} ->
-                    md5_in_footer;
-                _ ->
-                    <<>>
-            end;
-        _ ->
-            <<>>
-    end.
 
 parse_doc_query(Req) ->
     lists:foldl(
