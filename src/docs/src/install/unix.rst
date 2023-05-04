@@ -152,6 +152,8 @@ You should have the following installed:
 * `help2man                     <http://www.gnu.org/s/help2man/>`_
 * `Python (>=3.6) for docs and tests      <http://python.org/>`_
 * `Python Sphinx (>=1.1.3)      <http://pypi.python.org/pypi/Sphinx>`_
+* Java (required for `nouveau`, minimum version 11, recommended version 19)
+* Apache Maven (required for `nouveau`, 3.x)
 
 You will only need libcurl if you plan to run the JavaScript test suite. And
 help2man is only need if you plan on installing the CouchDB man pages.
