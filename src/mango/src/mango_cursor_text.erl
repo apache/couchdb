@@ -132,7 +132,7 @@ execute(Cursor, UserFun, UserAcc) ->
             ),
             %% This needs Stats1 as log_end is called in maybe_add_stats
             mango_execution_stats:log_stats(Stats1),
-            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats0, FinalUserAcc0),
+            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats1, FinalUserAcc0),
             {ok, FinalUserAcc1}
     end.
 
