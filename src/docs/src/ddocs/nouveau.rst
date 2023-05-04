@@ -159,7 +159,7 @@ most common runtime errors are described below;
 .. warning:: example of bad code
 .. code-block:: javascript
 
-    index("min_length", doc.min_length, {"store": true});
+    index("double", "min_length", doc.min_length, {"store": true});
 
 For documents without a `min_length` value, this index call will
 pass ``undefined`` as the value. This will be rejected by nouveau's
@@ -171,7 +171,7 @@ validation function and the document will not be indexed.
 .. code-block:: javascript
 
     if (doc.foo.bar) {
-        index("bar", doc.foo.bar, {"store": true});
+        index("string", "bar", doc.foo.bar, {"store": true});
     }
 
 This bad example fails in a different way if ``doc.foo`` doesn't
@@ -180,7 +180,7 @@ exist; the evaluation of ``doc.foo.bar`` throws an exception.
 .. code-block:: javascript
 
     if (doc.foo && typeof(doc.foo) == 'object' && typeof(doc.foo.bar == 'string')) {
-        index("bar", doc.foo.bar, {"store": true});
+        index("string", "bar", doc.foo.bar, {"store": true});
     }
 
 This example correctly checks that ``doc.foo`` is an object and its
@@ -192,7 +192,7 @@ This example correctly checks that ``doc.foo`` is an object and its
 .. code-block:: javascript
 
     if (doc.min_length) {
-      index("min_length", doc.min_length, {"store": true});
+      index("double", "min_length", doc.min_length, {"store": true});
     }
 
 We correct the previous mistake so documents without min_length are
@@ -203,7 +203,7 @@ exist) but we've acccidentally prevented the indexing of the
 .. code-block:: javascript
 
     if (typeof(doc.min_length == 'number')) {
-      index("min_length", doc.min_length, {"store": true});
+      index("double", "min_length", doc.min_length, {"store": true});
     }
 
 This good example ensures we index any document where ``min_length`` is a number.
@@ -375,14 +375,14 @@ Specify your search by using the ``q`` parameter.
 
 .. code-block:: http
 
-    GET /$DATABASE/_partition/$PARTITION_KEY/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&query="*:*"&limit=1 HTTP/1.1
+    GET /$DATABASE/_partition/$PARTITION_KEY/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&q=*:*&limit=1 HTTP/1.1
     Content-Type: application/json
 
 *Example of using HTTP to query a global index:*
 
 .. code-block:: http
 
-    GET /$DATABASE/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&query="*:*"&limit=1 HTTP/1.1
+    GET /$DATABASE/_design/$DDOC/_nouveau/$INDEX_NAME?include_docs=true&q=*:*&limit=1 HTTP/1.1
     Content-Type: application/json
 
 *Example of using the command line to query a partitioned index:*
@@ -390,14 +390,14 @@ Specify your search by using the ``q`` parameter.
 .. code-block:: sh
 
     curl https://$HOST:5984/$DATABASE/_partition/$PARTITION_KEY/_design/$DDOC/
-    _nouveau/$INDEX_NAME?include_docs=true\&query="*:*"\&limit=1 \
+    _nouveau/$INDEX_NAME?include_docs=true\&q=*:*\&limit=1 \
 
 *Example of using the command line to query a global index:*
 
 .. code-block:: sh
 
     curl https://$HOST:5984/$DATABASE/_design/$DDOC/_nouveau/$INDEX_NAME?
-    include_docs=true\&query="*:*"\&limit=1 \
+    include_docs=true\&q=*:*\&limit=1 \
 
 .. _ddoc/nouveau/query_parameters:
 
