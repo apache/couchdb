@@ -265,7 +265,7 @@ ddoc_to_mrst(DbName, #doc{id = Id, body = {Fields}}) ->
         partitioned = Partitioned
     },
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
-    {ok, IdxState#mrst{sig = couch_hash:digest(term_to_binary(SigInfo))}}.
+    {ok, IdxState#mrst{sig = couch_hash:md5_hash(term_to_binary(SigInfo))}}.
 
 set_view_type(_Args, _ViewName, []) ->
     throw({not_found, missing_named_view});
@@ -315,7 +315,7 @@ view_sig(Db, State, View, #mrargs{include_docs = true} = Args) ->
     UpdateSeq = couch_db:get_update_seq(Db),
     PurgeSeq = couch_db:get_purge_seq(Db),
     Term = view_sig_term(BaseSig, UpdateSeq, PurgeSeq),
-    couch_index_util:hexsig(couch_hash:digest(term_to_binary(Term)));
+    couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Term)));
 view_sig(Db, State, {_Nth, _Lang, View}, Args) ->
     view_sig(Db, State, View, Args);
 view_sig(_Db, State, View, Args0) ->
@@ -327,7 +327,7 @@ view_sig(_Db, State, View, Args0) ->
         extra = []
     },
     Term = view_sig_term(Sig, UpdateSeq, PurgeSeq, Args),
-    couch_index_util:hexsig(couch_hash:digest(term_to_binary(Term))).
+    couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Term))).
 
 view_sig_term(BaseSig, UpdateSeq, PurgeSeq) ->
     {BaseSig, UpdateSeq, PurgeSeq}.
@@ -1114,7 +1114,7 @@ sig_vsn_2x(State) ->
     KSI = proplists:get_value(<<"keyseq_indexed">>, DesignOpts, false),
     Views = [old_view_format(V, SI, KSI) || V <- State#mrst.views],
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
-    couch_hash:digest(term_to_binary(SigInfo)).
+    couch_hash:md5_hash(term_to_binary(SigInfo)).
 
 old_view_format(View, SI, KSI) ->
     {

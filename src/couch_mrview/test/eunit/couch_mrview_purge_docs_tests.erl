@@ -143,7 +143,7 @@ test_purge_partial(Db) ->
         Update =
             {[
                 {'_id', <<"1">>},
-                {'_rev', couch_doc:rev_to_str({1, [couch_hash:digest(<<"1.2">>)]})},
+                {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
                 {'val', 1.2}
             ]},
         {ok, [_Rev2]} = save_docs(Db, [Update], [?REPLICATED_CHANGES]),

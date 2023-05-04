@@ -97,7 +97,7 @@ cpse_increment_purge_seq_on_partial_purge(DbName) ->
     Update =
         {[
             {'_id', foo1},
-            {'_rev', couch_doc:rev_to_str({1, [couch_hash:digest(<<"1.2">>)]})},
+            {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
             {vsn, <<"1.2">>}
         ]},
     {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [?REPLICATED_CHANGES]),

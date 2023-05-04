@@ -1261,7 +1261,7 @@ new_revid(#doc{body = Body, revs = {OldStart, OldRevs}, atts = Atts, deleted = D
                     [] -> 0;
                     [OldRev0 | _] -> OldRev0
                 end,
-            couch_hash:digest(
+            couch_hash:md5_hash(
                 term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}])
             )
     end.

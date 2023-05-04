@@ -91,9 +91,9 @@ foldl({Engine, EngineState}, Fun, Acc) ->
 foldl(Engine, <<>>, Fun, Acc) ->
     foldl(Engine, Fun, Acc);
 foldl(Engine, Digest, UserFun, UserAcc) ->
-    InitAcc = {couch_hash:digest_init(), UserFun, UserAcc},
+    InitAcc = {couch_hash:md5_hash_init(), UserFun, UserAcc},
     {DigestAcc, _, OutAcc} = foldl(Engine, fun foldl_digest/2, InitAcc),
-    Digest = couch_hash:digest_final(DigestAcc),
+    Digest = couch_hash:md5_hash_final(DigestAcc),
     OutAcc.
 
 foldl_decode(Engine, Digest, Enc, UserFun, UserAcc1) ->
@@ -119,7 +119,7 @@ range_foldl(Engine, From, To, UserFun, UserAcc) when To >= From ->
     end.
 
 foldl_digest(Bin, {DigestAcc, UserFun, UserAcc}) ->
-    NewDigestAcc = couch_hash:digest_update(DigestAcc, Bin),
+    NewDigestAcc = couch_hash:md5_hash_update(DigestAcc, Bin),
     {NewDigestAcc, UserFun, UserFun(Bin, UserAcc)}.
 
 foldl_decode(EncBin, {DecFun, UserFun, UserAcc}) ->
@@ -189,8 +189,8 @@ init({Engine, OpenerPid, OpenerPriority, Options}) ->
     {ok, #stream{
         engine = Engine,
         opener_monitor = erlang:monitor(process, OpenerPid),
-        digest = couch_hash:digest_init(),
-        identity_digest = couch_hash:digest_init(),
+        digest = couch_hash:md5_hash_init(),
+        identity_digest = couch_hash:md5_hash_init(),
         encoding_fun = EncodingFun,
         end_encoding_fun = EndEncodingFun,
         max_buffer = couch_util:get_value(
@@ -217,7 +217,7 @@ handle_call({write, Bin}, _From, Stream) ->
     if
         BinSize + BufferLen > Max ->
             WriteBin = lists:reverse(Buffer, [Bin]),
-            IdenDigest_2 = couch_hash:digest_update(IdenDigest, WriteBin),
+            IdenDigest_2 = couch_hash:md5_hash_update(IdenDigest, WriteBin),
             case EncodingFun(WriteBin) of
                 [] ->
                     % case where the encoder did some internal buffering
@@ -228,7 +228,7 @@ handle_call({write, Bin}, _From, Stream) ->
                 WriteBin2 ->
                     NewEngine = do_write(Engine, WriteBin2),
                     WrittenLen2 = WrittenLen + iolist_size(WriteBin2),
-                    Digest_2 = couch_hash:digest_update(Digest, WriteBin2)
+                    Digest_2 = couch_hash:md5_hash_update(Digest, WriteBin2)
             end,
 
             {reply, ok,
@@ -263,9 +263,9 @@ handle_call(close, _From, Stream) ->
     } = Stream,
 
     WriteBin = lists:reverse(Buffer),
-    IdenDigestFinal = couch_hash:digest_final(couch_hash:digest_update(IdenDigest, WriteBin)),
+    IdenDigestFinal = couch_hash:md5_hash_final(couch_hash:md5_hash_update(IdenDigest, WriteBin)),
     WriteBin2 = EncodingFun(WriteBin) ++ EndEncodingFun(),
-    DigestFinal = couch_hash:digest_final(couch_hash:digest_update(Digest, WriteBin2)),
+    DigestFinal = couch_hash:md5_hash_final(couch_hash:md5_hash_update(Digest, WriteBin2)),
     Result =
         case WriteBin2 of
             [] ->

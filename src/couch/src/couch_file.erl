@@ -400,7 +400,7 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Digest = couch_hash:digest(Bin),
+    Digest = couch_hash:md5_hash(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Digest/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
@@ -676,7 +676,7 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
         end,
     <<DigestSig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
-    DigestSig = couch_hash:digest(HeaderBin),
+    DigestSig = couch_hash:md5_hash(HeaderBin),
     {ok, HeaderBin}.
 
 %% Read multiple block locations using a single file:pread/2.
@@ -855,7 +855,7 @@ monitored_by_pids() ->
 verify_digest(_Fd, _Pos, IoList, <<>>) ->
     IoList;
 verify_digest(Fd, Pos, IoList, Digest) ->
-    case couch_hash:digest(IoList) of
+    case couch_hash:md5_hash(IoList) of
         Digest -> IoList;
         _ -> report_digest_error(Fd, Pos)
     end.

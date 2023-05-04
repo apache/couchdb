@@ -285,7 +285,7 @@ should_recover_header_data_corruption() ->
         check_header_recovery(
             fun(CouchFd, RawFd, Expect, HeaderPos) ->
                 ?assertNotMatch(Expect, couch_file:read_header(CouchFd)),
-                % +21 = +1 for 0x1 byte, +4 for term size and +16 for MD5 sig
+                % +21 = +1 for 0x1 byte, +4 for term size and +16 for DIGEST sig
                 file:pwrite(RawFd, HeaderPos + 21, <<"some data goes here!">>),
                 ?assertMatch(Expect, couch_file:read_header(CouchFd))
             end

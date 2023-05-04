@@ -117,4 +117,4 @@ definitions({callback_module, Module}) ->
 
 hash_of_file(FilePath) ->
     {ok, Data} = file:read_file(FilePath),
-    couch_hash:digest(Data).
+    couch_hash:md5_hash(Data).

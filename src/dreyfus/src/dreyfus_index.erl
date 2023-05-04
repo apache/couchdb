@@ -326,7 +326,7 @@ design_doc_to_index(#doc{id = Id, body = {Fields}}, IndexName) ->
                 Def ->
                     Sig = ?l2b(
                         couch_util:to_hex(
-                            couch_hash:digest(
+                            couch_hash:md5_hash(
                                 term_to_binary({Analyzer, Def})
                             )
                         )
