@@ -15,7 +15,8 @@
     pid,
     msg,
     msg_id,
-    time_stamp
+    time_stamp,
+    type
 }).
 
 

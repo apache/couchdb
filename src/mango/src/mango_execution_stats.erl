@@ -14,6 +14,7 @@
 
 -export([
     to_json/1,
+    to_map/1,
     incr_keys_examined/1,
     incr_docs_examined/1,
     incr_docs_examined/2,
@@ -21,6 +22,7 @@
     incr_results_returned/1,
     log_start/1,
     log_end/1,
+    log_stats/1,
     maybe_add_stats/4
 ]).
 
@@ -34,6 +36,15 @@ to_json(Stats) ->
         {results_returned, Stats#execution_stats.resultsReturned},
         {execution_time_ms, Stats#execution_stats.executionTimeMs}
     ]}.
+
+to_map(Stats) ->
+    #{
+        total_keys_examined => Stats#execution_stats.totalKeysExamined,
+        total_docs_examined => Stats#execution_stats.totalDocsExamined,
+        total_quorum_docs_examined => Stats#execution_stats.totalQuorumDocsExamined,
+        results_returned => Stats#execution_stats.resultsReturned,
+        execution_time_ms => Stats#execution_stats.executionTimeMs
+    }.
 
 incr_keys_examined(Stats) ->
     Stats#execution_stats{
@@ -74,13 +85,24 @@ log_end(Stats) ->
 maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
     Stats1 = log_end(Stats0),
     couch_stats:update_histogram([mango, query_time], Stats1#execution_stats.executionTimeMs),
+    %% TODO: add rows read when we collect the stats
+    %% TODO: add docs vs quorum docs
+    chttpd_stats:incr_reads(Stats1#execution_stats.totalDocsExamined),
 
-    case couch_util:get_value(execution_stats, Opts) of
-        true ->
-            JSONValue = to_json(Stats1),
-            Arg = {add_key, execution_stats, JSONValue},
-            {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
-            FinalUserAcc;
-        _ ->
-            UserAcc
-    end.
+    FinalAcc =
+        case couch_util:get_value(execution_stats, Opts) of
+            true ->
+                JSONValue = to_json(Stats1),
+                Arg = {add_key, execution_stats, JSONValue},
+                {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
+                FinalUserAcc;
+            _ ->
+                UserAcc
+        end,
+    {FinalAcc, Stats1}.
+
+log_stats(Stats) ->
+    MStats0 = to_map(Stats),
+    Nonce = list_to_binary(couch_log_util:get_msg_id()),
+    MStats1 = MStats0#{nonce => Nonce},
+    couch_log:report("mango-stats", MStats1).

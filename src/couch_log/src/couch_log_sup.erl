@@ -59,6 +59,8 @@ handle_config_change("log", Key, _, _, S) ->
     case Key of
         "level" ->
             couch_log_config:reconfigure();
+        "report_level" ->
+            couch_log_config:reconfigure();
         "max_message_size" ->
             couch_log_config:reconfigure();
         "strip_last_msg" ->

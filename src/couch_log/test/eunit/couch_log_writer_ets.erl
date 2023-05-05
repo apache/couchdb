@@ -30,9 +30,10 @@ terminate(_, _St) ->
     ok.
 
 write(Entry0, St) ->
-    Entry = Entry0#log_entry{
-        msg = lists:flatten(Entry0#log_entry.msg),
-        time_stamp = lists:flatten(Entry0#log_entry.time_stamp)
+    Entry1 = couch_log_util:maybe_format_type(Entry0),
+    Entry = Entry1#log_entry{
+        msg = lists:flatten(Entry1#log_entry.msg),
+        time_stamp = lists:flatten(Entry1#log_entry.time_stamp)
     },
     Ignored = application:get_env(couch_log, ignored_pids, []),
     case lists:member(Entry#log_entry.pid, Ignored) of

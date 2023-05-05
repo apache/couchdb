@@ -25,6 +25,24 @@ truncate_test() ->
     Entry = couch_log_formatter:format(info, self(), Msg),
     ?assert(length(Entry#log_entry.msg) =< 16000).
 
+format_report_etoolong_test() ->
+    Payload = lists:flatten(lists:duplicate(1048576, "a")),
+    Resp = couch_log_formatter:format_report(self(), report123, #{
+        msg => Payload
+    }),
+    ?assertEqual({error, emsgtoolong}, Resp).
+
+format_report_test() ->
+    {ok, Entry} = couch_log_formatter:format_report(self(), report123, #{
+        foo => 123,
+        bar => "barStr",
+        baz => baz
+    }),
+    % NOTE: this currently hardcodes the ordering of the keys, however, map
+    % key order is not guaranteed and this may break.
+    Formatted = "[foo=123 baz=\"baz\" bar=\"barStr\"]",
+    ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
+
 format_reason_test() ->
     MsgFmt = "This is a reason: ~r",
     Reason = {foo, [{x, k, 3}, {c, d, 2}]},

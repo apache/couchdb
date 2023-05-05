@@ -43,6 +43,7 @@ entries() ->
     [
         {level, "level", "info"},
         {level_int, "level", "info"},
+        {report_level, "report_level", "info"},
         {max_message_size, "max_message_size", "16000"},
         {strip_last_msg, "strip_last_msg", "true"},
         {filter_fields, "filter_fields", "[pid, registered_name, error_info, messages]"}
@@ -86,6 +87,8 @@ forms() ->
     [erl_syntax:revert(X) || X <- Statements].
 
 transform(level, LevelStr) ->
+    couch_log_util:level_to_atom(LevelStr);
+transform(report_level, LevelStr) ->
     couch_log_util:level_to_atom(LevelStr);
 transform(level_int, LevelStr) ->
     Level = couch_log_util:level_to_atom(LevelStr),

@@ -21,6 +21,8 @@
     format/3,
     format/1,
 
+    format_report/3,
+
     format_reason/1,
     format_mfa/1,
     format_trace/1,
@@ -30,6 +32,30 @@
 -include("couch_log.hrl").
 
 -define(DEFAULT_TRUNCATION, 1024).
+
+-define(REPORT_LEVEL, report).
+
+format_report(Pid, Type, Meta) ->
+    MaxMsgSize = couch_log_config:get(max_message_size),
+    Msg =
+        case format_meta(Meta) of
+            "" -> "";
+            Msg0 -> ["[", Msg0, "]"]
+        end,
+    case iolist_size(Msg) > MaxMsgSize of
+        true ->
+            {error, emsgtoolong};
+        false ->
+            Entry = #log_entry{
+                level = couch_log_util:level_to_atom(?REPORT_LEVEL),
+                pid = Pid,
+                msg = Msg,
+                msg_id = couch_log_util:get_msg_id(),
+                time_stamp = couch_log_util:iso8601_timestamp(),
+                type = Type
+            },
+            {ok, Entry}
+    end.
 
 format(Level, Pid, Fmt, Args) ->
     #log_entry{
@@ -436,3 +462,40 @@ get_value(Key, List, Default) ->
 
 supervisor_name({local, Name}) -> Name;
 supervisor_name(Name) -> Name.
+
+format_meta(Meta) ->
+    %% https://www.rfc-editor.org/rfc/rfc5424.html#section-6.3
+    %% iut="3" eventSource="Application" eventID="1011"
+    string:join(
+        maps:fold(
+            fun(K, V, Acc) ->
+                [to_str(K, V) | Acc]
+            end,
+            [],
+            Meta
+        ),
+        " "
+    ).
+
+%% passing complex terms as meta value is a mistake so we are going
+%% to eat it, because we cannot bubble up errors from logger
+%% Therefore following are not supported
+%% - lists
+%% - tuples
+%% - maps
+%% However we are not going to try to distinguish lists from string
+%% Atoms would be printed as strings
+to_str(K, _) when not (is_list(K) or is_atom(K)) ->
+    "";
+to_str(K, Term) when is_list(Term) ->
+    io_lib:format("~s=\"~s\"", [K, Term]);
+to_str(_K, Term) when is_tuple(Term) ->
+    "";
+to_str(_K, Term) when is_map(Term) ->
+    "";
+to_str(K, Term) when is_number(Term) ->
+    io_lib:format("~s=~p", [K, Term]);
+to_str(K, Term) when is_binary(Term) ->
+    io_lib:format("~s=\"~s\"", [K, Term]);
+to_str(K, Term) ->
+    io_lib:format("~s=\"~p\"", [K, Term]).
