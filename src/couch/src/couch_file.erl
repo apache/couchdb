@@ -142,8 +142,8 @@ assemble_file_chunk(Bin) ->
     [<<0:1/integer, (iolist_size(Bin)):31/integer>>, Bin].
 
 assemble_file_chunk_and_checksum(Bin) ->
-    Digest = exxhash:xxhash128(Bin),
-    [<<1:1/integer, (iolist_size(Bin)):31/integer>>, Digest, Bin].
+    Checksum = exxhash:xxhash128(Bin),
+    [<<1:1/integer, (iolist_size(Bin)):31/integer>>, Checksum, Bin].
 
 %%----------------------------------------------------------------------
 %% Purpose: Reads a term from a file that was written with append_term
@@ -169,8 +169,8 @@ pread_binary(Fd, Pos) ->
 
 pread_iolist(Fd, Pos) ->
     case ioq:call(Fd, {pread_iolist, Pos}, erlang:get(io_priority)) of
-        {ok, IoList, Digest} ->
-            {ok, verify_digest(Fd, Pos, IoList, Digest)};
+        {ok, IoList, Checksum} ->
+            {ok, verify_checksum(Fd, Pos, IoList, Checksum)};
         Error ->
             Error
     end.
@@ -191,13 +191,13 @@ pread_binaries(Fd, PosList) ->
 
 pread_iolists(Fd, PosList) ->
     case ioq:call(Fd, {pread_iolists, PosList}, erlang:get(io_priority)) of
-        {ok, DataAndDigests} ->
+        {ok, DataAndChecksums} ->
             Data = lists:zipwith(
-                fun(Pos, {IoList, Digest}) ->
-                    verify_digest(Fd, Pos, IoList, Digest)
+                fun(Pos, {IoList, Checksum}) ->
+                    verify_checksum(Fd, Pos, IoList, Checksum)
                 end,
                 PosList,
-                DataAndDigests
+                DataAndChecksums
             ),
             {ok, Data};
         Error ->
@@ -400,9 +400,9 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Digest = exxhash:xxhash128(Bin),
+    Checksum = exxhash:xxhash128(Bin),
     % now we assemble the final header binary and write to disk
-    FinalBin = <<Digest/binary, Bin/binary>>,
+    FinalBin = <<Checksum/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
 
 init_status_error(ReturnPid, Ref, Error) ->
@@ -504,11 +504,11 @@ handle_call({pread_iolist, Pos}, _From, File) ->
     update_read_timestamp(),
     {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
     case iolist_to_binary(LenIolist) of
-        % an digest-prefixed term
+        % an checksum-prefixed term
         <<1:1/integer, Len:31/integer>> ->
-            {DigestAndIoList, _} = read_raw_iolist_int(File, NextPos, Len + 16),
-            {Digest, IoList} = extract_digest(DigestAndIoList),
-            {reply, {ok, IoList, Digest}, File};
+            {ChecksumAndIoList, _} = read_raw_iolist_int(File, NextPos, Len + 16),
+            {Checksum, IoList} = extract_checksum(ChecksumAndIoList),
+            {reply, {ok, IoList, Checksum}, File};
         <<0:1/integer, Len:31/integer>> ->
             {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
             {reply, {ok, Iolist, <<>>}, File}
@@ -520,7 +520,7 @@ handle_call({pread_iolists, PosL}, _From, File) ->
     LocNums2 = lists:map(
         fun({LenIoList, NextPos}) ->
             case iolist_to_binary(LenIoList) of
-                % a digest-prefixed term
+                % a checksum-prefixed term
                 <<1:1/integer, Len:31/integer>> ->
                     {NextPos, Len + 16};
                 <<0:1/integer, Len:31/integer>> ->
@@ -534,8 +534,8 @@ handle_call({pread_iolists, PosL}, _From, File) ->
         fun({LenIoList, _}, {IoList, _}) ->
             case iolist_to_binary(LenIoList) of
                 <<1:1/integer, _:31/integer>> ->
-                    {Digest, IoList} = extract_digest(IoList),
-                    {IoList, Digest};
+                    {Checksum, IoList} = extract_checksum(IoList),
+                    {IoList, Checksum};
                 <<0:1/integer, _:31/integer>> ->
                     {IoList, <<>>}
             end
@@ -674,14 +674,14 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
                 {ok, Missing} = file:pread(Fd, ReadStart, ReadLen),
                 <<RestBlock/binary, Missing/binary>>
         end,
-    <<Digest:16/binary, HeaderBin/binary>> =
+    <<Checksum:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
     case exxhash:xxhash128(HeaderBin) of
-        Digest ->
+        Checksum ->
             ok;
         <<_/binary>> ->
-            couch_stats:increment_counter([couch_file, old_digests]),
-            Digest = couch_hash:md5_hash(HeaderBin)
+            couch_stats:increment_counter([couch_file, old_checksums]),
+            Checksum = couch_hash:md5_hash(HeaderBin)
     end,
     {ok, HeaderBin}.
 
@@ -785,10 +785,10 @@ get_pread_locnum(File, Pos, Len) ->
             {Pos, TotalBytes}
     end.
 
--spec extract_digest(iolist()) -> {binary(), iolist()}.
-extract_digest(FullIoList) ->
-    {DigestList, IoList} = split_iolist(FullIoList, 16, []),
-    {iolist_to_binary(DigestList), IoList}.
+-spec extract_checksum(iolist()) -> {binary(), iolist()}.
+extract_checksum(FullIoList) ->
+    {ChecksumList, IoList} = split_iolist(FullIoList, 16, []),
+    {iolist_to_binary(ChecksumList), IoList}.
 
 calculate_total_read_len(0, FinalLen) ->
     calculate_total_read_len(1, FinalLen) + 1;
@@ -858,23 +858,23 @@ monitored_by_pids() ->
     {monitored_by, PidsAndRefs} = process_info(self(), monitored_by),
     lists:filter(fun is_pid/1, PidsAndRefs).
 
-verify_digest(_Fd, _Pos, IoList, <<>>) ->
+verify_checksum(_Fd, _Pos, IoList, <<>>) ->
     IoList;
-verify_digest(Fd, Pos, IoList, Digest) ->
+verify_checksum(Fd, Pos, IoList, Checksum) ->
     case exxhash:xxhash128(iolist_to_binary(IoList)) of
-        Digest ->
+        Checksum ->
             IoList;
         <<_/binary>> ->
             case couch_hash:md5_hash(IoList) of
-                Digest ->
-                    couch_stats:increment_counter([couch_file, old_digests]),
+                Checksum ->
+                    couch_stats:increment_counter([couch_file, old_checksums]),
                     IoList;
                 _ ->
-                    report_digest_error(Fd, Pos)
+                    report_checksum_error(Fd, Pos)
             end
     end.
 
-report_digest_error(Fd, Pos) ->
+report_checksum_error(Fd, Pos) ->
     couch_log:emergency("File corruption in ~p at position ~B", [Fd, Pos]),
     exit({file_corruption, <<"file corruption">>}).
 
