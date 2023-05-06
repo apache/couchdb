@@ -567,14 +567,8 @@ flush_data(Db, Fun, Att) when is_function(Fun) ->
                     % Called with Length == 0 on the last time.
                     % WriterFun returns NewState.
                     fun
-                        ({0, Footers}, _Total) ->
-                            F = mochiweb_headers:from_binary(Footers),
-                            case mochiweb_headers:get_value("Content-MD5", F) of
-                                undefined ->
-                                    ok;
-                                Md5 ->
-                                    {md5, base64:decode(Md5)}
-                            end;
+                        ({0, _Footers}, _Total) ->
+                            ok;
                         ({Length, Chunk}, Total0) ->
                             Total = Total0 + Length,
                             validate_attachment_size(AttName, Total, MaxAttSize),
