@@ -580,3 +580,182 @@ fake_fsync_fd() ->
         {'$gen_call', From, sync} ->
             gen:reply(From, {error, eio})
     end.
+
+checksum_test_() ->
+    {
+        foreach,
+        fun setup_checksum/0,
+        fun teardown_checksum/1,
+        [
+            ?TDEF_FE(t_write_read_xxhash_checksums),
+            ?TDEF_FE(t_downgrade_xxhash_checksums),
+            ?TDEF_FE(t_read_legacy_checksums_after_upgrade),
+            ?TDEF_FE(t_can_detect_block_corruption_with_xxhash),
+            ?TDEF_FE(t_can_detect_block_corruption_with_legacy_checksum)
+        ]
+    }.
+
+setup_checksum() ->
+    Path = ?tempfile(),
+    Ctx = test_util:start_couch(),
+    config:set("couchdb", "write_xxhash_checksums", "false", _Persist = false),
+    {Ctx, Path}.
+
+teardown_checksum({Ctx, Path}) ->
+    file:delete(Path),
+    meck:unload(),
+    test_util:stop_couch(Ctx),
+    couch_file:reset_checksum_persistent_term_config().
+
+t_write_read_xxhash_checksums({_Ctx, Path}) ->
+    enable_xxhash(),
+
+    {ok, Fd} = couch_file:open(Path, [create]),
+    Header = header,
+    ok = couch_file:write_header(Fd, Header),
+    Bin = <<"bin">>,
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    {ok, Pos, _} = couch_file:append_raw_chunk(Fd, Chunk),
+    couch_file:close(Fd),
+
+    {ok, Fd1} = couch_file:open(Path, []),
+    {ok, Header1} = couch_file:read_header(Fd1),
+    ?assertEqual(Header, Header1),
+    {ok, Bin1} = couch_file:pread_binary(Fd1, Pos),
+    ?assertEqual(Bin, Bin1),
+    ?assertEqual(0, legacy_stats()),
+    couch_file:close(Fd1).
+
+t_downgrade_xxhash_checksums({_Ctx, Path}) ->
+    % We're in the future and writting xxhash checkums by default
+    enable_xxhash(),
+    {ok, Fd} = couch_file:open(Path, [create]),
+    Header = header,
+    ok = couch_file:write_header(Fd, Header),
+    Bin = <<"bin">>,
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    {ok, Pos, _} = couch_file:append_raw_chunk(Fd, Chunk),
+    couch_file:close(Fd),
+
+    % The future was broken, we travel back, but still know how to
+    % interpret future checksums without crashing
+    disable_xxhash(),
+    {ok, Fd1} = couch_file:open(Path, []),
+    {ok, Header1} = couch_file:read_header(Fd1),
+    ?assertEqual(Header, Header1),
+    {ok, Bin1} = couch_file:pread_binary(Fd1, Pos),
+    ?assertEqual(Bin, Bin1),
+
+    % We'll write some legacy checksums to the file and then ensure
+    % we can read both legacy and the new ones
+    OtherBin = <<"otherbin">>,
+    OtherChunk = couch_file:assemble_file_chunk_and_checksum(OtherBin),
+    {ok, OtherPos, _} = couch_file:append_raw_chunk(Fd1, OtherChunk),
+    couch_file:close(Fd1),
+
+    {ok, Fd2} = couch_file:open(Path, []),
+    {ok, Header2} = couch_file:read_header(Fd2),
+    ?assertEqual(Header, Header2),
+    {ok, Bin2} = couch_file:pread_binary(Fd2, Pos),
+    {ok, OtherBin1} = couch_file:pread_binary(Fd2, OtherPos),
+    ?assertEqual(Bin, Bin2),
+    ?assertEqual(OtherBin, OtherBin1),
+    couch_file:close(Fd2).
+
+t_read_legacy_checksums_after_upgrade({_Ctx, Path}) ->
+    % We're in the past and writting legacy checkums by default
+    disable_xxhash(),
+    {ok, Fd} = couch_file:open(Path, [create]),
+    Header = header,
+    ok = couch_file:write_header(Fd, Header),
+    Bin = <<"bin">>,
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    {ok, Pos, _} = couch_file:append_raw_chunk(Fd, Chunk),
+    couch_file:close(Fd),
+
+    % We upgrade and xxhash checksums are now the default, but we can
+    % still read legacy checksums.
+    enable_xxhash(),
+    {ok, Fd1} = couch_file:open(Path, []),
+    {ok, Header1} = couch_file:read_header(Fd1),
+    ?assertEqual(Header, Header1),
+    {ok, Bin1} = couch_file:pread_binary(Fd1, Pos),
+    ?assertEqual(Bin, Bin1),
+    % one header, one chunk
+    ?assertEqual(2, legacy_stats()),
+
+    % We'll write some new checksums to the file and then ensure
+    % we can read both legacy and the new ones
+    OtherBin = <<"otherbin">>,
+    OtherChunk = couch_file:assemble_file_chunk_and_checksum(OtherBin),
+    {ok, OtherPos, _} = couch_file:append_raw_chunk(Fd1, OtherChunk),
+    couch_file:close(Fd1),
+
+    couch_stats:decrement_counter([couchdb, legacy_checksums], legacy_stats()),
+    {ok, Fd2} = couch_file:open(Path, []),
+    {ok, Header2} = couch_file:read_header(Fd2),
+    ?assertEqual(Header, Header2),
+    {ok, Bin2} = couch_file:pread_binary(Fd2, Pos),
+    {ok, OtherBin1} = couch_file:pread_binary(Fd2, OtherPos),
+    ?assertEqual(Bin, Bin2),
+    ?assertEqual(OtherBin, OtherBin1),
+    % one header, legacy chunk, not counting new chunk
+    ?assertEqual(2, legacy_stats()),
+    couch_file:close(Fd2).
+
+t_can_detect_block_corruption_with_xxhash({_Ctx, Path}) ->
+    enable_xxhash(),
+
+    {ok, Fd} = couch_file:open(Path, [create]),
+    Bin = crypto:strong_rand_bytes(100000),
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    {ok, Pos, _} = couch_file:append_raw_chunk(Fd, Chunk),
+    ok = couch_file:write_header(Fd, header),
+    couch_file:close(Fd),
+
+    {ok, SneakyFd} = file:open(Path, [binary, read, write, raw]),
+    ok = file:pwrite(SneakyFd, Pos + 100, <<"oops!">>),
+    file:close(SneakyFd),
+
+    {ok, Fd1} = couch_file:open(Path, []),
+    {ok, Header} = couch_file:read_header(Fd1),
+    ?assertEqual(header, Header),
+    ?assertExit({file_corruption, <<"file corruption">>}, couch_file:pread_binary(Fd1, Pos)),
+    catch couch_file:close(Fd1).
+
+t_can_detect_block_corruption_with_legacy_checksum({_Ctx, Path}) ->
+    disable_xxhash(),
+
+    {ok, Fd} = couch_file:open(Path, [create]),
+    Bin = crypto:strong_rand_bytes(100000),
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    {ok, Pos, _} = couch_file:append_raw_chunk(Fd, Chunk),
+    ok = couch_file:write_header(Fd, header),
+    couch_file:close(Fd),
+
+    {ok, SneakyFd} = file:open(Path, [write, binary, read, raw]),
+    ok = file:pwrite(SneakyFd, Pos + 100, <<"oops!">>),
+    file:close(SneakyFd),
+
+    {ok, Fd1} = couch_file:open(Path, []),
+    {ok, Header} = couch_file:read_header(Fd1),
+    ?assertEqual(header, Header),
+    ?assertExit({file_corruption, <<"file corruption">>}, couch_file:pread_binary(Fd1, Pos)),
+    catch couch_file:close(Fd1).
+
+enable_xxhash() ->
+    couch_file:reset_checksum_persistent_term_config(),
+    reset_legacy_checksum_stats(),
+    config:set("couchdb", "write_xxhash_checksums", "true", _Persist = false).
+
+disable_xxhash() ->
+    couch_file:reset_checksum_persistent_term_config(),
+    reset_legacy_checksum_stats(),
+    config:set("couchdb", "write_xxhash_checksums", "false", _Persist = false).
+
+legacy_stats() ->
+    couch_stats:sample([couchdb, legacy_checksums]).
+
+reset_legacy_checksum_stats() ->
+    Counter = couch_stats:sample([couchdb, legacy_checksums]),
+    couch_stats:decrement_counter([couchdb, legacy_checksums], Counter).

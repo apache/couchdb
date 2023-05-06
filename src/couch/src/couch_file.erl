@@ -23,6 +23,8 @@
 -define(IS_OLD_STATE(S), is_pid(S#file.db_monitor)).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
+-define(WRITE_XXHASH_CHECKSUMS_KEY, {?MODULE, write_xxhash_checksums}).
+-define(WRITE_XXHASH_CHECKSUMS_DEFAULT, false).
 
 -type block_id() :: non_neg_integer().
 -type location() :: non_neg_integer().
@@ -54,6 +56,9 @@
 
 %% helper functions
 -export([process_info/1]).
+
+% test helper functions
+-export([reset_checksum_persistent_term_config/0]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -142,8 +147,8 @@ assemble_file_chunk(Bin) ->
     [<<0:1/integer, (iolist_size(Bin)):31/integer>>, Bin].
 
 assemble_file_chunk_and_checksum(Bin) ->
-    Md5 = couch_hash:md5_hash(Bin),
-    [<<1:1/integer, (iolist_size(Bin)):31/integer>>, Md5, Bin].
+    Checksum = generate_checksum(Bin),
+    [<<1:1/integer, (iolist_size(Bin)):31/integer>>, Checksum, Bin].
 
 %%----------------------------------------------------------------------
 %% Purpose: Reads a term from a file that was written with append_term
@@ -169,8 +174,8 @@ pread_binary(Fd, Pos) ->
 
 pread_iolist(Fd, Pos) ->
     case ioq:call(Fd, {pread_iolist, Pos}, erlang:get(io_priority)) of
-        {ok, IoList, Md5} ->
-            {ok, verify_md5(Fd, Pos, IoList, Md5)};
+        {ok, IoList, Checksum} ->
+            {ok, verify_checksum(Fd, Pos, IoList, Checksum, false)};
         Error ->
             Error
     end.
@@ -191,13 +196,13 @@ pread_binaries(Fd, PosList) ->
 
 pread_iolists(Fd, PosList) ->
     case ioq:call(Fd, {pread_iolists, PosList}, erlang:get(io_priority)) of
-        {ok, DataMd5s} ->
+        {ok, DataAndChecksums} ->
             Data = lists:zipwith(
-                fun(Pos, {IoList, Md5}) ->
-                    verify_md5(Fd, Pos, IoList, Md5)
+                fun(Pos, {IoList, Checksum}) ->
+                    verify_checksum(Fd, Pos, IoList, Checksum, false)
                 end,
                 PosList,
-                DataMd5s
+                DataAndChecksums
             ),
             {ok, Data};
         Error ->
@@ -400,9 +405,9 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = ?term_to_bin(Data),
-    Md5 = couch_hash:md5_hash(Bin),
+    Checksum = generate_checksum(Bin),
     % now we assemble the final header binary and write to disk
-    FinalBin = <<Md5/binary, Bin/binary>>,
+    FinalBin = <<Checksum/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
 
 init_status_error(ReturnPid, Ref, Error) ->
@@ -504,11 +509,11 @@ handle_call({pread_iolist, Pos}, _From, File) ->
     update_read_timestamp(),
     {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
     case iolist_to_binary(LenIolist) of
-        % an MD5-prefixed term
+        % an checksum-prefixed term
         <<1:1/integer, Len:31/integer>> ->
-            {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len + 16),
-            {Md5, IoList} = extract_md5(Md5AndIoList),
-            {reply, {ok, IoList, Md5}, File};
+            {ChecksumAndIoList, _} = read_raw_iolist_int(File, NextPos, Len + 16),
+            {Checksum, IoList} = extract_checksum(ChecksumAndIoList),
+            {reply, {ok, IoList, Checksum}, File};
         <<0:1/integer, Len:31/integer>> ->
             {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
             {reply, {ok, Iolist, <<>>}, File}
@@ -520,7 +525,7 @@ handle_call({pread_iolists, PosL}, _From, File) ->
     LocNums2 = lists:map(
         fun({LenIoList, NextPos}) ->
             case iolist_to_binary(LenIoList) of
-                % an MD5-prefixed term
+                % a checksum-prefixed term
                 <<1:1/integer, Len:31/integer>> ->
                     {NextPos, Len + 16};
                 <<0:1/integer, Len:31/integer>> ->
@@ -534,8 +539,8 @@ handle_call({pread_iolists, PosL}, _From, File) ->
         fun({LenIoList, _}, {IoList, _}) ->
             case iolist_to_binary(LenIoList) of
                 <<1:1/integer, _:31/integer>> ->
-                    {Md5, IoList} = extract_md5(IoList),
-                    {IoList, Md5};
+                    {Checksum, IoList} = extract_checksum(IoList),
+                    {IoList, Checksum};
                 <<0:1/integer, _:31/integer>> ->
                     {IoList, <<>>}
             end
@@ -686,10 +691,9 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
                 {ok, Missing} = file:pread(Fd, ReadStart, ReadLen),
                 <<RestBlock/binary, Missing/binary>>
         end,
-    <<Md5Sig:16/binary, HeaderBin/binary>> =
+    <<Checksum:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
-    Md5Sig = couch_hash:md5_hash(HeaderBin),
-    {ok, HeaderBin}.
+    {ok, verify_checksum(Fd, Pos, HeaderBin, Checksum, true)}.
 
 %% Read multiple block locations using a single file:pread/2.
 -spec find_header(file:fd(), block_id(), non_neg_integer()) ->
@@ -791,10 +795,10 @@ get_pread_locnum(File, Pos, Len) ->
             {Pos, TotalBytes}
     end.
 
--spec extract_md5(iolist()) -> {binary(), iolist()}.
-extract_md5(FullIoList) ->
-    {Md5List, IoList} = split_iolist(FullIoList, 16, []),
-    {iolist_to_binary(Md5List), IoList}.
+-spec extract_checksum(iolist()) -> {binary(), iolist()}.
+extract_checksum(FullIoList) ->
+    {ChecksumList, IoList} = split_iolist(FullIoList, 16, []),
+    {iolist_to_binary(ChecksumList), IoList}.
 
 calculate_total_read_len(0, FinalLen) ->
     calculate_total_read_len(1, FinalLen) + 1;
@@ -864,15 +868,47 @@ monitored_by_pids() ->
     {monitored_by, PidsAndRefs} = process_info(self(), monitored_by),
     lists:filter(fun is_pid/1, PidsAndRefs).
 
-verify_md5(_Fd, _Pos, IoList, <<>>) ->
+verify_checksum(_Fd, _Pos, IoList, <<>>, _IsHeader) ->
     IoList;
-verify_md5(Fd, Pos, IoList, Md5) ->
-    case couch_hash:md5_hash(IoList) of
-        Md5 -> IoList;
-        _ -> report_md5_error(Fd, Pos)
+verify_checksum(Fd, Pos, IoList, Checksum, IsHeader) ->
+    % If writing xxhash checksums is enabled, check those first, then check
+    % legacy ones. If any legacy ones are found, bump the legacy metric. If
+    % generating xxhash checksums is disabled, assume most checksums would be
+    % legacy, so check that first, and then, in a likely case of release
+    % downgrade, check xxhash ones.
+    case generate_xxhash_checksums() of
+        true ->
+            case exxhash:xxhash128(iolist_to_binary(IoList)) of
+                Checksum ->
+                    IoList;
+                <<_/binary>> ->
+                    case couch_hash:md5_hash(IoList) of
+                        Checksum ->
+                            legacy_checksums_stats_update(),
+                            IoList;
+                        _ ->
+                            report_checksum_error(Fd, Pos, IsHeader)
+                    end
+            end;
+        false ->
+            case couch_hash:md5_hash(IoList) of
+                Checksum ->
+                    IoList;
+                _ ->
+                    case exxhash:xxhash128(iolist_to_binary(IoList)) of
+                        Checksum ->
+                            IoList;
+                        <<_/binary>> ->
+                            report_checksum_error(Fd, Pos, IsHeader)
+                    end
+            end
     end.
 
-report_md5_error(Fd, Pos) ->
+report_checksum_error(_Fd, _Pos, _IsHeader = true) ->
+    % When loading header we'd expect to find junk data which might not have
+    % been committed at the end of the file, so we don't emit an emergency log for it.
+    exit({file_corruption, <<"file corruption">>});
+report_checksum_error(Fd, Pos, _IsHeader = false) ->
     couch_log:emergency("File corruption in ~p at position ~B", [Fd, Pos]),
     exit({file_corruption, <<"file corruption">>}).
 
@@ -917,6 +953,37 @@ get_pread_limit() ->
 reset_eof(#file{} = File) ->
     {ok, Eof} = file:position(File#file.fd, eof),
     File#file{eof = Eof}.
+
+-spec generate_checksum(binary()) -> <<_:128>>.
+generate_checksum(Bin) when is_binary(Bin) ->
+    case generate_xxhash_checksums() of
+        true -> <<_:128>> = exxhash:xxhash128(Bin);
+        false -> <<_:128>> = couch_hash:md5_hash(Bin)
+    end.
+
+legacy_checksums_stats_update() ->
+    % Bump stats only if we're writing new checksums.
+    case generate_xxhash_checksums() of
+        true -> couch_stats:increment_counter([couchdb, legacy_checksums]);
+        false -> ok
+    end.
+
+reset_checksum_persistent_term_config() ->
+    persistent_term:erase(?WRITE_XXHASH_CHECKSUMS_KEY).
+
+generate_xxhash_checksums() ->
+    % Caching the config value here as we'd need to call this per file chunk
+    % and also from various processes (not just couch_file pids). Node must be
+    % restarted for the new value to take effect.
+    case persistent_term:get(?WRITE_XXHASH_CHECKSUMS_KEY, not_cached) of
+        not_cached ->
+            Default = ?WRITE_XXHASH_CHECKSUMS_DEFAULT,
+            Val = config:get_boolean("couchdb", "write_xxhash_checksums", Default),
+            persistent_term:put(?WRITE_XXHASH_CHECKSUMS_KEY, Val),
+            Val;
+        Val when is_boolean(Val) ->
+            Val
+    end.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
