@@ -230,3 +230,20 @@ Base CouchDB Options
 
             [couchdb]
             view_index_dir = /var/lib/couchdb
+
+    .. config:option:: write_xxhash_checksums :: Enable writting xxHash checksums
+
+        .. versionadded:: 3.4
+
+        The default value in version 3.4 is ``false``. The legacy checksum
+        algorithm will be used for writing couch_file blocks. During reads,
+        both xxHash and the legacy checksum algorithm will be used to verify
+        data integrity. In a future version of CouchDB the default value will
+        become ``true``. However, it would still be possible to safely
+        downgrade to version 3.4, which would be able to verify both xxHash and
+        legacy checksums. If CouchDB version downgrade is not a concern,
+        enabling xxHash checksums can result in a measuralbe document read
+        performance, especially for larger document sizes::
+
+            [couchdb]
+            write_xxhash_checksums = false
