@@ -1,0 +1,878 @@
+options {
+  STATIC = false;
+  JAVA_UNICODE_ESCAPE = true;
+  USER_CHAR_STREAM = true;
+  IGNORE_CASE = false;
+  JDK_VERSION = "1.8";
+
+  // FORCE_LA_CHECK = true;
+  // DEBUG_LOOKAHEAD = true;
+  // DEBUG_PARSER = true;
+}
+
+PARSER_BEGIN(StandardSyntaxParser)
+package org.apache.lucene.queryparser.flexible.standard.parser;
+
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import java.io.StringReader;
+import java.io.Reader;
+import java.util.Collections;
+import java.util.ArrayList;
+
+import org.apache.lucene.queryparser.flexible.core.nodes.AndQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.BooleanQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.BoostQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.FieldQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.FuzzyQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.GroupQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.ModifierQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.OrQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.QueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.QuotedFieldQueryNode;
+import org.apache.lucene.queryparser.flexible.core.nodes.SlopQueryNode;
+import org.apache.lucene.queryparser.flexible.messages.Message;
+import org.apache.lucene.queryparser.flexible.messages.MessageImpl;
+import org.apache.lucene.queryparser.flexible.core.QueryNodeParseException;
+import org.apache.lucene.queryparser.flexible.core.messages.QueryParserMessages;
+import org.apache.lucene.queryparser.flexible.core.parser.SyntaxParser;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.After;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.AnalyzedText;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.AtLeast;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Before;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.ContainedBy;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Containing;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Extend;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.FuzzyTerm;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.IntervalFunction;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.MaxGaps;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.MaxWidth;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.NonOverlapping;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.NotContainedBy;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.NotContaining;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.NotWithin;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Or;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Ordered;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Overlapping;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Phrase;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Unordered;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.UnorderedNoOverlaps;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Wildcard;
+import org.apache.lucene.queryparser.flexible.standard.nodes.intervalfn.Within;
+import org.apache.lucene.queryparser.flexible.standard.nodes.IntervalQueryNode;
+import org.apache.lucene.queryparser.flexible.standard.nodes.MinShouldMatchNode;
+import org.apache.lucene.queryparser.flexible.standard.nodes.RegexpQueryNode;
+import org.apache.lucene.queryparser.charstream.CharStream;
+import org.apache.lucene.queryparser.charstream.FastCharStream;
+import org.apache.lucene.queryparser.flexible.standard.nodes.TermRangeQueryNode;
+
+import static org.apache.lucene.queryparser.flexible.standard.parser.EscapeQuerySyntaxImpl.discardEscapeChar;
+
+/**
+ * Parser for the standard Lucene syntax
+ */
+public class StandardSyntaxParser implements SyntaxParser {
+  public StandardSyntaxParser() {
+    this(new FastCharStream(Reader.nullReader()));
+  }
+
+  /**
+   * Parses a query string, returning a {@link org.apache.lucene.queryparser.flexible.core.nodes.QueryNode}.
+   * @param query  the query string to be parsed.
+   * @throws ParseException if the parsing fails
+   */
+  @Override
+  public QueryNode parse(CharSequence query, CharSequence field) throws QueryNodeParseException {
+    ReInit(new FastCharStream(new StringReader(query.toString())));
+    try {
+      return TopLevelQuery(field);
+    } catch (ParseException tme) {
+      tme.setQuery(query);
+      throw tme;
+    } catch (Error tme) {
+      Message message = new MessageImpl(QueryParserMessages.INVALID_SYNTAX_CANNOT_PARSE, query, tme.getMessage());
+      QueryNodeParseException e = new QueryNodeParseException(tme);
+      e.setQuery(query);
+      e.setNonLocalizedMessage(message);
+      throw e;
+    }
+  }
+
+  public static float parseFloat(Token token) {
+    return Float.parseFloat(token.image);
+  }
+
+  public static int parseInt(Token token) {
+    return Integer.parseInt(token.image);
+  }
+}
+PARSER_END(StandardSyntaxParser)
+
+// Token definitions.
+
+<*> TOKEN : {
+      <#_NUM_CHAR:   ["0"-"9"] >
+    // Every character that follows a backslash is considered as an escaped character
+    | <#_ESCAPED_CHAR: "\\" ~[] >
+    | <#_TERM_START_CHAR: ( ~[ " ", "\t", "\n", "\r", "\u3000", "+", "-", "!", "(", ")", ":", "^", "@",
+                               "<", ">", "=", "[", "]", "\"", "{", "}", "~", "\\", "/"]
+                            | <_ESCAPED_CHAR> ) >
+    | <#_TERM_CHAR: ( <_TERM_START_CHAR> | <_ESCAPED_CHAR> | "-" | "+" ) >
+    | <#_WHITESPACE: ( " " | "\t" | "\n" | "\r" | "\u3000") >
+    | <#_QUOTED_CHAR: ( ~[ "\"", "\\" ] | <_ESCAPED_CHAR> ) >
+}
+
+<DEFAULT, Range, Function> SKIP : {
+    < <_WHITESPACE> >
+}
+
+<DEFAULT> TOKEN : {
+      <AND:           ("AND" | "&&") >
+    | <OR:            ("OR" | "||") >
+    | <NOT:           ("NOT" | "!") >
+    | <FN_PREFIX:     ("fn:") > : Function
+    | <PLUS:          "+" >
+    | <MINUS:         "-" >
+    | <RPAREN:        ")" >
+    | <OP_COLON:      ":" >
+    | <OP_EQUAL:      "=" >
+    | <OP_LESSTHAN:   "<"  >
+    | <OP_LESSTHANEQ: "<=" >
+    | <OP_MORETHAN:   ">"  >
+    | <OP_MORETHANEQ: ">=" >
+    | <CARAT:         "^" >
+    | <TILDE:         "~" >
+    | <QUOTED:        "\"" (<_QUOTED_CHAR>)* "\"">
+    | <NUMBER:        (<_NUM_CHAR>)+ ( "." (<_NUM_CHAR>)+ )? >
+    | <TERM:          <_TERM_START_CHAR> (<_TERM_CHAR>)* >
+    | <REGEXPTERM:    "/" (~[ "/" ] | "\\/" )* "/" >
+    | <RANGEIN_START: "[" > : Range
+    | <RANGEEX_START: "{" > : Range
+}
+
+<DEFAULT,Function> TOKEN : {
+      <LPAREN:        "(" > : DEFAULT
+}
+
+<Function> TOKEN : {
+      <ATLEAST:       ("atleast" | "atLeast") >
+    | <AFTER:         ("after") >
+    | <BEFORE:        ("before") >
+    | <CONTAINED_BY:  ("containedBy" | "containedby") >
+    | <CONTAINING:    ("containing") >
+    | <EXTEND:        ("extend") >
+    | <FN_OR:         ("or") >
+    | <FUZZYTERM:     ("fuzzyterm" | "fuzzyTerm") >
+    | <MAXGAPS:       ("maxgaps" | "maxGaps") >
+    | <MAXWIDTH:      ("maxwidth" | "maxWidth") >
+    | <NON_OVERLAPPING:  ("nonOverlapping" | "nonoverlapping") >
+    | <NOT_CONTAINED_BY: ("notContainedBy" | "notcontainedby") >
+    | <NOT_CONTAINING:   ("notContaining" | "notcontaining") >
+    | <NOT_WITHIN:    ("notWithin" | "notwithin") >
+    | <ORDERED:       ("ordered") >
+    | <OVERLAPPING:   ("overlapping") >
+    | <PHRASE:        ("phrase") >
+    | <UNORDERED:     ("unordered") >
+    | <UNORDERED_NO_OVERLAPS: ("unorderedNoOverlaps" | "unorderednooverlaps") >
+    | <WILDCARD:      ("wildcard") >
+    | <WITHIN:        ("within") >
+}
+
+<Range> TOKEN : {
+      <RANGE_TO:     "TO">
+    | <RANGEIN_END:  "]"> : DEFAULT
+    | <RANGEEX_END:  "}"> : DEFAULT
+    | <RANGE_QUOTED: "\"" (~["\""] | "\\\"")+ "\"">
+    | <RANGE_GOOP:   (~[ " ", "]", "}" ])+ >
+}
+
+
+
+// Non-terminal production rules.
+
+/**
+ * The top-level rule ensures that there is no garbage after the query string.
+ *
+ * <pre>{@code
+ * TopLevelQuery ::= Query <EOF>
+ * }</pre>
+ */
+public QueryNode TopLevelQuery(CharSequence field) :
+{
+  QueryNode q;
+}
+{
+  q = Query(field) <EOF> {
+    return q;
+  }
+}
+
+/**
+ * A query consists of one or more disjunction queries (solves operator precedence).
+ * <pre>{@code
+ * Query ::= DisjQuery ( DisjQuery )*
+ * DisjQuery ::= ConjQuery ( OR ConjQuery )*
+ * ConjQuery ::= ModClause ( AND ModClause )*
+ * }</pre>
+ */
+private QueryNode Query(CharSequence field) : {
+  ArrayList<QueryNode> clauses = new ArrayList<QueryNode>();
+  QueryNode node;
+}
+{
+  ( node = DisjQuery(field) { clauses.add(node);  } )+
+  {
+    // Handle the case of a "pure" negation query which
+    // needs to be wrapped as a boolean query, otherwise
+    // the returned result drops the negation.
+    if (clauses.size() == 1) {
+      QueryNode first = clauses.get(0);
+      if (first instanceof ModifierQueryNode
+          && ((ModifierQueryNode) first).getModifier() == ModifierQueryNode.Modifier.MOD_NOT) {
+        clauses.set(0, new BooleanQueryNode(Collections.singletonList(first)));
+      }
+    }
+
+    return clauses.size() == 1 ? clauses.get(0) : new BooleanQueryNode(clauses);
+  }
+}
+
+/**
+ * A disjoint clause consists of one or more conjunction clauses.
+ * <pre>{@code
+ * DisjQuery ::= ConjQuery ( OR ConjQuery )*
+ * }</pre>
+ */
+private QueryNode DisjQuery(CharSequence field) : {
+  ArrayList<QueryNode> clauses = new ArrayList<QueryNode>();
+  QueryNode node;
+}
+{
+  node = ConjQuery(field) { clauses.add(node);  }
+  ( <OR> node = ConjQuery(field) { clauses.add(node);  } )*
+  {
+    return clauses.size() == 1 ? clauses.get(0) : new OrQueryNode(clauses);
+  }
+}
+
+/**
+ * A conjunction clause consists of one or more modifier-clause pairs.
+ * <pre>{@code
+ * ConjQuery ::= ModClause ( AND ModClause )*
+ * }</pre>
+ */
+private QueryNode ConjQuery(CharSequence field) : {
+  ArrayList<QueryNode> clauses = new ArrayList<QueryNode>();
+  QueryNode node;
+}
+{
+  node = ModClause(field) { clauses.add(node);  }
+  ( <AND> node = ModClause(field) { clauses.add(node);  } )*
+  {
+    return clauses.size() == 1 ? clauses.get(0) : new AndQueryNode(clauses);
+  }
+}
+
+/**
+ * A modifier-atomic clause pair.
+ * <pre>{@code
+ * ModClause ::= (Modifier)? Clause
+ * }</pre>
+ */
+private QueryNode ModClause(CharSequence field) : {
+  QueryNode q;
+  ModifierQueryNode.Modifier modifier = ModifierQueryNode.Modifier.MOD_NONE;
+}
+{
+  (    <PLUS>           { modifier = ModifierQueryNode.Modifier.MOD_REQ; }
+    | (<MINUS> | <NOT>) { modifier = ModifierQueryNode.Modifier.MOD_NOT; }
+  )?
+  q = Clause(field)
+  {
+    if (modifier != ModifierQueryNode.Modifier.MOD_NONE) {
+      q = new ModifierQueryNode(q, modifier);
+    }
+    return q;
+  }
+}
+
+/**
+ * An atomic clause consists of a field range expression, a potentially
+ * field-qualified term or a group.
+ *
+ * <pre>{@code
+ * Clause ::= FieldRangeExpr
+ *          | (FieldName (':' | '='))? (Term | GroupingExpr)
+ * }</pre>
+ */
+private QueryNode Clause(CharSequence field) : {
+  QueryNode q;
+}
+{
+  (
+      LOOKAHEAD(2) q = FieldRangeExpr(field)
+    | (LOOKAHEAD(2) field = FieldName() ( <OP_COLON> | <OP_EQUAL> ))?
+      (LOOKAHEAD(2) q = Term(field) | q = GroupingExpr(field) | q = IntervalExpr(field))
+  )
+  {
+    return q;
+  }
+}
+
+/**
+ * A field name. This utility method strips escape characters from field names.
+ */
+private CharSequence FieldName() : {
+  Token name;
+}
+{
+  name = <TERM> { return discardEscapeChar(name.image); }
+}
+
+/**
+ * An grouping expression is a Query with potential boost applied to it.
+ *
+ * <pre>{@code
+ * GroupingExpr ::= '(' Query ')' ('^' <NUMBER>)?
+ * }</pre>
+ */
+private QueryNode GroupingExpr(CharSequence field) : {
+  QueryNode q;
+  Token boost, minShouldMatch = null;
+}
+{
+  <LPAREN> q = Query(field) <RPAREN> (q = Boost(q))? ("@" minShouldMatch = <NUMBER>)?
+  {
+    if (minShouldMatch != null) {
+      q = new MinShouldMatchNode(parseInt(minShouldMatch), new GroupQueryNode(q));
+    } else {
+      q = new GroupQueryNode(q);
+    }
+    return q;
+  }
+}
+
+
+/**
+ * An interval expression (functions) node.
+ */
+private IntervalQueryNode IntervalExpr(CharSequence field) : {
+ IntervalFunction source;
+}
+ {
+   source = IntervalFun()
+   {
+     return new IntervalQueryNode(field == null ? null : field.toString(), source);
+   }
+ }
+
+private IntervalFunction IntervalFun() : {
+  IntervalFunction source;
+}
+{
+    LOOKAHEAD(2) source = IntervalAtLeast()   { return source; }
+  | LOOKAHEAD(2) source = IntervalMaxWidth()  { return source; }
+  | LOOKAHEAD(2) source = IntervalMaxGaps()   { return source; }
+  | LOOKAHEAD(2) source = IntervalOrdered()   { return source; }
+  | LOOKAHEAD(2) source = IntervalUnordered() { return source; }
+  | LOOKAHEAD(2) source = IntervalUnorderedNoOverlaps() { return source; }
+  | LOOKAHEAD(2) source = IntervalOr()        { return source; }
+  | LOOKAHEAD(2) source = IntervalWildcard()  { return source; }
+  | LOOKAHEAD(2) source = IntervalAfter()     { return source; }
+  | LOOKAHEAD(2) source = IntervalBefore()    { return source; }
+  | LOOKAHEAD(2) source = IntervalPhrase()    { return source; }
+  | LOOKAHEAD(2) source = IntervalContaining() { return source; }
+  | LOOKAHEAD(2) source = IntervalNotContaining() { return source; }
+  | LOOKAHEAD(2) source = IntervalContainedBy() { return source; }
+  | LOOKAHEAD(2) source = IntervalNotContainedBy() { return source; }
+  | LOOKAHEAD(2) source = IntervalWithin()    { return source; }
+  | LOOKAHEAD(2) source = IntervalNotWithin() { return source; }
+  | LOOKAHEAD(2) source = IntervalOverlapping() { return source; }
+  | LOOKAHEAD(2) source = IntervalNonOverlapping() { return source; }
+  | LOOKAHEAD(2) source = IntervalExtend() { return source; }
+  | LOOKAHEAD(2) source = IntervalFuzzyTerm() { return source; }
+  | LOOKAHEAD(2) source = IntervalText()      { return source; }
+}
+
+private IntervalFunction IntervalAtLeast() : {
+  IntervalFunction source;
+  ArrayList<IntervalFunction> sources = new ArrayList<IntervalFunction>();
+  Token minShouldMatch;
+}
+{
+  <FN_PREFIX> <ATLEAST>
+  <LPAREN> minShouldMatch = <NUMBER> (source = IntervalFun() { sources.add(source); })+  <RPAREN>
+  {
+    return new AtLeast(parseInt(minShouldMatch), sources);
+  }
+}
+
+private IntervalFunction IntervalMaxWidth() : {
+  IntervalFunction source;
+  Token maxWidth;
+}
+{
+  <FN_PREFIX> <MAXWIDTH>
+  <LPAREN> maxWidth = <NUMBER> source = IntervalFun() <RPAREN>
+  {
+    return new MaxWidth(parseInt(maxWidth), source);
+  }
+}
+
+private IntervalFunction IntervalMaxGaps() : {
+  IntervalFunction source;
+  Token maxGaps;
+}
+{
+  <FN_PREFIX> <MAXGAPS>
+  <LPAREN> maxGaps = <NUMBER> source = IntervalFun() <RPAREN>
+  {
+    return new MaxGaps(parseInt(maxGaps), source);
+  }
+}
+
+private IntervalFunction IntervalUnordered() : {
+  IntervalFunction source;
+  ArrayList<IntervalFunction> sources = new ArrayList<IntervalFunction>();
+}
+{
+  <FN_PREFIX> <UNORDERED>
+  <LPAREN> (source = IntervalFun() { sources.add(source); })+  <RPAREN>
+  {
+    return new Unordered(sources);
+  }
+}
+
+private IntervalFunction IntervalUnorderedNoOverlaps() : {
+  IntervalFunction a, b;
+}
+{
+  <FN_PREFIX> <UNORDERED_NO_OVERLAPS>
+  <LPAREN> a = IntervalFun() b = IntervalFun()  <RPAREN>
+  {
+    return new UnorderedNoOverlaps(a, b);
+  }
+}
+
+private IntervalFunction IntervalOrdered() : {
+  IntervalFunction source;
+  ArrayList<IntervalFunction> sources = new ArrayList<IntervalFunction>();
+}
+{
+  <FN_PREFIX> <ORDERED>
+  <LPAREN> (source = IntervalFun() { sources.add(source); })+  <RPAREN>
+  {
+    return new Ordered(sources);
+  }
+}
+
+private IntervalFunction IntervalOr() : {
+  IntervalFunction source;
+  ArrayList<IntervalFunction> sources = new ArrayList<IntervalFunction>();
+}
+{
+  <FN_PREFIX> <FN_OR>
+  <LPAREN> (source = IntervalFun() { sources.add(source); })+  <RPAREN>
+  {
+    return new Or(sources);
+  }
+}
+
+private IntervalFunction IntervalPhrase() : {
+  IntervalFunction source;
+  ArrayList<IntervalFunction> sources = new ArrayList<IntervalFunction>();
+}
+{
+  <FN_PREFIX> <PHRASE>
+  <LPAREN> (source = IntervalFun() { sources.add(source); })+  <RPAREN>
+  {
+    return new Phrase(sources);
+  }
+}
+
+private IntervalFunction IntervalBefore() : {
+  IntervalFunction source;
+  IntervalFunction reference;
+}
+{
+  <FN_PREFIX> <BEFORE> <LPAREN> source = IntervalFun() reference = IntervalFun() <RPAREN>
+  {
+    return new Before(source, reference);
+  }
+}
+
+private IntervalFunction IntervalAfter() : {
+  IntervalFunction source;
+  IntervalFunction reference;
+}
+{
+  <FN_PREFIX> <AFTER> <LPAREN> source = IntervalFun() reference = IntervalFun() <RPAREN>
+  {
+    return new After(source, reference);
+  }
+}
+
+private IntervalFunction IntervalContaining() : {
+  IntervalFunction big;
+  IntervalFunction small;
+}
+{
+  <FN_PREFIX> <CONTAINING> <LPAREN> big = IntervalFun() small = IntervalFun() <RPAREN>
+  {
+    return new Containing(big, small);
+  }
+}
+
+private IntervalFunction IntervalNotContaining() : {
+  IntervalFunction minuend;
+  IntervalFunction subtrahend;
+}
+{
+  <FN_PREFIX> <NOT_CONTAINING> <LPAREN> minuend = IntervalFun() subtrahend = IntervalFun() <RPAREN>
+  {
+    return new NotContaining(minuend, subtrahend);
+  }
+}
+
+private IntervalFunction IntervalContainedBy() : {
+  IntervalFunction big;
+  IntervalFunction small;
+}
+{
+  <FN_PREFIX> <CONTAINED_BY> <LPAREN> small = IntervalFun() big = IntervalFun() <RPAREN>
+  {
+    return new ContainedBy(small, big);
+  }
+}
+
+private IntervalFunction IntervalNotContainedBy() : {
+  IntervalFunction big;
+  IntervalFunction small;
+}
+{
+  <FN_PREFIX> <NOT_CONTAINED_BY> <LPAREN> small = IntervalFun() big = IntervalFun() <RPAREN>
+  {
+    return new NotContainedBy(small, big);
+  }
+}
+
+private IntervalFunction IntervalWithin() : {
+  IntervalFunction source, reference;
+  Token positions;
+}
+{
+  <FN_PREFIX> <WITHIN>
+    <LPAREN>
+    source = IntervalFun()
+    positions = <NUMBER>
+    reference = IntervalFun()
+    <RPAREN>
+  {
+    return new Within(source, parseInt(positions), reference);
+  }
+}
+
+private IntervalFunction IntervalExtend() : {
+  IntervalFunction source;
+  Token before, after;
+}
+{
+  <FN_PREFIX> <EXTEND>
+    <LPAREN>
+    source = IntervalFun()
+    before = <NUMBER>
+    after = <NUMBER>
+    <RPAREN>
+  {
+    return new Extend(source, parseInt(before), parseInt(after));
+  }
+}
+
+private IntervalFunction IntervalNotWithin() : {
+  IntervalFunction minuend, subtrahend;
+  Token positions;
+}
+{
+  <FN_PREFIX> <NOT_WITHIN>
+    <LPAREN>
+    minuend = IntervalFun()
+    positions = <NUMBER>
+    subtrahend = IntervalFun()
+    <RPAREN>
+  {
+    return new NotWithin(minuend, parseInt(positions), subtrahend);
+  }
+}
+
+private IntervalFunction IntervalOverlapping() : {
+  IntervalFunction source, reference;
+}
+{
+  <FN_PREFIX> <OVERLAPPING> <LPAREN> source = IntervalFun() reference = IntervalFun() <RPAREN>
+  {
+    return new Overlapping(source, reference);
+  }
+}
+
+private IntervalFunction IntervalNonOverlapping() : {
+  IntervalFunction minuend, subtrahend;
+}
+{
+  <FN_PREFIX> <NON_OVERLAPPING> <LPAREN> minuend = IntervalFun() subtrahend = IntervalFun() <RPAREN>
+  {
+    return new NonOverlapping(minuend, subtrahend);
+  }
+}
+
+private IntervalFunction IntervalWildcard() : {
+  String wildcard;
+  Token maxExpansions = null;
+}
+{
+  <FN_PREFIX> <WILDCARD>
+  <LPAREN>
+   (
+     (<TERM> | <NUMBER>)   { wildcard = token.image; }
+     | <QUOTED>            { wildcard = token.image.substring(1, token.image.length() - 1); }
+   )
+   (maxExpansions = <NUMBER>)?
+  <RPAREN>
+  {
+    return new Wildcard(wildcard, maxExpansions == null ? 0 : parseInt(maxExpansions));
+  }
+}
+
+private IntervalFunction IntervalFuzzyTerm() : {
+  String term;
+  Token maxEdits = null;
+  Token maxExpansions = null;
+}
+{
+  <FN_PREFIX> <FUZZYTERM>
+  <LPAREN>
+   (
+     (<TERM> | <NUMBER>)   { term = token.image; }
+     | <QUOTED>            { term = token.image.substring(1, token.image.length() - 1); }
+   )
+   (LOOKAHEAD(2) maxEdits = <NUMBER>)?
+   (LOOKAHEAD(2) maxExpansions = <NUMBER>)?
+  <RPAREN>
+  {
+    return new FuzzyTerm(term,
+      maxEdits == null ? null : parseInt(maxEdits),
+      maxExpansions == null ? null : parseInt(maxExpansions));
+  }
+}
+
+private IntervalFunction IntervalText() : {
+}
+{
+    (<QUOTED>)          { return new AnalyzedText(token.image.substring(1, token.image.length() - 1)); }
+  | (<TERM> | <NUMBER>) { return new AnalyzedText(token.image); }
+}
+
+/**
+ * Score boost modifier.
+ *
+ * <pre>{@code
+ * Boost ::= '^' <NUMBER>
+ * }</pre>
+ */
+private QueryNode Boost(QueryNode node) : {
+  Token boost;
+}
+{
+  <CARAT> boost = <NUMBER>
+  {
+    return node == null ? node : new BoostQueryNode(node, parseFloat(boost));
+  }
+}
+
+/**
+ * Fuzzy term modifier.
+ *
+ * <pre>{@code
+ * Fuzzy ::= '~' <NUMBER>?
+ * }</pre>
+ */
+private QueryNode FuzzyOp(CharSequence field, Token term, QueryNode node) : {
+  Token similarity = null;
+}
+{
+  <TILDE> (LOOKAHEAD(2) similarity = <NUMBER>)?
+  {
+    float fms = org.apache.lucene.search.FuzzyQuery.defaultMaxEdits;
+    if (similarity != null) {
+      fms = parseFloat(similarity);
+      if (fms < 0.0f) {
+        throw new ParseException(new MessageImpl(QueryParserMessages.INVALID_SYNTAX_FUZZY_LIMITS));
+      } else if (fms >= 1.0f && fms != (int) fms) {
+        throw new ParseException(new MessageImpl(QueryParserMessages.INVALID_SYNTAX_FUZZY_EDITS));
+      }
+    }
+    return new FuzzyQueryNode(field, discardEscapeChar(term.image), fms, term.beginColumn, term.endColumn);
+  }
+}
+
+/**
+ * A field range expression selects all field values larger/ smaller (or equal) than a given one.
+ * <pre>{@code
+ * FieldRangeExpr ::= FieldName ('<' | '>' | '<=' | '>=') (<TERM> | <QUOTED> | <NUMBER>)
+ * }</pre>
+ */
+private TermRangeQueryNode FieldRangeExpr(CharSequence field) : {
+  Token operator, term;
+  FieldQueryNode qLower, qUpper;
+  boolean lowerInclusive, upperInclusive;
+}
+{
+  field = FieldName()
+  ( <OP_LESSTHAN> | <OP_LESSTHANEQ> | <OP_MORETHAN> | <OP_MORETHANEQ>) { operator = token; }
+  ( <TERM> | <QUOTED> | <NUMBER>) { term = token; }
+  {
+    if (term.kind == QUOTED) {
+      term.image = term.image.substring(1, term.image.length() - 1);
+    }
+    switch (operator.kind) {
+      case OP_LESSTHAN:
+        lowerInclusive = true;
+        upperInclusive = false;
+        qLower = new FieldQueryNode(field, "*", term.beginColumn, term.endColumn);
+        qUpper = new FieldQueryNode(field, discardEscapeChar(term.image), term.beginColumn, term.endColumn);
+        break;
+      case OP_LESSTHANEQ:
+        lowerInclusive = true;
+        upperInclusive = true;
+        qLower = new FieldQueryNode(field, "*", term.beginColumn, term.endColumn);
+        qUpper = new FieldQueryNode(field, discardEscapeChar(term.image), term.beginColumn, term.endColumn);
+        break;
+      case OP_MORETHAN:
+        lowerInclusive = false;
+        upperInclusive = true;
+        qLower = new FieldQueryNode(field, discardEscapeChar(term.image), term.beginColumn, term.endColumn);
+        qUpper = new FieldQueryNode(field, "*", term.beginColumn, term.endColumn);
+        break;
+      case OP_MORETHANEQ:
+        lowerInclusive = true;
+        upperInclusive = true;
+        qLower = new FieldQueryNode(field, discardEscapeChar(term.image), term.beginColumn, term.endColumn);
+        qUpper = new FieldQueryNode(field, "*", term.beginColumn, term.endColumn);
+        break;
+      default:
+        throw new Error("Unhandled case, operator=" + operator);
+    }
+    return new TermRangeQueryNode(qLower, qUpper, lowerInclusive, upperInclusive);
+  }
+}
+
+/**
+ * A term expression.
+ *
+ * <pre>{@code
+ * Term ::= (<TERM> | <NUMBER>) ('~' <NUM>)? ('^' <NUM>)?
+ *        | <REGEXPTERM> ('^' <NUM>)?
+ *        | TermRangeExpr ('^' <NUM>)?
+ *        | QuotedTerm ('^' <NUM>)?
+ * }</pre>
+ */
+private QueryNode Term(CharSequence field) : {
+  QueryNode q;
+  Token term, fuzzySlop=null;
+}
+{
+  (
+       term = <REGEXPTERM>
+       {
+          String v = term.image.substring(1, term.image.length() - 1);
+          q = new RegexpQueryNode(field, v, 0, v.length());
+       }
+     | (term = <TERM> | term = <NUMBER>)
+       { q = new FieldQueryNode(field, discardEscapeChar(term.image), term.beginColumn, term.endColumn); }
+       ( q = FuzzyOp(field, term, q) )?
+     | q = TermRangeExpr(field)
+     | q = QuotedTerm(field)
+  )
+  ( q = Boost(q) )?
+  {
+    return q;
+  }
+}
+
+
+/**
+ * A quoted term (phrase).
+ *
+ * <pre>{@code
+ * QuotedTerm ::= <QUOTED> ('~' <NUM>)?
+ * }</pre>
+ */
+private QueryNode QuotedTerm(CharSequence field) : {
+  QueryNode q;
+  Token term, slop;
+}
+{
+  term = <QUOTED>
+  {
+    String image = term.image.substring(1, term.image.length() - 1);
+    q = new QuotedFieldQueryNode(field, discardEscapeChar(image), term.beginColumn + 1, term.endColumn - 1);
+  }
+  ( <TILDE> slop = <NUMBER> { q = new SlopQueryNode(q, parseInt(slop)); } )?
+  {
+    return q;
+  }
+}
+
+/**
+ * A value range expression.
+ *
+ * <pre>{@code
+ * TermRangeExpr ::= ('[' | '{') <RANGE_START> 'TO' <RANGE_END> (']' | '}')
+ * }</pre>
+ */
+private TermRangeQueryNode TermRangeExpr(CharSequence field) : {
+  Token left, right;
+  boolean leftInclusive = false;
+  boolean rightInclusive = false;
+}
+{
+  // RANGE_TO can be consumed as range start/end because this needs to be accepted as a valid range:
+  // [TO TO TO]
+  (
+    (<RANGEIN_START> { leftInclusive = true; } | <RANGEEX_START>)
+    (<RANGE_GOOP> | <RANGE_QUOTED> | <RANGE_TO>) { left = token; }
+    <RANGE_TO>
+    (<RANGE_GOOP> | <RANGE_QUOTED> | <RANGE_TO>) { right = token; }
+    (<RANGEIN_END> { rightInclusive = true; } | <RANGEEX_END>)
+  )
+
+  {
+    if (left.kind == RANGE_QUOTED) {
+      left.image = left.image.substring(1, left.image.length() - 1);
+    }
+    if (right.kind == RANGE_QUOTED) {
+      right.image = right.image.substring(1, right.image.length() - 1);
+    }
+
+    FieldQueryNode qLower = new FieldQueryNode(field,
+      discardEscapeChar(left.image), left.beginColumn, left.endColumn);
+    FieldQueryNode qUpper = new FieldQueryNode(field,
+      discardEscapeChar(right.image), right.beginColumn, right.endColumn);
+
+    return new TermRangeQueryNode(qLower, qUpper, leftInclusive, rightInclusive);
+  }
+}
