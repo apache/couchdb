@@ -870,7 +870,7 @@ verify_checksum(Data, ExpectedChecksum) ->
         false ->
             case ExpectedChecksum == legacy_checksum(Data) of
                 true ->
-                    couch_stats:increment_counter([couch_file, old_checksums]),
+                    couch_stats:increment_counter([couch_file, legacy_checksums]),
                     true;
                 false ->
                     false
