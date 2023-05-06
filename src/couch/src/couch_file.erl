@@ -864,11 +864,11 @@ verify_checksum(Fd, Pos, IoList, Checksum) ->
 
 verify_checksum(Data, ExpectedChecksum) ->
     Bin = iolist_to_binary(Data),
-    case ExpectedChecksum == exxhash:xxhash128(Bin) of
+    case ExpectedChecksum == checksum(Bin) of
         true ->
             true;
         false ->
-            case ExpectedChecksum == couch_hash:md5_hash(Data) of
+            case ExpectedChecksum == legacy_checksum(Data) of
                 true ->
                     couch_stats:increment_counter([couch_file, old_checksums]),
                     true;
@@ -876,6 +876,18 @@ verify_checksum(Data, ExpectedChecksum) ->
                     false
             end
     end.
+
+checksum(Bin) when is_binary(Bin) ->
+    exxhash:xxhash128(Bin).
+
+-ifdef(NO_MD5).
+legacy_checksum(Bin) when is_binary(Bin) ->
+    true.
+-else.
+legacy_checksum(Bin) when is_binary(Bin) ->
+    couch_hash:md5_hash(Bin).
+-endif.
+
 
 report_checksum_error(Fd, Pos) ->
     couch_log:emergency("File corruption in ~p at position ~B", [Fd, Pos]),
