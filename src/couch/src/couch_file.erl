@@ -676,13 +676,7 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
         end,
     <<Checksum:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
-    case exxhash:xxhash128(HeaderBin) of
-        Checksum ->
-            ok;
-        <<_/binary>> ->
-            couch_stats:increment_counter([couch_file, old_checksums]),
-            Checksum = couch_hash:md5_hash(HeaderBin)
-    end,
+    true = verify_checksum(HeaderBin, Checksum),
     {ok, HeaderBin}.
 
 %% Read multiple block locations using a single file:pread/2.
@@ -861,16 +855,25 @@ monitored_by_pids() ->
 verify_checksum(_Fd, _Pos, IoList, <<>>) ->
     IoList;
 verify_checksum(Fd, Pos, IoList, Checksum) ->
-    case exxhash:xxhash128(iolist_to_binary(IoList)) of
-        Checksum ->
+    case verify_checksum(IoList, Checksum) of
+        true ->
             IoList;
-        <<_/binary>> ->
-            case couch_hash:md5_hash(IoList) of
-                Checksum ->
+        false ->
+            report_checksum_error(Fd, Pos)
+    end.
+
+verify_checksum(Data, ExpectedChecksum) ->
+    Bin = iolist_to_binary(Data),
+    case ExpectedChecksum == exxhash:xxhash128(Bin) of
+        true ->
+            true;
+        false ->
+            case ExpectedChecksum == couch_hash:md5_hash(Data) of
+                true ->
                     couch_stats:increment_counter([couch_file, old_checksums]),
-                    IoList;
-                _ ->
-                    report_checksum_error(Fd, Pos)
+                    true;
+                false ->
+                    false
             end
     end.
 
