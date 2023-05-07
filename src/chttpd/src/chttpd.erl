@@ -813,8 +813,7 @@ doc_etag(#doc{id = Id, body = Body, revs = {Start, [DiskRev | _]}}) ->
     couch_httpd:doc_etag(Id, Body, {Start, DiskRev}).
 
 make_etag(Term) ->
-    <<SigInt:128/integer>> = exxhash:xxhash128(term_to_binary(Term)),
-    list_to_binary(io_lib:format("\"~.36B\"", [SigInt])).
+    couch_httpd:make_etag(Term).
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
