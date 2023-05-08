@@ -129,6 +129,13 @@ parse_opts() {
             --dev)
                 WITH_DOCS=0
                 WITH_FAUXTON=0
+                shift
+                continue
+                ;;
+
+            --dev-with-nouveau)
+                WITH_DOCS=0
+                WITH_FAUXTON=0
                 WITH_NOUVEAU=1
                 shift
                 continue
