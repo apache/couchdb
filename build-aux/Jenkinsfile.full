@@ -277,7 +277,7 @@ pipeline {
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
-    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group -v /root/.m2:/root/.m2'
+    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group -v /root/.gradle:/root/.gradle'
   }
 
   options {

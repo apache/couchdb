@@ -2,6 +2,6 @@
 .classpath
 .project
 .settings/
-target/
 .vscode/
-dependency-reduced-pom.xml
+.gradle/
+build/

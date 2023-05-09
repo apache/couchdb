@@ -471,7 +471,7 @@ def boot_nouveau(ctx):
         "java",
         "-server",
         "-jar",
-        "target/server-%s-dist.jar" % version,
+        "build/libs/server-%s-dist.jar" % version,
         "server",
         "nouveau.yaml",
     ]
