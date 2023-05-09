@@ -38,9 +38,8 @@ format_report_test() ->
         bar => "barStr",
         baz => baz
     }),
-    % NOTE: this currently hardcodes the ordering of the keys, however, map
-    % key order is not guaranteed and this may break.
-    Formatted = "[foo=123 baz=\"baz\" bar=\"barStr\"]",
+    % Rely on `couch_log_formatter:format_meta/1` to sort keys
+    Formatted = "[bar=\"barStr\" baz=\"baz\" foo=123]",
     ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
 
 format_reason_test() ->
