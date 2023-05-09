@@ -56,7 +56,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.SortedDocValuesField;
-import org.apache.lucene.document.SortedSetDocValuesField;
+import org.apache.lucene.document.StoredValue;
 import org.apache.lucene.facet.FacetResult;
 import org.apache.lucene.facet.Facets;
 import org.apache.lucene.facet.FacetsCollector;
@@ -248,12 +248,19 @@ public class Lucene9Index extends Index {
                 if (field.name().equals("_id")) {
                     continue;
                 }
-                if (field.numericValue() != null) {
-                    fields.add(new StoredField(field.name(), field.numericValue().doubleValue()));
-                } else if (field.binaryValue() != null) {
-                    fields.add(new StoredField(field.name(), toBytes(field.binaryValue())));
-                } else if (field.stringValue() != null) {
-                    fields.add(new StoredField(field.name(), field.stringValue()));
+                final StoredValue storedValue = field.storedValue();
+                switch (storedValue.getType()) {
+                    case DOUBLE:
+                        fields.add(new StoredField(field.name(), storedValue.getDoubleValue()));
+                        break;
+                    case STRING:
+                        fields.add(new StoredField(field.name(), storedValue.getStringValue()));
+                        break;
+                    case BINARY:
+                        fields.add(new StoredField(field.name(), storedValue.getBinaryValue()));
+                        break;
+                    default:
+                        throw new IllegalArgumentException(storedValue.getType() + " not supported");
                 }
             }
 
@@ -387,18 +394,13 @@ public class Lucene9Index extends Index {
                 result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
                         f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
-                // TODO use KeywordField when available.
                 var f = (StringField) field;
-                result.add(new org.apache.lucene.document.StringField(f.getName(), f.getValue(),
+                result.add(new org.apache.lucene.document.KeywordField(f.getName(), f.getValue(),
                         f.isStore() ? Store.YES : Store.NO));
-                result.add(new SortedSetDocValuesField(f.getName(),
-                        new BytesRef(f.getValue())));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
-                result.add(new org.apache.lucene.document.DoubleField(f.getName(), f.getValue()));
-                if (f.isStore()) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), f.getValue()));
-                }
+                result.add(new org.apache.lucene.document.DoubleField(f.getName(), f.getValue(),
+                        f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StoredField) {
                 var f = (StoredField) field;
                 var val = f.getValue();

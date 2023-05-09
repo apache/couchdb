@@ -24,7 +24,7 @@
     <argLine>-Duser.language=en -Duser.region=US -Duser.timezone=UTC</argLine>
     <dropwizard.version>4.0.0</dropwizard.version>
     <junit5.version>5.8.2</junit5.version>
-    <lucene.version>9.5.0</lucene.version>
+    <lucene.version>9.6.0</lucene.version>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
