@@ -107,6 +107,8 @@ handle_index_req(#httpd{method = 'POST', path_parts = [_, _]} = Req, Db) ->
                 end
         end,
     chttpd:send_json(Req, {[{result, Status}, {id, Id}, {name, Name}]});
+handle_index_req(#httpd{path_parts = [_, _]} = Req, _Db) ->
+    chttpd:send_method_not_allowed(Req, "GET,POST");
 %% Essentially we just iterate through the list of ddoc ids passed in and
 %% delete one by one. If an error occurs, all previous documents will be
 %% deleted, but an error will be thrown for the current ddoc id.
@@ -187,9 +189,7 @@ handle_index_req(
             ?MANGO_ERROR({error_saving_ddoc, Error})
     end;
 handle_index_req(#httpd{path_parts = [_, _, _DDocId0, _Type, _Name]} = Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "DELETE");
-handle_index_req(#httpd{path_parts = [_, _ | _]} = Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "GET,POST").
+    chttpd:send_method_not_allowed(Req, "DELETE").
 
 handle_explain_req(#httpd{method = 'POST'} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
