@@ -94,6 +94,17 @@ info(mango_cursor_nouveau, {nouveau_search_error, {error, Error}}) ->
         <<"nouveau_search_error">>,
         fmt("~p", [Error])
     };
+info(mango_idx_nouveau, {invalid_index_fields_definition, Def}) ->
+    {
+        400,
+        <<"invalid_index_fields_definition">>,
+        fmt(
+            "Text Index field definitions must be of the form\n"
+            "            {\"name\": \"non-empty fieldname\", \"type\":\n"
+            "                \"boolean,number, or string\"}. Def: ~p",
+            [Def]
+        )
+    };
 info(mango_fields, {invalid_fields_json, BadFields}) ->
     {
         400,
