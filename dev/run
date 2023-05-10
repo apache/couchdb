@@ -475,7 +475,6 @@ def boot_nouveau(ctx):
         "server",
         "nouveau.yaml",
     ]
-
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
