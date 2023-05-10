@@ -433,7 +433,7 @@ endif
 
 ifeq ($(with_nouveau), 1)
 	@mkdir -p rel/couchdb/nouveau/
-	@cp nouveau/target/server-*-dist.jar rel/couchdb/nouveau/
+	@cp nouveau/build/libs/server-*-dist.jar rel/couchdb/nouveau/
 	@cp nouveau/nouveau.yaml rel/couchdb/nouveau/
 endif
 
@@ -478,7 +478,7 @@ clean:
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
 ifeq ($(with_nouveau), 1)
-	@cd nouveau && mvn -B clean
+	@cd nouveau && ./gradlew clean
 endif
 
 
@@ -549,16 +549,16 @@ derived:
 # Build nouveau
 nouveau:
 ifeq ($(with_nouveau), 1)
-	@cd nouveau && mvn -B -D maven.test.skip=true
+	@cd nouveau && ./gradlew build -x test
 endif
 
 .PHONY: nouveau-test
-nouveau-test: nouveau-test-maven nouveau-test-elixir
+nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
-.PHONY: nouveau-test-maven
-nouveau-test-maven: couch nouveau
+.PHONY: nouveau-test-gradle
+nouveau-test-gradle: couch nouveau
 ifeq ($(with_nouveau), 1)
-	@cd nouveau && mvn -B test -P allTests
+	@cd nouveau && ./gradlew test
 endif
 
 .PHONY: nouveau-test-elixir
