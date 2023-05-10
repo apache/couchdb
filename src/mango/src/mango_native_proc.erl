@@ -254,7 +254,10 @@ add_default_text_field(Fields) ->
 add_default_text_field([], Acc) ->
     Acc;
 add_default_text_field([{_Name, <<"string">>, Value} | Rest], Acc) ->
-    NewAcc = [{<<"$default">>, <<"string">>, Value} | Acc],
+    NewAcc = [{<<"$default">>, <<"text">>, Value} | Acc],
+    add_default_text_field(Rest, NewAcc);
+add_default_text_field([{_Name, <<"text">>, Value} | Rest], Acc) ->
+    NewAcc = [{<<"$default">>, <<"text">>, Value} | Acc],
     add_default_text_field(Rest, NewAcc);
 add_default_text_field([_ | Rest], Acc) ->
     add_default_text_field(Rest, Acc).
@@ -310,6 +313,8 @@ get_text_field_type(<<"number">>) ->
     <<"number">>;
 get_text_field_type(<<"boolean">>) ->
     <<"boolean">>;
+get_text_field_type(<<"text">>) ->
+    <<"text">>;
 get_text_field_type(_) ->
     <<"string">>.
 
@@ -357,6 +362,14 @@ convert_to_nouveau_string_field([Name, Value, []]) when is_binary(Name), is_bina
 convert_nouveau_fields([]) ->
     [];
 convert_nouveau_fields([{Name, <<"string">>, Value} | Rest]) ->
+    Field =
+        {[
+            {<<"@type">>, <<"string">>},
+            {<<"name">>, Name},
+            {<<"value">>, Value}
+        ]},
+    [Field | convert_nouveau_fields(Rest)];
+convert_nouveau_fields([{Name, <<"text">>, Value} | Rest]) ->
     Field =
         {[
             {<<"@type">>, <<"text">>},

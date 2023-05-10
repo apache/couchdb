@@ -15,6 +15,9 @@
     "ranges (open)",
     "mango search by number",
     "mango search by string",
+    "mango search by text",
+    "mango sort by number",
+    "mango sort by string",
     "search GET (partitioned)",
     "search POST (partitioned)",
     "mango (partitioned)"

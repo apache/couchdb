@@ -11,10 +11,10 @@ defmodule NouveauTest do
     resp = Couch.post("/#{db_name}/_bulk_docs",
       headers: ["Content-Type": "application/json"],
       body: %{:docs => [
-                %{"_id" => "doc4", "foo" => "foo", "bar" => 42},
-                %{"_id" => "doc3", "foo" => "bar", "bar" => 12.0},
-                %{"_id" => "doc1", "foo" => "baz", "bar" => 0},
-                %{"_id" => "doc2", "foo" => "foobar", "bar" => 100},
+                %{"_id" => "doc4", "foo" => "foo", "bar" => 42, "baz" => "hello there"},
+                %{"_id" => "doc3", "foo" => "bar", "bar" => 12.0, "baz" => "hello"},
+                %{"_id" => "doc1", "foo" => "baz", "bar" => 0, "baz" => "there"},
+                %{"_id" => "doc2", "foo" => "foobar", "bar" => 100, "baz" => "hi"},
       ]}
     )
     assert resp.status_code in [201]
@@ -61,13 +61,15 @@ defmodule NouveauTest do
       index: %{
         fields: [
           %{name: "foo", type: "string"},
-          %{name: "bar", type: "number"}
+          %{name: "bar", type: "number"},
+          %{name: "baz", type: "string"},
         ]
       }
     }
 
     resp = Couch.post("/#{db_name}/_index", body: body)
     assert resp.status_code in [200]
+    resp.body
   end
 
   def get_ids(resp) do
@@ -301,6 +303,45 @@ defmodule NouveauTest do
     assert_status_code(resp, 200)
     ids = get_mango_ids(resp)
     assert ids == ["doc4"]
+  end
+
+  @tag :with_db
+  test "mango search by text", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_mango_index(db_name)
+
+    url = "/#{db_name}/_find"
+    resp = Couch.post(url, body: %{selector: %{"$text": "hello"}})
+    assert_status_code(resp, 200)
+    ids = get_mango_ids(resp)
+    assert ids == ["doc4", "doc3"]
+  end
+
+  @tag :with_db
+  test "mango sort by number", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_mango_index(db_name)
+
+    url = "/#{db_name}/_find"
+    resp = Couch.post(url, body: %{sort: [%{"bar:number": "asc"}], selector: %{bar: %{"$gt": 5}}})
+    assert_status_code(resp, 200)
+    ids = get_mango_ids(resp)
+    assert ids == ["doc3", "doc4", "doc2"]
+  end
+
+  @tag :with_db
+  test "mango sort by string", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_mango_index(db_name)
+
+    url = "/#{db_name}/_find"
+    resp = Couch.post(url, body: %{sort: [%{"foo:string": "asc"}], selector: %{bar: %{"$gte": 0}}})
+    assert_status_code(resp, 200)
+    ids = get_mango_ids(resp)
+    assert ids == ["doc3", "doc1", "doc4", "doc2"]
   end
 
   @tag :with_partitioned_db
