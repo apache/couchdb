@@ -222,7 +222,15 @@ sort_query(Opts, Selector) ->
                     {Field, <<"desc">>} -> {desc, Field};
                     Field when is_binary(Field) -> {asc, Field}
                 end,
-            SField = mango_selector_text:append_sort_type(RawSortField, Selector),
+            SField0 = mango_selector_text:append_sort_type(RawSortField, Selector),
+            %% ugly fixup below
+            SField =
+                case SField0 of
+                    <<Prefix:(size(SField0) - 8)/binary, "<number>">> ->
+                        <<Prefix/binary, "<double>">>;
+                    Else ->
+                        Else
+                end,
             case Dir of
                 asc ->
                     SField;

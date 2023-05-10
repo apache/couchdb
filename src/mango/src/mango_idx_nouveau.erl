@@ -181,6 +181,8 @@ validate_field_name(Else) when is_binary(Else) ->
 validate_field_name(_) ->
     throw(invalid_field_name).
 
+validate_field_type(<<"text">>) ->
+    <<"text">>;
 validate_field_type(<<"string">>) ->
     <<"string">>;
 validate_field_type(<<"number">>) ->
