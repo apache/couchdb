@@ -58,9 +58,18 @@ def setup_users(db, **kwargs):
     db.save_docs(copy.deepcopy(USERS_DOCS))
 
 
-def setup(db, index_type="view", **kwargs):
+def setup(db, index_type="view", partitioned=False, **kwargs):
     db.recreate()
-    db.save_docs(copy.deepcopy(DOCS))
+    p = str(partitioned).lower()
+    docs = copy.deepcopy(DOCS)
+
+    if partitioned:
+        for index, doc in enumerate(docs):
+            partition = index % PARTITIONS
+            doc["_id"] = "{}:{}".format(partition, doc["_id"])
+
+    db.save_docs(docs, partitioned=p)
+
     if index_type == "view":
         add_view_indexes(db, kwargs)
     elif index_type == "text":
@@ -95,6 +104,8 @@ def add_view_indexes(db, kwargs):
 def add_text_indexes(db, kwargs):
     db.create_text_index(**kwargs)
 
+
+PARTITIONS = 3
 
 DOCS = [
     {
