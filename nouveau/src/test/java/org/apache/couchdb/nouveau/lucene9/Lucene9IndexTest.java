@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.DoubleField;
@@ -137,12 +136,13 @@ public class Lucene9IndexTest {
             }
             final SearchRequest request = new SearchRequest();
             request.setQuery("*:*");
-            request.setRanges(Map.of("bar",
-                    List.of(new DoubleRange("low", 0.0, true, (double) count / 2, true),
+            request.setRanges(Map.of(
+                    "bar",
+                    List.of(
+                            new DoubleRange("low", 0.0, true, (double) count / 2, true),
                             new DoubleRange("high", (double) count / 2, true, (double) count, true))));
             final SearchResults results = index.search(request);
-            assertThat(results.getRanges()).isEqualTo(
-                    Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
+            assertThat(results.getRanges()).isEqualTo(Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
         } finally {
             cleanup(index);
         }
@@ -158,7 +158,8 @@ public class Lucene9IndexTest {
             index.update("foo", new DocumentUpdateRequest(2, null, fields));
 
             // Should be prevented from going down to 1.
-            assertThrows(UpdatesOutOfOrderException.class,
+            assertThrows(
+                    UpdatesOutOfOrderException.class,
                     () -> index.update("foo", new DocumentUpdateRequest(1, null, fields)));
         } finally {
             cleanup(index);
@@ -219,5 +220,4 @@ public class Lucene9IndexTest {
             return new Lucene9Index(analyzer, writer, 0L, searcherManager);
         };
     }
-
 }

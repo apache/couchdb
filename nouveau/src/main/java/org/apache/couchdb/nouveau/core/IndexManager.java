@@ -15,6 +15,18 @@ package org.apache.couchdb.nouveau.core;
 
 import static com.codahale.metrics.MetricRegistry.name;
 
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.caffeine.MetricsStatsCounter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
+import com.github.benmanes.caffeine.cache.Scheduler;
+import io.dropwizard.lifecycle.Managed;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,31 +38,15 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
-
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.caffeine.MetricsStatsCounter;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalCause;
-import com.github.benmanes.caffeine.cache.RemovalListener;
-import com.github.benmanes.caffeine.cache.Scheduler;
-
-import io.dropwizard.lifecycle.Managed;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response.Status;
-
 /**
  * The central class of Nouveau, responsible for loading and unloading Lucene
  * indexes and making them available for query.
  */
-
 public final class IndexManager implements Managed {
 
     @FunctionalInterface
@@ -164,15 +160,13 @@ public final class IndexManager implements Managed {
     }
 
     public void deleteAll(final String path, final List<String> exclusions) throws IOException {
-        LOGGER.info("deleting indexes below {} (excluding {})", path,
-            exclusions == null ? "nothing" : exclusions);
+        LOGGER.info("deleting indexes below {} (excluding {})", path, exclusions == null ? "nothing" : exclusions);
 
         final Path indexRootPath = indexRootPath(path);
         if (!indexRootPath.toFile().exists()) {
             return;
         }
-        Stream<Path> stream = Files.find(indexRootPath, 100,
-            (p, attr) -> attr.isDirectory() && isIndex(p));
+        Stream<Path> stream = Files.find(indexRootPath, 100, (p, attr) -> attr.isDirectory() && isIndex(p));
         try {
             stream.forEach((p) -> {
                 final String relativeToExclusions = indexRootPath.relativize(p).toString();
@@ -298,8 +292,7 @@ public final class IndexManager implements Managed {
         if (result.startsWith(rootDir)) {
             return result;
         }
-        throw new WebApplicationException(name + " attempts to escape from index root directory",
-                Status.BAD_REQUEST);
+        throw new WebApplicationException(name + " attempts to escape from index root directory", Status.BAD_REQUEST);
     }
 
     private class IndexEvictionListener implements RemovalListener<String, Index> {
@@ -342,5 +335,4 @@ public final class IndexManager implements Managed {
             throw new WebApplicationException("Index already exists", Status.EXPECTATION_FAILED);
         }
     }
-
 }

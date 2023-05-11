@@ -13,16 +13,13 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import java.util.Collection;
-import java.util.Objects;
-
-import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
-
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import java.util.Collection;
+import java.util.Objects;
+import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class SearchHit {
@@ -36,8 +33,7 @@ public class SearchHit {
     @NotNull
     private Collection<@NotNull StoredField> fields;
 
-    public SearchHit() {
-    }
+    public SearchHit() {}
 
     public SearchHit(final String id, final PrimitiveWrapper<?>[] order, final Collection<StoredField> fields) {
         this.id = id;
@@ -61,5 +57,4 @@ public class SearchHit {
     public String toString() {
         return "SearchHit [id=" + id + ", order=" + order + ", fields=" + fields + "]";
     }
-
 }

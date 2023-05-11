@@ -24,9 +24,8 @@ public class UpdatesOutOfOrderExceptionMapper implements ExceptionMapper<Updates
     @Override
     public Response toResponse(final UpdatesOutOfOrderException exception) {
         return Response.status(Status.BAD_REQUEST)
-            .type(MediaType.APPLICATION_JSON_TYPE)
-            .entity(new ErrorMessage(Status.BAD_REQUEST.getStatusCode(), exception.getMessage()))
-            .build();
+                .type(MediaType.APPLICATION_JSON_TYPE)
+                .entity(new ErrorMessage(Status.BAD_REQUEST.getStatusCode(), exception.getMessage()))
+                .build();
     }
-
 }

@@ -13,11 +13,24 @@
 
 package org.apache.couchdb.nouveau.resources;
 
+import com.codahale.metrics.annotation.ExceptionMetered;
+import com.codahale.metrics.annotation.Metered;
+import com.codahale.metrics.annotation.ResponseMetered;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
@@ -36,22 +49,6 @@ import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-
-import com.codahale.metrics.annotation.ExceptionMetered;
-import com.codahale.metrics.annotation.Metered;
-import com.codahale.metrics.annotation.ResponseMetered;
-
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.PUT;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.core.MediaType;;
 
 @Path("/index/{name}")
 @Metered
@@ -77,8 +74,11 @@ public final class IndexResource {
 
     @DELETE
     @Path("/doc/{docId}")
-    public void deleteDoc(@PathParam("name") String name, @PathParam("docId") String docId,
-            @NotNull @Valid DocumentDeleteRequest request) throws Exception {
+    public void deleteDoc(
+            @PathParam("name") String name,
+            @PathParam("docId") String docId,
+            @NotNull @Valid DocumentDeleteRequest request)
+            throws Exception {
         indexManager.with(name, indexLoader(), (index) -> {
             index.delete(docId, request);
             return null;
@@ -99,8 +99,7 @@ public final class IndexResource {
 
     @POST
     @Path("/search")
-    public SearchResults searchIndex(@PathParam("name") String name,
-            @NotNull @Valid SearchRequest request)
+    public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest request)
             throws Exception {
         return indexManager.with(name, indexLoader(), (index) -> {
             return index.search(request);
@@ -109,7 +108,9 @@ public final class IndexResource {
 
     @PUT
     @Path("/doc/{docId}")
-    public void updateDoc(@PathParam("name") String name, @PathParam("docId") String docId,
+    public void updateDoc(
+            @PathParam("name") String name,
+            @PathParam("docId") String docId,
             @NotNull @Valid DocumentUpdateRequest request)
             throws Exception {
         indexManager.with(name, indexLoader(), (index) -> {
@@ -143,5 +144,4 @@ public final class IndexResource {
         }
         return 0L;
     }
-
 }

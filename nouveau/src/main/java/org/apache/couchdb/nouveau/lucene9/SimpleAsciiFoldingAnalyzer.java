@@ -22,8 +22,7 @@ import org.apache.lucene.analysis.miscellaneous.ASCIIFoldingFilter;
 
 class SimpleAsciiFoldingAnalyzer extends Analyzer {
 
-    SimpleAsciiFoldingAnalyzer() {
-    }
+    SimpleAsciiFoldingAnalyzer() {}
 
     @Override
     protected TokenStreamComponents createComponents(String fieldName) {
@@ -35,5 +34,4 @@ class SimpleAsciiFoldingAnalyzer extends Analyzer {
     protected TokenStream normalize(String fieldName, TokenStream in) {
         return new ASCIIFoldingFilter(new LowerCaseFilter(in));
     }
-
 }

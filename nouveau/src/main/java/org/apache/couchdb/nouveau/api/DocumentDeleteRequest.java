@@ -16,8 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.Positive;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -31,7 +29,7 @@ public class DocumentDeleteRequest {
     }
 
     public DocumentDeleteRequest(long seq) {
-        if (seq < 1)  {
+        if (seq < 1) {
             throw new IllegalArgumentException("seq must be 1 or greater");
         }
         this.seq = seq;
@@ -46,5 +44,4 @@ public class DocumentDeleteRequest {
     public String toString() {
         return "DocumentDeleteRequest [seq=" + seq + "]";
     }
-
 }

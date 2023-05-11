@@ -18,8 +18,7 @@ import java.io.IOException;
 public final class UpdatesOutOfOrderException extends IOException {
 
     public UpdatesOutOfOrderException(final long currentSeq, final long attemptedSeq) {
-        super(String.format("Updates applied in the wrong order (current seq: %d, attempted seq: %d)",
-            currentSeq, attemptedSeq));
+        super(String.format(
+                "Updates applied in the wrong order (current seq: %d, attempted seq: %d)", currentSeq, attemptedSeq));
     }
-
 }

@@ -16,7 +16,6 @@ package org.apache.couchdb.nouveau.lucene9;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.List;
-
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.queryparser.flexible.core.QueryParserHelper;
@@ -116,7 +115,7 @@ public final class NouveauQueryParser extends QueryParserHelper {
             if (node instanceof FieldQueryNode && !(node.getParent() instanceof RangeQueryNode)) {
                 final var fieldNode = (FieldQueryNode) node;
                 String text = fieldNode.getTextAsString();
-                if (text.length() == 0) {
+                if (text.isEmpty()) {
                     return node;
                 }
                 final Number number;
@@ -159,8 +158,7 @@ public final class NouveauQueryParser extends QueryParserHelper {
                 final var lowerInclusive = termRangeNode.isLowerInclusive();
                 final var upperInclusive = termRangeNode.isUpperInclusive();
 
-                return new PointRangeQueryNode(
-                        lowerNode, upperNode, lowerInclusive, upperInclusive, pointsConfig);
+                return new PointRangeQueryNode(lowerNode, upperNode, lowerInclusive, upperInclusive, pointsConfig);
             }
 
             return node;
@@ -175,7 +173,5 @@ public final class NouveauQueryParser extends QueryParserHelper {
         protected List<QueryNode> setChildrenOrder(final List<QueryNode> children) throws QueryNodeException {
             return children;
         }
-
     }
-
 }

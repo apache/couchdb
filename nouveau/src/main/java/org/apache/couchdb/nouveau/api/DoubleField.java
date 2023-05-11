@@ -16,7 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
 import jakarta.validation.constraints.NotNull;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -27,7 +26,9 @@ public class DoubleField extends Field {
 
     private final boolean store;
 
-    public DoubleField(@JsonProperty("name") final String name, @JsonProperty("value") final Double value,
+    public DoubleField(
+            @JsonProperty("name") final String name,
+            @JsonProperty("value") final Double value,
             @JsonProperty("store") final boolean store) {
         super(name);
         this.value = value;
@@ -48,5 +49,4 @@ public class DoubleField extends Field {
     public String toString() {
         return "DoubleField [name=" + name + ", value=" + value + ", store=" + store + "]";
     }
-
 }

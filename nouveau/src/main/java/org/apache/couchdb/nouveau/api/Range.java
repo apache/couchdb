@@ -16,8 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
@@ -37,8 +35,7 @@ public class Range<T> {
 
     private boolean maxInclusive = true;
 
-    public Range() {
-    }
+    public Range() {}
 
     public Range(String label, T min, boolean minInclusive, T max, boolean maxInclusive) {
         this.label = label;
@@ -107,32 +104,21 @@ public class Range<T> {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
+        if (this == obj) return true;
+        if (obj == null) return false;
+        if (getClass() != obj.getClass()) return false;
         Range<?> other = (Range<?>) obj;
         if (label == null) {
-            if (other.label != null)
-                return false;
-        } else if (!label.equals(other.label))
-            return false;
+            if (other.label != null) return false;
+        } else if (!label.equals(other.label)) return false;
         if (min == null) {
-            if (other.min != null)
-                return false;
-        } else if (!min.equals(other.min))
-            return false;
-        if (minInclusive != other.minInclusive)
-            return false;
+            if (other.min != null) return false;
+        } else if (!min.equals(other.min)) return false;
+        if (minInclusive != other.minInclusive) return false;
         if (max == null) {
-            if (other.max != null)
-                return false;
-        } else if (!max.equals(other.max))
-            return false;
-        if (maxInclusive != other.maxInclusive)
-            return false;
+            if (other.max != null) return false;
+        } else if (!max.equals(other.max)) return false;
+        if (maxInclusive != other.maxInclusive) return false;
         return true;
     }
 
@@ -141,5 +127,4 @@ public class Range<T> {
         return "Range [label=" + label + ", min=" + min + ", minInclusive=" + minInclusive + ", max=" + max
                 + ", maxInclusive=" + maxInclusive + "]";
     }
-
 }

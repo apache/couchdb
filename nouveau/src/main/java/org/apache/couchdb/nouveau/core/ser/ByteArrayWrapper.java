@@ -20,5 +20,4 @@ public class ByteArrayWrapper extends PrimitiveWrapper<byte[]> {
     public ByteArrayWrapper(@JsonProperty("value") byte[] value) {
         super(value);
     }
-
 }

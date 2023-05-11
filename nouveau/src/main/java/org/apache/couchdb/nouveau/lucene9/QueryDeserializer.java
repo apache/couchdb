@@ -13,9 +13,14 @@
 
 package org.apache.couchdb.nouveau.lucene9;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import java.io.IOException;
 import java.util.Iterator;
-
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.FuzzyQuery;
@@ -26,13 +31,6 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
-
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationContext;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
 public class QueryDeserializer extends StdDeserializer<Query> {
 
@@ -107,15 +105,12 @@ public class QueryDeserializer extends StdDeserializer<Query> {
                 return new RegexpQuery(new Term(field, text));
             }
             case "term_range": {
-
             }
             case "point_range": {
-
             }
             case "match_all":
-            return new MatchAllDocsQuery();
+                return new MatchAllDocsQuery();
         }
         throw new JsonParseException(parser, type + " not a supported query type");
     }
-
 }

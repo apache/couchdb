@@ -12,6 +12,7 @@
 // limitations under the License.
 
 package org.apache.couchdb.nouveau.health;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
@@ -25,5 +26,4 @@ public class AnalyzeHealthCheckTest {
         var check = new AnalyzeHealthCheck(resource);
         assertTrue(check.check().isHealthy());
     }
-
 }

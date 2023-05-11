@@ -13,10 +13,11 @@
 
 package org.apache.couchdb.nouveau.lucene9;
 
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
-
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
@@ -59,13 +60,9 @@ import org.apache.lucene.analysis.sv.SwedishAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tr.TurkishAnalyzer;
 
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response.Status;
-
 public final class Lucene9AnalyzerFactory {
 
-    private Lucene9AnalyzerFactory() {
-    }
+    private Lucene9AnalyzerFactory() {}
 
     public static Analyzer fromDefinition(final IndexDefinition indexDefinition) {
         final Analyzer defaultAnalyzer = newAnalyzer(indexDefinition.getDefaultAnalyzer());
@@ -73,14 +70,14 @@ public final class Lucene9AnalyzerFactory {
             return defaultAnalyzer;
         }
         final Map<String, Analyzer> fieldAnalyzers = new HashMap<String, Analyzer>();
-        for (Map.Entry<String, String> entry : indexDefinition.getFieldAnalyzers().entrySet()) {
+        for (Map.Entry<String, String> entry :
+                indexDefinition.getFieldAnalyzers().entrySet()) {
             fieldAnalyzers.put(entry.getKey(), newAnalyzer(entry.getValue()));
         }
         return new PerFieldAnalyzerWrapper(defaultAnalyzer, fieldAnalyzers);
     }
 
     private enum KnownAnalyzer {
-
         arabic(ArabicAnalyzer::new),
         armenian(ArmenianAnalyzer::new),
         basque(BasqueAnalyzer::new),
@@ -139,5 +136,4 @@ public final class Lucene9AnalyzerFactory {
             throw new WebApplicationException(name + " is not a valid analyzer name", Status.BAD_REQUEST);
         }
     }
-
 }

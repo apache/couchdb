@@ -13,14 +13,12 @@
 
 package org.apache.couchdb.nouveau.health;
 
+import com.codahale.metrics.health.HealthCheck;
 import java.util.Arrays;
 import java.util.List;
-
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
-
-import com.codahale.metrics.health.HealthCheck;
 
 public final class AnalyzeHealthCheck extends HealthCheck {
 
@@ -42,5 +40,4 @@ public final class AnalyzeHealthCheck extends HealthCheck {
             return Result.unhealthy("Expected '%s' but got '%s'", expected, actual);
         }
     }
-
 }

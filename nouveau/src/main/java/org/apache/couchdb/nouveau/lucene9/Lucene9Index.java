@@ -13,6 +13,8 @@
 
 package org.apache.couchdb.nouveau.lucene9;
 
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -31,7 +33,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.DoubleField;
@@ -89,20 +90,20 @@ import org.apache.lucene.search.TopFieldCollector;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response.Status;
-
 public class Lucene9Index extends Index {
 
-    private static final Sort DEFAULT_SORT = new Sort(SortField.FIELD_SCORE,
-            new SortField("_id", SortField.Type.STRING));
+    private static final Sort DEFAULT_SORT =
+            new Sort(SortField.FIELD_SCORE, new SortField("_id", SortField.Type.STRING));
     private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)(?:<(\\w+)>)$");
 
     private final Analyzer analyzer;
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
 
-    public Lucene9Index(final Analyzer analyzer, final IndexWriter writer, final long updateSeq,
+    public Lucene9Index(
+            final Analyzer analyzer,
+            final IndexWriter writer,
+            final long updateSeq,
             final SearcherManager searcherManager) {
         super(updateSeq);
         this.analyzer = Objects.requireNonNull(analyzer);
@@ -147,7 +148,8 @@ public class Lucene9Index extends Index {
         if (!writer.hasUncommittedChanges()) {
             return false;
         }
-        writer.setLiveCommitData(Collections.singletonMap("update_seq", Long.toString(updateSeq)).entrySet());
+        writer.setLiveCommitData(
+                Collections.singletonMap("update_seq", Long.toString(updateSeq)).entrySet());
         writer.commit();
         return true;
     }
@@ -213,11 +215,7 @@ public class Lucene9Index extends Index {
             fieldDoc = null;
         }
 
-        return TopFieldCollector.createSharedManager(
-                sort,
-                searchRequest.getLimit(),
-                fieldDoc,
-                1000);
+        return TopFieldCollector.createSharedManager(sort, searchRequest.getLimit(), fieldDoc, 1000);
     }
 
     private SortField getLastSortField(final Sort sort) {
@@ -225,8 +223,9 @@ public class Lucene9Index extends Index {
         return sortFields[sortFields.length - 1];
     }
 
-    private SearchResults toSearchResults(final SearchRequest searchRequest, final IndexSearcher searcher,
-            final Object[] reduces) throws IOException {
+    private SearchResults toSearchResults(
+            final SearchRequest searchRequest, final IndexSearcher searcher, final Object[] reduces)
+            throws IOException {
         final SearchResults result = new SearchResults();
         collectHits(searcher, (TopDocs) reduces[0], result);
         if (reduces.length == 2) {
@@ -243,7 +242,8 @@ public class Lucene9Index extends Index {
         for (final ScoreDoc scoreDoc : topDocs.scoreDocs) {
             final Document doc = storedFields.document(scoreDoc.doc);
 
-            final List<StoredField> fields = new ArrayList<StoredField>(doc.getFields().size());
+            final List<StoredField> fields =
+                    new ArrayList<StoredField>(doc.getFields().size());
             for (IndexableField field : doc.getFields()) {
                 if (field.name().equals("_id")) {
                     continue;
@@ -273,14 +273,18 @@ public class Lucene9Index extends Index {
         searchResults.setHits(hits);
     }
 
-    private void collectFacets(final SearchRequest searchRequest, final IndexSearcher searcher,
-            final FacetsCollector fc, final SearchResults searchResults) throws IOException {
+    private void collectFacets(
+            final SearchRequest searchRequest,
+            final IndexSearcher searcher,
+            final FacetsCollector fc,
+            final SearchResults searchResults)
+            throws IOException {
         if (searchRequest.hasCounts()) {
             final Map<String, Map<String, Number>> countsMap = new HashMap<String, Map<String, Number>>(
                     searchRequest.getCounts().size());
             for (final String field : searchRequest.getCounts()) {
-                final StringDocValuesReaderState state = new StringDocValuesReaderState(searcher.getIndexReader(),
-                        field);
+                final StringDocValuesReaderState state =
+                        new StringDocValuesReaderState(searcher.getIndexReader(), field);
                 final StringValueFacetCounts counts = new StringValueFacetCounts(state, fc);
                 countsMap.put(field, collectFacets(counts, searchRequest.getTopN(), field));
             }
@@ -290,7 +294,8 @@ public class Lucene9Index extends Index {
         if (searchRequest.hasRanges()) {
             final Map<String, Map<String, Number>> rangesMap = new HashMap<String, Map<String, Number>>(
                     searchRequest.getRanges().size());
-            for (final Entry<String, List<DoubleRange>> entry : searchRequest.getRanges().entrySet()) {
+            for (final Entry<String, List<DoubleRange>> entry :
+                    searchRequest.getRanges().entrySet()) {
                 final DoubleRangeFacetCounts counts = toDoubleRangeFacetCounts(fc, entry.getKey(), entry.getValue());
                 rangesMap.put(entry.getKey(), collectFacets(counts, searchRequest.getTopN(), entry.getKey()));
             }
@@ -298,15 +303,17 @@ public class Lucene9Index extends Index {
         }
     }
 
-    private DoubleRangeFacetCounts toDoubleRangeFacetCounts(final FacetsCollector fc, final String field,
-            final List<DoubleRange> ranges) throws IOException {
-        final org.apache.lucene.facet.range.DoubleRange[] luceneRanges = new org.apache.lucene.facet.range.DoubleRange[ranges
-                .size()];
+    private DoubleRangeFacetCounts toDoubleRangeFacetCounts(
+            final FacetsCollector fc, final String field, final List<DoubleRange> ranges) throws IOException {
+        final org.apache.lucene.facet.range.DoubleRange[] luceneRanges =
+                new org.apache.lucene.facet.range.DoubleRange[ranges.size()];
         for (int i = 0; i < luceneRanges.length; i++) {
             final DoubleRange range = ranges.get(i);
             luceneRanges[i] = new org.apache.lucene.facet.range.DoubleRange(
-                    range.getLabel(), range.getMin() != null ? range.getMin() : Double.NEGATIVE_INFINITY,
-                    range.isMinInclusive(), range.getMax() != null ? range.getMax() : Double.POSITIVE_INFINITY,
+                    range.getLabel(),
+                    range.getMin() != null ? range.getMin() : Double.NEGATIVE_INFINITY,
+                    range.isMinInclusive(),
+                    range.getMax() != null ? range.getMax() : Double.POSITIVE_INFINITY,
                     range.isMaxInclusive());
         }
         return new DoubleRangeFacetCounts(field, fc, luceneRanges);
@@ -355,8 +362,7 @@ public class Lucene9Index extends Index {
         }
         final Matcher m = SORT_FIELD_RE.matcher(sortString);
         if (!m.matches()) {
-            throw new WebApplicationException(
-                    sortString + " is not a valid sort parameter", Status.BAD_REQUEST);
+            throw new WebApplicationException(sortString + " is not a valid sort parameter", Status.BAD_REQUEST);
         }
         final boolean reverse = "-".equals(m.group(1));
         switch (m.group(3)) {
@@ -365,8 +371,7 @@ public class Lucene9Index extends Index {
             case "double":
                 return new SortedNumericSortField(m.group(2), SortField.Type.DOUBLE, reverse);
             default:
-                throw new WebApplicationException(
-                        m.group(3) + " is not a valid sort type", Status.BAD_REQUEST);
+                throw new WebApplicationException(m.group(3) + " is not a valid sort type", Status.BAD_REQUEST);
         }
     }
 
@@ -391,16 +396,16 @@ public class Lucene9Index extends Index {
             }
             if (field instanceof TextField) {
                 var f = (TextField) field;
-                result.add(new org.apache.lucene.document.TextField(f.getName(), f.getValue(),
-                        f.isStore() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.TextField(
+                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
                 var f = (StringField) field;
-                result.add(new org.apache.lucene.document.KeywordField(f.getName(), f.getValue(),
-                        f.isStore() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.KeywordField(
+                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
-                result.add(new org.apache.lucene.document.DoubleField(f.getName(), f.getValue(),
-                        f.isStore() ? Store.YES : Store.NO));
+                result.add(new org.apache.lucene.document.DoubleField(
+                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
             } else if (field instanceof StoredField) {
                 var f = (StoredField) field;
                 var val = f.getValue();
@@ -505,5 +510,4 @@ public class Lucene9Index extends Index {
         return "Lucene9Index [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager
                 + "]";
     }
-
 }

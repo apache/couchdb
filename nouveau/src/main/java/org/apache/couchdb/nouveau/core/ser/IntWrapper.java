@@ -20,5 +20,4 @@ public class IntWrapper extends PrimitiveWrapper<Integer> {
     public IntWrapper(@JsonProperty("value") Integer value) {
         super(value);
     }
-
 }

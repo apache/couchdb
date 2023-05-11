@@ -13,9 +13,9 @@
 
 package org.apache.couchdb.nouveau.lucene9;
 
-
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
@@ -23,8 +23,6 @@ import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.junit.jupiter.api.Test;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class QuerySerializationTest {
 
@@ -40,8 +38,8 @@ public class QuerySerializationTest {
         builder.add(new PhraseQuery("bar", "foo", "bar", "baz"), Occur.MUST);
         final Query query = builder.build();
 
-        final String expected = "{\"@type\":\"boolean\",\"clauses\":[{\"query\":{\"@type\":\"term\",\"field\":\"foo\",\"term\":\"bar\"},\"occur\":\"must\"},{\"query\":{\"@type\":\"term\",\"field\":\"foo\",\"term\":\"bar\"},\"occur\":\"must_not\"},{\"query\":{\"@type\":\"term\",\"field\":\"foo\",\"term\":\"bar\"},\"occur\":\"should\"},{\"query\":{\"@type\":\"phrase\",\"field\":\"bar\",\"terms\":[\"foo\",\"bar\",\"baz\"],\"slop\":0},\"occur\":\"must\"}]}";
+        final String expected =
+                "{\"@type\":\"boolean\",\"clauses\":[{\"query\":{\"@type\":\"term\",\"field\":\"foo\",\"term\":\"bar\"},\"occur\":\"must\"},{\"query\":{\"@type\":\"term\",\"field\":\"foo\",\"term\":\"bar\"},\"occur\":\"must_not\"},{\"query\":{\"@type\":\"term\",\"field\":\"foo\",\"term\":\"bar\"},\"occur\":\"should\"},{\"query\":{\"@type\":\"phrase\",\"field\":\"bar\",\"terms\":[\"foo\",\"bar\",\"baz\"],\"slop\":0},\"occur\":\"must\"}]}";
         assertThat(mapper.writeValueAsString(query)).isEqualTo(expected);
     }
-
 }

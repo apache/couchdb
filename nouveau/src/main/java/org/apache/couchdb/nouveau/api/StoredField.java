@@ -16,8 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
@@ -44,5 +42,4 @@ public final class StoredField extends Field {
     public String toString() {
         return "StoredField [name=" + name + ", value=" + value + "]";
     }
-
 }

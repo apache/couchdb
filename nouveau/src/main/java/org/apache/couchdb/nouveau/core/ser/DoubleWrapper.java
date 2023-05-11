@@ -20,5 +20,4 @@ public class DoubleWrapper extends PrimitiveWrapper<Double> {
     public DoubleWrapper(@JsonProperty("value") Double value) {
         super(value);
     }
-
 }

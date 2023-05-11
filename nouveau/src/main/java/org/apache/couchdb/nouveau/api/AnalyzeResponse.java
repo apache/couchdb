@@ -13,15 +13,12 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class AnalyzeResponse {
@@ -41,5 +38,4 @@ public class AnalyzeResponse {
     public List<String> getTokens() {
         return tokens;
     }
-
 }

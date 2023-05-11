@@ -13,20 +13,17 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import java.util.List;
-import java.util.Map;
-
-import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import java.util.List;
+import java.util.Map;
+import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class SearchRequest {
@@ -145,7 +142,7 @@ public class SearchRequest {
 
     @Override
     public String toString() {
-        return "SearchRequest [query=" + query + ", sort=" + sort + ", limit=" + limit + ", after=" + after + ", counts=" + counts + ", ranges=" + ranges + "]";
+        return "SearchRequest [query=" + query + ", sort=" + sort + ", limit=" + limit + ", after=" + after
+                + ", counts=" + counts + ", ranges=" + ranges + "]";
     }
-
 }

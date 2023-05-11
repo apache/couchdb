@@ -13,21 +13,9 @@
 
 package org.apache.couchdb.nouveau.resources;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.couchdb.nouveau.api.AnalyzeRequest;
-import org.apache.couchdb.nouveau.api.AnalyzeResponse;
-import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.ResponseMetered;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
@@ -37,6 +25,15 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response.Status;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.couchdb.nouveau.api.AnalyzeRequest;
+import org.apache.couchdb.nouveau.api.AnalyzeResponse;
+import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 
 @Path("/analyze")
 @Metered
@@ -49,12 +46,11 @@ public final class AnalyzeResource {
     @POST
     public AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest request) throws IOException {
         try {
-            final List<String> tokens = tokenize(Lucene9AnalyzerFactory.newAnalyzer(request.getAnalyzer()),
-                    request.getText());
+            final List<String> tokens =
+                    tokenize(Lucene9AnalyzerFactory.newAnalyzer(request.getAnalyzer()), request.getText());
             return new AnalyzeResponse(tokens);
         } catch (IllegalArgumentException e) {
-            throw new WebApplicationException(request.getAnalyzer() + " not a valid analyzer",
-                    Status.BAD_REQUEST);
+            throw new WebApplicationException(request.getAnalyzer() + " not a valid analyzer", Status.BAD_REQUEST);
         }
     }
 
@@ -70,5 +66,4 @@ public final class AnalyzeResource {
         }
         return result;
     }
-
 }
