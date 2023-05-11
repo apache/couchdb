@@ -19,5 +19,4 @@ import java.io.IOException;
 public interface IndexFunction {
 
     <T> T with(final Index index) throws IOException;
-
 }

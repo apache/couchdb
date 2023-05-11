@@ -16,8 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.NotEmpty;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -47,5 +45,4 @@ public class AnalyzeRequest {
     public String getText() {
         return text;
     }
-
 }

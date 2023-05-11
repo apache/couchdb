@@ -13,13 +13,11 @@
 
 package org.apache.couchdb.nouveau;
 
-import java.nio.file.Path;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import io.dropwizard.core.Configuration;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import java.nio.file.Path;
 
 public class NouveauApplicationConfiguration extends Configuration {
 
@@ -70,5 +68,4 @@ public class NouveauApplicationConfiguration extends Configuration {
     public Path getRootDir() {
         return rootDir;
     }
-
 }

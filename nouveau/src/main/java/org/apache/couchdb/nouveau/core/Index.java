@@ -17,7 +17,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexInfo;
@@ -34,7 +33,6 @@ import org.apache.couchdb.nouveau.api.SearchResults;
  * This class also expects a monotonically incrementing update sequence
  * associated with each modification.
  */
-
 public abstract class Index implements Closeable {
 
     private long updateSeq;
@@ -83,8 +81,7 @@ public abstract class Index implements Closeable {
 
     protected abstract long doDiskSize() throws IOException;
 
-    public final synchronized void update(final String docId, final DocumentUpdateRequest request)
-            throws IOException {
+    public final synchronized void update(final String docId, final DocumentUpdateRequest request) throws IOException {
         assertUpdateSeqIsLower(request.getSeq());
         doUpdate(docId, request);
         incrementUpdateSeq(request.getSeq());
@@ -172,5 +169,4 @@ public abstract class Index implements Closeable {
     private long now() {
         return System.nanoTime();
     }
-
 }

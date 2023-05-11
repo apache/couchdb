@@ -13,18 +13,14 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import java.util.List;
-import java.util.Map;
-
-import org.apache.lucene.search.TotalHits.Relation;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.util.List;
+import java.util.Map;
+import org.apache.lucene.search.TotalHits.Relation;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class SearchResults {
@@ -42,8 +38,7 @@ public class SearchResults {
 
     private Map<@NotNull String, Map<@NotNull String, Number>> ranges;
 
-    public SearchResults() {
-    }
+    public SearchResults() {}
 
     public void setTotalHits(final long totalHits) {
         this.totalHits = totalHits;
@@ -91,7 +86,7 @@ public class SearchResults {
 
     @Override
     public String toString() {
-        return "SearchResults [hits=" + hits + ", totalHits=" + totalHits + ", counts=" + counts + ", ranges=" + ranges + "]";
+        return "SearchResults [hits=" + hits + ", totalHits=" + totalHits + ", counts=" + counts + ", ranges=" + ranges
+                + "]";
     }
-
 }

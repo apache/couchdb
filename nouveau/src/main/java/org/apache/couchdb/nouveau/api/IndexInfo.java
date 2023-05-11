@@ -16,8 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.PositiveOrZero;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -32,8 +30,7 @@ public class IndexInfo {
     @PositiveOrZero
     private long diskSize;
 
-    public IndexInfo() {
-    }
+    public IndexInfo() {}
 
     public IndexInfo(final long updateSeq, final int numDocs, final long diskSize) {
         this.updateSeq = updateSeq;
@@ -60,5 +57,4 @@ public class IndexInfo {
     public String toString() {
         return "IndexInfo [updateSeq=" + updateSeq + ", numDocs=" + numDocs + ", diskSize=" + diskSize + "]";
     }
-
 }

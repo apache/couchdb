@@ -16,16 +16,12 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-
-
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class DoubleRange extends Range<Double> {
 
-    public DoubleRange() {
-    }
+    public DoubleRange() {}
 
     public DoubleRange(String name, Double min, boolean minInclusive, Double max, boolean maxInclusive) {
         super(name, min, minInclusive, max, maxInclusive);
     }
-
 }

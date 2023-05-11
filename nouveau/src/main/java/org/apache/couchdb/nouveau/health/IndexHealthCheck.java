@@ -13,16 +13,14 @@
 
 package org.apache.couchdb.nouveau.health;
 
+import com.codahale.metrics.health.HealthCheck;
 import java.io.IOException;
 import java.util.Collections;
-
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.resources.IndexResource;
-
-import com.codahale.metrics.health.HealthCheck;
 
 public final class IndexHealthCheck extends HealthCheck {
 
@@ -44,7 +42,7 @@ public final class IndexHealthCheck extends HealthCheck {
         indexResource.createIndex(name, new IndexDefinition("standard", null));
         try {
             final DocumentUpdateRequest documentUpdateRequest =
-                new DocumentUpdateRequest(1, null, Collections.emptyList());
+                    new DocumentUpdateRequest(1, null, Collections.emptyList());
             indexResource.updateDoc(name, "foo", documentUpdateRequest);
 
             final SearchRequest searchRequest = new SearchRequest();
@@ -59,5 +57,4 @@ public final class IndexHealthCheck extends HealthCheck {
         }
         return Result.unhealthy(name);
     }
-
 }

@@ -15,12 +15,10 @@ package org.apache.couchdb.nouveau.core;
 
 import java.io.IOException;
 import java.nio.file.Path;
-
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 
 @FunctionalInterface
 public interface IndexLoader {
 
     Index apply(final Path path, final IndexDefinition indexDefinition) throws IOException;
-
 }

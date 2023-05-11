@@ -13,8 +13,10 @@
 
 package org.apache.couchdb.nouveau;
 
+import io.dropwizard.core.Application;
+import io.dropwizard.core.setup.Environment;
+import io.swagger.v3.jaxrs2.integration.resources.OpenApiResource;
 import java.util.concurrent.ForkJoinPool;
-
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderExceptionMapper;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
@@ -25,10 +27,6 @@ import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
 import org.apache.lucene.search.SearcherFactory;
-
-import io.dropwizard.core.Application;
-import io.dropwizard.core.setup.Environment;
-import io.swagger.v3.jaxrs2.integration.resources.OpenApiResource;
 
 public class NouveauApplication extends Application<NouveauApplicationConfiguration> {
 
@@ -51,7 +49,11 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setMetricRegistry(environment.metrics());
-        indexManager.setScheduler(environment.lifecycle().scheduledExecutorService("index-manager-%d").threads(5).build());
+        indexManager.setScheduler(environment
+                .lifecycle()
+                .scheduledExecutorService("index-manager-%d")
+                .threads(5)
+                .build());
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());
         environment.lifecycle().manage(indexManager);
@@ -78,5 +80,4 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         // Swagger
         environment.jersey().register(new OpenApiResource());
     }
-
 }

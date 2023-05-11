@@ -13,14 +13,11 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import java.util.Map;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.NotEmpty;
+import java.util.Map;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class IndexDefinition {
@@ -72,30 +69,21 @@ public class IndexDefinition {
 
     @Override
     public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
+        if (this == obj) return true;
+        if (obj == null) return false;
+        if (getClass() != obj.getClass()) return false;
         IndexDefinition other = (IndexDefinition) obj;
         if (defaultAnalyzer == null) {
-            if (other.defaultAnalyzer != null)
-                return false;
-        } else if (!defaultAnalyzer.equals(other.defaultAnalyzer))
-            return false;
+            if (other.defaultAnalyzer != null) return false;
+        } else if (!defaultAnalyzer.equals(other.defaultAnalyzer)) return false;
         if (fieldAnalyzers == null) {
-            if (other.fieldAnalyzers != null)
-                return false;
-        } else if (!fieldAnalyzers.equals(other.fieldAnalyzers))
-            return false;
+            if (other.fieldAnalyzers != null) return false;
+        } else if (!fieldAnalyzers.equals(other.fieldAnalyzers)) return false;
         return true;
     }
 
     @Override
     public String toString() {
-        return "IndexDefinition [defaultAnalyzer=" + defaultAnalyzer
-                + ", fieldAnalyzers=" + fieldAnalyzers + "]";
+        return "IndexDefinition [defaultAnalyzer=" + defaultAnalyzer + ", fieldAnalyzers=" + fieldAnalyzers + "]";
     }
-
 }

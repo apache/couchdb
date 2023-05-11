@@ -54,14 +54,14 @@ public class NouveauQueryParserTest {
 
     @Test
     public void testStringRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[bar TO foo]", DEFAULT_FIELD)).isEqualTo(new TermRangeQuery("foo",
-                new BytesRef("bar"), new BytesRef("foo"), true, true));
+        assertThat(qp.parse("foo:[bar TO foo]", DEFAULT_FIELD))
+                .isEqualTo(new TermRangeQuery("foo", new BytesRef("bar"), new BytesRef("foo"), true, true));
     }
 
     @Test
     public void testMixedRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[12.0 TO foo]", DEFAULT_FIELD)).isEqualTo(new TermRangeQuery("foo",
-                new BytesRef("12.0"), new BytesRef("foo"), true, true));
+        assertThat(qp.parse("foo:[12.0 TO foo]", DEFAULT_FIELD))
+                .isEqualTo(new TermRangeQuery("foo", new BytesRef("12.0"), new BytesRef("foo"), true, true));
     }
 
     @Test
@@ -72,35 +72,32 @@ public class NouveauQueryParserTest {
     @Test
     public void testInferredPointRangeQuery() throws Exception {
         assertThat(qp.parse("foo:[1 TO 12]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] { 1 }, new double[] { 12 }));
+                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {12}));
     }
 
     @Test
     public void testOpenLeftPointRangeQuery() throws Exception {
         assertThat(qp.parse("foo:[* TO 100.0]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] { Double.NEGATIVE_INFINITY },
-                        new double[] { 100 }));
+                .isEqualTo(
+                        DoublePoint.newRangeQuery("foo", new double[] {Double.NEGATIVE_INFINITY}, new double[] {100}));
     }
 
     @Test
     public void testOpenRightPointRangeQuery() throws Exception {
         assertThat(qp.parse("foo:[1.0 TO *]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] { 1 },
-                        new double[] { Double.POSITIVE_INFINITY }));
+                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {Double.POSITIVE_INFINITY}));
     }
 
     @Test
     public void testOpenLeftPointRangeQueryLegacy() throws Exception {
         assertThat(qp.parse("foo:[-Infinity TO 100.0]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] { Double.NEGATIVE_INFINITY },
-                        new double[] { 100 }));
+                .isEqualTo(
+                        DoublePoint.newRangeQuery("foo", new double[] {Double.NEGATIVE_INFINITY}, new double[] {100}));
     }
 
     @Test
     public void testOpenRightPointRangeQueryLegacy() throws Exception {
         assertThat(qp.parse("foo:[1.0 TO Infinity]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] { 1 },
-                        new double[] { Double.POSITIVE_INFINITY }));
+                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {Double.POSITIVE_INFINITY}));
     }
-
 }

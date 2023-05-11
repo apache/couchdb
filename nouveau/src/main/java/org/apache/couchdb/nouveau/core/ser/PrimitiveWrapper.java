@@ -20,12 +20,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
 
 @JsonTypeInfo(use = Id.NAME, include = As.PROPERTY, property = "@type")
 @JsonSubTypes({
-        @JsonSubTypes.Type(value = ByteArrayWrapper.class, name = "bytes"),
-        @JsonSubTypes.Type(value = DoubleWrapper.class, name = "double"),
-        @JsonSubTypes.Type(value = FloatWrapper.class, name = "float"),
-        @JsonSubTypes.Type(value = IntWrapper.class, name = "int"),
-        @JsonSubTypes.Type(value = LongWrapper.class, name = "long"),
-        @JsonSubTypes.Type(value = StringWrapper.class, name = "string"),
+    @JsonSubTypes.Type(value = ByteArrayWrapper.class, name = "bytes"),
+    @JsonSubTypes.Type(value = DoubleWrapper.class, name = "double"),
+    @JsonSubTypes.Type(value = FloatWrapper.class, name = "float"),
+    @JsonSubTypes.Type(value = IntWrapper.class, name = "int"),
+    @JsonSubTypes.Type(value = LongWrapper.class, name = "long"),
+    @JsonSubTypes.Type(value = StringWrapper.class, name = "string"),
 })
 public class PrimitiveWrapper<T> {
 
@@ -42,5 +42,4 @@ public class PrimitiveWrapper<T> {
     public void setValue(T value) {
         this.value = value;
     }
-
 }

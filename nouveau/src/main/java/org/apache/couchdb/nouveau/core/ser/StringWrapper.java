@@ -20,5 +20,4 @@ public class StringWrapper extends PrimitiveWrapper<String> {
     public StringWrapper(@JsonProperty("value") String value) {
         super(value);
     }
-
 }

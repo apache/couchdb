@@ -13,13 +13,11 @@
 
 package org.apache.couchdb.nouveau.tasks;
 
+import io.dropwizard.servlets.tasks.Task;
 import java.io.PrintWriter;
 import java.util.List;
 import java.util.Map;
-
 import org.apache.couchdb.nouveau.core.IndexManager;
-
-import io.dropwizard.servlets.tasks.Task;
 
 public class CloseAllIndexesTask extends Task {
 
@@ -34,5 +32,4 @@ public class CloseAllIndexesTask extends Task {
     public void execute(Map<String, List<String>> parameters, PrintWriter output) throws Exception {
         indexManager.stop();
     }
-
 }

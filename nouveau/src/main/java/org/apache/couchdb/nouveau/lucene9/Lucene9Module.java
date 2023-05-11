@@ -13,10 +13,9 @@
 
 package org.apache.couchdb.nouveau.lucene9;
 
-import org.apache.lucene.search.Query;
-
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import org.apache.lucene.search.Query;
 
 public class Lucene9Module extends SimpleModule {
 
@@ -27,5 +26,4 @@ public class Lucene9Module extends SimpleModule {
         addSerializer(Query.class, new QuerySerializer());
         addDeserializer(Query.class, new QueryDeserializer());
     }
-
 }

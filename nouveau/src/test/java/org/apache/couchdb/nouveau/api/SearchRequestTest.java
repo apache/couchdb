@@ -15,13 +15,11 @@ package org.apache.couchdb.nouveau.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class SearchRequestTest {
 
@@ -43,7 +41,8 @@ public class SearchRequestTest {
     @Test
     public void testDeserialisation() throws Exception {
         SearchRequest request = asObject();
-        assertThat(mapper.readValue(getClass().getResource("/fixtures/SearchRequest.json"), SearchRequest.class).toString())
+        assertThat(mapper.readValue(getClass().getResource("/fixtures/SearchRequest.json"), SearchRequest.class)
+                        .toString())
                 .isEqualTo(request.toString());
     }
 
@@ -55,5 +54,4 @@ public class SearchRequestTest {
         result.setRanges(Map.of("foo", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))));
         return result;
     }
-
 }

@@ -15,17 +15,15 @@ package org.apache.couchdb.nouveau.health;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.codahale.metrics.MetricRegistry;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
-
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.lucene.search.SearcherFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-
-import com.codahale.metrics.MetricRegistry;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class IndexHealthCheckTest {
 
@@ -47,5 +45,4 @@ public class IndexHealthCheckTest {
             manager.stop();
         }
     }
-
 }

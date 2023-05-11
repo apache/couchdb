@@ -15,7 +15,6 @@ package org.apache.couchdb.nouveau.lucene9;
 
 import java.io.IOException;
 import java.util.concurrent.Executor;
-
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.SearcherFactory;
@@ -32,5 +31,4 @@ public class ParallelSearcherFactory extends SearcherFactory {
     public IndexSearcher newSearcher(final IndexReader reader, final IndexReader previousReader) throws IOException {
         return new IndexSearcher(reader, executor);
     }
-
 }

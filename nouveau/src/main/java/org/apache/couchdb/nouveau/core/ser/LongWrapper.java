@@ -20,5 +20,4 @@ public class LongWrapper extends PrimitiveWrapper<Long> {
     public LongWrapper(@JsonProperty("value") Long value) {
         super(value);
     }
-
 }

@@ -18,14 +18,10 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
 import jakarta.validation.constraints.Pattern;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-@JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "@type")
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = DoubleField.class, name = "double"),
     @JsonSubTypes.Type(value = StoredField.class, name = "stored"),
@@ -45,5 +41,4 @@ public abstract class Field {
     public String getName() {
         return name;
     }
-
 }

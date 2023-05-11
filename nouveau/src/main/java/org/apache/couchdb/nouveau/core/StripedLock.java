@@ -21,8 +21,7 @@ final class StripedLock<K> {
 
     private final ReadWriteLock[] locks;
 
-    public StripedLock(
-            final int lockCount) {
+    public StripedLock(final int lockCount) {
         this.locks = new ReadWriteLock[lockCount];
         for (int i = 0; i < locks.length; i++) {
             this.locks[i] = new ReentrantReadWriteLock();
@@ -40,5 +39,4 @@ final class StripedLock<K> {
     private ReadWriteLock readWriteLock(final K key) {
         return locks[Math.floorMod(key.hashCode(), locks.length)];
     }
-
 }

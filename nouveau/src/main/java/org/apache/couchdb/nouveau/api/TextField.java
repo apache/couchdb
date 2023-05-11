@@ -13,14 +13,11 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import java.util.Objects;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-
-
 import jakarta.validation.constraints.NotNull;
+import java.util.Objects;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public final class TextField extends Field {
@@ -30,7 +27,9 @@ public final class TextField extends Field {
 
     private final boolean store;
 
-    public TextField(@JsonProperty("name") final String name, @JsonProperty("value") final String value,
+    public TextField(
+            @JsonProperty("name") final String name,
+            @JsonProperty("value") final String value,
             @JsonProperty("store") final boolean store) {
         super(name);
         this.value = Objects.requireNonNull(value);
@@ -51,5 +50,4 @@ public final class TextField extends Field {
     public String toString() {
         return "TextField [name=" + name + ", value=" + value + ", store=" + store + "]";
     }
-
 }

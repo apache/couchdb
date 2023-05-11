@@ -20,5 +20,4 @@ public class FloatWrapper extends PrimitiveWrapper<Float> {
     public FloatWrapper(@JsonProperty("value") float value) {
         super(value);
     }
-
 }
