@@ -1,6 +1,8 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'application'
+    id 'com.diffplug.spotless' version '6.18.0'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'jacoco'
 }
 
 application {
@@ -47,10 +49,24 @@ dependencies {
 group = 'org.apache.couchdb.nouveau'
 version = '1.0-SNAPSHOT'
 description = 'server'
-java.sourceCompatibility = JavaVersion.VERSION_11
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(11)
+    }
+}
 
 jar {
     manifest.attributes('Multi-Release': 'true')
+}
+
+spotless {
+  java {
+    importOrder()
+    removeUnusedImports()
+    cleanthat()
+    palantirJavaFormat()
+  }
 }
 
 test {
