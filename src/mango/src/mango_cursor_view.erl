@@ -435,7 +435,12 @@ match_and_extract_doc(Doc, Selector, Fields) ->
     end.
 
 -spec derive_doc_from_index(#idx{}, #view_row{}) -> term().
-derive_doc_from_index(Index, #view_row{id = DocId, key = Keys}) ->
+derive_doc_from_index(Index, #view_row{id = DocId, key = KeyData}) ->
+    Keys =
+        case KeyData of
+            {p, _Partition, KeyValues} -> KeyValues;
+            KeyValues -> KeyValues
+        end,
     Columns = mango_idx:columns(Index),
     lists:foldr(
         fun({Column, Key}, Doc) -> mango_doc:set_field(Doc, Column, Key) end,
@@ -859,6 +864,18 @@ derive_doc_from_index_test() ->
     DocId = doc_id,
     Keys = [key1, key2],
     ViewRow = #view_row{id = DocId, key = Keys},
+    Doc = {[{<<"_id">>, DocId}, {<<"field2">>, key2}, {<<"field1">>, key1}]},
+    ?assertEqual(Doc, derive_doc_from_index(Index, ViewRow)).
+
+derive_doc_from_index_partitioned_test() ->
+    Index =
+        #idx{
+            type = <<"json">>,
+            def = {[{<<"fields">>, {[{<<"field1">>, undefined}, {<<"field2">>, undefined}]}}]}
+        },
+    DocId = doc_id,
+    Keys = [key1, key2],
+    ViewRow = #view_row{id = DocId, key = {p, partition, Keys}},
     Doc = {[{<<"_id">>, DocId}, {<<"field2">>, key2}, {<<"field1">>, key1}]},
     ?assertEqual(Doc, derive_doc_from_index(Index, ViewRow)).
 

@@ -66,10 +66,11 @@ class Database(object):
             parts = [parts]
         return "/".join([self.url] + parts)
 
-    def create(self, q=1, n=1):
+    def create(self, q=1, n=1, partitioned=False):
         r = self.sess.get(self.url)
         if r.status_code == 404:
-            r = self.sess.put(self.url, params={"q": q, "n": n})
+            p = str(partitioned).lower()
+            r = self.sess.put(self.url, params={"q": q, "n": n, "partitioned": p})
             r.raise_for_status()
 
     def delete(self):
@@ -240,6 +241,7 @@ class Database(object):
         return_raw=False,
         update=True,
         executionStats=False,
+        partition=None,
     ):
         body = {
             "selector": selector,
@@ -260,10 +262,14 @@ class Database(object):
         if executionStats == True:
             body["execution_stats"] = True
         body = json.dumps(body)
-        if explain:
-            path = self.path("_explain")
+        if partition:
+            ppath = "_partition/{}/".format(partition)
         else:
-            path = self.path("_find")
+            ppath = ""
+        if explain:
+            path = self.path("{}_explain".format(ppath))
+        else:
+            path = self.path("{}_find".format(ppath))
         r = self.sess.post(path, data=body)
         r.raise_for_status()
         if explain or return_raw:
@@ -298,9 +304,9 @@ class UsersDbTests(unittest.TestCase):
 
 class DbPerClass(unittest.TestCase):
     @classmethod
-    def setUpClass(klass):
+    def setUpClass(klass, partitioned=False):
         klass.db = Database(random_db_name())
-        klass.db.create(q=1, n=1)
+        klass.db.create(q=1, n=1, partitioned=partitioned)
 
     @classmethod
     def tearDownClass(klass):
@@ -318,6 +324,15 @@ class UserDocsTests(DbPerClass):
     def setUpClass(klass):
         super(UserDocsTests, klass).setUpClass()
         user_docs.setup(klass.db)
+
+
+class PartitionedUserDocsTests(DbPerClass):
+    INDEX_TYPE = "json"
+
+    @classmethod
+    def setUpClass(klass):
+        super(PartitionedUserDocsTests, klass).setUpClass(partitioned=True)
+        user_docs.setup(klass.db, partitioned=True)
 
 
 class UserDocsTestsNoIndexes(DbPerClass):
