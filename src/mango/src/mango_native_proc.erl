@@ -254,13 +254,22 @@ add_default_text_field(Fields) ->
 add_default_text_field([], Acc) ->
     Acc;
 add_default_text_field([{_Name, <<"string">>, Value} | Rest], Acc) ->
-    NewAcc = [{<<"$default">>, <<"text">>, Value} | Acc],
-    add_default_text_field(Rest, NewAcc);
-add_default_text_field([{_Name, <<"text">>, Value} | Rest], Acc) ->
-    NewAcc = [{<<"$default">>, <<"text">>, Value} | Acc],
+    NewAcc = [{<<"$default">>, <<"string">>, Value} | Acc],
     add_default_text_field(Rest, NewAcc);
 add_default_text_field([_ | Rest], Acc) ->
     add_default_text_field(Rest, Acc).
+
+add_default_text_field_nouveau(Fields) ->
+    DefaultFields = add_default_text_field_nouveau(Fields, []),
+    DefaultFields ++ Fields.
+
+add_default_text_field_nouveau([], Acc) ->
+    Acc;
+add_default_text_field_nouveau([{_Name, <<"string">>, Value} | Rest], Acc) ->
+    NewAcc = [{<<"$default">>, <<"text">>, Value} | Acc],
+    add_default_text_field_nouveau(Rest, NewAcc);
+add_default_text_field_nouveau([_ | Rest], Acc) ->
+    add_default_text_field_nouveau(Rest, Acc).
 
 %% index of all field names
 get_field_names(Fields) ->
@@ -345,7 +354,7 @@ get_nouveau_entries0(IdxProps, Doc) ->
     Fields =
         if
             not DefaultEnabled -> Fields0;
-            true -> add_default_text_field(Fields0)
+            true -> add_default_text_field_nouveau(Fields0)
         end,
     FieldNames0 = get_field_names(Fields),
     FieldNames1 = lists:map(fun convert_to_nouveau_string_field/1, FieldNames0),
