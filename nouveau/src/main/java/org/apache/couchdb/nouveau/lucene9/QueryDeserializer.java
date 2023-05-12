@@ -50,19 +50,19 @@ public class QueryDeserializer extends StdDeserializer<Query> {
 
     private Query deserializeNode(final JsonParser parser, final DeserializationContext context, final JsonNode node)
             throws IOException, JsonProcessingException {
-        final String type = node.get("@type").asText();
+        final String type = get(parser, node, "@type").asText();
         switch (type) {
             case "term": {
-                final String field = node.get("field").asText();
-                final String text = node.get("text").asText();
+                final String field = get(parser, node, "field").asText();
+                final String text = get(parser, node, "text").asText();
                 return new TermQuery(new Term(field, text));
             }
             case "boolean": {
-                if (!node.get("clauses").isArray()) {
+                if (!get(parser, node, "clauses").isArray()) {
                     throw new JsonParseException(parser, "boolean clauses must be an array");
                 }
                 final BooleanQuery.Builder builder = new BooleanQuery.Builder();
-                final Iterator<JsonNode> it = node.get("clauses").elements();
+                final Iterator<JsonNode> it = get(parser, node, "clauses").elements();
                 while (it.hasNext()) {
                     final Query q = deserializeNode(parser, context, it.next());
                     builder.add(q, null);
@@ -70,38 +70,38 @@ public class QueryDeserializer extends StdDeserializer<Query> {
                 return builder.build();
             }
             case "wildcard": {
-                final String field = node.get("field").asText();
-                final String text = node.get("text").asText();
+                final String field = get(parser, node, "field").asText();
+                final String text = get(parser, node, "text").asText();
                 return new WildcardQuery(new Term(field, text));
             }
             case "phrase": {
-                final String field = node.get("field").asText();
-                if (!node.get("terms").isArray()) {
+                final String field = get(parser, node, "field").asText();
+                if (!get(parser, node, "terms").isArray()) {
                     throw new JsonParseException(parser, "phrase terms must be an array");
                 }
                 final PhraseQuery.Builder builder = new PhraseQuery.Builder();
-                final Iterator<JsonNode> it = node.get("terms").elements();
+                final Iterator<JsonNode> it = get(parser, node, "terms").elements();
                 while (it.hasNext()) {
                     builder.add(new Term(field, it.next().asText()));
                 }
-                builder.setSlop(node.get("slop").asInt());
+                builder.setSlop(getInt(parser, node, "slop", 0));
                 return builder.build();
             }
             case "prefix": {
-                final String field = node.get("field").asText();
-                final String text = node.get("text").asText();
+                final String field = get(parser, node, "field").asText();
+                final String text = get(parser, node, "text").asText();
                 return new PrefixQuery(new Term(field, text));
             }
             case "fuzzy": {
-                final String field = node.get("field").asText();
-                final String text = node.get("text").asText();
-                final int maxEdits = node.get("max_edits").asInt();
-                final int prefixLength = node.get("prefix_length").asInt();
+                final String field = get(parser, node, "field").asText();
+                final String text = get(parser, node, "text").asText();
+                final int maxEdits = getInt(parser, node, "max_edits", 2);
+                final int prefixLength = getInt(parser, node, "prefix_length", 0);
                 return new FuzzyQuery(new Term(field, text), maxEdits, prefixLength);
             }
             case "regexp": {
-                final String field = node.get("field").asText();
-                final String text = node.get("text").asText();
+                final String field = get(parser, node, "field").asText();
+                final String text = get(parser, node, "text").asText();
                 return new RegexpQuery(new Term(field, text));
             }
             case "term_range": {
@@ -112,5 +112,23 @@ public class QueryDeserializer extends StdDeserializer<Query> {
                 return new MatchAllDocsQuery();
         }
         throw new JsonParseException(parser, type + " not a supported query type");
+    }
+
+    private JsonNode get(final JsonParser parser, final JsonNode node, final String key) throws JsonParseException {
+        if (node.hasNonNull(key)) {
+            return node.get(key);
+        }
+        throw new JsonParseException(parser, key + " is required");
+    }
+
+    private int getInt(final JsonParser parser, final JsonNode node, final String key, final int defaultValue)
+            throws JsonParseException {
+        if (node.hasNonNull(key)) {
+            if (node.get(key).isInt()) {
+                return node.get(key).asInt();
+            }
+            throw new JsonParseException(parser, key + " must be an int");
+        }
+        return defaultValue;
     }
 }
