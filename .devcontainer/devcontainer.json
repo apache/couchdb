@@ -23,7 +23,14 @@
     // Your code will live inside the volume created for the container under /workspace.
     "workspaceMount": "target=/workspaces/couchdb,type=volume",
     "workspaceFolder": "/workspaces/couchdb",
-    "postCreateCommand": "./configure && make",
+    "postCreateCommand": "./configure --enable-nouveau && make",
 
-    "extensions": ["erlang-ls.erlang-ls"]
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "erlang-ls.erlang-ls",
+                "redhat.java"
+            ]
+        }
+    }
 }
