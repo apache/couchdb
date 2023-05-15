@@ -61,6 +61,18 @@
 # Dirty IO schedulers are used for file IO.
 +SDio 16
 
+# Increase distribution buffer size from default of 1MB to 32MB. The default is
+# usually a bit low on busy clusters. Has no effect for single-node setups.
+# The unit is in kilobytes.
++zdbbl 32768
+
+# When running on Docker, Kubernetes or an OS using CFS (Completely Fair
+# Scheduler) with CPU quota limits set, disable busy waiting for schedulers to
+# avoid busy waiting consuming too much of Erlang VM's CPU time-slice shares.
+#+sbwt none
+#+sbwtdcpu none
+#+sbwtdio none
+
 # Comment this line out to enable the interactive Erlang shell on startup
 +Bd -noinput
 
