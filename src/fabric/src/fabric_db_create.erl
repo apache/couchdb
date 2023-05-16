@@ -62,8 +62,7 @@ validate_dbname(DbName, Options) ->
     end.
 
 generate_shard_map(DbName, Options) ->
-    {MegaSecs, Secs, _} = os:timestamp(),
-    Suffix = "." ++ integer_to_list(MegaSecs * 1000000 + Secs),
+    Suffix = mem3:generate_shard_suffix(),
     Shards = mem3:choose_shards(DbName, [{shard_suffix, Suffix} | Options]),
     case mem3_util:open_db_doc(DbName) of
         {ok, Doc} ->

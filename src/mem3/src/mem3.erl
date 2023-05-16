@@ -34,6 +34,7 @@
 -export([ping/1, ping/2]).
 -export([db_is_current/1]).
 -export([shard_creation_time/1]).
+-export([generate_shard_suffix/0]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1, engine/1]).
@@ -295,7 +296,7 @@ decode_placement_string(PlacementStr) ->
 dbname(#shard{dbname = DbName}) ->
     DbName;
 dbname(<<"shards/", _:8/binary, "-", _:8/binary, "/", DbName/binary>>) ->
-    list_to_binary(filename:rootname(binary_to_list(DbName)));
+    strip_shard_suffix(DbName);
 dbname(DbName) when is_list(DbName) ->
     dbname(list_to_binary(DbName));
 dbname(DbName) when is_binary(DbName) ->
@@ -462,6 +463,26 @@ db_is_current(Name) when is_binary(Name) ->
     % for unit tests that either test or use mem3_rep logic
     couch_server:exists(Name).
 
+generate_shard_suffix() ->
+    UnixSeconds = os:system_time(second),
+    "." ++ integer_to_list(UnixSeconds).
+
+strip_shard_suffix(DbName) when is_binary(DbName) ->
+    % length(".1684269710") = 11. On 2286-11-20 the timestamp would flip to 11
+    % digits so we'd have to increase length to 12 then.
+    case DbName of
+        <<Prefix:(byte_size(DbName) - 11)/binary, $., Ts/binary>> ->
+            try
+                _ = binary_to_integer(Ts),
+                Prefix
+            catch
+                error:badarg ->
+                    filename:rootname(DbName)
+            end;
+        _ ->
+            filename:rootname(DbName)
+    end.
+
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -504,5 +525,35 @@ rotate_rand_degenerate_test() ->
 rotate_rand_distribution_test() ->
     Cases = [rotate_rand([1, 2, 3]) || _ <- lists:seq(1, 100)],
     ?assertEqual(3, length(lists:usort(Cases))).
+
+strip_shard_suffix_test_() ->
+    Prefix = <<"shards/c0000000-ffffffff/">>,
+    [
+        {DbName, ?_assertEqual(Res, dbname(<<Prefix/binary, DbName/binary>>))}
+     || {Res, DbName} <- [
+            {<<"foo">>, <<"foo.1684269710">>},
+            {<<"foo">>, <<"foo.168426971z">>},
+            {<<"foo/bar">>, <<"foo/bar.1684269710">>},
+            {<<"foo">>, <<"foo.1">>},
+            {<<"foo">>, <<"foo.abc">>},
+            {<<"foo">>, <<"foo.1111111111111111">>},
+            {<<"">>, <<"">>},
+            {<<"/">>, <<"/">>},
+            {<<"//">>, <<"//">>},
+            {<<"/.foo">>, <<"/.foo">>},
+            {<<".">>, <<"..">>},
+            {<<".">>, <<"..foo">>}
+        ]
+    ].
+
+shard_suffix_test() ->
+    % Assert a few basic things about the db suffixes we generate. If we change
+    % this scheme make sure to update strip_shard_suffix/1 and other places
+    % which assume the suffix is a 10 digit unix timestamp.
+    Suffix = generate_shard_suffix(),
+    ?assertEqual($., hd(Suffix)),
+    ?assertEqual(11, length(Suffix)),
+    [$. | Timestamp] = Suffix,
+    ?assert(is_integer(list_to_integer(Timestamp))).
 
 -endif.
