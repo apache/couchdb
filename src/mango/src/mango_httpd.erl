@@ -157,7 +157,6 @@ handle_index_req(
     chttpd:send_method_not_allowed(Req, "POST");
 handle_index_req(
     #httpd{
-        method = 'DELETE',
         path_parts = [A, B, <<"_design">>, DDocId0, Type, Name]
     } = Req,
     Db
@@ -166,30 +165,35 @@ handle_index_req(
     handle_index_req(Req#httpd{path_parts = PathParts}, Db);
 handle_index_req(
     #httpd{
-        method = 'DELETE',
+        method = Method,
         path_parts = [_, _, DDocId0, Type, Name]
     } = Req,
     Db
 ) ->
-    Idxs = mango_idx:list(Db),
-    DDocId = convert_to_design_id(DDocId0),
-    DelOpts = get_idx_del_opts(Req),
-    Filt = fun(Idx) ->
-        IsDDoc = mango_idx:ddoc(Idx) == DDocId,
-        IsType = mango_idx:type(Idx) == Type,
-        IsName = mango_idx:name(Idx) == Name,
-        IsDDoc andalso IsType andalso IsName
-    end,
-    case mango_idx:delete(Filt, Db, Idxs, DelOpts) of
-        {ok, true} ->
-            chttpd:send_json(Req, {[{ok, true}]});
-        {error, not_found} ->
-            throw({not_found, missing});
-        {error, Error} ->
-            ?MANGO_ERROR({error_saving_ddoc, Error})
+    case Method of
+        'DELETE' ->
+            Idxs = mango_idx:list(Db),
+            DDocId = convert_to_design_id(DDocId0),
+            DelOpts = get_idx_del_opts(Req),
+            Filt = fun(Idx) ->
+                IsDDoc = mango_idx:ddoc(Idx) == DDocId,
+                IsType = mango_idx:type(Idx) == Type,
+                IsName = mango_idx:name(Idx) == Name,
+                IsDDoc andalso IsType andalso IsName
+            end,
+            case mango_idx:delete(Filt, Db, Idxs, DelOpts) of
+                {ok, true} ->
+                    chttpd:send_json(Req, {[{ok, true}]});
+                {error, not_found} ->
+                    throw({not_found, missing});
+                {error, Error} ->
+                    ?MANGO_ERROR({error_saving_ddoc, Error})
+            end;
+        _ ->
+            chttpd:send_method_not_allowed(Req, "DELETE")
     end;
-handle_index_req(#httpd{path_parts = [_, _, _DDocId0, _Type, _Name]} = Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "DELETE").
+handle_index_req(Req, _Db) ->
+    chttpd:send_error(Req, not_found).
 
 handle_explain_req(#httpd{method = 'POST'} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),

@@ -1261,7 +1261,8 @@ it easier to take advantage of future improvements to query planning
     :synopsis: Delete an index.
 
     :param db: Database name.
-    :param design_doc: Design document name.
+    :param design_doc: Design document name.  The ``_design/`` prefix
+                       is not required.
     :param name: Index name.
 
     :>header Content-Type: - :mimetype:`application/json`
@@ -1295,6 +1296,80 @@ it easier to take advantage of future improvements to query planning
 
         {
             "ok": true
+        }
+
+.. _api/db/find/index-bulk-delete:
+
+.. http:post:: /{db}/_index/_bulk_delete
+   :synopsis: Delete indexes in bulk.
+
+   :param db: Database name
+
+   :<header Content-Type: - :mimetype:`application/json`
+
+   :<json array docids: List of names for indexes to be deleted.
+   :<json number w: Write quorum for each of the deletions.  Default
+      is ``2``. *Optional*
+
+   :>header Content-Type: - :mimetype:`application/json`
+
+   :>json array success: An array of objects that represent successful
+      deletions per index.  The ``id`` key contains the name of the
+      index, and ``ok`` reports if the operation has completed
+   :>json array fail: An array of object that describe failed
+      deletions per index.  The ``id`` key names the corresponding
+      index, and ``error`` describes the reason for the failure
+
+   :code 200: Success
+   :code 400: Invalid request
+   :code 404: Requested database not found
+   :code 500: Execution error
+
+   **Request**:
+
+   .. code-block:: http
+
+        POST /db/_index/_bulk_delete HTTP/1.1
+        Accept: application/json
+        Content-Type: application/json
+        Host: localhost:5984
+
+        {
+            "docids": [
+                "_design/example-ddoc",
+                "foo-index",
+                "nonexistent-index"
+            ]
+        }
+
+   **Response**:
+
+   .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Length: 94
+        Content-Type: application/json
+        Date: Thu, 01 Sep 2016 19:26:59 GMT
+        Server: CouchDB (Erlang OTP/18)
+
+        {
+            "success": [
+                {
+                    "id": "_design/example-ddoc",
+                    "ok": true
+                },
+                {
+                    "id": "foo-index",
+                    "ok": true
+                }
+            ],
+            "fail": [
+                {
+                    "id": "nonexistent-index",
+                    "error": "not_found"
+                }
+            ]
         }
 
 .. _api/db/find/explain:
