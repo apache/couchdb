@@ -422,7 +422,7 @@ pending_count(Dict) ->
 pack_seqs(Workers) ->
     SeqList = [{N, R, S} || {#shard{node = N, range = R}, S} <- Workers],
     SeqSum = lists:sum([seq(S) || {_, _, S} <- SeqList]),
-    Opaque = couch_util:encodeBase64Url(term_to_binary(SeqList, [compressed])),
+    Opaque = couch_util:encodeBase64Url(?term_to_bin(SeqList, [compressed])),
     ?l2b([integer_to_list(SeqSum), $-, Opaque]).
 
 seq({Seq, _Uuid, _Node}) -> Seq;

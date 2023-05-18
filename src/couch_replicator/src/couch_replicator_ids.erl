@@ -120,7 +120,7 @@ maybe_append_filters(
                 true ->
                     [<<"winning_revs_only">>]
             end,
-    couch_util:to_hex(couch_hash:md5_hash(term_to_binary(Base3))).
+    couch_util:to_hex(couch_hash:md5_hash(?term_to_bin(Base3))).
 
 maybe_append_options(Options, RepOptions) ->
     lists:foldl(

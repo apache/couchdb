@@ -1428,7 +1428,7 @@ stack_trace_id(Stack) ->
     {"X-Couch-Stack-Hash", stack_hash(Stack)}.
 
 stack_hash(Stack) ->
-    erlang:crc32(term_to_binary(Stack)).
+    erlang:crc32(?term_to_bin(Stack)).
 
 %% @doc CouchDB uses a chunked transfer-encoding to stream responses to
 %% _all_docs, _changes, _view and other similar requests. This configuration

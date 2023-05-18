@@ -13,3 +13,6 @@
 -record(couch_epi_spec, {
     behaviour, app, kind, options, key, value, codegen, type
 }).
+
+% Copied from `couch_db.hrl` which cannot be included in this application
+-define(term_to_bin(T), term_to_binary(T, [{minor_version, 1}])).

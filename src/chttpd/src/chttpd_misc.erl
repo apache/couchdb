@@ -295,7 +295,7 @@ choose_node(Key) when is_binary(Key) ->
     Nodes = lists:sort([node() | erlang:nodes()]),
     lists:nth(1 + Checksum rem length(Nodes), Nodes);
 choose_node(Key) ->
-    choose_node(term_to_binary(Key)).
+    choose_node(?term_to_bin(Key)).
 
 handle_reload_query_servers_req(#httpd{method = 'POST'} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),

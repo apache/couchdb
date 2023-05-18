@@ -152,7 +152,7 @@ filter_hash(_) ->
     <<>>.
 
 local_id_hash(Thing) ->
-    couch_util:encodeBase64Url(couch_hash:md5_hash(term_to_binary(Thing))).
+    couch_util:encodeBase64Url(couch_hash:md5_hash(?term_to_bin(Thing))).
 
 make_purge_id(SourceUUID, TargetUUID) ->
     <<"_local/purge-mem3-", SourceUUID/binary, "-", TargetUUID/binary>>.

@@ -12,6 +12,8 @@
 
 -module(couch_epi_util).
 
+-include("couch_epi.hrl").
+
 -export([module_version/1, hash/1, module_exists/1]).
 
 -compile([nowarn_deprecated_function]).
@@ -22,7 +24,7 @@ module_version(Module) ->
     VSNs.
 
 hash(Term) ->
-    <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
+    <<SigInt:128/integer>> = couch_hash:md5_hash(?term_to_bin(Term)),
     lists:flatten(io_lib:format("\"~.36B\"", [SigInt])).
 
 module_exists(Module) ->

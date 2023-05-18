@@ -19,6 +19,7 @@
 ]).
 
 -include_lib("kernel/include/file.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 -define(SUFFIX, ".smooshq").
 
@@ -183,7 +184,7 @@ t_corrupted_read(_) ->
     Path = file_path("foochan"),
     ?assertEqual(ok, write(#{<<"a">> => 1}, Path)),
 
-    ok = file:write_file(Path, term_to_binary(foo), [raw]),
+    ok = file:write_file(Path, ?term_to_bin(foo), [raw]),
     ?assertEqual({error, term_not_a_map}, read(Path)),
 
     ok = file:write_file(Path, <<"42">>, [raw]),
