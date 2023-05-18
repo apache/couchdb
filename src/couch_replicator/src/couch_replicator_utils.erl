@@ -140,7 +140,8 @@ decode_basic_creds(Base64) ->
             {undefined, undefined}
     catch
         % Tolerate invalid B64 values here to avoid crashing replicator
-        error:function_clause ->
+        % Changed to `missing_padding` in OTP 26
+        error:Reason when Reason =:= function_clause; Reason =:= missing_padding ->
             {undefined, undefined}
     end.
 
