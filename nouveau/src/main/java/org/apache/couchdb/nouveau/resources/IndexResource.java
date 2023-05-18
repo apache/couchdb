@@ -126,19 +126,20 @@ public final class IndexResource {
             final IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setUseCompoundFile(false);
             final IndexWriter writer = new IndexWriter(dir, config);
-            final long updateSeq = getUpdateSeq(writer);
+            final long updateSeq = getSeq(writer, "update_seq");
+            final long purgeSeq = getSeq(writer, "purge_seq");
             final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-            return new Lucene9Index(analyzer, writer, updateSeq, searcherManager);
+            return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
         };
     }
 
-    private static long getUpdateSeq(final IndexWriter writer) throws IOException {
+    private static long getSeq(final IndexWriter writer, final String key) throws IOException {
         final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
         if (commitData == null) {
             return 0L;
         }
         for (Map.Entry<String, String> entry : commitData) {
-            if (entry.getKey().equals("update_seq")) {
+            if (entry.getKey().equals(key)) {
                 return Long.parseLong(entry.getValue());
             }
         }

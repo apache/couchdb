@@ -24,6 +24,7 @@
     delete_path/1,
     delete_path/2,
     delete_doc/3,
+    purge_doc/3,
     update_doc/5,
     search/2
 ]).
@@ -97,7 +98,17 @@ delete_path(Path, Exclusions) when
 delete_doc(#index{} = Index, DocId, UpdateSeq) when
     is_binary(DocId), is_integer(UpdateSeq)
 ->
-    ReqBody = {[{<<"seq">>, UpdateSeq}]},
+    delete_doc(Index, DocId, UpdateSeq, false).
+
+purge_doc(#index{} = Index, DocId, PurgeSeq) when
+    is_binary(DocId), is_integer(PurgeSeq)
+->
+    delete_doc(Index, DocId, PurgeSeq, true).
+
+delete_doc(#index{} = Index, DocId, Seq, IsPurge) when
+    is_binary(DocId), is_integer(Seq), is_boolean(IsPurge)
+->
+    ReqBody = #{seq => Seq, purge => IsPurge},
     Resp = send_if_enabled(
         doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
     ),

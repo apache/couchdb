@@ -36,13 +36,15 @@ import org.apache.couchdb.nouveau.api.SearchResults;
 public abstract class Index implements Closeable {
 
     private long updateSeq;
+    private long purgeSeq;
     private boolean deleteOnClose = false;
     private long lastCommit = now();
     private volatile boolean closed;
     private final Semaphore permits = new Semaphore(Integer.MAX_VALUE);
 
-    protected Index(final long updateSeq) {
+    protected Index(final long updateSeq, final long purgeSeq) {
         this.updateSeq = updateSeq;
+        this.purgeSeq = purgeSeq;
     }
 
     public final boolean tryAcquire() {
@@ -74,7 +76,7 @@ public abstract class Index implements Closeable {
     public final IndexInfo info() throws IOException {
         final int numDocs = doNumDocs();
         final long diskSize = doDiskSize();
-        return new IndexInfo(updateSeq, numDocs, diskSize);
+        return new IndexInfo(updateSeq, purgeSeq, numDocs, diskSize);
     }
 
     protected abstract int doNumDocs() throws IOException;
@@ -90,9 +92,15 @@ public abstract class Index implements Closeable {
     protected abstract void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException;
 
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
-        assertUpdateSeqIsLower(request.getSeq());
-        doDelete(docId, request);
-        incrementUpdateSeq(request.getSeq());
+        if (request.isPurge()) {
+            assertPurgeSeqIsLower(request.getSeq());
+            doDelete(docId, request);
+            incrementPurgeSeq(request.getSeq());
+        } else {
+            assertUpdateSeqIsLower(request.getSeq());
+            doDelete(docId, request);
+            incrementUpdateSeq(request.getSeq());
+        }
     }
 
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
@@ -105,10 +113,12 @@ public abstract class Index implements Closeable {
 
     public final boolean commit() throws IOException {
         final long updateSeq;
+        final long purgeSeq;
         synchronized (this) {
             updateSeq = this.updateSeq;
+            purgeSeq = this.purgeSeq;
         }
-        final boolean result = doCommit(updateSeq);
+        final boolean result = doCommit(updateSeq, purgeSeq);
         if (result) {
             final long now = now();
             synchronized (this) {
@@ -118,7 +128,7 @@ public abstract class Index implements Closeable {
         return result;
     }
 
-    protected abstract boolean doCommit(final long updateSeq) throws IOException;
+    protected abstract boolean doCommit(final long updateSeq, final long purgeSeq) throws IOException;
 
     @Override
     public final void close() throws IOException {
@@ -157,6 +167,19 @@ public abstract class Index implements Closeable {
         assert Thread.holdsLock(this);
         assertUpdateSeqIsLower(updateSeq);
         this.updateSeq = updateSeq;
+    }
+
+    protected final void assertPurgeSeqIsLower(final long purgeSeq) throws UpdatesOutOfOrderException {
+        assert Thread.holdsLock(this);
+        if (!(purgeSeq > this.purgeSeq)) {
+            throw new UpdatesOutOfOrderException(this.purgeSeq, purgeSeq);
+        }
+    }
+
+    protected final void incrementPurgeSeq(final long purgeSeq) throws IOException {
+        assert Thread.holdsLock(this);
+        assertPurgeSeqIsLower(purgeSeq);
+        this.purgeSeq = purgeSeq;
     }
 
     public boolean needsCommit(final long duration, final TimeUnit unit) {

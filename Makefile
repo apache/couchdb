@@ -547,6 +547,7 @@ derived:
 # Build nouveau
 nouveau:
 ifeq ($(with_nouveau), 1)
+	@cd nouveau && ./gradlew spotlessApply
 	@cd nouveau && ./gradlew build -x test
 endif
 

@@ -18,6 +18,7 @@ defmodule NouveauTest do
       ]}
     )
     assert resp.status_code in [201]
+    resp
   end
 
   def create_partitioned_search_docs(db_name) do
@@ -85,6 +86,11 @@ defmodule NouveauTest do
   def get_bookmark(resp) do
     %{:body => %{"bookmark" => bookmark}} = resp
     bookmark
+  end
+
+  def get_total_hits(resp) do
+    %{:body => %{"total_hits" => total_hits}} = resp
+    total_hits
   end
 
   def assert_status_code(resp, code) do
@@ -418,6 +424,67 @@ defmodule NouveauTest do
     assert_status_code(resp, 200)
     ids = get_mango_ids(resp)
     assert ids == ["bar:doc3"]
+  end
+
+  @tag :with_db
+  test "delete", context do
+    db_name = context[:db_name]
+    create_resp = create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    search_url = "/#{db_name}/_design/foo/_nouveau/bar"
+
+    # confirm all hits
+    resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 4
+
+    # delete a doc
+    doc = hd(create_resp.body)
+    resp = Couch.delete("/#{db_name}/#{doc["id"]}?rev=#{doc["rev"]}")
+    assert_status_code(resp, 200)
+
+    # confirm it is gone
+    resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 3
+
+    resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
+    assert_status_code(resp, 200)
+    assert resp.body["search_index"]["update_seq"] == 6
+    assert resp.body["search_index"]["purge_seq"] == 0
+  end
+
+  @tag :with_db
+  test "purge", context do
+    db_name = context[:db_name]
+    create_resp = create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    search_url = "/#{db_name}/_design/foo/_nouveau/bar"
+
+    # confirm all hits
+    resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 4
+
+    # purge a doc
+    doc = hd(create_resp.body)
+    resp =
+      Couch.post("/#{db_name}/_purge",
+        body: %{doc["id"] => [doc["rev"]]}
+      )
+    assert_status_code(resp, 201)
+
+    # confirm it is gone
+    resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 3
+
+    resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
+    assert_status_code(resp, 200)
+    assert resp.body["search_index"]["update_seq"] == 4
+    assert resp.body["search_index"]["purge_seq"] == 1
   end
 
 end

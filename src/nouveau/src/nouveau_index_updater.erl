@@ -28,9 +28,10 @@
 
 outdated(#index{} = Index) ->
     case open_or_create_index(Index) of
-        {ok, IndexSeq} ->
-            DbSeq = get_db_seq(Index),
-            DbSeq > IndexSeq;
+        {ok, #{} = Info} ->
+            #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
+            {DbUpdateSeq, DbPurgeSeq} = get_db_info(Index),
+            DbUpdateSeq > IndexUpdateSeq orelse DbPurgeSeq > IndexPurgeSeq;
         {error, Reason} ->
             {error, Reason}
     end.
@@ -38,11 +39,14 @@ outdated(#index{} = Index) ->
 update(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
     try
-        case open_or_create_index(Index) of
+        case open_or_create_index(Db, Index) of
             {error, Reason} ->
                 exit({error, Reason});
-            {ok, CurSeq} ->
-                TotalChanges = couch_db:count_changes_since(Db, CurSeq),
+            {ok, #{} = Info} ->
+                #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
+                ChangesSince = couch_db:count_changes_since(Db, IndexUpdateSeq),
+                PurgesSince = couch_db:get_purge_seq(Db) - IndexPurgeSeq,
+                TotalChanges = ChangesSince + PurgesSince,
                 couch_task_status:add_task([
                     {type, search_indexer},
                     {database, Index#index.dbname},
@@ -56,11 +60,13 @@ update(#index{} = Index) ->
                 %% update status every half second
                 couch_task_status:set_update_frequency(500),
 
+                {ok, ExcludeIdRevs} = purge_index(Db, Index, IndexPurgeSeq),
+
                 Proc = get_os_process(Index#index.def_lang),
                 try
                     true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
-                    Acc0 = {Db, Index, Proc, 0, TotalChanges},
-                    {ok, _} = couch_db:fold_changes(Db, CurSeq, fun load_docs/2, Acc0, [])
+                    Acc0 = {Db, Index, Proc, 0, TotalChanges, ExcludeIdRevs},
+                    {ok, _} = couch_db:fold_changes(Db, IndexUpdateSeq, fun load_docs/2, Acc0, [])
                 after
                     ret_os_process(Proc)
                 end
@@ -71,14 +77,20 @@ update(#index{} = Index) ->
 
 load_docs(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
     {ok, Acc};
-load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges}) ->
+load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges, ExcludeIdRevs}) ->
     couch_task_status:update([
         {changes_done, ChangesDone}, {progress, (ChangesDone * 100) div TotalChanges}
     ]),
-
     DI = couch_doc:to_doc_info(FDI),
-    #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DI,
+    #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
+    case lists:member({Id, Rev}, ExcludeIdRevs) of
+        true -> ok;
+        false -> update_or_delete_index(Db, Index, DI, Proc)
+    end,
+    {ok, {Db, Index, Proc, ChangesDone + 1, TotalChanges, ExcludeIdRevs}}.
 
+update_or_delete_index(Db, #index{} = Index, #doc_info{} = DI, Proc) ->
+    #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DI,
     case Del of
         true ->
             ok = nouveau_api:delete_doc(Index, Id, Seq);
@@ -104,17 +116,16 @@ load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges}) ->
                             exit({error, Reason})
                     end
             end
-    end,
-    {ok, {Db, Index, Proc, ChangesDone + 1, TotalChanges}}.
+    end.
 
 open_or_create_index(#index{} = Index) ->
-    case get_index_seq(Index) of
-        {ok, UpdateSeq} ->
-            {ok, UpdateSeq};
+    case nouveau_api:index_info(Index) of
+        {ok, #{} = Info} ->
+            {ok, Info};
         {error, {not_found, _}} ->
             case nouveau_api:create_index(Index, index_definition(Index)) of
                 ok ->
-                    {ok, 0};
+                    nouveau_api:index_info(Index);
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -122,20 +133,23 @@ open_or_create_index(#index{} = Index) ->
             {error, Reason}
     end.
 
-get_db_seq(#index{} = Index) ->
-    {ok, Db} = couch_db:open_int(Index#index.dbname, []),
-    try
-        couch_db:get_update_seq(Db)
-    after
-        couch_db:close(Db)
+open_or_create_index(Db, #index{} = Index) ->
+    case open_or_create_index(Index) of
+        {ok, #{} = Info} ->
+            nouveau_util:maybe_create_local_purge_doc(Db, Index),
+            {ok, Info};
+        Else ->
+            Else
     end.
 
-get_index_seq(#index{} = Index) ->
-    case nouveau_api:index_info(Index) of
-        {ok, #{<<"update_seq">> := Seq}} ->
-            {ok, Seq};
-        {error, Reason} ->
-            {error, Reason}
+get_db_info(#index{} = Index) ->
+    {ok, Db} = couch_db:open_int(Index#index.dbname, []),
+    try
+        UpdateSeq = couch_db:get_update_seq(Db),
+        PurgeSeq = couch_db:get_purge_seq(Db),
+        {UpdateSeq, PurgeSeq}
+    after
+        couch_db:close(Db)
     end.
 
 index_definition(#index{} = Index) ->
@@ -143,3 +157,54 @@ index_definition(#index{} = Index) ->
         <<"default_analyzer">> => Index#index.default_analyzer,
         <<"field_analyzers">> => Index#index.field_analyzers
     }.
+
+purge_index(Db, Index, IndexPurgeSeq) ->
+    Proc = get_os_process(Index#index.def_lang),
+    try
+        true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
+        FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, {Acc, _}) ->
+            Acc0 =
+                case couch_db:get_full_doc_info(Db, Id) of
+                    not_found ->
+                        ok = nouveau_api:purge_doc(Index, Id, PurgeSeq),
+                        Acc;
+                    FDI ->
+                        DI = couch_doc:to_doc_info(FDI),
+                        #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
+                        case lists:member({Id, Rev}, Acc) of
+                            true ->
+                                Acc;
+                            false ->
+                                update_or_delete_index(Db, Index, DI, Proc),
+                                [{Id, Rev} | Acc]
+                        end
+                end,
+            update_task(1),
+            {ok, {Acc0, PurgeSeq}}
+        end,
+
+        {ok, {ExcludeList, NewPurgeSeq}} = couch_db:fold_purge_infos(
+            Db, IndexPurgeSeq, FoldFun, {[], 0}, []
+        ),
+        update_local_doc(Db, Index, NewPurgeSeq),
+        {ok, ExcludeList}
+    after
+        ret_os_process(Proc)
+    end.
+
+update_task(NumChanges) ->
+    [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
+    Changes2 = Changes + NumChanges,
+    Progress =
+        case Total of
+            0 ->
+                0;
+            _ ->
+                (Changes2 * 100) div Total
+        end,
+    couch_task_status:update([{progress, Progress}, {changes_done, Changes2}]).
+
+update_local_doc(Db, #index{} = Index, PurgeSeq) ->
+    DocId = nouveau_util:get_local_purge_doc_id(Index#index.sig),
+    DocContent = nouveau_util:get_local_purge_doc_body(DocId, PurgeSeq, Index),
+    couch_db:update_doc(Db, DocContent, []).
