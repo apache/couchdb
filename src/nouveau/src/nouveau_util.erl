@@ -22,6 +22,11 @@
     index_name/1,
     design_doc_to_indexes/2,
     design_doc_to_index/3,
+    verify_index_exists/2,
+    ensure_local_purge_docs/2,
+    maybe_create_local_purge_doc/2,
+    get_local_purge_doc_id/1,
+    get_local_purge_doc_body/3,
     nouveau_url/0
 ]).
 
@@ -92,6 +97,102 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
         _ ->
             {error, InvalidDDocError}
     end.
+
+verify_index_exists(DbName, Props) ->
+    try
+        Type = couch_util:get_value(<<"type">>, Props),
+        if
+            Type =/= <<"nouveau">> ->
+                false;
+            true ->
+                DDocId = couch_util:get_value(<<"ddoc_id">>, Props),
+                IndexName = couch_util:get_value(<<"indexname">>, Props),
+                Sig = couch_util:get_value(<<"signature">>, Props),
+                couch_util:with_db(DbName, fun(Db) ->
+                    case couch_db:get_design_doc(Db, DDocId) of
+                        {ok, #doc{} = DDoc} ->
+                            {ok, IdxState} = design_doc_to_index(
+                                DbName, DDoc, IndexName
+                            ),
+                            IdxState#index.sig == Sig;
+                        {not_found, _} ->
+                            false
+                    end
+                end)
+        end
+    catch
+        _:_ ->
+            false
+    end.
+
+ensure_local_purge_docs(DbName, DDocs) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        lists:foreach(
+            fun(DDoc) ->
+                #doc{body = {Props}} = DDoc,
+                case couch_util:get_value(<<"indexes">>, Props) of
+                    undefined ->
+                        false;
+                    _ ->
+                        try design_doc_to_indexes(DbName, DDoc) of
+                            SIndexes -> ensure_local_purge_doc(Db, SIndexes)
+                        catch
+                            _:_ ->
+                                ok
+                        end
+                end
+            end,
+            DDocs
+        )
+    end).
+
+ensure_local_purge_doc(Db, SIndexes) ->
+    if
+        SIndexes =/= [] ->
+            lists:map(
+                fun(SIndex) ->
+                    maybe_create_local_purge_doc(Db, SIndex)
+                end,
+                SIndexes
+            );
+        true ->
+            ok
+    end.
+
+maybe_create_local_purge_doc(Db, Index) ->
+    DocId = get_local_purge_doc_id(Index#index.sig),
+    case couch_db:open_doc(Db, DocId) of
+        {ok, _Doc} ->
+            ok;
+        {not_found, _} ->
+            DbPurgeSeq = couch_db:get_purge_seq(Db),
+            DocContent = get_local_purge_doc_body(
+                DocId, DbPurgeSeq, Index
+            ),
+            couch_db:update_doc(Db, DocContent, [])
+    end.
+
+get_local_purge_doc_id(Sig) ->
+    iolist_to_binary([?LOCAL_DOC_PREFIX, "purge-", "nouveau-", Sig]).
+
+get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
+    #index{
+        name = IdxName,
+        ddoc_id = DDocId,
+        sig = Sig
+    } = Index,
+    NowSecs = os:system_time(second),
+    JsonList =
+        {[
+            {<<"_id">>, LocalDocId},
+            {<<"purge_seq">>, PurgeSeq},
+            {<<"updated_on">>, NowSecs},
+            {<<"indexname">>, IdxName},
+            {<<"ddoc_id">>, DDocId},
+            {<<"signature">>, Sig},
+            {<<"type">>, <<"nouveau">>}
+        ]},
+    couch_doc:from_json_obj(JsonList).
 
 nouveau_url() ->
     config:get("nouveau", "url", "http://127.0.0.1:8080").

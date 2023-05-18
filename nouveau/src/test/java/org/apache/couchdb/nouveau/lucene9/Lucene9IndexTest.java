@@ -199,11 +199,34 @@ public class Lucene9IndexTest {
             IndexInfo info = index.info();
             assertThat(info.getNumDocs()).isEqualTo(1);
 
-            index.delete("foo", new DocumentDeleteRequest(3));
+            index.delete("foo", new DocumentDeleteRequest(3, false));
             index.commit();
 
             info = index.info();
             assertThat(info.getNumDocs()).isEqualTo(0);
+            assertThat(info.getUpdateSeq()).isEqualTo(3);
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testPurge(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
+            index.update("foo", new DocumentUpdateRequest(2, null, fields));
+            index.commit();
+
+            IndexInfo info = index.info();
+            assertThat(info.getNumDocs()).isEqualTo(1);
+
+            index.delete("foo", new DocumentDeleteRequest(3, true));
+            index.commit();
+
+            info = index.info();
+            assertThat(info.getNumDocs()).isEqualTo(0);
+            assertThat(info.getPurgeSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }
@@ -217,7 +240,7 @@ public class Lucene9IndexTest {
             config.setUseCompoundFile(false);
             final IndexWriter writer = new IndexWriter(dir, config);
             final SearcherManager searcherManager = new SearcherManager(writer, null);
-            return new Lucene9Index(analyzer, writer, 0L, searcherManager);
+            return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager);
         };
     }
 }

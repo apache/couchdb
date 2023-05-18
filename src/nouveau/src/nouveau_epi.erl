@@ -31,7 +31,10 @@ app() ->
     nouveau.
 
 providers() ->
-    [{chttpd_handlers, nouveau_httpd_handlers}].
+    [
+        {couch_db, nouveau_plugin_couch_db},
+        {chttpd_handlers, nouveau_httpd_handlers}
+    ].
 
 services() ->
     [].

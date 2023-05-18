@@ -21,6 +21,9 @@
     "mango sort by string",
     "search GET (partitioned)",
     "search POST (partitioned)",
-    "mango (partitioned)"
+    "mango (partitioned)",
+    "delete",
+    "purge",
+    "purge with conflicts"
   ]
 }

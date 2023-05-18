@@ -24,8 +24,11 @@
     delete_path/1,
     delete_path/2,
     delete_doc/3,
+    purge_doc/3,
     update_doc/5,
-    search/2
+    search/2,
+    set_purge_seq/2,
+    set_update_seq/2
 ]).
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
@@ -97,7 +100,17 @@ delete_path(Path, Exclusions) when
 delete_doc(#index{} = Index, DocId, UpdateSeq) when
     is_binary(DocId), is_integer(UpdateSeq)
 ->
-    ReqBody = {[{<<"seq">>, UpdateSeq}]},
+    delete_doc(Index, DocId, UpdateSeq, false).
+
+purge_doc(#index{} = Index, DocId, PurgeSeq) when
+    is_binary(DocId), is_integer(PurgeSeq)
+->
+    delete_doc(Index, DocId, PurgeSeq, true).
+
+delete_doc(#index{} = Index, DocId, Seq, IsPurge) when
+    is_binary(DocId), is_integer(Seq), is_boolean(IsPurge)
+->
+    ReqBody = #{seq => Seq, purge => IsPurge},
     Resp = send_if_enabled(
         doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
     ),
@@ -140,6 +153,27 @@ search(#index{} = Index, QueryArgs) ->
     case Resp of
         {ok, "200", _, RespBody} ->
             {ok, jiffy:decode(RespBody, [return_maps])};
+        {ok, StatusCode, _, RespBody} ->
+            {error, jaxrs_error(StatusCode, RespBody)};
+        {error, Reason} ->
+            send_error(Reason)
+    end.
+
+set_update_seq(#index{} = Index, UpdateSeq) ->
+    set_seq(Index, update_seq, UpdateSeq).
+set_purge_seq(#index{} = Index, PurgeSeq) ->
+    set_seq(Index, purge_seq, PurgeSeq).
+
+set_seq(#index{} = Index, Key, Value) when is_atom(Key), is_integer(Value) ->
+    ReqBody = #{
+        Key => Value
+    },
+    Resp = send_if_enabled(
+        index_url(Index), [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
+    ),
+    case Resp of
+        {ok, "204", _, _} ->
+            ok;
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
         {error, Reason} ->
