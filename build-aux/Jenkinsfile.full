@@ -65,15 +65,13 @@ meta = [
     image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
   ],
 
-  // ARM64 worker seems to have gone away. Disable it for now
-  // to unlock main CI runs
-  // 'bullseye-arm64': [
-  //   name: 'Debian 11 ARM',
-  //   spidermonkey_vsn: '78',
-  //   enable_nouveau: true,
-  //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-  //   node_label: 'arm64v8'
-  // ],
+  'bullseye-arm64': [
+    name: 'Debian 11 ARM',
+    spidermonkey_vsn: '78',
+    enable_nouveau: true,
+    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    node_label: 'arm64v8'
+  ],
 
   'bullseye-ppc64': [
     name: 'Debian 11 POWER',
