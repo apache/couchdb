@@ -21,7 +21,7 @@ basename=`basename $0`
 
 PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
-REBAR3_BRANCH="main"
+REBAR3_BRANCH="3.21.0"
 
 # TEST=0
 WITH_PROPER="true"
