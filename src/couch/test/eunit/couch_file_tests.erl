@@ -70,67 +70,86 @@ read_write_test_() ->
         "Common file read/write tests",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end,
-            fun test_util:stop/1,
-            ?foreach([
-                fun should_increase_file_size_on_write/1,
-                fun should_return_current_file_size_on_write/1,
-                fun should_write_and_read_term/1,
-                fun should_write_and_read_binary/1,
-                fun should_write_and_read_large_binary/1,
-                fun should_return_term_as_binary_for_reading_binary/1,
-                fun should_read_term_written_as_binary/1,
-                fun should_read_iolist/1,
-                fun should_fsync/1,
-                fun should_not_read_beyond_eof/1,
-                fun should_truncate/1
-            ])
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    ?TDEF_FE(should_increase_file_size_on_write),
+                    ?TDEF_FE(should_return_current_file_size_on_write),
+                    ?TDEF_FE(should_write_and_read_term),
+                    ?TDEF_FE(should_write_and_read_binary),
+                    ?TDEF_FE(should_write_and_read_large_binary),
+                    ?TDEF_FE(should_return_term_as_binary_for_reading_binary),
+                    ?TDEF_FE(should_read_term_written_as_binary),
+                    ?TDEF_FE(should_read_iolist),
+                    ?TDEF_FE(should_fsync),
+                    ?TDEF_FE(should_update_fsync_stats),
+                    ?TDEF_FE(should_not_read_beyond_eof),
+                    ?TDEF_FE(should_truncate)
+                ]
+            }
         }
     }.
 
 should_increase_file_size_on_write(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
     {ok, Size} = couch_file:bytes(Fd),
-    ?_assert(Size > 0).
+    ?assert(Size > 0).
 
 should_return_current_file_size_on_write(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
     {ok, Size} = couch_file:bytes(Fd),
-    ?_assertMatch({ok, Size, _}, couch_file:append_term(Fd, bar)).
+    ?assertMatch({ok, Size, _}, couch_file:append_term(Fd, bar)).
 
 should_write_and_read_term(Fd) ->
     {ok, Pos, _} = couch_file:append_term(Fd, foo),
-    ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
+    ?assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
 
 should_write_and_read_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, <<"fancy!">>),
-    ?_assertMatch({ok, <<"fancy!">>}, couch_file:pread_binary(Fd, Pos)).
+    ?assertMatch({ok, <<"fancy!">>}, couch_file:pread_binary(Fd, Pos)).
 
 should_return_term_as_binary_for_reading_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_term(Fd, foo),
     Foo = couch_compress:compress(foo, snappy),
-    ?_assertMatch({ok, Foo}, couch_file:pread_binary(Fd, Pos)).
+    ?assertMatch({ok, Foo}, couch_file:pread_binary(Fd, Pos)).
 
 should_read_term_written_as_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, <<131, 100, 0, 3, 102, 111, 111>>),
-    ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
+    ?assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
 
 should_write_and_read_large_binary(Fd) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _} = couch_file:append_binary(Fd, BigBin),
-    ?_assertMatch({ok, BigBin}, couch_file:pread_binary(Fd, Pos)).
+    ?assertMatch({ok, BigBin}, couch_file:pread_binary(Fd, Pos)).
 
 should_read_iolist(Fd) ->
     %% append_binary == append_iolist?
     %% Possible bug in pread_iolist or iolist() -> append_binary
     {ok, Pos, _} = couch_file:append_binary(Fd, ["foo", $m, <<"bam">>]),
     {ok, IoList} = couch_file:pread_iolist(Fd, Pos),
-    ?_assertMatch(<<"foombam">>, iolist_to_binary(IoList)).
+    ?assertMatch(<<"foombam">>, iolist_to_binary(IoList)).
 
 should_fsync(Fd) ->
-    {"How does on test fsync?", ?_assertMatch(ok, couch_file:sync(Fd))}.
+    ?assertMatch(ok, couch_file:sync(Fd)).
 
-should_not_read_beyond_eof(Fd) ->
+should_update_fsync_stats(Fd) ->
+    Count0 = couch_stats:sample([fsync, count]),
+    Seq = lists:seq(1, 10),
+    lists:foreach(fun(_) -> ok = couch_file:sync(Fd) end, Seq),
+    Hist = couch_stats:sample([fsync, time]),
+    Count1 = couch_stats:sample([fsync, count]),
+    ?assert(Count1 > Count0),
+    HistMax = proplists:get_value(max, Hist),
+    HistPct = proplists:get_value(percentile, Hist),
+    ?assert(HistMax > 0),
+    ?assertMatch([{50, P50} | _] when P50 > 0, HistPct).
+
+should_not_read_beyond_eof(_) ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     DoubleBin = round(byte_size(BigBin) * 2),
     {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
@@ -140,8 +159,10 @@ should_not_read_beyond_eof(Fd) ->
     ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
     file:close(Io),
     unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value, {read_beyond_eof, Filepath}}}},
-    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    ExpectExit = {bad_return_value, {read_beyond_eof, Filepath}},
+    ExpectError = {badmatch, {'EXIT', ExpectExit}},
+    ?assertError(ExpectError, couch_file:pread_binary(Fd, Pos)),
+    catch file:close(Fd).
 
 should_truncate(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
@@ -149,7 +170,7 @@ should_truncate(Fd) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, _, _} = couch_file:append_binary(Fd, BigBin),
     ok = couch_file:truncate(Fd, Size),
-    ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, 0)).
+    ?assertMatch({ok, foo}, couch_file:pread_term(Fd, 0)).
 
 pread_limit_test_() ->
     {
@@ -157,31 +178,39 @@ pread_limit_test_() ->
         {
             setup,
             fun() ->
-                Ctx = test_util:start(?MODULE),
-                config:set("couchdb", "max_pread_size", "50000"),
+                Ctx = test_util:start_couch([ioq]),
+                config:set("couchdb", "max_pread_size", "50000", _Persist = false),
                 Ctx
             end,
             fun(Ctx) ->
-                config:delete("couchdb", "max_pread_size"),
-                test_util:stop(Ctx)
+                config:delete("couchdb", "max_pread_size", _Persist = false),
+                test_util:stop_couch(Ctx)
             end,
-            ?foreach([
-                fun should_increase_file_size_on_write/1,
-                fun should_return_current_file_size_on_write/1,
-                fun should_write_and_read_term/1,
-                fun should_write_and_read_binary/1,
-                fun should_not_read_more_than_pread_limit/1
-            ])
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    ?TDEF_FE(should_increase_file_size_on_write),
+                    ?TDEF_FE(should_return_current_file_size_on_write),
+                    ?TDEF_FE(should_write_and_read_term),
+                    ?TDEF_FE(should_write_and_read_binary),
+                    ?TDEF_FE(should_not_read_more_than_pread_limit)
+                ]
+            }
         }
     }.
 
-should_not_read_more_than_pread_limit(Fd) ->
+should_not_read_more_than_pread_limit(_) ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     {_, Filepath} = couch_file:process_info(Fd),
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
     unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value, {exceed_pread_limit, Filepath, 50000}}}},
-    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    ExpectExit = {bad_return_value, {exceed_pread_limit, Filepath, 50000}},
+    ExpectError = {badmatch, {'EXIT', ExpectExit}},
+    ?assertError(ExpectError, couch_file:pread_binary(Fd, Pos)),
+    catch file:close(Fd).
 
 header_test_() ->
     {

@@ -250,7 +250,7 @@ sync(Filepath) when is_list(Filepath) ->
     case file:open(Filepath, [append, raw]) of
         {ok, Fd} ->
             try
-                case file:sync(Fd) of
+                case fsync(Fd) of
                     ok ->
                         ok;
                     {error, Reason} ->
@@ -437,7 +437,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                 true ->
                                     {ok, 0} = file:position(Fd, 0),
                                     ok = file:truncate(Fd),
-                                    ok = file:sync(Fd),
+                                    ok = fsync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
                                     {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}};
@@ -554,7 +554,7 @@ handle_call({set_db_pid, Pid}, _From, #file{db_monitor = OldRef} = File) ->
     Ref = monitor(process, Pid),
     {reply, ok, File#file{db_monitor = Ref}};
 handle_call(sync, _From, #file{fd = Fd} = File) ->
-    case file:sync(Fd) of
+    case fsync(Fd) of
         ok ->
             {reply, ok, File};
         {error, _} = Error ->
@@ -641,6 +641,14 @@ handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor = Ref} = File)
 format_status(_Opt, [PDict, #file{} = File]) ->
     {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
     [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
+
+fsync(Fd) ->
+    T0 = erlang:monotonic_time(microsecond),
+    Res = file:sync(Fd),
+    Dt = erlang:monotonic_time(microsecond) - T0,
+    couch_stats:update_histogram([fsync, time], Dt),
+    couch_stats:increment_counter([fsync, count]),
+    Res.
 
 find_header(Fd, Block) ->
     case (catch load_header(Fd, Block)) of

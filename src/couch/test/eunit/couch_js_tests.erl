@@ -53,6 +53,11 @@ should_create_sandbox() ->
     ?assertMatch([[[true, <<_/binary>>]]], Result),
     [[[true, ErrMsg]]] = Result,
     ?assertNotEqual([], binary:matches(ErrMsg, <<"not defined">>)),
+    ?assert(couch_stats:sample([couchdb, query_server, process_starts]) > 0),
+    ?assert(couch_stats:sample([couchdb, query_server, process_prompts]) > 0),
+    ?assert(couch_stats:sample([couchdb, query_server, acquired_processes]) > 0),
+    ?assert(couch_stats:sample([couchdb, query_server, process_exists]) >= 0),
+    ?assert(couch_stats:sample([couchdb, query_server, process_errors]) >= 0),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
@@ -274,7 +279,8 @@ should_exit_on_internal_error() ->
         % It may fail and just exit the process. That's expected as well
         throw:{os_process_error, _} ->
             ok
-    end.
+    end,
+    ?assert(couch_stats:sample([couchdb, query_server, process_errors]) > 0).
 
 trigger_oom(Proc) ->
     Status =
