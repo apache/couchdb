@@ -81,13 +81,17 @@ get_proc(#doc{body = {Props}} = DDoc, DbKey, {_DDocId, _Rev} = DDocKey) ->
     Lang = couch_util:to_binary(LangStr),
     Client = #client{lang = Lang, ddoc = DDoc, db_key = DbKey, ddoc_key = DDocKey},
     Timeout = get_os_process_timeout(),
-    gen_server:call(?MODULE, {get_proc, Client}, Timeout).
+    Res = gen_server:call(?MODULE, {get_proc, Client}, Timeout),
+    couch_stats:increment_counter([couchdb, query_server, acquired_processes]),
+    Res.
 
 get_proc(LangStr) ->
     Lang = couch_util:to_binary(LangStr),
     Client = #client{lang = Lang},
     Timeout = get_os_process_timeout(),
-    gen_server:call(?MODULE, {get_proc, Client}, Timeout).
+    Res = gen_server:call(?MODULE, {get_proc, Client}, Timeout),
+    couch_stats:increment_counter([couchdb, query_server, acquired_processes]),
+    Res.
 
 ret_proc(#proc{} = Proc) ->
     gen_server:call(?MODULE, {ret_proc, Proc}, infinity).

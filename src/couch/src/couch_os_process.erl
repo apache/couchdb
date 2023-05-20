@@ -169,6 +169,7 @@ init([Command, Options, PortOptions]) ->
     KillCmd = iolist_to_binary(readline(BaseProc)),
     Pid = self(),
     couch_log:debug("OS Process Start :: ~p", [BaseProc#os_proc.port]),
+    couch_stats:increment_counter([couchdb, query_server, process_starts]),
     spawn(fun() ->
         % this ensure the real os process is killed when this process dies.
         erlang:monitor(process, Pid),
@@ -207,13 +208,17 @@ handle_call({prompt, Data}, _From, #os_proc{idle = Idle} = OsProc) ->
     #os_proc{writer = Writer, reader = Reader} = OsProc,
     try
         Writer(OsProc, Data),
+        couch_stats:increment_counter([couchdb, query_server, process_prompts]),
         {reply, {ok, Reader(OsProc)}, OsProc, Idle}
     catch
         throw:{error, OsError} ->
+            couch_stats:increment_counter([couchdb, query_server, process_errors]),
             {reply, OsError, OsProc, Idle};
         throw:{fatal, OsError} ->
+            couch_stats:increment_counter([couchdb, query_server, process_errors]),
             {stop, normal, OsError, OsProc};
         throw:OtherError ->
+            couch_stats:increment_counter([couchdb, query_server, process_errors]),
             {stop, normal, OtherError, OsProc}
     after
         garbage_collect()
@@ -243,9 +248,11 @@ handle_info(timeout, #os_proc{idle = Idle} = OsProc) ->
     {noreply, OsProc, Idle};
 handle_info({Port, {exit_status, 0}}, #os_proc{port = Port} = OsProc) ->
     couch_log:info("OS Process terminated normally", []),
+    couch_stats:increment_counter([couchdb, query_server, process_exits]),
     {stop, normal, OsProc};
 handle_info({Port, {exit_status, Status}}, #os_proc{port = Port} = OsProc) ->
     couch_log:error("OS Process died with status: ~p", [Status]),
+    couch_stats:increment_counter([couchdb, query_server, process_error_exits]),
     {stop, {exit_status, Status}, OsProc};
 handle_info(Msg, #os_proc{idle = Idle} = OsProc) ->
     couch_log:debug("OS Proc: Unknown info: ~p", [Msg]),

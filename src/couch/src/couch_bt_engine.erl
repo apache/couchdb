@@ -570,6 +570,7 @@ commit_data(St) ->
             couch_file:sync(Fd),
             ok = couch_file:write_header(Fd, NewHeader),
             couch_file:sync(Fd),
+            couch_stats:increment_counter([couchdb, commits]),
             {ok, St#st{
                 header = NewHeader,
                 needs_commit = false

@@ -295,6 +295,10 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts) ->
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
         {update_docs, Client, GroupedDocs, [], MergeConflicts} ->
+            case MergeConflicts of
+                true -> couch_stats:increment_counter([couchdb, coalesced_updates, replicated]);
+                false -> couch_stats:increment_counter([couchdb, coalesced_updates, interactive])
+            end,
             GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2),

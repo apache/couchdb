@@ -43,6 +43,7 @@ cpse_write_one_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
+    Commits = couch_stats:sample([couchdb, commits]),
 
     Actions = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}}
@@ -57,7 +58,9 @@ cpse_write_one_doc(Db1) ->
     ?assertEqual(1, couch_db_engine:get_doc_count(Db3)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db3)),
     ?assertEqual(1, couch_db_engine:get_update_seq(Db3)),
-
+    ?assert(couch_stats:sample([couchdb, commits]) > Commits),
+    ?assert(couch_stats:sample([couchdb, coalesced_updates, interactive]) >= 0),
+    ?assert(couch_stats:sample([couchdb, coalesced_updates, replicated]) >= 0),
     [FDI] = couch_db_engine:open_docs(Db3, [<<"foo">>]),
     #rev_info{
         rev = {RevPos, PrevRevId},
