@@ -573,8 +573,7 @@ class NumStringTests(mango.DbPerClass):
     def setUpClass(klass):
         super(NumStringTests, klass).setUpClass()
         klass.db.recreate()
-        if mango.has_text_service():
-            klass.db.create_text_index()
+        klass.db.create_text_index()
 
     # not available for python 2.7.x
     def isFinite(num):
