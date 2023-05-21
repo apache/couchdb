@@ -249,8 +249,7 @@ class TextIndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
         super(TextIndexSelectionTests, klass).setUpClass()
-        if mango.has_text_service():
-            user_docs.add_text_indexes(klass.db, {})
+        user_docs.add_text_indexes(klass.db, {})
 
     def test_with_text(self):
         resp = self.db.find(
@@ -315,9 +314,8 @@ class MultiTextIndexSelectionTests(mango.UserDocsTests):
     @classmethod
     def setUpClass(klass):
         super(MultiTextIndexSelectionTests, klass).setUpClass()
-        if mango.has_text_service():
-            klass.db.create_text_index(ddoc="foo", analyzer="keyword")
-            klass.db.create_text_index(ddoc="bar", analyzer="email")
+        klass.db.create_text_index(ddoc="foo", analyzer="keyword")
+        klass.db.create_text_index(ddoc="bar", analyzer="email")
 
     def test_fallback_to_json_with_multi_text(self):
         resp = self.db.find(
