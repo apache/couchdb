@@ -256,6 +256,16 @@ HTTP Server Options
             [chttpd]
             admin_only_all_dbs = true
 
+    .. config:option:: server_header_versions :: Whether to send version info Server header
+
+        .. versionadded:: 3.4
+
+        Set to false to remove the CouchDB and Erlang/OTP versions from the Server response
+        header. ::
+
+            [chttpd]
+            server_header_versions = true
+
 .. config:section:: httpd :: HTTP Server Options
 
     .. versionchanged:: 3.2 These options were moved to [chttpd] section:

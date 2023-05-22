@@ -1202,11 +1202,16 @@ negotiate_content_type(_Req) ->
     end.
 
 server_header() ->
-    [
-        {"Server",
-            "CouchDB/" ++ couch_server:get_version() ++
-                " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}
-    ].
+    case chttpd_util:get_chttpd_config_boolean("server_header_versions", true) of
+        false ->
+            [{"Server", "CouchDB"}];
+        true ->
+            [
+                {"Server",
+                    "CouchDB/" ++ couch_server:get_version() ++
+                        " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}
+            ]
+    end.
 
 -record(mp, {boundary, buffer, data_fun, callback}).
 
