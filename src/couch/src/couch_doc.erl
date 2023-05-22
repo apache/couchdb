@@ -347,7 +347,7 @@ transfer_fields([{<<"_conflicts">>, _} | Rest], Doc, DbName) ->
     transfer_fields(Rest, Doc, DbName);
 transfer_fields([{<<"_deleted_conflicts">>, _} | Rest], Doc, DbName) ->
     transfer_fields(Rest, Doc, DbName);
-transfer_fields([{<<"_access">>, Access} = Field | Rest], Doc, DbName) ->
+transfer_fields([{<<"_access">>, Access} | Rest], Doc, DbName) ->
     transfer_fields(Rest, Doc#doc{access = Access}, DbName);
 % special fields for replication documents
 transfer_fields(

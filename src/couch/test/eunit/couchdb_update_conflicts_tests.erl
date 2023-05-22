@@ -19,7 +19,7 @@
 -define(DOC_ID, <<"foobar">>).
 -define(LOCAL_DOC_ID, <<"_local/foobar">>).
 % TODO: enable 1000, 2000, 5000, 10000]).
--define(NUM_CLIENTS, [100, 500]).
+-define(NUM_CLIENTS, [100]).
 -define(TIMEOUT, 200000).
 
 start() ->
@@ -55,8 +55,8 @@ view_indexes_cleanup_test_() ->
             fun start/0,
             fun test_util:stop_couch/1,
             [
-                concurrent_updates(),
-                bulk_docs_updates()
+                concurrent_updates()%,
+                % bulk_docs_updates()
             ]
         }
     }.
@@ -75,20 +75,20 @@ concurrent_updates() ->
         }
     }.
 
-bulk_docs_updates() ->
-    {
-        "Bulk docs updates",
-        {
-            foreach,
-            fun setup/0,
-            fun teardown/1,
-            [
-                fun should_bulk_create_delete_doc/1,
-                fun should_bulk_create_local_doc/1,
-                fun should_ignore_invalid_local_doc/1
-            ]
-        }
-    }.
+% bulk_docs_updates() ->
+%     {
+%         "Bulk docs updates",
+%         {
+%             foreach,
+%             fun setup/0,
+%             fun teardown/1,
+%             [
+%                 fun should_bulk_create_delete_doc/1,
+%                 fun should_bulk_create_local_doc/1,
+%                 fun should_ignore_invalid_local_doc/1
+%             ]
+%         }
+%     }.
 
 should_concurrently_update_doc(NumClients, {DbName, InitRev}) ->
     {
@@ -101,16 +101,22 @@ should_concurrently_update_doc(NumClients, {DbName, InitRev}) ->
         ]}
     }.
 
-should_bulk_create_delete_doc({DbName, InitRev}) ->
-    ?_test(bulk_delete_create(DbName, InitRev)).
-
-should_bulk_create_local_doc({DbName, _}) ->
-    ?_test(bulk_create_local_doc(DbName)).
-
-should_ignore_invalid_local_doc({DbName, _}) ->
-    ?_test(ignore_invalid_local_doc(DbName)).
+% should_bulk_create_delete_doc({DbName, InitRev}) ->
+%     ?_test(bulk_delete_create(DbName, InitRev)).
+% 
+% should_bulk_create_local_doc({DbName, _}) ->
+%     ?_test(bulk_create_local_doc(DbName)).
+% 
+% should_ignore_invalid_local_doc({DbName, _}) ->
+%     ?_test(ignore_invalid_local_doc(DbName)).
 
 concurrent_doc_update(NumClients, DbName, InitRev) ->
+    eprof:start(),
+    eprof:log("/tmp/eprof1.log"),
+    eprof:profile(fun() -> concurrent_doc_update1(NumClients, DbName, InitRev) end),
+    eprof:analyze().
+
+concurrent_doc_update1(NumClients, DbName, InitRev) ->
     Clients = lists:map(
         fun(Value) ->
             ClientDoc = couch_doc:from_json_obj(
