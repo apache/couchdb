@@ -95,7 +95,7 @@ while getopts ":hn:c:l:mvt:" optionName; do
     t)
       TLSCONF=$OPTARG
       if [ ! -f "$TLSCONF" ]; then
-        echo "ERROR: Could't find the file \"$TLSCONF\"." >&2
+        echo "ERROR: Couldn't find the file \"$TLSCONF\"." >&2
         exit 1
       fi
       ;;

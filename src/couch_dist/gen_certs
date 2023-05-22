@@ -1,0 +1,43 @@
+#!/bin/sh
+set -e
+
+certs_dir="$(cd "${0%/*}" 2>/dev/null; echo "${PWD}")/certs"
+cd "${certs_dir}"
+mkdir -p "${certs_dir}/out"
+
+if [ ! -e "${certs_dir}/out/ca-cert.pem" ]; then
+  ./certs self-signed \
+    --out-cert out/ca-cert.pem --out-key out/ca-key.pem \
+    --template root-ca \
+    --subject "/CN=CouchDB Root CA"
+fi
+
+if [ ! -e "${certs_dir}/out/cert.pem" ]; then
+  ./certs create-cert \
+    --issuer-cert out/ca-cert.pem --issuer-key out/ca-key.pem \
+    --out-cert out/cert.pem --out-key out/key.pem \
+    --template server \
+    --subject "/CN=127.0.0.1"
+fi
+
+if [ ! -e "${certs_dir}/out/couch_dist.conf" ]; then
+  cat <<EOF >"${certs_dir}/out/couch_dist.conf"
+[
+  {server, [
+    {cacertfile, "$(pwd)/out/ca-cert.pem"},
+    {certfile,   "$(pwd)/out/cert.pem"},
+    {keyfile,    "$(pwd)/out/key.pem"},
+    {secure_renegotiate, true},
+    {verify, verify_peer},
+    {fail_if_no_peer_cert, true}
+  ]},
+  {client, [
+    {cacertfile, "$(pwd)/out/ca-cert.pem"},
+    {certfile,   "$(pwd)/out/cert.pem"},
+    {keyfile,    "$(pwd)/out/key.pem"},
+    {secure_renegotiate, true},
+    {verify, verify_peer}
+  ]}
+].
+EOF
+fi
