@@ -30,8 +30,6 @@ dev/*.beam
 dev/devnode.*
 dev/lib/
 dev/logs/
-dev/erlserver.pem
-dev/couch_ssl_dist.conf
 ebin/
 erl_crash.dump
 erln8.config

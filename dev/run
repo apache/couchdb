@@ -117,7 +117,7 @@ def setup_argparse():
 
 
 def get_args_parser():
-    parser = optparse.OptionParser(description="Runs CouchDB 2.0 dev cluster")
+    parser = optparse.OptionParser(description="Runs CouchDB dev cluster")
     parser.add_option(
         "-a",
         "--admin",
@@ -234,6 +234,20 @@ def get_args_parser():
         action="store_true",
         help="Start Nouveau server",
     )
+    parser.add_option(
+        "-t",
+        "--enable-tls",
+        dest="enable_tls",
+        default=False,
+        action="store_true",
+        help="Enable custom TLS distribution -- couch",
+    )
+    parser.add_option(
+        "--no-tls",
+        dest="no_tls",
+        default=None,
+        help="Use TCP for specified node when TLS distribution is enabled",
+    )
     return parser
 
 
@@ -264,6 +278,8 @@ def setup_context(opts, args):
         "auto_ports": opts.auto_ports,
         "locald_configs": opts.locald_configs,
         "with_nouveau": opts.with_nouveau,
+        "enable_tls": opts.enable_tls,
+        "no_tls": opts.no_tls,
     }
 
 
@@ -421,6 +437,8 @@ def cluster_port(ctx, n):
 def write_config(ctx, node, env):
     etc_src = os.path.join(ctx["rootdir"], "rel", "overlay", "etc")
     etc_tgt = ensure_dir_exists(ctx["devdir"], "lib", node, "etc")
+    if ctx["enable_tls"]:
+        sp.call(["./src/couch_dist/gen_certs"], cwd=ctx["rootdir"])
 
     for fname in glob.glob(os.path.join(etc_src, "*")):
         base = os.path.basename(fname)
@@ -440,6 +458,8 @@ def write_config(ctx, node, env):
             content = apply_config_overrides(ctx, content)
         elif base == "local.ini":
             content = hack_local_ini(ctx, content)
+        elif ctx["enable_tls"] and base == "vm.args":
+            content = hack_vm_args(ctx, node, content)
 
         with open(tgt, "w") as handle:
             handle.write(content)
@@ -522,6 +542,20 @@ def hack_local_ini(ctx, contents):
     contents = contents + "\n%s = %s" % (user, hashify(pswd))
 
     return contents + "\n\n[chttpd_auth]\nsecret = %s\n" % COMMON_SALT
+
+
+def hack_vm_args(ctx, node, contents):
+    contents += f"""
+-proto_dist couch
+-couch_dist no_tls '"clouseau{node[-1]}@127.0.0.1"'
+-ssl_dist_optfile {ctx["rootdir"]}/src/couch_dist/certs/out/couch_dist.conf
+    """
+    if ctx["no_tls"]:
+        no_tls_nodes = ctx["no_tls"].split(",")
+        for node_name in no_tls_nodes:
+            node_name = node_name if "@" in node_name else f"{node_name}@127.0.0.1"
+            contents += f"""\n-couch_dist no_tls '"{node_name}"'"""
+    return contents
 
 
 def gen_password():

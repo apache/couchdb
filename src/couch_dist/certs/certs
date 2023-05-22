@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# Source code: https://github.com/rnewson/elixir-certs/
+# We want the keys to be u=rw,go=, but there's no way to do that in
+# Elixir without race conditions, afaict, so we use umask:
+umask 077
+
+SCRIPT=$(readlink -f "$0")
+SCRIPTPATH=$(dirname "$SCRIPT")
+
+exec elixir "$SCRIPTPATH/certs.exs" "$@"

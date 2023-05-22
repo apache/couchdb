@@ -29,28 +29,53 @@ Reference: `Using TLS for Erlang Distribution`_
 
 Generate Certificate
 ====================
-For TLS to work properly, at least one public key and one certificate must be
-specified. In the following example (couch_ssl_dist.conf), the PEM file contains
-the ``certificate`` and its ``private key``.
+To distribute using TLS, appropriate certificates need to be provided.
+In the following example (couch_dist.conf), the cert.pem certificate must be
+trusted by a root certificate known to the server, and the erlserver.pem file
+contains the "certificate" and its "private key".
 
     .. code-block:: text
 
         [{server,
-          [{certfile, "</path/to/erlserver.pem>"},
-           {secure_renegotiate, true}]},
+          [{cacertfile, "</absolute_path/to/ca-cert.pem>"},
+           {certfile,   "</absolute_path/to/erlserver.pem>"},
+           {secure_renegotiate, true},
+           {verify, verify_peer},
+           {fail_if_no_peer_cert, true}]},
          {client,
-          [{secure_renegotiate, true}]}].
+          [{cacertfile, "</absolute_path/to/ca-cert.pem>"},
+           {keyfile,    "</absolute_path/to/key.pem>"},
+           {certfile,   "</absolute_path/to/cert.pem>"},
+           {secure_renegotiate, true},
+           {verify, verify_peer}]}].
 
-The following command is an example of generating a certificate (PEM) file.
+You can use ``{verify, verify_peer}`` to enable verification,
+but it requires appropriate certificates to verify.
+
+This is an example of generating certificates.
 
     .. code-block:: bash
 
-        $ openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout key.pem -out cert.pem
-        $ cat key.pem cert.pem > erlserver.pem && rm key.pem cert.pem
+        $ git clone https://github.com/rnewson/elixir-certs
+        $ cd elixir-certs
+        $ ./certs self-signed \
+            --out-cert ca-cert.pem --out-key ca-key.pem \
+            --template root-ca \
+            --subject "/CN=CouchDB Root CA"
+        $./certs create-cert \
+            --issuer-cert ca-cert.pem --issuer-key ca-key.pem \
+            --out-cert cert.pem --out-key key.pem \
+            --template server \
+            --subject "/CN=<hostname>"
+        $ cat key.pem cert.pem >erlserver.pem
 
     .. note::
-       This is **not** an endorsement of a specific expiration limit,
-       key size or algorithm.
+        * The above examples are **not** an endorsement of specific expiration limits, key sizes, or algorithms.
+        * If option ``verify_peer`` is set, the ``server_name_indication`` option should also be specified.
+        * The option ``{fail_if_no_peer_cert, true}`` should only be used on the server side in OTP 26,
+          for previous versions it can be specified both on the server side and client side.
+        * When generating certificates, make sure Common Name (FQDN) should be different in CA certificate and certificate.
+          Also, FQDN in the certificate should be the same as the hostname.
 
 Config Settings
 ===============
@@ -62,7 +87,7 @@ To enable TLS distribution, make sure to set custom parameters in ``vm.args``.
 
         -proto_dist couch
         -couch_dist no_tls \"clouseau@127.0.0.1\"
-        -ssl_dist_optfile <path/to/couch_ssl_dist.conf>
+        -ssl_dist_optfile </absolute_path/to/couch_dist.conf>
 
     .. note::
        * The default value of ``no_tls`` is ``false``. If the user does not
@@ -90,7 +115,7 @@ The ``no_tls`` flag can have these values:
 
         # Specify node1 and node2 to use TCP, others use TLS
 
-        -couch_dist no_tls \"node1@127.0.0.1\"
+        -couch_dist no_tls '"node1@127.0.0.1"'
         -couch_dist no_tls \"node2@127.0.0.1\"
 
     .. code-block:: text
@@ -119,4 +144,4 @@ Start Erlang using a remote shell connected to Node.
 
     .. code-block:: bash
 
-        $ ./remsh -t <path/to/couch_ssl_dist.conf>
+        $ ./remsh -t </absolute_path/to/couch_dist.conf>

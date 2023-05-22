@@ -476,7 +476,7 @@ clean:
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
-	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
+	@rm -f src/couch_dist/certs/out
 ifeq ($(with_nouveau), 1)
 	@cd nouveau && ./gradlew clean
 endif
