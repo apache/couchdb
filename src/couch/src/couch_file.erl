@@ -399,7 +399,7 @@ read_header(Fd) ->
     end.
 
 write_header(Fd, Data) ->
-    Bin = term_to_binary(Data),
+    Bin = ?term_to_bin(Data),
     Md5 = couch_hash:md5_hash(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,

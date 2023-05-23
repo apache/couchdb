@@ -360,7 +360,7 @@ is_deleted(Change) ->
 rotate_list(_Key, []) ->
     [];
 rotate_list(Key, List) when not is_binary(Key) ->
-    rotate_list(term_to_binary(Key), List);
+    rotate_list(?term_to_bin(Key), List);
 rotate_list(Key, List) ->
     {H, T} = lists:split(erlang:crc32(Key) rem length(List), List),
     T ++ H.

@@ -467,12 +467,14 @@ format_meta(Meta) ->
     %% https://www.rfc-editor.org/rfc/rfc5424.html#section-6.3
     %% iut="3" eventSource="Application" eventID="1011"
     string:join(
-        maps:fold(
-            fun(K, V, Acc) ->
-                [to_str(K, V) | Acc]
-            end,
-            [],
-            Meta
+        lists:sort(
+            maps:fold(
+                fun(K, V, Acc) ->
+                    [to_str(K, V) | Acc]
+                end,
+                [],
+                Meta
+            )
         ),
         " "
     ).

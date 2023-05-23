@@ -366,11 +366,11 @@ gen_write(Db, {Action, {DocId, Body, Atts}}) ->
     }}.
 
 gen_rev(A, DocId, {Pos, Rev}, Body, Atts) when A == update; A == delete ->
-    NewRev = couch_hash:md5_hash(term_to_binary({DocId, Rev, Body, Atts})),
+    NewRev = couch_hash:md5_hash(?term_to_bin({DocId, Rev, Body, Atts})),
     {Pos + 1, [NewRev, Rev]};
 gen_rev(conflict, DocId, _, Body, Atts) ->
     UUID = couch_uuids:random(),
-    NewRev = couch_hash:md5_hash(term_to_binary({DocId, UUID, Body, Atts})),
+    NewRev = couch_hash:md5_hash(?term_to_bin({DocId, UUID, Body, Atts})),
     {1, [NewRev]}.
 
 prep_atts(_Db, []) ->

@@ -392,7 +392,7 @@ makefun(State, Source) ->
     BindFuns = bindings(State, Sig),
     {Sig, makefun(State, Source, BindFuns)}.
 makefun(State, Source, {DDoc}) ->
-    Sig = couch_hash:md5_hash(lists:flatten([Source, term_to_binary(DDoc)])),
+    Sig = couch_hash:md5_hash(lists:flatten([Source, ?term_to_bin(DDoc)])),
     BindFuns = bindings(State, Sig, {DDoc}),
     {Sig, makefun(State, Source, BindFuns)};
 makefun(_State, Source, BindFuns) when is_list(BindFuns) ->

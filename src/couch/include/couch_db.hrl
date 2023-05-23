@@ -33,6 +33,7 @@
 -define(i2b(V), couch_util:integer_to_boolean(V)).
 -define(b2i(V), couch_util:boolean_to_integer(V)).
 -define(term_to_bin(T), term_to_binary(T, [{minor_version, 1}])).
+-define(term_to_bin(T, O), term_to_binary(T, O ++ [{minor_version, 1}])).
 -define(term_size(T), erlang:external_size(T, [{minor_version, 1}])).
 
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).

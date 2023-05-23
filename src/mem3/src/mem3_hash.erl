@@ -21,6 +21,7 @@
 ]).
 
 -include_lib("mem3/include/mem3.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 calculate(#shard{opts = Opts}, DocId) ->
     Props = couch_util:get_value(props, Opts, []),
@@ -53,7 +54,7 @@ get_hash_fun(DbName0) when is_binary(DbName0) ->
 crc32(Item) when is_binary(Item) ->
     erlang:crc32(Item);
 crc32(Item) ->
-    erlang:crc32(term_to_binary(Item)).
+    erlang:crc32(?term_to_bin(Item)).
 
 get_hash_fun_int(Opts) when is_list(Opts) ->
     case lists:keyfind(hash, 1, Opts) of

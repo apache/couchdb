@@ -72,7 +72,7 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
                         couch_util:to_hex(
                             crypto:hash(
                                 sha256,
-                                term_to_binary(
+                                ?term_to_bin(
                                     {DefaultAnalyzer, FieldAnalyzers, Def}
                                 )
                             )

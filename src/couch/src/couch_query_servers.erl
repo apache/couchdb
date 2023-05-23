@@ -377,7 +377,7 @@ get_number(Key, Props) ->
 approx_count_distinct(reduce, KVs) ->
     lists:foldl(
         fun([[Key, _Id], _Value], Filter) ->
-            hyper:insert(term_to_binary(Key), Filter)
+            hyper:insert(?term_to_bin(Key), Filter)
         end,
         hyper:new(11),
         KVs

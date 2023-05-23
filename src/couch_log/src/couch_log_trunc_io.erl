@@ -352,7 +352,7 @@ map_body(Map, Max, #print_options{depth = Depth}) when Max < 4; Depth =:= 0 ->
         _ -> {"...", 3}
     end;
 map_body(Map, Max, Options) ->
-    case maps:to_list(Map) of
+    case lists:sort(maps:to_list(Map)) of
         [] ->
             {[], 0};
         [{Key, Value} | Rest] ->
