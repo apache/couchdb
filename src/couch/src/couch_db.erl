@@ -1320,7 +1320,7 @@ update_docs(Db, Docs0, Options, ?REPLICATED_CHANGES) ->
         )
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors} =
+    {ok, DocBuckets, LocalDocs, DocErrors} =
         before_docs_update(Db, Docs, PrepValidateFun, ?REPLICATED_CHANGES),
 
     DocBuckets2 = [
@@ -1333,8 +1333,8 @@ update_docs(Db, Docs0, Options, ?REPLICATED_CHANGES) ->
     {ok, _} = write_and_commit(
         Db,
         DocBuckets2,
-        NonRepDocs,
-        [merge_conflicts | Options]
+        LocalDocs,
+        [?REPLICATED_CHANGES | Options]
     ),
     {ok, DocErrors};
 update_docs(Db, Docs0, Options, ?INTERACTIVE_EDIT) ->
@@ -1352,7 +1352,7 @@ update_docs(Db, Docs0, Options, ?INTERACTIVE_EDIT) ->
         )
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors} =
+    {ok, DocBuckets, LocalDocs, DocErrors} =
         before_docs_update(Db, Docs, PrepValidateFun, ?INTERACTIVE_EDIT),
 
     if
@@ -1372,7 +1372,7 @@ update_docs(Db, Docs0, Options, ?INTERACTIVE_EDIT) ->
         true ->
             Options2 =
                 if
-                    AllOrNothing -> [merge_conflicts];
+                    AllOrNothing -> [?REPLICATED_CHANGES];
                     true -> []
                 end ++ Options,
             DocBuckets2 = [
@@ -1392,7 +1392,7 @@ update_docs(Db, Docs0, Options, ?INTERACTIVE_EDIT) ->
             {ok, CommitResults} = write_and_commit(
                 Db,
                 DocBuckets3,
-                NonRepDocs,
+                LocalDocs,
                 Options2
             ),
 
@@ -1451,14 +1451,14 @@ collect_results(Pid, MRef, ResultsAcc) ->
 write_and_commit(
     #db{main_pid = Pid, user_ctx = Ctx} = Db,
     DocBuckets1,
-    NonRepDocs,
+    LocalDocs,
     Options
 ) ->
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
-    MergeConflicts = lists:member(merge_conflicts, Options),
+    ReplicatedChanges = lists:member(?REPLICATED_CHANGES, Options),
     MRef = erlang:monitor(process, Pid),
     try
-        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts},
+        Pid ! {update_docs, self(), DocBuckets, LocalDocs, ReplicatedChanges},
         case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} ->
                 {ok, Results};
@@ -1473,7 +1473,7 @@ write_and_commit(
                 % We only retry once
                 DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
                 close(Db2),
-                Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts},
+                Pid ! {update_docs, self(), DocBuckets3, LocalDocs, ReplicatedChanges},
                 case collect_results_with_metrics(Pid, MRef, []) of
                     {ok, Results} -> {ok, Results};
                     retry -> throw({update_error, compaction_retry})
@@ -1521,7 +1521,7 @@ before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType
         (#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
         (_) -> false
     end,
-    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
+    {LocalDocs, Docs2} = lists:partition(IsLocal, Docs),
 
     BucketList = group_alike_docs(Docs2),
 
@@ -1551,9 +1551,9 @@ before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType
             {DocBuckets2, DocErrors} = PVFun(Db, DocBuckets, ExistingDocs),
             % remove empty buckets
             DocBuckets3 = [Bucket || Bucket <- DocBuckets2, Bucket /= []],
-            {ok, DocBuckets3, NonRepDocs, DocErrors};
+            {ok, DocBuckets3, LocalDocs, DocErrors};
         false ->
-            {ok, DocBuckets, NonRepDocs, []}
+            {ok, DocBuckets, LocalDocs, []}
     end.
 
 set_new_att_revpos(#doc{revs = {RevPos, _Revs}, atts = Atts0} = Doc) ->

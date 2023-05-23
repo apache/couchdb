@@ -26,7 +26,7 @@
 
 -record(merge_acc, {
     revs_limit,
-    merge_conflicts,
+    replicated_changes,
     add_infos = [],
     rem_seqs = [],
     cur_seq,
@@ -165,23 +165,23 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     {stop, Msg, Db}.
 
 handle_info(
-    {update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts},
+    {update_docs, Client, GroupedDocs, LocalDocs, ReplicatedChanges},
     Db
 ) ->
     GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
     if
-        NonRepDocs == [] ->
+        LocalDocs == [] ->
             {GroupedDocs3, Clients} = collect_updates(
                 GroupedDocs2,
                 [Client],
-                MergeConflicts
+                ReplicatedChanges
             );
         true ->
             GroupedDocs3 = GroupedDocs2,
             Clients = [Client]
     end,
-    NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
-    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts) of
+    LocalDocs2 = [{Client, NRDoc} || NRDoc <- LocalDocs],
+    try update_docs_int(Db, GroupedDocs3, LocalDocs2, ReplicatedChanges) of
         {ok, Db2, UpdatedDDocIds} ->
             ok = couch_server:db_updated(Db2),
             case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
@@ -189,7 +189,7 @@ handle_info(
                 _ -> couch_event:notify(Db2#db.name, updated)
             end,
             if
-                NonRepDocs2 /= [] ->
+                LocalDocs2 /= [] ->
                     couch_event:notify(Db2#db.name, local_updated);
                 true ->
                     ok
@@ -288,14 +288,14 @@ merge_updates([], RestB) ->
 merge_updates(RestA, []) ->
     RestA.
 
-collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts) ->
+collect_updates(GroupedDocsAcc, ClientsAcc, ReplicatedChanges) ->
     receive
-        % Only collect updates with the same MergeConflicts flag and without
+        % Only collect updates with the same ReplicatedChanges flag and without
         % local docs. It's easier to just avoid multiple _local doc
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
-        {update_docs, Client, GroupedDocs, [], MergeConflicts} ->
-            case MergeConflicts of
+        {update_docs, Client, GroupedDocs, [], ReplicatedChanges} ->
+            case ReplicatedChanges of
                 true -> couch_stats:increment_counter([couchdb, coalesced_updates, replicated]);
                 false -> couch_stats:increment_counter([couchdb, coalesced_updates, interactive])
             end,
@@ -305,7 +305,7 @@ collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts) ->
             collect_updates(
                 GroupedDocsAcc2,
                 [Client | ClientsAcc],
-                MergeConflicts
+                ReplicatedChanges
             )
     after 0 ->
         {GroupedDocsAcc, ClientsAcc}
@@ -485,7 +485,7 @@ merge_rev_trees([], [], Acc) ->
 merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
     #merge_acc{
         revs_limit = Limit,
-        merge_conflicts = MergeConflicts,
+        replicated_changes = ReplicatedChanges,
         full_partitions = FullPartitions
     } = Acc,
 
@@ -493,9 +493,9 @@ merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id),
     NewDocInfo0 = lists:foldl(
         fun({Client, NewDoc}, OldInfoAcc) ->
-            NewInfo = merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts),
+            NewInfo = merge_rev_tree(OldInfoAcc, NewDoc, Client, ReplicatedChanges),
             case is_overflowed(NewInfo, OldInfoAcc, FullPartitions) of
-                true when not MergeConflicts ->
+                true when not ReplicatedChanges ->
                     DocId = NewInfo#full_doc_info.id,
                     send_result(Client, NewDoc, {partition_overflow, DocId}),
                     OldInfoAcc;
@@ -507,14 +507,14 @@ merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
         NewDocs
     ),
     NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
-    % When MergeConflicts is false, we updated #full_doc_info.deleted on every
+    % When ReplicatedChanges is false, we updated #full_doc_info.deleted on every
     % iteration of merge_rev_tree. However, merge_rev_tree does not update
-    % #full_doc_info.deleted when MergeConflicts is true, since we don't need
+    % #full_doc_info.deleted when ReplicatedChanges is true, since we don't need
     % to know whether the doc is deleted between iterations. Since we still
     % need to know if the doc is deleted after the merge happens, we have to
     % set it here.
     NewDocInfo2 =
-        case MergeConflicts of
+        case ReplicatedChanges of
             true ->
                 NewDocInfo1#full_doc_info{
                     deleted = couch_doc:is_deleted(NewDocInfo1)
@@ -659,7 +659,7 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
             Info
     end.
 
-update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
+update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
@@ -705,7 +705,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     % Merge the new docs into the revision trees.
     AccIn = #merge_acc{
         revs_limit = RevsLimit,
-        merge_conflicts = MergeConflicts,
+        replicated_changes = ReplicatedChanges,
         add_infos = [],
         rem_seqs = [],
         cur_seq = UpdateSeq,
