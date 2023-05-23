@@ -63,7 +63,7 @@ init(_) ->
     ok = subscribe_for_config(),
     Delay = config:get_integer("mem3", "sync_delay", 5000),
     Frequency = config:get_integer("mem3", "sync_frequency", 500),
-    Buckets = lists:duplicate(Delay div Frequency + 1, sets:new()),
+    Buckets = lists:duplicate(Delay div Frequency + 1, sets:new([{version, 2}])),
     St = #state{
         nodes = mem3_sync:nodes_db(),
         shards = mem3_sync:shards_db(),
@@ -163,7 +163,7 @@ rebucket_shards(Frequency, Delay, Buckets0) ->
             [sets:union([B | ToMerge]) | Buckets1];
         M ->
             %% Extend the number of buckets by M
-            lists:duplicate(M, sets:new()) ++ Buckets0
+            lists:duplicate(M, sets:new([{version, 2}])) ++ Buckets0
     end.
 
 %% To ensure that mem3_sync:push/2 is indeed called with roughly the frequency
@@ -180,7 +180,7 @@ maybe_push_shards(St) ->
     case Delta > Frequency of
         true ->
             {Buckets1, [ToPush]} = lists:split(length(Buckets0) - 1, Buckets0),
-            Buckets2 = [sets:new() | Buckets1],
+            Buckets2 = [sets:new([{version, 2}]) | Buckets1],
             %% There's no sets:map/2!
             sets:fold(
                 fun(ShardName, _) -> push_shard(ShardName) end,

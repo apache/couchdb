@@ -69,7 +69,7 @@ init([]) ->
     State = #state{
         update_db = UpdateDb,
         pending_update_count = 0,
-        pending_updates = sets:new(),
+        pending_updates = sets:new([{version, 2}]),
         max_write_delay = MaxWriteDelay,
         dbname = GlobalChangesDbName,
         handler_ref = erlang:monitor(process, Handler)
@@ -106,7 +106,7 @@ handle_cast({set_update_db, Boolean}, State0) ->
             {false, true} ->
                 State0#state{
                     update_db = Boolean,
-                    pending_updates = sets:new(),
+                    pending_updates = sets:new([{version, 2}]),
                     pending_update_count = 0
                 };
             _ ->
@@ -177,7 +177,7 @@ flush_updates(State) ->
         0
     ),
     {noreply, State#state{
-        pending_updates = sets:new(),
+        pending_updates = sets:new([{version, 2}]),
         pending_update_count = 0
     }}.
 
