@@ -1,4 +1,5 @@
 nose2==0.11.0
-requests==2.31.0
+# requests 2.27.1 is the highest supported version
+# on ubuntu 18 and centos 7 CI workers
+requests==2.27.1
 hypothesis==6.31.6
-
