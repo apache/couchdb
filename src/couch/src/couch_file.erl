@@ -643,13 +643,14 @@ format_status(_Opt, [PDict, #file{} = File]) ->
     [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
 
 fsync(Fd) ->
-    % Our metrics histograms are in milliseconds so stick to that pattern.
-    % However we measure the time delta in microseconds so we get fractional
-    % microseconds for cases when the disk drives are faster.
-    T0 = erlang:monotonic_time(microsecond),
+    T0 = erlang:monotonic_time(),
     Res = file:sync(Fd),
-    DtUSec = erlang:monotonic_time(microsecond) - T0,
-    couch_stats:update_histogram([fsync, time], DtUSec / 1000),
+    T1 = erlang:monotonic_time(),
+    % Since histograms can consume floating point values we can measure in
+    % nanoseconds, then turn it into floating point milliseconds
+    DtNSec = erlang:convert_time_unit(T1 - T0, native, nanosecond),
+    DtMSec = DtNSec / 1000000,
+    couch_stats:update_histogram([fsync, time], DtMSec),
     couch_stats:increment_counter([fsync, count]),
     Res.
 
