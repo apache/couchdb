@@ -799,7 +799,15 @@ do_checkpoint(State) ->
         {target_error, Reason} ->
             {checkpoint_commit_failure,
                 <<"Failure on target commit: ", (to_binary(Reason))/binary>>};
-        {SrcInstanceStartTime, TgtInstanceStartTime} ->
+        {<<S/binary>>, <<T/binary>>} when
+            % Handle upgrades from 3.2 to 3.3 better by expecting 0 to be
+            % returned if endpoints are upgraded while the replication job is running.
+            % TODO: Remove the `0` special case in a future release (4.x or 5.x)
+            (S =:= SrcInstanceStartTime orelse S =:= <<"0">> orelse
+                SrcInstanceStartTime =:= <<"0">>) andalso
+                (T =:= TgtInstanceStartTime orelse T =:= <<"0">> orelse
+                    TgtInstanceStartTime =:= <<"0">>)
+        ->
             couch_log:notice(
                 "recording a checkpoint for `~s` -> `~s` at source update_seq ~p",
                 [SourceName, TargetName, NewSeq]
