@@ -27,13 +27,15 @@
     get_basic_auth_creds/1,
     remove_basic_auth_creds/1,
     normalize_basic_auth/1,
-    seq_encode/1
+    seq_encode/1,
+    log_security_warnings/1
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
+-include_lib("public_key/include/public_key.hrl").
 
 -import(couch_util, [
     get_value/2,
@@ -276,6 +278,98 @@ seq_encode(Seq) ->
     % [Seq, Opaque] json array from BigCouch 0.4, or any other json
     % object. We are being maximally compatible here.
     ?JSON_ENCODE(Seq).
+
+%% Log uses of http protocol and uses of https protocol where verify_peer
+%% would fail.
+log_security_warnings(#rep{} = Rep) ->
+    case config:get_boolean("replicator", "log_security_warnings", false) of
+        false ->
+            ok;
+        true ->
+            ok = check_security(Rep, source),
+            ok = check_security(Rep, target)
+    end.
+
+check_security(#rep{} = Rep, Type) ->
+    Url =
+        case Type of
+            source -> Rep#rep.source#httpdb.url;
+            target -> Rep#rep.target#httpdb.url
+        end,
+    #url{protocol = Protocol} = ibrowse_lib:parse_url(Url),
+    case Protocol of
+        http ->
+            couch_log:warning("**security warning** replication ~s has insecure ~s at ~s", [
+                rep_principal(Rep), Type, Url
+            ]),
+            ok;
+        https ->
+            VerifyEnabled = config:get_boolean("replicator", "verify_ssl_certificates", false),
+            CACertFile = config:get("replicator", "ssl_trusted_certificates_file"),
+            if
+                VerifyEnabled ->
+                    % no need for an extra check if we're doing them anyway.
+                    ok;
+                CACertFile == undefined ->
+                    couch_log:warning(
+                        "security warnings enabled but no ssl_trusted_certificates_file configured",
+                        []
+                    );
+                true ->
+                    try
+                        ibrowse:send_req(Url, [], head, [], [
+                            {is_ssl, true},
+                            {ssl_options, [
+                                {cacertfile, CACertFile},
+                                {verify, verify_peer},
+                                {verify_fun, check_certificate_fun(Rep, Url, Type)}
+                            ]}
+                        ])
+                    catch
+                        Class:Reason ->
+                            couch_log:warning("failed to check certificate of ~s (~p:~p)", [
+                                Url, Class, Reason
+                            ])
+                    end,
+                    ok
+            end;
+        _ ->
+            ok
+    end.
+
+check_certificate_fun(#rep{} = Rep, Url, Type) ->
+    Fun = fun
+        (_, {bad_cert, Reason}, UserState) ->
+            couch_log:warning(
+                "**security warning** replication ~s has bad cert in ~s for reason ~p at ~s", [
+                    rep_principal(Rep), Type, Reason, Url
+                ]
+            ),
+            {valid, UserState};
+        (_, {extension, #'Extension'{critical = true} = Ext}, UserState) ->
+            couch_log:warning(
+                "**security warning** replication ~s has unsupported critical extension in ~s of id ~p at ~s",
+                [
+                    rep_principal(Rep), Ext#'Extension'.extnID, Url
+                ]
+            ),
+            {valid, UserState};
+        (_, {extension, _}, UserState) ->
+            {unknown, UserState};
+        (_, valid, UserState) ->
+            {valid, UserState};
+        (_, valid_peer, UserState) ->
+            {valid, UserState}
+    end,
+    InitialState = [],
+    {Fun, InitialState}.
+
+rep_principal(#rep{db_name = DbName} = Rep) when is_binary(DbName) ->
+    io_lib:format("in database ~s, docid ~s", [
+        mem3:dbname(DbName), Rep#rep.doc_id
+    ]);
+rep_principal(#rep{user_ctx = #user_ctx{name = Name}}) when is_binary(Name) ->
+    io_lib:format("by user ~s", [Name]).
 
 -ifdef(TEST).
 

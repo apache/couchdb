@@ -168,6 +168,7 @@ process_updated({DbName, _DocId} = Id, JsonRepDoc) ->
     % problem.
     Rep0 = couch_replicator_parse:parse_rep_doc_without_id(JsonRepDoc),
     Rep = Rep0#rep{db_name = DbName, start_time = os:timestamp()},
+    ok = couch_replicator_utils:log_security_warnings(Rep),
     Filter =
         case couch_replicator_filters:parse(Rep#rep.options) of
             {ok, nil} ->
