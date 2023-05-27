@@ -314,12 +314,18 @@ repl(#acc{db = Db0} = Acc0) ->
             {ok, Count}
     end.
 
-pull_purges_multi(#acc{source = Source} = Acc0) ->
-    #acc{batch_size = Count, seq = UpdateSeq, targets = Targets0} = Acc0,
+pull_purges_multi(#acc{} = Acc0) ->
+    #acc{
+        source = Source,
+        targets = Targets0,
+        batch_size = Count,
+        seq = UpdateSeq,
+        hashfun = HashFun
+    } = Acc0,
     with_src_db(Acc0, fun(Db) ->
         Targets = maps:map(
             fun(_, #tgt{} = T) ->
-                pull_purges(Db, Count, Source, T)
+                pull_purges(Db, Count, Source, T, HashFun)
             end,
             reset_remaining(Targets0)
         ),
@@ -343,7 +349,7 @@ pull_purges_multi(#acc{source = Source} = Acc0) ->
         end
     end).
 
-pull_purges(Db, Count, SrcShard, #tgt{} = Tgt0) ->
+pull_purges(Db, Count, #shard{} = SrcShard, #tgt{} = Tgt0, HashFun) ->
     #tgt{shard = TgtShard} = Tgt0,
     SrcUUID = couch_db:get_uuid(Db),
     #shard{node = TgtNode, name = TgtDbName} = TgtShard,
@@ -354,18 +360,33 @@ pull_purges(Db, Count, SrcShard, #tgt{} = Tgt0) ->
         Infos == [] ->
             ok;
         true ->
-            {ok, _} = couch_db:purge_docs(Db, Infos, [?REPLICATED_CHANGES]),
+            % When shard ranges are split it's possible to pull purges from a
+            % larger target range to a smaller source range, we don't want to
+            % pull purges which don't belong on the source, so we filter them
+            % out using the same pickfun which we use when picking documents
+            #shard{range = SrcRange} = SrcShard,
+            BelongsFun = fun({_UUID, Id, _Revs}) when is_binary(Id) ->
+                mem3_reshard_job:pickfun(Id, [SrcRange], HashFun) =:= SrcRange
+            end,
+            Infos1 = lists:filter(BelongsFun, Infos),
+            {ok, _} = couch_db:purge_docs(Db, Infos1, [?REPLICATED_CHANGES]),
             Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
             mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, LocalPurgeId, Body)
     end,
     Tgt#tgt{remaining = max(0, Remaining)}.
 
-push_purges_multi(#acc{source = SrcShard} = Acc) ->
-    #acc{batch_size = BatchSize, seq = UpdateSeq, targets = Targets0} = Acc,
+push_purges_multi(#acc{} = Acc) ->
+    #acc{
+        source = SrcShard,
+        targets = Targets0,
+        batch_size = BatchSize,
+        seq = UpdateSeq,
+        hashfun = HashFun
+    } = Acc,
     with_src_db(Acc, fun(Db) ->
         Targets = maps:map(
             fun(_, #tgt{} = T) ->
-                push_purges(Db, BatchSize, SrcShard, T)
+                push_purges(Db, BatchSize, SrcShard, T, HashFun)
             end,
             reset_remaining(Targets0)
         ),
@@ -385,9 +406,9 @@ push_purges_multi(#acc{source = SrcShard} = Acc) ->
         end
     end).
 
-push_purges(Db, BatchSize, SrcShard, Tgt) ->
+push_purges(Db, BatchSize, SrcShard, Tgt, HashFun) ->
     #tgt{shard = TgtShard, purgeid = LocalPurgeId} = Tgt,
-    #shard{node = TgtNode, name = TgtDbName} = TgtShard,
+    #shard{node = TgtNode, range = TgtRange, name = TgtDbName} = TgtShard,
     StartSeq =
         case couch_db:open_doc(Db, LocalPurgeId, []) of
             {ok, #doc{body = {Props}}} ->
@@ -396,15 +417,25 @@ push_purges(Db, BatchSize, SrcShard, Tgt) ->
                 Oldest = couch_db:get_oldest_purge_seq(Db),
                 erlang:max(0, Oldest - 1)
         end,
+    BelongsFun = fun(Id) when is_binary(Id) ->
+        mem3_reshard_job:pickfun(Id, [TgtRange], HashFun) =:= TgtRange
+    end,
     FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
-        NewCount = Count + length(Revs),
-        NewInfos = [{UUID, Id, Revs} | Infos],
-        Status =
-            if
-                NewCount < BatchSize -> ok;
-                true -> stop
-            end,
-        {Status, {NewCount, NewInfos, PSeq}}
+        case BelongsFun(Id) of
+            true ->
+                NewCount = Count + length(Revs),
+                NewInfos = [{UUID, Id, Revs} | Infos],
+                Status =
+                    if
+                        NewCount < BatchSize -> ok;
+                        true -> stop
+                    end,
+                {Status, {NewCount, NewInfos, PSeq}};
+            false ->
+                % In case of split shard ranges, purges, like documents, will
+                % belong only to one target
+                {ok, {Count, Infos, PSeq}}
+        end
     end,
     InitAcc = {0, [], StartSeq},
     {ok, {_, Infos, ThroughSeq}} =
