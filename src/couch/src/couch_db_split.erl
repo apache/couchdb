@@ -62,7 +62,10 @@ split(Source, #{} = Targets, PickFun) when
             catch
                 throw:{target_create_error, DbName, Error, TargetDbs} ->
                     cleanup_targets(TargetDbs, Engine),
-                    {error, {target_create_error, DbName, Error}}
+                    {error, {target_create_error, DbName, Error}};
+                throw:{range_error, Context, DocId, TargetDbs} ->
+                    cleanup_targets(TargetDbs, Engine),
+                    {error, {range_error, Context, DocId, maps:keys(TargetDbs)}}
             after
                 couch_db:close(SourceDb)
             end;
@@ -208,10 +211,20 @@ delete_target(DbName, Engine) ->
     DelOpt = [{context, compaction}, sync],
     couch_db_engine:delete(Engine, RootDir, Filepath, DelOpt).
 
-pick_target(DocId, #state{} = State, #{} = Targets) ->
+pick_target(DocId, #state{} = State, #{} = Targets, Context) when
+    is_binary(DocId), is_atom(Context)
+->
     #state{pickfun = PickFun, hashfun = HashFun} = State,
-    Key = PickFun(DocId, maps:keys(Targets), HashFun),
-    {Key, maps:get(Key, Targets)}.
+    TargetRanges = maps:keys(Targets),
+    Key = PickFun(DocId, TargetRanges, HashFun),
+    case Key of
+        not_in_range ->
+            % We found a document, or purge info which doesn't hash to
+            % any of the target ranges. Stop, and raise a fatal exception.
+            throw({range_error, Context, DocId, Targets});
+        [B, E] when is_integer(B), is_integer(E), B =< E, is_map_key(Key, Targets) ->
+            {Key, map_get(Key, Targets)}
+    end.
 
 set_targets_update_seq(#state{targets = Targets} = State) ->
     Seq = couch_db:get_update_seq(State#state.source_db),
@@ -337,11 +350,23 @@ acc_and_flush(Item, #target{} = Target, MaxBuffer, FlushCb) ->
         false -> Target1
     end.
 
-purge_cb({_PSeq, _UUID, Id, _Revs} = PI, #state{targets = Targets} = State) ->
-    {Key, Target} = pick_target(Id, State, Targets),
-    MaxBuffer = State#state.max_buffer_size,
-    Target1 = acc_and_flush(PI, Target, MaxBuffer, fun commit_purge_infos/1),
-    {ok, State#state{targets = Targets#{Key => Target1}}}.
+purge_cb({PSeq, UUID, Id, _Revs} = PI, #state{} = State) ->
+    #state{source_db = Db, targets = Targets} = State,
+    try
+        {Key, Target} = pick_target(Id, State, Targets, purge_info_copy),
+        MaxBuffer = State#state.max_buffer_size,
+        Target1 = acc_and_flush(PI, Target, MaxBuffer, fun commit_purge_infos/1),
+        {ok, State#state{targets = Targets#{Key => Target1}}}
+    catch
+        throw:{range_error, purge_info_copy, _, _} ->
+            % Before 3.4, due to a bug in internal replicator, it was possible
+            % for purge infos which don't belong to the source shard to end up
+            % there during, or after shard splitting. We choose to emit a warning
+            % and ignore the misplaced purge info record.
+            LogMsg = "~p : ignore misplaced purge info pseq:~p uuid:~p doc_id:~p shard:~p",
+            couch_log:warning(LogMsg, [?MODULE, PSeq, UUID, Id, couch_db:name(Db)]),
+            {ok, State}
+    end.
 
 commit_purge_infos(#target{buffer = [], db = Db} = Target) ->
     Target#target{db = Db};
@@ -367,7 +392,7 @@ changes_cb(#doc_info{id = Id}, #state{source_db = Db} = State) ->
     changes_cb(FDI, State);
 changes_cb(#full_doc_info{id = Id} = FDI, #state{} = State) ->
     #state{source_db = SourceDb, targets = Targets} = State,
-    {Key, Target} = pick_target(Id, State, Targets),
+    {Key, Target} = pick_target(Id, State, Targets, changes),
     FDI1 = process_fdi(FDI, SourceDb, Target#target.db),
     MaxBuffer = State#state.max_buffer_size,
     Target1 = acc_and_flush(FDI1, Target, MaxBuffer, fun commit_docs/1),
@@ -500,7 +525,7 @@ copy_local_docs(#state{source_db = Db, targets = Targets} = State) ->
                 <<?LOCAL_DOC_PREFIX, _/binary>> ->
                     % Users' and replicator app's checkpoints go to their
                     % respective shards based on the general hashing algorithm
-                    {Key, Target} = pick_target(Id, State, Acc),
+                    {Key, Target} = pick_target(Id, State, Acc, local_docs),
                     #target{buffer = Docs} = Target,
                     Acc#{Key => Target#target{buffer = [Doc | Docs]}}
             end,

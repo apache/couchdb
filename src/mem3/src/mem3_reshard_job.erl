@@ -265,6 +265,19 @@ handle_worker_exit(#job{} = Job, _Pid, {error, missing_target}) ->
     couch_log:error(Msg, [?MODULE, jobfmt(Job)]),
     kill_workers(Job),
     exit({error, missing_target});
+handle_worker_exit(#job{} = Job, _Pid, {error, {range_error, _, _, _}} = Reason) ->
+    Msg1 = "~p fatal range error job:~p error:~p",
+    couch_log:error(Msg1, [?MODULE, jobfmt(Job), Reason]),
+    kill_workers(Job),
+    case lists:member(Job#job.split_state, ?CLEAN_TARGET_STATES) of
+        true ->
+            Msg2 = "~p cleaning target after db was deleted ~p",
+            couch_log:error(Msg2, [?MODULE, jobfmt(Job)]),
+            reset_target(Job),
+            exit(Reason);
+        false ->
+            exit(Reason)
+    end;
 handle_worker_exit(#job{} = Job0, _Pid, Reason) ->
     couch_log:error("~p worker error ~p ~p", [?MODULE, jobfmt(Job0), Reason]),
     kill_workers(Job0),
