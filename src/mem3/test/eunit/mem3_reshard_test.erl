@@ -77,7 +77,9 @@ mem3_reshard_db_test_() ->
                     fun retries_work/1,
                     fun target_reset_in_initial_copy/1,
                     fun split_an_incomplete_shard_map/1,
-                    fun target_shards_are_locked/1
+                    fun target_shards_are_locked/1,
+                    fun doc_in_bad_range_on_source/1,
+                    fun purge_info_in_bad_range_on_source/1
                 ]
             }
         }
@@ -88,7 +90,7 @@ mem3_reshard_db_test_() ->
 split_one_shard(#{db1 := Db}) ->
     {timeout, ?TIMEOUT,
         ?_test(begin
-            DocSpec = #{docs => 10, delete => [5, 9], mrview => 1, local => 1},
+            DocSpec = #{docs => 10, delete => [5, 9], mrview => 1, local => 10},
             add_test_docs(Db, DocSpec),
 
             % Save documents before the split
@@ -107,6 +109,7 @@ split_one_shard(#{db1 := Db}) ->
 
             % Split the one shard
             [#shard{name = Shard}] = lists:sort(mem3:local_shards(Db)),
+            SrcDocIds = get_shard_doc_ids(Shard),
             {ok, JobId} = mem3_reshard:start_split_job(Shard),
             wait_state(JobId, completed),
 
@@ -116,6 +119,16 @@ split_one_shard(#{db1 := Db}) ->
             [#shard{range = R1}, #shard{range = R2}] = Shards1,
             ?assertEqual([16#00000000, 16#7fffffff], R1),
             ?assertEqual([16#80000000, 16#ffffffff], R2),
+
+            % Check that docs are on the shards where they belong to
+            [#shard{name = SN1}, #shard{name = SN2}] = Shards1,
+            DocIds1 = get_shard_doc_ids(SN1),
+            DocIds2 = get_shard_doc_ids(SN2),
+            [?assert(mem3:belongs(SN1, Id)) || Id <- DocIds1],
+            [?assert(mem3:belongs(SN2, Id)) || Id <- DocIds2],
+
+            % None of the docs or purges were dropped
+            ?assertEqual(lists:sort(SrcDocIds), lists:sort(DocIds1 ++ DocIds2)),
 
             % Check metadata bits after the split
             ?assertEqual(942, get_revs_limit(Db)),
@@ -173,6 +186,9 @@ split_shard_with_lots_of_purges(#{db1 := Db}) ->
 
             % Split the one shard
             [#shard{name = Shard}] = lists:sort(mem3:local_shards(Db)),
+            % Get purge infos before the split
+            SrcPurges = get_purge_infos(Shard),
+            SrcDocIds = get_shard_doc_ids(Shard),
             {ok, JobId} = mem3_reshard:start_split_job(Shard),
             wait_state(JobId, completed),
 
@@ -182,6 +198,21 @@ split_shard_with_lots_of_purges(#{db1 := Db}) ->
             [#shard{range = R1}, #shard{range = R2}] = Shards1,
             ?assertEqual([16#00000000, 16#7fffffff], R1),
             ?assertEqual([16#80000000, 16#ffffffff], R2),
+
+            % Check that purges and docs are on the shards where they belong to
+            [#shard{name = SN1}, #shard{name = SN2}] = Shards1,
+            TgtPurges1 = get_purge_infos(SN1),
+            TgtPurges2 = get_purge_infos(SN2),
+            DocIds1 = get_shard_doc_ids(SN1),
+            DocIds2 = get_shard_doc_ids(SN2),
+            [?assert(mem3:belongs(SN1, Id)) || Id <- TgtPurges1],
+            [?assert(mem3:belongs(SN2, Id)) || Id <- TgtPurges2],
+            [?assert(mem3:belongs(SN1, Id)) || Id <- DocIds1],
+            [?assert(mem3:belongs(SN2, Id)) || Id <- DocIds2],
+
+            % None of the docs or purges were dropped
+            ?assertEqual(lists:sort(SrcDocIds), lists:sort(DocIds1 ++ DocIds2)),
+            ?assertEqual(lists:sort(SrcPurges), lists:sort(TgtPurges1 ++ TgtPurges2)),
 
             % Check metadata bits after the split
             ?assertEqual(10, get_purge_infos_limit(Db)),
@@ -619,6 +650,53 @@ target_shards_are_locked(#{db1 := Db}) ->
             wait_state(JobId, completed)
         end)}.
 
+% Source somehow got a bad doc which doesn't belong there
+doc_in_bad_range_on_source(#{db1 := Db}) ->
+    {timeout, ?TIMEOUT,
+        ?_test(begin
+            DocSpec = #{docs => 10, mrview => 0, local => 1},
+            add_test_docs(Db, DocSpec),
+
+            % Split first shard
+            [#shard{name = Shard1}] = lists:sort(mem3:local_shards(Db)),
+            {ok, JobId1} = mem3_reshard:start_split_job(Shard1),
+            wait_state(JobId1, completed),
+
+            % Split the first range again but before doing that insert
+            % a doc in the shard with a doc id that wouldn't belong to
+            % any target ranges
+            [#shard{name = Shard2}, _] = lists:sort(mem3:local_shards(Db)),
+            add_shard_doc(Shard2, <<"4">>, [{<<"in_the_wrong">>, <<"shard_range">>}]),
+            {ok, JobId2} = mem3_reshard:start_split_job(Shard2),
+            wait_state(JobId2, failed),
+            {ok, {JobProps}} = mem3_reshard:job(JobId2),
+            StateInfo = proplists:get_value(state_info, JobProps),
+            ?assertMatch({[{reason, <<"{error,{range_error", _/binary>>}]}, StateInfo)
+        end)}.
+
+% Source has a bad doc but we expect that due to a bug in <3.4 so we
+% skip over it and move on
+purge_info_in_bad_range_on_source(#{db1 := Db}) ->
+    {timeout, ?TIMEOUT,
+        ?_test(begin
+            DocSpec = #{docs => 10, mrview => 0, local => 1},
+            add_test_docs(Db, DocSpec),
+
+            % Split first shard
+            [#shard{name = Shard1}] = lists:sort(mem3:local_shards(Db)),
+            {ok, JobId1} = mem3_reshard:start_split_job(Shard1),
+            wait_state(JobId1, completed),
+
+            % Split the first range again but before doing that insert
+            % a purge info in the shard with an id which wouldn't belong to
+            % any target ranges
+            [#shard{name = Shard2}, _] = lists:sort(mem3:local_shards(Db)),
+            PurgeInfo = {couch_uuids:new(), <<"4">>, [{1, <<"a">>}]},
+            add_shard_purge_info(Shard2, PurgeInfo),
+            {ok, JobId2} = mem3_reshard:start_split_job(Shard2),
+            wait_state(JobId2, completed)
+        end)}.
+
 intercept_state(State) ->
     TestPid = self(),
     meck:new(mem3_reshard_job, [passthrough]),
@@ -988,3 +1066,29 @@ atts(Size) when is_integer(Size), Size >= 1 ->
             {data, Data}
         ])
     ].
+
+get_purge_infos(ShardName) when is_binary(ShardName) ->
+    FoldFun = fun({_Seq, _UUID, Id, _Revs}, Acc) -> {ok, [Id | Acc]} end,
+    couch_util:with_db(ShardName, fun(Db) ->
+        PSeq = max(0, couch_db:get_oldest_purge_seq(Db) - 1),
+        {ok, Res} = couch_db:fold_purge_infos(Db, PSeq, FoldFun, []),
+        Res
+    end).
+
+get_shard_doc_ids(ShardName) when is_binary(ShardName) ->
+    FoldFun = fun(#full_doc_info{id = Id}, Acc) -> {ok, [Id | Acc]} end,
+    couch_util:with_db(ShardName, fun(Db) ->
+        {ok, Res} = couch_db:fold_docs(Db, FoldFun, [], []),
+        Res
+    end).
+
+add_shard_doc(ShardName, DocId, Props) ->
+    couch_util:with_db(ShardName, fun(Db) ->
+        Doc = couch_doc:from_json_obj({[{<<"_id">>, DocId}] ++ Props}),
+        couch_db:update_doc(Db, Doc, [])
+    end).
+
+add_shard_purge_info(ShardName, {UUID, Id, Revs}) ->
+    couch_util:with_db(ShardName, fun(Db) ->
+        couch_db:purge_docs(Db, [{UUID, Id, Revs}])
+    end).
