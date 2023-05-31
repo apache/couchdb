@@ -411,7 +411,7 @@ make_enable_recovery_test_case({RootDir, File}, EnableRecovery, Context) ->
         ("couchdb", "delete_after_rename", _) -> false
     end),
     FileExistsBefore = filelib:is_regular(File),
-    couch_file:delete(RootDir, File, [{context, Context}]),
+    DeleteResult = couch_file:delete(RootDir, File, [{context, Context}]),
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
     DeletedFiles = filelib:wildcard(RootDir ++ "/.delete/*"),
@@ -421,6 +421,7 @@ make_enable_recovery_test_case({RootDir, File}, EnableRecovery, Context) ->
             true -> {0, 1}
         end,
     [
+        ?_assertEqual(ok, DeleteResult),
         ?_assert(FileExistsBefore),
         ?_assertNot(FileExistsAfter),
         ?_assertEqual(ExpectRenamedCount, length(RenamedFiles)),
