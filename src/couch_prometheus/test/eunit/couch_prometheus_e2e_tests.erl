@@ -41,7 +41,8 @@ e2e_test_() ->
                     ?TDEF_FE(t_prometheus_port),
                     ?TDEF_FE(t_metric_updated),
                     ?TDEF_FE(t_no_duplicate_metrics),
-                    ?TDEF_FE(t_starts_with_couchdb)
+                    ?TDEF_FE(t_starts_with_couchdb),
+                    ?TDEF_FE(t_survives_mem3_sync_termination)
                 ]
             }
         }
@@ -172,6 +173,19 @@ t_starts_with_couchdb(Port) ->
         end,
         Lines
     ).
+
+t_survives_mem3_sync_termination(_) ->
+    ServerPid = whereis(couch_prometheus_server),
+    ?assertNotEqual(undefined, ServerPid),
+    ?assertNotEqual(undefined, whereis(mem3_sync)),
+    ok = supervisor:terminate_child(mem3_sup, mem3_sync),
+    ?assertEqual(undefined, whereis(mem3_sync)),
+    ?assertMatch(
+        [[_, _], <<"couchdb_internal_replication_jobs 0">>],
+        couch_prometheus_server:get_internal_replication_jobs_stat()
+    ),
+    {ok, _} = supervisor:restart_child(mem3_sup, mem3_sync),
+    ?assertEqual(ServerPid, whereis(couch_prometheus_server)).
 
 node_local_url(Port) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
