@@ -36,6 +36,12 @@
     terminate/2
 ]).
 
+-ifdef(TEST).
+-export([
+    get_internal_replication_jobs_stat/0
+]).
+-endif.
+
 -include("couch_prometheus.hrl").
 
 start_link() ->
@@ -128,7 +134,13 @@ get_internal_replication_jobs_stat() ->
         internal_replication_jobs,
         gauge,
         "count of internal replication changes to process",
-        mem3_sync:get_backlog()
+        try
+            mem3_sync:get_backlog()
+        catch
+            _:_ ->
+                couch_log:warning("~p mem3_sync down", [?MODULE]),
+                0
+        end
     ).
 
 get_membership_stat() ->
