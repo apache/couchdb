@@ -387,7 +387,7 @@
 
     .. code-block:: http
 
-        POST /recipes/_design/recipe/_update/ingredients/SpaghettiWithMeatballs HTTP/1.1
+        PUT /recipes/_design/recipe/_update/ingredients/SpaghettiWithMeatballs HTTP/1.1
         Accept: application/json
         Content-Length: 5
         Content-Type: application/json
