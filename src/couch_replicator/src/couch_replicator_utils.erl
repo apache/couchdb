@@ -28,7 +28,7 @@
     remove_basic_auth_creds/1,
     normalize_basic_auth/1,
     seq_encode/1,
-    log_security_warnings/1
+    valid_endpoint_protocols_log/1
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
@@ -281,8 +281,8 @@ seq_encode(Seq) ->
 
 %% Log uses of http protocol and uses of https protocol where verify_peer
 %% would fail.
-log_security_warnings(#rep{} = Rep) ->
-    case config:get_boolean("replicator", "log_security_warnings", false) of
+valid_endpoint_protocols_log(#rep{} = Rep) ->
+    case config:get_boolean("replicator", "valid_endpoint_protocols_log", false) of
         false ->
             ok;
         true ->

@@ -57,7 +57,7 @@
     | no_return().
 replicate(PostBody, Ctx) ->
     {ok, Rep0} = couch_replicator_parse:parse_rep_doc(PostBody, Ctx),
-    ok = couch_replicator_utils:log_security_warnings(Rep0),
+    ok = couch_replicator_utils:valid_endpoint_protocols_log(Rep0),
     Rep = Rep0#rep{start_time = os:timestamp()},
     #rep{id = RepId, options = Options, user_ctx = UserCtx} = Rep,
     case get_value(cancel, Options, false) of
