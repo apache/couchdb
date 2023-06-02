@@ -282,13 +282,8 @@ seq_encode(Seq) ->
 %% Log uses of http protocol and uses of https protocol where verify_peer
 %% would fail.
 valid_endpoint_protocols_log(#rep{} = Rep) ->
-    case config:get_boolean("replicator", "valid_endpoint_protocols_log", false) of
-        false ->
-            ok;
-        true ->
-            ok = check_security(Rep, source),
-            ok = check_security(Rep, target)
-    end.
+    ok = check_security(Rep, source),
+    ok = check_security(Rep, target).
 
 check_security(#rep{} = Rep, Type) ->
     Url =

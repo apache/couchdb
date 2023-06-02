@@ -78,7 +78,8 @@
     use_checkpoints = true,
     checkpoint_interval = ?DEFAULT_CHECKPOINT_INTERVAL,
     type = db,
-    view = nil
+    view = nil,
+    security_checker
 }).
 
 start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
@@ -175,6 +176,15 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
     % unfortunately not immune to race conditions.
 
     log_replication_start(State),
+
+    SecurityCheckerPid =
+        case config:get_boolean("replicator", "valid_endpoint_protocols_log", false) of
+            true ->
+                spawn_link(couch_replicator_utils, valid_endpoint_protocols_log, [Rep]);
+            false ->
+                undefined
+        end,
+
     couch_log:debug("Worker pids are: ~p", [Workers]),
 
     doc_update_triggered(Rep),
@@ -183,6 +193,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
         changes_queue = ChangesQueue,
         changes_manager = ChangesManager,
         changes_reader = ChangesReader,
+        security_checker = SecurityCheckerPid,
         workers = Workers
     }}.
 
@@ -268,6 +279,8 @@ handle_info({'EXIT', Pid, {shutdown, max_backoff}}, State) ->
     couch_log:error("Max backoff reached child process ~p", [Pid]),
     {stop, {shutdown, max_backoff}, State};
 handle_info({'EXIT', Pid, normal}, #rep_state{changes_reader = Pid} = State) ->
+    {noreply, State};
+handle_info({'EXIT', Pid, _Reason}, #rep_state{security_checker = Pid} = State) ->
     {noreply, State};
 handle_info({'EXIT', Pid, Reason0}, #rep_state{changes_reader = Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_reader_deaths]),
