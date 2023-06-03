@@ -77,16 +77,22 @@ class Database(object):
         r = self.sess.delete(self.url)
 
     def recreate(self):
-        r = self.sess.get(self.url)
-        if r.status_code == 200:
-            db_info = r.json()
-            docs = db_info["doc_count"] + db_info["doc_del_count"]
-            if docs == 0:
-                # db never used - create unnecessary
-                return
-            self.delete()
-        self.create()
-        self.recreate()
+        NUM_TRIES = 10
+
+        for k in range(NUM_TRIES):
+            r = self.sess.get(self.url)
+            if r.status_code == 200:
+                db_info = r.json()
+                docs = db_info["doc_count"] + db_info["doc_del_count"]
+                if docs == 0:
+                    # db exists and it is empty -- exit condition is met
+                    return
+                self.delete()
+            self.create()
+            time.sleep(k * 0.1)
+        raise Exception(
+            "Failed to recreate the database after {} tries".format(NUM_TRIES)
+        )
 
     def save_doc(self, doc):
         self.save_docs([doc])
