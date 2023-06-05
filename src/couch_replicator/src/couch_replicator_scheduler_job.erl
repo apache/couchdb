@@ -176,14 +176,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
     % unfortunately not immune to race conditions.
 
     log_replication_start(State),
-
-    SecurityCheckerPid =
-        case config:get_boolean("replicator", "valid_endpoint_protocols_log", false) of
-            true ->
-                spawn_link(couch_replicator_utils, valid_endpoint_protocols_log, [Rep]);
-            false ->
-                undefined
-        end,
+    SecurityCheckerPid = valid_endpoint_protocols_log(Rep),
 
     couch_log:debug("Worker pids are: ~p", [Workers]),
 
@@ -1160,6 +1153,14 @@ log_replication_start(#rep_state{rep_details = Rep} = RepState) ->
         "Starting replication ~s (~s -> ~s) ~s worker_procesess:~p"
         " worker_batch_size:~p session_id:~s",
     couch_log:notice(Msg, [Id, Source, Target, From, Workers, BatchSize, Sid]).
+
+valid_endpoint_protocols_log(#rep{} = Rep) ->
+    case config:get_boolean("replicator", "valid_endpoint_protocols_log", false) of
+        true ->
+            spawn_link(couch_replicator_utils, valid_endpoint_protocols_log, [Rep]);
+        false ->
+            undefined
+    end.
 
 -ifdef(TEST).
 
