@@ -166,17 +166,39 @@ Replicator Database Configuration
 
         .. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
 
-     .. config:option:: valid_endpoint_protocols :: Replicator endpoint protocols
+    .. config:option:: valid_endpoint_protocols :: Replicator endpoint protocols
 
-        .. versionadded:: 3.3
+       .. versionadded:: 3.3
 
-        Valid replication endpoint protocols. Replication jobs with endpoint
-        urls not in this list will fail to run::
+       Valid replication endpoint protocols. Replication jobs with endpoint
+       urls not in this list will fail to run::
 
-            [replicator]
-            valid_endpoint_protocols = http,https
+           [replicator]
+           valid_endpoint_protocols = http,https
 
-     .. config:option:: valid_proxy_protocols :: Replicator proxy protocols
+    .. config:option:: valid_endpoint_protocols_log :: Log security issues with endpoints
+
+       .. versionadded:: 3.4
+
+       When enabled, CouchDB will log any replication that uses the insecure http
+       protocol::
+
+           [replicator]
+           valid_endpoint_protocols_log = true
+
+    .. config:option:: verify_ssl_certificates_log :: Log security issues with endpoints
+
+       .. versionadded:: 3.4
+
+       When enabled, and if ``ssl_trusted_certificates_file`` is configured
+       but ``verify_ssl_certificates`` is not, CouchDB will check the
+       validity of the TLS certificates of all sources and targets (
+       without causing the replication to fail) and log any issues::
+
+           [replicator]
+           verify_ssl_certificates_log = true
+
+    .. config:option:: valid_proxy_protocols :: Replicator proxy protocols
 
         .. versionadded:: 3.3
 
@@ -307,7 +329,7 @@ Replicator Database Configuration
 
     .. config:option:: priority_coeff :: Priority coefficient decays
 
-        .. versionadded:: 3.2.0
+       .. versionadded:: 3.2.0
 
        Priority coefficient decays all the job priorities such that they slowly
        drift towards the front of the run queue. This coefficient defines a maximum
