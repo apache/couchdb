@@ -28,7 +28,8 @@
     remove_basic_auth_creds/1,
     normalize_basic_auth/1,
     seq_encode/1,
-    valid_endpoint_protocols_log/1
+    valid_endpoint_protocols_log/1,
+    verify_ssl_certificates_log/1
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
@@ -279,18 +280,19 @@ seq_encode(Seq) ->
     % object. We are being maximally compatible here.
     ?JSON_ENCODE(Seq).
 
-%% Log uses of http protocol and uses of https protocol where verify_peer
-%% would fail.
+%% Log uses of http protocol
 valid_endpoint_protocols_log(#rep{} = Rep) ->
-    ok = check_security(Rep, source),
-    ok = check_security(Rep, target).
+    VerifyEnabled = config:get_boolean("replicator", "valid_endpoint_protocols_log", false),
+    case VerifyEnabled of
+        true ->
+            ok = check_endpoint_protocols(Rep, source),
+            ok = check_endpoint_protocols(Rep, target);
+        false ->
+            ok
+    end.
 
-check_security(#rep{} = Rep, Type) ->
-    Url =
-        case Type of
-            source -> Rep#rep.source#httpdb.url;
-            target -> Rep#rep.target#httpdb.url
-        end,
+check_endpoint_protocols(#rep{} = Rep, Type) ->
+    Url = url_from_type(Rep, Type),
     #url{protocol = Protocol} = ibrowse_lib:parse_url(Url),
     case Protocol of
         http ->
@@ -298,37 +300,49 @@ check_security(#rep{} = Rep, Type) ->
                 rep_principal(Rep), Type, Url
             ]),
             ok;
-        https ->
-            VerifyEnabled = config:get_boolean("replicator", "verify_ssl_certificates", false),
-            CACertFile = config:get("replicator", "ssl_trusted_certificates_file"),
-            if
-                VerifyEnabled ->
-                    % no need for an extra check if we're doing them anyway.
-                    ok;
-                CACertFile == undefined ->
-                    couch_log:warning(
-                        "security warnings enabled but no ssl_trusted_certificates_file configured",
-                        []
-                    );
-                true ->
-                    try
-                        ibrowse:send_req(Url, [], head, [], [
-                            {is_ssl, true},
-                            {ssl_options, [
-                                {cacertfile, CACertFile},
-                                {verify, verify_peer},
-                                {verify_fun, check_certificate_fun(Rep, Url, Type)}
-                            ]}
-                        ])
-                    catch
-                        Class:Reason ->
-                            couch_log:warning("failed to check certificate of ~s (~p:~p)", [
-                                Url, Class, Reason
-                            ])
-                    end,
-                    ok
-            end;
-        _ ->
+        _Else ->
+            ok
+    end.
+
+url_from_type(#rep{} = Rep, source) ->
+    Rep#rep.source#httpdb.url;
+url_from_type(#rep{} = Rep, target) ->
+    Rep#rep.target#httpdb.url.
+
+%% log uses of https protocol where verify_peer would fail.
+verify_ssl_certificates_log(#rep{} = Rep) ->
+    ok = check_ssl_certificates(Rep, source),
+    ok = check_ssl_certificates(Rep, target).
+
+check_ssl_certificates(#rep{} = Rep, Type) ->
+    VerifyEnabled = config:get_boolean("replicator", "verify_ssl_certificates", false),
+    CACertFile = config:get("replicator", "ssl_trusted_certificates_file"),
+    if
+        VerifyEnabled ->
+            % no need for an extra check if we're doing them anyway.
+            ok;
+        CACertFile == undefined ->
+            couch_log:warning(
+                "security warnings enabled but no ssl_trusted_certificates_file configured",
+                []
+            );
+        true ->
+            Url = url_from_type(Rep, Type),
+            try
+                ibrowse:send_req(Url, [], head, [], [
+                    {is_ssl, true},
+                    {ssl_options, [
+                        {cacertfile, CACertFile},
+                        {verify, verify_peer},
+                        {verify_fun, check_certificate_fun(Rep, Url, Type)}
+                    ]}
+                ])
+            catch
+                Class:Reason ->
+                    couch_log:warning("failed to check certificate of ~s (~p:~p)", [
+                        Url, Class, Reason
+                    ])
+            end,
             ok
     end.
 
