@@ -378,7 +378,9 @@ rep_principal(#rep{db_name = DbName} = Rep) when is_binary(DbName) ->
         mem3:dbname(DbName), Rep#rep.doc_id
     ]);
 rep_principal(#rep{user_ctx = #user_ctx{name = Name}}) when is_binary(Name) ->
-    io_lib:format("by user ~s", [Name]).
+    io_lib:format("by user ~s", [Name]);
+rep_principal(#rep{}) ->
+    "by unknown principal".
 
 -ifdef(TEST).
 
