@@ -181,15 +181,22 @@ Replicator Database Configuration
         .. versionadded:: 3.4
 
         When enabled, CouchDB will log any replication that uses the insecure http
-        protocol.
+        protocol::
 
-        Additionally, if ``ssl_trusted_certificates_file`` is configured
+            [replicator]
+            valid_endpoint_protocols_log = true
+
+     .. config:option:: verify_ssl_certificates_log :: Log security issues with endpoints
+
+        .. versionadded:: 3.4
+
+        When enabled, and if ``ssl_trusted_certificates_file`` is configured
         but ``verify_ssl_certificates`` is not, CouchDB will check the
         validity of the TLS certificates of all sources and targets (
         without causing the replication to fail) and log any issues::
 
             [replicator]
-            valid_endpoint_protocols_log = true
+            verify_ssl_certificates_log = true
 
     .. config:option:: valid_proxy_protocols :: Replicator proxy protocols
 
