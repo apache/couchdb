@@ -325,7 +325,8 @@ check_ssl_certificates(#rep{} = Rep, Type) ->
             couch_log:warning(
                 "security warnings enabled but no ssl_trusted_certificates_file configured",
                 []
-            );
+            ),
+            ok;
         true ->
             Url = url_from_type(Rep, Type),
             try
