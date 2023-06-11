@@ -93,10 +93,11 @@ include itself. The coordinating node sends a response to the client
 once a `quorum
 <https://en.wikipedia.org/wiki/Quorum_(distributed_computing)>`__ of
 database nodes have responded; 2, by default. The default required size
-of a quorum is equal to ``r=w=((n+1)/2)`` where ``r`` refers to the size
-of a read quorum, ``w`` refers to the size of a write quorum, and ``n``
-refers to the number of replicas of each shard. In a default cluster where
-``n`` is 3, ``((n+1)/2)`` would be 2.
+of a quorum is equal to ``r=w=((n div 2) + 1)`` where ``r`` refers to the size
+of a read quorum, ``w`` refers to the size of a write quorum, ``n``
+refers to the number of replicas of each shard, and ``div`` is integer division,
+rounding down. In a default cluster where
+``n`` is 3, ``((n div 2) + 1)`` would be 2.
 
 .. note::
     Each node in a cluster can be a coordinating node for any one
