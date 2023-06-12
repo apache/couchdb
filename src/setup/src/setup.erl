@@ -16,7 +16,7 @@
 -export([is_cluster_enabled/0, has_cluster_system_dbs/1, cluster_system_dbs/0]).
 -export([enable_single_node/1, is_single_node_enabled/1]).
 
--include_lib("../couch/include/couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 require_admins(undefined, {undefined, undefined}) ->
     % no admin in CouchDB, no admin in request
