@@ -64,9 +64,11 @@ t_newer_db_deletion_doesnt_work(_Ctx) ->
     Db = <<"fabricbenchdb-", Suffix/binary>>,
     ok = fabric:create_db(Db, [{q, 1}, {n, 1}]),
     fabric_bench:delete_old_dbs(),
-    ?assertEqual({ok, 0}, fabric:get_doc_count(Db)).
+    ?assertEqual({ok, 0}, fabric:get_doc_count(Db)),
+    ok = fabric:delete_db(Db).
 
 t_db_deletion_ignores_other_dbs(_Ctx) ->
+    ok = delete_prefixed_dbs(<<"fabricbenchdb">>),
     Db1 = <<"fabricbenchdb-">>,
     Db2 = <<"fabricbenchdb">>,
     Db3 = <<"fabricbenchdb-xyz">>,
@@ -76,4 +78,14 @@ t_db_deletion_ignores_other_dbs(_Ctx) ->
     fabric_bench:delete_old_dbs(),
     ?assertEqual({ok, 0}, fabric:get_doc_count(Db1)),
     ?assertEqual({ok, 0}, fabric:get_doc_count(Db2)),
-    ?assertEqual({ok, 0}, fabric:get_doc_count(Db3)).
+    ?assertEqual({ok, 0}, fabric:get_doc_count(Db3)),
+    ok = delete_prefixed_dbs(<<"fabricbenchdb">>).
+
+delete_prefixed_dbs(Prefix) ->
+    {ok, Prefixed} = fabric:all_dbs(Prefix),
+    lists:foreach(
+        fun(Name) ->
+            ok = fabric:delete_db(Name)
+        end,
+        Prefixed
+    ).
