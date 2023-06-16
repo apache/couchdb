@@ -151,7 +151,7 @@ Alternatively, configuration parameters can be set via the
 :ref:`HTTP API <api/config>`. This API allows changing CouchDB configuration
 on-the-fly without requiring a server restart::
 
-    curl -X PUT http://localhost:5984/_node/<name@host>/_config/uuids/algorithm -d '"random"'
+    curl -X PUT http://adm:pass@localhost:5984/_node/<name@host>/_config/uuids/algorithm -d '"random"'
 
 The old parameter's value is returned in the response::
 
@@ -161,7 +161,7 @@ You should be careful changing configuration via the HTTP API since it's
 possible  to make CouchDB unreachable, for example, by changing the
 :option:`chttpd/bind_address`::
 
-    curl -X PUT http://localhost:5984/_node/<name@host>/_config/chttpd/bind_address -d '"10.10.0.128"'
+    curl -X PUT http://adm:pass@localhost:5984/_node/<name@host>/_config/chttpd/bind_address -d '"10.10.0.128"'
 
 If you make a typo or the specified IP address is not available from your
 network, CouchDB will be unreachable. The only way to resolve this will be
@@ -182,4 +182,4 @@ cluster, as a convenience, you can use the literal string ``_local`` in place
 of the node name, to interact with the local node's configuration.  For
 example::
 
-    curl -X PUT http://localhost:5984/_node/_local/_config/uuids/algorithm -d '"random"'
+    curl -X PUT http://adm:pass@localhost:5984/_node/_local/_config/uuids/algorithm -d '"random"'

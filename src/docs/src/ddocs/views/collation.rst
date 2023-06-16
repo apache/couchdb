@@ -179,7 +179,7 @@ You can demonstrate the collation sequence for 7-bit ASCII characters like this:
     require 'restclient'
     require 'json'
 
-    DB="http://127.0.0.1:5984/collator"
+    DB="http://adm:pass@127.0.0.1:5984/collator"
 
     RestClient.delete DB rescue nil
     RestClient.put "#{DB}",""

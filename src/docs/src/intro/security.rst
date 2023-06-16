@@ -330,7 +330,7 @@ Creating a new user is a very trivial operation. You just need to do a
 :method:`PUT` request with the user's data to CouchDB. Let's create a user with
 login `jan` and password `apple`::
 
-    curl -X PUT http://localhost:5984/_users/org.couchdb.user:jan \
+    curl -X PUT http://admin:password@localhost:5984/_users/org.couchdb.user:jan \
          -H "Accept: application/json" \
          -H "Content-Type: application/json" \
          -d '{"name": "jan", "password": "apple", "roles": [], "type": "user"}'
@@ -394,7 +394,7 @@ Summarizing the above process - we need to get the document's content, add
 the ``password`` field with the new password in plain text and then store the
 JSON result to the authentication database. ::
 
-    curl -X GET http://localhost:5984/_users/org.couchdb.user:jan
+    curl -X GET http://admin:password@localhost:5984/_users/org.couchdb.user:jan
 
 .. code-block:: javascript
 
@@ -413,7 +413,7 @@ JSON result to the authentication database. ::
 Here is our user's document. We may strip hashes from the stored document to
 reduce the amount of posted data::
 
-    curl -X PUT http://localhost:5984/_users/org.couchdb.user:jan \
+    curl -X PUT http://admin:password@localhost:5984/_users/org.couchdb.user:jan \
          -H "Accept: application/json" \
          -H "Content-Type: application/json" \
          -H "If-Match: 1-e0ebfb84005b920488fc7a8cc5470cc0" \
@@ -504,7 +504,7 @@ The database is now secured against anonymous reads and writes::
 You declared user "jan" as a member in this database, so he is able to read and
 write normal documents::
 
-    > curl -u jan:apple http://localhost:5984/mydatabase/
+    > curl -u jan:orange http://localhost:5984/mydatabase/
 
 .. code-block:: javascript
 

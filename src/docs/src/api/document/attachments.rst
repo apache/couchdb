@@ -278,14 +278,14 @@ database:
 
 .. code-block:: bash
 
-    shell> curl -X PUT http://127.0.0.1:5984/test
+    shell> curl -X PUT http://adm:pass@127.0.0.1:5984/test
     {"ok":true}
 
 Then we create a new document and the file attachment in one go:
 
 .. code-block:: bash
 
-    shell> curl -X PUT http://127.0.0.1:5984/test/doc/file.txt \
+    shell> curl -X PUT http://adm:pass@127.0.0.1:5984/test/doc/file.txt \
                 -H "Content-Type: application/octet-stream" -d@file.txt
     {"ok":true,"id":"doc","rev":"1-287a28fa680ae0c7fb4729bf0c6e0cf2"}
 
@@ -293,14 +293,14 @@ Now we can request the whole file easily:
 
 .. code-block:: bash
 
-    shell> curl -X GET http://127.0.0.1:5984/test/doc/file.txt
+    shell> curl -X GET http://adm:pass@127.0.0.1:5984/test/doc/file.txt
     My hovercraft is full of eels!
 
 But say we only want the first 13 bytes:
 
 .. code-block:: bash
 
-    shell> curl -X GET http://127.0.0.1:5984/test/doc/file.txt \
+    shell> curl -X GET http://adm:pass@127.0.0.1:5984/test/doc/file.txt \
                 -H "Range: bytes=0-12"
     My hovercraft
 

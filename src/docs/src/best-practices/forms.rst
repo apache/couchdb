@@ -111,10 +111,10 @@ Here's the worked sample above, using ``curl`` to simulate the form POST.
 
 .. code-block:: bash
 
-    $ curl -X PUT localhost:5984/testdb/_design/myddoc -d '{ "updates": { "contactform": "function(doc, req) { ... }" } }'
+    $ curl -X PUT adm:pass@localhost:5984/testdb/_design/myddoc -d '{ "updates": { "contactform": "function(doc, req) { ... }" } }'
     {"ok":true,"id":"_design/myddoc","rev":"1-2a2b0951fcaf7287817573b03bba02ed"}
 
-    $ curl --data "name=Lin&email=lin@example.com&message=I Love CouchDB" http://localhost:5984/testdb/_design/myddoc/_update/contactform
+    $ curl --data "name=Lin&email=lin@example.com&message=I Love CouchDB" http://adm:pass@localhost:5984/testdb/_design/myddoc/_update/contactform
     *   Trying 127.0.0.1...
     * TCP_NODELAY set
     * Connected to localhost (127.0.0.1) port 5984 (#1)
@@ -139,5 +139,5 @@ Here's the worked sample above, using ``curl`` to simulate the form POST.
     * Connection #1 to host localhost left intact
     {"success":"ok"}
 
-    $ curl http://localhost:5984/testdb/lin\@example.com_2018-04-05T19:51:22.278Z
+    $ curl http://adm:pass@localhost:5984/testdb/lin\@example.com_2018-04-05T19:51:22.278Z
     {"_id":"lin@example.com_2018-04-05T19:51:22.278Z","_rev":"1-34483732407fcc6cfc5b60ace48b9da9","name":"Lin","email":"lin@example.com","message":"I Love CouchDB"}

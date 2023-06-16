@@ -421,7 +421,7 @@ First, retrieve the database's current metadata:
 
 .. code-block:: bash
 
-    $ curl http://localhost/_node/_local/_dbs/{name}
+    $ curl http://adm:pass@localhost:5984/_node/_local/_dbs/{name}
     {
       "_id": "{name}",
       "_rev": "1-e13fb7e79af3b3107ed62925058bfa3a",
@@ -532,7 +532,7 @@ Now you can ``PUT`` this new metadata:
 
 .. code-block:: bash
 
-    $ curl -X PUT http://localhost/_node/_local/_dbs/{name} -d '{...}'
+    $ curl -X PUT http://adm:pass@localhost:5984/_node/_local/_dbs/{name} -d '{...}'
 
 .. _cluster/sharding/sync:
 
@@ -643,7 +643,7 @@ Do this for all of the nodes in your cluster. For example:
 
 .. code-block:: bash
 
-    $ curl -X PUT http://localhost/_node/_local/_nodes/{node-name} \
+    $ curl -X PUT http://adm:pass@localhost:5984/_node/_local/_nodes/{node-name} \
         -d '{ \
             "_id": "{node-name}",
             "_rev": "{rev}",

@@ -45,11 +45,11 @@ databases manually on startup:
 
 .. code-block:: sh
 
-    curl -X PUT http://127.0.0.1:5984/_users
+    curl -X PUT http://adm:pass@127.0.0.1:5984/_users
 
-    curl -X PUT http://127.0.0.1:5984/_replicator
+    curl -X PUT http://adm:pass@127.0.0.1:5984/_replicator
 
-    curl -X PUT http://127.0.0.1:5984/_global_changes
+    curl -X PUT http://adm:pass@127.0.0.1:5984/_global_changes
 
 Note that the last of these is not necessary if you do not expect to be
 using the global changes feed. Feel free to delete this database if you
