@@ -1138,6 +1138,8 @@ error_info(timeout) ->
     >>};
 error_info({service_unavailable, Reason}) ->
     {503, <<"service unavailable">>, Reason};
+error_info({insufficient_storage, Reason}) ->
+    {507, <<"insufficent_storage">>, Reason};
 error_info({timeout, _Reason}) ->
     error_info(timeout);
 error_info({'EXIT', {Error, _Stack}}) ->

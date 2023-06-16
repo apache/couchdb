@@ -122,3 +122,15 @@
 # in the features list.
 #
 #-crypto fips_mode true
+
+# OS Mon Settings
+
+# only start disksup
+-os_mon start_cpu_sup false
+-os_mon start_memsup false
+
+# Check disk space every 5 minutes
+-os_mon disk_space_check_interval 5
+
+# don't let disksup send alerts
+-os_mon disk_almost_full_threshold 1.0

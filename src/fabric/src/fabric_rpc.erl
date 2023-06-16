@@ -493,7 +493,9 @@ view_cb(complete, Acc) ->
     ok = rexi:stream_last(complete),
     {ok, Acc};
 view_cb(ok, ddoc_updated) ->
-    rexi:reply({ok, ddoc_updated}).
+    rexi:reply({ok, ddoc_updated});
+view_cb(ok, insufficient_storage) ->
+    rexi:reply({ok, insufficient_storage}).
 
 reduce_cb({meta, Meta}, Acc) ->
     % Map function starting
@@ -511,7 +513,9 @@ reduce_cb(complete, Acc) ->
     ok = rexi:stream_last(complete),
     {ok, Acc};
 reduce_cb(ok, ddoc_updated) ->
-    rexi:reply({ok, ddoc_updated}).
+    rexi:reply({ok, ddoc_updated});
+reduce_cb(ok, insufficient_storage) ->
+    rexi:reply({ok, insufficient_storage}).
 
 changes_enumerator(#full_doc_info{} = FDI, Acc) ->
     changes_enumerator(couch_doc:to_doc_info(FDI), Acc);

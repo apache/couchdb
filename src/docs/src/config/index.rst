@@ -23,6 +23,7 @@ Configuration
     couchdb
     cluster
     couch-peruser
+    disk-monitor
     http
     auth
     compaction

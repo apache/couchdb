@@ -47,6 +47,8 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
         of
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
+            {ok, insufficient_storage} ->
+                Callback({error, insufficient_storage}, Acc);
             {ok, Workers} ->
                 try
                     go2(DbName, Workers, VInfo, CoordArgs, Callback, Acc)
@@ -175,6 +177,8 @@ handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
     C1 = fabric_dict:update_counter(Worker, 1, Counters0),
     fabric_view:maybe_send_row(State#collector{counters = C1});
 handle_message(ddoc_updated, _Worker, State) ->
+    {stop, State};
+handle_message(insufficient_storage, _Worker, State) ->
     {stop, State}.
 
 os_proc_needed(<<"_", _/binary>>) -> false;

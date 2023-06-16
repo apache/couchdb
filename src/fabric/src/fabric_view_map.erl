@@ -56,6 +56,10 @@ go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
         of
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
+            {ok, insufficient_storage} ->
+                Callback(
+                    {error, {insufficient_storage, <<"not enough room to update index">>}}, Acc
+                );
             {ok, Workers} ->
                 try
                     go(DbName, Workers, VInfo, CoordArgs, Callback, Acc)
@@ -207,6 +211,8 @@ handle_message({execution_stats, _} = Msg, {_, From}, St) ->
     rexi:stream_ack(From),
     {Go, St#collector{user_acc = Acc}};
 handle_message(ddoc_updated, _Worker, State) ->
+    {stop, State};
+handle_message(insufficient_storage, _Worker, State) ->
     {stop, State}.
 
 merge_row(Dir, Collation, undefined, Row, Rows0) ->

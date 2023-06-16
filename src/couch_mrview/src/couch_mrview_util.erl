@@ -158,8 +158,8 @@ get_view(Db, DDoc, ViewName, Args0) ->
             check_range(Args3, view_cmp(View)),
             Sig = view_sig(Db, State, View, Args3),
             {ok, {Type, View, Ref}, Sig, Args3};
-        ddoc_updated ->
-            ddoc_updated
+        Error when Error == ddoc_updated; Error == insufficient_storage ->
+            Error
     end.
 
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
@@ -176,6 +176,7 @@ get_view_index_state(_, DDoc, _, _, RetryCount) when RetryCount < 0 ->
     couch_log:warning("DDoc '~s' recreated too frequently", [DDoc#doc.id]),
     throw({get_view_state, exceeded_retry_count});
 get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount) ->
+    BlockInteractiveIndexing = couch_disk_monitor:block_interactive_view_indexing(),
     try
         {ok, Pid, Args} = get_view_index_pid(Db, DDoc, ViewName, Args0),
         UpdateSeq = couch_util:with_db(Db, fun(WDb) ->
@@ -190,12 +191,24 @@ get_view_index_state(Db, DDoc, ViewName, Args0, RetryCount) ->
                     couch_index:get_state(Pid, 0);
                 false ->
                     couch_index:get_state(Pid, 0);
+                _ when BlockInteractiveIndexing ->
+                    %% if the view is already fresh enough, proceed.
+                    %% otherwise it's an error until there's room to update.
+                    case couch_index:get_state(Pid, 0) of
+                        {ok, #mrst{update_seq = MaybeSeq} = St} when MaybeSeq >= UpdateSeq ->
+                            {ok, St};
+                        {ok, #mrst{}} ->
+                            insufficient_storage;
+                        Else0 ->
+                            Else0
+                    end;
                 _ ->
                     couch_index:get_state(Pid, UpdateSeq)
             end,
         case State of
             {ok, State0} -> {ok, State0, Args};
             ddoc_updated -> ddoc_updated;
+            insufficient_storage -> insufficient_storage;
             Else -> throw(Else)
         end
     catch

@@ -487,11 +487,16 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
     IncrementalChannels = list_to_integer(config("incremental_channels", "80")),
     BatchChannels = list_to_integer(config("batch_channels", "20")),
     TotalChannels = IncrementalChannels + BatchChannels,
+    BlockBackgroundViewIndexing = couch_disk_monitor:block_background_view_indexing(),
+    % View name has two elements
+    IsView = tuple_size(Name) == 2,
     A = get_active_count(),
     #state{delay = Delay, batch_size = BS} = State,
     case ets:lookup(ken_workers, Name) of
         [] ->
             if
+                BlockBackgroundViewIndexing andalso IsView ->
+                    false;
                 A < BatchChannels ->
                     true;
                 A < TotalChannels ->
@@ -501,7 +506,7 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
                             {ok, CurrentSeq} = hastings_index:await(Pid, 0),
                             (Seq - CurrentSeq) < Threshold;
                         % View name has two elements.
-                        {_, _} ->
+                        _ when IsView ->
                             % Since seq is 0, couch_index:get_state/2 won't
                             % spawn an index update.
                             {ok, MRSt} = couch_index:get_state(Pid, 0),
@@ -525,6 +530,8 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
             Now = erlang:monotonic_time(),
             DeltaT = erlang:convert_time_unit(Now - LRU, native, millisecond),
             if
+                BlockBackgroundViewIndexing andalso IsView ->
+                    false;
                 A < BatchChannels, (Seq - OldSeq) >= BS ->
                     true;
                 A < BatchChannels, DeltaT > Delay ->
