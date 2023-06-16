@@ -26,7 +26,7 @@ to get the database information:
 
 .. code-block:: bash
 
-    shell> curl http://admin:password@127.0.0.1:5984
+    shell> curl http://127.0.0.1:5984
 
 This returns the database information (formatted in the output below for
 clarity):
@@ -65,13 +65,13 @@ clarity):
 
     .. code-block:: bash
 
-        shell> curl -X PUT 'http://127.0.0.1:5984/demo/doc' -d '{"motto": "I love gnomes"}'
+        shell> curl -X PUT 'http://adm:pass@127.0.0.1:5984/demo/doc' -d '{"motto": "I love gnomes"}'
 
     you should replace it with:
 
-    .. code-blocK:: bash
+    .. code-block:: bash
 
-        shell> curl -X PUT "http://127.0.0.1:5984/demo/doc" -d "{""motto"": ""I love gnomes""}"
+        shell> curl -X PUT "http://adm:pass@127.0.0.1:5984/demo/doc" -d "{""motto"": ""I love gnomes""}"
 
     If you prefer, ``^"`` and ``\"`` may be used to escape the double-quote
     character in quoted strings instead.
@@ -82,7 +82,7 @@ URL you send using a PUT request:
 
 .. code-block:: bash
 
-    shell> curl -X PUT http://user:pass@127.0.0.1:5984/demo
+    shell> curl -X PUT http://adm:pass@127.0.0.1:5984/demo
     {"ok":true}
 
 But to obtain the database information you use a ``GET`` request (with
@@ -90,7 +90,7 @@ the return information formatted for clarity):
 
 .. code-block:: bash
 
-    shell> curl -X GET http://user:pass@127.0.0.1:5984/demo
+    shell> curl -X GET http://adm:pass@127.0.0.1:5984/demo
     {
         "compact_running" : false,
         "doc_count" : 0,
@@ -120,7 +120,7 @@ submit a simple document to the ``demo`` database:
 .. code-block:: bash
 
     shell> curl -H 'Content-Type: application/json' \
-                -X POST http://user:pass@127.0.0.1:5984/demo \
+                -X POST http://adm:pass@127.0.0.1:5984/demo \
                 -d '{"company": "Example, Inc."}'
     {"ok":true,"id":"8843faaf0b831d364278331bc3001bd8",
      "rev":"1-33b9fbce46930280dab37d672bbc8bb9"}
@@ -133,7 +133,7 @@ that was returned:
 
 .. code-block:: bash
 
-    shell> curl -X GET http://user:pass@127.0.0.1:5984/demo/8843faaf0b831d364278331bc3001bd8
+    shell> curl -X GET http://adm:pass@127.0.0.1:5984/demo/8843faaf0b831d364278331bc3001bd8
     {"_id":"8843faaf0b831d364278331bc3001bd8",
      "_rev":"1-33b9fbce46930280dab37d672bbc8bb9",
      "company":"Example, Inc."}

@@ -33,14 +33,14 @@ simply use ``group_level`` to zoom in on whatever time you wish to use.
 
 .. code-block:: bash
 
-    curl -X GET "http://localhost:5984/transactions/_design/widget_count/_view/toss?group_level=1"
+    curl -X GET "http://adm:pass@localhost:5984/transactions/_design/widget_count/_view/toss?group_level=1"
 
     {"rows":[
     {"key":[20],"value":10},
     {"key":[21],"value":20}
     ]}
 
-    curl -X GET "http://localhost:5984/transactions/_design/widget_count/_view/toss?group_level=2"
+    curl -X GET "http://adm:pass@localhost:5984/transactions/_design/widget_count/_view/toss?group_level=2"
 
     {"rows":[
     {"key":[20,widget],"value":10},

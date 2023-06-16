@@ -613,8 +613,8 @@ easy to make)::
 
 Now we can use the database `albums-replica` as a replication target::
 
-    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://adm:pass@127.0.0.1:5984/albums","target":"http://adm:pass@127.0.0.1:5984/albums-replica"}' \
+    curl -X POST http://admin:password@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://admin:password@127.0.0.1:5984/albums","target":"http://admin:password@127.0.0.1:5984/albums-replica"}' \
          -H "Content-Type: application/json"
 
 .. note::
@@ -681,8 +681,8 @@ and target members of our replication request are actually links (like in
 HTML) and so far we've seen links relative to the server we're working on
 (hence local). You can also specify a remote database as the target::
 
-    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://adm:pass@127.0.0.1:5984/albums","target":"http://user:password@example.org:5984/albums-replica"}' \
+    curl -X POST http://admin:password@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://admin:password@127.0.0.1:5984/albums","target":"http://user:password@example.org:5984/albums-replica"}' \
          -H "Content-Type:application/json"
 
 Using a *local source* and a *remote target* database is called *push
@@ -700,14 +700,14 @@ You can also use a *remote source* and a *local target* to do a *pull
 replication*. This is great for getting the latest changes from a server that
 is used by others::
 
-    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
-         -d '{"source":"http://user:password@example.org:5984/albums-replica","target":"http://adm:pass@127.0.0.1:5984/albums"}' \
+    curl -X POST http://admin:password@127.0.0.1:5984/_replicate \
+         -d '{"source":"http://user:password@example.org:5984/albums-replica","target":"http://admin:password@127.0.0.1:5984/albums"}' \
          -H "Content-Type:application/json"
 
 Finally, you can run remote replication, which is mostly useful for management
 operations::
 
-    curl -X POST http://adm:pass@127.0.0.1:5984/_replicate \
+    curl -X POST http://admin:password@127.0.0.1:5984/_replicate \
          -d '{"source":"http://user:password@example.org:5984/albums","target":"http://user:password@example.org:5984/albums-replica"}' \
          -H "Content-Type: application/json"
 

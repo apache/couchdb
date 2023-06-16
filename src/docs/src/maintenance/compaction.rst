@@ -235,7 +235,7 @@ Compaction can be manually triggered per database and runs as a background
 task. To start it for specific database there is need to send HTTP
 :post:`/{db}/_compact` sub-resource of the target database::
 
-    curl -H "Content-Type: application/json" -X POST http://localhost:5984/my_db/_compact
+    curl -H "Content-Type: application/json" -X POST http://adm:pass@localhost:5984/my_db/_compact
 
 On success, HTTP status :statuscode:`202` is returned immediately:
 
@@ -271,7 +271,7 @@ for the request. If you don't, you will be aware about with HTTP status
 When the compaction is successful started and running it is possible to get
 information about it via :ref:`database information resource <api/db>`::
 
-    curl http://localhost:5984/my_db
+    curl http://adm:pass@localhost:5984/my_db
 
 .. code-block:: http
 
@@ -303,7 +303,7 @@ Note that ``compact_running`` field is ``true`` indicating that compaction
 is actually running. To track the compaction progress you may query the
 :get:`_active_tasks </_active_tasks>` resource::
 
-    curl http://localhost:5984/_active_tasks
+    curl http://adm:pass@localhost:5984/_active_tasks
 
 .. code-block:: http
 
@@ -351,7 +351,7 @@ per `design document`. To start their compaction, send the HTTP
 
 .. code-block:: bash
 
-    curl -H "Content-Type: application/json" -X POST http://localhost:5984/dbname/_compact/ddoc-name
+    curl -H "Content-Type: application/json" -X POST http://adm:pass@localhost:5984/dbname/_compact/ddoc-name
 
 .. code-block:: javascript
 
@@ -372,7 +372,7 @@ When you change a view, old indexes remain on disk. To clean up all outdated
 view indexes (files named after the MD5 representation of views, that does not
 exist anymore) you can trigger a :ref:`view cleanup <api/db/view_cleanup>`::
 
-    curl -H "Content-Type: application/json" -X POST http://localhost:5984/dbname/_view_cleanup
+    curl -H "Content-Type: application/json" -X POST http://adm:pass@localhost:5984/dbname/_view_cleanup
 
 .. code-block:: javascript
 

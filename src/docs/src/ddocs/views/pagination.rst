@@ -129,7 +129,7 @@ Paging
 To get the first five rows from the view result, you use the ``?limit=5``
 query parameter::
 
-    curl -X GET http://127.0.0.1:5984/artists/_design/artists/_view/by-name?limit=5
+    curl -X GET 'http://adm:pass@127.0.0.1:5984/artists/_design/artists/_view/by-name?limit=5'
 
 The result:
 
@@ -156,7 +156,7 @@ we can determine if there are more pages to display. We also know by the
 
 So we query CouchDB with::
 
-    curl -X GET 'http://127.0.0.1:5984/artists/_design/artists/_view/by-name?limit=5&skip=5'
+    curl -X GET 'http://adm:pass@127.0.0.1:5984/artists/_design/artists/_view/by-name?limit=5&skip=5'
 
 Note we have to use ``'`` (single quotes) to escape the ``&`` character that is
 special to the shell we execute curl in.

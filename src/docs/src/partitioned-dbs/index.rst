@@ -144,7 +144,7 @@ parameter:
 
 .. code-block:: bash
 
-    shell> curl -X PUT http://127.0.0.1:5984/my_new_db?partitioned=true
+    shell> curl -X PUT 'http://adm:pass@127.0.0.1:5984/my_new_db?partitioned=true'
     {"ok":true}
 
 To see that our database is partitioned, we can look at the database
@@ -152,7 +152,7 @@ information:
 
 .. code-block:: bash
 
-    shell> curl http://127.0.0.1:5984/my_new_db
+    shell> curl http://adm:pass@127.0.0.1:5984/my_new_db
     {
       "cluster": {
         "n": 3,
@@ -213,7 +213,7 @@ Using our earlier example, we could do this as such:
         ]
     }
     shell> $ curl -X POST -H "Content-Type: application/json" \
-                http://127.0.0.1:5984/my_new_db -d @doc.json
+                http://adm:pass@127.0.0.1:5984/my_new_db -d @doc.json
     {
         "ok": true,
         "id": "sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf",
@@ -239,7 +239,7 @@ containing the document:
 
 .. code-block:: bash
 
-    shell> curl http://127.0.0.1:5984/my_new_db/_partition/sensor-260
+    shell> curl http://adm:pass@127.0.0.1:5984/my_new_db/_partition/sensor-260
     {
       "db_name": "my_new_db",
       "doc_count": 1,
@@ -255,7 +255,7 @@ And we can also list all documents in a partition:
 
 .. code-block:: bash
 
-    shell> curl http://127.0.0.1:5984/my_new_db/_partition/sensor-260/_all_docs
+    shell> curl http://adm:pass@127.0.0.1:5984/my_new_db/_partition/sensor-260/_all_docs
     {"total_rows": 1, "offset": 0, "rows":[
         {
             "id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf",
@@ -300,13 +300,13 @@ After uploading our design document, we can try out a partitioned query:
             }
         }
     }
-    shell> $ curl -X POST -H "Content-Type: application/json" http://127.0.0.1:5984/my_new_db -d @ddoc.json
+    shell> $ curl -X POST -H "Content-Type: application/json" http://adm:pass@127.0.0.1:5984/my_new_db -d @ddoc.json
     {
         "ok": true,
         "id": "_design/sensor-readings",
         "rev": "1-13859808da293bd72fde3b31be97372a"
     }
-    shell> curl http://127.0.0.1:5984/my_new_db/_partition/sensor-260/_design/sensor-readings/_view/by_sensor
+    shell> curl http://adm:pass@127.0.0.1:5984/my_new_db/_partition/sensor-260/_design/sensor-readings/_view/by_sensor
     {"total_rows":4,"offset":0,"rows":[
     {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","0"],"value":null},
     {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","1"],"value":null},
@@ -354,7 +354,7 @@ that the ``"options"`` member contains ``"partitioned": false``.
         }
       }
     }
-    shell> $ curl -X POST -H "Content-Type: application/json" http://127.0.0.1:5984/my_new_db -d @ddoc2.json
+    shell> $ curl -X POST -H "Content-Type: application/json" http://adm:pass@127.0.0.1:5984/my_new_db -d @ddoc2.json
     {
         "ok": true,
         "id": "_design/all_sensors",
@@ -378,7 +378,7 @@ request like:
 
 .. code-block:: bash
 
-    shell> curl -u adm:pass http://127.0.0.1:15984/my_new_db/_design/all_sensors/_view/by_field
+    shell> curl -u adm:pass http://adm:pass@127.0.0.1:15984/my_new_db/_design/all_sensors/_view/by_field
     {"total_rows":1,"offset":0,"rows":[
     {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":"Bob's Corn Field #5","value":"sensor-260"}
     ]}
