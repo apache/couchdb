@@ -421,13 +421,28 @@ pending_count(Dict) ->
 
 pack_seqs(Workers) ->
     SeqList = [{N, R, S} || {#shard{node = N, range = R}, S} <- Workers],
-    SeqSum = lists:sum([seq(S) || {_, _, S} <- SeqList]),
+    SeqSum = lists:sum([fake_packed_seq(S) || {_, _, S} <- SeqList]),
     Opaque = couch_util:encodeBase64Url(?term_to_bin(SeqList, [compressed])),
     ?l2b([integer_to_list(SeqSum), $-, Opaque]).
 
-seq({Seq, _Uuid, _Node}) -> Seq;
-seq({Seq, _Uuid}) -> Seq;
-seq(Seq) -> Seq.
+% Generate the sequence number used to build the emitted N-... prefix.
+%
+% The prefix is discarded when the sequence is decoded in the current CouchDB
+% version. It's mostly there as a visual heuristic about all the packed
+% sequences and to keep backwards compatibility with previous CouchDB versions.
+%
+% We handle a few backwards compatibility clauses, and also when we get a
+% sequence before a shard split. In that case, we fill in the missing ranges
+% with a special {split, OldNodeUUid} marker. However, when sequences are
+% emitted, that will make the N- prefix (SeqSum) bounce around from higher to
+% lower numbers if we leave it as is. To fix that, use 0 for that range,
+% assuming it will be full rewind. That way the N-... prefix is more likely to
+% be incrementing, which is what users would generally expect.
+%
+fake_packed_seq({Seq, {split, <<_/binary>>}, _Node}) when is_integer(Seq) -> 0;
+fake_packed_seq({Seq, _Uuid, _Node}) -> Seq;
+fake_packed_seq({Seq, _Uuid}) -> Seq;
+fake_packed_seq(Seq) -> Seq.
 
 unpack_seq_regex_match(Packed) ->
     Pattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
@@ -1064,5 +1079,19 @@ find_replacement_sequence_test() ->
     Dead4 = mk_workers(Shards, {replace, 'n1', Uuid, 45}),
     ?assertEqual(0, find_replacement_sequence(Dead4, [0, 10])),
     ?assertEqual(0, find_replacement_sequence(Dead4, [0, 5])).
+
+pack_split_seq_test() ->
+    Shards = [{"n1", 0, 10}, {"n2", 11, ?RING_END}],
+    Workers = mk_workers(Shards, {42, {split, <<"abc1234">>}, 'node1@127.0.0.1'}),
+    PackedSeq = pack_seqs(Workers),
+    ?assertMatch(<<"0-", _/binary>>, PackedSeq),
+    DecodedSeq = decode_seq(PackedSeq),
+    ?assertEqual(
+        [
+            {n1, [0, 10], {42, {split, <<"abc1234">>}, 'node1@127.0.0.1'}},
+            {n2, [11, 4294967295], {42, {split, <<"abc1234">>}, 'node1@127.0.0.1'}}
+        ],
+        DecodedSeq
+    ).
 
 -endif.
