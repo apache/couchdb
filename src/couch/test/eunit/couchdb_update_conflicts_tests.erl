@@ -19,7 +19,7 @@
 -define(DOC_ID, <<"foobar">>).
 -define(LOCAL_DOC_ID, <<"_local/foobar">>).
 % TODO: enable 1000, 2000, 5000, 10000]).
--define(NUM_CLIENTS, [100]).
+-define(NUM_CLIENTS, [1000]).
 -define(TIMEOUT, 200000).
 
 start() ->
