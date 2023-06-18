@@ -19,7 +19,7 @@ You need the following to run tests:
 
 You need the following optionally to build documentation:
 
-* `Sphinx                 <http://sphinx.pocoo.org/>`_
+* `Sphinx                 <https://www.sphinx-doc.org/>`_
 * `GNU help2man           <http://www.gnu.org/software/help2man/>`_
 * `GnuPG                  <http://www.gnupg.org/>`_
 
