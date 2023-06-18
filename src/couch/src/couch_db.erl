@@ -1682,7 +1682,7 @@ write_and_commit(
     ReplicatedChanges = lists:member(?REPLICATED_CHANGES, Options),
     MRef = monitor(process, Pid),
     try
-        Pid ! {update_docs, self(), DocBuckets, LocalDocs, MergeConflicts, Ctx},
+        Pid ! {update_docs, self(), DocBuckets, LocalDocs, ReplicatedChanges, Ctx},
         case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} ->
                 {ok, Results};
@@ -1697,7 +1697,7 @@ write_and_commit(
                 % We only retry once
                 DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
                 close(Db2),
-                Pid ! {update_docs, self(), DocBuckets3, LocalDocs, MergeConflicts, Ctx},
+                Pid ! {update_docs, self(), DocBuckets3, LocalDocs, ReplicatedChanges, Ctx},
                 case collect_results_with_metrics(Pid, MRef, []) of
                     {ok, Results} -> {ok, Results};
                     retry -> throw({update_error, compaction_retry})
