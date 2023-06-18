@@ -170,7 +170,7 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     {stop, Msg, Db}.
 
 handle_info(
-    {update_docs, Client, GroupedDocs, LocalDocs, MergeConflicts, UserCtx},
+    {update_docs, Client, GroupedDocs, LocalDocs, ReplicatedChanges, UserCtx},
     Db
 ) ->
     GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
@@ -186,7 +186,7 @@ handle_info(
             Clients = [Client]
     end,
     LocalDocs2 = [{Client, NRDoc} || NRDoc <- LocalDocs],
-    try update_docs_int(Db, GroupedDocs3, LocalDocs2, MergeConflicts, UserCtx) of
+    try update_docs_int(Db, GroupedDocs3, LocalDocs2, ReplicatedChanges, UserCtx) of
         {ok, Db2, UpdatedDDocIds} ->
             ok = couch_server:db_updated(Db2),
             case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
