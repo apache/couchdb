@@ -114,6 +114,9 @@ update_gauge(Name, Value) ->
     notify_existing_metric(Name, Value, gauge).
 
 -spec notify_existing_metric(any(), any(), any()) -> response().
+notify_existing_metric(Name, Op, histogram) ->
+    %% HACK! skip histogram updates for a benchmark
+    ok;
 notify_existing_metric(Name, Op, Type) ->
     try
         ok = folsom_metrics:notify_existing_metric(Name, Op, Type)
