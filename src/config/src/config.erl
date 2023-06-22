@@ -480,8 +480,16 @@ read_ini_file(IniFile) ->
     end.
 
 remove_comments(Line) ->
-    {NoComments, _Comments} = string:take(Line, [$;], true),
-    NoComments.
+    case trim(Line) of
+        [$; | _] ->
+            % Comment is at the start of line after it's trimmed
+            "";
+        NoLeadingComment when is_list(NoLeadingComment) ->
+            % Check for in-line comments. In-line comments must be preceded by
+            % space or a tab character.
+            [NoComments | _] = re:split(NoLeadingComment, " ;|\t;", [{return, list}]),
+            NoComments
+    end.
 
 % Specially handle the ?DELETE marker
 %
@@ -650,6 +658,10 @@ parse_skip_test() ->
     ?assertEqual([], ini("s]\nk=v")),
     ?assertEqual([], ini(";[s]\nk = v")),
     ?assertEqual([], ini(" ; [s]\nk = v")),
+    ?assertEqual([], ini("[s]\n ;k = v")),
+    ?assertEqual([], ini("[s]\n;;k = v")),
+    ?assertEqual([], ini("[s]\n\t;k = v")),
+    ?assertEqual([], ini("[s]\nk ;=v")),
     ?assertEqual([], ini("[s]\n ; k = v")),
     ?assertEqual([], ini("[]\nk = v")),
     ?assertEqual([], ini(";[s]\n ")).
@@ -681,14 +693,32 @@ parse_extra_equal_sign_test() ->
 
 parse_delete_test() ->
     ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=")),
-    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=;")),
     ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk =")),
     ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ")),
     ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk= ")),
     ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ")),
     ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ;")),
-    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk  =;")),
-    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=\n")).
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk  =\t;")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk=\n")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ; ;")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ;v")),
+    ?assertEqual([{{"s", "k"}, ?DELETE}], ini("[s]\nk = ;")).
+
+parse_comments_test() ->
+    ?assertEqual([], ini("[s]\n;k=v")),
+    ?assertEqual([{{"s", "k"}, ";"}], ini("[s]\nk=;")),
+    ?assertEqual([{{"s", "k"}, ";"}], ini("[s]\nk =;")),
+    ?assertEqual([{{"s", "k"}, "v;"}], ini("[s]\nk = v;")),
+    ?assertEqual([{{"s", "k"}, ";v;"}], ini("[s]\nk =;v;")),
+    ?assertEqual([{{"s", "k"}, ";v"}], ini("[s]\nk =;v")),
+    ?assertEqual([{{"s", "k"}, "v;"}], ini("[s]\nk =v;")),
+    ?assertEqual([{{"s", "k"}, "v;;"}], ini("[s]\nk =v;;")),
+    ?assertEqual([{{"s", "k"}, "v1;v2"}], ini("[s]\nk = v1;v2")),
+    ?assertEqual([{{"s", "k"}, "v1;v2;v3"}], ini("[s]\nk = v1;v2;v3")),
+    ?assertEqual([{{"s", "k"}, "v1;v2"}], ini("[s]\nk = v1;v2 ;")),
+    ?assertEqual([{{"s", "k"}, "v1;v2"}], ini("[s]\nk = v1;v2\t;")),
+    ?assertEqual([{{"s", "k"}, "v1;v2"}], ini("[s]\nk = v1;v2 ;;")),
+    ?assertEqual([{{"s", "k"}, "v1;v2"}], ini("[s]\nk = v1;v2 ;c1; c2")).
 
 parse_multiple_kvs_test() ->
     ?assertEqual(
