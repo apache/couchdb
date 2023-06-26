@@ -87,12 +87,12 @@ class RegularCoveringIndexTests(mango.UserDocsTests, CoveringIndexTests):
         self.assertEqual(resp["index"]["type"], "json")
         self.assertEqual(resp["index"]["name"], index)
         self.assertEqual(resp["mrargs"]["include_docs"], False)
-        self.assertEqual(resp["covered"], True)
+        self.assertEqual(resp["covering"], True)
 
     def is_not_covered(self, selector, fields, use_index=None):
         resp = self.db.find(selector, fields=fields, use_index=use_index, explain=True)
         self.assertEqual(resp["mrargs"]["include_docs"], True)
-        self.assertEqual(resp["covered"], False)
+        self.assertEqual(resp["covering"], False)
 
     def test_covering_index_provides_correct_answer_2field_index(self):
         docs = self.db.find(
@@ -147,14 +147,14 @@ class PartitionedCoveringIndexTests(mango.PartitionedUserDocsTests, CoveringInde
         self.assertEqual(resp["index"]["type"], "json")
         self.assertEqual(resp["index"]["name"], index)
         self.assertEqual(resp["mrargs"]["include_docs"], False)
-        self.assertEqual(resp["covered"], True)
+        self.assertEqual(resp["covering"], True)
 
     def is_not_covered(self, selector, fields, use_index=None):
         resp = self.db.find(
             selector, fields=fields, use_index=use_index, explain=True, partition="0"
         )
         self.assertEqual(resp["mrargs"]["include_docs"], True)
-        self.assertEqual(resp["covered"], False)
+        self.assertEqual(resp["covering"], False)
 
     def test_covering_index_provides_correct_answer_2field_index(self):
         docs = self.db.find(

@@ -13,8 +13,6 @@
 -module(mango_native_proc).
 -behavior(gen_server).
 
--include("mango_idx.hrl").
-
 -export([
     start_link/0,
     set_timeout/2,

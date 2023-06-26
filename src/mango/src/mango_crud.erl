@@ -46,7 +46,7 @@ insert(Db, Docs, Opts0) when is_list(Docs) ->
 find(Db, Selector, Callback, UserAcc, Opts0) ->
     Opts1 = maybe_add_user_ctx(Db, Opts0),
     Opts2 = maybe_int_to_str(r, Opts1),
-    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2),
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2, find),
     mango_cursor:execute(Cursor, Callback, UserAcc).
 
 update(Db, Selector, Update, Options) ->
@@ -103,7 +103,7 @@ delete(Db, Selector, Options) ->
 explain(Db, Selector, Opts0) ->
     Opts1 = maybe_add_user_ctx(Db, Opts0),
     Opts2 = maybe_int_to_str(r, Opts1),
-    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2),
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2, explain),
     mango_cursor:explain(Cursor).
 
 maybe_add_user_ctx(Db, Opts) ->

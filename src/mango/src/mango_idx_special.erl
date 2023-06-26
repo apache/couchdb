@@ -25,7 +25,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
--include("mango_idx.hrl").
+-include("mango.hrl").
 
 validate(_) ->
     erlang:exit(invalid_call).
@@ -58,10 +58,16 @@ columns(#idx{def = all_docs}) ->
     [<<"_id">>].
 
 is_usable(#idx{def = all_docs}, _Selector, []) ->
-    true;
+    {true, #{reason => []}};
 is_usable(#idx{def = all_docs} = Idx, Selector, SortFields) ->
     Fields = mango_idx_view:indexable_fields(Selector),
-    lists:member(<<"_id">>, Fields) and can_use_sort(Idx, SortFields, Selector).
+    SelectorHasRequiredFields = lists:member(<<"_id">>, Fields),
+    CanUseSort = can_use_sort(Idx, SortFields, Selector),
+    Reason =
+        [field_mismatch || not SelectorHasRequiredFields] ++
+            [sort_order_mismatch || not CanUseSort],
+    Details = #{reason => Reason},
+    {SelectorHasRequiredFields and CanUseSort, Details}.
 
 start_key([{'$gt', Key, _, _}]) ->
     case mango_json:special(Key) of
@@ -96,3 +102,22 @@ can_use_sort(_Idx, [], _Selector) ->
 can_use_sort(Idx, SortFields, _Selector) ->
     Cols = columns(Idx),
     lists:prefix(SortFields, Cols).
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+usable(Index, undefined, Fields) ->
+    is_usable(Index, undefined, Fields);
+usable(Index, Selector, Fields) ->
+    is_usable(Index, test_util:as_selector(Selector), Fields).
+
+is_usable_test() ->
+    Usable = {true, #{reason => []}},
+    FieldMismatch = {false, #{reason => [field_mismatch]}},
+    SortOrderMismatch = {false, #{reason => [sort_order_mismatch]}},
+
+    Index = #idx{def = all_docs},
+    ?assertEqual(FieldMismatch, usable(Index, #{}, [<<"_id">>])),
+    ?assertEqual(SortOrderMismatch, usable(Index, #{<<"_id">> => 11}, [<<"field3">>])),
+    ?assertEqual(Usable, usable(Index, #{}, [])).
+-endif.

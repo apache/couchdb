@@ -58,7 +58,7 @@ class JSONIndexSortOptimisations(mango.DbPerClass):
         self.db.create_index(["cars", "age"], name="cars-age")
         selector = {"cars": {"$gt": 10}, "age": {"$gt": 10}}
         try:
-            self.db.find(selector, explain=True, sort=["age"])
+            self.db.find(selector, sort=["age"])
             raise Exception("Should not get here")
         except Exception as e:
             resp = e.response.json()
@@ -80,7 +80,7 @@ class JSONIndexSortOptimisations(mango.DbPerClass):
         self.db.create_index(["cars", "age", "name"], name="cars-age-name")
         selector = {"name": "Eddie", "age": {"$gt": 1}, "cars": {"$gt": "1"}}
         try:
-            self.db.find(selector, explain=True, sort=["name"])
+            self.db.find(selector, sort=["name"])
             raise Exception("Should not get here")
         except Exception as e:
             resp = e.response.json()
@@ -99,7 +99,7 @@ class JSONIndexSortOptimisations(mango.DbPerClass):
         self.assertEqual(explain["index"]["name"], "cars-age-name")
 
         try:
-            self.db.find(selector, sort=["cars", "name"], explain=True)
+            self.db.find(selector, sort=["cars", "name"])
             raise Exception("Should not get here")
         except Exception as e:
             resp = e.response.json()
@@ -115,7 +115,7 @@ class JSONIndexSortOptimisations(mango.DbPerClass):
         self.db.create_index(["cars", "age"], name="cars-age")
         selector = {"age": 10, "cars": {"$gt": "1"}}
         try:
-            self.db.find(selector, sort=["cars", "name"], explain=True)
+            self.db.find(selector, sort=["cars", "name"])
             raise Exception("Should not get here")
         except Exception as e:
             resp = e.response.json()

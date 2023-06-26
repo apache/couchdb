@@ -10,6 +10,16 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+-record(idx, {
+    dbname,
+    ddoc,
+    name,
+    type,
+    def,
+    partitioned,
+    opts
+}).
+
 -define(MANGO_ERROR(R), throw({mango_error, ?MODULE, R})).
 
 -type maybe(A) :: A | undefined.
@@ -30,6 +40,10 @@
 -type selector() :: any().
 -type ejson() :: {[{atom(), any()}]}.
 
+-type cursor_options() :: [{term(), term()}].
+-type comparator() :: '$lt' | '$lte' | '$eq' | '$gte' | '$gt'.
+-type range() :: {comparator(), any(), comparator(), any()} | empty.
+
 -type shard_stats() :: shard_stats_v1() | shard_stats_v2().
 
 -type shard_stats_v1() :: {docs_examined, non_neg_integer()}.
@@ -41,3 +55,31 @@
 
 -type row_property_key() :: id | key | value | doc.
 -type row_properties() :: [{row_property_key(), any()}].
+
+-type reason() :: needs_text_search
+		| field_mismatch
+		| sort_order_mismatch
+		| empty_selector
+		| less_overlap
+		| too_many_fields
+		| alphabetically_comes_after
+		| is_partial
+		| scope_mismatch
+		| excluded_by_user
+		| unfavored_type.
+
+-type rejection_details() :: #{reason => [reason()]}.
+
+-type trace() ::
+   #{
+         all_indexes := sets:set(#idx{}),
+         global_indexes := sets:set(#idx{}),
+         partition_indexes := sets:set(#idx{}),
+         usable_indexes := sets:set(#idx{}),
+         filtered_indexes := sets:set(#idx{}),
+         indexes_of_type := sets:set(#idx{}),
+         usability_map := [{#idx{}, {boolean(), rejection_details()}}],
+         sorted_index_ranges => [{#idx{}, [range()], integer()}]
+   }.
+
+-type cursor_kind() :: explain | find.

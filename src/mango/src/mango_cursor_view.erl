@@ -32,12 +32,10 @@
 
 -include("mango.hrl").
 -include("mango_cursor.hrl").
--include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
 
 -define(HEARTBEAT_INTERVAL_IN_USEC, 4000000).
 
--type cursor_options() :: [{term(), term()}].
 -type message() ::
     {meta, _}
     | {row, row_properties()}
@@ -88,15 +86,16 @@ shard_stats_get(docs_examined, Args) when is_map(Args) ->
 shard_stats_get(keys_examined, Args) when is_map(Args) ->
     maps:get(keys_examined, Args, 0).
 
--spec create(Db, Indexes, Selector, Options) -> {ok, #cursor{}} when
+-spec create(Db, {Indexes, Trace}, Selector, Options) -> {ok, #cursor{}} when
     Db :: database(),
     Indexes :: [#idx{}],
+    Trace :: trace(),
     Selector :: selector(),
     Options :: cursor_options().
-create(Db, Indexes, Selector, Opts) ->
+create(Db, {Indexes, Trace0}, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
     Composited = composite_indexes(Indexes, FieldRanges),
-    {Index, IndexRanges} = choose_best_index(Composited),
+    {{Index, IndexRanges}, SortedIndexRanges} = choose_best_index(Composited),
 
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
@@ -104,11 +103,13 @@ create(Db, Indexes, Selector, Opts) ->
     Bookmark = couch_util:get_value(bookmark, Opts),
 
     IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
+    Trace = maps:merge(Trace0, #{sorted_index_ranges => SortedIndexRanges}),
 
     {ok, #cursor{
         db = Db,
         index = Index,
         ranges = IndexRanges1,
+        trace = Trace,
         selector = Selector,
         opts = Opts,
         limit = Limit,
@@ -130,12 +131,12 @@ apply_cursor_opts(#cursor{} = Cursor) ->
     Args0 = apply_opts(Opts, BaseArgs),
     Fields = required_fields(Cursor),
     Args = consider_index_coverage(Index, Fields, Args0),
-    Covered = mango_idx_view:covers(Index, Fields),
-    {Args, Covered}.
+    Covering = mango_idx_view:covers(Index, Fields),
+    {Args, Covering}.
 
 -spec explain(#cursor{}) -> nonempty_list(term()).
 explain(Cursor) ->
-    {Args, Covered} = apply_cursor_opts(Cursor),
+    {Args, Covering} = apply_cursor_opts(Cursor),
     [
         {mrargs,
             {[
@@ -150,7 +151,7 @@ explain(Cursor) ->
                 {update, Args#mrargs.update},
                 {conflicts, Args#mrargs.conflicts}
             ]}},
-        {covered, Covered}
+        {covering, Covering}
     ].
 
 % replace internal values that cannot
@@ -262,9 +263,6 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             end
     end.
 
--type comparator() :: '$lt' | '$lte' | '$eq' | '$gte' | '$gt'.
--type range() :: {comparator(), any(), comparator(), any()} | empty.
-
 % Any of these indexes may be a composite index. For each
 % index find the most specific set of fields for each
 % index. Ie, if an index has columns a, b, c, d, then
@@ -307,7 +305,7 @@ composite_prefix([Col | Rest], Ranges) ->
 % In the future we can look into doing a cached parallel
 % reduce view read on each index with the ranges to find
 % the one that has the fewest number of rows or something.
--spec choose_best_index(IndexRanges) -> Selection when
+-spec choose_best_index(IndexRanges) -> {Selection, IndexRanges} when
     IndexRanges :: nonempty_list({#idx{}, [range()], integer()}),
     Selection :: {#idx{}, [range()]}.
 choose_best_index(IndexRanges) ->
@@ -334,8 +332,9 @@ choose_best_index(IndexRanges) ->
                 false
         end
     end,
-    {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
-    {SelectedIndex, SelectedIndexRanges}.
+    SortedIndexRanges = lists:sort(Cmp, IndexRanges),
+    {SelectedIndex, SelectedIndexRanges, _} = hd(SortedIndexRanges),
+    {{SelectedIndex, SelectedIndexRanges}, SortedIndexRanges}.
 
 -spec view_cb
     (Message, #mrargs{}) -> Response when
@@ -910,6 +909,7 @@ composite_indexes_test() ->
 create_test() ->
     Index = #idx{type = <<"json">>, def = {[{<<"fields">>, {[]}}]}},
     Indexes = [Index],
+    Trace = #{},
     Ranges = [],
     Selector = {[]},
     Options = [{limit, limit}, {skip, skip}, {fields, fields}, {bookmark, bookmark}],
@@ -923,9 +923,10 @@ create_test() ->
             limit = limit,
             skip = skip,
             fields = fields,
-            bookmark = bookmark
+            bookmark = bookmark,
+            trace = #{sorted_index_ranges => [{Index, [], 0}]}
         },
-    ?assertEqual({ok, Cursor}, create(db, Indexes, Selector, Options)).
+    ?assertEqual({ok, Cursor}, create(db, {Indexes, Trace}, Selector, Options)).
 
 to_selector(Map) ->
     test_util:as_selector(Map).
@@ -982,7 +983,7 @@ explain_test() ->
                     {update, true},
                     {conflicts, undefined}
                 ]}},
-            {covered, false}
+            {covering, false}
         ],
     ?assertEqual(Response, explain(Cursor)).
 
@@ -1738,7 +1739,9 @@ match_and_extract_doc_nomatch_fields_test() ->
 %% Query planner tests:
 %% - there should be no comparison for a singleton list, with a trivial result
 choose_best_index_with_singleton_test() ->
-    ?assertEqual({index, ranges}, choose_best_index([{index, ranges, undefined}])).
+    IndexRanges = [{index, ranges, undefined}],
+    Result = {{index, ranges}, IndexRanges},
+    ?assertEqual(Result, choose_best_index([{index, ranges, undefined}])).
 
 %% - choose the index with the lowest difference between its prefix and field ranges
 choose_best_index_lowest_difference_test() ->
@@ -1748,14 +1751,28 @@ choose_best_index_lowest_difference_test() ->
             {index2, ranges2, 2},
             {index3, ranges3, 1}
         ],
-    ?assertEqual({index3, ranges3}, choose_best_index(IndexRanges1)),
+    SortedIndexRanges1 =
+        [
+            {index3, ranges3, 1},
+            {index2, ranges2, 2},
+            {index1, ranges1, 3}
+        ],
+    Result1 = {{index3, ranges3}, SortedIndexRanges1},
+    ?assertEqual(Result1, choose_best_index(IndexRanges1)),
     IndexRanges2 =
         [
             {index1, ranges1, 3},
             {index2, ranges2, 1},
             {index3, ranges3, 2}
         ],
-    ?assertEqual({index2, ranges2}, choose_best_index(IndexRanges2)).
+    SortedIndexRanges2 =
+        [
+            {index2, ranges2, 1},
+            {index3, ranges3, 2},
+            {index1, ranges1, 3}
+        ],
+    Result2 = {{index2, ranges2}, SortedIndexRanges2},
+    ?assertEqual(Result2, choose_best_index(IndexRanges2)).
 
 %% - if that is equal, choose the index with the least number of fields in the index
 choose_best_index_least_number_of_fields_test() ->
@@ -1767,7 +1784,14 @@ choose_best_index_least_number_of_fields_test() ->
             {Index2, ranges2, 1},
             {Index3, ranges3, 1}
         ],
-    ?assertEqual({Index2, ranges2}, choose_best_index(IndexRanges)).
+    SortedIndexRanges =
+        [
+            {Index2, ranges2, 1},
+            {Index1, ranges1, 1},
+            {Index3, ranges3, 1}
+        ],
+    Result = {{Index2, ranges2}, SortedIndexRanges},
+    ?assertEqual(Result, choose_best_index(IndexRanges)).
 
 %% - otherwise, choose alphabetically based on the index properties:
 choose_best_index_lowest_index_triple_test() ->
@@ -1783,7 +1807,14 @@ choose_best_index_lowest_index_triple_test() ->
             {Index2, ranges2, 1},
             {Index3, ranges3, 1}
         ],
-    ?assertEqual({Index1, ranges1}, choose_best_index(IndexRanges1)),
+    SortedIndexRanges1 =
+        [
+            {Index1, ranges1, 1},
+            {Index2, ranges2, 1},
+            {Index3, ranges3, 1}
+        ],
+    Result1 = {{Index1, ranges1}, SortedIndexRanges1},
+    ?assertEqual(Result1, choose_best_index(IndexRanges1)),
 
     % - if that is equal, design document name
     Index4 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/c">>, <<"B">>)),
@@ -1795,7 +1826,14 @@ choose_best_index_lowest_index_triple_test() ->
             {Index5, ranges5, 1},
             {Index6, ranges6, 1}
         ],
-    ?assertEqual({Index6, ranges6}, choose_best_index(IndexRanges2)),
+    SortedIndexRanges2 =
+        [
+            {Index6, ranges6, 1},
+            {Index5, ranges5, 1},
+            {Index4, ranges4, 1}
+        ],
+    Result2 = {{Index6, ranges6}, SortedIndexRanges2},
+    ?assertEqual(Result2, choose_best_index(IndexRanges2)),
 
     % - otherwise, index name
     Index7 = WithSomeColumns(json_index(<<"db_a">>, <<"_design/a">>, <<"B">>)),
@@ -1807,7 +1845,14 @@ choose_best_index_lowest_index_triple_test() ->
             {Index8, ranges8, 1},
             {Index9, ranges9, 1}
         ],
-    ?assertEqual({Index9, ranges9}, choose_best_index(IndexRanges3)).
+    SortedIndexRanges3 =
+        [
+            {Index9, ranges9, 1},
+            {Index7, ranges7, 1},
+            {Index8, ranges8, 1}
+        ],
+    Result3 = {{Index9, ranges9}, SortedIndexRanges3},
+    ?assertEqual(Result3, choose_best_index(IndexRanges3)).
 
 json_index(DbName, DesignDoc, Name) ->
     #idx{
