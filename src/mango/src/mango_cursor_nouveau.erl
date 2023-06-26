@@ -38,7 +38,7 @@
     execution_stats
 }).
 
-create(Db, Indexes, Selector, Opts) ->
+create(Db, {Indexes, Trace}, Selector, Opts) ->
     Index =
         case Indexes of
             [Index0] ->
@@ -56,6 +56,7 @@ create(Db, Indexes, Selector, Opts) ->
         db = Db,
         index = Index,
         ranges = null,
+        trace = Trace,
         selector = Selector,
         opts = Opts,
         limit = Limit,

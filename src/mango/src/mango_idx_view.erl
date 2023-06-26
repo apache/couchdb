@@ -33,7 +33,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
--include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
 
 validate_new(#idx{} = Idx, _Db) ->
@@ -114,6 +113,7 @@ columns(Idx) ->
     {<<"fields">>, {Fields}} = lists:keyfind(<<"fields">>, 1, Props),
     [Key || {Key, _} <- Fields].
 
+-spec is_usable(#idx{}, selector(), [field()]) -> {boolean(), rejection_details()}.
 is_usable(Idx, Selector, SortFields) ->
     % This index is usable if all of the columns are
     % restricted by the selector such that they are required to exist
@@ -131,9 +131,15 @@ is_usable(Idx, Selector, SortFields) ->
         [<<"_id">>, <<"_rev">>]
     ),
 
-    mango_selector:has_required_fields(Selector, RequiredFields2) andalso
-        not is_text_search(Selector) andalso
-        can_use_sort(RequiredFields, SortFields, Selector).
+    SelectorHasRequiredFields = mango_selector:has_required_fields(Selector, RequiredFields2),
+    NotTextSearch = not is_text_search(Selector),
+    CanUseSort = can_use_sort(RequiredFields, SortFields, Selector),
+    Reason =
+        [needs_text_search || not NotTextSearch] ++
+            [field_mismatch || not SelectorHasRequiredFields] ++
+            [sort_order_mismatch || not CanUseSort],
+    Details = #{reason => Reason},
+    {NotTextSearch andalso SelectorHasRequiredFields andalso CanUseSort, Details}.
 
 is_text_search({[]}) ->
     false;
@@ -655,4 +661,44 @@ covers_regular_index_test() ->
     ?assert(covers(Index, [field2, field1])),
     ?assert(covers(Index, [<<"_id">>, field1, field2])),
     ?assertNot(covers(Index, [field3, field1, field2])).
+
+usable(Index, undefined, Fields) ->
+    is_usable(Index, undefined, Fields);
+usable(Index, Selector, Fields) ->
+    is_usable(Index, test_util:as_selector(Selector), Fields).
+
+is_usable_test() ->
+    Usable = {true, #{reason => []}},
+    NeedsTextSearch = {false, #{reason => [needs_text_search, field_mismatch]}},
+    FieldMismatch = {false, #{reason => [field_mismatch]}},
+    SortOrderMismatch = {false, #{reason => [sort_order_mismatch]}},
+
+    Index = #idx{
+        def = {[{<<"fields">>, {[{<<"field1">>, undefined}, {<<"field2">>, undefined}]}}]}
+    },
+    ?assertEqual(FieldMismatch, usable(Index, #{}, [])),
+    ?assertEqual(FieldMismatch, usable(Index, #{<<"field1">> => <<"value1">>}, [])),
+    ?assertEqual(
+        NeedsTextSearch,
+        usable(
+            Index,
+            #{
+                <<"$or">> => [
+                    #{<<"$text">> => <<"foobar">>},
+                    #{<<"field1">> => <<"value1">>}
+                ],
+                <<"field2">> => 42
+            },
+            []
+        )
+    ),
+    ?assertEqual(
+        SortOrderMismatch,
+        usable(Index, #{<<"field1">> => <<"value1">>, <<"field2">> => 42}, [
+            <<"field3">>, <<"field4">>
+        ])
+    ),
+    ?assertEqual(
+        Usable, usable(Index, #{<<"field1">> => <<"value1">>, <<"field2">> => <<"value2">>}, [])
+    ).
 -endif.

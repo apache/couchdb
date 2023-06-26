@@ -350,6 +350,15 @@ class UserDocsTestsNoIndexes(DbPerClass):
         user_docs.setup(klass.db, index_type=klass.INDEX_TYPE)
 
 
+class PartitionedUserDocsTestsNoIndexes(DbPerClass):
+    INDEX_TYPE = "special"
+
+    @classmethod
+    def setUpClass(klass):
+        super(PartitionedUserDocsTestsNoIndexes, klass).setUpClass(partitioned=True)
+        user_docs.setup(klass.db, index_type=klass.INDEX_TYPE, partitioned=True)
+
+
 class UserDocsTextTests(DbPerClass):
     INDEX_TYPE = "text"
     DEFAULT_FIELD = None

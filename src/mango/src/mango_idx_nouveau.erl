@@ -22,12 +22,12 @@
     to_json/1,
     columns/1,
     is_usable/3,
-    get_default_field_options/1
+    get_default_field_options/1,
+    indexable_fields/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
--include("mango_idx.hrl").
 
 validate_new(#idx{} = Idx, Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
@@ -128,14 +128,17 @@ columns(Idx) ->
     end.
 
 is_usable(_, Selector, _) when Selector =:= {[]} ->
-    false;
+    {false, #{reason => [empty_selector]}};
 is_usable(Idx, Selector, _) ->
     case columns(Idx) of
         all_fields ->
-            true;
+            {true, #{}};
         Cols ->
             Fields = indexable_fields(Selector),
-            sets:is_subset(sets:from_list(Fields), sets:from_list(Cols))
+            Usable = sets:is_subset(sets:from_list(Fields), sets:from_list(Cols)),
+            Reason = [field_mismatch || not Usable],
+            Details = #{reason => Reason},
+            {Usable, Details}
     end.
 
 do_validate({Props}) ->
@@ -305,6 +308,8 @@ construct_analyzer({Props}) ->
             ]}
     end.
 
+indexable_fields({[]}) ->
+    [];
 indexable_fields(Selector) ->
     TupleTree = mango_selector_text:convert([], Selector),
     couch_lists:uniq(indexable_fields([], TupleTree)).

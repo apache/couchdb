@@ -22,12 +22,12 @@
     to_json/1,
     columns/1,
     is_usable/3,
-    get_default_field_options/1
+    get_default_field_options/1,
+    indexable_fields/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
--include("mango_idx.hrl").
 
 validate_new(#idx{} = Idx, Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
@@ -133,17 +133,19 @@ columns(Idx) ->
 % will be, because we checked that all the bits of the query that
 % imply `$exists` for a field are used when we check that the indexing
 % process will have included all the relevant documents in the index".
--spec is_usable(#idx{}, SelectorObject, _) -> boolean() when
-    SelectorObject :: any().
+-spec is_usable(#idx{}, selector(), _) -> {boolean(), rejection_details()}.
 is_usable(_, Selector, _) when Selector =:= {[]} ->
-    false;
+    {false, #{reason => [empty_selector]}};
 is_usable(Idx, Selector, _) ->
     case columns(Idx) of
         all_fields ->
-            true;
+            {true, #{reason => []}};
         Cols ->
             Fields = indexable_fields(Selector),
-            sets:is_subset(sets:from_list(Fields), sets:from_list(Cols))
+            Usable = sets:is_subset(sets:from_list(Fields), sets:from_list(Cols)),
+            Reason = [field_mismatch || not Usable],
+            Details = #{reason => Reason},
+            {Usable, Details}
     end.
 
 do_validate({Props}) ->
@@ -314,6 +316,8 @@ construct_analyzer({Props}) ->
 -spec indexable_fields(SelectorObject) -> Fields when
     SelectorObject :: any(),
     Fields :: [binary()].
+indexable_fields({[]}) ->
+    [];
 indexable_fields(Selector) ->
     TupleTree = mango_selector_text:convert([], Selector),
     couch_lists:uniq(indexable_fields([], TupleTree)).
@@ -554,50 +558,61 @@ indexable_fields_test() ->
         )
     ).
 
+usable(Index, undefined, Fields) ->
+    is_usable(Index, undefined, Fields);
 usable(Index, Selector, Fields) ->
     is_usable(Index, test_util:as_selector(Selector), Fields).
 
 is_usable_test() ->
-    ?assertNot(is_usable(undefined, {[]}, undefined)),
+    Usable = {true, #{reason => []}},
+    EmptySelector = {false, #{reason => [empty_selector]}},
+    FieldMismatch = {false, #{reason => [field_mismatch]}},
+    ?assertEqual(EmptySelector, usable(undefined, #{}, undefined)),
 
     AllFieldsIndex = #idx{def = {[{<<"fields">>, <<"all_fields">>}]}},
-    ?assert(is_usable(AllFieldsIndex, undefined, undefined)),
+    ?assertEqual(Usable, usable(AllFieldsIndex, undefined, undefined)),
 
     Field1 = {[{<<"name">>, <<"field1">>}, {<<"type">>, <<"string">>}]},
     Field2 = {[{<<"name">>, <<"field2">>}, {<<"type">>, <<"number">>}]},
     Index = #idx{def = {[{<<"fields">>, [Field1, Field2]}]}},
-    ?assert(usable(Index, #{<<"field1">> => <<"value">>}, undefined)),
-    ?assertNot(usable(Index, #{<<"field1">> => 42}, undefined)),
-    ?assertNot(usable(Index, #{<<"field3">> => true}, undefined)),
-    ?assert(
-        usable(Index, #{<<"field1">> => #{<<"$type">> => <<"string">>}}, undefined)
+    ?assertEqual(Usable, usable(Index, #{<<"field1">> => <<"value">>}, undefined)),
+    ?assertEqual(FieldMismatch, usable(Index, #{<<"field1">> => 42}, undefined)),
+    ?assertEqual(FieldMismatch, usable(Index, #{<<"field3">> => true}, undefined)),
+    ?assertEqual(
+        Usable, usable(Index, #{<<"field1">> => #{<<"$type">> => <<"string">>}}, undefined)
     ),
-    ?assert(
-        usable(Index, #{<<"field1">> => #{<<"$type">> => <<"boolean">>}}, undefined)
+    ?assertEqual(
+        Usable, usable(Index, #{<<"field1">> => #{<<"$type">> => <<"boolean">>}}, undefined)
     ),
-    ?assert(
-        usable(Index, #{<<"field3">> => #{<<"$type">> => <<"boolean">>}}, undefined)
+    ?assertEqual(
+        Usable, usable(Index, #{<<"field3">> => #{<<"$type">> => <<"boolean">>}}, undefined)
     ),
-    ?assert(usable(Index, #{<<"field1">> => #{<<"$exists">> => true}}, undefined)),
-    ?assert(usable(Index, #{<<"field1">> => #{<<"$exists">> => false}}, undefined)),
-    ?assert(usable(Index, #{<<"field3">> => #{<<"$exists">> => true}}, undefined)),
-    ?assert(usable(Index, #{<<"field3">> => #{<<"$exists">> => false}}, undefined)),
-    ?assert(
+    ?assertEqual(Usable, usable(Index, #{<<"field1">> => #{<<"$exists">> => true}}, undefined)),
+    ?assertEqual(Usable, usable(Index, #{<<"field1">> => #{<<"$exists">> => false}}, undefined)),
+    ?assertEqual(Usable, usable(Index, #{<<"field3">> => #{<<"$exists">> => true}}, undefined)),
+    ?assertEqual(Usable, usable(Index, #{<<"field3">> => #{<<"$exists">> => false}}, undefined)),
+    ?assertEqual(
+        Usable,
         usable(Index, #{<<"field1">> => #{<<"$regex">> => <<".*">>}}, undefined)
     ),
-    ?assertNot(
+    ?assertEqual(
+        FieldMismatch,
         usable(Index, #{<<"field2">> => #{<<"$regex">> => <<".*">>}}, undefined)
     ),
-    ?assertNot(
+    ?assertEqual(
+        FieldMismatch,
         usable(Index, #{<<"field3">> => #{<<"$regex">> => <<".*">>}}, undefined)
     ),
-    ?assertNot(
+    ?assertEqual(
+        FieldMismatch,
         usable(Index, #{<<"field1">> => #{<<"$nin">> => [1, 2, 3]}}, undefined)
     ),
-    ?assert(
+    ?assertEqual(
+        Usable,
         usable(Index, #{<<"field2">> => #{<<"$nin">> => [1, 2, 3]}}, undefined)
     ),
-    ?assertNot(
+    ?assertEqual(
+        FieldMismatch,
         usable(Index, #{<<"field3">> => #{<<"$nin">> => [1, 2, 3]}}, undefined)
     ).
 -endif.

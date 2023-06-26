@@ -42,35 +42,55 @@
     idx_mod/1,
     to_json/1,
     delete/4,
-    get_usable_indexes/3,
+    get_usable_indexes/4,
     get_partial_filter_selector/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
--include("mango_idx.hrl").
 
 list(Db) ->
     {ok, Indexes} = ddoc_cache:open(db_to_name(Db), ?MODULE),
     Indexes.
 
-get_usable_indexes(Db, Selector, Opts) ->
-    ExistingIndexes = mango_idx:list(Db),
+-spec get_usable_indexes(Database, Selector, Options, Kind) -> {[#idx{}], Trace} | no_return() when
+    Database :: database(),
+    Selector :: selector(),
+    Options :: cursor_options(),
+    Kind :: cursor_kind(),
+    Trace :: trace().
+get_usable_indexes(Db, Selector, Opts, Kind) ->
+    ExistingIndexes = list(Db),
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
         ExistingIndexes
     ),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
-    UsableIndexes1 = filter_partition_indexes(UsableIndexes0, Opts),
+    PartitionIndexes = filter_partition_indexes(UsableIndexes0, Opts),
 
     SortFields = get_sort_fields(Opts),
-    UsableFilter = fun(I) -> is_usable(I, Selector, SortFields) end,
+    UsabilityCheck = fun(Ix) -> {Ix, is_usable(Ix, Selector, SortFields)} end,
+    UsabilityMap = lists:map(UsabilityCheck, PartitionIndexes),
+    UsabilityFilter =
+        fun({Ix, {Verdict, _}}) ->
+            case Verdict of
+                true -> [Ix];
+                false -> []
+            end
+        end,
 
-    case lists:filter(UsableFilter, UsableIndexes1) of
-        [] ->
+    case {lists:flatmap(UsabilityFilter, UsabilityMap), Kind} of
+        {[], find} ->
             mango_sort_error(Db, Opts);
-        UsableIndexes ->
-            UsableIndexes
+        {UsableIndexes, _} ->
+            Trace = #{
+                all_indexes => sets:from_list(ExistingIndexes),
+                global_indexes => sets:from_list(GlobalIndexes),
+                partition_indexes => sets:from_list(PartitionIndexes),
+                usable_indexes => sets:from_list(UsableIndexes),
+                usability_map => UsabilityMap
+            },
+            {UsableIndexes, Trace}
     end.
 
 mango_sort_error(Db, Opts) ->
@@ -479,7 +499,176 @@ get_legacy_selector(Def) ->
     end.
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
+
+get_usable_indexes_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(fabric_util)
+        end,
+        fun(_) ->
+            meck:unload()
+        end,
+        [
+            ?TDEF_FE(t_get_usable_indexes_empty),
+            ?TDEF_FE(t_get_usable_indexes_regular),
+            ?TDEF_FE(t_get_usable_indexes_user_specified_index)
+        ]
+    }.
+
+t_get_usable_indexes_empty(_) ->
+    Database = <<"db">>,
+    Options1 = [],
+    ExistingIndexes = [],
+    GlobalIndexes = [],
+    UserSpecifiedIndex = [],
+    meck:expect(ddoc_cache, open, [Database, mango_idx], meck:val({ok, ExistingIndexes})),
+    meck:expect(
+        mango_cursor,
+        remove_indexes_with_partial_filter_selector,
+        [ExistingIndexes],
+        meck:val(GlobalIndexes)
+    ),
+    meck:expect(
+        mango_cursor,
+        maybe_filter_indexes_by_ddoc,
+        [ExistingIndexes, Options1],
+        meck:val(UserSpecifiedIndex)
+    ),
+    meck:expect(fabric_util, is_partitioned, [Database], meck:val(false)),
+    Exception1 = {mango_error, mango_idx, {no_usable_index, missing_sort_index}},
+    ?assertThrow(Exception1, get_usable_indexes(Database, selector, Options1, find)),
+    meck:expect(fabric_util, is_partitioned, [Database], meck:val(true)),
+    Exception2 = {mango_error, mango_idx, {no_usable_index, missing_sort_index_global}},
+    ?assertThrow(Exception2, get_usable_indexes(Database, selector, Options1, find)),
+    Trace =
+        #{
+            all_indexes => sets:new(),
+            global_indexes => sets:new(),
+            partition_indexes => sets:new(),
+            usable_indexes => sets:new(),
+            usability_map => []
+        },
+    ?assertEqual({[], Trace}, get_usable_indexes(Database, selector, Options1, explain)),
+    Options2 = [{partition, <<"partition">>}],
+    meck:expect(
+        mango_cursor,
+        maybe_filter_indexes_by_ddoc,
+        [ExistingIndexes, Options2],
+        meck:val(UserSpecifiedIndex)
+    ),
+    Exception3 = {mango_error, mango_idx, {no_usable_index, missing_sort_index_partitioned}},
+    ?assertThrow(Exception3, get_usable_indexes(Database, selector, Options2, find)).
+
+t_get_usable_indexes_regular(_) ->
+    Database = <<"db">>,
+    Options = [{sort, sort_options}],
+    Index1 = #idx{type = <<"special">>, def = all_docs, partitioned = false},
+    Index2 = #idx{type = <<"json">>, name = <<"view_idx1">>, partitioned = false},
+    Index3 = #idx{type = <<"json">>, name = <<"view_idx2">>, partitioned = false},
+    ExistingIndexes = [Index1, Index2, Index3],
+    GlobalIndexes = [Index1, Index2, Index3],
+    PartitionIndexes = [Index1, Index2, Index3],
+    UserSpecifiedIndex = [],
+    UsableIndexes = [Index1, Index2],
+    UsabilityMap =
+        [
+            {Index1, {true, usability_info_1}},
+            {Index2, {true, usability_info_2}},
+            {Index3, {false, usability_info_3}}
+        ],
+    Trace =
+        #{
+            all_indexes => sets:from_list(ExistingIndexes),
+            global_indexes => sets:from_list(GlobalIndexes),
+            partition_indexes => sets:from_list(PartitionIndexes),
+            usable_indexes => sets:from_list(UsableIndexes),
+            usability_map => UsabilityMap
+        },
+    meck:expect(ddoc_cache, open, [Database, mango_idx], meck:val({ok, ExistingIndexes})),
+    meck:expect(
+        mango_cursor,
+        remove_indexes_with_partial_filter_selector,
+        [ExistingIndexes],
+        meck:val(GlobalIndexes)
+    ),
+    meck:expect(mango_sort, fields, [sort_options], meck:val(sort_fields)),
+    meck:expect(
+        mango_cursor,
+        maybe_filter_indexes_by_ddoc,
+        [ExistingIndexes, Options],
+        meck:val(UserSpecifiedIndex)
+    ),
+    meck:expect(
+        mango_idx_special,
+        is_usable,
+        [Index1, selector, sort_fields],
+        meck:val({true, usability_info_1})
+    ),
+    meck:expect(
+        mango_idx_view,
+        is_usable,
+        fun(#idx{name = Name}, selector, sort_fields) ->
+            case Name of
+                <<"view_idx1">> -> {true, usability_info_2};
+                <<"view_idx2">> -> {false, usability_info_3}
+            end
+        end
+    ),
+    ?assertNot(meck:called(fabric_util, is_partitioned, '_')),
+    ?assertEqual({UsableIndexes, Trace}, get_usable_indexes(Database, selector, Options, find)).
+
+t_get_usable_indexes_user_specified_index(_) ->
+    Database = <<"db">>,
+    Options = [],
+    Index1 = #idx{type = <<"special">>, def = all_docs, partitioned = false},
+    Index2 = #idx{type = <<"json">>, name = <<"users">>, partitioned = false},
+    ExistingIndexes = [Index1, Index2],
+    GlobalIndexes = [Index1, Index2],
+    PartitionIndexes = [Index1, Index2],
+    UserSpecifiedIndex = [Index2],
+    UsableIndexes = [Index1, Index2],
+    UsabilityMap =
+        [
+            {Index1, {true, usability_info_1}},
+            {Index2, {true, usability_info_2}}
+        ],
+    Trace =
+        #{
+            all_indexes => sets:from_list(ExistingIndexes),
+            global_indexes => sets:from_list(GlobalIndexes),
+            partition_indexes => sets:from_list(PartitionIndexes),
+            usable_indexes => sets:from_list(UsableIndexes),
+            usability_map => UsabilityMap
+        },
+    meck:expect(ddoc_cache, open, [Database, mango_idx], meck:val({ok, ExistingIndexes})),
+    meck:expect(
+        mango_cursor,
+        remove_indexes_with_partial_filter_selector,
+        [ExistingIndexes],
+        meck:val(GlobalIndexes)
+    ),
+    meck:expect(
+        mango_cursor,
+        maybe_filter_indexes_by_ddoc,
+        [ExistingIndexes, Options],
+        meck:val(UserSpecifiedIndex)
+    ),
+    meck:expect(
+        mango_idx_special,
+        is_usable,
+        [Index1, selector, []],
+        meck:val({true, usability_info_1})
+    ),
+    meck:expect(
+        mango_idx_view,
+        is_usable,
+        [Index2, selector, []],
+        meck:val({true, usability_info_2})
+    ),
+    ?assertNot(meck:called(fabric_util, is_partitioned, '_')),
+    ?assertEqual({UsableIndexes, Trace}, get_usable_indexes(Database, selector, Options, find)).
 
 index(SelectorName, Selector) ->
     {

@@ -17,6 +17,7 @@
     db,
     index,
     ranges,
+    trace,
     selector,
     opts,
     limit,
