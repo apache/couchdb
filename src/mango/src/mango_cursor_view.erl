@@ -267,17 +267,16 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
 % the longest prefix of columns found.
 -spec composite_indexes([#idx{}], [{field(), range()}]) -> [{#idx{}, [range()], integer()}].
 composite_indexes(Indexes, FieldRanges) ->
-    lists:foldl(
-        fun(Idx, Acc) ->
+    lists:map(
+        fun(Idx) ->
             Cols = mango_idx:columns(Idx),
             Prefix = composite_prefix(Cols, FieldRanges),
             % Calculate the difference between the FieldRanges/Selector
             % and the Prefix. We want to select the index with a prefix
             % that is as close to the FieldRanges as possible
             PrefixDifference = length(FieldRanges) - length(Prefix),
-            [{Idx, Prefix, PrefixDifference} | Acc]
+            {Idx, Prefix, PrefixDifference}
         end,
-        [],
         Indexes
     ).
 
@@ -899,7 +898,7 @@ composite_indexes_test() ->
     Indexes = [Index1, Index2, Index3],
     Ranges = [{field1, range1}, {field3, range3}, {field4, range4}],
     Result = [
-        {Index3, [range3, range4], 1}, {Index2, [range1, range3, range4], 0}, {Index1, [range1], 2}
+        {Index1, [range1], 2}, {Index2, [range1, range3, range4], 0}, {Index3, [range3, range4], 1}
     ],
     ?assertEqual(Result, composite_indexes(Indexes, Ranges)).
 
