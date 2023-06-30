@@ -59,7 +59,9 @@ go(Source, Target) ->
 
 go(DbName, Node, Opts) when is_binary(DbName), is_atom(Node) ->
     go(#shard{name = DbName, node = node()}, #shard{name = DbName, node = Node}, Opts);
-go(#shard{} = Source, #shard{} = Target, Opts) ->
+go(#shard{} = Source0, #shard{} = Target0, Opts) ->
+    Source = add_range(Source0),
+    Target = add_range(Target0),
     case mem3:db_is_current(Source) of
         true ->
             go(Source, targets_map(Source, Target), Opts);
@@ -366,7 +368,15 @@ pull_purges(Db, Count, #shard{} = SrcShard, #tgt{} = Tgt0, HashFun) ->
             % out using the same pickfun which we use when picking documents
             #shard{range = SrcRange} = SrcShard,
             BelongsFun = fun({_UUID, Id, _Revs}) when is_binary(Id) ->
-                mem3_reshard_job:pickfun(Id, [SrcRange], HashFun) =:= SrcRange
+                case SrcRange of
+                    [B, E] when is_integer(B), is_integer(E) ->
+                        mem3_reshard_job:pickfun(Id, [SrcRange], HashFun) =:= SrcRange;
+                    undefined ->
+                        % We may replicate node-local databases
+                        % which are not associated with a shard range. In that case
+                        % range will be undefined.
+                        true
+                end
             end,
             Infos1 = lists:filter(BelongsFun, Infos),
             {ok, _} = couch_db:purge_docs(Db, Infos1, [?REPLICATED_CHANGES]),
@@ -418,7 +428,14 @@ push_purges(Db, BatchSize, SrcShard, Tgt, HashFun) ->
                 erlang:max(0, Oldest - 1)
         end,
     BelongsFun = fun(Id) when is_binary(Id) ->
-        mem3_reshard_job:pickfun(Id, [TgtRange], HashFun) =:= TgtRange
+        case TgtRange of
+            [B, E] when is_integer(B), is_integer(E) ->
+                mem3_reshard_job:pickfun(Id, [TgtRange], HashFun) =:= TgtRange;
+            undefined ->
+                % We may replicate node-local databases which are not associated
+                % with a shard range. In that case range will be undefined.
+                true
+        end
     end,
     FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
         case BelongsFun(Id) of
@@ -875,9 +892,36 @@ reset_remaining(#{} = Targets) ->
         Targets
     ).
 
+add_range(#shard{name = DbName} = Shard) when is_binary(DbName) ->
+    case DbName of
+        <<"shards/", _Start:8/binary, "-", _End:8/binary, "/", _/binary>> ->
+            Shard#shard{range = mem3:range(DbName)};
+        <<_/binary>> ->
+            % We may replicate local dbs which do not have a shard range.
+            Shard
+    end.
+
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
+
+name_node_to_shard_local_db_test() ->
+    DbName = <<"foo">>,
+    Node = 'n1@bar.net',
+    Shard = add_range(#shard{name = DbName, node = Node}),
+    ?assertMatch(#shard{}, Shard),
+    ?assertEqual(DbName, Shard#shard.name),
+    ?assertEqual(Node, Shard#shard.node),
+    ?assertEqual(undefined, Shard#shard.range).
+
+name_node_to_shard_local_shard_test() ->
+    DbName = <<"shards/00000000-7fffffff/db.1687450595">>,
+    Node = 'n2@baz.org',
+    Shard = add_range(#shard{name = DbName, node = Node}),
+    ?assertMatch(#shard{}, Shard),
+    ?assertEqual(DbName, Shard#shard.name),
+    ?assertEqual(Node, Shard#shard.node),
+    ?assertEqual([0, 2147483647], Shard#shard.range).
 
 find_source_seq_int_test_() ->
     {
