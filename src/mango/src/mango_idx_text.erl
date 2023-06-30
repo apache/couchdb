@@ -316,7 +316,7 @@ construct_analyzer({Props}) ->
     Fields :: [binary()].
 indexable_fields(Selector) ->
     TupleTree = mango_selector_text:convert([], Selector),
-    indexable_fields([], TupleTree).
+    couch_lists:uniq(indexable_fields([], TupleTree)).
 
 -spec indexable_fields(Fields, abstract_text_selector()) -> Fields when
     Fields :: [binary()].
@@ -505,6 +505,24 @@ indexable_fields_test() ->
                     <<"$not">> => #{<<"f5">> => <<"v5">>}
                 }
             )
+        )
+    ),
+    ?assertEqual(
+        [<<"f2:string">>, <<"f3:string">>, <<"f1:string">>],
+        indexable(
+            #{
+                <<"$and">> =>
+                    [
+                        #{<<"f2">> => <<"v1">>},
+                        #{<<"f2">> => <<"v2">>}
+                    ],
+                <<"$not">> => #{<<"f3">> => <<"v5">>},
+                <<"$or">> =>
+                    [
+                        #{<<"f1">> => <<"v3">>},
+                        #{<<"f1">> => <<"v4">>}
+                    ]
+            }
         )
     ),
     ?assertEqual(
