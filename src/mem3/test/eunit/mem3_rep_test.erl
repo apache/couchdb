@@ -24,15 +24,29 @@
 setup() ->
     {AllSrc, AllTgt} = {?tempdb(), ?tempdb()},
     {PartSrc, PartTgt} = {?tempdb(), ?tempdb()},
+    Localdb = ?tempdb(),
     create_db(AllSrc, [{q, 1}, {n, 1}]),
     create_db(AllTgt, [{q, 2}, {n, 1}]),
     PartProps = [{partitioned, true}, {hash, [couch_partition, hash, []]}],
     create_db(PartSrc, [{q, 1}, {n, 1}, {props, PartProps}]),
     create_db(PartTgt, [{q, 2}, {n, 1}, {props, PartProps}]),
-    #{allsrc => AllSrc, alltgt => AllTgt, partsrc => PartSrc, parttgt => PartTgt}.
+    create_local_db(Localdb),
+    #{
+        allsrc => AllSrc,
+        alltgt => AllTgt,
+        partsrc => PartSrc,
+        parttgt => PartTgt,
+        localdb => Localdb
+    }.
 
 teardown(#{} = Dbs) ->
-    maps:map(fun(_, Db) -> delete_db(Db) end, Dbs).
+    maps:map(
+        fun
+            (localdb, Db) -> delete_local_db(Db);
+            (_, Db) -> delete_db(Db)
+        end,
+        Dbs
+    ).
 
 start_couch() ->
     test_util:start_couch([mem3, fabric]).
@@ -52,102 +66,133 @@ mem3_reshard_db_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun replicate_basics/1,
-                    fun replicate_small_batches/1,
-                    fun replicate_low_batch_count/1,
-                    fun replicate_with_partitions/1
+                    ?TDEF_FE(replicate_basics, ?TIMEOUT),
+                    ?TDEF_FE(replicate_small_batches, ?TIMEOUT),
+                    ?TDEF_FE(replicate_low_batch_count, ?TIMEOUT),
+                    ?TDEF_FE(replicate_with_partitions, ?TIMEOUT),
+                    ?TDEF_FE(replicate_to_and_from_local, ?TIMEOUT),
+                    ?TDEF_FE(replicate_with_purges, ?TIMEOUT)
                 ]
             }
         }
     }.
 
 replicate_basics(#{allsrc := AllSrc, alltgt := AllTgt}) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            DocSpec = #{docs => 10, delete => [5, 9]},
-            add_test_docs(AllSrc, DocSpec),
-            SDocs = get_all_docs(AllSrc),
+    DocSpec = #{docs => 10, delete => [5, 9]},
+    add_test_docs(AllSrc, DocSpec),
+    SDocs = get_all_docs(AllSrc),
 
-            [Src] = lists:sort(mem3:local_shards(AllSrc)),
-            [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
-            #shard{range = R1} = Tgt1,
-            #shard{range = R2} = Tgt2,
-            TMap = #{R1 => Tgt1, R2 => Tgt2},
-            Opts = [{batch_size, 1000}, {batch_count, all}],
-            ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
+    [Src] = lists:sort(mem3:local_shards(AllSrc)),
+    [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
+    #shard{range = R1} = Tgt1,
+    #shard{range = R2} = Tgt2,
+    TMap = #{R1 => Tgt1, R2 => Tgt2},
+    Opts = [{batch_size, 1000}, {batch_count, all}],
+    ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
 
-            ?assertEqual(SDocs, get_all_docs(AllTgt))
-        end)}.
+    ?assertEqual(SDocs, get_all_docs(AllTgt)).
 
 replicate_small_batches(#{allsrc := AllSrc, alltgt := AllTgt}) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            DocSpec = #{docs => 10, delete => [5, 9]},
-            add_test_docs(AllSrc, DocSpec),
-            SDocs = get_all_docs(AllSrc),
+    DocSpec = #{docs => 10, delete => [5, 9]},
+    add_test_docs(AllSrc, DocSpec),
+    SDocs = get_all_docs(AllSrc),
 
-            [Src] = lists:sort(mem3:local_shards(AllSrc)),
-            [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
-            #shard{range = R1} = Tgt1,
-            #shard{range = R2} = Tgt2,
-            TMap = #{R1 => Tgt1, R2 => Tgt2},
-            Opts = [{batch_size, 2}, {batch_count, all}],
-            ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
+    [Src] = lists:sort(mem3:local_shards(AllSrc)),
+    [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
+    #shard{range = R1} = Tgt1,
+    #shard{range = R2} = Tgt2,
+    TMap = #{R1 => Tgt1, R2 => Tgt2},
+    Opts = [{batch_size, 2}, {batch_count, all}],
+    ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
 
-            ?assertEqual(SDocs, get_all_docs(AllTgt))
-        end)}.
+    ?assertEqual(SDocs, get_all_docs(AllTgt)).
 
 replicate_low_batch_count(#{allsrc := AllSrc, alltgt := AllTgt}) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            DocSpec = #{docs => 10, delete => [5, 9]},
-            add_test_docs(AllSrc, DocSpec),
-            SDocs = get_all_docs(AllSrc),
+    DocSpec = #{docs => 10, delete => [5, 9]},
+    add_test_docs(AllSrc, DocSpec),
+    SDocs = get_all_docs(AllSrc),
 
-            [Src] = lists:sort(mem3:local_shards(AllSrc)),
-            [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
-            #shard{range = R1} = Tgt1,
-            #shard{range = R2} = Tgt2,
-            TMap = #{R1 => Tgt1, R2 => Tgt2},
+    [Src] = lists:sort(mem3:local_shards(AllSrc)),
+    [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
+    #shard{range = R1} = Tgt1,
+    #shard{range = R2} = Tgt2,
+    TMap = #{R1 => Tgt1, R2 => Tgt2},
 
-            Opts1 = [{batch_size, 2}, {batch_count, 1}],
-            ?assertMatch({ok, 8}, mem3_rep:go(Src, TMap, Opts1)),
+    Opts1 = [{batch_size, 2}, {batch_count, 1}],
+    ?assertMatch({ok, 8}, mem3_rep:go(Src, TMap, Opts1)),
 
-            Opts2 = [{batch_size, 1}, {batch_count, 2}],
-            ?assertMatch({ok, 6}, mem3_rep:go(Src, TMap, Opts2)),
+    Opts2 = [{batch_size, 1}, {batch_count, 2}],
+    ?assertMatch({ok, 6}, mem3_rep:go(Src, TMap, Opts2)),
 
-            Opts3 = [{batch_size, 1000}, {batch_count, all}],
-            ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts3)),
+    Opts3 = [{batch_size, 1000}, {batch_count, all}],
+    ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts3)),
 
-            ?assertEqual(SDocs, get_all_docs(AllTgt))
-        end)}.
+    ?assertEqual(SDocs, get_all_docs(AllTgt)).
 
 replicate_with_partitions(#{partsrc := PartSrc, parttgt := PartTgt}) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            DocSpec = #{
-                pdocs => #{
-                    <<"PX">> => 15,
-                    <<"PY">> => 19
-                }
-            },
-            add_test_docs(PartSrc, DocSpec),
-            SDocs = get_all_docs(PartSrc),
-            PXSrc = get_partition_info(PartSrc, <<"PX">>),
-            PYSrc = get_partition_info(PartSrc, <<"PY">>),
+    DocSpec = #{
+        pdocs => #{
+            <<"PX">> => 15,
+            <<"PY">> => 19
+        }
+    },
+    add_test_docs(PartSrc, DocSpec),
+    SDocs = get_all_docs(PartSrc),
+    PXSrc = get_partition_info(PartSrc, <<"PX">>),
+    PYSrc = get_partition_info(PartSrc, <<"PY">>),
 
-            [Src] = lists:sort(mem3:local_shards(PartSrc)),
-            [Tgt1, Tgt2] = lists:sort(mem3:local_shards(PartTgt)),
-            #shard{range = R1} = Tgt1,
-            #shard{range = R2} = Tgt2,
-            TMap = #{R1 => Tgt1, R2 => Tgt2},
-            Opts = [{batch_size, 1000}, {batch_count, all}],
-            ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
+    [Src] = lists:sort(mem3:local_shards(PartSrc)),
+    [Tgt1, Tgt2] = lists:sort(mem3:local_shards(PartTgt)),
+    #shard{range = R1} = Tgt1,
+    #shard{range = R2} = Tgt2,
+    TMap = #{R1 => Tgt1, R2 => Tgt2},
+    Opts = [{batch_size, 1000}, {batch_count, all}],
+    ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
 
-            ?assertEqual(PXSrc, get_partition_info(PartTgt, <<"PX">>)),
-            ?assertEqual(PYSrc, get_partition_info(PartTgt, <<"PY">>)),
-            ?assertEqual(SDocs, get_all_docs(PartTgt))
-        end)}.
+    ?assertEqual(PXSrc, get_partition_info(PartTgt, <<"PX">>)),
+    ?assertEqual(PYSrc, get_partition_info(PartTgt, <<"PY">>)),
+    ?assertEqual(SDocs, get_all_docs(PartTgt)).
+
+replicate_with_purges(#{allsrc := AllSrc, alltgt := AllTgt}) ->
+    DocSpec = #{docs => 10, delete => [5, 9], purge => [2, 4]},
+    add_test_docs(AllSrc, DocSpec),
+    % Add and purge some docs on target to excercise the pull_purges code path
+    add_test_docs(AllTgt, #{docs => 3, purge => [0, 2]}),
+
+    [Src] = lists:sort(mem3:local_shards(AllSrc)),
+    [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
+    #shard{range = R1} = Tgt1,
+    #shard{range = R2} = Tgt2,
+    TMap = #{R1 => Tgt1, R2 => Tgt2},
+    Opts = [{batch_size, 1000}, {batch_count, all}],
+    ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
+
+    SDocs = get_all_docs(AllSrc),
+    % Purges from the target should have been pulled and removed docs 0,1,2.
+    % Source should have no live docs.
+    ?assertEqual(#{}, SDocs),
+    ?assertEqual(#{}, get_all_docs(AllTgt)).
+
+replicate_to_and_from_local(#{localdb := LocalDb, allsrc := ClusteredDb}) ->
+    % We'll just tests that we can pull purges from the target
+    add_test_docs(ClusteredDb, #{docs => 6, purge => [0, 2]}),
+
+    [#shard{name = TgtDbName}] = mem3:local_shards(ClusteredDb),
+    Opts = [{batch_size, 1000}, {batch_count, all}],
+    Src1 = #shard{name = LocalDb, node = node()},
+    Tgt1 = #shard{name = TgtDbName, node = node()},
+    ?assertMatch({ok, 0}, mem3_rep:go(Src1, Tgt1, Opts)),
+
+    % Purge a few more docs in clustered db
+    add_test_docs(ClusteredDb, #{purge => [3, 4]}),
+
+    % Replicate the other way: from clustered to source
+    Src2 = #shard{name = TgtDbName, node = node()},
+    Tgt2 = #shard{name = LocalDb, node = node()},
+    ?assertMatch({ok, 0}, mem3_rep:go(Src2, Tgt2, Opts)),
+    SDocs = get_all_docs(ClusteredDb),
+    ?assertEqual(1, map_size(SDocs)),
+    ?assertMatch(#{<<"00005">> := #{}}, SDocs).
 
 get_partition_info(DbName, Partition) ->
     with_proc(fun() ->
@@ -197,6 +242,13 @@ delete_db(DbName) ->
     GL = erlang:group_leader(),
     with_proc(fun() -> fabric:delete_db(DbName, [?ADMIN_CTX]) end, GL).
 
+create_local_db(DbName) ->
+    {ok, _} = couch_server:create(DbName, []),
+    ok.
+
+delete_local_db(DbName) ->
+    couch_server:delete(DbName, []).
+
 with_proc(Fun) ->
     with_proc(Fun, undefined, 30000).
 
@@ -237,7 +289,7 @@ add_test_docs(DbName, #{} = DocSpec) ->
         [] -> ok;
         [_ | _] = Deleted -> update_docs(DbName, Deleted)
     end,
-    ok.
+    purge_docs(DbName, maps:get(purge, DocSpec, [])).
 
 update_docs(DbName, Docs) ->
     with_proc(fun() ->
@@ -260,6 +312,19 @@ delete_docs([S, E], Docs) when E >= S ->
     );
 delete_docs(_, _) ->
     [].
+
+purge_docs(DbName, [S, E]) when E >= S ->
+    Ids = [doc_id(<<"">>, I) || I <- lists:seq(S, E)],
+    IdRevs = [{Id, get_revs(DbName, Id)} || Id <- Ids],
+    {ok, _} = fabric:purge_docs(DbName, IdRevs, []),
+    ok;
+purge_docs(_DbName, []) ->
+    ok.
+
+get_revs(DbName, DocId) ->
+    FDI = fabric:get_full_doc_info(DbName, DocId, []),
+    #doc_info{revs = Revs} = couch_doc:to_doc_info(FDI),
+    [Rev#rev_info.rev || Rev <- Revs].
 
 pdocs(#{} = PMap) ->
     maps:fold(
