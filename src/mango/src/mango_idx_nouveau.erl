@@ -346,8 +346,6 @@ indexable_fields(Fields, {op_not, {ExistsQuery, Arg}}) when is_tuple(Arg) ->
 % forces "$exists" : false to use _all_docs
 indexable_fields(_, {op_not, {_, false}}) ->
     [];
-indexable_fields(Fields, {op_insert, Arg}) when is_binary(Arg) ->
-    Fields;
 %% fieldname.[]:length is not a user defined field.
 indexable_fields(Fields, {op_field, {[_, <<":length">>], _}}) ->
     Fields;
@@ -362,6 +360,8 @@ indexable_fields(Fields, {op_fieldname, {_, _}}) ->
 %% Similar idea to op_fieldname but with fieldname:null
 indexable_fields(Fields, {op_null, {_, _}}) ->
     Fields;
+indexable_fields(Fields, {op_regex, Name}) ->
+    [iolist_to_binary([Name, ":string"]) | Fields];
 indexable_fields(Fields, {op_default, _}) ->
     [<<"$default">> | Fields].
 
