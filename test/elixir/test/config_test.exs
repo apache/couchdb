@@ -181,4 +181,16 @@ defmodule ConfigTest do
 
     assert resp.status_code == 200
   end
+
+  # Those are negative test cases.  The positive cases are implicitly
+  # tested by other ones.
+  test "Only JSON strings are accepted", context do
+    url = "#{context[:config_url]}/a/b"
+    values = ["true", "11", "{}", "{\"testing\": [1, 2, 3]}"]
+
+    Enum.each(values, fn value ->
+      resp = Couch.put(url, body: value)
+      assert resp.status_code == 400
+    end)
+  end
 end
