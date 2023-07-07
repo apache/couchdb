@@ -1,18 +1,13 @@
 # couch_stats
 
-couch_stats is a simple statistics collection app for Erlang applications. Its
-core API is a thin wrapper around a stat storage library (currently Folsom,) but
-abstracting over that library provides several benefits:
+couch_stats is a simple statistics collection app for Erlang applications. It
+uses https://www.erlang.org/doc/man/counters.html to implement counters,
+gauges and histograms. By default histograms record 10 seconds worth of data,
+with a granularity of 1 second.
 
-* All references to stat storage are in one place, so it's easy to swap
-  the module out.
-
-* Some common patterns, such as tying a process's lifetime to a counter value,
-  are straightforward to support.
-
-* Configuration can be managed in a single place - for example, it's much easier
-  to ensure that all histogram metrics use a 10-second sliding window if those
-  metrics are instantiated/configured centrally.
+Stats can be fetched with `couch_stats:fetch()`. That returns the current
+values of all the counters and gauges as well as the histogram statistics for
+the last 10 seconds.
 
 ## Adding a metric
 
@@ -26,4 +21,4 @@ abstracting over that library provides several benefits:
 
 2. Tell couch_stats to use your description file via application configuration.
 
-2. Instrument your code with the helper functions in `couch_stats.erl`.
+3. Instrument your code with the helper functions in `couch_stats.erl`.

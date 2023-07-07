@@ -88,8 +88,6 @@ setup_prometheus(WithAdditionalPort) ->
     % It's already started by default, so restart to pick up config
     ok = application:stop(couch_prometheus),
     ok = application:start(couch_prometheus),
-    % Flush so that stats aggregator starts using the new, shorter interval
-    couch_stats_aggregator:flush(),
     Ctx.
 
 t_chttpd_port(Port) ->
@@ -175,17 +173,18 @@ t_starts_with_couchdb(Port) ->
     ).
 
 t_survives_mem3_sync_termination(_) ->
-    ServerPid = whereis(couch_prometheus_server),
-    ?assertNotEqual(undefined, ServerPid),
     ?assertNotEqual(undefined, whereis(mem3_sync)),
     ok = supervisor:terminate_child(mem3_sup, mem3_sync),
     ?assertEqual(undefined, whereis(mem3_sync)),
     ?assertMatch(
         [[_, _], <<"couchdb_internal_replication_jobs 0">>],
-        couch_prometheus_server:get_internal_replication_jobs_stat()
+        couch_prometheus:get_internal_replication_jobs_stat()
     ),
     {ok, _} = supervisor:restart_child(mem3_sup, mem3_sync),
-    ?assertEqual(ServerPid, whereis(couch_prometheus_server)).
+    ?assertMatch(
+        [[_, _], <<"couchdb_internal_replication_jobs", _/binary>>],
+        couch_prometheus:get_internal_replication_jobs_stat()
+    ).
 
 node_local_url(Port) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),

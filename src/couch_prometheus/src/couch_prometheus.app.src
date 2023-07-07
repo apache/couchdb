@@ -14,7 +14,7 @@
     {description, "Aggregated metrics info for Prometheus consumption"},
     {vsn, git},
     {registered, []},
-    {applications, [kernel, stdlib, folsom, couch_stats, couch_log, mem3, couch]},
+    {applications, [kernel, stdlib, couch_stats, couch_log, mem3, couch]},
     {mod, {couch_prometheus_app, []}},
     {env, []}
 ]}.

@@ -19,7 +19,6 @@
     handle_request/1
 ]).
 
--include("couch_prometheus.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 start_link() ->
@@ -63,13 +62,13 @@ handle_request(MochiReq) ->
     end.
 
 send_prometheus(MochiReq, Node) ->
-    Type = "text/plain; version=" ++ ?PROMETHEUS_VERSION,
+    Type = "text/plain; version=" ++ couch_prometheus:version(),
     Headers =
         couch_httpd:server_header() ++
             [
                 {<<"Content-Type">>, ?l2b(Type)}
             ],
-    Body = call_node(Node, couch_prometheus_server, scrape, []),
+    Body = call_node(Node, couch_prometheus, scrape, []),
     send_resp(MochiReq, 200, Headers, Body).
 
 send_resp(MochiReq, Status, ExtraHeaders, Body) ->
