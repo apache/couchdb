@@ -159,7 +159,6 @@ handle_node_req(#httpd{path_parts = [_, _Node, <<"_config">>, _Section, _Key | _
     chttpd:send_error(Req, not_found);
 % GET /_node/$node/_stats
 handle_node_req(#httpd{method = 'GET', path_parts = [_, Node, <<"_stats">> | Path]} = Req) ->
-    flush(Node, Req),
     Stats0 = call_node(Node, couch_stats, fetch, []),
     Stats = couch_stats_httpd:transform_stats(Stats0),
     Nested = couch_stats_httpd:nest(Stats),
@@ -169,8 +168,8 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, Node, <<"_stats">> | Pat
 handle_node_req(#httpd{path_parts = [_, _Node, <<"_stats">>]} = Req) ->
     send_method_not_allowed(Req, "GET");
 handle_node_req(#httpd{method = 'GET', path_parts = [_, Node, <<"_prometheus">>]} = Req) ->
-    Metrics = call_node(Node, couch_prometheus_server, scrape, []),
-    Version = call_node(Node, couch_prometheus_server, version, []),
+    Metrics = call_node(Node, couch_prometheus, scrape, []),
+    Version = call_node(Node, couch_prometheus, version, []),
     Type = "text/plain; version=" ++ Version,
     Header = [{<<"Content-Type">>, ?l2b(Type)}],
     chttpd:send_response(Req, 200, Header, Metrics);
@@ -259,14 +258,6 @@ call_node(Node, Mod, Fun, Args) when is_atom(Node) ->
             throw({error, {nodedown, Reason}});
         Else ->
             Else
-    end.
-
-flush(Node, Req) ->
-    case couch_util:get_value("flush", chttpd:qs(Req)) of
-        "true" ->
-            call_node(Node, couch_stats_aggregator, flush, []);
-        _Else ->
-            ok
     end.
 
 get_stats() ->

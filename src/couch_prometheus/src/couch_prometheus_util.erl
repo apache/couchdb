@@ -20,8 +20,6 @@
     to_prom_summary/2
 ]).
 
--include("couch_prometheus.hrl").
-
 couch_to_prom([couch_log, level, alert], Info, _All) ->
     to_prom(couch_log_requests_total, counter, "number of logged messages", {
         [{level, alert}], val(Info)

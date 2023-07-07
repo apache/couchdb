@@ -146,7 +146,6 @@ defmodule CouchDBTest.Mixfile do
       "unicode_util_compat",
       "b64url",
       "exxhash",
-      "bear",
       "mochiweb",
       "snappy",
       "rebar",
@@ -155,8 +154,7 @@ defmodule CouchDBTest.Mixfile do
       "meck",
       "khash",
       "hyper",
-      "fauxton",
-      "folsom"
+      "fauxton"
     ]
 
     deps |> Enum.map(fn app -> "src/#{app}" end)

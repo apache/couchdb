@@ -10,9 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_prometheus_server).
-
--behaviour(gen_server).
+-module(couch_prometheus).
 
 -import(couch_prometheus_util, [
     couch_to_prom/3,
@@ -26,72 +24,15 @@
     version/0
 ]).
 
--export([
-    start_link/0,
-    init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    code_change/3,
-    terminate/2
-]).
-
 -ifdef(TEST).
 -export([
     get_internal_replication_jobs_stat/0
 ]).
 -endif.
 
--include("couch_prometheus.hrl").
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
--record(st, {
-    metrics,
-    refresh
-}).
-
-init([]) ->
-    Metrics = refresh_metrics(),
-    RT = update_refresh_timer(),
-    {ok, #st{metrics = Metrics, refresh = RT}}.
+-define(PROMETHEUS_VERSION, "2.0").
 
 scrape() ->
-    {ok, Metrics} = gen_server:call(?MODULE, scrape),
-    Metrics.
-
-version() ->
-    ?PROMETHEUS_VERSION.
-
-handle_call(scrape, _from, #st{metrics = Metrics} = State) ->
-    {reply, {ok, Metrics}, State};
-handle_call(refresh, _from, #st{refresh = OldRT} = State) ->
-    timer:cancel(OldRT),
-    Metrics = refresh_metrics(),
-    RT = update_refresh_timer(),
-    {reply, ok, State#st{metrics = Metrics, refresh = RT}};
-handle_call(Msg, _From, State) ->
-    {stop, {unknown_call, Msg}, error, State}.
-
-handle_cast(Msg, State) ->
-    {stop, {unknown_cast, Msg}, State}.
-
-handle_info(refresh, #st{refresh = OldRT} = State) ->
-    timer:cancel(OldRT),
-    Metrics = refresh_metrics(),
-    RT = update_refresh_timer(),
-    {noreply, State#st{metrics = Metrics, refresh = RT}};
-handle_info(Msg, State) ->
-    {stop, {unknown_info, Msg}, State}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-refresh_metrics() ->
     CouchDB = get_couchdb_stats(),
     System = couch_stats_httpd:to_ejson(get_system_stats()),
     couch_prometheus_util:to_bin(
@@ -102,6 +43,9 @@ refresh_metrics() ->
             CouchDB ++ System
         )
     ).
+
+version() ->
+    ?PROMETHEUS_VERSION.
 
 get_couchdb_stats() ->
     Stats = lists:sort(couch_stats:fetch()),
@@ -416,29 +360,3 @@ get_distribution_stats() ->
 get_ets_stats() ->
     NumTabs = length(ets:all()),
     to_prom(erlang_ets_table, gauge, "number of ETS tables", NumTabs).
-
-drain_refresh_messages() ->
-    receive
-        refresh -> drain_refresh_messages()
-    after 0 ->
-        ok
-    end.
-
-update_refresh_timer() ->
-    drain_refresh_messages(),
-    RefreshTime = 1000 * config:get_integer("prometheus", "interval", ?REFRESH_INTERVAL),
-    erlang:send_after(RefreshTime, self(), refresh).
-
--ifdef(TEST).
-
--include_lib("couch/include/couch_eunit.hrl").
-
-drain_refresh_messages_test() ->
-    self() ! refresh,
-    {messages, Mq0} = erlang:process_info(self(), messages),
-    ?assert(lists:member(refresh, Mq0)),
-    drain_refresh_messages(),
-    {messages, Mq1} = erlang:process_info(self(), messages),
-    ?assert(not lists:member(refresh, Mq1)).
-
--endif.
