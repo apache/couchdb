@@ -453,7 +453,8 @@ reduce_to_count(Reductions) ->
 
 get_access_row_count(#mrview{btree = Bt}, UserName) ->
     couch_btree:full_reduce_with_options(Bt, [
-        {start_key, UserName}
+        {start_key, UserName},
+        {end_key, {[UserName, {[]}]}} % is this correct? should this not be \ufff0?
     ]).
 
 fold(#mrview{btree = Bt}, Fun, Acc, Opts) ->

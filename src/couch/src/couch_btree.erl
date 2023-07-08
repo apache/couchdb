@@ -110,17 +110,10 @@ full_reduce(#btree{root = nil, reduce = Reduce}) ->
 full_reduce(#btree{root = Root}) ->
     {ok, element(2, Root)}.
 
-full_reduce_with_options(Bt, Options0) ->
+full_reduce_with_options(Bt, Options) ->
     CountFun = fun(_SeqStart, PartialReds, 0) ->
         {ok, couch_btree:final_reduce(Bt, PartialReds)}
     end,
-    [UserName] = proplists:get_value(start_key, Options0, <<"">>),
-    EndKey = {[UserName, {[]}]},
-    Options =
-        Options0 ++
-            [
-                {end_key, EndKey}
-            ],
     fold_reduce(Bt, CountFun, 0, Options).
 
 size(#btree{root = nil}) ->
