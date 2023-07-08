@@ -159,8 +159,6 @@ update(Idx, Mod, IdxState) ->
                     case IndexName of
                         <<"_design/_access">> ->
                             {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                            % TODO: hande conflicted docs in _access index
-                            % probably remove
                             [RevInfo | _] = DocInfo#doc_info.revs,
                             Doc1 = Doc#doc{
                                 meta = [{body_sp, RevInfo#rev_info.body_sp}],
