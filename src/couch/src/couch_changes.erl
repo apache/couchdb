@@ -688,13 +688,10 @@ maybe_get_changes_doc(_Value, _Acc) ->
     [].
 
 load_doc(Db, Value, Opts, DocOpts, Filter) ->
-    %couch_log:error("~ncouch_changes:load_doc(): Value: ~p~n", [Value]),
     case couch_index_util:load_doc(Db, Value, Opts) of
         null ->
-            %couch_log:error("~ncouch_changes:load_doc(): null~n", []),
             [{doc, null}];
         Doc ->
-            %couch_log:error("~ncouch_changes:load_doc(): Doc: ~p~n", [Doc]),
             [{doc, doc_to_json(Doc, DocOpts, Filter)}]
     end.
 
