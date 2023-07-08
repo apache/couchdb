@@ -292,16 +292,14 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
     DDoc = access_ddoc(),
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
-    %% % TODO: add roles
+    % Future work: this is where we’d do a multi-key-query with a user’s
+    % roles
     Args1 = prefix_startkey_endkey(UserName, #mrargs{}, fwd),
     Args2 = Args1#mrargs{deleted = true},
     Args = Args2#mrargs{reduce = false},
-    %% % filter out the user-prefix from the key, so _all_docs looks normal
-    %% % this isn’t a separate function because I’m binding Callback0 and I don’t
-    %% % know the Erlang equivalent of JS’s fun.bind(this, newarg)
+    % filter out the user-prefix from the key, so _all_docs looks normal
     Callback = fun
         ({meta, _}, Acc0) ->
-            % ignore for now
             {ok, Acc0};
         ({row, Props}, Acc0) ->
             % turn row into FDI
@@ -330,7 +328,6 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
             },
             Fun(FDI, Acc0);
         (_Else, Acc0) ->
-            % ignore for now
             {ok, Acc0}
     end,
     VName = <<"_access_by_seq">>,
@@ -347,8 +344,6 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
     Callback = fun
         ({row, Props}, Acc0) ->
             % filter out the user-prefix from the key, so _all_docs looks normal
-            % this isn’t a separate function because I’m binding Callback0 and I
-            % don’t know the Erlang equivalent of JS’s fun.bind(this, newarg)
             [_User, Key] = proplists:get_value(key, Props),
             Row0 = proplists:delete(key, Props),
             Row = [{key, Key} | Row0],
