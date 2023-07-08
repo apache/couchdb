@@ -362,7 +362,6 @@ changes_callback({stop, EndSeq}, _) ->
 changes_callback({change, {Change}, _}, _) ->
     DbName = couch_util:get_value(<<"id">>, Change),
     Seq = couch_util:get_value(<<"seq">>, Change),
-    %couch_log:error("~nChange: ~p~n", [Change]),
     case DbName of
         <<"_design/", _/binary>> ->
             ok;
