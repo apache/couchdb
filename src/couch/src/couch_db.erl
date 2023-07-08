@@ -814,13 +814,11 @@ validate_access2(Db, Doc) ->
     validate_access3(check_access(Db, Doc)).
 
 validate_access3(true) -> ok;
-% TODO: fix language
-validate_access3(_) -> throw({forbidden, <<"can't touch this">>}).
+validate_access3(_) -> throw({forbidden, <<"access denied">>}).
 
 check_access(Db, #doc{access = Access}) ->
     check_access(Db, Access);
 check_access(Db, Access) ->
-    %couch_log:notice("~n Db.user_ctx: ~p, Access: ~p ~n", [Db#db.user_ctx, Access]),
     #user_ctx{
         name = UserName,
         roles = UserRoles
@@ -831,7 +829,6 @@ check_access(Db, Access) ->
             is_admin(Db);
         Access ->
             % if doc has _access, userCtx must be admin OR matching user or role
-            % _access = ["a", "b", ]
             case is_admin(Db) of
                 true ->
                     true;
@@ -846,10 +843,7 @@ check_access(Db, Access) ->
 
 check_name(null, _Access) -> false;
 check_name(UserName, Access) ->
-  Res = lists:member(UserName, Access),
-  Res.
-% nicked from couch_db:check_security
-% TODO: might need DRY
+    lists:member(UserName, Access).
 
 check_roles(Roles, Access) ->
     UserRolesSet = ordsets:from_list(Roles),
@@ -1409,9 +1403,9 @@ validate_docs_access(Db, DocBuckets, DocErrors) ->
     validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
 
 validate_docs_access1(_Db, [], {DocBuckets0, DocErrors}) ->
-    DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
+    % DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
     DocBuckets =
-        case DocBuckets1 of
+        case DocBuckets0 of
             [[]] -> [];
             Else -> Else
         end,
