@@ -761,7 +761,7 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs1 = apply_local_docs_access(Db, LocalDocs), % TODO: local docs acess needs validating
+    LocalDocs1 = apply_local_docs_access(Db, LocalDocs), % TODO: local docs access needs validating
     LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
@@ -779,14 +779,14 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
 
     % Check if we just updated any non-access design documents,
     % and update the validation funs if we did.
-    NonAccessIds = [Id || [{_Client, #doc{id = Id, access = []}} | _] <- DocsList],
-    UpdatedDDocIds = lists:flatmap(
-        fun
-            (<<"_design/", _/binary>> = Id) -> [Id];
-            (_) -> []
-        end,
-        NonAccessIds
-    ),
+    UpdatedDDocIds = [Id || [{_Client, #doc{id = <<"_design/", _/binary>> = Id, access = []}} | _] <- DocsList],
+    % UpdatedDDocIds = lists:flatmap(
+    %     fun
+    %         (<<"_design/", _/binary>> = Id) -> [Id];
+    %         (_) -> []
+    %     end,
+    %     NonAccessIds
+    % ),
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
