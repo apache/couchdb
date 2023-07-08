@@ -124,9 +124,6 @@ process_doc(Doc, Seq, #mrst{doc_acc = Acc} = State) when length(Acc) > 100 ->
     process_doc(Doc, Seq, State#mrst{doc_acc = []});
 process_doc(nil, Seq, #mrst{doc_acc = Acc} = State) ->
     {ok, State#mrst{doc_acc = [{nil, Seq, nil} | Acc]}};
-% TODO: re-evaluate why this is commented out
-% process_doc(#doc{id=Id, deleted=true}, Seq, #mrst{doc_acc=Acc}=State) ->
-%     {ok, State#mrst{doc_acc=[{Id, Seq, deleted} | Acc]}};
 process_doc(#doc{id = Id} = Doc, Seq, #mrst{doc_acc = Acc} = State) ->
     {ok, State#mrst{doc_acc = [{Id, Seq, Doc} | Acc]}}.
 
@@ -165,8 +162,9 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             couch_query_servers:stop_doc_map(State0#mrst.qserver),
             couch_work_queue:close(State0#mrst.write_queue);
         {ok, Dequeued} ->
-            % Run all the non deleted docs through the view engine and
+            % Run all the non deleted* docs through the view engine and
             % then pass the results on to the writer process.
+            % *except when the ddoc name is _access
             State1 =
                 case State0#mrst.qserver of
                     nil -> start_query_server(State0);
@@ -176,7 +174,7 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             DocFun = fun
                 ({nil, Seq, _}, {SeqAcc, Results}) ->
                     {erlang:max(Seq, SeqAcc), Results};
-                ({Id, Seq, Rev, #doc{deleted = true, body = Body, meta = Meta}}, {SeqAcc, Results}) ->
+                ({Id, Seq, #doc{deleted = true, revs = Rev, body = Body, meta = Meta}}, {SeqAcc, Results}) ->
                     % _access needs deleted docs
                     case IdxName of
                         <<"_design/_access">> ->
@@ -192,7 +190,7 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                             {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
                             {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]};
                         _Else ->
-                            {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]}
+                            {erlang:max(Seq, SeqAcc), Results}
                     end;
                 ({Id, Seq, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
