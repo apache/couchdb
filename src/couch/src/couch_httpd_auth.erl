@@ -255,7 +255,7 @@ jwt_authentication_handler(Req) ->
                             Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = User,
-                                    roles = Roles
+                                    roles = Roles ++ [<<"_users">>]
                                 }
                             }
                     end;
