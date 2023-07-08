@@ -183,7 +183,6 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                             Doc = #doc{
                                 id = Id,
                                 revs = {Start, [Rev1]},
-                                %% todo: only keep _access and add _seq
                                 body = {make_deleted_body(Body, Meta, Seq)},
                                 deleted = true
                             },
@@ -194,7 +193,6 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                     end;
                 ({Id, Seq, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
-                    % IdxName: ~p, Doc: ~p~n~n", [IdxName, Doc]),
                     Doc0 =
                         case IdxName of
                             <<"_design/_access">> ->
