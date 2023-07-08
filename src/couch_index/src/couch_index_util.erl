@@ -31,10 +31,7 @@ index_file(Module, DbName, FileName) ->
 
 load_doc(Db, #doc_info{} = DI, Opts) ->
     Deleted = lists:member(deleted, Opts),
-    % MyDoc = ,
-    %{ok, MyDoc2} = MyDoc,
-    %couch_log:error("~ncouch_index_util:load_doc(): Doc: ~p, Deleted ~p~n", [MyDoc2, MyDoc2#doc.deleted]),
-    case catch (couch_db:open_doc(Db, DI, Opts)) of
+    case (catch (couch_db:open_doc(Db, DI, Opts))) of
         {ok, #doc{deleted = false} = Doc} -> Doc;
         {ok, #doc{deleted = true} = Doc} when Deleted -> Doc;
         _Else -> null
