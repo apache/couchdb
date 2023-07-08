@@ -18,7 +18,7 @@
 -define(i2l(I), integer_to_list(I)).
 -define(DOC_ID, <<"foobar">>).
 -define(LOCAL_DOC_ID, <<"_local/foobar">>).
--define(NUM_CLIENTS, [1000, 2000, 5000, 10000]).
+-define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
 -define(TIMEOUT, 20000).
 
 start() ->
@@ -68,7 +68,7 @@ concurrent_updates() ->
             fun setup/1,
             fun teardown/2,
             [
-             {NumClients, fun should_concurrently_update_doc/2}
+               {NumClients, fun should_concurrently_update_doc/2}
              || NumClients <- ?NUM_CLIENTS
             ]
         }
@@ -337,11 +337,11 @@ spawn_client(DbName, Doc) ->
         end,
         erlang:yield(),
         Result = try
-                 couch_db:update_doc(Db, Doc, [])
-            catch
-                _:Error ->
-                    Error
-            end,
+             couch_db:update_doc(Db, Doc, [])
+        catch
+            _:Error ->
+                Error
+        end,
         ok = couch_db:close(Db),
         exit(Result)
     end).
