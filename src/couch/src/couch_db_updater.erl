@@ -169,11 +169,23 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     ),
     {stop, Msg, Db}.
 
+-include_lib("couch/include/couch_eunit.hrl").
+-define(debugTimeNano(S, E),
+    begin
+    ((fun () ->
+          __T0 = erlang:system_time(nanosecond),
+          __V = (E),
+          __T1 = erlang:system_time(nanosecond),
+          ?debugFmt(<<"~ts: ~.3f ms">>, [(S), (__T1-__T0)/1000]),
+          __V
+      end)())
+    end).
+
 handle_info(
     {update_docs, Client, GroupedDocs, LocalDocs, ReplicatedChanges, UserCtx},
     Db
 ) ->
-    GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
+    GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs, UserCtx),
     if
         LocalDocs == [] ->
             {GroupedDocs3, Clients} = collect_updates(
@@ -186,7 +198,7 @@ handle_info(
             Clients = [Client]
     end,
     LocalDocs2 = [{Client, NRDoc} || NRDoc <- LocalDocs],
-    try update_docs_int(Db, GroupedDocs3, LocalDocs2, ReplicatedChanges, UserCtx) of
+    try update_docs_int(Db, GroupedDocs3, LocalDocs2, ReplicatedChanges) of
         {ok, Db2, UpdatedDDocIds} ->
             ok = couch_server:db_updated(Db2),
             case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
@@ -260,7 +272,7 @@ handle_info(Msg, Db) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-sort_and_tag_grouped_docs(Client, GroupedDocs) ->
+sort_and_tag_grouped_docs(Client, GroupedDocs, UserCtx) ->
     % These groups should already be sorted but sometimes clients misbehave.
     % The merge_updates function will fail and the database can end up with
     % duplicate documents if the incoming groups are not sorted, so as a sanity
@@ -268,7 +280,7 @@ sort_and_tag_grouped_docs(Client, GroupedDocs) ->
     Cmp = fun([#doc{id = A} | _], [#doc{id = B} | _]) -> A < B end,
     lists:map(
         fun(DocGroup) ->
-            [{Client, maybe_tag_doc(D)} || D <- DocGroup]
+            [{Client, maybe_tag_doc(D), UserCtx} || D <- DocGroup]
         end,
         lists:sort(Cmp, GroupedDocs)
     ).
@@ -282,11 +294,11 @@ maybe_tag_doc(#doc{id = Id, revs = {Pos, [_Rev | PrevRevs]}, meta = Meta0} = Doc
             Doc#doc{meta = [{ref, Key} | Meta0]}
     end.
 
-merge_updates([[{_, #doc{id = X}} | _] = A | RestA], [[{_, #doc{id = X}} | _] = B | RestB]) ->
+merge_updates([[{_, #doc{id = X}, _} | _] = A | RestA], [[{_, #doc{id = X}, _} | _] = B | RestB]) ->
     [A ++ B | merge_updates(RestA, RestB)];
-merge_updates([[{_, #doc{id = X}} | _] | _] = A, [[{_, #doc{id = Y}} | _] | _] = B) when X < Y ->
+merge_updates([[{_, #doc{id = X}, _} | _] | _] = A, [[{_, #doc{id = Y}, _} | _] | _] = B) when X < Y ->
     [hd(A) | merge_updates(tl(A), B)];
-merge_updates([[{_, #doc{id = X}} | _] | _] = A, [[{_, #doc{id = Y}} | _] | _] = B) when X > Y ->
+merge_updates([[{_, #doc{id = X}, _} | _] | _] = A, [[{_, #doc{id = Y}, _} | _] | _] = B) when X > Y ->
     [hd(B) | merge_updates(A, tl(B))];
 merge_updates([], RestB) ->
     RestB;
@@ -299,12 +311,12 @@ collect_updates(GroupedDocsAcc, ClientsAcc, ReplicatedChanges) ->
         % local docs. It's easier to just avoid multiple _local doc
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
-        {update_docs, Client, GroupedDocs, [], ReplicatedChanges} ->
+        {update_docs, Client, GroupedDocs, [], ReplicatedChanges, UserCtx} ->
             case ReplicatedChanges of
                 true -> couch_stats:increment_counter([couchdb, coalesced_updates, replicated]);
                 false -> couch_stats:increment_counter([couchdb, coalesced_updates, interactive])
             end,
-            GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
+            GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs, UserCtx),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2),
             collect_updates(
@@ -503,7 +515,7 @@ merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
     % Track doc ids so we can debug large revision trees
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id),
     NewDocInfo0 = lists:foldl(
-        fun({Client, NewDoc}, OldInfoAcc) ->
+        fun({Client, NewDoc, _UserCtx}, OldInfoAcc) ->
             NewInfo = merge_rev_tree(OldInfoAcc, NewDoc, Client, ReplicatedChanges),
             case is_overflowed(NewInfo, OldInfoAcc, FullPartitions) of
                 true when not ReplicatedChanges ->
@@ -600,7 +612,8 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) when
                     send_result(Client, NewDoc, {ok, {OldPos + 1, NewRevId}}),
                     OldInfo#full_doc_info{
                         rev_tree = NewTree1,
-                        deleted = false
+                        deleted = false,
+                        access = NewDoc#doc.access
                     };
                 _ ->
                     throw(doc_recreation_failed)
@@ -621,7 +634,8 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) ->
         {NewTree, new_leaf} when not NewDeleted ->
             OldInfo#full_doc_info{
                 rev_tree = NewTree,
-                deleted = false
+                deleted = false,
+                access = NewDoc#doc.access
             };
         {NewTree, new_leaf} when NewDeleted ->
             % We have to check if we just deleted this
@@ -629,7 +643,8 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) ->
             % resolution.
             OldInfo#full_doc_info{
                 rev_tree = NewTree,
-                deleted = couch_doc:is_deleted(NewTree)
+                deleted = couch_doc:is_deleted(NewTree),
+                access = NewDoc#doc.access
             };
         _ ->
             send_result(Client, NewDoc, conflict),
@@ -671,29 +686,25 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
     end.
 
 
-update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
+update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
-    Ids = [Id || [{_Client, #doc{id = Id}} | _] <- DocsList],
-    % TODO: maybe a perf hit, instead of zip3-ing existing Accesses into
-    %       our doc lists, maybe find 404 docs differently down in
-    %       validate_docs_access (revs is [], which we can then use
-    %       to skip validation as we know it is the first doc rev)
-    Accesses = [Access || [{_Client, #doc{access = Access}} | _] <- DocsList],
+    Ids = [Id || [{_Client, #doc{id = Id}, _} | _] <- DocsList],
+    % % TODO: maybe combine these comprehensions, so we do not loop twice
+    % Accesses = [Access || [{_Client, #doc{access = Access}, _} | _] <- DocsList],
 
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
-    OldDocInfos = lists:zipwith3(
+    OldDocInfos = lists:zipwith(
         fun
-            (_Id, #full_doc_info{} = FDI, _Access) ->
+            (_Id, #full_doc_info{} = FDI) ->
                 FDI;
-            (Id, not_found, Access) ->
-                #full_doc_info{id = Id, access = Access}
+            (Id, not_found) ->
+                #full_doc_info{id = Id}
         end,
         Ids,
-        OldDocLookups,
-        Accesses
+        OldDocLookups
     ),
 
     %% Get the list of full partitions
@@ -737,7 +748,7 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
     %.    and don’t add to DLV, nor ODI
 
     {DocsListValidated, OldDocInfosValidated} = validate_docs_access(
-        Db, UserCtx, DocsList, OldDocInfos
+        Db, DocsList, OldDocInfos
     ),
 
     {ok, AccOut} = merge_rev_trees(DocsListValidated, OldDocInfosValidated, AccIn),
@@ -750,7 +761,7 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs1 = apply_local_docs_access(Db, LocalDocs),
+    LocalDocs1 = apply_local_docs_access(Db, LocalDocs), % TODO: local docs acess needs validating
     LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
@@ -780,28 +791,30 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
 % at this point, we already validated this Db is access enabled, so do the checks right away.
-check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx = UserCtx}, Access).
+check_access(Db, UserCtx, Access) ->
+    couch_db:check_access(Db#db{user_ctx = UserCtx}, Access).
 
-validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
+validate_docs_access(Db, DocsList, OldDocInfos) ->
     case couch_db:has_access_enabled(Db) of
-        true -> validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos);
+        true -> validate_docs_access_int(Db, DocsList, OldDocInfos);
         _Else -> {DocsList, OldDocInfos}
     end.
 
-validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos) ->
-    validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
+validate_docs_access_int(Db, DocsList, OldDocInfos) ->
+    validate_docs_access(Db, DocsList, OldDocInfos, [], []).
 
-validate_docs_access(_Db, _UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
+validate_docs_access(_Db, [], [], DocsListValidated, OldDocInfosValidated) ->
+    % TODO: check if need to reverse this? maybe this is the cause of the test reverse issue?
     {lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated)};
 validate_docs_access(
-    Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated
+    Db, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated
 ) ->
     % loop over Docs as {Client,  NewDoc}
     %   validate Doc
     %   if valid, then put back in Docs
     %   if not, then send_result and skip
     NewDocs = lists:foldl(
-        fun({Client, Doc}, Acc) ->
+        fun({Client, Doc, UserCtx}, Acc) ->
             % check if we are allowed to update the doc, skip when new doc
             OldDocMatchesAccess =
                 case OldInfo#full_doc_info.rev_tree of
@@ -810,11 +823,12 @@ validate_docs_access(
                 end,
 
             NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
+
             case OldDocMatchesAccess andalso NewDocMatchesAccess of
                 % if valid, then send to DocsListValidated, OldDocsInfo
                 true ->
                     % and store the access context on the new doc
-                    [{Client, Doc} | Acc];
+                    [{Client, Doc, UserCtx} | Acc];
                 % if invalid, then send_result tagged `access`(c.f. `conflict)
                 false ->
                     % and don’t add to DLV, nor ODI
@@ -827,7 +841,7 @@ validate_docs_access(
     ),
 
     {NewDocsListValidated, NewOldDocInfosValidated} =
-        case length(NewDocs) of
+        case length(NewDocs) of %TODO: what if only 2/3?
             % we sent out all docs as invalid access, drop the old doc info associated with it
             0 ->
                 {[NewDocs | DocsListValidated], OldDocInfosValidated};
@@ -835,7 +849,7 @@ validate_docs_access(
                 {[NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated]}
         end,
     validate_docs_access(
-        Db, UserCtx, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated
+        Db, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated
     ).
 
 apply_local_docs_access(Db, Docs) ->

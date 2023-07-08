@@ -307,13 +307,8 @@ delete_doc(Db, Id, Revisions) ->
 open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
-open_doc(Db, Id, Options0) ->
+open_doc(Db, Id, Options) ->
     increment_stat(Db, [couchdb, database_reads]),
-    Options =
-        case has_access_enabled(Db) of
-            true -> Options0 ++ [conflicts];
-            _Else -> Options0
-        end,
     case open_doc_int(Db, Id, Options) of
         {ok, #doc{deleted = true} = Doc} ->
             case lists:member(deleted, Options) of
@@ -808,23 +803,13 @@ validate_access(Db, Doc, Options) ->
 
 validate_access1(false, _Db, _Doc, _Options) ->
     ok;
-validate_access1(true, Db, #doc{meta = Meta} = Doc, Options) ->
-    case proplists:get_value(conflicts, Meta) of
-        % no conflicts
-        undefined ->
-            case is_read_from_ddoc_cache(Options) andalso is_per_user_ddoc(Doc) of
-                true -> throw({not_found, missing});
-                _False -> validate_access2(Db, Doc)
-            end;
-        % only admins can read conflicted docs in _access dbs
-        _Else ->
-            % TODO: expand: if leaves agree on _access, then a user should be able
-            %       to proceed normally, only if they disagree should this become admin-only
-            case is_admin(Db) of
-                true -> ok;
-                _Else2 -> throw({forbidden, <<"document is in conflict">>})
-            end
-    end.
+validate_access1(true, Db, #doc{id = <<"_design", _/binary>>} = Doc, Options) ->
+    case is_read_from_ddoc_cache(Options) andalso is_per_user_ddoc(Doc) of
+        true -> throw({not_found, missing});
+        _False -> validate_access2(Db, Doc)
+    end;
+validate_access1(true, Db, #doc{} = Doc, _Options) ->
+    validate_access2(Db, Doc).
 validate_access2(Db, Doc) ->
     validate_access3(check_access(Db, Doc)).
 
@@ -859,8 +844,10 @@ check_access(Db, Access) ->
             end
     end.
 
-check_name(null, _Access) -> true;
-check_name(UserName, Access) -> lists:member(UserName, Access).
+check_name(null, _Access) -> false;
+check_name(UserName, Access) ->
+  Res = lists:member(UserName, Access),
+  Res.
 % nicked from couch_db:check_security
 % TODO: might need DRY
 
@@ -1526,7 +1513,6 @@ update_docs_interactive(Db, Docs0, Options) ->
 
     {ok, DocBuckets, LocalDocs, DocErrors} =
         before_docs_update(Db, Docs, PrepValidateFun, ?INTERACTIVE_EDIT),
-
     if
         (AllOrNothing) and (DocErrors /= []) ->
             RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
@@ -1609,7 +1595,7 @@ collect_results_with_metrics(Pid, MRef, []) ->
     end.
 
 collect_results(Pid, MRef, ResultsAcc) ->
-    receive
+    receive % TDOD: need to receiver access?
         {result, Pid, Result} ->
             collect_results(Pid, MRef, [Result | ResultsAcc]);
         {done, Pid} ->
