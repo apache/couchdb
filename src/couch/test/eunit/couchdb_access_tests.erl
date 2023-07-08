@@ -13,7 +13,6 @@
 -module(couchdb_access_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 -define(ADMIN_REQ_HEADERS, [?CONTENT_JSON, {basic_auth, {"a", "a"}}]).
@@ -48,10 +47,10 @@ after_each(_, Url) ->
 before_all() ->
     Couch = test_util:start_couch([chttpd, couch_replicator]),
     Hashed = couch_passwords:hash_admin_password("a"),
-    ok = config:set("admins", "a", binary_to_list(Hashed), _Persist = false),
-    ok = config:set("couchdb", "uuid", "21ac467c1bc05e9d9e9d2d850bb1108f", _Persist = false),
-    ok = config:set("log", "level", "debug", _Persist = false),
-    ok = config:set("per_doc_access", "enabled", "true", _Persist = false),
+    ok = config:set("admins", "a", binary_to_list(Hashed), false),
+    ok = config:set("couchdb", "uuid", "21ac467c1bc05e9d9e9d2d850bb1108f", false),
+    ok = config:set("log", "level", "debug", false),
+    ok = config:set("per_doc_access", "enabled", "true", false),
 
     % cleanup and setup
     {ok, _, _, _} = test_request:delete(url() ++ "/db", ?ADMIN_REQ_HEADERS),
@@ -79,64 +78,63 @@ after_all(_) ->
 access_test_() ->
     Tests = [
         % Server config
-          fun performance_regression/2
-%         fun should_not_let_create_access_db_if_disabled/2,
-% 
-%         % Doc creation
-%         fun should_not_let_anonymous_user_create_doc/2,
-%         fun should_let_admin_create_doc_with_access/2,
-%         fun should_let_admin_create_doc_without_access/2,
-%         fun should_let_user_create_doc_for_themselves/2,
-%         fun should_not_let_user_create_doc_for_someone_else/2,
-%         fun should_let_user_create_access_ddoc/2,
-%         fun access_ddoc_should_have_no_effects/2,
-% 
-%         % Doc updates
-%         fun users_with_access_can_update_doc/2,
-%         fun users_without_access_can_not_update_doc/2,
-%         fun users_with_access_can_not_change_access/2,
-%         fun users_with_access_can_not_remove_access/2,
-% 
-%         % Doc reads
-%         fun should_let_admin_read_doc_with_access/2,
-%         fun user_with_access_can_read_doc/2,
-%         fun user_without_access_can_not_read_doc/2,
-%         fun user_can_not_read_doc_without_access/2,
-%         fun admin_with_access_can_read_conflicted_doc/2,
-%         fun user_with_access_can_not_read_conflicted_doc/2,
-% 
-%         % Doc deletes
-%         fun should_let_admin_delete_doc_with_access/2,
-%         fun should_let_user_delete_doc_for_themselves/2,
-%         fun should_not_let_user_delete_doc_for_someone_else/2,
-% 
-%         % _all_docs with include_docs
-%         fun should_let_admin_fetch_all_docs/2,
-%         fun should_let_user_fetch_their_own_all_docs/2,
-% 
-%         % _changes
-%         fun should_let_admin_fetch_changes/2,
-%         fun should_let_user_fetch_their_own_changes/2,
-% 
-%         % views
-%         fun should_not_allow_admin_access_ddoc_view_request/2,
-%         fun should_not_allow_user_access_ddoc_view_request/2,
-%         fun should_allow_admin_users_access_ddoc_view_request/2,
-%         fun should_allow_user_users_access_ddoc_view_request/2,
-% 
-%         % replication
-%         fun should_allow_admin_to_replicate_from_access_to_access/2,
-%         fun should_allow_admin_to_replicate_from_no_access_to_access/2,
-%         fun should_allow_admin_to_replicate_from_access_to_no_access/2,
-%         fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
-%         %
-%         fun should_allow_user_to_replicate_from_access_to_access/2,
-%         fun should_allow_user_to_replicate_from_access_to_no_access/2,
-%         fun should_allow_user_to_replicate_from_no_access_to_access/2,
-%         fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
-% 
-%         % _revs_diff for docs you don’t have access to
-%         fun should_not_allow_user_to_revs_diff_other_docs/2
+        fun should_not_let_create_access_db_if_disabled/2,
+
+        % Doc creation
+        fun should_not_let_anonymous_user_create_doc/2,
+        fun should_let_admin_create_doc_with_access/2,
+        fun should_let_admin_create_doc_without_access/2,
+        fun should_let_user_create_doc_for_themselves/2,
+        fun should_not_let_user_create_doc_for_someone_else/2,
+        fun should_let_user_create_access_ddoc/2,
+        % fun access_ddoc_should_have_no_effects/2,
+
+        % Doc updates
+        fun users_with_access_can_update_doc/2,
+        fun users_without_access_can_not_update_doc/2,
+        fun users_with_access_can_not_change_access/2,
+        fun users_with_access_can_not_remove_access/2,
+
+        % Doc reads
+        fun should_let_admin_read_doc_with_access/2,
+        fun user_with_access_can_read_doc/2,
+        fun user_without_access_can_not_read_doc/2,
+        fun user_can_not_read_doc_without_access/2,
+        fun admin_with_access_can_read_conflicted_doc/2,
+        % fun user_with_access_can_not_read_conflicted_doc/2,
+
+        % Doc deletes
+        fun should_let_admin_delete_doc_with_access/2,
+        fun should_let_user_delete_doc_for_themselves/2,
+        fun should_not_let_user_delete_doc_for_someone_else/2,
+
+        % _all_docs with include_docs
+        fun should_let_admin_fetch_all_docs/2,
+        fun should_let_user_fetch_their_own_all_docs/2,
+
+        % _changes
+        fun should_let_admin_fetch_changes/2,
+        fun should_let_user_fetch_their_own_changes/2,
+
+        % views
+        fun should_not_allow_admin_access_ddoc_view_request/2,
+        fun should_not_allow_user_access_ddoc_view_request/2,
+        fun should_allow_admin_users_access_ddoc_view_request/2,
+        fun should_allow_user_users_access_ddoc_view_request/2,
+
+        % replication
+        fun should_allow_admin_to_replicate_from_access_to_access/2,
+        fun should_allow_admin_to_replicate_from_no_access_to_access/2,
+        fun should_allow_admin_to_replicate_from_access_to_no_access/2,
+        fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
+
+        fun should_allow_user_to_replicate_from_access_to_access/2,
+        fun should_allow_user_to_replicate_from_access_to_no_access/2,
+        fun should_allow_user_to_replicate_from_no_access_to_access/2,
+        fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
+ 
+        % _revs_diff for docs you don’t have access to
+        fun should_not_allow_user_to_revs_diff_other_docs/2
 
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
@@ -151,7 +149,7 @@ access_test_() ->
             fun before_all/0,
             fun after_all/1,
             [
-                make_test_cases(clustered, Tests)
+                make_test_cases(basic, Tests)
             ]
         }
     }.
@@ -161,36 +159,6 @@ make_test_cases(Mod, Funs) ->
         lists:flatten(io_lib:format("~s", [Mod])),
         {foreachx, fun before_each/1, fun after_each/2, [{Mod, Fun} || Fun <- Funs]}
     }.
-
-
-performance_regression(_PortType, _Url) ->
-    DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX, overwrite]),
-    Result =
-        try
-            T=erlang:system_time(second),
-            eprof:start(),
-            eprof:log("/tmp/eprof-" ++ integer_to_list(T) ++ ".log"),
-            eprof:profile(fun() ->
-                Update = fun(Iter) ->
-                    Doc = couch_doc:from_json_obj(
-                        {[
-                            {<<"_id">>, integer_to_binary(Iter)},
-                            {<<"value">>, 1}
-                        ]}
-                    ),
-                    couch_db:update_doc(Db, Doc, [])
-                end,
-                lists:foreach(Update, lists:seq(0, 20000))
-            end),
-            eprof:analyze()
-        catch
-            _:Error ->
-                Error
-        end,
-    ok = couch_db:close(Db),
-    ?debugFmt("~nResult: ~p~n", [Result]),
-    ?_assertEqual(ok, Result).
 
 % Doc creation
 % http://127.0.0.1:64903/db/a?revs=true&open_revs=%5B%221-23202479633c2b380f79507a776743d5%22%5D&latest=true
@@ -206,9 +174,9 @@ performance_regression(_PortType, _Url) ->
 %
 
 should_not_let_create_access_db_if_disabled(_PortType, Url) ->
-    ok = config:set("per_doc_access", "enabled", "false", _Persist = false),
+    ok = config:set("per_doc_access", "enabled", "false", false),
     {ok, Code, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
-    ok = config:set("per_doc_access", "enabled", "true", _Persist = false),
+    ok = config:set("per_doc_access", "enabled", "true", false),
     ?_assertEqual(400, Code).
 
 should_not_let_anonymous_user_create_doc(_PortType, Url) ->
@@ -276,7 +244,7 @@ access_ddoc_should_have_no_effects(_PortType, Url) ->
             Ddoc
         ),
         ?assertEqual(201, Code),
-        {ok, Code1, _, _} = test_request:put(
+        {ok, Code1, _, B} = test_request:put(
             Url ++ "/db/b",
             ?USERX_REQ_HEADERS,
             "{\"a\":1,\"_access\":[\"x\"]}"
@@ -403,22 +371,27 @@ user_with_access_can_read_doc(_PortType, Url) ->
     ),
     ?_assertEqual(200, Code).
 
-user_with_access_can_not_read_conflicted_doc(_PortType, Url) ->
-    {ok, 201, _, _} = test_request:put(
-        Url ++ "/db/a",
-        ?ADMIN_REQ_HEADERS,
-        "{\"_id\":\"f1\",\"a\":1,\"_access\":[\"x\"]}"
-    ),
-    {ok, 201, _, _} = test_request:put(
-        Url ++ "/db/a?new_edits=false",
-        ?ADMIN_REQ_HEADERS,
-        "{\"_id\":\"f1\",\"_rev\":\"7-XYZ\",\"a\":1,\"_access\":[\"x\"]}"
-    ),
-    {ok, Code, _, _} = test_request:get(
-        Url ++ "/db/a",
-        ?USERX_REQ_HEADERS
-    ),
-    ?_assertEqual(403, Code).
+% TODO: induce conflict with two different _access users per rev
+% could be comiing from a split-brain scenario
+% whoever ends up winner can read the doc, but not the leaf
+% that doesn’t belong to them
+% whoever loses can only request their leaf
+% user_with_access_can_not_read_conflicted_doc(_PortType, Url) ->
+%     {ok, 201, _, _} = test_request:put(
+%         Url ++ "/db/a",
+%         ?ADMIN_REQ_HEADERS,
+%         "{\"_id\":\"f1\",\"a\":1,\"_access\":[\"x\"]}"
+%     ),
+%     {ok, 201, _, _} = test_request:put(
+%         Url ++ "/db/a?new_edits=false",
+%         ?ADMIN_REQ_HEADERS,
+%         "{\"_id\":\"f1\",\"_rev\":\"7-XYZ\",\"a\":1,\"_access\":[\"x\"]}"
+%     ),
+%     {ok, Code, _, _} = test_request:get(
+%         Url ++ "/db/a",
+%         ?USERX_REQ_HEADERS
+%     ),
+%     ?_assertEqual(403, Code).
 
 admin_with_access_can_read_conflicted_doc(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
@@ -1503,5 +1476,5 @@ port() ->
 %     {ok, 200, _, Body} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
 %         ?USERX_REQ_HEADERS),
 %     {Json} = jiffy:decode(Body),
-%     ?debugFmt("~nHSOIN: ~p~n", [Json]),
 %     ?_assertEqual(3, length(proplists:get_value(<<"rows">>, Json))).
+%     ?debugFmt("~nHSOIN: ~p~n", [Json]),
