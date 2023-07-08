@@ -1988,7 +1988,6 @@ parse_shards_opt("access", _Req, _Value) ->
     Err = ?l2b(["The `access` value should be a boolean."]),
     throw({bad_request, Err});
 parse_shards_opt(Param, Req, Default) ->
-    couch_log:error("~n parse_shards_opt Param: ~p, Default: ~p~n", [Param, Default]),
     Val = chttpd:qs_value(Req, Param, Default),
     Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
     case couch_util:validate_positive_int(Val) of
