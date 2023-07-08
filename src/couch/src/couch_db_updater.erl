@@ -169,18 +169,6 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     ),
     {stop, Msg, Db}.
 
--include_lib("couch/include/couch_eunit.hrl").
--define(debugTimeNano(S, E),
-    begin
-    ((fun () ->
-          __T0 = erlang:system_time(nanosecond),
-          __V = (E),
-          __T1 = erlang:system_time(nanosecond),
-          ?debugFmt(<<"~ts: ~.3f ms">>, [(S), (__T1-__T0)/1000]),
-          __V
-      end)())
-    end).
-
 handle_info(
     {update_docs, Client, GroupedDocs, LocalDocs, ReplicatedChanges, UserCtx},
     Db
@@ -691,8 +679,6 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
     Ids = [Id || [{_Client, #doc{id = Id}, _} | _] <- DocsList],
-    % % TODO: maybe combine these comprehensions, so we do not loop twice
-    % Accesses = [Access || [{_Client, #doc{access = Access}, _} | _] <- DocsList],
 
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
@@ -780,13 +766,6 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     % Check if we just updated any non-access design documents,
     % and update the validation funs if we did.
     UpdatedDDocIds = [Id || [{_Client, #doc{id = <<"_design/", _/binary>> = Id, access = []}} | _] <- DocsList],
-    % UpdatedDDocIds = lists:flatmap(
-    %     fun
-    %         (<<"_design/", _/binary>> = Id) -> [Id];
-    %         (_) -> []
-    %     end,
-    %     NonAccessIds
-    % ),
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
@@ -805,7 +784,8 @@ validate_docs_access_int(Db, DocsList, OldDocInfos) ->
 
 validate_docs_access(_Db, [], [], DocsListValidated, OldDocInfosValidated) ->
     % TODO: check if need to reverse this? maybe this is the cause of the test reverse issue?
-    {lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated)};
+    % {lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated)};
+    {DocsListValidated, OldDocInfosValidated};
 validate_docs_access(
     Db, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated
 ) ->
