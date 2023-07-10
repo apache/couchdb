@@ -283,7 +283,7 @@ cfg_atoms(Cfg, Default) ->
         undefined ->
             Default;
         V when is_list(V) ->
-            [list_to_atom(string:strip(S)) || S <- string:split(V, ",")]
+            [list_to_atom(string:strip(S)) || S <- string:split(V, ",", all)]
     end.
 
 cfg_sock_opts() ->
