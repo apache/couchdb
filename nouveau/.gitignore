@@ -5,3 +5,4 @@
 .vscode/
 .gradle/
 build/
+target/

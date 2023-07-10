@@ -98,7 +98,7 @@ TEST_OPTS=-c startup_jitter=0 -c default_security=admin_local
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs
+all: couch fauxton docs nouveau
 
 
 .PHONY: help
@@ -140,9 +140,11 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
+	@$(MAKE) nouveau-test
 
 ifdef apps
 subdirs = $(apps)
@@ -270,6 +272,10 @@ elixir-source-checks: elixir-init
 # target: build-report - Generate a build report
 build-report:
 	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
+	cat .\dev\logs\node1.log || true
+	cat .\dev\logs\nouveau.log || true
+	cat .\tmp\couch.log || true
+	cat test-results.log || true
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
@@ -383,6 +389,12 @@ else
 endif
 endif
 
+ifeq ($(with_nouveau), 1)
+	-@mkdir -p rel\couchdb\nouveau
+	@cp nouveau\build\libs\server-*-dist.jar rel\couchdb\nouveau
+	@cp nouveau\nouveau.yaml rel\couchdb\nouveau
+endif
+
 	@echo ... done
 	@echo .
 	@echo     You can now copy the rel\couchdb directory anywhere on your system.
@@ -423,7 +435,9 @@ clean:
 	-@rmdir /s/q src\mango\.venv
 	-@del /f/q src\couch\priv\couch_js\config.h
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log
-
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && .\gradlew clean
+endif
 
 .PHONY: distclean
 # target: distclean - Remove build and release artifacts
@@ -489,3 +503,35 @@ derived:
 	@echo "ON_TAG:                 $(ON_TAG)"
 	@echo "REL_TAG:                $(REL_TAG)"
 	@echo "SUB_VSN:                $(SUB_VSN)"
+
+
+################################################################################
+# Nouveau
+################################################################################
+
+.PHONY: nouveau
+# target: nouveau - Build nouveau
+nouveau:
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && .\gradlew build -x test
+endif
+
+.PHONY: nouveau-test
+# target: nouveau-test - Run nouveau tests
+nouveau-test: nouveau-test-gradle nouveau-test-elixir
+
+.PHONY: nouveau-test-gradle
+nouveau-test-gradle: couch nouveau
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && .\gradlew test
+endif
+
+.PHONY: nouveau-test-elixir
+nouveau-test-elixir: export MIX_ENV=integration
+nouveau-test-elixir: elixir-init devclean
+nouveau-test-elixir: couch nouveau
+ifeq ($(with_nouveau), 1)
+	@dev\run -n 1 -q -a adm:pass --with-nouveau \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
+endif

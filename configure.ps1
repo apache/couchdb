@@ -7,6 +7,7 @@
 
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
+  -EnableNouveau             enable the new experiemtal search module (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
@@ -43,6 +44,7 @@ Param(
     [switch]$Test = $false,
     [switch]$DisableFauxton = $false, # do not build Fauxton
     [switch]$DisableDocs = $false, # do not build any documentation or manpages
+    [switch]$EnableNouveau = $false, # dont use new search module by default
     [switch]$SkipDeps = $false, # do not update erlang dependencies
     [switch]$DisableProper = $false, # a compilation pragma. proper is a kind of automated test suite
     [switch]$EnableErlangMD5 = $false, # don't use Erlang for md5 hash operations by default
@@ -127,6 +129,7 @@ $InstallDir="$LibDir\couchdb"
 $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
+$BuildNouveau = $(If ($EnableNouveau) {1} else {0})
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 $WithProper = (-not $DisableProper).ToString().ToLower()
 $ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
@@ -151,11 +154,12 @@ $CouchDBConfig = @"
 {prefix, "."}.
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
+{state_dir, "./data"}.
 {log_file, ""}.
 {fauxton_root, "./share/www"}.
 {user, "$CouchDBUser"}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
-{node_name, "-name couchdb@localhost"}.
+{node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
 {prometheus_port, 17986}.
@@ -196,6 +200,7 @@ man_dir = $ManDir
 
 with_fauxton = $BuildFauxton
 with_docs = $BuildDocs
+with_nouveau = $BuildNouveau
 
 user = $CouchDBUser
 spidermonkey_version = $SpiderMonkeyVersion
