@@ -34,6 +34,10 @@
     recbuf,
     sndbuf
 ]).
+-define(DEFAULT_IBROWSE_OPTS, []).
+-define(VALID_IBROWSE_OPTS, [
+    prefer_ipv6
+]).
 -define(VALID_PROTOCOLS, #{
     endpoint => [http, https],
     proxy => [http, https, socks5]
@@ -50,6 +54,7 @@ default_options() ->
         {checkpoint_interval, cfg_int("checkpoint_interval", 30000)},
         {use_checkpoints,     cfg_boolean("use_checkpoints", true)},
         {use_bulk_get,        cfg_boolean("use_bulk_get", true)},
+        {ibrowse_options,     cfg_ibrowse_opts()},
         {socket_options,      cfg_sock_opts()}
     ].
 
@@ -196,6 +201,7 @@ parse_rep_db({Props}, Proxy, Options) ->
     {BinHeaders} = get_value(<<"headers">>, Props, {[]}),
     Headers = lists:ukeysort(1, [{?b2l(K), ?b2l(V)} || {K, V} <- BinHeaders]),
     DefaultHeaders = (#httpdb{})#httpdb.headers,
+    IbrowseOptions = get_value(ibrowse_options, Options, []),
     HttpDb = #httpdb{
         url = Url,
         auth_props = AuthProps,
@@ -204,7 +210,7 @@ parse_rep_db({Props}, Proxy, Options) ->
             1,
             [
                 {socket_options, get_value(socket_options, Options)}
-                | ProxyParams ++ ssl_params(Url)
+                | ProxyParams ++ ssl_params(Url) ++ IbrowseOptions
             ]
         ),
         timeout = get_value(connection_timeout, Options),
@@ -288,14 +294,18 @@ cfg_atoms(Cfg, Default) ->
 
 cfg_sock_opts() ->
     CfgTerm = cfg("socket_options"),
-    parse_sock_opts(CfgTerm, ?DEFAULT_SOCK_OPTS, ?VALID_SOCK_OPTS).
+    parse_opts(CfgTerm, ?DEFAULT_SOCK_OPTS, ?VALID_SOCK_OPTS).
+
+cfg_ibrowse_opts() ->
+    CfgTerm = cfg("ibrowse_options"),
+    parse_opts(CfgTerm, ?DEFAULT_IBROWSE_OPTS, ?VALID_IBROWSE_OPTS).
 
 cfg(Var) ->
     config:get("replicator", Var).
 
-parse_sock_opts(undefined, Defaults, _) ->
+parse_opts(undefined, Defaults, _) ->
     Defaults;
-parse_sock_opts(Term, _Defaults, ValidOpts) ->
+parse_opts(Term, _Defaults, ValidOpts) ->
     SocketOptions =
         case couch_util:parse_term(Term) of
             {ok, Opts} -> Opts;
@@ -306,7 +316,11 @@ parse_sock_opts(Term, _Defaults, ValidOpts) ->
 
 sock_opts(CfgTerm) ->
     ValidOpts = cfg_atoms("valid_socket_options", ?VALID_SOCK_OPTS),
-    parse_sock_opts(CfgTerm, ?DEFAULT_SOCK_OPTS, ValidOpts).
+    parse_opts(CfgTerm, ?DEFAULT_SOCK_OPTS, ValidOpts).
+
+ibrowse_opts(CfgTerm) ->
+    ValidOpts = cfg_atoms("valid_ibrowse_options", ?VALID_IBROWSE_OPTS),
+    parse_opts(CfgTerm, ?DEFAULT_IBROWSE_OPTS, ValidOpts).
 
 -spec convert_options([_]) -> [_].
 convert_options([]) ->
@@ -368,6 +382,8 @@ convert_options([{<<"retries_per_request">>, V} | R]) ->
     [{retries, couch_util:to_integer(V)} | convert_options(R)];
 convert_options([{<<"socket_options">>, V} | R]) ->
     [{socket_options, sock_opts(V)} | convert_options(R)];
+convert_options([{<<"ibrowse_options">>, V} | R]) ->
+    [{ibrowse_options, ibrowse_opts(V)} | convert_options(R)];
 convert_options([{<<"since_seq">>, V} | R]) ->
     [{since_seq, V} | convert_options(R)];
 convert_options([{<<"use_checkpoints">>, V} | R]) ->
@@ -603,7 +619,8 @@ local_replication_endpoint_error_test_() ->
             ?TDEF_FE(t_parse_db_invalid_protocol),
             ?TDEF_FE(t_parse_proxy_invalid_protocol),
             ?TDEF_FE(t_parse_sock_opts),
-            ?TDEF_FE(t_parse_sock_opts_invalid)
+            ?TDEF_FE(t_parse_ibrowse_opts),
+            ?TDEF_FE(t_parse_opts_invalid)
         ]
     }.
 
@@ -711,7 +728,8 @@ t_parse_proxy_invalid_protocol(_) ->
     ?assertThrow({error, _}, parse_rep_db({[{<<"url">>, Url}]}, <<"http://x">>, [])).
 
 t_parse_sock_opts(_) ->
-    Allowed = "priority, sndbuf",
+    %% more than two to ensure we string:split correctly
+    Allowed = "priority, sndbuf, recbuf",
     MeckFun = fun
         ("replicator", "valid_socket_options", _) -> Allowed;
         (_, _, Default) -> Default
@@ -721,7 +739,8 @@ t_parse_sock_opts(_) ->
         {[
             {<<"source">>, <<"http://a">>},
             {<<"target">>, <<"http://b/">>},
-            {<<"socket_options">>, <<"[{priority, 3}, {potato, true}, {sndbuf, 10000}]">>}
+            {<<"socket_options">>,
+                <<"[{priority, 3}, {potato, true}, {sndbuf, 10000}, {recbuf, 10000}]">>}
         ]},
     Rep = parse_rep_doc_without_id(RepDoc),
     ?assertMatch(
@@ -738,10 +757,12 @@ t_parse_sock_opts(_) ->
             {checkpoint_interval, 30000},
             {connection_timeout, 30000},
             {http_connections, 20},
+            {ibrowse_options, []},
             {retries, 5},
             {socket_options, [
                 {priority, 3},
-                {sndbuf, 10000}
+                {sndbuf, 10000},
+                {recbuf, 10000}
             ]},
             {use_bulk_get, true},
             {use_checkpoints, true},
@@ -751,7 +772,51 @@ t_parse_sock_opts(_) ->
         Options
     ).
 
-t_parse_sock_opts_invalid(_) ->
-    ?assertEqual([], parse_sock_opts(<<"<}garbage]][">>, [], [])).
+t_parse_ibrowse_opts(_) ->
+    Allowed = "prefer_ipv6",
+    MeckFun = fun
+        ("replicator", "valid_ibrowse_options", _) -> Allowed;
+        (_, _, Default) -> Default
+    end,
+    meck:expect(config, get, MeckFun),
+    RepDoc =
+        {[
+            {<<"source">>, <<"http://a">>},
+            {<<"target">>, <<"http://b/">>},
+            {<<"ibrowse_options">>, <<"[{prefer_ipv6, true}]">>}
+        ]},
+    Rep = parse_rep_doc_without_id(RepDoc),
+    ?assertMatch(
+        #rep{
+            source = #httpdb{url = "http://a/"},
+            target = #httpdb{url = "http://b/"},
+            options = [{_, _} | _]
+        },
+        Rep
+    ),
+    Options = Rep#rep.options,
+    ?assertEqual(
+        [
+            {checkpoint_interval, 30000},
+            {connection_timeout, 30000},
+            {http_connections, 20},
+            {ibrowse_options, [
+                {prefer_ipv6, true}
+            ]},
+            {retries, 5},
+            {socket_options, [
+                {keepalive, true},
+                {nodelay, false}
+            ]},
+            {use_bulk_get, true},
+            {use_checkpoints, true},
+            {worker_batch_size, 500},
+            {worker_processes, 4}
+        ],
+        Options
+    ).
+
+t_parse_opts_invalid(_) ->
+    ?assertEqual([], parse_opts(<<"<}garbage]][">>, [], [])).
 
 -endif.
