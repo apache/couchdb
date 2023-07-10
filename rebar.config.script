@@ -165,7 +165,7 @@ WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
 
 OptionalDeps = case WithProper of
     true ->
-        [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.4"}}];
+        [{proper, {url, "https://github.com/proper-testing/proper"}, "def84f172df92635cc62f3356e3e7ad054638eb4"}];
     false ->
         []
 end.
