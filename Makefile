@@ -546,13 +546,14 @@ derived:
 ################################################################################
 
 .PHONY: nouveau
-# Build nouveau
+# target: nouveau - Build nouveau
 nouveau:
 ifeq ($(with_nouveau), 1)
 	@cd nouveau && ./gradlew build -x test
 endif
 
 .PHONY: nouveau-test
+# target: nouveau-test - Run nouveau tests
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle

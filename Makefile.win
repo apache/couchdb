@@ -78,7 +78,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse,local
+skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse
 suites=
 tests=
 
@@ -95,29 +95,24 @@ TEST_OPTS=-c startup_jitter=0 -c default_security=admin_local
 # Main commands
 ################################################################################
 
-
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs
-
+all: couch fauxton docs nouveau
 
 .PHONY: help
 # target: help - Print this help
 help:
 	@powershell -Command 'Select-String Makefile.win -Pattern "^# target: (?<name>.*) - (?<description>.*)" | ForEach-Object { ("{0,-22} - {1}" -f $$_.Matches[0].Groups["name"], $$_.Matches[0].Groups["description"]) } | Sort'
 
-
 ################################################################################
 # Building
 ################################################################################
-
 
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile $(COMPILE_OPTS)
 	@copy src\couch\priv\couchjs.exe bin
-
 
 .PHONY: docs
 # target: docs - Build documentation
@@ -131,18 +126,18 @@ endif
 # target: fauxton - Build Fauxton web UI
 fauxton: share\www
 
-
 ################################################################################
 # Testing
 ################################################################################
 
-
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
+	@$(MAKE) nouveau-test
 
 ifdef apps
 subdirs = $(apps)
@@ -167,8 +162,9 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell echo %cd%)/src
 exunit: export ERL_AFLAGS = -config $(shell echo "%cd%")/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
-exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
-	@mix test --cover --trace $(EXUNIT_OPTS)
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+exunit: couch elixir-init setup-eunit
+	@mix test --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell echo %cd%)
 setup-eunit: export ERL_AFLAGS = -config $(shell echo "%cd%")/rel/files/eunit.config
@@ -215,26 +211,27 @@ python-black-update: .venv/bin/black
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev\run $(TEST_OPTS) -a adm:pass -n 1 --enable-erlang-views \
-      --locald-config test/elixir/test/config/test-config.ini \
-      --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+elixir: elixir-init devclean
+	@dev\run $(TEST_OPTS) -a adm:pass -n 1 \
+		--enable-erlang-views \
+    	--locald-config test/elixir/test/config/test-config.ini \
+    	--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
-elixir-init: MIX_ENV=test
+elixir-init: MIX_ENV=integration
 elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: export MIX_ENV=integration
-elixir-cluster-without-quorum: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-cluster-without-quorum: elixir-init devclean
 	@dev\run -n 3 -q -a adm:pass \
 	    --degrade-cluster 2 \
         --no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-cluster-with-quorum
 elixir-cluster-with-quorum: export MIX_ENV=integration
-elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-cluster-with-quorum: elixir-init devclean
 	@dev\run -n 3 -q -a adm:pass \
 	    --degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
@@ -269,7 +266,11 @@ elixir-source-checks: elixir-init
 .PHONY: build-report
 # target: build-report - Generate a build report
 build-report:
-	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
+	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log || true
+	cat .\dev\logs\node1.log || true
+	cat .\dev\logs\nouveau.log || true
+	cat .\tmp\couch.log || true
+	cat test-results.log || true
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
@@ -293,7 +294,7 @@ list-eunit-suites:
 mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src\mango && \
-		python.exe -m venv .venv && \
+		@$(PYTHON) -m venv .venv && \
 		.venv\Scripts\pip.exe install -r requirements.txt
 	@cd src\mango && \
 		..\..\dev\run $(TEST_OPTS) \
@@ -383,6 +384,12 @@ else
 endif
 endif
 
+ifeq ($(with_nouveau), 1)
+	-@mkdir -p rel\couchdb\nouveau
+	@cp nouveau\build\libs\server-*-dist.jar rel\couchdb\nouveau\
+	@cp nouveau\nouveau.yaml rel\couchdb\nouveau\
+endif
+
 	@echo ... done
 	@echo .
 	@echo     You can now copy the rel\couchdb directory anywhere on your system.
@@ -423,7 +430,9 @@ clean:
 	-@rmdir /s/q src\mango\.venv
 	-@del /f/q src\couch\priv\couch_js\config.h
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log
-
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && .\gradlew clean
+endif
 
 .PHONY: distclean
 # target: distclean - Remove build and release artifacts
@@ -489,3 +498,34 @@ derived:
 	@echo "ON_TAG:                 $(ON_TAG)"
 	@echo "REL_TAG:                $(REL_TAG)"
 	@echo "SUB_VSN:                $(SUB_VSN)"
+
+################################################################################
+# Nouveau
+################################################################################
+
+.PHONY: nouveau
+# target: nouveau - Build nouveau
+nouveau:
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && .\gradlew build -x test
+endif
+
+.PHONY: nouveau-test
+# target: nouveau-test - Run nouveau tests
+nouveau-test: nouveau-test-gradle nouveau-test-elixir
+
+.PHONY: nouveau-test-gradle
+nouveau-test-gradle: couch nouveau
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && .\gradlew test
+endif
+
+.PHONY: nouveau-test-elixir
+nouveau-test-elixir: export MIX_ENV=integration
+nouveau-test-elixir: elixir-init devclean
+nouveau-test-elixir: couch nouveau
+ifeq ($(with_nouveau), 1)
+	@dev/run -n 1 -q -a adm:pass --with-nouveau \
+		--locald-config test/config/test-config.ini \
+		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
+endif

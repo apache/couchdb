@@ -60,6 +60,7 @@ Options:
   --enable-nouveau            enable the new experimental search module
   --erlang-md5                use erlang for md5 hash operations
   --dev                       alias for --disable-docs --disable-fauxton
+  --dev-with-nouveau          alias for --disable-docs --disable-fauxton --enable-nouveau
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
