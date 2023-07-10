@@ -166,6 +166,31 @@ Replicator Database Configuration
 
         .. _inet: http://www.erlang.org/doc/man/inet.html#setopts-2
 
+    .. config:option:: ibrowse_options :: ibrowse options
+
+        .. versionadded:: 3.4
+
+         A non-default ibrowse setting is needed to support IPV6-only replication sources
+         or targets:
+
+         - ``{prefer_ipv6, boolean()}``
+
+         See the `ibrowse`_ site for the full list of options::
+
+            [replicator]
+            ibrowse_options = [{prefer_ipv6, true}]
+
+         .. _ibrowse: https://github.com/cmullaparthi/ibrowse/
+
+    .. config:option:: valid_ibrowse_options :: ibrowse options
+
+        .. versionadded:: 3.4
+
+        Valid ibrowse options. Options not in this list are ignored::
+
+            [replicator]
+            valid_ibrowse_options = prefer_ipv6
+
     .. config:option:: valid_endpoint_protocols :: Replicator endpoint protocols
 
        .. versionadded:: 3.3
