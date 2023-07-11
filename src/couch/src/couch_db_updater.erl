@@ -488,7 +488,9 @@ doc_tag(#doc{meta = Meta}) ->
 
 merge_rev_trees([[]], [], Acc) ->
     % validate_docs_access left us with no docs to merge
-    {ok, Acc};
+    {ok, Acc#merge_acc{
+        add_infos = lists:reverse(Acc#merge_acc.add_infos)
+    }};
 merge_rev_trees([], [], Acc) ->
     {ok, Acc#merge_acc{
         add_infos = lists:reverse(Acc#merge_acc.add_infos)
