@@ -68,7 +68,7 @@ concurrent_updates() ->
             fun setup/1,
             fun teardown/2,
             [
-              {NumClients, fun should_concurrently_update_doc/2}
+                {NumClients, fun should_concurrently_update_doc/2}
              || NumClients <- ?NUM_CLIENTS
             ]
         }
@@ -338,11 +338,11 @@ spawn_client(DbName, Doc) ->
         erlang:yield(),
         Result =
             try
-                 couch_db:update_doc(Db, Doc, [])
+                couch_db:update_doc(Db, Doc, [])
             catch
                 _:Error ->
                     Error
-        end,
+            end,
         ok = couch_db:close(Db),
         exit(Result)
     end).
