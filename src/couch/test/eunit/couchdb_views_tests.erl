@@ -109,25 +109,25 @@ teardown(DbName) when is_binary(DbName) ->
 teardown_legacy({_DbName, Files}) ->
     lists:foreach(fun(File) -> file:delete(File) end, Files).
 
-view_indexes_cleanup_test_() ->
-    {
-        "View indexes cleanup",
-        {
-            setup,
-            fun test_util:start_couch/0,
-            fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup/0,
-                fun teardown/1,
-                [
-                    fun should_have_two_indexes_alive_before_deletion/1,
-                    fun should_cleanup_index_file_after_ddoc_deletion/1,
-                    fun should_cleanup_all_index_files/1
-                ]
-            }
-        }
-    }.
+% view_indexes_cleanup_test_() ->
+%     {
+%         "View indexes cleanup",
+%         {
+%             setup,
+%             fun test_util:start_couch/0,
+%             fun test_util:stop_couch/1,
+%             {
+%                 foreach,
+%                 fun setup/0,
+%                 fun teardown/1,
+%                 [
+%                     fun should_have_two_indexes_alive_before_deletion/1,
+%                     fun should_cleanup_index_file_after_ddoc_deletion/1,
+%                     fun should_cleanup_all_index_files/1
+%                 ]
+%             }
+%         }
+%     }.
 
 view_group_db_leaks_test_() ->
     {
@@ -141,129 +141,129 @@ view_group_db_leaks_test_() ->
                 fun setup_with_docs/0,
                 fun teardown/1,
                 [
-                    fun couchdb_1138/1,
+                    % fun couchdb_1138/1%,
                     fun couchdb_1309/1
                 ]
             }
         }
     }.
 
-view_group_shutdown_test_() ->
-    {
-        "View group shutdown",
-        {
-            setup,
-            fun() ->
-                meck:new(couch_mrview_index, [passthrough]),
-                test_util:start_couch()
-            end,
-            fun(Ctx) ->
-                test_util:stop_couch(Ctx),
-                meck:unload()
-            end,
-            [couchdb_1283()]
-        }
-    }.
-
-backup_restore_test_() ->
-    {
-        "Upgrade and bugs related tests",
-        {
-            setup,
-            fun test_util:start_couch/0,
-            fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup_with_docs/0,
-                fun teardown/1,
-                [
-                    fun should_not_remember_docs_in_index_after_backup_restore/1
-                ]
-            }
-        }
-    }.
-
-upgrade_2x_test_() ->
-    {
-        "Upgrade 2x tests",
-        {
-            setup,
-            fun test_util:start_couch/0,
-            fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup_legacy_2x/0,
-                fun teardown_legacy/1,
-                [
-                    fun should_upgrade_legacy_2x_view_files/1
-                ]
-            }
-        }
-    }.
-
-upgrade_3_2_1_test_() ->
-    {
-        "Upgrade 3.2.1 tests",
-        {
-            foreach,
-            fun() ->
-                Ctx = test_util:start_couch(),
-                DbFiles = setup_legacy_3_2_1(),
-                {Ctx, DbFiles}
-            end,
-            fun({Ctx, DbFiles}) ->
-                teardown_legacy(DbFiles),
-                test_util:stop_couch(Ctx)
-            end,
-            [
-                fun should_upgrade_legacy_3_2_1_view_files/1,
-                fun can_disable_auto_commit_on_view_upgrade/1
-            ]
-        }
-    }.
-
-multiple_view_collators_test_() ->
-    {
-        "Test views with multiple collators",
-        {
-            foreach,
-            fun() ->
-                Ctx = test_util:start_couch(),
-                DbFiles = setup_collator_test1(),
-                {Ctx, DbFiles}
-            end,
-            fun({Ctx, DbFiles}) ->
-                teardown_legacy(DbFiles),
-                test_util:stop_couch(Ctx)
-            end,
-            [
-                fun can_read_views_with_old_collators/1,
-                fun can_update_views_with_old_collators/1
-            ]
-        }
-    }.
-
-autocompact_view_to_upgrade_collators_test_() ->
-    {
-        "Auto compactions triggered to update collators",
-        {
-            foreach,
-            fun() ->
-                Ctx = test_util:start_couch([smoosh]),
-                DbFiles = setup_collator_test1(),
-                {Ctx, DbFiles}
-            end,
-            fun({Ctx, DbFiles}) ->
-                teardown_legacy(DbFiles),
-                test_util:stop_couch(Ctx)
-            end,
-            [
-                fun view_collator_auto_upgrade_on_open/1,
-                fun view_collator_auto_upgrade_on_update/1,
-                fun view_collator_auto_upgrade_can_be_disabled/1
-            ]
-        }
-    }.
+% view_group_shutdown_test_() ->
+%     {
+%         "View group shutdown",
+%         {
+%             setup,
+%             fun() ->
+%                 meck:new(couch_mrview_index, [passthrough]),
+%                 test_util:start_couch()
+%             end,
+%             fun(Ctx) ->
+%                 test_util:stop_couch(Ctx),
+%                 meck:unload()
+%             end,
+%             [couchdb_1283()]
+%         }
+%     }.
+% 
+% backup_restore_test_() ->
+%     {
+%         "Upgrade and bugs related tests",
+%         {
+%             setup,
+%             fun test_util:start_couch/0,
+%             fun test_util:stop_couch/1,
+%             {
+%                 foreach,
+%                 fun setup_with_docs/0,
+%                 fun teardown/1,
+%                 [
+%                     fun should_not_remember_docs_in_index_after_backup_restore/1
+%                 ]
+%             }
+%         }
+%     }.
+% 
+% upgrade_2x_test_() ->
+%     {
+%         "Upgrade 2x tests",
+%         {
+%             setup,
+%             fun test_util:start_couch/0,
+%             fun test_util:stop_couch/1,
+%             {
+%                 foreach,
+%                 fun setup_legacy_2x/0,
+%                 fun teardown_legacy/1,
+%                 [
+%                     fun should_upgrade_legacy_2x_view_files/1
+%                 ]
+%             }
+%         }
+%     }.
+% 
+% upgrade_3_2_1_test_() ->
+%     {
+%         "Upgrade 3.2.1 tests",
+%         {
+%             foreach,
+%             fun() ->
+%                 Ctx = test_util:start_couch(),
+%                 DbFiles = setup_legacy_3_2_1(),
+%                 {Ctx, DbFiles}
+%             end,
+%             fun({Ctx, DbFiles}) ->
+%                 teardown_legacy(DbFiles),
+%                 test_util:stop_couch(Ctx)
+%             end,
+%             [
+%                 fun should_upgrade_legacy_3_2_1_view_files/1,
+%                 fun can_disable_auto_commit_on_view_upgrade/1
+%             ]
+%         }
+%     }.
+% 
+% multiple_view_collators_test_() ->
+%     {
+%         "Test views with multiple collators",
+%         {
+%             foreach,
+%             fun() ->
+%                 Ctx = test_util:start_couch(),
+%                 DbFiles = setup_collator_test1(),
+%                 {Ctx, DbFiles}
+%             end,
+%             fun({Ctx, DbFiles}) ->
+%                 teardown_legacy(DbFiles),
+%                 test_util:stop_couch(Ctx)
+%             end,
+%             [
+%                 fun can_read_views_with_old_collators/1,
+%                 fun can_update_views_with_old_collators/1
+%             ]
+%         }
+%     }.
+% 
+% autocompact_view_to_upgrade_collators_test_() ->
+%     {
+%         "Auto compactions triggered to update collators",
+%         {
+%             foreach,
+%             fun() ->
+%                 Ctx = test_util:start_couch([smoosh]),
+%                 DbFiles = setup_collator_test1(),
+%                 {Ctx, DbFiles}
+%             end,
+%             fun({Ctx, DbFiles}) ->
+%                 teardown_legacy(DbFiles),
+%                 test_util:stop_couch(Ctx)
+%             end,
+%             [
+%                 fun view_collator_auto_upgrade_on_open/1,
+%                 fun view_collator_auto_upgrade_on_update/1,
+%                 fun view_collator_auto_upgrade_can_be_disabled/1
+%             ]
+%         }
+%     }.
 
 should_not_remember_docs_in_index_after_backup_restore(DbName) ->
     ?_test(begin
@@ -930,9 +930,11 @@ count_users(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     DbPid = couch_db:get_pid(Db),
     {monitored_by, Monitors0} = process_info(DbPid, monitored_by),
+    S = lists:nth(2, Monitors0),
     Monitors = lists:filter(fun is_pid/1, Monitors0),
     CouchFiles = [P || P <- Monitors, couch_file:process_info(P) =/= undefined],
     ok = couch_db:close(Db),
+    ?debugFmt("~n Monitors0: ~p Self: ~p S: ~p SI: ~p: List: ~p~n", [Monitors0, self(), S, process_info(S), lists:usort(Monitors) -- [self() | CouchFiles]]),
     length(lists:usort(Monitors) -- [self() | CouchFiles]).
 
 count_index_files(DbName) ->

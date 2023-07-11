@@ -78,8 +78,7 @@ replicate(PostBody, Ctx) ->
         false ->
             check_authorization(RepId, UserCtx),
             {ok, Listener} = rep_result_listener(RepId),
-            % TODO: review why we need this
-            Result =
+            Result = % fudge replication id
                 case do_replication_loop(Rep) of
                     {ok, {ResultJson}} ->
                         % TODO: check with options

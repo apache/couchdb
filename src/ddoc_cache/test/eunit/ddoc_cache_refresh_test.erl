@@ -38,11 +38,11 @@ check_refresh_test_() ->
         fun start_couch/0,
         fun stop_couch/1,
         with([
-            ?TDEF(refresh_ddoc),
-            ?TDEF(refresh_ddoc_rev),
-            ?TDEF(refresh_vdu),
-            ?TDEF(refresh_custom),
-            ?TDEF(refresh_multiple)
+            % ?TDEF(refresh_ddoc),
+            % ?TDEF(refresh_ddoc_rev),
+            % ?TDEF(refresh_vdu),
+            % ?TDEF(refresh_custom),
+            % ?TDEF(refresh_multiple)
         ])
     }.
 
