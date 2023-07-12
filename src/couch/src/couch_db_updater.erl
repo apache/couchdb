@@ -488,9 +488,7 @@ doc_tag(#doc{meta = Meta}) ->
 
 merge_rev_trees([[]], [], Acc) ->
     % validate_docs_access left us with no docs to merge
-    {ok, Acc#merge_acc{
-        add_infos = lists:reverse(Acc#merge_acc.add_infos)
-    }};
+    {ok, Acc};
 merge_rev_trees([], [], Acc) ->
     {ok, Acc#merge_acc{
         add_infos = lists:reverse(Acc#merge_acc.add_infos)
@@ -767,8 +765,7 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
 
     % Check if we just updated any non-access design documents,
     % and update the validation funs if we did.
-    UpdatedDDocIds = [Id || [{_Client, #doc{id = <<"_design/", _/binary>> = Id, access = []}} | _] <- DocsList],
-
+    UpdatedDDocIds = [Id || [{_Client, #doc{id = <<"_design/", _/binary>> = Id, access = []}, _} | _] <- DocsList],
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
 % at this point, we already validated this Db is access enabled, so do the checks right away.

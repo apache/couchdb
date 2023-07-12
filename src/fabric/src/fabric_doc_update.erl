@@ -423,15 +423,9 @@ doc_update1() ->
     {ok, StW5_2} = handle_message({rexi_EXIT, nil}, SB1, StW5_1),
     {ok, StW5_3} = handle_message({rexi_EXIT, nil}, SA2, StW5_2),
     {stop, ReplyW5} = handle_message({rexi_EXIT, nil}, SB2, StW5_3),
-    ?debugFmt("StW5_0: ~p~n", [StW5_0]),
-    ?debugFmt("StW5_1: ~p~n", [StW5_1]),
-    ?debugFmt("StW5_2: ~p~n", [StW5_2]),
-    ?debugFmt("StW5_3: ~p~n", [StW5_3]),
-    ?debugFmt("~n Expect5: ~p~n", [{error, [{Doc1, {accepted, "A"}}, {Doc2, {error, internal_server_error}}]}]),
-    ?debugFmt("~n ReplyW5: ~p~n", [ReplyW5]),
+
     ?assertEqual(
-        % TODO: find out why we had to swap this
-        {error, [{Doc1, {accepted, "A"}}, {Doc2, {error, internal_server_error}}]},
+        {error, [{Doc2, {error, internal_server_error}}, {Doc1, {accepted, "A"}}]},
         ReplyW5
     ).
 

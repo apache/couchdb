@@ -1601,7 +1601,7 @@ collect_results(Pid, MRef, ResultsAcc) ->
     end.
 
 write_and_commit(
-    #db{main_pid = Pid, user_ctx = Ctx} = Db,
+    #db{main_pid = Pid, user_ctx = UserCtx0} = Db,
     DocBuckets1,
     LocalDocs,
     Options
@@ -1609,15 +1609,20 @@ write_and_commit(
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
     ReplicatedChanges = lists:member(?REPLICATED_CHANGES, Options),
     MRef = erlang:monitor(process, Pid),
+    UserCtx = case has_access_enabled(Db) of
+        true -> UserCtx0;
+        false -> []
+    end,
+
     try
-        Pid ! {update_docs, self(), DocBuckets, LocalDocs, ReplicatedChanges, Ctx},
+        Pid ! {update_docs, self(), DocBuckets, LocalDocs, ReplicatedChanges, UserCtx},
         case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} ->
                 {ok, Results};
             retry ->
                 % This can happen if the db file we wrote to was swapped out by
                 % compaction. Retry by reopening the db and writing to the current file
-                {ok, Db2} = open(Db#db.name, [{user_ctx, Ctx}]),
+                {ok, Db2} = open(Db#db.name, [{user_ctx, UserCtx}]),
                 DocBuckets2 = [
                     [doc_flush_atts(Db2, Doc) || Doc <- Bucket]
                  || Bucket <- DocBuckets1
@@ -1625,7 +1630,7 @@ write_and_commit(
                 % We only retry once
                 DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
                 close(Db2),
-                Pid ! {update_docs, self(), DocBuckets3, LocalDocs, ReplicatedChanges, Ctx},
+                Pid ! {update_docs, self(), DocBuckets3, LocalDocs, ReplicatedChanges},
                 case collect_results_with_metrics(Pid, MRef, []) of
                     {ok, Results} -> {ok, Results};
                     retry -> throw({update_error, compaction_retry})
