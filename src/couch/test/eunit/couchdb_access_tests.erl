@@ -134,7 +134,7 @@ access_test_() ->
         % fun should_allow_user_to_replicate_from_no_access_to_access/2,
 
         % fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
- 
+
         % _revs_diff for docs you don’t have access to
         fun should_not_allow_user_to_revs_diff_other_docs/2
 

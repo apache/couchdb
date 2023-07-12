@@ -284,9 +284,13 @@ maybe_tag_doc(#doc{id = Id, revs = {Pos, [_Rev | PrevRevs]}, meta = Meta0} = Doc
 
 merge_updates([[{_, #doc{id = X}, _} | _] = A | RestA], [[{_, #doc{id = X}, _} | _] = B | RestB]) ->
     [A ++ B | merge_updates(RestA, RestB)];
-merge_updates([[{_, #doc{id = X}, _} | _] | _] = A, [[{_, #doc{id = Y}, _} | _] | _] = B) when X < Y ->
+merge_updates([[{_, #doc{id = X}, _} | _] | _] = A, [[{_, #doc{id = Y}, _} | _] | _] = B) when
+    X < Y
+->
     [hd(A) | merge_updates(tl(A), B)];
-merge_updates([[{_, #doc{id = X}, _} | _] | _] = A, [[{_, #doc{id = Y}, _} | _] | _] = B) when X > Y ->
+merge_updates([[{_, #doc{id = X}, _} | _] | _] = A, [[{_, #doc{id = Y}, _} | _] | _] = B) when
+    X > Y
+->
     [hd(B) | merge_updates(A, tl(B))];
 merge_updates([], RestB) ->
     RestB;
@@ -673,7 +677,6 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
             Info
     end.
 
-
 update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
@@ -747,7 +750,8 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs1 = apply_local_docs_access(Db, LocalDocs), % TODO: local docs access needs validating
+    % TODO: local docs access needs validating
+    LocalDocs1 = apply_local_docs_access(Db, LocalDocs),
     LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
@@ -765,7 +769,10 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
 
     % Check if we just updated any non-access design documents,
     % and update the validation funs if we did.
-    UpdatedDDocIds = [Id || [{_Client, #doc{id = <<"_design/", _/binary>> = Id, access = []}, _} | _] <- DocsList],
+    UpdatedDDocIds = [
+        Id
+     || [{_Client, #doc{id = <<"_design/", _/binary>> = Id, access = []}, _} | _] <- DocsList
+    ],
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
 % at this point, we already validated this Db is access enabled, so do the checks right away.
@@ -820,7 +827,8 @@ validate_docs_access(
     ),
 
     {NewDocsListValidated, NewOldDocInfosValidated} =
-        case length(NewDocs) of %TODO: what if only 2/3?
+        %TODO: what if only 2/3?
+        case length(NewDocs) of
             % we sent out all docs as invalid access, drop the old doc info associated with it
             0 ->
                 {[NewDocs | DocsListValidated], OldDocInfosValidated};

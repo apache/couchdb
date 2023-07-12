@@ -842,8 +842,7 @@ check_access(Db, Access) ->
     end.
 
 check_name(null, _Access) -> false;
-check_name(UserName, Access) ->
-    lists:member(UserName, Access).
+check_name(UserName, Access) -> lists:member(UserName, Access).
 
 check_roles(Roles, Access) ->
     UserRolesSet = ordsets:from_list(Roles),
@@ -1589,7 +1588,8 @@ collect_results_with_metrics(Pid, MRef, []) ->
     end.
 
 collect_results(Pid, MRef, ResultsAcc) ->
-    receive % TDOD: need to receiver access?
+    % TDOD: need to receiver access?
+    receive
         {result, Pid, Result} ->
             collect_results(Pid, MRef, [Result | ResultsAcc]);
         {done, Pid} ->
@@ -1609,10 +1609,11 @@ write_and_commit(
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
     ReplicatedChanges = lists:member(?REPLICATED_CHANGES, Options),
     MRef = erlang:monitor(process, Pid),
-    UserCtx = case has_access_enabled(Db) of
-        true -> UserCtx0;
-        false -> []
-    end,
+    UserCtx =
+        case has_access_enabled(Db) of
+            true -> UserCtx0;
+            false -> []
+        end,
 
     try
         Pid ! {update_docs, self(), DocBuckets, LocalDocs, ReplicatedChanges, UserCtx},
