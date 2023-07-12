@@ -189,7 +189,7 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                             {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
                             {max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]};
                         _Else ->
-                            {max(Seq, SeqAcc), Results}
+                            {max(Seq, SeqAcc), [{Id, []} | Results]}
                     end;
                 ({Id, Seq, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
