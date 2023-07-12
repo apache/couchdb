@@ -174,7 +174,10 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             DocFun = fun
                 ({nil, Seq, _}, {SeqAcc, Results}) ->
                     {erlang:max(Seq, SeqAcc), Results};
-                ({Id, Seq, #doc{deleted = true, revs = Rev, body = Body, meta = Meta}}, {SeqAcc, Results}) ->
+                (
+                    {Id, Seq, #doc{deleted = true, revs = Rev, body = Body, meta = Meta}},
+                    {SeqAcc, Results}
+                ) ->
                     % _access needs deleted docs
                     case IdxName of
                         <<"_design/_access">> ->
