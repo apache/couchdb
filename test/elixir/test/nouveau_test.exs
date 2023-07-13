@@ -1,7 +1,7 @@
 defmodule NouveauTest do
   use CouchTestCase
 
-  @moduletag :search
+  @moduletag :nouveau
 
   @moduledoc """
   Test search
