@@ -236,6 +236,11 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
+-include install.mk
+ifeq ($(with_nouveau), 0)
+  exclude_nouveau=--exclude nouveau
+endif
+
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
@@ -243,7 +248,7 @@ elixir: elixir-init devclean
 	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(exclude_nouveau) $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=integration
@@ -405,7 +410,6 @@ dist: all derived
 
 .PHONY: release
 # target: release - Create an Erlang release including CouchDB!
--include install.mk
 release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
