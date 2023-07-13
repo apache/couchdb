@@ -80,7 +80,7 @@ handle_info(Msg, St) ->
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
-% return value is an array of arrays, first dimension is the different indexes
+% Return value is an array of arrays, first dimension is the different indexes
 % [0] will be by-access-id // for this test, later we should make this by-access
 % -seq, since that one we will always need, and by-access-id can be opt-in.
 % the second dimension is the number of emit kv pairs:
