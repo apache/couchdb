@@ -24,6 +24,14 @@ error_reporting_test_() ->
         [
             ?TDEF_FE(t_fail_bulk_docs),
             ?TDEF_FE(t_fail_changes_reader),
+            ?TDEF_FE(t_fail_doc_put_4xx_well_formed_json_error),
+            ?TDEF_FE(t_fail_doc_put_4xx_unexpected_json_error),
+            ?TDEF_FE(t_fail_doc_put_4xx_invalid_json_error),
+            ?TDEF_FE(t_skip_doc_put_401_errors),
+            ?TDEF_FE(t_skip_doc_put_403_errors),
+            ?TDEF_FE(t_skip_doc_put_413_errors),
+            ?TDEF_FE(t_skip_doc_put_415_errors),
+            ?TDEF_FE(t_skip_doc_put_invalid_attachment_name),
             ?TDEF_FE(t_fail_revs_diff),
             ?TDEF_FE(t_fail_bulk_get, 15),
             ?TDEF_FE(t_fail_changes_queue),
@@ -41,7 +49,7 @@ t_fail_bulk_docs({_Ctx, {Source, Target}}) ->
     wait_target_in_sync(Source, Target),
 
     {ok, Listener} = rep_result_listener(RepId),
-    mock_fail_req("/_bulk_docs", {ok, "403", [], [<<"{\"x\":\"y\"}">>]}),
+    mock_fail_req(post, "/_bulk_docs", {ok, "403", [], [<<"{\"x\":\"y\"}">>]}),
     populate_db(Source, 6, 6),
 
     {error, Result} = wait_rep_result(RepId),
@@ -55,12 +63,158 @@ t_fail_changes_reader({_Ctx, {Source, Target}}) ->
     wait_target_in_sync(Source, Target),
 
     {ok, Listener} = rep_result_listener(RepId),
-    mock_fail_req("/_changes", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
+    mock_fail_req(get, "/_changes", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
     populate_db(Source, 6, 6),
 
     {error, Result} = wait_rep_result(RepId),
     ?assertEqual({changes_req_failed, 418, {[{<<"x">>, <<"y">>}]}}, Result),
 
+    couch_replicator_notifier:stop(Listener).
+
+t_fail_doc_put_4xx_well_formed_json_error({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
+
+    {ok, Listener} = rep_result_listener(RepId),
+    ErrBody = [<<"{\"error\":\"x\", \"reason\":\"y\"}">>],
+    mock_fail_req(put, "/6", {ok, "400", [], ErrBody}),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({doc_write_failed, {<<"x">>, <<"y">>}}, Result),
+
+    couch_replicator_notifier:stop(Listener).
+
+t_fail_doc_put_4xx_unexpected_json_error({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
+
+    {ok, Listener} = rep_result_listener(RepId),
+    ErrBody = [<<"{\"a\":\"b\"}">>],
+    mock_fail_req(put, "/6", {ok, "400", [], ErrBody}),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+
+    {error, Result} = wait_rep_result(RepId),
+    ?assertEqual({doc_write_failed, {400, [{<<"a">>, <<"b">>}]}}, Result),
+
+    couch_replicator_notifier:stop(Listener).
+
+t_fail_doc_put_4xx_invalid_json_error({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    {ok, RepId} = replicate(Source, Target),
+    wait_target_in_sync(Source, Target),
+
+    {ok, Listener} = rep_result_listener(RepId),
+    mock_fail_req(put, "/6", {ok, "400", [], [<<"potato">>]}),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+
+    {error, Result} = wait_rep_result(RepId),
+    ?assertMatch({doc_write_failed, {invalid_json, _}}, Result),
+
+    couch_replicator_notifier:stop(Listener).
+
+t_skip_doc_put_401_errors({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+    ErrBody = [<<"{\"error\":\"unauthorized\", \"reason\":\"vdu\"}">>],
+    mock_fail_req(put, "/6", {ok, "401", [], ErrBody}),
+    {ok, RepId} = replicate(Source, Target, false),
+    {ok, Listener} = rep_result_listener(RepId),
+    Res = wait_rep_result(RepId),
+    % Replication job should succeed
+    ?assertMatch({ok, {[_ | _]}}, Res),
+    {ok, {Props}} = Res,
+    History = proplists:get_value(<<"history">>, Props),
+    ?assertMatch([{[_ | _]}], History),
+    [{HistProps}] = History,
+    DocsWritten = proplists:get_value(<<"docs_written">>, HistProps),
+    DocWriteFailures = proplists:get_value(<<"doc_write_failures">>, HistProps),
+    ?assertEqual(5, DocsWritten),
+    ?assertEqual(1, DocWriteFailures),
+    couch_replicator_notifier:stop(Listener).
+
+t_skip_doc_put_403_errors({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+    ErrBody = [<<"{\"error\":\"forbidden\", \"reason\":\"vdu\"}">>],
+    mock_fail_req(put, "/6", {ok, "403", [], ErrBody}),
+    {ok, RepId} = replicate(Source, Target, false),
+    {ok, Listener} = rep_result_listener(RepId),
+    Res = wait_rep_result(RepId),
+    % Replication job should succeed
+    ?assertMatch({ok, {[_ | _]}}, Res),
+    {ok, {Props}} = Res,
+    History = proplists:get_value(<<"history">>, Props),
+    ?assertMatch([{[_ | _]}], History),
+    [{HistProps}] = History,
+    DocsWritten = proplists:get_value(<<"docs_written">>, HistProps),
+    DocWriteFailures = proplists:get_value(<<"doc_write_failures">>, HistProps),
+    ?assertEqual(5, DocsWritten),
+    ?assertEqual(1, DocWriteFailures),
+    couch_replicator_notifier:stop(Listener).
+
+t_skip_doc_put_413_errors({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+    ErrBody = [<<"{\"error\":\"too_large\", \"reason\":\"too_large\"}">>],
+    mock_fail_req(put, "/6", {ok, "413", [], ErrBody}),
+    {ok, RepId} = replicate(Source, Target, false),
+    {ok, Listener} = rep_result_listener(RepId),
+    Res = wait_rep_result(RepId),
+    % Replication job should succeed
+    ?assertMatch({ok, {[_ | _]}}, Res),
+    {ok, {Props}} = Res,
+    History = proplists:get_value(<<"history">>, Props),
+    ?assertMatch([{[_ | _]}], History),
+    [{HistProps}] = History,
+    DocsWritten = proplists:get_value(<<"docs_written">>, HistProps),
+    DocWriteFailures = proplists:get_value(<<"doc_write_failures">>, HistProps),
+    ?assertEqual(5, DocsWritten),
+    ?assertEqual(1, DocWriteFailures),
+    couch_replicator_notifier:stop(Listener).
+
+t_skip_doc_put_415_errors({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+    ErrBody = [<<"{\"error\":\"unsupported_media_type\", \"reason\":\"bad_media\"}">>],
+    mock_fail_req(put, "/6", {ok, "415", [], ErrBody}),
+    {ok, RepId} = replicate(Source, Target, false),
+    {ok, Listener} = rep_result_listener(RepId),
+    Res = wait_rep_result(RepId),
+    % Replication job should succeed
+    ?assertMatch({ok, {[_ | _]}}, Res),
+    {ok, {Props}} = Res,
+    History = proplists:get_value(<<"history">>, Props),
+    ?assertMatch([{[_ | _]}], History),
+    [{HistProps}] = History,
+    DocsWritten = proplists:get_value(<<"docs_written">>, HistProps),
+    DocWriteFailures = proplists:get_value(<<"doc_write_failures">>, HistProps),
+    ?assertEqual(5, DocsWritten),
+    ?assertEqual(1, DocWriteFailures),
+    couch_replicator_notifier:stop(Listener).
+
+t_skip_doc_put_invalid_attachment_name({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    populate_db(Source, 6, 6, _WithAttachments = true),
+    ErrBody = [
+        <<"{\"error\":\"bad_request\", \"reason\":\"Attachment name '_foo' starts with prohibited character '_'\"}">>
+    ],
+    mock_fail_req(put, "/6", {ok, "400", [], ErrBody}),
+    {ok, RepId} = replicate(Source, Target, false),
+    {ok, Listener} = rep_result_listener(RepId),
+    Res = wait_rep_result(RepId),
+    % Replication job should succeed
+    ?assertMatch({ok, {[_ | _]}}, Res),
+    {ok, {Props}} = Res,
+    History = proplists:get_value(<<"history">>, Props),
+    ?assertMatch([{[_ | _]}], History),
+    [{HistProps}] = History,
+    DocsWritten = proplists:get_value(<<"docs_written">>, HistProps),
+    DocWriteFailures = proplists:get_value(<<"doc_write_failures">>, HistProps),
+    ?assertEqual(5, DocsWritten),
+    ?assertEqual(1, DocWriteFailures),
     couch_replicator_notifier:stop(Listener).
 
 t_fail_revs_diff({_Ctx, {Source, Target}}) ->
@@ -69,7 +223,7 @@ t_fail_revs_diff({_Ctx, {Source, Target}}) ->
     wait_target_in_sync(Source, Target),
 
     {ok, Listener} = rep_result_listener(RepId),
-    mock_fail_req("/_revs_diff", {ok, "407", [], [<<"{\"x\":\"y\"}">>]}),
+    mock_fail_req(post, "/_revs_diff", {ok, "407", [], [<<"{\"x\":\"y\"}">>]}),
     populate_db(Source, 6, 6),
 
     {error, Result} = wait_rep_result(RepId),
@@ -87,7 +241,7 @@ t_fail_bulk_get({_Ctx, {Source, Target}}) ->
     wait_target_in_sync(Source, Target),
 
     % Tolerate a 500 error
-    mock_fail_req("/_bulk_get", {ok, "501", [], [<<"not_implemented">>]}),
+    mock_fail_req(post, "/_bulk_get", {ok, "501", [], [<<"not_implemented">>]}),
     meck:reset(couch_replicator_api_wrap),
     populate_db(Source, 6, 6),
     wait_target_in_sync(Source, Target),
@@ -95,7 +249,7 @@ t_fail_bulk_get({_Ctx, {Source, Target}}) ->
     ?assertEqual(1, meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6)),
 
     % Tolerate a 400 error
-    mock_fail_req("/_bulk_get", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
+    mock_fail_req(post, "/_bulk_get", {ok, "418", [], [<<"{\"x\":\"y\"}">>]}),
     meck:reset(couch_replicator_api_wrap),
     populate_db(Source, 7, 7),
     wait_target_in_sync(Source, Target),
@@ -157,7 +311,7 @@ t_dont_start_duplicate_job({_Ctx, {Source, Target}}) ->
     meck:new(couch_replicator_pg, [passthrough]),
     Pid = pid_from_another_node(),
     meck:expect(couch_replicator_pg, should_start, fun(_, _) -> {no, Pid} end),
-    Rep = make_rep(Source, Target),
+    Rep = make_rep(Source, Target, true),
     ExpectErr = {error, {already_started, Pid}},
     ?assertEqual(ExpectErr, couch_replicator_scheduler_job:start_link(Rep)).
 
@@ -205,16 +359,19 @@ pid_from_another_node() ->
     ?assertEqual('A@1', node(Pid)),
     Pid.
 
-mock_fail_req(Path, Return) ->
+mock_fail_req(Method, Path, Return) ->
     meck:expect(
         ibrowse,
         send_req_direct,
         fun(W, Url, Headers, Meth, Body, Opts, TOut) ->
             Args = [W, Url, Headers, Meth, Body, Opts, TOut],
             #{path := UPath} = uri_string:parse(Url),
-            case lists:suffix(Path, UPath) of
-                true -> Return;
-                false -> meck:passthrough(Args)
+            case {lists:suffix(Path, UPath), Method == Meth} of
+                {true, true} ->
+                    _ = meck:passthrough(Args),
+                    Return;
+                {_, _} ->
+                    meck:passthrough(Args)
             end
         end
     ).
@@ -237,16 +394,32 @@ wait_rep_result(RepId) ->
     end.
 
 populate_db(DbName, Start, End) ->
+    populate_db(DbName, Start, End, false).
+
+populate_db(DbName, Start, End, WithAttachments) ->
     Docs = lists:foldl(
         fun(DocIdCounter, Acc) ->
             Id = integer_to_binary(DocIdCounter),
-            Doc = #doc{id = Id, body = {[]}},
+            Atts =
+                case WithAttachments of
+                    true -> [att(<<"att1">>, 1024, <<"app/binary">>)];
+                    false -> []
+                end,
+            Doc = #doc{id = Id, body = {[]}, atts = Atts},
             [Doc | Acc]
         end,
         [],
         lists:seq(Start, End)
     ),
     {ok, [_ | _]} = fabric:update_docs(DbName, Docs, [?ADMIN_CTX]).
+
+att(Name, Size, Type) ->
+    couch_att:new([
+        {name, Name},
+        {type, Type},
+        {att_len, Size},
+        {data, fun(Count) -> crypto:strong_rand_bytes(Count) end}
+    ]).
 
 wait_target_in_sync(Source, Target) ->
     {ok, SourceDocCount} = fabric:get_doc_count(Source),
@@ -271,17 +444,20 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     end.
 
 replicate(Source, Target) ->
-    Rep = make_rep(Source, Target),
+    replicate(Source, Target, true).
+
+replicate(Source, Target, Continuous) ->
+    Rep = make_rep(Source, Target, Continuous),
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),
     {ok, Rep#rep.id}.
 
-make_rep(Source, Target) ->
+make_rep(Source, Target, Continuous) ->
     RepObject =
         {[
             {<<"source">>, url(Source)},
             {<<"target">>, url(Target)},
-            {<<"continuous">>, true},
+            {<<"continuous">>, Continuous},
             {<<"worker_processes">>, 1},
             {<<"retries_per_request">>, 1},
             % Low connection timeout so _changes feed gets restarted quicker
