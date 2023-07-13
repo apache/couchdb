@@ -238,6 +238,8 @@ handle_info({'EXIT', _Pid, {revs_diff_failed, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
 handle_info({'EXIT', _Pid, {http_request_failed, _, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
+handle_info({'EXIT', _Pid, {doc_write_failed, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
 handle_info({'EXIT', Pid, Reason}, State) ->
     {stop, {process_died, Pid, Reason}, State}.
 
@@ -583,43 +585,77 @@ handle_flush_docs_result({error, {bulk_docs_failed, _, _} = Err}, _, _) ->
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
     try couch_replicator_api_wrap:update_doc(Target, Doc, [], ?REPLICATED_CHANGES) of
-        {ok, _} ->
-            ok;
-        Error ->
-            couch_log:error(
-                "Replicator: error writing document `~s` to `~s`: ~s",
-                [Id, couch_replicator_api_wrap:db_uri(Target), couch_util:to_binary(Error)]
-            ),
-            Error
+        {ok, _} -> ok;
+        Error -> handle_doc_write_error(Error, Target, Id, Pos, RevId)
     catch
-        throw:{missing_stub, _} = MissingStub ->
-            throw(MissingStub);
         throw:{Error, Reason} ->
-            couch_log:error(
-                "Replicator: couldn't write document `~s`, revision `~s`,"
-                " to target database `~s`. Error: `~s`, reason: `~s`.",
-                [
-                    Id,
-                    couch_doc:rev_to_str({Pos, RevId}),
-                    couch_replicator_api_wrap:db_uri(Target),
-                    to_binary(Error),
-                    to_binary(Reason)
-                ]
-            ),
-            {error, Error};
-        throw:Err ->
-            couch_log:error(
-                "Replicator: couldn't write document `~s`, revision `~s`,"
-                " to target database `~s`. Error: `~s`.",
-                [
-                    Id,
-                    couch_doc:rev_to_str({Pos, RevId}),
-                    couch_replicator_api_wrap:db_uri(Target),
-                    to_binary(Err)
-                ]
-            ),
-            {error, Err}
+            handle_doc_write_error({Error, Reason}, Target, Id, Pos, RevId)
     end.
+
+% In most cases we fail the replication job by re-throwing the error.
+% The only exceptions are expected validation and VDU failures
+%  401 : unauthorized
+%  403 : forbidden
+%  413 : request_body_too_large
+%  415 : unsupported_media_type
+%  400 : bad_request where reason starts with "Attachment name "
+%
+handle_doc_write_error({missing_stub, _} = MissingStub, _, _, _, _) ->
+    throw(MissingStub);
+handle_doc_write_error({error, Reason} = Error, Target, Id, _, _) when
+    Reason == request_body_too_large orelse Reason == unsupported_media_type
+->
+    couch_log:error(
+        "Replicator: skipping writing document `~s` to `~s` : ~s.",
+        [Id, couch_replicator_api_wrap:db_uri(Target), Reason]
+    ),
+    Error;
+handle_doc_write_error({error, {invalid_attachment_name, Reason}} = Error, Target, Id, _, _) ->
+    couch_log:error(
+        "Replicator: skipping writing document `~s` to `~s` : invalid_attachment_name ~s",
+        [Id, couch_replicator_api_wrap:db_uri(Target), Reason]
+    ),
+    Error;
+handle_doc_write_error({Error, Reason}, Target, Id, Pos, RevId) when
+    Error == unauthorized orelse Error == forbidden
+->
+    couch_log:error(
+        "Replicator: skipping writing document `~s`, revision `~s`,"
+        " to target database `~s`. Error: `~s`, reason: `~s`.",
+        [
+            Id,
+            couch_doc:rev_to_str({Pos, RevId}),
+            couch_replicator_api_wrap:db_uri(Target),
+            to_binary(Error),
+            to_binary(Reason)
+        ]
+    ),
+    {error, Error};
+handle_doc_write_error({error, {Error, Reason}}, Target, Id, Pos, RevId) ->
+    couch_log:error(
+        "Replicator: error writing document `~s`, revision `~s`,"
+        " to target database `~s`. Error: `~s`, reason: `~s`.",
+        [
+            Id,
+            couch_doc:rev_to_str({Pos, RevId}),
+            couch_replicator_api_wrap:db_uri(Target),
+            to_binary(Error),
+            to_binary(Reason)
+        ]
+    ),
+    exit({doc_write_failed, {Error, Reason}});
+handle_doc_write_error(Error, Target, Id, Pos, RevId) ->
+    couch_log:error(
+        "Replicator: error writing document `~s`, revision `~s`,"
+        " to target database `~s`. Error: `~s`.",
+        [
+            Id,
+            couch_doc:rev_to_str({Pos, RevId}),
+            couch_replicator_api_wrap:db_uri(Target),
+            to_binary(Error)
+        ]
+    ),
+    exit({doc_write_failed, Error}).
 
 find_missing(DocInfos, Target, Parent, #fetch_stats{} = St) ->
     {IdRevs, AllCount} = lists:foldr(

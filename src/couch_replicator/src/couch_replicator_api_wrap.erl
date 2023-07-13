@@ -343,6 +343,8 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             throw(Stub);
         {'DOWN', Ref, process, Pid, {http_request_failed, _, _, max_backoff}} ->
             exit(max_backoff);
+        {'DOWN', Ref, process, Pid, {doc_write_failed, _} = Error} ->
+            exit(Error);
         {'DOWN', Ref, process, Pid, request_uri_too_long} ->
             NewMaxLen = get_value(max_url_len, Options, ?MAX_URL_LEN) div 2,
             case NewMaxLen < ?MIN_URL_LEN of
@@ -451,17 +453,25 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
             (409, _, _) ->
                 throw(conflict);
             (Code, _, {Props}) ->
-                case {Code, get_value(<<"error">>, Props)} of
-                    {401, <<"unauthorized">>} ->
-                        throw({unauthorized, get_value(<<"reason">>, Props)});
-                    {403, <<"forbidden">>} ->
-                        throw({forbidden, get_value(<<"reason">>, Props)});
-                    {412, <<"missing_stub">>} ->
-                        throw({missing_stub, get_value(<<"reason">>, Props)});
-                    {413, _} ->
+                Error = get_value(<<"error">>, Props),
+                Reason = get_value(<<"reason">>, Props),
+                case {Code, Error, Reason} of
+                    {401, <<"unauthorized">>, _} ->
+                        throw({unauthorized, Reason});
+                    {403, <<"forbidden">>, _} ->
+                        throw({forbidden, Reason});
+                    {412, <<"missing_stub">>, _} ->
+                        throw({missing_stub, Reason});
+                    {413, _, _} ->
                         {error, request_body_too_large};
-                    {_, Error} ->
-                        {error, Error}
+                    {415, _, _} ->
+                        {error, unsupported_media_type};
+                    {400, <<"bad_request">>, <<"Attachment name ", _/binary>>} ->
+                        {error, {invalid_attachment_name, Reason}};
+                    {_, undefined, _} ->
+                        {error, {Code, Props}};
+                    {_, _, _} ->
+                        {error, {Error, Reason}}
                 end
         end
     ).
