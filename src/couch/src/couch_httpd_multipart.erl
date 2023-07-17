@@ -203,7 +203,7 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
                         end;
                     {hello_from_writer, Ref, WriterPid} ->
                         C2 = handle_hello(WriterPid, Counters),
-                        maybe_send_data({Ref, NewChunks, NewOffset, C2, Waiting});
+                        maybe_send_data({Ref, NewChunks, NewOffset, C2, NewWaiting});
                     {get_bytes, Ref, X} ->
                         C2 = update_writer(X, Counters),
                         maybe_send_data({Ref, NewChunks, NewOffset, C2, [X | NewWaiting]})
