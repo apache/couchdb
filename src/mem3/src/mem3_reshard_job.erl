@@ -49,7 +49,8 @@
 -include("mem3_reshard.hrl").
 
 % Batch size for internal replication topoffs
--define(INTERNAL_REP_BATCH_SIZE, 2000).
+-define(INTERNAL_REP_BATCH_SIZE, 500).
+-define(DEFAULT_REXI_TIMEOUT, 600000).
 
 % The list of possible job states. The order of this
 % list is important as a job will progress linearly
@@ -406,8 +407,16 @@ topoff_impl(#job{source = #shard{} = Source, target = Targets}) ->
     couch_log:notice("~p topoff ~p", [?MODULE, shardsstr(Source, Targets)]),
     check_source_exists(Source, topoff),
     check_targets_exist(Targets, topoff),
+    Timeout = config:get_integer("rexi", "shard_split_timeout_msec", ?DEFAULT_REXI_TIMEOUT),
+    BatchSize = config:get_integer(
+        "rexi", "shard_split_topoff_batch_size", ?INTERNAL_REP_BATCH_SIZE
+    ),
     TMap = maps:from_list([{R, T} || #shard{range = R} = T <- Targets]),
-    Opts = [{batch_size, ?INTERNAL_REP_BATCH_SIZE}, {batch_count, all}],
+    Opts = [
+        {batch_size, BatchSize},
+        {batch_count, all},
+        {rexi_timeout, Timeout}
+    ],
     case mem3_rep:go(Source, TMap, Opts) of
         {ok, Count} ->
             Args = [?MODULE, shardsstr(Source, Targets), Count],
