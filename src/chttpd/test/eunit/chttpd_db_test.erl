@@ -29,30 +29,13 @@
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
-    TmpDb = ?tempdb(),
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
-    Url = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
-    create_db(Url),
-    Url.
+    Db = ?tempdb(),
+    create_db(Db),
+    Db.
 
-teardown(Url) ->
-    delete_db(Url),
+teardown(Db) ->
+    delete_db(Db),
     ok = config:delete("admins", ?USER, _Persist = false).
-
-create_db(Url) ->
-    {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
-    ?assert(Status =:= 201 orelse Status =:= 202).
-
-create_doc(Url, Id) ->
-    test_request:put(
-        Url ++ "/" ++ Id,
-        [?CONTENT_JSON, ?AUTH],
-        "{\"mr\": \"rockoartischocko\"}"
-    ).
-
-delete_db(Url) ->
-    {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
 all_test_() ->
     {
@@ -66,609 +49,327 @@ all_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_return_ok_true_on_bulk_update/1,
-                    fun should_return_201_new_edits_false_with_revs_on_bulk_update/1,
-                    fun should_return_400_new_edits_false_no_revs_on_bulk_update/1,
-                    fun should_return_201_new_edits_false_with_rev_on_doc_update/1,
-                    fun should_return_201_new_edits_false_with_revisions_on_doc_update/1,
-                    fun should_return_400_new_edits_false_no_revs_on_doc_update/1,
-                    fun should_return_ok_true_on_ensure_full_commit/1,
-                    fun should_return_404_for_ensure_full_commit_on_no_db/1,
-                    fun should_accept_live_as_an_alias_for_continuous/1,
-                    fun should_return_headers_after_starting_continious/1,
-                    fun should_return_404_for_delete_att_on_notadoc/1,
-                    fun should_return_409_for_del_att_without_rev/1,
-                    fun should_return_200_for_del_att_with_rev/1,
-                    fun should_return_409_for_put_att_nonexistent_rev/1,
-                    fun should_return_update_seq_when_set_on_all_docs/1,
-                    fun should_not_return_update_seq_when_unset_on_all_docs/1,
-                    fun should_return_correct_id_on_doc_copy/1,
-                    fun should_return_only_one_ok_on_doc_copy/1,
-                    fun should_return_400_for_bad_engine/1,
-                    fun should_not_change_db_proper_after_rewriting_shardmap/1,
-                    fun should_succeed_on_all_docs_with_queries_keys/1,
-                    fun should_succeed_on_all_docs_with_queries_limit_skip/1,
-                    fun should_succeed_on_all_docs_with_multiple_queries/1,
-                    fun should_succeed_on_design_docs_with_queries_keys/1,
-                    fun should_succeed_on_design_docs_with_queries_limit_skip/1,
-                    fun should_succeed_on_design_docs_with_multiple_queries/1,
-                    fun should_succeed_on_local_docs_with_queries_keys/1,
-                    fun should_succeed_on_local_docs_with_queries_limit_skip/1,
-                    fun should_succeed_on_local_docs_with_multiple_queries/1
+                    ?TDEF_FE(t_return_ok_true_on_bulk_update, ?TIMEOUT),
+                    ?TDEF_FE(t_return_201_new_edits_false_with_revs_on_bulk_update, ?TIMEOUT),
+                    ?TDEF_FE(t_return_400_new_edits_false_no_revs_on_bulk_update, ?TIMEOUT),
+                    ?TDEF_FE(t_return_201_new_edits_false_with_rev_on_doc_update, ?TIMEOUT),
+                    ?TDEF_FE(t_return_201_new_edits_false_with_revisions_on_doc_update, ?TIMEOUT),
+                    ?TDEF_FE(t_return_400_new_edits_false_no_revs_on_doc_update, ?TIMEOUT),
+                    ?TDEF_FE(t_return_ok_true_on_ensure_full_commit, ?TIMEOUT),
+                    ?TDEF_FE(t_return_404_for_ensure_full_commit_on_no_db, ?TIMEOUT),
+                    ?TDEF_FE(t_accept_live_as_an_alias_for_continuous, ?TIMEOUT),
+                    ?TDEF_FE(t_return_headers_after_starting_continuous, ?TIMEOUT),
+                    ?TDEF_FE(t_return_404_for_delete_att_on_notadoc, ?TIMEOUT),
+                    ?TDEF_FE(t_return_409_for_del_att_without_rev, ?TIMEOUT),
+                    ?TDEF_FE(t_return_200_for_del_att_with_rev, ?TIMEOUT),
+                    ?TDEF_FE(t_return_409_for_put_att_nonexistent_rev, ?TIMEOUT),
+                    ?TDEF_FE(t_return_update_seq_when_set_on_all_docs, ?TIMEOUT),
+                    ?TDEF_FE(t_not_return_update_seq_when_unset_on_all_docs, ?TIMEOUT),
+                    ?TDEF_FE(t_return_correct_id_on_doc_copy, ?TIMEOUT),
+                    ?TDEF_FE(t_return_only_one_ok_on_doc_copy, ?TIMEOUT),
+                    ?TDEF_FE(t_return_400_for_bad_engine, ?TIMEOUT),
+                    ?TDEF_FE(t_not_change_db_proper_after_rewriting_shardmap, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_all_docs_with_queries_keys, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_all_docs_with_queries_limit_skip, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_all_docs_with_multiple_queries, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_design_docs_with_queries_keys, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_design_docs_with_queries_limit_skip, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_design_docs_with_multiple_queries, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_local_docs_with_queries_keys, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_local_docs_with_queries_limit_skip, ?TIMEOUT),
+                    ?TDEF_FE(t_succeed_on_local_docs_with_multiple_queries, ?TIMEOUT)
                 ]
             }
         }
     }.
 
-should_return_ok_true_on_bulk_update(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_assertEqual(
-            true,
-            begin
-                {ok, _, _, Body} = create_doc(Url, "testdoc"),
-                {Json} = ?JSON_DECODE(Body),
-                Ref = couch_util:get_value(<<"rev">>, Json, undefined),
-                NewDoc = "{\"docs\": [{\"_rev\": \"" ++ ?b2l(Ref) ++ "\", \"_id\": \"testdoc\"}]}",
-                {ok, _, _, ResultBody} = test_request:post(
-                    Url ++ "/_bulk_docs/",
-                    [?CONTENT_JSON, ?AUTH],
-                    NewDoc
-                ),
-                ResultJson = ?JSON_DECODE(ResultBody),
-                {InnerJson} = lists:nth(1, ResultJson),
-                couch_util:get_value(<<"ok">>, InnerJson, undefined)
+t_return_ok_true_on_bulk_update(Db) ->
+    {_, #{<<"rev">> := Rev}} = create_doc(Db, "testdoc"),
+    Body = #{<<"docs">> => [#{<<"_id">> => <<"testdoc">>, <<"_rev">> => Rev}]},
+    {_, [#{<<"ok">> := Res}]} = req(post, url(Db, "_bulk_docs"), Body),
+    ?assert(Res).
+
+t_return_201_new_edits_false_with_revs_on_bulk_update(Db) ->
+    {_, #{<<"rev">> := Rev}} = create_doc(Db, "dochasrev"),
+    Body = #{
+        <<"docs">> => [#{<<"_id">> => <<"dochasrev">>, <<"_rev">> => Rev}],
+        <<"new_edits">> => false
+    },
+    {Status, Response} = req(post, url(Db, "_bulk_docs"), Body),
+    ?assertEqual(201, Status),
+    ?assertEqual([], Response).
+
+t_return_400_new_edits_false_no_revs_on_bulk_update(Db) ->
+    create_doc(Db, "docnorev"),
+    NewDoc = #{<<"docs">> => [#{<<"_id">> => <<"docnorev">>}], <<"new_edits">> => false},
+    {Status, Response} = req(post, url(Db, "_bulk_docs"), NewDoc),
+    ?assertEqual(400, Status),
+    ?assertMatch(#{<<"error">> := <<"bad_request">>}, Response).
+
+t_return_201_new_edits_false_with_rev_on_doc_update(Db) ->
+    Body = #{<<"foo">> => <<"bar">>, <<"_rev">> => <<"1-abc">>},
+    {Status, #{<<"id">> := Id, <<"rev">> := Rev}} =
+        req(put, url(Db, "docrev2?new_edits=false"), Body),
+    ?assertEqual(201, Status),
+    ?assertEqual(<<"docrev2">>, Id),
+    ?assertEqual(<<"1-abc">>, Rev).
+
+t_return_201_new_edits_false_with_revisions_on_doc_update(Db) ->
+    Body = #{
+        <<"foo">> => <<"bar">>,
+        <<"_revisions">> => #{<<"ids">> => [<<"abc">>, <<"def">>], <<"start">> => 2}
+    },
+    {Status, #{<<"id">> := Id, <<"rev">> := Rev}} =
+        req(put, url(Db, "docrev3?new_edits=false"), Body),
+    ?assertEqual(201, Status),
+    ?assertEqual(<<"docrev3">>, Id),
+    ?assertEqual(<<"2-abc">>, Rev).
+
+t_return_400_new_edits_false_no_revs_on_doc_update(Db) ->
+    Body = #{<<"foo">> => <<"bar">>},
+    {Status, Response} = req(put, url(Db, "docrev3?new_edits=false"), Body),
+    ?assertEqual(400, Status),
+    ?assertMatch(#{<<"error">> := <<"bad_request">>}, Response).
+
+t_return_ok_true_on_ensure_full_commit(Db) ->
+    {Status, #{<<"ok">> := Res}} = req(post, url(Db, "_ensure_full_commit")),
+    ?assertEqual(201, Status),
+    ?assert(Res).
+
+t_return_404_for_ensure_full_commit_on_no_db(Db) ->
+    {Status, Response} = req(post, url(Db) ++ "-missing-db" ++ "/_ensure_full_commit"),
+    ?assertEqual(404, Status),
+    ?assertMatch(#{<<"error">> := <<"not_found">>}, Response).
+
+t_accept_live_as_an_alias_for_continuous(Db) ->
+    GetLastSeq =
+        fun(Chunks) ->
+            LastSeqBin = lists:last(Chunks),
+            {Result} =
+                try ?JSON_DECODE(LastSeqBin) of
+                    Data -> Data
+                catch
+                    _:_ ->
+                        % should not happen, abort
+                        ?assert(false)
+                end,
+            couch_util:get_value(<<"last_seq">>, Result, undefined)
+        end,
+    LastSeq1 = GetLastSeq(wait_non_empty_chunk(Db)),
+    create_doc(Db, "testdoc2"),
+    LastSeq2 = GetLastSeq(wait_non_empty_chunk(Db)),
+    ?assertNotEqual(LastSeq1, LastSeq2).
+
+t_return_headers_after_starting_continuous(Db) ->
+    {ok, _, _, Bin} = test_request:get(url(Db, "_changes?feed=live&timeout=1"), [?AUTH]),
+    Parts = binary:split(Bin, <<"\n">>, [global]),
+    %% we should receive at least one part even when timeout=1
+    ?assertNotEqual([], Parts).
+
+t_return_404_for_delete_att_on_notadoc(Db) ->
+    {Status, Response} = req(delete, url(Db, "notadoc/att.pdf")),
+    ?assertEqual(404, Status),
+    ?assertMatch(#{<<"error">> := <<"not_found">>, <<"reason">> := <<"missing">>}, Response),
+    {Status1, Response} = req(get, url(Db, "notadoc")),
+    ?assertEqual(404, Status1).
+
+t_return_409_for_del_att_without_rev(Db) ->
+    {Status, _} = req(put, url(Db, "testdoc3"), attachment_doc()),
+    ?assertEqual(201, Status),
+    {Status1, _} = req(delete, url(Db, "testdoc3/file.erl")),
+    ?assertEqual(409, Status1).
+
+t_return_200_for_del_att_with_rev(Db) ->
+    {Status, #{<<"rev">> := Rev}} = req(put, url(Db, "testdoc4"), attachment_doc()),
+    ?assertEqual(201, Status),
+    {Status1, _} = req(delete, url(Db, "testdoc4/file.erl?rev=" ++ Rev)),
+    ?assertEqual(200, Status1).
+
+t_return_409_for_put_att_nonexistent_rev(Db) ->
+    {Status, Response} = req(put, url(Db, "t_return_404/file.erl?rev=1-000"), attachment_doc()),
+    ?assertEqual(409, Status),
+    ?assertMatch(#{<<"error">> := <<"not_found">>, <<"reason">> := <<"missing_rev">>}, Response).
+
+t_return_update_seq_when_set_on_all_docs(Db) ->
+    [create_doc(Db, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
+    {Status, #{<<"update_seq">> := UpdateSeq, <<"offset">> := Offset}} =
+        req(get, url(Db, "_all_docs?update_seq=true&keys=[\"testdoc1\"]")),
+    ?assertEqual(200, Status),
+    ?assertNotEqual(undefined, UpdateSeq),
+    ?assertNotEqual(undefined, Offset).
+
+t_not_return_update_seq_when_unset_on_all_docs(Db) ->
+    [create_doc(Db, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
+    {Status, #{<<"offset">> := Offset} = Response} =
+        req(get, url(Db, "_all_docs?update_seq=false&keys=[\"testdoc1\"]")),
+    ?assertEqual(200, Status),
+    ?assertNot(maps:is_key(<<"update_seq">>, Response)),
+    ?assertNotEqual(undefined, Offset).
+
+t_return_correct_id_on_doc_copy(Db) ->
+    create_doc(Db, "testdoc"),
+    {_, #{<<"id">> := Id1}} = req(copy, url(Db, "testdoc"), [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
+    {_, #{<<"id">> := Id2}} = req(copy, url(Db, "testdoc"), [?CONTENT_JSON, ?AUTH, ?DESTHEADER2]),
+    ?assertEqual(<<102, 111, 111, 229, 149, 138, 98, 97, 114>>, Id1),
+    ?assertEqual(<<"foo/bar#baz?pow:fiz">>, Id2).
+
+t_return_only_one_ok_on_doc_copy(Db) ->
+    create_doc(Db, "testdoc"),
+    {_, #{<<"ok">> := Res}} = req(copy, url(Db, "testdoc"), [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
+    ?assert(Res).
+
+t_return_400_for_bad_engine(Db) ->
+    {Status, _} = req(put, url(Db) ++ "?engine=cowabunga"),
+    ?assertEqual(400, Status).
+
+t_not_change_db_proper_after_rewriting_shardmap(Db) ->
+    delete_db(Db),
+    {201, _} = req(put, url(Db) ++ "?partitioned=true&q=1"),
+    ShardDbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    {ok, ShardDb} = mem3_util:ensure_exists(ShardDbName),
+    {ok, #doc{body = {Props}}} = couch_db:open_doc(
+        ShardDb, Db, [ejson_body]
+    ),
+    Shards = mem3_util:build_shards(Db, Props),
+    {Prop2} = ?JSON_DECODE(?JSON_ENCODE({Props})),
+    Shards2 = mem3_util:build_shards(Db, Prop2),
+    ?assertEqual(Shards2, Shards).
+
+t_succeed_on_all_docs_with_queries_keys(Db) ->
+    helper_queries_with_keys(Db, "_all_docs", 3).
+
+t_succeed_on_design_docs_with_queries_keys(Db) ->
+    helper_queries_with_keys(Db, "_design_docs", 1).
+
+t_succeed_on_local_docs_with_queries_keys(Db) ->
+    helper_queries_with_keys(Db, "_local_docs", 1).
+
+helper_queries_with_keys(Db, Path, ExpectedRows) ->
+    [create_doc(Db, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 5)],
+    [create_doc(Db, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 5)],
+    [create_doc(Db, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 5)],
+    QueryDoc = #{
+        <<"queries">> => [
+            #{
+                <<"keys">> =>
+                    [<<"testdoc1">>, <<"_design/ddoc3">>, <<"_local/doc5">>]
+            }
+        ]
+    },
+    {Status, #{<<"results">> := [#{<<"rows">> := Rows}]}} =
+        req(post, url(Db, Path ++ "/queries"), QueryDoc),
+    ?assertEqual(200, Status),
+    ?assertEqual(ExpectedRows, length(Rows)).
+
+t_succeed_on_all_docs_with_queries_limit_skip(Db) ->
+    helper_queries_with_limit_skip(Db, "testdoc", "_all_docs", 2, 5).
+
+t_succeed_on_design_docs_with_queries_limit_skip(Db) ->
+    helper_queries_with_limit_skip(Db, "_design/ddoc", "_design_docs", 2, 5).
+
+t_succeed_on_local_docs_with_queries_limit_skip(Db) ->
+    helper_queries_with_limit_skip(Db, "_local/doc", "_local_docs", null, 5).
+
+helper_queries_with_limit_skip(Db, Id, Path, ExpectedOffset, ExpectedRows) ->
+    [create_doc(Db, Id ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+    QueryDoc = #{<<"queries">> => [#{<<"limit">> => 5, <<"skip">> => 2}]},
+    {Status, #{<<"results">> := [#{<<"offset">> := Offset, <<"rows">> := Rows}]}} =
+        req(post, url(Db, Path ++ "/queries"), QueryDoc),
+    ?assertEqual(200, Status),
+    ?assertEqual(ExpectedOffset, Offset),
+    ?assertEqual(ExpectedRows, length(Rows)).
+
+t_succeed_on_all_docs_with_multiple_queries(Db) ->
+    helper_queries_with_keys_limit_skip(Db, "_all_docs", 2, 3, 5).
+
+t_succeed_on_design_docs_with_multiple_queries(Db) ->
+    helper_queries_with_keys_limit_skip(Db, "_design_docs", 2, 1, 5).
+
+t_succeed_on_local_docs_with_multiple_queries(Db) ->
+    helper_queries_with_keys_limit_skip(Db, "_local_docs", null, 1, 5).
+
+helper_queries_with_keys_limit_skip(Db, Path, ExpectedOffset, ExpectedRows1, ExpectedRows2) ->
+    [create_doc(Db, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+    [create_doc(Db, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+    [create_doc(Db, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
+    QueryDoc = #{
+        <<"queries">> => [
+            #{
+                <<"keys">> =>
+                    [<<"testdoc1">>, <<"_design/ddoc3">>, <<"_local/doc5">>]
+            },
+            #{<<"limit">> => 5, <<"skip">> => 2}
+        ]
+    },
+    {Status, #{
+        <<"results">> := [
+            #{<<"rows">> := Rows1},
+            #{<<"offset">> := Offset2, <<"rows">> := Rows2}
+        ]
+    }} = req(post, url(Db, Path ++ "/queries"), QueryDoc),
+    ?assertEqual(200, Status),
+    ?assertEqual(ExpectedRows1, length(Rows1)),
+    ?assertEqual(ExpectedOffset, Offset2),
+    ?assertEqual(ExpectedRows2, length(Rows2)).
+
+%%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
+url(Db) ->
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
+    lists:concat(["http://", Addr, ":", Port, "/", ?b2l(Db)]).
+
+url(Db, Path) ->
+    url(Db) ++ "/" ++ Path.
+
+create_db(Db) ->
+    case req(put, url(Db)) of
+        {201, #{}} -> ok;
+        Error -> error({failed_to_create_test_db, Db, Error})
+    end.
+
+delete_db(Db) ->
+    case req(delete, url(Db)) of
+        {200, #{}} -> ok;
+        Error -> error({failed_to_delete_test_db, Db, Error})
+    end.
+
+create_doc(Db, Id) ->
+    req(put, url(Db, Id), #{<<"mr">> => <<"rockoartischocko">>}).
+
+req(Method, Url) ->
+    Headers = [?CONTENT_JSON, ?AUTH],
+    {ok, Code, _, Res} = test_request:request(Method, Url, Headers),
+    {Code, jiffy:decode(Res, [return_maps])}.
+
+req(copy, Url, Headers) ->
+    {ok, Code, _, Res} = test_request:request(copy, Url, Headers),
+    {Code, jiffy:decode(Res, [return_maps])};
+req(Method, Url, #{} = Body) ->
+    req(Method, Url, jiffy:encode(Body));
+req(Method, Url, Body) ->
+    Headers = [?CONTENT_JSON, ?AUTH],
+    {ok, Code, _, Res} = test_request:request(Method, Url, Headers, Body),
+    {Code, jiffy:decode(Res, [return_maps])}.
+
+wait_non_empty_chunk(Db) ->
+    test_util:wait(
+        fun() ->
+            {ok, _, _, Bin} = test_request:get(url(Db, "_changes?feed=live&timeout=1"), [?AUTH]),
+            Parts = binary:split(Bin, <<"\n">>, [global]),
+            case [P || P <- Parts, size(P) > 0] of
+                [] -> wait;
+                Chunks -> Chunks
             end
-        )}.
-
-should_return_201_new_edits_false_with_revs_on_bulk_update(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(
-            begin
-                {ok, _, _, Body} = create_doc(Url, "dochasrev"),
-                {Json} = ?JSON_DECODE(Body),
-                Ref = couch_util:get_value(<<"rev">>, Json, undefined),
-                NewDoc =
-                    "{\"docs\": [{\"_rev\": \"" ++ ?b2l(Ref) ++
-                        "\", \"_id\": \"dochasrev\"}], \"new_edits\": false}",
-                {ok, Status, _, ResultBody} = test_request:post(
-                    Url ++
-                        "/_bulk_docs/",
-                    [?CONTENT_JSON, ?AUTH],
-                    NewDoc
-                ),
-                ?assertEqual(201, Status),
-                ?assertEqual([], ?JSON_DECODE(ResultBody))
-            end
-        )}.
-
-should_return_400_new_edits_false_no_revs_on_bulk_update(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(
-            begin
-                {ok, _, _, _} = create_doc(Url, "docnorev"),
-                NewDoc =
-                    "{\"docs\": [{\"_id\": \"docnorev\"}], " ++
-                        "\"new_edits\": false}",
-                {ok, Status, _, ResultBody} = test_request:post(
-                    Url ++
-                        "/_bulk_docs/",
-                    [?CONTENT_JSON, ?AUTH],
-                    NewDoc
-                ),
-                {ResultJson} = ?JSON_DECODE(ResultBody),
-                ?assertEqual(400, Status),
-                ?assertEqual(
-                    <<"bad_request">>,
-                    couch_util:get_value(<<"error">>, ResultJson)
-                )
-            end
-        )}.
-
-should_return_201_new_edits_false_with_rev_on_doc_update(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(
-            begin
-                Url1 = Url ++ "/docrev2?new_edits=false",
-                Headers = [?CONTENT_JSON, ?AUTH],
-                Body = "{\"foo\": \"bar\", \"_rev\": \"1-abc\"}",
-                {ok, Status, _, ResultBody} = test_request:put(Url1, Headers, Body),
-                {Props} = ?JSON_DECODE(ResultBody),
-                ?assertEqual(201, Status),
-                Id = couch_util:get_value(<<"id">>, Props),
-                Rev = couch_util:get_value(<<"rev">>, Props),
-                ?assertEqual(<<"docrev2">>, Id),
-                ?assertEqual(<<"1-abc">>, Rev)
-            end
-        )}.
-
-should_return_201_new_edits_false_with_revisions_on_doc_update(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(
-            begin
-                Url1 = Url ++ "/docrev3?new_edits=false",
-                Headers = [?CONTENT_JSON, ?AUTH],
-                Body =
-                    "{\"foo\": \"bar\", " ++
-                        "\"_revisions\": {" ++
-                        "\"ids\": [\"abc\", \"def\"], " ++
-                        "\"start\": 2}} ",
-                {ok, Status, _, ResultBody} = test_request:put(Url1, Headers, Body),
-                {Props} = ?JSON_DECODE(ResultBody),
-                Id = couch_util:get_value(<<"id">>, Props),
-                Rev = couch_util:get_value(<<"rev">>, Props),
-                ?assertEqual(201, Status),
-                ?assertEqual(<<"docrev3">>, Id),
-                ?assertEqual(<<"2-abc">>, Rev)
-            end
-        )}.
-
-should_return_400_new_edits_false_no_revs_on_doc_update(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(
-            begin
-                Url1 = Url ++ "/docnorev4?new_edits=false",
-                Headers = [?CONTENT_JSON, ?AUTH],
-                Body = "{\"foo\": \"bar\"}",
-                {ok, Status, _, ResultBody} = test_request:put(Url1, Headers, Body),
-                {Props} = ?JSON_DECODE(ResultBody),
-                ?assertEqual(400, Status),
-                Error = couch_util:get_value(<<"error">>, Props),
-                ?assertEqual(<<"bad_request">>, Error)
-            end
-        )}.
-
-should_return_ok_true_on_ensure_full_commit(Url0) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            Url = Url0 ++ "/_ensure_full_commit",
-            {ok, RC, _, Body} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], []),
-            {Json} = ?JSON_DECODE(Body),
-            ?assertEqual(201, RC),
-            ?assert(couch_util:get_value(<<"ok">>, Json))
-        end)}.
-
-should_return_404_for_ensure_full_commit_on_no_db(Url0) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            Url = Url0 ++ "-missing-db" ++ "/_ensure_full_commit",
-            {ok, RC, _, Body} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], []),
-            {Json} = ?JSON_DECODE(Body),
-            ?assertEqual(404, RC),
-            ?assertEqual(<<"not_found">>, couch_util:get_value(<<"error">>, Json))
-        end)}.
-
-should_accept_live_as_an_alias_for_continuous(Url) ->
-    GetLastSeq = fun(Chunks) ->
-        LastSeqBin = lists:last(Chunks),
-        {Result} =
-            try ?JSON_DECODE(LastSeqBin) of
-                Data -> Data
-            catch
-                _:_ ->
-                    % should not happen, abort
-                    ?assert(false)
-            end,
-        couch_util:get_value(<<"last_seq">>, Result, undefined)
-    end,
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            LastSeq1 = GetLastSeq(wait_non_empty_chunk(Url)),
-
-            {ok, _, _, _} = create_doc(Url, "testdoc2"),
-
-            LastSeq2 = GetLastSeq(wait_non_empty_chunk(Url)),
-
-            ?assertNotEqual(LastSeq1, LastSeq2)
-        end)}.
-
-should_return_404_for_delete_att_on_notadoc(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, RC, _, RespBody} = test_request:delete(
-                Url ++ "/notadoc/att.pdf",
-                [?CONTENT_JSON, ?AUTH],
-                []
-            ),
-            ?assertEqual(404, RC),
-            ?assertEqual(
-                {[
-                    {<<"error">>, <<"not_found">>},
-                    {<<"reason">>, <<"missing">>}
-                ]},
-                jiffy:decode(RespBody)
-            ),
-            {ok, RC1, _, _} = test_request:get(
-                Url ++ "/notadoc",
-                [?CONTENT_JSON, ?AUTH],
-                []
-            ),
-            ?assertEqual(404, RC1)
-        end)}.
-
-should_return_409_for_del_att_without_rev(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, RC, _, _} = test_request:put(
-                Url ++ "/testdoc3",
-                [?CONTENT_JSON, ?AUTH],
-                jiffy:encode(attachment_doc())
-            ),
-            ?assertEqual(201, RC),
-
-            {ok, RC1, _, _} = test_request:delete(
-                Url ++ "/testdoc3/file.erl",
-                [?CONTENT_JSON, ?AUTH],
-                []
-            ),
-            ?assertEqual(409, RC1)
-        end)}.
-
-should_return_200_for_del_att_with_rev(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, RC, _Headers, RespBody} = test_request:put(
-                Url ++ "/testdoc4",
-                [?CONTENT_JSON, ?AUTH],
-                jiffy:encode(attachment_doc())
-            ),
-            ?assertEqual(201, RC),
-
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            Rev = couch_util:get_value(<<"rev">>, ResultJson, undefined),
-
-            {ok, RC1, _, _} = test_request:delete(
-                Url ++ "/testdoc4/file.erl?rev=" ++ Rev,
-                [?CONTENT_JSON, ?AUTH],
-                []
-            ),
-            ?assertEqual(200, RC1)
-        end)}.
-
-should_return_409_for_put_att_nonexistent_rev(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, RC, _Headers, RespBody} = test_request:put(
-                Url ++ "/should_return_404/file.erl?rev=1-000",
-                [?CONTENT_JSON, ?AUTH],
-                jiffy:encode(attachment_doc())
-            ),
-            ?assertEqual(409, RC),
-            ?assertMatch(
-                {[
-                    {<<"error">>, <<"not_found">>},
-                    {<<"reason">>, <<"missing_rev">>}
-                ]},
-                ?JSON_DECODE(RespBody)
-            )
-        end)}.
-
-should_return_update_seq_when_set_on_all_docs(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
-            {ok, RC, _, RespBody} = test_request:get(
-                Url ++ "/_all_docs/" ++
-                    "?update_seq=true&keys=[\"testdoc1\"]",
-                [?CONTENT_JSON, ?AUTH]
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ?assertNotEqual(
-                undefined,
-                couch_util:get_value(<<"update_seq">>, ResultJson)
-            ),
-            ?assertNotEqual(
-                undefined,
-                couch_util:get_value(<<"offset">>, ResultJson)
-            )
-        end)}.
-
-should_not_return_update_seq_when_unset_on_all_docs(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
-            {ok, RC, _, RespBody} = test_request:get(
-                Url ++ "/_all_docs/" ++
-                    "?update_seq=false&keys=[\"testdoc1\"]",
-                [?CONTENT_JSON, ?AUTH]
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ?assertEqual(
-                undefined,
-                couch_util:get_value(<<"update_seq">>, ResultJson)
-            ),
-            ?assertNotEqual(
-                undefined,
-                couch_util:get_value(<<"offset">>, ResultJson)
-            )
-        end)}.
-
-should_return_correct_id_on_doc_copy(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, _, _, _} = create_doc(Url, "testdoc"),
-            {_, _, _, ResultBody1} = test_request:copy(
-                Url ++ "/testdoc/",
-                [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]
-            ),
-            {ResultJson1} = ?JSON_DECODE(ResultBody1),
-            Id1 = couch_util:get_value(<<"id">>, ResultJson1),
-
-            {_, _, _, ResultBody2} = test_request:copy(
-                Url ++ "/testdoc/",
-                [?CONTENT_JSON, ?AUTH, ?DESTHEADER2]
-            ),
-            {ResultJson2} = ?JSON_DECODE(ResultBody2),
-            Id2 = couch_util:get_value(<<"id">>, ResultJson2),
-            [
-                ?assertEqual(<<102, 111, 111, 229, 149, 138, 98, 97, 114>>, Id1),
-                ?assertEqual(<<"foo/bar#baz?pow:fiz">>, Id2)
-            ]
-        end)}.
-
-should_return_only_one_ok_on_doc_copy(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, _, _, _} = create_doc(Url, "testdoc"),
-            {_, _, _, ResultBody} = test_request:copy(
-                Url ++ "/testdoc",
-                [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]
-            ),
-            {ResultJson} = jiffy:decode(ResultBody),
-            NumOks = length(lists:filter(fun({Key, _Value}) -> Key == <<"ok">> end, ResultJson)),
-            [
-                ?assertEqual(1, NumOks)
-            ]
-        end)}.
+        end
+    ).
 
 attachment_doc() ->
     {ok, Data} = file:read_file(?FIXTURE_TXT),
-    {[
-        {<<"_attachments">>,
-            {[
-                {<<"file.erl">>,
-                    {[
-                        {<<"content_type">>, <<"text/plain">>},
-                        {<<"data">>, base64:encode(Data)}
-                    ]}}
-            ]}}
-    ]}.
-
-should_return_400_for_bad_engine(_) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            TmpDb = ?tempdb(),
-            Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-            Port = mochiweb_socket_server:get(chttpd, port),
-            BaseUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
-            Url = BaseUrl ++ "?engine=cowabunga",
-            {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
-            ?assertEqual(400, Status)
-        end)}.
-
-should_not_change_db_proper_after_rewriting_shardmap(_) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            TmpDb = ?tempdb(),
-            Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-            Port = mochiweb_socket_server:get(chttpd, port),
-
-            BaseUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
-            Url = BaseUrl ++ "?partitioned=true&q=1",
-            {ok, 201, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
-
-            ShardDbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-            {ok, ShardDb} = mem3_util:ensure_exists(ShardDbName),
-            {ok, #doc{body = {Props}}} = couch_db:open_doc(
-                ShardDb, TmpDb, [ejson_body]
-            ),
-            Shards = mem3_util:build_shards(TmpDb, Props),
-
-            {Prop2} = ?JSON_DECODE(?JSON_ENCODE({Props})),
-            Shards2 = mem3_util:build_shards(TmpDb, Prop2),
-            ?assertEqual(Shards2, Shards),
-            {ok, 200, _, _} = test_request:delete(BaseUrl, [?AUTH])
-        end)}.
-
-should_succeed_on_all_docs_with_queries_keys(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc = "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++ "/_all_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
-
-should_succeed_on_all_docs_with_queries_limit_skip(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++ "/_all_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
-
-should_succeed_on_all_docs_with_multiple_queries(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc =
-                "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]},\n"
-                "            {\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++ "/_all_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson1} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
-            {InnerJson2} = lists:nth(2, ResultJsonBody),
-            ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-        end)}.
-
-should_succeed_on_design_docs_with_queries_keys(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc =
-                "{\"queries\": [{\"keys\": [ \"_design/ddoc3\",\n"
-                "            \"_design/ddoc8\"]}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++
-                    "/_design_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
-
-should_succeed_on_design_docs_with_queries_limit_skip(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++
-                    "/_design_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
-
-should_succeed_on_design_docs_with_multiple_queries(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc =
-                "{\"queries\": [{\"keys\": [ \"_design/ddoc3\",\n"
-                "            \"_design/ddoc8\"]}, {\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++
-                    "/_design_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson1} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
-            {InnerJson2} = lists:nth(2, ResultJsonBody),
-            ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-        end)}.
-
-should_succeed_on_local_docs_with_queries_keys(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc =
-                "{\"queries\": [{\"keys\":\n"
-                "            [ \"_local/doc3\", \"_local/doc8\"]}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++ "/_local_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
-
-should_succeed_on_local_docs_with_queries_limit_skip(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++
-                    "/_local_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-        end)}.
-
-should_succeed_on_local_docs_with_multiple_queries(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            [create_doc(Url, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
-            QueryDoc =
-                "{\"queries\": [{\"keys\": [ \"_local/doc3\",\n"
-                "            \"_local/doc8\"]}, {\"limit\": 5, \"skip\": 2}]}",
-            {ok, RC, _, RespBody} = test_request:post(
-                Url ++
-                    "/_local_docs/queries/",
-                [?CONTENT_JSON, ?AUTH],
-                QueryDoc
-            ),
-            ?assertEqual(200, RC),
-            {ResultJson} = ?JSON_DECODE(RespBody),
-            ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
-            {InnerJson1} = lists:nth(1, ResultJsonBody),
-            ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
-            {InnerJson2} = lists:nth(2, ResultJsonBody),
-            ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-        end)}.
-
-should_return_headers_after_starting_continious(Url) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            {ok, _, _, Bin} =
-                test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-
-            Parts = binary:split(Bin, <<"\n">>, [global]),
-            %% we should receive at least one part even when timeout=1
-            ?assertNotEqual([], Parts)
-        end)}.
-
-wait_non_empty_chunk(Url) ->
-    test_util:wait(fun() ->
-        {ok, _, _, Bin} =
-            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-
-        Parts = binary:split(Bin, <<"\n">>, [global]),
-
-        case [P || P <- Parts, size(P) > 0] of
-            [] -> wait;
-            Chunks -> Chunks
-        end
-    end).
+    #{
+        <<"_attachments">> => #{
+            <<"file.erl">> => #{
+                <<"content_type">> => <<"text/plain">>,
+                <<"data">> => base64:encode(Data)
+            }
+        }
+    }.
