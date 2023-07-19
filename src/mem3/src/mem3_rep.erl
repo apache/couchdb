@@ -41,7 +41,8 @@
     filter,
     db,
     hashfun,
-    incomplete_ranges
+    incomplete_ranges,
+    rexi_timeout
 }).
 
 -record(tgt, {
@@ -53,6 +54,8 @@
     history = {[]},
     remaining = 0
 }).
+
+-define(DEFAULT_REXI_TIMEOUT, 600000).
 
 go(Source, Target) ->
     go(Source, Target, []).
@@ -90,6 +93,11 @@ go(#shard{} = Source, #{} = Targets0, Opts) when map_size(Targets0) > 0 ->
                 "incomplete_ranges",
                 false
             ),
+            RexiTimeout =
+                case proplists:get_value(rexi_timeout, Opts) of
+                    T when is_integer(T), T > 0 -> T;
+                    _ -> ?DEFAULT_REXI_TIMEOUT
+                end,
             Filter = proplists:get_value(filter, Opts),
             Acc = #acc{
                 batch_size = BatchSize,
@@ -97,7 +105,8 @@ go(#shard{} = Source, #{} = Targets0, Opts) when map_size(Targets0) > 0 ->
                 source = Source,
                 targets = Targets,
                 filter = Filter,
-                incomplete_ranges = IncompleteRanges
+                incomplete_ranges = IncompleteRanges,
+                rexi_timeout = RexiTimeout
             },
             go(Acc);
         false ->
@@ -606,16 +615,16 @@ changes_append_fdi(
             )
     end.
 
-replicate_batch_multi(#acc{targets = Targets0, seq = Seq, db = Db} = Acc) ->
+replicate_batch_multi(#acc{targets = Targets0, seq = Seq, db = Db, rexi_timeout = Timeout} = Acc) ->
     Targets = maps:map(
         fun(_, #tgt{} = T) ->
-            replicate_batch(T, Db, Seq)
+            replicate_batch(T, Db, Seq, Timeout)
         end,
         Targets0
     ),
     {ok, Acc#acc{targets = Targets, revcount = 0}}.
 
-replicate_batch(#tgt{shard = TgtShard, infos = Infos} = Target, Db, Seq) ->
+replicate_batch(#tgt{shard = TgtShard, infos = Infos} = Target, Db, Seq, Timeout) ->
     #shard{node = Node, name = Name} = TgtShard,
     case find_missing_revs(Target) of
         [] ->
@@ -624,7 +633,7 @@ replicate_batch(#tgt{shard = TgtShard, infos = Infos} = Target, Db, Seq) ->
             lists:map(
                 fun(Chunk) ->
                     Docs = open_docs(Db, Infos, Chunk),
-                    ok = save_on_target(Node, Name, Docs)
+                    ok = save_on_target(Node, Name, Docs, Timeout)
                 end,
                 chunk_revs(Missing)
             )
@@ -694,13 +703,19 @@ open_docs(Db, Infos, Missing) ->
         Missing
     ).
 
-save_on_target(Node, Name, Docs) ->
-    mem3_rpc:update_docs(Node, Name, Docs, [
-        ?REPLICATED_CHANGES,
-        full_commit,
-        ?ADMIN_CTX,
-        {io_priority, {internal_repl, Name}}
-    ]),
+save_on_target(Node, Name, Docs, Timeout) ->
+    mem3_rpc:update_docs(
+        Node,
+        Name,
+        Docs,
+        [
+            ?REPLICATED_CHANGES,
+            full_commit,
+            ?ADMIN_CTX,
+            {io_priority, {internal_repl, Name}}
+        ],
+        Timeout
+    ),
     ok.
 
 purge_on_target(Node, Name, PurgeInfos) ->

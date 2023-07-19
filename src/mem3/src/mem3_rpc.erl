@@ -18,6 +18,7 @@
     find_common_seq/4,
     get_missing_revs/4,
     update_docs/4,
+    update_docs/5,
     pull_replication/1,
     load_checkpoint/4,
     load_checkpoint/5,
@@ -61,6 +62,8 @@ get_missing_revs(Node, DbName, IdsRevs, Options) ->
 
 update_docs(Node, DbName, Docs, Options) ->
     rexi_call(Node, {fabric_rpc, update_docs, [DbName, Docs, Options]}).
+update_docs(Node, DbName, Docs, Options, Timeout) ->
+    rexi_call(Node, {fabric_rpc, update_docs, [DbName, Docs, Options]}, Timeout).
 
 load_checkpoint(Node, DbName, SourceNode, SourceUUID, <<>>) ->
     % Upgrade clause for a mixed cluster for old nodes that don't have
