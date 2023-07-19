@@ -50,6 +50,8 @@ teardown({Url, {Db1, Db2, Db3}}) ->
     ok = config:delete("reshard", "max_jobs", Persist),
     ok = config:delete("reshard", "require_node_param", Persist),
     ok = config:delete("reshard", "require_range_param", Persist),
+    ok = config:delete("reshard", "max_retries", Persist),
+    ok = config:delete("reshard", "retry_interval_sec", Persist),
     ok = config:delete("admins", ?USER, Persist),
     meck:unload().
 
@@ -79,6 +81,7 @@ mem3_reshard_api_test_() ->
                     fun test_disabled/1,
                     fun start_stop_cluster_with_a_job/1,
                     fun individual_job_start_stop/1,
+                    fun individual_job_start_after_failure/1,
                     fun individual_job_stop_when_cluster_stopped/1,
                     fun create_job_with_invalid_arguments/1,
                     fun create_job_with_db/1,
@@ -414,6 +417,35 @@ individual_job_start_stop({Top, {Db1, _, _}}) ->
             ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
             % Let it continue running and it should complete eventually
             JobPid2 ! continue,
+            wait_state(StUrl, <<"completed">>)
+        end)}.
+
+individual_job_start_after_failure({Top, {Db1, _, _}}) ->
+    {timeout, ?TIMEOUT,
+        ?_test(begin
+            config:set("reshard", "retry_interval_sec", "0", false),
+            config:set("reshard", "max_retries", "1", false),
+            meck:expect(couch_db_split, split, fun(_, _, _) ->
+                meck:exception(error, kapow)
+            end),
+
+            Body = #{type => split, db => Db1},
+            {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+
+            JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
+            StUrl = JobUrl ++ "/state",
+
+            wait_state(StUrl, <<"failed">>),
+
+            % Stop/start resharding globally and job should still stay failed
+            ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
+            ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+            ?assertMatch({200, #{<<"state">> := <<"failed">>}}, req(get, StUrl)),
+
+            meck:unload(),
+
+            % Start the job again
+            ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
             wait_state(StUrl, <<"completed">>)
         end)}.
 
