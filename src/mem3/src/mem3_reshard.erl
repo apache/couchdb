@@ -266,7 +266,7 @@ handle_call({resume_job, _}, _From, #state{state = stopped} = State) ->
 handle_call({resume_job, Id}, _From, State) ->
     couch_log:notice("~p resume_job call ~p", [?MODULE, Id]),
     case job_by_id(Id) of
-        #job{job_state = stopped} = Job ->
+        #job{job_state = JobState} = Job when JobState == stopped; JobState == failed ->
             case start_job_int(Job, State) of
                 ok ->
                     {reply, ok, State};
