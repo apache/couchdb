@@ -73,6 +73,15 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         spawn_monitor(?MODULE, open_doc, [DbName, Options ++ DocOptions1, Key, IncludeDocs])
     end,
     MaxJobs = all_docs_concurrency(),
+    %% namespace can be _set_ to `undefined`, so we want simulate enum here
+    Namespace =
+        case couch_util:get_value(namespace, Extra) of
+            <<"_all_docs">> -> <<"_all_docs">>;
+            <<"_design">> -> <<"_design">>;
+            <<"_non_design">> -> <<"_non_design">>;
+            <<"_local">> -> <<"_local">>;
+            _ -> <<"_all_docs">>
+        end,
     Keys1 =
         case Dir of
             fwd -> Keys0;
@@ -88,15 +97,7 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
             true -> lists:sublist(Keys2, Limit);
             false -> Keys2
         end,
-    %% namespace can be _set_ to `undefined`, so we want simulate enum here
-    Namespace =
-        case couch_util:get_value(namespace, Extra) of
-            <<"_all_docs">> -> <<"_all_docs">>;
-            <<"_design">> -> <<"_design">>;
-            <<"_non_design">> -> <<"_non_design">>;
-            <<"_local">> -> <<"_local">>;
-            _ -> <<"_all_docs">>
-        end,
+    Keys4 = filter_keys_by_namespace(Keys3, Namespace),
     Timeout = fabric_util:all_docs_timeout(),
     {_, Ref} = spawn_monitor(fun() ->
         exit(fabric:get_doc_count(DbName, Namespace))
@@ -112,7 +113,7 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
                 end,
             {ok, Acc1} = Callback({meta, Meta}, Acc0),
             Resp = doc_receive_loop(
-                Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
+                Keys4, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
             ),
             case Resp of
                 {ok, Acc2} ->
@@ -361,3 +362,26 @@ cancel_read_pids(Pids) ->
         {empty, _} ->
             ok
     end.
+
+filter_keys_by_namespace(Keys, Namespace) when Namespace =:= <<"_design">> ->
+    lists:filter(
+        fun(Key) ->
+            case Key of
+                <<?DESIGN_DOC_PREFIX, _/binary>> -> true;
+                _ -> false
+            end
+        end,
+        Keys
+    );
+filter_keys_by_namespace(Keys, Namespace) when Namespace =:= <<"_local">> ->
+    lists:filter(
+        fun(Key) ->
+            case Key of
+                <<?LOCAL_DOC_PREFIX, _/binary>> -> true;
+                _ -> false
+            end
+        end,
+        Keys
+    );
+filter_keys_by_namespace(Keys, _Namespace) ->
+    Keys.
