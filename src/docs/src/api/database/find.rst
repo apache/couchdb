@@ -1472,9 +1472,7 @@ it easier to take advantage of future improvements to query planning
                     "year",
                     "title"
                 ],
-                "r": [
-                    49
-                ],
+                "r": 1,
                 "conflicts": false,
                 "execution_stats": false,
                 "partition": "",
