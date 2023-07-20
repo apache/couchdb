@@ -65,7 +65,17 @@ explain(#cursor{} = Cursor) ->
         fields = Fields
     } = Cursor,
     Mod = mango_idx:cursor_mod(Idx),
-    Opts = lists:keydelete(user_ctx, 1, Opts0),
+    Opts1 = lists:keydelete(user_ctx, 1, Opts0),
+    % The value of `r` needs to be translated to an integer
+    % otherwise `jiffy:encode/1` will render it as an array.
+    RValue = lists:keyfind(r, 1, Opts1),
+    Opts =
+        case RValue of
+            {r, R} ->
+                lists:keyreplace(r, 1, Opts1, {r, list_to_integer(R)});
+            false ->
+                Opts1
+        end,
     {
         [
             {dbname, mango_idx:dbname(Idx)},
