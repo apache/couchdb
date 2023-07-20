@@ -489,7 +489,7 @@ public class Lucene9Index extends Index {
     }
 
     private Query parse(final SearchRequest request) {
-        var queryParser = new NouveauQueryParser(analyzer);
+        var queryParser = new NouveauQueryParser(analyzer, request.getLocale());
         Query result;
         try {
             result = queryParser.parse(request.getQuery(), "default");

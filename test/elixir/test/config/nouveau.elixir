@@ -6,6 +6,7 @@
     "search returns all items for POST",
     "search returns all items (paginated)",
     "search for foo:bar",
+    "search for numeric ranges with locales",
     "sort by string field (asc)",
     "sort by string field (desc)",
     "sort by numeric field (asc)",

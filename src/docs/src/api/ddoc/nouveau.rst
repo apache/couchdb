@@ -46,6 +46,9 @@
         name among the documents that match the search query.
     :query boolean include_docs: Include the full content of the documents in the
         response.
+    :query string locale: The (Java) locale used to parse numbers in range queries.
+        Defaults to the JDK default locale if not specified. Some examples are ``de``
+        , ``us``, ``gb``.
     :query number limit: Limit the number of the returned documents to the specified
         number. For a grouped search, this parameter limits the number of documents per
         group.
