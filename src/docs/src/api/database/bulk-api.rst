@@ -321,6 +321,11 @@
 Sending multiple queries to a database
 ======================================
 
+.. _api/db/_all_docs/queries:
+
+``/{db}/_all_docs/queries``
+---------------------------
+
 .. versionadded:: 2.2
 
 .. http:post:: /{db}/_all_docs/queries
@@ -442,8 +447,107 @@ Sending multiple queries to a database
     }
 
 .. Note::
-    The multiple queries are also supported in /{db}/_local_docs/queries and
-    /{db}/_design_docs/queries (similar to /{db}/_all_docs/queries).
+    The multiple queries are also supported in
+    :ref:`/{db}/_local_docs/queries <api/db/_local_docs/queries>` and
+    :ref:`/{db}/_design_docs/queries <api/db/_design_docs/queries>`
+    (similar to :ref:`/{db}/_all_docs/queries <api/db/_all_docs/queries>`).
+
+.. _api/db/_design_docs/queries:
+
+``/{db}/_design_docs/queries``
+------------------------------
+
+.. http:post:: /{db}/_design_docs/queries
+    :synopsis: Returns results for the specified queries
+
+    Querying with specified ``keys`` will return design documents only.
+    You can also combine ``keys`` with other query parameters,
+    such as ``limit`` and ``skip``.
+
+    :param db: Database name
+
+    :<header Content-Type: - :mimetype:`application/json`
+    :<header Accept: - :mimetype:`application/json`
+
+    :<json queries: An array of query objects with fields for the
+        parameters of each individual view query to be executed.
+        The field names and their meaning are the same as the query
+        parameters of a regular
+        :ref:`_design_docs request <api/db/design_docs>`.
+
+    :>header Content-Type: - :mimetype:`application/json`
+                           - :mimetype:`text/plain; charset=utf-8`
+    :>header Transfer-Encoding: ``chunked``
+
+    :>json array results: An array of result objects - one for each query. Each
+        result object contains the same fields as the response to a regular
+        :ref:`_design_docs request <api/db/design_docs>`.
+
+    :code 200: Request completed successfully
+    :code 400: Invalid request
+    :code 401: Read permission required
+    :code 404: Specified database is missing
+    :code 500: Query execution error
+
+**Request**:
+
+.. code-block:: http
+
+    POST /db/_design_docs/queries HTTP/1.1
+    Content-Type: application/json
+    Accept: application/json
+    Host: localhost:5984
+
+    {
+        "queries": [
+            {
+                "keys": [
+                    "_design/recipe",
+                    "_design/not-exist",
+                    "spaghetti"
+                ]
+            }
+        ]
+    }
+
+**Response**:
+
+.. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Thu, 20 Jul 2023 20:06:44 GMT
+    Server: CouchDB (Erlang/OTP)
+    Transfer-Encoding: chunked
+
+    {
+        "results": [
+            {
+                "total_rows": 1,
+                "offset": null,
+                "rows": [
+                    {
+                        "id": "_design/recipe",
+                        "key": "_design/recipe",
+                        "value": {
+                            "rev": "1-ad0e29fe6b473658514742a7c2317766"
+                        }
+                    },
+                    {
+                        "key": "_design/not-exist",
+                        "error": "not_found"
+                    }
+                ]
+            }
+        ]
+    }
+
+.. Note::
+    /{db}/_design_docs/queries with keys will only return design documents,
+    or ``"error": "not_found"`` if the design document doesn't exist. If
+    ``key`` is not a design document id, it will not be included in the
+    response.
 
 .. _api/db/bulk_get:
 

@@ -16,7 +16,7 @@
 Local (non-replicating) Documents
 =================================
 
-The Local (non-replicating) document interface allows you to create local
+The local (non-replicating) document interface allows you to create local
 documents that are not replicated to other databases. These documents can be
 used to hold configuration or other information that is required specifically
 on the local CouchDB instance.
@@ -35,22 +35,25 @@ other information for the current (local) instance of a given database.
 
 A list of the available methods and URL paths are provided below:
 
-+--------+------------------------+--------------------------------------------+
-| Method | Path                   | Description                                |
-+========+========================+============================================+
-| GET,   | /{db}/_local_docs      | Returns a list of all the                  |
-| POST   |                        | non-replicated documents in the database   |
-+--------+------------------------+--------------------------------------------+
-| GET    | /{db}/_local/{docid}   | Returns the latest revision of the         |
-|        |                        | non-replicated document                    |
-+--------+------------------------+--------------------------------------------+
-| PUT    | /{db}/_local/{docid}   | Inserts a new version of the               |
-|        |                        | non-replicated document                    |
-+--------+------------------------+--------------------------------------------+
-| DELETE | /{db}/_local/{docid}   | Deletes the non-replicated document        |
-+--------+------------------------+--------------------------------------------+
-| COPY   | /{db}/_local/{docid}   | Copies the non-replicated document         |
-+--------+------------------------+--------------------------------------------+
++--------+---------------------------+--------------------------------------------+
+| Method | Path                      | Description                                |
++========+===========================+============================================+
+| GET,   | /{db}/_local_docs         | Returns a list of all the                  |
+| POST   |                           | non-replicated documents in the database   |
++--------+---------------------------+--------------------------------------------+
+| POST   | /{db}/_local_docs/queries | Returns a list of specified                |
+|        |                           | non-replicated documents in the database   |
++--------+---------------------------+--------------------------------------------+
+| GET    | /{db}/_local/{docid}      | Returns the latest revision of the         |
+|        |                           | non-replicated document                    |
++--------+---------------------------+--------------------------------------------+
+| PUT    | /{db}/_local/{docid}      | Inserts a new version of the               |
+|        |                           | non-replicated document                    |
++--------+---------------------------+--------------------------------------------+
+| DELETE | /{db}/_local/{docid}      | Deletes the non-replicated document        |
++--------+---------------------------+--------------------------------------------+
+| COPY   | /{db}/_local/{docid}      | Copies the non-replicated document         |
++--------+---------------------------+--------------------------------------------+
 
 .. _api/db/_local_docs:
 
@@ -222,6 +225,116 @@ A list of the available methods and URL paths are provided below:
             ],
             "offset" : null
         }
+
+.. _api/db/_local_docs/queries:
+
+``/{db}/_local_docs/queries``
+=============================
+
+.. http:post:: /{db}/_local_docs/queries
+    :synopsis: Returns results for the specified queries
+
+    Querying with specified ``keys`` will return local documents only.
+    You can also combine ``keys`` with other query parameters,
+    such as ``limit`` and ``skip``.
+
+    :param db: Database name
+
+    :<header Content-Type: - :mimetype:`application/json`
+    :<header Accept: - :mimetype:`application/json`
+
+    :<json queries: An array of query objects with fields for the
+        parameters of each individual view query to be executed.
+        The field names and their meaning are the same as the query
+        parameters of a regular
+        :ref:`_local_docs request <api/db/_local_docs>`.
+
+    :>header Content-Type: - :mimetype:`application/json`
+                           - :mimetype:`text/plain; charset=utf-8`
+    :>header Transfer-Encoding: ``chunked``
+
+    :>json array results: An array of result objects - one for each query. Each
+        result object contains the same fields as the response to a regular
+        :ref:`_local_docs request <api/db/_local_docs>`.
+
+    :code 200: Request completed successfully
+    :code 400: Invalid request
+    :code 401: Read permission required
+    :code 404: Specified database is missing
+    :code 500: Query execution error
+
+**Request**:
+
+.. code-block:: http
+
+    POST /db/_local_docs/queries HTTP/1.1
+    Content-Type: application/json
+    Accept: application/json
+    Host: localhost:5984
+
+    {
+        "queries": [
+            {
+                "keys": [
+                    "_local/localdoc05",
+                    "_local/not-exist",
+                    "_design/recipe",
+                    "spaghetti"
+                ]
+            }
+        ]
+    }
+
+**Response**:
+
+.. code-block:: http
+
+    HTTP/1.1 200 OK
+    Cache-Control: must-revalidate
+    Content-Type: application/json
+    Date: Thu, 20 Jul 2023 21:45:37 GMT
+    Server: CouchDB (Erlang/OTP)
+    Transfer-Encoding: chunked
+
+    {
+        "results": [
+            {
+                "total_rows": null,
+                "offset": null,
+                "rows": [
+                    {
+                        "id": "_local/localdoc05",
+                        "key": "_local/localdoc05",
+                        "value": {
+                          "rev": "0-1"
+                        }
+                    },
+                    {
+                        "key": "_local/not-exist",
+                        "error": "not_found"
+                    }
+                ]
+            },
+            {
+                "total_rows": null,
+                "offset": null,
+                "rows": [
+                    {
+                      "id": "_local/localdoc04",
+                      "key": "_local/localdoc04",
+                      "value": {
+                          "rev": "0-1"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+.. Note::
+    Similar to :ref:`_design_docs/queries <api/db/_design_docs/queries>`,
+    /{db}/_local_docs/queries will only return local documents.
+    The difference is ``total_rows`` and ``offset`` are always ``null``.
 
 .. _api/db/_local/doc:
 
