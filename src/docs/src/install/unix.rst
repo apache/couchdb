@@ -31,6 +31,7 @@ to install CouchDB is to use the convenience binary packages:
 
 * CentOS/RHEL 7
 * CentOS/RHEL 8
+* CentOS/RHEL 9 (with caveats)
 * Debian 10 (buster)
 * Debian 11 (bullseye)
 * Ubuntu 18.04 (bionic)
@@ -63,10 +64,18 @@ Enabling the Apache CouchDB package repository
     echo "deb [signed-by=/usr/share/keyrings/couchdb-archive-keyring.gpg] https://apache.jfrog.io/artifactory/couchdb-deb/ ${VERSION_CODENAME} main" \
         | sudo tee /etc/apt/sources.list.d/couchdb.list >/dev/null
 
-**RedHat or CentOS**: Run the following commands::
+**RedHat(<9) or CentOS**: Run the following commands::
 
     sudo yum install -y yum-utils
     sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
+
+**RedHat(>=9)**: Run the following commands::
+
+    sudo yum install -y yum-utils
+    sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
+    # Enable EPEL for the SpiderMonkey dependency
+    sudo dnf config-manager --set-enabled crb
+    sudo dnf install epel-release epel-next-release
 
 Installing the Apache CouchDB packages
 --------------------------------------
@@ -83,8 +92,13 @@ clustered installations. For clusters, multiple nodes will still need to be
 joined together and configured consistently across all machines; **follow the**
 :ref:`Cluster Setup <setup/cluster>` **walkthrough** to complete the process.
 
-**RedHat/CentOS**: Run the command::
+**RedHat(<9)/CentOS**: Run the command::
 
+    sudo yum install -y couchdb
+
+**RedHat(>=9)**: Run the following commands::
+
+    sudo yum install -y mozjs78
     sudo yum install -y couchdb
 
 Once installed, :ref:`create an admin user<config/admins>` by hand before
