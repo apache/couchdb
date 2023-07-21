@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.lucene9;
 import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.List;
+import java.util.Locale;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.queryparser.flexible.core.QueryParserHelper;
@@ -55,11 +56,11 @@ import org.apache.lucene.search.Query;
 
 public final class NouveauQueryParser extends QueryParserHelper {
 
-    public NouveauQueryParser(final Analyzer analyzer) {
+    public NouveauQueryParser(final Analyzer analyzer, final Locale locale) {
         super(
                 new StandardQueryConfigHandler(),
                 new StandardSyntaxParser(),
-                new NouveauQueryNodeProcessorPipeline(),
+                new NouveauQueryNodeProcessorPipeline(locale),
                 new StandardQueryTreeBuilder());
         getQueryConfigHandler().set(ConfigurationKeys.ENABLE_POSITION_INCREMENTS, true);
         getQueryConfigHandler().set(ConfigurationKeys.ANALYZER, analyzer);
@@ -77,7 +78,7 @@ public final class NouveauQueryParser extends QueryParserHelper {
      */
     public static class NouveauQueryNodeProcessorPipeline extends QueryNodeProcessorPipeline {
 
-        public NouveauQueryNodeProcessorPipeline() {
+        public NouveauQueryNodeProcessorPipeline(final Locale locale) {
             super(null);
             add(new WildcardQueryNodeProcessor());
             add(new MultiFieldQueryNodeProcessor());
@@ -85,7 +86,7 @@ public final class NouveauQueryParser extends QueryParserHelper {
             add(new RegexpQueryNodeProcessor());
             add(new MatchAllDocsQueryNodeProcessor());
             add(new OpenRangeQueryNodeProcessor());
-            add(new NouveauPointProcessor());
+            add(new NouveauPointProcessor(locale));
             add(new TermRangeQueryNodeProcessor());
             add(new AllowLeadingWildcardProcessor());
             add(new AnalyzerQueryNodeProcessor());
@@ -107,9 +108,15 @@ public final class NouveauQueryParser extends QueryParserHelper {
      */
     public static class NouveauPointProcessor extends QueryNodeProcessorImpl {
 
+        private final Locale locale;
+
+        NouveauPointProcessor(final Locale locale) {
+            this.locale = locale != null ? locale : Locale.getDefault();
+        }
+
         @Override
         protected QueryNode postProcessNode(final QueryNode node) throws QueryNodeException {
-            final var numberFormat = NumberFormat.getInstance();
+            final var numberFormat = NumberFormat.getInstance(locale);
             final var pointsConfig = new PointsConfig(numberFormat, Double.class);
 
             if (node instanceof FieldQueryNode && !(node.getParent() instanceof RangeQueryNode)) {

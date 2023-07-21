@@ -183,6 +183,25 @@ defmodule NouveauTest do
   end
 
   @tag :with_db
+  test "search for numeric ranges with locales", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "bar:[10.0 TO 20.0]", locale: "us", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    assert ids == ["doc3"]
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "bar:[10.0 TO 20.0]", locale: "de", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    assert ids == ["doc2"]
+  end
+
+  @tag :with_db
   test "sort by string field (asc)", context do
     db_name = context[:db_name]
     create_search_docs(db_name)

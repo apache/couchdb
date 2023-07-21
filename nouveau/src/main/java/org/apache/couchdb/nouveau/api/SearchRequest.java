@@ -22,6 +22,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
@@ -30,6 +31,8 @@ public class SearchRequest {
 
     @NotNull
     private String query;
+
+    private Locale locale;
 
     private String partition;
 
@@ -59,6 +62,15 @@ public class SearchRequest {
     @JsonProperty
     public String getQuery() {
         return query;
+    }
+
+    public void setLocale(final Locale locale) {
+        this.locale = locale;
+    }
+
+    @JsonProperty
+    public Locale getLocale() {
+        return locale;
     }
 
     public void setPartition(final String partition) {
@@ -142,7 +154,7 @@ public class SearchRequest {
 
     @Override
     public String toString() {
-        return "SearchRequest [query=" + query + ", sort=" + sort + ", limit=" + limit + ", after=" + after
-                + ", counts=" + counts + ", ranges=" + ranges + "]";
+        return "SearchRequest [query=" + query + ", locale=" + locale + ", sort=" + sort + ", limit=" + limit
+                + ", after=" + after + ", counts=" + counts + ", ranges=" + ranges + "]";
     }
 }

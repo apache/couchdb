@@ -15,6 +15,7 @@ package org.apache.couchdb.nouveau.lucene9;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Locale;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.index.Term;
@@ -34,7 +35,7 @@ public class NouveauQueryParserTest {
 
     @BeforeAll
     public static void setup() {
-        qp = new NouveauQueryParser(new StandardAnalyzer());
+        qp = new NouveauQueryParser(new StandardAnalyzer(), Locale.US);
     }
 
     @Test
@@ -99,5 +100,17 @@ public class NouveauQueryParserTest {
     public void testOpenRightPointRangeQueryLegacy() throws Exception {
         assertThat(qp.parse("foo:[1.0 TO Infinity]", DEFAULT_FIELD))
                 .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {Double.POSITIVE_INFINITY}));
+    }
+
+    @Test
+    public void testLocales() throws Exception {
+        var us = new NouveauQueryParser(new StandardAnalyzer(), Locale.US);
+        var de = new NouveauQueryParser(new StandardAnalyzer(), Locale.GERMAN);
+
+        assertThat(us.parse("foo:[10.0 TO 20.0]", DEFAULT_FIELD))
+                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {10}, new double[] {20}));
+
+        assertThat(de.parse("foo:[10.0 TO 20.0]", DEFAULT_FIELD))
+                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {100}, new double[] {200}));
     }
 }
