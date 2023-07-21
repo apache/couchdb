@@ -500,7 +500,7 @@ def boot_nouveau(ctx):
     return sp.Popen(
         " ".join(cmd),
         cwd="nouveau",
-        shell=True,
+        shell=False,
         stdin=sp.PIPE,
         stdout=log,
         stderr=sp.STDOUT,
