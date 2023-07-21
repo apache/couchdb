@@ -477,9 +477,7 @@ def boot_haproxy(ctx):
     env = os.environ.copy()
     if "HAPROXY_PORT" not in env:
         env["HAPROXY_PORT"] = ctx["haproxy_port"]
-    return sp.Popen(
-        " ".join(cmd), shell=True, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env
-    )
+    return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
 
 def boot_nouveau(ctx):
@@ -498,9 +496,8 @@ def boot_nouveau(ctx):
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
-        " ".join(cmd),
+        cmd,
         cwd="nouveau",
-        shell=True,
         stdin=sp.PIPE,
         stdout=log,
         stderr=sp.STDOUT,
