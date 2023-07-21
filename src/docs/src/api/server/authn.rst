@@ -27,6 +27,13 @@ Interfaces for obtaining session and authorization data.
 Basic Authentication
 ====================
 
+.. versionchanged:: 3.4 In order to aid transition to stronger password hashing
+    without causing a performance penalty, CouchDB will send a Set-Cookie header
+    when a request authenticates successfully with Basic authentication. All browsers
+    and many http libraries will automatically send this cookie on subsequent requests.
+    The cost of verifying the cookie is significantly less than PBKDF2 with a high
+    iteration count, for example.
+
 `Basic authentication`_ (:rfc:`2617`) is a quick and simple way to authenticate
 with CouchDB. The main drawback is the need to send user credentials with each
 request which may be insecure and could hurt operation performance (since
