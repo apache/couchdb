@@ -51,9 +51,7 @@ version = '1.0-SNAPSHOT'
 description = 'server'
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(11)
-    }
+    sourceCompatibility = "11"
 }
 
 jar {
