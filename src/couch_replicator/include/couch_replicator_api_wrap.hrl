@@ -11,13 +11,14 @@
 % the License.
 
 
+-define(COUCH_REPLICATOR_USER_AGENT, "CouchDB-Replicator/" ++ couch_server:get_version()).
 
 -record(httpdb, {
     url,
     auth_props = [],
     headers = [
         {"Accept", "application/json"},
-        {"User-Agent", "CouchDB-Replicator/" ++ couch_server:get_version()}
+        {"User-Agent", ?COUCH_REPLICATOR_USER_AGENT}
     ],
     timeout,            % milliseconds
     ibrowse_options = [],
