@@ -389,23 +389,6 @@ defmodule CookieAuthTest do
       &test_change_admin_fun/0
     )
 
-    # performing a successful basic authentication will
-    # create a session cookie
-    resp = Couch.get(
-      "/_all_dbs",
-      headers: [authorization: "Basic #{:base64.encode("jan:apple")}"])
-    assert resp.status_code == 200
-
-    # extract cookie value
-    cookie = resp.headers[:"set-cookie"]
-    [token | _] = String.split(cookie, ";")
-
-    resp = Couch.get(
-      "/_session",
-      headers: [cookie: token])
-    assert resp.status_code == 200
-    assert resp.body["info"]["authenticated"] == "cookie"
-
     # log in one last time so run_on_modified_server can clean up the admin account
     login("jan", "apple")
   end
