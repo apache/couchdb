@@ -307,7 +307,10 @@ maybe_refresh(#state{next_refresh = T} = State) ->
 -spec refresh(#state{}) -> {ok, #state{}} | {error, term()}.
 refresh(#state{session_url = Url, user = User, pass = Pass} = State) ->
     Body = mochiweb_util:urlencode([{name, User}, {password, Pass}]),
-    Headers0 = [{"Content-Type", "application/x-www-form-urlencoded"}],
+    Headers0 = [
+        {"User-Agent", ?COUCH_REPLICATOR_USER_AGENT},
+        {"Content-Type", "application/x-www-form-urlencoded"}
+    ],
     Headers =
         case State#state.require_valid_user of
             true ->
@@ -535,7 +538,8 @@ cookie_update_test_() ->
                 t_init_state_401_with_require_valid_user(),
                 t_init_state_404(),
                 t_init_state_no_creds(),
-                t_init_state_http_error()
+                t_init_state_http_error(),
+                t_send_replicator_user_agent()
             ]
         }
     }.
@@ -649,6 +653,18 @@ t_init_state_http_error() ->
         {error, Error} = init_state(httpdb("http://u:p@h")),
         SessionUrl = "http://h/_session",
         ?assertEqual({session_request_failed, SessionUrl, "u", x}, Error)
+    end).
+
+t_send_replicator_user_agent() ->
+    ?_test(begin
+        mock_http_cookie_response("Abc"),
+        {ok, State} = maybe_refresh(#state{next_refresh = 0}),
+        ?assertMatch(#state{epoch = 1, cookie = "Abc"}, State),
+        % Headers is the 3rd argument in send_req_direct/7
+        % See https://hexdocs.pm/meck/meck.html#capture-5
+        Headers = meck:capture(first, ibrowse, send_req_direct, '_', 3),
+        UserAgent = proplists:get_value("User-Agent", Headers),
+        ?assertMatch("CouchDB-Replicator/" ++ _, UserAgent)
     end).
 
 httpdb(Url) ->
