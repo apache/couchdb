@@ -114,23 +114,12 @@ default_authentication_handler(Req, AuthModule) ->
                     Password = ?l2b(Pass),
                     case authenticate(Password, UserProps) of
                         true ->
-                            Req0 = Req#httpd{
+                            Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = UserName,
                                     roles = couch_util:get_value(<<"roles">>, UserProps, [])
                                 }
-                            },
-                            case chttpd_util:get_chttpd_auth_config("secret") of
-                                undefined ->
-                                    Req0;
-                                SecretStr ->
-                                    Secret = ?l2b(SecretStr),
-                                    UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
-                                    FullSecret = <<Secret/binary, UserSalt/binary>>,
-                                    Req0#httpd{
-                                        auth = {FullSecret, true}
-                                    }
-                            end;
+                            };
                         false ->
                             authentication_warning(Req, UserName),
                             throw({unauthorized, <<"Name or password is incorrect.">>})
