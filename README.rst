@@ -8,7 +8,7 @@ Apache CouchDB README
 .. |1| image:: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/main/badge/icon?subject=main
     :target: https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=main
 .. |2| image:: https://readthedocs.org/projects/couchdb/badge/?version=latest
-    :target: https://docs.couchdb.org/en/main/?badge=latest
+    :target: https://docs.couchdb.org/en/latest/?badge=latest
 
 Installation
 ------------
