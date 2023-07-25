@@ -138,18 +138,21 @@ defmodule Couch do
   end
 
   def set_auth_options(options) do
-    if Keyword.get(options, :cookie) == nil do
-      headers = Keyword.get(options, :headers, [])
-      if headers[:basic_auth] != nil or headers[:authorization] != nil
-         or List.keymember?(headers, :"X-Auth-CouchDB-UserName", 0) do
+    cond do
+      Keyword.get(options, :no_auth, false) ->
         options
-      else
-        username = System.get_env("EX_USERNAME") || "adm"
-        password = System.get_env("EX_PASSWORD") || "pass"
-        Keyword.put(options, :basic_auth, {username, password})
-      end
-    else
-      options
+      Keyword.get(options, :cookie) == nil ->
+        headers = Keyword.get(options, :headers, [])
+        if headers[:basic_auth] != nil or headers[:authorization] != nil
+          or List.keymember?(headers, :"X-Auth-CouchDB-UserName", 0) do
+          options
+        else
+          username = System.get_env("EX_USERNAME") || "adm"
+          password = System.get_env("EX_PASSWORD") || "pass"
+          Keyword.put(options, :basic_auth, {username, password})
+        end
+      true ->
+        options
     end
   end
 

@@ -30,7 +30,6 @@
 
 -export([authenticate/2, verify_totp/2]).
 -export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
--export([cookie_auth_cookie/4, cookie_scheme/1]).
 -export([maybe_value/3]).
 
 -export([jwt_authentication_handler/1]).
@@ -114,12 +113,23 @@ default_authentication_handler(Req, AuthModule) ->
                     Password = ?l2b(Pass),
                     case authenticate(Password, UserProps) of
                         true ->
-                            Req#httpd{
+                            Req0 = Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = UserName,
                                     roles = couch_util:get_value(<<"roles">>, UserProps, [])
                                 }
-                            };
+                            },
+                            case chttpd_util:get_chttpd_auth_config("secret") of
+                                undefined ->
+                                    Req0;
+                                SecretStr ->
+                                    Secret = ?l2b(SecretStr),
+                                    UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
+                                    FullSecret = <<Secret/binary, UserSalt/binary>>,
+                                    Req0#httpd{
+                                        auth = {FullSecret, true, true}
+                                    }
+                            end;
                         false ->
                             authentication_warning(Req, UserName),
                             throw({unauthorized, <<"Name or password is incorrect.">>})
@@ -331,11 +341,15 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
         [] ->
             Req;
         Cookie ->
-            [User, TimeStr, HashStr] =
+            % TimestampStr is expanded to be a list of options, separated
+            % by commas. The new second option is 'MustMatchBasic', a 0 or
+            % 1 to indicate if the basic auth username must match the cookie
+            % if present.
+            [User, OptionsStr, HashStr] =
                 try
                     AuthSession = couch_util:decodeBase64Url(Cookie),
                     [_A, _B, _Cs] = re:split(
-                        ?b2l(AuthSession),
+                        AuthSession,
                         ":",
                         [{return, list}, {parts, 3}]
                     )
@@ -344,12 +358,29 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                         Reason = <<"Malformed AuthSession cookie. Please clear your cookies.">>,
                         throw({bad_request, Reason})
                 end,
+            [TimeStr, MustMatchBasic] =
+                case re:split(OptionsStr, ",", [{return, list}]) of
+                    [T, M] ->
+                        [T, M];
+                    [T] ->
+                        [T, "0"]
+                end,
+            BasicAuthUser =
+                case basic_name_pw(Req) of
+                    {U, _P} ->
+                        U;
+                    nil ->
+                        nil
+                end,
             % Verify expiry and hash
             CurrentTime = make_cookie_time(),
             HashAlgorithms = couch_util:get_config_hash_algorithms(),
             case chttpd_util:get_chttpd_auth_config("secret") of
                 undefined ->
                     couch_log:debug("cookie auth secret is not set", []),
+                    Req;
+                _ when MustMatchBasic == "1", BasicAuthUser /= nil, User /= BasicAuthUser ->
+                    % ignoring pre-emptive cookie
                     Req;
                 SecretStr ->
                     Secret = ?l2b(SecretStr),
@@ -361,7 +392,13 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                             FullSecret = <<Secret/binary, UserSalt/binary>>,
                             Hash = ?l2b(HashStr),
                             VerifyHash = fun(HashAlg) ->
-                                Hmac = couch_util:hmac(HashAlg, FullSecret, User ++ ":" ++ TimeStr),
+                                Hmac = couch_util:hmac(
+                                    HashAlg,
+                                    FullSecret,
+                                    lists:join(":", [
+                                        User, lists:join(",", [TimeStr, MustMatchBasic])
+                                    ])
+                                ),
                                 couch_passwords:verify(Hmac, Hash)
                             end,
                             Timeout = chttpd_util:get_chttpd_auth_config_integer(
@@ -384,7 +421,9 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                                                         <<"roles">>, UserProps, []
                                                     )
                                                 },
-                                                auth = {FullSecret, TimeLeft < Timeout * 0.9}
+                                                auth =
+                                                    {FullSecret, TimeLeft < Timeout * 0.9,
+                                                        MustMatchBasic == "1"}
                                             };
                                         _Else ->
                                             Req
@@ -398,7 +437,11 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
 
 cookie_auth_header(#httpd{user_ctx = #user_ctx{name = null}}, _Headers) ->
     [];
-cookie_auth_header(#httpd{user_ctx = #user_ctx{name = User}, auth = {Secret, true}} = Req, Headers) ->
+cookie_auth_header(
+    #httpd{user_ctx = #user_ctx{name = User}, auth = {Secret, _SendCookie = true, MustMatchBasic}} =
+        Req,
+    Headers
+) ->
     % Note: we only set the AuthSession cookie if:
     %  * a valid AuthSession cookie has been received
     %  * we are outside a 10% timeout window
@@ -412,20 +455,28 @@ cookie_auth_header(#httpd{user_ctx = #user_ctx{name = User}, auth = {Secret, tru
     if
         AuthSession == undefined ->
             TimeStamp = make_cookie_time(),
-            [cookie_auth_cookie(Req, ?b2l(User), Secret, TimeStamp)];
+            [cookie_auth_cookie(Req, User, Secret, TimeStamp, MustMatchBasic)];
         true ->
             []
     end;
 cookie_auth_header(_Req, _Headers) ->
     [].
 
-cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
-    SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
+cookie_auth_cookie(Req, User, Secret, TimeStamp, MustMatchBasic) ->
+    MustMatchBasicStr =
+        case MustMatchBasic of
+            true -> "1";
+            false -> "0"
+        end,
+    SessionData = lists:join(":", [
+        User,
+        lists:join(",", [erlang:integer_to_list(TimeStamp, 16), MustMatchBasicStr])
+    ]),
     [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
     Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
     mochiweb_cookies:cookie(
         "AuthSession",
-        couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
+        couch_util:encodeBase64Url(lists:join(":", [SessionData, Hash])),
         cookie_attributes(Req)
     ).
 
@@ -493,7 +544,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
             UserSalt = couch_util:get_value(<<"salt">>, UserProps),
             CurrentTime = make_cookie_time(),
             Cookie = cookie_auth_cookie(
-                Req, ?b2l(UserName), <<Secret/binary, UserSalt/binary>>, CurrentTime
+                Req, UserName, <<Secret/binary, UserSalt/binary>>, CurrentTime, false
             ),
             % TODO document the "next" feature in Futon
             {Code, Headers} =
