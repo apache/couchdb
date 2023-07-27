@@ -26,6 +26,7 @@
 -export([null_authentication_handler/1]).
 -export([proxy_authentication_handler/1, proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
+-export([cookie_auth_session_value/5]).
 -export([handle_session_req/1, handle_session_req/2]).
 
 -export([authenticate/2, verify_totp/2]).
@@ -462,7 +463,7 @@ cookie_auth_header(
 cookie_auth_header(_Req, _Headers) ->
     [].
 
-cookie_auth_cookie(Req, User, Secret, TimeStamp, MustMatchBasic) ->
+cookie_auth_session_value(HashAlgorithm, User, Secret, TimeStamp, MustMatchBasic) ->
     MustMatchBasicStr =
         case MustMatchBasic of
             true -> "1";
@@ -472,11 +473,14 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp, MustMatchBasic) ->
         User,
         lists:join(",", [erlang:integer_to_list(TimeStamp, 16), MustMatchBasicStr])
     ]),
-    [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
     Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
+    couch_util:encodeBase64Url(lists:join(":", [SessionData, Hash])).
+
+cookie_auth_cookie(Req, User, Secret, TimeStamp, MustMatchBasic) ->
+    [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
     mochiweb_cookies:cookie(
         "AuthSession",
-        couch_util:encodeBase64Url(lists:join(":", [SessionData, Hash])),
+        cookie_auth_session_value(HashAlgorithm, User, Secret, TimeStamp, MustMatchBasic),
         cookie_attributes(Req)
     ).
 
