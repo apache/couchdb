@@ -155,7 +155,7 @@ check: all
 	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
-	@$(MAKE) elixir-suite
+	@$(MAKE) elixir
 	@$(MAKE) weatherreport-test
 	@$(MAKE) nouveau-test
 
@@ -241,15 +241,6 @@ ifeq ($(with_nouveau), 0)
   exclude_nouveau=--exclude nouveau
 endif
 
-.PHONY: elixir
-elixir: export MIX_ENV=integration
-elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir: elixir-init devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
-		--enable-erlang-views \
-		--locald-config test/elixir/test/config/test-config.ini \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(exclude_nouveau) $(EXUNIT_OPTS)'
-
 .PHONY: elixir-init
 elixir-init: MIX_ENV=integration
 elixir-init: config.erl
@@ -269,17 +260,17 @@ elixir-cluster-with-quorum: elixir-init devclean
 		--degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
-.PHONY: elixir-suite
-# target: elixir-suite - Run Elixir-based integration tests
-elixir-suite: export MIX_ENV=integration
-elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir-suite: elixir-init devclean
-	@dev/run -n 1 -q -a adm:pass \
+.PHONY: elixir
+# target: elixir - Run Elixir-based integration tests
+elixir: export MIX_ENV=integration
+elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir: elixir-init devclean
+	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
 		--enable-erlang-views \
 		--no-join \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
 .PHONY: elixir-search
 # target: elixir-search - Run search tests, requires a running Clouseau instance

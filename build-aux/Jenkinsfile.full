@@ -152,7 +152,7 @@ def generateNativeStage(platform) {
                 sh "${configure(meta[platform])}"
                 sh '$MAKE'
                 sh '$MAKE eunit'
-                sh '$MAKE elixir-suite'
+                sh '$MAKE elixir'
                 sh '$MAKE exunit'
                 sh '$MAKE mango-test'
                 sh '$MAKE weatherreport-test'
@@ -206,7 +206,7 @@ def generateContainerStage(platform) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
                     sh 'make eunit'
-                    sh 'make elixir-suite'
+                    sh 'make elixir'
                     sh 'make exunit'
                     sh 'make mango-test'
                     sh 'make weatherreport-test'
