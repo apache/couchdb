@@ -191,11 +191,11 @@ To run all the tests use run::
     make check
 
 You can also run each test suite individually via the ``eunit``, ``mango-test``,
-``elixir-suite``, and ``weatherreport-test`` targets::
+``elixir``, and ``weatherreport-test`` targets::
 
     make eunit
     make mango-test
-    make elixir-suite
+    make elixir
     make weatherreport-test
 
 Erlang Unit Tests
@@ -226,13 +226,13 @@ to specify exact ``rebar eunit`` options::
 Elixir Integration Tests
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-All the Elixir-based integration tests could be by the `elixir-suite`
+All the Elixir-based integration tests could be by the `elixir`
 target::
 
-    make elixir-suite
+    make elixir
 
 There is an additional suite for Dreyfus, which is not run
-automatically by either the ``elixir-suite`` or the ``check`` target
+automatically by either the ``elixir`` or the ``check`` target
 but it could be done manually via the corresponding target::
 
     make elixir-search
