@@ -27,6 +27,10 @@
     "drilldown single key single value for POST",
     "drilldown three keys single values for POST",
     "search returns all items for GET",
-    "search returns all items for POST"
+    "search returns all items for POST",
+    "facet counts, non-empty",
+    "facet counts, empty",
+    "facet ranges, empty",
+    "facet ranges, non-empty"
   ]
 }

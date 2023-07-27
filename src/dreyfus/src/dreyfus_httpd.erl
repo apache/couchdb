@@ -673,8 +673,8 @@ group_to_json(DbName, IncludeDocs, {Name, TotalHits, Hits}, UseNewApi) ->
 facets_to_json(Facets) ->
     {[facet_to_json(F) || F <- Facets]}.
 
-facet_to_json({K, V, []}) ->
-    {hd(K), V};
+facet_to_json({K, 0, []}) ->
+    {hd(K), {[]}};
 facet_to_json({K0, _V0, C0}) ->
     C2 = [{tl(K1), V1, C1} || {K1, V1, C1} <- C0],
     {hd(K0), facets_to_json(C2)}.

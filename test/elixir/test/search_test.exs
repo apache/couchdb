@@ -11,10 +11,10 @@ defmodule SearchTest do
     resp = Couch.post("/#{db_name}/_bulk_docs",
       headers: ["Content-Type": "application/json"],
       body: %{:docs => [
-                %{"item" => "apple",  "place" => "kitchen", "state" => "new"},
-                %{"item" => "banana", "place" => "kitchen", "state" => "new"},
-                %{"item" => "carrot", "place" => "kitchen", "state" => "old"},
-                %{"item" => "date",   "place" => "lobby",   "state" => "unknown"},
+                %{"item" => "apple",  "place" => "kitchen", "state" => "new",     "price" => 0.99},
+                %{"item" => "banana", "place" => "kitchen", "state" => "new",     "price" => 1.49},
+                %{"item" => "carrot", "place" => "kitchen", "state" => "old",     "price" => 0.75},
+                %{"item" => "date",   "place" => "lobby",   "state" => "unknown", "price" => 1.25},
       ]}
     )
     assert resp.status_code in [201, 202]
@@ -25,7 +25,14 @@ defmodule SearchTest do
       indexes: %{
         fruits: %{
           analyzer: %{name: "standard"},
-          index: "function (doc) {\n  index(\"item\", doc.item, {facet: true});\n  index(\"place\", doc.place, {facet: true});\n  index(\"state\", doc.state, {facet: true});\n}"
+          index: ~S"""
+            function (doc) {
+              index("item", doc.item, {facet: true});
+              index("place", doc.place, {facet: true});
+              index("state", doc.state, {facet: true});
+              index("price", doc.price, {facet: true});
+            }
+            """
         }
       }
     }
@@ -222,5 +229,65 @@ defmodule SearchTest do
 
     resp = Couch.post("/#{db_name}/_search_cleanup")
     assert resp.status_code in [201, 202]
+  end
+
+  @tag :with_db
+  test "facet counts, non-empty", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    counts = ["place"]
+    resp = Couch.get(url, query: %{q: "*:*", limit: 0, counts: :jiffy.encode(counts)})
+    assert resp.status_code == 200
+
+    %{:body => %{"counts" => counts}} = resp
+    assert counts == %{"place" => %{"kitchen" => 3, "lobby" => 1}}
+  end
+
+  @tag :with_db
+  test "facet counts, empty", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    counts = ["place"]
+    resp = Couch.get(url, query: %{q: "item:tomato", limit: 0, counts: :jiffy.encode(counts)})
+    assert resp.status_code == 200
+
+    %{:body => %{"counts" => counts}} = resp
+    assert counts == %{"place" => %{}}
+  end
+
+  @tag :with_db
+  test "facet ranges, non-empty", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    ranges = %{"price" => %{"cheap" => "[0 TO 0.99]", "expensive" => "[1.00 TO Infinity]"}}
+    resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
+    assert resp.status_code == 200
+
+    %{:body => %{"ranges" => ranges}} = resp
+    assert ranges == %{"price" => %{"cheap" => 2, "expensive" => 2}}
+  end
+
+  @tag :with_db
+  test "facet ranges, empty", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    ranges = %{"price" => %{}}
+    resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
+    assert resp.status_code == 200
+
+    %{:body => %{"ranges" => ranges}} = resp
+    assert ranges == %{"price" => %{}}
   end
 end
