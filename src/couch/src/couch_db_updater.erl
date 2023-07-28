@@ -266,6 +266,7 @@ sort_and_tag_grouped_docs(Client, GroupedDocs, UserCtx) ->
     % duplicate documents if the incoming groups are not sorted, so as a sanity
     % check we sort them again here. See COUCHDB-2735.
     Cmp = fun([#doc{id = A} | _], [#doc{id = B} | _]) -> A < B end,
+    % couch_log:notice("~n s_a_t_g_d: GroupedDocs: ~p, UserCtx: ~p ~n", [GroupedDocs, UserCtx]),
     lists:map(
         fun(DocGroup) ->
             [{Client, maybe_tag_doc(D), UserCtx} || D <- DocGroup]
@@ -739,7 +740,7 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     {DocsListValidated, OldDocInfosValidated} = validate_docs_access(
         Db, DocsList, OldDocInfos
     ),
-
+    % couch_log:notice("~n~n u_d_i: DocsList: ~p~n, OldDocInfos: ~p~n, DocsListValidated: ~p~n, OldDocInfosValidated: ~p~n~n~n", [DocsList, OldDocInfos, DocsListValidated, OldDocInfosValidated]),
     {ok, AccOut} = merge_rev_trees(DocsListValidated, OldDocInfosValidated, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
@@ -791,7 +792,7 @@ validate_docs_access_int(Db, DocsList, OldDocInfos) ->
 validate_docs_access(_Db, [], [], DocsListValidated, OldDocInfosValidated) ->
     % TODO: check if need to reverse this? maybe this is the cause of the test reverse issue?
     % {lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated)};
-    {DocsListValidated, OldDocInfosValidated};
+    {lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated)};
 validate_docs_access(
     Db, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated
 ) ->
@@ -831,7 +832,7 @@ validate_docs_access(
         case length(NewDocs) of
             % we sent out all docs as invalid access, drop the old doc info associated with it
             0 ->
-                {[NewDocs | DocsListValidated], OldDocInfosValidated};
+                {DocsListValidated, OldDocInfosValidated};
             _ ->
                 {[NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated]}
         end,
