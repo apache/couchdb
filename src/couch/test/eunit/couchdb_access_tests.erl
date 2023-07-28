@@ -87,7 +87,7 @@ access_test_() ->
         fun should_let_user_create_doc_for_themselves/2,
         fun should_not_let_user_create_doc_for_someone_else/2,
         fun should_let_user_create_access_ddoc/2,
-        % fun access_ddoc_should_have_no_effects/2,
+        fun access_ddoc_should_have_no_effects/2,
 
         % Doc updates
         fun users_with_access_can_update_doc/2,
@@ -100,8 +100,6 @@ access_test_() ->
         fun user_with_access_can_read_doc/2,
         fun user_without_access_can_not_read_doc/2,
         fun user_can_not_read_doc_without_access/2,
-        fun admin_with_access_can_read_conflicted_doc/2,
-        % fun user_with_access_can_not_read_conflicted_doc/2,
 
         % Doc deletes
         fun should_let_admin_delete_doc_with_access/2,
@@ -130,10 +128,8 @@ access_test_() ->
 
         fun should_allow_user_to_replicate_from_access_to_access/2,
         fun should_allow_user_to_replicate_from_access_to_no_access/2,
-        % TODO: find out why this is flakey
-        % fun should_allow_user_to_replicate_from_no_access_to_access/2,
-
-        % fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
+        fun should_allow_user_to_replicate_from_no_access_to_access/2,
+        fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
 
         % _revs_diff for docs you don’t have access to
         fun should_not_allow_user_to_revs_diff_other_docs/2
@@ -370,45 +366,6 @@ user_with_access_can_read_doc(_PortType, Url) ->
     {ok, Code, _, _} = test_request:get(
         Url ++ "/db/a",
         ?USERX_REQ_HEADERS
-    ),
-    ?_assertEqual(200, Code).
-
-% TODO: induce conflict with two different _access users per rev
-% could be comiing from a split-brain scenario
-% whoever ends up winner can read the doc, but not the leaf
-% that doesn’t belong to them
-% whoever loses can only request their leaf
-% user_with_access_can_not_read_conflicted_doc(_PortType, Url) ->
-%     {ok, 201, _, _} = test_request:put(
-%         Url ++ "/db/a",
-%         ?ADMIN_REQ_HEADERS,
-%         "{\"_id\":\"f1\",\"a\":1,\"_access\":[\"x\"]}"
-%     ),
-%     {ok, 201, _, _} = test_request:put(
-%         Url ++ "/db/a?new_edits=false",
-%         ?ADMIN_REQ_HEADERS,
-%         "{\"_id\":\"f1\",\"_rev\":\"7-XYZ\",\"a\":1,\"_access\":[\"x\"]}"
-%     ),
-%     {ok, Code, _, _} = test_request:get(
-%         Url ++ "/db/a",
-%         ?USERX_REQ_HEADERS
-%     ),
-%     ?_assertEqual(403, Code).
-
-admin_with_access_can_read_conflicted_doc(_PortType, Url) ->
-    {ok, 201, _, _} = test_request:put(
-        Url ++ "/db/a",
-        ?ADMIN_REQ_HEADERS,
-        "{\"_id\":\"a\",\"a\":1,\"_access\":[\"x\"]}"
-    ),
-    {ok, 201, _, _} = test_request:put(
-        Url ++ "/db/a?new_edits=false",
-        ?ADMIN_REQ_HEADERS,
-        "{\"_id\":\"a\",\"_rev\":\"7-XYZ\",\"a\":1,\"_access\":[\"x\"]}"
-    ),
-    {ok, Code, _, _} = test_request:get(
-        Url ++ "/db/a",
-        ?ADMIN_REQ_HEADERS
     ),
     ?_assertEqual(200, Code).
 
