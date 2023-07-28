@@ -78,7 +78,7 @@ ddoc_update_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    % fun check_indexing_stops_on_ddoc_change/1
+                    fun check_indexing_stops_on_ddoc_change/1
                 ]
             }
         }
