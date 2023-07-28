@@ -47,11 +47,11 @@ check_refresh_test_() ->
         fun start_couch/0,
         fun stop_couch/1,
         with([
-            % ?TDEF(remove_ddoc),
-            % ?TDEF(remove_ddoc_rev),
-            % ?TDEF(remove_ddoc_rev_only),
-            % ?TDEF(remove_custom_not_ok),
-            % ?TDEF(remove_custom_error)
+            ?TDEF(remove_ddoc),
+            ?TDEF(remove_ddoc_rev),
+            ?TDEF(remove_ddoc_rev_only),
+            ?TDEF(remove_custom_not_ok),
+            ?TDEF(remove_custom_error)
         ])
     }.
 
