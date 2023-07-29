@@ -51,8 +51,12 @@ check_down_shards(Collector, BadNode) ->
 -spec handle_worker_exit(#collector{}, #shard{}, any()) -> {error, any()}.
 handle_worker_exit(Collector, _Worker, Reason) ->
     #collector{callback = Callback, user_acc = Acc} = Collector,
-    {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
-    {error, Resp}.
+    case Callback({error, fabric_util:error_info(Reason)}, Acc) of
+        {error, Resp} ->
+            {error, Resp};
+        {ok, Resp} ->
+            {error, Resp}
+    end.
 
 -spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
     [{#shard{}, any()}].

@@ -400,6 +400,12 @@ info(mango_util, {invalid_ddoc_lang, Lang}) ->
         <<"invalid_ddoc_lang">>,
         fmt("Existing design doc has an invalid language: ~w", [Lang])
     };
+info(mango_util, {invalid_field_name, Field}) ->
+    {
+        400,
+        <<"invalid_field_name">>,
+        fmt("Invalid field name: ~s", [Field])
+    };
 info(Module, Reason) ->
     {
         500,
