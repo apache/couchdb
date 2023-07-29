@@ -26,6 +26,7 @@ class BasicFindTests(mango.UserDocsTests):
             {"foo": {"$not_an_op": 2}},
             {"$gt": 2},
             [None, "bing"],
+            {"_id": {"": None}},
         ]
         for bs in bad_selectors:
             try:

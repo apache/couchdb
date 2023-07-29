@@ -238,7 +238,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                         fabric:query_view(Db, DbOpts, DDoc, Name, CB, Cursor, Args)
                 end,
             case Result of
-                {ok, LastCursor} ->
+                {ok, #cursor{} = LastCursor} ->
                     NewBookmark = mango_json_bookmark:create(LastCursor),
                     Arg = {add_key, bookmark, NewBookmark},
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
@@ -252,6 +252,11 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                         UserFun, Cursor, Stats1, FinalUserAcc0
                     ),
                     {ok, FinalUserAcc1};
+                {ok, Error} when is_tuple(Error) ->
+                    % fabric_view_all_docs turns {error, Resp} results into {ok, Resp}
+                    % for some reason. If we didn't get a proper cursor record, assume
+                    % it's an error and pass it through
+                    {error, Error};
                 {error, Reason} ->
                     {error, Reason}
             end
