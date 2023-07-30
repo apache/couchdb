@@ -248,6 +248,7 @@ class Database(object):
         update=True,
         executionStats=False,
         partition=None,
+        use_index_strict=None,
     ):
         body = {
             "selector": selector,
@@ -267,6 +268,8 @@ class Database(object):
             body["update"] = False
         if executionStats == True:
             body["execution_stats"] = True
+        if use_index_strict is not None:
+            body["use_index_strict"] = use_index_strict
         body = json.dumps(body)
         if partition:
             ppath = "_partition/{}/".format(partition)

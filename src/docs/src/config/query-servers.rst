@@ -309,3 +309,20 @@ Mango is the Query Engine that services the :ref:`_find <api/db/_find>`, endpoin
 
             [mango]
             index_scan_warning_threshold = 10
+
+    .. config:option:: strict_index_selection :: Strict index selection.
+
+        .. versionadded:: 3.4
+
+        Make the index selection strict.  The query planner will not
+        try to find a suitable index automatically but use the
+        user-specified index and give up immediately in case of
+        failure.  This implictly makes the use of the ``use_index``
+        query parameter mandatory.  Using the ``use_index_strict``
+        Boolean parameter, this behavior may be adjusted per query.
+
+        Defaults to ``false``.
+        ::
+
+            [mango]
+            strict_index_selection = false
