@@ -282,7 +282,8 @@ Mango is the Query Engine that services the :ref:`_find <api/db/_find>`, endpoin
 
         Set to ``true`` to disable the "index all fields" text index. This can lead
         to out of memory issues when there are documents with nested array fields.
-        Defaults to ``false``.::
+        Defaults to ``false``.
+        ::
 
             [mango]
             index_all_disabled = false
@@ -292,7 +293,8 @@ Mango is the Query Engine that services the :ref:`_find <api/db/_find>`, endpoin
         Sets the default number of results that will be returned in a
         :ref:`_find <api/db/_find>` response. Individual requests can override this
         by setting ``limit`` directly in the query parameters.
-        Defaults to ``25``.::
+        Defaults to ``25``.
+        ::
 
             [mango]
             default_limit = 25
@@ -305,7 +307,8 @@ Mango is the Query Engine that services the :ref:`_find <api/db/_find>`, endpoin
         requires reading 100 documents to return 10 rows, a warning will be
         generated if this value is ``10``.
 
-        Defaults to ``10``. Setting the value to ``0`` disables the warning.::
+        Defaults to ``10``. Setting the value to ``0`` disables the warning.
+        ::
 
             [mango]
             index_scan_warning_threshold = 10
