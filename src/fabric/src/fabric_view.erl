@@ -419,7 +419,14 @@ maybe_update_others(
     ViewName,
     #mrargs{update = lazy} = Args
 ) ->
-    ShardsNeedUpdated = mem3:shards(DbName) -- ShardsInvolved,
+    BlockInteractiveIndexing = couch_disk_monitor:block_interactive_view_indexing(),
+    ShardsNeedUpdated =
+        case BlockInteractiveIndexing of
+            true ->
+                [];
+            false ->
+                mem3:shards(DbName) -- ShardsInvolved
+        end,
     lists:foreach(
         fun(#shard{node = Node, name = ShardName}) ->
             rpc:cast(Node, fabric_rpc, update_mrview, [ShardName, DDoc, ViewName, Args])

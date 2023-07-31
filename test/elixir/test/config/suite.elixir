@@ -194,6 +194,11 @@
     "design doc options - include_desing=true",
     "design doc options - local_seq=true"
   ],
+  "DiskMonitorTest": [
+    "block background view indexing",
+    "block interactive view indexing",
+    "block interactive database writes"
+  ],
   "DesignPathTest": [
     "design doc path",
     "design doc path with slash in db name"

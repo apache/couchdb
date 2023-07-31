@@ -144,11 +144,11 @@ handle_stream_start(rexi_STREAM_INIT, {Worker, From}, St) ->
                     {stop, St#stream_acc{workers = [], ready = Ready1}}
             end
     end;
-handle_stream_start({ok, ddoc_updated}, _, St) ->
+handle_stream_start({ok, Error}, _, St) when Error == ddoc_updated; Error == insufficient_storage ->
     WaitingWorkers = [W || {W, _} <- St#stream_acc.workers],
     ReadyWorkers = [W || {W, _} <- St#stream_acc.ready],
     cleanup(WaitingWorkers ++ ReadyWorkers),
-    {stop, ddoc_updated};
+    {stop, Error};
 handle_stream_start(Else, _, _) ->
     exit({invalid_stream_start, Else}).
 

@@ -291,8 +291,8 @@ query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
                     _ -> {ok, Acc0}
                 end,
             query_view(Db, VInfo, Args, Callback, Acc1);
-        ddoc_updated ->
-            Callback(ok, ddoc_updated)
+        Error when Error == ddoc_updated; Error == insufficient_storage ->
+            Callback(ok, Error)
     end.
 
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
@@ -752,8 +752,8 @@ default_cb({final, Info}, []) ->
     {ok, [Info]};
 default_cb({final, _}, Acc) ->
     {ok, Acc};
-default_cb(ok, ddoc_updated) ->
-    {ok, ddoc_updated};
+default_cb(ok, Error) when Error == ddoc_updated; Error == insufficient_storage ->
+    {ok, Error};
 default_cb(Row, Acc) ->
     {ok, [Row | Acc]}.
 
