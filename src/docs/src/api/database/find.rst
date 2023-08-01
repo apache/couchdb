@@ -1441,13 +1441,12 @@ it easier to take advantage of future improvements to query planning
         Transfer-Encoding: chunked
 
         {
-            "covered": false,
             "dbname": "movies",
             "index": {
                 "ddoc": "_design/0d61d9177426b1e2aa8d0fe732ec6e506f5d443c",
                 "name": "0d61d9177426b1e2aa8d0fe732ec6e506f5d443c",
-                "partitioned": false,
                 "type": "json",
+                "partitioned": false,
                 "def": {
                     "fields": [
                         {
@@ -1456,12 +1455,14 @@ it easier to take advantage of future improvements to query planning
                     ]
                 }
             },
+            "partitioned": false,
             "selector": {
                 "year": {
                     "$gt": 2010
                 }
             },
             "opts": {
+                "use_index": [],
                 "bookmark": "nil",
                 "limit": 2,
                 "skip": 0,
@@ -1472,30 +1473,13 @@ it easier to take advantage of future improvements to query planning
                     "year",
                     "title"
                 ],
+                "partition": "",
                 "r": 1,
                 "conflicts": false,
-                "execution_stats": false,
-                "partition": "",
-                "stable": false,
                 "stale": false,
                 "update": true,
-                "use_index": []
-            },
-            "mrargs": {
-                "conflicts": "undefined",
-                "direction": "fwd",
-                "end_key": [
-                    "<MAX>"
-                ],
-                "include_docs": true,
-                "partition": null,
-                "reduce": false,
                 "stable": false,
-                "start_key": [
-                    2010
-                ],
-                "update": true,
-                "view_type": "map"
+                "execution_stats": false
             },
             "limit": 2,
             "skip": 0,
@@ -1505,7 +1489,23 @@ it easier to take advantage of future improvements to query planning
                 "year",
                 "title"
             ],
-            "partitioned": false
+            "mrargs": {
+                "include_docs": true,
+                "view_type": "map",
+                "reduce": false,
+                "partition": null,
+                "start_key": [
+                    2010
+                ],
+                "end_key": [
+                    "<MAX>"
+                ],
+                "direction": "fwd",
+                "stable": false,
+                "update": true,
+                "conflicts": "undefined"
+            },
+            "covered": false
         }
 
 Index selection
