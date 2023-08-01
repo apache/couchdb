@@ -47,10 +47,26 @@
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
     UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
-    case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
+    case maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
         [] ->
-            % use_index doesn't match a valid index - fall back to a valid one
-            create_cursor(Db, UsableIndexes, Selector, Opts);
+            % use_index doesn't match a valid index - determine how
+            % this shall be handlded by the settings
+            case (use_index_strict(Opts)) of
+                true ->
+                    % return an error
+                    Details =
+                        case use_index(Opts) of
+                            [] ->
+                                [];
+                            UseIndex ->
+                                [DesignId | Rest] = UseIndex,
+                                [ddoc_name(DesignId) | Rest]
+                        end,
+                    ?MANGO_ERROR({invalid_index, Details});
+                false ->
+                    % fall back to a valid one
+                    create_cursor(Db, UsableIndexes, Selector, Opts)
+            end;
         UserSpecifiedIndex ->
             create_cursor(Db, UserSpecifiedIndex, Selector, Opts)
     end.
@@ -93,13 +109,25 @@ execute(#cursor{index = Idx} = Cursor, UserFun, UserAcc) ->
     Mod = mango_idx:cursor_mod(Idx),
     Mod:execute(Cursor, UserFun, UserAcc).
 
+use_index(Opts) ->
+    {use_index, UseIndex} = lists:keyfind(use_index, 1, Opts),
+    UseIndex.
+
+use_index_strict(Opts) ->
+    case lists:keyfind(use_index_strict, 1, Opts) of
+        {use_index_strict, ByQuery} ->
+            ByQuery;
+        false ->
+            config:get_boolean("mango", "strict_index_selection", false)
+    end.
+
 maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
-    case lists:keyfind(use_index, 1, Opts) of
-        {use_index, []} ->
+    case use_index(Opts) of
+        [] ->
             [];
-        {use_index, [DesignId]} ->
+        [DesignId] ->
             filter_indexes(Indexes, DesignId);
-        {use_index, [DesignId, ViewName]} ->
+        [DesignId, ViewName] ->
             filter_indexes(Indexes, DesignId, ViewName)
     end.
 
@@ -263,3 +291,48 @@ ddoc_name(<<"_design/", Name/binary>>) ->
     Name;
 ddoc_name(Name) ->
     Name.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+use_index_strict_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(config)
+        end,
+        fun(_) ->
+            meck:unload(config)
+        end,
+        [
+            ?TDEF_FE(t_use_index_strict_disabled_not_requested),
+            ?TDEF_FE(t_use_index_strict_disabled_requested),
+            ?TDEF_FE(t_use_index_strict_enabled_not_requested),
+            ?TDEF_FE(t_use_index_strict_enabled_requested)
+        ]
+    }.
+
+t_use_index_strict_disabled_not_requested(_) ->
+    meck:expect(config, get_boolean, ["mango", "strict_index_selection", '_'], meck:val(false)),
+    Options1 = [{use_index_strict, false}],
+    ?assertEqual(false, use_index_strict(Options1)),
+    Options2 = [],
+    ?assertEqual(false, use_index_strict(Options2)).
+
+t_use_index_strict_disabled_requested(_) ->
+    meck:expect(config, get_boolean, ["mango", "strict_index_selection", '_'], meck:val(false)),
+    Options = [{use_index_strict, true}],
+    ?assertEqual(true, use_index_strict(Options)).
+
+t_use_index_strict_enabled_not_requested(_) ->
+    meck:expect(config, get_boolean, ["mango", "strict_index_selection", '_'], meck:val(true)),
+    Options1 = [{use_index_strict, false}],
+    ?assertEqual(false, use_index_strict(Options1)),
+    Options2 = [],
+    ?assertEqual(true, use_index_strict(Options2)).
+
+t_use_index_strict_enabled_requested(_) ->
+    meck:expect(config, get_boolean, ["mango", "strict_index_selection", '_'], meck:val(true)),
+    Options = [{use_index_strict, true}],
+    ?assertEqual(true, use_index_strict(Options)).
+-endif.

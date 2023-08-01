@@ -91,6 +91,12 @@ validate_find({Props}) ->
             {default, []},
             {validator, fun validate_use_index/1}
         ]},
+        {<<"use_index_strict">>, [
+            {tag, use_index_strict},
+            {optional, true},
+            {default, false},
+            {validator, fun mango_opts:is_boolean/1}
+        ]},
         {<<"bookmark">>, [
             {tag, bookmark},
             {optional, true},

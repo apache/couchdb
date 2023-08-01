@@ -211,6 +211,25 @@ class IndexSelectionTests:
         )
         self.assertEqual(resp_explain["index"]["type"], "json")
 
+    def test_strict_index_selection(self):
+        with self.subTest(with_use_index=True):
+            try:
+                self.db.find(
+                    {"manager": True}, use_index="invalid", use_index_strict=True
+                )
+            except Exception as e:
+                self.assertEqual(e.response.status_code, 400)
+            else:
+                raise AssertionError("did not fail on invalid index")
+
+        with self.subTest(with_use_index=False):
+            try:
+                self.db.find({"manager": True}, use_index_strict=True)
+            except Exception as e:
+                self.assertEqual(e.response.status_code, 400)
+            else:
+                raise AssertionError("did not fail due to missing use_index")
+
 
 class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
     @classmethod

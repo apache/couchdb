@@ -45,6 +45,10 @@
     :<json string|array use_index: Instruct a query to use a specific index.
         Specified either as ``"<design_document>"`` or
         ``["<design_document>", "<index_name>"]``. *Optional*
+    :<json boolean use_index_strict: Do not perform the query unless
+       the index specified by ``use_index`` is found and suitable.
+       The use of this parameter implies the use of
+       ``use_index``. *Optional*
     :<json boolean conflicts: Include conflicted documents if ``true``.
         Intended use is to easily find conflicted documents, without an
         index or view. Default is ``false``. *Optional*
@@ -1479,7 +1483,8 @@ it easier to take advantage of future improvements to query planning
                 "stable": false,
                 "stale": false,
                 "update": true,
-                "use_index": []
+                "use_index": [],
+                "use_index_strict": false
             },
             "mrargs": {
                 "conflicts": "undefined",
@@ -1512,7 +1517,9 @@ Index selection
 ===============
 
 :ref:`_find <api/db/_find>` chooses which index to use for responding
-to a query, unless you specify an index at query time.
+to a query, unless you specify an index at query time.  Note that this
+is just a hint for the query planner and as such it might be ignored
+if the named index is not suitable for performing the query.
 
 The query planner looks at the selector section and finds the index with the
 closest match to operators and fields used in the query. If there are two
@@ -1525,3 +1532,8 @@ the index with the first alphabetical name is chosen.
     It is good practice to specify indexes explicitly in your queries. This
     prevents existing queries being affected by new indexes that might get added
     in a production environment.
+
+Setting the ``use_index_strict`` parameter to ``true`` disables the
+automated query planning.  In that case, one must specify an index
+which will be checked for usability and an error is return when it is
+not specified or it is not usable.
