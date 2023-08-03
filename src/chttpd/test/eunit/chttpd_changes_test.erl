@@ -282,7 +282,7 @@ t_reverse({_, DbUrl}) ->
     Params = "?descending=true",
     {Seq, Pending, Rows} = changes(DbUrl, Params),
     ?assertEqual(5, Seq),
-    ?assertEqual(-3, Pending),
+    ?assertEqual(0, Pending),
     ?assertEqual(
         [
             {7, {?DDOC2, <<"2-c">>}, ?LEAFREV},
@@ -296,7 +296,7 @@ t_continuous_reverse({_, DbUrl}) ->
     Params = "?feed=continuous&timeout=10&descending=true",
     {Seq, Pending, Rows} = changes(DbUrl, Params),
     ?assertEqual(5, Seq),
-    ?assertEqual(-3, Pending),
+    ?assertEqual(0, Pending),
     ?assertEqual(
         [
             {7, {?DDOC2, <<"2-c">>}, ?LEAFREV},
@@ -310,7 +310,7 @@ t_reverse_q8({_, DbUrl}) ->
     Params = "?descending=true",
     {Seq, Pending, Rows} = changes(DbUrl, Params),
     ?assertEqual(7, Seq),
-    ?assertEqual(-3, Pending),
+    ?assertEqual(0, Pending),
     {Seqs, Revs, _Deleted} = lists:unzip3(Rows),
     ?assertEqual(
         [
@@ -324,12 +324,12 @@ t_reverse_q8({_, DbUrl}) ->
 
 t_reverse_limit_zero({_, DbUrl}) ->
     Params = "?descending=true&limit=0",
-    ?assertEqual({7, 0, []}, changes(DbUrl, Params)).
+    ?assertEqual({7, 3, []}, changes(DbUrl, Params)).
 
 t_reverse_limit_one({_, DbUrl}) ->
     Params = "?descending=true&limit=1",
     ?assertEqual(
-        {7, -1, [
+        {7, 2, [
             {7, {?DDOC2, <<"2-c">>}, ?LEAFREV}
         ]},
         changes(DbUrl, Params)
@@ -338,7 +338,7 @@ t_reverse_limit_one({_, DbUrl}) ->
 t_reverse_limit_one_q8({_, DbUrl}) ->
     Params = "?descending=true&limit=1",
     ?assertMatch(
-        {7, -1, [
+        {7, 2, [
             {_, {<<_/binary>>, <<_/binary>>}, _}
         ]},
         changes(DbUrl, Params)
