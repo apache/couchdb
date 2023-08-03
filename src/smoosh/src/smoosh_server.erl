@@ -123,6 +123,9 @@ handle_db_event(DbName, local_updated, St) ->
 handle_db_event(DbName, updated, St) ->
     enqueue(DbName),
     {ok, St};
+handle_db_event(DbName, ddoc_updated, St) ->
+    enqueue({?INDEX_CLEANUP, mem3:dbname(DbName)}),
+    {ok, St};
 handle_db_event(DbName, {index_commit, IdxName}, St) ->
     enqueue({DbName, IdxName}),
     {ok, St};
@@ -342,6 +345,8 @@ find_channel(#state{} = State, [Channel | Rest], Object) ->
             find_channel(State, Rest, Object)
     end.
 
+stale_enough({?INDEX_CLEANUP, _}) ->
+    true;
 stale_enough(Object) ->
     LastUpdatedSec = last_updated(Object),
     Staleness = erlang:monotonic_time(second) - LastUpdatedSec,

@@ -22,6 +22,8 @@
     index_name/1,
     design_doc_to_indexes/2,
     design_doc_to_index/3,
+    active_sigs/1,
+    active_sigs/2,
     verify_index_exists/2,
     ensure_local_purge_docs/2,
     maybe_create_local_purge_doc/2,
@@ -97,6 +99,22 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
         _ ->
             {error, InvalidDDocError}
     end.
+
+active_sigs(DbName) when is_binary(DbName) ->
+    couch_util:with_db(DbName, fun active_sigs/1);
+active_sigs(Db) ->
+    DbName = couch_db:name(Db),
+    {ok, DesignDocs} = couch_db:get_design_docs(Db),
+    lists:usort(
+        lists:flatmap(
+            fun(Doc) -> active_sigs(DbName, Doc) end,
+            [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
+        )
+    ).
+
+active_sigs(DbName, #doc{} = Doc) ->
+    Indexes = design_doc_to_indexes(DbName, Doc),
+    lists:map(fun(Index) -> Index#index.sig end, Indexes).
 
 verify_index_exists(DbName, Props) ->
     try

@@ -14,9 +14,6 @@
 
 -module(nouveau_fabric_cleanup).
 
--include_lib("couch/include/couch_db.hrl").
-
--include("nouveau.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 -export([go/1]).
@@ -26,7 +23,7 @@ go(DbName) ->
     ActiveSigs =
         lists:usort(
             lists:flatmap(
-                fun(Doc) -> active_sigs(DbName, Doc) end,
+                fun(Doc) -> nouveau_util:active_sigs(DbName, Doc) end,
                 [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
             )
         ),
@@ -37,7 +34,3 @@ go(DbName) ->
         end,
         Shards
     ).
-
-active_sigs(DbName, #doc{} = Doc) ->
-    Indexes = nouveau_util:design_doc_to_indexes(DbName, Doc),
-    lists:map(fun(Index) -> Index#index.sig end, Indexes).
