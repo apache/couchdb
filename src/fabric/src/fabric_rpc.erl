@@ -92,12 +92,21 @@ changes(DbName, Options, StartVector, DbOptions) ->
             StartSeq = calculate_start_seq(Db, node(), StartVector),
             Enum = fun changes_enumerator/2,
             Opts = [{dir, Dir}],
+            Pending0 =
+                case Dir of
+                    fwd ->
+                        couch_db:count_changes_since(Db, StartSeq);
+                    rev ->
+                        ChangesTotal = couch_db:count_changes_since(Db, 0),
+                        ChangesToEnd = couch_db:count_changes_since(Db, StartSeq),
+                        ChangesTotal - ChangesToEnd
+                end,
             Acc0 = #fabric_changes_acc{
                 db = Db,
                 seq = StartSeq,
                 args = Args,
                 options = Options,
-                pending = couch_db:count_changes_since(Db, StartSeq),
+                pending = Pending0,
                 epochs = couch_db:get_epochs(Db)
             },
             try
