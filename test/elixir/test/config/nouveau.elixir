@@ -23,6 +23,7 @@
     "search POST (partitioned)",
     "mango (partitioned)",
     "delete",
-    "purge"
+    "purge",
+    "purge with conflicts"
   ]
 }
