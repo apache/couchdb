@@ -13,12 +13,16 @@
 
 package org.apache.couchdb.nouveau.core;
 
-import java.io.IOException;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response.Status;
 
-public final class UpdatesOutOfOrderException extends IOException {
+public final class UpdatesOutOfOrderException extends WebApplicationException {
 
     public UpdatesOutOfOrderException(final long currentSeq, final long attemptedSeq) {
-        super(String.format(
-                "Updates applied in the wrong order (current seq: %d, attempted seq: %d)", currentSeq, attemptedSeq));
+        super(
+                String.format(
+                        "Updates applied in the wrong order (current seq: %d, attempted seq: %d)",
+                        currentSeq, attemptedSeq),
+                Status.BAD_REQUEST);
     }
 }

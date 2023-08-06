@@ -25,7 +25,6 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,8 +103,9 @@ public class Lucene9Index extends Index {
             final Analyzer analyzer,
             final IndexWriter writer,
             final long updateSeq,
+            final long purgeSeq,
             final SearcherManager searcherManager) {
-        super(updateSeq);
+        super(updateSeq, purgeSeq);
         this.analyzer = Objects.requireNonNull(analyzer);
         this.writer = Objects.requireNonNull(writer);
         this.searcherManager = Objects.requireNonNull(searcherManager);
@@ -144,12 +144,12 @@ public class Lucene9Index extends Index {
     }
 
     @Override
-    public boolean doCommit(final long updateSeq) throws IOException {
+    public boolean doCommit(final long updateSeq, final long purgeSeq) throws IOException {
         if (!writer.hasUncommittedChanges()) {
             return false;
         }
-        writer.setLiveCommitData(
-                Collections.singletonMap("update_seq", Long.toString(updateSeq)).entrySet());
+        writer.setLiveCommitData(Map.of("update_seq", Long.toString(updateSeq), "purge_seq", Long.toString(purgeSeq))
+                .entrySet());
         writer.commit();
         return true;
     }

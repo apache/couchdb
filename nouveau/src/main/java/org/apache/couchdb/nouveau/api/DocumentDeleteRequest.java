@@ -24,15 +24,18 @@ public class DocumentDeleteRequest {
     @Positive
     private long seq;
 
+    private boolean purge;
+
     public DocumentDeleteRequest() {
         // Jackson deserialization
     }
 
-    public DocumentDeleteRequest(long seq) {
+    public DocumentDeleteRequest(long seq, final boolean purge) {
         if (seq < 1) {
             throw new IllegalArgumentException("seq must be 1 or greater");
         }
         this.seq = seq;
+        this.purge = purge;
     }
 
     @JsonProperty
@@ -40,8 +43,13 @@ public class DocumentDeleteRequest {
         return seq;
     }
 
+    @JsonProperty
+    public boolean isPurge() {
+        return purge;
+    }
+
     @Override
     public String toString() {
-        return "DocumentDeleteRequest [seq=" + seq + "]";
+        return "DocumentDeleteRequest [seq=" + seq + ", purge=" + purge + "]";
     }
 }

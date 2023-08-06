@@ -35,6 +35,7 @@ import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.IndexInfoRequest;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexLoader;
@@ -91,9 +92,23 @@ public final class IndexResource {
     }
 
     @GET
-    public IndexInfo indexInfo(@PathParam("name") String name) throws Exception {
+    public IndexInfo getIndexInfo(@PathParam("name") String name) throws Exception {
         return indexManager.with(name, indexLoader(), (index) -> {
             return index.info();
+        });
+    }
+
+    @POST
+    public void setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request)
+            throws Exception {
+        indexManager.with(name, indexLoader(), (index) -> {
+            if (request.getUpdateSeq().isPresent()) {
+                index.setUpdateSeq(request.getUpdateSeq().getAsLong());
+            }
+            if (request.getPurgeSeq().isPresent()) {
+                index.setPurgeSeq(request.getPurgeSeq().getAsLong());
+            }
+            return null;
         });
     }
 
@@ -126,19 +141,20 @@ public final class IndexResource {
             final IndexWriterConfig config = new IndexWriterConfig(analyzer);
             config.setUseCompoundFile(false);
             final IndexWriter writer = new IndexWriter(dir, config);
-            final long updateSeq = getUpdateSeq(writer);
+            final long updateSeq = getSeq(writer, "update_seq");
+            final long purgeSeq = getSeq(writer, "purge_seq");
             final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-            return new Lucene9Index(analyzer, writer, updateSeq, searcherManager);
+            return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
         };
     }
 
-    private static long getUpdateSeq(final IndexWriter writer) throws IOException {
+    private static long getSeq(final IndexWriter writer, final String key) throws IOException {
         final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
         if (commitData == null) {
             return 0L;
         }
         for (Map.Entry<String, String> entry : commitData) {
-            if (entry.getKey().equals("update_seq")) {
+            if (entry.getKey().equals(key)) {
                 return Long.parseLong(entry.getValue());
             }
         }
