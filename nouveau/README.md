@@ -43,7 +43,7 @@ I don't intend to add grouping support, it seems barely used. Would accept a tid
 
 ## Getting started
 
-Configure CouchDB with `--enable-nouveau'
+Configure CouchDB with `--enable-nouveau`
 
 Build Nouveau with;
 
