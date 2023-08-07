@@ -140,8 +140,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
-% TODO: can we do without this?
--include_lib("couch_mrview/include/couch_mrview.hrl").
+
 -include("couch_db_int.hrl").
 
 -define(DBNAME_REGEX,
@@ -320,9 +319,6 @@ open_doc(Db, Id, Options) ->
         Else ->
             Else
     end.
-
-apply_open_options(Db, Options) ->
-    apply_open_options2(Db, Options).
 
 apply_open_options(Db, {ok, Doc}, Options) ->
     ok = validate_access(Db, Doc, Options),
@@ -1392,36 +1388,6 @@ doc_tag(#doc{meta = Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
-validate_update(Db, Doc) ->
-    case catch validate_access(Db, Doc) of
-        ok -> Doc;
-        Error -> Error
-    end.
-
-validate_docs_access(Db, DocBuckets, DocErrors) ->
-    validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
-
-validate_docs_access1(_Db, [], {DocBuckets0, DocErrors}) ->
-    % DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
-    DocBuckets =
-        case DocBuckets0 of
-            [[]] -> [];
-            Else -> Else
-        end,
-    {ok, DocBuckets, lists:reverse(DocErrors)};
-validate_docs_access1(Db, [DocBucket | RestBuckets], {DocAcc, ErrorAcc}) ->
-    {NewBuckets, NewErrors} = lists:foldl(
-        fun(Doc, {Acc, ErrAcc}) ->
-            case catch validate_access(Db, Doc) of
-                ok -> {[Doc | Acc], ErrAcc};
-                Error -> {Acc, [{doc_tag(Doc), Error} | ErrAcc]}
-            end
-        end,
-        {[], ErrorAcc},
-        DocBucket
-    ),
-    validate_docs_access1(Db, RestBuckets, {[NewBuckets | DocAcc], NewErrors}).
-
 update_docs(Db, Docs0, Options, ?REPLICATED_CHANGES) ->
     Docs = tag_docs(Docs0),
 
@@ -1823,12 +1789,6 @@ open_read_stream(Db, AttState) ->
 
 is_active_stream(Db, StreamEngine) ->
     couch_db_engine:is_active_stream(Db, StreamEngine).
-
-changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
-    case couch_db:has_access_enabled(Db) and not couch_db:is_admin(Db) of
-        true -> couch_mrview:query_changes_access(Db, StartSeq, Fun, Options, Acc);
-        false -> couch_db_engine:fold_changes(Db, StartSeq, Fun, Options, Acc)
-    end.
 
 calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
     Seq;
