@@ -24,6 +24,7 @@ Configuration
     cluster
     couch-peruser
     disk-monitor
+    scanner
     http
     auth
     compaction
