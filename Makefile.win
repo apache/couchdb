@@ -89,7 +89,7 @@ DIALYZE_OPTS=$(shell powershell -command "('apps=${apps} skip_deps=${skip_deps} 
 
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-TEST_OPTS=-c startup_jitter=0 -c default_security=admin_local
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 ################################################################################
 # Main commands
@@ -147,7 +147,7 @@ check: all
 	@$(MAKE) nouveau-test
 
 ifdef apps
-subdirs = $(apps)
+subdirs=$(apps)
 else
 subdirs=$(shell dir /b src)
 endif
@@ -155,7 +155,7 @@ endif
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell echo %cd%)
-eunit: export ERL_AFLAGS = -config $(shell echo "%cd%")/rel/files/eunit.config
+eunit: export ERL_AFLAGS = -config $(shell echo %cd%)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
@@ -167,18 +167,19 @@ eunit: couch
 exunit: export BUILDDIR = $(shell echo %cd%)
 exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell echo %cd%)/src
-exunit: export ERL_AFLAGS = -config $(shell echo "%cd%")/rel/files/eunit.config
+exunit: export ERL_AFLAGS = -config $(shell echo %cd%)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
-exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
-	@mix test --cover --trace $(EXUNIT_OPTS)
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+exunit: couch elixir-init setup-eunit
+	@mix test --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell echo %cd%)
-setup-eunit: export ERL_AFLAGS = -config $(shell echo "%cd%")/rel/files/eunit.config
+setup-eunit: export ERL_AFLAGS = -config $(shell echo %cd%)/rel/files/eunit.config
 setup-eunit:
 	@$(REBAR) setup_eunit 2> nul
 
 just-eunit: export BUILDDIR = $(shell echo %cd%)
-just-eunit: export ERL_AFLAGS = -config $(shell echo "%cd%")/rel/files/eunit.config
+just-eunit: export ERL_AFLAGS = -config $(shell echo %cd%)/rel/files/eunit.config
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
@@ -214,22 +215,25 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux dev\run dev\format_*.py src\mango\test src\docs\src\conf.py src\docs\ext .
 
+ifeq ($(with_nouveau), 0)
+  exclude_nouveau=--exclude nouveau
+endif
 
 .PHONY: elixir-init
-elixir-init: MIX_ENV=test
+elixir-init: MIX_ENV=integration
 elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: export MIX_ENV=integration
-elixir-cluster-without-quorum: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-cluster-without-quorum: elixir-init devclean
 	@dev\run -n 3 -q -a adm:pass \
 	    --degrade-cluster 2 \
         --no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-cluster-with-quorum
 elixir-cluster-with-quorum: export MIX_ENV=integration
-elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devclean
+elixir-cluster-with-quorum: elixir-init devclean
 	@dev\run -n 3 -q -a adm:pass \
 	    --degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
@@ -264,7 +268,7 @@ elixir-source-checks: elixir-init
 .PHONY: build-report
 # target: build-report - Generate a build report
 build-report:
-	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
+	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log || true
 	cat .\dev\logs\node1.log || true
 	cat .\dev\logs\nouveau.log || true
 	cat .\tmp\couch.log || true
