@@ -61,6 +61,7 @@ defmodule CouchDBTest.Mixfile do
       consolidate_protocols: Mix.env() not in [:test, :dev, :integration],
       test_paths: get_test_paths(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
+      prune_code_paths: false,
       test_coverage: [
         tool: CoverTool,
         dirs: get_coverage_paths(),
