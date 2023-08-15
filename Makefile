@@ -436,11 +436,14 @@ install: release
 # target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
+	@mix clean --deps
 	@rm -rf .rebar/
+	@rm -rf _build
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
 	@rm -rf src/*/ebin
 	@rm -rf src/*/.rebar
+	@rm -rf src/*/_build
 	@rm -rf src/*/priv/*.so
 	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-ast-bypass.js share/server/main-coffee.js

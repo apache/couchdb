@@ -368,10 +368,13 @@ install: release
 # target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
+	-@mix clean --deps
 	-@rmdir /s/q .rebar
+	-@rmdir /s/q _build
 	-@del /f/q bin\couchjs.exe
 	-@rmdir /s/q src\*\ebin
 	-@rmdir /s/q src\*\.rebar
+	-@rmdir /s/q src\*\_build
 	-@del /f/q/s src\*.dll
 	-@del /f/q src\couch\priv\*.exe
 	-@del /f/q share\server\main.js share\server\main-ast-bypass.js share\server\main-coffee.js
