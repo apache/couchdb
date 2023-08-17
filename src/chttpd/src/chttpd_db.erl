@@ -726,6 +726,15 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_purge">>]} = Req, Db) ->
     send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
 db_req(#httpd{path_parts = [_, <<"_purge">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "POST");
+db_req(#httpd{method = 'GET', path_parts = [_, <<"_purged_infos">>]} = Req, Db) ->
+    {ok, PurgedInfosRaw} = fabric:get_purged_infos(Db),
+    PurgedInfos = [
+        {[{id, Id}, {revs, [couch_doc:rev_to_str(Rev) || Rev <- Revs]}]}
+     || {Id, Revs} <- PurgedInfosRaw
+    ],
+    send_json(Req, {[{purged_infos, PurgedInfos}]});
+db_req(#httpd{path_parts = [_, <<"_purged_infos">>]} = Req, _Db) ->
+    send_method_not_allowed(Req, "GET");
 db_req(#httpd{method = 'GET', path_parts = [_, OP]} = Req, Db) when ?IS_ALL_DOCS(OP) ->
     case chttpd:qs_json_value(Req, "keys", nil) of
         Keys when is_list(Keys) ->
@@ -855,10 +864,12 @@ db_req(#httpd{method = 'PUT', path_parts = [_, <<"_purged_infos_limit">>]} = Req
                     throw(Error)
             end;
         _ ->
-            throw({bad_request, "`purge_infos_limit` must be positive integer"})
+            throw({bad_request, "`purged_infos_limit` must be positive integer"})
     end;
 db_req(#httpd{method = 'GET', path_parts = [_, <<"_purged_infos_limit">>]} = Req, Db) ->
     send_json(Req, fabric:get_purge_infos_limit(Db));
+db_req(#httpd{path_parts = [_, <<"_purged_infos_limit">>]} = Req, _Db) ->
+    send_method_not_allowed(Req, "GET,PUT");
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
 db_req(

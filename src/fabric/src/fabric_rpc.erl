@@ -39,7 +39,7 @@
 ]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
--export([get_purge_seq/2, purge_docs/3, set_purge_infos_limit/3]).
+-export([get_purge_seq/2, get_purged_infos/1, purge_docs/3, set_purge_infos_limit/3]).
 
 -export([
     get_db_info/2,
@@ -298,6 +298,10 @@ update_docs(DbName, Docs0, Options) ->
         end,
     Docs2 = make_att_readers(Docs1),
     with_db(DbName, Options, {couch_db, update_docs, [Docs2, Options, Type]}).
+
+get_purged_infos(DbName) ->
+    FoldFun = fun({_Seq, _UUID, Id, Revs}, Acc) -> {ok, [{Id, Revs} | Acc]} end,
+    with_db(DbName, [], {couch_db, fold_purge_infos, [0, FoldFun, []]}).
 
 get_purge_seq(DbName, Options) ->
     with_db(DbName, Options, {couch_db, get_purge_seq, []}).
