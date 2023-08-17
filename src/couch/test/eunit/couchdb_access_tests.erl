@@ -50,7 +50,7 @@ before_all() ->
     ok = config:set("admins", "a", binary_to_list(Hashed), false),
     ok = config:set("couchdb", "uuid", "21ac467c1bc05e9d9e9d2d850bb1108f", false),
     ok = config:set("log", "level", "debug", false),
-    ok = config:set("per_doc_access", "enabled", "true", false),
+    ok = config:set("per_doc_access", "enable", "true", false),
 
     % cleanup and setup
     {ok, _, _, _} = test_request:delete(url() ++ "/db", ?ADMIN_REQ_HEADERS),
@@ -172,9 +172,9 @@ make_test_cases(Mod, Funs) ->
 %
 
 should_not_let_create_access_db_if_disabled(_PortType, Url) ->
-    ok = config:set("per_doc_access", "enabled", "false", false),
+    ok = config:set("per_doc_access", "enable", "false", false),
     {ok, Code, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
-    ok = config:set("per_doc_access", "enabled", "true", false),
+    ok = config:set("per_doc_access", "enable", "true", false),
     ?_assertEqual(400, Code).
 
 should_not_let_anonymous_user_create_doc(_PortType, Url) ->
