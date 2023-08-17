@@ -132,8 +132,6 @@ map_doc(_St, {Doc}) ->
                 Access
             ),
             ById ++ BySeq;
-        Else ->
-            % TODO: no comprende: should not be needed once we implement
-            % _access field validation
+        _Else ->
             [[], []]
     end.
