@@ -140,7 +140,6 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
-
 -include("couch_db_int.hrl").
 
 -define(DBNAME_REGEX,
@@ -821,20 +820,11 @@ check_access(Db, Access) ->
     } = Db#db.user_ctx,
     case Access of
         [] ->
-            % if doc has no _access, userCtX must be admin
+            % if doc has no _access, userCtx must be admin
             is_admin(Db);
         Access ->
             % if doc has _access, userCtx must be admin OR matching user or role
-            case is_admin(Db) of
-                true ->
-                    true;
-                _ ->
-                    case {check_name(UserName, Access), check_roles(UserRoles, Access)} of
-                        {true, _} -> true;
-                        {_, true} -> true;
-                        _ -> false
-                    end
-            end
+            is_admin(Db) or (check_name(UserName, Access) or check_roles(UserRoles, Access))
     end.
 
 check_name(null, _Access) -> false;
@@ -989,7 +979,7 @@ validate_doc_update(#db{} = Db, #doc{id = <<"_design/", _/binary>>} = Doc, _GetD
     case couch_doc:has_access(Doc) of
         true ->
             validate_ddoc(Db, Doc);
-        _Else ->
+        false ->
             case catch check_is_admin(Db) of
                 ok -> validate_ddoc(Db, Doc);
                 Error -> Error
@@ -1421,13 +1411,13 @@ update_docs(Db, Docs0, Options, ?REPLICATED_CHANGES) ->
         false ->
             % we’re done here
             {ok, DocErrors};
-        _ ->
-            AccessViolations = lists:filter(fun({_Ref, Tag}) -> Tag =:= access end, Results),
+        true ->
+            AccessViolations = lists:filter(fun({_Ref, Tag}) -> Tag == access end, Results),
             case length(AccessViolations) of
                 0 ->
                     % we’re done here
                     {ok, DocErrors};
-                _ ->
+                N when N > 0 ->
                     % dig out FDIs from Docs matching our tags/refs
                     DocsDict = lists:foldl(
                         fun(Doc, Dict) ->
@@ -1472,6 +1462,7 @@ update_docs_interactive(Db, Docs0, Options) ->
 
     {ok, DocBuckets, LocalDocs, DocErrors} =
         before_docs_update(Db, Docs, PrepValidateFun, ?INTERACTIVE_EDIT),
+
     if
         (AllOrNothing) and (DocErrors /= []) ->
             RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),

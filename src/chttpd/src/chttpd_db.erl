@@ -961,14 +961,14 @@ db_doc_req(#httpd{method = 'DELETE'} = Req, Db, DocId) ->
     % fetch the old doc revision, so we can compare access control
     % in send_update_doc() later.
     Doc0 = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
-    Revs = chttpd:qs_value(Req, "rev"),
-    case Revs of
+    Rev = chttpd:qs_value(Req, "rev"),
+    case Rev of
         undefined ->
             Body = {[{<<"_deleted">>, true}]};
         Rev ->
             Body = {[{<<"_rev">>, ?l2b(Rev)}, {<<"_deleted">>, true}]}
     end,
-    Doc = #doc{revs = Revs, body = Body, deleted = true, access = Doc0#doc.access},
+    Doc = #doc{revs = Rev, body = Body, deleted = true, access = Doc0#doc.access},
     send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
     #doc_query_args{
@@ -1940,10 +1940,11 @@ parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
 
 parse_shards_opt(Req) ->
+    AccessValue = list_to_existing_atom(chttpd:qs_value(Req, "access", "false")),
     [
         {n, parse_shards_opt("n", Req, config:get_integer("cluster", "n", 3))},
         {q, parse_shards_opt("q", Req, config:get_integer("cluster", "q", 2))},
-        {access, parse_shards_opt("access", Req, chttpd:qs_value(Req, "access", false))},
+        {access, parse_shards_opt("access", Req, AccessValue)},
         {placement,
             parse_shards_opt(
                 "placement", Req, config:get("cluster", "placement")
@@ -1972,27 +1973,26 @@ parse_shards_opt("placement", Req, Default) ->
                     throw({bad_request, Err})
             end
     end;
-parse_shards_opt("access", Req, Value) when is_list(Value) ->
-    parse_shards_opt("access", Req, list_to_existing_atom(Value));
-parse_shards_opt("access", _Req, Value) when Value =:= true ->
-    case config:get_boolean("per_doc_access", "enabled", false) of
+parse_shards_opt("access", _Req, true) ->
+    case config:get_boolean("per_doc_access", "enable", false) of
         true ->
             true;
         false ->
-            Err = ?l2b(["The `access` option is not available on this CouchDB installation."]),
+            Err = <<"The `access` option is not available on this CouchDB installation.">>,
             throw({bad_request, Err})
     end;
-parse_shards_opt("access", _Req, Value) when Value =:= false ->
+parse_shards_opt("access", _Req, false) ->
     false;
 parse_shards_opt("access", _Req, _Value) ->
-    Err = ?l2b(["The `access` value should be a boolean."]),
+    Err = <<"The `access` value should be a boolean.">>,
     throw({bad_request, Err});
 parse_shards_opt(Param, Req, Default) ->
     Val = chttpd:qs_value(Req, Param, Default),
-    Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
     case couch_util:validate_positive_int(Val) of
         true -> Val;
-        false -> throw({bad_request, Err})
+        false ->
+            Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
+            throw({bad_request, Err})
     end.
 
 parse_engine_opt(Req) ->
