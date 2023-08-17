@@ -175,6 +175,56 @@ following behavior:
   record of the document will be deleted. The document will no longer be found
   in searches.
 
+.. _api/db/_purged_infos:
+
+==============================
+``/{db}/_purged_infos``
+==============================
+
+.. http:get:: /{db}/_purged_infos
+    :synopsis: Returns a history list of purged document IDs and revisions
+
+    Get a list of purged document IDs and revisions stored in the database.
+
+    :param db: Database name
+    :<header Accept: - :mimetype:`application/json`
+                     - :mimetype:`text/plain`
+    :>header Content-Type: - :mimetype:`application/json`
+                           - :mimetype:`text/plain; charset=utf-8`
+    :code 200: Request completed successfully
+    :code 400: Invalid database name
+
+    **Request**:
+
+    .. code-block:: http
+
+        GET /db/_purged_infos HTTP/1.1
+        Accept: application/json
+        Host: localhost:5984
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Length: 75
+        Content-Type: application/json
+        Date: Thu, 24 Aug 2023 20:56:06 GMT
+        Server: CouchDB (Erlang/OTP)
+
+        {
+          "purged_infos": [
+            {
+              "id": "doc_id",
+              "revs": [
+                "1-85cfcb946ba8fea03ba81ec38a7a9998",
+                "2-c6548393a891f2cec9c7755832ff9d6f"
+              ]
+            }
+          ]
+        }
+
 .. _api/db/_purged_infos_limit:
 
 ==============================

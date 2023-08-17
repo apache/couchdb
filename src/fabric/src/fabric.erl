@@ -31,6 +31,7 @@
     get_all_security/1, get_all_security/2,
     get_purge_infos_limit/1,
     set_purge_infos_limit/3,
+    get_purged_infos/1,
     compact/1, compact/2,
     get_partition_info/2
 ]).
@@ -210,6 +211,12 @@ get_purge_infos_limit(DbName) ->
     after
         catch couch_db:close(Db)
     end.
+
+%% @doc returns purged requests history for the given database
+-spec get_purged_infos(dbname()) ->
+    {ok, [{purged_infos, json_obj()}]} | {error, Reason :: term()}.
+get_purged_infos(Db) ->
+    fabric_db_purged_infos:go(dbname(Db)).
 
 get_security(DbName) ->
     get_security(DbName, [?ADMIN_CTX]).
