@@ -12,7 +12,7 @@
 
 -module(fabric_db_update_listener).
 
--export([go/4, start_update_notifier/1, stop/1, wait_db_updated/1]).
+-export([go/5, start_update_notifier/1, stop/1, wait_db_updated/1]).
 -export([handle_db_event/3]).
 
 -include_lib("fabric/include/fabric.hrl").
@@ -36,12 +36,12 @@
     shards
 }).
 
-go(Parent, ParentRef, DbName, Timeout) ->
+go(Parent, ParentRef, DbName, Timeout, ClientSock) ->
     Shards = mem3:shards(DbName),
     Notifiers = start_update_notifiers(Shards),
     MonRefs = lists:usort([rexi_utils:server_pid(N) || #worker{node = N} <- Notifiers]),
     RexiMon = rexi_monitor:start(MonRefs),
-    MonPid = start_cleanup_monitor(self(), Notifiers),
+    MonPid = start_cleanup_monitor(self(), Notifiers, ClientSock),
     %% This is not a common pattern for rexi but to enable the calling
     %% process to communicate via handle_message/3 we "fake" it as a
     %% a spawned worker.
@@ -97,16 +97,17 @@ handle_db_event(_DbName, deleted, St) ->
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
 
-start_cleanup_monitor(Parent, Notifiers) ->
+start_cleanup_monitor(Parent, Notifiers, ClientSock) ->
     spawn(fun() ->
         Ref = erlang:monitor(process, Parent),
-        cleanup_monitor(Parent, Ref, Notifiers)
+        cleanup_monitor(Parent, Ref, Notifiers, ClientSock)
     end).
 
 stop_cleanup_monitor(MonPid) ->
     MonPid ! {self(), stop}.
 
-cleanup_monitor(Parent, Ref, Notifiers) ->
+cleanup_monitor(Parent, Ref, Notifiers, ClientSock) ->
+    CheckMSec = chttpd_util:mochiweb_socket_check_msec(),
     receive
         {'DOWN', Ref, _, _, _} ->
             stop_update_notifiers(Notifiers);
@@ -116,6 +117,9 @@ cleanup_monitor(Parent, Ref, Notifiers) ->
             couch_log:error("Unkown message in ~w :: ~w", [?MODULE, Else]),
             stop_update_notifiers(Notifiers),
             exit(Parent, {unknown_message, Else})
+    after CheckMSec ->
+        chttpd_util:stop_client_process_if_disconnected(Parent, ClientSock),
+        cleanup_monitor(Parent, Ref, Notifiers, ClientSock)
     end.
 
 stop_update_notifiers(Notifiers) ->

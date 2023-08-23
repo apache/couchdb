@@ -39,11 +39,12 @@ go(DbName, Feed, Options, Callback, Acc0) when
             {Timeout, _} = couch_changes:get_changes_timeout(Args, Callback),
             Ref = make_ref(),
             Parent = self(),
+            ClientSock = chttpd_util:mochiweb_socket_get(),
             UpdateListener = {
                 spawn_link(
                     fabric_db_update_listener,
                     go,
-                    [Parent, Ref, DbName, Timeout]
+                    [Parent, Ref, DbName, Timeout, ClientSock]
                 ),
                 Ref
             },
