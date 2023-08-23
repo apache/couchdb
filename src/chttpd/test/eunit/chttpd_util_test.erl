@@ -113,3 +113,92 @@ test_auth_with_undefined_option(_) ->
     ?assertEqual("", chttpd_util:get_chttpd_auth_config("undefine", "")),
     ?assert(chttpd_util:get_chttpd_auth_config("undefine", true)),
     ?assertNot(chttpd_util:get_chttpd_auth_config("undefine", false)).
+
+chttpd_util_client_socker_monitor_test_() ->
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        with([
+            ?TDEF(t_socket_set_get_clean),
+            ?TDEF(t_socket_check_config),
+            ?TDEF(t_closed_socket_kills_coordinator)
+        ])
+    }.
+
+t_socket_set_get_clean(_) ->
+    ?assertEqual(undefined, chttpd_util:mochiweb_socket_get()),
+    {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
+    chttpd_util:mochiweb_socket_set(Sock),
+    ?assertEqual(Sock, chttpd_util:mochiweb_socket_get()),
+    chttpd_util:mochiweb_socket_clean(),
+    ?assertEqual(undefined, chttpd_util:mochiweb_socket_get()),
+    gen_tcp:close(Sock).
+
+t_socket_check_config(_) ->
+    config:set("chttpd", "disconnect_check_msec", "100", false),
+    config:set("chttpd", "disconnect_check_jitter_msec", "50", false),
+    lists:foreach(
+        fun(_) ->
+            MSec = chttpd_util:mochiweb_socket_check_msec(),
+            ?assert(is_integer(MSec)),
+            ?assert(MSec >= 100),
+            ?assert(MSec =< 150)
+        end,
+        lists:seq(1, 1000)
+    ),
+    config:delete("chttpd", "disconnect_check_msec", false),
+    config:delete("chttpd", "disconnect_check_jitter_msec", false).
+
+t_closed_socket_kills_coordinator(_) ->
+    {Pid, Ref} = spawn_coord(),
+    {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
+
+    % Can call getopts many times in a row process should stay alive
+    lists:foreach(
+        fun(_) ->
+            ok = chttpd_util:stop_client_process_if_disconnected(Pid, Sock)
+        end,
+        lists:seq(1, 10000)
+    ),
+    ?assert(is_process_alive(Pid)),
+
+    gen_tcp:close(Sock),
+
+    ?assertEqual(ok, chttpd_util:stop_client_process_if_disconnected(Pid, Sock)),
+    case tcp_info_works() of
+        true ->
+            ?assertEqual({shutdown, client_disconnected}, wait_coord_death(Ref));
+        false ->
+            ?assert(is_process_alive(Pid)),
+            % Kill it manually
+            exit(Pid, kill)
+    end,
+
+    % Can call stop_client_... even if process may be dead and the socket is closed
+    lists:foreach(
+        fun(_) ->
+            ok = chttpd_util:stop_client_process_if_disconnected(Pid, Sock)
+        end,
+        lists:seq(1, 10000)
+    ).
+
+spawn_coord() ->
+    spawn_monitor(fun() ->
+        receive
+            die -> ok
+        end
+    end).
+
+wait_coord_death(Ref) ->
+    receive
+        {'DOWN', Ref, _, _, Reason} -> Reason
+    end.
+
+tcp_info_works() ->
+    case os:type() of
+        {unix, OsName} ->
+            lists:member(OsName, [linux, freebsd, darwin]);
+        {_, _} ->
+            false
+    end.
