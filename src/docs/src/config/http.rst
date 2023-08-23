@@ -266,6 +266,17 @@ HTTP Server Options
             [chttpd]
             server_header_versions = true
 
+    .. config:option:: disconnect_check_msec :: Client disconnection check interval
+
+        .. versionadded:: 3.4
+
+        How often, in milliseconds, to check for client disconnects while
+        processing streaming requests such as _all_docs, _find, _changes and
+        views. ::
+
+            [chttpd]
+            disconnect_check_msec = 30000
+
 .. config:section:: httpd :: HTTP Server Options
 
     .. versionchanged:: 3.2 These options were moved to [chttpd] section:
