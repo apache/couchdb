@@ -57,6 +57,8 @@
 #
 -kernel prevent_overlapping_partitions false
 
+-kernel inet_backend socket
+
 # Increase the pool of dirty IO schedulers from 10 to 16
 # Dirty IO schedulers are used for file IO.
 +SDio 16
@@ -134,3 +136,4 @@
 
 # don't let disksup send alerts
 -os_mon disk_almost_full_threshold 1.0
+
