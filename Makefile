@@ -16,9 +16,9 @@
 
 include version.mk
 
-REBAR?=$(shell echo `pwd`/bin/rebar)
-REBAR3?=$(shell echo `pwd`/bin/rebar3)
-ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
+REBAR?=$(CURDIR)/bin/rebar
+REBAR3?=$(CURDIR)/bin/rebar3
+ERLFMT?=$(CURDIR)/bin/erlfmt
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -169,9 +169,9 @@ endif
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
-eunit: export BUILDDIR = $(shell pwd)
-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
-eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+eunit: export BUILDDIR = $(CURDIR)
+eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
+eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
@@ -182,28 +182,28 @@ eunit: couch
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests, use EXUNIT_OPTS to provide custom options
-exunit: export BUILDDIR = $(shell pwd)
+exunit: export BUILDDIR = $(CURDIR)
 exunit: export MIX_ENV=test
-exunit: export ERL_LIBS = $(shell pwd)/src
-exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
-exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+exunit: export ERL_LIBS = $(CURDIR)/src
+exunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
+exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit
 	@mix test --trace $(EXUNIT_OPTS)
 
-setup-eunit: export BUILDDIR = $(shell pwd)
-setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+setup-eunit: export BUILDDIR = $(CURDIR)
+setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 setup-eunit:
 	@$(REBAR) setup_eunit 2> /dev/null
 
-just-eunit: export BUILDDIR = $(shell pwd)
-just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+just-eunit: export BUILDDIR = $(CURDIR)
+just-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
 .PHONY: soak-eunit
-soak-eunit: export BUILDDIR = $(shell pwd)
-soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+soak-eunit: export BUILDDIR = $(CURDIR)
+soak-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
