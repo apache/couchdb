@@ -55,7 +55,7 @@ content:
     name=clouseau@127.0.0.1
 
     ; set this to the same distributed Erlang cookie used by the CouchDB nodes
-    cookie=monster
+    cookie=brumbrum
 
     ; the path where you would like to store the search index files
     dir=/path/to/index/storage
