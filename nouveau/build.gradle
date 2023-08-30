@@ -35,15 +35,15 @@ dependencies {
     implementation group: 'org.apache.lucene', name: 'lucene-facet', version: luceneVersion
     implementation group: 'org.apache.lucene', name: 'lucene-misc', version: luceneVersion
 
+    implementation group: 'com.ibm.cos', name: 'ibm-cos-java-sdk', version: '2.13.1'
+
     def swaggerVersion = '2.2.8'
     implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-jakarta', version: swaggerVersion
     implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-servlet-initializer-v2', version: swaggerVersion
 
     testImplementation platform('org.junit:junit-bom:5.8.2')
-    testImplementation 'org.junit.jupiter:junit-jupiter-api'
-    testRuntimeOnly    'org.junit.jupiter:junit-jupiter-engine'
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation 'org.assertj:assertj-core'
-    testImplementation 'org.mockito:mockito-core'
 }
 
 group = 'org.apache.couchdb.nouveau'

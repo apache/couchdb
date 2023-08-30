@@ -475,10 +475,7 @@ clean:
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f src/couch_dist/certs/out
-ifeq ($(with_nouveau), 1)
-	@cd nouveau && ./gradlew clean
-endif
-
+	@$(MAKE) nouveau-clean
 
 .PHONY: distclean
 # target: distclean - Remove build and release artifacts
@@ -549,6 +546,12 @@ nouveau:
 ifeq ($(with_nouveau), 1)
 	@cd nouveau && ./gradlew spotlessApply
 	@cd nouveau && ./gradlew build -x test
+endif
+
+.PHONY: nouveau-clean
+nouveau-clean:
+ifeq ($(with_nouveau), 1)
+	@cd nouveau && ./gradlew clean
 endif
 
 .PHONY: nouveau-test
