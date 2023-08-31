@@ -120,27 +120,29 @@ chttpd_util_client_socker_monitor_test_() ->
         fun test_util:start_couch/0,
         fun test_util:stop_couch/1,
         with([
-            ?TDEF(t_socket_set_get_clean),
-            ?TDEF(t_socket_check_config),
+            ?TDEF(t_client_req_set_get_clean),
+            ?TDEF(t_client_req_check_config),
             ?TDEF(t_closed_socket_kills_coordinator)
         ])
     }.
 
-t_socket_set_get_clean(_) ->
-    ?assertEqual(undefined, chttpd_util:mochiweb_socket_get()),
+t_client_req_set_get_clean(_) ->
+    ?assertEqual(undefined, chttpd_util:mochiweb_client_req_get()),
     {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
-    chttpd_util:mochiweb_socket_set(Sock),
-    ?assertEqual(Sock, chttpd_util:mochiweb_socket_get()),
-    chttpd_util:mochiweb_socket_clean(),
-    ?assertEqual(undefined, chttpd_util:mochiweb_socket_get()),
+    Headers = mochiweb_headers:make([]),
+    ClientReq = mochiweb_request:new(Sock, 'GET', "/foo", {1, 1}, Headers),
+    chttpd_util:mochiweb_client_req_set(ClientReq),
+    ?assertEqual(ClientReq, chttpd_util:mochiweb_client_req_get()),
+    chttpd_util:mochiweb_client_req_clean(),
+    ?assertEqual(undefined, chttpd_util:mochiweb_client_req_get()),
     gen_tcp:close(Sock).
 
-t_socket_check_config(_) ->
+t_client_req_check_config(_) ->
     config:set("chttpd", "disconnect_check_msec", "100", false),
     config:set("chttpd", "disconnect_check_jitter_msec", "50", false),
     lists:foreach(
         fun(_) ->
-            MSec = chttpd_util:mochiweb_socket_check_msec(),
+            MSec = chttpd_util:mochiweb_client_req_check_msec(),
             ?assert(is_integer(MSec)),
             ?assert(MSec >= 100),
             ?assert(MSec =< 150)
@@ -153,11 +155,12 @@ t_socket_check_config(_) ->
 t_closed_socket_kills_coordinator(_) ->
     {Pid, Ref} = spawn_coord(),
     {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
-
+    Headers = mochiweb_headers:make([]),
+    ClientReq = mochiweb_request:new(Sock, 'GET', "/foo", {1, 1}, Headers),
     % Can call getopts many times in a row process should stay alive
     lists:foreach(
         fun(_) ->
-            ok = chttpd_util:stop_client_process_if_disconnected(Pid, Sock)
+            ok = chttpd_util:stop_client_process_if_disconnected(Pid, ClientReq)
         end,
         lists:seq(1, 10000)
     ),
@@ -165,7 +168,7 @@ t_closed_socket_kills_coordinator(_) ->
 
     gen_tcp:close(Sock),
 
-    ?assertEqual(ok, chttpd_util:stop_client_process_if_disconnected(Pid, Sock)),
+    ?assertEqual(ok, chttpd_util:stop_client_process_if_disconnected(Pid, ClientReq)),
     case tcp_info_works() of
         true ->
             ?assertEqual({shutdown, client_disconnected}, wait_coord_death(Ref));
@@ -178,7 +181,7 @@ t_closed_socket_kills_coordinator(_) ->
     % Can call stop_client_... even if process may be dead and the socket is closed
     lists:foreach(
         fun(_) ->
-            ok = chttpd_util:stop_client_process_if_disconnected(Pid, Sock)
+            ok = chttpd_util:stop_client_process_if_disconnected(Pid, ClientReq)
         end,
         lists:seq(1, 10000)
     ).
@@ -198,7 +201,7 @@ wait_coord_death(Ref) ->
 tcp_info_works() ->
     case os:type() of
         {unix, OsName} ->
-            lists:member(OsName, [linux, freebsd, darwin]);
+            lists:member(OsName, [linux, freebsd, netbsd, openbsd, darwin]);
         {_, _} ->
             false
     end.
