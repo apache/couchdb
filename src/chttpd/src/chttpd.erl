@@ -321,7 +321,7 @@ handle_request_int(MochiReq) ->
     erlang:put(dont_log_response, true),
 
     % Save client socket so that it can be monitored for disconnects
-    chttpd_util:mochiweb_socket_set(MochiReq:get(socket)),
+    chttpd_util:mochiweb_client_req_set(MochiReq),
 
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
@@ -331,7 +331,7 @@ handle_request_int(MochiReq) ->
                 {HttpReq0, Response0}
         end,
 
-    chttpd_util:mochiweb_socket_clean(),
+    chttpd_util:mochiweb_client_req_clean(),
 
     {Status, Code, Reason, Resp} = split_response(Response),
 
