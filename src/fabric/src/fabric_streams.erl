@@ -43,8 +43,8 @@ start(Workers0, Keypos, StartFun, Replacements, RingOpts) ->
         replacements = Replacements,
         ring_opts = RingOpts
     },
-    ClientSock = chttpd_util:mochiweb_socket_get(),
-    spawn_worker_cleaner(self(), Workers0, ClientSock),
+    ClientReq = chttpd_util:mochiweb_client_req_get(),
+    spawn_worker_cleaner(self(), Workers0, ClientReq),
     Timeout = fabric_util:request_timeout(),
     case rexi_utils:recv(Workers0, Keypos, Fun, Acc, Timeout, infinity) of
         {ok, #stream_acc{ready = Workers}} ->
@@ -156,12 +156,12 @@ handle_stream_start(Else, _, _) ->
 % Spawn an auxiliary rexi worker cleaner. This will be used in cases
 % when the coordinator (request) process is forceably killed and doesn't
 % get a chance to process its `after` fabric:clean/1 clause.
-spawn_worker_cleaner(Coordinator, Workers, ClientSock) ->
+spawn_worker_cleaner(Coordinator, Workers, ClientReq) ->
     case get(?WORKER_CLEANER) of
         undefined ->
             Pid = spawn(fun() ->
                 erlang:monitor(process, Coordinator),
-                cleaner_loop(Coordinator, Workers, ClientSock)
+                cleaner_loop(Coordinator, Workers, ClientReq)
             end),
             put(?WORKER_CLEANER, Pid),
             Pid;
@@ -169,16 +169,16 @@ spawn_worker_cleaner(Coordinator, Workers, ClientSock) ->
             ExistingCleaner
     end.
 
-cleaner_loop(Pid, Workers, ClientSock) ->
-    CheckMSec = chttpd_util:mochiweb_socket_check_msec(),
+cleaner_loop(Pid, Workers, ClientReq) ->
+    CheckMSec = chttpd_util:mochiweb_client_req_check_msec(),
     receive
         {add_worker, Pid, Worker} ->
-            cleaner_loop(Pid, [Worker | Workers], ClientSock);
+            cleaner_loop(Pid, [Worker | Workers], ClientReq);
         {'DOWN', _, _, Pid, _} ->
             fabric_util:cleanup(Workers)
     after CheckMSec ->
-        chttpd_util:stop_client_process_if_disconnected(Pid, ClientSock),
-        cleaner_loop(Pid, Workers, ClientSock)
+        chttpd_util:stop_client_process_if_disconnected(Pid, ClientReq),
+        cleaner_loop(Pid, Workers, ClientReq)
     end.
 
 add_worker_to_cleaner(CoordinatorPid, Worker) ->
@@ -285,14 +285,22 @@ coordinator_is_killed_if_client_disconnects(_) ->
             die -> ok
         end
     end),
+    Headers = mochiweb_headers:make([]),
     {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
+    ClientReq = mochiweb_request:new(Sock, 'GET', "/foo", {1, 1}, Headers),
     % Close the socket and then expect coordinator to be killed
     ok = gen_tcp:close(Sock),
-    Cleaner = spawn_worker_cleaner(Coord, Workers, Sock),
+    Cleaner = spawn_worker_cleaner(Coord, Workers, ClientReq),
     CleanerRef = erlang:monitor(process, Cleaner),
     % Assert the correct behavior on the support platforms (all except Windows so far)
     case os:type() of
-        {unix, Type} when Type =:= linux; Type =:= darwin; Type =:= freebsd ->
+        {unix, Type} when
+            Type =:= linux;
+            Type =:= darwin;
+            Type =:= freebsd;
+            Type =:= openbsd;
+            Type =:= netbsd
+        ->
             % Coordinator should be torn down
             receive
                 {'DOWN', CoordRef, _, _, Reason} ->
@@ -320,8 +328,10 @@ coordinator_is_not_killed_if_client_is_connected(_) ->
             die -> ok
         end
     end),
+    Headers = mochiweb_headers:make([]),
     {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
-    Cleaner = spawn_worker_cleaner(Coord, Workers, Sock),
+    ClientReq = mochiweb_request:new(Sock, 'GET', "/foo", {1, 1}, Headers),
+    Cleaner = spawn_worker_cleaner(Coord, Workers, ClientReq),
     CleanerRef = erlang:monitor(process, Cleaner),
     % Coordinator should stay up
     receive
@@ -342,7 +352,7 @@ coordinator_is_not_killed_if_client_is_connected(_) ->
 setup() ->
     ok = meck:expect(rexi, kill_all, fun(_) -> ok end),
     % Speed up disconnect socket timeout for the test to 200 msec
-    ok = meck:expect(chttpd_util, mochiweb_socket_check_msec, 0, 200).
+    ok = meck:expect(chttpd_util, mochiweb_client_req_check_msec, 0, 200).
 
 teardown(_) ->
     meck:unload().
