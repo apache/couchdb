@@ -36,12 +36,12 @@
     shards
 }).
 
-go(Parent, ParentRef, DbName, Timeout, ClientSock) ->
+go(Parent, ParentRef, DbName, Timeout, ClientReq) ->
     Shards = mem3:shards(DbName),
     Notifiers = start_update_notifiers(Shards),
     MonRefs = lists:usort([rexi_utils:server_pid(N) || #worker{node = N} <- Notifiers]),
     RexiMon = rexi_monitor:start(MonRefs),
-    MonPid = start_cleanup_monitor(self(), Notifiers, ClientSock),
+    MonPid = start_cleanup_monitor(self(), Notifiers, ClientReq),
     %% This is not a common pattern for rexi but to enable the calling
     %% process to communicate via handle_message/3 we "fake" it as a
     %% a spawned worker.
@@ -97,17 +97,17 @@ handle_db_event(_DbName, deleted, St) ->
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
 
-start_cleanup_monitor(Parent, Notifiers, ClientSock) ->
+start_cleanup_monitor(Parent, Notifiers, ClientReq) ->
     spawn(fun() ->
         Ref = erlang:monitor(process, Parent),
-        cleanup_monitor(Parent, Ref, Notifiers, ClientSock)
+        cleanup_monitor(Parent, Ref, Notifiers, ClientReq)
     end).
 
 stop_cleanup_monitor(MonPid) ->
     MonPid ! {self(), stop}.
 
-cleanup_monitor(Parent, Ref, Notifiers, ClientSock) ->
-    CheckMSec = chttpd_util:mochiweb_socket_check_msec(),
+cleanup_monitor(Parent, Ref, Notifiers, ClientReq) ->
+    CheckMSec = chttpd_util:mochiweb_client_req_check_msec(),
     receive
         {'DOWN', Ref, _, _, _} ->
             stop_update_notifiers(Notifiers);
@@ -118,8 +118,8 @@ cleanup_monitor(Parent, Ref, Notifiers, ClientSock) ->
             stop_update_notifiers(Notifiers),
             exit(Parent, {unknown_message, Else})
     after CheckMSec ->
-        chttpd_util:stop_client_process_if_disconnected(Parent, ClientSock),
-        cleanup_monitor(Parent, Ref, Notifiers, ClientSock)
+        chttpd_util:stop_client_process_if_disconnected(Parent, ClientReq),
+        cleanup_monitor(Parent, Ref, Notifiers, ClientReq)
     end.
 
 stop_update_notifiers(Notifiers) ->
