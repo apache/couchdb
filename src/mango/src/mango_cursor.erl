@@ -558,9 +558,9 @@ create_test_() ->
             meck:unload()
         end,
         [
-            ?TDEF_FE(t_create_regular),
-            ?TDEF_FE(t_create_user_specified_index),
-            ?TDEF_FE(t_create_invalid_user_specified_index)
+            ?TDEF_FE(t_create_regular, 10),
+            ?TDEF_FE(t_create_user_specified_index, 10),
+            ?TDEF_FE(t_create_invalid_user_specified_index, 10)
         ]
     }.
 
