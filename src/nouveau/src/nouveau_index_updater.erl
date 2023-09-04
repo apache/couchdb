@@ -26,6 +26,15 @@
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 -import(nouveau_util, [index_path/1]).
 
+-record(acc, {
+    db,
+    index,
+    proc,
+    changes_done,
+    total_changes,
+    exclude_idrevs
+}).
+
 outdated(#index{} = Index) ->
     case open_or_create_index(Index) of
         {ok, #{} = Info} ->
@@ -66,7 +75,7 @@ update(#index{} = Index) ->
                 Proc = get_os_process(Index#index.def_lang),
                 try
                     true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
-                    Acc0 = {Db, Index, Proc, 0, TotalChanges, ExcludeIdRevs},
+                    Acc0 = #acc{db = Db, index=Index, proc=Proc, changes_done=0, total_changes=TotalChanges, exclude_idrevs=ExcludeIdRevs},
                     {ok, _} = couch_db:fold_changes(Db, IndexUpdateSeq, fun load_docs/2, Acc0, []),
                     ok = nouveau_api:set_update_seq(Index, NewCurSeq)
                 after
@@ -77,19 +86,19 @@ update(#index{} = Index) ->
         couch_db:close(Db)
     end.
 
-load_docs(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
+load_docs(#full_doc_info{id = <<"_design/", _/binary>>}, #acc{} = Acc) ->
     {ok, Acc};
-load_docs(FDI, {Db, Index, Proc, ChangesDone, TotalChanges, ExcludeIdRevs}) ->
+load_docs(FDI, #acc{} = Acc) ->
     couch_task_status:update([
-        {changes_done, ChangesDone}, {progress, (ChangesDone * 100) div TotalChanges}
+        {changes_done, Acc#acc.changes_done}, {progress, (Acc#acc.changes_done * 100) div Acc#acc.total_changes}
     ]),
     DI = couch_doc:to_doc_info(FDI),
     #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
-    case lists:member({Id, Rev}, ExcludeIdRevs) of
+    case lists:member({Id, Rev}, Acc#acc.exclude_idrevs) of
         true -> ok;
-        false -> update_or_delete_index(Db, Index, DI, Proc)
+        false -> update_or_delete_index(Acc#acc.db, Acc#acc.index, DI, Acc#acc.proc)
     end,
-    {ok, {Db, Index, Proc, ChangesDone + 1, TotalChanges, ExcludeIdRevs}}.
+    {ok, Acc#acc{changes_done = Acc#acc.changes_done + 1}}.
 
 update_or_delete_index(Db, #index{} = Index, #doc_info{} = DI, Proc) ->
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DI,
