@@ -86,22 +86,22 @@ public abstract class Index implements Closeable {
     protected abstract long doDiskSize() throws IOException;
 
     public final synchronized void update(final String docId, final DocumentUpdateRequest request) throws IOException {
-        assertUpdateSeqIsLower(request.getSeq());
+        assertUpdateSeqProgress(request.getMatchSeq(), request.getSeq());
         doUpdate(docId, request);
-        incrementUpdateSeq(request.getSeq());
+        incrementUpdateSeq(request.getMatchSeq(), request.getSeq());
     }
 
     protected abstract void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException;
 
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
         if (request.isPurge()) {
-            assertPurgeSeqIsLower(request.getSeq());
+            assertPurgeSeqProgress(request.getMatchSeq(), request.getSeq());
             doDelete(docId, request);
-            incrementPurgeSeq(request.getSeq());
+            incrementPurgeSeq(request.getMatchSeq(), request.getSeq());
         } else {
-            assertUpdateSeqIsLower(request.getSeq());
+            assertUpdateSeqProgress(request.getMatchSeq(), request.getSeq());
             doDelete(docId, request);
-            incrementUpdateSeq(request.getSeq());
+            incrementUpdateSeq(request.getMatchSeq(), request.getSeq());
         }
     }
 
@@ -132,23 +132,23 @@ public abstract class Index implements Closeable {
 
     protected abstract boolean doCommit(final long updateSeq, final long purgeSeq) throws IOException;
 
-    public final synchronized void setUpdateSeq(final long updateSeq) throws IOException {
+    public final synchronized void setUpdateSeq(final long matchSeq, final long updateSeq) throws IOException {
         if (updateSeq < this.updateSeq) {
             throw new WebApplicationException(
                     "update_seq must be equal or greater than current update_seq", Status.BAD_REQUEST);
         }
         if (updateSeq > this.updateSeq) {
-            incrementUpdateSeq(updateSeq);
+            incrementUpdateSeq(matchSeq, updateSeq);
         }
     }
 
-    public final synchronized void setPurgeSeq(final long purgeSeq) throws IOException {
+    public final synchronized void setPurgeSeq(final long matchSeq, final long purgeSeq) throws IOException {
         if (purgeSeq < this.purgeSeq) {
             throw new WebApplicationException(
                     "purge_seq must be equal or greater than current purge_seq", Status.BAD_REQUEST);
         }
         if (purgeSeq > this.purgeSeq) {
-            incrementPurgeSeq(purgeSeq);
+            incrementPurgeSeq(matchSeq, purgeSeq);
         }
     }
 
@@ -178,29 +178,37 @@ public abstract class Index implements Closeable {
         }
     }
 
-    protected final void assertUpdateSeqIsLower(final long updateSeq) throws UpdatesOutOfOrderException {
+    protected final void assertUpdateSeqProgress(final long matchSeq, final long updateSeq)
+            throws UpdatesOutOfOrderException {
         assert Thread.holdsLock(this);
+        if (matchSeq != this.updateSeq) {
+            throw new UpdatesOutOfOrderException(false, this.updateSeq, matchSeq, updateSeq);
+        }
         if (!(updateSeq > this.updateSeq)) {
-            throw new UpdatesOutOfOrderException(this.updateSeq, updateSeq);
+            throw new UpdatesOutOfOrderException(false, this.updateSeq, matchSeq, updateSeq);
         }
     }
 
-    protected final void incrementUpdateSeq(final long updateSeq) throws IOException {
+    protected final void incrementUpdateSeq(final long matchSeq, final long updateSeq) throws IOException {
         assert Thread.holdsLock(this);
-        assertUpdateSeqIsLower(updateSeq);
+        assertUpdateSeqProgress(matchSeq, updateSeq);
         this.updateSeq = updateSeq;
     }
 
-    protected final void assertPurgeSeqIsLower(final long purgeSeq) throws UpdatesOutOfOrderException {
+    protected final void assertPurgeSeqProgress(final long matchSeq, final long purgeSeq)
+            throws UpdatesOutOfOrderException {
         assert Thread.holdsLock(this);
+        if (matchSeq != this.purgeSeq) {
+            throw new UpdatesOutOfOrderException(true, this.purgeSeq, matchSeq, purgeSeq);
+        }
         if (!(purgeSeq > this.purgeSeq)) {
-            throw new UpdatesOutOfOrderException(this.purgeSeq, purgeSeq);
+            throw new UpdatesOutOfOrderException(true, this.purgeSeq, matchSeq, purgeSeq);
         }
     }
 
-    protected final void incrementPurgeSeq(final long purgeSeq) throws IOException {
+    protected final void incrementPurgeSeq(final long matchSeq, final long purgeSeq) throws IOException {
         assert Thread.holdsLock(this);
-        assertPurgeSeqIsLower(purgeSeq);
+        assertPurgeSeqProgress(matchSeq, purgeSeq);
         this.purgeSeq = purgeSeq;
     }
 

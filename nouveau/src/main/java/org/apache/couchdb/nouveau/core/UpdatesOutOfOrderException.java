@@ -18,11 +18,12 @@ import jakarta.ws.rs.core.Response.Status;
 
 public final class UpdatesOutOfOrderException extends WebApplicationException {
 
-    public UpdatesOutOfOrderException(final long currentSeq, final long attemptedSeq) {
+    public UpdatesOutOfOrderException(
+            final boolean purge, final long currentSeq, final long matchSeq, final long attemptedSeq) {
         super(
                 String.format(
-                        "Updates applied in the wrong order (current seq: %d, attempted seq: %d)",
-                        currentSeq, attemptedSeq),
-                Status.BAD_REQUEST);
+                        "%s updates applied in the wrong order (current seq: %d, match seq: %d, attempted seq: %d)",
+                        purge ? "Purge" : "Index", currentSeq, matchSeq, attemptedSeq),
+                Status.CONFLICT);
     }
 }

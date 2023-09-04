@@ -17,9 +17,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.Collection;
 
 public final class DocumentUpdateRequest {
+
+    @PositiveOrZero
+    private final long matchSeq;
 
     @Positive
     private final long seq;
@@ -31,12 +35,18 @@ public final class DocumentUpdateRequest {
     private final Collection<Field> fields;
 
     public DocumentUpdateRequest(
+            @JsonProperty("match_seq") final long matchSeq,
             @JsonProperty("seq") final long seq,
             @JsonProperty("partition") final String partition,
             @JsonProperty("fields") final Collection<Field> fields) {
+        this.matchSeq = matchSeq;
         this.seq = seq;
         this.partition = partition;
         this.fields = fields;
+    }
+
+    public long getMatchSeq() {
+        return matchSeq;
     }
 
     public long getSeq() {
@@ -57,6 +67,7 @@ public final class DocumentUpdateRequest {
 
     @Override
     public String toString() {
-        return "DocumentUpdateRequest [seq=" + seq + ", partition=" + partition + ", fields=" + fields + "]";
+        return "DocumentUpdateRequest [matchSeq=" + matchSeq + ", seq=" + seq + ", partition=" + partition + ", fields="
+                + fields + "]";
     }
 }

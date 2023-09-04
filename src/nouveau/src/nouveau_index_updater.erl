@@ -34,7 +34,14 @@
     total_changes,
     exclude_idrevs,
     reqids = [],
-    conn_pid
+    conn_pid,
+    update_seq
+}).
+
+-record(purge_acc, {
+    exclude_list = [],
+    index_update_seq,
+    index_purge_seq
 }).
 
 outdated(#index{} = Index) ->
@@ -72,7 +79,11 @@ update(#index{} = Index) ->
                 couch_task_status:set_update_frequency(500),
 
                 {ok, ConnPid} = ibrowse:spawn_link_worker_process(nouveau_util:nouveau_url()),
-                {ok, ExcludeIdRevs} = purge_index(ConnPid, Db, Index, IndexPurgeSeq),
+                PurgeAcc0 = #purge_acc{
+                    index_update_seq = IndexUpdateSeq,
+                    index_purge_seq = IndexPurgeSeq
+                },
+                {ok, PurgeAcc1} = purge_index(ConnPid, Db, Index, PurgeAcc0),
 
                 NewCurSeq = couch_db:get_update_seq(Db),
                 Proc = get_os_process(Index#index.def_lang),
@@ -85,15 +96,16 @@ update(#index{} = Index) ->
                         proc = Proc,
                         changes_done = 0,
                         total_changes = TotalChanges,
-                        exclude_idrevs = ExcludeIdRevs,
-                        conn_pid = ConnPid
+                        exclude_idrevs = PurgeAcc1#purge_acc.exclude_list,
+                        conn_pid = ConnPid,
+                        update_seq = PurgeAcc1#purge_acc.index_update_seq
                     },
                     {ok, Acc1} = couch_db:fold_changes(
-                        Db, IndexUpdateSeq, fun load_docs/2, Acc0, []
+                        Db, Acc0#acc.update_seq, fun load_docs/2, Acc0, []
                     ),
                     nouveau_api:drain_async_responses(lists:reverse(Acc1#acc.reqids)),
                     ibrowse:stop_worker_process(ConnPid),
-                    ok = nouveau_api:set_update_seq(Index, NewCurSeq)
+                    ok = nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq)
                 after
                     ret_os_process(Proc)
                 end
@@ -123,22 +135,30 @@ load_docs(FDI, #acc{} = Acc0) ->
             false ->
                 case
                     update_or_delete_index(
-                        Acc1#acc.conn_pid, Acc1#acc.db, Acc1#acc.index, DI, Acc1#acc.proc
+                        Acc1#acc.conn_pid,
+                        Acc1#acc.db,
+                        Acc1#acc.index,
+                        Acc1#acc.update_seq,
+                        DI,
+                        Acc1#acc.proc
                     )
                 of
                     {ibrowse_req_id, ReqId} ->
-                        Acc1#acc{reqids = [ReqId | Acc1#acc.reqids]};
+                        Acc1#acc{
+                            update_seq = DI#doc_info.high_seq,
+                            reqids = [ReqId | Acc1#acc.reqids]
+                        };
                     {error, Reason} ->
                         exit({error, Reason})
                 end
         end,
     {ok, Acc2#acc{changes_done = Acc2#acc.changes_done + 1}}.
 
-update_or_delete_index(ConnPid, Db, #index{} = Index, #doc_info{} = DI, Proc) ->
+update_or_delete_index(ConnPid, Db, #index{} = Index, MatchSeq, #doc_info{} = DI, Proc) ->
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DI,
     case Del of
         true ->
-            nouveau_api:delete_doc_async(ConnPid, Index, Id, Seq);
+            nouveau_api:delete_doc_async(ConnPid, Index, Id, MatchSeq, Seq);
         false ->
             {ok, Doc} = couch_db:open_doc(Db, DI, []),
             Json = couch_doc:to_json_obj(Doc, []),
@@ -152,9 +172,11 @@ update_or_delete_index(ConnPid, Db, #index{} = Index, #doc_info{} = DI, Proc) ->
                 end,
             case Fields of
                 [] ->
-                    nouveau_api:delete_doc_async(ConnPid, Index, Id, Seq);
+                    nouveau_api:delete_doc_async(ConnPid, Index, Id, MatchSeq, Seq);
                 _ ->
-                    nouveau_api:update_doc_async(ConnPid, Index, Id, Seq, Partition, Fields)
+                    nouveau_api:update_doc_async(
+                        ConnPid, Index, Id, MatchSeq, Seq, Partition, Fields
+                    )
             end
     end.
 
@@ -198,37 +220,52 @@ index_definition(#index{} = Index) ->
         <<"field_analyzers">> => Index#index.field_analyzers
     }.
 
-purge_index(ConnPid, Db, Index, IndexPurgeSeq) ->
+purge_index(ConnPid, Db, Index, #purge_acc{} = PurgeAcc0) ->
     Proc = get_os_process(Index#index.def_lang),
     try
         true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
-        FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, {Acc, _}) ->
-            Acc0 =
+        FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, #purge_acc{} = PurgeAcc1) ->
+            PurgeAcc2 =
                 case couch_db:get_full_doc_info(Db, Id) of
                     not_found ->
-                        ok = nouveau_api:purge_doc(Index, Id, PurgeSeq),
-                        Acc;
+                        ok = nouveau_api:purge_doc(
+                            Index, Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
+                        ),
+                        PurgeAcc1#purge_acc{index_purge_seq = PurgeSeq};
                     FDI ->
                         DI = couch_doc:to_doc_info(FDI),
-                        #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
-                        case lists:member({Id, Rev}, Acc) of
+                        #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{rev = Rev} | _]} = DI,
+                        case lists:member({Id, Rev}, PurgeAcc1#purge_acc.exclude_list) of
                             true ->
-                                Acc;
+                                PurgeAcc1;
                             false ->
-                                update_or_delete_index(ConnPid, Db, Index, DI, Proc),
-                                [{Id, Rev} | Acc]
+                                update_or_delete_index(
+                                    ConnPid,
+                                    Db,
+                                    Index,
+                                    PurgeAcc1#purge_acc.index_update_seq,
+                                    DI,
+                                    Proc
+                                ),
+                                PurgeAcc1#purge_acc{
+                                    exclude_list = [{Id, Rev} | PurgeAcc1#purge_acc.exclude_list],
+                                    index_update_seq = Seq
+                                }
                         end
                 end,
             update_task(1),
-            {ok, {Acc0, PurgeSeq}}
+            {ok, PurgeAcc2}
         end,
 
-        {ok, {ExcludeList, NewPurgeSeq}} = couch_db:fold_purge_infos(
-            Db, IndexPurgeSeq, FoldFun, {[], 0}, []
+        {ok, #purge_acc{} = PurgeAcc3} = couch_db:fold_purge_infos(
+            Db, PurgeAcc0#purge_acc.index_purge_seq, FoldFun, PurgeAcc0, []
         ),
-        nouveau_api:set_purge_seq(Index, NewPurgeSeq),
-        update_local_doc(Db, Index, NewPurgeSeq),
-        {ok, ExcludeList}
+        DbPurgeSeq = couch_db:get_purge_seq(Db),
+        ok = nouveau_api:set_purge_seq(
+            Index, PurgeAcc3#purge_acc.index_purge_seq, DbPurgeSeq
+        ),
+        update_local_doc(Db, Index, DbPurgeSeq),
+        {ok, PurgeAcc3}
     after
         ret_os_process(Proc)
     end.

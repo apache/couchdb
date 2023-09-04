@@ -23,12 +23,12 @@
     create_index/2,
     delete_path/1,
     delete_path/2,
-    delete_doc_async/4,
-    purge_doc/3,
-    update_doc_async/6,
+    delete_doc_async/5,
+    purge_doc/4,
+    update_doc_async/7,
     search/2,
-    set_purge_seq/2,
-    set_update_seq/2,
+    set_purge_seq/3,
+    set_update_seq/3,
     drain_async_responses/1,
     jaxrs_error/2
 ]).
@@ -99,10 +99,15 @@ delete_path(Path, Exclusions) when
             send_error(Reason)
     end.
 
-delete_doc_async(ConnPid, #index{} = Index, DocId, UpdateSeq) when
-    is_pid(ConnPid), is_binary(DocId), is_integer(UpdateSeq)
+delete_doc_async(ConnPid, #index{} = Index, DocId, MatchSeq, UpdateSeq) when
+    is_pid(ConnPid),
+    is_binary(DocId),
+    is_integer(MatchSeq),
+    MatchSeq >= 0,
+    is_integer(UpdateSeq),
+    UpdateSeq > 0
 ->
-    ReqBody = #{seq => UpdateSeq, purge => false},
+    ReqBody = #{match_seq => MatchSeq, seq => UpdateSeq, purge => false},
     send_direct_if_enabled(
         ConnPid,
         doc_url(Index, DocId),
@@ -114,10 +119,10 @@ delete_doc_async(ConnPid, #index{} = Index, DocId, UpdateSeq) when
         ]
     ).
 
-purge_doc(#index{} = Index, DocId, PurgeSeq) when
-    is_binary(DocId), is_integer(PurgeSeq)
+purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
+    is_binary(DocId), is_integer(MatchSeq), MatchSeq >= 0, is_integer(PurgeSeq), PurgeSeq > 0
 ->
-    ReqBody = #{seq => PurgeSeq, purge => true},
+    ReqBody = #{match_seq => MatchSeq, seq => PurgeSeq, purge => true},
     Resp = send_if_enabled(
         doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
     ),
@@ -130,14 +135,18 @@ purge_doc(#index{} = Index, DocId, PurgeSeq) when
             send_error(Reason)
     end.
 
-update_doc_async(ConnPid, #index{} = Index, DocId, UpdateSeq, Partition, Fields) when
+update_doc_async(ConnPid, #index{} = Index, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
     is_pid(ConnPid),
     is_binary(DocId),
+    is_integer(MatchSeq),
+    MatchSeq >= 0,
     is_integer(UpdateSeq),
+    UpdateSeq > 0,
     (is_binary(Partition) orelse Partition == null),
     is_list(Fields)
 ->
     ReqBody = #{
+        match_seq => MatchSeq,
         seq => UpdateSeq,
         partition => Partition,
         fields => Fields
@@ -166,15 +175,20 @@ search(#index{} = Index, QueryArgs) ->
             send_error(Reason)
     end.
 
-set_update_seq(#index{} = Index, UpdateSeq) ->
-    set_seq(Index, update_seq, UpdateSeq).
-set_purge_seq(#index{} = Index, PurgeSeq) ->
-    set_seq(Index, purge_seq, PurgeSeq).
-
-set_seq(#index{} = Index, Key, Value) when is_atom(Key), is_integer(Value) ->
+set_update_seq(#index{} = Index, MatchSeq, UpdateSeq) ->
     ReqBody = #{
-        Key => Value
+        match_update_seq => MatchSeq,
+        update_seq => UpdateSeq
     },
+    set_seq(Index, ReqBody).
+set_purge_seq(#index{} = Index, MatchSeq, PurgeSeq) ->
+    ReqBody = #{
+        match_purge_seq => MatchSeq,
+        purge_seq => PurgeSeq
+    },
+    set_seq(Index, ReqBody).
+
+set_seq(#index{} = Index, ReqBody) ->
     Resp = send_if_enabled(
         index_url(Index), [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
     ),
@@ -271,6 +285,8 @@ jaxrs_error("404", Body) ->
     {not_found, message(Body)};
 jaxrs_error("405", Body) ->
     {method_not_allowed, message(Body)};
+jaxrs_error("409", Body) ->
+    {conflict, message(Body)};
 jaxrs_error("417", Body) ->
     {expectation_failed, message(Body)};
 jaxrs_error("422", Body) ->
