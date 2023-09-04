@@ -19,13 +19,13 @@ import java.util.OptionalLong;
 
 public final class IndexInfoRequest {
 
-    private OptionalLong updateSeq;
+    private final OptionalLong updateSeq;
 
-    private OptionalLong purgeSeq;
+    private final OptionalLong purgeSeq;
 
     public IndexInfoRequest(
-            @JsonProperty("update_seq") @Positive OptionalLong updateSeq,
-            @JsonProperty("purge_seq") @Positive OptionalLong purgeSeq) {
+            @JsonProperty("update_seq") @Positive final OptionalLong updateSeq,
+            @JsonProperty("purge_seq") @Positive final OptionalLong purgeSeq) {
         this.updateSeq = updateSeq;
         this.purgeSeq = purgeSeq;
     }

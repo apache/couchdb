@@ -14,23 +14,16 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.Positive;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class DocumentDeleteRequest {
+public final class DocumentDeleteRequest {
 
     @Positive
-    private long seq;
+    private final long seq;
 
-    private boolean purge;
+    private final boolean purge;
 
-    public DocumentDeleteRequest() {
-        // Jackson deserialization
-    }
-
-    public DocumentDeleteRequest(long seq, final boolean purge) {
+    public DocumentDeleteRequest(@JsonProperty("seq") final long seq, @JsonProperty("purge") final boolean purge) {
         if (seq < 1) {
             throw new IllegalArgumentException("seq must be 1 or greater");
         }
@@ -38,12 +31,10 @@ public class DocumentDeleteRequest {
         this.purge = purge;
     }
 
-    @JsonProperty
     public long getSeq() {
         return seq;
     }
 
-    @JsonProperty
     public boolean isPurge() {
         return purge;
     }
