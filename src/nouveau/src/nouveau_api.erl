@@ -23,12 +23,14 @@
     create_index/2,
     delete_path/1,
     delete_path/2,
-    delete_doc/3,
+    delete_doc_async/4,
     purge_doc/3,
-    update_doc/5,
+    update_doc_async/6,
     search/2,
     set_purge_seq/2,
-    set_update_seq/2
+    set_update_seq/2,
+    drain_async_responses/1,
+    jaxrs_error/2
 ]).
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
@@ -97,20 +99,25 @@ delete_path(Path, Exclusions) when
             send_error(Reason)
     end.
 
-delete_doc(#index{} = Index, DocId, UpdateSeq) when
-    is_binary(DocId), is_integer(UpdateSeq)
+delete_doc_async(ConnPid, #index{} = Index, DocId, UpdateSeq) when
+    is_pid(ConnPid), is_binary(DocId), is_integer(UpdateSeq)
 ->
-    delete_doc(Index, DocId, UpdateSeq, false).
+    ReqBody = #{seq => UpdateSeq, purge => false},
+    send_direct_if_enabled(
+        ConnPid,
+        doc_url(Index, DocId),
+        [?JSON_CONTENT_TYPE],
+        delete,
+        jiffy:encode(ReqBody),
+        [
+            {stream_to, self()}
+        ]
+    ).
 
 purge_doc(#index{} = Index, DocId, PurgeSeq) when
     is_binary(DocId), is_integer(PurgeSeq)
 ->
-    delete_doc(Index, DocId, PurgeSeq, true).
-
-delete_doc(#index{} = Index, DocId, Seq, IsPurge) when
-    is_binary(DocId), is_integer(Seq), is_boolean(IsPurge)
-->
-    ReqBody = #{seq => Seq, purge => IsPurge},
+    ReqBody = #{seq => PurgeSeq, purge => true},
     Resp = send_if_enabled(
         doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
     ),
@@ -123,7 +130,8 @@ delete_doc(#index{} = Index, DocId, Seq, IsPurge) when
             send_error(Reason)
     end.
 
-update_doc(#index{} = Index, DocId, UpdateSeq, Partition, Fields) when
+update_doc_async(ConnPid, #index{} = Index, DocId, UpdateSeq, Partition, Fields) when
+    is_pid(ConnPid),
     is_binary(DocId),
     is_integer(UpdateSeq),
     (is_binary(Partition) orelse Partition == null),
@@ -134,17 +142,16 @@ update_doc(#index{} = Index, DocId, UpdateSeq, Partition, Fields) when
         partition => Partition,
         fields => Fields
     },
-    Resp = send_if_enabled(
-        doc_url(Index, DocId), [?JSON_CONTENT_TYPE], put, jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, "204", _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
+    send_direct_if_enabled(
+        ConnPid,
+        doc_url(Index, DocId),
+        [?JSON_CONTENT_TYPE],
+        put,
+        jiffy:encode(ReqBody),
+        [
+            {stream_to, self()}
+        ]
+    ).
 
 search(#index{} = Index, QueryArgs) ->
     Resp = send_if_enabled(
@@ -178,6 +185,45 @@ set_seq(#index{} = Index, Key, Value) when is_atom(Key), is_integer(Value) ->
             {error, jaxrs_error(StatusCode, RespBody)};
         {error, Reason} ->
             send_error(Reason)
+    end.
+
+drain_async_responses(List) when is_list(List) ->
+    drain_async_responses_list(List);
+drain_async_responses(Timeout) when is_integer(Timeout); Timeout == infinity ->
+    drain_async_responses_timeout(Timeout, []).
+
+drain_async_responses_list([]) ->
+    ok;
+drain_async_responses_list([ReqId | Rest]) ->
+    receive
+        {ibrowse_async_headers, ReqId, Code, Headers} ->
+            case drain_async_response(ReqId, Code, Headers, undefined) of
+                {ok, "204", _Headers, _Body} ->
+                    drain_async_responses_list(Rest);
+                {ok, StatusCode, _Headers, RespBody} ->
+                    exit({error, jaxrs_error(StatusCode, RespBody)})
+            end
+    end.
+
+drain_async_responses_timeout(Timeout, ReqIds) when is_integer(Timeout); Timeout == infinity ->
+    receive
+        {ibrowse_async_headers, ReqId, Code0, Headers0} ->
+            case drain_async_response(ReqId, Code0, Headers0, undefined) of
+                {ok, "204", _Headers, _Body} ->
+                    drain_async_responses_timeout(Timeout, [ReqId | ReqIds]);
+                {ok, StatusCode, _Headers, RespBody} ->
+                    exit({error, jaxrs_error(StatusCode, RespBody)})
+            end
+    after Timeout ->
+        ReqIds
+    end.
+
+drain_async_response(ReqId, Code0, Headers0, Body0) ->
+    receive
+        {ibrowse_async_response, ReqId, Body1} ->
+            drain_async_response(ReqId, Code0, Headers0, Body1);
+        {ibrowse_async_response_end, ReqId} ->
+            {ok, Code0, Headers0, Body0}
     end.
 
 %% private functions
@@ -249,9 +295,20 @@ send_if_enabled(Url, Header, Method) ->
     send_if_enabled(Url, Header, Method, []).
 
 send_if_enabled(Url, Header, Method, Body) ->
+    send_if_enabled(Url, Header, Method, Body, []).
+
+send_if_enabled(Url, Header, Method, Body, Options) ->
     case nouveau:enabled() of
         true ->
-            ibrowse:send_req(Url, Header, Method, Body);
+            ibrowse:send_req(Url, Header, Method, Body, Options);
+        false ->
+            {error, nouveau_not_enabled}
+    end.
+
+send_direct_if_enabled(ConnPid, Url, Header, Method, Body, Options) ->
+    case nouveau:enabled() of
+        true ->
+            ibrowse:send_req_direct(ConnPid, Url, Header, Method, Body, Options);
         false ->
             {error, nouveau_not_enabled}
     end.
