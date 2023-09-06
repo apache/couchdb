@@ -480,13 +480,33 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     end.
 
 file_open_options(Options) ->
-    [read, raw, binary] ++
-        case lists:member(read_only, Options) of
-            true ->
-                [];
-            false ->
-                [append]
-        end.
+    Opts =
+        [read, raw, binary] ++
+            case lists:member(read_only, Options) of
+                true ->
+                    [];
+                false ->
+                    [append]
+            end,
+    Opts ++ delayed_write() ++ read_ahead().
+
+delayed_write() ->
+    case config:get_boolean("couchdb", "delayed_write_enabled", false) of
+        false ->
+            [];
+        true ->
+            Bytes = config:get_integer("couchdb", "delayed_write_bytes", 64 bsl 10),
+            Delay = config:get_integer("couchdb", "delayed_write_msec", 2000),
+            [{delayed_write, Bytes, Delay}]
+    end.
+
+read_ahead() ->
+    case config:get_integer("couchdb", "read_ahead_bytes", 64 bsl 10) of
+        0 ->
+            [];
+        Bytes when is_integer(Bytes), Bytes > 0 ->
+            [{read_ahead, Bytes}]
+    end.
 
 maybe_track_open_os_files(Options) ->
     case not lists:member(sys_db, Options) of
