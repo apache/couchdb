@@ -33,9 +33,10 @@
     changes_done,
     total_changes,
     exclude_idrevs,
-    reqids = [],
+    reqids,
     conn_pid,
-    update_seq
+    update_seq,
+    max_pipeline_size
 }).
 
 -record(purge_acc, {
@@ -97,13 +98,15 @@ update(#index{} = Index) ->
                         changes_done = 0,
                         total_changes = TotalChanges,
                         exclude_idrevs = PurgeAcc1#purge_acc.exclude_list,
+                        reqids = queue:new(),
                         conn_pid = ConnPid,
-                        update_seq = PurgeAcc1#purge_acc.index_update_seq
+                        update_seq = PurgeAcc1#purge_acc.index_update_seq,
+                        max_pipeline_size = nouveau_util:max_pipeline_size()
                     },
                     {ok, Acc1} = couch_db:fold_changes(
                         Db, Acc0#acc.update_seq, fun load_docs/2, Acc0, []
                     ),
-                    nouveau_api:drain_async_responses(lists:reverse(Acc1#acc.reqids)),
+                    nouveau_api:drain_async_responses(Acc1#acc.reqids, 0),
                     ibrowse:stop_worker_process(ConnPid),
                     ok = nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq)
                 after
@@ -117,9 +120,9 @@ update(#index{} = Index) ->
 load_docs(#full_doc_info{id = <<"_design/", _/binary>>}, #acc{} = Acc) ->
     {ok, Acc};
 load_docs(FDI, #acc{} = Acc0) ->
-    %% collect completed requests without blocking
-    ReqIds = nouveau_api:drain_async_responses(0),
-    Acc1 = Acc0#acc{reqids = Acc0#acc.reqids -- ReqIds},
+    %% block for responses so we stay under the max pipeline size
+    ReqIds1 = nouveau_api:drain_async_responses(Acc0#acc.reqids, Acc0#acc.max_pipeline_size),
+    Acc1 = Acc0#acc{reqids = ReqIds1},
 
     couch_task_status:update([
         {changes_done, Acc1#acc.changes_done},
@@ -146,7 +149,7 @@ load_docs(FDI, #acc{} = Acc0) ->
                     {ibrowse_req_id, ReqId} ->
                         Acc1#acc{
                             update_seq = DI#doc_info.high_seq,
-                            reqids = [ReqId | Acc1#acc.reqids]
+                            reqids = queue:in(ReqId, Acc1#acc.reqids)
                         };
                     {error, Reason} ->
                         exit({error, Reason})

@@ -29,7 +29,7 @@
     search/2,
     set_purge_seq/3,
     set_update_seq/3,
-    drain_async_responses/1,
+    drain_async_responses/2,
     jaxrs_error/2
 ]).
 
@@ -201,39 +201,32 @@ set_seq(#index{} = Index, ReqBody) ->
             send_error(Reason)
     end.
 
-drain_async_responses(List) when is_list(List) ->
-    drain_async_responses_list(List);
-drain_async_responses(Timeout) when is_integer(Timeout); Timeout == infinity ->
-    drain_async_responses_timeout(Timeout, []).
-
-drain_async_responses_list([]) ->
-    ok;
-drain_async_responses_list([ReqId | Rest]) ->
-    receive
-        {ibrowse_async_headers, ReqId, Code, Headers} ->
-            case drain_async_response(ReqId, Code, Headers, undefined) of
-                {ok, "204", _Headers, _Body} ->
-                    drain_async_responses_list(Rest);
-                {ok, StatusCode, _Headers, RespBody} ->
-                    exit({error, jaxrs_error(StatusCode, RespBody)})
-            end
+%% wait for enough async responses to reduce the Queue to Min length.
+drain_async_responses(Queue0, Min) when Min >= 0 ->
+    case queue:len(Queue0) > Min of
+        true ->
+            {{value, ReqId}, Queue1} = queue:out(Queue0),
+            wait_for_response(ReqId),
+            drain_async_responses(Queue1, Min);
+        false ->
+            Queue0
     end.
 
-drain_async_responses_timeout(Timeout, ReqIds) when is_integer(Timeout); Timeout == infinity ->
-    receive
-        {ibrowse_async_headers, ReqId, Code0, Headers0} ->
-            case drain_async_response(ReqId, Code0, Headers0, undefined) of
-                {ok, "204", _Headers, _Body} ->
-                    drain_async_responses_timeout(Timeout, [ReqId | ReqIds]);
-                {ok, StatusCode, _Headers, RespBody} ->
-                    exit({error, jaxrs_error(StatusCode, RespBody)})
-            end
-    after Timeout ->
-        ReqIds
+wait_for_response(ReqId) ->
+    case drain_async_response(ReqId) of
+        {ok, "204", _Headers, _Body} ->
+            ok;
+        {ok, StatusCode, _Headers, RespBody} ->
+            exit({error, jaxrs_error(StatusCode, RespBody)})
     end.
+
+drain_async_response(ReqId) ->
+    drain_async_response(ReqId, undefined, undefined, undefined).
 
 drain_async_response(ReqId, Code0, Headers0, Body0) ->
     receive
+        {ibrowse_async_headers, ReqId, Code1, Headers1} ->
+            drain_async_response(ReqId, Code1, Headers1, Body0);
         {ibrowse_async_response, ReqId, Body1} ->
             drain_async_response(ReqId, Code0, Headers0, Body1);
         {ibrowse_async_response_end, ReqId} ->
