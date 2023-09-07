@@ -1401,7 +1401,9 @@ it easier to take advantage of future improvements to query planning
     :>json object mrargs: Arguments passed to the underlying view.
     :>json number limit: Limit parameter used.
     :>json number skip: Skip parameter used.
-    :>json array fields: Fields to be returned by the query.
+    :>json array fields: Fields to be returned by the query.  The `[]`
+       value here means all the fields, since there is no projection
+       happening in that case.
     :>json boolean partitioned: The database is partitioned or not.
     :>json array index_candidates: The list of all indexes that were
        found but not selected for serving the query.  See :ref:`the

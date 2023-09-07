@@ -294,7 +294,7 @@ extract_selector_hints(Selector) ->
     | {opts, ejson()}
     | {limit, integer()}
     | {skip, integer()}
-    | {fields, fields()}
+    | {fields, [field()]}
     | {index_candidates, [candidate_index()]}
     | {selector_hints, selector_hints()}
     | {atom(), any()}.
@@ -309,7 +309,7 @@ explain(#cursor{} = Cursor) ->
         opts = Opts0,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields0
     } = Cursor,
     DbName = couch_db:name(Db),
     Partitioned = fabric_util:is_partitioned(Db),
@@ -331,6 +331,11 @@ explain(#cursor{} = Cursor) ->
                 lists:keyreplace(r, 1, Opts1, {r, list_to_integer(R)});
             false ->
                 Opts1
+        end,
+    Fields =
+        case Fields0 of
+            all_fields -> [];
+            Value -> Value
         end,
     CandidateIndexes = extract_candidate_indexes(Cursor),
     SelectorHints = extract_selector_hints(Selector),
@@ -1091,7 +1096,6 @@ explain_test_() ->
 t_explain_empty(_) ->
     Selector = {[]},
     Indexes = sets:new(),
-    Fields = all_fields,
     Trace =
         #{
             all_indexes => Indexes,
@@ -1110,7 +1114,7 @@ t_explain_empty(_) ->
             opts = [{user_ctx, user_ctx}],
             limit = limit,
             skip = skip,
-            fields = Fields,
+            fields = all_fields,
             trace = Trace
         },
     Hints = [{[{type, json}, {indexable_fields, []}, {unindexable_fields, []}]}],
@@ -1123,7 +1127,7 @@ t_explain_empty(_) ->
             {opts, {[]}},
             {limit, limit},
             {skip, skip},
-            {fields, Fields},
+            {fields, []},
             {index_candidates, []},
             {selector_hints, Hints}
         ]},
@@ -1140,7 +1144,7 @@ t_explain_regular(_) ->
     },
     Selector = {[]},
     Indexes = sets:from_list([Index]),
-    Fields = all_fields,
+    Fields = some_fields,
     Trace =
         #{
             all_indexes => Indexes,
