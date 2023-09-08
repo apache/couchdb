@@ -250,7 +250,7 @@ handle_request_int(MochiReq) ->
                 P
         end,
 
-    Peer = peer(MochiReq),
+    Peer = MochiReq:get(peer),
 
     Method1 =
         case MochiReq:get(method) of
@@ -1477,23 +1477,6 @@ get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
     couch_util:url_encode(User);
 get_user(#httpd{user_ctx = undefined}) ->
     "undefined".
-
-peer(MochiReq) ->
-    Socket = MochiReq:get(socket),
-    case mochiweb_socket:peername(Socket) of
-        {ok, {{O1, O2, O3, O4}, Port}} ->
-            io_lib:format(
-                "~B.~B.~B.~B:~B",
-                [O1, O2, O3, O4, Port]
-            );
-        {ok, {{O1, O2, O3, O4, O5, O6, O7, O8}, Port}} ->
-            io_lib:format(
-                "~B.~B.~B.~B.~B.~B.~B.~B:~B",
-                [O1, O2, O3, O4, O5, O6, O7, O8, Port]
-            );
-        {error, _Reason} ->
-            MochiReq:get(peer)
-    end.
 
 -ifdef(TEST).
 
