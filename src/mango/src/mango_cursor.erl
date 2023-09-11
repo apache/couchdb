@@ -325,7 +325,7 @@ explain(#cursor{} = Cursor) ->
     % The value of `r` needs to be translated to an integer
     % otherwise `jiffy:encode/1` will render it as an array.
     RValue = lists:keyfind(r, 1, Opts1),
-    Opts =
+    Opts2 =
         case RValue of
             {r, R} ->
                 lists:keyreplace(r, 1, Opts1, {r, list_to_integer(R)});
@@ -336,6 +336,14 @@ explain(#cursor{} = Cursor) ->
         case Fields0 of
             all_fields -> [];
             Value -> Value
+        end,
+    OptsFields = lists:keyfind(fields, 1, Opts2),
+    Opts =
+        case OptsFields of
+            {fields, all_fields} ->
+                lists:keyreplace(fields, 1, Opts2, {fields, []});
+            _ ->
+                Opts2
         end,
     CandidateIndexes = extract_candidate_indexes(Cursor),
     SelectorHints = extract_selector_hints(Selector),
@@ -1111,7 +1119,7 @@ t_explain_empty(_) ->
             db = db,
             index = none,
             selector = Selector,
-            opts = [{user_ctx, user_ctx}],
+            opts = [{user_ctx, user_ctx}, {fields, all_fields}],
             limit = limit,
             skip = skip,
             fields = all_fields,
@@ -1124,7 +1132,7 @@ t_explain_empty(_) ->
             {index, null},
             {partitioned, db_partitioned},
             {selector, Selector},
-            {opts, {[]}},
+            {opts, {[{fields, []}]}},
             {limit, limit},
             {skip, skip},
             {fields, []},
@@ -1160,7 +1168,7 @@ t_explain_regular(_) ->
             db = db,
             index = Index,
             selector = Selector,
-            opts = [{user_ctx, user_ctx}],
+            opts = [{user_ctx, user_ctx}, {fields, Fields}],
             limit = limit,
             skip = skip,
             fields = Fields,
@@ -1173,7 +1181,7 @@ t_explain_regular(_) ->
             {index, index},
             {partitioned, db_partitioned},
             {selector, Selector},
-            {opts, {[]}},
+            {opts, {[{fields, Fields}]}},
             {limit, limit},
             {skip, skip},
             {fields, Fields},
