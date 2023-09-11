@@ -152,10 +152,10 @@ configure_ibrowse(URL) ->
     ibrowse:set_max_sessions(
         Host,
         Port,
-        config:get_integer("nouveau", "max_sessions", 100)
+        nouveau_util:max_sessions()
     ),
     ibrowse:set_max_pipeline_size(
         Host,
         Port,
-        config:get_integer("nouveau", "max_pipeline_size", 1000)
+        nouveau_util:max_pipeline_size()
     ).

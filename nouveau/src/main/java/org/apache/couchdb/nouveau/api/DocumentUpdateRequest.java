@@ -14,41 +14,45 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.Collection;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class DocumentUpdateRequest {
+public final class DocumentUpdateRequest {
+
+    @PositiveOrZero
+    private final long matchSeq;
 
     @Positive
-    private long seq;
+    private final long seq;
 
-    private String partition;
+    private final String partition;
 
     @NotEmpty
     @Valid
-    private Collection<Field> fields;
+    private final Collection<Field> fields;
 
-    public DocumentUpdateRequest() {
-        // Jackson deserialization
-    }
-
-    public DocumentUpdateRequest(long seq, String partition, Collection<Field> fields) {
+    public DocumentUpdateRequest(
+            @JsonProperty("match_seq") final long matchSeq,
+            @JsonProperty("seq") final long seq,
+            @JsonProperty("partition") final String partition,
+            @JsonProperty("fields") final Collection<Field> fields) {
+        this.matchSeq = matchSeq;
         this.seq = seq;
         this.partition = partition;
         this.fields = fields;
     }
 
-    @JsonProperty
+    public long getMatchSeq() {
+        return matchSeq;
+    }
+
     public long getSeq() {
         return seq;
     }
 
-    @JsonProperty
     public String getPartition() {
         return partition;
     }
@@ -57,13 +61,13 @@ public class DocumentUpdateRequest {
         return partition != null;
     }
 
-    @JsonProperty
     public Collection<Field> getFields() {
         return fields;
     }
 
     @Override
     public String toString() {
-        return "DocumentUpdateRequest [seq=" + seq + ", partition=" + partition + ", fields=" + fields + "]";
+        return "DocumentUpdateRequest [matchSeq=" + matchSeq + ", seq=" + seq + ", partition=" + partition + ", fields="
+                + fields + "]";
     }
 }

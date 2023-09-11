@@ -27,7 +27,9 @@
     maybe_create_local_purge_doc/2,
     get_local_purge_doc_id/1,
     get_local_purge_doc_body/3,
-    nouveau_url/0
+    nouveau_url/0,
+    max_sessions/0,
+    max_pipeline_size/0
 ]).
 
 index_name(Path) when is_binary(Path) ->
@@ -196,3 +198,9 @@ get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
 
 nouveau_url() ->
     config:get("nouveau", "url", "http://127.0.0.1:8080").
+
+max_sessions() ->
+    config:get_integer("nouveau", "max_sessions", 100).
+
+max_pipeline_size() ->
+    config:get_integer("nouveau", "max_pipeline_size", 1000).

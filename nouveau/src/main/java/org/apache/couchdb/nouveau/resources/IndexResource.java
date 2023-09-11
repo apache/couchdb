@@ -102,11 +102,16 @@ public final class IndexResource {
     public void setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request)
             throws Exception {
         indexManager.with(name, indexLoader(), (index) -> {
-            if (request.getUpdateSeq().isPresent()) {
-                index.setUpdateSeq(request.getUpdateSeq().getAsLong());
+            if (request.getMatchUpdateSeq().isPresent()
+                    && request.getUpdateSeq().isPresent()) {
+                index.setUpdateSeq(
+                        request.getMatchUpdateSeq().getAsLong(),
+                        request.getUpdateSeq().getAsLong());
             }
-            if (request.getPurgeSeq().isPresent()) {
-                index.setPurgeSeq(request.getPurgeSeq().getAsLong());
+            if (request.getMatchPurgeSeq().isPresent() && request.getPurgeSeq().isPresent()) {
+                index.setPurgeSeq(
+                        request.getMatchPurgeSeq().getAsLong(),
+                        request.getPurgeSeq().getAsLong());
             }
             return null;
         });

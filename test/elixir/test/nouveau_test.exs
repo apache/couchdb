@@ -524,8 +524,9 @@ defmodule NouveauTest do
 
     resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
     assert_status_code(resp, 200)
-    assert resp.body["search_index"]["update_seq"] == 6
-    assert resp.body["search_index"]["purge_seq"] == 1
+    db_info = info(db_name)
+    assert seq(db_info["update_seq"]) == resp.body["search_index"]["update_seq"]
+    assert seq(db_info["purge_seq"]) == resp.body["search_index"]["purge_seq"]
   end
 
   @tag :with_db
@@ -593,7 +594,13 @@ defmodule NouveauTest do
 
     resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
     assert_status_code(resp, 200)
-    assert resp.body["search_index"]["update_seq"] == 8
-    assert resp.body["search_index"]["purge_seq"] == 4
+    db_info = info(db_name)
+    assert seq(db_info["update_seq"]) == resp.body["search_index"]["update_seq"]
+    assert seq(db_info["purge_seq"]) == resp.body["search_index"]["purge_seq"]
   end
+
+  def seq(str) do
+    String.to_integer(hd(Regex.run(~r/^[0-9]+/, str)))
+  end
+
 end

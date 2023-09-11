@@ -19,19 +19,35 @@ import java.util.OptionalLong;
 
 public final class IndexInfoRequest {
 
-    private OptionalLong updateSeq;
+    private final OptionalLong matchUpdateSeq;
 
-    private OptionalLong purgeSeq;
+    private final OptionalLong updateSeq;
+
+    private final OptionalLong matchPurgeSeq;
+
+    private final OptionalLong purgeSeq;
 
     public IndexInfoRequest(
-            @JsonProperty("update_seq") @Positive OptionalLong updateSeq,
-            @JsonProperty("purge_seq") @Positive OptionalLong purgeSeq) {
+            @JsonProperty("match_update_seq") @Positive final OptionalLong matchUpdateSeq,
+            @JsonProperty("update_seq") @Positive final OptionalLong updateSeq,
+            @JsonProperty("match_purge_seq") @Positive final OptionalLong matchPurgeSeq,
+            @JsonProperty("purge_seq") @Positive final OptionalLong purgeSeq) {
+        this.matchUpdateSeq = matchUpdateSeq;
         this.updateSeq = updateSeq;
+        this.matchPurgeSeq = matchPurgeSeq;
         this.purgeSeq = purgeSeq;
+    }
+
+    public OptionalLong getMatchUpdateSeq() {
+        return matchUpdateSeq;
     }
 
     public OptionalLong getUpdateSeq() {
         return updateSeq;
+    }
+
+    public OptionalLong getMatchPurgeSeq() {
+        return matchPurgeSeq;
     }
 
     public OptionalLong getPurgeSeq() {
@@ -40,6 +56,7 @@ public final class IndexInfoRequest {
 
     @Override
     public String toString() {
-        return "IndexInfoRequest [updateSeq=" + updateSeq + ", purgeSeq=" + purgeSeq + "]";
+        return "IndexInfoRequest [matchUpdateSeq=" + matchUpdateSeq + ", updateSeq=" + updateSeq + ", matchPurgeSeq="
+                + matchPurgeSeq + ", purgeSeq=" + purgeSeq + "]";
     }
 }
