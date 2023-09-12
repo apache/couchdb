@@ -7,7 +7,7 @@ Community installation guides are available on the wiki:
     http://wiki.apache.org/couchdb/Installation
 
 If you are trying to build CouchDB from a git checkout rather than
-a .tar.gz, see the `DEVELOPERS` file.
+a .tar.gz, see the `README-DEV.rst` file.
 
 This document is the canonical source of installation
 information. However, many systems have gotchas that you need to be
