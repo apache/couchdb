@@ -489,7 +489,11 @@ ssl_params(Url) ->
 -spec ssl_verify_options(true | false) -> [_].
 ssl_verify_options(true) ->
     CAFile = cfg("ssl_trusted_certificates_file"),
-    [{verify, verify_peer}, {cacertfile, CAFile}];
+    [
+        {verify, verify_peer},
+        {customize_hostname_check, [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]},
+        {cacertfile, CAFile}
+    ];
 ssl_verify_options(false) ->
     [{verify, verify_none}].
 
