@@ -121,6 +121,7 @@ chttpd_util_client_socker_monitor_test_() ->
         fun test_util:stop_couch/1,
         with([
             ?TDEF(t_client_req_set_get_clean),
+            ?TDEF(t_client_req_sensitive_headers_are_removed),
             ?TDEF(t_client_req_check_config),
             ?TDEF(t_closed_socket_kills_coordinator)
         ])
@@ -135,6 +136,26 @@ t_client_req_set_get_clean(_) ->
     ?assertEqual(ClientReq, chttpd_util:mochiweb_client_req_get()),
     chttpd_util:mochiweb_client_req_clean(),
     ?assertEqual(undefined, chttpd_util:mochiweb_client_req_get()),
+    gen_tcp:close(Sock).
+
+t_client_req_sensitive_headers_are_removed(_) ->
+    {ok, Sock} = gen_tcp:listen(0, [{active, false}]),
+    Headers = [
+        {"AutHoriZatioN", "Basic s3cr3t"},
+        {"COOkiE", "C00kie"},
+        {"x-AUth-CouchDB-TokeN", "S3cr3tT0k3n"},
+        {"other", "oth3r"}
+    ],
+    ClientReq = mochiweb:new_request({Sock, {'GET', "/foo", {1, 1}}, Headers}),
+    chttpd_util:mochiweb_client_req_set(ClientReq),
+    ResReq = chttpd_util:mochiweb_client_req_get(),
+    ?assertEqual(Sock, mochiweb_request:get(socket, ResReq)),
+    ?assertEqual('GET', mochiweb_request:get(method, ResReq)),
+    ?assertEqual([], mochiweb_request:get(opts, ResReq)),
+    ?assertEqual({1, 1}, mochiweb_request:get(version, ResReq)),
+    ?assertEqual("/foo", mochiweb_request:get(raw_path, ResReq)),
+    ResHeaders = mochiweb_request:get(headers, ResReq),
+    ?assertEqual([{"other", "oth3r"}], mochiweb_headers:to_list(ResHeaders)),
     gen_tcp:close(Sock).
 
 t_client_req_check_config(_) ->
