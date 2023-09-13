@@ -121,7 +121,19 @@ get_db_info(DbName) ->
     end.
 
 mochiweb_client_req_set(ClientReq) ->
-    put(?MOCHIWEB_CLIENT_REQ, ClientReq).
+    Method = mochiweb_request:get(method, ClientReq),
+    Socket = mochiweb_request:get(socket, ClientReq),
+    Path = mochiweb_request:get(raw_path, ClientReq),
+    Version = mochiweb_request:get(version, ClientReq),
+    Opts = mochiweb_request:get(opts, ClientReq),
+    Headers = mochiweb_request:get(headers, ClientReq),
+    % Remove any senstive info in case process dict gets dumped
+    % to the logs at some point
+    Headers1 = mochiweb_headers:delete_any("Authorization", Headers),
+    Headers2 = mochiweb_headers:delete_any("Cookie", Headers1),
+    Headers3 = mochiweb_headers:delete_any("X-Auth-CouchDB-Token", Headers2),
+    ClientReq1 = mochiweb_request:new(Socket, Opts, Method, Path, Version, Headers3),
+    put(?MOCHIWEB_CLIENT_REQ, ClientReq1).
 
 mochiweb_client_req_clean() ->
     erase(?MOCHIWEB_CLIENT_REQ).
