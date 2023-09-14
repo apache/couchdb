@@ -82,21 +82,22 @@ teardown(DbName) ->
     config:delete("smoosh", "cleanup_index_files", false).
 
 t_default_channels(_) ->
+    ChannelStatus = maps:get(channels, status()),
     ?assertMatch(
         [
-            {"index_cleanup", _},
-            {"ratio_dbs", _},
-            {"ratio_views", _},
-            {"slack_dbs", _},
-            {"slack_views", _},
-            {"upgrade_dbs", _},
-            {"upgrade_views", _}
+            index_cleanup,
+            ratio_dbs,
+            ratio_views,
+            slack_dbs,
+            slack_views,
+            upgrade_dbs,
+            upgrade_views
         ],
-        status()
+        lists:sort(maps:keys(ChannelStatus))
     ),
     % If app hasn't started status won't crash
     application:stop(smoosh),
-    ?assertEqual([], status()).
+    ?assertEqual(#{channels => #{}}, status()).
 
 t_channels_recreated_on_crash(_) ->
     RatioDbsPid = get_channel_pid("ratio_dbs"),
@@ -104,7 +105,8 @@ t_channels_recreated_on_crash(_) ->
     exit(RatioDbsPid, kill),
     meck:wait(1, smoosh_channel, start_link, 1, 3000),
     wait_for_channels(7),
-    ?assertMatch([_, {"ratio_dbs", _} | _], status()),
+    ChannelStatus = maps:get(channels, status()),
+    ?assertMatch(true, maps:is_key(ratio_dbs, ChannelStatus)),
     ?assertNotEqual(RatioDbsPid, get_channel_pid("ratio_dbs")).
 
 t_can_create_and_delete_channels(_) ->
@@ -402,17 +404,17 @@ delete_doc(DbName, DDocId) ->
 
 status() ->
     {ok, Props} = smoosh:status(),
-    lists:keysort(1, Props).
+    Props.
 
 status(Channel) ->
-    case lists:keyfind(Channel, 1, status()) of
-        {_, Val} ->
-            Val,
-            Active = proplists:get_value(active, Val),
-            Starting = proplists:get_value(starting, Val),
-            WaitingInfo = proplists:get_value(waiting, Val),
-            Waiting = proplists:get_value(size, WaitingInfo),
-            {Active, Starting, Waiting};
+    ChannelStatus = maps:get(channels, status()),
+    ChannelAtom = list_to_atom(Channel),
+    case maps:is_key(ChannelAtom, ChannelStatus) of
+        true ->
+            #{active := Active, starting := Starting, waiting := Waiting} = maps:get(
+                ChannelAtom, ChannelStatus
+            ),
+            {Active, Starting, maps:get(size, Waiting)};
         false ->
             false
     end.
@@ -443,7 +445,8 @@ wait_for_channels() ->
 
 wait_for_channels(N) when is_integer(N), N >= 0 ->
     WaitFun = fun() ->
-        case length(status()) of
+        ChannelStatus = maps:get(channels, status()),
+        case length(maps:keys(ChannelStatus)) of
             N -> ok;
             _ -> wait
         end

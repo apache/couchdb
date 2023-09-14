@@ -225,7 +225,7 @@ t_persist_unpersist_disabled(_) ->
 
     Q2 = unpersist(Name),
     ?assertEqual(Name, smoosh_priority_queue:name(Q2)),
-    ?assertEqual([{size, 0}], smoosh_priority_queue:info(Q2)).
+    ?assertEqual(#{max => 0, min => 0, size => 0}, smoosh_priority_queue:info(Q2)).
 
 t_persist_unpersist_enabled(_) ->
     Name = "chan2",
@@ -241,7 +241,7 @@ t_persist_unpersist_enabled(_) ->
     Q2 = unpersist(Name),
     ?assertEqual(Name, smoosh_priority_queue:name(Q2)),
     Info2 = smoosh_priority_queue:info(Q2),
-    ?assertEqual([{size, 3}, {min, 1.0}, {max, infinity}], Info2),
+    ?assertEqual(#{max => infinity, min => 1.0, size => 3}, Info2),
     ?assertEqual(Keys, drain_q(Q2)),
 
     % Try to persist the already unpersisted queue
@@ -249,7 +249,7 @@ t_persist_unpersist_enabled(_) ->
     Q3 = unpersist(Name),
     ?assertEqual(Name, smoosh_priority_queue:name(Q3)),
     Info3 = smoosh_priority_queue:info(Q2),
-    ?assertEqual([{size, 3}, {min, 1.0}, {max, infinity}], Info3),
+    ?assertEqual(#{max => infinity, min => 1.0, size => 3}, Info3),
     ?assertEqual(Keys, drain_q(Q3)).
 
 t_persist_unpersist_errors(_) ->
@@ -267,7 +267,7 @@ t_persist_unpersist_errors(_) ->
 
     Q2 = unpersist(Name),
     ?assertEqual(Name, smoosh_priority_queue:name(Q2)),
-    ?assertEqual([{size, 0}], smoosh_priority_queue:info(Q2)),
+    ?assertEqual(#{max => 0, min => 0, size => 0}, smoosh_priority_queue:info(Q2)),
 
     Dir = state_dir(),
     ok = file:make_dir(Dir),
@@ -278,7 +278,7 @@ t_persist_unpersist_errors(_) ->
 
     Q3 = unpersist(Name),
     ?assertEqual(Name, smoosh_priority_queue:name(Q3)),
-    ?assertEqual([{size, 0}], smoosh_priority_queue:info(Q3)),
+    ?assertEqual(#{max => 0, min => 0, size => 0}, smoosh_priority_queue:info(Q3)),
 
     ok = file:del_dir_r(Dir).
 

@@ -64,17 +64,14 @@ qsize(#priority_queue{tree = Tree}) ->
     gb_trees:size(Tree).
 
 info(#priority_queue{tree = Tree} = Q) ->
-    [
-        {size, qsize(Q)}
-        | case gb_trees:is_empty(Tree) of
-            true ->
-                [];
-            false ->
-                {{Min, _}, _} = gb_trees:smallest(Tree),
-                {{Max, _}, _} = gb_trees:largest(Tree),
-                [{min, Min}, {max, Max}]
-        end
-    ].
+    case gb_trees:is_empty(Tree) of
+        true ->
+            #{size => qsize(Q), min => 0, max => 0};
+        false ->
+            {{Min, _}, _} = gb_trees:smallest(Tree),
+            {{Max, _}, _} = gb_trees:largest(Tree),
+            #{size => qsize(Q), min => Min, max => Max}
+    end.
 
 insert(Key, Priority, Capacity, #priority_queue{tree = Tree, map = Map} = Q) ->
     TreeKey = {Priority, make_ref()},
@@ -122,7 +119,7 @@ basics_test() ->
     Q = new("foo"),
     ?assertMatch(#priority_queue{}, Q),
     ?assertEqual("foo", name(Q)),
-    ?assertEqual([{size, 0}], info(Q)).
+    ?assertEqual(0, maps:get(size, info(Q))).
 
 empty_test() ->
     Q = new("foo"),
@@ -136,7 +133,7 @@ one_element_test() ->
     Q0 = new("foo"),
     Q = in(?K1, ?P1, 1, Q0),
     ?assertMatch(#priority_queue{}, Q),
-    ?assertEqual([{size, 1}, {min, 1}, {max, 1}], info(Q)),
+    ?assertEqual(#{max => 1, min => 1, size => 1}, info(Q)),
     ?assertEqual(Q, truncate(1, Q)),
     ?assertMatch({?K1, #priority_queue{}}, out(Q)),
     {?K1, Q2} = out(Q),
@@ -144,7 +141,7 @@ one_element_test() ->
     ?assertEqual(#{?K1 => ?P1}, to_map(Q)),
     Q3 = from_map("foo", 1, to_map(Q)),
     ?assertEqual("foo", name(Q3)),
-    ?assertEqual([{size, 1}, {min, ?P1}, {max, ?P1}], info(Q3)),
+    ?assertEqual(#{max => ?P1, min => ?P1, size => 1}, info(Q3)),
     ?assertEqual(to_map(Q), to_map(Q3)),
     ?assertEqual(Q0, flush(Q)).
 
@@ -153,7 +150,7 @@ multiple_elements_basics_test() ->
     Q1 = in(?K1, ?P1, 10, Q0),
     Q2 = in(?K2, ?P2, 10, Q1),
     Q3 = in(?K3, ?P3, 10, Q2),
-    ?assertEqual([{size, 3}, {min, ?P1}, {max, ?P3}], info(Q3)),
+    ?assertEqual(#{max => ?P3, min => ?P1, size => 3}, info(Q3)),
     ?assertEqual([?K3, ?K2, ?K1], drain(Q3)).
 
 update_element_same_priority_test() ->
@@ -166,7 +163,7 @@ update_element_new_priority_test() ->
     Q1 = in(?K1, ?P1, 10, Q0),
     Q2 = in(?K2, ?P2, 10, Q1),
     Q3 = in(?K1, ?P3, 10, Q2),
-    ?assertEqual([{size, 2}, {min, ?P2}, {max, ?P3}], info(Q3)),
+    ?assertEqual(#{max => ?P3, min => ?P2, size => 2}, info(Q3)),
     ?assertEqual([?K1, ?K2], drain(Q3)).
 
 capacity_test() ->
@@ -189,7 +186,7 @@ a_lot_of_elements_test() ->
         lists:seq(1, N)
     ),
     Q = from_map("foo", N, maps:from_list(KVs)),
-    ?assertMatch([{size, N} | _], info(Q)),
+    ?assertMatch(N, maps:get(size, info(Q))),
     {_, Priorities} = lists:unzip(drain(Q)),
     ?assertEqual(lists:reverse(lists:sort(Priorities)), Priorities).
 

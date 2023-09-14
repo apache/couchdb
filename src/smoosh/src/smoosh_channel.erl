@@ -77,10 +77,10 @@ enqueue(ServerRef, Object, Priority) ->
 get_status(StatusTab) when is_reference(StatusTab) ->
     try ets:lookup(StatusTab, status) of
         [{status, Status}] -> Status;
-        [] -> []
+        [] -> #{}
     catch
         error:badarg ->
-            []
+            #{}
     end.
 
 close(ServerRef) ->
@@ -235,11 +235,11 @@ unpersist(Name) ->
 %
 set_status(#state{} = State) ->
     #state{active = Active, starting = Starting, waiting = Waiting} = State,
-    Status = [
-        {active, map_size(Active)},
-        {starting, map_size(Starting)},
-        {waiting, smoosh_priority_queue:info(Waiting)}
-    ],
+    Status = #{
+        active => map_size(Active),
+        starting => map_size(Starting),
+        waiting => smoosh_priority_queue:info(Waiting)
+    },
     true = ets:insert(State#state.stab, {status, Status}),
     State.
 

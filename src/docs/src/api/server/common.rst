@@ -1902,6 +1902,116 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
         Accept: text/plain
         Host: localhost:17986
 
+.. _api/server/smoosh/status:
+
+=====================================
+``/_node/{node-name}/_smoosh/status``
+=====================================
+
+.. versionadded:: 3.4
+
+.. http:get:: /_node/{node-name}/_smoosh/status
+    :synopsis: Returns metrics of the CouchDB's auto-compaction daemon
+
+    This prints the state of each channel, how many jobs they are
+    currently running and how many jobs are enqueued (as well as the
+    lowest and highest priority of those enqueued items). The idea is to
+    provide, at a glance, sufficient insight into ``smoosh`` that an operator
+    can assess whether ``smoosh`` is adequately targeting the reclaimable
+    space in the cluster.
+
+    In general, a healthy status output will have
+    items in the ``ratio_dbs`` and ``ratio_views`` channels. Owing to the default
+    settings, the ``slack_dbs`` and ``slack_views`` will almost certainly have
+    items in them. Historically, we've not found that the slack channels,
+    on their own, are particularly adept at keeping things well compacted.
+
+    :code 200: Request completed successfully
+    :code 401: CouchDB Server Administrator privileges required
+
+    **Request**:
+
+    .. code-block:: http
+
+        GET /_node/_local/_smoosh/status HTTP/1.1
+        Host: 127.0.0.1:5984
+        Accept: */*
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+
+        {
+            "channels": {
+                "slack_dbs": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 0,
+                        "min": 0,
+                        "max": 0
+                    },
+                    "active": 0
+                },
+                "ratio_dbs": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 56,
+                        "min": 1.125,
+                        "max": 11.0625
+                    },
+                    "active": 0
+                },
+                "ratio_views": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 0,
+                        "min": 0,
+                        "max": 0
+                    },
+                    "active": 0
+                },
+                "upgrade_dbs": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 0,
+                        "min": 0,
+                        "max": 0
+                    },
+                    "active": 0
+                },
+                "slack_views": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 0,
+                        "min": 0,
+                        "max": 0
+                    },
+                    "active": 0
+                },
+                "upgrade_views": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 0,
+                        "min": 0,
+                        "max": 0
+                    },
+                    "active": 0
+                },
+                "index_cleanup": {
+                    "starting": 0,
+                    "waiting": {
+                        "size": 0,
+                        "min": 0,
+                        "max": 0
+                    },
+                    "active": 0
+                }
+            }
+        }
+
 .. _api/server/system:
 
 ==============================
