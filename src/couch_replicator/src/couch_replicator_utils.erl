@@ -281,6 +281,10 @@ seq_encode(Seq) ->
     ?JSON_ENCODE(Seq).
 
 %% Log uses of http protocol
+valid_endpoint_protocols_log(#rep{source = undefined, target = undefined}) ->
+    % When we cancel continuous transient replications (with a POST to _replicate)
+    % source and target will be undefined
+    ok;
 valid_endpoint_protocols_log(#rep{} = Rep) ->
     VerifyEnabled = config:get_boolean("replicator", "valid_endpoint_protocols_log", false),
     case VerifyEnabled of
@@ -684,5 +688,64 @@ auth_props(User, Pass) when is_list(User), is_list(Pass) ->
                 {<<"password">>, list_to_binary(Pass)}
             ]}}
     ].
+
+http_log_setup() ->
+    Ctx = test_util:start_couch(),
+    config:set("replicator", "valid_endpoint_protocols_log", "true", false),
+    meck:new(couch_log, [passthrough]),
+    Ctx.
+
+http_log_teardown(Ctx) ->
+    meck:unload(),
+    config:delete("replicator", "valid_endpoint_protocols_log", false),
+    test_util:stop_couch(Ctx).
+
+valid_protocol_log_test_() ->
+    {
+        foreach,
+        fun http_log_setup/0,
+        fun http_log_teardown/1,
+        [
+            ?TDEF_FE(t_warn_on_http_urls),
+            ?TDEF_FE(t_dont_warn_on_https_urls),
+            ?TDEF_FE(t_dont_warn_if_disabled),
+            ?TDEF_FE(t_allow_canceling_transient_jobs)
+        ]
+    }.
+
+t_warn_on_http_urls(_) ->
+    Rep = #rep{
+        source = #httpdb{url = "http://foo.local"},
+        target = #httpdb{url = "http://127.0.0.2"}
+    },
+    meck:reset(couch_log),
+    ?assertEqual(ok, valid_endpoint_protocols_log(Rep)),
+    ?assertEqual(2, meck:num_calls(couch_log, warning, 2)).
+
+t_dont_warn_on_https_urls(_) ->
+    Rep = #rep{
+        source = #httpdb{url = "https://foo.local"},
+        target = #httpdb{url = "https://127.0.0.2"}
+    },
+    meck:reset(couch_log),
+    ?assertEqual(ok, valid_endpoint_protocols_log(Rep)),
+    ?assertEqual(0, meck:num_calls(couch_log, warning, 2)).
+
+t_dont_warn_if_disabled(_) ->
+    config:set("replicator", "valid_endpoint_protocols_log", "false", false),
+    Rep = #rep{
+        source = #httpdb{url = "http://foo.local"},
+        target = #httpdb{url = "http://127.0.0.2"}
+    },
+    meck:reset(couch_log),
+    ?assertEqual(ok, valid_endpoint_protocols_log(Rep)),
+    ?assertEqual(0, meck:num_calls(couch_log, warning, 2)).
+
+t_allow_canceling_transient_jobs(_) ->
+    meck:reset(couch_log),
+    % Transient job rep cancel records don't have any source or
+    % target endpoints defined. They are left undefined.
+    ?assertEqual(ok, valid_endpoint_protocols_log(#rep{})),
+    ?assertEqual(0, meck:num_calls(couch_log, warning, 2)).
 
 -endif.
