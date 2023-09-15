@@ -127,7 +127,7 @@ mochiweb_client_req_set(ClientReq) ->
     Version = mochiweb_request:get(version, ClientReq),
     Opts = mochiweb_request:get(opts, ClientReq),
     Headers = mochiweb_request:get(headers, ClientReq),
-    % Remove any senstive info in case process dict gets dumped
+    % Remove any sensitive info in case process dict gets dumped
     % to the logs at some point
     Headers1 = mochiweb_headers:delete_any("Authorization", Headers),
     Headers2 = mochiweb_headers:delete_any("Cookie", Headers1),
