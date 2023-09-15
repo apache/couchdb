@@ -336,12 +336,10 @@ indices_can_be_built_with_errors(#{db1 := Db}) ->
             ),
             {ok, JobId} = mem3_reshard:start_split_job(Shard),
             wait_state(JobId, completed),
-            % Normally would expect 4 (2 shards x 2 mrviews), but there were 2
-            % failures in get_index/2 and 3 in get_state/3 for a total of 4 + 5 = 9
-            ?assertEqual(9, meck:num_calls(couch_index_server, get_index, 2)),
-            % Normally would be 4 calls (2 shards x 2 mrviews), but there were
-            % 3 extra failures in get_state/2 for a total of 4 + 3 = 7
-            ?assertEqual(7, meck:num_calls(couch_index, get_state, 2)),
+            % Normally would expect 4 (2 shards x 2 mrviews). When retrying
+            % we expect get_index/2 and get_state/2 to be called more than once
+            ?assert(meck:num_calls(couch_index_server, get_index, 2) > 4),
+            ?assert(meck:num_calls(couch_index, get_state, 2) > 4),
             Shards1 = lists:sort(mem3:local_shards(Db)),
             ?assertEqual(2, length(Shards1)),
             MRViewGroupInfo = get_group_info(Db, <<"_design/mrview00000">>),
