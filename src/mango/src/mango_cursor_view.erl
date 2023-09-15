@@ -1003,7 +1003,8 @@ execute_test_() ->
             ?TDEF_FE(t_execute_ok_all_docs),
             ?TDEF_FE(t_execute_ok_all_docs_with_execution_stats),
             ?TDEF_FE(t_execute_ok_query_view),
-            ?TDEF_FE(t_execute_error)
+            ?TDEF_FE(t_execute_error_1),
+            ?TDEF_FE(t_execute_error_2)
         ]
     }.
 
@@ -1216,7 +1217,7 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     ?assertEqual({ok, updated_accumulator2}, execute(Cursor, fun foo:bar/2, accumulator)),
     ?assert(meck:called(fabric, all_docs, '_')).
 
-t_execute_error(_) ->
+t_execute_error_1(_) ->
     Cursor =
         #cursor{
             index = #idx{type = <<"json">>, ddoc = <<"_design/ghibli">>, name = index_name},
@@ -1232,6 +1233,23 @@ t_execute_error(_) ->
     ],
     meck:expect(fabric, query_view, Parameters, meck:val({error, reason})),
     ?assertEqual({error, reason}, execute(Cursor, undefined, accumulator)).
+
+t_execute_error_2(_) ->
+    Cursor =
+        #cursor{
+            index = #idx{type = <<"json">>, ddoc = <<"_design/ghibli">>, name = index_name},
+            db = db,
+            selector = {[]},
+            fields = all_fields,
+            ranges = [{'$gte', start_key, '$lte', end_key}],
+            opts = [{user_ctx, user_ctx}],
+            bookmark = nil
+        },
+    Parameters = [
+        db, '_', <<"ghibli">>, index_name, fun mango_cursor_view:handle_message/2, '_', '_'
+    ],
+    meck:expect(fabric, query_view, Parameters, meck:val({ok, {error, reason}})),
+    ?assertEqual({error, {error, reason}}, execute(Cursor, undefined, accumulator)).
 
 view_cb_test_() ->
     {
