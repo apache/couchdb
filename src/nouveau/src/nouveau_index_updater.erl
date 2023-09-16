@@ -108,7 +108,7 @@ update(#index{} = Index) ->
                     ),
                     nouveau_api:drain_async_responses(Acc1#acc.reqids, 0),
                     ibrowse:stop_worker_process(ConnPid),
-                    ok = nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq)
+                    exit(nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq))
                 after
                     ret_os_process(Proc)
                 end
