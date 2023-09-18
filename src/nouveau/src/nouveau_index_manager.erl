@@ -92,7 +92,7 @@ handle_info({'DOWN', IndexerRef, process, _Pid, Reason}, State) ->
             [{_, Index, Queue0}] = ets:lookup(?BY_DBSIG, DbSig),
             {{value, From}, Queue1} = queue:out(Queue0),
             case Reason of
-                normal ->
+                ok ->
                     gen_server:reply(From, ok);
                 {error, Msg} ->
                     couch_log:error(
