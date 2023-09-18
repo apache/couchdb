@@ -34,6 +34,7 @@ error_reporting_test_() ->
             ?TDEF_FE(t_skip_doc_put_invalid_attachment_name),
             ?TDEF_FE(t_fail_revs_diff),
             ?TDEF_FE(t_fail_bulk_get, 15),
+            ?TDEF_FE(t_fail_open_docs_get, 15),
             ?TDEF_FE(t_fail_changes_queue),
             ?TDEF_FE(t_fail_changes_manager),
             ?TDEF_FE(t_fail_changes_reader_proc),
@@ -120,7 +121,7 @@ t_skip_doc_put_401_errors({_Ctx, {Source, Target}}) ->
     populate_db(Source, 6, 6, _WithAttachments = true),
     ErrBody = [<<"{\"error\":\"unauthorized\", \"reason\":\"vdu\"}">>],
     mock_fail_req(put, "/6", {ok, "401", [], ErrBody}),
-    {ok, RepId} = replicate(Source, Target, false),
+    {ok, RepId} = replicate(Source, Target, #{continuous => false}),
     {ok, Listener} = rep_result_listener(RepId),
     Res = wait_rep_result(RepId),
     % Replication job should succeed
@@ -140,7 +141,7 @@ t_skip_doc_put_403_errors({_Ctx, {Source, Target}}) ->
     populate_db(Source, 6, 6, _WithAttachments = true),
     ErrBody = [<<"{\"error\":\"forbidden\", \"reason\":\"vdu\"}">>],
     mock_fail_req(put, "/6", {ok, "403", [], ErrBody}),
-    {ok, RepId} = replicate(Source, Target, false),
+    {ok, RepId} = replicate(Source, Target, #{continuous => false}),
     {ok, Listener} = rep_result_listener(RepId),
     Res = wait_rep_result(RepId),
     % Replication job should succeed
@@ -160,7 +161,7 @@ t_skip_doc_put_413_errors({_Ctx, {Source, Target}}) ->
     populate_db(Source, 6, 6, _WithAttachments = true),
     ErrBody = [<<"{\"error\":\"too_large\", \"reason\":\"too_large\"}">>],
     mock_fail_req(put, "/6", {ok, "413", [], ErrBody}),
-    {ok, RepId} = replicate(Source, Target, false),
+    {ok, RepId} = replicate(Source, Target, #{continuous => false}),
     {ok, Listener} = rep_result_listener(RepId),
     Res = wait_rep_result(RepId),
     % Replication job should succeed
@@ -180,7 +181,7 @@ t_skip_doc_put_415_errors({_Ctx, {Source, Target}}) ->
     populate_db(Source, 6, 6, _WithAttachments = true),
     ErrBody = [<<"{\"error\":\"unsupported_media_type\", \"reason\":\"bad_media\"}">>],
     mock_fail_req(put, "/6", {ok, "415", [], ErrBody}),
-    {ok, RepId} = replicate(Source, Target, false),
+    {ok, RepId} = replicate(Source, Target, #{continuous => false}),
     {ok, Listener} = rep_result_listener(RepId),
     Res = wait_rep_result(RepId),
     % Replication job should succeed
@@ -202,7 +203,7 @@ t_skip_doc_put_invalid_attachment_name({_Ctx, {Source, Target}}) ->
         <<"{\"error\":\"bad_request\", \"reason\":\"Attachment name '_foo' starts with prohibited character '_'\"}">>
     ],
     mock_fail_req(put, "/6", {ok, "400", [], ErrBody}),
-    {ok, RepId} = replicate(Source, Target, false),
+    {ok, RepId} = replicate(Source, Target, #{continuous => false}),
     {ok, Listener} = rep_result_listener(RepId),
     Res = wait_rep_result(RepId),
     % Replication job should succeed
@@ -255,6 +256,33 @@ t_fail_bulk_get({_Ctx, {Source, Target}}) ->
     wait_target_in_sync(Source, Target),
     % Check that there was a falback to a plain GET
     ?assertEqual(1, meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6)).
+
+t_fail_open_docs_get({_Ctx, {Source, Target}}) ->
+    populate_db(Source, 1, 5),
+    Opts = #{
+        % We're testing the case of individual doc rev GETs
+        use_bulk_get => false,
+        % Perform at least one retry before giving up (for extra coverage)
+        retries_per_request => 2
+    },
+    {ok, RepId} = replicate(Source, Target, Opts),
+    wait_target_in_sync(Source, Target),
+
+    {ok, Listener} = rep_result_listener(RepId),
+    % Break open_doc_revs on the server side and see what happens
+    meck:new(fabric_doc_open_revs, [passthrough]),
+    meck:expect(fabric_doc_open_revs, go, fun
+        (Src, <<"6">>, _, _) when Src =:= Source ->
+            % This is a random error, no particular reason for a 404
+            meck:exception(throw, not_found);
+        (ArgDb, ArgDocId, ArgRevs, ArgOpts) ->
+            meck:passthrough([ArgDb, ArgDocId, ArgRevs, ArgOpts])
+    end),
+    populate_db(Source, 6, 6),
+    {error, Result} = wait_rep_result(RepId),
+    ?assertMatch({worker_died, _, {process_died, _, open_doc_revs_failed}}, Result),
+    ?assert(meck:num_calls(fabric_doc_open_revs, go, 4) >= 2),
+    couch_replicator_notifier:stop(Listener).
 
 t_fail_changes_queue({_Ctx, {Source, Target}}) ->
     populate_db(Source, 1, 5),
@@ -311,7 +339,7 @@ t_dont_start_duplicate_job({_Ctx, {Source, Target}}) ->
     meck:new(couch_replicator_pg, [passthrough]),
     Pid = pid_from_another_node(),
     meck:expect(couch_replicator_pg, should_start, fun(_, _) -> {no, Pid} end),
-    Rep = make_rep(Source, Target, true),
+    Rep = make_rep(Source, Target, #{continuous => true}),
     ExpectErr = {error, {already_started, Pid}},
     ?assertEqual(ExpectErr, couch_replicator_scheduler_job:start_link(Rep)).
 
@@ -444,26 +472,28 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     end.
 
 replicate(Source, Target) ->
-    replicate(Source, Target, true).
+    replicate(Source, Target, #{}).
 
-replicate(Source, Target, Continuous) ->
-    Rep = make_rep(Source, Target, Continuous),
+replicate(Source, Target, #{} = Opts) ->
+    Rep = make_rep(Source, Target, Opts),
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),
     {ok, Rep#rep.id}.
 
-make_rep(Source, Target, Continuous) ->
-    RepObject =
-        {[
-            {<<"source">>, url(Source)},
-            {<<"target">>, url(Target)},
-            {<<"continuous">>, Continuous},
-            {<<"worker_processes">>, 1},
-            {<<"retries_per_request">>, 1},
-            % Low connection timeout so _changes feed gets restarted quicker
-            {<<"connection_timeout">>, 3000}
-        ]},
-    {ok, Rep} = couch_replicator_parse:parse_rep_doc(RepObject, ?ADMIN_USER),
+make_rep(Source, Target, #{} = OverrideOpts) ->
+    Opts0 = #{
+        source => url(Source),
+        target => url(Target),
+        continuous => true,
+        worker_processes => 1,
+        retries_per_request => 1,
+        % Low connection timeout so _changes feed gets restarted quicker
+        connection_timeout => 3000
+    },
+    RepMap = maps:merge(Opts0, OverrideOpts),
+    % parse_rep_doc accepts {[...]} ejson format
+    RepEJson = couch_util:json_decode(couch_util:json_encode(RepMap)),
+    {ok, Rep} = couch_replicator_parse:parse_rep_doc(RepEJson, ?ADMIN_USER),
     Rep.
 
 url(DbName) ->

@@ -277,14 +277,6 @@ bulk_get_zip({Id, Rev, _}, {[_ | _] = Props}) ->
     end.
 
 -spec open_doc_revs(#httpdb{}, binary(), list(), list(), function(), any()) -> no_return().
-open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
-    Path = encode_doc_id(Id),
-    QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
-    Url = couch_util:url_strip_password(
-        couch_replicator_httpc:full_url(HttpDb, [{path, Path}, {qs, QS}])
-    ),
-    couch_log:error("Replication crashing because GET ~s failed", [Url]),
-    exit(kaboom);
 open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     Path = encode_doc_id(Id),
     QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
@@ -369,17 +361,20 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                 couch_replicator_httpc:full_url(HttpDb, [{path, Path}, {qs, QS}])
             ),
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
-            Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
-            couch_log:notice(
-                "Retrying GET to ~s in ~p seconds due to error ~w",
-                [Url, Wait / 1000, error_reason(Else)]
-            ),
-            ok = timer:sleep(Wait),
-            RetryDb = HttpDb#httpdb{
-                retries = Retries - 1,
-                wait = Wait
-            },
-            open_doc_revs(RetryDb, Id, Revs, Options, Fun, Acc)
+            NewRetries = Retries - 1,
+            case NewRetries > 0 of
+                true ->
+                    Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
+                    LogRetryMsg = "Retrying GET to ~s in ~p seconds due to error ~w",
+                    couch_log:notice(LogRetryMsg, [Url, Wait / 1000, error_reason(Else)]),
+                    ok = timer:sleep(Wait),
+                    RetryDb = HttpDb#httpdb{retries = NewRetries, wait = Wait},
+                    open_doc_revs(RetryDb, Id, Revs, Options, Fun, Acc);
+                false ->
+                    LogFailMsg = "Replication crashing because GET ~s failed. Error ~p",
+                    couch_log:error(LogFailMsg, [Url, error_reason(Else)]),
+                    exit(open_doc_revs_failed)
+            end
     end.
 
 error_reason({http_request_failed, "GET", _Url, {error, timeout}}) ->
