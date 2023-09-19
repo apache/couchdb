@@ -107,9 +107,9 @@ update(#index{} = Index) ->
                         Db, Acc0#acc.update_seq, fun load_docs/2, Acc0, []
                     ),
                     nouveau_api:drain_async_responses(Acc1#acc.reqids, 0),
-                    ibrowse:stop_worker_process(ConnPid),
-                    exit(nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq))
+                    exit(nouveau_api:set_update_seq(ConnPid, Index, Acc1#acc.update_seq, NewCurSeq))
                 after
+                    ibrowse:stop_worker_process(ConnPid),
                     ret_os_process(Proc)
                 end
         end
@@ -232,7 +232,7 @@ purge_index(ConnPid, Db, Index, #purge_acc{} = PurgeAcc0) ->
                 case couch_db:get_full_doc_info(Db, Id) of
                     not_found ->
                         ok = nouveau_api:purge_doc(
-                            Index, Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
+                            ConnPid, Index, Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
                         ),
                         PurgeAcc1#purge_acc{index_purge_seq = PurgeSeq};
                     FDI ->
@@ -265,7 +265,7 @@ purge_index(ConnPid, Db, Index, #purge_acc{} = PurgeAcc0) ->
         ),
         DbPurgeSeq = couch_db:get_purge_seq(Db),
         ok = nouveau_api:set_purge_seq(
-            Index, PurgeAcc3#purge_acc.index_purge_seq, DbPurgeSeq
+            ConnPid, Index, PurgeAcc3#purge_acc.index_purge_seq, DbPurgeSeq
         ),
         update_local_doc(Db, Index, DbPurgeSeq),
         {ok, PurgeAcc3}

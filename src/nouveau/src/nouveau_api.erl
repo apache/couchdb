@@ -24,11 +24,11 @@
     delete_path/1,
     delete_path/2,
     delete_doc_async/5,
-    purge_doc/4,
+    purge_doc/5,
     update_doc_async/7,
     search/2,
-    set_purge_seq/3,
-    set_update_seq/3,
+    set_purge_seq/4,
+    set_update_seq/4,
     drain_async_responses/2,
     jaxrs_error/2
 ]).
@@ -119,12 +119,17 @@ delete_doc_async(ConnPid, #index{} = Index, DocId, MatchSeq, UpdateSeq) when
         ]
     ).
 
-purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
-    is_binary(DocId), is_integer(MatchSeq), MatchSeq >= 0, is_integer(PurgeSeq), PurgeSeq > 0
+purge_doc(ConnPid, #index{} = Index, DocId, MatchSeq, PurgeSeq) when
+    is_pid(ConnPid),
+    is_binary(DocId),
+    is_integer(MatchSeq),
+    MatchSeq >= 0,
+    is_integer(PurgeSeq),
+    PurgeSeq > 0
 ->
     ReqBody = #{match_seq => MatchSeq, seq => PurgeSeq, purge => true},
-    Resp = send_if_enabled(
-        doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody)
+    Resp = send_direct_if_enabled(
+        ConnPid, doc_url(Index, DocId), [?JSON_CONTENT_TYPE], delete, jiffy:encode(ReqBody), []
     ),
     case Resp of
         {ok, "204", _, _} ->
@@ -175,22 +180,22 @@ search(#index{} = Index, QueryArgs) ->
             send_error(Reason)
     end.
 
-set_update_seq(#index{} = Index, MatchSeq, UpdateSeq) ->
+set_update_seq(ConnPid, #index{} = Index, MatchSeq, UpdateSeq) ->
     ReqBody = #{
         match_update_seq => MatchSeq,
         update_seq => UpdateSeq
     },
-    set_seq(Index, ReqBody).
-set_purge_seq(#index{} = Index, MatchSeq, PurgeSeq) ->
+    set_seq(ConnPid, Index, ReqBody).
+set_purge_seq(ConnPid, #index{} = Index, MatchSeq, PurgeSeq) ->
     ReqBody = #{
         match_purge_seq => MatchSeq,
         purge_seq => PurgeSeq
     },
-    set_seq(Index, ReqBody).
+    set_seq(ConnPid, Index, ReqBody).
 
-set_seq(#index{} = Index, ReqBody) ->
-    Resp = send_if_enabled(
-        index_url(Index), [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody)
+set_seq(ConnPid, #index{} = Index, ReqBody) ->
+    Resp = send_direct_if_enabled(
+        ConnPid, index_url(Index), [?JSON_CONTENT_TYPE], post, jiffy:encode(ReqBody), []
     ),
     case Resp of
         {ok, "204", _, _} ->
