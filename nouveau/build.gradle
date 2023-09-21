@@ -39,9 +39,6 @@ dependencies {
     implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-jakarta', version: swaggerVersion
     implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-servlet-initializer-v2', version: swaggerVersion
 
-    testImplementation platform('org.junit:junit-bom:5.8.2')
-    testImplementation 'org.junit.jupiter:junit-jupiter-api'
-    testRuntimeOnly    'org.junit.jupiter:junit-jupiter-engine'
     testImplementation 'org.assertj:assertj-core'
     testImplementation 'org.mockito:mockito-core'
 }
@@ -67,8 +64,12 @@ spotless {
   }
 }
 
-test {
-    useJUnitPlatform()
+testing {
+    suites {
+        test {
+            useJUnitJupiter()
+        }
+    }
 }
 
 shadowJar {
