@@ -27,6 +27,12 @@ github:
         strict: true
         contexts:
           - continuous-integration/jenkins/pr-merge
+      required_pull_request_reviews:
+        # Set to true if you want to automatically dismiss approving reviews when someone pushes a new commit.
+        dismiss_stale_reviews: false
+        # Specifies the number of reviewers required to approve pull requests.
+        # Use a number between 1 and 6 or 0 to not require reviewers.
+        required_approving_review_count: 1
     fdbmain:
       required_status_checks:
         strict: true
