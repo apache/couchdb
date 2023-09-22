@@ -96,12 +96,14 @@ flush() ->
     gen_server:call(?MODULE, flush, infinity).
 
 status() ->
-    try ets:foldl(fun get_channel_status/2, [], ?MODULE) of
-        Res -> {ok, Res}
-    catch
-        error:badarg ->
-            {ok, []}
-    end.
+    ChannelsStatus =
+        try ets:foldl(fun get_channel_status/2, #{}, ?MODULE) of
+            Res -> Res
+        catch
+            error:badarg ->
+                #{}
+        end,
+    {ok, #{channels => ChannelsStatus}}.
 
 enqueue(Object0) ->
     Object = smoosh_utils:validate_arg(Object0),
@@ -286,7 +288,7 @@ remove_enqueue_ref(Ref, #state{} = State) when is_reference(Ref) ->
 
 get_channel_status(#channel{name = Name, stab = Tab}, Acc) ->
     Status = smoosh_channel:get_status(Tab),
-    [{Name, Status} | Acc];
+    Acc#{list_to_atom(Name) => Status};
 get_channel_status(_, Acc) ->
     Acc.
 

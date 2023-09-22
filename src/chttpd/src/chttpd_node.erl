@@ -39,6 +39,12 @@ handle_node_req(#httpd{path_parts = [_, <<"_local">>]} = Req) ->
     send_json(Req, 200, {[{name, node()}]});
 handle_node_req(#httpd{path_parts = [A, <<"_local">> | Rest]} = Req) ->
     handle_node_req(Req#httpd{path_parts = [A, node()] ++ Rest});
+% GET /_node/$node/_smoosh/status
+handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_smoosh">>, <<"status">>]} = Req) ->
+    {ok, Status} = smoosh:status(),
+    send_json(Req, 200, Status);
+handle_node_req(#httpd{path_parts = [_, _Node, <<"_smoosh">>, <<"status">>]} = Req) ->
+    send_method_not_allowed(Req, "GET");
 % GET /_node/$node/_versions
 handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]} = Req) ->
     IcuVer = couch_ejson_compare:get_icu_version(),
