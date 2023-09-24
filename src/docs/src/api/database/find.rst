@@ -42,9 +42,14 @@
         should be returned. If it is omitted, the entire object is returned.
         More information provided in the section on :ref:`filtering fields
         <find/filter>`. *Optional*
-    :<json string|array use_index: Instruct a query to use a specific index.
-        Specified either as ``"<design_document>"`` or
-        ``["<design_document>", "<index_name>"]``. *Optional*
+    :<json string|array use_index: Request a query to use a specific
+        index. Specified either as ``"<design_document>"`` or
+        ``["<design_document>", "<index_name>"]``. It is not
+        guaranteed that the index will be actually used because if the
+        index is not valid for the selector, fallback to a valid index
+        is attempted. Therefore that is more like a hint. When
+        fallback occurs, the details are given in the ``warning``
+        field of the response. *Optional*
     :<json boolean conflicts: Include conflicted documents if ``true``.
         Intended use is to easily find conflicted documents, without an
         index or view. Default is ``false``. *Optional*
