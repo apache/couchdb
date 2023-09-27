@@ -153,7 +153,7 @@ escriptize: couch
 .PHONY: check
 # target: check - Test everything
 check: all
-	@$(MAKE) find-bugs
+	@$(MAKE) xref
 	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
@@ -369,9 +369,9 @@ dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
 
-.PHONY: find-bugs
+.PHONY: xref
 # target: xref - find unused exports etc
-find-bugs:
+xref:
 	@./build-aux/xref-helper.sh $(REBAR) $(DIALYZE_OPTS)
 
 

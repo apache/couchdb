@@ -327,9 +327,9 @@ check-plt:
 dialyze: .rebar
 	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
 
-.PHONY: find_bugs
-# target: find_bugs - Find unused exports etc
-find_bugs:
+.PHONY: xref
+# target: xref - Find unused exports etc
+xref:
 	@$(REBAR) --keep-going --recursive xref $(DIALYZE_OPTS)
 
 .PHONY: introspect
