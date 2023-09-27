@@ -16,7 +16,7 @@
 
 -export([start_link/1, start_link/2, start_link/3, stop/1]).
 -export([set_timeout/2, prompt/2, killer/1]).
--export([send/2, writeline/2, readline/1, writejson/2, readjson/1]).
+-export([writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -45,10 +45,6 @@ stop(Pid) ->
 % Read/Write API
 set_timeout(Pid, TimeOut) when is_integer(TimeOut) ->
     ok = gen_server:call(Pid, {set_timeout, TimeOut}, infinity).
-
-% Used by couch_event_os_process.erl
-send(Pid, Data) ->
-    gen_server:cast(Pid, {send, Data}).
 
 prompt(Pid, Data) ->
     case ioq:call(Pid, {prompt, Data}, erlang:get(io_priority)) of
@@ -224,15 +220,6 @@ handle_call({prompt, Data}, _From, #os_proc{idle = Idle} = OsProc) ->
         garbage_collect()
     end.
 
-handle_cast({send, Data}, #os_proc{writer = Writer, idle = Idle} = OsProc) ->
-    try
-        Writer(OsProc, Data),
-        {noreply, OsProc, Idle}
-    catch
-        throw:OsError ->
-            couch_log:error("Failed sending data: ~p -> ~p", [Data, OsError]),
-            {stop, normal, OsProc}
-    end;
 handle_cast(garbage_collect, #os_proc{idle = Idle} = OsProc) ->
     erlang:garbage_collect(),
     {noreply, OsProc, Idle};
