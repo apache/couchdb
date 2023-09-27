@@ -12,9 +12,8 @@
 
 -module(couch_os_process).
 -behaviour(gen_server).
--vsn(1).
 
--export([start_link/1, start_link/2, start_link/3, stop/1]).
+-export([start_link/1, stop/1]).
 -export([set_timeout/2, prompt/2, killer/1]).
 -export([writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
@@ -33,11 +32,7 @@
 }).
 
 start_link(Command) ->
-    start_link(Command, []).
-start_link(Command, Options) ->
-    start_link(Command, Options, ?PORT_OPTIONS).
-start_link(Command, Options, PortOptions) ->
-    gen_server:start_link(couch_os_process, [Command, Options, PortOptions], []).
+    gen_server:start_link(?MODULE, [Command], []).
 
 stop(Pid) ->
     gen_server:cast(Pid, stop).
@@ -149,43 +144,28 @@ pick_command1(_) ->
     throw(abort).
 
 % gen_server API
-init([Command, Options, PortOptions]) ->
+init([Command]) ->
     couch_io_logger:start(os:getenv("COUCHDB_IO_LOG_DIR")),
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     V = config:get("query_server_config", "os_process_idle_limit", "300"),
     IdleLimit = list_to_integer(V) * 1000,
-    BaseProc = #os_proc{
+    OsProc = #os_proc{
         command = Command,
-        port = open_port({spawn, Spawnkiller ++ " " ++ Command}, PortOptions),
+        port = open_port({spawn, Spawnkiller ++ " " ++ Command}, ?PORT_OPTIONS),
         writer = fun ?MODULE:writejson/2,
         reader = fun ?MODULE:readjson/1,
         idle = IdleLimit
     },
-    KillCmd = iolist_to_binary(readline(BaseProc)),
+    KillCmd = iolist_to_binary(readline(OsProc)),
     Pid = self(),
-    couch_log:debug("OS Process Start :: ~p", [BaseProc#os_proc.port]),
+    couch_log:debug("OS Process Start :: ~p", [OsProc#os_proc.port]),
     couch_stats:increment_counter([couchdb, query_server, process_starts]),
     spawn(fun() ->
         % this ensure the real os process is killed when this process dies.
         erlang:monitor(process, Pid),
         killer(?b2l(KillCmd))
     end),
-    OsProc =
-        lists:foldl(
-            fun(Opt, Proc) ->
-                case Opt of
-                    {writer, Writer} when is_function(Writer) ->
-                        Proc#os_proc{writer = Writer};
-                    {reader, Reader} when is_function(Reader) ->
-                        Proc#os_proc{reader = Reader};
-                    {timeout, TimeOut} when is_integer(TimeOut) ->
-                        Proc#os_proc{timeout = TimeOut}
-                end
-            end,
-            BaseProc,
-            Options
-        ),
     {ok, OsProc, IdleLimit}.
 
 terminate(Reason, #os_proc{port = Port}) ->
@@ -245,17 +225,6 @@ handle_info(Msg, #os_proc{idle = Idle} = OsProc) ->
     couch_log:debug("OS Proc: Unknown info: ~p", [Msg]),
     {noreply, OsProc, Idle}.
 
-code_change(_, {os_proc, Cmd, Port, W, R, Timeout}, _) ->
-    V = config:get("query_server_config", "os_process_idle_limit", "300"),
-    State = #os_proc{
-        command = Cmd,
-        port = Port,
-        writer = W,
-        reader = R,
-        timeout = Timeout,
-        idle = list_to_integer(V) * 1000
-    },
-    {ok, State};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
