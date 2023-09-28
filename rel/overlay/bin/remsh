@@ -39,7 +39,7 @@ ARGS_FILE="${COUCHDB_ARGS_FILE:-$ROOTDIR/etc/vm.args}"
 
 # If present, extract cookie from ERL_FLAGS
 # This is used by the CouchDB Dockerfile and Helm chart
-NODE=$(echo "$ERL_FLAGS" | sed 's/^.*name \([^ ][^ ]*\).*$/\1/g')
+NODE=$(echo "$ERL_FLAGS" | sed -n 's/^.*name \([^ ][^ ]*\).*$/\1/p')
 if test -f "$ARGS_FILE"; then
 # else attempt to extract from vm.args
   ARGS_FILE_COOKIE=$(awk '$1=="-name"{print $2}' "$ARGS_FILE")
