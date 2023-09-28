@@ -14,8 +14,7 @@
 -behaviour(gen_server).
 
 -export([start_link/1, stop/1]).
--export([set_timeout/2, prompt/2, killer/1]).
--export([writeline/2, readline/1, writejson/2, readjson/1]).
+-export([set_timeout/2, prompt/2]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -25,8 +24,6 @@
 -record(os_proc, {
     command,
     port,
-    writer,
-    reader,
     timeout = 5000,
     idle
 }).
@@ -50,8 +47,8 @@ prompt(Pid, Data) ->
             throw(Error)
     end.
 
-% Utility functions for reading and writing
-% in custom functions
+% Utility functions for reading and writing lines
+%
 writeline(OsProc, Data) when is_record(OsProc, os_proc) ->
     Res = port_command(OsProc#os_proc.port, [Data, $\n]),
     couch_io_logger:log_output(Data),
@@ -153,8 +150,6 @@ init([Command]) ->
     OsProc = #os_proc{
         command = Command,
         port = open_port({spawn, Spawnkiller ++ " " ++ Command}, ?PORT_OPTIONS),
-        writer = fun ?MODULE:writejson/2,
-        reader = fun ?MODULE:readjson/1,
         idle = IdleLimit
     },
     KillCmd = iolist_to_binary(readline(OsProc)),
@@ -181,11 +176,10 @@ terminate(Reason, #os_proc{port = Port}) ->
 handle_call({set_timeout, TimeOut}, _From, #os_proc{idle = Idle} = OsProc) ->
     {reply, ok, OsProc#os_proc{timeout = TimeOut}, Idle};
 handle_call({prompt, Data}, _From, #os_proc{idle = Idle} = OsProc) ->
-    #os_proc{writer = Writer, reader = Reader} = OsProc,
     try
-        Writer(OsProc, Data),
+        writejson(OsProc, Data),
         couch_stats:increment_counter([couchdb, query_server, process_prompts]),
-        {reply, {ok, Reader(OsProc)}, OsProc, Idle}
+        {reply, {ok, readjson(OsProc)}, OsProc, Idle}
     catch
         throw:{error, OsError} ->
             couch_stats:increment_counter([couchdb, query_server, process_errors]),
@@ -233,5 +227,5 @@ killer(KillCmd) ->
         _ ->
             os:cmd(KillCmd)
     after 1000 ->
-        ?MODULE:killer(KillCmd)
+        killer(KillCmd)
     end.
