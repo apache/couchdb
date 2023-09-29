@@ -104,6 +104,9 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
         {ok, SearchResults} ->
             RespBody = #{
                 <<"bookmark">> => nouveau_bookmark:pack(maps:get(bookmark, SearchResults)),
+                <<"hints">> => pack_hints(
+                    maps:get(<<"index_versions">>, SearchResults)
+                ),
                 <<"total_hits">> => maps:get(<<"total_hits">>, SearchResults),
                 <<"total_hits_relation">> => maps:get(<<"total_hits_relation">>, SearchResults),
                 <<"hits">> => include_docs(
@@ -278,6 +281,11 @@ is_valid_range(FieldName, Ranges) when is_binary(FieldName), is_list(Ranges) ->
         AllMaps -> ok;
         true -> throw({query_parser_error, <<"all values in ranges parameter must be objects">>})
     end.
+
+pack_hints(IndexVersions) ->
+    Encoded = jiffy:encode(#{iv => IndexVersions}),
+    Compressed = zlib:compress(Encoded),
+    base64:encode(Compressed).
 
 check_if_enabled() ->
     case nouveau:enabled() of

@@ -86,10 +86,14 @@ handle_message({ok, Response}, Shard, State) ->
             %% already heard from someone else in this range
             {ok, State};
         nil ->
-            SearchResults = merge_search_results(State#state.search_results, Response, State),
+            SearchResults = merge_search_results(
+                State#state.search_results, Shard, Response, State
+            ),
             Counters1 = fabric_dict:store(Shard, ok, State#state.counters),
             Counters2 = fabric_view:remove_overlapping_shards(Shard, Counters1),
-            State1 = State#state{counters = Counters2, search_results = SearchResults},
+            State1 = State#state{
+                counters = Counters2, search_results = SearchResults
+            },
             case fabric_dict:any(nil, Counters2) of
                 true ->
                     {ok, State1};
@@ -110,28 +114,41 @@ handle_message({error, Reason}, _Shard, _State) ->
 handle_message(Else, _Shard, _State) ->
     {error, Else}.
 
-merge_search_results(A, B, #state{} = State) ->
+merge_search_results(Acc, #shard{} = Shard, Response, #state{} = State) ->
     #{
+        <<"index_versions">> => merge_index_version(
+            maps:get(<<"index_versions">>, Acc, #{}),
+            Shard,
+            maps:get(<<"index_version">>, Response)
+        ),
         <<"total_hits">> => merge_total_hits(
-            maps:get(<<"total_hits">>, A, 0), maps:get(<<"total_hits">>, B, 0)
+            maps:get(<<"total_hits">>, Acc, 0), maps:get(<<"total_hits">>, Response, 0)
         ),
         <<"total_hits_relation">> => merge_total_hits_relation(
-            maps:get(<<"total_hits_relation">>, A, null),
-            maps:get(<<"total_hits_relation">>, B, null)
+            maps:get(<<"total_hits_relation">>, Acc, null),
+            maps:get(<<"total_hits_relation">>, Response, null)
         ),
         <<"hits">> => merge_hits(
-            maps:get(<<"hits">>, A, []),
-            maps:get(<<"hits">>, B, []),
+            maps:get(<<"hits">>, Acc, []),
+            maps:get(<<"hits">>, Response, []),
             State#state.sort,
             State#state.limit
         ),
         <<"counts">> => merge_facets(
-            maps:get(<<"counts">>, A, null), maps:get(<<"counts">>, B, null), State#state.limit
+            maps:get(<<"counts">>, Acc, null),
+            maps:get(<<"counts">>, Response, null),
+            State#state.limit
         ),
         <<"ranges">> => merge_facets(
-            maps:get(<<"ranges">>, A, null), maps:get(<<"ranges">>, B, null), State#state.limit
+            maps:get(<<"ranges">>, Acc, null),
+            maps:get(<<"ranges">>, Response, null),
+            State#state.limit
         )
     }.
+
+merge_index_version(Acc, #shard{} = Shard, IndexVersion) ->
+    Range = ?l2b(io_lib:format("~16.16b-~.16b", Shard#shard.range)),
+    Acc#{Range => IndexVersion}.
 
 merge_total_hits(TotalHitsA, TotalHitsB) ->
     TotalHitsA + TotalHitsB.

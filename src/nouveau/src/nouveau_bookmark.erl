@@ -58,7 +58,10 @@ pack(nil) ->
 pack({EJson}) when is_list(EJson) ->
     pack(from_ejson(EJson));
 pack(UnpackedBookmark) when is_map(UnpackedBookmark) ->
-    base64:encode(jiffy:encode(maps:values(UnpackedBookmark))).
+    Values = maps:values(UnpackedBookmark),
+    Encoded = jiffy:encode(Values),
+    Compressed = zlib:compress(Encoded),
+    base64:encode(Compressed).
 
 %% legacy use of ejson within mango
 from_ejson({Props}) ->

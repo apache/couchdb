@@ -47,6 +47,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherFactory;
+import org.apache.lucene.search.SearcherLifetimeManager;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -149,7 +150,8 @@ public final class IndexResource {
             final long updateSeq = getSeq(writer, "update_seq");
             final long purgeSeq = getSeq(writer, "purge_seq");
             final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-            return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
+            final SearcherLifetimeManager searcherLifetimeManager = new SearcherLifetimeManager();
+            return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager, searcherLifetimeManager);
         };
     }
 

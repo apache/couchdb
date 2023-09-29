@@ -24,6 +24,8 @@ import jakarta.validation.constraints.Positive;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.OptionalLong;
 import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
@@ -31,6 +33,8 @@ public class SearchRequest {
 
     @NotNull
     private String query;
+
+    private OptionalLong indexVersion = OptionalLong.empty();
 
     private Locale locale;
 
@@ -62,6 +66,14 @@ public class SearchRequest {
     @JsonProperty
     public String getQuery() {
         return query;
+    }
+
+    public OptionalLong getIndexVersion() {
+        return indexVersion;
+    }
+
+    public void setIndexVersion(final OptionalLong indexVersion) {
+        this.indexVersion = Objects.requireNonNull(indexVersion);
     }
 
     public void setLocale(final Locale locale) {
@@ -154,7 +166,7 @@ public class SearchRequest {
 
     @Override
     public String toString() {
-        return "SearchRequest [query=" + query + ", locale=" + locale + ", sort=" + sort + ", limit=" + limit
-                + ", after=" + after + ", counts=" + counts + ", ranges=" + ranges + "]";
+        return "SearchRequest [query=" + query + ", indexVersion=" + indexVersion + ", locale=" + locale + ", sort="
+                + sort + ", limit=" + limit + ", after=" + after + ", counts=" + counts + ", ranges=" + ranges + "]";
     }
 }

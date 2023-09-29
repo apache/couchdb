@@ -16,6 +16,7 @@ package org.apache.couchdb.nouveau.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -28,6 +29,7 @@ public class SearchRequestTest {
     @BeforeAll
     public static void setupMapper() {
         mapper = new ObjectMapper();
+        mapper.registerModule(new Jdk8Module());
     }
 
     @Test

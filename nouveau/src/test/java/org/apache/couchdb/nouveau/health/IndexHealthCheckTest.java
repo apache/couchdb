@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import org.apache.couchdb.nouveau.core.IndexManager;
@@ -31,7 +32,9 @@ public class IndexHealthCheckTest {
     public void testIndexHealthCheck(@TempDir final Path tempDir) throws Exception {
         var scheduler = Executors.newSingleThreadScheduledExecutor();
         var manager = new IndexManager();
-        manager.setObjectMapper(new ObjectMapper());
+        var mapper = new ObjectMapper();
+        mapper.registerModule(new Jdk8Module());
+        manager.setObjectMapper(mapper);
         manager.setMetricRegistry(new MetricRegistry());
         manager.setRootDir(tempDir);
         manager.setScheduler(scheduler);

@@ -28,6 +28,8 @@ public class SearchResults {
     @PositiveOrZero
     private long totalHits;
 
+    private long indexVersion;
+
     @NotNull
     private Relation totalHitsRelation;
 
@@ -47,6 +49,15 @@ public class SearchResults {
     @JsonProperty
     public long getTotalHits() {
         return totalHits;
+    }
+
+    @JsonProperty
+    public long getIndexVersion() {
+        return indexVersion;
+    }
+
+    public void setIndexVersion(long indexVersion) {
+        this.indexVersion = indexVersion;
     }
 
     public Relation getTotalHitsRelation() {
@@ -86,7 +97,7 @@ public class SearchResults {
 
     @Override
     public String toString() {
-        return "SearchResults [hits=" + hits + ", totalHits=" + totalHits + ", counts=" + counts + ", ranges=" + ranges
-                + "]";
+        return "SearchResults [indexVersion=" + indexVersion + ", hits=" + hits + ", totalHits=" + totalHits
+                + ", counts=" + counts + ", ranges=" + ranges + "]";
     }
 }

@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
@@ -78,6 +79,8 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.MultiCollectorManager;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.SearcherLifetimeManager;
+import org.apache.lucene.search.SearcherLifetimeManager.PruneByAge;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
@@ -98,17 +101,20 @@ public class Lucene9Index extends Index {
     private final Analyzer analyzer;
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
+    private final SearcherLifetimeManager searcherLifetimeManager;
 
     public Lucene9Index(
             final Analyzer analyzer,
             final IndexWriter writer,
             final long updateSeq,
             final long purgeSeq,
-            final SearcherManager searcherManager) {
+            final SearcherManager searcherManager,
+            final SearcherLifetimeManager searcherLifetimeManager) {
         super(updateSeq, purgeSeq);
         this.analyzer = Objects.requireNonNull(analyzer);
         this.writer = Objects.requireNonNull(writer);
         this.searcherManager = Objects.requireNonNull(searcherManager);
+        this.searcherLifetimeManager = Objects.requireNonNull(searcherLifetimeManager);
     }
 
     @Override
@@ -158,6 +164,9 @@ public class Lucene9Index extends Index {
     public void doClose() throws IOException {
         IOUtils.runAll(
                 () -> {
+                    searcherLifetimeManager.close();
+                },
+                () -> {
                     searcherManager.close();
                 },
                 () -> {
@@ -186,17 +195,39 @@ public class Lucene9Index extends Index {
             cm = new MultiCollectorManager(hits);
         }
 
-        searcherManager.maybeRefreshBlocking();
-
-        final IndexSearcher searcher = searcherManager.acquire();
-        try {
-            final Object[] reduces = searcher.search(query, cm);
-            return toSearchResults(request, searcher, reduces);
-        } catch (final IllegalStateException e) {
-            throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
-        } finally {
-            searcherManager.release(searcher);
+        // Search latest version of index
+        if (request.getIndexVersion().isEmpty()) {
+            searcherManager.maybeRefreshBlocking();
+            var searcher = searcherManager.acquire();
+            var indexVersion = searcherLifetimeManager.record(searcher);
+            try {
+                final Object[] reduces = searcher.search(query, cm);
+                return toSearchResults(request, indexVersion, searcher, reduces);
+            } catch (final IllegalStateException e) {
+                throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
+            } finally {
+                searcherLifetimeManager.release(searcher);
+                searcherLifetimeManager.prune(new PruneByAge(600.0));
+            }
         }
+
+        // Try to search specific version of index if available
+        var indexVersion = request.getIndexVersion().getAsLong();
+        var searcher = searcherLifetimeManager.acquire(indexVersion);
+        if (searcher != null) {
+            try {
+                final Object[] reduces = searcher.search(query, cm);
+                return toSearchResults(request, indexVersion, searcher, reduces);
+            } catch (final IllegalStateException e) {
+                throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
+            } finally {
+                searcherLifetimeManager.release(searcher);
+                searcherLifetimeManager.prune(new PruneByAge(600.0));
+            }
+        }
+        // We failed to find the requested version, fallback to latest.
+        request.setIndexVersion(OptionalLong.empty());
+        return doSearch(request);
     }
 
     private CollectorManager<?, ? extends TopDocs> hitCollector(final SearchRequest searchRequest) {
@@ -224,9 +255,10 @@ public class Lucene9Index extends Index {
     }
 
     private SearchResults toSearchResults(
-            final SearchRequest searchRequest, final IndexSearcher searcher, final Object[] reduces)
+            final SearchRequest searchRequest, final long version, final IndexSearcher searcher, final Object[] reduces)
             throws IOException {
         final SearchResults result = new SearchResults();
+        result.setIndexVersion(version);
         collectHits(searcher, (TopDocs) reduces[0], result);
         if (reduces.length == 2) {
             collectFacets(searchRequest, searcher, (FacetsCollector) reduces[1], result);

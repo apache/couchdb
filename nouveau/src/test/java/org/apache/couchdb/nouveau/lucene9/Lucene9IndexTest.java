@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.DoubleField;
@@ -39,6 +40,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.misc.store.DirectIODirectory;
+import org.apache.lucene.search.SearcherLifetimeManager;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -79,6 +81,38 @@ public class Lucene9IndexTest {
             request.setQuery("*:*");
             final SearchResults results = index.search(request);
             assertThat(results.getTotalHits()).isEqualTo(count);
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testSearchingWithVersion(@TempDir Path path) throws IOException {
+        final Index index = setup(path);
+        try {
+            final int count = 100;
+            final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
+            for (int i = 1; i <= count; i++) {
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                index.update("doc" + i, request);
+            }
+            final SearchRequest request = new SearchRequest();
+            request.setQuery("*:*");
+            SearchResults results = index.search(request);
+            assertThat(results.getTotalHits()).isEqualTo(count);
+
+            // add another doc
+            index.update("doc" + count + 1, new DocumentUpdateRequest(count, count + 1, null, fields));
+
+            // Search with previous version and get same results.
+            request.setIndexVersion(OptionalLong.of(results.getIndexVersion()));
+            results = index.search(request);
+            assertThat(results.getTotalHits()).isEqualTo(count);
+
+            // Search without version and get the extra result.
+            request.setIndexVersion(OptionalLong.empty());
+            results = index.search(request);
+            assertThat(results.getTotalHits()).isEqualTo(count + 1);
         } finally {
             cleanup(index);
         }
@@ -245,7 +279,8 @@ public class Lucene9IndexTest {
             config.setUseCompoundFile(false);
             final IndexWriter writer = new IndexWriter(dir, config);
             final SearcherManager searcherManager = new SearcherManager(writer, null);
-            return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager);
+            final SearcherLifetimeManager searcherLifetimeManager = new SearcherLifetimeManager();
+            return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager, searcherLifetimeManager);
         };
     }
 }
