@@ -47,12 +47,8 @@ prompt(Pid, Data) ->
             throw(Error)
     end.
 
-% Utility functions for reading and writing lines
+% Utility functions for reading lines and parsing json
 %
-writeline(OsProc, Data) when is_record(OsProc, os_proc) ->
-    Res = port_command(OsProc#os_proc.port, [Data, $\n]),
-    couch_io_logger:log_output(Data),
-    Res.
 
 readline(#os_proc{} = OsProc) ->
     Res = readline(OsProc, []),
@@ -79,15 +75,6 @@ readline(#os_proc{port = Port} = OsProc, Acc) ->
         catch port_close(Port),
         throw({os_process_error, "OS process timed out."})
     end.
-
-% Standard JSON functions
-writejson(OsProc, Data) when is_record(OsProc, os_proc) ->
-    JsonData = ?JSON_ENCODE(Data),
-    couch_log:debug(
-        "OS Process ~p Input  :: ~s",
-        [OsProc#os_proc.port, JsonData]
-    ),
-    true = writeline(OsProc, JsonData).
 
 readjson(OsProc) when is_record(OsProc, os_proc) ->
     Line = iolist_to_binary(readline(OsProc)),
@@ -147,12 +134,16 @@ init([Command]) ->
     Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     V = config:get("query_server_config", "os_process_idle_limit", "300"),
     IdleLimit = list_to_integer(V) * 1000,
+    T0 = erlang:monotonic_time(),
     OsProc = #os_proc{
         command = Command,
         port = open_port({spawn, Spawnkiller ++ " " ++ Command}, ?PORT_OPTIONS),
         idle = IdleLimit
     },
     KillCmd = iolist_to_binary(readline(OsProc)),
+    T1 = erlang:monotonic_time(),
+    DtUSec = erlang:convert_time_unit(T1 - T0, native, microsecond),
+    bump_time_stat(spawn_proc, DtUSec),
     Pid = self(),
     couch_log:debug("OS Process Start :: ~p", [OsProc#os_proc.port]),
     couch_stats:increment_counter([couchdb, query_server, process_starts]),
@@ -177,9 +168,17 @@ handle_call({set_timeout, TimeOut}, _From, #os_proc{idle = Idle} = OsProc) ->
     {reply, ok, OsProc#os_proc{timeout = TimeOut}, Idle};
 handle_call({prompt, Data}, _From, #os_proc{idle = Idle} = OsProc) ->
     try
-        writejson(OsProc, Data),
         couch_stats:increment_counter([couchdb, query_server, process_prompts]),
-        {reply, {ok, readjson(OsProc)}, OsProc, Idle}
+        JsonData = ?JSON_ENCODE(Data),
+        couch_log:debug("OS Process ~p Input  :: ~s", [OsProc#os_proc.port, JsonData]),
+        couch_io_logger:log_output(JsonData),
+        T0 = erlang:monotonic_time(),
+        true = port_command(OsProc#os_proc.port, [JsonData, $\n]),
+        Response = readjson(OsProc),
+        T1 = erlang:monotonic_time(),
+        DtUSec = erlang:convert_time_unit(T1 - T0, native, microsecond),
+        bump_cmd_time_stat(Data, DtUSec),
+        {reply, {ok, Response}, OsProc, Idle}
     catch
         throw:{error, OsError} ->
             couch_stats:increment_counter([couchdb, query_server, process_errors]),
@@ -229,3 +228,30 @@ killer(KillCmd) ->
     after 1000 ->
         killer(KillCmd)
     end.
+
+bump_cmd_time_stat(Cmd, USec) when is_list(Cmd), is_integer(USec) ->
+    case Cmd of
+        [<<"map_doc">> | _] ->
+            bump_time_stat(map, USec);
+        [<<"reduce">> | _] ->
+            bump_time_stat(reduce, USec);
+        [<<"rereduce">> | _] ->
+            bump_time_stat(reduce, USec);
+        [<<"reset">> | _] ->
+            bump_time_stat(reset, USec);
+        [<<"add_fun">> | _] ->
+            bump_time_stat(add_fun, USec);
+        [<<"ddoc">>, <<"new">> | _] ->
+            bump_time_stat(ddoc_new, USec);
+        [<<"ddoc">>, _, [<<"validate_doc_update">> | _] | _] ->
+            bump_time_stat(ddoc_vdu, USec);
+        [<<"ddoc">>, _, [<<"filters">> | _] | _] ->
+            bump_time_stat(ddoc_filter, USec);
+        [<<"ddoc">> | _] ->
+            bump_time_stat(ddoc_other, USec);
+        _ ->
+            bump_time_stat(other, USec)
+    end.
+
+bump_time_stat(Stat, USec) when is_atom(Stat), is_integer(USec) ->
+    couch_stats:increment_counter([couchdb, query_server, time, Stat], USec).

@@ -11,7 +11,7 @@
 % the License.
 
 -module(couch_js_tests).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 couch_js_test_() ->
     {
@@ -20,22 +20,23 @@ couch_js_test_() ->
             setup,
             fun test_util:start_couch/0,
             fun test_util:stop_couch/1,
-            [
-                fun should_create_sandbox/0,
-                fun should_reset_properly/0,
-                fun should_freeze_doc_object/0,
-                fun should_roundtrip_utf8/0,
-                fun should_roundtrip_modified_utf8/0,
-                fun should_replace_broken_utf16/0,
-                fun should_allow_js_string_mutations/0,
-                {timeout, 60000, fun should_exit_on_oom/0},
-                {timeout, 60000, fun should_exit_on_internal_error/0}
-            ]
+            with([
+                ?TDEF(should_create_sandbox),
+                ?TDEF(should_reset_properly),
+                ?TDEF(should_freeze_doc_object),
+                ?TDEF(should_roundtrip_utf8),
+                ?TDEF(should_roundtrip_modified_utf8),
+                ?TDEF(should_replace_broken_utf16),
+                ?TDEF(should_allow_js_string_mutations),
+                ?TDEF(should_bump_timing_stats),
+                ?TDEF(should_exit_on_oom, 60000),
+                ?TDEF(should_exit_on_internal_error, 60000)
+            ])
         }
     }.
 
 %% erlfmt-ignore
-should_create_sandbox() ->
+should_create_sandbox(_) ->
     % Try and detect whether we can see out of the
     % sandbox or not.
     Src = <<"
@@ -48,8 +49,8 @@ should_create_sandbox() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
-    Result = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, {[]}]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
+    Result = prompt(Proc, [<<"map_doc">>, {[]}]),
     ?assertMatch([[[true, <<_/binary>>]]], Result),
     [[[true, ErrMsg]]] = Result,
     ?assertNotEqual([], binary:matches(ErrMsg, <<"not defined">>)),
@@ -61,7 +62,7 @@ should_create_sandbox() ->
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_reset_properly() ->
+should_reset_properly(_) ->
     Src = <<"
         function(doc) {
             var a = [0,1,2];
@@ -71,20 +72,20 @@ should_reset_properly() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     Doc = {[]},
-    Result1 = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result1 = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[0, null]]], Result1),
-    Result2 = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result2 = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[42, 43]]], Result2),
-    true = couch_query_servers:proc_prompt(Proc, [<<"reset">>]),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
-    Result3 = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    true = prompt(Proc, [<<"reset">>]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
+    Result3 = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[0, null]]], Result3),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_freeze_doc_object() ->
+should_freeze_doc_object(_) ->
     Src = <<"
         function(doc) {
             emit(doc.foo, doc.bar);
@@ -94,16 +95,16 @@ should_freeze_doc_object() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     Doc = {[{<<"bar">>, 1041}]},
-    Result1 = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result1 = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[null, 1041], [null, 1041]]], Result1),
-    Result2 = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result2 = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[null, 1041], [null, 1041]]], Result2),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_roundtrip_utf8() ->
+should_roundtrip_utf8(_) ->
     % Try round tripping UTF-8 both directions through
     % couchjs. These tests use hex encoded values of
     % Ä (C384) and Ü (C39C) so as to avoid odd editor/Erlang encoding
@@ -114,17 +115,17 @@ should_roundtrip_utf8() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     Doc =
         {[
             {<<"value">>, <<16#C3, 16#84>>}
         ]},
-    Result = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[<<16#C3, 16#84>>, <<16#C3, 16#9C>>]]], Result),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_roundtrip_modified_utf8() ->
+should_roundtrip_modified_utf8(_) ->
     % Mimicking the test case from the mailing list
     Src = <<"
         function(doc) {
@@ -132,17 +133,17 @@ should_roundtrip_modified_utf8() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     Doc =
         {[
             {<<"value">>, <<16#C3, 16#84>>}
         ]},
-    Result = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[<<16#C3, 16#A4>>, <<16#C3, 16#9C>>]]], Result),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_replace_broken_utf16() ->
+should_replace_broken_utf16(_) ->
     % This test reverse the surrogate pair of
     % the Boom emoji U+1F4A5
     Src = <<"
@@ -151,12 +152,12 @@ should_replace_broken_utf16() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     Doc =
         {[
             {<<"value">>, list_to_binary(xmerl_ucs:to_utf8([16#1F4A5]))}
         ]},
-    Result = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result = prompt(Proc, [<<"map_doc">>, Doc]),
     % Invalid UTF-8 gets replaced with the 16#FFFD replacement
     % marker
     Markers = list_to_binary(xmerl_ucs:to_utf8([16#FFFD, 16#FFFD])),
@@ -164,7 +165,7 @@ should_replace_broken_utf16() ->
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_allow_js_string_mutations() ->
+should_allow_js_string_mutations(_) ->
     % This binary corresponds to this string: мама мыла раму
     % Which I'm told translates to: "mom was washing the frame"
     MomWashedTheFrame = <<
@@ -213,11 +214,11 @@ should_allow_js_string_mutations() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src1]),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src2]),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src3]),
+    true = prompt(Proc, [<<"add_fun">>, Src1]),
+    true = prompt(Proc, [<<"add_fun">>, Src2]),
+    true = prompt(Proc, [<<"add_fun">>, Src3]),
     Doc = {[{<<"value">>, MomWashedTheFrame}]},
-    Result = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
+    Result = prompt(Proc, [<<"map_doc">>, Doc]),
     Expect = [
         [[<<"length">>, 14]],
         [[<<"substring">>, Washed]],
@@ -227,7 +228,101 @@ should_allow_js_string_mutations() ->
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_exit_on_oom() ->
+should_bump_timing_stats(_) ->
+    Proc = couch_query_servers:get_os_process(<<"javascript">>),
+    ?assert(sample_time(spawn_proc) > 0),
+
+    ResetTime = sample_time(reset),
+    true = prompt(Proc, [<<"reset">>]),
+    ?assert(sample_time(reset) > ResetTime),
+
+    AddFunTime = sample_time(add_fun),
+    true = prompt(Proc, [
+        <<"add_fun">>,
+        <<"function(doc) {emit(doc.x, doc.y);}">>
+    ]),
+    ?assert(sample_time(add_fun) > AddFunTime),
+
+    MapTime = sample_time(map),
+    [[[1, 2]]] = prompt(Proc, [
+        <<"map_doc">>,
+       {[{<<"x">>, 1}, {<<"y">>, 2}]}
+    ]),
+    ?assert(sample_time(map) > MapTime),
+
+    ReduceTime = sample_time(reduce),
+    [true, [2]] = prompt(Proc, [
+        <<"reduce">>,
+        [<<"function(k, v) {return sum(v);}">>], [[1, 2]]
+    ]),
+    ?assert(sample_time(reduce)> ReduceTime),
+
+    ReduceTime1 = sample_time(reduce),
+    [true, [7]] = prompt(Proc, [
+        <<"rereduce">>,
+        [<<"function(k, v) {return sum(v);}">>], [3, 4]
+    ]),
+    ?assert(sample_time(reduce) > ReduceTime1),
+
+    FilterFun = <<"function(doc, req) {return true;}">>,
+    UpdateFun =  <<"function(doc, req) {return [null, 'something'];}">>,
+    VduFun = <<"function(cur, old, ctx, sec) {return true;}">>,
+    DDocId = <<"_design/ddoc1">>,
+    DDoc = #{
+        <<"_id">> => DDocId,
+        <<"_rev">> => <<"1-a">>,
+        <<"filters">> => #{<<"f1">> => FilterFun},
+        <<"updates">> => #{<<"u1">> => UpdateFun},
+        <<"validate_doc_update">> => VduFun
+    },
+
+    NewDDocTime = sample_time(ddoc_new),
+    true = prompt(Proc, [
+        <<"ddoc">>,
+        <<"new">>,
+        DDocId,
+        DDoc
+    ]),
+    ?assert(sample_time(ddoc_new) > NewDDocTime),
+
+    VduTime = sample_time(ddoc_vdu),
+    1 = prompt(Proc, [
+        <<"ddoc">>,
+        DDocId,
+        [<<"validate_doc_update">>],
+        [#{}, #{}]
+    ]),
+    ?assert(sample_time(ddoc_vdu) > VduTime),
+
+    FilterTime = sample_time(ddoc_filter),
+    [true, [true]] = prompt(Proc, [
+        <<"ddoc">>,
+        DDocId,
+        [<<"filters">>, <<"f1">>],
+        [[#{}], #{}]
+    ]),
+    ?assert(sample_time(ddoc_filter) > FilterTime),
+
+    DDocOtherTime = sample_time(ddoc_other),
+    prompt(Proc, [
+        <<"ddoc">>,
+        DDocId,
+        [<<"updates">>, <<"u1">>],
+        [null, #{}]
+    ]),
+    ?assert(sample_time(ddoc_other) > DDocOtherTime),
+
+    OtherTime = sample_time(other),
+    true = prompt(Proc, [
+        <<"add_lib">>,
+        #{<<"foo">> => <<"exports.bar = 42;">>}
+    ]),
+    ?assert(sample_time(other) > OtherTime),
+
+    couch_query_servers:ret_os_process(Proc).
+
+%% erlfmt-ignore
+should_exit_on_oom(_) ->
     Src = <<"
         var state = [];
         function(doc) {
@@ -239,11 +334,11 @@ should_exit_on_oom() ->
         }
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     trigger_oom(Proc).
 
 %% erlfmt-ignore
-should_exit_on_internal_error() ->
+should_exit_on_internal_error(_) ->
     % A different way to trigger OOM which previously used to
     % throw an InternalError on SM. Check that we still exit on that
     % type of error
@@ -260,11 +355,11 @@ should_exit_on_internal_error() ->
             emit(42, j.length);}
     ">>,
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = couch_query_servers:proc_prompt(Proc, [<<"reset">>]),
-    true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src]),
+    true = prompt(Proc, [<<"reset">>]),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
     Doc = {[]},
     try
-        couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc])
+        prompt(Proc, [<<"map_doc">>, Doc])
     catch
         % Expect either an internal error thrown if it catches it and
         % emits an error log before dying
@@ -285,7 +380,7 @@ should_exit_on_internal_error() ->
 trigger_oom(Proc) ->
     Status =
         try
-            couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, <<"{}">>]),
+            prompt(Proc, [<<"map_doc">>, <<"{}">>]),
             continue
         catch
             throw:{os_process_error, {exit_status, 1}} ->
@@ -295,3 +390,9 @@ trigger_oom(Proc) ->
         continue -> trigger_oom(Proc);
         done -> ok
     end.
+
+sample_time(Stat) ->
+    couch_stats:sample([couchdb, query_server, time, Stat]).
+
+prompt(Proc, Cmd) ->
+    couch_query_servers:proc_prompt(Proc, Cmd).
