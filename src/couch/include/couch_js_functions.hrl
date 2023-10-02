@@ -64,7 +64,7 @@
             });
         }
 
-        var available_schemes = [\"simple\", \"pbkdf2\", \"bcrypt\"];
+        var available_schemes = [\"simple\", \"pbkdf2\"];
         if (newDoc.password_scheme
                 && available_schemes.indexOf(newDoc.password_scheme) == -1) {
             throw({
