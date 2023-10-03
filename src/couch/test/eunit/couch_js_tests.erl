@@ -28,7 +28,7 @@ couch_js_test_() ->
                 ?TDEF(should_roundtrip_modified_utf8),
                 ?TDEF(should_replace_broken_utf16),
                 ?TDEF(should_allow_js_string_mutations),
-                ?TDEF(should_bump_timing_stats),
+                ?TDEF(should_bump_timing_and_call_stats),
                 ?TDEF(should_exit_on_oom, 60000),
                 ?TDEF(should_exit_on_internal_error, 60000)
             ])
@@ -228,41 +228,51 @@ should_allow_js_string_mutations(_) ->
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_bump_timing_stats(_) ->
+should_bump_timing_and_call_stats(_) ->
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
     ?assert(sample_time(spawn_proc) > 0),
 
     ResetTime = sample_time(reset),
+    ResetCalls = sample_calls(reset),
     true = prompt(Proc, [<<"reset">>]),
     ?assert(sample_time(reset) > ResetTime),
+    ?assertEqual(ResetCalls + 1, sample_calls(reset)),
 
     AddFunTime = sample_time(add_fun),
+    AddFunCalls = sample_calls(add_fun),
     true = prompt(Proc, [
         <<"add_fun">>,
         <<"function(doc) {emit(doc.x, doc.y);}">>
     ]),
     ?assert(sample_time(add_fun) > AddFunTime),
+    ?assertEqual(AddFunCalls + 1, sample_calls(add_fun)),
 
     MapTime = sample_time(map),
+    MapCalls = sample_calls(map),
     [[[1, 2]]] = prompt(Proc, [
         <<"map_doc">>,
        {[{<<"x">>, 1}, {<<"y">>, 2}]}
     ]),
     ?assert(sample_time(map) > MapTime),
+    ?assertEqual(MapCalls + 1, sample_calls(map)),
 
     ReduceTime = sample_time(reduce),
+    ReduceCalls = sample_calls(reduce),
     [true, [2]] = prompt(Proc, [
         <<"reduce">>,
         [<<"function(k, v) {return sum(v);}">>], [[1, 2]]
     ]),
     ?assert(sample_time(reduce)> ReduceTime),
+    ?assertEqual(ReduceCalls + 1, sample_calls(reduce)),
 
     ReduceTime1 = sample_time(reduce),
+    ReduceCalls1 = sample_calls(reduce),
     [true, [7]] = prompt(Proc, [
         <<"rereduce">>,
         [<<"function(k, v) {return sum(v);}">>], [3, 4]
     ]),
     ?assert(sample_time(reduce) > ReduceTime1),
+    ?assertEqual(ReduceCalls1 + 1, sample_calls(reduce)),
 
     FilterFun = <<"function(doc, req) {return true;}">>,
     UpdateFun =  <<"function(doc, req) {return [null, 'something'];}">>,
@@ -277,6 +287,7 @@ should_bump_timing_stats(_) ->
     },
 
     NewDDocTime = sample_time(ddoc_new),
+    NewDDocCalls = sample_calls(ddoc_new),
     true = prompt(Proc, [
         <<"ddoc">>,
         <<"new">>,
@@ -284,8 +295,10 @@ should_bump_timing_stats(_) ->
         DDoc
     ]),
     ?assert(sample_time(ddoc_new) > NewDDocTime),
+    ?assertEqual(NewDDocCalls + 1, sample_calls(ddoc_new)),
 
     VduTime = sample_time(ddoc_vdu),
+    VduCalls = sample_calls(ddoc_vdu),
     1 = prompt(Proc, [
         <<"ddoc">>,
         DDocId,
@@ -293,8 +306,10 @@ should_bump_timing_stats(_) ->
         [#{}, #{}]
     ]),
     ?assert(sample_time(ddoc_vdu) > VduTime),
+    ?assertEqual(VduCalls + 1, sample_calls(ddoc_vdu)),
 
     FilterTime = sample_time(ddoc_filter),
+    FilterCalls = sample_calls(ddoc_filter),
     [true, [true]] = prompt(Proc, [
         <<"ddoc">>,
         DDocId,
@@ -302,8 +317,10 @@ should_bump_timing_stats(_) ->
         [[#{}], #{}]
     ]),
     ?assert(sample_time(ddoc_filter) > FilterTime),
+    ?assertEqual(FilterCalls + 1, sample_calls(ddoc_filter)),
 
     DDocOtherTime = sample_time(ddoc_other),
+    DDocOtherCalls = sample_calls(ddoc_other),
     prompt(Proc, [
         <<"ddoc">>,
         DDocId,
@@ -311,13 +328,16 @@ should_bump_timing_stats(_) ->
         [null, #{}]
     ]),
     ?assert(sample_time(ddoc_other) > DDocOtherTime),
+    ?assertEqual(DDocOtherCalls + 1, sample_calls(ddoc_other)),
 
     OtherTime = sample_time(other),
+    OtherCalls = sample_calls(other),
     true = prompt(Proc, [
         <<"add_lib">>,
         #{<<"foo">> => <<"exports.bar = 42;">>}
     ]),
     ?assert(sample_time(other) > OtherTime),
+    ?assertEqual(OtherCalls + 1, sample_calls(other)),
 
     couch_query_servers:ret_os_process(Proc).
 
@@ -393,6 +413,9 @@ trigger_oom(Proc) ->
 
 sample_time(Stat) ->
     couch_stats:sample([couchdb, query_server, time, Stat]).
+
+sample_calls(Stat) ->
+    couch_stats:sample([couchdb, query_server, calls, Stat]).
 
 prompt(Proc, Cmd) ->
     couch_query_servers:proc_prompt(Proc, Cmd).

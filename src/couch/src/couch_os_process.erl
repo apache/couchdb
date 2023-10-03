@@ -254,4 +254,5 @@ bump_cmd_time_stat(Cmd, USec) when is_list(Cmd), is_integer(USec) ->
     end.
 
 bump_time_stat(Stat, USec) when is_atom(Stat), is_integer(USec) ->
+    couch_stats:increment_counter([couchdb, query_server, calls, Stat]),
     couch_stats:increment_counter([couchdb, query_server, time, Stat], USec).
