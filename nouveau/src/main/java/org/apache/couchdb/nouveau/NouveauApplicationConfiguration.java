@@ -33,6 +33,9 @@ public class NouveauApplicationConfiguration extends Configuration {
     @NotNull
     private Path rootDir = null;
 
+    @Min(2)
+    private int schedulerThreadCount = 5;
+
     @JsonProperty
     public void setMaxIndexesOpen(int maxIndexesOpen) {
         this.maxIndexesOpen = maxIndexesOpen;
@@ -67,5 +70,13 @@ public class NouveauApplicationConfiguration extends Configuration {
 
     public Path getRootDir() {
         return rootDir;
+    }
+
+    public int getSchedulerThreadCount() {
+        return schedulerThreadCount;
+    }
+
+    public void setSchedulerThreadCount(int schedulerThreadCount) {
+        this.schedulerThreadCount = schedulerThreadCount;
     }
 }

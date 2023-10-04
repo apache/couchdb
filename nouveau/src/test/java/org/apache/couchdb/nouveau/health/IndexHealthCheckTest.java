@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import java.nio.file.Path;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.resources.IndexResource;
@@ -33,6 +34,7 @@ public class IndexHealthCheckTest {
         manager.setObjectMapper(new ObjectMapper());
         manager.setMetricRegistry(new MetricRegistry());
         manager.setRootDir(tempDir);
+        manager.setScheduler(Scheduler.systemScheduler());
         manager.setSearcherFactory(new SearcherFactory());
         manager.start();
 

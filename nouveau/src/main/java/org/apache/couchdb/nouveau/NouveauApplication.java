@@ -13,10 +13,12 @@
 
 package org.apache.couchdb.nouveau;
 
+import com.github.benmanes.caffeine.cache.Scheduler;
 import io.dropwizard.core.Application;
 import io.dropwizard.core.setup.Environment;
 import io.swagger.v3.jaxrs2.integration.resources.OpenApiResource;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ScheduledExecutorService;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexHealthCheck;
@@ -39,12 +41,19 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
     @Override
     public void run(NouveauApplicationConfiguration configuration, Environment environment) throws Exception {
+
         // configure index manager
         final IndexManager indexManager = new IndexManager();
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setMetricRegistry(environment.metrics());
+        final ScheduledExecutorService schedulerExecutorService = environment
+                .lifecycle()
+                .scheduledExecutorService("index-manager-%d")
+                .threads(configuration.getSchedulerThreadCount())
+                .build();
+        indexManager.setScheduler(Scheduler.forScheduledExecutorService(schedulerExecutorService));
         indexManager.setSearcherFactory(new ParallelSearcherFactory(ForkJoinPool.commonPool()));
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());

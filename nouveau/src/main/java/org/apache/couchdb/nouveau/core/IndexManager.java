@@ -80,6 +80,8 @@ public final class IndexManager implements Managed {
 
     private MetricRegistry metricRegistry;
 
+    private Scheduler scheduler;
+
     private SearcherFactory searcherFactory;
 
     private AsyncLoadingCache<String, Index> cache;
@@ -212,6 +214,10 @@ public final class IndexManager implements Managed {
         this.metricRegistry = metricRegistry;
     }
 
+    public void setScheduler(final Scheduler scheduler) {
+        this.scheduler = scheduler;
+    }
+
     public void setSearcherFactory(final SearcherFactory searcherFactory) {
         this.searcherFactory = searcherFactory;
     }
@@ -225,7 +231,7 @@ public final class IndexManager implements Managed {
                 .weigher(new IndexWeigher())
                 .expireAfterAccess(Duration.ofSeconds(idleSeconds))
                 .refreshAfterWrite(Duration.ofSeconds(commitIntervalSeconds))
-                .scheduler(Scheduler.systemScheduler())
+                .scheduler(scheduler)
                 .evictionListener(new IndexEvictionListener())
                 .buildAsync(new AsyncIndexLoader());
         lock = new StripedLock<String>(100);
