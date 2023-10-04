@@ -41,7 +41,6 @@ public abstract class Index implements Closeable {
     private long purgeSeq;
     private boolean deleteOnClose = false;
     private long lastCommit = now();
-    private volatile boolean closed;
     private final Semaphore permits = new Semaphore(Integer.MAX_VALUE);
 
     protected Index(final long updateSeq, final long purgeSeq) {
@@ -50,14 +49,7 @@ public abstract class Index implements Closeable {
     }
 
     public final boolean tryAcquire() {
-        if (permits.tryAcquire() == false) {
-            return false;
-        }
-        if (closed) {
-            permits.release();
-            return false;
-        }
-        return true;
+        return permits.tryAcquire();
     }
 
     public final void release() {
@@ -143,16 +135,10 @@ public abstract class Index implements Closeable {
 
     @Override
     public final void close() throws IOException {
-        synchronized (this) {
-            closed = true;
-        }
         // Ensures exclusive access to the index before closing.
         permits.acquireUninterruptibly(Integer.MAX_VALUE);
-        try {
-            doClose();
-        } finally {
-            permits.release(Integer.MAX_VALUE);
-        }
+        doClose();
+        // Never release permits.
     }
 
     protected abstract void doClose() throws IOException;
