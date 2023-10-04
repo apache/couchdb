@@ -137,16 +137,12 @@ public abstract class Index implements Closeable {
 
     protected abstract void doClose() throws IOException;
 
-    public boolean isDeleteOnClose() {
-        synchronized (this) {
-            return deleteOnClose;
-        }
+    public synchronized boolean isDeleteOnClose() {
+        return deleteOnClose;
     }
 
-    public void setDeleteOnClose(final boolean deleteOnClose) {
-        synchronized (this) {
-            this.deleteOnClose = deleteOnClose;
-        }
+    public synchronized void setDeleteOnClose(final boolean deleteOnClose) {
+        this.deleteOnClose = deleteOnClose;
     }
 
     public final boolean isActive() {
