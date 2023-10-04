@@ -56,7 +56,17 @@ t_old_db_deletion_works(_Ctx) ->
     Db = <<"fabricbenchdb-", Suffix/binary>>,
     ok = fabric:create_db(Db, [{q, 1}, {n, 1}]),
     fabric_bench:delete_old_dbs(),
-    ?assertError(database_does_not_exist, fabric:get_doc_count(Db)).
+    % Quick db creation and deletion is racy so
+    % we have to wait until the db is gone before proceeding.
+    WaitFun = fun() ->
+        try mem3_shards:opts_for_db(Db) of
+            _ -> wait
+        catch
+            error:database_does_not_exist ->
+                ok
+        end
+    end,
+    test_util:wait(WaitFun, 1000).
 
 t_newer_db_deletion_doesnt_work(_Ctx) ->
     SevenHoursAgoUsec = os:system_time(microsecond) - (7 * 60 * 60 * 1000000),
