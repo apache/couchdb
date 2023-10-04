@@ -53,7 +53,7 @@ opts_for_db(DbName0) ->
         {ok, #doc{body = {Props}}} ->
             mem3_util:get_shard_opts(Props);
         {not_found, _} ->
-            erlang:error(database_does_not_exist, ?b2l(DbName))
+            erlang:error(database_does_not_exist, [DbName])
     end.
 
 for_db(DbName) ->
@@ -427,7 +427,7 @@ load_shards_from_db(ShardDb, DbName) ->
             end,
             Shards;
         {not_found, _} ->
-            erlang:error(database_does_not_exist, ?b2l(DbName))
+            erlang:error(database_does_not_exist, [DbName])
     end.
 
 load_shards_from_disk(DbName, DocId) ->
