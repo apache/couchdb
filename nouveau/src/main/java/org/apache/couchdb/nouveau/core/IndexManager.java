@@ -19,13 +19,13 @@ import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.AsyncCacheLoader;
+import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.github.benmanes.caffeine.cache.Weigher;
-
 import io.dropwizard.lifecycle.Managed;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
@@ -36,13 +36,25 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
+import org.apache.couchdb.nouveau.lucene9.Lucene9Index;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.misc.store.DirectIODirectory;
+import org.apache.lucene.search.SearcherFactory;
+import org.apache.lucene.search.SearcherManager;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.checkerframework.checker.index.qual.NonNegative;
-import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,34 +83,23 @@ public final class IndexManager implements Managed {
 
     private MetricRegistry metricRegistry;
 
+    private SearcherFactory searcherFactory;
+
     private ScheduledExecutorService scheduler;
 
-    private Cache<String, Index> cache;
+    private AsyncLoadingCache<String, Index> cache;
 
     private StripedLock<String> lock;
 
-    public <R> R with(final String name, final IndexLoader loader, final IndexFunction<Index, R> indexFun)
+    public <R> R with(final String name, final IndexFunction<Index, R> indexFun)
             throws IOException, InterruptedException {
         while (true) {
             if (!exists(name)) {
                 throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
             }
 
-            final Index index;
-            try {
-                index = cache.get(name, (n) -> {
-                    LOGGER.info("opening {}", n);
-                    final Path path = indexPath(n);
-                    try {
-                        final IndexDefinition indexDefinition = loadIndexDefinition(n);
-                        return loader.apply(path, indexDefinition);
-                    } catch (final IOException e) {
-                        throw new RuntimeIOException(e);
-                    }
-                });
-            } catch (final RuntimeIOException e) {
-                throw (IOException) e.getCause();
-            }
+            final CompletableFuture<Index> future = cache.get(name);
+            final Index index = future.join();
 
             if (index.tryAcquire()) {
                 try {
@@ -196,7 +197,11 @@ public final class IndexManager implements Managed {
     }
 
     private void deleteIndex(final String name) throws IOException {
-        final Index index = cache.asMap().remove(name);
+        final CompletableFuture<Index> future = cache.asMap().remove(name);
+        if (future == null) {
+            return;
+        }
+        final Index index = future.getNow(null);
         if (index != null) {
             index.setDeleteOnClose(true);
             close(name, index);
@@ -250,6 +255,10 @@ public final class IndexManager implements Managed {
         this.metricRegistry = metricRegistry;
     }
 
+    public void setSearcherFactory(final SearcherFactory searcherFactory) {
+        this.searcherFactory = searcherFactory;
+    }
+
     @Override
     public void start() throws IOException {
         cache = Caffeine.newBuilder()
@@ -260,7 +269,7 @@ public final class IndexManager implements Managed {
                 .expireAfterAccess(Duration.ofSeconds(idleSeconds))
                 .scheduler(Scheduler.systemScheduler())
                 .evictionListener(new IndexEvictionListener())
-                .build();
+                .buildAsync(new AsyncIndexLoader());
         lock = new StripedLock<String>(100);
     }
 
@@ -318,7 +327,57 @@ public final class IndexManager implements Managed {
             // Pin active indexes
             return value.isActive() ? 0 : 1;
         }
+    }
 
+    private class AsyncIndexLoader implements AsyncCacheLoader<String, Index> {
+
+        @Override
+        public CompletableFuture<? extends Index> asyncLoad(String name, Executor executor) throws Exception {
+            final CompletableFuture<Index> future = new CompletableFuture<Index>();
+
+            executor.execute(() -> {
+                LOGGER.info("opening {}", name);
+                final Path path = indexPath(name);
+                Index result;
+                try {
+                    final IndexDefinition indexDefinition = loadIndexDefinition(name);
+                    final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
+                    final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
+                    final IndexWriterConfig config = new IndexWriterConfig(analyzer);
+                    config.setUseCompoundFile(false);
+                    final IndexWriter writer = new IndexWriter(dir, config);
+                    final long updateSeq = getSeq(writer, "update_seq");
+                    final long purgeSeq = getSeq(writer, "purge_seq");
+                    final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
+                    result = new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
+                    future.complete(result);
+                } catch (IOException e) {
+                    future.completeExceptionally(e);
+                }
+            });
+
+            return future;
+        }
+
+        private long getSeq(final IndexWriter writer, final String key) throws IOException {
+            final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
+            if (commitData == null) {
+                return 0L;
+            }
+            for (Map.Entry<String, String> entry : commitData) {
+                if (entry.getKey().equals(key)) {
+                    return Long.parseLong(entry.getValue());
+                }
+            }
+            return 0L;
+        }
+    }
+
+    private void close(final String name, final CompletableFuture<Index> future) throws IOException {
+        final Index index = future.getNow(null);
+        if (index != null) {
+            close(name, index);
+        }
     }
 
     private void close(final String name, final Index index) throws IOException {

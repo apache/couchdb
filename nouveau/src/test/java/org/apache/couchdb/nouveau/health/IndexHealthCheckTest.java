@@ -34,12 +34,15 @@ public class IndexHealthCheckTest {
         manager.setObjectMapper(new ObjectMapper());
         manager.setMetricRegistry(new MetricRegistry());
         manager.setRootDir(tempDir);
+        manager.setSearcherFactory(new SearcherFactory());
         manager.setScheduler(scheduler);
         manager.start();
+
         try {
-            var resource = new IndexResource(manager, new SearcherFactory());
+            var resource = new IndexResource(manager);
             var check = new IndexHealthCheck(resource);
             assertTrue(check.check().isHealthy());
+
         } finally {
             scheduler.shutdown();
             manager.stop();

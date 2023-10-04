@@ -25,7 +25,6 @@ import org.apache.couchdb.nouveau.lucene9.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
-import org.apache.lucene.search.SearcherFactory;
 
 public class NouveauApplication extends Application<NouveauApplicationConfiguration> {
 
@@ -46,6 +45,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setMetricRegistry(environment.metrics());
+        indexManager.setSearcherFactory(new ParallelSearcherFactory(ForkJoinPool.commonPool()));
         indexManager.setScheduler(environment
                 .lifecycle()
                 .scheduledExecutorService("index-manager-%d")
@@ -63,8 +63,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         environment.jersey().register(analyzeResource);
 
         // IndexResource
-        final SearcherFactory searcherFactory = new ParallelSearcherFactory(ForkJoinPool.commonPool());
-        final IndexResource indexResource = new IndexResource(indexManager, searcherFactory);
+        final IndexResource indexResource = new IndexResource(indexManager);
         environment.jersey().register(indexResource);
 
         // Health checks
