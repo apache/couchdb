@@ -18,7 +18,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Path;
-import java.util.concurrent.Executors;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.lucene.search.SearcherFactory;
@@ -29,22 +28,19 @@ public class IndexHealthCheckTest {
 
     @Test
     public void testIndexHealthCheck(@TempDir final Path tempDir) throws Exception {
-        var scheduler = Executors.newSingleThreadScheduledExecutor();
         var manager = new IndexManager();
+        manager.setCommitIntervalSeconds(1);
         manager.setObjectMapper(new ObjectMapper());
         manager.setMetricRegistry(new MetricRegistry());
         manager.setRootDir(tempDir);
         manager.setSearcherFactory(new SearcherFactory());
-        manager.setScheduler(scheduler);
         manager.start();
 
         try {
             var resource = new IndexResource(manager);
             var check = new IndexHealthCheck(resource);
             assertTrue(check.check().isHealthy());
-
         } finally {
-            scheduler.shutdown();
             manager.stop();
         }
     }

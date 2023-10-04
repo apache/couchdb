@@ -46,11 +46,6 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
         indexManager.setMetricRegistry(environment.metrics());
         indexManager.setSearcherFactory(new ParallelSearcherFactory(ForkJoinPool.commonPool()));
-        indexManager.setScheduler(environment
-                .lifecycle()
-                .scheduledExecutorService("index-manager-%d")
-                .threads(5)
-                .build());
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());
         environment.lifecycle().manage(indexManager);

@@ -18,7 +18,6 @@ import jakarta.ws.rs.core.Response.Status;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexInfo;
@@ -40,7 +39,6 @@ public abstract class Index implements Closeable {
     private long updateSeq;
     private long purgeSeq;
     private boolean deleteOnClose = false;
-    private long lastCommit = now();
     private final Semaphore permits = new Semaphore(Integer.MAX_VALUE);
 
     protected Index(final long updateSeq, final long purgeSeq) {
@@ -104,14 +102,7 @@ public abstract class Index implements Closeable {
             updateSeq = this.updateSeq;
             purgeSeq = this.purgeSeq;
         }
-        final boolean result = doCommit(updateSeq, purgeSeq);
-        if (result) {
-            final long now = now();
-            synchronized (this) {
-                this.lastCommit = now;
-            }
-        }
-        return result;
+        return doCommit(updateSeq, purgeSeq);
     }
 
     protected abstract boolean doCommit(final long updateSeq, final long purgeSeq) throws IOException;
@@ -194,16 +185,5 @@ public abstract class Index implements Closeable {
         assert Thread.holdsLock(this);
         assertPurgeSeqProgress(matchSeq, purgeSeq);
         this.purgeSeq = purgeSeq;
-    }
-
-    public boolean needsCommit(final long duration, final TimeUnit unit) {
-        final long commitNeededSince = now() - unit.toNanos(duration);
-        synchronized (this) {
-            return this.lastCommit < commitNeededSince;
-        }
-    }
-
-    private long now() {
-        return System.nanoTime();
     }
 }

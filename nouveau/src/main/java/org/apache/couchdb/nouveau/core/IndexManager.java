@@ -39,8 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
@@ -85,8 +83,6 @@ public final class IndexManager implements Managed {
 
     private SearcherFactory searcherFactory;
 
-    private ScheduledExecutorService scheduler;
-
     private AsyncLoadingCache<String, Index> cache;
 
     private StripedLock<String> lock;
@@ -103,24 +99,7 @@ public final class IndexManager implements Managed {
 
             if (index.tryAcquire()) {
                 try {
-                    final R result = indexFun.apply(index);
-                    if (index.needsCommit(commitIntervalSeconds, TimeUnit.SECONDS)) {
-                        scheduler.execute(() -> {
-                            if (index.tryAcquire()) {
-                                try {
-                                    LOGGER.debug("committing {}", name);
-                                    try {
-                                        index.commit();
-                                    } catch (final IOException e) {
-                                        LOGGER.warn("I/O exception while committing " + name, e);
-                                    }
-                                } finally {
-                                    index.release();
-                                }
-                            }
-                        });
-                    }
-                    return result;
+                    return indexFun.apply(index);
                 } finally {
                     index.release();
                 }
@@ -235,10 +214,6 @@ public final class IndexManager implements Managed {
         this.idleSeconds = idleSeconds;
     }
 
-    public void setScheduler(ScheduledExecutorService scheduler) {
-        this.scheduler = scheduler;
-    }
-
     public Path getRootDir() {
         return rootDir;
     }
@@ -267,6 +242,7 @@ public final class IndexManager implements Managed {
                 .maximumWeight(maxIndexesOpen)
                 .weigher(new IndexWeigher())
                 .expireAfterAccess(Duration.ofSeconds(idleSeconds))
+                .refreshAfterWrite(Duration.ofSeconds(commitIntervalSeconds))
                 .scheduler(Scheduler.systemScheduler())
                 .evictionListener(new IndexEvictionListener())
                 .buildAsync(new AsyncIndexLoader());
@@ -357,6 +333,25 @@ public final class IndexManager implements Managed {
             });
 
             return future;
+        }
+
+        @Override
+        public CompletableFuture<? extends Index> asyncReload(String name, Index index, Executor executor)
+                throws Exception {
+            executor.execute(() -> {
+                if (index.tryAcquire()) {
+                    try {
+                        if (index.commit()) {
+                            LOGGER.info("committed {}", name);
+                        }
+                    } catch (final IOException e) {
+                        LOGGER.warn("I/O exception while committing " + name, e);
+                    } finally {
+                        index.release();
+                    }
+                }
+            });
+            return CompletableFuture.completedFuture(index);
         }
 
         private long getSeq(final IndexWriter writer, final String key) throws IOException {
