@@ -245,7 +245,7 @@ public class Lucene9Index extends Index {
             final List<StoredField> fields =
                     new ArrayList<StoredField>(doc.getFields().size());
             for (IndexableField field : doc.getFields()) {
-                if (field.name().equals("_id")) {
+                if (field.name().startsWith("_")) {
                     continue;
                 }
                 final StoredValue storedValue = field.storedValue();
@@ -265,7 +265,8 @@ public class Lucene9Index extends Index {
             }
 
             final PrimitiveWrapper<?>[] after = toAfter(((FieldDoc) scoreDoc));
-            hits.add(new SearchHit(doc.get("_id"), after, fields));
+            hits.add(new SearchHit(
+                    doc.get("_id"), doc.getField("_seq").numericValue().longValue(), after, fields));
         }
 
         searchResults.setTotalHits(topDocs.totalHits.value);
@@ -381,6 +382,9 @@ public class Lucene9Index extends Index {
         // id
         result.add(new org.apache.lucene.document.StringField("_id", docId, Store.YES));
         result.add(new SortedDocValuesField("_id", new BytesRef(docId)));
+
+        // seq
+        result.add(new org.apache.lucene.document.LongField("_seq", request.getSeq(), Store.YES));
 
         // partition (optional)
         if (request.hasPartition()) {

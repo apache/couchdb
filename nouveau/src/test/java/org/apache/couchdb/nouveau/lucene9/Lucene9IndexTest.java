@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -74,15 +75,25 @@ public class Lucene9IndexTest {
         final Index index = setup(path);
         try {
             final int count = 100;
+            List<String> ids = new ArrayList<String>(count);
             for (int i = 1; i <= count; i++) {
                 final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
-                index.update("doc" + i, request);
+                final String id = "doc" + i;
+                ids.add(id);
+                index.update(id, request);
             }
+            ids.sort(String::compareTo);
             final SearchRequest request = new SearchRequest();
             request.setQuery("*:*");
+            request.setLimit(count);
             final SearchResults results = index.search(request);
             assertThat(results.getTotalHits()).isEqualTo(count);
+            for (int i = 0; i < count; i++) {
+                var hit = results.getHits().get(i);
+                assertThat(hit.getId()).isEqualTo(ids.get(i));
+                assertThat(hit.getSeq()).isEqualTo(Long.parseLong(ids.get(i).substring(3)));
+            }
         } finally {
             cleanup(index);
         }
