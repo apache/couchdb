@@ -187,7 +187,7 @@ load_shards(Db, #full_doc_info{id = Id} = FDI) ->
         {ok, #doc{body = {Props}}} ->
             mem3_util:build_shards(Id, Props);
         {not_found, _} ->
-            erlang:error(database_does_not_exist, ?b2l(Id))
+            erlang:error(database_does_not_exist, [Id])
     end.
 
 maybe_redirect(Nodes) ->
