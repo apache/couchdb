@@ -37,7 +37,8 @@
     user_fun,
     user_acc,
     fields,
-    execution_stats
+    execution_stats,
+    documents_seen
 }).
 
 create(Db, {Indexes, Trace}, Selector, Opts0) ->
@@ -108,7 +109,8 @@ execute(Cursor, UserFun, UserAcc) ->
         user_fun = UserFun,
         user_acc = UserAcc,
         fields = Cursor#cursor.fields,
-        execution_stats = mango_execution_stats:log_start(Stats)
+        execution_stats = mango_execution_stats:log_start(Stats),
+        documents_seen = sets:new([{version, 2}])
     },
     try
         case Query of
@@ -179,28 +181,42 @@ handle_hit(CAcc0, Sort, Doc) ->
     #cacc{
         limit = Limit,
         skip = Skip,
-        execution_stats = Stats
+        execution_stats = Stats,
+        documents_seen = Seen
     } = CAcc0,
-    CAcc1 = update_bookmark(CAcc0, Sort),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
     couch_stats:increment_counter([mango, docs_examined]),
-    CAcc2 = CAcc1#cacc{execution_stats = Stats1},
-    case mango_selector:match(CAcc2#cacc.selector, Doc) of
-        true when Skip > 0 ->
-            CAcc2#cacc{skip = Skip - 1};
-        true when Limit == 0 ->
-            % We hit this case if the user spcified with a
-            % zero limit. Notice that in this case we need
-            % to return the bookmark from before this match
-            throw({stop, CAcc0});
-        true when Limit == 1 ->
-            NewCAcc = apply_user_fun(CAcc2, Doc),
-            throw({stop, NewCAcc});
-        true when Limit > 1 ->
-            NewCAcc = apply_user_fun(CAcc2, Doc),
-            NewCAcc#cacc{limit = Limit - 1};
+    CAcc1 = CAcc0#cacc{execution_stats = Stats1},
+    case mango_selector:match(CAcc1#cacc.selector, Doc) of
+        true ->
+            DocId = mango_doc:get_field(Doc, <<"_id">>),
+            case sets:is_element(DocId, Seen) of
+                true ->
+                    CAcc1;
+                false ->
+                    CAcc2 = update_bookmark(CAcc1, Sort),
+                    CAcc3 = CAcc2#cacc{
+                        documents_seen = sets:add_element(DocId, Seen)
+                    },
+                    if
+                        Skip > 0 ->
+                            CAcc3#cacc{skip = Skip - 1};
+                        Limit == 0 ->
+                            % We hit this case if the user specified
+                            % with a zero limit. Notice that in this
+                            % case we need to return the bookmark from
+                            % before this match.
+                            throw({stop, CAcc0});
+                        Limit == 1 ->
+                            CAcc4 = apply_user_fun(CAcc3, Doc),
+                            throw({stop, CAcc4});
+                        Limit > 1 ->
+                            CAcc4 = apply_user_fun(CAcc3, Doc),
+                            CAcc4#cacc{limit = Limit - 1}
+                    end
+            end;
         false ->
-            CAcc2
+            CAcc1
     end.
 
 apply_user_fun(CAcc, Doc) ->
@@ -477,6 +493,7 @@ execute_test_() ->
                 append_sort_type,
                 fun(RawField, selector) -> <<RawField/binary, "<type>">> end
             ),
+            meck:expect(mango_doc, get_field, fun({doc, N}, <<"_id">>) -> N end),
             meck:expect(mango_fields, extract, fun({doc, N}, fields) -> {final_doc, N} end),
             meck:expect(
                 foo,
@@ -502,6 +519,7 @@ execute_test_() ->
             ?TDEF_FE(t_execute_more_results, 10),
             ?TDEF_FE(t_execute_unique_results, 10),
             ?TDEF_FE(t_execute_limit_cutoff, 10),
+            ?TDEF_FE(t_execute_limit_cutoff_unique, 10),
             ?TDEF_FE(t_execute_limit_zero, 10),
             ?TDEF_FE(t_execute_limit_unique, 10),
             ?TDEF_FE(t_execute_skip, 10),
@@ -619,6 +637,7 @@ t_execute_more_results(_) ->
     ?assertEqual(3, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
 
 t_execute_unique_results(_) ->
+    UniqueHits = 3,
     Options = [{partition, partition}, {sort, {[]}}, {bookmark, []}],
     Cursor = #cursor{
         db = db,
@@ -661,10 +680,10 @@ t_execute_unique_results(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 9}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
     ?assertEqual(6, meck:num_calls(couch_stats, increment_counter, 1)),
     ?assertEqual(6, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(6, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
 
 t_execute_limit_cutoff(_) ->
     Limit = 2,
@@ -707,6 +726,57 @@ t_execute_limit_cutoff(_) ->
     ?assertEqual(Limit, meck:num_calls(couch_stats, increment_counter, 1)),
     ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
     ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+
+t_execute_limit_cutoff_unique(_) ->
+    Limit = 4,
+    ActualHits = 3,
+    AllHits = 6,
+    Options = [{partition, partition}, {sort, {[]}}, {bookmark, []}],
+    Cursor = #cursor{
+        db = db,
+        index = #idx{ddoc = <<"ddoc">>, name = <<"index">>},
+        limit = Limit,
+        skip = 0,
+        fields = fields,
+        selector = selector,
+        opts = Options,
+        execution_stats = stats
+    },
+    meck:expect(
+        dreyfus_fabric_search,
+        go,
+        fun(db_name, <<"ddoc">>, <<"index">>, QueryArgs) ->
+            #index_query_args{
+                q = query,
+                partition = partition,
+                bookmark = B,
+                sort = relevance,
+                raw_bookmark = true
+            } = QueryArgs,
+            {Bookmark, Hits} =
+                case B of
+                    nil ->
+                        Hit1 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 1}}]}},
+                        Hit2 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 2}}]}},
+                        Hit3 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 3}}]}},
+                        {[bookmark, 0], [Hit1, Hit2, Hit3]};
+                    [bookmark, 3] ->
+                        Hit1 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 1}}]}},
+                        Hit2 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 2}}]}},
+                        Hit3 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 3}}]}},
+                        {[bookmark, 4], [Hit3, Hit2, Hit1]};
+                    [bookmark, 4] ->
+                        {[bookmark, 5], []}
+                end,
+            {ok, Bookmark, undefined, Hits, undefined, undefined}
+        end
+    ),
+    meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
+    meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
+    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, 1)),
+    ?assertEqual(AllHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
+    ?assertEqual(ActualHits, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
 
 t_execute_limit_zero(_) ->
     Limit = 0,
@@ -751,6 +821,8 @@ t_execute_limit_zero(_) ->
 
 t_execute_limit_unique(_) ->
     Limit = 5,
+    AllHits = 6,
+    UniqueHits = 3,
     Options = [{partition, partition}, {sort, {[]}}, {bookmark, []}],
     Cursor = #cursor{
         db = db,
@@ -784,17 +856,19 @@ t_execute_limit_unique(_) ->
                         Hit1 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 1}}]}},
                         Hit2 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 2}}]}},
                         Hit3 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 3}}]}},
-                        {[bookmark, 4], [Hit3, Hit2, Hit1]}
+                        {[bookmark, 4], [Hit3, Hit2, Hit1]};
+                    [bookmark, 4] ->
+                        {[bookmark, 5], []}
                 end,
             {ok, Bookmark, undefined, Hits, undefined, undefined}
         end
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 8}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(Limit, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, 1)),
+    ?assertEqual(AllHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
+    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
 
 t_execute_skip(_) ->
     UniqueHits = 3,
@@ -845,12 +919,14 @@ t_execute_skip(_) ->
 
 t_execute_skip_unique(_) ->
     AllHits = 6,
+    UniqueHits = 3,
+    Skip = 2,
     Options = [{partition, partition}, {sort, {[]}}, {bookmark, []}],
     Cursor = #cursor{
         db = db,
         index = #idx{ddoc = <<"ddoc">>, name = <<"index">>},
         limit = 10,
-        skip = 2,
+        skip = Skip,
         fields = fields,
         selector = selector,
         opts = Options,
@@ -887,10 +963,12 @@ t_execute_skip_unique(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 7}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
     ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, 1)),
     ?assertEqual(AllHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(4, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    ?assertEqual(
+        UniqueHits - Skip, meck:num_calls(mango_execution_stats, incr_results_returned, 1)
+    ).
 
 t_execute_no_matches(_) ->
     UniqueHits = 3,
