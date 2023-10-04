@@ -98,6 +98,9 @@ public abstract class Index implements Closeable {
         final long updateSeq;
         final long purgeSeq;
         synchronized (this) {
+            if (deleteOnClose) {
+                return false;
+            }
             updateSeq = this.updateSeq;
             purgeSeq = this.purgeSeq;
         }
@@ -144,7 +147,9 @@ public abstract class Index implements Closeable {
     protected abstract void doClose() throws IOException;
 
     public boolean isDeleteOnClose() {
-        return deleteOnClose;
+        synchronized (this) {
+            return deleteOnClose;
+        }
     }
 
     public void setDeleteOnClose(final boolean deleteOnClose) {

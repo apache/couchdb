@@ -312,7 +312,7 @@ public final class IndexManager implements Managed {
                 () -> {
                     if (index.tryAcquire()) {
                         try {
-                            if (!index.isDeleteOnClose() && index.commit()) {
+                            if (index.commit()) {
                                 LOGGER.debug("committed {} before close", name);
                             }
                         } finally {

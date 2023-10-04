@@ -50,12 +50,11 @@ public class Lucene9IndexTest {
     protected final Index setup(final Path path) throws IOException {
         final IndexDefinition indexDefinition = new IndexDefinition();
         indexDefinition.setDefaultAnalyzer("standard");
-        final Index index = indexLoader().apply(path, indexDefinition);
-        index.setDeleteOnClose(true);
-        return index;
+        return indexLoader().apply(path, indexDefinition);
     }
 
     protected final void cleanup(final Index index) throws IOException {
+        index.setDeleteOnClose(true);
         index.close();
     }
 
