@@ -97,7 +97,7 @@ public final class IndexManager implements Managed {
                 throw (IOException) e.getCause();
             }
 
-            if (index.tryAcquire(1, TimeUnit.SECONDS)) {
+            if (index.tryAcquire()) {
                 try {
                     final R result = indexFun.apply(index);
                     if (index.needsCommit(commitIntervalSeconds, TimeUnit.SECONDS)) {

@@ -60,17 +60,6 @@ public abstract class Index implements Closeable {
         return true;
     }
 
-    public final boolean tryAcquire(long timeout, TimeUnit unit) throws InterruptedException {
-        if (permits.tryAcquire(timeout, unit) == false) {
-            return false;
-        }
-        if (closed) {
-            permits.release();
-            return false;
-        }
-        return true;
-    }
-
     public final void release() {
         permits.release();
     }
