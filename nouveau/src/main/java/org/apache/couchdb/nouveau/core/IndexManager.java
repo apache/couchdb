@@ -17,7 +17,6 @@ import static com.codahale.metrics.MetricRegistry.name;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.AsyncCacheLoader;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
@@ -189,33 +188,16 @@ public final class IndexManager implements Managed {
         }
     }
 
-    @JsonProperty
-    public int getMaxIndexesOpen() {
-        return maxIndexesOpen;
-    }
-
     public void setMaxIndexesOpen(int maxIndexesOpen) {
         this.maxIndexesOpen = maxIndexesOpen;
-    }
-
-    public int getCommitIntervalSeconds() {
-        return commitIntervalSeconds;
     }
 
     public void setCommitIntervalSeconds(int commitIntervalSeconds) {
         this.commitIntervalSeconds = commitIntervalSeconds;
     }
 
-    public int getIdleSeconds() {
-        return idleSeconds;
-    }
-
     public void setIdleSeconds(int idleSeconds) {
         this.idleSeconds = idleSeconds;
-    }
-
-    public Path getRootDir() {
-        return rootDir;
     }
 
     public void setRootDir(Path rootDir) {
