@@ -29,7 +29,7 @@ go(DbName, _Options) ->
         {ok, accepted} ->
             accepted;
         {ok, not_found} ->
-            erlang:error(database_does_not_exist, DbName);
+            erlang:error(database_does_not_exist, [DbName]);
         Error ->
             Error
     after
