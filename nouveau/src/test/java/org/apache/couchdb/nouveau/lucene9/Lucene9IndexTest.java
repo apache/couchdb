@@ -33,7 +33,6 @@ import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.core.Index;
-import org.apache.couchdb.nouveau.core.IndexLoader;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderException;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
@@ -50,12 +49,17 @@ public class Lucene9IndexTest {
     protected final Index setup(final Path path) throws IOException {
         final IndexDefinition indexDefinition = new IndexDefinition();
         indexDefinition.setDefaultAnalyzer("standard");
-        final Index index = indexLoader().apply(path, indexDefinition);
-        index.setDeleteOnClose(true);
-        return index;
+        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
+        final Directory dir = new DirectIODirectory(FSDirectory.open(path));
+        final IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setUseCompoundFile(false);
+        final IndexWriter writer = new IndexWriter(dir, config);
+        final SearcherManager searcherManager = new SearcherManager(writer, null);
+        return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager);
     }
 
     protected final void cleanup(final Index index) throws IOException {
+        index.setDeleteOnClose(true);
         index.close();
     }
 
@@ -235,17 +239,5 @@ public class Lucene9IndexTest {
         } finally {
             cleanup(index);
         }
-    }
-
-    protected IndexLoader indexLoader() {
-        return (path, indexDefinition) -> {
-            final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
-            final Directory dir = new DirectIODirectory(FSDirectory.open(path));
-            final IndexWriterConfig config = new IndexWriterConfig(analyzer);
-            config.setUseCompoundFile(false);
-            final IndexWriter writer = new IndexWriter(dir, config);
-            final SearcherManager searcherManager = new SearcherManager(writer, null);
-            return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager);
-        };
     }
 }
