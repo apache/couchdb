@@ -24,6 +24,8 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.github.benmanes.caffeine.cache.Weigher;
+
 import io.dropwizard.lifecycle.Managed;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
@@ -39,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.stream.Stream;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
+import org.checkerframework.checker.index.qual.NonNegative;
 import org.eclipse.jetty.io.RuntimeIOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -252,7 +255,8 @@ public final class IndexManager implements Managed {
         cache = Caffeine.newBuilder()
                 .recordStats(() -> new MetricsStatsCounter(metricRegistry, name(IndexManager.class, "cache")))
                 .initialCapacity(maxIndexesOpen)
-                .maximumSize(maxIndexesOpen)
+                .maximumWeight(maxIndexesOpen)
+                .weigher(new IndexWeigher())
                 .expireAfterAccess(Duration.ofSeconds(idleSeconds))
                 .scheduler(Scheduler.systemScheduler())
                 .evictionListener(new IndexEvictionListener())
@@ -305,6 +309,16 @@ public final class IndexManager implements Managed {
                 LOGGER.error("I/O exception when evicting " + name, e);
             }
         }
+    }
+
+    private class IndexWeigher implements Weigher<String, Index> {
+
+        @Override
+        public @NonNegative int weigh(String key, Index value) {
+            // Pin active indexes
+            return value.isActive() ? 0 : 1;
+        }
+
     }
 
     private void close(final String name, final Index index) throws IOException {

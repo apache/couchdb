@@ -158,6 +158,10 @@ public abstract class Index implements Closeable {
         }
     }
 
+    public final boolean isActive() {
+        return permits.availablePermits() < Integer.MAX_VALUE || permits.hasQueuedThreads();
+    }
+
     protected final void assertUpdateSeqProgress(final long matchSeq, final long updateSeq)
             throws UpdatesOutOfOrderException {
         assert Thread.holdsLock(this);
