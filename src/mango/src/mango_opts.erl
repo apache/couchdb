@@ -262,7 +262,7 @@ validate_bulk_docs(Else) ->
     ?MANGO_ERROR({invalid_bulk_docs, Else}).
 
 validate_use_index(IndexName) when is_binary(IndexName) ->
-    case binary:split(IndexName, <<"/">>) of
+    case binary:split(IndexName, <<"/">>, [global]) of
         [DesignId] ->
             {ok, [DesignId]};
         [<<"_design">>, DesignId] ->
