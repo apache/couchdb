@@ -50,6 +50,12 @@
         is attempted. Therefore that is more like a hint. When
         fallback occurs, the details are given in the ``warning``
         field of the response. *Optional*
+    :<json boolean allow_fallback: Tell if it is allowed to fall back
+        to a valid index when requesting a query to use a specific
+        index that is not deemed usable.  Default is ``true``.  This
+        is meant to be used in combination with ``use_index`` and
+        setting ``allow_fallback`` to ``false`` can make the query
+        fail if the user-specified index is not suitable.  *Optional*
     :<json boolean conflicts: Include conflicted documents if ``true``.
         Intended use is to easily find conflicted documents, without an
         index or view. Default is ``false``. *Optional*
@@ -1498,7 +1504,8 @@ it easier to take advantage of future improvements to query planning
                 "stale": false,
                 "update": true,
                 "stable": false,
-                "execution_stats": false
+                "execution_stats": false,
+                "allow_fallback": true
             },
             "limit": 2,
             "skip": 0,

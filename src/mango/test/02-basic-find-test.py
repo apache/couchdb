@@ -311,6 +311,7 @@ class BasicFindTests(mango.UserDocsTests):
         assert opts["stale"] == False
         assert opts["update"] == True
         assert opts["use_index"] == []
+        assert opts["allow_fallback"] == True
 
     def test_sort_with_all_docs(self):
         explain = self.db.find(
