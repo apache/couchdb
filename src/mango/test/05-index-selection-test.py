@@ -211,6 +211,31 @@ class IndexSelectionTests:
         )
         self.assertEqual(resp_explain["index"]["type"], "json")
 
+    def test_use_index_without_fallback(self):
+        with self.subTest(use_index="valid"):
+            docs = self.db.find(
+                {"manager": True}, use_index="manager", allow_fallback=False
+            )
+            assert len(docs) > 0
+
+        with self.subTest(use_index="invalid"):
+            try:
+                self.db.find(
+                    {"manager": True}, use_index="invalid", allow_fallback=False
+                )
+            except Exception as e:
+                self.assertEqual(e.response.status_code, 400)
+            else:
+                raise AssertionError("did not fail on invalid index")
+
+        with self.subTest(use_index="empty"):
+            try:
+                self.db.find({"manager": True}, use_index=[], allow_fallback=False)
+            except Exception as e:
+                self.assertEqual(e.response.status_code, 400)
+            else:
+                raise AssertionError("did not fail due to missing use_index")
+
 
 class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
     @classmethod
