@@ -162,6 +162,12 @@ validate_find({Props}) ->
             {optional, true},
             {default, false},
             {validator, fun mango_opts:is_boolean/1}
+        ]},
+        {<<"allow_fallback">>, [
+            {tag, allow_fallback},
+            {optional, true},
+            {default, true},
+            {validator, fun mango_opts:is_boolean/1}
         ]}
     ],
     validate(Props, Opts).
