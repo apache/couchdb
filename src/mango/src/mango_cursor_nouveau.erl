@@ -35,8 +35,7 @@
     user_fun,
     user_acc,
     fields,
-    execution_stats,
-    documents_seen
+    execution_stats
 }).
 
 create(Db, {Indexes, Trace}, Selector, Opts) ->
@@ -104,8 +103,7 @@ execute(Cursor, UserFun, UserAcc) ->
         user_fun = UserFun,
         user_acc = UserAcc,
         fields = Cursor#cursor.fields,
-        execution_stats = mango_execution_stats:log_start(Stats),
-        documents_seen = sets:new([{version, 2}])
+        execution_stats = mango_execution_stats:log_start(Stats)
     },
     try
         case Query of
@@ -173,41 +171,28 @@ handle_hit(CAcc0, Hit, Doc) ->
     #cacc{
         limit = Limit,
         skip = Skip,
-        execution_stats = Stats,
-        documents_seen = Seen
+        execution_stats = Stats
     } = CAcc0,
+    CAcc1 = update_bookmark(CAcc0, Hit),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
     couch_stats:increment_counter([mango, docs_examined]),
-    CAcc1 = CAcc0#cacc{execution_stats = Stats1},
-    case mango_selector:match(CAcc1#cacc.selector, Doc) of
-        true ->
-            DocId = mango_doc:get_field(Doc, <<"_id">>),
-            case sets:is_element(DocId, Seen) of
-                true ->
-                    CAcc1;
-                false ->
-                    CAcc2 = update_bookmark(CAcc1, Hit),
-                    CAcc3 = CAcc2#cacc{
-                        documents_seen = sets:add_element(DocId, Seen)
-                    },
-                    if
-                        Skip > 0 ->
-                            CAcc3#cacc{skip = Skip - 1};
-                        Limit == 0 ->
-                            % We hit this case if the user specified with a
-                            % zero limit. Notice that in this case we need
-                            % to return the bookmark from before this match.
-                            throw({stop, CAcc0});
-                        Limit == 1 ->
-                            CAcc4 = apply_user_fun(CAcc3, Doc),
-                            throw({stop, CAcc4});
-                        Limit > 1 ->
-                            CAcc4 = apply_user_fun(CAcc3, Doc),
-                            CAcc4#cacc{limit = Limit - 1}
-                    end
-            end;
+    CAcc2 = CAcc1#cacc{execution_stats = Stats1},
+    case mango_selector:match(CAcc2#cacc.selector, Doc) of
+        true when Skip > 0 ->
+            CAcc2#cacc{skip = Skip - 1};
+        true when Limit == 0 ->
+            % We hit this case if the user spcified with a
+            % zero limit. Notice that in this case we need
+            % to return the bookmark from before this match
+            throw({stop, CAcc0});
+        true when Limit == 1 ->
+            NewCAcc = apply_user_fun(CAcc2, Doc),
+            throw({stop, NewCAcc});
+        true when Limit > 1 ->
+            NewCAcc = apply_user_fun(CAcc2, Doc),
+            NewCAcc#cacc{limit = Limit - 1};
         false ->
-            CAcc1
+            CAcc2
     end.
 
 apply_user_fun(CAcc, Doc) ->
