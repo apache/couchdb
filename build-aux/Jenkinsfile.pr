@@ -44,7 +44,7 @@ pipeline {
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
-    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
+    DOCKER_ARGS = '-e npm_config_cache=/home/jenkins/.npm -e HOME=. -e MIX_HOME=/home/jenkins/.mix -e HEX_HOME=/home/jenkins/.hex -e PIP_CACHE_DIR=/home/jenkins/.cache/pip -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group -v /home/jenkins/.gradle:/home/jenkins/.gradle:rw,z -v /home/jenkins/.hex:/home/jenkins/.hex:rw,z -v /home/jenkins/.npm:/home/jenkins/.npm:rw,z -v /home/jenkins/.cache/pip:/home/jenkins/.cache/pip:rw,z -v /home/jenkins/.mix:/home/jenkins/.mix:rw,z'
 
     // *** BE SURE TO ALSO CHANGE THE ERLANG VERSIONS FARTHER DOWN ***
     // Search for ERLANG_VERSION

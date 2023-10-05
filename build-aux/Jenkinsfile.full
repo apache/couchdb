@@ -65,13 +65,16 @@ meta = [
     image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
   ],
 
-  'bullseye-arm64': [
-    name: 'Debian 11 ARM',
-    spidermonkey_vsn: '78',
-    enable_nouveau: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-    node_label: 'arm64v8'
-  ],
+  // Exclude temporarily until we can fix package cache directory
+  // permissions
+  //
+  // 'bullseye-arm64': [
+  //   name: 'Debian 11 ARM',
+  //   spidermonkey_vsn: '78',
+  //   enable_nouveau: true,
+  //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+  //   node_label: 'arm64v8'
+  // ],
 
   'bullseye-ppc64': [
     name: 'Debian 11 POWER',
@@ -81,13 +84,15 @@ meta = [
     node_label: 'ppc64le'
   ],
 
-  'bullseye-s390x': [
-    name: 'Debian 11 s390x',
-    spidermonkey_vsn: '78',
-    enable_nouveau: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-    node_label: 's390x'
-  ],
+  // Exclude until hex.pm downloads are resolved
+  //   https://github.com/linuxone-community-cloud/tickets/issues/58
+  // 'bullseye-s390x': [
+  //   name: 'Debian 11 s390x',
+  //   spidermonkey_vsn: '78',
+  //   enable_nouveau: true,
+  //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+  //   node_label: 's390x'
+  // ],
 
   'bullseye': [
     name: 'Debian 11',
@@ -282,7 +287,7 @@ pipeline {
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
-    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group -v /root/.gradle:/root/.gradle'
+    DOCKER_ARGS = '-e npm_config_cache=/home/jenkins/.npm -e HOME=. -e MIX_HOME=/home/jenkins/.mix -e HEX_HOME=/home/jenkins/.hex -e PIP_CACHE_DIR=/home/jenkins/.cache/pip -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group -v /home/jenkins/.gradle:/home/jenkins/.gradle:rw,z -v /home/jenkins/.hex:/home/jenkins/.hex:rw,z -v /home/jenkins/.npm:/home/jenkins/.npm:rw,z -v /home/jenkins/.cache/pip:/home/jenkins/.cache/pip:rw,z -v /home/jenkins/.mix:/home/jenkins/.mix:rw,z'
   }
 
   options {
