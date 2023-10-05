@@ -184,17 +184,17 @@ handle_hit(CAcc0, Sort, Doc) ->
         execution_stats = Stats,
         documents_seen = Seen
     } = CAcc0,
+    CAcc1 = update_bookmark(CAcc0, Sort),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
     couch_stats:increment_counter([mango, docs_examined]),
-    CAcc1 = CAcc0#cacc{execution_stats = Stats1},
-    case mango_selector:match(CAcc1#cacc.selector, Doc) of
+    CAcc2 = CAcc1#cacc{execution_stats = Stats1},
+    case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true ->
             DocId = mango_doc:get_field(Doc, <<"_id">>),
             case sets:is_element(DocId, Seen) of
                 true ->
-                    CAcc1;
+                    CAcc2;
                 false ->
-                    CAcc2 = update_bookmark(CAcc1, Sort),
                     CAcc3 = CAcc2#cacc{
                         documents_seen = sets:add_element(DocId, Seen)
                     },
@@ -216,7 +216,7 @@ handle_hit(CAcc0, Sort, Doc) ->
                     end
             end;
         false ->
-            CAcc1
+            CAcc2
     end.
 
 apply_user_fun(CAcc, Doc) ->
@@ -765,8 +765,8 @@ t_execute_limit_cutoff_unique(_) ->
                         Hit2 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 2}}]}},
                         Hit3 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 3}}]}},
                         {[bookmark, 4], [Hit3, Hit2, Hit1]};
-                    [bookmark, 4] ->
-                        {[bookmark, 5], []}
+                    [bookmark, 7] ->
+                        {[bookmark, 8], []}
                 end,
             {ok, Bookmark, undefined, Hits, undefined, undefined}
         end
@@ -857,8 +857,8 @@ t_execute_limit_unique(_) ->
                         Hit2 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 2}}]}},
                         Hit3 = #sortable{item = #hit{fields = [{<<"_id">>, {id, 3}}]}},
                         {[bookmark, 4], [Hit3, Hit2, Hit1]};
-                    [bookmark, 4] ->
-                        {[bookmark, 5], []}
+                    [bookmark, 7] ->
+                        {[bookmark, 8], []}
                 end,
             {ok, Bookmark, undefined, Hits, undefined, undefined}
         end

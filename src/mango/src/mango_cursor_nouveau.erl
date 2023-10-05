@@ -176,17 +176,17 @@ handle_hit(CAcc0, Hit, Doc) ->
         execution_stats = Stats,
         documents_seen = Seen
     } = CAcc0,
+    CAcc1 = update_bookmark(CAcc0, Hit),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
     couch_stats:increment_counter([mango, docs_examined]),
-    CAcc1 = CAcc0#cacc{execution_stats = Stats1},
-    case mango_selector:match(CAcc1#cacc.selector, Doc) of
+    CAcc2 = CAcc1#cacc{execution_stats = Stats1},
+    case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true ->
             DocId = mango_doc:get_field(Doc, <<"_id">>),
             case sets:is_element(DocId, Seen) of
                 true ->
-                    CAcc1;
+                    CAcc2;
                 false ->
-                    CAcc2 = update_bookmark(CAcc1, Hit),
                     CAcc3 = CAcc2#cacc{
                         documents_seen = sets:add_element(DocId, Seen)
                     },
@@ -207,7 +207,7 @@ handle_hit(CAcc0, Hit, Doc) ->
                     end
             end;
         false ->
-            CAcc1
+            CAcc2
     end.
 
 apply_user_fun(CAcc, Doc) ->
