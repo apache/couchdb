@@ -53,8 +53,22 @@ create(Db, Selector0, Opts, Kind) ->
     {UsableIndexes, Trace} = mango_idx:get_usable_indexes(Db, Selector, Opts, Kind),
     case maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
         [] ->
-            % use_index doesn't match a valid index - fall back to a valid one
-            create_cursor(Db, {UsableIndexes, Trace}, Selector, Opts);
+            % use_index doesn't match a valid index - determine how
+            % this shall be handled by the further settings
+            case allow_fallback(Opts) of
+                true ->
+                    % fall back to a valid index
+                    create_cursor(Db, {UsableIndexes, Trace}, Selector, Opts);
+                false ->
+                    % return an error
+                    Details =
+                        case use_index(Opts) of
+                            [] -> [];
+                            [DesignId] -> [ddoc_name(DesignId)];
+                            [DesignId, ViewName] -> [ddoc_name(DesignId), ViewName]
+                        end,
+                    ?MANGO_ERROR({invalid_index, Details})
+            end;
         UserSpecifiedIndex ->
             create_cursor(Db, {UserSpecifiedIndex, Trace}, Selector, Opts)
     end.
@@ -366,13 +380,21 @@ execute(#cursor{index = Idx} = Cursor, UserFun, UserAcc) ->
     Mod = mango_idx:cursor_mod(Idx),
     Mod:execute(Cursor, UserFun, UserAcc).
 
+use_index(Opts) ->
+    {use_index, UseIndex} = lists:keyfind(use_index, 1, Opts),
+    UseIndex.
+
+allow_fallback(Opts) ->
+    {allow_fallback, AllowFallback} = lists:keyfind(allow_fallback, 1, Opts),
+    AllowFallback.
+
 maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
-    case lists:keyfind(use_index, 1, Opts) of
-        {use_index, []} ->
+    case use_index(Opts) of
+        [] ->
             [];
-        {use_index, [DesignId]} ->
+        [DesignId] ->
             filter_indexes(Indexes, DesignId);
-        {use_index, [DesignId, ViewName]} ->
+        [DesignId, ViewName] ->
             filter_indexes(Indexes, DesignId, ViewName)
     end.
 
@@ -575,7 +597,9 @@ create_test_() ->
         [
             ?TDEF_FE(t_create_regular, 10),
             ?TDEF_FE(t_create_user_specified_index, 10),
-            ?TDEF_FE(t_create_invalid_user_specified_index, 10)
+            ?TDEF_FE(t_create_invalid_user_specified_index, 10),
+            ?TDEF_FE(t_create_invalid_user_specified_index_no_fallback_1, 10),
+            ?TDEF_FE(t_create_invalid_user_specified_index_no_fallback_2, 10)
         ]
     }.
 
@@ -591,7 +615,7 @@ t_create_regular(_) ->
             filtered_indexes => sets:from_list(FilteredIndexes),
             indexes_of_type => sets:from_list(IndexesOfType)
         },
-    Options = [{use_index, []}],
+    Options = [{use_index, []}, {allow_fallback, true}],
     meck:expect(mango_selector, normalize, [selector], meck:val(normalized_selector)),
     meck:expect(
         mango_idx,
@@ -650,7 +674,7 @@ t_create_invalid_user_specified_index(_) ->
             filtered_indexes => sets:from_list(UsableIndexes),
             indexes_of_type => sets:from_list(IndexesOfType)
         },
-    Options = [{use_index, [<<"foobar">>]}],
+    Options = [{use_index, [<<"foobar">>]}, {allow_fallback, true}],
     meck:expect(mango_selector, normalize, [selector], meck:val(normalized_selector)),
     meck:expect(
         mango_idx,
@@ -665,6 +689,68 @@ t_create_invalid_user_specified_index(_) ->
         meck:val(view_cursor)
     ),
     ?assertEqual(view_cursor, create(db, selector, Options, target)).
+
+t_create_invalid_user_specified_index_no_fallback_1(_) ->
+    IndexSpecial = #idx{type = <<"special">>, def = all_docs},
+    IndexView1 = #idx{type = <<"json">>, ddoc = <<"_design/view_idx1">>},
+    IndexView2 = #idx{type = <<"json">>, ddoc = <<"_design/view_idx2">>},
+    IndexView3 = #idx{type = <<"json">>, ddoc = <<"_design/view_idx3">>},
+    UsableIndexes = [IndexSpecial, IndexView1, IndexView2, IndexView3],
+    IndexesOfType = [IndexView1, IndexView2, IndexView3],
+    Trace1 = #{},
+    Trace2 =
+        #{
+            filtered_indexes => sets:from_list(UsableIndexes),
+            indexes_of_type => sets:from_list(IndexesOfType)
+        },
+    UseIndex = [<<"design">>, <<"foobar">>],
+    Options = [{use_index, UseIndex}, {allow_fallback, false}],
+    meck:expect(mango_selector, normalize, [selector], meck:val(normalized_selector)),
+    meck:expect(
+        mango_idx,
+        get_usable_indexes,
+        [db, normalized_selector, Options, target],
+        meck:val({UsableIndexes, Trace1})
+    ),
+    meck:expect(
+        mango_cursor_view,
+        create,
+        [db, {IndexesOfType, Trace2}, normalized_selector, Options],
+        meck:val(view_cursor)
+    ),
+    Exception = {mango_error, mango_cursor, {invalid_index, UseIndex}},
+    ?assertThrow(Exception, create(db, selector, Options, target)).
+
+t_create_invalid_user_specified_index_no_fallback_2(_) ->
+    IndexSpecial = #idx{type = <<"special">>, def = all_docs},
+    IndexView1 = #idx{type = <<"json">>, ddoc = <<"_design/view_idx1">>},
+    IndexView2 = #idx{type = <<"json">>, ddoc = <<"_design/view_idx2">>},
+    IndexView3 = #idx{type = <<"json">>, ddoc = <<"_design/view_idx3">>},
+    UsableIndexes = [IndexSpecial, IndexView1, IndexView2, IndexView3],
+    IndexesOfType = [IndexView1, IndexView2, IndexView3],
+    Trace1 = #{},
+    Trace2 =
+        #{
+            filtered_indexes => sets:from_list(UsableIndexes),
+            indexes_of_type => sets:from_list(IndexesOfType)
+        },
+    UseIndex = [],
+    Options = [{use_index, UseIndex}, {allow_fallback, false}],
+    meck:expect(mango_selector, normalize, [selector], meck:val(normalized_selector)),
+    meck:expect(
+        mango_idx,
+        get_usable_indexes,
+        [db, normalized_selector, Options, target],
+        meck:val({UsableIndexes, Trace1})
+    ),
+    meck:expect(
+        mango_cursor_view,
+        create,
+        [db, {IndexesOfType, Trace2}, normalized_selector, Options],
+        meck:val(view_cursor)
+    ),
+    Exception = {mango_error, mango_cursor, {invalid_index, UseIndex}},
+    ?assertThrow(Exception, create(db, selector, Options, target)).
 
 enhance_candidates_test() ->
     Candidates1 = #{index => #{reason => [], usable => true}},
