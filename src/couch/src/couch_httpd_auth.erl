@@ -460,16 +460,18 @@ cookie_auth_header(
 cookie_auth_header(_Req, _Headers) ->
     [].
 
-cookie_auth_cookie(Req, User, Secret, TimeStamp, MustMatchBasic) ->
-    MustMatchBasicStr =
-        case MustMatchBasic of
-            true -> "1";
-            false -> "0"
-        end,
-    SessionData = lists:join(":", [
+cookie_auth_cookie(Req, User, Secret, TimeStamp, true) ->
+    SessionItems = [
         User,
-        lists:join(",", [erlang:integer_to_list(TimeStamp, 16), MustMatchBasicStr])
-    ]),
+        [erlang:integer_to_list(TimeStamp, 16), ",1"]
+    ],
+    cookie_auth_cookie(Req, Secret, SessionItems);
+cookie_auth_cookie(Req, User, Secret, TimeStamp, false) ->
+    SessionItems = [User, erlang:integer_to_list(TimeStamp, 16)],
+    cookie_auth_cookie(Req, Secret, SessionItems).
+
+cookie_auth_cookie(Req, Secret, SessionItems) when is_list(SessionItems) ->
+    SessionData = lists:join(":", SessionItems),
     [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
     Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
     mochiweb_cookies:cookie(
