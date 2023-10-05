@@ -11,13 +11,10 @@
 # the License.
 
 import json
-import random
-import string
 import time
 import unittest
 import uuid
 import os
-import threading
 
 import requests
 
@@ -31,16 +28,8 @@ COUCH_USER = os.environ.get("COUCH_USER")
 COUCH_PASS = os.environ.get("COUCH_PASS")
 
 
-BULK_BATCH_SIZE = 500
-
-
 def random_db_name():
     return "mango_test_" + uuid.uuid4().hex
-
-
-def random_string(n_max):
-    n = random.choice(range(n_max))
-    return "".join(random.choice(string.ascii_letters) for _ in range(n))
 
 
 def has_text_service():
@@ -56,27 +45,6 @@ def clean_up_dbs():
 def delay(n=5, t=0.5):
     for i in range(0, n):
         time.sleep(t)
-
-
-class Concurrently(object):
-    def __init__(self, thread, thread_args, start=True):
-        self.thread = threading.Thread(target=self.wrapper, args=(thread, thread_args))
-        self.return_value = None
-        if start:
-            self.start()
-
-    def wrapper(self, body, args):
-        self.return_value = body(*args)
-
-    def start(self):
-        self.thread.start()
-
-    def get_result(self):
-        self.thread.join()
-        return self.return_value
-
-    def join(self):
-        self.thread.join()
 
 
 class Database(object):
@@ -135,14 +103,12 @@ class Database(object):
         r.raise_for_status()
 
     def save_docs(self, docs, **kwargs):
-        for offset in range(0, len(docs), BULK_BATCH_SIZE):
-            chunk = docs[offset : (offset + BULK_BATCH_SIZE)]
-            body = {"docs": chunk}
-            r = self.sess.post(self.path("_bulk_docs"), json=body, params=kwargs)
-            r.raise_for_status()
-            for doc, result in zip(chunk, r.json()):
-                doc["_id"] = result["id"]
-                doc["_rev"] = result["rev"]
+        body = json.dumps({"docs": docs})
+        r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)
+        r.raise_for_status()
+        for doc, result in zip(docs, r.json()):
+            doc["_id"] = result["id"]
+            doc["_rev"] = result["rev"]
 
     def open_doc(self, docid):
         r = self.sess.get(self.path(docid))
