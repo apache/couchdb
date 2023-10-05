@@ -253,6 +253,12 @@ info(mango_opts, {invalid_bulk_docs, Val}) ->
             [Val]
         )
     };
+info(mango_opts, {invalid_index_name, Val}) ->
+    {
+        400,
+        <<"invalid_index_name">>,
+        fmt("Invalid index name: ~w", [Val])
+    };
 info(mango_opts, {invalid_ejson, Val}) ->
     {
         400,

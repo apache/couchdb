@@ -211,6 +211,16 @@ class IndexSelectionTests:
         )
         self.assertEqual(resp_explain["index"]["type"], "json")
 
+    def test_use_index_with_invalid_name(self):
+        for index in ["foo/bar/baz", ["foo", "bar", "baz"]]:
+            with self.subTest(index=index):
+                try:
+                    self.db.find({"manager": True}, use_index=index)
+                except Exception as e:
+                    self.assertEqual(e.response.status_code, 400)
+                else:
+                    raise AssertionError("did not fail on invalid index name")
+
     def test_use_index_without_fallback(self):
         with self.subTest(use_index="valid"):
             docs = self.db.find(
