@@ -57,16 +57,16 @@ check_not_started_test() ->
 
 check_lru_test_() ->
     {
-        setup,
+        foreach,
         fun start_couch/0,
         fun stop_couch/1,
-        with([
-            ?TDEF(check_multi_start, 10),
-            ?TDEF(check_multi_open, 10),
-            ?TDEF(check_capped_size, 10),
-            ?TDEF(check_cache_refill, 10),
-            ?TDEF(check_evict_and_exit, 10)
-        ])
+        [
+            ?TDEF_FE(check_multi_start, 10),
+            ?TDEF_FE(check_multi_open, 10),
+            ?TDEF_FE(check_capped_size, 10),
+            ?TDEF_FE(check_cache_refill, 10),
+            ?TDEF_FE(check_evict_and_exit, 10)
+        ]
     }.
 
 check_multi_start(_) ->
@@ -200,10 +200,23 @@ check_cache_refill({DbName, _}) ->
         lists:seq(1, 5)
     ),
 
+    % Wait for all 10 entries (5 ddocid + 5 ddocid_rev) to be inserted into the
+    % LRU before proceeding
+    test_util:wait(
+        fun() ->
+            case ets:info(?LRU, size) of
+                10 -> ok;
+                _ -> wait
+            end
+        end
+    ),
+
     ShardName = mem3:name(hd(mem3:shards(DbName))),
     {ok, _} = ddoc_cache_lru:handle_db_event(ShardName, deleted, foo),
     meck:wait(ddoc_cache_ev, event, [evicted, DbName], ?EVENT_TIMEOUT),
-    meck:wait(10, ddoc_cache_ev, event, [removed, '_'], ?EVENT_TIMEOUT),
+    % We're waiting for 5 ddocid and 5 ddocid_rev entries to be removed
+    % Use a longer wait timeout as we expect 10 calls instead of just 1
+    meck:wait(10, ddoc_cache_ev, event, [removed, '_'], 5 * ?EVENT_TIMEOUT),
     test_util:wait(
         fun() ->
             case ets:info(?CACHE, size) of
