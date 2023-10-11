@@ -29,8 +29,14 @@ json_req_obj(Req, Db, DocId) ->
 json_req_obj(Req, Db, DocId, all) ->
     Fields = json_req_obj_fields(),
     json_req_obj(Req, Db, DocId, Fields);
-json_req_obj(Req, Db, DocId, Fields) when is_list(Fields) ->
-    {[{Field, json_req_obj_field(Field, Req, Db, DocId)} || Field <- Fields]}.
+json_req_obj(#httpd{} = Req, Db, DocId, Fields) when is_list(Fields) ->
+    MochiReq =
+        case scrub_json_request() of
+            true -> chttpd_util:scrub_mochiweb_client_req(Req#httpd.mochi_req);
+            false -> Req#httpd.mochi_req
+        end,
+    Req1 = Req#httpd{mochi_req = MochiReq},
+    {[{Field, json_req_obj_field(Field, Req1, Db, DocId)} || Field <- Fields]}.
 
 json_req_obj_fields() ->
     [
@@ -103,7 +109,10 @@ json_req_obj_field(<<"form">>, #httpd{mochi_req = Req, method = Method} = HttpRe
         end,
     to_json_terms(ParsedForm);
 json_req_obj_field(<<"cookie">>, #httpd{mochi_req = Req}, _Db, _DocId) ->
-    to_json_terms(Req:parse_cookie());
+    case scrub_json_request() of
+        true -> {[]};
+        false -> to_json_terms(Req:parse_cookie())
+    end;
 json_req_obj_field(<<"userCtx">>, #httpd{}, Db, _DocId) ->
     couch_util:json_user_ctx(Db);
 json_req_obj_field(<<"secObj">>, #httpd{user_ctx = UserCtx}, Db, _DocId) ->
@@ -216,3 +225,6 @@ default_or_content_type(DefaultContentType, Headers) ->
         true ->
             Headers
     end.
+
+scrub_json_request() ->
+    config:get_boolean("chttpd", "scrub_json_request", true).
