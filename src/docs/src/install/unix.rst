@@ -162,15 +162,11 @@ You should have the following installed:
 * `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91) <https://spidermonkey.dev/>`_
 * `GNU Make                     <http://www.gnu.org/software/make/>`_
 * `GNU Compiler Collection      <http://gcc.gnu.org/>`_
-* `libcurl                      <http://curl.haxx.se/libcurl/>`_
 * `help2man                     <http://www.gnu.org/s/help2man/>`_
 * `Python (>=3.6) for docs and tests      <http://python.org/>`_
-* `Python Sphinx (>=1.1.3)      <http://pypi.python.org/pypi/Sphinx>`_
 * Java (required for `nouveau`, minimum version 11, recommended version 19 or 20)
 
-You will only need libcurl if you plan to run the JavaScript test suite. And
 help2man is only need if you plan on installing the CouchDB man pages.
-Sphinx is only required for building the online documentation.
 Documentation build can be disabled by adding the ``--disable-docs`` flag to
 the ``configure`` script.
 
@@ -181,7 +177,7 @@ You can install the dependencies by running::
 
     sudo apt-get --no-install-recommends -y install \
         build-essential pkg-config erlang \
-        libicu-dev libmozjs185-dev libcurl4-openssl-dev
+        libicu-dev libmozjs185-dev
 
 Be sure to update the version numbers to match your system's available
 packages.
@@ -192,7 +188,7 @@ RedHat-based (Fedora, CentOS, RHEL) Systems
 You can install the dependencies by running::
 
     sudo yum install autoconf autoconf-archive automake \
-        curl-devel erlang-asn1 erlang-erts erlang-eunit gcc-c++ \
+        erlang-asn1 erlang-erts erlang-eunit gcc-c++ \
         erlang-os_mon erlang-xmerl erlang-erl_interface help2man \
         libicu-devel libtool perl-Test-Harness
 
@@ -248,7 +244,7 @@ Line Tools::
 You can then install the other dependencies by running::
 
     brew install autoconf autoconf-archive automake libtool \
-        erlang icu4c spidermonkey curl pkg-config
+        erlang icu4c spidermonkey pkg-config
 
 You will need `Homebrew` installed to use the ``brew`` command.
 
