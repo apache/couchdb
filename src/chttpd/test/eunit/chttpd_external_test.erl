@@ -28,14 +28,21 @@ setup_mock() ->
 teardown_mock(_) ->
     meck:unload().
 
+headers() ->
+    [
+        {"host", "example.com"},
+        {"AutHoriZatioN", "Basic s3cr3t"},
+        {"COOkiE", "cookie1=val1; cookie2=val2"},
+        {"x-AUth-CouchDB-TokeN", "S3cr3tT0k3n"}
+    ].
+
 setup_local_httpd_req() ->
     ok = meck:new(mochiweb, [passthrough]),
     ok = meck:expect(mochiweb_socket, peername, fun(_) ->
         {ok, {{127, 0, 0, 1}, 5984}}
     end),
     ok = meck:expect(mochiweb_request, recv_body, 2, {[{<<"a">>, 42}]}),
-    Headers = mochiweb_headers:make([{"host", "example.com"}]),
-    MochiReq = mochiweb_request:new(nil, 'GET', "/", {1, 1}, Headers),
+    MochiReq = mochiweb:new_request({nil, {'GET', "/", {1, 1}}, headers()}),
     #httpd{
         mochi_req = MochiReq,
         method = 'GET',
@@ -45,8 +52,7 @@ setup_local_httpd_req() ->
     }.
 
 setup_remote_httpd_req() ->
-    Headers = mochiweb_headers:make([{"host", "example.com"}]),
-    MochiReq = mochiweb_request:new(nil, 'GET', "/", {1, 1}, Headers),
+    MochiReq = mochiweb:new_request({nil, {'GET', "/", {1, 1}}, headers()}),
     #httpd{
         mochi_req = MochiReq,
         method = 'GET',
@@ -67,7 +73,10 @@ json_req_obj_local_httpd_req_test_() ->
             {
                 setup,
                 fun setup_local_httpd_req/0,
-                fun should_convert_req_to_json_obj/1
+                with([
+                    ?TDEF(should_convert_req_to_json_obj_not_scrubbed),
+                    ?TDEF(should_convert_req_to_json_obj_scrubbed)
+                ])
             }
         }
     }.
@@ -82,22 +91,59 @@ json_req_obj_remote_httpd_req_test_() ->
             {
                 setup,
                 fun setup_remote_httpd_req/0,
-                fun should_convert_req_to_json_obj/1
+                with([
+                    ?TDEF(should_convert_req_to_json_obj_not_scrubbed),
+                    ?TDEF(should_convert_req_to_json_obj_scrubbed)
+                ])
             }
         }
     }.
 
-should_convert_req_to_json_obj(HttpdReq) ->
-    Expect = expect(),
+should_convert_req_to_json_obj_not_scrubbed(HttpdReq) ->
+    meck:expect(config, get_boolean, fun("chttpd", "scrub_json_request", _) -> false end),
+    Expect = expect(expect_headers_not_scrubbed(), expect_cookie_not_scrubbed()),
     {Result} = chttpd_external:json_req_obj(HttpdReq, <<"fake">>),
     lists:map(
         fun({K, V}) ->
-            {K, ?_assertEqual(couch_util:get_value(K, Expect), V)}
+            {K, ?assertEqual(couch_util:get_value(K, Expect), V)}
         end,
         Result
     ).
 
-expect() ->
+should_convert_req_to_json_obj_scrubbed(HttpdReq) ->
+    meck:expect(config, get_boolean, fun("chttpd", "scrub_json_request", _) -> true end),
+    Expect = expect(expect_headers_scrubbed(), expect_cookie_scrubbed()),
+    {Result} = chttpd_external:json_req_obj(HttpdReq, <<"fake">>),
+    lists:map(
+        fun({K, V}) ->
+            {K, ?assertEqual(couch_util:get_value(K, Expect), V)}
+        end,
+        Result
+    ).
+
+expect_headers_not_scrubbed() ->
+    {[
+        {<<"AutHoriZatioN">>, <<"Basic s3cr3t">>},
+        {<<"COOkiE">>, <<"cookie1=val1; cookie2=val2">>},
+        {<<"host">>, <<"example.com">>},
+        {<<"x-AUth-CouchDB-TokeN">>, <<"S3cr3tT0k3n">>}
+    ]}.
+
+expect_headers_scrubbed() ->
+    {[
+        {<<"host">>, <<"example.com">>}
+    ]}.
+
+expect_cookie_not_scrubbed() ->
+    {[
+        {<<"cookie1">>, <<"val1">>},
+        {<<"cookie2">>, <<"val2">>}
+    ]}.
+
+expect_cookie_scrubbed() ->
+    {[]}.
+
+expect({[_ | _]} = Headers, Cookie) ->
     [
         {<<"info">>, {[{name, <<"fake">>}]}},
         {<<"uuid">>, <<"4">>},
@@ -107,11 +153,11 @@ expect() ->
         {<<"path">>, [<<"/">>]},
         {<<"raw_path">>, <<"/">>},
         {<<"query">>, {[]}},
-        {<<"headers">>, {[{<<"host">>, <<"example.com">>}]}},
+        {<<"headers">>, Headers},
         {<<"body">>, {[{<<"a">>, 42}]}},
         {<<"peer">>, <<"127.0.0.1">>},
         {<<"form">>, {[]}},
-        {<<"cookie">>, {[]}},
+        {<<"cookie">>, Cookie},
         {<<"userCtx">>,
             {[
                 {<<"db">>, <<"fake">>},
