@@ -19,7 +19,6 @@
 ]).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(TIMEOUT, 4000).
 -define(RESTART_TIMEOUT_IN_MILLISEC, 3000).
@@ -55,9 +54,6 @@
     ok = file:close(Fd),
     FileName
 end).
-
--define(T(F), {erlang:fun_to_list(F), F}).
--define(FEXT(F), fun(_, _) -> F() end).
 
 setup() ->
     setup(?CONFIG_CHAIN).
@@ -441,7 +437,7 @@ should_write_changes(_, _) ->
         ?assertEqual("5986", config:get("httpd", "port")),
         ?assertEqual(ok, config:set("httpd", "port", "8080")),
         ?assertEqual("8080", config:get("httpd", "port")),
-        ?assertEqual(ok, config:delete("httpd", "bind_address", "8080")),
+        ?assertEqual(ok, config:delete("httpd", "bind_address")),
         ?assertEqual(undefined, config:get("httpd", "bind_address"))
     end).
 
@@ -461,16 +457,12 @@ should_ensure_that_no_ini_files_loaded() ->
     ?assertEqual(0, length(config:all())).
 
 should_create_non_persistent_option() ->
-    ?_test(begin
-        ?assertEqual(ok, config:set("httpd", "port", "80", false)),
-        ?assertEqual("80", config:get("httpd", "port"))
-    end).
+    ?assertEqual(ok, config:set("httpd", "port", "80", false)),
+    ?assertEqual("80", config:get("httpd", "port")).
 
 should_create_persistent_option() ->
-    ?_test(begin
-        ?assertEqual(ok, config:set("httpd", "bind_address", "127.0.0.1")),
-        ?assertEqual("127.0.0.1", config:get("httpd", "bind_address"))
-    end).
+    ?assertEqual(ok, config:set("httpd", "bind_address", "127.0.0.1")),
+    ?assertEqual("127.0.0.1", config:get("httpd", "bind_address")).
 
 should_handle_value_change({_Apps, Pid}) ->
     ?_test(begin
