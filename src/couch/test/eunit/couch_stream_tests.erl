@@ -36,45 +36,45 @@ stream_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_write/1,
-                    fun should_write_consecutive/1,
-                    fun should_write_empty_binary/1,
-                    fun should_return_file_pointers_on_close/1,
-                    fun should_return_stream_size_on_close/1,
-                    fun should_return_valid_pointers/1,
-                    fun should_recall_last_pointer_position/1,
-                    fun should_stream_more_with_4K_chunk_size/1,
-                    fun should_stop_on_normal_exit_of_stream_opener/1
+                    ?TDEF_FE(should_write),
+                    ?TDEF_FE(should_write_consecutive),
+                    ?TDEF_FE(should_write_empty_binary),
+                    ?TDEF_FE(should_return_file_pointers_on_close),
+                    ?TDEF_FE(should_return_stream_size_on_close),
+                    ?TDEF_FE(should_return_valid_pointers),
+                    ?TDEF_FE(should_recall_last_pointer_position),
+                    ?TDEF_FE(should_stream_more_with_4K_chunk_size),
+                    ?TDEF_FE(should_stop_on_normal_exit_of_stream_opener)
                 ]
             }
         }
     }.
 
 should_write({_, Stream}) ->
-    ?_assertEqual(ok, couch_stream:write(Stream, <<"food">>)).
+    ?assertEqual(ok, couch_stream:write(Stream, <<"food">>)).
 
 should_write_consecutive({_, Stream}) ->
     couch_stream:write(Stream, <<"food">>),
-    ?_assertEqual(ok, couch_stream:write(Stream, <<"foob">>)).
+    ?assertEqual(ok, couch_stream:write(Stream, <<"foob">>)).
 
 should_write_empty_binary({_, Stream}) ->
-    ?_assertEqual(ok, couch_stream:write(Stream, <<>>)).
+    ?assertEqual(ok, couch_stream:write(Stream, <<>>)).
 
 should_return_file_pointers_on_close({_, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
     {NewEngine, _, _, _, _} = couch_stream:close(Stream),
     {ok, Ptrs} = couch_stream:to_disk_term(NewEngine),
-    ?_assertEqual([{0, 8}], Ptrs).
+    ?assertEqual([{0, 8}], Ptrs).
 
 should_return_stream_size_on_close({_, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
     {_, Length, _, _, _} = couch_stream:close(Stream),
-    ?_assertEqual(8, Length).
+    ?assertEqual(8, Length).
 
 should_return_valid_pointers({_Fd, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
     {NewEngine, _, _, _, _} = couch_stream:close(Stream),
-    ?_assertEqual(<<"foodfoob">>, read_all(NewEngine)).
+    ?assertEqual(<<"foodfoob">>, read_all(NewEngine)).
 
 should_recall_last_pointer_position({Fd, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
@@ -89,7 +89,7 @@ should_recall_last_pointer_position({Fd, Stream}) ->
     {ok, Ptrs} = couch_stream:to_disk_term(NewEngine),
     [{ExpPtr, 20}] = Ptrs,
     AllBits = iolist_to_binary([OneBits, ZeroBits]),
-    ?_assertEqual(AllBits, read_all(NewEngine)).
+    ?assertEqual(AllBits, read_all(NewEngine)).
 
 should_stream_more_with_4K_chunk_size({Fd, _}) ->
     {ok, Stream} = couch_stream:open(?ENGINE(Fd), [{buffer_size, 4096}]),
@@ -104,11 +104,11 @@ should_stream_more_with_4K_chunk_size({Fd, _}) ->
     ),
     {NewEngine, Length, _, _, _} = couch_stream:close(Stream),
     {ok, Ptrs} = couch_stream:to_disk_term(NewEngine),
-    ?_assertMatch({[{0, 4100}, {4106, 1020}], 5120}, {Ptrs, Length}).
+    ?assertMatch({[{0, 4100}, {4106, 1020}], 5120}, {Ptrs, Length}).
 
 should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
     RunnerPid = self(),
-    OpenerPid = spawn(
+    {OpenerPid, OpenerRef} = spawn_monitor(
         fun() ->
             {ok, StreamPid} = couch_stream:open(?ENGINE(Fd)),
             RunnerPid ! {pid, StreamPid}
@@ -119,9 +119,16 @@ should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
             {pid, StreamPid0} -> StreamPid0
         end,
     % Confirm the validity of the test by verifying the stream opener has died
+    receive
+        {'DOWN', OpenerRef, _, _, _} -> ok
+    end,
     ?assertNot(is_process_alive(OpenerPid)),
     % Verify the stream itself has also died
-    ?_assertNot(is_process_alive(StreamPid)).
+    StreamRef = erlang:monitor(process, StreamPid),
+    receive
+        {'DOWN', StreamRef, _, _, _} -> ok
+    end,
+    ?assertNot(is_process_alive(StreamPid)).
 
 read_all(Engine) ->
     Data = couch_stream:foldl(Engine, fun(Bin, Acc) -> [Bin, Acc] end, []),
