@@ -135,6 +135,8 @@ norm_ops({[{<<"$text">>, Arg}]}) when
     {[{<<"$default">>, {[{<<"$text">>, Arg}]}}]};
 norm_ops({[{<<"$text">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$text', Arg});
+norm_ops({[{<<"$beginsWith">>, Arg}]} = Cond) when is_binary(Arg) ->
+    Cond;
 % Not technically an operator but we pass it through here
 % so that this function accepts its own output. This exists
 % so that $text can have a field name value which simplifies
@@ -513,6 +515,11 @@ match({[{<<"$type">>, Arg}]}, Value, _Cmp) when is_binary(Arg) ->
 match({[{<<"$mod">>, [D, R]}]}, Value, _Cmp) when is_integer(Value) ->
     Value rem D == R;
 match({[{<<"$mod">>, _}]}, _Value, _Cmp) ->
+    false;
+match({[{<<"$beginsWith">>, Prefix}]}, Value, _Cmp) when is_binary(Prefix), is_binary(Value) ->
+    string:prefix(Value, Prefix) /= nomatch;
+% When Value is not a string, do not match
+match({[{<<"$beginsWith">>, Prefix}]}, _, _Cmp) when is_binary(Prefix) ->
     false;
 match({[{<<"$regex">>, Regex}]}, Value, _Cmp) when is_binary(Value) ->
     try
@@ -1053,5 +1060,30 @@ fields_nor_test() ->
         <<"$nor">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
     ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
+
+match_beginswith_test() ->
+    Doc =
+        {[
+            {<<"_id">>, <<"foo">>},
+            {<<"_rev">>, <<"bar">>},
+            {<<"user_id">>, 11}
+        ]},
+    Check = fun(Field, Prefix) ->
+        Selector = {[{Field, {[{<<"$beginsWith">>, Prefix}]}}]},
+        % Call match_int/2 to avoid ERROR for missing metric; this is confusing
+        % in the middle of test output.
+        match_int(mango_selector:normalize(Selector), Doc)
+    end,
+    [
+        % matching
+        ?assertEqual(true, Check(<<"_id">>, <<"f">>)),
+        % no match (user_id is not a binary string)
+        ?assertEqual(false, Check(<<"user_id">>, <<"f">>)),
+        % invalid (prefix is not a binary string)
+        ?assertThrow(
+            {mango_error, mango_selector, {invalid_operator, <<"$beginsWith">>}},
+            Check(<<"user_id">>, 1)
+        )
+    ].
 
 -endif.

@@ -142,6 +142,9 @@ convert(Path, {[{<<"$exists">>, ShouldExist}]}) ->
         true -> FieldExists;
         false -> {op_not, {FieldExists, false}}
     end;
+convert(Path, {[{<<"$beginsWith">>, Arg}]}) ->
+    PrefixSearch = [value_str(Arg), <<"*">>],
+    {op_field, {make_field(Path, Arg), PrefixSearch}};
 % We're not checking the actual type here, just looking for
 % anything that has a possibility of matching by checking
 % for the field name. We use the same logic for $exists on

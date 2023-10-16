@@ -141,6 +141,22 @@ class BaseOperatorTests:
             for d in docs:
                 self.assertNotIn("twitter", d)
 
+        def test_beginswith(self):
+            docs = self.db.find({"location.state": {"$beginsWith": "New"}})
+            self.assertEqual(len(docs), 2)
+            self.assertUserIds([2, 10], docs)
+
+        # non-string prefixes should return an error
+        def test_beginswith_invalid_prefix(self):
+            docs = self.db.find({"location.state": {"$beginsWith": 123}})
+            self.assertEqual(len(docs), 2)
+
+        # non-string values in documents should not match the prefix,
+        # but should not error
+        def test_beginswith_invalid_prefix(self):
+            docs = self.db.find({"user_id": {"$beginsWith": "Foo"}})
+            self.assertEqual(len(docs), 0)
+
 
 class OperatorJSONTests(mango.UserDocsTests, BaseOperatorTests.Common):
     # START: text indexes do not support range queries across type boundaries so only
