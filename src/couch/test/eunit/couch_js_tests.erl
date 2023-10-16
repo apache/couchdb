@@ -57,8 +57,9 @@ should_create_sandbox(_) ->
     ?assert(couch_stats:sample([couchdb, query_server, process_starts]) > 0),
     ?assert(couch_stats:sample([couchdb, query_server, process_prompts]) > 0),
     ?assert(couch_stats:sample([couchdb, query_server, acquired_processes]) > 0),
-    ?assert(couch_stats:sample([couchdb, query_server, process_exists]) >= 0),
+    ?assert(couch_stats:sample([couchdb, query_server, process_exits]) >= 0),
     ?assert(couch_stats:sample([couchdb, query_server, process_errors]) >= 0),
+    ?assert(couch_stats:sample([couchdb, query_server, process_error_exits]) >= 0),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
