@@ -34,7 +34,6 @@
 
 -export([listen_for_changes/2]).
 -export([subscribe_for_changes/1]).
--export([parse_ini_file/1]).
 
 -export([init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
@@ -50,7 +49,6 @@
 -define(DELETE, delete).
 
 -record(config, {
-    notify_funs = [],
     ini_files = undefined,
     write_filename = undefined
 }).
