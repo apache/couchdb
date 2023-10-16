@@ -36,6 +36,7 @@ to install CouchDB is to use the convenience binary packages:
 * Debian 11 (bullseye)
 * Ubuntu 18.04 (bionic)
 * Ubuntu 20.04 (focal)
+* Ubuntu 22.04 (jammy)
 
 These RedHat-style rpm packages and Debian-style deb packages will install CouchDB at
 ``/opt/couchdb`` and ensure CouchDB is run at system startup by the appropriate init
