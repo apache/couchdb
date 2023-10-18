@@ -113,60 +113,8 @@ pbkdf2(Password, Salt, Iterations, DerivedLength) when
     Iterations > 0,
     is_integer(DerivedLength)
 ->
-    L = ceiling(DerivedLength / ?SHA1_OUTPUT_LENGTH),
-    <<Bin:DerivedLength/binary, _/binary>> =
-        iolist_to_binary(pbkdf2(Password, Salt, Iterations, L, 1, [])),
-    {ok, couch_util:to_hex_bin(Bin)}.
-
--spec pbkdf2(binary(), binary(), integer(), integer(), integer(), iolist()) ->
-    iolist().
-pbkdf2(_Password, _Salt, _Iterations, BlockCount, BlockIndex, Acc) when
-    BlockIndex > BlockCount
-->
-    lists:reverse(Acc);
-pbkdf2(Password, Salt, Iterations, BlockCount, BlockIndex, Acc) ->
-    Block = pbkdf2(Password, Salt, Iterations, BlockIndex, 1, <<>>, <<>>),
-    pbkdf2(Password, Salt, Iterations, BlockCount, BlockIndex + 1, [Block | Acc]).
-
--spec pbkdf2(
-    binary(),
-    binary(),
-    integer(),
-    integer(),
-    integer(),
-    binary(),
-    binary()
-) -> binary().
-pbkdf2(_Password, _Salt, Iterations, _BlockIndex, Iteration, _Prev, Acc) when
-    Iteration > Iterations
-->
-    Acc;
-pbkdf2(Password, Salt, Iterations, BlockIndex, 1, _Prev, _Acc) ->
-    InitialBlock = couch_util:hmac(
-        sha,
-        Password,
-        <<Salt/binary, BlockIndex:32/integer>>
-    ),
-    pbkdf2(
-        Password,
-        Salt,
-        Iterations,
-        BlockIndex,
-        2,
-        InitialBlock,
-        InitialBlock
-    );
-pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration, Prev, Acc) ->
-    Next = couch_util:hmac(sha, Password, Prev),
-    pbkdf2(
-        Password,
-        Salt,
-        Iterations,
-        BlockIndex,
-        Iteration + 1,
-        Next,
-        crypto:exor(Next, Acc)
-    ).
+    DerivedKey = fast_pbkdf2:pbkdf2(sha, Password, Salt, Iterations, DerivedLength),
+    {ok, couch_util:to_hex_bin(DerivedKey)}.
 
 %% verify two lists for equality without short-circuits to avoid timing attacks.
 -spec verify(string(), string(), integer()) -> boolean().
@@ -189,12 +137,3 @@ verify(X, Y) when is_list(X) and is_list(Y) ->
     end;
 verify(_X, _Y) ->
     false.
-
--spec ceiling(number()) -> integer().
-ceiling(X) ->
-    T = erlang:trunc(X),
-    case (X - T) of
-        Neg when Neg < 0 -> T;
-        Pos when Pos > 0 -> T + 1;
-        _ -> T
-    end.
