@@ -33,6 +33,10 @@ class BeginsWithOperator(mango.DbPerClass):
         self.db.create_index(["location"])
         self.db.create_index(["name", "location"])
 
+    def get_mrargs(self, selector, sort=None):
+        explain = self.db.find(selector, sort=sort, explain=True)
+        return explain["mrargs"]
+
     def assertDocIds(self, user_ids, docs):
         user_ids_returned = list(d["_id"] for d in docs)
         user_ids.sort()
@@ -46,54 +50,57 @@ class BeginsWithOperator(mango.DbPerClass):
         self.assertDocIds(["aaa", "abc"], docs)
 
     def test_json_range(self):
-        explain = self.db.find({"location": {"$beginsWith": "A"}}, explain=True)
-        self.assertEqual(explain["mrargs"]["start_key"], ["A"])
-        end_key_bytes = to_utf8_bytes(explain["mrargs"]["end_key"])
+        mrargs = self.get_mrargs({"location": {"$beginsWith": "A"}})
+
+        self.assertEqual(mrargs["start_key"], ["A"])
+        end_key_bytes = to_utf8_bytes(mrargs["end_key"])
         self.assertEqual(end_key_bytes, [b"A\xef\xbf\xbd", b"<MAX>"])
 
     def test_compound_key(self):
         selector = {"name": "Eddie", "location": {"$beginsWith": "A"}}
-        explain = self.db.find(selector, explain=True)
+        mrargs = self.get_mrargs(selector)
 
-        self.assertEqual(explain["mrargs"]["start_key"], ["Eddie", "A"])
-        end_key_bytes = to_utf8_bytes(explain["mrargs"]["end_key"])
+        self.assertEqual(mrargs["start_key"], ["Eddie", "A"])
+        end_key_bytes = to_utf8_bytes(mrargs["end_key"])
         self.assertEqual(end_key_bytes, [b"Eddie", b"A\xef\xbf\xbd", b"<MAX>"])
 
         docs = self.db.find(selector)
         self.assertEqual(len(docs), 1)
         self.assertDocIds(["abc"], docs)
 
-    def test_sort_asc(self):
+    def test_sort(self):
         selector = {"location": {"$beginsWith": "A"}}
-        explain = self.db.find(selector, sort=["location"], explain=True)
+        mrargs = self.get_mrargs(selector, sort=["location"])
 
-        self.assertEqual(explain["mrargs"]["start_key"], ["A"])
-        end_key_bytes = to_utf8_bytes(explain["mrargs"]["end_key"])
+        self.assertEqual(mrargs["start_key"], ["A"])
+        end_key_bytes = to_utf8_bytes(mrargs["end_key"])
         self.assertEqual(end_key_bytes, [b"A\xef\xbf\xbd", b"<MAX>"])
-        self.assertEqual(explain["mrargs"]["direction"], "fwd")
+        self.assertEqual(mrargs["direction"], "fwd")
 
     def test_sort_desc(self):
         selector = {"location": {"$beginsWith": "A"}}
-        explain = self.db.find(selector, sort=[{"location": "desc"}], explain=True)
+        mrargs = self.get_mrargs(selector, sort=[{"location": "desc"}])
 
-        start_key_bytes = to_utf8_bytes(explain["mrargs"]["end_key"])
+        start_key_bytes = to_utf8_bytes(mrargs["end_key"])
         self.assertEqual(start_key_bytes, [b"A"])
-        self.assertEqual(explain["mrargs"]["end_key"], ["A"])
-        self.assertEqual(explain["mrargs"]["direction"], "rev")
+        self.assertEqual(mrargs["end_key"], ["A"])
+        self.assertEqual(mrargs["direction"], "rev")
 
     def test_all_docs_range(self):
-        explain = self.db.find({"_id": {"$beginsWith": "a"}}, explain=True)
-        self.assertEqual(explain["mrargs"]["start_key"], "a")
-        end_key_bytes = to_utf8_bytes(explain["mrargs"]["end_key"])
+        mrargs = self.get_mrargs({"_id": {"$beginsWith": "a"}})
+
+        self.assertEqual(mrargs["start_key"], "a")
+        end_key_bytes = to_utf8_bytes(mrargs["end_key"])
         self.assertEqual(end_key_bytes, [b"a", b"\xef\xbf\xbd"])
 
     def test_no_index(self):
         selector = {"foo": {"$beginsWith": "a"}}
         resp_explain = self.db.find(selector, explain=True)
+        mrargs = resp_explain["mrargs"]
 
         self.assertEqual(resp_explain["index"]["type"], "special")
-        self.assertEqual(resp_explain["mrargs"]["start_key"], None)
-        self.assertEqual(resp_explain["mrargs"]["end_key"], "<MAX>")
+        self.assertEqual(mrargs["start_key"], None)
+        self.assertEqual(mrargs["end_key"], "<MAX>")
 
     def test_invalid_operand(self):
         try:
@@ -106,7 +113,16 @@ class BeginsWithOperator(mango.DbPerClass):
             raise AssertionError("expected find error")
 
     def test_does_not_match_non_string_value(self):
-        selector = {"age": {"$beginsWith": "a"}}
-        docs = self.db.find(selector)
-
+        docs = self.db.find({"age": {"$beginsWith": "a"}})
         self.assertEqual(len(docs), 0)
+
+    def test_no_matches(self):
+        docs = self.db.find({"name": {"$beginsWith": "Z"}})
+        self.assertEqual(len(docs), 0)
+
+    def test_case_sensitivity(self):
+        docs = self.db.find({"name": {"$beginsWith": "j"}})
+        self.assertEqual(len(docs), 0)
+
+        docs = self.db.find({"name": {"$beginsWith": "J"}})
+        self.assertEqual(len(docs), 2)
