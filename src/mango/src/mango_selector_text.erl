@@ -144,7 +144,7 @@ convert(Path, {[{<<"$exists">>, ShouldExist}]}) ->
     end;
 convert(Path, {[{<<"$beginsWith">>, Arg}]}) when is_binary(Arg) ->
     Suffix = <<"*">>,
-    PrefixSearch = value_str(<<Arg/binary,  Suffix/binary>>),
+    PrefixSearch = value_str(<<Arg/binary, Suffix/binary>>),
     {op_field, {make_field(Path, Arg), PrefixSearch}};
 % We're not checking the actual type here, just looking for
 % anything that has a possibility of matching by checking
@@ -827,7 +827,7 @@ convert_nor_test() ->
 
 convert_beginswith_test() ->
     ?assertEqual(
-        {op_field, {[[<<"field">>], <<":">>, <<"string">>],<<"\"foo\\*\"">>}},
+        {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"foo\\*\"">>}},
         convert_selector(#{<<"field">> => #{<<"$beginsWith">> => <<"foo">>}})
     ).
 
