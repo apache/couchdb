@@ -357,7 +357,7 @@ handle_config_change("couchdb_engines", _, _, _, N) ->
     {ok, N};
 handle_config_change("admins", _, _, Persist, 1 = N) ->
     % async hashing on couch_server with number 1 only
-    couch_password_hasher:hash(Persist),
+    couch_password_hasher:hash_admin_passwords(Persist),
     {ok, N};
 handle_config_change("httpd", "authentication_handlers", _, _, 1 = N) ->
     couch_httpd:stop(),
