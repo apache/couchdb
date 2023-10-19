@@ -28,7 +28,7 @@
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1, handle_session_req/2]).
 
--export([authenticate/2, verify_totp/2]).
+-export([authenticate/4, verify_totp/2]).
 -export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
 -export([maybe_value/3]).
 
@@ -111,7 +111,7 @@ default_authentication_handler(Req, AuthModule) ->
                     reject_if_totp(UserProps),
                     UserName = ?l2b(User),
                     Password = ?l2b(Pass),
-                    case authenticate(Password, UserProps) of
+                    case authenticate(AuthModule, UserName, Password, UserProps) of
                         true ->
                             Req#httpd{
                                 user_ctx = #user_ctx{
@@ -497,7 +497,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
             nil -> {ok, [], nil};
             Result -> Result
         end,
-    case authenticate(Password, UserProps) of
+    case authenticate(AuthModule, UserName, Password, UserProps) of
         true ->
             verify_totp(UserProps, Form),
             % setup the session cookie
@@ -613,8 +613,22 @@ extract_username(Form) ->
 maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) -> [{Key, Fun(Else)}].
 
-authenticate(Pass, UserProps) ->
+authenticate(AuthModule, UserName, Password, UserProps) ->
     UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<>>),
+    case couch_passwords_cache:authenticate(AuthModule, UserName, Password, UserSalt) of
+        not_found ->
+            case authenticate_int(Password, UserSalt, UserProps) of
+                false ->
+                    false;
+                true ->
+                    couch_passwords_cache:insert(AuthModule, UserName, Password, UserSalt),
+                    true
+            end;
+        Result when is_boolean(Result) ->
+            Result
+    end.
+
+authenticate_int(Pass, UserSalt, UserProps) ->
     {PasswordHash, ExpectedHash} =
         case couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>) of
             <<"simple">> ->
