@@ -24,7 +24,7 @@
     code_change/3
 ]).
 
--export([hash/1]).
+-export([hash_admin_passwords/1]).
 
 -record(state, {}).
 
@@ -32,9 +32,9 @@
 %%% Public functions
 %%%===================================================================
 
--spec hash(Persist :: boolean()) -> Reply :: term().
-hash(Persist) ->
-    gen_server:cast(?MODULE, {hash_passwords, Persist}).
+-spec hash_admin_passwords(Persist :: boolean()) -> Reply :: term().
+hash_admin_passwords(Persist) ->
+    gen_server:cast(?MODULE, {hash_admin_passwords, Persist}).
 
 %%%===================================================================
 %%% Spawning and gen_server implementation
@@ -50,8 +50,8 @@ init(_Args) ->
 handle_call(Msg, _From, #state{} = State) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, State}.
 
-handle_cast({hash_passwords, Persist}, State) ->
-    hash_admin_passwords(Persist),
+handle_cast({hash_admin_passwords, Persist}, State) ->
+    hash_admin_passwords_int(Persist),
     {noreply, State};
 handle_cast(Msg, State) ->
     {stop, {invalid_cast, Msg}, State}.
@@ -63,7 +63,7 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-hash_admin_passwords(Persist) ->
+hash_admin_passwords_int(Persist) ->
     lists:foreach(
         fun({User, ClearPassword}) ->
             HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
