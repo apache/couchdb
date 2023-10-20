@@ -18,25 +18,25 @@ pbkdf2_test_() ->
     {"PBKDF2", [
         {"Iterations: 1, length: 20",
             ?_assertEqual(
-                {ok, <<"0c60c80f961f0e71f3a9b524af6012062fe037a6">>},
+                <<"0c60c80f961f0e71f3a9b524af6012062fe037a6">>,
                 couch_passwords:pbkdf2(<<"password">>, <<"salt">>, 1, 20)
             )},
 
         {"Iterations: 2, length: 20",
             ?_assertEqual(
-                {ok, <<"ea6c014dc72d6f8ccd1ed92ace1d41f0d8de8957">>},
+                <<"ea6c014dc72d6f8ccd1ed92ace1d41f0d8de8957">>,
                 couch_passwords:pbkdf2(<<"password">>, <<"salt">>, 2, 20)
             )},
 
         {"Iterations: 4096, length: 20",
             ?_assertEqual(
-                {ok, <<"4b007901b765489abead49d926f721d065a429c1">>},
+                <<"4b007901b765489abead49d926f721d065a429c1">>,
                 couch_passwords:pbkdf2(<<"password">>, <<"salt">>, 4096, 20)
             )},
 
         {"Iterations: 4096, length: 25",
             ?_assertEqual(
-                {ok, <<"3d2eec4fe41c849b80c8d83662c0e44a8b291a964cf2f07038">>},
+                <<"3d2eec4fe41c849b80c8d83662c0e44a8b291a964cf2f07038">>,
                 couch_passwords:pbkdf2(
                     <<"passwordPASSWORDpassword">>,
                     <<"saltSALTsaltSALTsaltSALTsaltSALTsalt">>,
@@ -46,7 +46,7 @@ pbkdf2_test_() ->
             )},
         {"Null byte",
             ?_assertEqual(
-                {ok, <<"56fa6aa75548099dcc37d7f03425e0c3">>},
+                <<"56fa6aa75548099dcc37d7f03425e0c3">>,
                 couch_passwords:pbkdf2(
                     <<"pass\0word">>,
                     <<"sa\0lt">>,
@@ -59,7 +59,7 @@ pbkdf2_test_() ->
         {timeout, 600,
             {"Iterations: 16777216 - this may take some time",
                 ?_assertEqual(
-                    {ok, <<"eefe3d61cd4da4e4e9945b3d6ba2158c2634e984">>},
+                    <<"eefe3d61cd4da4e4e9945b3d6ba2158c2634e984">>,
                     couch_passwords:pbkdf2(<<"password">>, <<"salt">>, 16777216, 20)
                 )}}
     ]}.
