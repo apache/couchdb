@@ -623,10 +623,14 @@ authenticate(Pass, UserProps) ->
                     couch_util:get_value(<<"password_sha">>, UserProps, nil)
                 };
             <<"pbkdf2">> ->
+                PRF = couch_util:get_value(<<"pbkdf2_prf">>, UserProps, <<"sha">>),
+                verify_prf(PRF),
                 Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
                 verify_iterations(Iterations),
                 {
-                    couch_passwords:pbkdf2(Pass, UserSalt, Iterations),
+                    couch_passwords:pbkdf2(
+                        binary_to_existing_atom(PRF), Pass, UserSalt, Iterations
+                    ),
                     couch_util:get_value(<<"derived_key">>, UserProps, nil)
                 }
         end,
@@ -647,6 +651,17 @@ verify_iterations(Iterations) when is_integer(Iterations) ->
         false ->
             ok
     end.
+
+verify_prf(PRF) when
+    PRF == <<"sha">>;
+    PRF == <<"sha224">>;
+    PRF == <<"sha256">>;
+    PRF == <<"sha384">>;
+    PRF == <<"sha512">>
+->
+    ok;
+verify_prf(_PRF) ->
+    throw({forbidden, <<"PRF is invalid">>}).
 
 make_cookie_time() ->
     {NowMS, NowS, _} = os:timestamp(),

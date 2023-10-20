@@ -12,13 +12,10 @@
 
 -module(couch_passwords).
 
--export([simple/2, pbkdf2/3, pbkdf2/4, verify/2]).
+-export([simple/2, pbkdf2/3, pbkdf2/4, pbkdf2/5, verify/2]).
 -export([hash_admin_password/1, get_unhashed_admins/0]).
 
 -include_lib("couch/include/couch_db.hrl").
-
--define(MAX_DERIVED_KEY_LENGTH, (1 bsl 32 - 1)).
--define(SHA1_OUTPUT_LENGTH, 20).
 
 %% legacy scheme, not used for new passwords.
 -spec simple(binary(), binary()) -> binary().
@@ -46,15 +43,17 @@ hash_admin_password("simple", ClearPassword) ->
     Hash = crypto:hash(sha, <<ClearPassword/binary, Salt/binary>>),
     ?l2b("-hashed-" ++ couch_util:to_hex(Hash) ++ "," ++ ?b2l(Salt));
 hash_admin_password("pbkdf2", ClearPassword) ->
+    PRF = chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256"),
     Iterations = chttpd_util:get_chttpd_auth_config("iterations", "10"),
     Salt = couch_uuids:random(),
     DerivedKey = couch_passwords:pbkdf2(
+        list_to_existing_atom(PRF),
         couch_util:to_binary(ClearPassword),
         Salt,
         list_to_integer(Iterations)
     ),
     ?l2b(
-        "-pbkdf2-" ++ ?b2l(DerivedKey) ++ "," ++
+        "-pbkdf2:" ++ PRF ++ "-" ++ ?b2l(DerivedKey) ++ "," ++
             ?b2l(Salt) ++ "," ++
             Iterations
     ).
@@ -69,52 +68,67 @@ get_unhashed_admins() ->
             ({_User, "-pbkdf2-" ++ _}) ->
                 % already hashed
                 false;
+            ({_User, "-pbkdf2:sha-" ++ _}) ->
+                % already hashed
+                false;
+            ({_User, "-pbkdf2:sha224-" ++ _}) ->
+                % already hashed
+                false;
+            ({_User, "-pbkdf2:sha256-" ++ _}) ->
+                % already hashed
+                false;
+            ({_User, "-pbkdf2:sha384-" ++ _}) ->
+                % already hashed
+                false;
+            ({_User, "-pbkdf2:sha512-" ++ _}) ->
+                % already hashed
+                false;
             ({_User, _ClearPassword}) ->
                 true
         end,
         config:get("admins")
     ).
 
-%% Current scheme, much stronger.
--spec pbkdf2(binary(), binary(), integer()) -> binary().
-pbkdf2(Password, Salt, Iterations) when
+pbkdf2(Password, Salt, Iterations) ->
+    pbkdf2(sha, Password, Salt, Iterations).
+
+pbkdf2(PRF, Password, Salt, Iterations) when is_atom(PRF) ->
+    #{size := Size} = crypto:hash_info(PRF),
+    pbkdf2(PRF, Password, Salt, Iterations, Size);
+pbkdf2(Password, Salt, Iterations, KeyLen) ->
+    pbkdf2(sha, Password, Salt, Iterations, KeyLen).
+
+pbkdf2(PRF, Password, Salt, Iterations, KeyLen) when
+    is_atom(PRF),
     is_binary(Password),
     is_binary(Salt),
     is_integer(Iterations),
-    Iterations > 0
+    is_integer(KeyLen),
+    Iterations > 0,
+    KeyLen > 0
 ->
-    {ok, Result} = pbkdf2(Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH),
-    Result;
-pbkdf2(Password, Salt, Iterations) when
+    DerivedKey = fast_pbkdf2:pbkdf2(PRF, Password, Salt, Iterations, KeyLen),
+    couch_util:to_hex_bin(DerivedKey);
+pbkdf2(PRF, Password, Salt, Iterations, KeyLen) when
+    is_atom(PRF),
     is_binary(Salt),
     is_integer(Iterations),
-    Iterations > 0
+    is_integer(KeyLen),
+    Iterations > 0,
+    KeyLen > 0
 ->
     Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
     throw({forbidden, Msg});
-pbkdf2(Password, Salt, Iterations) when
+pbkdf2(PRF, Password, Salt, Iterations, KeyLen) when
+    is_atom(PRF),
     is_binary(Password),
     is_integer(Iterations),
-    Iterations > 0
+    is_integer(KeyLen),
+    Iterations > 0,
+    KeyLen > 0
 ->
     Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
     throw({forbidden, Msg}).
-
--spec pbkdf2(binary(), binary(), integer(), integer()) ->
-    {ok, binary()} | {error, derived_key_too_long}.
-pbkdf2(_Password, _Salt, _Iterations, DerivedLength) when
-    DerivedLength > ?MAX_DERIVED_KEY_LENGTH
-->
-    {error, derived_key_too_long};
-pbkdf2(Password, Salt, Iterations, DerivedLength) when
-    is_binary(Password),
-    is_binary(Salt),
-    is_integer(Iterations),
-    Iterations > 0,
-    is_integer(DerivedLength)
-->
-    DerivedKey = fast_pbkdf2:pbkdf2(sha, Password, Salt, Iterations, DerivedLength),
-    {ok, couch_util:to_hex_bin(DerivedKey)}.
 
 %% verify two lists for equality without short-circuits to avoid timing attacks.
 -if((?OTP_RELEASE) >= 25).
