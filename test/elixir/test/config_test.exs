@@ -92,7 +92,7 @@ defmodule ConfigTest do
     assert Couch.login("administrator", plain_pass)
     hash_pass = get_config(context, "admins", "administrator")
 
-    assert Regex.match?(~r/^-pbkdf2-/, hash_pass) or
+    assert Regex.match?(~r/^-pbkdf2(:[a-z0-9]+)?-/, hash_pass) or
              Regex.match?(~r/^-hashed-/, hash_pass)
 
     delete_config(context, "admins", "administrator")

@@ -23,6 +23,7 @@
 -define(SIMPLE, <<"simple">>).
 -define(PASSWORD_SHA, <<"password_sha">>).
 -define(PBKDF2, <<"pbkdf2">>).
+-define(PBKDF2_PRF, <<"pbkdf2_prf">>).
 -define(ITERATIONS, <<"iterations">>).
 -define(SALT, <<"salt">>).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
@@ -81,17 +82,21 @@ save_doc(#doc{body = {Body}} = Doc) ->
             Doc#doc{body = {Body3}};
         {ClearPassword, "pbkdf2"} ->
             ok = validate_password(ClearPassword),
+            PRF = chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256"),
             Iterations = chttpd_util:get_chttpd_auth_config_integer(
                 "iterations", 10
             ),
             Salt = couch_uuids:random(),
-            DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
+            DerivedKey = couch_passwords:pbkdf2(
+                list_to_existing_atom(PRF), ClearPassword, Salt, Iterations
+            ),
             Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?PBKDF2),
-            Body1 = ?replace(Body0, ?ITERATIONS, Iterations),
-            Body2 = ?replace(Body1, ?DERIVED_KEY, DerivedKey),
-            Body3 = ?replace(Body2, ?SALT, Salt),
-            Body4 = proplists:delete(?PASSWORD, Body3),
-            Doc#doc{body = {Body4}};
+            Body1 = ?replace(Body0, ?PBKDF2_PRF, ?l2b(PRF)),
+            Body2 = ?replace(Body1, ?ITERATIONS, Iterations),
+            Body3 = ?replace(Body2, ?DERIVED_KEY, DerivedKey),
+            Body4 = ?replace(Body3, ?SALT, Salt),
+            Body5 = proplists:delete(?PASSWORD, Body4),
+            Doc#doc{body = {Body5}};
         {_ClearPassword, Scheme} ->
             couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
             throw({forbidden, ?PASSWORD_SERVER_ERROR})
