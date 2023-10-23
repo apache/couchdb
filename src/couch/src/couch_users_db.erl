@@ -27,7 +27,6 @@
 -define(PRESERVE_SALT, <<"preserve_salt">>).
 -define(ITERATIONS, <<"iterations">>).
 -define(SALT, <<"salt">>).
--define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 -define(REQUIREMENT_ERROR, "Password does not conform to requirements.").
 -define(PASSWORD_SERVER_ERROR, "Server cannot hash passwords at this time.").
 
@@ -90,12 +89,14 @@ save_doc(#doc{body = {Body}} = Doc) ->
         {ClearPassword, "simple"} ->
             ok = validate_password(ClearPassword),
             PasswordSha = couch_passwords:simple(ClearPassword, Salt),
-            Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?SIMPLE),
-            Body1 = ?replace(Body0, ?SALT, Salt),
-            Body2 = ?replace(Body1, ?PASSWORD_SHA, PasswordSha),
-            Body3 = proplists:delete(?PRESERVE_SALT, Body2),
-            Body4 = proplists:delete(?PASSWORD, Body3),
-            Doc#doc{body = {Body4}};
+            Body0 = remove_password_fields(Body),
+            Body1 = [
+                {?PASSWORD_SCHEME, ?SIMPLE},
+                {?SALT, Salt},
+                {?PASSWORD_SHA, PasswordSha}
+                | Body0
+            ],
+            Doc#doc{body = {Body1}};
         {ClearPassword, "pbkdf2"} ->
             ok = validate_password(ClearPassword),
             PRF = chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256"),
@@ -105,18 +106,35 @@ save_doc(#doc{body = {Body}} = Doc) ->
             DerivedKey = couch_passwords:pbkdf2(
                 list_to_existing_atom(PRF), ClearPassword, Salt, Iterations
             ),
-            Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?PBKDF2),
-            Body1 = ?replace(Body0, ?PBKDF2_PRF, ?l2b(PRF)),
-            Body2 = ?replace(Body1, ?ITERATIONS, Iterations),
-            Body3 = ?replace(Body2, ?DERIVED_KEY, DerivedKey),
-            Body4 = ?replace(Body3, ?SALT, Salt),
-            Body5 = proplists:delete(?PRESERVE_SALT, Body4),
-            Body6 = proplists:delete(?PASSWORD, Body5),
-            Doc#doc{body = {Body6}};
+            Body0 = remove_password_fields(Body),
+            Body1 = [
+                {?PASSWORD_SCHEME, ?PBKDF2},
+                {?PBKDF2_PRF, ?l2b(PRF)},
+                {?SALT, Salt},
+                {?ITERATIONS, Iterations},
+                {?DERIVED_KEY, DerivedKey}
+                | Body0
+            ],
+            Doc#doc{body = {Body1}};
         {_ClearPassword, Scheme} ->
             couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
             throw({forbidden, ?PASSWORD_SERVER_ERROR})
     end.
+
+remove_password_fields(Props) ->
+    lists:filter(fun not_password_field/1, Props).
+
+not_password_field({Key, _Value}) ->
+    not lists:member(Key, [
+        ?DERIVED_KEY,
+        ?ITERATIONS,
+        ?PASSWORD,
+        ?PASSWORD_SCHEME,
+        ?PASSWORD_SHA,
+        ?PRESERVE_SALT,
+        ?PBKDF2_PRF,
+        ?SALT
+    ]).
 
 % Validate if a new password matches all RegExp in the password_regexp setting.
 % Throws if not.
