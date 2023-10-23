@@ -495,7 +495,7 @@ view_cb({row, Row}, Acc) ->
     %% TODO: distinguish between rows and docs
     %% TODO: wire in csrt tracking
     %% TODO: distinguish between all_docs vs view call
-    couch_stats:increment_counter([fabric_rpc, view, row_processed]),
+    couch_stats:increment_counter([fabric_rpc, view, rows_read]),
     %%couch_stats_resource_tracker:inc(rows_read),
     % Adding another row
     ViewRow = #view_row{
@@ -540,7 +540,7 @@ changes_enumerator(#full_doc_info{} = FDI, Acc) ->
 changes_enumerator(#doc_info{id = <<"_local/", _/binary>>, high_seq = Seq}, Acc) ->
     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Acc#fabric_changes_acc.pending - 1}};
 changes_enumerator(DocInfo, Acc) ->
-    couch_stats:increment_counter([fabric_rpc, changes, rows_read]),
+    couch_stats:increment_counter([fabric_rpc, changes, processed]),
     #fabric_changes_acc{
         db = Db,
         args = #changes_args{
