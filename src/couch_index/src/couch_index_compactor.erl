@@ -112,7 +112,7 @@ compact(Idx, Mod, IdxState, Opts) ->
         Mod:compact(Db, IdxState, Opts)
     end),
     ok = Mod:commit(NewIdxState),
-    case gen_server:call(Idx, {compacted, NewIdxState}) of
+    case gen_server:call(Idx, {compacted, NewIdxState}, infinity) of
         recompact ->
             couch_log:info("Compaction restarting for db: ~s idx: ~s", Args),
             compact(Idx, Mod, NewIdxState, [recompact]);
