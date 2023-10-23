@@ -473,7 +473,7 @@ reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
 get_node(#btree{fd = Fd}, NodePos) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
     %% TODO: wire in csrt tracking
-    couch_stats:increment_counter([couchdb, btree, get_node]),
+    couch_stats:increment_counter([couchdb, btree, NodeType]),
     {NodeType, NodeList}.
 
 write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
@@ -1165,7 +1165,7 @@ stream_kv_node2(Bt, Reds, PrevKVs, [{K, V} | RestKVs], InRange, Dir, Fun, Acc) -
         false ->
             {stop, {PrevKVs, Reds}, Acc};
         true ->
-            couch_stats:increment_counter([couchdb, btree, changes_processed]),
+            couch_stats:increment_counter([couchdb, btree, folds]),
             AssembledKV = assemble(Bt, K, V),
             case Fun(visit, AssembledKV, {PrevKVs, Reds}, Acc) of
                 {ok, Acc2} ->

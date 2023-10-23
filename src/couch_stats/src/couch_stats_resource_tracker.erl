@@ -50,7 +50,7 @@
     db_opened/0,
     doc_read/0,
     row_read/0,
-    change_processed/0,
+    btree_fold/0,
     ioq_called/0,
     js_evaled/0,
     js_filtered/0,
@@ -80,7 +80,18 @@
 
 -define(MANGO_EVAL_MATCH, mango_eval_match).
 -define(DB_OPEN_DOC, docs_read).
+-define(DB_OPEN, db_open).
+-define(COUCH_SERVER_OPEN, db_open).
+-define(COUCH_BT_FOLDS, btree_folds).
+-define(COUCH_BT_GET_KP_NODE, get_kp_node).
+-define(COUCH_BT_GET_KV_NODE, get_kv_node).
+-define(COUCH_JS_FILTER, js_filter).
+-define(COUCH_JS_FILTER_ERROR, js_filter_error).
+-define(COUCH_JS_FILTERED_DOCS, js_filtered_docs).
+-define(ROWS_READ, rows_read).
 
+%% TODO: overlap between this and couch btree fold invocations
+%% TODO: need some way to distinguish fols on views vs find vs all_docs
 -define(FRPC_CHANGES_ROW, changes_processed).
 
 %% Module pdict markers
@@ -108,6 +119,7 @@
     db_open = 0,
     docs_read = 0,
     rows_read = 0,
+    btree_folds = 0,
     changes_processed = 0,
     ioq_calls = 0,
     io_bytes_read = 0,
@@ -117,15 +129,17 @@
     js_filter_error = 0,
     js_filtered_docs = 0,
     mango_eval_match = 0,
+    %% TODO: switch record definitions to be macro based, eg:
+    %% ?COUCH_BT_GET_KP_NODE = 0,
     get_kv_node = 0,
     get_kp_node = 0,
     state = alive
 }).
 
-db_opened() -> inc(db_open).
+db_opened() -> inc(db_opened).
 doc_read() -> inc(docs_read).
 row_read() -> inc(rows_read).
-change_processed() -> inc(changes_processed).
+btree_fold() -> inc(?COUCH_BT_FOLDS).
 ioq_called() -> inc(ioq_calls).
 js_evaled() -> inc(js_evals).
 js_filtered() -> inc(js_filter).
@@ -139,14 +153,14 @@ js_filtered_docs(N) -> inc(js_filtered_docs, N).
 io_bytes_read(N) -> inc(io_bytes_read, N).
 io_bytes_written(N) -> inc(io_bytes_written, N).
 
-inc(db_open) ->
-    inc(db_open, 1);
+inc(?DB_OPEN) ->
+    inc(?DB_OPEN, 1);
 inc(docs_read) ->
     inc(docs_read, 1);
-inc(rows_read) ->
-    inc(rows_read, 1);
-inc(changes_processed) ->
-    inc(changes_processed, 1);
+inc(?ROWS_READ) ->
+    inc(?ROWS_READ, 1);
+inc(?COUCH_BT_FOLDS) ->
+    inc(?COUCH_BT_FOLDS, 1);
 inc(ioq_calls) ->
     inc(ioq_calls, 1);
 inc(io_bytes_read) ->
@@ -155,26 +169,26 @@ inc(io_bytes_written) ->
     inc(io_bytes_written, 1);
 inc(js_evals) ->
     inc(js_evals, 1);
-inc(js_filter) ->
-    inc(js_filter, 1);
-inc(js_filter_error) ->
-    inc(js_filter_error, 1);
-inc(js_filtered_docs) ->
-    inc(js_filtered_docs, 1);
+inc(?COUCH_JS_FILTER) ->
+    inc(?COUCH_JS_FILTER, 1);
+inc(?COUCH_JS_FILTER_ERROR) ->
+    inc(?COUCH_JS_FILTER_ERROR, 1);
+inc(?COUCH_JS_FILTERED_DOCS) ->
+    inc(?COUCH_JS_FILTERED_DOCS, 1);
 inc(?MANGO_EVAL_MATCH) ->
     inc(?MANGO_EVAL_MATCH, 1);
-inc(get_kv_node) ->
-    inc(get_kv_node, 1);
-inc(get_kp_node) ->
-    inc(get_kp_node, 1);
+inc(?COUCH_BT_GET_KP_NODE) ->
+    inc(?COUCH_BT_GET_KP_NODE, 1);
+inc(?COUCH_BT_GET_KV_NODE) ->
+    inc(?COUCH_BT_GET_KV_NODE, 1);
 inc(_) ->
     0.
 
 
-inc(db_open, N) ->
-    update_counter(#rctx.db_open, N);
-inc(rows_read, N) ->
-    update_counter(#rctx.rows_read, N);
+inc(?DB_OPEN, N) ->
+    update_counter(#rctx.?DB_OPEN, N);
+inc(?ROWS_READ, N) ->
+    update_counter(#rctx.?ROWS_READ, N);
 inc(ioq_calls, N) ->
     update_counter(#rctx.ioq_calls, N);
 inc(io_bytes_read, N) ->
@@ -183,22 +197,22 @@ inc(io_bytes_written, N) ->
     update_counter(#rctx.io_bytes_written, N);
 inc(js_evals, N) ->
     update_counter(#rctx.js_evals, N);
-inc(js_filter, N) ->
-    update_counter(#rctx.js_filter, N);
-inc(js_filter_error, N) ->
-    update_counter(#rctx.js_filter_error, N);
-inc(js_filtered_docs, N) ->
-    update_counter(#rctx.js_filtered_docs, N);
+inc(?COUCH_JS_FILTER, N) ->
+    update_counter(#rctx.?COUCH_JS_FILTER, N);
+inc(?COUCH_JS_FILTER_ERROR, N) ->
+    update_counter(#rctx.?COUCH_JS_FILTER_ERROR, N);
+inc(?COUCH_JS_FILTERED_DOCS, N) ->
+    update_counter(#rctx.?COUCH_JS_FILTERED_DOCS, N);
 inc(?MANGO_EVAL_MATCH, N) ->
     update_counter(#rctx.?MANGO_EVAL_MATCH, N);
 inc(?DB_OPEN_DOC, N) ->
     update_counter(#rctx.?DB_OPEN_DOC, N);
 inc(?FRPC_CHANGES_ROW, N) ->
     update_counter(#rctx.?FRPC_CHANGES_ROW, N);
-inc(get_kv_node, N) ->
-    update_counter(#rctx.get_kv_node, N);
-inc(get_kp_node, N) ->
-    update_counter(#rctx.get_kp_node, N);
+inc(?COUCH_BT_GET_KP_NODE, N) ->
+    update_counter(#rctx.?COUCH_BT_GET_KP_NODE, N);
+inc(?COUCH_BT_GET_KV_NODE, N) ->
+    update_counter(#rctx.?COUCH_BT_GET_KV_NODE, N);
 inc(_, _) ->
     0.
 
@@ -206,9 +220,26 @@ maybe_inc([mango, evaluate_selector], Val) ->
     inc(?MANGO_EVAL_MATCH, Val);
 maybe_inc([couchdb, database_reads], Val) ->
     inc(?DB_OPEN_DOC, Val);
-maybe_inc([fabric_rpc, changes, rows_read], Val) ->
+maybe_inc([fabric_rpc, changes, processed], Val) ->
     inc(?FRPC_CHANGES_ROW, Val);
-maybe_inc(_, _) ->
+maybe_inc([fabric_rpc, view, rows_read], Val) ->
+    inc(?ROWS_READ, Val);
+maybe_inc([couchdb, couch_server, open], Val) ->
+    inc(?DB_OPEN, Val);
+maybe_inc([couchdb, btree, folds], Val) ->
+    inc(?COUCH_BT_FOLDS, Val);
+maybe_inc([couchdb, btree, kp_node], Val) ->
+    inc(?COUCH_BT_GET_KP_NODE, Val);
+maybe_inc([couchdb, btree, kv_node], Val) ->
+    inc(?COUCH_BT_GET_KV_NODE, Val);
+maybe_inc([couchdb, query_server, js_filter_error], Val) ->
+    inc(?COUCH_JS_FILTER_ERROR, Val);
+maybe_inc([couchdb, query_server, js_filter], Val) ->
+    inc(?COUCH_JS_FILTER, Val);
+maybe_inc([couchdb, query_server, js_filtered_docs], Val) ->
+    inc(?COUCH_JS_FILTERED_DOCS, Val);
+maybe_inc(Metric, Val) ->
+    io:format("SKIPPING MAYBE_INC METRIC[~p]: ~p~n", [Val, Metric]),
     0.
 
 
@@ -233,12 +264,16 @@ should_track([mango_cursor, view, all_docs]) ->
     true;
 should_track([mango_cursor, view, idx]) ->
     true;
-should_track(_) ->
+should_track(_Metric) ->
+    %%io:format("SKIPPING METRIC: ~p~n", [Metric]),
     false.
 
 %% TODO: update coordinator stats from worker deltas
-accumulate_delta(_Delta) ->
-    ok.
+accumulate_delta(Delta) ->
+    io:format("Accumulating delta: ~p~n", [Delta]),
+    %% TODO: switch to creating a batch of updates to invoke a single
+    %% update_counter rather than sequentially invoking it for each field
+    maps:foreach(fun inc/2, Delta).
 
 update_counter(Field, Count) ->
     update_counter(get_pid_ref(), Field, Count).
@@ -263,6 +298,7 @@ to_json(#rctx{}=Rctx) ->
         rows_read = RowsRead,
         state = State0,
         type = Type,
+        btree_folds = BtFolds,
         changes_processed = ChangesProcessed
     } = Rctx,
     %%io:format("TO_JSON_MFA: ~p~n", [MFA0]),
@@ -306,6 +342,7 @@ to_json(#rctx{}=Rctx) ->
         rows_read => RowsRead,
         state => State,
         type => term_to_json(Type),
+        btree_folds => BtFolds,
         changes_processed => ChangesProcessed
     }.
 
@@ -336,7 +373,7 @@ to_flat_json(#rctx{}=Rctx) ->
         rows_read = RowsRead,
         state = State0,
         type = Type,
-        changes_processed = ChangesProcessed
+        btree_folds = ChangesProcessed
     } = Rctx,
     io:format("TO_JSON_MFA: ~p~n", [MFA0]),
     MFA = case MFA0 of
@@ -377,7 +414,7 @@ to_flat_json(#rctx{}=Rctx) ->
         rows_read => RowsRead,
         state => State,
         type => term_to_flat_json(Type),
-        changes_processed => ChangesProcessed
+        btree_folds => ChangesProcessed
     }.
 
 get_pid_ref() ->
@@ -484,7 +521,7 @@ make_delta(#rctx{}=TA, #rctx{}=TB) ->
     Delta = #{
         docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
         rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
-        changes_processed => TB#rctx.changes_processed - TA#rctx.changes_processed,
+        btree_folds => TB#rctx.btree_folds - TA#rctx.btree_folds,
         dt => timer:now_diff(TB#rctx.updated_at, TA#rctx.updated_at)
     },
     %% TODO: reevaluate this decision
