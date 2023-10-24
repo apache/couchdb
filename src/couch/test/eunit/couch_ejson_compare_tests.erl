@@ -163,6 +163,10 @@ zero_width_list() ->
 zero_width_chars() ->
     oneof([16#200B, 16#200C, 16#200D]).
 
+-else.
+
+-include_lib("couch/include/couch_eunit.hrl").
+
 -endif.
 
 % Regular EUnit tests
