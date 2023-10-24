@@ -659,6 +659,14 @@ fields({[]}) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TEST_DOC,
+    {[
+        {<<"_id">>, <<"foo">>},
+        {<<"_rev">>, <<"bar">>},
+        {<<"user_id">>, 11}
+    ]}
+).
+
 is_constant_field_basic_test() ->
     Selector = normalize({[{<<"A">>, <<"foo">>}]}),
     Field = <<"A">>,
@@ -998,30 +1006,22 @@ has_required_fields_or_nested_or_false_test() ->
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
+check_match(Selector) ->
+    % Call match_int/2 to avoid ERROR for missing metric; this is confusing
+    % in the middle of test output.
+    match_int(mango_selector:normalize(Selector), ?TEST_DOC).
+
 %% This test shows the shape match/2 expects for its arguments.
-match_demo_test_() ->
-    Doc =
-        {[
-            {<<"_id">>, <<"foo">>},
-            {<<"_rev">>, <<"bar">>},
-            {<<"user_id">>, 11}
-        ]},
-    Check = fun(Selector) ->
-        % Call match_int/2 to avoid ERROR for missing metric; this is confusing
-        % in the middle of test output.
-        match_int(mango_selector:normalize(Selector), Doc)
-    end,
-    [
-        % matching
-        ?_assertEqual(true, Check({[{<<"user_id">>, 11}]})),
-        ?_assertEqual(true, Check({[{<<"_id">>, <<"foo">>}]})),
-        ?_assertEqual(true, Check({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"bar">>}]})),
-        % non-matching
-        ?_assertEqual(false, Check({[{<<"user_id">>, 1234}]})),
-        % string 11 doesn't match number 11
-        ?_assertEqual(false, Check({[{<<"user_id">>, <<"11">>}]})),
-        ?_assertEqual(false, Check({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"quux">>}]}))
-    ].
+match_demo_test() ->
+    % matching
+    ?assertEqual(true, check_match({[{<<"user_id">>, 11}]})),
+    ?assertEqual(true, check_match({[{<<"_id">>, <<"foo">>}]})),
+    ?assertEqual(true, check_match({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"bar">>}]})),
+    % non-matching
+    ?assertEqual(false, check_match({[{<<"user_id">>, 1234}]})),
+    % string 11 doesn't match number 11
+    ?assertEqual(false, check_match({[{<<"user_id">>, <<"11">>}]})),
+    ?assertEqual(false, check_match({[{<<"_id">>, <<"foo">>}, {<<"_rev">>, <<"quux">>}]})).
 
 fields_of(Selector) ->
     fields(test_util:as_selector(Selector)).
@@ -1061,29 +1061,21 @@ fields_nor_test() ->
     },
     ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
 
+check_beginswith(Field, Prefix) ->
+    Selector = {[{Field, {[{<<"$beginsWith">>, Prefix}]}}]},
+    % Call match_int/2 to avoid ERROR for missing metric; this is confusing
+    % in the middle of test output.
+    match_int(mango_selector:normalize(Selector), ?TEST_DOC).
+
 match_beginswith_test() ->
-    Doc =
-        {[
-            {<<"_id">>, <<"foo">>},
-            {<<"_rev">>, <<"bar">>},
-            {<<"user_id">>, 11}
-        ]},
-    Check = fun(Field, Prefix) ->
-        Selector = {[{Field, {[{<<"$beginsWith">>, Prefix}]}}]},
-        % Call match_int/2 to avoid ERROR for missing metric; this is confusing
-        % in the middle of test output.
-        match_int(mango_selector:normalize(Selector), Doc)
-    end,
-    [
-        % matching
-        ?assertEqual(true, Check(<<"_id">>, <<"f">>)),
-        % no match (user_id is not a binary string)
-        ?assertEqual(false, Check(<<"user_id">>, <<"f">>)),
-        % invalid (prefix is not a binary string)
-        ?assertThrow(
-            {mango_error, mango_selector, {invalid_operator, <<"$beginsWith">>}},
-            Check(<<"user_id">>, 1)
-        )
-    ].
+    % matching
+    ?assertEqual(true, check_beginswith(<<"_id">>, <<"f">>)),
+    % no match (user_id is not a binary string)
+    ?assertEqual(false, check_beginswith(<<"user_id">>, <<"f">>)),
+    % invalid (prefix is not a binary string)
+    ?assertThrow(
+        {mango_error, mango_selector, {invalid_operator, <<"$beginsWith">>}},
+        check_beginswith(<<"user_id">>, 1)
+    ).
 
 -endif.
