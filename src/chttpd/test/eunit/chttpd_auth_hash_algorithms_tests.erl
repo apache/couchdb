@@ -88,8 +88,8 @@ test_hash_algorithm([DefaultHashAlgorithm | DecodingHashAlgorithmsList] = _, Sta
         get_full_secret(?ADM_USER),
         CurrentTime
     ),
-    {ok, ReqStatus, _, _} = test_request:request(get, base_url(), [{cookie, Cookie}]),
-    ?assertEqual(Status, ReqStatus),
+    {ok, ReqStatus, Hdrs, Body} = test_request:request(get, base_url(), [{cookie, Cookie}]),
+    ?assertMatch({Status, _, _}, {ReqStatus, Hdrs, Body}),
     test_hash_algorithm(DecodingHashAlgorithmsList, Status).
 
 test_hash_algorithms_should_work({_, {WorkingHashes, _, SupportedHashAlgorithms}} = _) ->
