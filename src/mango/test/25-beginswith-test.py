@@ -70,21 +70,27 @@ class BeginsWithOperator(mango.DbPerClass):
 
     def test_sort(self):
         selector = {"location": {"$beginsWith": "A"}}
-        mrargs = self.get_mrargs(selector, sort=["location"])
+        cases = [
+            {
+                "sort": ["location"],
+                "start_key": [b"A"],
+                "end_key": [b"A\xef\xbf\xbd", b"<MAX>"],
+                "direction": "fwd",
+            },
+            {
+                "sort": [{"location": "desc"}],
+                "start_key": [b"A\xef\xbf\xbd", b"<MAX>"],
+                "end_key": [b"A"],
+                "direction": "rev",
+            },
+        ]
 
-        self.assertEqual(mrargs["start_key"], ["A"])
-        end_key_bytes = to_utf8_bytes(mrargs["end_key"])
-        self.assertEqual(end_key_bytes, [b"A\xef\xbf\xbd", b"<MAX>"])
-        self.assertEqual(mrargs["direction"], "fwd")
-
-    def test_sort_desc(self):
-        selector = {"location": {"$beginsWith": "A"}}
-        mrargs = self.get_mrargs(selector, sort=[{"location": "desc"}])
-
-        start_key_bytes = to_utf8_bytes(mrargs["end_key"])
-        self.assertEqual(start_key_bytes, [b"A"])
-        self.assertEqual(mrargs["end_key"], ["A"])
-        self.assertEqual(mrargs["direction"], "rev")
+        for case in cases:
+            with self.subTest(sort=case["sort"]):
+                mrargs = self.get_mrargs(selector, sort=case["sort"])
+                self.assertEqual(to_utf8_bytes(mrargs["start_key"]), case["start_key"])
+                self.assertEqual(to_utf8_bytes(mrargs["end_key"]), case["end_key"])
+                self.assertEqual(mrargs["direction"], case["direction"])
 
     def test_all_docs_range(self):
         mrargs = self.get_mrargs({"_id": {"$beginsWith": "a"}})
