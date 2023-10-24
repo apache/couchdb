@@ -117,6 +117,14 @@ pbkdf2(Password, Salt, Iterations, DerivedLength) when
     {ok, couch_util:to_hex_bin(DerivedKey)}.
 
 %% verify two lists for equality without short-circuits to avoid timing attacks.
+-if((?OTP_RELEASE) >= 25).
+verify(ListA, ListB) when is_list(ListA), is_list(ListB) ->
+    verify(?l2b(ListA), ?l2b(ListB));
+verify(BinA, BinB) when is_binary(BinA), is_binary(BinB), byte_size(BinA) == byte_size(BinB) ->
+    crypto:hash_equals(BinA, BinB);
+verify(BinA, BinB) when is_binary(BinA), is_binary(BinB) ->
+    false.
+-else.
 -spec verify(string(), string(), integer()) -> boolean().
 verify([X | RestX], [Y | RestY], Result) ->
     verify(RestX, RestY, (X bxor Y) bor Result);
@@ -137,3 +145,4 @@ verify(X, Y) when is_list(X) and is_list(Y) ->
     end;
 verify(_X, _Y) ->
     false.
+-endif.
