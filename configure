@@ -252,6 +252,11 @@ if [ "${ERLANG_OS}" = "unix" ]; then
     fi
 fi
 
+# If we're in a release tarball and we don't have proper, then mark it as skipped
+if [ ! -d .git ] && [ "$WITH_PROPER" = "true" ] && [ ! -d src/proper ]; then
+    WITH_PROPER="false"
+fi
+
 echo "==> configuring couchdb in rel/couchdb.config"
 cat > rel/couchdb.config << EOF
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
