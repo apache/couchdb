@@ -1675,8 +1675,8 @@ reason code.
 |                                |            | specify the index.                       |
 +--------------------------------+------------+------------------------------------------+
 | ``field_mismatch``             | any        | Fields in ``"selector"`` of the query do |
-|                                |            | match with the fields available in the   |
-|                                |            | index.                                   |
+|                                |            | not match with the fields available in   |
+|                                |            | the index.                               |
 +--------------------------------+------------+------------------------------------------+
 | ``is_partial``                 | json, text | Partial indexes can be selected only     |
 |                                |            | manually.                                |
