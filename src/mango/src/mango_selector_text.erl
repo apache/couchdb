@@ -828,7 +828,7 @@ convert_nor_test() ->
 
 convert_beginswith_test() ->
     ?assertEqual(
-        {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"\"foo\\*\"">>}},
+        {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"foo*">>}},
         convert_selector(#{<<"field">> => #{<<"$beginsWith">> => <<"foo">>}})
     ).
 
