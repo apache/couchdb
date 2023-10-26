@@ -143,8 +143,9 @@ convert(Path, {[{<<"$exists">>, ShouldExist}]}) ->
         false -> {op_not, {FieldExists, false}}
     end;
 convert(Path, {[{<<"$beginsWith">>, Arg}]}) when is_binary(Arg) ->
+    Prefix = mango_util:lucene_escape_query_value(Arg),
     Suffix = <<"*">>,
-    PrefixSearch = value_str(<<Arg/binary, Suffix/binary>>),
+    PrefixSearch = <<Prefix/binary, Suffix/binary>>,
     {op_field, {make_field(Path, Arg), PrefixSearch}};
 % We're not checking the actual type here, just looking for
 % anything that has a possibility of matching by checking

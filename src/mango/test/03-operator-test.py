@@ -10,12 +10,13 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+from requests.exceptions import HTTPError
 import mango
 import unittest
 
 
 class BaseOperatorTests:
-    class Common(object):
+    class Common(unittest.TestCase):
         def assertUserIds(self, user_ids, docs):
             user_ids_returned = list(d["user_id"] for d in docs)
             user_ids.sort()
@@ -142,20 +143,36 @@ class BaseOperatorTests:
                 self.assertNotIn("twitter", d)
 
         def test_beginswith(self):
-            docs = self.db.find({"location.state": {"$beginsWith": "New"}})
-            self.assertEqual(len(docs), 2)
-            self.assertUserIds([2, 10], docs)
+            cases = [
+                {"prefix": "New", "user_ids": [2, 10]},
+                {
+                    # test escaped characters - note the space in the test string
+                    "prefix": "New ",
+                    "user_ids": [2, 10],
+                },
+                {
+                    # non-string values in documents should not match the prefix,
+                    # but should not error
+                    "prefix": "Foo",
+                    "user_ids": [],
+                },
+                {"prefix": " New", "user_ids": []},
+            ]
+
+            for case in cases:
+                with self.subTest(prefix=case["prefix"]):
+                    selector = {"location.state": {"$beginsWith": case["prefix"]}}
+                    docs = self.db.find(selector)
+                    self.assertEqual(len(docs), len(case["user_ids"]))
+                    self.assertUserIds(case["user_ids"], docs)
 
         # non-string prefixes should return an error
         def test_beginswith_invalid_prefix(self):
-            docs = self.db.find({"location.state": {"$beginsWith": 123}})
-            self.assertEqual(len(docs), 2)
-
-        # non-string values in documents should not match the prefix,
-        # but should not error
-        def test_beginswith_invalid_prefix(self):
-            docs = self.db.find({"user_id": {"$beginsWith": "Foo"}})
-            self.assertEqual(len(docs), 0)
+            cases = [123, True, [], {}]
+            for prefix in cases:
+                with self.subTest(prefix=prefix):
+                    with self.assertRaises(HTTPError):
+                        self.db.find({"location.state": {"$beginsWith": prefix}})
 
 
 class OperatorJSONTests(mango.UserDocsTests, BaseOperatorTests.Common):
