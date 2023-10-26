@@ -143,19 +143,19 @@ class BaseOperatorTests:
                 self.assertNotIn("twitter", d)
 
         def test_beginswith(self):
+            self.db.save_docs(
+                [
+                    {"user_id": 99, "location": {"state": ":Bar"}},
+                ]
+            )
+
             cases = [
                 {"prefix": "New", "user_ids": [2, 10]},
-                {
-                    # test escaped characters - note the space in the test string
-                    "prefix": "New ",
-                    "user_ids": [2, 10],
-                },
-                {
-                    # non-string values in documents should not match the prefix,
-                    # but should not error
-                    "prefix": "Foo",
-                    "user_ids": [],
-                },
+                # test characters that require escaping
+                {"prefix": "New ", "user_ids": [2, 10]},
+                {"prefix": ":", "user_ids": [99]},
+                {"prefix": "Foo", "user_ids": []},
+                {"prefix": '"Foo', "user_ids": []},
                 {"prefix": " New", "user_ids": []},
             ]
 
