@@ -18,7 +18,7 @@ defmodule HelperTest do
   end
 
   test "retry_until times out", _context do
-    assert_raise RuntimeError, ~r/^timed out after \d+ ms$/, fn ->
+    assert_raise ExUnit.AssertionError, "\n\nExpected truthy, got false\ncode: assert false\n", fn ->
       retry_until(
         fn ->
           assert false
