@@ -24,6 +24,7 @@
 -define(PASSWORD_SHA, <<"password_sha">>).
 -define(PBKDF2, <<"pbkdf2">>).
 -define(PBKDF2_PRF, <<"pbkdf2_prf">>).
+-define(PRESERVE_SALT, <<"preserve_salt">>).
 -define(ITERATIONS, <<"iterations">>).
 -define(SALT, <<"salt">>).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
@@ -64,6 +65,21 @@ before_doc_update(Doc, Db, _UpdateType) ->
 save_doc(#doc{body = {Body}} = Doc) ->
     %% Support both schemes to smooth migration from legacy scheme
     Scheme = chttpd_util:get_chttpd_auth_config("password_scheme", "pbkdf2"),
+
+    % We preserve the salt value if requested (for a hashing upgrade, typically)
+    % in order to avoid conflicts if multiple nodes try to upgrade at the same time
+    % and to avoid invalidating existing session cookies (since the password did not
+    % change).
+    PreserveSalt = couch_util:get_value(?PRESERVE_SALT, Body, false),
+    Salt =
+        case PreserveSalt of
+            true ->
+                % use existing salt, if present.
+                couch_util:get_value(?SALT, Body, couch_uuids:random());
+            false ->
+                couch_uuids:random()
+        end,
+
     case {couch_util:get_value(?PASSWORD, Body), Scheme} of
         % server admins don't have a user-db password entry
         {null, _} ->
@@ -73,20 +89,19 @@ save_doc(#doc{body = {Body}} = Doc) ->
         % deprecated
         {ClearPassword, "simple"} ->
             ok = validate_password(ClearPassword),
-            Salt = couch_uuids:random(),
             PasswordSha = couch_passwords:simple(ClearPassword, Salt),
             Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?SIMPLE),
             Body1 = ?replace(Body0, ?SALT, Salt),
             Body2 = ?replace(Body1, ?PASSWORD_SHA, PasswordSha),
-            Body3 = proplists:delete(?PASSWORD, Body2),
-            Doc#doc{body = {Body3}};
+            Body3 = proplists:delete(?PRESERVE_SALT, Body2),
+            Body4 = proplists:delete(?PASSWORD, Body3),
+            Doc#doc{body = {Body4}};
         {ClearPassword, "pbkdf2"} ->
             ok = validate_password(ClearPassword),
             PRF = chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256"),
             Iterations = chttpd_util:get_chttpd_auth_config_integer(
                 "iterations", 10
             ),
-            Salt = couch_uuids:random(),
             DerivedKey = couch_passwords:pbkdf2(
                 list_to_existing_atom(PRF), ClearPassword, Salt, Iterations
             ),
@@ -95,8 +110,9 @@ save_doc(#doc{body = {Body}} = Doc) ->
             Body2 = ?replace(Body1, ?ITERATIONS, Iterations),
             Body3 = ?replace(Body2, ?DERIVED_KEY, DerivedKey),
             Body4 = ?replace(Body3, ?SALT, Salt),
-            Body5 = proplists:delete(?PASSWORD, Body4),
-            Doc#doc{body = {Body5}};
+            Body5 = proplists:delete(?PRESERVE_SALT, Body4),
+            Body6 = proplists:delete(?PASSWORD, Body5),
+            Doc#doc{body = {Body6}};
         {_ClearPassword, Scheme} ->
             couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
             throw({forbidden, ?PASSWORD_SERVER_ERROR})

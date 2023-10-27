@@ -54,7 +54,7 @@ get_user_creds(_Req, UserName) ->
 update_user_creds(_Req, UserDoc, _AuthCtx) ->
     ok = ensure_users_db_exists(),
     couch_util:with_db(users_db(), fun(UserDb) ->
-        {ok, _NewRev} = couch_db:update_doc(UserDb, UserDoc, []),
+        {ok, _NewRev} = couch_db:update_doc(UserDb, UserDoc, [?ADMIN_CTX]),
         ok
     end).
 
