@@ -416,11 +416,11 @@ defmodule Couch.DBTest do
     retry_until(condition, now(:ms), sleep, timeout)
   end
 
-  defp retry_until(condition, start, sleep, timeout) do
+  defp retry_until(condition, start, sleep, timeout, err \\ nil) do
     now = now(:ms)
 
     if now > start + timeout do
-      raise "timed out after #{now - start} ms"
+      raise err
     else
       try do
         if result = condition.() do
@@ -429,9 +429,9 @@ defmodule Couch.DBTest do
           raise ExUnit.AssertionError
         end
       rescue
-        ExUnit.AssertionError ->
+        e in ExUnit.AssertionError ->
           :timer.sleep(sleep)
-          retry_until(condition, start, sleep, timeout)
+          retry_until(condition, start, sleep, timeout, e)
       end
     end
   end
