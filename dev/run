@@ -17,6 +17,7 @@ import base64
 import contextlib
 import functools
 import glob
+import hashlib
 import inspect
 import json
 import ntpath
@@ -560,7 +561,7 @@ def gen_password():
     return base64.b64encode(os.urandom(6)).decode()
 
 
-def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
+def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=32):
     """
     Implements password hashing according to:
       - https://issues.apache.org/jira/browse/COUCHDB-1060
@@ -571,8 +572,8 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
     >>> hashify(candeira)
     -pbkdf2-99eb34d97cdaa581e6ba7b5386e112c265c5c670,d1d2d4d8909c82c81b6c8184429a0739,10
     """
-    derived_key = pbkdf2_hex(pwd, salt, iterations, keylen)
-    return "-pbkdf2-%s,%s,%s" % (derived_key, salt, iterations)
+    derived_key = pbkdf2_hex(pwd, salt, iterations, keylen, hashfunc=hashlib.sha256)
+    return "-pbkdf2:sha256-%s,%s,%s" % (derived_key, salt, iterations)
 
 
 def startup(ctx):
