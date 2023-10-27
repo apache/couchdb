@@ -113,6 +113,9 @@ default_authentication_handler(Req, AuthModule) ->
                     Password = ?l2b(Pass),
                     case authenticate(AuthModule, UserName, Password, UserProps) of
                         true ->
+                            couch_password_hasher:maybe_upgrade_password_hash(
+                                AuthModule, UserName, Password, UserProps
+                            ),
                             Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = UserName,
@@ -500,6 +503,9 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
     case authenticate(AuthModule, UserName, Password, UserProps) of
         true ->
             verify_totp(UserProps, Form),
+            couch_password_hasher:maybe_upgrade_password_hash(
+                AuthModule, UserName, Password, UserProps
+            ),
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
             UserSalt = couch_util:get_value(<<"salt">>, UserProps),
