@@ -61,7 +61,7 @@ get_user_creds(_Req, UserName) when is_binary(UserName) ->
 
 update_user_creds(_Req, UserDoc, _Ctx) ->
     {_, Ref} = spawn_monitor(fun() ->
-        case fabric:update_doc(dbname(), UserDoc, []) of
+        case fabric:update_doc(dbname(), UserDoc, [?ADMIN_CTX]) of
             {ok, _} ->
                 exit(ok);
             Else ->
