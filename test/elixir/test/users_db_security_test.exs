@@ -91,10 +91,11 @@ defmodule UsersDbSecurityTest do
   defp save_as(db_name, doc, options) do
     use_session = Keyword.get(options, :use_session)
     user = Keyword.get(options, :user)
+    pwd = Keyword.get(options, :pwd)
     expect_response = Keyword.get(options, :expect_response, [201, 202])
     expect_message = Keyword.get(options, :error_message)
 
-    session = use_session || login_as(user)
+    session = use_session || login_as(user, pwd)
 
     resp =
       Couch.Session.put(
@@ -276,7 +277,7 @@ defmodule UsersDbSecurityTest do
     # Exising 'derived_key' and 'salt' fields are overwritten with new values
     # when a non-null 'password' field exists.
     # anonymous should be able to create a user document
-    user_doc = %{
+    tom_doc1 = %{
       _id: "org.couchdb.user:tom",
       type: "user",
       name: "tom",
@@ -285,18 +286,18 @@ defmodule UsersDbSecurityTest do
     }
 
     resp =
-      Couch.post("/#{@users_db}", body: user_doc, headers: [authorization: "annonymous"])
+      Couch.post("/#{@users_db}", body: tom_doc1, headers: [authorization: "annonymous"])
 
     assert resp.status_code in [201, 202]
     assert resp.body["ok"]
 
-    user_doc =
+    _tom_doc2 =
       retry_until(fn ->
-        user_doc = open_as(@users_db, "org.couchdb.user:tom", user: "tom")
-        assert !user_doc["password"]
-        assert String.length(user_doc["derived_key"]) == 40
-        assert String.length(user_doc["salt"]) == 32
-        user_doc
+        doc = open_as(@users_db, "org.couchdb.user:tom", user: "tom")
+        assert !doc["password"]
+        assert String.length(doc["derived_key"]) == 64
+        assert String.length(doc["salt"]) == 32
+        doc
       end)
 
     # anonymous should not be able to read an existing user's user document
@@ -313,8 +314,8 @@ defmodule UsersDbSecurityTest do
     assert resp.body["error"] == "unauthorized"
 
     # user should be able to read their own document
-    tom_doc = open_as(@users_db, "org.couchdb.user:tom", user: "tom")
-    assert tom_doc["_id"] == "org.couchdb.user:tom"
+    tom_doc3 = open_as(@users_db, "org.couchdb.user:tom", user: "tom")
+    assert tom_doc3["_id"] == "org.couchdb.user:tom"
 
     # user should not be able to read /_users/_changes
     changes_as(@users_db,
@@ -323,15 +324,96 @@ defmodule UsersDbSecurityTest do
       expect_message: "unauthorized"
     )
 
-    tom_doc = Map.put(tom_doc, "password", "couch")
-    save_as(@users_db, tom_doc, user: "tom")
+    # changing password regenerates derived_key and salt
+    tom_doc4 = Map.put(tom_doc3, "password", "couch")
+    save_as(@users_db, tom_doc4, user: "tom")
 
-    tom_doc = open_as(@users_db, "org.couchdb.user:tom", user: "jerry")
-    assert !tom_doc["password"]
-    assert String.length(tom_doc["derived_key"]) == 40
-    assert String.length(tom_doc["salt"]) == 32
-    assert tom_doc["derived_key"] != user_doc["derived_key"]
-    assert tom_doc["salt"] != user_doc["salt"]
+    _tom_doc5 =
+      retry_until(fn ->
+        doc = open_as(@users_db, "org.couchdb.user:tom", user: "jerry")
+        assert !doc["password"]
+        assert String.length(doc["derived_key"]) == 64
+        assert String.length(doc["salt"]) == 32
+        assert doc["iterations"] == 1
+        assert doc["pbkdf2_prf"] == "sha256"
+        assert doc["derived_key"] != tom_doc4["derived_key"]
+        assert doc["salt"] != tom_doc4["salt"]
+        doc
+      end)
+
+    # changing iteration count regenerates derived_key, salt and iterations
+    # on next password change
+    set_config({
+      "chttpd_auth",
+      "iterations",
+      "3"
+    })
+
+    tom_doc5 = Map.put(tom_doc4, "password", "couch")
+    # 201 if the save does the update, 409 if the async password hasher got there first.
+    save_as(@users_db, tom_doc5, user: "tom", pwd: "couch", expect_response: [201, 409])
+
+    tom_doc6 =
+      retry_until(fn ->
+        doc = open_as(@users_db, "org.couchdb.user:tom", user: "jerry")
+        assert !doc["password"]
+        assert String.length(doc["derived_key"]) == 64
+        assert String.length(doc["salt"]) == 32
+        assert doc["iterations"] == 3
+        assert doc["pbkdf2_prf"] == "sha256"
+        assert doc["derived_key"] != tom_doc5["derived_key"]
+        assert doc["salt"] != tom_doc5["salt"]
+        doc
+      end)
+
+    # changing PRF regenerates derived_key and salt on next
+    # password change
+    set_config({
+      "chttpd_auth",
+      "pbkdf2_prf",
+      "sha512"
+    })
+
+    tom_doc7 = Map.put(tom_doc6, "password", "couch")
+    # 201 if the save does the update, 409 if the async password hasher got there first.
+    save_as(@users_db, tom_doc7, user: "tom", pwd: "couch", expect_response: [201, 409])
+
+    tom_doc8 =
+      retry_until(fn ->
+        doc = open_as(@users_db, "org.couchdb.user:tom", user: "jerry")
+        assert !doc["password"]
+        assert String.length(doc["derived_key"]) == 128
+        assert String.length(doc["salt"]) == 32
+        assert doc["iterations"] == 3
+        assert doc["pbkdf2_prf"] == "sha512"
+        assert doc["derived_key"] != tom_doc7["derived_key"]
+        assert doc["salt"] != tom_doc7["salt"]
+        doc
+      end)
+
+    # changing iterations regenerates derived_key and preserves salt
+    # on next successful authentication
+    set_config({
+      "chttpd_auth",
+      "iterations",
+      "4"
+    })
+
+    _tom_doc9 =
+      retry_until(fn ->
+        # login inside the loop as we need to trigger the async
+        # hasher each time
+        assert login_as("tom", "couch")
+        doc = open_as(@users_db, "org.couchdb.user:tom", user: "jerry")
+        assert !doc["password"]
+        assert String.length(doc["derived_key"]) == 128
+        assert String.length(doc["salt"]) == 32
+        assert doc["iterations"] == 4
+        assert doc["pbkdf2_prf"] == "sha512"
+        assert doc["derived_key"] != tom_doc8["derived_key"]
+        assert doc["salt"] == tom_doc8["salt"]
+        doc
+      end)
 
     # user should not be able to read another user's user document
     spike_doc = %{
