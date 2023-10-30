@@ -10,7 +10,6 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-from requests.exceptions import HTTPError
 import mango
 import unittest
 
