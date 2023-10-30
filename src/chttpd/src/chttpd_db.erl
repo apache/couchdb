@@ -83,6 +83,7 @@
 
 % Database request handlers
 handle_request(#httpd{path_parts = [DbName | RestParts], method = Method} = Req) ->
+    couch_stats_resource_tracker:set_context_dbname(DbName),
     case {Method, RestParts} of
         {'PUT', []} ->
             create_db_req(Req, DbName);

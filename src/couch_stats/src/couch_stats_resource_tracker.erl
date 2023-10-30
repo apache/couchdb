@@ -33,12 +33,17 @@
 
 -export([
     create_context/0, create_context/1, create_context/3,
+    create_coordinator_context/1, create_coordinator_context/2,
+    set_context_dbname/1,
+    set_context_username/1,
     track/1,
     should_track/1
 ]).
 
 -export([
-    active/0
+    active/0,
+    active_coordinators/0,
+    active_workers/0
 ]).
 
 -export([
@@ -93,6 +98,7 @@
 %% TODO: overlap between this and couch btree fold invocations
 %% TODO: need some way to distinguish fols on views vs find vs all_docs
 -define(FRPC_CHANGES_ROW, changes_processed).
+%%-define(FRPC_CHANGES_ROW, ?ROWS_READ).
 
 %% Module pdict markers
 -define(DELTA_TA, csrt_delta_ta).
@@ -109,6 +115,7 @@
 %% TODO: switch to:
 %% -record(?RCTX, {
 -record(rctx, {
+    %% Metadata
     updated_at = os:timestamp(),
     exited_at,
     pid_ref,
@@ -116,6 +123,11 @@
     nonce,
     from,
     type = unknown, %% unknown/background/system/rpc/coordinator/fabric_rpc/etc_rpc/etc
+    state = alive,
+    dbname,
+    username,
+
+    %% Stats counters
     db_open = 0,
     docs_read = 0,
     rows_read = 0,
@@ -132,8 +144,7 @@
     %% TODO: switch record definitions to be macro based, eg:
     %% ?COUCH_BT_GET_KP_NODE = 0,
     get_kv_node = 0,
-    get_kp_node = 0,
-    state = alive
+    get_kp_node = 0
 }).
 
 db_opened() -> inc(db_opened).
@@ -208,7 +219,7 @@ inc(?MANGO_EVAL_MATCH, N) ->
 inc(?DB_OPEN_DOC, N) ->
     update_counter(#rctx.?DB_OPEN_DOC, N);
 inc(?FRPC_CHANGES_ROW, N) ->
-    update_counter(#rctx.?FRPC_CHANGES_ROW, N);
+    update_counter(#rctx.?ROWS_READ, N); %% TODO: rework double use of rows_read
 inc(?COUCH_BT_GET_KP_NODE, N) ->
     update_counter(#rctx.?COUCH_BT_GET_KP_NODE, N);
 inc(?COUCH_BT_GET_KV_NODE, N) ->
@@ -238,8 +249,8 @@ maybe_inc([couchdb, query_server, js_filter], Val) ->
     inc(?COUCH_JS_FILTER, Val);
 maybe_inc([couchdb, query_server, js_filtered_docs], Val) ->
     inc(?COUCH_JS_FILTERED_DOCS, Val);
-maybe_inc(Metric, Val) ->
-    io:format("SKIPPING MAYBE_INC METRIC[~p]: ~p~n", [Val, Metric]),
+maybe_inc(_Metric, _Val) ->
+    %%io:format("SKIPPING MAYBE_INC METRIC[~p]: ~p~n", [Val, Metric]),
     0.
 
 
@@ -247,6 +258,8 @@ maybe_inc(Metric, Val) ->
 should_track([fabric_rpc, all_docs, spawned]) ->
     true;
 should_track([fabric_rpc, changes, spawned]) ->
+    true;
+should_track([fabric_rpc, changes, processed]) ->
     true;
 should_track([fabric_rpc, map_view, spawned]) ->
     true;
@@ -283,7 +296,26 @@ update_counter({_Pid,_Ref}=Key, Field, Count) ->
     ets:update_counter(?MODULE, Key, {Field, Count}, #rctx{pid_ref=Key}).
 
 
-active() ->
+active() -> active_int(all).
+active_coordinators() -> active_int(coordinators).
+active_workers() -> active_int(workers).
+
+
+active_int(coordinators) ->
+    select_by_type(coordinators);
+active_int(workers) ->
+    select_by_type(workers);
+active_int(all) ->
+    lists:map(fun to_json/1, ets:tab2list(?MODULE)).
+
+
+select_by_type(coordinators) ->
+    ets:select(couch_stats_resource_tracker,
+        [{#rctx{type = {coordinator,'_','_'}, _ = '_'}, [], ['$_']}]);
+select_by_type(workers) ->
+    ets:select(couch_stats_resource_tracker,
+        [{#rctx{type = {worker,'_','_'}, _ = '_'}, [], ['$_']}]);
+select_by_type(all) ->
     lists:map(fun to_json/1, ets:tab2list(?MODULE)).
 
 
@@ -294,11 +326,17 @@ to_json(#rctx{}=Rctx) ->
         mfa = MFA0,
         nonce = Nonce0,
         from = From0,
+        dbname = DbName,
+        username = UserName,
+        db_open = DbOpens,
         docs_read = DocsRead,
         rows_read = RowsRead,
         state = State0,
         type = Type,
         btree_folds = BtFolds,
+        get_kp_node = KpNodes,
+        get_kv_node = KvNodes,
+        ioq_calls = IoqCalls,
         changes_processed = ChangesProcessed
     } = Rctx,
     %%io:format("TO_JSON_MFA: ~p~n", [MFA0]),
@@ -338,26 +376,42 @@ to_json(#rctx{}=Rctx) ->
         nonce => term_to_json(Nonce),
         %%from => From,
         from => term_to_json(From),
+        dbname => DbName,
+        username => UserName,
+        db_open => DbOpens,
         docs_read => DocsRead,
         rows_read => RowsRead,
         state => State,
-        type => term_to_json(Type),
+        type => term_to_json({type, Type}),
         btree_folds => BtFolds,
+        kp_nodes => KpNodes,
+        kv_nodes => KvNodes,
+        ioq_calls => IoqCalls,
         changes_processed => ChangesProcessed
     }.
 
 term_to_json({Pid, Ref}) when is_pid(Pid), is_reference(Ref) ->
     [?l2b(pid_to_list(Pid)), ?l2b(ref_to_list(Ref))];
+term_to_json({type, {coordinator, _, _} = Type}) ->
+    %%io:format("SETTING JSON TYPE: ~p~n", [Type]),
+    ?l2b(io_lib:format("~p", [Type]));
 term_to_json({A, B, C}) ->
     [A, B, C];
 term_to_json(undefined) ->
     null;
+term_to_json(null) ->
+    null;
 term_to_json(T) ->
     T.
 
+term_to_flat_json({type, {coordinator, _, _} = Type}) ->
+    %%io:format("SETTING FLAT JSON TYPE: ~p~n", [Type]),
+    ?l2b(io_lib:format("~p", [Type]));
 term_to_flat_json(Tuple) when is_tuple(Tuple) ->
     ?l2b(io_lib:format("~w", [Tuple]));
 term_to_flat_json(undefined) ->
+    null;
+term_to_flat_json(null) ->
     null;
 term_to_flat_json(T) ->
     T.
@@ -369,11 +423,17 @@ to_flat_json(#rctx{}=Rctx) ->
         mfa = MFA0,
         nonce = Nonce0,
         from = From0,
+        dbname = DbName,
+        username = UserName,
+        db_open = DbOpens,
         docs_read = DocsRead,
         rows_read = RowsRead,
         state = State0,
         type = Type,
-        btree_folds = ChangesProcessed
+        get_kp_node = KpNodes,
+        get_kv_node = KvNodes,
+        btree_folds = ChangesProcessed,
+        ioq_calls = IoqCalls
     } = Rctx,
     io:format("TO_JSON_MFA: ~p~n", [MFA0]),
     MFA = case MFA0 of
@@ -402,6 +462,7 @@ to_flat_json(#rctx{}=Rctx) ->
         Nonce0 ->
             list_to_binary(Nonce0)
     end,
+    io:format("NONCE IS: ~p||~p~n", [Nonce0, Nonce]),
     #{
         %%updated_at => ?l2b(io_lib:format("~w", [TP])),
         updated_at => term_to_flat_json(TP),
@@ -410,11 +471,17 @@ to_flat_json(#rctx{}=Rctx) ->
         mfa => MFA,
         nonce => Nonce,
         from => From,
+        dbname => DbName,
+        username => UserName,
+        db_open => DbOpens,
         docs_read => DocsRead,
         rows_read => RowsRead,
         state => State,
-        type => term_to_flat_json(Type),
-        btree_folds => ChangesProcessed
+        type => term_to_flat_json({type, Type}),
+        kp_nodes => KpNodes,
+        kv_nodes => KvNodes,
+        btree_folds => ChangesProcessed,
+        ioq_calls => IoqCalls
     }.
 
 get_pid_ref() ->
@@ -440,12 +507,12 @@ create_context(Pid) ->
 
 %% add type to disnguish coordinator vs rpc_worker
 create_context(From, {M,F,_A} = MFA, Nonce) ->
-    io:format("CREAT_CONTEXT MFA[~p]: {~p}: ~p~n", [From, MFA, Nonce]),
-    Ref = make_ref(),
+    io:format("[~p] CREAT_CONTEXT MFA[~p]: {~p}: ~p~n", [self(), From, MFA, Nonce]),
+    PidRef = get_pid_ref(), %% this will instantiate a new PidRef
     %%Rctx = make_record(self(), Ref),
     %% TODO: extract user_ctx and db/shard from 
     Rctx = #rctx{
-        pid_ref = {self(), Ref},
+        pid_ref = PidRef,
         from = From,
         mfa = MFA,
         type = {worker, M, F},
@@ -453,8 +520,57 @@ create_context(From, {M,F,_A} = MFA, Nonce) ->
     },
     track(Rctx),
     erlang:put(?DELTA_TZ, Rctx),
-    ets:insert(?MODULE, Rctx),
+    true = ets:insert(?MODULE, Rctx),
     Rctx.
+
+create_coordinator_context(#httpd{path_parts=Parts} = Req) ->
+    create_coordinator_context(Req, io_lib:format("~p", [Parts])).
+
+create_coordinator_context(#httpd{} = Req, Path) ->
+    io:format("CREATING COORDINATOR CONTEXT ON {~p}~n", [Path]),
+    #httpd{
+        method = Verb,
+        %%path_parts = Parts,
+        nonce = Nonce
+    } = Req,
+    PidRef = get_pid_ref(), %% this will instantiate a new PidRef
+    %%Rctx = make_record(self(), Ref),
+    %% TODO: extract user_ctx and db/shard from Req
+    Rctx = #rctx{
+        pid_ref = PidRef,
+        %%type = {cooridantor, Verb, Parts},
+        type = {coordinator, Verb, [$/ | Path]},
+        nonce = Nonce
+    },
+    track(Rctx),
+    erlang:put(?DELTA_TZ, Rctx),
+    true = ets:insert(?MODULE, Rctx),
+    Rctx.
+
+set_context_dbname(DbName) ->
+    case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.dbname, DbName}]) of
+        false ->
+            Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
+            io:format("UPDATING DBNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [DbName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
+            timer:sleep(1000),
+            erlang:halt(kaboomz);
+        true ->
+            true
+    end.
+
+set_context_username(null) ->
+    ok;
+set_context_username(UserName) ->
+    io:format("CSRT SETTING USERNAME CONTEXT: ~p~n", [UserName]),
+    case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
+        false ->
+            Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
+            io:format("UPDATING DBNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [UserName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
+            timer:sleep(1000),
+            erlang:halt(kaboomz);
+        true ->
+            true
+    end.
 
 track(#rctx{}=Rctx) ->
     %% TODO: should this block or not? If no, what cleans up zombies?
@@ -522,6 +638,10 @@ make_delta(#rctx{}=TA, #rctx{}=TB) ->
         docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
         rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
         btree_folds => TB#rctx.btree_folds - TA#rctx.btree_folds,
+        get_kp_node => TB#rctx.get_kp_node - TA#rctx.get_kp_node,
+        get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
+        db_open => TB#rctx.db_open - TA#rctx.db_open,
+        ioq_calls => TB#rctx.ioq_calls - TA#rctx.ioq_calls,
         dt => timer:now_diff(TB#rctx.updated_at, TA#rctx.updated_at)
     },
     %% TODO: reevaluate this decision

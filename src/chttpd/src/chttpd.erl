@@ -323,6 +323,8 @@ handle_request_int(MochiReq) ->
     % Save client socket so that it can be monitored for disconnects
     chttpd_util:mochiweb_client_req_set(MochiReq),
 
+    %% This is probably better in before_request, but having Path is nice
+    couch_stats_resource_tracker:create_coordinator_context(HttpReq0, Path),
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
             {ok, HttpReq1} ->
@@ -353,6 +355,8 @@ handle_request_int(MochiReq) ->
 
 before_request(HttpReq) ->
     try
+        %% TODO: re-enable this here once we have Path
+        %% couch_stats_resource_tracker:create_coordinator_context(HttpReq),
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
     catch
