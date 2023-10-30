@@ -129,8 +129,7 @@ async_server_call(Server, Caller, Request) ->
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    Delta = couch_stats_resource_tracker:make_delta(),
-    erlang:send(Caller, {Ref, Reply, {delta, Delta}}).
+    erlang:send(Caller, {Ref, Reply, get_delta()}).
 
 %% @equiv sync_reply(Reply, 300000)
 sync_reply(Reply) ->
@@ -215,8 +214,7 @@ stream(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            Delta = couch_stats_resource_tracker:make_delta(),
-            erlang:send(Caller, {Ref, self(), Msg, {delta, Delta}}),
+            erlang:send(Caller, {Ref, self(), Msg, get_delta()}),
             ok
     catch
         throw:timeout ->
@@ -330,3 +328,6 @@ drain_acks(Count) ->
     after 0 ->
         {ok, Count}
     end.
+
+get_delta() ->
+    {delta, couch_stats_resource_tracker:make_delta()}.

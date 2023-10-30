@@ -262,6 +262,7 @@ set_purge_infos_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_purge_infos_limit, [Limit]}).
 
 open_doc(DbName, DocId, Options) ->
+    io:format("frpc:open_doc(~p, ~p, ~p)~n", [DbName, DocId, Options]),
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
 
 open_revs(DbName, IdRevsOpts, Options) ->
@@ -352,6 +353,14 @@ get_uuid(DbName) ->
 
 with_db(DbName, Options, {M, F, A}) ->
     set_io_priority(DbName, Options),
+    couch_stats_resource_tracker:set_context_dbname(DbName),
+    %% TODO: better approach here than using proplists?
+    case proplists:get_value(user_ctx, Options) of
+        undefined ->
+            ok;
+        #user_ctx{name = UserName} ->
+            couch_stats_resource_tracker:set_context_username(UserName)
+    end,
     case get_or_create_db(DbName, Options) of
         {ok, Db} ->
             rexi:reply(
