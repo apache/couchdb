@@ -200,8 +200,9 @@ A simple selector, inspecting specific fields:
 
 You can create more complex selector expressions by combining operators.
 For best performance, it is best to combine 'combination' or
-'array logical' operators, such as ``$regex``, with an equality
-operators such as ``$eq``, ``$gt``, ``$gte``, ``$lt``, and ``$lte``
+'array logical' operators, such as ``$regex``, with an operator
+that defines a contiguous range of keys such as ``$eq``,
+``$gt``, ``$gte``, ``$lt``, ``$lte``, and ``$beginsWith``
 (but not ``$ne``). For more information about creating complex
 selector expressions, see :ref:`creating selector expressions
 <find/expressions>`.
@@ -759,11 +760,12 @@ In general, whenever you have an operator that takes an argument, that argument
 can itself be another operator with arguments of its own. This enables us to
 build up more complex selector expressions.
 
-However, only equality operators such as ``$eq``, ``$gt``, ``$gte``, ``$lt``,
-``$lte`` and ``$beginsWith`` (but not ``$ne``) can be used as the basis
+However, only operators that define a contiguous range of values
+such as ``$eq``, ``$gt``, ``$gte``, ``$lt``, ``$lte``,
+and ``$beginsWith`` (but not ``$ne``) can be used as the basis
 of a query that can make efficient use of a ``json`` index. You should
 include at least one of these in a selector, or consider using
-a ``text`` index if more flexibility is required.
+a ``text`` index if greater flexibility is required.
 
 For example, if you try to perform a query that attempts to match all documents
 that have a field called `afieldname` containing a value that begins with the

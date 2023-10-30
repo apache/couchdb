@@ -171,8 +171,12 @@ class BaseOperatorTests:
             cases = [123, True, [], {}]
             for prefix in cases:
                 with self.subTest(prefix=prefix):
-                    with self.assertRaises(HTTPError):
+                    try:
                         self.db.find({"location.state": {"$beginsWith": prefix}})
+                    except Exception as e:
+                        self.assertEqual(e.response.status_code, 400)
+                    else:
+                        raise AssertionError("expected request to fail")
 
 
 class OperatorJSONTests(mango.UserDocsTests, BaseOperatorTests.Common):
