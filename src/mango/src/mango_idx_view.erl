@@ -306,6 +306,8 @@ indexable({[{<<"$gt">>, _}]}) ->
     true;
 indexable({[{<<"$gte">>, _}]}) ->
     true;
+indexable({[{<<"$beginsWith">>, _}]}) ->
+    true;
 % This is required to improve index selection for covering indexes.
 % Making `$exists` indexable should not cause problems in other cases.
 indexable({[{<<"$exists">>, _}]}) ->
@@ -412,6 +414,10 @@ range(_, _, LCmp, Low, HCmp, High) ->
 % operators but its all straight forward once you figure out how
 % we're basically just narrowing our logical ranges.
 
+% beginsWith requires both a high and low bound
+range({[{<<"$beginsWith">>, Arg}]}, LCmp, Low, HCmp, High) ->
+    {LCmp0, Low0, HCmp0, High0} = range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High),
+    range({[{<<"$lte">>, <<Arg/binary, 16#10FFFF>>}]}, LCmp0, Low0, HCmp0, High0);
 range({[{<<"$lt">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->

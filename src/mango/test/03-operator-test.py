@@ -15,7 +15,7 @@ import unittest
 
 
 class BaseOperatorTests:
-    class Common(object):
+    class Common(unittest.TestCase):
         def assertUserIds(self, user_ids, docs):
             user_ids_returned = list(d["user_id"] for d in docs)
             user_ids.sort()
@@ -140,6 +140,42 @@ class BaseOperatorTests:
             self.assertGreater(len(docs), 0)
             for d in docs:
                 self.assertNotIn("twitter", d)
+
+        def test_beginswith(self):
+            self.db.save_docs(
+                [
+                    {"user_id": 99, "location": {"state": ":Bar"}},
+                ]
+            )
+
+            cases = [
+                {"prefix": "New", "user_ids": [2, 10]},
+                # test characters that require escaping
+                {"prefix": "New ", "user_ids": [2, 10]},
+                {"prefix": ":", "user_ids": [99]},
+                {"prefix": "Foo", "user_ids": []},
+                {"prefix": '"Foo', "user_ids": []},
+                {"prefix": " New", "user_ids": []},
+            ]
+
+            for case in cases:
+                with self.subTest(prefix=case["prefix"]):
+                    selector = {"location.state": {"$beginsWith": case["prefix"]}}
+                    docs = self.db.find(selector)
+                    self.assertEqual(len(docs), len(case["user_ids"]))
+                    self.assertUserIds(case["user_ids"], docs)
+
+        # non-string prefixes should return an error
+        def test_beginswith_invalid_prefix(self):
+            cases = [123, True, [], {}]
+            for prefix in cases:
+                with self.subTest(prefix=prefix):
+                    try:
+                        self.db.find({"location.state": {"$beginsWith": prefix}})
+                    except Exception as e:
+                        self.assertEqual(e.response.status_code, 400)
+                    else:
+                        raise AssertionError("expected request to fail")
 
 
 class OperatorJSONTests(mango.UserDocsTests, BaseOperatorTests.Common):

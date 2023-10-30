@@ -142,6 +142,11 @@ convert(Path, {[{<<"$exists">>, ShouldExist}]}) ->
         true -> FieldExists;
         false -> {op_not, {FieldExists, false}}
     end;
+convert(Path, {[{<<"$beginsWith">>, Arg}]}) when is_binary(Arg) ->
+    Prefix = mango_util:lucene_escape_query_value(Arg),
+    Suffix = <<"*">>,
+    PrefixSearch = <<Prefix/binary, Suffix/binary>>,
+    {op_field, {make_field(Path, Arg), PrefixSearch}};
 % We're not checking the actual type here, just looking for
 % anything that has a possibility of matching by checking
 % for the field name. We use the same logic for $exists on
@@ -819,6 +824,12 @@ convert_nor_test() ->
         convert_selector(#{
             <<"$nor">> => [#{<<"field1">> => <<"value1">>}, #{<<"field2">> => <<"value2">>}]
         })
+    ).
+
+convert_beginswith_test() ->
+    ?assertEqual(
+        {op_field, {[[<<"field">>], <<":">>, <<"string">>], <<"foo*">>}},
+        convert_selector(#{<<"field">> => #{<<"$beginsWith">> => <<"foo">>}})
     ).
 
 to_query_test() ->
