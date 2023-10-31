@@ -67,6 +67,10 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
+        {rexi, '$rexi_ping', {delta, Delta}} ->
+            io:format("[~p]GOT PING DELTA: ~p~n", [self(), Delta]),
+            couch_stats_resource_tracker:accumulate_delta(Delta),
+            {ok, Acc0};
         {rexi, Ref, Msg} ->
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
@@ -81,8 +85,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                 Worker ->
                     Fun(Msg, {Worker, From}, Acc0)
             end;
-        {rexi, '$rexi_ping'} ->
-            {ok, Acc0};
         {Ref, Msg, {delta, Delta}} ->
             io:format("[~p]GOT DELTA: ~p -- ~p~n", [self(), Delta, Msg]),
             couch_stats_resource_tracker:accumulate_delta(Delta),

@@ -265,16 +265,22 @@ stream_last(Msg, Timeout) ->
 
 %% @equiv stream_ack(Client, 1)
 stream_ack(Client) ->
+    %% stream_ack is coordinator side only, no need to send worker deltas
     erlang:send(Client, {rexi_ack, 1}).
 
 %% @doc Ack streamed messages
 stream_ack(Client, N) ->
+    %% stream_ack is coordinator side only, no need to send worker deltas
     erlang:send(Client, {rexi_ack, N}).
 
 %% Sends a ping message to the coordinator. This is for long running
 %% operations on a node that could exceed the rexi timeout
 ping() ->
     {Caller, _} = get(rexi_from),
+    %% It is essential ping/0 includes deltas as otherwise long running
+    %% filtered queries will be silent on usage until they finally return
+    %% a row or no results. This delay is proportional to the database size,
+    %% so instead we make sure ping/0 keeps live stats flowing.
     erlang:send(Caller, {rexi, '$rexi_ping'}).
 
 %% internal functions %%
