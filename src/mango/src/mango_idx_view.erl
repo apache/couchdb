@@ -417,7 +417,7 @@ range(_, _, LCmp, Low, HCmp, High) ->
 % beginsWith requires both a high and low bound
 range({[{<<"$beginsWith">>, Arg}]}, LCmp, Low, HCmp, High) ->
     {LCmp0, Low0, HCmp0, High0} = range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High),
-    range({[{<<"$lte">>, <<Arg/binary, 16#10FFFF>>}]}, LCmp0, Low0, HCmp0, High0);
+    range({[{<<"$lte">>, <<Arg/binary, 16#FFFF/utf8>>}]}, LCmp0, Low0, HCmp0, High0);
 range({[{<<"$lt">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->

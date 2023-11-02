@@ -136,7 +136,10 @@ norm_ops({[{<<"$text">>, Arg}]}) when
 norm_ops({[{<<"$text">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$text', Arg});
 norm_ops({[{<<"$beginsWith">>, Arg}]} = Cond) when is_binary(Arg) ->
-    Cond;
+    case couch_util:validate_utf8(Arg) of
+        true -> Cond;
+        false -> ?MANGO_ERROR({bad_arg, '$beginsWith', Arg})
+    end;
 % Not technically an operator but we pass it through here
 % so that this function accepts its own output. This exists
 % so that $text can have a field name value which simplifies
