@@ -347,7 +347,7 @@ range(Selector, Index) ->
     range(Selector, Index, '$gt', mango_json:min(), '$lt', mango_json:max()).
 
 % Adjust Low and High based on values found for the
-% givend Index in Selector.
+% given Index in Selector.
 range({[{<<"$and">>, Args}]}, Index, LCmp, Low, HCmp, High) ->
     lists:foldl(
         fun
@@ -417,7 +417,9 @@ range(_, _, LCmp, Low, HCmp, High) ->
 % beginsWith requires both a high and low bound
 range({[{<<"$beginsWith">>, Arg}]}, LCmp, Low, HCmp, High) ->
     {LCmp0, Low0, HCmp0, High0} = range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High),
-    range({[{<<"$lte">>, <<Arg/binary, 16#10FFFF>>}]}, LCmp0, Low0, HCmp0, High0);
+    % U+FFFF is the highest sorting code point according to the collator rules,
+    % even though it's not the highest code point in UTF8.
+    range({[{<<"$lte">>, <<Arg/binary, 16#FFFF/utf8>>}]}, LCmp0, Low0, HCmp0, High0);
 range({[{<<"$lt">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
@@ -622,6 +624,10 @@ indexable_fields_ne_test() ->
 
 indexable_fields_gte_test() ->
     Selector = #{<<"field">> => #{<<"$gte">> => undefined}},
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
+
+indexable_fields_beginswith_test() ->
+    Selector = #{<<"field">> => #{<<"$beginsWith">> => undefined}},
     ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_gt_test() ->

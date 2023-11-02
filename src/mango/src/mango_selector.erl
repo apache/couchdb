@@ -136,7 +136,10 @@ norm_ops({[{<<"$text">>, Arg}]}) when
 norm_ops({[{<<"$text">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$text', Arg});
 norm_ops({[{<<"$beginsWith">>, Arg}]} = Cond) when is_binary(Arg) ->
-    Cond;
+    case couch_util:validate_utf8(Arg) of
+        true -> Cond;
+        false -> ?MANGO_ERROR({bad_arg, '$beginsWith', Arg})
+    end;
 % Not technically an operator but we pass it through here
 % so that this function accepts its own output. This exists
 % so that $text can have a field name value which simplifies
@@ -1070,12 +1073,18 @@ check_beginswith(Field, Prefix) ->
 match_beginswith_test() ->
     % matching
     ?assertEqual(true, check_beginswith(<<"_id">>, <<"f">>)),
-    % no match (user_id is not a binary string)
+    % no match (user_id field in the test doc contains an integer)
     ?assertEqual(false, check_beginswith(<<"user_id">>, <<"f">>)),
     % invalid (prefix is not a binary string)
     ?assertThrow(
         {mango_error, mango_selector, {invalid_operator, <<"$beginsWith">>}},
         check_beginswith(<<"user_id">>, 1)
+    ),
+    % invalid (prefix is not a utf8 string)
+    InvalidArg = <<16#EF>>,
+    ?assertThrow(
+        {mango_error, mango_selector, {bad_arg, '$beginsWith', InvalidArg}},
+        check_beginswith(<<"user_id">>, InvalidArg)
     ).
 
 -endif.
