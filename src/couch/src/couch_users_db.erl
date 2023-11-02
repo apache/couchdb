@@ -101,7 +101,7 @@ save_doc(#doc{body = {Body}} = Doc) ->
             ok = validate_password(ClearPassword),
             PRF = chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256"),
             Iterations = chttpd_util:get_chttpd_auth_config_integer(
-                "iterations", 10
+                "iterations", 50000
             ),
             DerivedKey = couch_passwords:pbkdf2(
                 list_to_existing_atom(PRF), ClearPassword, Salt, Iterations
