@@ -92,7 +92,7 @@ DIALYZE_OPTS=$(shell echo "\
 	" | sed -e 's/[a-z]\{1,\}= / /g')
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local' -c 'iterations=9'"
 
 ################################################################################
 # Main commands
@@ -343,7 +343,7 @@ mango-test: devclean all
 .PHONY: weatherreport-test
 # target: weatherreport-test - Run weatherreport against dev cluster
 weatherreport-test: devclean escriptize
-	@dev/run -n 1 -a adm:pass --no-eval \
+	@dev/run "$(TEST_OPTS)" -n 1 -a adm:pass --no-eval \
 		'bin/weatherreport --etc dev/lib/node1/etc --level error'
 
 ################################################################################
@@ -565,7 +565,7 @@ nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
 nouveau-test-elixir: couch nouveau
 ifeq ($(with_nouveau), 1)
-	@dev/run -n 1 -q -a adm:pass --with-nouveau \
+	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
 endif
