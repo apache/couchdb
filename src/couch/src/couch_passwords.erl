@@ -44,7 +44,7 @@ hash_admin_password("simple", ClearPassword) ->
     ?l2b("-hashed-" ++ couch_util:to_hex(Hash) ++ "," ++ ?b2l(Salt));
 hash_admin_password("pbkdf2", ClearPassword) ->
     PRF = chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256"),
-    Iterations = chttpd_util:get_chttpd_auth_config("iterations", "10"),
+    Iterations = chttpd_util:get_chttpd_auth_config("iterations", "50000"),
     Salt = couch_uuids:random(),
     DerivedKey = couch_passwords:pbkdf2(
         list_to_existing_atom(PRF),
