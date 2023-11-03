@@ -89,7 +89,7 @@ DIALYZE_OPTS=$(shell powershell -command "('apps=${apps} skip_deps=${skip_deps} 
 
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-TEST_OPTS="-c startup_jitter=0 -c default_security=admin_local"
+TEST_OPTS="-c startup_jitter=0 -c default_security=admin_local -c iterations=9"
 
 ################################################################################
 # Main commands
@@ -528,7 +528,7 @@ nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
 nouveau-test-elixir: couch nouveau
 ifeq ($(with_nouveau), 1)
-	@dev\run -n 1 -q -a adm:pass --with-nouveau \
+	@dev\run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
 endif
