@@ -54,7 +54,7 @@ class BeginsWithOperator(mango.DbPerClass):
 
         self.assertEqual(mrargs["start_key"], ["A"])
         end_key_bytes = to_utf8_bytes(mrargs["end_key"])
-        self.assertEqual(end_key_bytes, [b"A\xef\xbf\xbd", b"<MAX>"])
+        self.assertEqual(end_key_bytes, [b"A\xef\xbf\xbf", b"<MAX>"])
 
     def test_compound_key(self):
         selector = {"name": "Eddie", "location": {"$beginsWith": "A"}}
@@ -62,7 +62,7 @@ class BeginsWithOperator(mango.DbPerClass):
 
         self.assertEqual(mrargs["start_key"], ["Eddie", "A"])
         end_key_bytes = to_utf8_bytes(mrargs["end_key"])
-        self.assertEqual(end_key_bytes, [b"Eddie", b"A\xef\xbf\xbd", b"<MAX>"])
+        self.assertEqual(end_key_bytes, [b"Eddie", b"A\xef\xbf\xbf", b"<MAX>"])
 
         docs = self.db.find(selector)
         self.assertEqual(len(docs), 1)
@@ -74,12 +74,12 @@ class BeginsWithOperator(mango.DbPerClass):
             {
                 "sort": ["location"],
                 "start_key": [b"A"],
-                "end_key": [b"A\xef\xbf\xbd", b"<MAX>"],
+                "end_key": [b"A\xef\xbf\xbf", b"<MAX>"],
                 "direction": "fwd",
             },
             {
                 "sort": [{"location": "desc"}],
-                "start_key": [b"A\xef\xbf\xbd", b"<MAX>"],
+                "start_key": [b"A\xef\xbf\xbf", b"<MAX>"],
                 "end_key": [b"A"],
                 "direction": "rev",
             },
@@ -97,7 +97,7 @@ class BeginsWithOperator(mango.DbPerClass):
 
         self.assertEqual(mrargs["start_key"], "a")
         end_key_bytes = to_utf8_bytes(mrargs["end_key"])
-        self.assertEqual(end_key_bytes, [b"a", b"\xef\xbf\xbd"])
+        self.assertEqual(end_key_bytes, [b"a", b"\xef\xbf\xbf"])
 
     def test_no_index(self):
         selector = {"foo": {"$beginsWith": "a"}}
