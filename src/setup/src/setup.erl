@@ -169,7 +169,21 @@ enable_cluster_int(Options, false) ->
     couch_log:debug("Enable Cluster: ~p~n", [couch_util:remove_sensitive_data(Options)]).
 
 set_admin(Username, Password) ->
-    config:set("admins", binary_to_list(Username), binary_to_list(Password), #{sensitive => true}).
+    config:set("admins", binary_to_list(Username), binary_to_list(Password), #{sensitive => true}),
+    % 5 minutes
+    wait_admins_to_be_hashed(60 * 5).
+
+wait_admins_to_be_hashed(Tries) when is_integer(Tries), Tries > 0 ->
+    case couch_passwords:get_unhashed_admins() of
+        [] ->
+            ok;
+        [_ | _] ->
+            timer:sleep(1000),
+            couch_log:debug("Waiting for admins to be hashed. Seconds left: ~p", [Tries]),
+            wait_admins_to_be_hashed(Tries - 1)
+    end;
+wait_admins_to_be_hashed(0) ->
+    throw({setup_error, "Admin passwords could not be hashed"}).
 
 setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
     case NewCredentials of
