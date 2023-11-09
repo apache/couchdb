@@ -243,7 +243,9 @@ stream2(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, {Ref, self(), Msg}),
+            %% TODO: why do the numbers go whacky when we add the delta here
+            erlang:send(Caller, {Ref, self(), Msg, get_delta()}),
+            %%erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch
         throw:timeout ->
@@ -281,7 +283,7 @@ ping() ->
     %% filtered queries will be silent on usage until they finally return
     %% a row or no results. This delay is proportional to the database size,
     %% so instead we make sure ping/0 keeps live stats flowing.
-    erlang:send(Caller, {rexi, '$rexi_ping'}).
+    erlang:send(Caller, {rexi, '$rexi_ping'}, get_delta()).
 
 %% internal functions %%
 

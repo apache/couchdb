@@ -107,6 +107,9 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         {Ref, Msg} ->
             %% TODO: add stack trace to log entry
             couch_log:debug("rexi_utils:process_message no delta: {Ref, Msg} => {~p, ~p}~n", [Ref, Msg]),
+            timer:sleep(100),
+            %%erlang:halt(enodelta),
+            erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, Msg} => {~w, ~w}~n", [Ref, Msg])))),
             %%io:format("GOT NON DELTA MSG: ~p~n", [Msg]),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
@@ -119,6 +122,9 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             %%io:format("GOT NON DELTA MSG: ~p~n", [Msg]),
             %% TODO: add stack trace to log entry
             couch_log:debug("rexi_utils:process_message no delta: {Ref, From, Msg} => {~p, ~p, ~p}~n", [Ref, From, Msg]),
+            timer:sleep(100),
+            %%erlang:halt(enodelta),
+            erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, From, Msg} => {~w, ~w, ~w}~n", [Ref, From, Msg])))),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};

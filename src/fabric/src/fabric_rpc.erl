@@ -570,6 +570,7 @@ changes_enumerator(DocInfo, Acc) ->
                     {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}}
                 ]};
         Results ->
+            couch_stats:increment_counter([fabric_rpc, changes, returned]),
             Opts =
                 if
                     Conflicts -> [conflicts | DocOptions];
