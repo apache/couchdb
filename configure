@@ -22,6 +22,7 @@ basename=`basename $0`
 PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
 REBAR3_BRANCH="3.21.0"
+ERLFMT_VERSION="v1.3.0"
 
 # TEST=0
 WITH_PROPER="true"
@@ -334,7 +335,7 @@ install_local_rebar3() {
 install_local_erlfmt() {
     if [ ! -x "${rootdir}/bin/erlfmt" ]; then
         if [ ! -d "${rootdir}/src/erlfmt" ]; then
-            git clone --depth 1 https://github.com/WhatsApp/erlfmt.git ${rootdir}/src/erlfmt
+            git clone --depth 1 --branch "${ERLFMT_VERSION}" https://github.com/WhatsApp/erlfmt.git ${rootdir}/src/erlfmt
         fi
         cd "${rootdir}"/src/erlfmt
         ${REBAR3} as release escriptize
