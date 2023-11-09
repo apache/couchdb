@@ -132,6 +132,34 @@ basic_behavior_test_() ->
                             ?_assertEqual(not_found, ets_lru:lookup(LRU, foo))
                         }
                     ]
+                end,
+                fun({ok, LRU}) ->
+                    [
+                        {
+                            "Insert the value twice",
+                            ?_assertEqual(ok, ets_lru:insert(LRU, foo, bar))
+                        },
+                        {
+                            "Objects table size should be 1",
+                            ?_assertEqual(1, ets:info(test_lru_objects, size))
+                        },
+                        {
+                            "ATimes table size should be 1",
+                            ?_assertEqual(1, ets:info(test_lru_atimes, size))
+                        },
+                        {
+                            "CTimes table size should be 1",
+                            ?_assertEqual(1, ets:info(test_lru_ctimes, size))
+                        },
+                        {
+                            "Clear LRU after duplicate insert",
+                            ?_assertEqual(ok, ets_lru:clear(LRU))
+                        },
+                        {
+                            "Lookup returned not_found after a clear after a duplicate insert",
+                            ?_assertEqual(not_found, ets_lru:lookup(LRU, foo))
+                        }
+                    ]
                 end
             ]}
     }.
