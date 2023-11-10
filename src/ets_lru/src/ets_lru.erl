@@ -366,4 +366,4 @@ table_name(Name, Ext) ->
 
 -spec strict_monotonic_time(atom()) -> strict_monotonic_time().
 strict_monotonic_time(TimeUnit) ->
-    {erlang:monotonic_time(TimeUnit), erlang:unique_integer([monotonic])}.
+    {erlang:monotonic_time(TimeUnit), make_ref()}.
