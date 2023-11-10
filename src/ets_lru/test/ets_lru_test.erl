@@ -181,7 +181,10 @@ lru_good_options_test_() ->
                 {[{max_size, 2342923423942309423094}], fun test_good_opts/2},
                 {[{max_lifetime, 1}], fun test_good_opts/2},
                 {[{max_lifetime, 5}], fun test_good_opts/2},
-                {[{max_lifetime, 1244209909180928348}], fun test_good_opts/2}
+                {[{max_lifetime, 1244209909180928348}], fun test_good_opts/2},
+                {[{max_idle, 1}], fun test_good_opts/2},
+                {[{max_idle, 5}], fun test_good_opts/2},
+                {[{max_idle, 1244209909180928348}], fun test_good_opts/2}
             ]}
     }.
 
@@ -215,7 +218,8 @@ lru_limits_test_() ->
             [
                 {[{max_objects, 25}], fun test_limits/2},
                 {[{max_size, 1024}], fun test_limits/2},
-                {[{max_lifetime, 100}], fun test_limits/2}
+                {[{max_lifetime, 100}], fun test_limits/2},
+                {[{max_idle, 100}], fun test_limits/2}
             ]}
     }.
 
@@ -306,7 +310,7 @@ test_limits([{max_size, N}], {ok, LRU}) ->
         "Max size ok",
         ?_assert(insert_kvs(memory, LRU, 10 * N, N))
     };
-test_limits([{max_lifetime, N}], {ok, LRU}) ->
+test_limits([{Max, N}], {ok, LRU}) when Max == max_lifetime; Max == max_idle ->
     [
         {
             "Expire leaves new entries",

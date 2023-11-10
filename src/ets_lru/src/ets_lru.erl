@@ -62,6 +62,7 @@
     max_objs :: non_neg_integer() | undefined,
     max_size :: non_neg_integer() | undefined,
     max_lifetime :: non_neg_integer() | undefined,
+    max_idle :: non_neg_integer() | undefined,
     time_unit = ?DEFAULT_TIME_UNIT :: atom()
 }).
 
@@ -236,7 +237,8 @@ accessed(Key, St) ->
 trim(St) ->
     trim_count(St),
     trim_size(St),
-    trim_lifetime(St).
+    trim_lifetime(St),
+    trim_idle(St).
 
 trim_count(#st{max_objs = undefined}) ->
     ok;
@@ -280,6 +282,28 @@ trim_lifetime(#st{max_lifetime = Max} = St) ->
             end
     end.
 
+trim_idle(#st{max_idle = undefined}) ->
+    ok;
+trim_idle(#st{max_idle = Max} = St) ->
+    Now = erlang:monotonic_time(St#st.time_unit),
+    case ets:first(St#st.atimes) of
+        '$end_of_table' ->
+            ok;
+        ATime = {Time, _} ->
+            case Now - Time > Max of
+                true ->
+                    [{ATime, Key}] = ets:lookup(St#st.atimes, ATime),
+                    Pattern = #entry{key = Key, ctime = '$1', _ = '_'},
+                    [[CTime]] = ets:match(St#st.objects, Pattern),
+                    true = ets:delete(St#st.objects, Key),
+                    true = ets:delete(St#st.atimes, ATime),
+                    true = ets:delete(St#st.ctimes, CTime),
+                    trim_idle(St);
+                false ->
+                    ok
+            end
+    end.
+
 drop_lru(St, Continue) ->
     case ets:first(St#st.atimes) of
         '$end_of_table' ->
@@ -294,16 +318,23 @@ drop_lru(St, Continue) ->
             Continue(St)
     end.
 
-next_timeout(#st{max_lifetime = undefined}) ->
+next_timeout(#st{max_lifetime = undefined, max_idle = undefined}) ->
     infinity;
 next_timeout(St) ->
-    case ets:first(St#st.ctimes) of
+    Now = erlang:monotonic_time(St#st.time_unit),
+    CTimeout = next_timeout(St#st.ctimes, Now, St#st.max_lifetime),
+    ATimeout = next_timeout(St#st.atimes, Now, St#st.max_idle),
+    min(CTimeout, ATimeout).
+
+next_timeout(_Tab, _Now, undefined) ->
+    infinity;
+next_timeout(Tab, Now, Max) ->
+    case ets:first(Tab) of
         '$end_of_table' ->
             infinity;
         {Time, _} ->
-            Now = erlang:monotonic_time(St#st.time_unit),
             TimeDiff = Now - Time,
-            erlang:max(St#st.max_lifetime - TimeDiff, 0)
+            erlang:max(Max - TimeDiff, 0)
     end.
 
 set_options(St, []) ->
@@ -314,6 +345,8 @@ set_options(St, [{max_size, N} | Rest]) when is_integer(N), N >= 0 ->
     set_options(St#st{max_size = N}, Rest);
 set_options(St, [{max_lifetime, N} | Rest]) when is_integer(N), N >= 0 ->
     set_options(St#st{max_lifetime = N}, Rest);
+set_options(St, [{max_idle, N} | Rest]) when is_integer(N), N >= 0 ->
+    set_options(St#st{max_idle = N}, Rest);
 set_options(St, [{time_unit, T} | Rest]) when is_atom(T) ->
     set_options(St#st{time_unit = T}, Rest);
 set_options(_, [Opt | _]) ->
