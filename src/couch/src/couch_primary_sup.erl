@@ -23,7 +23,17 @@ init([]) ->
             {couch_task_status, {couch_task_status, start_link, []}, permanent, brutal_kill, worker,
                 [couch_task_status]},
             {couch_password_hasher, {couch_password_hasher, start_link, []}, permanent, brutal_kill,
-                worker, [couch_password_hasher]}
+                worker, [couch_password_hasher]},
+            {couch_passwords_cache_lru,
+                {ets_lru, start_link, [
+                    couch_passwords_cache_lru,
+                    [
+                        {max_objects,
+                            config:get_integer("couch_passwords_cache", "max_objects", 10_000)},
+                        {max_idle, config:get_integer("couch_passwords_cache", "max_idle", 600_000)}
+                    ]
+                ]},
+                permanent, 5000, worker, [ets_lru]}
         ] ++ couch_servers(),
     {ok, {{one_for_one, 10, 3600}, Children}}.
 

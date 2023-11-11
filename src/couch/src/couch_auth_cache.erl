@@ -54,7 +54,7 @@ get_user_creds(_Req, UserName) ->
 update_user_creds(_Req, UserDoc, _AuthCtx) ->
     ok = ensure_users_db_exists(),
     couch_util:with_db(users_db(), fun(UserDb) ->
-        {ok, _NewRev} = couch_db:update_doc(UserDb, UserDoc, []),
+        {ok, _NewRev} = couch_db:update_doc(UserDb, UserDoc, [?ADMIN_CTX]),
         ok
     end).
 
@@ -70,15 +70,30 @@ get_admin(UserName) when is_list(UserName) ->
             % the name is an admin, now check to see if there is a user doc
             % which has a matching name, salt, and password_sha
             [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
-            make_admin_doc(HashedPwd, Salt);
+            make_admin_doc_simple(HashedPwd, Salt);
         "-pbkdf2-" ++ HashedPwdSaltAndIterations ->
             [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
-            make_admin_doc(HashedPwd, Salt, Iterations);
+            make_admin_doc_pbkdf2(<<"sha">>, HashedPwd, Salt, Iterations);
+        "-pbkdf2:sha-" ++ HashedPwdSaltAndIterations ->
+            [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
+            make_admin_doc_pbkdf2(<<"sha">>, HashedPwd, Salt, Iterations);
+        "-pbkdf2:sha224-" ++ HashedPwdSaltAndIterations ->
+            [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
+            make_admin_doc_pbkdf2(<<"sha224">>, HashedPwd, Salt, Iterations);
+        "-pbkdf2:sha256-" ++ HashedPwdSaltAndIterations ->
+            [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
+            make_admin_doc_pbkdf2(<<"sha256">>, HashedPwd, Salt, Iterations);
+        "-pbkdf2:sha384-" ++ HashedPwdSaltAndIterations ->
+            [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
+            make_admin_doc_pbkdf2(<<"sha384">>, HashedPwd, Salt, Iterations);
+        "-pbkdf2:sha512-" ++ HashedPwdSaltAndIterations ->
+            [HashedPwd, Salt, Iterations] = string:tokens(HashedPwdSaltAndIterations, ","),
+            make_admin_doc_pbkdf2(<<"sha512">>, HashedPwd, Salt, Iterations);
         _Else ->
             nil
     end.
 
-make_admin_doc(HashedPwd, Salt) ->
+make_admin_doc_simple(HashedPwd, Salt) ->
     [
         {<<"roles">>, [<<"_admin">>]},
         {<<"salt">>, ?l2b(Salt)},
@@ -86,12 +101,13 @@ make_admin_doc(HashedPwd, Salt) ->
         {<<"password_sha">>, ?l2b(HashedPwd)}
     ].
 
-make_admin_doc(DerivedKey, Salt, Iterations) ->
+make_admin_doc_pbkdf2(PRF, DerivedKey, Salt, Iterations) ->
     [
         {<<"roles">>, [<<"_admin">>]},
         {<<"salt">>, ?l2b(Salt)},
         {<<"iterations">>, list_to_integer(Iterations)},
         {<<"password_scheme">>, <<"pbkdf2">>},
+        {<<"pbkdf2_prf">>, PRF},
         {<<"derived_key">>, ?l2b(DerivedKey)}
     ].
 

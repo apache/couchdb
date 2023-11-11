@@ -13,9 +13,6 @@
   "SecurityValidationTest": [
     "Author presence and user security when replicated"
   ],
-  "UsersDbSecurityTest": [
-    "user db security"
-  ],
   "WithQuorumTest": [
     "Creating/Deleting DB should return 201-Created/202-Acepted"
   ],
