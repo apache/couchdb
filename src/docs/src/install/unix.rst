@@ -34,6 +34,7 @@ to install CouchDB is to use the convenience binary packages:
 * CentOS/RHEL 9 (with caveats)
 * Debian 10 (buster)
 * Debian 11 (bullseye)
+* Debian 12 (bookworm)
 * Ubuntu 18.04 (bionic)
 * Ubuntu 20.04 (focal)
 * Ubuntu 22.04 (jammy)
