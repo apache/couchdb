@@ -101,6 +101,13 @@ meta = [
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
+  'bookworm': [
+    name: 'Debian 12',
+    spidermonkey_vsn: '78',
+    enable_nouveau: true,
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
+  ],
+
   'freebsd-x86_64': [
      name: 'FreeBSD',
      spidermonkey_vsn: '91',
