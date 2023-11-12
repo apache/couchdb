@@ -27,4 +27,4 @@ priv/
 erl_crash.dump
 *.ez
 *.tar
-
+compile_commands.json
