@@ -287,6 +287,17 @@ all_docs_concurrency() ->
             10
     end.
 
+validate_if_partition(Row, Acc) ->
+    case chttpd:qs_value(Acc#vacc.req, "partition") of
+        undefined -> Row;
+        Partition -> is_doc_in_partition(Row, list_to_binary(Partition))
+    end.
+is_doc_in_partition(Row, Partition) ->
+    case couch_partition:is_member(Row#view_row.key, Partition) of
+        true -> Row;
+        false -> #view_row{key = Row#view_row.key}
+    end.
+
 doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
     case {Keys, queue:len(Pids)} of
         {[], 0} ->
@@ -299,9 +310,10 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
             Timeout = fabric_util:all_docs_timeout(),
             receive
                 {'DOWN', Ref, process, Pid, Row} ->
-                    case Row of
+                    ValidRow = validate_if_partition(Row, AccIn),
+                    case ValidRow of
                         #view_row{} ->
-                            case Callback(fabric_view:transform_row(Row), AccIn) of
+                            case Callback(fabric_view:transform_row(ValidRow), AccIn) of
                                 {ok, Acc} ->
                                     doc_receive_loop(
                                         Keys, RestPids, SpawnFun, MaxJobs, Callback, Acc
