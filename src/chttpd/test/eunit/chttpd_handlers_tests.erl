@@ -15,74 +15,108 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-setup() ->
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
-    BaseUrl = lists:concat(["http://", Addr, ":", Port]),
-    BaseUrl.
+-define(USER, "chttpd_replicate_handler_test").
+-define(PASS, "pass").
+-define(AUTH, {basic_auth, {?USER, ?PASS}}).
+-define(JSON, {"Content-Type", "application/json"}).
 
-teardown(_Url) ->
-    ok.
-
-replicate_test_() ->
+replicate_endpoint_test_() ->
     {
-        "_replicate",
-        {
-            setup,
-            fun chttpd_test_util:start_couch/0,
-            fun chttpd_test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup/0,
-                fun teardown/1,
-                [
-                    fun should_escape_dbname_on_replicate/1
-                ]
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(should_escape_local_dbname_on_replicate),
+            ?TDEF_FE(require_authenticated_user)
+        ]
+    }.
+
+should_escape_local_dbname_on_replicate({_Ctx, Url}) ->
+    SrcPrefix = ?tempdb(),
+    TgtPrefix = ?tempdb(),
+    SrcDb = <<SrcPrefix/binary, "%2Fsrc">>,
+    TgtDb = <<TgtPrefix/binary, "%2Ftgt">>,
+    create_db(Url, SrcDb),
+    post(Url ++ binary_to_list(SrcDb), [?AUTH], #{}),
+    create_db(Url, TgtDb),
+    Res = post(Url ++ "_replicate", [?AUTH], #{
+        <<"source">> => endpoint(Url, SrcDb, ?USER, ?PASS),
+        <<"target">> => endpoint("", <<TgtPrefix/binary, "/tgt">>, ?USER, ?PASS)
+    }),
+    ?assertMatch({200, #{<<"ok">> := true}}, Res),
+    delete_db(Url, SrcDb),
+    delete_db(Url, TgtDb).
+
+require_authenticated_user({_Ctx, Url}) ->
+    SrcDb = ?tempdb(),
+    TgtDb = ?tempdb(),
+    create_db(Url, SrcDb),
+    post(Url ++ binary_to_list(SrcDb), [?AUTH], #{}),
+    create_db(Url, TgtDb),
+
+    % Try as an unauthenticated user
+    ResNoAuth = post(Url ++ "_replicate", [], #{
+        <<"source">> => endpoint(Url, SrcDb, ?USER, ?PASS),
+        <<"target">> => endpoint(Url, TgtDb, ?USER, ?PASS)
+    }),
+    ?assertMatch(
+        {401, #{
+            <<"error">> := <<"unauthorized">>,
+            <<"reason">> := <<"You are not an authenticated user">>
+        }},
+        ResNoAuth
+    ),
+
+    % Now try as an authenticated user
+    ResAuth = post(Url ++ "_replicate", [?AUTH], #{
+        <<"source">> => endpoint(Url, SrcDb, ?USER, ?PASS),
+        <<"target">> => endpoint(Url, TgtDb, ?USER, ?PASS)
+    }),
+    ?assertMatch({200, #{<<"ok">> := true}}, ResAuth),
+    delete_db(Url, SrcDb),
+    delete_db(Url, TgtDb).
+
+endpoint(Url, Db, User, Pass) ->
+    UrlBin = list_to_binary(Url),
+    #{
+        <<"url">> => <<UrlBin/binary, Db/binary>>,
+        <<"auth">> => #{
+            <<"basic">> => #{
+                <<"username">> => list_to_binary(User),
+                <<"password">> => list_to_binary(Pass)
             }
         }
     }.
 
-should_escape_dbname_on_replicate(Url) ->
-    ?_test(
-        begin
-            UrlBin = ?l2b(Url),
-            Request = couch_util:json_encode(
-                {[
-                    {<<"source">>, <<UrlBin/binary, "/foo%2Fbar">>},
-                    {<<"target">>, <<"bar/baz">>},
-                    {<<"create_target">>, true}
-                ]}
-            ),
-            {ok, 200, _, Body} = request_replicate(Url ++ "/_replicate", Request),
-            JSON = couch_util:json_decode(Body),
+setup() ->
+    Ctx = test_util:start_couch([chttpd, couch_replicator]),
+    Hashed = couch_passwords:hash_admin_password(?PASS),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
+    Url = lists:concat(["http://", Addr, ":", Port, "/"]),
+    {Ctx, Url}.
 
-            Source = json_value(JSON, [<<"source">>]),
-            Target = json_value(JSON, [<<"target">>, <<"url">>]),
-            ?assertEqual(<<UrlBin/binary, "/foo%2Fbar">>, Source),
-            ?assertEqual(<<UrlBin/binary, "/bar%2Fbaz">>, Target)
-        end
-    ).
+teardown({Ctx, _Url}) ->
+    ok = config:delete("admins", ?USER, _Persist = false),
+    test_util:stop_couch(Ctx).
 
-json_value(JSON, Keys) ->
-    couch_util:get_nested_json_value(JSON, Keys).
+create_db(Top, Db) when is_binary(Db) ->
+    Url = Top ++ binary_to_list(Db) ++ "?q=1",
+    {ok, Status, _, _} = test_request:put(Url, [?JSON, ?AUTH], "{}"),
+    ?assert(Status =:= 201 orelse Status =:= 202).
 
-request_replicate(Url, Body) ->
-    Headers = [{"Content-Type", "application/json"}],
-    Handler = {chttpd_misc, handle_replicate_req},
-    request(post, Url, Headers, Body, Handler, fun(Req) ->
-        chttpd:send_json(Req, 200, Req#httpd.req_body)
-    end).
-
-request(Method, Url, Headers, Body, {M, F}, MockFun) ->
-    meck:new(M, [passthrough, non_strict]),
-    try
-        meck:expect(M, F, MockFun),
-        Result = test_request:Method(Url, Headers, Body),
-        ?assert(meck:validate(M)),
-        Result
-    catch
-        Kind:Reason ->
-            {Kind, Reason}
-    after
-        meck:unload(M)
+delete_db(Top, Db) when is_binary(Db) ->
+    Url = Top ++ binary_to_list(Db),
+    case test_request:get(Url, [?AUTH]) of
+        {ok, 404, _, _} ->
+            not_found;
+        {ok, 200, _, _} ->
+            {ok, 200, _, _} = test_request:delete(Url, [?AUTH]),
+            ok
     end.
+
+post(Url, Headers0, #{} = Body) when is_list(Headers0), is_list(Url) ->
+    BodyBin = jiffy:encode(Body),
+    {ok, Code, _, Res} = test_request:request(post, Url, [?JSON | Headers0], BodyBin),
+    {Code, jiffy:decode(Res, [return_maps])}.
