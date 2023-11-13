@@ -126,7 +126,7 @@ Below we present a few use cases where code-generation is really helpful.
 4. Define test cases in the module
 
 You can run tests either:
-- using make: `make exunit`
+- using make: `make elixir`
 - using mix: BUILDDIR=`pwd` ERL_LIBS=`pwd`/src MIX_ENV=test mix test --trace
 
 ## Generating tests from spec
