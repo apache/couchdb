@@ -118,14 +118,16 @@ meta = [
      name: 'FreeBSD',
      spidermonkey_vsn: '91',
      gnu_make: 'gmake'
-  ],
-
- 'macos': [
-    name: 'macOS',
-    spidermonkey_vsn: '91',
-    enable_nouveau: false,
-    gnu_make: 'make'
   ]
+ // Temporarily exclude until we figure out the shell spawning issue:
+ // Cannot run program "sh" (in directory "/Users/jenkins2/workspace/kins-cm1_FullPlatformMatrix_main"): error=316, posix_spawn failed
+ //
+ // 'macos': [
+ //    name: 'macOS',
+ //    spidermonkey_vsn: '91',
+ //    enable_nouveau: false,
+ //    gnu_make: 'make'
+ //  ]
 ]
 
 def String configure(config) {
