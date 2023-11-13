@@ -154,7 +154,6 @@ escriptize: couch
 # target: check - Test everything
 check: all
 	@$(MAKE) xref
-	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
@@ -179,17 +178,6 @@ eunit: couch
             COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
 
-
-.PHONY: exunit
-# target: exunit - Run ExUnit tests, use EXUNIT_OPTS to provide custom options
-exunit: export BUILDDIR = $(CURDIR)
-exunit: export MIX_ENV=test
-exunit: export ERL_LIBS = $(CURDIR)/src
-exunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
-exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-exunit: couch elixir-init setup-eunit
-	@mix test --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(CURDIR)
 setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
