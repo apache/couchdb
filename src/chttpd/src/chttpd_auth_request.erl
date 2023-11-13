@@ -85,7 +85,7 @@ server_authorization_check(#httpd{path_parts = [<<"_uuids">>]} = Req) ->
 server_authorization_check(#httpd{path_parts = [<<"_session">>]} = Req) ->
     Req;
 server_authorization_check(#httpd{path_parts = [<<"_replicate">>]} = Req) ->
-    Req;
+    require_authenticated_user(Req);
 server_authorization_check(#httpd{path_parts = [<<"_stats">>]} = Req) ->
     Req;
 server_authorization_check(#httpd{path_parts = [<<"_active_tasks">>]} = Req) ->
@@ -129,6 +129,11 @@ require_db_admin(#httpd{path_parts = [DbName | _], user_ctx = Ctx} = Req) ->
         true -> Req;
         false -> throw({unauthorized, <<"You are not a server or db admin.">>})
     end.
+
+require_authenticated_user(#httpd{user_ctx = #user_ctx{name = null}}) ->
+    throw({unauthorized, <<"You are not an authenticated user">>});
+require_authenticated_user(#httpd{} = Req) ->
+    Req.
 
 is_db_admin(#user_ctx{name = UserName, roles = UserRoles}, {Security}) ->
     {Admins} = couch_util:get_value(<<"admins">>, Security, {[]}),
