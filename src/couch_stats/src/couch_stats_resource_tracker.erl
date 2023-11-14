@@ -45,7 +45,8 @@
 -export([
     active/0,
     active_coordinators/0,
-    active_workers/0
+    active_workers/0,
+    find_unmonitored/0
 ]).
 
 -export([
@@ -125,7 +126,8 @@
 
 
 -record(st, {
-    eviction_delay = 10000, %% How many ms dead processes are visible
+    eviction_delay = 10 * 1000, %% How many ms dead processes are visible
+    scan_interval = 2048, %% How regularly to perfom scans
     tracking = #{} %% track active processes for eventual eviction
 }).
 
@@ -134,9 +136,11 @@
 %% -record(?RCTX, {
 -record(rctx, {
     %% Metadata
+    started_at = os:timestamp(),
     updated_at = os:timestamp(),
     exited_at,
     pid_ref,
+    mon_ref,
     mfa,
     nonce,
     from,
@@ -426,6 +430,7 @@ sorted_by(KeyFun, ValFun, AggFun) -> sorted(group_by(KeyFun, ValFun, AggFun)).
 to_json(#rctx{}=Rctx) ->
     #rctx{
         updated_at = TP,
+        started_at = TInit,
         pid_ref = {_Pid, _Ref} = PidRef,
         mfa = MFA0,
         nonce = Nonce0,
@@ -478,6 +483,7 @@ to_json(#rctx{}=Rctx) ->
     end,
     #{
         updated_at => term_to_json(TP),
+        started_at => term_to_json(TInit),
         %%pid_ref => [pid_to_list(Pid), ref_to_list(Ref)],
         pid_ref => term_to_json(PidRef),
         mfa => term_to_json(MFA),
@@ -531,6 +537,7 @@ term_to_flat_json(T) ->
 to_flat_json(#rctx{}=Rctx) ->
     #rctx{
         updated_at = TP,
+        started_at = TInit,
         pid_ref = {_Pid, _Ref} = PidRef,
         mfa = MFA0,
         nonce = Nonce0,
@@ -582,6 +589,7 @@ to_flat_json(#rctx{}=Rctx) ->
     #{
         %%updated_at => ?l2b(io_lib:format("~w", [TP])),
         updated_at => term_to_flat_json(TP),
+        started_at => term_to_flat_json(TInit),
         %%pid_ref => [pid_to_list(Pid), ref_to_list(Ref)],
         pid_ref => ?l2b(io_lib:format("~w", [PidRef])),
         mfa => MFA,
@@ -814,6 +822,12 @@ get_resource(PidRef) ->
 make_record(Pid, Ref) ->
     #rctx{pid_ref = {Pid, Ref}}.
 
+
+find_unmonitored() ->
+    %% TODO: only need PidRef here, replace with a select that does that...
+    [PR || #rctx{pid_ref=PR} <- ets:match_object(?MODULE, #rctx{mon_ref=undefined, _ = '_'})].
+
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -826,28 +840,31 @@ init([]) ->
         {read_concurrency, true},
         {keypos, #rctx.pid_ref}
     ]),
-    {ok, #st{}}.
+    St = #st{},
+    _TimerRef = erlang:send_after(St#st.scan_interval, self(), scan),
+    {ok, St}.
 
 handle_call(fetch, _from, #st{} = St) ->
     {reply, {ok, St}, St};
-handle_call({track, _}, _From, St) ->
-    {reply, ok, St};
+handle_call({track, _}=Msg, _From, St) ->
+    {noreply, St1} = handle_cast(Msg, St),
+    {reply, ok, St1};
 handle_call(Msg, _From, St) ->
     {stop, {unknown_call, Msg}, error, St}.
 
-handle_cast({track, #rctx{pid_ref={Pid,_}=PidRef}}, #st{tracking=AT0} = St0) ->
-    St = case maps:is_key(PidRef, AT0) of
-        true -> %% noop, we're already tracking this PidRef
-            St0;
-        false -> %% setup new monitor and double bookkeep refs
-            Mon = erlang:monitor(process, Pid),
-            AT = maps:put(Mon, PidRef, maps:put(PidRef, Mon, AT0)),
-            St0#st{tracking=AT}
-    end,
-    {noreply, St};
+handle_cast({track, #rctx{pid_ref=PidRef}}, #st{tracking=AT0} = St0) ->
+    AT = maybe_track(PidRef, AT0),
+    {noreply, St0#st{tracking=AT}};
 handle_cast(Msg, St) ->
     {stop, {unknown_cast, Msg}, St}.
 
+handle_info(scan, #st{tracking=AT0} = St0) ->
+    io:format("{CSRT} TRIGGERING SCAN: ~n", []),
+    Unmonitored = find_unmonitored(),
+    io:format("{CSRT} SCAN FOUND ~p UNMONITORED PIDS: ~n", [length(Unmonitored)]),
+    AT = maybe_track(Unmonitored, AT0),
+    _TimerRef = erlang:send_after(St0#st.scan_interval, self(), scan),
+    {noreply, St0#st{tracking=AT}};
 handle_info({'DOWN', MonRef, Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
     io:format("CSRT:HI(~p)~n", [{'DOWN', MonRef, Type, DPid, Reason}]),
     St = case maps:get(MonRef, AT0, undefined) of
@@ -883,6 +900,23 @@ terminate(_Reason, _St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+maybe_track([], AT) ->
+    AT;
+maybe_track(PidRef, AT) when is_tuple(PidRef) ->
+    maybe_track([PidRef], AT);
+maybe_track([{Pid,_Ref} = PidRef | PidRefs], AT) ->
+    AT1 = case maps:is_key(PidRef, AT) of
+        true -> %% noop, we're already tracking this PidRef
+            AT;
+        false -> %% setup new monitor and double bookkeep refs
+            Mon = erlang:monitor(process, Pid),
+            %% TODO: decide whether we want the true match to crash this process on failure
+            true = ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
+            maps:put(Mon, PidRef, maps:put(PidRef, Mon, AT))
+    end,
+    maybe_track(PidRefs, AT1).
 
 log_process_lifetime_report(PidRef) ->
     %% More safely assert this can't ever be undefined
