@@ -243,9 +243,7 @@ stream2(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            %% TODO: why do the numbers go whacky when we add the delta here
             erlang:send(Caller, {Ref, self(), Msg, get_delta()}),
-            %%erlang:send(Caller, {Ref, self(), Msg}),
             ok
     catch
         throw:timeout ->
