@@ -49,6 +49,16 @@
 ]).
 
 -export([
+    count_by/1,
+    group_by/2,
+    group_by/3,
+    sorted/1,
+    sorted_by/1,
+    sorted_by/2,
+    sorted_by/3
+]).
+
+-export([
     make_delta/0
 ]).
 
@@ -76,7 +86,8 @@
 ]).
 
 -export([
-    field/2
+    field/2,
+    curry_field/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -366,11 +377,50 @@ field(#rctx{get_kv_node=Val}, get_kv_node) -> Val;
 field(#rctx{get_kp_node=Val}, get_kp_node) -> Val.
 
 
-%%group_by(GBFun) when is_fun(GBFun) ->
-%%    group_by(GBFun, sum).
+curry_field(Field) ->
+    fun(Ele) -> field(Ele, Field) end.
 
 
-%%group_by(GbFun, Agg) when is_function(GBFun) ->
+count_by(KeyFun) ->
+    group_by(KeyFun, fun(_) -> 1 end).
+
+
+group_by(KeyFun, ValFun) ->
+    group_by(KeyFun, ValFun, fun erlang:'+'/2).
+
+
+%% eg: group_by(mfa, docs_read).
+%% eg: group_by(fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
+%% eg: ^^ or: group_by([mfa, docs_read], ioq_calls).
+%% eg: group_by([username, dbname, mfa], docs_read).
+%% eg: group_by([username, dbname, mfa], ioq_calls).
+%% eg: group_by([username, dbname, mfa], js_filters).
+group_by(KeyL, ValFun, AggFun) when is_list(KeyL) ->
+    KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
+    group_by(KeyFun, ValFun, AggFun);
+group_by(Key, ValFun, AggFun) when is_atom(Key) ->
+    group_by(curry_field(Key), ValFun, AggFun);
+group_by(KeyFun, Val, AggFun) when is_atom(Val) ->
+    group_by(KeyFun, curry_field(Val), AggFun);
+group_by(KeyFun, ValFun, AggFun) ->
+    FoldFun = fun(Ele, Acc) ->
+        Key = KeyFun(Ele),
+        Val = ValFun(Ele),
+        CurrVal = maps:get(Key, Acc, 0),
+        NewVal = AggFun(CurrVal, Val),
+        maps:put(Key, NewVal, Acc)
+    end,
+    ets:foldl(FoldFun, #{}, ?MODULE).
+
+sorted(Map) when is_map(Map) ->
+    lists:sort(fun({_K1, A}, {_K2, B}) -> B < A end, maps:to_list(Map)).
+
+
+%% eg: sorted_by([username, dbname, mfa], ioq_calls)
+%% eg: sorted_by([dbname, mfa], doc_reads)
+sorted_by(KeyFun) -> sorted(count_by(KeyFun)).
+sorted_by(KeyFun, ValFun) -> sorted(group_by(KeyFun, ValFun)).
+sorted_by(KeyFun, ValFun, AggFun) -> sorted(group_by(KeyFun, ValFun, AggFun)).
 
 
 to_json(#rctx{}=Rctx) ->
