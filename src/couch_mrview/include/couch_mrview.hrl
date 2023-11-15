@@ -83,7 +83,8 @@
     conflicts,
     callback,
     sorted = true,
-    extra = []
+    extra = [],
+    deleted = false
 }).
 
 -record(vacc, {

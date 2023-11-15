@@ -183,7 +183,8 @@ maintenance_nodes(Nodes) ->
     [N || {N, Mode} <- lists:zip(Nodes, Modes), Mode =:= "true"].
 
 load_shards(Db, #full_doc_info{id = Id} = FDI) ->
-    case couch_db:open_doc(Db, FDI, [ejson_body]) of
+    Doc = couch_db:open_doc(Db, FDI, [ejson_body]),
+    case Doc of
         {ok, #doc{body = {Props}}} ->
             mem3_util:build_shards(Id, Props);
         {not_found, _} ->

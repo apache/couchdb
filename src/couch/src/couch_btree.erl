@@ -16,6 +16,7 @@
 -export([fold/4, full_reduce/1, final_reduce/2, size/1, foldl/3, foldl/4]).
 -export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
 -export([extract/2, assemble/3, less/3]).
+-export([full_reduce_with_options/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -108,6 +109,12 @@ full_reduce(#btree{root = nil, reduce = Reduce}) ->
     {ok, Reduce(reduce, [])};
 full_reduce(#btree{root = Root}) ->
     {ok, element(2, Root)}.
+
+full_reduce_with_options(Bt, Options) ->
+    CountFun = fun(_SeqStart, PartialReds, 0) ->
+        {ok, couch_btree:final_reduce(Bt, PartialReds)}
+    end,
+    fold_reduce(Bt, CountFun, 0, Options).
 
 size(#btree{root = nil}) ->
     0;

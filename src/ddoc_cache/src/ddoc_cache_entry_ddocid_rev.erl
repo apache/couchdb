@@ -28,7 +28,7 @@ ddocid({_, DDocId, _}) ->
     DDocId.
 
 recover({DbName, DDocId, Rev}) ->
-    Opts = [ejson_body, ?ADMIN_CTX],
+    Opts = [ejson_body, ?ADMIN_CTX, ddoc_cache],
     {ok, [Resp]} = fabric:open_revs(DbName, DDocId, [Rev], Opts),
     Resp.
 

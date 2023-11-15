@@ -31,7 +31,7 @@ index_file(Module, DbName, FileName) ->
 
 load_doc(Db, #doc_info{} = DI, Opts) ->
     Deleted = lists:member(deleted, Opts),
-    case (catch couch_db:open_doc(Db, DI, Opts)) of
+    case (catch (couch_db:open_doc(Db, DI, Opts))) of
         {ok, #doc{deleted = false} = Doc} -> Doc;
         {ok, #doc{deleted = true} = Doc} when Deleted -> Doc;
         _Else -> null

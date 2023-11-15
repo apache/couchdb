@@ -5,7 +5,6 @@ defmodule ProxyAuthTest do
 
   @tag :with_db
   test "proxy auth with secret" do
-
     users_db_name = random_db_name()
     create_db(users_db_name)
 
@@ -71,7 +70,7 @@ defmodule ProxyAuthTest do
       )
 
     assert resp2.body["userCtx"]["name"] == "couch@apache.org"
-    assert resp2.body["userCtx"]["roles"] == ["test_role"]
+    assert resp2.body["userCtx"]["roles"] == ["test_role", "_users"]
     assert resp2.body["info"]["authenticated"] == "proxy"
     assert resp2.body["ok"] == true
 
@@ -79,7 +78,6 @@ defmodule ProxyAuthTest do
 
   @tag :with_db
   test "proxy auth without secret" do
-
     users_db_name = random_db_name()
     create_db(users_db_name)
 
@@ -126,7 +124,7 @@ defmodule ProxyAuthTest do
       )
 
     assert resp2.body["userCtx"]["name"] == "couch@apache.org"
-    assert resp2.body["userCtx"]["roles"] == ["test_role_1", "test_role_2"]
+    assert resp2.body["userCtx"]["roles"] == ["test_role_1", "test_role_2", "_users"]
     assert resp2.body["info"]["authenticated"] == "proxy"
     assert resp2.body["ok"] == true
 

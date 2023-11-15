@@ -113,6 +113,8 @@ merge_results(Info) ->
                 [{disk_format_version, lists:max(X)} | Acc];
             (cluster, [X], Acc) ->
                 [{cluster, {X}} | Acc];
+            (access, [X], Acc) ->
+                [{access, X} | Acc];
             (props, Xs, Acc) ->
                 [{props, {merge_object(Xs)}} | Acc];
             (_K, _V, Acc) ->
