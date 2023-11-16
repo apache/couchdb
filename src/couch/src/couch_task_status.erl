@@ -28,7 +28,7 @@
 -export([all/0, add_task/1, update/1, get/1, set_update_frequency/1]).
 -export([is_task_added/0]).
 
--export([init/1, terminate/2, code_change/3]).
+-export([init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -39,10 +39,16 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 stop() ->
-    gen_server:cast(?MODULE, stop).
+    gen_server:stop(?MODULE).
 
 all() ->
-    gen_server:call(?MODULE, all).
+    try
+        get_task_status()
+    catch
+        error:badarg ->
+            % application may not be started yet and ets table is missing
+            []
+    end.
 
 add_task(Props) ->
     put(task_status_update, {{0, 0, 0}, 0}),
@@ -94,11 +100,8 @@ persist(TaskProps0) ->
 
 init([]) ->
     % read configuration settings and register for configuration changes
-    ets:new(?MODULE, [ordered_set, protected, named_table]),
+    ets:new(?MODULE, [set, protected, named_table, {read_concurrency, true}]),
     {ok, nil}.
-
-terminate(_Reason, _State) ->
-    ok.
 
 handle_call({add_task, TaskProps}, {From, _}, Server) ->
     case ets:lookup(?MODULE, From) of
@@ -110,11 +113,9 @@ handle_call({add_task, TaskProps}, {From, _}, Server) ->
             {reply, {add_task_error, already_registered}, Server}
     end;
 handle_call(all, _, Server) ->
-    All = [
-        [{pid, ?l2b(pid_to_list(Pid))}, process_status(Pid) | TaskProps]
-     || {Pid, TaskProps} <- ets:tab2list(?MODULE)
-    ],
-    {reply, All, Server}.
+    % Online upgrade compatibility clause. Previous =< 3.3.2 clustered
+    % _active_tasks used to call gen_server:multi_call(couch_task_status, all).
+    {reply, get_task_status(), Server}.
 
 handle_cast({update_status, Pid, NewProps}, Server) ->
     case ets:lookup(?MODULE, Pid) of
@@ -126,23 +127,24 @@ handle_cast({update_status, Pid, NewProps}, Server) ->
             % a monitor message before this call - ignore.
             ok
     end,
-    {noreply, Server};
-handle_cast(stop, State) ->
-    {stop, normal, State}.
+    {noreply, Server}.
 
 handle_info({'DOWN', _MonitorRef, _Type, Pid, _Info}, Server) ->
     %% should we also erlang:demonitor(_MonitorRef), ?
     ets:delete(?MODULE, Pid),
     {noreply, Server}.
 
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
 timestamp() ->
     timestamp(os:timestamp()).
 
 timestamp({Mega, Secs, _}) ->
     Mega * 1000000 + Secs.
+
+get_task_status() ->
+    [
+        [{pid, ?l2b(pid_to_list(Pid))}, process_status(Pid) | TaskProps]
+     || {Pid, TaskProps} <- ets:tab2list(?MODULE)
+    ].
 
 process_status(Pid) ->
     case process_info(Pid, status) of

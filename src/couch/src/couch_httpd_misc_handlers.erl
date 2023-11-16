@@ -92,7 +92,7 @@ handle_all_dbs_req(Req) ->
 handle_task_status_req(#httpd{method = 'GET'} = Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     % convert the list of prop lists to a list of json objects
-    send_json(Req, [{Props} || Props <- couch_task_status:all()]);
+    send_json(Req, [{Props} || Props <- lists:sort(couch_task_status:all())]);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
