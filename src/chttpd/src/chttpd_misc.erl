@@ -219,14 +219,8 @@ handle_dbs_info_req(Req) ->
 
 handle_task_status_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
-    {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
-    Response = lists:flatmap(
-        fun({Node, Tasks}) ->
-            [{[{node, Node} | Task]} || Task <- Tasks]
-        end,
-        Replies
-    ),
-    send_json(Req, lists:sort(Response));
+    TaskList = chttpd_util:get_active_tasks(nodes([visible, this])),
+    send_json(Req, lists:sort(TaskList));
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 

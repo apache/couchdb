@@ -13,7 +13,6 @@
 -module(couch_task_status_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(TIMEOUT, 1000).
 
@@ -23,7 +22,7 @@ setup() ->
     TaskUpdaterPid = spawn(fun() -> loop() end),
     {TaskStatusPid, TaskUpdaterPid, Ctx}.
 
-teardown({TaskStatusPid, _, Ctx}) ->
+teardown({TaskStatusPid, TaskUpdaterPid, Ctx}) ->
     test_util:stop_sync_throw(
         TaskStatusPid,
         fun() ->
@@ -32,6 +31,7 @@ teardown({TaskStatusPid, _, Ctx}) ->
         timeout_error,
         ?TIMEOUT
     ),
+    catch exit(TaskUpdaterPid, kill),
     test_util:stop(Ctx).
 
 couch_task_status_test_() ->
@@ -42,57 +42,57 @@ couch_task_status_test_() ->
             fun setup/0,
             fun teardown/1,
             [
-                fun should_register_task/1,
-                fun should_set_task_startup_time/1,
-                fun should_have_update_time_as_startup_before_any_progress/1,
-                fun should_set_task_type/1,
-                fun should_not_register_multiple_tasks_for_same_pid/1,
-                fun should_set_task_progress/1,
-                fun should_update_task_progress/1,
-                fun should_update_time_changes_on_task_progress/1,
-                %% fun should_control_update_frequency/1,
-                fun should_reset_control_update_frequency/1,
-                fun should_track_multiple_tasks/1,
-                fun should_finish_task/1
+                ?TDEF_FE(should_register_task),
+                ?TDEF_FE(should_set_task_startup_time),
+                ?TDEF_FE(should_have_update_time_as_startup_before_any_progress),
+                ?TDEF_FE(should_set_task_type),
+                ?TDEF_FE(should_not_register_multiple_tasks_for_same_pid),
+                ?TDEF_FE(should_set_task_progress),
+                ?TDEF_FE(should_update_task_progress),
+                ?TDEF_FE(should_update_time_changes_on_task_progress),
+                %% ?TDEF_FE(should_control_update_frequency/1,
+                ?TDEF_FE(should_reset_control_update_frequency),
+                ?TDEF_FE(should_track_multiple_tasks),
+                ?TDEF_FE(should_finish_task)
             ]
         }
     }.
 
 should_register_task({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?_assertEqual(1, length(couch_task_status:all())).
+    ?assertEqual(1, length(all_tasks_sync())).
 
 should_set_task_startup_time({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?_assert(is_integer(get_task_prop(Pid, started_on))).
+    ?assert(is_integer(get_task_prop(Pid, started_on))).
 
 should_have_update_time_as_startup_before_any_progress({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
     StartTime = get_task_prop(Pid, started_on),
-    ?_assertEqual(StartTime, get_task_prop(Pid, updated_on)).
+    ?assertEqual(StartTime, get_task_prop(Pid, updated_on)).
 
 should_set_task_type({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?_assertEqual(replication, get_task_prop(Pid, type)).
+    ?assertEqual(replication, get_task_prop(Pid, type)).
 
 should_not_register_multiple_tasks_for_same_pid({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?_assertEqual(
+    ?assertEqual(
         {add_task_error, already_registered},
         call(Pid, add, [{type, compaction}, {progress, 0}])
     ).
 
 should_set_task_progress({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?_assertEqual(0, get_task_prop(Pid, progress)).
+    ?assertEqual(0, get_task_prop(Pid, progress)).
 
 should_update_task_progress({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
     call(Pid, update, [{progress, 25}]),
-    ?_assertEqual(25, get_task_prop(Pid, progress)).
+    ?assertEqual(25, get_task_prop(Pid, progress)).
 
 should_update_time_changes_on_task_progress({_, Pid, _Ctx}) ->
-    ?_assert(
+    ?assert(
         begin
             ok = call(Pid, add, [{type, replication}, {progress, 0}]),
             % sleep awhile to customize update time
@@ -103,7 +103,7 @@ should_update_time_changes_on_task_progress({_, Pid, _Ctx}) ->
     ).
 
 %%should_control_update_frequency({_, Pid, _Ctx}) ->
-%%    ?_assertEqual(66,
+%%    ?assertEqual(66,
 %%        begin
 %%            ok = call(Pid, add, [{type, replication}, {progress, 0}]),
 %%            call(Pid, update, [{progress, 50}]),
@@ -114,7 +114,7 @@ should_update_time_changes_on_task_progress({_, Pid, _Ctx}) ->
 %%        end).
 
 should_reset_control_update_frequency({_, Pid, _Ctx}) ->
-    ?_assertEqual(
+    ?assertEqual(
         87,
         begin
             ok = call(Pid, add, [{type, replication}, {progress, 0}]),
@@ -128,16 +128,13 @@ should_reset_control_update_frequency({_, Pid, _Ctx}) ->
         end
     ).
 
-should_track_multiple_tasks(_) ->
-    ?_assert(run_multiple_tasks()).
-
 should_finish_task({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?assertEqual(1, length(couch_task_status:all())),
+    ?assertEqual(1, length(all_tasks_sync())),
     ok = call(Pid, done),
-    ?_assertEqual(0, length(couch_task_status:all())).
+    ?assertEqual(0, length(all_tasks_sync())).
 
-run_multiple_tasks() ->
+should_track_multiple_tasks(_) ->
     Pid1 = spawn(fun() -> loop() end),
     Pid2 = spawn(fun() -> loop() end),
     Pid3 = spawn(fun() -> loop() end),
@@ -145,7 +142,7 @@ run_multiple_tasks() ->
     call(Pid2, add, [{type, compaction}, {progress, 0}]),
     call(Pid3, add, [{type, indexer}, {progress, 0}]),
 
-    ?assertEqual(3, length(couch_task_status:all())),
+    ?assertEqual(3, length(all_tasks_sync())),
     ?assertEqual(replication, get_task_prop(Pid1, type)),
     ?assertEqual(compaction, get_task_prop(Pid2, type)),
     ?assertEqual(indexer, get_task_prop(Pid3, type)),
@@ -159,13 +156,11 @@ run_multiple_tasks() ->
     ?assertEqual(33, get_task_prop(Pid2, progress)),
 
     call(Pid1, done),
-    ?assertEqual(2, length(couch_task_status:all())),
+    ?assertEqual(2, length(all_tasks_sync())),
     call(Pid3, done),
-    ?assertEqual(1, length(couch_task_status:all())),
+    ?assertEqual(1, length(all_tasks_sync())),
     call(Pid2, done),
-    ?assertEqual(0, length(couch_task_status:all())),
-
-    true.
+    ?assertEqual(0, length(all_tasks_sync())).
 
 loop() ->
     receive
@@ -223,7 +218,7 @@ get_task_prop(Pid, Prop) ->
             end
         end,
         [],
-        couch_task_status:all()
+        all_tasks_sync()
     ),
     case couch_util:get_value(Prop, hd(Element), nil) of
         nil ->
@@ -241,3 +236,7 @@ get_task_prop(Pid, Prop) ->
         Value ->
             Value
     end.
+
+all_tasks_sync() ->
+    % When we remove the `all` call, switch to test_util:wait/1
+    gen_server:call(couch_task_status, all).

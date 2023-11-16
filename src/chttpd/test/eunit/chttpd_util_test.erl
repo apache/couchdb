@@ -226,3 +226,125 @@ tcp_info_works() ->
         {_, _} ->
             false
     end.
+
+chttpd_util_get_active_tasks_test_() ->
+    {
+        "chttpd util get_active_tasks() tests",
+        {
+            setup,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    ?TDEF_FE(t_empty_tasks),
+                    ?TDEF_FE(t_one_task),
+                    ?TDEF_FE(t_multiple_tasks),
+                    ?TDEF_FE(t_ignore_errors),
+                    ?TDEF_FE(t_rolling_upgrade_test)
+                ]
+            }
+        }
+    }.
+
+t_empty_tasks(_) ->
+    Tasks = chttpd_util:get_active_tasks(nodes([visible, this])),
+    ?assert(is_list(Tasks)),
+    ?assertEqual([], Tasks).
+
+t_one_task(_) ->
+    [Pid] = spawn_link_some_tasks(1),
+    [Task] = chttpd_util:get_active_tasks(nodes([visible, this])),
+    ThisNode = node(),
+    ?assertMatch({[{node, ThisNode}, {pid, <<_/binary>>}, {_, _} | _]}, Task),
+    kill_tasks([Pid]).
+
+t_multiple_tasks(_) ->
+    N = 1000,
+    Pids = spawn_link_some_tasks(N),
+    Tasks = chttpd_util:get_active_tasks(nodes([visible, this])),
+    ?assert(is_list(Tasks)),
+    ?assertEqual(N, length(Tasks)),
+    ThisNode = node(),
+    lists:map(
+        fun(T) ->
+            ?assertMatch({[{node, ThisNode}, {pid, <<_/binary>>}, {_, _} | _]}, T)
+        end,
+        Tasks
+    ),
+    kill_tasks(Pids).
+
+t_ignore_errors(_) ->
+    [Pid] = spawn_link_some_tasks(1),
+    ThisNode = node(),
+    Nodes = [node(), 'bad@foobar'],
+    [Task] = chttpd_util:get_active_tasks(Nodes),
+    ?assertMatch({[{node, ThisNode}, {pid, <<_/binary>>}, {_, _} | _]}, Task),
+    kill_tasks([Pid]).
+
+t_rolling_upgrade_test(_) ->
+    % Previously, in releases =< 3.3.2, we used to fetch active tasks with:
+    %   gen_server:multi_call(couch_task_status, all)
+    % Here we test the rolling upgrade case when old nodes would call the
+    % the new nodes which were just upgraded. This test should be removed
+    % in the future when rolling upgrades from before =< 3.3.2 is not a
+    % concern any longer.
+    N = 1000,
+    Pids = spawn_link_some_tasks(N),
+    Tasks = chttpd_util:get_active_tasks(nodes([visible, this])),
+    OldTasks = compat_get_active_stats(),
+    % There should be no difference between the two
+    ?assertEqual(lists:sort(Tasks), lists:sort(OldTasks)),
+    kill_tasks(Pids).
+
+compat_get_active_stats() ->
+    {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
+    lists:flatmap(
+        fun({Node, Tasks}) ->
+            [{[{node, Node} | Task]} || Task <- Tasks]
+        end,
+        Replies
+    ).
+
+spawn_link_some_tasks(N) ->
+    Pids = [spawn_link(fun rand_task_proc/0) || _ <- lists:seq(1, N)],
+    [
+        begin
+            Pid ! {add_task, self()},
+            receive
+                task_added -> ok
+            end
+        end
+     || Pid <- Pids
+    ],
+    Pids.
+
+kill_tasks(Pids) ->
+    [
+        begin
+            unlink(Pid),
+            exit(Pid, kill)
+        end
+     || Pid <- Pids
+    ],
+    ok.
+
+rand_task_proc() ->
+    receive
+        {add_task, From} ->
+            couch_task_status:add_task(rand_task_props()),
+            From ! task_added,
+            rand_task_proc()
+    end.
+
+rand_task_props() ->
+    [
+        {type, indexer},
+        {database, binary:encode_hex(rand:bytes(10))},
+        {design_document, binary:encode_hex(rand:bytes(10))},
+        {progress, rand:uniform(100)},
+        {changes_done, rand:uniform(1000000)},
+        {total_changes, rand:uniform(1000000)}
+    ].

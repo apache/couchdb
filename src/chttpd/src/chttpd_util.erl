@@ -27,7 +27,8 @@
     mochiweb_client_req_clean/0,
     mochiweb_client_req_get/0,
     mochiweb_client_req_check_msec/0,
-    stop_client_process_if_disconnected/2
+    stop_client_process_if_disconnected/2,
+    get_active_tasks/1
 ]).
 
 -define(MOCHIWEB_CLIENT_REQ, mochiweb_client_req).
@@ -165,3 +166,20 @@ stop_client_process_if_disconnected(Pid, ClientReq) ->
             % so we default to the previous behavior.
             ok
     end.
+
+get_active_tasks(Nodes) when is_list(Nodes) ->
+    Responses = lists:zip(Nodes, erpc:multicall(Nodes, couch_task_status, all, [])),
+    % Responses has this shape:
+    %   [
+    %      {node1, {ok, [[{pid, <<"<0.1.2>">>}, ...], [{pid, <<"<0.3.4>">>}, ...]]}},
+    %      {node2, {error, foo}},
+    %      {node3, {ok, [[{pid, <<"<0.5.6>">>}, ...] ...]}}
+    %   ]
+    lists:foldl(fun tasks_fold_fun/2, [], Responses).
+
+% See https://www.erlang.org/doc/man/erpc#multicall-3
+%
+tasks_fold_fun({Node, {ok, Tasks}}, Acc) when is_atom(Node), is_list(Tasks) ->
+    [{[{node, Node} | Task]} || Task <- Tasks] ++ Acc;
+tasks_fold_fun({_Node, {_Class, _Reason}}, Acc) ->
+    Acc.
