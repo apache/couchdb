@@ -353,7 +353,7 @@ dist: all derived
 -include install.mk
 release: all
 	@echo 'Installing CouchDB into rel\couchdb\ ...'
-	-@rmdir /s/q rel\couchdb
+	-@rmdir /s/q rel\couchdb >NUL 2>&1 || true
 	@$(REBAR) generate
 	@copy src\couch\priv\couchjs.exe rel\couchdb\bin
 
@@ -406,20 +406,20 @@ install: release
 # target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
-	-@rmdir /s/q .rebar
-	-@del /f/q bin\couchjs.exe
-	-@rmdir /s/q src\*\ebin
-	-@rmdir /s/q src\*\.rebar
-	-@del /f/q/s src\*.dll
-	-@del /f/q src\couch\priv\*.exe
-	-@del /f/q share\server\main.js share\server\main-ast-bypass.js share\server\main-coffee.js
-	-@rmdir /s/q tmp
-	-@rmdir /s/q dev\data
-	-@rmdir /s/q dev\lib
-	-@rmdir /s/q dev\logs
-	-@rmdir /s/q src\mango\.venv
-	-@del /f/q src\couch\priv\couch_js\config.h
-	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log
+	-@rmdir /s/q .rebar >NUL 2>&1 || true
+	-@del /f/q bin\couchjs.exe >NUL 2>&1 || true
+	-@rmdir /s/q src\*\ebin >NUL 2>&1 || true
+	-@rmdir /s/q src\*\.rebar >NUL 2>&1 || true
+	-@del /f/q/s src\*.dll >NUL 2>&1 || true
+	-@del /f/q src\couch\priv\*.exe >NUL 2>&1 || true
+	-@del /f/q share\server\main.js share\server\main-ast-bypass.js share\server\main-coffee.js >NUL 2>&1 || true
+	-@rmdir /s/q tmp >NUL 2>&1 || true
+	-@rmdir /s/q dev\data >NUL 2>&1 || true
+	-@rmdir /s/q dev\lib >NUL 2>&1 || true
+	-@rmdir /s/q dev\logs >NUL 2>&1 || true
+	-@rmdir /s/q src\mango\.venv >NUL 2>&1 || true
+	-@del /f/q src\couch\priv\couch_js\config.h >NUL 2>&1 || true
+	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log >NUL 2>&1 || true
 ifeq ($(with_nouveau), 1)
 	@cd nouveau && .\gradlew clean
 endif
@@ -427,27 +427,27 @@ endif
 .PHONY: distclean
 # target: distclean - Remove build and release artifacts
 distclean: clean
-	-@del install.mk
-	-@del config.erl
-	-@del rel\couchdb.config
+	-@del install.mk >NUL 2>&1 || true
+	-@del config.erl >NUL 2>&1 || true
+	-@del rel\couchdb.config >NUL 2>&1 || true
 ifneq ($(IN_RELEASE), true)
 # when we are in a release, don’t delete the
 # copied sources, generated docs, or fauxton
-	-@rmdir /s/q rel\couchdb
-	-@rmdir /s/q share\www
-	-@rmdir /s/q src\docs
+	-@rmdir /s/q rel\couchdb >NUL 2>&1 || true
+	-@rmdir /s/q share\www >NUL 2>&1 || true
+	-@rmdir /s/q src\docs >NUL 2>&1 || true
 endif
 
 
 .PHONY: devclean
 # target: devclean - Remove dev cluster artifacts
 devclean:
-	-@rmdir /s/q dev\lib\node1\data
-	-@rmdir /s/q dev\lib\node2\data
-	-@rmdir /s/q dev\lib\node3\data
-	-@rmdir /s/q dev\lib\node1\etc
-	-@rmdir /s/q dev\lib\node2\etc
-	-@rmdir /s/q dev\lib\node3\etc
+	-@rmdir /s/q dev\lib\node1\data >NUL 2>&1 || true
+	-@rmdir /s/q dev\lib\node2\data >NUL 2>&1 || true
+	-@rmdir /s/q dev\lib\node3\data >NUL 2>&1 || true
+	-@rmdir /s/q dev\lib\node1\etc >NUL 2>&1 || true
+	-@rmdir /s/q dev\lib\node2\etc >NUL 2>&1 || true
+	-@rmdir /s/q dev\lib\node3\etc >NUL 2>&1 || true
 
 
 ################################################################################
