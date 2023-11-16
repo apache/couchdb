@@ -53,10 +53,13 @@
     count_by/1,
     group_by/2,
     group_by/3,
+    group_by/4,
     sorted/1,
     sorted_by/1,
     sorted_by/2,
-    sorted_by/3
+    sorted_by/3,
+
+    unsafe_foldl/3
 ]).
 
 -export([
@@ -393,20 +396,24 @@ group_by(KeyFun, ValFun) ->
     group_by(KeyFun, ValFun, fun erlang:'+'/2).
 
 
+group_by(KeyFun, ValFun, AggFun) ->
+    group_by(KeyFun, ValFun, AggFun, fun ets:foldl/3).
+
+
 %% eg: group_by(mfa, docs_read).
 %% eg: group_by(fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
 %% eg: ^^ or: group_by([mfa, docs_read], ioq_calls).
 %% eg: group_by([username, dbname, mfa], docs_read).
 %% eg: group_by([username, dbname, mfa], ioq_calls).
 %% eg: group_by([username, dbname, mfa], js_filters).
-group_by(KeyL, ValFun, AggFun) when is_list(KeyL) ->
+group_by(KeyL, ValFun, AggFun, Fold) when is_list(KeyL) ->
     KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
-    group_by(KeyFun, ValFun, AggFun);
-group_by(Key, ValFun, AggFun) when is_atom(Key) ->
-    group_by(curry_field(Key), ValFun, AggFun);
-group_by(KeyFun, Val, AggFun) when is_atom(Val) ->
-    group_by(KeyFun, curry_field(Val), AggFun);
-group_by(KeyFun, ValFun, AggFun) ->
+    group_by(KeyFun, ValFun, AggFun, Fold);
+group_by(Key, ValFun, AggFun, Fold) when is_atom(Key) ->
+    group_by(curry_field(Key), ValFun, AggFun, Fold);
+group_by(KeyFun, Val, AggFun, Fold) when is_atom(Val) ->
+    group_by(KeyFun, curry_field(Val), AggFun, Fold);
+group_by(KeyFun, ValFun, AggFun, Fold) ->
     FoldFun = fun(Ele, Acc) ->
         Key = KeyFun(Ele),
         Val = ValFun(Ele),
@@ -414,7 +421,8 @@ group_by(KeyFun, ValFun, AggFun) ->
         NewVal = AggFun(CurrVal, Val),
         maps:put(Key, NewVal, Acc)
     end,
-    ets:foldl(FoldFun, #{}, ?MODULE).
+    Fold(FoldFun, #{}, ?MODULE).
+
 
 sorted(Map) when is_map(Map) ->
     lists:sort(fun({_K1, A}, {_K2, B}) -> B < A end, maps:to_list(Map)).
@@ -924,3 +932,20 @@ log_process_lifetime_report(PidRef) ->
     %% TODO: catch error out of here, report crashes on depth>1 json
     io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
     couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx)).
+
+
+%% Reimplementation of: https://github.com/erlang/otp/blob/b2ee4fc9a0b81a139dad2033e9b2bfc178146886/lib/stdlib/src/ets.erl#L633-L658
+%% with wrapping of ets:safe_fixtable/2 removed
+unsafe_foldl(F, Accu, T) ->
+    First = ets:first(T),
+    do_foldl(F, Accu, First, T).
+
+do_foldl(F, Accu0, Key, T) ->
+    case Key of
+        '$end_of_table' ->
+            Accu0;
+        _ ->
+            do_foldl(F,
+                lists:foldl(F, Accu0, ets:lookup(T, Key)),
+                ets:next(T, Key), T)
+    end.
