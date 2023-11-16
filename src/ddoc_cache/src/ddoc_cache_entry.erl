@@ -12,7 +12,6 @@
 
 -module(ddoc_cache_entry).
 -behaviour(gen_server).
--vsn(1).
 
 % for the stacktrace macro only so far
 -include_lib("couch/include/couch_db.hrl").

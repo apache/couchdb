@@ -12,7 +12,6 @@
 
 -module(couch_file).
 -behaviour(gen_server).
--vsn(2).
 
 -include_lib("couch/include/couch_db.hrl").
 

@@ -12,7 +12,6 @@
 
 -module(ets_lru).
 -behaviour(gen_server).
--vsn(2).
 
 -export([
     start_link/2,

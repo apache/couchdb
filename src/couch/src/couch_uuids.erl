@@ -13,7 +13,6 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -behaviour(gen_server).
--vsn(3).
 -behaviour(config_listener).
 
 -export([start/0, stop/0]).

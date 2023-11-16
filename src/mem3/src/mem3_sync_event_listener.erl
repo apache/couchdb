@@ -12,7 +12,6 @@
 
 -module(mem3_sync_event_listener).
 -behavior(couch_event_listener).
--vsn(1).
 
 -export([
     start_link/0

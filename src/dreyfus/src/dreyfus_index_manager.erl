@@ -14,7 +14,6 @@
 
 -module(dreyfus_index_manager).
 -behaviour(gen_server).
--vsn(1).
 -include_lib("couch/include/couch_db.hrl").
 -include("dreyfus.hrl").
 

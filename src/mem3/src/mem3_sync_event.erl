@@ -12,7 +12,6 @@
 
 -module(mem3_sync_event).
 -behaviour(gen_event).
--vsn(1).
 
 -export([
     init/1,

@@ -12,7 +12,6 @@
 
 -module(mem3_shards).
 -behaviour(gen_server).
--vsn(3).
 -behaviour(config_listener).
 
 -export([init/1, terminate/2, code_change/3]).

@@ -12,7 +12,6 @@
 
 -module(config_listener_mon).
 -behaviour(gen_server).
--vsn(1).
 
 -export([
     subscribe/2,

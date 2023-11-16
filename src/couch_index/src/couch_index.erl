@@ -15,8 +15,6 @@
 
 -compile(tuple_calls).
 
--vsn(3).
-
 %% API
 -export([start_link/1, stop/1, get_state/2, get_info/1]).
 -export([trigger_update/2]).

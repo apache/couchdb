@@ -12,7 +12,6 @@
 
 -module(ddoc_cache_lru).
 -behaviour(gen_server).
--vsn(1).
 
 -export([
     start_link/0,

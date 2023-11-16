@@ -12,7 +12,6 @@
 
 -module(couch_event_server).
 -behaviour(gen_server).
--vsn(1).
 
 -export([
     start_link/0

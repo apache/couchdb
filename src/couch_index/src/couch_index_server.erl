@@ -14,8 +14,6 @@
 -behaviour(gen_server).
 -behaviour(config_listener).
 
--vsn(2).
-
 -export([start_link/1, validate/2, get_index/4, get_index/3, get_index/2]).
 
 -export([init/1, terminate/2, code_change/3]).

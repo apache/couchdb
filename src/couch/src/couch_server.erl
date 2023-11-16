@@ -13,7 +13,6 @@
 -module(couch_server).
 -behaviour(gen_server).
 -behaviour(config_listener).
--vsn(3).
 
 -export([open/2, create/2, delete/2, get_version/0, get_version/1, get_git_sha/0, get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
