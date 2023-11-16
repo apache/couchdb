@@ -13,7 +13,6 @@
 -module(couch_log_sup).
 
 -behaviour(supervisor).
--vsn(1).
 -behaviour(config_listener).
 
 -export([init/1]).

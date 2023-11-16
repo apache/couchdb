@@ -12,7 +12,6 @@
 -module(rexi_buffer).
 
 -behaviour(gen_server).
--vsn(1).
 
 %  gen_server callbacks
 -export([

@@ -12,7 +12,6 @@
 
 -module(couch_db_updater).
 -behaviour(gen_server).
--vsn(1).
 
 -export([add_sizes/3, upgrade_sizes/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, code_change/3, handle_info/2]).

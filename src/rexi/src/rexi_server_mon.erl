@@ -15,7 +15,6 @@
 -module(rexi_server_mon).
 -behaviour(gen_server).
 -behaviour(mem3_cluster).
--vsn(1).
 
 -export([
     start_link/1,

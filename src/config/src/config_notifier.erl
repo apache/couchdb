@@ -13,7 +13,6 @@
 -module(config_notifier).
 
 -behaviour(gen_event).
--vsn(1).
 
 %% Public interface
 -export([subscribe/1]).

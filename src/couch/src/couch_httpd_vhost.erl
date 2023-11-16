@@ -12,7 +12,6 @@
 
 -module(couch_httpd_vhost).
 -behaviour(gen_server).
--vsn(1).
 -behaviour(config_listener).
 
 -compile(tuple_calls).

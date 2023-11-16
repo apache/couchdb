@@ -12,7 +12,6 @@
 
 -module(mem3_nodes).
 -behaviour(gen_server).
--vsn(1).
 -export([
     init/1,
     handle_call/3,

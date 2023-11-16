@@ -12,7 +12,6 @@
 
 -module(rexi_server).
 -behaviour(gen_server).
--vsn(1).
 -export([
     init/1,
     handle_call/3,

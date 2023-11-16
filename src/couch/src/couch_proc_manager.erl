@@ -13,7 +13,6 @@
 -module(couch_proc_manager).
 -behaviour(gen_server).
 -behaviour(config_listener).
--vsn(3).
 
 -export([
     start_link/0,

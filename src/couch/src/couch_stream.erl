@@ -12,7 +12,6 @@
 
 -module(couch_stream).
 -behaviour(gen_server).
--vsn(1).
 
 -export([
     open/1,

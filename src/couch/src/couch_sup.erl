@@ -12,7 +12,6 @@
 
 -module(couch_sup).
 -behaviour(supervisor).
--vsn(1).
 -behaviour(config_listener).
 
 -export([

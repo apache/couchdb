@@ -13,7 +13,6 @@
 -module(config_listener).
 
 -behaviour(gen_event).
--vsn(2).
 
 %% Public interface
 -export([start/2]).

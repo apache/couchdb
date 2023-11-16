@@ -12,7 +12,6 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
--vsn(3).
 -behaviour(config_listener).
 
 % public api.

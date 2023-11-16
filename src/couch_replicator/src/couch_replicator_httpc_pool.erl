@@ -12,7 +12,6 @@
 
 -module(couch_replicator_httpc_pool).
 -behaviour(gen_server).
--vsn(1).
 
 % public API
 -export([start_link/2, start_link/3, stop/1]).
