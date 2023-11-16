@@ -331,7 +331,7 @@ reset_validation_funs(DbName) ->
 
 open_shard(Name, Opts) ->
     set_io_priority(Name, Opts),
-    couch_stats_resource_tracker:set_context_dbname(DbName),
+    couch_stats_resource_tracker:set_context_dbname(Name),
     try
         rexi:reply(mem3_util:get_or_create_db(Name, Opts))
     catch
