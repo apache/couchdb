@@ -20,11 +20,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -define(HANDLER_MOD, couch_log_error_logger_h).
@@ -38,9 +36,6 @@ init(_) ->
     ok = gen_event:add_sup_handler(error_logger, ?HANDLER_MOD, []),
     {ok, nil}.
 
-terminate(_, _) ->
-    ok.
-
 handle_call(_Msg, _From, St) ->
     {reply, ignored, St}.
 
@@ -51,6 +46,3 @@ handle_info({gen_event_EXIT, ?HANDLER_MOD, Reason}, St) ->
     {stop, Reason, St};
 handle_info(_Msg, St) ->
     {noreply, St}.
-
-code_change(_, State, _) ->
-    {ok, State}.

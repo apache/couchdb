@@ -16,7 +16,7 @@
 -export([start_link/0]).
 -export([add/1]).
 
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -export([monitor_sync/1]).
@@ -78,9 +78,6 @@ handle_info({'DOWN', _, _, _, {sync_error, Nodes}}, #st{tid = Tid} = St) ->
     {noreply, St};
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 start_sync(Nodes) ->
     {Pid, _} = spawn_monitor(?MODULE, monitor_sync, [Nodes]),

@@ -19,11 +19,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([
@@ -74,9 +72,6 @@ init([]) ->
         handler_ref = erlang:monitor(process, Handler)
     },
     {ok, State}.
-
-terminate(_Reason, _Srv) ->
-    ok.
 
 handle_call(_Msg, _From, State) ->
     {reply, ok, State}.
@@ -136,9 +131,6 @@ handle_info({'DOWN', Ref, _, _, Reason}, #state{handler_ref = Ref} = State) ->
     {noreply, State};
 handle_info(_, State) ->
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 flush_updates(State) ->
     DocIds = sets:to_list(State#state.pending_updates),

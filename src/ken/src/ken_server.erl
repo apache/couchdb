@@ -14,8 +14,8 @@
 
 % gen_server boilerplate
 -behaviour(gen_server).
--export([init/1, terminate/2]).
--export([handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
+-export([init/1]).
+-export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % Public interface
 -export([start_link/0]).
@@ -114,9 +114,6 @@ init(_) ->
     ets:new(ken_resubmit, [named_table]),
     ets:new(ken_workers, [named_table, public, {keypos, #job.name}]),
     {ok, #state{pruned_last = erlang:monotonic_time()}}.
-
-terminate(_Reason, _State) ->
-    ok.
 
 handle_call({set_batch_size, BS}, _From, #state{batch_size = Old} = State) ->
     {reply, Old, State#state{batch_size = BS}, 0};
@@ -222,9 +219,6 @@ handle_info({'DOWN', _, _, Pid, Reason}, State) ->
     {noreply, State, 0};
 handle_info(Msg, State) ->
     {stop, {unknown_info, Msg}, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 %% private functions
 

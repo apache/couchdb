@@ -21,11 +21,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_info/2,
-    handle_cast/2,
-    code_change/3
+    handle_cast/2
 ]).
 
 -export([
@@ -243,12 +241,6 @@ handle_info(close_idle_connections, State) ->
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
-
-terminate(_Reason, _State) ->
-    ok.
 
 maybe_log_worker_death(_Host, _Port, normal) ->
     ok;

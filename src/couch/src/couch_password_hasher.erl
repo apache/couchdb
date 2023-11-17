@@ -21,8 +21,7 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([maybe_upgrade_password_hash/4, hash_admin_passwords/1]).
@@ -93,9 +92,6 @@ handle_info({done, AuthModule, UserName}, State) ->
     {noreply, State};
 handle_info(Msg, State) ->
     {stop, {invalid_info, Msg}, State}.
-
-code_change(_OldVsn, #state{} = State, _Extra) ->
-    {ok, State}.
 
 %%%===================================================================
 %%% Internal functions

@@ -59,11 +59,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3,
     format_status/2
 ]).
 
@@ -131,9 +129,6 @@ cleanup({Pid, _Epoch, Timeout}) ->
 init([#state{} = State]) ->
     {ok, State}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call({update_headers, Headers, _Epoch}, _From, State) ->
     case maybe_refresh(State) of
         {ok, State1} ->
@@ -158,9 +153,6 @@ handle_cast(Msg, State) ->
 handle_info(Msg, State) ->
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 format_status(_Opt, [_PDict, State]) ->
     [

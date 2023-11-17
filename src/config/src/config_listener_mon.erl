@@ -20,11 +20,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -record(st, {
@@ -51,9 +49,6 @@ init({Pid, Mod, InitSt}) ->
             proc_lib:init_ack(Else)
     end.
 
-terminate(_Reason, _St) ->
-    ok.
-
 handle_call(_Message, _From, St) ->
     {reply, ignored, St}.
 
@@ -74,6 +69,3 @@ handle_info({gen_event_EXIT, {config_listener, Module}, Reason}, St) ->
     {stop, shutdown, St};
 handle_info(_, St) ->
     {noreply, St}.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.

@@ -23,11 +23,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([
@@ -68,9 +66,6 @@ init(ChildMod) ->
     couch_log:notice("~s : started servers", [ChildMod]),
     {ok, ChildMod}.
 
-terminate(_Reason, _St) ->
-    ok.
-
 handle_call(status, _From, ChildMod) ->
     case missing_servers(ChildMod) of
         [] ->
@@ -103,11 +98,6 @@ handle_cast(Msg, St) ->
 handle_info(Msg, St) ->
     couch_log:notice("~s ignored_info ~w", [?MODULE, Msg]),
     {noreply, St}.
-
-code_change(_OldVsn, nil, _Extra) ->
-    {ok, rexi_server};
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 start_servers(ChildMod) ->
     lists:foreach(

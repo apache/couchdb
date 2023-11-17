@@ -104,7 +104,3 @@ check_logs_ignored_messages() ->
         },
         couch_log_test_util:last_log()
     ).
-
-coverage_test() ->
-    Resp = couch_log_server:code_change(foo, bazinga, baz),
-    ?assertEqual({ok, bazinga}, Resp).

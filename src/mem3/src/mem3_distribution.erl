@@ -26,8 +26,7 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -define(JITTER_PERCENT, 0.25).
@@ -58,9 +57,6 @@ handle_info(connect, #st{} = St) ->
     {noreply, St#st{tref = erlang:send_after(wait_msec(), self(), connect)}};
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
-
-code_change(_OldVsn, #st{} = St, _Extra) ->
-    {ok, St}.
 
 connect(Log) ->
     Expected = ordsets:from_list([N || N <- mem3:nodes(), N =/= node()]),

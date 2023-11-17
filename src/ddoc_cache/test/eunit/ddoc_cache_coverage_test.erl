@@ -29,8 +29,7 @@ coverage_test_() ->
 
 restart_lru() ->
     send_bad_messages(ddoc_cache_lru),
-    ?assertEqual(ok, ddoc_cache_lru:terminate(bang, {st, a, b, c})),
-    ?assertEqual({ok, foo}, ddoc_cache_lru:code_change(1, foo, [])).
+    ?assertEqual(ok, ddoc_cache_lru:terminate(bang, {st, a, b, c})).
 
 stop_on_evictor_death() ->
     meck:new(ddoc_cache_ev, [passthrough]),

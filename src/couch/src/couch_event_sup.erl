@@ -20,7 +20,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([start_link/3, start_link/4, stop/1]).
--export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 %
 % Instead calling the
@@ -57,9 +57,6 @@ init({EventMgr, EventHandler, Args}) ->
             {stop, Error}
     end.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
 
@@ -68,6 +65,3 @@ handle_cast(_Msg, State) ->
 
 handle_info({gen_event_EXIT, _Handler, Reason}, State) ->
     {stop, Reason, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.

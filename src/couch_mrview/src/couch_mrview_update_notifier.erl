@@ -15,7 +15,7 @@
 -behaviour(gen_event).
 
 -export([start_link/1, notify/1]).
--export([init/1, terminate/2, handle_event/2, handle_call/2, handle_info/2, code_change/3, stop/1]).
+-export([init/1, handle_event/2, handle_call/2, handle_info/2, stop/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -33,9 +33,6 @@ stop(Pid) ->
 init(Fun) ->
     {ok, Fun}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_event(Event, Fun) ->
     Fun(Event),
     {ok, Fun}.
@@ -46,6 +43,3 @@ handle_call(_Request, State) ->
 handle_info({'EXIT', Pid, Reason}, Pid) ->
     couch_log:error("View update notification process ~p died: ~p", [Pid, Reason]),
     remove_handler.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.

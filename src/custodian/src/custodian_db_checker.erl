@@ -20,8 +20,7 @@
     terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([
@@ -63,9 +62,6 @@ handle_info({'EXIT', Pid, Reason}, #st{checker = Pid} = St) ->
     {noreply, restart_checker(St#st{checker = undefined})};
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 restart_checker(#st{checker = undefined} = St) ->
     Pid = spawn_link(fun ?MODULE:check_dbs/0),

@@ -33,7 +33,6 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3,
     terminate/2
 ]).
 
@@ -263,9 +262,6 @@ terminate(_Reason, #state{access_cleaner = CPid}) ->
         smoosh_channel:close(P)
     end,
     ets:foldl(Fun, ok, ?MODULE).
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 update_access(Object) ->
     Now = erlang:monotonic_time(second),

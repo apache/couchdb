@@ -44,8 +44,7 @@ check_entry_test_() ->
             ?TDEF(kill_opener_on_terminate),
             ?TDEF(evict_when_not_accessed),
             ?TDEF(open_dead_entry),
-            ?TDEF(handles_bad_messages),
-            ?TDEF(handles_code_change)
+            ?TDEF(handles_bad_messages)
         ])
     }.
 
@@ -131,10 +130,6 @@ handles_bad_messages(_) ->
     ?assertEqual(CallExpect, ddoc_cache_entry:handle_call(foo, bar, baz)),
     ?assertEqual(CastExpect, ddoc_cache_entry:handle_cast(foo, bar)),
     ?assertEqual(InfoExpect, ddoc_cache_entry:handle_info(foo, bar)).
-
-handles_code_change(_) ->
-    CCExpect = {ok, bar},
-    ?assertEqual(CCExpect, ddoc_cache_entry:code_change(foo, bar, baz)).
 
 handles_bad_shutdown_test_() ->
     {timeout, 10,

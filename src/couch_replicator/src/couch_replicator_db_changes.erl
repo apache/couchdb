@@ -20,11 +20,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_info/2,
-    handle_cast/2,
-    code_change/3
+    handle_cast/2
 ]).
 
 -export([
@@ -59,9 +57,6 @@ init([]) ->
             {ok, State}
     end.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call(_Msg, _From, State) ->
     {reply, {error, invalid_call}, State}.
 
@@ -72,9 +67,6 @@ handle_cast({cluster, stable}, State) ->
 
 handle_info(_Msg, State) ->
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 -spec restart_mdb_changes(#state{}) -> #state{}.
 restart_mdb_changes(#state{mdb_changes = nil} = State) ->

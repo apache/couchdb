@@ -17,9 +17,7 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3,
-    terminate/2
+    handle_info/2
 ]).
 
 -export([
@@ -91,12 +89,6 @@ handle_info({'DOWN', Ref, _, Pid, Output}, #st{jobref = {Pid, Ref}} = St) ->
     {noreply, update_state(St, Output)};
 handle_info(_Msg, St) ->
     {noreply, St}.
-
-terminate(_Reason, _St) ->
-    ok.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 % internal functions
 

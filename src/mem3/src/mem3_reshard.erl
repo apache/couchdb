@@ -44,8 +44,7 @@
     terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -include("mem3_reshard.hrl").
@@ -355,9 +354,6 @@ handle_info({'DOWN', _Ref, process, Pid, Info}, State) ->
 handle_info(Info, State) ->
     couch_log:error("~p unexpected info ~p", [?MODULE, Info]),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 %% Private API
 

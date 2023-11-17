@@ -20,18 +20,13 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/2,
     handle_event/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 init(_) ->
     {ok, undefined}.
-
-terminate(_Reason, _St) ->
-    ok.
 
 handle_call(_, St) ->
     {ok, ignored, St}.
@@ -43,6 +38,3 @@ handle_event(Event, St) ->
 
 handle_info(_, St) ->
     {ok, St}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.

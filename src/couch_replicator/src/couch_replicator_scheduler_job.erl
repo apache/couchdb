@@ -24,7 +24,6 @@
     handle_call/3,
     handle_info/2,
     handle_cast/2,
-    code_change/3,
     format_status/2,
     sum_stats/2,
     report_seq_done/3
@@ -457,9 +456,6 @@ terminate_cleanup(#rep_state{rep_details = #rep{id = RepId}} = State) ->
     update_task(State),
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
-
-code_change(_OldVsn, #rep_state{} = State, _Extra) ->
-    {ok, State}.
 
 format_status(_Opt, [_PDict, State]) ->
     #rep_state{

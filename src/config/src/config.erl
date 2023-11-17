@@ -36,7 +36,7 @@
 -export([subscribe_for_changes/1]).
 -export([parse_ini_file/1]).
 
--export([init/1, terminate/2, code_change/3]).
+-export([init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -export([is_sensitive/2]).
@@ -264,9 +264,6 @@ init(IniFiles) ->
     debug_config(),
     {ok, #config{ini_files = IniFiles, write_filename = WriteFile}}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
     {reply, Resp, Config};
@@ -413,9 +410,6 @@ handle_cast(_Msg, State) ->
 handle_info(Info, State) ->
     couch_log:error("config:handle_info Info: ~p~n", [Info]),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 is_sensitive(Section, Key) ->
     Sensitive = application:get_env(config, sensitive, #{}),

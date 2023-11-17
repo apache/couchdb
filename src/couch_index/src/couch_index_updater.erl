@@ -20,7 +20,7 @@
 -export([update/3]).
 
 %% gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -109,9 +109,6 @@ handle_info({'EXIT', _Pid, normal}, State) ->
     {noreply, State};
 handle_info(_Mesg, State) ->
     {stop, unknown_info, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 update(Idx, Mod, IdxState) ->
     DbName = Mod:get(db_name, IdxState),

@@ -18,8 +18,7 @@
 
 couch_log_error_logger_h_test_() ->
     {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
-        fun handler_ignores_unknown_messages/0,
-        fun coverage_test/0
+        fun handler_ignores_unknown_messages/0
     ]}.
 
 handler_ignores_unknown_messages() ->
@@ -30,7 +29,3 @@ handler_ignores_unknown_messages() ->
     error_logger ! this_is_a_message,
     Handlers2 = gen_event:which_handlers(error_logger),
     ?assert(lists:member(?HANDLER, Handlers2)).
-
-coverage_test() ->
-    Resp = couch_log_error_logger_h:code_change(foo, bazinga, baz),
-    ?assertEqual({ok, bazinga}, Resp).

@@ -30,11 +30,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -197,9 +195,6 @@ init({Engine, OpenerPid, OpenerPriority, Options}) ->
         )
     }}.
 
-terminate(_Reason, _Stream) ->
-    ok.
-
 handle_call({write, Bin}, _From, Stream) ->
     BinSize = iolist_size(Bin),
     #stream{
@@ -279,9 +274,6 @@ handle_call(close, _From, Stream) ->
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 handle_info({'DOWN', Ref, _, _, _}, #stream{opener_monitor = Ref} = State) ->
     {stop, normal, State};

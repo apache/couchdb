@@ -19,8 +19,7 @@
 couch_log_monitor_test_() ->
     {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
         fun monitor_ignores_unknown_messages/0,
-        fun monitor_restarts_handler/0,
-        fun coverage_test/0
+        fun monitor_restarts_handler/0
     ]}.
 
 monitor_ignores_unknown_messages() ->
@@ -45,10 +44,6 @@ monitor_restarts_handler() ->
 
     Handlers = gen_event:which_handlers(error_logger),
     ?assert(lists:member(?HANDLER, Handlers)).
-
-coverage_test() ->
-    Resp = couch_log_monitor:code_change(foo, bazinga, baz),
-    ?assertEqual({ok, bazinga}, Resp).
 
 get_monitor_pid() ->
     Children = supervisor:which_children(couch_log_sup),
