@@ -19,7 +19,7 @@
 
 % gen_server API
 -export([init/1, handle_call/3, handle_info/2, handle_cast/2]).
--export([code_change/3, terminate/2, format_status/2]).
+-export([format_status/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -134,12 +134,6 @@ handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
         false ->
             {noreply, State}
     end.
-
-code_change(_OldVsn, #state{} = State, _Extra) ->
-    {ok, State}.
-
-terminate(_Reason, _State) ->
-    ok.
 
 format_status(_Opt, [_PDict, State]) ->
     #state{

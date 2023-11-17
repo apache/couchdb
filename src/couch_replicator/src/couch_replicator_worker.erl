@@ -17,7 +17,7 @@
 -export([start_link/5]).
 
 % gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 -export([format_status/2]).
 
@@ -242,9 +242,6 @@ handle_info({'EXIT', _Pid, {doc_write_failed, _} = Err}, State) ->
 handle_info({'EXIT', Pid, Reason}, State) ->
     {stop, {process_died, Pid, Reason}, State}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 format_status(_Opt, [_PDict, State]) ->
     #state{
         cp = MainJobPid,
@@ -264,9 +261,6 @@ format_status(_Opt, [_PDict, State]) ->
         {pending_fetch, PendingFetch},
         {batch_size, BatchSize}
     ].
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 sum_stats(Pid, Stats) when is_pid(Pid) ->
     ok = gen_server:cast(Pid, {sum_stats, Stats}).

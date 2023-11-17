@@ -16,7 +16,7 @@
 
 -export([start_link/1, validate/2, get_index/4, get_index/3, get_index/2]).
 
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % Sharding functions
@@ -241,9 +241,6 @@ handle_info(restart_config_listener, State) ->
 handle_info(Msg, State) ->
     couch_log:warning("~p did not expect ~p", [?MODULE, Msg]),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 handle_config_change("couchdb", "index_dir", RootDir, _, #st{root_dir = RootDir} = St) ->
     {ok, St};

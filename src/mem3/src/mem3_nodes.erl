@@ -16,9 +16,7 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([start_link/0, get_nodelist/0, get_node_info/2]).
@@ -95,12 +93,6 @@ handle_info(start_listener, #state{update_seq = Seq} = State) ->
     {noreply, State#state{changes_pid = NewPid}};
 handle_info(_Info, State) ->
     {noreply, State}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, #state{} = State, _Extra) ->
-    {ok, State}.
 
 %% internal functions
 

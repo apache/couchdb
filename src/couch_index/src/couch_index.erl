@@ -21,7 +21,7 @@
 -export([compact/1, compact/2, get_compactor_pid/1]).
 
 %% gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -363,9 +363,6 @@ handle_info({'DOWN', _, _, _Pid, _}, #st{mod = Mod, idx_state = IdxState} = Stat
     couch_log:debug("Index shutdown by monitor notice for db: ~s idx: ~s", Args),
     catch send_all(State#st.waiters, shutdown),
     {stop, normal, State#st{waiters = []}}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 maybe_restart_updater(#st{waiters = []}) ->
     ok;

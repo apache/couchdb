@@ -18,9 +18,7 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    terminate/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([
@@ -87,15 +85,6 @@ handle_info(timeout, State) ->
     {noreply, State};
 handle_info({'DOWN', Ref, _, Pid, _}, #state{sender = {Pid, Ref}} = State) ->
     {noreply, State#state{sender = nil}, 0}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, {state, Buffer, Sender, Count}, _Extra) ->
-    Max = list_to_integer(config:get("rexi", "buffer_count", "2000")),
-    {ok, #state{buffer = Buffer, sender = Sender, count = Count, max_count = Max}};
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 should_drop(#state{count = Count, max_count = Max}) ->
     Count >= Max.

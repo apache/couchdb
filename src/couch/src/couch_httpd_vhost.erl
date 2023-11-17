@@ -20,7 +20,7 @@
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
 -export([host/1, split_host_port/1]).
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -411,12 +411,6 @@ handle_info(restart_config_listener, State) ->
     {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 handle_config_change("vhosts", _, _, _, _) ->
     {ok, ?MODULE:reload()};

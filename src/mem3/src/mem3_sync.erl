@@ -17,8 +17,7 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    terminate/2,
-    code_change/3
+    terminate/2
 ]).
 
 -export([
@@ -183,11 +182,6 @@ handle_info(Msg, State) ->
 terminate(_Reason, State) ->
     [exit(Pid, shutdown) || #job{pid = Pid} <- State#state.active],
     ok.
-
-code_change(_, #state{waiting = WaitingList} = State, _) when is_list(WaitingList) ->
-    {ok, State#state{waiting = from_list(WaitingList)}};
-code_change(_, State, _) ->
-    {ok, State}.
 
 maybe_resubmit(State, #job{name = DbName, node = Node} = Job) ->
     case lists:member(DbName, local_dbs()) of

@@ -24,8 +24,7 @@
     terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -include("couch_log.hrl").
@@ -87,6 +86,3 @@ handle_cast(Msg, St) ->
 handle_info(Msg, St) ->
     {reply, ok, NewSt} = handle_call(Msg, nil, St),
     {noreply, NewSt}.
-
-code_change(_Vsn, St, _Extra) ->
-    {ok, St}.

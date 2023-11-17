@@ -45,11 +45,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_info/2,
-    handle_cast/2,
-    code_change/3
+    handle_cast/2
 ]).
 
 -export([
@@ -127,9 +125,6 @@ init([]) ->
     couch_replicator_rate_limiter_tables:create(#rec.id),
     {ok, #state{timer = new_timer()}}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call(_Msg, _From, State) ->
     {reply, invalid, State}.
 
@@ -141,9 +136,6 @@ handle_info(cleanup, #state{timer = Timer}) ->
     TIds = couch_replicator_rate_limiter_tables:tids(),
     [cleanup_table(TId, now_msec() - ?MAX_INTERVAL) || TId <- TIds],
     {noreply, #state{timer = new_timer()}}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 % Private functions
 

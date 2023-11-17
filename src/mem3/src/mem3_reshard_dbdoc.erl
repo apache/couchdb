@@ -20,11 +20,9 @@
     start_link/0,
 
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -64,9 +62,6 @@ init(_) ->
     couch_log:notice("~p start init()", [?MODULE]),
     {ok, nil}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call({update_shard_map, Source, Target}, _From, State) ->
     Res =
         try
@@ -87,9 +82,6 @@ handle_cast(Cast, State) ->
 handle_info(Info, State) ->
     couch_log:error("~p unexpected info ~p", [?MODULE, Info]),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 % Private
 

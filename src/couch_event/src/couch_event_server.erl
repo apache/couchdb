@@ -19,11 +19,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -include("couch_event_int.hrl").
@@ -43,9 +41,6 @@ init(_) ->
         by_pid = ByPid,
         by_dbname = ByDbName
     }}.
-
-terminate(_Reason, _St) ->
-    ok.
 
 handle_call({register, Pid, NewDbNames}, _From, St) ->
     case khash:get(St#st.by_pid, Pid) of
@@ -90,9 +85,6 @@ handle_info({'DOWN', Ref, process, Pid, _Reason}, St) ->
 handle_info(Msg, St) ->
     couch_log:notice("~s ignoring info ~w", [?MODULE, Msg]),
     {noreply, St}.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 notify_listeners(ByDbName, DbName, Event) ->
     Msg = {'$couch_event', DbName, Event},

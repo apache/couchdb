@@ -34,11 +34,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_info/2,
-    handle_cast/2,
-    code_change/3
+    handle_cast/2
 ]).
 
 -export([
@@ -151,9 +149,6 @@ init([]) ->
     ),
     {ok, #state{mem3_cluster_pid = Mem3Cluster, cluster_stable = false}}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call(is_stable, _From, #state{cluster_stable = IsStable} = State) ->
     {reply, IsStable, State};
 handle_call(set_stable, _From, State) ->
@@ -168,9 +163,6 @@ handle_cast({set_period, Period}, #state{mem3_cluster_pid = Pid} = State) ->
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 %% Internal functions
 

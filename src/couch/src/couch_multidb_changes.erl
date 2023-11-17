@@ -23,8 +23,7 @@
     terminate/2,
     handle_call/3,
     handle_info/2,
-    handle_cast/2,
-    code_change/3
+    handle_cast/2
 ]).
 
 -export([
@@ -162,9 +161,6 @@ handle_info({'EXIT', From, Reason}, #state{pids = Pids} = State) ->
     end;
 handle_info(_Msg, State) ->
     {noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 % Private functions
 
@@ -721,8 +717,7 @@ t_start_link_no_ddocs() ->
 
 t_misc_gen_server_callbacks() ->
     ?_test(begin
-        ?assertEqual(ok, terminate(reason, state)),
-        ?assertEqual({ok, state}, code_change(old, state, extra))
+        ?assertEqual(ok, terminate(reason, state))
     end).
 
 scan_dbs_test_() ->

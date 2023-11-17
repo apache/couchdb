@@ -36,9 +36,7 @@
 
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-
-    code_change/3
+    handle_info/2
 ]).
 
 -define(DEFAULT_TIME_UNIT, millisecond).
@@ -215,9 +213,6 @@ handle_info(timeout, St) ->
     {noreply, St, next_timeout(St)};
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 accessed(Key, St) ->
     Pattern = #entry{key = Key, atime = '$1', _ = '_'},

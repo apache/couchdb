@@ -17,7 +17,7 @@
 -export([start_link/2, run/2, cancel/1, is_running/1, get_compacting_pid/1]).
 
 %% gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -88,9 +88,6 @@ handle_info({'EXIT', Pid, _Reason}, #st{idx = Pid} = State) ->
     {stop, normal, State};
 handle_info(_Mesg, State) ->
     {stop, unknown_info, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 compact(Parent, Mod, IdxState) ->
     DbName = Mod:get(db_name, IdxState),

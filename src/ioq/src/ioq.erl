@@ -17,7 +17,7 @@
 -export([start_link/0, call/3, call_search/3]).
 -export([get_queue_lengths/0]).
 -export([get_io_priority/0, set_io_priority/1, maybe_set_io_priority/1]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -174,12 +174,6 @@ handle_config_terminate(_Server, stop, _State) ->
     ok;
 handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
-
-code_change(_Vsn, State, _Extra) ->
-    {ok, State}.
-
-terminate(_Reason, _State) ->
-    ok.
 
 enqueue_request(#request{priority = compaction} = Request, #state{} = State) ->
     State#state{background = queue:in(Request, State#state.background)};

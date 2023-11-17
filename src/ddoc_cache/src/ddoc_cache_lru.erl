@@ -25,8 +25,7 @@
     terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -export([
@@ -217,9 +216,6 @@ handle_info({'EXIT', Pid, normal}, St) ->
     {noreply, St};
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 handle_db_event(ShardDbName, created, St) ->
     gen_server:cast(?MODULE, {evict, mem3:dbname(ShardDbName)}),

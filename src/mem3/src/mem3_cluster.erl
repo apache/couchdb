@@ -36,11 +36,9 @@
 
 -export([
     init/1,
-    terminate/2,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    code_change/3
+    handle_info/2
 ]).
 
 -callback cluster_stable(Context :: term()) -> NewContext :: term().
@@ -81,9 +79,6 @@ init([Module, Context, StartPeriod, Period]) ->
         timer = new_timer(StartPeriod)
     }}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 handle_call(_Msg, _From, State) ->
     {reply, ignored, State}.
 
@@ -103,9 +98,6 @@ handle_info(stability_check, #state{mod = Mod, ctx = Ctx} = State) ->
             Timer = new_timer(interval(State)),
             {noreply, State#state{timer = Timer}}
     end.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
 
 %% Internal functions
 
