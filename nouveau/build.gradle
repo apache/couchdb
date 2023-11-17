@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    implementation platform('io.dropwizard:dropwizard-dependencies:4.0.3')
+    implementation platform('io.dropwizard:dropwizard-dependencies:4.0.4')
     implementation 'io.dropwizard:dropwizard-core'
     implementation 'io.dropwizard:dropwizard-http2'
     implementation 'io.dropwizard.metrics:metrics-core'
