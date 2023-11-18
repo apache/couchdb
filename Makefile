@@ -157,6 +157,7 @@ check: all
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
+	@$(MAKE) elixir-search
 	@$(MAKE) weatherreport-test
 	@$(MAKE) nouveau-test
 
@@ -263,12 +264,17 @@ elixir: elixir-init devclean
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
 .PHONY: elixir-search
-# target: elixir-search - Run search tests, requires a running Clouseau instance
+# target: elixir-search - Run search tests, requires a configured Clouseau instance
 elixir-search: export MIX_ENV=integration
 elixir-search: elixir-init devclean
+ifeq ($(with_clouseau), 1)
 	@dev/run -n 1 -q -a adm:pass \
+		--with-clouseau \
 		--locald-config test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
+else
+	@echo "Warning: Clouseau is not enabled, \`elixir-search\` cannot be run."
+endif
 
 .PHONY: elixir-source-checks
 # target: elixir-source-checks - Check source code formatting of Elixir test files
@@ -313,19 +319,24 @@ list-eunit-suites:
 build-test:
 	@test/build/test-configure.sh
 
+ifeq ($(with_clouseau), 1)
+_WITH_CLOUSEAU="--with-clouseau"
+endif
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
 mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
-	@cd src/mango && \
-		python3 -m venv .venv && \
-		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && \
-		../../dev/run "$(TEST_OPTS)" \
+	@python3 -m venv src/mango/.venv && \
+		src/mango/.venv/bin/python3 -m pip install -r src/mango/requirements.txt
+	@dev/run \
+		"$(TEST_OPTS)" \
+		"$(_WITH_CLOUSEAU)" \
 		-n 1 \
 		--admin=adm:pass \
-		'COUCH_USER=adm COUCH_PASS=pass .venv/bin/python3 -m nose2 $(MANGO_TEST_OPTS)'
+		--no-eval "\
+COUCH_USER=adm COUCH_PASS=pass \
+src/mango/.venv/bin/nose2 -s src/mango/test -c src/mango/unittest.cfg $(MANGO_TEST_OPTS)"
 
 
 .PHONY: weatherreport-test

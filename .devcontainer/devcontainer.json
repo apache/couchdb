@@ -5,11 +5,11 @@
         "context": "..",
         "args": {
             // Useful choices include:
-            // apache/couchdbci-debian:bullseye-erlang-25.0.2
-            // apache/couchdbci-debian:bullseye-erlang-24.3.4.2
-            // apache/couchdbci-debian:bullseye-erlang-23.3.4.15
+            // apache/couchdbci-debian:bullseye-erlang-26.1.2
+            // apache/couchdbci-debian:bullseye-erlang-25.3.2.7
+            // apache/couchdbci-debian:bookworm-erlang-24.3.4.14
             //
-            "COUCHDB_IMAGE": "apache/couchdbci-debian:bullseye-erlang-24.3.4.10"
+            "COUCHDB_IMAGE": "apache/couchdbci-debian:bullseye-erlang-24.3.4.14"
         }
     },
 
@@ -23,7 +23,7 @@
     // Your code will live inside the volume created for the container under /workspace.
     "workspaceMount": "target=/workspaces/couchdb,type=volume",
     "workspaceFolder": "/workspaces/couchdb",
-    "postCreateCommand": "./configure --enable-nouveau && make",
+    "postCreateCommand": "./configure --enable-nouveau --enable-clouseau && make",
 
     "customizations": {
         "vscode": {

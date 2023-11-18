@@ -27,6 +27,7 @@ meta = [
     name: 'CentOS 7',
     spidermonkey_vsn: '1.8.5',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-centos:7-erlang-${ERLANG_VERSION}"
   ],
 
@@ -34,6 +35,7 @@ meta = [
     name: 'CentOS 8',
     spidermonkey_vsn: '60',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
@@ -41,6 +43,7 @@ meta = [
     name: 'Ubuntu 18.04',
     spidermonkey_vsn: '1.8.5',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-ubuntu:bionic-erlang-${ERLANG_VERSION}"
   ],
 
@@ -48,6 +51,7 @@ meta = [
     name: 'Ubuntu 20.04',
     spidermonkey_vsn: '68',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
@@ -55,6 +59,7 @@ meta = [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
@@ -62,6 +67,7 @@ meta = [
     name: 'Debian 10',
     spidermonkey_vsn: '60',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
   ],
 
@@ -72,6 +78,7 @@ meta = [
   //   name: 'Debian 11 ARM',
   //   spidermonkey_vsn: '78',
   //   enable_nouveau: true,
+  //   enable_clouseau: false,
   //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
   //   node_label: 'arm64v8'
   // ],
@@ -80,6 +87,7 @@ meta = [
     name: 'Debian 11 POWER',
     spidermonkey_vsn: '78',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 'ppc64le'
   ],
@@ -98,6 +106,7 @@ meta = [
     name: 'Debian 11',
     spidermonkey_vsn: '78',
     enable_nouveau: true,
+    enable_clouseau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
@@ -105,18 +114,21 @@ meta = [
     name: 'Debian 12',
     spidermonkey_vsn: '78',
     enable_nouveau: true,
+    enable_clouseau: false,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
   'freebsd-x86_64': [
      name: 'FreeBSD',
      spidermonkey_vsn: '91',
+     enable_clouseau: false,
      gnu_make: 'gmake'
   ],
 
   'freebsd-arm64': [
      name: 'FreeBSD',
      spidermonkey_vsn: '91',
+     enable_clouseau: false,
      gnu_make: 'gmake'
   ],
 
@@ -124,6 +136,7 @@ meta = [
     name: 'macOS',
     spidermonkey_vsn: '91',
     enable_nouveau: false,
+    enable_clouseau: false,
     gnu_make: 'make'
   ]
 ]
@@ -132,6 +145,9 @@ def String configure(config) {
   result = "./configure --skip-deps --spidermonkey-version ${config.spidermonkey_vsn}"
   if (config.enable_nouveau) {
     result += " --enable-nouveau"
+  }
+  if (config.enable_clouseau) {
+    result += " --enable-clouseau"
   }
   return result
 }
@@ -170,6 +186,7 @@ def generateNativeStage(platform) {
                 sh '$MAKE'
                 sh '$MAKE eunit'
                 sh '$MAKE elixir'
+                sh '$MAKE elixir-search'
                 sh '$MAKE mango-test'
                 sh '$MAKE weatherreport-test'
                 sh '$MAKE nouveau-test'
@@ -223,6 +240,7 @@ def generateContainerStage(platform) {
                     sh 'make'
                     sh 'make eunit'
                     sh 'make elixir'
+                    sh 'make elixir-search'
                     sh 'make mango-test'
                     sh 'make weatherreport-test'
                     sh 'make nouveau-test'
