@@ -23,6 +23,7 @@ import json
 import ntpath
 import optparse
 import os
+import platform
 import posixpath
 import re
 import signal
@@ -90,11 +91,15 @@ log.verbose = True
 
 def main():
     ctx = setup()
-    startup(ctx)
-    if ctx["cmd"]:
-        run_command(ctx, ctx["cmd"])
+    try:
+        startup(ctx)
+    except ClouseauError:
+        sys.exit(1)
     else:
-        join(ctx, cluster_port(ctx, 1), *ctx["admin"])
+        if ctx["cmd"]:
+            run_command(ctx, ctx["cmd"])
+        else:
+            join(ctx, cluster_port(ctx, 1), *ctx["admin"])
 
 
 def setup():
@@ -236,6 +241,19 @@ def get_args_parser():
         help="Start Nouveau server",
     )
     parser.add_option(
+        "--with-clouseau",
+        dest="with_clouseau",
+        default=False,
+        action="store_true",
+        help="Start Clouseau nodes",
+    )
+    parser.add_option(
+        "--erlang-cookie",
+        dest="erlang_cookie",
+        default=None,
+        help="Erlang cookie string",
+    )
+    parser.add_option(
         "-t",
         "--enable-tls",
         dest="enable_tls",
@@ -279,6 +297,8 @@ def setup_context(opts, args):
         "auto_ports": opts.auto_ports,
         "locald_configs": opts.locald_configs,
         "with_nouveau": opts.with_nouveau,
+        "with_clouseau": opts.with_clouseau,
+        "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
         "no_tls": opts.no_tls,
     }
@@ -505,6 +525,157 @@ def boot_nouveau(ctx):
     )
 
 
+CLOUSEAU_DIR = "clouseau"
+JAVA_VERSION_RE = re.compile('"(\d+\.\d+).*"')
+
+
+def get_java_version(java):
+    try:
+        output = sp.check_output([java, "-version"], stderr=sp.STDOUT).decode("utf-8")
+    except:
+        output = None
+
+    if output:
+        matches = JAVA_VERSION_RE.search(output)
+        if matches:
+            return float(matches.groups()[0])
+
+
+class ClouseauError(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
+@log("Start Clouseau node clouseau{idx}")
+def boot_clouseau(ctx, idx):
+    configure_cmd = (
+        "&.\\configure.ps1 -EnableClouseau"
+        if platform.system() == "Windows"
+        else "./configure --enable-clouseau"
+    )
+
+    if not os.path.isdir(CLOUSEAU_DIR):
+        raise ClouseauError(
+            "Clouseau deployment cannot be found, please run `{}`".format(configure_cmd)
+        )
+
+    clouseau_jdk_home = os.environ.get("CLOUSEAU_JAVA_HOME") or os.environ.get(
+        "JAVA_HOME"
+    )
+    java = clouseau_jdk_home + "/bin/java" if clouseau_jdk_home else "java"
+    java_version = get_java_version(java)
+
+    if not java_version:
+        print(
+            "Warning: Java version could not be determined, Clouseau may not be able to run"
+        )
+    else:
+        if java_version < 1.7 or java_version > 1.8:
+            raise ClouseauError(
+                "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+            )
+
+    clouseau_jars = [
+        "{}/{}".format(CLOUSEAU_DIR, fname)
+        for fname in os.listdir(CLOUSEAU_DIR)
+        if fname.endswith(".jar")
+    ]
+
+    if not clouseau_jars:
+        raise ClouseauError("Clouseau has no JAR files")
+
+    clouseau_ini = "{}/clouseau.ini".format(CLOUSEAU_DIR)
+    if not os.path.isfile(clouseau_ini):
+        raise ClouseauError("Clouseau has no ini file")
+
+    log4j_properties = "{}/log4j.properties".format(CLOUSEAU_DIR)
+    if not os.path.isfile(log4j_properties):
+        raise ClouseauError("Clouseau has no Log4J configuration")
+
+    clouseau_name = "clouseau{}@127.0.0.1".format(idx)
+    clouseau_indexes_dir = "{}/clouseau{}/data".format(ctx["devdir"], idx)
+
+    if ctx["erlang_cookie"]:
+        clouseau_cookie = ["-Dclouseau.cookie={}".format(ctx["erlang_cookie"])]
+    else:
+        clouseau_cookie = []
+
+    # `HOME` must be set for Scalang to find the Erlang cookie
+    if not os.environ.get("HOME"):
+        # This is usually `USERPROFILE` on Windows
+        alternativeHome = os.environ.get("USERPROFILE")
+        if alternativeHome:
+            os.environ["HOME"] = alternativeHome
+
+    separator = ";" if platform.system() == "Windows" else ":"
+
+    cmd = (
+        [
+            java,
+            "-server",
+            "-Xmx2G",
+            "-Dsun.net.inetaddr.ttl=30",
+            "-Dsun.net.inetaddr.negative.ttl=30",
+            '-XX:OnOutOfMemoryError="kill -9 %p"',
+            "-XX:+UseConcMarkSweepGC",
+            "-XX:+CMSParallelRemarkEnabled",
+            "-cp",
+            separator.join(clouseau_jars),
+            "-Dlog4j.configuration=file:{}".format(log4j_properties),
+            "-Dclouseau.name={}".format(clouseau_name),
+            "-Dclouseau.dir={}".format(clouseau_indexes_dir),
+        ]
+        + clouseau_cookie
+        + [
+            "com.cloudant.clouseau.Main",
+            clouseau_ini,
+        ]
+    )
+    logfname = os.path.join(ctx["devdir"], "logs", "clouseau{}.log".format(idx))
+    log = open(logfname, "w")
+
+    try:
+        return sp.Popen(
+            cmd,
+            stdin=sp.PIPE,
+            stdout=log,
+            stderr=sp.STDOUT,
+        )
+    except:
+        raise ClouseauError("Java is not capable of running Clouseau")
+
+
+def maybe_boot_clouseau(ctx, idx):
+    if ctx["with_clouseau"]:
+        return boot_clouseau(ctx, idx)
+
+
+@log("Check Clouseau node clouseau{idx}")
+def check_clouseau_node_alive(ctx, idx):
+    if ctx["erlang_cookie"]:
+        cookie = ["-c", ctx["erlang_cookie"]]
+    else:
+        cookie = []
+
+    cmd = (
+        ["erl_call", "-n", "node{}@127.0.0.1".format(idx)]
+        + cookie
+        + [
+            "-a",
+            "net_adm ping ['clouseau{}@127.0.0.1']".format(idx),
+        ]
+    )
+
+    if sp.check_output(cmd) != b"pong":
+        raise ValueError("Clouseau is not working")
+
+
+def maybe_check_clouseau_node_alive(ctx, idx):
+    if ctx["with_clouseau"]:
+        check_clouseau_node_alive(ctx, idx)
+
+
 def hack_default_ini(ctx, node, contents):
     contents = re.sub(
         "^\[httpd\]$",
@@ -628,6 +799,10 @@ def boot_nodes(ctx):
     nouveau_proc = boot_nouveau(ctx)
     if nouveau_proc is not None:
         ctx["procs"].append(nouveau_proc)
+    for idx in [(i + ctx["node_number"]) for i in range(ctx["N"])]:
+        clouseau_proc = maybe_boot_clouseau(ctx, idx)
+        if clouseau_proc is not None:
+            ctx["procs"].append(clouseau_proc)
 
 
 def ensure_all_nodes_alive(ctx):
@@ -640,6 +815,7 @@ def ensure_all_nodes_alive(ctx):
             url = "http://127.0.0.1:{0}/".format(local_port)
             try:
                 check_node_alive(url)
+                maybe_check_clouseau_node_alive(ctx, num + 1)
             except:
                 pass
             else:

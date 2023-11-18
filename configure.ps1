@@ -8,9 +8,11 @@
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
   -EnableNouveau             enable the new experiemtal search module (default false)
+  -EnableClouseau            enable the Clouseau search module (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
+  -ClouseauVersion VSN       select the version of Clouseau to use (default 2.22.0)
 
   Installation directories:
   -Prefix PREFIX             install architecture-independent files in PREFIX
@@ -45,6 +47,7 @@ Param(
     [switch]$DisableFauxton = $false, # do not build Fauxton
     [switch]$DisableDocs = $false, # do not build any documentation or manpages
     [switch]$EnableNouveau = $false, # dont use new search module by default
+    [switch]$EnableClouseau = $false, # do not use Clouseau by default
     [switch]$SkipDeps = $false, # do not update erlang dependencies
     [switch]$DisableProper = $false, # a compilation pragma. proper is a kind of automated test suite
     [switch]$EnableErlangMD5 = $false, # don't use Erlang for md5 hash operations by default
@@ -53,6 +56,8 @@ Param(
     [string]$CouchDBUser = [Environment]::UserName, # set the username to run as (defaults to current user)
     [ValidateNotNullOrEmpty()]
     [string]$SpiderMonkeyVersion = "91", # select the version of SpiderMonkey to use (default 91)
+    [ValidateNotNullOrEmpty()]
+    [string]$ClouseauVersion = "2.22.0", # select the version of Clouseau to use (default 2.22.0)
     [ValidateNotNullOrEmpty()]
     [string]$Prefix = "C:\Program Files\Apache\CouchDB", # install architecture-independent file location (default C:\Program Files\Apache\CouchDB)
     [ValidateNotNullOrEmpty()]
@@ -130,6 +135,7 @@ $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
 $BuildNouveau = $(If ($EnableNouveau) {1} else {0})
+$WithClouseau = $(If ($EnableClouseau) {1} else {0})
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 $WithProper = (-not $DisableProper).ToString().ToLower()
 $ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
@@ -201,6 +207,7 @@ man_dir = $ManDir
 with_fauxton = $BuildFauxton
 with_docs = $BuildDocs
 with_nouveau = $BuildNouveau
+with_clouseau = $WithClouseau
 
 user = $CouchDBUser
 spidermonkey_version = $SpiderMonkeyVersion
@@ -265,6 +272,63 @@ if ((Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue) -eq $null)
    cp $rootdir\src\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
    make -C $rootdir\src\erlfmt clean
    cd ..\..
+}
+
+$ClouseauDir = "$rootdir\clouseau"
+
+if ($EnableClouseau)
+{
+    Write-Verbose "===> downloading Clouseau distribution..."
+
+    if (Test-Path $ClouseauDir) {
+	Remove-Item -Recurse -Force $ClouseauDir
+    }
+    New-Item -Path $ClouseauDir -ItemType Directory | Out-File Null
+
+    $Slf4jVersion = "1.7.36"
+    $ClouseauDistUrl = "https://github.com/cloudant-labs/clouseau/releases/download/$ClouseauVersion/clouseau-$ClouseauVersion-dist.zip"
+    $Slf4jSimpleJar = "slf4j-simple-$Slf4jVersion.jar"
+    $Slf4jSimpleUrl = "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/$Slf4jVersion/$Slf4jSimpleJar"
+
+    Set-Variable ProgressPreference SilentlyContinue
+    Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
+    If ($LASTEXITCODE -ne 0) {
+	Write-Output "ERROR: $ClouseauDistUrl could not be downloaded."
+	exit 1
+    }
+
+    Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
+    If ($LASTEXITCODE -ne 0) {
+	Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
+	exit 1
+    }
+    mv "$ClouseauDir\*\*.jar" "$ClouseauDir"
+    rm "$ClouseauDir\clouseau-$ClouseauVersion"
+    rm clouseau.zip
+
+    Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$Slf4jSimpleJar" $Slf4jSimpleUrl
+    If ($LASTEXITCODE -ne 0) {
+	Write-Output "ERROR: $Slf4jSimpleJarUrl could not be downloaded."
+	exit 1
+    }
+
+    $ClouseauIni = @"
+[clouseau]
+"@
+    $ClouseauIni | Out-File "$ClouseauDir\clouseau.ini" -encoding ascii
+
+    $Log4JProperties = @"
+log4j.rootLogger=debug, CONSOLE
+log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
+"@
+    $Log4JProperties | Out-File "$ClouseauDir\log4j.properties"
+}
+else {
+    if (Test-Path $ClouseauDir) {
+	Remove-Item -Recurse -Force $ClouseauDir
+    }
 }
 
 # only update dependencies, when we are not in a release tarball

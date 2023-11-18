@@ -29,6 +29,7 @@ WITH_PROPER="true"
 WITH_FAUXTON=1
 WITH_DOCS=1
 WITH_NOUVEAU=0
+WITH_CLOUSEAU=0
 ERLANG_MD5="false"
 SKIP_DEPS=0
 
@@ -38,6 +39,8 @@ run_erlang() {
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
 SM_VSN=${SM_VSN:-"91"}
+CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.22.0"}
+CLOUSEAU_DIR="$(pwd)"/clouseau
 ARCH="$(uname -m)"
 ERLANG_VER="$(run_erlang 'io:put_chars(erlang:system_info(otp_release)).')"
 ERLANG_OS="$(run_erlang 'case os:type() of {OS, _} -> io:format("~s~n", [OS]) end.')"
@@ -59,9 +62,11 @@ Options:
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
   --enable-nouveau            enable the new experimental search module
+  --enable-clouseau           enable the Clouseau search module
   --erlang-md5                use erlang for md5 hash operations
   --dev                       alias for --disable-docs --disable-fauxton
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
+  --clouseau-version VSN      specify the version of Clouseau to use (defaults to $CLOUSEAU_VSN)
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
   --rebar3=PATH               use rebar3 by specified path
@@ -100,6 +105,17 @@ parse_opts() {
                 shift
                 continue
                 ;;
+
+	    --enable-clouseau)
+		if [ "${ERLANG_VER}" -gt 25 ]; then
+		    echo "Warning: Clouseau is not working with OTP 26 or later at the moment, therefore it is not configured.  Continue in 5 seconds..."
+		    sleep 5
+		else
+		    WITH_CLOUSEAU=1
+		fi
+		shift
+		continue
+		;;
 
             --erlang-md5)
                 ERLANG_MD5="true"
@@ -202,6 +218,24 @@ parse_opts() {
                 exit 1
                 ;;
 
+	    --clouseau-version)
+		if [ -n "$2" ]; then
+		    eval CLOUSEAU_SVN=$2
+		    shift 2
+		    continue
+		else
+		    printf 'ERROR: "--clouseau-version" requires a non-empty argument.\n' >&2
+		    exit 1
+		fi
+		;;
+	    --clouseau-version=?*)
+		eval CLOUSEAU_VSN=${1#*=}
+		;;
+	    --clouseau-version=)
+	        printf 'ERROR: "--clouseau-version" requires a non-empty argument.\n' >&2
+	        exit 1
+	        ;;
+
             --) # End of options
                 shift
                 break
@@ -298,6 +332,7 @@ package_author_name = $PACKAGE_AUTHOR_NAME
 with_fauxton = $WITH_FAUXTON
 with_docs = $WITH_DOCS
 with_nouveau = $WITH_NOUVEAU
+with_clouseau = $WITH_CLOUSEAU
 
 user = $COUCHDB_USER
 spidermonkey_version = $SM_VSN
@@ -345,6 +380,45 @@ install_local_erlfmt() {
     fi
 }
 
+install_local_clouseau() {
+    _DIST_URL=https://github.com/cloudant-labs/clouseau/releases/download/"$CLOUSEAU_VSN"/clouseau-"$CLOUSEAU_VSN"-dist.zip
+    _MAVEN_BASE_URI=https://repo1.maven.org/maven2
+
+    _SLF4J_SIMPLE_VSN=${SLF4J_SIMPLE_VERSION:-1.7.36}
+    _SLF4J_SIMPLE_JAR=slf4j-simple-"$_SLF4J_SIMPLE_VSN".jar
+    _SLF4J_SIMPLE_URL="$_MAVEN_BASE_URI"/org/slf4j/slf4j-simple/"$_SLF4J_SIMPLE_VSN"/"$_SLF4J_SIMPLE_JAR"
+
+    rm -rf "$CLOUSEAU_DIR"
+    mkdir -p "$CLOUSEAU_DIR"
+
+    if ! curl -sSL --max-redirs 1 -o clouseau.zip "$_DIST_URL"; then
+	printf "ERROR: %s could not be downloaded.\n" "$_DIST_URL" >&2
+	exit 1
+    fi
+
+    if ! unzip -q -j clouseau.zip -d "$CLOUSEAU_DIR"; then
+	printf "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted.\n" >&2
+	exit 1
+    fi
+
+    rm clouseau.zip
+
+    if ! curl -sSL --max-redirs 1 -o "$CLOUSEAU_DIR"/"$_SLF4J_SIMPLE_JAR" "$_SLF4J_SIMPLE_URL"; then
+	printf "ERROR: %s could not be downloaded.\n" "$_SLF4J_SIMPLE_URL" >&2
+	exit 1
+    fi
+
+    cat <<EOF > "$CLOUSEAU_DIR"/clouseau.ini
+[clouseau]
+EOF
+    cat <<EOF > "$CLOUSEAU_DIR"/log4j.properties
+log4j.rootLogger=debug, CONSOLE
+log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
+EOF
+}
+
 if [ -z "${REBAR}" ]; then
     install_local_rebar
     REBAR=${rootdir}/bin/rebar
@@ -358,6 +432,12 @@ fi
 if [ -z "${ERLFMT}" ]; then
     install_local_erlfmt
     ERLFMT=${rootdir}/bin/erlfmt
+fi
+
+if [ $WITH_CLOUSEAU -ne 0 ]; then
+    install_local_clouseau
+else
+    rm -rf "$CLOUSEAU_DIR"
 fi
 
 # only update dependencies, when we are not in a release tarball

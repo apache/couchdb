@@ -143,6 +143,7 @@ check: all
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
+	@$(MAKE) elixir-search
 	@$(MAKE) nouveau-test
 
 ifdef apps
@@ -203,6 +204,8 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux dev\run dev\format_*.py src\mango\test src\docs\src\conf.py src\docs\ext .
 
+-include install.mk
+
 ifeq ($(with_nouveau), 0)
   exclude_nouveau=--exclude nouveau
 endif
@@ -239,12 +242,17 @@ elixir: elixir-init devclean
 		--no-eval 'mix test --trace --include test\elixir\test\config\suite.elixir --exclude test\elixir\test\config\skip.elixir $(EXUNIT_OPTS)'
 
 .PHONY: elixir-search
-# target: elixir-search - Run search tests, requires a running Clouseau instance
+# target: elixir-search - Run search tests, requires a configured Clouseau instance
 elixir-search: export MIX_ENV=integration
 elixir-search: elixir-init devclean
+ifeq ($(with_clouseau), 1)
 	@dev\run -n 1 -q -a adm:pass \
+		--with-clouseau \
 		--locald-config test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
+else
+	@echo "Warning: Clouseau is not enabled, `elixir-search` cannot be run."
+endif
 
 .PHONY: elixir-source-checks
 # target: elixir-source-checks - Check source code formatting of Elixir test files
@@ -278,19 +286,24 @@ list-eunit-apps:
 list-eunit-suites:
 	@powershell -Command 'Get-ChildItem -Path src -Recurse -Filter "*_tests?.erl" | ForEach-Object { "{0}" -f $$_.BaseName } | Sort'
 
+ifeq ($(with_clouseau), 1)
+_WITH_CLOUSEAU="--with-clouseau"
+endif
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
 mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
-	@cd src\mango && \
-		python.exe -m venv .venv && \
-		.venv\Scripts\pip.exe install -r requirements.txt
-	@cd src\mango && \
-		..\..\dev\run "$(TEST_OPTS)" \
+	@$(PYTHON) -m venv src\mango\.venv && \
+		src\mango\.venv\Scripts\pip.exe install -r src\mango\requirements.txt
+	@dev\run \
+		"$(TEST_OPTS)" \
+		"$(_WITH_CLOUSEAU)" \
 		-n 1 \
 		--admin=adm:pass \
-		"env COUCH_USER=adm COUCH_PASS=pass .venv\Scripts\nose2 $(MANGO_TEST_OPTS)"
+		"\
+env COUCH_USER=adm COUCH_PASS=pass \
+src\mango\.venv\Scripts\nose2 -s src\mango\test -c src\mango\unittest.cfg $(MANGO_TEST_OPTS)"
 
 
 ################################################################################
@@ -350,7 +363,6 @@ dist: all derived
 
 .PHONY: release
 # target: release - Create an Erlang release including CouchDB!
--include install.mk
 release: all
 	@echo 'Installing CouchDB into rel\couchdb\ ...'
 	-@rmdir /s/q rel\couchdb >NUL 2>&1 || true
