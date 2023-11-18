@@ -70,7 +70,6 @@ changes(DbName, #changes_args{} = Args, StartSeq, DbOptions) ->
     changes(DbName, [Args], StartSeq, DbOptions);
 changes(DbName, Options, StartVector, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    couch_stats_resource_tracker:set_context_dbname(DbName),
     Args0 = lists:keyfind(changes_args, 1, Options),
     #changes_args{dir = Dir, filter_fun = Filter} = Args0,
     Args =
@@ -147,7 +146,6 @@ all_docs(DbName, Options, Args0) ->
     case fabric_util:upgrade_mrargs(Args0) of
         #mrargs{keys = undefined} = Args ->
             set_io_priority(DbName, Options),
-            couch_stats_resource_tracker:set_context_dbname(DbName),
             {ok, Db} = get_or_create_db(DbName, Options),
             CB = get_view_cb(Args),
             couch_mrview:query_all_docs(Db, Args, CB, Args)
@@ -172,7 +170,6 @@ map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     map_view(DbName, DDoc, ViewName, Args0, DbOptions);
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    couch_stats_resource_tracker:set_context_dbname(DbName),
     Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     CB = get_view_cb(Args),
@@ -187,7 +184,6 @@ reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     reduce_view(DbName, DDoc, ViewName, Args0, DbOptions);
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    couch_stats_resource_tracker:set_context_dbname(DbName),
     Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db = Db},
@@ -331,7 +327,6 @@ reset_validation_funs(DbName) ->
 
 open_shard(Name, Opts) ->
     set_io_priority(Name, Opts),
-    couch_stats_resource_tracker:set_context_dbname(Name),
     try
         rexi:reply(mem3_util:get_or_create_db(Name, Opts))
     catch
@@ -358,14 +353,6 @@ get_uuid(DbName) ->
 
 with_db(DbName, Options, {M, F, A}) ->
     set_io_priority(DbName, Options),
-    couch_stats_resource_tracker:set_context_dbname(DbName),
-    %% TODO: better approach here than using proplists?
-    case proplists:get_value(user_ctx, Options) of
-        undefined ->
-            ok;
-        #user_ctx{name = UserName} ->
-            couch_stats_resource_tracker:set_context_username(UserName)
-    end,
     case get_or_create_db(DbName, Options) of
         {ok, Db} ->
             rexi:reply(
@@ -391,7 +378,6 @@ with_db(DbName, Options, {M, F, A}) ->
 
 read_repair_filter(DbName, Docs, NodeRevs, Options) ->
     set_io_priority(DbName, Options),
-    couch_stats_resource_tracker:set_context_dbname(DbName),
     case get_or_create_db(DbName, Options) of
         {ok, Db} ->
             try
@@ -682,6 +668,14 @@ clean_stack(S) ->
     ).
 
 set_io_priority(DbName, Options) ->
+    couch_stats_resource_tracker:set_context_dbname(DbName),
+    %% TODO: better approach here than using proplists?
+    case proplists:get_value(user_ctx, Options) of
+        undefined ->
+            ok;
+        #user_ctx{name = UserName} ->
+            couch_stats_resource_tracker:set_context_username(UserName)
+    end,
     case lists:keyfind(io_priority, 1, Options) of
         {io_priority, Pri} ->
             erlang:put(io_priority, Pri);
