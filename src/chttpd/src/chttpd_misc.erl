@@ -37,8 +37,7 @@
     [
         send_json/2, send_json/3,
         send_method_not_allowed/2,
-        send_chunk/2,
-        start_chunked_response/3
+        send_chunk/2
     ]
 ).
 
@@ -231,6 +230,92 @@ handle_task_status_req(#httpd{method = 'GET'} = Req) ->
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
+handle_resource_status_req(#httpd{method = 'POST'} = Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
+    chttpd:validate_ctype(Req, "application/json"),
+    {Props} = chttpd:json_body_obj(Req),
+    Action = proplists:get_value(<<"action">>, Props),
+    Key = proplists:get_value(<<"key">>, Props),
+    Val = proplists:get_value(<<"val">>, Props),
+
+    CountBy = fun couch_stats_resource_tracker:count_by/1,
+    GroupBy = fun couch_stats_resource_tracker:group_by/2,
+    SortedBy1 = fun couch_stats_resource_tracker:sorted_by/1,
+    SortedBy2 = fun couch_stats_resource_tracker:sorted_by/2,
+    ConvertEle = fun(K) -> list_to_existing_atom(binary_to_list(K)) end,
+    ConvertList = fun(L) -> [ConvertEle(E) || E <- L] end,
+    ToJson = fun couch_stats_resource_tracker:term_to_flat_json/1,
+    JsonKeys = fun(PL) -> [[ToJson(K), V] || {K, V} <- PL] end,
+
+    Fun = case {Action, Key, Val} of
+        {<<"count_by">>, Keys, undefined} when is_list(Keys) ->
+            Keys1 = [ConvertEle(K) || K <- Keys],
+            fun() -> CountBy(Keys1) end;
+        {<<"count_by">>, Key, undefined} ->
+            Key1 = ConvertEle(Key),
+            fun() -> CountBy(Key1) end;
+        {<<"group_by">>, Keys, Vals} when is_list(Keys) andalso is_list(Vals) ->
+            Keys1 = ConvertList(Keys),
+            Vals1 = ConvertList(Vals),
+            fun() -> GroupBy(Keys1, Vals1) end;
+        {<<"group_by">>, Key, Vals} when is_list(Vals) ->
+            Key1 = ConvertEle(Key),
+            Vals1 = ConvertList(Vals),
+            fun() -> GroupBy(Key1, Vals1) end;
+        {<<"group_by">>, Keys, Val} when is_list(Keys) ->
+            Keys1 = ConvertList(Keys),
+            Val1 = ConvertEle(Val),
+            fun() -> GroupBy(Keys1, Val1) end;
+        {<<"group_by">>, Key, Val} ->
+            Key1 = ConvertEle(Key),
+            Val1 = ConvertList(Val),
+            fun() -> GroupBy(Key1, Val1) end;
+
+        {<<"sorted_by">>, Key, undefined} ->
+            Key1 = ConvertEle(Key),
+            fun() -> JsonKeys(SortedBy1(Key1)) end;
+        {<<"sorted_by">>, Keys, undefined} when is_list(Keys) ->
+            Keys1 = [ConvertEle(K) || K <- Keys],
+            fun() -> JsonKeys(SortedBy1(Keys1)) end;
+        {<<"sorted_by">>, Keys, Vals} when is_list(Keys) andalso is_list(Vals) ->
+            Keys1 = ConvertList(Keys),
+            Vals1 = ConvertList(Vals),
+            fun() -> JsonKeys(SortedBy2(Keys1, Vals1)) end;
+        {<<"sorted_by">>, Key, Vals} when is_list(Vals) ->
+            Key1 = ConvertEle(Key),
+            Vals1 = ConvertList(Vals),
+            fun() -> JsonKeys(SortedBy2(Key1, Vals1)) end;
+        {<<"sorted_by">>, Keys, Val} when is_list(Keys) ->
+            Keys1 = ConvertList(Keys),
+            Val1 = ConvertEle(Val),
+            fun() -> JsonKeys(SortedBy2(Keys1, Val1)) end;
+        {<<"sorted_by">>, Key, Val} ->
+            Key1 = ConvertEle(Key),
+            Val1 = ConvertList(Val),
+            fun() -> JsonKeys(SortedBy2(Key1, Val1)) end;
+        _ ->
+            throw({badrequest, invalid_resource_request})
+    end,
+
+    Fun1 = fun() ->
+        case Fun() of
+            Map when is_map(Map) ->
+                {maps:fold(
+                    fun(K,V,A) -> [{ToJson(K), V} | A] end,
+                    [], Map)};
+            List when is_list(List) ->
+                List
+        end
+    end,
+
+    {Resp, _Bad} = rpc:multicall(erlang, apply, [
+        fun() ->
+            {node(), Fun1()}
+        end,
+        []
+    ]),
+    io:format("{CSRT}***** GOT RESP: ~p~n", [Resp]),
+    send_json(Req, {Resp});
 handle_resource_status_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     {Resp, Bad} = rpc:multicall(erlang, apply, [
@@ -243,7 +328,8 @@ handle_resource_status_req(#httpd{method = 'GET'} = Req) ->
     io:format("ACTIVE RESP: ~p~nBAD RESP: ~p~n", [Resp, Bad]),
     send_json(Req, {Resp});
 handle_resource_status_req(Req) ->
-    send_method_not_allowed(Req, "GET,HEAD").
+    ok = chttpd:verify_is_server_admin(Req),
+    send_method_not_allowed(Req, "GET,HEAD,POST").
 
 handle_replicate_req(#httpd{method = 'POST', user_ctx = Ctx, req_body = PostBody} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),

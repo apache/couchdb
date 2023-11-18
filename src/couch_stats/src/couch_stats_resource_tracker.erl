@@ -59,7 +59,9 @@
     sorted_by/2,
     sorted_by/3,
 
-    unsafe_foldl/3
+    unsafe_foldl/3,
+
+    term_to_flat_json/1
 ]).
 
 -export([
@@ -424,6 +426,7 @@ group_by(KeyFun, ValFun, AggFun, Fold) ->
     Fold(FoldFun, #{}, ?MODULE).
 
 
+%% Sorts largest first
 sorted(Map) when is_map(Map) ->
     lists:sort(fun({_K1, A}, {_K2, B}) -> B < A end, maps:to_list(Map)).
 
@@ -523,6 +526,8 @@ term_to_json({type, {coordinator, _, _} = Type}) ->
     ?l2b(io_lib:format("~p", [Type]));
 term_to_json({A, B, C}) ->
     [A, B, C];
+term_to_json(Tuple) when is_tuple(Tuple) ->
+    ?l2b(io_lib:format("~w", [Tuple]));
 term_to_json(undefined) ->
     null;
 term_to_json(null) ->
@@ -530,11 +535,13 @@ term_to_json(null) ->
 term_to_json(T) ->
     T.
 
-term_to_flat_json({type, {coordinator, _, _} = Type}) ->
+term_to_flat_json({type, {coordinator, _, _}}=Type) ->
     %%io:format("SETTING FLAT JSON TYPE: ~p~n", [Type]),
     ?l2b(io_lib:format("~p", [Type]));
+term_to_flat_json({coordinator, _, _}=Type) ->
+    ?l2b(io_lib:format("~p", [Type]));
 term_to_flat_json(Tuple) when is_tuple(Tuple) ->
-    ?l2b(io_lib:format("~w", [Tuple]));
+    ?l2b(io_lib:format("~p", [Tuple]));
 term_to_flat_json(undefined) ->
     null;
 term_to_flat_json(null) ->
