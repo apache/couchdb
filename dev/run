@@ -90,10 +90,10 @@ log.verbose = True
 
 
 def main():
-    ctx = setup()
     try:
+        ctx = setup()
         startup(ctx)
-    except ClouseauError:
+    except StartupError:
         sys.exit(1)
     else:
         if ctx["cmd"]:
@@ -327,7 +327,12 @@ def check_boot_script(ctx):
     if not os.path.exists(os.path.join(ctx["devdir"], "devnode.boot")):
         env = os.environ.copy()
         env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "src")
-        sp.check_call(["escript", "make_boot_script"], env=env, cwd=ctx["devdir"])
+        try:
+            sp.check_call(["escript", "make_boot_script"], env=env, cwd=ctx["devdir"])
+        except sp.CalledProcessError:
+            raise StartupError(
+                "Boot script could not be created.  Perhaps you forgot to run `make`?"
+            )
 
 
 @log("Prepare configuration files")
@@ -541,7 +546,7 @@ def get_java_version(java):
             return float(matches.groups()[0])
 
 
-class ClouseauError(Exception):
+class StartupError(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
@@ -556,7 +561,7 @@ def boot_clouseau(ctx, idx):
     )
 
     if not os.path.isdir(CLOUSEAU_DIR):
-        raise ClouseauError(
+        raise StartupError(
             "Clouseau deployment cannot be found, please run `{}`".format(configure_cmd)
         )
 
@@ -572,7 +577,7 @@ def boot_clouseau(ctx, idx):
         )
     else:
         if java_version < 1.7 or java_version > 1.8:
-            raise ClouseauError(
+            raise StartupError(
                 "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
             )
 
@@ -583,15 +588,15 @@ def boot_clouseau(ctx, idx):
     ]
 
     if not clouseau_jars:
-        raise ClouseauError("Clouseau has no JAR files")
+        raise StartupError("Clouseau has no JAR files")
 
     clouseau_ini = "{}/clouseau.ini".format(CLOUSEAU_DIR)
     if not os.path.isfile(clouseau_ini):
-        raise ClouseauError("Clouseau has no ini file")
+        raise StartupError("Clouseau has no ini file")
 
     log4j_properties = "{}/log4j.properties".format(CLOUSEAU_DIR)
     if not os.path.isfile(log4j_properties):
-        raise ClouseauError("Clouseau has no Log4J configuration")
+        raise StartupError("Clouseau has no Log4J configuration")
 
     clouseau_name = "clouseau{}@127.0.0.1".format(idx)
     clouseau_indexes_dir = "{}/clouseau{}/data".format(ctx["devdir"], idx)
@@ -643,7 +648,7 @@ def boot_clouseau(ctx, idx):
             stderr=sp.STDOUT,
         )
     except:
-        raise ClouseauError("Java is not capable of running Clouseau")
+        raise StartupError("Java is not capable of running Clouseau")
 
 
 def maybe_boot_clouseau(ctx, idx):
