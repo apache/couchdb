@@ -138,7 +138,6 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     try
         receive
             {Ref, {ok, Db}, {delta, Delta}} ->
-                io:format("[~p]GET SHARD GOT DELTA: ~p~n", [self(), Delta]),
                 couch_stats_resource_tracker:accumulate_delta(Delta),
                 {ok, Db};
             {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
@@ -149,7 +148,6 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
                 couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
                 get_shard(Rest, Opts, Timeout, Factor);
             Other ->
-                io:format("GOT UNEXPECTED MESSAGE FORMAT: ~p~n", [Other]),
                 erlang:error(Other)
         after Timeout ->
             couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),

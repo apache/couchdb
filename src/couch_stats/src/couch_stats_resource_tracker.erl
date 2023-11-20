@@ -317,14 +317,7 @@ should_track(_Metric) ->
     %%io:format("SKIPPING METRIC: ~p~n", [Metric]),
     false.
 
-%% TODO: update coordinator stats from worker deltas
 accumulate_delta(Delta) ->
-    case get_resource() of
-        #rctx{type={coordinator,_,_}} = Rctx ->
-            io:format("Accumulating delta: ~w || ~w~n", [Delta, Rctx]);
-        _ ->
-            ok
-    end,
     %% TODO: switch to creating a batch of updates to invoke a single
     %% update_counter rather than sequentially invoking it for each field
     maps:foreach(fun inc/2, Delta).
@@ -463,7 +456,6 @@ to_json(#rctx{}=Rctx) ->
         changes_processed = ChangesProcessed,
         changes_returned = ChangesReturned
     } = Rctx,
-    %%io:format("TO_JSON_MFA: ~p~n", [MFA0]),
     MFA = case MFA0 of
         {M, F, A} ->
             [M, F, A];
@@ -495,11 +487,9 @@ to_json(#rctx{}=Rctx) ->
     #{
         updated_at => term_to_json(TP),
         started_at => term_to_json(TInit),
-        %%pid_ref => [pid_to_list(Pid), ref_to_list(Ref)],
         pid_ref => term_to_json(PidRef),
         mfa => term_to_json(MFA),
         nonce => term_to_json(Nonce),
-        %%from => From,
         from => term_to_json(From),
         dbname => DbName,
         username => UserName,
@@ -522,7 +512,6 @@ to_json(#rctx{}=Rctx) ->
 term_to_json({Pid, Ref}) when is_pid(Pid), is_reference(Ref) ->
     [?l2b(pid_to_list(Pid)), ?l2b(ref_to_list(Ref))];
 term_to_json({type, {coordinator, _, _} = Type}) ->
-    %%io:format("SETTING JSON TYPE: ~p~n", [Type]),
     ?l2b(io_lib:format("~p", [Type]));
 term_to_json({A, B, C}) ->
     [A, B, C];
@@ -536,7 +525,6 @@ term_to_json(T) ->
     T.
 
 term_to_flat_json({type, {coordinator, _, _}}=Type) ->
-    %%io:format("SETTING FLAT JSON TYPE: ~p~n", [Type]),
     ?l2b(io_lib:format("~p", [Type]));
 term_to_flat_json({coordinator, _, _}=Type) ->
     ?l2b(io_lib:format("~p", [Type]));
@@ -573,7 +561,6 @@ to_flat_json(#rctx{}=Rctx) ->
         changes_returned = ChangesReturned,
         ioq_calls = IoqCalls
     } = Rctx,
-    %%io:format("TO_JSON_MFA: ~p~n", [MFA0]),
     MFA = case MFA0 of
         {_M, _F, _A} ->
             ?l2b(io_lib:format("~w", [MFA0]));
@@ -600,12 +587,9 @@ to_flat_json(#rctx{}=Rctx) ->
         Nonce0 ->
             list_to_binary(Nonce0)
     end,
-    io:format("NONCE IS: ~p||~p~n", [Nonce0, Nonce]),
     #{
-        %%updated_at => ?l2b(io_lib:format("~w", [TP])),
         updated_at => term_to_flat_json(TP),
         started_at => term_to_flat_json(TInit),
-        %%pid_ref => [pid_to_list(Pid), ref_to_list(Ref)],
         pid_ref => ?l2b(io_lib:format("~w", [PidRef])),
         mfa => MFA,
         nonce => Nonce,
@@ -650,10 +634,8 @@ create_context(Pid) ->
 
 %% add type to disnguish coordinator vs rpc_worker
 create_context(From, {M,F,_A} = MFA, Nonce) ->
-    %%io:format("[~p] CREAT_CONTEXT MFA[~p]: {~p}: ~p~n", [self(), From, MFA, Nonce]),
     PidRef = get_pid_ref(), %% this will instantiate a new PidRef
-    %%Rctx = make_record(self(), Ref),
-    %% TODO: extract user_ctx and db/shard from 
+    %% TODO: extract user_ctx and db/shard from
     Rctx = #rctx{
         pid_ref = PidRef,
         from = From,
@@ -670,18 +652,13 @@ create_coordinator_context(#httpd{path_parts=Parts} = Req) ->
     create_coordinator_context(Req, io_lib:format("~p", [Parts])).
 
 create_coordinator_context(#httpd{} = Req, Path) ->
-    %%io:format("CREATING COORDINATOR CONTEXT ON {~p}~n", [Path]),
     #httpd{
         method = Verb,
-        %%path_parts = Parts,
         nonce = Nonce
     } = Req,
     PidRef = get_pid_ref(), %% this will instantiate a new PidRef
-    %%Rctx = make_record(self(), Ref),
-    %% TODO: extract user_ctx and db/shard from Req
     Rctx = #rctx{
         pid_ref = PidRef,
-        %%type = {cooridantor, Verb, Parts},
         type = {coordinator, Verb, [$/ | Path]},
         nonce = Nonce
     },
@@ -704,7 +681,6 @@ set_context_dbname(DbName) ->
 set_context_username(null) ->
     ok;
 set_context_username(UserName) ->
-    %%io:format("CSRT SETTING USERNAME CONTEXT: ~p~n", [UserName]),
     case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
         false ->
             Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
@@ -755,7 +731,7 @@ make_delta() ->
             %% Perhaps somewhat naughty we're incrementing stats from within
             %% couch_stats itself? Might need to handle this differently
             %% TODO: determine appropriate course of action here
-            io:format("~n**********MISSING STARTING DELTA************~n~n", []),
+            %% io:format("~n**********MISSING STARTING DELTA************~n~n", []),
             couch_stats:increment_counter(
                 [couchdb, csrt, delta_missing_t0]),
                 %%[couch_stats_resource_tracker, delta_missing_t0]),
@@ -769,7 +745,6 @@ make_delta() ->
                 TA0 ->
                     TA0
             end;
-        %%?RCTX{} = TA0 ->
         #rctx{} = TA0 ->
             TA0
     end,
@@ -804,7 +779,6 @@ make_delta(#rctx{}, _) ->
 
 make_delta_base() ->
     Ref = make_ref(),
-    %%Rctx = make_record(self(), Ref),
     %% TODO: extract user_ctx and db/shard from request
     TA0 = #rctx{
         pid_ref = {self(), Ref}
@@ -874,14 +848,12 @@ handle_cast(Msg, St) ->
     {stop, {unknown_cast, Msg}, St}.
 
 handle_info(scan, #st{tracking=AT0} = St0) ->
-    io:format("{CSRT} TRIGGERING SCAN: ~n", []),
     Unmonitored = find_unmonitored(),
-    io:format("{CSRT} SCAN FOUND ~p UNMONITORED PIDS: ~n", [length(Unmonitored)]),
     AT = maybe_track(Unmonitored, AT0),
     _TimerRef = erlang:send_after(St0#st.scan_interval, self(), scan),
     {noreply, St0#st{tracking=AT}};
 handle_info({'DOWN', MonRef, Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
-    io:format("CSRT:HI(~p)~n", [{'DOWN', MonRef, Type, DPid, Reason}]),
+    %% io:format("CSRT:HI(~p)~n", [{'DOWN', MonRef, Type, DPid, Reason}]),
     St = case maps:get(MonRef, AT0, undefined) of
         undefined ->
             io:format("ERROR: UNEXPECTED MISSING MONITOR IN TRACKING TABLE: {~p, ~p}~n", [MonRef, DPid]),
@@ -937,7 +909,7 @@ log_process_lifetime_report(PidRef) ->
     %% More safely assert this can't ever be undefined
     #rctx{} = Rctx = get_resource(PidRef),
     %% TODO: catch error out of here, report crashes on depth>1 json
-    io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
+    %%io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
     couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx)).
 
 

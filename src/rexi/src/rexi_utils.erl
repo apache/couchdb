@@ -68,7 +68,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
         {rexi, '$rexi_ping', {delta, Delta}} ->
-            io:format("[~p]GOT PING DELTA: ~p~n", [self(), Delta]),
             couch_stats_resource_tracker:accumulate_delta(Delta),
             {ok, Acc0};
         {rexi, Ref, Msg} ->
@@ -86,7 +85,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                     Fun(Msg, {Worker, From}, Acc0)
             end;
         {Ref, Msg, {delta, Delta}} ->
-            io:format("[~p]GOT DELTA: ~p -- ~p~n", [self(), Delta, Msg]),
             couch_stats_resource_tracker:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
             false ->
@@ -96,7 +94,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                 Fun(Msg, Worker, Acc0)
             end;
         {Ref, From, Msg, {delta, Delta}} ->
-            io:format("[~p]GOT DELTA: ~p -- ~p~n", [self(), Delta, Msg]),
             couch_stats_resource_tracker:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
             false ->
@@ -125,7 +122,6 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             %% TODO: add stack trace to log entry
             couch_log:debug("rexi_utils:process_message no delta: {Ref, Msg} => {~p, ~p}~n", [Ref, Msg]),
             timer:sleep(100),
-            %%erlang:halt(enodelta),
             erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, Msg} => {~w, ~w}~n", [Ref, Msg]))));
         {Ref, From, rexi_STREAM_INIT = Msg} ->
             case lists:keyfind(Ref, Keypos, RefList) of
@@ -135,11 +131,9 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                     Fun(Msg, {Worker, From}, Acc0)
             end;
         {Ref, From, Msg} ->
-            %%io:format("GOT NON DELTA MSG: ~p~n", [Msg]),
             %% TODO: add stack trace to log entry
             couch_log:debug("rexi_utils:process_message no delta: {Ref, From, Msg} => {~p, ~p, ~p}~n", [Ref, From, Msg]),
             timer:sleep(100),
-            %%erlang:halt(enodelta),
             erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, From, Msg} => {~w, ~w, ~w}~n", [Ref, From, Msg]))));
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
