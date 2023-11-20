@@ -67,6 +67,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
+        {rexi, '$rexi_ping'} ->
+            {ok, Acc0};
         {rexi, '$rexi_ping', {delta, Delta}} ->
             couch_stats_resource_tracker:accumulate_delta(Delta),
             {ok, Acc0};
@@ -120,9 +122,16 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         %% {#Ref<0.1961702128.3491758082.26965>, {rexi_EXIT,{{query_parse_error,<<78,111,32,114,111,119,115,32,99,97,110,32,109,97
         {Ref, Msg} ->
             %% TODO: add stack trace to log entry
-            couch_log:debug("rexi_utils:process_message no delta: {Ref, Msg} => {~p, ~p}~n", [Ref, Msg]),
-            timer:sleep(100),
-            erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, Msg} => {~w, ~w}~n", [Ref, Msg]))));
+            %% couch_log:debug("rexi_utils:process_message no delta: {Ref, Msg} => {~p, ~p}~n", [Ref, Msg]),
+            %% timer:sleep(100),
+            %% erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, Msg} => {~w, ~w}~n", [Ref, Msg]))));
+            case lists:keyfind(Ref, Keypos, RefList) of
+                false ->
+                    % this was some non-matching message which we will ignore
+                    {ok, Acc0};
+                Worker ->
+                    Fun(Msg, Worker, Acc0)
+            end;
         {Ref, From, rexi_STREAM_INIT = Msg} ->
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
@@ -132,9 +141,15 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             end;
         {Ref, From, Msg} ->
             %% TODO: add stack trace to log entry
-            couch_log:debug("rexi_utils:process_message no delta: {Ref, From, Msg} => {~p, ~p, ~p}~n", [Ref, From, Msg]),
-            timer:sleep(100),
-            erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, From, Msg} => {~w, ~w, ~w}~n", [Ref, From, Msg]))));
+            %% couch_log:debug("rexi_utils:process_message no delta: {Ref, From, Msg} => {~p, ~p, ~p}~n", [Ref, From, Msg]),
+            %% timer:sleep(100),
+            %% erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, From, Msg} => {~w, ~w, ~w}~n", [Ref, From, Msg]))));
+            case lists:keyfind(Ref, Keypos, RefList) of
+                false ->
+                    {ok, Acc0};
+                Worker ->
+                    Fun(Msg, {Worker, From}, Acc0)
+            end;
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
     after PerMsgTO ->

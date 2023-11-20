@@ -34,6 +34,7 @@
 -export([
     create_context/0, create_context/1, create_context/3,
     create_coordinator_context/1, create_coordinator_context/2,
+    is_enabled/0,
     get_resource/0,
     get_resource/1,
     set_context_dbname/1,
@@ -175,11 +176,15 @@
     get_kp_node = 0
 }).
 
+is_enabled() ->
+    config:get_boolean("couch_stats_resource_tracker", "enabled", true).
+
 db_opened() -> inc(db_opened).
 doc_read() -> inc(docs_read).
 row_read() -> inc(rows_read).
 btree_fold() -> inc(?COUCH_BT_FOLDS).
-ioq_called() -> inc(ioq_calls).
+%% TODO: do we need ioq_called and this access pattern?
+ioq_called() -> is_enabled() andalso inc(ioq_calls).
 js_evaled() -> inc(js_evals).
 js_filtered() -> inc(js_filter).
 js_filtered_error() -> inc(js_filter_error).
@@ -290,29 +295,29 @@ maybe_inc(_Metric, _Val) ->
 
 %% TODO: update stats_descriptions.cfg for relevant apps
 should_track([fabric_rpc, all_docs, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, changes, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, changes, processed]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, changes, returned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, map_view, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, reduce_view, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, get_all_security, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, open_doc, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, update_docs, spawned]) ->
-    true;
+    is_enabled();
 should_track([fabric_rpc, open_shard, spawned]) ->
-    true;
+    is_enabled();
 should_track([mango_cursor, view, all_docs]) ->
-    true;
+    is_enabled();
 should_track([mango_cursor, view, idx]) ->
-    true;
+    is_enabled();
 should_track(_Metric) ->
     %%io:format("SKIPPING METRIC: ~p~n", [Metric]),
     false.
@@ -320,14 +325,14 @@ should_track(_Metric) ->
 accumulate_delta(Delta) ->
     %% TODO: switch to creating a batch of updates to invoke a single
     %% update_counter rather than sequentially invoking it for each field
-    maps:foreach(fun inc/2, Delta).
+    is_enabled() andalso maps:foreach(fun inc/2, Delta).
 
 update_counter(Field, Count) ->
-    update_counter(get_pid_ref(), Field, Count).
+    is_enabled() andalso update_counter(get_pid_ref(), Field, Count).
 
 
 update_counter({_Pid,_Ref}=PidRef, Field, Count) ->
-    ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
+    is_enabled() andalso ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
 
 
 active() -> active_int(all).
@@ -622,73 +627,98 @@ get_pid_ref() ->
 
 
 create_context() ->
-    create_context(self()).
+    is_enabled() andalso create_context(self()).
 
 
 create_context(Pid) ->
-    Ref = make_ref(),
-    Rctx = make_record(Pid, Ref),
-    track(Rctx),
-    ets:insert(?MODULE, Rctx),
-    Rctx.
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            Ref = make_ref(),
+            Rctx = make_record(Pid, Ref),
+            track(Rctx),
+            ets:insert(?MODULE, Rctx),
+            Rctx
+    end.
 
 %% add type to disnguish coordinator vs rpc_worker
 create_context(From, {M,F,_A} = MFA, Nonce) ->
-    PidRef = get_pid_ref(), %% this will instantiate a new PidRef
-    %% TODO: extract user_ctx and db/shard from
-    Rctx = #rctx{
-        pid_ref = PidRef,
-        from = From,
-        mfa = MFA,
-        type = {worker, M, F},
-        nonce = Nonce
-    },
-    track(Rctx),
-    erlang:put(?DELTA_TZ, Rctx),
-    true = ets:insert(?MODULE, Rctx),
-    Rctx.
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            PidRef = get_pid_ref(), %% this will instantiate a new PidRef
+            %% TODO: extract user_ctx and db/shard from
+            Rctx = #rctx{
+                pid_ref = PidRef,
+                from = From,
+                mfa = MFA,
+                type = {worker, M, F},
+                nonce = Nonce
+            },
+            track(Rctx),
+            erlang:put(?DELTA_TZ, Rctx),
+            true = ets:insert(?MODULE, Rctx),
+            Rctx
+    end.
 
 create_coordinator_context(#httpd{path_parts=Parts} = Req) ->
-    create_coordinator_context(Req, io_lib:format("~p", [Parts])).
+    is_enabled() andalso create_coordinator_context(Req, io_lib:format("~p", [Parts])).
 
 create_coordinator_context(#httpd{} = Req, Path) ->
-    #httpd{
-        method = Verb,
-        nonce = Nonce
-    } = Req,
-    PidRef = get_pid_ref(), %% this will instantiate a new PidRef
-    Rctx = #rctx{
-        pid_ref = PidRef,
-        type = {coordinator, Verb, [$/ | Path]},
-        nonce = Nonce
-    },
-    track(Rctx),
-    erlang:put(?DELTA_TZ, Rctx),
-    true = ets:insert(?MODULE, Rctx),
-    Rctx.
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            #httpd{
+                method = Verb,
+                nonce = Nonce
+            } = Req,
+            PidRef = get_pid_ref(), %% this will instantiate a new PidRef
+            Rctx = #rctx{
+                pid_ref = PidRef,
+                type = {coordinator, Verb, [$/ | Path]},
+                nonce = Nonce
+            },
+            track(Rctx),
+            erlang:put(?DELTA_TZ, Rctx),
+            true = ets:insert(?MODULE, Rctx),
+            Rctx
+    end.
 
 set_context_dbname(DbName) ->
-    case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.dbname, DbName}]) of
+    case is_enabled() of
         false ->
-            Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
-            io:format("UPDATING DBNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [DbName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
-            timer:sleep(1000),
-            erlang:halt(kaboomz);
+            ok;
         true ->
-            true
+            case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.dbname, DbName}]) of
+                false ->
+                    Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
+                    io:format("UPDATING DBNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [DbName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
+                    timer:sleep(1000),
+                    erlang:halt(kaboomz);
+                true ->
+                    true
+            end
     end.
 
 set_context_username(null) ->
     ok;
 set_context_username(UserName) ->
-    case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
+    case is_enabled() of
         false ->
-            Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
-            io:format("UPDATING USERNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [UserName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
-            timer:sleep(1000),
-            erlang:halt(kaboomz);
+            ok;
         true ->
-            true
+            case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
+                false ->
+                    Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
+                    io:format("UPDATING USERNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [UserName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
+                    timer:sleep(1000),
+                    erlang:halt(kaboomz);
+                true ->
+                    true
+            end
     end.
 
 track(#rctx{}=Rctx) ->
@@ -830,7 +860,12 @@ init([]) ->
         {keypos, #rctx.pid_ref}
     ]),
     St = #st{},
-    _TimerRef = erlang:send_after(St#st.scan_interval, self(), scan),
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            _TimerRef = erlang:send_after(St#st.scan_interval, self(), scan)
+    end,
     {ok, St}.
 
 handle_call(fetch, _from, #st{} = St) ->
@@ -852,7 +887,7 @@ handle_info(scan, #st{tracking=AT0} = St0) ->
     AT = maybe_track(Unmonitored, AT0),
     _TimerRef = erlang:send_after(St0#st.scan_interval, self(), scan),
     {noreply, St0#st{tracking=AT}};
-handle_info({'DOWN', MonRef, Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
+handle_info({'DOWN', MonRef, _Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
     %% io:format("CSRT:HI(~p)~n", [{'DOWN', MonRef, Type, DPid, Reason}]),
     St = case maps:get(MonRef, AT0, undefined) of
         undefined ->
