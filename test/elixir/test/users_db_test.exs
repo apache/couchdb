@@ -29,25 +29,13 @@ defmodule UsersDbTest do
              ]
 
   setup do
-    # Create db if not exists
-    Couch.put("/#{@users_db_name}")
-
-    resp =
-      Couch.get(
-        "/#{@users_db_name}/_changes",
-        query: [feed: "longpoll", timeout: 5000, filter: "_design"]
-      )
-
-    assert resp.body
-
+    reset_db(@users_db_name)
+    wait_for_design_auth(@users_db_name)
     on_exit(&tear_down/0)
-
-    :ok
   end
 
   defp tear_down do
-    delete_db(@users_db_name)
-    create_db(@users_db_name)
+    reset_db(@users_db_name)
   end
 
   defp save_as(db_name, doc, options) do

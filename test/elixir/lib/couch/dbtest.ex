@@ -179,6 +179,27 @@ defmodule Couch.DBTest do
     {:ok, resp}
   end
 
+  def reset_db(db_name, opts \\ []) do
+    delete_db(db_name)
+    create_db(db_name, opts)
+  end
+
+  # Use this function when testing authentication after resetting (re-creating)
+  # _users db. The auth cache can take up to 5 seconds or so to notice the old
+  # db is gone and spawn another changes feed for the new users db.
+  #
+  def wait_for_design_auth(users_db) do
+    retry_until(fn ->
+      resp =
+        Couch.get(
+          "/#{users_db}/_changes",
+          query: [feed: "longpoll", timeout: 5000, filter: "_design"]
+        )
+      results = resp.body["results"]
+      is_list(results) && length(results) > 0
+    end, 500, 60_000)
+  end
+
   def create_doc(db_name, body) do
     resp = Couch.post("/#{db_name}", body: body)
     assert resp.status_code in [201, 202]

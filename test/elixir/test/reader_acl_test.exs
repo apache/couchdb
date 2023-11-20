@@ -19,8 +19,7 @@ defmodule ReaderACLTest do
                }
              ]
   setup do
-    # Create db if not exists
-    Couch.put("/#{@users_db_name}")
+    reset_db(@users_db_name)
 
     # create a user with top-secret-clearance
     user_doc =

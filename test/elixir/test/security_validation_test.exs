@@ -54,12 +54,14 @@ defmodule SecurityValidationTest do
   setup_all do
     auth_db_name = random_db_name()
     {:ok, _} = create_db(auth_db_name)
-    on_exit(fn -> delete_db(auth_db_name) end)
+    on_exit(fn ->
+        delete_db(auth_db_name)
+        reset_db("_users")
+    end)
 
     configs = [
-      {"httpd", "authentication_handlers",
+      {"chttpd", "authentication_handlers",
        "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
-      {"couch_httpd_auth", "authentication_db", auth_db_name},
       {"chttpd_auth", "authentication_db", auth_db_name}
     ]
 
@@ -83,6 +85,12 @@ defmodule SecurityValidationTest do
 
       assert Couch.post("/#{auth_db_name}", body: doc).body["ok"]
     end)
+
+    # Reset users db to force the auth cache to restart and use
+    # the new auth db
+    reset_db("_users")
+
+    wait_for_design_auth(auth_db_name)
 
     {:ok, [auth_db_name: auth_db_name]}
   end

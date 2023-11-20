@@ -31,32 +31,13 @@ defmodule CookieAuthTest do
   @password "3.141592653589"
 
   setup do
-    # Create db if not exists
-    Couch.put("/#{@users_db}")
-
-    retry_until(fn ->
-      resp =
-        Couch.get(
-          "/#{@users_db}/_changes",
-          query: [feed: "longpoll", timeout: 5000, filter: "_design"]
-        )
-        length(resp.body["results"]) > 0
-    end)
-
+    reset_db(@users_db)
+    wait_for_design_auth(@users_db)
     on_exit(&tear_down/0)
-
-    :ok
   end
 
   defp tear_down do
-    # delete users
-    user = URI.encode("org.couchdb.user:jchris")
-    user_doc = Couch.get("/#{@users_db}/#{URI.encode(user)}").body
-    Couch.delete("/#{@users_db}/#{user}", query: [rev: user_doc["_rev"]])
-
-    user = URI.encode("org.couchdb.user:Jason Davies")
-    user_doc = Couch.get("/#{@users_db}/#{user}").body
-    Couch.delete("/#{@users_db}/#{user}", query: [rev: user_doc["_rev"]])
+    reset_db(@users_db)
   end
 
   defp login(user, password) do
