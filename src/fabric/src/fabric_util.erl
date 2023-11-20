@@ -137,6 +137,8 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
         receive
+            {Ref, {ok, Db}} ->
+                {ok, Db};
             {Ref, {ok, Db}, {delta, Delta}} ->
                 couch_stats_resource_tracker:accumulate_delta(Delta),
                 {ok, Db};
@@ -146,9 +148,7 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
                 throw(Error);
             {Ref, Reason} ->
                 couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
-                get_shard(Rest, Opts, Timeout, Factor);
-            Other ->
-                erlang:error(Other)
+                get_shard(Rest, Opts, Timeout, Factor)
         after Timeout ->
             couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
             get_shard(Rest, Opts, Factor * Timeout, Factor)
