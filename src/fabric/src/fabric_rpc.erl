@@ -262,7 +262,6 @@ set_purge_infos_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_purge_infos_limit, [Limit]}).
 
 open_doc(DbName, DocId, Options) ->
-    io:format("frpc:open_doc(~p, ~p, ~p)~n", [DbName, DocId, Options]),
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
 
 open_revs(DbName, IdRevsOpts, Options) ->

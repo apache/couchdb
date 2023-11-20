@@ -313,8 +313,6 @@ handle_request_int(MochiReq) ->
         ]
     },
 
-    io:format("CSRTZ PROCESSING: ~w~n", [RequestedPath]),
-
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, Nonce),
 
@@ -326,22 +324,15 @@ handle_request_int(MochiReq) ->
     chttpd_util:mochiweb_client_req_set(MochiReq),
 
     %% This is probably better in before_request, but having Path is nice
-    io:format("CSRTZ INITIATING CONTEXT: ~w~n", [Nonce]),
     couch_stats_resource_tracker:create_coordinator_context(HttpReq0, Path),
-    io:format("CSRTZ INITIAL CONTEXT: ~w~n", [couch_stats_resource_tracker:get_resource()]),
-    Coord = self(),
-    PidRef = couch_stats_resource_tracker:get_pid_ref(),
-    spawn(fun() -> monitor(process, Coord), receive M -> io:format("CSRTZ PROCESS DOWN[~w]{~w}: ~w~n", [ Coord, M, couch_stats_resource_tracker:get_resource(PidRef)]) end end),
+
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
             {ok, HttpReq1} ->
-                io:format("CSRTZ BEFORE_REQUEST OK: ~w~n", [couch_stats_resource_tracker:get_resource()]),
                 process_request(HttpReq1);
             {error, Response0} ->
-                io:format("CSRTZ BEFORE_REQUEST ERROR: ~w~n", [couch_stats_resource_tracker:get_resource()]),
                 {HttpReq0, Response0}
         end,
-    io:format("CSRTZ AFTER PROCESS_REQUEST: ~w~n", [couch_stats_resource_tracker:get_resource()]),
 
     chttpd_util:mochiweb_client_req_clean(),
 
@@ -357,10 +348,8 @@ handle_request_int(MochiReq) ->
 
     case after_request(HttpReq2, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
-            io:format("CSRTZ AFTER REQUEST OK: ~w~n", [couch_stats_resource_tracker:get_resource()]),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
-            io:format("CSRTZ AFTER REQUEST ERROR: ~w~n", [couch_stats_resource_tracker:get_resource()]),
             couch_log:error("Response abnormally terminated: ~w", [Reason]),
             exit({shutdown, Reason})
     end.

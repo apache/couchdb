@@ -308,7 +308,7 @@ handle_resource_status_req(#httpd{method = 'POST'} = Req) ->
         end,
         []
     ]),
-    io:format("{CSRT}***** GOT RESP: ~p~n", [Resp]),
+    %%io:format("{CSRT}***** GOT RESP: ~p~n", [Resp]),
     send_json(Req, {Resp});
 handle_resource_status_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
