@@ -144,7 +144,7 @@
     %% Metadata
     started_at = os:timestamp(),
     updated_at = os:timestamp(),
-    exited_at,
+    exited_at, %% TODO: do we need a final exit time and additional update times afterwards?
     pid_ref,
     mon_ref,
     mfa,
