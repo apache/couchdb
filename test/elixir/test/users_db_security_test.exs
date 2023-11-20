@@ -15,33 +15,13 @@ defmodule UsersDbSecurityTest do
   }
 
   setup_all do
-    # Create db if not exists
-    Couch.put("/#{@users_db}")
-
-    retry_until(fn ->
-      resp =
-        Couch.get(
-          "/#{@users_db}/_changes",
-          query: [feed: "longpoll", timeout: 5000, filter: "_design"]
-        )
-
-      length(resp.body["results"]) > 0
-    end)
-
+    reset_db(@users_db)
+    wait_for_design_auth(@users_db)
     on_exit(&tear_down/0)
-
-    :ok
   end
 
   defp tear_down do
-    users = Map.keys(@login_user)
-    Enum.each(users, fn name ->
-      resp = Couch.get("/#{@users_db}/org.couchdb.user:#{name}")
-      if resp.status_code == 200 do
-        rev = resp.body["_rev"]
-        Couch.delete("/#{@users_db}/org.couchdb.user:#{name}?rev=#{rev}")
-      end
-    end)
+    reset_db(@users_db)
   end
 
   defp login_as(user, password \\ nil) do
@@ -51,7 +31,14 @@ defmodule UsersDbSecurityTest do
         _ -> password
       end
 
-    sess = Couch.login(user, pwd)
+    sess = retry_until(fn ->
+        try do
+            Couch.login(user, pwd)
+        catch
+            _, _ ->
+                false
+        end
+    end, 500, 60_000)
     assert sess.cookie, "Login correct is expected"
     sess
   end
