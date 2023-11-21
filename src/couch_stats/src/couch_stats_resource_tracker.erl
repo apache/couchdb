@@ -903,7 +903,8 @@ handle_info({'DOWN', MonRef, _Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
             %% TODO: Assert Pid matches Object
             %% update process state in live table
             %% TODO: decide whether we want the true match to crash this process on failure
-            true = ets:update_element(?MODULE, PidRef,
+            %% true = ets:update_element(?MODULE, PidRef,
+            ets:update_element(?MODULE, PidRef,
                 [{#rctx.state, {down, Reason}}, {#rctx.updated_at, os:timestamp()}]),
             log_process_lifetime_report(PidRef),
             %% Delay eviction to allow human visibility on short lived pids
@@ -935,7 +936,8 @@ maybe_track([{Pid,_Ref} = PidRef | PidRefs], AT) ->
         false -> %% setup new monitor and double bookkeep refs
             Mon = erlang:monitor(process, Pid),
             %% TODO: decide whether we want the true match to crash this process on failure
-            true = ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
+            %%true = ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
+            ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
             maps:put(Mon, PidRef, maps:put(PidRef, Mon, AT))
     end,
     maybe_track(PidRefs, AT1).
