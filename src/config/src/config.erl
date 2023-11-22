@@ -268,34 +268,20 @@ handle_call(all, _From, Config) ->
 handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
     Persist = maps:get(persist, Opts, true),
     Reason = maps:get(reason, Opts, nil),
-    IsSensitive = is_sensitive(Sec, Key),
+    LogVal = maybe_conceal(Val, is_sensitive(Sec, Key)),
     case validate_config_update(Sec, Key, Val) of
-        {error, ValidationError} when IsSensitive ->
-            couch_log:error(
-                "~p: [~s] ~s = '****' rejected for reason ~p",
-                [?MODULE, Sec, Key, Reason]
-            ),
-            {reply, {error, ValidationError}, Config};
         {error, ValidationError} ->
             couch_log:error(
-                "~p: [~s] ~s = '~s' rejected for reason ~p",
-                [?MODULE, Sec, Key, Val, Reason]
+                "~p: [~s] ~s = ~s rejected for reason ~p",
+                [?MODULE, Sec, Key, LogVal, Reason]
             ),
             {reply, {error, ValidationError}, Config};
         ok ->
             true = ets:insert(?MODULE, {{Sec, Key}, Val}),
-            case IsSensitive of
-                false ->
-                    couch_log:notice(
-                        "~p: [~s] ~s set to ~s for reason ~p",
-                        [?MODULE, Sec, Key, Val, Reason]
-                    );
-                true ->
-                    couch_log:notice(
-                        "~p: [~s] ~s set to '****' for reason ~p",
-                        [?MODULE, Sec, Key, Reason]
-                    )
-            end,
+            couch_log:notice(
+                "~p: [~s] ~s set to ~s for reason ~p",
+                [?MODULE, Sec, Key, LogVal, Reason]
+            ),
             ConfigWriteReturn =
                 case {Persist, Config#config.write_filename} of
                     {true, undefined} ->
@@ -362,18 +348,10 @@ handle_call(reload, _From, Config) ->
                 true ->
                     ok;
                 false ->
-                    case is_sensitive(Sec, Key) of
-                        false ->
-                            couch_log:notice(
-                                "Reload detected config change ~s.~s = ~p",
-                                [Sec, Key, V]
-                            );
-                        true ->
-                            couch_log:notice(
-                                "Reload detected config change ~s.~s = '****'",
-                                [Sec, Key]
-                            )
-                    end,
+                    couch_log:notice(
+                        "Reload detected config change ~s.~s = ~p",
+                        [Sec, Key, maybe_conceal(V, is_sensitive(Sec, Key))]
+                    ),
                     Event = {config_change, Sec, Key, V, true},
                     gen_event:sync_notify(config_event, Event)
             end
@@ -408,6 +386,11 @@ handle_cast(_Msg, State) ->
 handle_info(Info, State) ->
     couch_log:error("config:handle_info Info: ~p~n", [Info]),
     {noreply, State}.
+
+maybe_conceal(Value, _IsSensitive = false) ->
+    Value;
+maybe_conceal(_, _IsSensitive = true) ->
+    "'****'".
 
 is_sensitive(Section, Key) ->
     Sensitive = application:get_env(config, sensitive, #{}),
