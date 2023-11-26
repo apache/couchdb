@@ -281,7 +281,7 @@ class IndexSelectorText(mango.DbPerClass):
         partial_selector = {"location": {"$gte": "FRA"}}
         selector = {"location": {"$exists": True}}
         self.db.create_text_index(
-            ["location"],
+            fields=[{"name": "location", "type": "string"}],
             partial_filter_selector=partial_selector,
             ddoc="Selected",
             name="Selected",
