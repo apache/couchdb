@@ -22,6 +22,8 @@
 
 -export([save_to_file/2]).
 
+-include("config.hrl").
+
 %% @spec save_to_file(
 %%           Config::{{Section::string(), Option::string()}, Value::string()},
 %%           File::filename()) -> ok
@@ -43,7 +45,7 @@ process_file_lines([Line | Rest], SeenLines, Section, Pattern, Key, Value) ->
     process_file_lines(Rest, [Line | SeenLines], Section, Pattern, Key, Value);
 process_file_lines([], SeenLines, Section, _Pattern, Key, Value) ->
     % Section wasn't found.  Append it with the option here.
-    [Key ++ " = " ++ Value, Section, "" | strip_empty_lines(SeenLines)].
+    [maybe_kv(Key, Value), Section, "" | strip_empty_lines(SeenLines)].
 
 process_section_lines([Line | Rest], SeenLines, Pattern, Key, Value) ->
     case re:run(Line, Pattern, [{capture, all_but_first}]) of
@@ -53,14 +55,14 @@ process_section_lines([Line | Rest], SeenLines, Pattern, Key, Value) ->
         % Found another section. Append the option here.
         {match, []} ->
             lists:reverse(Rest) ++
-                [Line, "", Key ++ " = " ++ Value | strip_empty_lines(SeenLines)];
+                [Line, "", maybe_kv(Key, Value) | strip_empty_lines(SeenLines)];
         % Found the option itself. Replace it.
         {match, _} ->
-            lists:reverse(Rest) ++ [Key ++ " = " ++ Value | SeenLines]
+            lists:reverse(Rest) ++ [maybe_kv(Key, Value) | SeenLines]
     end;
 process_section_lines([], SeenLines, _Pattern, Key, Value) ->
     % Found end of file within the section. Append the option here.
-    [Key ++ " = " ++ Value | strip_empty_lines(SeenLines)].
+    [maybe_kv(Key, Value) | strip_empty_lines(SeenLines)].
 
 reverse_and_add_newline([Line | Rest], Content) ->
     reverse_and_add_newline(Rest, [Line, "\n", Content]);
@@ -71,3 +73,8 @@ strip_empty_lines(["" | Rest]) ->
     strip_empty_lines(Rest);
 strip_empty_lines(All) ->
     All.
+
+maybe_kv(_, ?DELETE) ->
+    "";
+maybe_kv(Key, Value) ->
+    Key ++ " = " ++ Value.

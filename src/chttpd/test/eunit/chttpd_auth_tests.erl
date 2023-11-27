@@ -41,11 +41,11 @@ setup_proxy_auth() ->
     {{StartCtx, ProxyCfgFile}, HashesShouldWork, HashesShouldFail, SupportedHashAlgorithms}.
 
 teardown_proxy_auth({{Ctx, ProxyCfgFile}, _, _, _}) ->
-    ok = file:delete(ProxyCfgFile),
     config:delete("chttpd_auth", "hash_algorithms", false),
     config:delete("chttpd_auth", "secret", false),
     config:delete("chttpd_auth", "proxy_use_secret", false),
     config:delete("chttpd", "require_valid_user", false),
+    ok = file:delete(ProxyCfgFile),
     test_util:stop_couch(Ctx).
 
 require_valid_user_exception_test_() ->
