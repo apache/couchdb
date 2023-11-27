@@ -125,17 +125,6 @@ the parameter and value are separated `` = ``, i.e. the equal sign is surrounded
 by at least one space on each side. This might be useful in the ``[jwt_keys]``
 section, where base64 encoded keys may contain some ``=`` characters.
 
-.. note::
-    In case when you'd like to remove some parameter from the `default.ini`
-    without modifying that file, you may override in `local.ini`, but without
-    any value::
-
-        [compactions]
-        _default =
-
-    This could be read as: "remove the `_default` parameter from the
-    `compactions` section if it was ever set before".
-
 The semicolon (``;``) signals the start of a comment. Everything after this
 character is ignored by CouchDB.
 

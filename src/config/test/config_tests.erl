@@ -111,6 +111,35 @@ handle_config_terminate(Self, Reason, {Pid, State}) ->
     Pid ! {config_msg, {Self, Reason, State}},
     ok.
 
+setup_ini() ->
+    Chain = [write_ini(F) || F <- ["default.ini", "local.ini"]],
+    {Chain, setup(Chain)}.
+
+teardown_ini({Chain, Apps}) ->
+    lists:foreach(
+        fun(Path) -> ok = file:delete(Path) end,
+        Chain
+    ),
+    teardown(Apps).
+
+write_ini(FileName) ->
+    Path = filename:join([?TEMPDIR, FileName]),
+    Data = io_lib:format("[section]\nfile = ~s\n", [FileName]),
+    ok = file:write_file(Path, Data),
+    Path.
+
+config_delete_reload_restart_test_() ->
+    {
+        "Test consistency after set, delete, reload, and restart",
+        foreach,
+        fun setup_ini/0,
+        fun teardown_ini/1,
+        [
+            fun non_persistent_set_delete_reload_restart/0,
+            fun persistent_set_delete_reload_restart/0
+        ]
+    }.
+
 config_get_test_() ->
     {
         "Config get tests",
@@ -140,7 +169,8 @@ config_set_test_() ->
             [
                 fun should_update_option/0,
                 fun should_create_new_section/0,
-                fun should_fail_to_set_binary_value/0
+                fun should_fail_to_set_binary_value/0,
+                fun should_fail_to_set_invalid_sensitive_key/0
             ]
         }
     }.
@@ -386,6 +416,16 @@ should_fail_to_set_binary_value() ->
         config:set(<<"a">>, <<"b">>, <<"c">>, false)
     ).
 
+should_fail_to_set_invalid_sensitive_key() ->
+    ?assertEqual(
+        {error, <<"Invalid configuration key">>},
+        config:set("admins", "[]", "val")
+    ),
+    ?assertEqual(
+        "'****'",
+        lists:nth(4, meck:capture(first, couch_log, error, ['_', '_'], 2))
+    ).
+
 should_return_undefined_atom_after_option_deletion() ->
     ?assertEqual(ok, config:delete("mock_log", "level", false)),
     ?assertEqual(undefined, config:get("mock_log", "level")).
@@ -438,7 +478,7 @@ should_write_changes(_, _) ->
         ?assertEqual(ok, config:set("httpd", "port", "8080")),
         ?assertEqual("8080", config:get("httpd", "port")),
         ?assertEqual(ok, config:delete("httpd", "bind_address")),
-        ?assertEqual(undefined, config:get("httpd", "bind_address"))
+        ?assertEqual("127.0.0.1", config:get("httpd", "bind_address"))
     end).
 
 should_ensure_default_wasnt_modified(_, _) ->
@@ -705,6 +745,44 @@ should_notify_on_config_reload_flush(Subscription, {_Apps, Pid}) ->
             ok
         end)
     }.
+
+persistent_set_delete_reload_restart() ->
+    Persist = true,
+    ?assertEqual("local.ini", config:get("section", "file")),
+    ?assertEqual(ok, config:set("section", "file", "memory", Persist)),
+    ?assertEqual("memory", config:get("section", "file")),
+    ?assertEqual(ok, config:delete("section", "file", Persist)),
+    ?assertEqual("default.ini", config:get("section", "file")),
+    ?assertEqual(ok, config:reload()),
+    ?assertEqual("default.ini", config:get("section", "file")),
+    with_process_restart(config),
+    % Avoid race with config loading .ini files
+    wait_config_get("section", "file", "default.ini"),
+    ?assertEqual("default.ini", config:get("section", "file")).
+
+non_persistent_set_delete_reload_restart() ->
+    Persist = false,
+    ?assertEqual("local.ini", config:get("section", "file")),
+    ?assertEqual(ok, config:set("section", "file", "memory", Persist)),
+    ?assertEqual("memory", config:get("section", "file")),
+    ?assertEqual(ok, config:delete("section", "file", Persist)),
+    ?assertEqual("local.ini", config:get("section", "file")),
+    ?assertEqual(ok, config:reload()),
+    ?assertEqual("local.ini", config:get("section", "file")),
+    with_process_restart(config),
+    % Avoid race with config loading .ini files
+    wait_config_get("section", "file", "local.ini"),
+    ?assertEqual("local.ini", config:get("section", "file")).
+
+wait_config_get(Sec, Key, Val) ->
+    test_util:wait(
+        fun() ->
+            case config:get(Sec, Key) of
+                V when V =:= Val -> ok;
+                _ -> wait
+            end
+        end
+    ).
 
 spawn_config_listener() ->
     Self = self(),
