@@ -531,7 +531,7 @@ def boot_nouveau(ctx):
 
 
 CLOUSEAU_DIR = "clouseau"
-JAVA_VERSION_RE = re.compile('"(\d+\.\d+).*"')
+JAVA_VERSION_RE = re.compile(r'"(\d+\.\d+).*"')
 
 
 def get_java_version(java):
@@ -683,7 +683,7 @@ def maybe_check_clouseau_node_alive(ctx, idx):
 
 def hack_default_ini(ctx, node, contents):
     contents = re.sub(
-        "^\[httpd\]$",
+        r"^\[httpd\]$",
         "[httpd]\nenable = true",
         contents,
         flags=re.MULTILINE,
@@ -691,7 +691,7 @@ def hack_default_ini(ctx, node, contents):
 
     if ctx["enable_erlang_views"]:
         contents = re.sub(
-            "^\[native_query_servers\]$",
+            r"^\[native_query_servers\]$",
             "[native_query_servers]\nerlang = {couch_native_process, start_link, []}",
             contents,
             flags=re.MULTILINE,
