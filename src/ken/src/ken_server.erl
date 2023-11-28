@@ -267,22 +267,26 @@ get_active_count() ->
 
 % If any indexing job fails, resubmit requests for all indexes.
 update_db_indexes(Name, State) ->
-    {ok, DDocs} = design_docs(Name),
-    RandomSorted = lists:sort([{rand:uniform(), D} || D <- DDocs]),
-    Resubmit = lists:foldl(
-        fun({_, DDoc}, Acc) ->
-            JsonDDoc = couch_doc:from_json_obj(DDoc),
-            case update_ddoc_indexes(Name, JsonDDoc, State) of
-                ok -> Acc;
-                _ -> true
-            end
-        end,
-        false,
-        RandomSorted
-    ),
-    if
-        Resubmit -> exit(resubmit);
-        true -> ok
+    case design_docs(Name) of
+        {ok, DDocs} ->
+            RandomSorted = lists:sort([{rand:uniform(), D} || D <- DDocs]),
+            Resubmit = lists:foldl(
+                fun({_, DDoc}, Acc) ->
+                    JsonDDoc = couch_doc:from_json_obj(DDoc),
+                    case update_ddoc_indexes(Name, JsonDDoc, State) of
+                        ok -> Acc;
+                        _ -> true
+                    end
+                end,
+                false,
+                RandomSorted
+            ),
+            if
+                Resubmit -> exit(resubmit);
+                true -> ok
+            end;
+        {error, timeout} ->
+            exit(resubmit)
     end.
 
 design_docs(Name) ->
