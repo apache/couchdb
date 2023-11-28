@@ -20,6 +20,58 @@
     :depth: 1
     :local:
 
+.. _release/3.3.3:
+
+Version 3.3.3
+=============
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`4623`: Handle replicator instance start time during upgrades
+  better.
+
+* :ghissue:`4653`: Fix the ability to use ``;`` in config values.
+
+* :ghissue:`4626`: Fix purge infos replicating to the wrong shards during shard
+  splitting.
+
+* :ghissue:`4669`: Make it possible to override ``[replicator]
+  valid_socket_options`` with more than two items.
+
+* :ghissue:`4670`: Allow setting of some ibrowse replication options such as
+  ``{prefer_ipv6, true}``.
+
+* :ghissue:`4679`: Fix multipart parser "attachment longer than expected"
+  error. Previously there was a small chance attachments were not replicated.
+
+* :ghissue:`4680`: Allow restarting failed shard splitting jobs.
+
+* :ghissue:`4722`: Fix badmatch error when purge requests time out.
+
+* :ghissue:`4736`: Stop client process and clean up if client disconnects when
+  processing streaming requests.
+
+* :ghissue:`4758`: Remove sensitive headers from the mochiweb request in
+  process dictionary. This should prevent sensitive headers leaking into logs
+  when a request process crashes.
+
+* :ghissue:`4784`: Extract the correct node name from ``ERL_FLAGS`` in
+  ``remsh``.
+
+* :ghissue:`4794`: Fix incorrect raising of ``database_does_not_exist`` error.
+
+* :ghissue:`4821`: Wait for compacted indexes to flip. Previously, a timeout
+  during compact file flips could lead to crashes and a subsequent
+  recompaction.
+
+* :ghissue:`4837`: Fix update bug in ets_lru.
+
+* :ghissue:`4847`: Require auth for ``_replicate`` endpoint.
+
+* :ghissue:`4878`: Add an option to scrub some sensitive headers from external
+  json requests.
+
 .. _release/3.3.2:
 
 Version 3.3.2
