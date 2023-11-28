@@ -3,6 +3,7 @@ plugins {
     id 'com.diffplug.spotless' version '6.18.0'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'jacoco'
+    id 'com.netflix.nebula.ospackage' version '11.5.0'
 }
 
 application {
@@ -89,4 +90,34 @@ tasks.withType(Javadoc) {
 tasks.withType(AbstractArchiveTask) {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
+}
+
+
+apply plugin: 'com.netflix.nebula.deb'
+apply plugin: 'com.netflix.nebula.rpm'
+apply plugin: 'com.netflix.nebula.ospackage-daemon'
+
+ospackage {
+    packageName = 'nouveau'
+
+    into '/opt/nouveau'
+
+    from(jar.outputs.files) {
+            into 'lib'
+    }
+
+    from(configurations.runtimeClasspath) {
+        into 'lib'
+    }
+}
+
+daemon {
+    command = "java -server -cp /opt/nouveau/lib/*.jar server /opt/nouveau/etc/nouveau.yaml"
+}
+
+task nouveauDeb(type: Deb) {
+    packageName 'nouveau'
+    release '1'
+
+    configurationFile('/etc/defaults/nouveau')
 }
