@@ -429,9 +429,9 @@ endif
 endif
 
 ifeq ($(with_nouveau), 1)
-	@mkdir -p rel/couchdb/nouveau/
-	@cp nouveau/build/libs/server-*-dist.jar rel/couchdb/nouveau/
-	@cp nouveau/nouveau.yaml rel/couchdb/nouveau/
+	@mkdir rel/couchdb/nouveau
+	@cd nouveau && ./gradlew installDist
+	@cp -R nouveau/build/install/nouveau rel/couchdb
 endif
 
 	@echo "... done"
