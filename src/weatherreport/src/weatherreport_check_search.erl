@@ -49,14 +49,23 @@ check(_Opts) ->
         undefined ->
             [{info, clouseau_not_configured}];
         _ ->
-            SearchNode = list_to_atom(SearchNodeStr),
-            case net_adm:ping(SearchNode) of
-                pong ->
-                    [{info, {clouseau_ok, SearchNode}}];
-                Error ->
-                    % only warning since search is not enabled by default
-                    [{warning, {clouseau_error, SearchNode, Error}}]
+            try list_to_existing_atom(SearchNodeStr) of
+                SearchNode ->
+                    ping_search_node(SearchNode)
+            catch
+                error:badarg ->
+                    [{warning, {clouseau_node, SearchNodeStr}}]
             end
+    end.
+
+-spec ping_search_node(atom()) -> [{atom(), term()}].
+ping_search_node(SearchNode) ->
+    case net_adm:ping(SearchNode) of
+        pong ->
+            [{info, {clouseau_ok, SearchNode}}];
+        Error ->
+            % only warning since search is not enabled by default
+            [{warning, {clouseau_error, SearchNode, Error}}]
     end.
 
 -spec format(term()) -> {io:format(), [term()]}.
@@ -64,5 +73,7 @@ format(clouseau_not_configured) ->
     {"Clouseau service is not configured", []};
 format({clouseau_ok, SearchNode}) ->
     {"Local search node at ~w responding ok", [SearchNode]};
+format({clouseau_node, SearchNode}) ->
+    {"Search node name ~s is not recognised", [SearchNode]};
 format({clouseau_error, SearchNode, Error}) ->
     {"Local search node at ~w not responding: ~w", [SearchNode, Error]}.
