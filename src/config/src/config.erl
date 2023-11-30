@@ -158,15 +158,20 @@ get(Section, Key) ->
 get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
     ?MODULE:get(binary_to_list(Section), binary_to_list(Key), Default);
 get(Section, Key, Default) when is_list(Section), is_list(Key) ->
-    case ets:lookup(?MODULE, {Section, Key}) of
-        [] when Default == undefined -> Default;
-        [] when is_boolean(Default) -> Default;
-        [] when is_float(Default) -> Default;
-        [] when is_integer(Default) -> Default;
-        [] when is_list(Default) -> Default;
-        [] when is_atom(Default) -> Default;
-        [] -> error(badarg);
-        [{_, Match}] -> Match
+    try
+        case ets:lookup(?MODULE, {Section, Key}) of
+            [] when Default == undefined -> Default;
+            [] when is_boolean(Default) -> Default;
+            [] when is_float(Default) -> Default;
+            [] when is_integer(Default) -> Default;
+            [] when is_list(Default) -> Default;
+            [] when is_atom(Default) -> Default;
+            [] -> error(badarg);
+            [{_, Match}] -> Match
+        end
+    catch
+        error:badarg ->
+            Default
     end.
 
 set(Section, Key, Value) ->
