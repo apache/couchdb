@@ -26,6 +26,7 @@ import os
 import platform
 import posixpath
 import re
+import shutil
 import signal
 import socket
 import subprocess as sp
@@ -254,6 +255,12 @@ def get_args_parser():
         help="Erlang cookie string",
     )
     parser.add_option(
+        "--clouseau-dir",
+        dest="clouseau_dir",
+        default=None,
+        help="Use a specific directory for finding Clouseau files",
+    ),
+    parser.add_option(
         "-t",
         "--enable-tls",
         dest="enable_tls",
@@ -268,6 +275,9 @@ def get_args_parser():
         help="Use TCP for specified node when TLS distribution is enabled",
     )
     return parser
+
+
+CLOUSEAU_DIR = "clouseau"
 
 
 def setup_context(opts, args):
@@ -297,6 +307,7 @@ def setup_context(opts, args):
         "locald_configs": opts.locald_configs,
         "with_nouveau": opts.with_nouveau,
         "with_clouseau": opts.with_clouseau,
+        "clouseau_dir": opts.clouseau_dir or CLOUSEAU_DIR,
         "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
         "no_tls": opts.no_tls,
@@ -525,7 +536,6 @@ def boot_nouveau(ctx):
     )
 
 
-CLOUSEAU_DIR = "clouseau"
 JAVA_VERSION_RE = re.compile(r'"(\d+\.\d+).*"')
 
 
@@ -547,6 +557,27 @@ class StartupError(Exception):
         super().__init__(self.message)
 
 
+def generate_default_clouseau_ini(path):
+    print("(generate default clouseau.ini)")
+    with open(path, "w") as handle:
+        handle.write(
+            """[clouseau]
+"""
+        )
+
+
+def generate_default_log4j_properties(path):
+    print("(generate default log4j.properties)")
+    with open(path, "w") as handle:
+        handle.write(
+            """log4j.rootLogger=debug, CONSOLE
+log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
+"""
+        )
+
+
 @log("Start Clouseau node clouseau{idx}")
 def boot_clouseau(ctx, idx):
     configure_cmd = (
@@ -554,47 +585,115 @@ def boot_clouseau(ctx, idx):
         if platform.system() == "Windows"
         else "./configure --enable-clouseau"
     )
+    clouseau_dir = ctx["clouseau_dir"]
 
-    if not os.path.isdir(CLOUSEAU_DIR):
+    if not os.path.isdir(clouseau_dir):
         raise StartupError(
-            "Clouseau deployment cannot be found, please run `{}`".format(configure_cmd)
+            (
+                "Clouseau files cannot be found.  "
+                "Please run `{}` or make `--clouseau-dir` point to a valid directory"
+            ).format(configure_cmd)
         )
 
-    clouseau_jdk_home = os.environ.get("CLOUSEAU_JAVA_HOME") or os.environ.get(
+    clouseau_java_home = os.environ.get("CLOUSEAU_JAVA_HOME") or os.environ.get(
         "JAVA_HOME"
     )
-    java = clouseau_jdk_home + "/bin/java" if clouseau_jdk_home else "java"
+    java = (
+        clouseau_java_home + "/bin/java" if clouseau_java_home else shutil.which("java")
+    )
     java_version = get_java_version(java)
+
+    pom_file = os.path.join(clouseau_dir, "pom.xml")
+    method = "src" if os.path.isfile(pom_file) else "dist"
 
     if not java_version:
         print(
             "Warning: Java version could not be determined, Clouseau may not be able to run"
         )
     else:
-        if java_version < 1.7 or java_version > 1.8:
+        if method == "src" and (java_version < 1.7 or 1.7 < java_version):
+            raise StartupError(
+                "Java is not suitable to run Clouseau.  Please use JDK 1.7 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+            )
+        elif java_version < 1.7 or 1.8 < java_version:
             raise StartupError(
                 "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
             )
 
-    clouseau_jars = [
-        "{}/{}".format(CLOUSEAU_DIR, fname)
-        for fname in os.listdir(CLOUSEAU_DIR)
-        if fname.endswith(".jar")
-    ]
+    logfname = os.path.join(ctx["devdir"], "logs", "clouseau{}.log".format(idx))
+    log = open(logfname, "w")
+    separator = ";" if platform.system() == "Windows" else ":"
 
-    if not clouseau_jars:
-        raise StartupError("Clouseau has no JAR files")
+    if method == "src":
+        target_dir = os.path.join(clouseau_dir, "target")
+        cp_file = os.path.join(ctx["devdir"], "lib", "clouseau.classpath")
 
-    clouseau_ini = "{}/clouseau.ini".format(CLOUSEAU_DIR)
-    if not os.path.isfile(clouseau_ini):
-        raise StartupError("Clouseau has no ini file")
+        # attempt building the sources only once
+        if idx == 1:
+            env = os.environ.copy()
+            if clouseau_java_home:
+                env["JAVA_HOME"] = clouseau_java_home
 
-    log4j_properties = "{}/log4j.properties".format(CLOUSEAU_DIR)
-    if not os.path.isfile(log4j_properties):
-        raise StartupError("Clouseau has no Log4J configuration")
+            clouseau_mvn_home = os.environ.get("CLOUSEAU_M2_HOME") or os.environ.get(
+                "M2_HOME"
+            )
+            mvn = (
+                clouseau_mvn_home + "/bin/mvn"
+                if clouseau_mvn_home
+                else shutil.which("mvn")
+            )
+
+            if not mvn:
+                raise StartupError(
+                    "Maven could not be found.  Please install Maven 3.8 and configure its (root) path in `CLOUSEAU_M2_HOME`"
+                )
+
+            try:
+                sp.check_call(
+                    [
+                        mvn,
+                        "-B",
+                        "compile",
+                        "dependency:build-classpath",
+                        "-Dmdep.outputFile={}".format(cp_file),
+                    ],
+                    cwd=clouseau_dir,
+                    env=env,
+                    stdin=sp.PIPE,
+                    stdout=log,
+                    stderr=log,
+                )
+            except Exception as exc:
+                log.write(str(exc))
+                raise StartupError("Could not build Clouseau from sources.")
+
+        with open(cp_file, "r") as handle:
+            classpath_deps = handle.read().rstrip()
+
+        targets = os.path.join(clouseau_dir, "target", "classes")
+        classpath = separator.join([classpath_deps, targets])
+    else:
+        clouseau_jars = [
+            os.path.join(clouseau_dir, fname)
+            for fname in os.listdir(clouseau_dir)
+            if fname.endswith(".jar")
+        ]
+
+        if not clouseau_jars:
+            raise StartupError("Clouseau has no JAR files")
+
+        classpath = separator.join(clouseau_jars)
+
+    clouseau_ini = os.path.join(clouseau_dir, "clouseau.ini")
+    if not os.path.exists(clouseau_ini):
+        generate_default_clouseau_ini(clouseau_ini)
+
+    log4j_properties = os.path.join(clouseau_dir, "log4j.properties")
+    if not os.path.exists(log4j_properties):
+        generate_default_log4j_properties(log4j_properties)
 
     clouseau_name = "clouseau{}@127.0.0.1".format(idx)
-    clouseau_indexes_dir = "{}/clouseau{}/data".format(ctx["devdir"], idx)
+    clouseau_indexes_dir = os.path.join(ctx["devdir"], "clouseau{}".format(idx), "data")
 
     if ctx["erlang_cookie"]:
         clouseau_cookie = ["-Dclouseau.cookie={}".format(ctx["erlang_cookie"])]
@@ -608,8 +707,6 @@ def boot_clouseau(ctx, idx):
         if alternativeHome:
             os.environ["HOME"] = alternativeHome
 
-    separator = ";" if platform.system() == "Windows" else ":"
-
     cmd = (
         [
             java,
@@ -621,7 +718,7 @@ def boot_clouseau(ctx, idx):
             "-XX:+UseConcMarkSweepGC",
             "-XX:+CMSParallelRemarkEnabled",
             "-cp",
-            separator.join(clouseau_jars),
+            classpath,
             "-Dlog4j.configuration=file:{}".format(log4j_properties),
             "-Dclouseau.name={}".format(clouseau_name),
             "-Dclouseau.dir={}".format(clouseau_indexes_dir),
@@ -632,8 +729,6 @@ def boot_clouseau(ctx, idx):
             clouseau_ini,
         ]
     )
-    logfname = os.path.join(ctx["devdir"], "logs", "clouseau{}.log".format(idx))
-    log = open(logfname, "w")
 
     try:
         return sp.Popen(

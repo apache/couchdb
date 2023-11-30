@@ -39,6 +39,8 @@ run_erlang() {
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
 SM_VSN=${SM_VSN:-"91"}
+CLOUSEAU_MTH=${CLOUSEAU_MTH:-"dist"}
+CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases/download/%s/clouseau-%s-dist.zip"}
 CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.22.0"}
 CLOUSEAU_DIR="$(pwd)"/clouseau
 ARCH="$(uname -m)"
@@ -66,7 +68,9 @@ Options:
   --erlang-md5                use erlang for md5 hash operations
   --dev                       alias for --disable-docs --disable-fauxton
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
-  --clouseau-version VSN      specify the version of Clouseau to use (defaults to $CLOUSEAU_VSN)
+  --clouseau-method MTH       specify the method for Clouseau to deploy: git or dist (defaults to $CLOUSEAU_MTH)
+  --clouseau-uri URI          specify the location for retrieving Clouseau (defaults $(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN"))
+  --clouseau-version VSN      specify the version (tag/branch for git) of Clouseau to use (defaults to $CLOUSEAU_VSN)
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
   --rebar3=PATH               use rebar3 by specified path
@@ -220,7 +224,7 @@ parse_opts() {
 
 	    --clouseau-version)
 		if [ -n "$2" ]; then
-		    eval CLOUSEAU_SVN=$2
+		    eval CLOUSEAU_VSN=$2
 		    shift 2
 		    continue
 		else
@@ -233,6 +237,42 @@ parse_opts() {
 		;;
 	    --clouseau-version=)
 	        printf 'ERROR: "--clouseau-version" requires a non-empty argument.\n' >&2
+	        exit 1
+	        ;;
+
+	    --clouseau-method)
+		if [ -n "$2" ]; then
+		    eval CLOUSEAU_MTH=$2
+		    shift 2
+		    continue
+		else
+		    printf 'ERROR: "--clouseau-method" requires a non-empty argument.\n' >&2
+		    exit 1
+		fi
+		;;
+	    --clouseau-method=?*)
+		eval CLOUSEAU_MTH=${1#*=}
+		;;
+	    --clouseau-method=)
+	        printf 'ERROR: "--clouseau-method" requires a non-empty argument.\n' >&2
+	        exit 1
+	        ;;
+
+	    --clouseau-uri)
+		if [ -n "$2" ]; then
+		    eval CLOUSEAU_URI=$2
+		    shift 2
+		    continue
+		else
+		    printf 'ERROR: "--clouseau-uri" requires a non-empty argument.\n' >&2
+		    exit 1
+		fi
+		;;
+	    --clouseau-uri=?*)
+		eval CLOUSEAU_URI=${1#*=}
+		;;
+	    --clouseau-uri=)
+	        printf 'ERROR: "--clouseau-uri" requires a non-empty argument.\n' >&2
 	        exit 1
 	        ;;
 
@@ -380,43 +420,56 @@ install_local_erlfmt() {
     fi
 }
 
+check_local_clouseau_dir() {
+    _dir="$1"
+
+    if [ -e "$_dir" ]; then
+	printf "ERROR: \"%s\" already exists.  Please remove or move it away first.\n" "$_dir" >&2
+	exit 1
+    fi
+}
+
 install_local_clouseau() {
-    _DIST_URL=https://github.com/cloudant-labs/clouseau/releases/download/"$CLOUSEAU_VSN"/clouseau-"$CLOUSEAU_VSN"-dist.zip
-    _MAVEN_BASE_URI=https://repo1.maven.org/maven2
+    case "$CLOUSEAU_MTH" in
+	dist)
+	    _DIST_URL=$(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN")
+	    _MAVEN_BASE_URI=https://repo1.maven.org/maven2
 
-    _SLF4J_SIMPLE_VSN=${SLF4J_SIMPLE_VERSION:-1.7.36}
-    _SLF4J_SIMPLE_JAR=slf4j-simple-"$_SLF4J_SIMPLE_VSN".jar
-    _SLF4J_SIMPLE_URL="$_MAVEN_BASE_URI"/org/slf4j/slf4j-simple/"$_SLF4J_SIMPLE_VSN"/"$_SLF4J_SIMPLE_JAR"
+	    _SLF4J_SIMPLE_VSN=${SLF4J_SIMPLE_VERSION:-1.7.36}
+	    _SLF4J_SIMPLE_JAR=slf4j-simple-"$_SLF4J_SIMPLE_VSN".jar
+	    _SLF4J_SIMPLE_URL="$_MAVEN_BASE_URI"/org/slf4j/slf4j-simple/"$_SLF4J_SIMPLE_VSN"/"$_SLF4J_SIMPLE_JAR"
 
-    rm -rf "$CLOUSEAU_DIR"
-    mkdir -p "$CLOUSEAU_DIR"
+	    check_local_clouseau_dir "$CLOUSEAU_DIR"
+	    mkdir -p "$CLOUSEAU_DIR"
 
-    if ! curl -sSL --max-redirs 1 -o clouseau.zip "$_DIST_URL"; then
-	printf "ERROR: %s could not be downloaded.\n" "$_DIST_URL" >&2
-	exit 1
-    fi
+	    echo "Fetching Clouseau from $_DIST_URL..."
+	    if ! curl -sSL --max-redirs 1 -o clouseau.zip "$_DIST_URL"; then
+		printf "ERROR: %s could not be downloaded.\n" "$_DIST_URL" >&2
+		exit 1
+	    fi
 
-    if ! unzip -q -j clouseau.zip -d "$CLOUSEAU_DIR"; then
-	printf "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted.\n" >&2
-	exit 1
-    fi
+	    if ! unzip -q -j clouseau.zip -d "$CLOUSEAU_DIR"; then
+		printf "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted.\n" >&2
+		exit 1
+	    fi
 
-    rm clouseau.zip
+	    rm clouseau.zip
 
-    if ! curl -sSL --max-redirs 1 -o "$CLOUSEAU_DIR"/"$_SLF4J_SIMPLE_JAR" "$_SLF4J_SIMPLE_URL"; then
-	printf "ERROR: %s could not be downloaded.\n" "$_SLF4J_SIMPLE_URL" >&2
-	exit 1
-    fi
+	    if ! curl -sSL --max-redirs 1 -o "$CLOUSEAU_DIR"/"$_SLF4J_SIMPLE_JAR" "$_SLF4J_SIMPLE_URL"; then
+		printf "ERROR: %s could not be downloaded.\n" "$_SLF4J_SIMPLE_URL" >&2
+		exit 1
+	    fi
+	    ;;
 
-    cat <<EOF > "$CLOUSEAU_DIR"/clouseau.ini
-[clouseau]
-EOF
-    cat <<EOF > "$CLOUSEAU_DIR"/log4j.properties
-log4j.rootLogger=debug, CONSOLE
-log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
-log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
-log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
-EOF
+	git)
+	    echo "Cloning Clouseau from $CLOUSEAU_URI ($CLOUSEAU_VSN)..."
+	    check_local_clouseau_dir "$CLOUSEAU_DIR"
+	    git clone --depth 1 --branch "$CLOUSEAU_VSN" "$CLOUSEAU_URI" "$CLOUSEAU_DIR"
+	    ;;
+
+	*) printf "ERROR: Invalid deployment method for Clouseau.  Please use either \`dist\` or \`git\` verbatim.\n" >&2
+	   exit 1
+    esac
 }
 
 if [ -z "${REBAR}" ]; then
@@ -436,8 +489,6 @@ fi
 
 if [ $WITH_CLOUSEAU -ne 0 ]; then
     install_local_clouseau
-else
-    rm -rf "$CLOUSEAU_DIR"
 fi
 
 # only update dependencies, when we are not in a release tarball

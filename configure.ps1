@@ -13,6 +13,8 @@
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
   -ClouseauVersion VSN       select the version of Clouseau to use (default 2.22.0)
+  -ClouseauMethod MTH        method for Clouseau to deploy: git or dist (default dist)
+  -ClouseauUri URI           location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.22.0/clouseau-2.22.0-dist.zip)
 
   Installation directories:
   -Prefix PREFIX             install architecture-independent files in PREFIX
@@ -57,7 +59,11 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$SpiderMonkeyVersion = "91", # select the version of SpiderMonkey to use (default 91)
     [ValidateNotNullOrEmpty()]
+    [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
+    [ValidateNotNullOrEmpty()]
     [string]$ClouseauVersion = "2.22.0", # select the version of Clouseau to use (default 2.22.0)
+    [ValidateNotNullOrEmpty()]
+    [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.22.0/clouseau-2.22.0-dist.zip)
     [ValidateNotNullOrEmpty()]
     [string]$Prefix = "C:\Program Files\Apache\CouchDB", # install architecture-independent file location (default C:\Program Files\Apache\CouchDB)
     [ValidateNotNullOrEmpty()]
@@ -278,56 +284,52 @@ $ClouseauDir = "$rootdir\clouseau"
 
 if ($EnableClouseau)
 {
-    Write-Verbose "===> downloading Clouseau distribution..."
 
     if (Test-Path $ClouseauDir) {
-	Remove-Item -Recurse -Force $ClouseauDir
-    }
-    New-Item -Path $ClouseauDir -ItemType Directory | Out-File Null
-
-    $Slf4jVersion = "1.7.36"
-    $ClouseauDistUrl = "https://github.com/cloudant-labs/clouseau/releases/download/$ClouseauVersion/clouseau-$ClouseauVersion-dist.zip"
-    $Slf4jSimpleJar = "slf4j-simple-$Slf4jVersion.jar"
-    $Slf4jSimpleUrl = "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/$Slf4jVersion/$Slf4jSimpleJar"
-
-    Set-Variable ProgressPreference SilentlyContinue
-    Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
-    If ($LASTEXITCODE -ne 0) {
-	Write-Output "ERROR: $ClouseauDistUrl could not be downloaded."
+	Write-Output "ERROR: ""$ClouseauDir"" already exists.  Please remove or move it away first."
 	exit 1
     }
 
-    Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
-    If ($LASTEXITCODE -ne 0) {
-	Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
-	exit 1
+    if ($ClouseauMethod -eq "dist") {
+	Write-Verbose "===> fetching Clouseau from $ClouseauDistUrl..."
+
+	New-Item -Path $ClouseauDir -ItemType Directory | Out-File Null
+
+	$Slf4jVersion = "1.7.36"
+	$ClouseauDistUrl = $ClouseauUri -f $ClouseauVersion
+	$Slf4jSimpleJar = "slf4j-simple-$Slf4jVersion.jar"
+	$Slf4jSimpleUrl = "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/$Slf4jVersion/$Slf4jSimpleJar"
+
+	Set-Variable ProgressPreference SilentlyContinue
+	Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
+	If ($LASTEXITCODE -ne 0) {
+	    Write-Output "ERROR: $ClouseauDistUrl could not be downloaded."
+	    exit 1
+	}
+
+	Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
+	If ($LASTEXITCODE -ne 0) {
+	    Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
+	    exit 1
+	}
+	mv "$ClouseauDir\*\*.jar" "$ClouseauDir"
+	rm "$ClouseauDir\clouseau-$ClouseauVersion"
+	rm clouseau.zip
+
+	Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$Slf4jSimpleJar" $Slf4jSimpleUrl
+	If ($LASTEXITCODE -ne 0) {
+	    Write-Output "ERROR: $Slf4jSimpleJarUrl could not be downloaded."
+	    exit 1
+	}
     }
-    mv "$ClouseauDir\*\*.jar" "$ClouseauDir"
-    rm "$ClouseauDir\clouseau-$ClouseauVersion"
-    rm clouseau.zip
+    elseif ($ClouseauMethod -eq "git") {
+	Write-Verbose "===> cloning Clouseau from $ClouseauDistUrl ($ClouseauVersion)..."
 
-    Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$Slf4jSimpleJar" $Slf4jSimpleUrl
-    If ($LASTEXITCODE -ne 0) {
-	Write-Output "ERROR: $Slf4jSimpleJarUrl could not be downloaded."
-	exit 1
+	git clone --depth 1 --branch $ClouseauVersion $ClouseauUri $ClouseauDir
     }
-
-    $ClouseauIni = @"
-[clouseau]
-"@
-    $ClouseauIni | Out-File "$ClouseauDir\clouseau.ini" -encoding ascii
-
-    $Log4JProperties = @"
-log4j.rootLogger=debug, CONSOLE
-log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
-log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
-log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
-"@
-    $Log4JProperties | Out-File "$ClouseauDir\log4j.properties"
-}
-else {
-    if (Test-Path $ClouseauDir) {
-	Remove-Item -Recurse -Force $ClouseauDir
+    else {
+	Write-Output "ERROR: Invalid deployment method for Clouseau.  Please use either `dist` or `git`."
+	exit 1
     }
 }
 
