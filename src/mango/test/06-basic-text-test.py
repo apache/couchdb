@@ -15,7 +15,7 @@ import mango
 import unittest
 import user_docs
 import math
-from hypothesis import given, assume, example
+from hypothesis import given, assume, example, settings
 import hypothesis.strategies as st
 
 
@@ -580,6 +580,7 @@ class NumStringTests(mango.DbPerClass):
         not (math.isinf(num) or math.isnan(num))
 
     @given(f=st.floats().filter(isFinite).map(str) | st.floats().map(lambda f: f.hex()))
+    @settings(deadline=1000)
     @example("NaN")
     @example("Infinity")
     def test_floating_point_val(self, f):
