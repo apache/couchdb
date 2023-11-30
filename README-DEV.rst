@@ -317,6 +317,31 @@ used to configure Clouseau to work with that::
 
     dev/run --with-clouseau --erlang-cookie=brumbrum
 
+It is possible to override Clouseau's location per invocation of
+``./dev/run`` in case some other version needs to be exercised for the
+moment.  This can be done with the help of the ``--clouseau-dir``
+flag.  The specified location could be either an unpacked bundle of
+JAR files or a git clone of the Clouseau source code repository::
+
+    dev/run --with-clouseau --clouseau-dir $HOME/git/clouseau.wip
+
+Through the ``CLOUSEAU_DIR`` variable the same could be forwarded to the
+respective test targets, e.g. ``mango-test``::
+
+    make mango-test CLOUSEAU_DIR=$HOME/git/clouseau.wip
+
+This can even be done if there was no local Clouseau deployment
+configured previously.  Mind that this will require building Clouseau
+from source, which causes the nodes start up somewhat slower.  It also
+requires JDK 1.7 and Apache Maven 3.8 to be present, that is why it is
+important the set the ``CLOUSEAU_JAVA_HOME`` and the
+``CLOUSEAU_M2_HOME`` environment variables accordingly, for instance::
+
+    asdf install java zulu-7.56.0.11
+    asdf plugin add maven
+    asdf install maven 3.8.8
+    export CLOUSEAU_JAVA_HOME=$(asdf where java zulu-7.56.0.11)
+    export CLOUSEAU_M2_HOME=$(asdf where maven 3.8.8)
 
 Static Code Analysis
 ~~~~~~~~~~~~~~~~~~~~

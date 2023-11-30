@@ -262,13 +262,20 @@ elixir: elixir-init devclean
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
+ifneq ($(CLOUSEAU_DIR),)
+_WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
+else ifeq ($(with_clouseau), 1)
+_WITH_CLOUSEAU="--with-clouseau"
+endif
+
 .PHONY: elixir-search
 # target: elixir-search - Run search tests, requires a configured Clouseau instance
 elixir-search: export MIX_ENV=integration
 elixir-search: elixir-init devclean
-ifeq ($(with_clouseau), 1)
+ifneq ($(_WITH_CLOUSEAU), )
 	@dev/run -n 1 -q -a adm:pass \
-		--with-clouseau \
+		"$(_WITH_CLOUSEAU)" \
+		"$(TEST_OPTS)" \
 		--locald-config test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
 else
@@ -317,10 +324,6 @@ list-eunit-suites:
 # target: build-test - Test build script
 build-test:
 	@test/build/test-configure.sh
-
-ifeq ($(with_clouseau), 1)
-_WITH_CLOUSEAU="--with-clouseau"
-endif
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
