@@ -65,13 +65,18 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
 
 process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
+        Msg ->
+            process_raw_message(Msg, RefList, Keypos, Fun, Acc0, TimeoutRef)
+    after PerMsgTO ->
+        {timeout, Acc0}
+    end.
+
+process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
+    {Payload, Delta} = extract_delta(Payload0),
+    couch_stats_resource_tracker:accumulate_delta(Delta),
+    case Payload of
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
-        {rexi, '$rexi_ping'} ->
-            {ok, Acc0};
-        {rexi, '$rexi_ping', {delta, Delta}} ->
-            couch_stats_resource_tracker:accumulate_delta(Delta),
-            {ok, Acc0};
         {rexi, Ref, Msg} ->
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
@@ -86,64 +91,17 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                 Worker ->
                     Fun(Msg, {Worker, From}, Acc0)
             end;
-        {Ref, Msg, {delta, Delta}} ->
-            couch_stats_resource_tracker:accumulate_delta(Delta),
-            case lists:keyfind(Ref, Keypos, RefList) of
-            false ->
-                % this was some non-matching message which we will ignore
-                {ok, Acc0};
-            Worker ->
-                Fun(Msg, Worker, Acc0)
-            end;
-        {Ref, From, Msg, {delta, Delta}} ->
-            couch_stats_resource_tracker:accumulate_delta(Delta),
-            case lists:keyfind(Ref, Keypos, RefList) of
-            false ->
-                {ok, Acc0};
-            Worker ->
-                Fun(Msg, {Worker, From}, Acc0)
-            end;
-        {Ref, get_state = Msg} ->
-            case lists:keyfind(Ref, Keypos, RefList) of
-                false ->
-                    % this was some non-matching message which we will ignore
-                    {ok, Acc0};
-                Worker ->
-                    Fun(Msg, Worker, Acc0)
-            end;
-        {Ref, done = Msg} ->
-            case lists:keyfind(Ref, Keypos, RefList) of
-                false ->
-                    % this was some non-matching message which we will ignore
-                    {ok, Acc0};
-                Worker ->
-                    Fun(Msg, Worker, Acc0)
-            end;
-        %% {#Ref<0.1961702128.3491758082.26965>, {rexi_EXIT,{{query_parse_error,<<78,111,32,114,111,119,115,32,99,97,110,32,109,97
+        {rexi, '$rexi_ping'} ->
+            {ok, Acc0};
         {Ref, Msg} ->
-            %% TODO: add stack trace to log entry
-            %% couch_log:debug("rexi_utils:process_message no delta: {Ref, Msg} => {~p, ~p}~n", [Ref, Msg]),
-            %% timer:sleep(100),
-            %% erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, Msg} => {~w, ~w}~n", [Ref, Msg]))));
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     % this was some non-matching message which we will ignore
                     {ok, Acc0};
                 Worker ->
                     Fun(Msg, Worker, Acc0)
-            end;
-        {Ref, From, rexi_STREAM_INIT = Msg} ->
-            case lists:keyfind(Ref, Keypos, RefList) of
-                false ->
-                    {ok, Acc0};
-                Worker ->
-                    Fun(Msg, {Worker, From}, Acc0)
             end;
         {Ref, From, Msg} ->
-            %% TODO: add stack trace to log entry
-            %% couch_log:debug("rexi_utils:process_message no delta: {Ref, From, Msg} => {~p, ~p, ~p}~n", [Ref, From, Msg]),
-            %% timer:sleep(100),
-            %% erlang:halt(binary_to_list(iolist_to_binary(io_lib:format("{enodelta} rexi_utils:process_message no delta: {Ref, From, Msg} => {~w, ~w, ~w}~n", [Ref, From, Msg]))));
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
@@ -152,6 +110,13 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             end;
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
-    after PerMsgTO ->
-        {timeout, Acc0}
     end.
+
+extract_delta({A, {delta, Delta}}) -> {{A}, Delta};
+extract_delta({A, B, {delta, Delta}}) -> {{A, B}, Delta};
+extract_delta({A, B, C, {delta, Delta}}) -> {{A, B, C}, Delta};
+extract_delta({A, B, C, D, {delta, Delta}}) -> {{A, B, C, D}, Delta};
+extract_delta({A, B, C, D, E, {delta, Delta}}) -> {{A, B, C, D, E}, Delta};
+extract_delta({A, B, C, D, E, F, {delta, Delta}}) -> {{A, B, C, D, E, F}, Delta};
+extract_delta({A, B, C, D, E, F, G, {delta, Delta}}) -> {{A, B, C, D, E, F, G}, Delta};
+extract_delta(T) -> {T, undefined}.
