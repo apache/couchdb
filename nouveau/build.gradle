@@ -1,7 +1,6 @@
 plugins {
     id 'application'
     id 'com.diffplug.spotless' version '6.18.0'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'jacoco'
 }
 
@@ -43,9 +42,8 @@ dependencies {
     testImplementation 'org.mockito:mockito-core'
 }
 
-group = 'org.apache.couchdb.nouveau'
+group = 'org.apache.couchdb'
 version = '1.0-SNAPSHOT'
-description = 'server'
 
 java {
     sourceCompatibility = "11"
@@ -70,11 +68,6 @@ testing {
             useJUnitJupiter()
         }
     }
-}
-
-shadowJar {
-    archiveClassifier.set('dist')
-    mergeServiceFiles()
 }
 
 tasks.withType(JavaCompile) {

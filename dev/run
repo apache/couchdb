@@ -509,15 +509,11 @@ def boot_haproxy(ctx):
 def boot_nouveau(ctx):
     if not ctx["with_nouveau"]:
         return
-
-    version = "1.0-SNAPSHOT"
     cmd = [
-        "java",
-        "-server",
-        "-jar",
-        "build/libs/server-%s-dist.jar" % version,
-        "server",
-        "nouveau.yaml",
+        "./gradlew",
+        "run",
+        "--args",
+        "server nouveau.yaml",
     ]
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
