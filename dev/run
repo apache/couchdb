@@ -702,8 +702,9 @@ def hack_local_ini(ctx, contents):
     else:
         user, pswd = ctx["admin"]
 
-    # this relies on [admin] being the last section at the end of the file
-    contents = contents + "\n%s = %s" % (user, hashify(pswd))
+    contents = contents.replace(
+        "\n[admins]\n", "\n[admins]\n%s = %s\n" % (user, hashify(pswd))
+    )
 
     return contents + "\n\n[chttpd_auth]\nsecret = %s\n" % COMMON_SALT
 
