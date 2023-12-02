@@ -275,7 +275,6 @@ def setup_context(opts, args):
     return {
         "N": opts.nodes,
         "no_join": opts.no_join,
-        "with_admin_party": opts.with_admin_party,
         "enable_erlang_views": opts.enable_erlang_views,
         "admin": opts.admin.split(":", 1) if opts.admin else None,
         "nodes": ["node%d" % (i + opts.node_number) for i in range(opts.nodes)],
@@ -697,11 +696,6 @@ def hack_default_ini(ctx, node, contents):
 
 
 def hack_local_ini(ctx, contents):
-    if ctx["with_admin_party"]:
-        os.environ["COUCHDB_TEST_ADMIN_PARTY_OVERRIDE"] = "1"
-        ctx["admin"] = ("Admin Party!", "You do not need any password.")
-        return contents + "\n\n[chttpd_auth]\nsecret = %s\n" % COMMON_SALT
-
     # handle admin credentials passed from cli or generate own one
     if ctx["admin"] is None:
         ctx["admin"] = user, pswd = "root", gen_password()
@@ -759,10 +753,7 @@ def startup(ctx):
     ensure_all_nodes_alive(ctx)
     if ctx["no_join"]:
         return
-    if ctx["with_admin_party"]:
-        cluster_setup_with_admin_party(ctx)
-    else:
-        cluster_setup(ctx)
+    cluster_setup(ctx)
     if ctx["degrade_cluster"] > 0:
         degrade_cluster(ctx)
 
@@ -922,30 +913,32 @@ def cluster_setup(ctx):
 
 
 def enable_cluster(node_count, port, user, pswd):
-    conn = httpclient.HTTPConnection("127.0.0.1", port)
-    conn.request(
+    body = json.dumps(
+        {
+            "action": "enable_cluster",
+            "bind_address": "0.0.0.0",
+            "username": user,
+            "password": pswd,
+            "node_count": node_count,
+        }
+    )
+    headers = {
+        "Authorization": basic_auth_header(user, pswd),
+        "Content-Type": "application/json",
+    }
+    (status, response) = try_request(
+        "127.0.0.1",
+        port,
         "POST",
         "/_cluster_setup",
-        json.dumps(
-            {
-                "action": "enable_cluster",
-                "bind_address": "0.0.0.0",
-                "username": user,
-                "password": pswd,
-                "node_count": node_count,
-            }
-        ),
-        {
-            "Authorization": basic_auth_header(user, pswd),
-            "Content-Type": "application/json",
-        },
+        (201, 400),
+        body=body,
+        headers=headers,
+        error="Failed to run _cluster_setup",
     )
-    resp = conn.getresponse()
-    if resp.status == 400:
-        resp.close()
+    if status == 400:
         return False
-    assert resp.status == 201, resp.read()
-    resp.close()
+    assert status == 201, response
     return True
 
 
@@ -1015,36 +1008,29 @@ def generate_cookie():
     return base64.b64encode(os.urandom(12)).decode()
 
 
-def cluster_setup_with_admin_party(ctx):
-    connect_nodes(ctx)
-    host, port = "127.0.0.1", cluster_port(ctx, 1)
-    create_system_databases(host, port)
-
-
-def connect_nodes(ctx):
-    host, port = "127.0.0.1", backend_port(ctx, 1)
-    for node in ctx["nodes"]:
-        path = "/_nodes/%s@127.0.0.1" % node
-        try_request(
-            host,
-            port,
-            "PUT",
-            path,
-            (200, 201, 202, 409),
-            body="{}",
-            error="Failed to join %s into cluster:\n" % node,
-        )
-
-
 def try_request(
-    host, port, meth, path, success_codes, body=None, retries=10, retry_dt=1, error=""
+    host,
+    port,
+    meth,
+    path,
+    success_codes,
+    body=None,
+    headers=None,
+    retries=10,
+    retry_dt=1,
+    error="",
 ):
     while True:
         conn = httpclient.HTTPConnection(host, port)
-        conn.request(meth, path, body=body)
+        if headers is not None:
+            conn.request(meth, path, body=body, headers=headers)
+        else:
+            conn.request(meth, path, body=body)
         resp = conn.getresponse()
         if resp.status in success_codes:
-            return resp.status, resp.read()
+            result = (resp.status, resp.read())
+            resp.close()
+            return result
         elif retries <= 0:
             assert resp.status in success_codes, "%s%s" % (error, resp.read())
         retries -= 1

@@ -254,7 +254,6 @@ elixir-cluster-with-quorum: elixir-init devclean
 .PHONY: elixir
 # target: elixir - Run Elixir-based integration tests
 elixir: export MIX_ENV=integration
-elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init devclean
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
 		--enable-erlang-views \
@@ -325,7 +324,6 @@ endif
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@python3 -m venv src/mango/.venv && \
 		src/mango/.venv/bin/python3 -m pip install -r src/mango/requirements.txt
