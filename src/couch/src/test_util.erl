@@ -363,7 +363,7 @@ mock(Modules) when is_list(Modules) ->
 mock(config) ->
     meck:new(config, [passthrough]),
     meck:expect(config, get, fun(_, _) -> undefined end),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     meck:expect(config, get_boolean, fun(_, _, Default) -> Default end),
     meck:expect(config, get_float, fun(_, _, Default) -> Default end),
     meck:expect(config, get_integer, fun(_, _, Default) -> Default end),

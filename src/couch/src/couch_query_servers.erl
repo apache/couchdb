@@ -964,7 +964,7 @@ db_key_test_() ->
 
 setup() ->
     meck:new(config, [passthrough]),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     ok.
 
 teardown(_) ->
