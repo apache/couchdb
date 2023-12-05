@@ -362,6 +362,9 @@ mock(config) ->
     meck:new(config, [passthrough]),
     meck:expect(config, get, fun(_, _) -> undefined end),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
+    meck:expect(config, get_boolean, fun(_, _, Default) -> Default end),
+    meck:expect(config, get_float, fun(_, _, Default) -> Default end),
+    meck:expect(config, get_integer, fun(_, _, Default) -> Default end),
     ok;
 mock(couch_stats) ->
     meck:new(couch_stats, [passthrough]),
