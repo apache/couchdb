@@ -39,6 +39,8 @@
 
 -export([as_selector/1]).
 
+-export([mock/1]).
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_db_int.hrl").
