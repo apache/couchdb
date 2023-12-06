@@ -546,43 +546,56 @@ changes_enumerator(DocInfo, Acc) ->
         pending = Pending,
         epochs = Epochs
     } = Acc,
-    #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DocInfo,
-    case [X || X <- couch_changes:filter(Db, DocInfo, Filter), X /= null] of
-        [] ->
-            ChangesRow =
+    Opts =
+        case Conflicts of
+            true -> [conflicts | DocOptions];
+            false -> DocOptions
+        end,
+    Seq = DocInfo#doc_info.high_seq,
+    {Docs0, Revs} = couch_changes:filter(Db, DocInfo, Filter, IncludeDocs, Conflicts),
+    Changes = [X || X <- Revs, X /= null],
+    Docs = [X || X <- Docs0, X /= null],
+    ChangesRow =
+        case {Changes, Docs, IncludeDocs} of
+            {[], _, _} ->
                 {no_pass, [
                     {pending, Pending - 1},
                     {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}}
                 ]};
-        Results ->
-            Opts =
-                if
-                    Conflicts -> [conflicts | DocOptions];
-                    true -> DocOptions
-                end,
-            ChangesRow =
-                {change, [
-                    {pending, Pending - 1},
-                    {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}},
-                    {id, Id},
-                    {changes, Results},
-                    {deleted, Del}
-                    | if
-                        IncludeDocs -> [doc_member(Db, DocInfo, Opts, Filter)];
-                        true -> []
-                    end
-                ]}
-    end,
+            {_, _, false} ->
+                changes_row(Changes, [], DocInfo, Acc);
+            {_, [], true} ->
+                Docs1 = [doc_member(Db, DocInfo, Opts, Filter)],
+                changes_row(Changes, Docs1, DocInfo, Acc);
+            {_, [Doc | _], true} ->
+                Docs1 = [get_json_doc(Doc, Opts, Filter)],
+                changes_row(Changes, Docs1, DocInfo, Acc)
+        end,
     ok = rexi:stream2(ChangesRow),
     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Pending - 1}}.
+
+changes_row(Changes, Docs, DocInfo, Acc) ->
+    #fabric_changes_acc{db = Db, pending = Pending, epochs = Epochs} = Acc,
+    #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DocInfo,
+    {change, [
+        {pending, Pending - 1},
+        {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}},
+        {id, Id},
+        {changes, Changes},
+        {deleted, Del}
+        | Docs
+    ]}.
 
 doc_member(Shard, DocInfo, Opts, Filter) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
         {ok, Doc} ->
-            {doc, maybe_filtered_json_doc(Doc, Opts, Filter)};
+            get_json_doc(Doc, Opts, Filter);
         Error ->
             Error
     end.
+
+get_json_doc(Doc, Opts, Filter) ->
+    {doc, maybe_filtered_json_doc(Doc, Opts, Filter)}.
 
 maybe_filtered_json_doc(Doc, Opts, {selector, _Style, {_Selector, Fields}}) when
     Fields =/= nil
