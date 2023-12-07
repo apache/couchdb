@@ -21,7 +21,8 @@
     id,
     seq,
     deleted = false,
-    doc = nil
+    doc = nil,
+    revs = []
 }).
 
 setup() ->
@@ -78,7 +79,8 @@ changes_test_() ->
                 filter_by_custom_function(),
                 filter_by_filter_function(),
                 filter_by_view(),
-                style_and_include_docs()
+                style_and_include_docs(),
+                style_and_include_docs_with_revtree()
             ]
         }
     }.
@@ -200,13 +202,29 @@ style_and_include_docs() ->
         }
     }.
 
+style_and_include_docs_with_revtree() ->
+    {
+        "Style and include_docs with revtree",
+        {
+            foreach,
+            fun setup_with_revtree/0,
+            fun teardown/1,
+            [
+                ?TDEF_FE(t_style_main_only_with_revtree),
+                ?TDEF_FE(t_style_main_only_with_include_docs_with_revtree),
+                ?TDEF_FE(t_style_all_docs_with_revtree),
+                ?TDEF_FE(t_style_all_docs_with_include_docs_with_revtree)
+            ]
+        }
+    }.
+
 t_filter_by_specific_doc_ids({DbName, _}) ->
     ChArgs = #changes_args{filter = "_doc_ids"},
     DocIds = [<<"doc3">>, <<"doc4">>, <<"doc9999">>],
     Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(2, length(Rows)),
-    ?assertEqual([#row{seq = 4, id = <<"doc4">>}, #row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 4, id = <<"doc4">>}, #row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_filter_by_specific_doc_ids_descending({DbName, _}) ->
@@ -215,7 +233,7 @@ t_filter_by_specific_doc_ids_descending({DbName, _}) ->
     Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
     {Rows, LastSeq, _} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(2, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}, #row{seq = 4, id = <<"doc4">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}, #row{seq = 4, id = <<"doc4">>}], Rows),
     ?assertEqual(4, LastSeq).
 
 t_filter_by_specific_doc_ids_with_since({DbName, _}) ->
@@ -224,7 +242,7 @@ t_filter_by_specific_doc_ids_with_since({DbName, _}) ->
     Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_filter_by_specific_doc_ids_no_result({DbName, _}) ->
@@ -251,7 +269,7 @@ t_handle_deleted_docs({DbName, Revs}) ->
     Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
     {Rows, LastSeq, _} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = LastSeq, id = <<"doc3">>, deleted = true}], Rows),
+    ?assertMatch([#row{seq = LastSeq, id = <<"doc3">>, deleted = true}], Rows),
     ?assertEqual(11, LastSeq).
 
 t_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
@@ -266,7 +284,7 @@ t_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
 
     Rows = get_rows(Consumer),
     ?assertEqual(2, length(Rows)),
-    ?assertEqual([#row{seq = 4, id = <<"doc4">>}, #row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 4, id = <<"doc4">>}, #row{seq = 6, id = <<"doc3">>}], Rows),
 
     clear_rows(Consumer),
     {ok, _Rev9} = save_doc(Db, {[{<<"_id">>, <<"doc9">>}]}),
@@ -290,7 +308,7 @@ t_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
 
     NewRows = get_rows(Consumer),
     ?assertEqual(2, length(NewRows)),
-    ?assertEqual([#row{seq = 15, id = <<"doc4">>}, #row{seq = 17, id = <<"doc3">>}], NewRows),
+    ?assertMatch([#row{seq = 15, id = <<"doc4">>}, #row{seq = 17, id = <<"doc3">>}], NewRows),
 
     clear_rows(Consumer),
     {ok, _Rev3_4} = save_doc(Db, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3_3}]}),
@@ -304,7 +322,7 @@ t_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
     ok = unpause(Consumer),
     stop_consumer(Consumer),
     couch_db:close(Db),
-    ?assertEqual([#row{seq = 18, id = <<"doc3">>}], FinalRows).
+    ?assertMatch([#row{seq = 18, id = <<"doc3">>}], FinalRows).
 
 t_end_changes_when_db_deleted({DbName, _Revs}) ->
     {ok, _Db} = couch_db:open_int(DbName, []),
@@ -324,7 +342,7 @@ t_select_basic({DbName, _}) ->
     Req = {json_req, {[{<<"selector">>, Selector}]}},
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_select_with_since({DbName, _}) ->
@@ -334,7 +352,7 @@ t_select_with_since({DbName, _}) ->
     Req = {json_req, {[{<<"selector">>, Selector}]}},
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 10, id = <<"doc8">>}], Rows),
+    ?assertMatch([#row{seq = 10, id = <<"doc8">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_select_when_no_result({DbName, _}) ->
@@ -360,7 +378,7 @@ t_select_with_deleted_docs({DbName, Revs}) ->
     Selector = {[{<<"_id">>, <<"doc3">>}]},
     Req = {json_req, {[{<<"selector">>, Selector}]}},
     {Rows, LastSeq, _} = run_changes_query(DbName, ChArgs, Req),
-    ?assertEqual([#row{seq = LastSeq, id = <<"doc3">>, deleted = true}], Rows),
+    ?assertMatch([#row{seq = LastSeq, id = <<"doc3">>, deleted = true}], Rows),
     ?assertEqual(11, LastSeq).
 
 t_select_with_continuous({DbName, Revs}) ->
@@ -374,7 +392,7 @@ t_select_with_continuous({DbName, Revs}) ->
     ?assertEqual(ok, wait_row_notifications(1)),
     ok = pause(Consumer),
     Rows = get_rows(Consumer),
-    ?assertEqual([#row{seq = 10, id = <<"doc8">>, deleted = false}], Rows),
+    ?assertMatch([#row{seq = 10, id = <<"doc8">>, deleted = false}], Rows),
     clear_rows(Consumer),
     {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc01">>}]}),
     ok = unpause(Consumer),
@@ -391,7 +409,7 @@ t_select_with_continuous({DbName, Revs}) ->
     ok = pause(Consumer),
     NewRows = get_rows(Consumer),
     ?assertMatch([#row{seq = _, id = <<"doc8">>, deleted = false}], NewRows),
-    ?assertEqual([#row{seq = 12, id = <<"doc8">>, deleted = false}], NewRows).
+    ?assertMatch([#row{seq = 12, id = <<"doc8">>, deleted = false}], NewRows).
 
 t_stop_selector_when_db_deleted({DbName, _Revs}) ->
     {ok, _Db} = couch_db:open_int(DbName, []),
@@ -413,7 +431,7 @@ t_select_with_empty_fields({DbName, Revs}) ->
     ?assertEqual(1, length(Rows)),
     Rev3_2 = element(6, Revs),
     Doc = {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev3_2}]},
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>, doc = Doc}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>, doc = Doc}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_select_with_fields({DbName, _}) ->
@@ -422,7 +440,7 @@ t_select_with_fields({DbName, _}) ->
     Req = {json_req, {[{<<"selector">>, Selector}, {<<"fields">>, [<<"_id">>, <<"nope">>]}]}},
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>, doc = {[{<<"_id">>, <<"doc3">>}]}}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>, doc = {[{<<"_id">>, <<"doc3">>}]}}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_emit_only_design_documents({DbName, Revs}) ->
@@ -432,7 +450,7 @@ t_emit_only_design_documents({DbName, Revs}) ->
 
     ?assertEqual(1, length(Rows)),
     ?assertEqual(UpSeq, LastSeq),
-    ?assertEqual([#row{seq = 8, id = <<"_design/foo">>}], Rows),
+    ?assertMatch([#row{seq = 8, id = <<"_design/foo">>}], Rows),
 
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, _} = save_doc(
@@ -448,7 +466,7 @@ t_emit_only_design_documents({DbName, Revs}) ->
     {Rows2, LastSeq2, UpSeq2} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows2)),
     ?assertEqual(UpSeq2, LastSeq2),
-    ?assertEqual([#row{seq = 11, id = <<"_design/foo">>, deleted = true}], Rows2).
+    ?assertMatch([#row{seq = 11, id = <<"_design/foo">>, deleted = true}], Rows2).
 
 t_receive_heartbeats(_) ->
     DbName = ?tempdb(),
@@ -541,7 +559,7 @@ t_filter_by_doc_attribute({DbName, _}) ->
     ok = update_ddoc(DbName, DDoc),
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_filter_by_user_ctx({DbName, _}) ->
@@ -568,7 +586,7 @@ t_filter_by_user_ctx({DbName, _}) ->
     ok = update_ddoc(DbName, DDoc),
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_filter_by_view({DbName, _}) ->
@@ -596,7 +614,7 @@ t_filter_by_view({DbName, _}) ->
     ok = update_ddoc(DbName, DDoc),
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_filter_by_erlang_view({DbName, _}) ->
@@ -626,7 +644,7 @@ t_filter_by_erlang_view({DbName, _}) ->
     ok = update_ddoc(DbName, DDoc),
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(1, length(Rows)),
-    ?assertEqual([#row{seq = 6, id = <<"doc3">>}], Rows),
+    ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
 t_style_main_only({DbName, _}) ->
@@ -635,7 +653,7 @@ t_style_main_only({DbName, _}) ->
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(9, length(Rows)),
     ?assertEqual(UpSeq, LastSeq),
-    ?assertEqual(
+    ?assertMatch(
         [
             #row{seq = 1, id = <<"doc1">>},
             #row{seq = 2, id = <<"doc2">>},
@@ -656,13 +674,15 @@ t_style_main_only_with_include_docs({DbName, Revs}) ->
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(9, length(Rows)),
     ?assertEqual(UpSeq, LastSeq),
-    ?assertEqual(
+    FirstRev = element(1, Revs),
+    [FirstRow | _] = Rows,
+    ?assertMatch(
         #row{
             seq = 1,
             id = <<"doc1">>,
-            doc = {[{<<"_id">>, <<"doc1">>}, {<<"_rev">>, element(1, Revs)}]}
+            doc = {[{<<"_id">>, <<"doc1">>}, {<<"_rev">>, FirstRev}]}
         },
-        hd(Rows)
+        FirstRow
     ).
 
 t_style_all_docs({DbName, _}) ->
@@ -671,7 +691,7 @@ t_style_all_docs({DbName, _}) ->
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(9, length(Rows)),
     ?assertEqual(UpSeq, LastSeq),
-    ?assertEqual(
+    ?assertMatch(
         [
             #row{seq = 1, id = <<"doc1">>},
             #row{seq = 2, id = <<"doc2">>},
@@ -692,13 +712,145 @@ t_style_all_docs_with_include_docs({DbName, Revs}) ->
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(9, length(Rows)),
     ?assertEqual(UpSeq, LastSeq),
-    ?assertEqual(
+    FirstRev = element(1, Revs),
+    [FirstRow | _] = Rows,
+    ?assertMatch(
         #row{
             seq = 1,
             id = <<"doc1">>,
-            doc = {[{<<"_id">>, <<"doc1">>}, {<<"_rev">>, element(1, Revs)}]}
+            doc = {[{<<"_id">>, <<"doc1">>}, {<<"_rev">>, FirstRev}]}
         },
-        hd(Rows)
+        FirstRow
+    ).
+
+t_style_main_only_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{style = main_only},
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertMatch(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc = nil,
+                revs = [<<"2-y">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                doc = nil,
+                revs = [<<"1-m">>]
+            }
+        ],
+        Rows
+    ).
+
+t_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertMatch(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc2">>},
+                        {<<"_rev">>, <<"1-m">>},
+                        {<<"_deleted">>, true}
+                    ]},
+                revs = [<<"1-m">>]
+            }
+        ],
+        Rows
+    ).
+
+t_style_all_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{style = all_docs},
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertMatch(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>, <<"2-x">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                revs = [<<"1-m">>, <<"1-l">>]
+            }
+        ],
+        Rows
+    ).
+
+t_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertMatch(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc2">>},
+                        {<<"_rev">>, <<"1-m">>},
+                        {<<"_deleted">>, true}
+                    ]},
+                revs = [<<"1-m">>, <<"1-l">>]
+            }
+        ],
+        Rows
     ).
 
 %%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
@@ -851,8 +1003,10 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
                 Seq = couch_util:get_value(<<"seq">>, Change),
                 Del = couch_util:get_value(<<"deleted">>, Change, false),
                 Doc = couch_util:get_value(doc, Change, nil),
+                Revs = couch_util:get_value(<<"changes">>, Change, []),
+                Revs1 = lists:map(fun({[{<<"rev">>, Rev}]}) -> Rev end, Revs),
                 Parent ! row,
-                [#row{id = Id, seq = Seq, deleted = Del, doc = Doc} | Acc];
+                [#row{id = Id, seq = Seq, deleted = Del, doc = Doc, revs = Revs1} | Acc];
             ({stop, LastSeq}, _, Acc) ->
                 Parent ! {consumer_finished, lists:reverse(Acc), LastSeq},
                 stop_loop(Parent, Acc);
@@ -945,3 +1099,32 @@ create_db(DbName) ->
 
 delete_db(DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]).
+
+setup_with_revtree() ->
+    DbName = ?tempdb(),
+    {ok, Db} = create_db(DbName),
+    update_replicated(Db, [
+        doc(<<"doc1">>, [<<"x">>, <<"z">>]),
+        doc(<<"doc2">>, [<<"l">>], true)
+    ]),
+    {ok, Db1} = couch_db:reopen(Db),
+    update_replicated(Db1, [
+        doc(<<"doc1">>, [<<"y">>, <<"z">>]),
+        doc(<<"doc2">>, [<<"m">>], true)
+    ]),
+    ok = couch_db:close(Db1),
+    {DbName, []}.
+
+doc(Id, Revs) ->
+    doc(Id, Revs, false).
+
+doc(Id, Revs, Deleted) ->
+    #doc{
+        id = Id,
+        revs = {length(Revs), Revs},
+        deleted = Deleted
+    }.
+
+update_replicated(Db, Docs) ->
+    {ok, []} = couch_db:update_docs(Db, Docs, [], ?REPLICATED_CHANGES),
+    ok.
