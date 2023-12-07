@@ -17,6 +17,7 @@
 .vscode
 .rebar/
 .eunit/
+.hypothesis/
 cover/
 /core
 debian/
@@ -119,7 +120,6 @@ src/mango/ebin/
 src/mango/test/*.pyc
 src/mango/nosetests.xml
 src/mango/venv/
-src/mango/.hypothesis/
 src/jwtf/.rebar3/
 test/javascript/junit.xml
 
