@@ -18,7 +18,7 @@ couch_js_test_() ->
         "Test couchjs",
         {
             setup,
-            fun test_util:start_couch/0,
+            fun() -> test_util:start_couch([config]) end,
             fun test_util:stop_couch/1,
             with([
                 ?TDEF(should_create_sandbox),
@@ -29,8 +29,8 @@ couch_js_test_() ->
                 ?TDEF(should_replace_broken_utf16),
                 ?TDEF(should_allow_js_string_mutations),
                 ?TDEF(should_bump_timing_and_call_stats),
-                ?TDEF(should_exit_on_oom, 60000),
-                ?TDEF(should_exit_on_internal_error, 60000)
+                ?TDEF(should_exit_on_oom, 60),
+                ?TDEF(should_exit_on_internal_error, 60)
             ])
         }
     }.
@@ -344,6 +344,7 @@ should_bump_timing_and_call_stats(_) ->
 
 %% erlfmt-ignore
 should_exit_on_oom(_) ->
+    config:set("couchdb", "os_process_timeout", "15000", _Persist = false),
     Src = <<"
         var state = [];
         function(doc) {
@@ -363,6 +364,7 @@ should_exit_on_internal_error(_) ->
     % A different way to trigger OOM which previously used to
     % throw an InternalError on SM. Check that we still exit on that
     % type of error
+    config:set("couchdb", "os_process_timeout", "15000", _Persist = false),
     Src = <<"
         function(doc) {
             function mkstr(l) {
