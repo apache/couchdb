@@ -139,6 +139,12 @@ defmodule NouveauTest do
       "status code: #{resp.status_code}, resp body: #{:jiffy.encode(resp.body)}"
   end
 
+  test "user-agent header is forbidden", context do
+    resp = Couch.get("http://127.0.0.01:8080",
+      headers: ["User-Agent": "couchdb"])
+    assert_status_code(resp, 403)
+  end
+
   test "search analyze", context do
     url = "/_nouveau_analyze"
     resp = Couch.post(url,

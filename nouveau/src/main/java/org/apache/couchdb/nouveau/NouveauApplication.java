@@ -17,9 +17,12 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import io.dropwizard.core.Application;
 import io.dropwizard.core.setup.Environment;
 import io.swagger.v3.jaxrs2.integration.resources.OpenApiResource;
+import jakarta.servlet.DispatcherType;
+import java.util.EnumSet;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.couchdb.nouveau.core.IndexManager;
+import org.apache.couchdb.nouveau.core.UserAgentFilter;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexHealthCheck;
 import org.apache.couchdb.nouveau.lucene9.Lucene9Module;
@@ -41,6 +44,10 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
     @Override
     public void run(NouveauApplicationConfiguration configuration, Environment environment) throws Exception {
+        environment
+                .servlets()
+                .addFilter("UserAgentFilter", new UserAgentFilter())
+                .addMappingForUrlPatterns(EnumSet.of(DispatcherType.REQUEST), true, "/*");
 
         // configure index manager
         final IndexManager indexManager = new IndexManager();
