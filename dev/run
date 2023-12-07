@@ -40,15 +40,8 @@ from pbkdf2 import pbkdf2_hex
 
 COMMON_SALT = uuid.uuid4().hex
 
-try:
-    from urllib.request import urlopen
-except ImportError:
-    from urllib.request import urlopen
-
-try:
-    import http.client as httpclient
-except ImportError:
-    import http.client as httpclient
+from urllib.request import urlopen
+import http.client as httpclient
 
 
 def toposixpath(path):
@@ -1018,10 +1011,6 @@ def enable_cluster(node_count, port, user, pswd):
             "node_count": node_count,
         }
     )
-    headers = {
-        "Authorization": basic_auth_header(user, pswd),
-        "Content-Type": "application/json",
-    }
     (status, response) = try_request(
         "127.0.0.1",
         port,
@@ -1029,7 +1018,7 @@ def enable_cluster(node_count, port, user, pswd):
         "/_cluster_setup",
         (201, 400),
         body=body,
-        headers=headers,
+        headers=setup_headers(user, pswd),
         error="Failed to run _cluster_setup",
     )
     if status == 400:
@@ -1039,65 +1028,62 @@ def enable_cluster(node_count, port, user, pswd):
 
 
 def add_node(lead_port, node_name, node_port, user, pswd):
-    conn = httpclient.HTTPConnection("127.0.0.1", lead_port)
-    conn.request(
+    body = json.dumps(
+        {
+            "action": "add_node",
+            "host": "127.0.0.1",
+            "port": node_port,
+            "name": node_name,
+            "username": user,
+            "password": pswd,
+        }
+    )
+    (status, response) = try_request(
+        "127.0.0.1",
+        lead_port,
         "POST",
         "/_cluster_setup",
-        json.dumps(
-            {
-                "action": "add_node",
-                "host": "127.0.0.1",
-                "port": node_port,
-                "name": node_name,
-                "username": user,
-                "password": pswd,
-            }
-        ),
-        {
-            "Authorization": basic_auth_header(user, pswd),
-            "Content-Type": "application/json",
-        },
+        (201, 409),
+        body=body,
+        headers=setup_headers(user, pswd),
     )
-    resp = conn.getresponse()
-    assert resp.status in (201, 409), resp.read()
-    resp.close()
+    assert status in (201, 409), response
 
 
 def set_cookie(port, user, pswd):
-    conn = httpclient.HTTPConnection("127.0.0.1", port)
-    conn.request(
+    (status, response) = try_request(
+        "127.0.0.1",
+        port,
         "POST",
         "/_cluster_setup",
-        json.dumps({"action": "receive_cookie", "cookie": generate_cookie()}),
-        {
-            "Authorization": basic_auth_header(user, pswd),
-            "Content-Type": "application/json",
-        },
+        (201,),
+        body=json.dumps({"action": "receive_cookie", "cookie": generate_cookie()}),
+        headers=setup_headers(user, pswd),
     )
-    resp = conn.getresponse()
-    assert resp.status == 201, resp.read()
-    resp.close()
+    assert status == 201, response
 
 
 def finish_cluster(port, user, pswd):
-    conn = httpclient.HTTPConnection("127.0.0.1", port)
-    conn.request(
+    (status, response) = try_request(
+        "127.0.0.1",
+        port,
         "POST",
         "/_cluster_setup",
-        json.dumps({"action": "finish_cluster"}),
-        {
-            "Authorization": basic_auth_header(user, pswd),
-            "Content-Type": "application/json",
-        },
+        (201, 400),
+        body=json.dumps({"action": "finish_cluster"}),
+        headers=setup_headers(user, pswd),
+        error="Failed to run _finish_cluster",
     )
-    resp = conn.getresponse()
-    # 400 for already set up'ed cluster
-    assert resp.status in (201, 400), resp.read()
-    resp.close()
+    # 400 for already set up cluster
+    assert status in (201, 400), response
 
 
-def basic_auth_header(user, pswd):
-    return "Basic " + base64.b64encode((user + ":" + pswd).encode()).decode()
+def setup_headers(user, pswd):
+    b64userpass = base64.b64encode((user + ":" + pswd).encode()).decode()
+    return {
+        "Authorization": "Basic " + b64userpass,
+        "Content-Type": "application/json",
+    }
 
 
 def generate_cookie():
@@ -1135,18 +1121,14 @@ def try_request(
 
 def create_system_databases(host, port):
     for dbname in ["_users", "_replicator", "_global_changes"]:
-        conn = httpclient.HTTPConnection(host, port)
-        conn.request("HEAD", "/" + dbname)
-        resp = conn.getresponse()
-        if resp.status == 404:
-            try_request(
-                host,
-                port,
-                "PUT",
-                "/" + dbname,
-                (201, 202, 412),
-                error="Failed to create '%s' database:\n" % dbname,
-            )
+        try_request(
+            host,
+            port,
+            "PUT",
+            "/" + dbname,
+            (201, 202, 412),
+            error="Failed to create '%s' database:\n" % dbname,
+        )
 
 
 @log(
