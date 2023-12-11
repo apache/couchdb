@@ -1,5 +1,6 @@
 %{
   "NouveauTest": [
+    "user-agent header is forbidden",
     "search analyze",
     "search info",
     "search returns all items for GET",
