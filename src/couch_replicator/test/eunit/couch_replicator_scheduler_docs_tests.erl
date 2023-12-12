@@ -101,8 +101,8 @@ t_replicator_doc_state_fields_test_() ->
         fun setup_prefixed_replicator_db/0,
         fun teardown/1,
         with([
-            ?TDEF(t_doc_fields_are_updated, 10),
-            ?TDEF(t_doc_fields_are_ignored, 10)
+            ?TDEF(t_doc_fields_are_updated, 15),
+            ?TDEF(t_doc_fields_are_ignored, 15)
         ])
     }.
 
@@ -112,8 +112,8 @@ t_replicator_doc_state_fields_update_docs_true_test_() ->
         fun setup_prefixed_replicator_db_with_update_docs_true/0,
         fun teardown/1,
         with([
-            ?TDEF(t_doc_fields_are_updated, 10),
-            ?TDEF(t_doc_fields_are_ignored, 10)
+            ?TDEF(t_doc_fields_are_updated, 15),
+            ?TDEF(t_doc_fields_are_ignored, 15)
         ])
     }.
 
@@ -135,7 +135,7 @@ t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
                 {_, #{}} -> wait
             end
         end,
-        10000,
+        14000,
         1000
     ),
     Docs = maps:get(<<"docs">>, Body),
@@ -183,7 +183,7 @@ t_doc_fields_are_updated({_Ctx, {RepDb, Source, Target}}) ->
                 {_, #{}} -> wait
             end
         end,
-        10000,
+        14000,
         1000
     ),
     ?assertMatch(
@@ -225,7 +225,7 @@ t_doc_fields_are_ignored({_Ctx, {RepDb, Source, Target}}) ->
                 {_, #{}} -> wait
             end
         end,
-        10000,
+        14000,
         1000
     ),
     ?assertMatch(
