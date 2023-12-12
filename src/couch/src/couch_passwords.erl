@@ -137,6 +137,8 @@ verify(ListA, ListB) when is_list(ListA), is_list(ListB) ->
 verify(BinA, BinB) when is_binary(BinA), is_binary(BinB), byte_size(BinA) == byte_size(BinB) ->
     crypto:hash_equals(BinA, BinB);
 verify(BinA, BinB) when is_binary(BinA), is_binary(BinB) ->
+    false;
+verify(_A, _B) ->
     false.
 -else.
 -spec verify(string(), string(), integer()) -> boolean().
