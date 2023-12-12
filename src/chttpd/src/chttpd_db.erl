@@ -2248,7 +2248,7 @@ monitor_attachments(Att) ->
     monitor_attachments([Att]).
 
 demonitor_refs(Refs) when is_list(Refs) ->
-    [demonitor(Ref) || Ref <- Refs].
+    [demonitor(Ref, [flush]) || Ref <- Refs].
 
 % Return attachments which are not stubs
 non_stubbed_attachments(Atts) when is_list(Atts) ->
