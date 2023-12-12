@@ -1,0 +1,105 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2023-45725:
+
+===========================================================================
+CVE-2023-45725: Apache CouchDB: Privilege Escalation Using Design Documents
+===========================================================================
+
+:Date: 12.12.2023
+
+:Affected: 3.3.2 and below
+
+:Severity: Medium
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+Design document functions which receive a user http request object may expose
+authorization or session cookie headers of the user who accesses the document.
+
+These design document functions are:
+  * list
+  * show
+  * rewrite
+  * update
+
+An attacker can leak the session component using an HTML-like output, insert
+the session as an external resource (such as an image), or store the credential
+in a ``_local`` document with an "update" function.
+
+For the attack to succeed the attacker has to be able to insert the design
+documents into the database, then manipulate a user to access a function from
+that design document.
+
+Mitigation
+==========
+
+CouchDB :ref:`3.3.3 <release/3.3.3>` scrubs the sentive headers from http
+request objects passed to the query server execution environment.
+
+For versions older than :ref:`3.3.3 <release/3.3.3>` this patch applied to the
+``loop.js`` file would also mitigate the issue:
+
+.. code-block:: diff
+
+  diff --git a/share/server/loop.js b/share/server/loop.js
+  --- a/share/server/loop.js
+  +++ b/share/server/loop.js
+  @@ -49,6 +49,20 @@ function create_nouveau_sandbox() {
+     return sandbox;
+   }
+  ​
+  +function scrubReq(args) {
+  +  var req = args.pop()
+  +  if (req.method && req.headers && req.peer && req.userCtx) {
+  +    delete req.cookie
+  +    for (var p in req.headers) {
+  +      if (req.headers.hasOwnProperty(p) && ["authorization", "cookie"].indexOf(p.toLowerCase()) !== -1) {
+  +        delete req.headers[p]
+  +      }
+  +    }
+  +  }
+  +  args.push(req)
+  +  return args
+  +}
+  +
+   // Commands are in the form of json arrays:
+   // ["commandname",..optional args...]\n
+   //
+  @@ -85,7 +99,7 @@ var DDoc = (function() {
+           var funPath = args.shift();
+           var cmd = funPath[0];
+           // the first member of the fun path determines the type of operation
+  -        var funArgs = args.shift();
+  +        var funArgs = scrubReq(args.shift());
+           if (ddoc_dispatch[cmd]) {
+             // get the function, call the command with it
+             var point = ddoc;
+
+Workarounds
+===========
+
+Avoid using design documents from untrusted sources which may attempt to access
+or manipulate request object's headers.
+
+Credit
+======
+
+This issue was found by Natan Nehorai and reported by Or Peles from the JFrog
+Vulnerability Research Team.
+
+It was also independently found by Richard Ellis and Mike Rhodes from
+IBM/Cloudant.
