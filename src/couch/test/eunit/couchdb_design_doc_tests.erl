@@ -92,8 +92,14 @@ create_design_doc(DbName, DDName) ->
     Rev.
 
 query_text(BaseUrl, DbName, DDoc, Path) ->
-    {ok, Code, _Headers, Body} = test_request:get(
-        BaseUrl ++ "/" ++ DbName ++ "/_design/" ++ DDoc ++ "/" ++ Path
-    ),
-    ?assertEqual(200, Code),
-    Body.
+    test_util:wait(
+        fun() ->
+            {ok, Code, _Headers, Body} = test_request:get(
+                BaseUrl ++ "/" ++ DbName ++ "/_design/" ++ DDoc ++ "/" ++ Path
+            ),
+            case Code of
+                200 -> Body;
+                _ -> wait
+            end
+        end
+    ).
