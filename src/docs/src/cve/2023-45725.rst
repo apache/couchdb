@@ -47,7 +47,7 @@ that design document.
 Mitigation
 ==========
 
-CouchDB :ref:`3.3.3 <release/3.3.3>` scrubs the sentive headers from http
+CouchDB :ref:`3.3.3 <release/3.3.3>` scrubs the sensitive headers from http
 request objects passed to the query server execution environment.
 
 For versions older than :ref:`3.3.3 <release/3.3.3>` this patch applied to the
