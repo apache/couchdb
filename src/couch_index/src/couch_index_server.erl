@@ -171,9 +171,8 @@ handle_call({async_open, {DbName, DDocId, Sig}, {ok, Pid}}, {OpenerPid, _} = Fro
     unlink(OpenerPid),
     ets:delete(State#st.openers, OpenerPid),
     gen_server:reply(FromOpener, ok),
-    [{_, Waiters}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
+    ok = reply_to_waiters(DbName, Sig, {ok, Pid}, State),
     add_to_ets(DbName, Sig, DDocId, Pid, State),
-    [gen_server:reply(From, {ok, Pid}) || From <- Waiters],
     % Flush opener exit messages in case it died before we unlinked it
     ok = flush_exit_messages_from(OpenerPid),
     {noreply, State};
@@ -182,9 +181,8 @@ handle_call({async_error, {DbName, _DDocId, Sig}, Error}, {OpenerPid, _} = FromO
     unlink(OpenerPid),
     ets:delete(State#st.openers, OpenerPid),
     gen_server:reply(FromOpener, ok),
-    [{_, Waiters}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
+    ok = reply_to_waiters(DbName, Sig, Error, State),
     ets:delete(State#st.by_sig, {DbName, Sig}),
-    [gen_server:reply(From, Error) || From <- Waiters],
     % Flush opener exit messages in case it died before we unlinked it
     ok = flush_exit_messages_from(OpenerPid),
     {noreply, State};
@@ -207,8 +205,8 @@ handle_cast({add_to_ets, [Pid, DbName, DDocId, Sig]}, State) ->
 handle_cast({rem_from_ets, [DbName, DDocId, Sig]}, State) ->
     ets:delete_object(State#st.by_db, {DbName, {DDocId, Sig}}),
     {noreply, State};
-handle_cast({rem_from_ets, [DbName]}, State) ->
-    rem_from_ets(DbName, State),
+handle_cast({rem_from_ets, [DbName, Reason]}, State) ->
+    rem_from_ets_with_reply(DbName, Reason, State),
     {noreply, State}.
 
 handle_info({'EXIT', Pid, Reason}, Server) ->
@@ -218,10 +216,11 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
          || {_, {DDocId, _}} <-
                 ets:match_object(Server#st.by_db, {DbName, {'$1', Sig}})
         ],
-        rem_from_ets(DbName, Sig, DDocIds, Pid, Server)
+        rem_from_ets_with_reply(DbName, Sig, DDocIds, Reason, Server)
     end,
     case ets:lookup(Server#st.by_pid, Pid) of
         [{Pid, {DbName, Sig}}] ->
+            ets:delete(Server#st.by_pid, Pid),
             Cleanup(DbName, Sig);
         [] when Reason /= normal ->
             case ets:lookup(Server#st.openers, Pid) of
@@ -285,11 +284,16 @@ reset_indexes(DbName, #st{} = State) ->
         ets:lookup(State#st.by_db, DbName)
     ),
     Fun = fun({Sig, DDocIds}) ->
-        [{_, Pid}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
-        unlink(Pid),
-        gen_server:cast(Pid, delete),
-        ok = flush_exit_messages_from(Pid),
-        rem_from_ets(DbName, Sig, DDocIds, Pid, State)
+        case ets:lookup(State#st.by_sig, {DbName, Sig}) of
+            [{_, Pid}] when is_pid(Pid) ->
+                unlink(Pid),
+                gen_server:cast(Pid, delete),
+                ok = flush_exit_messages_from(Pid),
+                ets:delete(State#st.by_pid, Pid);
+            _ ->
+                ok
+        end,
+        rem_from_ets_with_reply(DbName, Sig, DDocIds, {error, index_reset}, State)
     end,
     lists:foreach(Fun, dict:to_list(SigDDocIds)),
     % We only need one of the index servers to do this.
@@ -301,14 +305,25 @@ reset_indexes(DbName, #st{} = State) ->
             ok
     end.
 
+reply_to_waiters(DbName, Sig, Reply, St = #st{}) ->
+    case ets:lookup(St#st.by_sig, {DbName, Sig}) of
+        [{_, Waiters}] when is_list(Waiters) ->
+            [gen_server:reply(From, Reply) || From <- Waiters];
+        [{_, Pid}] when is_pid(Pid) ->
+            [];
+        [] ->
+            []
+    end,
+    ok.
+
 add_to_ets(DbName, Sig, DDocId, Pid, #st{} = St) ->
     ets:insert(St#st.by_sig, {{DbName, Sig}, Pid}),
     ets:insert(St#st.by_pid, {Pid, {DbName, Sig}}),
     ets:insert(St#st.by_db, {DbName, {DDocId, Sig}}).
 
-rem_from_ets(DbName, Sig, DDocIds, Pid, #st{} = St) ->
+rem_from_ets_with_reply(DbName, Sig, DDocIds, Reply, #st{} = St) ->
+    ok = reply_to_waiters(DbName, Sig, Reply, St),
     ets:delete(St#st.by_sig, {DbName, Sig}),
-    ets:delete(St#st.by_pid, Pid),
     lists:foreach(
         fun(DDocId) ->
             ets:delete_object(St#st.by_db, {DbName, {DDocId, Sig}})
@@ -316,7 +331,7 @@ rem_from_ets(DbName, Sig, DDocIds, Pid, #st{} = St) ->
         DDocIds
     ).
 
-rem_from_ets(DbName, #st{} = State) ->
+rem_from_ets_with_reply(DbName, Reply, #st{} = State) ->
     SigDDocIds = lists:foldl(
         fun({_, {DDocId, Sig}}, DDict) ->
             dict:append(Sig, DDocId, DDict)
@@ -325,10 +340,15 @@ rem_from_ets(DbName, #st{} = State) ->
         ets:lookup(State#st.by_db, DbName)
     ),
     Fun = fun({Sig, DDocIds}) ->
-        [{_, Pid}] = ets:lookup(State#st.by_sig, {DbName, Sig}),
-        unlink(Pid),
-        ok = flush_exit_messages_from(Pid),
-        rem_from_ets(DbName, Sig, DDocIds, Pid, State)
+        case ets:lookup(State#st.by_sig, {DbName, Sig}) of
+            [{_, Pid}] when is_pid(Pid) ->
+                unlink(Pid),
+                ok = flush_exit_messages_from(Pid),
+                ets:delete(State#st.by_pid, Pid);
+            _ ->
+                ok
+        end,
+        rem_from_ets_with_reply(DbName, Sig, DDocIds, Reply, State)
     end,
     lists:foreach(Fun, dict:to_list(SigDDocIds)).
 
@@ -380,7 +400,7 @@ handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated, DDocId}, St) ->
             couch_log:warning("~p: handle_db_event ~p for db ~p, reason ~p, stack ~p", [
                 ?MODULE, Class, DbName, Reason, Stack
             ]),
-            gen_server:cast(St#st.server_name, {rem_from_ets, [DbName]}),
+            gen_server:cast(St#st.server_name, {rem_from_ets, [DbName, Reason]}),
             {ok, St}
     end;
 handle_db_event(DbName, {ddoc_updated, DDocId}, St) ->
