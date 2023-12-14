@@ -377,6 +377,7 @@ rexi_call(Node, MFA) ->
 rexi_call(Node, MFA, Timeout) ->
     Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
     Ref = rexi:cast(Node, self(), MFA, [sync]),
+    io:format("REXI_CALL MON_REF: {~p, ~p}~n", [Mon, Ref]),
     try
         receive
             {Ref, {ok, Reply}} ->
@@ -384,7 +385,9 @@ rexi_call(Node, MFA, Timeout) ->
             {Ref, Error} ->
                 erlang:error(Error);
             {rexi_DOWN, Mon, _, Reason} ->
-                erlang:error({rexi_DOWN, {Node, Reason}})
+                erlang:error({rexi_DOWN, {Node, Reason}});
+            Other ->
+                {error, {unexpected_msg, Other}}
         after Timeout ->
             erlang:error(timeout)
         end
