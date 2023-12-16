@@ -992,12 +992,10 @@ execute_test_() ->
         foreach,
         fun() ->
             meck:new(foo, [non_strict]),
-            meck:new(fabric)
+            meck:new(fabric),
+            meck:new(chttpd_stats)
         end,
-        fun(_) ->
-            meck:unload(fabric),
-            meck:unload(foo)
-        end,
+        fun(_) -> meck:unload() end,
         [
             ?TDEF_FE(t_execute_empty),
             ?TDEF_FE(t_execute_ok_all_docs),
@@ -1014,7 +1012,9 @@ t_execute_empty(_) ->
     meck:expect(fabric, query_view, ['_', '_', '_', '_', '_', '_'], meck:val(error)),
     ?assertEqual({ok, accumulator}, execute(Cursor, undefined, accumulator)),
     ?assertNot(meck:called(fabric, all_docs, '_')),
-    ?assertNot(meck:called(fabric, query_view, '_')).
+    ?assertNot(meck:called(fabric, query_view, '_')),
+    ?assertNot(meck:called(chttpd_stats, incr_rows, '_')),
+    ?assertNot(meck:called(chttpd_stats, incr_reads, '_')).
 
 t_execute_ok_all_docs(_) ->
     Bookmark = bookmark,
@@ -1039,12 +1039,19 @@ t_execute_ok_all_docs(_) ->
             user_fun = fun foo:bar/2,
             execution_stats = '_'
         },
+    TotalKeysExamined = 9,
+    TotalDocsExamined = 3,
     Cursor2 =
         Cursor1#cursor{
             bookmark = Bookmark,
             bookmark_docid = undefined,
             bookmark_key = undefined,
-            execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
+            execution_stats =
+                #execution_stats{
+                    totalKeysExamined = TotalKeysExamined,
+                    totalDocsExamined = TotalDocsExamined,
+                    executionStartTime = {0, 0, 0}
+                }
         },
     Extra =
         [
@@ -1071,13 +1078,25 @@ t_execute_ok_all_docs(_) ->
         db, [{user_ctx, user_ctx}], fun mango_cursor_view:handle_all_docs_message/2, Cursor1, Args
     ],
     meck:expect(fabric, all_docs, Parameters, meck:val({ok, Cursor2})),
+    meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [TotalDocsExamined], meck:val(ok)),
     ?assertEqual({ok, updated_accumulator}, execute(Cursor, fun foo:bar/2, accumulator)),
     ?assert(meck:called(fabric, all_docs, '_')).
 
 t_execute_ok_query_view(_) ->
     Bookmark = bookmark,
-    UserFnParameters = [{add_key, bookmark, Bookmark}, accumulator],
-    meck:expect(foo, bar, UserFnParameters, meck:val({undefined, updated_accumulator})),
+    UserFnParameters1 = [{add_key, bookmark, Bookmark}, accumulator1],
+    IndexScanWarning =
+        <<"The number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.">>,
+    UserFnParameters2 = [{add_key, warning, IndexScanWarning}, accumulator2],
+    meck:expect(
+        foo,
+        bar,
+        [
+            {UserFnParameters1, meck:val({undefined, accumulator2})},
+            {UserFnParameters2, meck:val({undefined, accumulator3})}
+        ]
+    ),
     Index =
         #idx{
             type = <<"json">>,
@@ -1099,16 +1118,23 @@ t_execute_ok_query_view(_) ->
         },
     Cursor1 =
         Cursor#cursor{
-            user_acc = accumulator,
+            user_acc = accumulator1,
             user_fun = fun foo:bar/2,
             execution_stats = '_'
         },
+    TotalKeysExamined = 99,
+    TotalDocsExamined = 33,
     Cursor2 =
         Cursor1#cursor{
             bookmark = Bookmark,
             bookmark_docid = undefined,
             bookmark_key = undefined,
-            execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
+            execution_stats =
+                #execution_stats{
+                    totalKeysExamined = TotalKeysExamined,
+                    totalDocsExamined = TotalDocsExamined,
+                    executionStartTime = {0, 0, 0}
+                }
         },
     Extra =
         [
@@ -1141,17 +1167,31 @@ t_execute_ok_query_view(_) ->
         Args
     ],
     meck:expect(fabric, query_view, Parameters, meck:val({ok, Cursor2})),
-    ?assertEqual({ok, updated_accumulator}, execute(Cursor, fun foo:bar/2, accumulator)),
+    meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [TotalDocsExamined], meck:val(ok)),
+    ?assertEqual({ok, accumulator3}, execute(Cursor, fun foo:bar/2, accumulator1)),
     ?assert(meck:called(fabric, query_view, '_')).
 
 t_execute_ok_all_docs_with_execution_stats(_) ->
     Bookmark = bookmark,
+    TotalKeysExamined = 33,
+    TotalDocsExamined = 12,
+    TotalQuorumDocsExamined = 0,
+    ResultsReturned = 20,
+    ExecutionStats =
+        #execution_stats{
+            totalKeysExamined = TotalKeysExamined,
+            totalDocsExamined = TotalDocsExamined,
+            totalQuorumDocsExamined = TotalQuorumDocsExamined,
+            resultsReturned = ResultsReturned,
+            executionStartTime = {0, 0, 0}
+        },
     Stats =
         {[
-            {total_keys_examined, 0},
-            {total_docs_examined, 0},
-            {total_quorum_docs_examined, 0},
-            {results_returned, 0},
+            {total_keys_examined, TotalKeysExamined},
+            {total_docs_examined, TotalDocsExamined},
+            {total_quorum_docs_examined, TotalQuorumDocsExamined},
+            {results_returned, ResultsReturned},
             {execution_time_ms, '_'}
         ]},
     UserFnDefinition =
@@ -1187,7 +1227,7 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
             bookmark = Bookmark,
             bookmark_docid = undefined,
             bookmark_key = undefined,
-            execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
+            execution_stats = ExecutionStats
         },
     Extra =
         [
@@ -1213,6 +1253,8 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     Parameters = [
         db, [{user_ctx, user_ctx}], fun mango_cursor_view:handle_all_docs_message/2, Cursor1, Args
     ],
+    meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [TotalDocsExamined], meck:val(ok)),
     meck:expect(fabric, all_docs, Parameters, meck:val({ok, Cursor2})),
     ?assertEqual({ok, updated_accumulator2}, execute(Cursor, fun foo:bar/2, accumulator)),
     ?assert(meck:called(fabric, all_docs, '_')).
@@ -1232,7 +1274,9 @@ t_execute_error_1(_) ->
         db, '_', <<"ghibli">>, index_name, fun mango_cursor_view:handle_message/2, '_', '_'
     ],
     meck:expect(fabric, query_view, Parameters, meck:val({error, reason})),
-    ?assertEqual({error, reason}, execute(Cursor, undefined, accumulator)).
+    ?assertEqual({error, reason}, execute(Cursor, undefined, accumulator)),
+    ?assertNot(meck:called(chttpd_stats, incr_rows, '_')),
+    ?assertNot(meck:called(chttpd_stats, incr_reads, '_')).
 
 t_execute_error_2(_) ->
     Cursor =
@@ -1249,7 +1293,9 @@ t_execute_error_2(_) ->
         db, '_', <<"ghibli">>, index_name, fun mango_cursor_view:handle_message/2, '_', '_'
     ],
     meck:expect(fabric, query_view, Parameters, meck:val({ok, {error, reason}})),
-    ?assertEqual({error, {error, reason}}, execute(Cursor, undefined, accumulator)).
+    ?assertEqual({error, {error, reason}}, execute(Cursor, undefined, accumulator)),
+    ?assertNot(meck:called(chttpd_stats, incr_rows, '_')),
+    ?assertNot(meck:called(chttpd_stats, incr_reads, '_')).
 
 view_cb_test_() ->
     {

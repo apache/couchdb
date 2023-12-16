@@ -181,13 +181,14 @@ handle_hit(CAcc0, Sort, Doc) ->
     #cacc{
         limit = Limit,
         skip = Skip,
-        execution_stats = Stats,
+        execution_stats = Stats0,
         documents_seen = Seen
     } = CAcc0,
     CAcc1 = update_bookmark(CAcc0, Sort),
-    Stats1 = mango_execution_stats:incr_docs_examined(Stats),
+    Stats1 = mango_execution_stats:incr_keys_examined(Stats0),
+    Stats = mango_execution_stats:incr_docs_examined(Stats1),
     couch_stats:increment_counter([mango, docs_examined]),
-    CAcc2 = CAcc1#cacc{execution_stats = Stats1},
+    CAcc2 = CAcc1#cacc{execution_stats = Stats},
     case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true ->
             DocId = mango_doc:get_field(Doc, <<"_id">>),
@@ -430,8 +431,18 @@ execute_test_() ->
         foreach,
         fun() ->
             meck:new(foo, [non_strict]),
+            meck:new(couch_stats),
             meck:expect(couch_db, name, [db], meck:val(db_name)),
-            meck:expect(couch_stats, increment_counter, [[mango, docs_examined]], meck:val(ok)),
+            meck:expect(
+                couch_stats,
+                increment_counter,
+                [
+                    {[[mango, docs_examined]], meck:val(ok)},
+                    {[[mango, results_returned]], meck:val(ok)},
+                    {[[couch_log, level, report]], meck:val(ok)}
+                ]
+            ),
+            meck:expect(couch_stats, update_histogram, [[mango, query_time], '_'], meck:val(ok)),
             % Dummy mock functions to progressively update the
             % respective states therefore their results could be
             % asserted later on.
@@ -465,28 +476,6 @@ execute_test_() ->
                     ),
                     {ok, IdDocs}
                 end
-            ),
-            meck:expect(mango_execution_stats, log_start, [stats], meck:val({stats, 0})),
-            meck:expect(
-                mango_execution_stats,
-                maybe_add_stats,
-                fun(_Options, _UserFun, {stats, N}, {acc, M}) -> {{acc, M + 1}, {stats, N + 1}} end
-            ),
-            meck:expect(mango_execution_stats, log_stats, [{stats, '_'}], meck:val(ok)),
-            meck:expect(
-                mango_cursor,
-                maybe_add_warning,
-                fun(_UserFun, _Cursor, {stats, _}, {acc, M}) -> {acc, M + 1} end
-            ),
-            meck:expect(
-                mango_execution_stats,
-                incr_docs_examined,
-                fun({stats, N}) -> {stats, N + 1} end
-            ),
-            meck:expect(
-                mango_execution_stats,
-                incr_results_returned,
-                fun({stats, N}) -> {stats, N + 1} end
             ),
             meck:expect(
                 mango_selector_text,
@@ -541,13 +530,14 @@ t_execute_empty(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(mango_selector_text, convert, [selector], meck:val(<<>>)),
-    ?assertEqual({ok, {acc, 3}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
-    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(0, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(0, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [0], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [0], meck:val(ok)),
+    ?assertEqual({ok, {acc, 1}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
+    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])).
 
 t_execute_no_results(_) ->
     Limit = 10,
@@ -564,7 +554,7 @@ t_execute_no_results(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     QueryArgs =
         #index_query_args{
@@ -583,13 +573,13 @@ t_execute_no_results(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 3}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
-    ?assertEqual(0, meck:num_calls(dreyfus_fabric, get_json_docs, 2)),
-    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(0, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(0, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [0], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [0], meck:val(ok)),
+    ?assertEqual({ok, {acc, 1}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
+    ?assertEqual(0, meck:num_calls(dreyfus_fabric, get_json_docs, 2)).
 
 t_execute_more_results(_) ->
+    AllHits = 3,
     Options = [{partition, partition}, {sort, {[]}}, {bookmark, [bookmark, 0]}],
     Cursor = #cursor{
         db = db,
@@ -599,7 +589,7 @@ t_execute_more_results(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -631,12 +621,16 @@ t_execute_more_results(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(3, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(3, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(3, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [AllHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [AllHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(
+        AllHits, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_unique_results(_) ->
+    AllHits = 6,
     UniqueHits = 3,
     Options = [{partition, partition}, {sort, {[]}}, {bookmark, []}],
     Cursor = #cursor{
@@ -647,7 +641,7 @@ t_execute_unique_results(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -680,10 +674,13 @@ t_execute_unique_results(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(6, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(6, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [AllHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [AllHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_limit_cutoff(_) ->
     Limit = 2,
@@ -699,7 +696,7 @@ t_execute_limit_cutoff(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     QueryArgs =
         #index_query_args{
@@ -722,10 +719,13 @@ t_execute_limit_cutoff(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 5}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(Limit, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [Limit], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [Limit], meck:val(ok)),
+    ?assertEqual({ok, {acc, 3}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(Limit, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(
+        Limit, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_limit_cutoff_unique(_) ->
     Limit = 4,
@@ -740,7 +740,7 @@ t_execute_limit_cutoff_unique(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -773,10 +773,13 @@ t_execute_limit_cutoff_unique(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(AllHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(ActualHits, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [AllHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [AllHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(
+        ActualHits, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_limit_zero(_) ->
     Limit = 0,
@@ -791,7 +794,7 @@ t_execute_limit_zero(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     QueryArgs =
         #index_query_args{
@@ -814,10 +817,13 @@ t_execute_limit_zero(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 3}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
-    ?assertEqual(1, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(1, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(Limit, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [Limit], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [Limit], meck:val(ok)),
+    ?assertEqual({ok, {acc, 1}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
+    ?assertEqual(1, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(
+        Limit, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_limit_unique(_) ->
     Limit = 5,
@@ -832,7 +838,7 @@ t_execute_limit_unique(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -865,10 +871,13 @@ t_execute_limit_unique(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(AllHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [AllHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [AllHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_skip(_) ->
     UniqueHits = 3,
@@ -882,7 +891,7 @@ t_execute_skip(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -910,11 +919,15 @@ t_execute_skip(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(UniqueHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
+    meck:expect(chttpd_stats, incr_rows, [UniqueHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [UniqueHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 2}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
     ?assertEqual(
-        UniqueHits - Skip, meck:num_calls(mango_execution_stats, incr_results_returned, 1)
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])
+    ),
+    ?assertEqual(
+        UniqueHits - Skip,
+        meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
     ).
 
 t_execute_skip_unique(_) ->
@@ -930,7 +943,7 @@ t_execute_skip_unique(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -963,11 +976,13 @@ t_execute_skip_unique(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> true end),
-    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(AllHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
+    meck:expect(chttpd_stats, incr_rows, [AllHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [AllHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 2}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(AllHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
     ?assertEqual(
-        UniqueHits - Skip, meck:num_calls(mango_execution_stats, incr_results_returned, 1)
+        UniqueHits - Skip,
+        meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
     ).
 
 t_execute_no_matches(_) ->
@@ -982,7 +997,7 @@ t_execute_no_matches(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -1010,10 +1025,15 @@ t_execute_no_matches(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, _}) -> false end),
-    ?assertEqual({ok, {acc, 3}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
-    ?assertEqual(UniqueHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(Matches, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [UniqueHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [UniqueHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 1}}, execute(Cursor, fun foo:add_key_only/2, {acc, 0})),
+    ?assertEqual(
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])
+    ),
+    ?assertEqual(
+        Matches, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_mixed_matches(_) ->
     UniqueHits = 3,
@@ -1027,7 +1047,7 @@ t_execute_mixed_matches(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     meck:expect(
         dreyfus_fabric_search,
@@ -1055,10 +1075,15 @@ t_execute_mixed_matches(_) ->
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
     meck:expect(mango_selector, match, fun(selector, {doc, N}) -> N == 2 end),
-    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
-    ?assertEqual(UniqueHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(Matches, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [UniqueHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [UniqueHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 2}}, execute(Cursor, fun foo:normal/2, {acc, 0})),
+    ?assertEqual(
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])
+    ),
+    ?assertEqual(
+        Matches, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_user_fun_returns_stop(_) ->
     UniqueHits = 3,
@@ -1075,7 +1100,7 @@ t_execute_user_fun_returns_stop(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     QueryArgs =
         #index_query_args{
@@ -1114,10 +1139,15 @@ t_execute_user_fun_returns_stop(_) ->
             {Status, {acc, N + 1}}
         end
     ),
-    ?assertEqual({ok, {acc, 6}}, execute(Cursor, fun foo:stops/2, {acc, 0})),
-    ?assertEqual(UniqueHits, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(UniqueHits, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(3, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    meck:expect(chttpd_stats, incr_rows, [UniqueHits], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [UniqueHits], meck:val(ok)),
+    ?assertEqual({ok, {acc, 4}}, execute(Cursor, fun foo:stops/2, {acc, 0})),
+    ?assertEqual(
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])
+    ),
+    ?assertEqual(
+        UniqueHits, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])
+    ).
 
 t_execute_search_error(_) ->
     Limit = 10,
@@ -1133,7 +1163,7 @@ t_execute_search_error(_) ->
         fields = fields,
         selector = selector,
         opts = Options,
-        execution_stats = stats
+        execution_stats = #execution_stats{executionStartTime = {0, 0, 0}}
     },
     QueryArgs =
         #index_query_args{
@@ -1151,13 +1181,14 @@ t_execute_search_error(_) ->
         meck:val({error, reason})
     ),
     meck:expect(mango_selector_text, convert, [selector], meck:val(query)),
+    meck:expect(chttpd_stats, incr_rows, [0], meck:val(ok)),
+    meck:expect(chttpd_stats, incr_reads, [0], meck:val(ok)),
     Exception = {mango_error, mango_cursor_text, {text_search_error, {error, reason}}},
     ?assertThrow(Exception, execute(Cursor, fun foo:normal/2, {acc, 0})),
     ?assertEqual(0, meck:num_calls(dreyfus_fabric, get_json_docs, 2)),
     ?assertEqual(0, meck:num_calls(foo, normal, 2)),
-    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, 1)),
-    ?assertEqual(0, meck:num_calls(mango_execution_stats, incr_docs_examined, 1)),
-    ?assertEqual(0, meck:num_calls(mango_execution_stats, incr_results_returned, 1)).
+    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, [[mango, docs_examined]])),
+    ?assertEqual(0, meck:num_calls(couch_stats, increment_counter, [[mango, results_returned]])).
 
 explain_test_() ->
     {

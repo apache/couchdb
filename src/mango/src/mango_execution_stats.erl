@@ -15,6 +15,7 @@
 -export([
     to_json/1,
     to_map/1,
+    incr_keys_examined/1,
     incr_keys_examined/2,
     incr_docs_examined/1,
     incr_docs_examined/2,
@@ -52,6 +53,9 @@ to_map(Stats) ->
         results_returned => Stats#execution_stats.resultsReturned,
         execution_time_ms => Stats#execution_stats.executionTimeMs
     }.
+
+incr_keys_examined(Stats) ->
+    incr_keys_examined(Stats, 1).
 
 incr_keys_examined(Stats, N) ->
     Stats#execution_stats{
@@ -92,8 +96,8 @@ log_end(Stats) ->
 maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
     Stats1 = log_end(Stats0),
     couch_stats:update_histogram([mango, query_time], Stats1#execution_stats.executionTimeMs),
-    %% TODO: add rows read when we collect the stats
     %% TODO: add docs vs quorum docs
+    chttpd_stats:incr_rows(Stats1#execution_stats.totalKeysExamined),
     chttpd_stats:incr_reads(Stats1#execution_stats.totalDocsExamined),
 
     FinalAcc =

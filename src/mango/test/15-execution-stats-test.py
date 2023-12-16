@@ -81,7 +81,7 @@ class ExecutionStatsTests_Text(mango.UserDocsTextTests):
             {"$text": "Stephanie"}, return_raw=True, executionStats=True
         )
         self.assertEqual(len(resp["docs"]), 1)
-        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
+        self.assertEqual(resp["execution_stats"]["total_keys_examined"], 1)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 1)
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 1)
