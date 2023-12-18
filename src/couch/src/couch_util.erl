@@ -46,6 +46,7 @@
 -export([verify_hash_names/2]).
 -export([get_config_hash_algorithms/0]).
 -export([remove_sensitive_data/1]).
+-export([clear_pdict/0, clear_pdict/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -870,3 +871,31 @@ remove_sensitive_data(KVList) ->
     KVList1 = lists:keyreplace(<<"password">>, 1, KVList, {<<"password">>, <<"****">>}),
     % some KVList entries are atoms, so test fo this too
     lists:keyreplace(password, 1, KVList1, {password, <<"****">>}).
+
+-spec clear_pdict() -> ok.
+clear_pdict() ->
+    clear_pdict(erlang:get()).
+
+%% Exclude mochiweb markers, otherwise just use erlang:erase/0
+-spec clear_pdict(list()) -> ok.
+clear_pdict([]) ->
+    ok;
+clear_pdict([{mochiweb_request_body, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_body_length, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_cookie, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_force_close, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_path, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_post, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_qs, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{mochiweb_request_recv, _V} | Rest]) ->
+    clear_pdict(Rest);
+clear_pdict([{Key, _V} | Rest]) ->
+    erlang:erase(Key),
+    clear_pdict(Rest).
