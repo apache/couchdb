@@ -197,7 +197,7 @@ get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
     couch_doc:from_json_obj(JsonList).
 
 nouveau_url() ->
-    config:get("nouveau", "url", "http://127.0.0.1:8080").
+    config:get("nouveau", "url", "http://127.0.0.1:5987").
 
 max_sessions() ->
     config:get_integer("nouveau", "max_sessions", 100).
