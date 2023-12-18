@@ -112,3 +112,4 @@ extlinks = {
 
 def setup(app):
     app.add_css_file("css/rtd_theme.css")
+    app.add_css_file("css/tablefix.css")

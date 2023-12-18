@@ -12,9 +12,9 @@
 
 .. _api/db/_find:
 
-================
+===============
 ``/{db}/_find``
-================
+===============
 
 .. http:post:: /{db}/_find
     :synopsis: Find documents within a given database.
@@ -683,7 +683,7 @@ operators require the argument to be in a specific JSON format.
 |               | ``$lte``        | Any JSON    | The field is less than or equal to |
 |               |                 |             | the argument.                      |
 +---------------+-----------------+-------------+------------------------------------+
-|               | ``$eq``         | Any JSON    | The field is equal to the argument |
+|               | ``$eq``         | Any JSON    | The field is equal to the argument.|
 +---------------+-----------------+-------------+------------------------------------+
 |               | ``$ne``         | Any JSON    | The field is not equal to the      |
 |               |                 |             | argument.                          |
@@ -692,7 +692,7 @@ operators require the argument to be in a specific JSON format.
 |               |                 |             | to the argument.                   |
 +---------------+-----------------+-------------+------------------------------------+
 |               | ``$gt``         | Any JSON    | The field is greater than the      |
-|               |                 |             | to the argument.                   |
+|               |                 |             | argument.                          |
 +---------------+-----------------+-------------+------------------------------------+
 | Object        | ``$exists``     | Boolean     | Check whether the field exists or  |
 |               |                 |             | not, regardless of its value.      |
@@ -731,7 +731,7 @@ operators require the argument to be in a specific JSON format.
 |               |                 |             | the Perl Compatible Regular        |
 |               |                 |             | Expression (PCRE) library. For     |
 |               |                 |             | more information about what is     |
-|               |                 |             | implemented, see the see the       |
+|               |                 |             | implemented, see the               |
 |               |                 |             | `Erlang Regular Expression         |
 |               |                 |             | <http://erlang.org/doc             |
 |               |                 |             | /man/re.html>`_.                   |
