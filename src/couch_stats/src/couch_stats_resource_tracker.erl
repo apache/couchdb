@@ -60,6 +60,8 @@
     sorted_by/2,
     sorted_by/3,
 
+    find_by_pid/1,
+
     unsafe_foldl/3,
 
     term_to_flat_json/1
@@ -322,17 +324,23 @@ should_track(_Metric) ->
     %%io:format("SKIPPING METRIC: ~p~n", [Metric]),
     false.
 
-accumulate_delta(Delta) ->
+accumulate_delta(Delta) when is_map(Delta) ->
     %% TODO: switch to creating a batch of updates to invoke a single
     %% update_counter rather than sequentially invoking it for each field
-    is_enabled() andalso maps:foreach(fun inc/2, Delta).
+    is_enabled() andalso maps:foreach(fun inc/2, Delta);
+accumulate_delta(undefined) ->
+    ok;
+accumulate_delta(Other) ->
+    io:format("CSRT:ACC_DELTA UNKNOWN DELTA: ~p~n", [Other]).
+
 
 update_counter(Field, Count) ->
     is_enabled() andalso update_counter(get_pid_ref(), Field, Count).
 
 
 update_counter({_Pid,_Ref}=PidRef, Field, Count) ->
-    is_enabled() andalso ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
+    %% TODO: mem3 crashes without catch, why do we lose the stats table?
+    is_enabled() andalso catch ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
 
 
 active() -> active_int(all).
@@ -638,9 +646,14 @@ create_context(Pid) ->
             Ref = make_ref(),
             Rctx = make_record(Pid, Ref),
             track(Rctx),
-            ets:insert(?MODULE, Rctx),
+            create_resource(Rctx),
             Rctx
     end.
+
+
+create_resource(#rctx{} = Rctx) ->
+    %% true = ets:insert(?MODULE, Rctx).
+    catch ets:insert(?MODULE, Rctx).
 
 %% add type to disnguish coordinator vs rpc_worker
 create_context(From, {M,F,_A} = MFA, Nonce) ->
@@ -659,7 +672,7 @@ create_context(From, {M,F,_A} = MFA, Nonce) ->
             },
             track(Rctx),
             erlang:put(?DELTA_TZ, Rctx),
-            true = ets:insert(?MODULE, Rctx),
+            create_resource(Rctx),
             Rctx
     end.
 
@@ -683,7 +696,7 @@ create_coordinator_context(#httpd{} = Req, Path) ->
             },
             track(Rctx),
             erlang:put(?DELTA_TZ, Rctx),
-            true = ets:insert(?MODULE, Rctx),
+            create_resource(Rctx),
             Rctx
     end.
 
@@ -831,7 +844,7 @@ get_resource() ->
     get_resource(get_pid_ref()).
 
 get_resource(PidRef) ->
-    case ets:lookup(?MODULE, PidRef) of
+    catch case ets:lookup(?MODULE, PidRef) of
         [#rctx{}=TP] ->
             TP;
         [] ->
@@ -845,6 +858,10 @@ make_record(Pid, Ref) ->
 find_unmonitored() ->
     %% TODO: only need PidRef here, replace with a select that does that...
     [PR || #rctx{pid_ref=PR} <- ets:match_object(?MODULE, #rctx{mon_ref=undefined, _ = '_'})].
+
+
+find_by_pid(Pid) ->
+    [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
 
 
 start_link() ->
@@ -947,7 +964,7 @@ log_process_lifetime_report(PidRef) ->
     #rctx{} = Rctx = get_resource(PidRef),
     %% TODO: catch error out of here, report crashes on depth>1 json
     %%io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
-    couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx)).
+    is_enabled() andalso couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx)).
 
 
 %% Reimplementation of: https://github.com/erlang/otp/blob/b2ee4fc9a0b81a139dad2033e9b2bfc178146886/lib/stdlib/src/ets.erl#L633-L658
