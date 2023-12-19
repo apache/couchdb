@@ -516,7 +516,7 @@ def boot_nouveau(ctx):
         "./gradlew",
         "run",
         "--args",
-        "server nouveau.yaml",
+        "server src/test/resources/nouveau.yaml",
     ]
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")

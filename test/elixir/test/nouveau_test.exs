@@ -140,7 +140,7 @@ defmodule NouveauTest do
   end
 
   test "user-agent header is forbidden", context do
-    resp = Couch.get("http://127.0.0.01:8080",
+    resp = Couch.get("http://127.0.0.1:5987",
       headers: ["User-Agent": "couchdb"])
     assert_status_code(resp, 403)
   end

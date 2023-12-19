@@ -8,15 +8,15 @@ logging:
 
 server:
   applicationConnectors:
-    - type: h2c
-      port: 8080
+    - type: http
       bindHost: 127.0.0.1
-      maxConcurrentStreams: 1024
-      initialStreamRecvWindow: 65535
+      port: 5987
+      useDateHeader: false
   adminConnectors:
-    - type: h2c
-      port: 8081
+    - type: http
       bindHost: 127.0.0.1
+      port: 5988
+      useDateHeader: false
   gzip:
     includedMethods:
       - GET
