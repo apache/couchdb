@@ -265,7 +265,7 @@ public final class IndexManager implements Managed {
     }
 
     private Path indexRootPath(final String name) {
-        final Path result = rootDir.resolve(name).normalize();
+        final Path result = rootDir.resolve(name);
         if (result.startsWith(rootDir)) {
             return result;
         }

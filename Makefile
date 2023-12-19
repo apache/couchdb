@@ -228,7 +228,7 @@ python-black-update: .venv/bin/black
 		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 -include install.mk
-ifeq ($(with_nouveau), 0)
+ifeq ($(with_nouveau), false)
   exclude_nouveau=--exclude nouveau
 endif
 
@@ -429,7 +429,7 @@ else
 endif
 endif
 
-ifeq ($(with_nouveau), 1)
+ifeq ($(with_nouveau), true)
 	@mkdir rel/couchdb/nouveau
 	@cd nouveau && ./gradlew installDist
 	@cp -R nouveau/build/install/nouveau rel/couchdb
@@ -475,7 +475,7 @@ clean:
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f src/couch_dist/certs/out
-ifeq ($(with_nouveau), 1)
+ifeq ($(with_nouveau), true)
 	@cd nouveau && ./gradlew clean
 endif
 
@@ -546,7 +546,7 @@ derived:
 .PHONY: nouveau
 # Build nouveau
 nouveau:
-ifeq ($(with_nouveau), 1)
+ifeq ($(with_nouveau), true)
 	@cd nouveau && ./gradlew spotlessApply
 	@cd nouveau && ./gradlew build -x test
 endif
@@ -556,7 +556,7 @@ nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
 nouveau-test-gradle: couch nouveau
-ifeq ($(with_nouveau), 1)
+ifeq ($(with_nouveau), true)
 	@cd nouveau && ./gradlew test
 endif
 
@@ -564,7 +564,7 @@ endif
 nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
 nouveau-test-elixir: couch nouveau
-ifeq ($(with_nouveau), 1)
+ifeq ($(with_nouveau), true)
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/config/test-config.ini \
 		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
