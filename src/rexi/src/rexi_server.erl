@@ -206,7 +206,13 @@ find_worker(Ref, Tab) ->
     end.
 
 notify_caller({Caller, Ref}, Reason, Delta) ->
-    rexi_utils:send(Caller, {Ref, {rexi_EXIT, Reason}, {delta, Delta}}).
+    Msg = case couch_stats_resource_tracker:is_enabled() of
+        true ->
+            {Ref, {rexi_EXIT, Reason}, {delta, Delta}};
+        false ->
+            {Ref, {rexi_EXIT, Reason}}
+    end,
+    rexi_utils:send(Caller, Msg).
 
 kill_worker(FromRef, #st{clients = Clients} = St) ->
     case find_worker(FromRef, Clients) of

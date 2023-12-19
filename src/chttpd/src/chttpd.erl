@@ -221,6 +221,7 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq0) ->
+    couch_util:clear_pdict(), %% Make sure we start clean, everytime
     erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
     handle_request_int(MochiReq).
@@ -377,6 +378,7 @@ after_request(HttpReq, HttpResp0) ->
     HttpResp2 = update_stats(HttpReq, HttpResp1),
     chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
+    %%couch_stats_resource_tracker:close_context(),
     HttpResp2.
 
 process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
