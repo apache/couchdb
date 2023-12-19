@@ -964,7 +964,34 @@ log_process_lifetime_report(PidRef) ->
     #rctx{} = Rctx = get_resource(PidRef),
     %% TODO: catch error out of here, report crashes on depth>1 json
     %%io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
-    is_enabled() andalso couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx)).
+    case is_enabled() andalso should_log(Rctx) of
+        true ->
+            couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx));
+        false ->
+            ok
+    end.
+
+should_log(#rctx{type = {coordinator, _, _}}) ->
+    true;
+should_log(#rctx{type = {worker, fabric_rpc, FName}}) ->
+    case conf_get("log_fabric_rpc") of
+        "true" ->
+            true;
+        undefined ->
+            false;
+        Name ->
+            Name =:= atom_to_list(FName)
+    end;
+should_log(_) ->
+    false.
+
+
+conf_get(Key) ->
+    conf_get(Key, undefined).
+
+
+conf_get(Key, Default) ->
+    config:get("couch_stats_resource_tracker", Key, Default).
 
 
 %% Reimplementation of: https://github.com/erlang/otp/blob/b2ee4fc9a0b81a139dad2033e9b2bfc178146886/lib/stdlib/src/ets.erl#L633-L658
