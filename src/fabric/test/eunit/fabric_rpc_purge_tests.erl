@@ -263,6 +263,8 @@ rpc_update_doc(DbName, Doc, Opts) ->
     Reply = test_util:wait(fun() ->
         receive
             {Ref, Reply} ->
+                Reply;
+            {Ref, Reply, {delta, _}} ->
                 Reply
         after 0 ->
             wait
