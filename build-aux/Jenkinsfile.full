@@ -125,12 +125,14 @@ meta = [
      gnu_make: 'gmake'
   ],
 
-  'freebsd-arm64': [
-     name: 'FreeBSD',
-     spidermonkey_vsn: '91',
-     enable_clouseau: false,
-     gnu_make: 'gmake'
-  ],
+  // Disable temporarily until issue 4916
+  // is resolved
+  // 'freebsd-arm64': [
+  //    name: 'FreeBSD',
+  //    spidermonkey_vsn: '91',
+  //    enable_clouseau: false,
+  //    gnu_make: 'gmake'
+  // ],
 
  'macos': [
     name: 'macOS',
