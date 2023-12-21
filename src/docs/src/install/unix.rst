@@ -31,10 +31,13 @@ to install CouchDB is to use the convenience binary packages:
 
 * CentOS/RHEL 7
 * CentOS/RHEL 8
+* CentOS/RHEL 9 (with caveats)
 * Debian 10 (buster)
 * Debian 11 (bullseye)
+* Debian 12 (bookworm)
 * Ubuntu 18.04 (bionic)
 * Ubuntu 20.04 (focal)
+* Ubuntu 22.04 (jammy)
 
 These RedHat-style rpm packages and Debian-style deb packages will install CouchDB at
 ``/opt/couchdb`` and ensure CouchDB is run at system startup by the appropriate init
@@ -63,10 +66,18 @@ Enabling the Apache CouchDB package repository
     echo "deb [signed-by=/usr/share/keyrings/couchdb-archive-keyring.gpg] https://apache.jfrog.io/artifactory/couchdb-deb/ ${VERSION_CODENAME} main" \
         | sudo tee /etc/apt/sources.list.d/couchdb.list >/dev/null
 
-**RedHat or CentOS**: Run the following commands::
+**RedHat(<9) or CentOS**: Run the following commands::
 
     sudo yum install -y yum-utils
     sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
+
+**RedHat(>=9)**: Run the following commands::
+
+    sudo yum install -y yum-utils
+    sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
+    # Enable EPEL for the SpiderMonkey dependency
+    sudo dnf config-manager --set-enabled crb
+    sudo dnf install epel-release epel-next-release
 
 Installing the Apache CouchDB packages
 --------------------------------------
@@ -83,8 +94,13 @@ clustered installations. For clusters, multiple nodes will still need to be
 joined together and configured consistently across all machines; **follow the**
 :ref:`Cluster Setup <setup/cluster>` **walkthrough** to complete the process.
 
-**RedHat/CentOS**: Run the command::
+**RedHat(<9)/CentOS**: Run the command::
 
+    sudo yum install -y couchdb
+
+**RedHat(>=9)**: Run the following commands::
+
+    sudo yum install -y mozjs78
     sudo yum install -y couchdb
 
 Once installed, :ref:`create an admin user<config/admins>` by hand before
@@ -142,20 +158,17 @@ Dependencies
 
 You should have the following installed:
 
-* `Erlang OTP (20.x >= 20.3.8.11, 21.x >= 21.2.3, 22.x >= 22.0.5, 23.x, 24.x) <http://erlang.org/>`_
+* `Erlang OTP (24.x, 25.x)      <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
 * `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91) <https://spidermonkey.dev/>`_
 * `GNU Make                     <http://www.gnu.org/software/make/>`_
 * `GNU Compiler Collection      <http://gcc.gnu.org/>`_
-* `libcurl                      <http://curl.haxx.se/libcurl/>`_
 * `help2man                     <http://www.gnu.org/s/help2man/>`_
 * `Python (>=3.6) for docs and tests      <http://python.org/>`_
-* `Python Sphinx (>=1.1.3)      <http://pypi.python.org/pypi/Sphinx>`_
+* Java (required for `nouveau`, minimum version 11, recommended version 19 or 20)
 
-You will only need libcurl if you plan to run the JavaScript test suite. And
 help2man is only need if you plan on installing the CouchDB man pages.
-Sphinx is only required for building the online documentation.
 Documentation build can be disabled by adding the ``--disable-docs`` flag to
 the ``configure`` script.
 
@@ -166,7 +179,7 @@ You can install the dependencies by running::
 
     sudo apt-get --no-install-recommends -y install \
         build-essential pkg-config erlang \
-        libicu-dev libmozjs185-dev libcurl4-openssl-dev
+        libicu-dev libmozjs185-dev
 
 Be sure to update the version numbers to match your system's available
 packages.
@@ -177,7 +190,7 @@ RedHat-based (Fedora, CentOS, RHEL) Systems
 You can install the dependencies by running::
 
     sudo yum install autoconf autoconf-archive automake \
-        curl-devel erlang-asn1 erlang-erts erlang-eunit gcc-c++ \
+        erlang-asn1 erlang-erts erlang-eunit gcc-c++ \
         erlang-os_mon erlang-xmerl erlang-erl_interface help2man \
         libicu-devel libtool perl-Test-Harness
 
@@ -233,7 +246,7 @@ Line Tools::
 You can then install the other dependencies by running::
 
     brew install autoconf autoconf-archive automake libtool \
-        erlang icu4c spidermonkey curl pkg-config
+        erlang icu4c spidermonkey pkg-config
 
 You will need `Homebrew` installed to use the ``brew`` command.
 
