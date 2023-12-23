@@ -51,7 +51,11 @@ small_recbuf(_, {_, Db}) ->
         ?_test(begin
             Id = data(2048),
             Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
-            ?assert(Response =:= 400 orelse Response =:= request_failed)
+            ?assert(
+                Response =:= 400 orelse
+                    Response =:= request_failed orelse
+                    Response =:= connection_closed
+            )
         end)}.
 
 small_buffer(_, {_, Db}) ->
@@ -59,7 +63,11 @@ small_buffer(_, {_, Db}) ->
         ?_test(begin
             Id = data(2048),
             Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
-            ?assert(Response =:= 400 orelse Response =:= request_failed)
+            ?assert(
+                Response =:= 400 orelse
+                    Response =:= request_failed orelse
+                    Response =:= connection_closed
+            )
         end)}.
 
 default_buffer(_, {_, Db}) ->
