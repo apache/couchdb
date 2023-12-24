@@ -1,0 +1,235 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/3.4.x:
+
+============
+3.4.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/3.4.0:
+
+Version 3.4.0
+=============
+
+Highlights
+----------
+
+.. code-block:: text
+
+      .-.
+          /  |
+         /\  | .-._.)  (  )   .-..-.  .-.  )  (
+        /  \ |(   )(    )(   / ./.-'_(  | (    )
+   .-' /    \| `-'  `--': \_/  (__.'  `-'-'`--':
+  (__.'      `.
+
+* :ghissue:`4291`: Introducing Nouveau (beta) a modern, from-the-ground-up
+  implementation of Lucene-based full-text search for CouchDB. Please test
+  this thoroughly and report back any issues you might find.
+
+  - Installation instructions // TODO LINK
+  - Report a bug // TODO LINK
+
+* :ghissue:`4570`, :ghissue:`4578`, :ghissue:`4576`: Adopt xxHash in favour
+  of md5 for ``couch_file`` checksums and ETag calculation. 30% performance
+  increase for large (128K) docs. No difference for smaller docs.
+
+* :ghissue:`4814`: Introduce PBKDF2-SHA256 for password hashing. The existing
+  PBKDF2-SHA1 variant is now deprecated. Increases the default iteration count
+  to ``500000``. Also introduce a password hash in-memory cache with a low
+  iteration number, to keep interactive requests fast for a fixed time.
+
+  Entries in the password hash cache are time-limited, unused entries are
+  automatically deleted, and there is a capacity bound.
+
+* :ghissue:`4512`: Mango: add keys-only covering indexes. Improves query
+  response times for certain queries up to 10x at p(95).
+
+* :ghissue:`4681`: Introduce optional countermeasures as we run out of
+  disk space.
+
+* :ghissue:`4847`: Require auth for ``_replicate`` endpoint. This continues
+  the 3.x closed-by-default design goal.
+
+* Many small small performance improvements, see Performance section // TODO LINK
+
+Features and Enhancements
+-------------------------
+
+* :ghissue:`4878`: Add an option to scrub some sensitive headers from external
+  json.
+* :ghissue:`4834`: Wait for newly set admin creds to be hashed in setup.
+* :ghissue:`4821`: Do not fail compactions if the last step is delayed
+  by ``ioq``.
+* :ghissue:`4810`: Mango: add ``$beginsWith`` operator .
+* :ghissue:`4769`: Improve replicator error handling.
+* :ghissue:`4766`: Add new HTTP endpoint ``/_node/_local/_smoosh/status``.
+* :ghissue:`4736`: Stop client process and clean up if client disconnects.
+* :ghissue:`4703`: Add ``_purged_infos`` endpoint.
+* :ghissue:`4685`: Add ``"CouchDB-Replicator/..."`` user agent to
+  replicator ``/_session`` requests
+* :ghissue:`4680`: Shard splitting: allow resumption of failed jobs and
+  make timeout configurable.
+* :ghissue:`4677`: Crash replication jobs on unexpected ``4xx`` errors.
+* :ghissue:`4670`: Allow setting of additional ``ibrowse`` options
+  like ``prefer_ipv6``.
+* :ghissue:`4662`: Mango: extend ``_explain`` with candidate indexes and
+  selector hints.
+* :ghissue:`4625`: Add optional logging of security issues when
+  replicating.
+* :ghissue:`4623`: Better upgrade handling of ``instance_start_time``
+  in replicator.
+* :ghissue:`4613`: Add option to suppress version info via HTTP header.
+* :ghissue:`4601`: Add simple ``fabric`` benchmark.
+* :ghissue:`4581`: Support Erlang/OTP 26.
+* :ghissue:`4575`: Add ``{verify, verify_peer}`` for TLS validation.
+* :ghissue:`4569`: Mango: add ``keys_examined`` for ``execution_stats``.
+* :ghissue:`4558`: Make Erlang/OTP 24 the minimum supported Erlang version.
+* :ghissue:`4503`: Make timeouts for ``_view`` and ``_search`` configurable.
+* :ghissue:`4483`: Add RFC5424 compliant report logging.
+* :ghissue:`4475`: Add type and descriptions to prometheus output.
+* :ghissue:`4443`: Automatically enable FIPS mode at runtime.
+* :ghissue:`4438`: Upgrade hash algorithm for proxy auth.
+* :ghissue:`4432`: Hide shard-sync and purge documents from ``_local_docs``.
+* :ghissue:`4431`: Allow definition of JWT roles claim as comma-separated
+  list.
+* :ghissue:`4404`: Respond with 503 immediately if search not available.
+* :ghissue:`4347`: Remove failed ``couch_plugins`` experiment.
+
+Performance
+-----------
+
+* :ghissue:`4852`: Optimise ``_active_tasks``.
+* :ghissue:`4811`: Prevent delayed opener error from crashing index servers.
+* :ghissue:`4786`, :ghissue:`4789`: Add extra timing stats for ``couch_js``
+  engine commands.
+* :ghissue:`4679`: Fix multipart parse “attachment longer than expected”
+  error.
+* :ghissue:`4672`: Remove ``folsom`` and reimplement required functionality
+  with new Erlang/OTP primitives resulting in up to 19x faster histogram
+  operations.
+* :ghissue:`4617`: Use a faster sets implementation available since OTP 24.
+* :ghissue:`4608`: Add metrics for fsync calls and query engine operations.
+* :ghissue:`4604`: 6x speedup for common ``mem3:dbname/1`` function.
+* :ghissue:`4603`: Update ``vm.args`` settings, increased Erlang distribution
+  buffer size to 32MB.
+* :ghissue:`4598`: Speed up internal replicator.
+* :ghissue:`4507`, :ghissue:`4525`: Add more prometheus metrics.
+* :ghissue:`4505`: Treat JavaScript internal errors as fatal.
+* :ghissue:`4503`: Add ``error_info`` clause for ``410 Gone``.
+* :ghissue:`4494`: Treat single-element keys as key.
+* :ghissue:`4473`: Avoid re-compiling filter view functions.
+* :ghissue:`4401`: Enforce doc ids ``_changes`` filter optimisation limit and
+  raise it from ``100`` to ``1000``.
+* :ghissue:`4394`: Mango: push ``fields`` selection down to data nodes.
+
+Bugfixes
+--------
+
+* :ghissue:`4887`: Look up search node name in config for weatherreport.
+* :ghissue:`4837`: Fix update bug in ``ets_lru``.
+* :ghissue:`4794`: Fix incorrect raising of ``database_does_not_exist`` error.
+* :ghissue:`4784`: Fix parsing of node name from ``ERL_FLAGS1``
+  in ``remsh``.
+* :ghissue:`4782`, :ghissue:`4891`: Mango: prevent occasional
+  duplication of paginated text results.
+* :ghissue:`4761`: Fix badrecord error when replicator is logging http usage.
+* :ghissue:`4759`: TLS: use HTTP rules for hostname verification.
+* :ghissue:`4758`: Remove sensitive headers from the mochiweb request in pdict.
+* :ghissue:`4751`: Mango: correct behaviour of ``fields`` on ``_explain``.
+* :ghissue:`4722`: Fix badmatch error when purge requests time out.
+* :ghissue:`4716`: Fix pending count for reverse changes feed.
+* :ghissue:`4709`: Mango: improve handling of invalid fields.
+* :ghissue:`4704`, :ghissue:`4707`: Fix empty facet search results.
+* :ghissue:`4682`: ``_design_doc/queries`` with ``keys`` should only return
+  design docs.
+* :ghissue:`4669`: Allow for more than two replicator socket options.
+* :ghissue:`4666`: Improve error handling in config API.
+* :ghissue:`4659`: Mango: remove duplicates from ``indexable_fields/1``
+  results.
+* :ghissue:`4658`: Fix undefined range in ``mem3_rep`` purge replication
+  logic.
+* :ghissue:`4653`: Fix ability to use ``;`` inside of config values.
+* :ghissue:`4629`: Fix prometheus to survive ``mem3_sync`` termination.
+* :ghissue:`4626`: Fix purge infos replicating to the wrong shards
+  during shard splitting.
+* :ghissue:`4602`: Fix error handling for the ``_index`` endpoint and
+  document ``_index/_bulk_delete``.
+* :ghissue:`4555`: Fix race condition when creating indexes.
+* :ghissue:`4524`: Querying ``_all_docs`` with non-string key should
+  return an empty list.
+* :ghissue:`4514`: GET invalid path under ``_index`` should not cause
+  500 response.
+* :ghissue:`4509`: Make ``remsh`` work with quoted cookie.
+* :ghissue:`4491`: Fix ``couch_index`` to avoid crashes under certain
+  conditions.
+* :ghissue:`4485`: Catch and log any error from ``mem3:local_shards`` in
+  ``index_server``.
+* :ghissue:`4473`: Fix prometheus counter metric naming.
+* :ghissue:`4458`: Mango: Fix text index selection for queries with ``$regex``.
+* :ghissue:`4416`: Allow ``_local`` doc writes to the replicator dbs.
+* :ghissue:`4370`: Ensure design docs are uploaded individually when
+  replicating with ``bulk_get``.
+* :ghissue:`4363`: Fix replication ``_scheduler/docs`` ``total_rows``.
+* :ghissue:`4360`: Fix handling forbidden exceptions from workers in
+  ``fabric_doc_update``.
+* :ghissue:`4353`: Fix replication ``job_link``.
+* :ghissue:`4348`: Fix undefined function warning in weatherreport.
+* :ghissue:`4343`: Fix undef when parsing replication doc body.
+
+Tests
+-----
+
+* :ghissue:`4873`: Fix test for `text` index creation.
+* :ghissue:`4863`: Fix flaky ``users_db_security`` test.
+* :ghissue:`4808`: Fix flaky ``couch_stream`` test.
+* :ghissue:`4806`: Mango: do not skip json tests when Clouseau installed.
+* :ghissue:`4803`: Fix flaky ``ddoc_cache`` test some more.
+* :ghissue:`4765`: Fix flaky mem3 reshard test.
+* :ghissue:`4763`: Plug hole in unit test coverage of view curser functions.
+* :ghissue:`4726`: Support Elixir 1.15.
+* :ghissue:`4691`: ``make elixir`` should match what we run in CI.
+* :ghissue:`4632`: Fix test database recreation logic.
+* :ghissue:`4630`: Add extra assert in flaky couch_file test.
+* :ghissue:`4620`: Add Erlang/OTP 26 to Pull Request CI matrix.
+* :ghissue:`4552`, :ghissue:`4553`: Fix flaky couchjs error test.
+* :ghissue:`4453`: Fix flaky LRU test that the new super fast macOS CI worker
+  noticed.
+* :ghissue:`4422`: Clean up JSON index selection and add unit tests.
+* :ghissue:`4345`: Add test coverage for replicator ``user_ctx`` parser.
+
+Docs
+----
+
+* :ghissue:`4774`: Amend description of ``use_index`` on ``/{db}/_find``.
+* :ghissue:`4743`: Ban the laster monster.
+* :ghissue:`4684`: Add ``_design_docs/queries`` and
+  ``_local_docs/queries``.
+* :ghissue:`4645`: Add authentication data to examples.
+* :ghissue:`4636`: Clarify default quorum calculation.
+* :ghissue:`4561`: Clarify encoding length in performance section.
+* :ghissue:`4402`: Fix example code in partitioned databases.
+* :ghissue:`4379`: match description of ``$mod`` with reality.
+
+Builds
+------
+* :ghissue:`4840`: Add Debian 12 (bookworm) to CI and binary packages.
+
+Other
+-----
+
+What’s new, Scooby-Doo?

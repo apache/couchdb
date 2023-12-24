@@ -30,8 +30,8 @@ extensions = [
 nitpicky = True
 
 # should be over-written using rebar-inherited settings
-version = "3.3"
-release = "3.3.0"
+version = "3.4"
+release = "3.4.0"
 
 project = "Apache CouchDB\u00ae"
 
