@@ -13,6 +13,7 @@
 import datetime
 import os
 import sys
+from pathlib import Path
 
 import sphinx_rtd_theme
 
@@ -29,9 +30,13 @@ extensions = [
 
 nitpicky = True
 
-# should be over-written using rebar-inherited settings
-version = "3.3"
-release = "3.3.0"
+# load version numbers from version.mk
+version_file = Path().absolute().joinpath("../../../version.mk").resolve()
+with open(version_file) as file:
+    props = dict(line.strip().split("=", 1) for line in file)
+
+version = f"{props['vsn_major']}.{props['vsn_minor']}"
+release = f"{props['vsn_major']}.{props['vsn_minor']}.{props['vsn_patch']}"
 
 project = "Apache CouchDB\u00ae"
 
