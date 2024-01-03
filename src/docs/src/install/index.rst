@@ -24,6 +24,7 @@ Installation
     mac
     freebsd
     docker
+    snap
     kubernetes
     search
     nouveau
