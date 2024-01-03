@@ -73,7 +73,7 @@ When troubleshooting couchdb snap, check the logs first. You'll likely need to i
 admin settings, port, or address bindings. Also, anything related to Erlang runtime
 check ``/var/snap/couchdb/current/etc/vm.args`` to view the erlang name.
 
-The most common issue is couchdb not finding the database files. Ensure that 
+The most common issue is couchdb not finding the database files. Ensure that
 ``local.ini`` includes the following stanza and points to your data files:
 
 .. code-block:: ini
