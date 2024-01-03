@@ -70,11 +70,11 @@ tries to restore the backup. The second command removes couchdb and purges any b
 
 When troubleshooting couchdb snap, check the logs first. You'll likely need to inspect
 ``/var/snap/couchdb/current/etc/local.ini`` to verify the data directory or modify
-admin settings, port, or address bindings. Also, check ``/var/snap/couchdb/current/etc/vm.args``
-to view the erlang name.
+admin settings, port, or address bindings. Also, anything related to Erlang runtime
+check ``/var/snap/couchdb/current/etc/vm.args`` to view the erlang name.
 
-The most common issue is couchdb not finding the database files. Ensure that ``local.ini``
-includes the following stanza and points to your data files:
+The most common issue is couchdb not finding the database files. Ensure that 
+``local.ini`` includes the following stanza and points to your data files:
 
 .. code-block:: ini
 
@@ -84,14 +84,12 @@ includes the following stanza and points to your data files:
     database_dir = /var/snap/couchdb/common/data
     view_index_dir = /var/snap/couchdb/common/data
 
-
 Remember, you cannot modify the ``/snap/couchdb/`` directory, even with sudo,
 as the filesystem is mounted read-only for security reasons.
 
 For additional details on the snap build process, refer to our
 `couchdb-pkg git repository`_. This includes instructions on setting up a cluster
 using the command line.
-
 
 .. _couchdb snap: https://snapcraft.io/couchdb
 .. _installing snapd: https://snapcraft.io/docs/core/install
