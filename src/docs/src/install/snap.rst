@@ -21,14 +21,14 @@ Installation via Snap
 Apache CouchDB provides 'convenience binary' Snap builds through the
 Ubuntu snapcraft repository under the name `couchdb snap`_. These are
 available in separate snap channels for each major/minor release stream,
-e.g., ``2.x``, ``3.3.x``, and a ``latest`` stream.
+e.g., ``2.x``, ``3.3``, and a ``latest`` stream.
 
-Once you've completed `installing snapd`_, you can install the CouchDB snap via:
+Once you've completed `installing snapd`_, you can install the CouchDB snap via::
 
     $ sudo snap install couchdb
 
 After installation, set up an admin password and a cookie using a snap hook.
-Then, restart the snap for changes to take effect:
+Then, restart the snap for changes to take effect::
 
     $ sudo snap set couchdb admin=[your-password] setcookie=[your-cookie]
     $ sudo snap restart couchdb
@@ -37,29 +37,32 @@ CouchDB will be installed (read only) at ``/snap/couchdb/current/``.
 Data files will be written to ``/var/snap/couchdb/common/data``, and
 (writable) configuration files will be stored in ``/var/snap/couchdb/current/etc``.
 
-**Your installation is not complete. Follow the**
-:ref:`Setup <setup>` **steps for a single node or clustered installation.**
+.. note::
+
+    Your installation is not complete. Follow the
+    :ref:`Setup <setup>` steps for a single node or clustered installation.
 
 Snaps use AppArmor and are closely tied to systemd. They enforce that
 only writable files are housed under ``/var/snap``. Ensure that ``/var``
 has sufficient space for your data requirements.
 
-To view logs, access them via journalctl snap.couchdb or using the snap logs command:
+To view logs, access them via ``journalctl snap.couchdb`` or using the ``snap logs``
+command::
 
     $ sudo snap logs couchdb -f
 
 When installing from a specific channel, snaps are automatically refreshed with
-new revisions. Revert to a previous installation with:
+new revisions. Revert to a previous installation with::
 
     $ sudo snap revert couchdb
 
 After this, updates will no longer be received. View installed snaps and alternative
-channels using the list and info commands:
+channels using the list and info commands::
 
     $ snap list
     $ snap info couchdb
 
-As easily as they are installed, snaps can be removed:
+As easily as they are installed, snaps can be removed::
 
     $ sudo snap remove couchdb
     $ sudo snap remove couchdb --purge
@@ -84,8 +87,10 @@ The most common issue is couchdb not finding the database files. Ensure that
     database_dir = /var/snap/couchdb/common/data
     view_index_dir = /var/snap/couchdb/common/data
 
-Remember, you cannot modify the ``/snap/couchdb/`` directory, even with sudo,
-as the filesystem is mounted read-only for security reasons.
+.. note::
+
+    Remember, you cannot modify the ``/snap/couchdb/`` directory, even with sudo,
+    as the filesystem is mounted read-only for security reasons.
 
 For additional details on the snap build process, refer to our
 `couchdb-pkg git repository`_. This includes instructions on setting up a cluster
