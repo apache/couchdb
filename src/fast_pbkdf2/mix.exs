@@ -1,4 +1,4 @@
-defmodule FastPbkdf2.MixProject do
+defmodule Fast_Pbkdf2.MixProject do
   use Mix.Project
 
   def project do
