@@ -228,7 +228,7 @@ unlimited. A detailed discussion can be found on the erlang-questions list,
 but the short answer is that you should decrease ``ulimit -n`` or lower the
 ``vm.args`` parameter ``+Q`` to something reasonable like 1024.
 
-function raised exception (Cannot encode 'undefined' value as JSON)
+Function raised exception (Cannot encode 'undefined' value as JSON)
 -------------------------------------------------------------------
 If you see this in the CouchDB error logs, the JavaScript code you are using
 for either a map or reduce function is referencing an object member that is
@@ -286,7 +286,7 @@ The function needs to return a value:
       return sum(values);
     }
 
-erlang stack trace contains ``bad_utf8_character_code``
+Erlang stack trace contains ``bad_utf8_character_code``
 -------------------------------------------------------
 
 CouchDB 1.1.1 and later contain stricter handling of UTF8 encoding. If you are
