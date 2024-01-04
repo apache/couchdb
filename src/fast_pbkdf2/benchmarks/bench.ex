@@ -1,5 +1,4 @@
 defmodule PBKDF2.Benchmarks do
-  @moduledoc "blank"
   def pbkdf2_input itCount do
     password = :base64.encode(:crypto.strong_rand_bytes(10))
     salt = :base64.encode(:crypto.strong_rand_bytes(16))
@@ -26,9 +25,9 @@ Benchee.run(
     "1. 8" => PBKDF2.Benchmarks.pbkdf2_input(8),
     "2. 512" => PBKDF2.Benchmarks.pbkdf2_input(512),
     "3. 4096" => PBKDF2.Benchmarks.pbkdf2_input(4096),
-    "4. 10000" => PBKDF2.Benchmarks.pbkdf2_input(10_000),
-    "5. 160000" => PBKDF2.Benchmarks.pbkdf2_input(160_000),
-    "6. 500000" => PBKDF2.Benchmarks.pbkdf2_input(500_000)
+    "4. 10000" => PBKDF2.Benchmarks.pbkdf2_input(10000),
+    "5. 160000" => PBKDF2.Benchmarks.pbkdf2_input(160000),
+    "6. 500000" => PBKDF2.Benchmarks.pbkdf2_input(500000)
   },
   parallel: 12,
   time: 5,

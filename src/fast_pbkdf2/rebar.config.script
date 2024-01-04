@@ -1,0 +1,8 @@
+Artifacts =  case os:type() of
+    {win32, _} ->
+        [{artifacts, ["priv/fast_pbkdf2.dll"]}];
+    _ ->
+        [{artifacts, ["priv/fast_pbkdf2.so"]}]
+end,
+
+CONFIG ++ Artifacts.

@@ -27,6 +27,7 @@
           ~r"/node_modules/",
           ~r"/src/certifi/",
           ~r"/src/excoveralls/",
+          ~r"/src/fast_pbkdf2/",
           ~r"/src/jason",
           ~r"/src/hackney",
           ~r"/src/httpotion",
