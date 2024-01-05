@@ -24,6 +24,7 @@ extensions = [
     "sphinx.ext.extlinks",
     "sphinxcontrib.httpdomain",
     "sphinxcontrib.jquery",
+    "sphinx_copybutton",
     "configdomain",
 ]
 
