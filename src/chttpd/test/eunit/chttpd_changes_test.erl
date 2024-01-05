@@ -873,7 +873,7 @@ t_selector_open_doc_times({_, DbUrl}) ->
     Filter = called_times(fun() -> changes_post(DbUrl, Body, F) end, DbUrl),
     FilterDocs = called_times(fun() -> changes_post(DbUrl, Body, F ++ I) end, DbUrl),
     FilterAllDocs = called_times(fun() -> changes_post(DbUrl, Body, F ++ I ++ S) end, DbUrl),
-    ?assertEqual({3, 4, 6}, {Filter, FilterDocs, FilterAllDocs}).
+    ?assertEqual({3, 3, 5}, {Filter, FilterDocs, FilterAllDocs}).
 
 t_js_filter_open_doc_times({_, DbUrl}) ->
     {DDocUrl, Rev} = create_ddocs(DbUrl, ?DOC1, custom),
@@ -883,7 +883,7 @@ t_js_filter_open_doc_times({_, DbUrl}) ->
     Filter = called_times(fun() -> changes(DbUrl, F) end, DbUrl),
     FilterDocs = called_times(fun() -> changes(DbUrl, F ++ I) end, DbUrl),
     FilterAllDocs = called_times(fun() -> changes(DbUrl, F ++ I ++ S) end, DbUrl),
-    ?assertEqual({4, 5, 7}, {Filter, FilterDocs, FilterAllDocs}),
+    ?assertEqual({4, 4, 6}, {Filter, FilterDocs, FilterAllDocs}),
     delete_ddocs(DDocUrl, Rev).
 
 t_view_open_doc_times({_, DbUrl}) ->
@@ -894,7 +894,7 @@ t_view_open_doc_times({_, DbUrl}) ->
     Filter = called_times(fun() -> changes(DbUrl, F) end, DbUrl),
     FilterDocs = called_times(fun() -> changes(DbUrl, F ++ I) end, DbUrl),
     FilterAllDocs = called_times(fun() -> changes(DbUrl, F ++ S ++ I) end, DbUrl),
-    ?assertEqual({4, 5, 7}, {Filter, FilterDocs, FilterAllDocs}),
+    ?assertEqual({4, 4, 6}, {Filter, FilterDocs, FilterAllDocs}),
     delete_ddocs(DDocUrl, Rev).
 
 % Utility functions
