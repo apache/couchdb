@@ -20,11 +20,10 @@
     :synopsis: Returns changes for the given database
 
     Returns a sorted list of changes made to documents in the database, in time
-    order of application, can be obtained from the database's ``_changes``
-    resource. Only the most recent change for a given document is guaranteed to
-    be provided, for example if a document has had fields added, and then
-    deleted, an API client checking for changes will not necessarily receive
-    the intermediate state of added documents.
+    order of application. Only the most recent change for a given document is
+    guaranteed to be provided, for example if a document has had fields added,
+    and then deleted, an API client checking for changes will not necessarily
+    receive the intermediate state of added documents.
 
     This can be used to listen for update and modifications to the database for
     post processing or synchronization, and for practical purposes,
@@ -60,10 +59,17 @@
                           <changes/eventsource>`. Works the same as Continuous
                           Mode, but sends the events in `EventSource
                           <http://dev.w3.org/html5/eventsource/>`_ format.
-    :query string filter: Reference to a :ref:`filter function <filterfun>`
-        from a design document that will filter whole stream emitting only
-        filtered events. See the section `Change Notifications in the book
-        CouchDB The Definitive Guide`_ for more information.
+    :query string filter: - **design_doc/filter_name** Reference to a
+                            :ref:`filter function <filterfun>` from a design
+                            document that will filter whole stream emitting
+                            only filtered events. See the section `Change
+                            Notifications in the book CouchDB The Definitive
+                            Guide`_ for more information.
+                          - **_doc_ids** :ref:`doc_ids filter
+                            <changes/filter/doc_ids>`
+                          - **_view** :ref:`view filter <changes/filter/view>`
+                          - **_design** :ref:`design filter
+                            <changes/filter/design>`
     :query number heartbeat: Period in *milliseconds* after which an empty
         line is sent in the results. Only applicable for :ref:`longpoll
         <changes/longpoll>`, :ref:`continuous <changes/continuous>`, and
@@ -72,7 +78,10 @@
         ``true`` to use default value.
     :query boolean include_docs: Include the associated document with each
         result. If there are conflicts, only the winning revision is returned.
-        Default is ``false``.
+        Default is ``false``. When used with ``all_docs`` style and a filter,
+        return the document body even if does not pass the filtering criteria.
+        In other words, filtering applies only to the list of ``"changes"``
+        revision list not the returned document body in the ``"doc"`` field.
     :query boolean attachments: Include the Base64-encoded content of
         :ref:`attachments <api/doc/attachments>` in the documents that
         are included if ``include_docs`` is ``true``. Ignored if ``include_docs``
@@ -87,10 +96,16 @@
     :query since: Start the results from the change immediately after the given
         update sequence. Can be valid update sequence or ``now`` value.
         Default is ``0``.
-    :query string style: Specifies how many revisions are returned in
-        the changes array. The default, ``main_only``, will only return
-        the current "winning" revision; ``all_docs`` will return all leaf
-        revisions (including conflicts and deleted former conflicts).
+    :query string style: Specifies how many revisions are returned in the
+        changes array. The default, ``main_only``, will only return the current
+        "winning" revision; ``all_docs`` will return all leaf revisions
+        (including conflicts and deleted former conflicts). When using a filter
+        with ``all_docs`` style, if none of the revisions match the filter, the
+        changes row is skipped. If at least one revision matches, the changes
+        row is returned with all matching revision. If ``all_docs`` style is
+        used with ``include_docs=true`` and at least one revision matches the
+        filter, the winning doc body is returned, even if it doesn't not pass
+        the filtering criteria.
     :query number timeout: Maximum period in *milliseconds* to wait for a change
         before the response is sent, even if there are no results.
         Only applicable for :ref:`longpoll <changes/longpoll>` or
@@ -228,11 +243,16 @@
 
 .. http:post:: /{db}/_changes
     :synopsis: Returns changes for the given database for certain document IDs
+               or selector filter.
 
-    Requests the database changes feed in the same way as
-    :get:`/{db}/_changes` does, but is widely used with
-    ``?filter=_doc_ids`` query parameter and allows one to pass a larger list of
-    document IDs to filter.
+    Requests the database changes feed in the same way as :get:`/{db}/_changes`
+    does, but is widely used with ``?filter=_doc_ids`` or ``?filter=_selector``
+    query parameters and allows one to pass a larger list of document IDs or
+    the body of the selector to filter.
+
+    :param db: Database name
+    :query string filter: - **_doc_ids** :ref:`doc_ids filter <changes/filter/doc_ids>`
+                          - **_selector** :ref:`selector filter <changes/filter/selector>`
 
     **Request**:
 
@@ -274,6 +294,51 @@
                     ],
                     "id": "SpaghettiWithMeatballs",
                     "seq":  "5-g1AAAAIReJyVkE0OgjAQRkcwUVceQU9g-mOpruQm2tI2SLCuXOtN9CZ6E70JFmpCCCFCmkyTdt6bfJMDwDQNFcztWWkcY8JXyB2cu49AgFwURZGloRid3MMkEUoJHbXbOxVy6arc_SxQWQzRVHCuYHaxSpuj1aqbj0t-3-AlSrZakn78oeSvjRSIkIhSNiCFHbsKN3c50b02mURvEB-yD296eNOzzoRMRLRZ98rkHS_veGcC_nR-fGe1gaCaxihhjOI2lX0BhniHaA"
+                }
+            ]
+        }
+
+    **Request**:
+
+    .. code-block:: http
+
+        POST /db/_changes?filter=_selector HTTP/1.1
+        Accept: application/json
+        Accept-Encoding: gzip, deflate
+        Content-Length: 25
+        Content-Type: application/json
+        Host: 127.0.0.1:5984
+
+        {
+            "selector": {
+                "data": 1
+            }
+        }
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Type: application/json
+        Date: Fri, 05 Jan 2024 18:08:46 GMT
+        ETag: "9UTJJV90GMV3XQKBM9RNAS0IK"
+        Server: CouchDB/3.3.3-42c2484 (Erlang OTP/24)
+        Transfer-Encoding: chunked
+
+        {
+            "last_seq": "4-g1AAAACTeJzLYWBgYMpgTmHgz8tPSTV0MDQy1zMAQsMckEQiQ1L9____szKYE5lzgQLshqkGSWmGyZjKcRqRxwIkGRqA1H-oSYxgk0ySLSxSEi0wdWUBAGlCJKQ",
+            "pending": 0,
+            "results": [
+                {
+                    "changes": [
+                        {
+                            "rev": "3-fc9d7a5cf38c9f062aa246cb072eae68"
+                        }
+                    ],
+                    "id": "d1",
+                    "seq": "4-g1AAAACTeJzLYWBgYMpgTmHgz8tPSTV0MDQy1zMAQsMckEQiQ1L9____szKYE5lzgQLshqkGSWmGyZjKcRqRxwIkGRqA1H-oSYxgk0ySLSxSEi0wdWUBAGlCJKQ"
                 }
             ]
         }
