@@ -1104,17 +1104,23 @@ def try_request(
 ):
     while True:
         conn = httpclient.HTTPConnection(host, port)
-        if headers is not None:
-            conn.request(meth, path, body=body, headers=headers)
-        else:
-            conn.request(meth, path, body=body)
-        resp = conn.getresponse()
-        if resp.status in success_codes:
-            result = (resp.status, resp.read())
-            resp.close()
-            return result
-        elif retries <= 0:
-            assert resp.status in success_codes, "%s%s" % (error, resp.read())
+        try:
+            if headers is not None:
+                conn.request(meth, path, body=body, headers=headers)
+            else:
+                conn.request(meth, path, body=body)
+            resp = conn.getresponse()
+            if resp.status in success_codes:
+                result = (resp.status, resp.read())
+                resp.close()
+                return result
+            elif retries <= 0:
+                assert resp.status in success_codes, "%s%s" % (error, resp.read())
+        except Exception as e:
+            if retries <= 0:
+                print("Connection failed %s %s" % (e, error))
+                raise e
+            print("Retrying ... %s " % e)
         retries -= 1
         time.sleep(retry_dt)
 
