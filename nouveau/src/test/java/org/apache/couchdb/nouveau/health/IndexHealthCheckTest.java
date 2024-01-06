@@ -41,7 +41,8 @@ public class IndexHealthCheckTest {
         try {
             var resource = new IndexResource(manager);
             var check = new IndexHealthCheck(resource);
-            assertTrue(check.check().isHealthy());
+            var result = check.check();
+            assertTrue(result.isHealthy(), result.toString());
         } finally {
             manager.stop();
         }
