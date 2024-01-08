@@ -38,6 +38,7 @@
     get_resource/0,
     get_resource/1,
     set_context_dbname/1,
+    set_context_handler_fun/1,
     set_context_username/1,
     track/1,
     should_track/1
@@ -144,8 +145,8 @@
 %% -record(?RCTX, {
 -record(rctx, {
     %% Metadata
-    started_at = os:timestamp(),
-    updated_at = os:timestamp(),
+    started_at = tnow(),
+    updated_at = tnow(),
     exited_at, %% TODO: do we need a final exit time and additional update times afterwards?
     pid_ref,
     mon_ref,
@@ -178,8 +179,12 @@
     get_kp_node = 0
 }).
 
+%% monotonic time now in millisecionds
+tnow() ->
+    erlang:monotonic_time(millisecond).
+
 is_enabled() ->
-    config:get_boolean("couch_stats_resource_tracker", "enabled", true).
+    config:get_boolean(?MODULE_STRING, "enabled", true).
 
 db_opened() -> inc(db_opened).
 doc_read() -> inc(docs_read).
@@ -264,6 +269,8 @@ inc(?COUCH_BT_GET_KP_NODE, N) ->
 inc(?COUCH_BT_GET_KV_NODE, N) ->
     update_counter(#rctx.?COUCH_BT_GET_KV_NODE, N);
 inc(_, _) ->
+    %% inc needs to allow unknown types to pass for accumulate_update to handle
+    %% updates from nodes with newer data formats
     0.
 
 maybe_inc([mango, evaluate_selector], Val) ->
@@ -353,7 +360,7 @@ active_int(coordinators) ->
 active_int(workers) ->
     select_by_type(workers);
 active_int(all) ->
-    lists:map(fun to_json/1, ets:tab2list(?MODULE)).
+    lists:map(fun to_flat_json/1, ets:tab2list(?MODULE)).
 
 
 select_by_type(coordinators) ->
@@ -363,14 +370,20 @@ select_by_type(workers) ->
     ets:select(couch_stats_resource_tracker,
         [{#rctx{type = {worker,'_','_'}, _ = '_'}, [], ['$_']}]);
 select_by_type(all) ->
-    lists:map(fun to_json/1, ets:tab2list(?MODULE)).
+    lists:map(fun to_flat_json/1, ets:tab2list(?MODULE)).
 
 
 field(#rctx{pid_ref=Val}, pid_ref) -> Val;
-field(#rctx{mfa=Val}, mfa) -> Val;
+%% NOTE: Pros and cons to doing these convert functions here
+%% Ideally, this would be done later so as to prefer the core data structures
+%% as long as possible, but we currently need the output of this function to
+%% be jiffy:encode'able. The tricky bit is dynamically encoding the group_by
+%% structure provided by the caller of *_by aggregator functions below.
+%% For now, we just always return jiffy:encode'able data types.
+field(#rctx{mfa=Val}, mfa) -> convert_mfa(Val);
 field(#rctx{nonce=Val}, nonce) -> Val;
 field(#rctx{from=Val}, from) -> Val;
-field(#rctx{type=Val}, type) -> Val;
+field(#rctx{type=Val}, type) -> convert_type(Val);
 field(#rctx{state=Val}, state) -> Val;
 field(#rctx{dbname=Val}, dbname) -> Val;
 field(#rctx{username=Val}, username) -> Val;
@@ -444,105 +457,27 @@ sorted_by(KeyFun, ValFun) -> sorted(group_by(KeyFun, ValFun)).
 sorted_by(KeyFun, ValFun, AggFun) -> sorted(group_by(KeyFun, ValFun, AggFun)).
 
 
-to_json(#rctx{}=Rctx) ->
-    #rctx{
-        updated_at = TP,
-        started_at = TInit,
-        pid_ref = {_Pid, _Ref} = PidRef,
-        mfa = MFA0,
-        nonce = Nonce0,
-        from = From0,
-        dbname = DbName,
-        username = UserName,
-        db_open = DbOpens,
-        docs_read = DocsRead,
-        rows_read = RowsRead,
-        js_filter = JSFilters,
-        js_filter_error = JSFilterErrors,
-        js_filtered_docs = JSFilteredDocss,
-        state = State0,
-        type = Type,
-        btree_folds = BtFolds,
-        get_kp_node = KpNodes,
-        get_kv_node = KvNodes,
-        ioq_calls = IoqCalls,
-        changes_processed = ChangesProcessed,
-        changes_returned = ChangesReturned
-    } = Rctx,
-    MFA = case MFA0 of
-        {M, F, A} ->
-            [M, F, A];
-        undefined ->
-            null;
-        Other ->
-            throw({error, {unexpected, Other}})
-    end,
-    From = case From0 of
-        {Parent, ParentRef} ->
-            [pid_to_list(Parent), ref_to_list(ParentRef)];
-        undefined ->
-            null
-    end,
-    State = case State0 of
-        alive ->
-            alive;
-        {down, Reason} when is_atom(Reason) ->
-            [down, Reason];
-        Unknown ->
-            [unknown, io_lib:format("~w", [Unknown])]
-    end,
-    Nonce = case Nonce0 of
-        undefined ->
-            null;
-        Nonce0 ->
-            list_to_binary(Nonce0)
-    end,
-    #{
-        updated_at => term_to_json(TP),
-        started_at => term_to_json(TInit),
-        pid_ref => term_to_json(PidRef),
-        mfa => term_to_json(MFA),
-        nonce => term_to_json(Nonce),
-        from => term_to_json(From),
-        dbname => DbName,
-        username => UserName,
-        db_open => DbOpens,
-        docs_read => DocsRead,
-        js_filter => JSFilters,
-        js_filter_error => JSFilterErrors,
-        js_filtered_docs => JSFilteredDocss,
-        rows_read => RowsRead,
-        state => State,
-        type => term_to_json({type, Type}),
-        btree_folds => BtFolds,
-        kp_nodes => KpNodes,
-        kv_nodes => KvNodes,
-        ioq_calls => IoqCalls,
-        changes_processed => ChangesProcessed,
-        changes_returned => ChangesReturned
-    }.
-
-term_to_json({Pid, Ref}) when is_pid(Pid), is_reference(Ref) ->
-    [?l2b(pid_to_list(Pid)), ?l2b(ref_to_list(Ref))];
-term_to_json({type, {coordinator, _, _} = Type}) ->
-    ?l2b(io_lib:format("~p", [Type]));
-term_to_json({A, B, C}) ->
-    [A, B, C];
-term_to_json(Tuple) when is_tuple(Tuple) ->
-    ?l2b(io_lib:format("~w", [Tuple]));
-term_to_json(undefined) ->
-    null;
-term_to_json(null) ->
-    null;
-term_to_json(T) ->
-    T.
-
-term_to_flat_json({type, {coordinator, _, _}}=Type) ->
-    ?l2b(io_lib:format("~p", [Type]));
-term_to_flat_json({coordinator, _, _}=Type) ->
-    ?l2b(io_lib:format("~p", [Type]));
+term_to_flat_json({shutdown, Reason0}) when is_atom(Reason0) ->
+    Reason = atom_to_binary(Reason0),
+    <<"shutdown: ", Reason/binary>>;
+term_to_flat_json({type, Atom}) when is_atom(Atom) ->
+    atom_to_binary(Atom);
+term_to_flat_json({type, {coordinator, Verb0, Path0}}=_Type) ->
+    Verb = atom_to_binary(Verb0),
+    Path = list_to_binary(Path0),
+    <<"coordinator:", Verb/binary, ":", Path/binary>>;
+term_to_flat_json({type, {worker, M0, F0}}=_Type) ->
+    M = atom_to_binary(M0),
+    F = atom_to_binary(F0),
+    <<"worker:", M/binary, ":", F/binary>>;
 term_to_flat_json(Tuple) when is_tuple(Tuple) ->
-    ?l2b(io_lib:format("~p", [Tuple]));
+    erlang:tuple_to_list(Tuple);
+term_to_flat_json(Pid) when is_pid(Pid) ->
+    ?l2b(pid_to_list(Pid));
+term_to_flat_json(Ref) when is_reference(Ref) ->
+    ?l2b(ref_to_list(Ref));
+term_to_flat_json(Atom) when is_atom(Atom) ->
+    atom_to_binary(Atom);
 term_to_flat_json(undefined) ->
     null;
 term_to_flat_json(null) ->
@@ -554,7 +489,7 @@ to_flat_json(#rctx{}=Rctx) ->
     #rctx{
         updated_at = TP,
         started_at = TInit,
-        pid_ref = {_Pid, _Ref} = PidRef,
+        pid_ref = {Pid, Ref},
         mfa = MFA0,
         nonce = Nonce0,
         from = From0,
@@ -574,25 +509,32 @@ to_flat_json(#rctx{}=Rctx) ->
         changes_returned = ChangesReturned,
         ioq_calls = IoqCalls
     } = Rctx,
+    PidRef = {term_to_flat_json(Pid), term_to_flat_json(Ref)},
     MFA = case MFA0 of
-        {_M, _F, _A} ->
-            ?l2b(io_lib:format("~w", [MFA0]));
+        {M0, F0, A0} ->
+            M = atom_to_binary(M0),
+            F = atom_to_binary(F0),
+            A = integer_to_binary(A0),
+            <<M/binary, ":", F/binary, "/", A/binary>>;
+        MFA0 when is_list(MFA0) ->
+            MFA0;
         undefined ->
             null;
-        Other ->
-            throw({error, {unexpected, Other}})
+        OtherMFA ->
+            throw({error, {unexpected, OtherMFA}})
     end,
     From = case From0 of
-        {_Parent, _ParentRef} ->
-            ?l2b(io_lib:format("~w", [From0]));
+        {Parent, ParentRef} ->
+            {term_to_flat_json(Parent), term_to_flat_json(ParentRef)};
         undefined ->
             null
     end,
     State = case State0 of
         alive ->
             alive;
-        State0 ->
-            ?l2b(io_lib:format("~w", [State0]))
+        {down, Reason0}  ->
+            Reason = term_to_flat_json(Reason0),
+            <<"down: ", Reason/binary>>
     end,
     Nonce = case Nonce0 of
         undefined ->
@@ -601,9 +543,9 @@ to_flat_json(#rctx{}=Rctx) ->
             list_to_binary(Nonce0)
     end,
     #{
-        updated_at => term_to_flat_json(TP),
-        started_at => term_to_flat_json(TInit),
-        pid_ref => ?l2b(io_lib:format("~w", [PidRef])),
+        updated_at => TP,
+        started_at => TInit,
+        pid_ref => PidRef,
         mfa => MFA,
         nonce => Nonce,
         from => From,
@@ -623,6 +565,26 @@ to_flat_json(#rctx{}=Rctx) ->
         changes_returned => ChangesReturned,
         ioq_calls => IoqCalls
     }.
+
+
+convert_mfa({M0, F0, A0}) ->
+    M = atom_to_binary(M0),
+    F = atom_to_binary(F0),
+    A = integer_to_binary(A0),
+    <<M/binary, ":", F/binary, "/", A/binary>>;
+convert_mfa(undefined) ->
+    null.
+
+convert_type(Atom) when is_atom(Atom) ->
+    atom_to_binary(Atom);
+convert_type({coordinator, Verb0, Path0}) ->
+    Verb = atom_to_binary(Verb0),
+    Path = list_to_binary(Path0),
+    <<"coordinator:", Verb/binary, ":", Path/binary>>;
+convert_type({worker, M0, F0}) ->
+    M = atom_to_binary(M0),
+    F = atom_to_binary(F0),
+    <<"worker:", M/binary, ":", F/binary>>.
 
 get_pid_ref() ->
     case get(?PID_REF) of
@@ -705,10 +667,27 @@ set_context_dbname(DbName) ->
         false ->
             ok;
         true ->
-            case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.dbname, DbName}]) of
+            catch case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.dbname, DbName}]) of
                 false ->
                     Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
                     io:format("UPDATING DBNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [DbName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
+                    timer:sleep(1000),
+                    erlang:halt(kaboomz);
+                true ->
+                    true
+            end
+    end.
+
+set_context_handler_fun(Fun) when is_function(Fun) ->
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            FunName = erlang:fun_to_list(Fun),
+            catch case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.mfa, FunName}]) of
+                false ->
+                    Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
+                    io:format("UPDATING HANDLER FUN[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [FunName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
                     timer:sleep(1000),
                     erlang:halt(kaboomz);
                 true ->
@@ -723,7 +702,7 @@ set_context_username(UserName) ->
         false ->
             ok;
         true ->
-            case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
+            catch case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
                 false ->
                     Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
                     io:format("UPDATING USERNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [UserName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
@@ -810,7 +789,7 @@ make_delta(#rctx{}=TA, #rctx{}=TB) ->
         get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
         db_open => TB#rctx.db_open - TA#rctx.db_open,
         ioq_calls => TB#rctx.ioq_calls - TA#rctx.ioq_calls,
-        dt => timer:now_diff(TB#rctx.updated_at, TA#rctx.updated_at)
+        dt => TB#rctx.updated_at - TA#rctx.updated_at
     },
     %% TODO: reevaluate this decision
     %% Only return non zero (and also positive) delta fields
@@ -823,15 +802,12 @@ make_delta(#rctx{}, _) ->
 make_delta_base() ->
     Ref = make_ref(),
     %% TODO: extract user_ctx and db/shard from request
-    TA0 = #rctx{
-        pid_ref = {self(), Ref}
-    },
-    case TA0#rctx.updated_at of
-        {Me, S, Mi} when Mi > 0 ->
-            TA0#rctx{updated_at = {Me, S, 0}};
-        {Me, S, Mi} when S > 0 ->
-            TA0#rctx{updated_at = {Me, S - 1, Mi}}
-    end.
+    Now = tnow(),
+    #rctx{
+        pid_ref = {self(), Ref},
+        started_at = Now - 100, %% give us 100ms rewind time for missing T0
+        updated_at = Now
+    }.
 
 set_delta_a(TA) ->
     erlang:put(?DELTA_TA, TA).
@@ -904,7 +880,7 @@ handle_info(scan, #st{tracking=AT0} = St0) ->
     AT = maybe_track(Unmonitored, AT0),
     _TimerRef = erlang:send_after(St0#st.scan_interval, self(), scan),
     {noreply, St0#st{tracking=AT}};
-handle_info({'DOWN', MonRef, _Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
+handle_info({'DOWN', MonRef, _Type, DPid, Reason0}, #st{tracking=AT0} = St0) ->
     %% io:format("CSRT:HI(~p)~n", [{'DOWN', MonRef, Type, DPid, Reason}]),
     St = case maps:get(MonRef, AT0, undefined) of
         undefined ->
@@ -921,8 +897,15 @@ handle_info({'DOWN', MonRef, _Type, DPid, Reason}, #st{tracking=AT0} = St0) ->
             %% update process state in live table
             %% TODO: decide whether we want the true match to crash this process on failure
             %% true = ets:update_element(?MODULE, PidRef,
+            Reason = case Reason0 of
+                {shutdown, Shutdown0} ->
+                    Shutdown = atom_to_binary(Shutdown0),
+                    <<"shutdown: ", Shutdown/binary>>;
+                Reason0 ->
+                    Reason0
+            end,
             ets:update_element(?MODULE, PidRef,
-                [{#rctx.state, {down, Reason}}, {#rctx.updated_at, os:timestamp()}]),
+                [{#rctx.state, {down, Reason}}, {#rctx.updated_at, tnow()}]),
             log_process_lifetime_report(PidRef),
             %% Delay eviction to allow human visibility on short lived pids
             erlang:send_after(St0#st.eviction_delay, self(), {evict, PidRef}),
@@ -971,9 +954,29 @@ log_process_lifetime_report(PidRef) ->
             ok
     end.
 
-should_log(#rctx{type = {coordinator, _, _}}) ->
+
+logging_enabled() ->
+    case conf_get("log_pid_usage_report", "coordinator") of
+        "coordinator" ->
+            coordinator;
+        "true" ->
+            true;
+        _ ->
+            false
+    end.
+
+
+should_log(#rctx{}=Rctx) ->
+    should_log(Rctx, logging_enabled()).
+
+
+should_log(#rctx{}, true) ->
     true;
-should_log(#rctx{type = {worker, fabric_rpc, FName}}) ->
+should_log(#rctx{}, false) ->
+    false;
+should_log(#rctx{type = {coordinator, _, _}}, coordinator) ->
+    true;
+should_log(#rctx{type = {worker, fabric_rpc, FName}}, _) ->
     case conf_get("log_fabric_rpc") of
         "true" ->
             true;
@@ -982,7 +985,7 @@ should_log(#rctx{type = {worker, fabric_rpc, FName}}) ->
         Name ->
             Name =:= atom_to_list(FName)
     end;
-should_log(_) ->
+should_log(#rctx{}, _) ->
     false.
 
 
@@ -991,7 +994,7 @@ conf_get(Key) ->
 
 
 conf_get(Key, Default) ->
-    config:get("couch_stats_resource_tracker", Key, Default).
+    config:get(?MODULE_STRING, Key, Default).
 
 
 %% Reimplementation of: https://github.com/erlang/otp/blob/b2ee4fc9a0b81a139dad2033e9b2bfc178146886/lib/stdlib/src/ets.erl#L633-L658
