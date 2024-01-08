@@ -138,7 +138,7 @@ meta = [
     name: 'macOS',
     spidermonkey_vsn: '91',
     enable_nouveau: false,
-    enable_clouseau: false,
+    enable_clouseau: true,
     gnu_make: 'make'
   ]
 ]
