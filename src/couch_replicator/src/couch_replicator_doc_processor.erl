@@ -27,7 +27,6 @@
 ]).
 
 -export([
-    db_created/2,
     db_deleted/2,
     db_found/2,
     db_change/3
@@ -72,10 +71,6 @@
 }).
 
 % couch_multidb_changes API callbacks
-
-db_created(_DbName, Server) ->
-    couch_stats:increment_counter([couch_replicator, docs, dbs_created]),
-    Server.
 
 db_deleted(DbName, Server) ->
     couch_stats:increment_counter([couch_replicator, docs, dbs_deleted]),

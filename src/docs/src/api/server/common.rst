@@ -1782,8 +1782,6 @@ containing only the requested individual statistic.
         couchdb_couch_replicator_docs_completed_state_updates_total 0
         # TYPE couchdb_couch_replicator_docs_db_changes_total counter
         couchdb_couch_replicator_docs_db_changes_total 0
-        # TYPE couchdb_couch_replicator_docs_dbs_created_total counter
-        couchdb_couch_replicator_docs_dbs_created_total 0
         # TYPE couchdb_couch_replicator_docs_dbs_deleted_total counter
         couchdb_couch_replicator_docs_dbs_deleted_total 0
         # TYPE couchdb_couch_replicator_docs_dbs_found_total counter
