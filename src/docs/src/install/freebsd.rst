@@ -16,71 +16,66 @@
 Installation on FreeBSD
 =======================
 
-Installation from ports
-=======================
+Installation
+============
 
-.. code-block:: text
+Use the pre-built binary packages to install CouchDB::
 
-    cd /usr/ports/databases/couchdb
+    pkg install couchdb3
+
+Alternatively, it is possible installing CouchDB from the Ports
+Collection::
+
+    cd /usr/ports/databases/couchdb3
     make install clean
-
-This will install CouchDB from the ports collection.
 
 .. note::
    Be sure to :ref:`create an admin user<config/admins>` before starting
    CouchDB for the first time!
 
-Start script
-------------
+Service Configuration
+=====================
 
-The following options for ``/etc/rc.conf`` or ``/etc/rc.conf.local`` are
-supported by the start script (defaults shown)::
+The port is shipped with a script that integrates CouchDB with
+FreeBSD's `rc.d service framework`_.  The following options for
+``/etc/rc.conf`` or ``/etc/rc.conf.local`` are supported (defaults
+shown)::
 
-    couchdb_enable="NO"
-    couchdb_enablelogs="YES"
-    couchdb_user="couchdb"
+    couchdb3_enable="NO"
+    couchdb3_user="couchdb"
+    couchdb3_erl_flags="-couch_ini /usr/local/libexec/couchdb3/etc/default.ini /usr/local/etc/couchdb3/local.ini"
+    couchdb3_chdir="/var/db/couchdb3"
 
-After enabling the couchdb rc service use the following command to start CouchDB::
+After enabling the ``couchdb3`` service (by setting
+``couchdb3_enable`` to ``"YES"``), use the following command to start
+CouchDB::
 
-    /usr/local/etc/rc.d/couchdb start
+    service couchdb3 start
 
-This script responds to the arguments `start`, `stop`, `status`, `rcvar` etc..
+This script responds to the arguments ``start``, ``stop``, ``status``,
+``rcvar`` etc.  If the service is not yet enabled in ``rc.conf``, use
+``onestart`` to start it up ad-hoc.
 
-The start script will also use settings from the following config files:
+The service will also use settings from the following config files:
 
-- /usr/local/etc/couchdb/default.ini
-- /usr/local/etc/couchdb/local.ini
+- ``/usr/local/libexec/couchdb3/etc/default.ini``
+- ``/usr/local/etc/couchdb3/local.ini``
 
-Administrators should use ``default.ini`` as reference and only modify the
+The ``default.ini`` should be left read-only, and will be replaced on
+upgrades and re-installs without warning.  Therefore administrators
+should use ``default.ini`` as a reference and only modify the
 ``local.ini`` file.
 
-Post install
-------------
-**Your installation is not complete. Be sure to complete the**
-:ref:`Setup <setup>` **steps for a single node or clustered installation.**
+Post Install
+============
 
-In case the install script fails to install a non-interactive user "couchdb" to
-be used for the database, the user needs to be created manually:
+**The installation is not complete. Be sure to complete the**
+:ref:`Setup <setup>` **steps for a single node or clustered
+installation.**
 
-I used the ``pw`` command to add a user "couchdb" in group "couchdb":
+Also note that the port will probably show some messages after the
+installation happened.  Make note of these instructions, although they
+can be found `in the ports tree`_ for later reference.
 
-.. code-block:: text
-
-    pw user add couchdb
-    pw user mod couchdb -c 'CouchDB, time to relax' -s /usr/sbin/nologin -d /var/lib/couchdb
-    pw group add couchdb
-
-The user is added to ``/etc/passwd`` and should look similar to the following:
-
-.. code-block:: text
-
-    shell#  grep couchdb /etc/passwd
-    couchdb:*:1013:1013:Couchdb, time to relax:/var/lib/couchdb/:/usr/sbin/nologin
-
-To change any of these settings, please refrain from editing `/etc/passwd` and
-instead use ``pw user mod ...`` or ``vipw``. Make sure that the user has no
-shell, but instead uses ``/usr/sbin/nologin``. The '*' in the second field means
-that this user can not login via password authorization. For details use
-`man 5 passwd`_.
-
-.. _man 5 passwd: http://linux.die.net/man/5/passwd
+.. _rc.d service framework: https://man.freebsd.org/rc.d
+.. _in the ports tree: https://cgit.freebsd.org/ports/tree/databases/couchdb3/files/pkg-message.in
