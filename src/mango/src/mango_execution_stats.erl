@@ -26,8 +26,8 @@
     log_stats/1,
     maybe_add_stats/4,
     shard_init/0,
-    shard_incr_keys_examined/0,
-    shard_incr_docs_examined/0,
+    shard_incr_keys_examined/1,
+    shard_incr_docs_examined/1,
     shard_get_stats/0
 ]).
 
@@ -123,19 +123,19 @@ shard_init() ->
     InitialState = #{docs_examined => 0, keys_examined => 0},
     put(?SHARD_STATS_KEY, InitialState).
 
--spec shard_incr_keys_examined() -> any().
-shard_incr_keys_examined() ->
-    incr(keys_examined).
+-spec shard_incr_keys_examined(integer()) -> any().
+shard_incr_keys_examined(N) ->
+    incr(keys_examined, N).
 
--spec shard_incr_docs_examined() -> any().
-shard_incr_docs_examined() ->
-    incr(docs_examined).
+-spec shard_incr_docs_examined(integer()) -> any().
+shard_incr_docs_examined(N) ->
+    incr(docs_examined, N).
 
--spec incr(atom()) -> any().
-incr(Key) ->
+-spec incr(atom(), integer()) -> any().
+incr(Key, N) ->
     case get(?SHARD_STATS_KEY) of
         #{} = Stats0 ->
-            Stats = maps:update_with(Key, fun(X) -> X + 1 end, Stats0),
+            Stats = maps:update_with(Key, fun(X) -> X + N end, Stats0),
             put(?SHARD_STATS_KEY, Stats);
         _ ->
             ok

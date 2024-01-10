@@ -73,6 +73,19 @@ class ExecutionStatsTests(mango.UserDocsTests):
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
 
+    def test_reporting_consistency(self):
+        resp = self.db.find(
+            {"age": {"$lte": 42}},
+            fields=["name", "email", "age"],
+            limit=3,
+            return_raw=True,
+            executionStats=True,
+        )
+        executionStats = resp["execution_stats"]
+        self.assertEqual(executionStats["total_keys_examined"], 3)
+        self.assertEqual(executionStats["total_docs_examined"], 3)
+        self.assertEqual(executionStats["results_returned"], 3)
+
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ExecutionStatsTests_Text(mango.UserDocsTextTests):
