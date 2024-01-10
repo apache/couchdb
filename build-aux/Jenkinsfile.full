@@ -27,7 +27,7 @@ meta = [
     name: 'CentOS 7',
     spidermonkey_vsn: '1.8.5',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-centos:7-erlang-${ERLANG_VERSION}"
   ],
 
@@ -35,7 +35,7 @@ meta = [
     name: 'CentOS 8',
     spidermonkey_vsn: '60',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
@@ -43,7 +43,7 @@ meta = [
     name: 'Ubuntu 18.04',
     spidermonkey_vsn: '1.8.5',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-ubuntu:bionic-erlang-${ERLANG_VERSION}"
   ],
 
@@ -51,7 +51,7 @@ meta = [
     name: 'Ubuntu 20.04',
     spidermonkey_vsn: '68',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
@@ -59,7 +59,7 @@ meta = [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
@@ -67,7 +67,7 @@ meta = [
     name: 'Debian 10',
     spidermonkey_vsn: '60',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
   ],
 
@@ -87,7 +87,7 @@ meta = [
     name: 'Debian 11 POWER',
     spidermonkey_vsn: '78',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 'ppc64le'
   ],
@@ -114,7 +114,7 @@ meta = [
     name: 'Debian 12',
     spidermonkey_vsn: '78',
     enable_nouveau: true,
-    enable_clouseau: false,
+    enable_clouseau: true,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
@@ -138,7 +138,7 @@ meta = [
     name: 'macOS',
     spidermonkey_vsn: '91',
     enable_nouveau: false,
-    enable_clouseau: false,
+    enable_clouseau: true,
     gnu_make: 'make'
   ]
 ]
