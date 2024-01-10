@@ -369,7 +369,8 @@ def setup_configs(ctx):
         write_config(ctx, node, env)
         write_locald_configs(ctx, node, env)
     generate_haproxy_config(ctx)
-    generate_nouveau_config(ctx)
+    if env["nouveau_enable"] == "true":
+        generate_nouveau_config(ctx)
 
 
 def write_locald_configs(ctx, node, env):
