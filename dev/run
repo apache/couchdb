@@ -369,8 +369,7 @@ def setup_configs(ctx):
         write_config(ctx, node, env)
         write_locald_configs(ctx, node, env)
     generate_haproxy_config(ctx)
-    if env["nouveau_enable"] == "true":
-        generate_nouveau_config(ctx)
+    generate_nouveau_config(ctx)
 
 
 def write_locald_configs(ctx, node, env):
@@ -414,6 +413,8 @@ def generate_haproxy_config(ctx):
 
 
 def generate_nouveau_config(ctx):
+    if not ctx["with_nouveau"]:
+        return
     src = os.path.join(ctx["rootdir"], "rel", "nouveau.yaml")
     tgt = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
 
@@ -532,9 +533,12 @@ def boot_haproxy(ctx):
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
 
+def maybe_boot_nouveau(ctx):
+    if ctx["with_nouveau"]:
+        return boot_nouveau(ctx)
+
+
 def boot_nouveau(ctx):
-    if not ctx["with_nouveau"]:
-        return
     config = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
     cmd = [
         "./gradlew",
@@ -901,7 +905,7 @@ def boot_nodes(ctx):
     haproxy_proc = boot_haproxy(ctx)
     if haproxy_proc is not None:
         ctx["procs"].append(haproxy_proc)
-    nouveau_proc = boot_nouveau(ctx)
+    nouveau_proc = maybe_boot_nouveau(ctx)
     if nouveau_proc is not None:
         ctx["procs"].append(nouveau_proc)
     for idx in [(i + ctx["node_number"]) for i in range(ctx["N"])]:
