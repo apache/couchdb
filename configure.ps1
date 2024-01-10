@@ -140,7 +140,7 @@ $InstallDir="$LibDir\couchdb"
 $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
-$BuildNouveau = $(If ($EnableNouveau) {1} else {0})
+$WithNouveau = ($EnableNouveau).ToString().ToLower()
 $WithClouseau = $(If ($EnableClouseau) {1} else {0})
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 $WithProper = (-not $DisableProper).ToString().ToLower()
@@ -166,6 +166,11 @@ $CouchDBConfig = @"
 {prefix, "."}.
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
+{nouveau_enable, "$WithNouveau"}.
+{nouveau_index_dir, "./data/nouveau"}.
+{nouveau_url, "http://127.0.0.1:5987"}.
+{nouveau_port, 5987}.
+{nouveau_admin_port, 5988}.
 {state_dir, "./data"}.
 {log_file, ""}.
 {fauxton_root, "./share/www"}.
@@ -212,7 +217,7 @@ man_dir = $ManDir
 
 with_fauxton = $BuildFauxton
 with_docs = $BuildDocs
-with_nouveau = $BuildNouveau
+with_nouveau = $WithNouveau
 with_clouseau = $WithClouseau
 
 user = $CouchDBUser

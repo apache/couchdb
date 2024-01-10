@@ -28,7 +28,7 @@ ERLFMT_VERSION="v1.3.0"
 WITH_PROPER="true"
 WITH_FAUXTON=1
 WITH_DOCS=1
-WITH_NOUVEAU=0
+WITH_NOUVEAU="false"
 WITH_CLOUSEAU=0
 ERLANG_MD5="false"
 SKIP_DEPS=0
@@ -105,7 +105,7 @@ parse_opts() {
                 ;;
 
             --enable-nouveau)
-                WITH_NOUVEAU=1
+                WITH_NOUVEAU="true"
                 shift
                 continue
                 ;;
@@ -137,7 +137,7 @@ parse_opts() {
             --dev-with-nouveau)
                 WITH_DOCS=0
                 WITH_FAUXTON=0
-                WITH_NOUVEAU=1
+                WITH_NOUVEAU="true"
                 shift
                 continue
                 ;;
@@ -341,6 +341,11 @@ cat > rel/couchdb.config << EOF
 {prefix, "."}.
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
+{nouveau_enable, "$WITH_NOUVEAU"}.
+{nouveau_index_dir, "./data/nouveau"}.
+{nouveau_url, "http://127.0.0.1:5987"}.
+{nouveau_port, 5987}.
+{nouveau_admin_port, 5988}.
 {state_dir, "./data"}.
 {log_file, "$LOG_FILE"}.
 {fauxton_root, "./share/www"}.

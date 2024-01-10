@@ -362,12 +362,14 @@ def setup_configs(ctx):
             "backend_port": backend_port,
             "prometheus_port": prometheus_port,
             "uuid": "fake_uuid_for_dev",
-            "with_nouveau": str(ctx["with_nouveau"]).lower(),
+            "nouveau_enable": str(ctx["with_nouveau"]).lower(),
+            "nouveau_url": "http://127.0.0.1:5987",
             "_default": "",
         }
         write_config(ctx, node, env)
         write_locald_configs(ctx, node, env)
     generate_haproxy_config(ctx)
+    generate_nouveau_config(ctx)
 
 
 def write_locald_configs(ctx, node, env):
@@ -408,6 +410,26 @@ def generate_haproxy_config(ctx):
     with open(haproxy_config, "w") as handle:
         handle.write("\n".join(out))
         handle.write("\n")
+
+
+def generate_nouveau_config(ctx):
+    src = os.path.join(ctx["rootdir"], "rel", "nouveau.yaml")
+    tgt = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
+
+    config = {
+        "nouveau_index_dir": os.path.join(ctx["devdir"], "lib", "nouveau"),
+        "nouveau_port": 5987,
+        "nouveau_admin_port": 5988,
+    }
+
+    with open(src) as handle:
+        content = handle.read()
+
+    for key in config:
+        content = re.sub("{{%s}}" % key, str(config[key]), content)
+
+    with open(tgt, "w") as handle:
+        handle.write(content)
 
 
 def apply_config_overrides(ctx, content):
@@ -512,11 +534,12 @@ def boot_haproxy(ctx):
 def boot_nouveau(ctx):
     if not ctx["with_nouveau"]:
         return
+    config = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
     cmd = [
         "./gradlew",
         "run",
         "--args",
-        "server src/test/resources/nouveau.yaml",
+        "server {}".format(config),
     ]
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
