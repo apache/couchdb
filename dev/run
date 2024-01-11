@@ -117,6 +117,7 @@ def setup_argparse():
 
 
 def get_args_parser():
+    install_mk = get_install_mk()
     parser = optparse.OptionParser(description="Runs CouchDB dev cluster")
     parser.add_option(
         "-a",
@@ -230,7 +231,7 @@ def get_args_parser():
     parser.add_option(
         "--with-nouveau",
         dest="with_nouveau",
-        default=False,
+        default=install_mk.get("with_nouveau") == "true",
         action="store_true",
         help="Start Nouveau server",
     )
@@ -538,6 +539,7 @@ def maybe_boot_nouveau(ctx):
         return boot_nouveau(ctx)
 
 
+@log("Booting nouveau")
 def boot_nouveau(ctx):
     config = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
     cmd = [
@@ -1202,6 +1204,30 @@ def reboot_nodes(ctx):
     kill_processes(ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)
+
+
+def get_install_mk():
+    fpath = os.path.abspath(__file__)
+    rootdir = os.path.dirname(os.path.dirname(fpath))
+    install_mk_path = os.path.join(rootdir, "install.mk")
+    install_mk = {}
+    with open(install_mk_path) as fh:
+        for line in fh.readlines():
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("#"):
+                continue
+            split = line.split("=", 1)
+            if len(split) != 2:
+                continue
+            [key, val] = split
+            key = key.strip()
+            val = val.strip()
+            if not key or not val:
+                continue
+            install_mk[key] = val
+    return install_mk
 
 
 if __name__ == "__main__":
