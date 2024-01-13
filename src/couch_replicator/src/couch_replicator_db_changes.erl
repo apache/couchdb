@@ -72,7 +72,9 @@ handle_info(_Msg, State) ->
 restart_mdb_changes(#state{mdb_changes = nil} = State) ->
     Suffix = <<"_replicator">>,
     CallbackMod = couch_replicator_doc_processor,
-    Options = [skip_ddocs],
+    Interval = couch_replicator_scheduler:get_interval_msec(),
+    Options = [skip_ddocs, {shards_db_check_msec, Interval div 2}],
+
     {ok, Pid} = couch_multidb_changes:start_link(
         Suffix,
         CallbackMod,
