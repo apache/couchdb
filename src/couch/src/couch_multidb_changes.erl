@@ -47,16 +47,25 @@
     event_server :: reference(),
     scanner :: nil | pid(),
     pids :: #{},
-    skip_ddocs :: boolean()
+    skip_ddocs :: boolean(),
+    shards_db :: binary(),
+    shards_db_check_msec = 0 :: non_neg_integer(),
+    tref :: reference()
+}).
+
+-record(row, {
+    dbname :: binary(),
+    end_seq = 0 :: non_neg_integer(),
+    rescan = false :: boolean(),
+    pid :: pid(),
+    wait_shard_map = false :: boolean()
 }).
 
 % Behavior API
 
-% For each db shard with a matching suffix, report created,
-% deleted, found (discovered) and change events.
-
--callback db_created(DbName :: binary(), Context :: term()) ->
-    Context :: term().
+% For each db shard with a matching suffix, report deleted, found (discovered)
+% and change events. For sharded database, report found and change events only
+% if the shard is also in the shard map as belonging to the current node.
 
 -callback db_deleted(DbName :: binary(), Context :: term()) ->
     Context :: term().
@@ -71,6 +80,8 @@
 
 % Opts list can contain:
 %  - `skip_ddocs` : Skip design docs
+%  - `shards_db_check_msec` : Milliseconds to wait before checking the shard map.
+%
 
 -spec start_link(binary(), module(), term(), list()) ->
     {ok, pid()} | ignore | {error, term()}.
@@ -85,31 +96,41 @@ init([DbSuffix, Module, Context, Opts]) ->
     process_flag(trap_exit, true),
     Server = self(),
     {ok, #state{
-        tid = ets:new(?MODULE, [set, public]),
+        tid = ets:new(?MODULE, [set, public, {keypos, #row.dbname}]),
         mod = Module,
         ctx = Context,
         suffix = DbSuffix,
         event_server = register_with_event_server(Server),
         scanner = spawn_link(fun() -> scan_all_dbs(Server, DbSuffix) end),
         pids = #{},
-        skip_ddocs = proplists:is_defined(skip_ddocs, Opts)
+        skip_ddocs = proplists:is_defined(skip_ddocs, Opts),
+        shards_db = mem3_sync:shards_db(),
+        shards_db_check_msec = proplists:get_value(shards_db_check_msec, Opts, 0),
+        tref = undefined
     }}.
 
 terminate(_Reason, _State) ->
     ok.
 
-handle_call({change, DbName, Change}, _From, #state{} = State) ->
-    #state{skip_ddocs = SkipDDocs, mod = Mod, ctx = Ctx} = State,
+handle_call({change, DbName, Change}, {Pid, _Tag} = _From, #state{} = State) ->
+    #state{skip_ddocs = SkipDDocs, mod = Mod, ctx = Ctx, tid = Ets} = State,
     case {SkipDDocs, is_design_doc(Change)} of
         {true, true} ->
             {reply, ok, State};
         {_, _} ->
-            {reply, ok, State#state{ctx = Mod:db_change(DbName, Change, Ctx)}}
+            case ets:lookup(Ets, DbName) of
+                [#row{pid = Pid, wait_shard_map = false}] ->
+                    {reply, ok, State#state{ctx = Mod:db_change(DbName, Change, Ctx)}};
+                _ ->
+                    % Ignore stale change feed updates or when the shard file
+                    % is not a in a shard map yet.
+                    {reply, ok, State}
+            end
     end;
 handle_call({checkpoint, DbName, EndSeq}, {Pid, _Tag} = _From, #state{tid = Ets} = State) ->
     case ets:lookup(Ets, DbName) of
-        [{DbName, _OldSeq, Rescan, Pid}] ->
-            true = ets:insert(Ets, {DbName, EndSeq, Rescan, Pid});
+        [#row{pid = Pid} = Row] ->
+            true = ets:insert(Ets, Row#row{end_seq = EndSeq});
         _ ->
             % Ignore stale checkpoints or checkpoints from unknown change feeds
             ok
@@ -119,6 +140,12 @@ handle_call({checkpoint, DbName, EndSeq}, {Pid, _Tag} = _From, #state{tid = Ets}
 handle_cast({resume_scan, DbName}, State) ->
     {noreply, resume_scan(DbName, State)}.
 
+handle_info({'$couch_event', Dbs, updated}, #state{shards_db = Dbs, tref = undefined} = State) ->
+    TRef = erlang:send_after(State#state.shards_db_check_msec, self(), check_shards_db),
+    {noreply, State#state{tref = TRef}};
+handle_info({'$couch_event', Dbs, updated}, #state{shards_db = Dbs} = State) ->
+    % Shard map check already scheduled
+    {noreply, State};
 handle_info({'$couch_event', DbName, Event}, #state{suffix = Suf} = State) ->
     case Suf =:= couch_db:dbname_suffix(DbName) of
         true ->
@@ -132,7 +159,7 @@ handle_info({'EXIT', From, normal}, #state{scanner = From} = State) ->
     {noreply, State#state{scanner = nil}};
 handle_info({'EXIT', From, Reason}, #state{scanner = From} = State) ->
     {stop, {scanner_died, Reason}, State};
-handle_info({'EXIT', From, Reason}, #state{pids = #{} = Pids} = State) ->
+handle_info({'EXIT', From, Reason}, #state{pids = #{} = Pids, tid = Ets} = State) ->
     couch_log:debug("~p change feed exited ~p", [State#state.suffix, From]),
     case maps:take(From, Pids) of
         {DbName, NewPids} ->
@@ -144,14 +171,13 @@ handle_info({'EXIT', From, Reason}, #state{pids = #{} = Pids} = State) ->
                     couch_log:error(Fmt, [?MODULE, From, Reason])
             end,
             NewState = State#state{pids = NewPids},
-            case ets:lookup(State#state.tid, DbName) of
-                [{DbName, _EndSeq, true, From}] ->
+            case ets:lookup(Ets, DbName) of
+                [#row{rescan = true, pid = From}] ->
                     % Match the From pid explicitly and then clear it
-                    % The pid is at 4th position in the ets object
-                    ets:update_element(NewState#state.tid, DbName, {4, undefined}),
+                    ets:update_element(Ets, DbName, {#row.pid, undefined}),
                     {noreply, resume_scan(DbName, NewState)};
-                [{DbName, _EndSeq, false, From}] ->
-                    ets:update_element(NewState#state.tid, DbName, {4, undefined}),
+                [#row{rescan = false, pid = From}] ->
+                    ets:update_element(Ets, DbName, {#row.pid, undefined}),
                     {noreply, NewState};
                 _ ->
                     {noreply, NewState}
@@ -161,10 +187,57 @@ handle_info({'EXIT', From, Reason}, #state{pids = #{} = Pids} = State) ->
             couch_log:error(Fmt, [?MODULE, State#state.suffix, From, Reason]),
             {stop, {unexpected_exit, From, Reason}, State}
     end;
+handle_info(check_shards_db, #state{tid = Tid} = State0) ->
+    {CheckAdded, CheckRemoved} = ets:foldl(fun shards_db_fold/2, {#{}, #{}}, Tid),
+    % Added and removed maps look like #{ClusteredDb => set([ShardName1, ShardName2, ...])}
+    State1 = maps:fold(fun removed_fold/3, State0, CheckRemoved),
+    State2 = maps:fold(fun added_fold/3, State1, CheckAdded),
+    {noreply, State2#state{tref = undefined}};
 handle_info(_Msg, State) ->
     {noreply, State}.
 
 % Private functions
+
+shards_db_fold(#row{dbname = <<"shards/", _/binary>> = DbName} = Row, {Add, Remove}) ->
+    Fun = fun(Dbs) -> sets:add_element(DbName, Dbs) end,
+    Init = sets:from_list([DbName], [{version, 2}]),
+    case Row#row.wait_shard_map of
+        true ->
+            {maps:update_with(mem3:dbname(DbName), Fun, Init, Add), Remove};
+        false ->
+            {Add, maps:update_with(mem3:dbname(DbName), Fun, Init, Remove)}
+    end;
+shards_db_fold(#row{}, {_, _} = Acc) ->
+    % This is for local, non-sharded dbs
+    Acc.
+
+removed_fold(DbName, EtsShards, #state{tid = Ets} = State) ->
+    FoldFun = fun(Shard, #state{mod = Mod, ctx = Ctx} = StateAcc) ->
+        ets:delete(Ets, Shard),
+        StateAcc#state{ctx = Mod:db_deleted(Shard, Ctx)}
+    end,
+    % EtsShards are the shards we track, and local_shards(DbName) produces the
+    % current shard map configuration. Subtracting local shards from our
+    % tracked shards, we get the set of removed shards (they are no longer in
+    % the local list).
+    sets:fold(FoldFun, State, sets:subtract(EtsShards, local_shards(DbName))).
+
+added_fold(DbName, EtsShards, #state{tid = Ets} = State) ->
+    FoldFun = fun(Shard, #state{mod = Mod, ctx = Ctx} = StateAcc) ->
+        [#row{wait_shard_map = true} = Row] = ets:lookup(Ets, Shard),
+        ets:insert(Ets, Row#row{rescan = true, end_seq = 0, wait_shard_map = false}),
+        resume_scan(Shard, StateAcc#state{ctx = Mod:db_found(Shard, Ctx)})
+    end,
+    % EtsShards are the shards we wait for to appear in the shard map. Local
+    % shards are the current ones in the shard map. Their intersection is the
+    % set of shards which were added to the shard map since the last time we
+    % checked.
+    sets:fold(FoldFun, State, sets:intersection(EtsShards, local_shards(DbName))).
+
+should_wait_for_shard_map(<<"shards/", _/binary>> = DbName) ->
+    not sets:is_element(DbName, local_shards(DbName));
+should_wait_for_shard_map(<<_/binary>>) ->
+    false.
 
 -spec register_with_event_server(pid()) -> reference().
 register_with_event_server(Server) ->
@@ -173,10 +246,11 @@ register_with_event_server(Server) ->
     Ref.
 
 -spec db_callback(created | deleted | updated, binary(), #state{}) -> #state{}.
-db_callback(created, DbName, #state{mod = Mod, ctx = Ctx} = State) ->
-    NewState = State#state{ctx = Mod:db_created(DbName, Ctx)},
-    resume_scan(DbName, NewState);
-db_callback(deleted, DbName, #state{mod = Mod, ctx = Ctx} = State) ->
+db_callback(created, DbName, #state{tid = Ets} = State) ->
+    ets:delete(Ets, DbName),
+    resume_scan(DbName, State);
+db_callback(deleted, DbName, #state{tid = Ets, mod = Mod, ctx = Ctx} = State) ->
+    ets:delete(Ets, DbName),
     State#state{ctx = Mod:db_deleted(DbName, Ctx)};
 db_callback(updated, DbName, State) ->
     resume_scan(DbName, State);
@@ -186,26 +260,42 @@ db_callback(_Other, _DbName, State) ->
 -spec resume_scan(binary(), #state{}) -> #state{}.
 resume_scan(DbName, #state{pids = #{} = Pids, tid = Ets} = State) ->
     case ets:lookup(Ets, DbName) of
-        [{DbName, EndSeq, _, undefined}] ->
+        [#row{wait_shard_map = true}] ->
+            % Don't scan when waiting for the shard to appear in shard map.
+            % When it appears there, that's when we call db_found callback and
+            % scan from 0
+            State;
+        [#row{end_seq = EndSeq, pid = undefined} = Row] ->
             % No existing change feed running. Found existing checkpoint.
             % Start a new change reader from last checkpoint.
             Pid = start_changes_reader(DbName, EndSeq),
-            true = ets:insert(Ets, {DbName, EndSeq, false, Pid}),
+            true = ets:insert(Ets, Row#row{rescan = false, pid = Pid}),
             State#state{pids = Pids#{Pid => DbName}};
-        [{DbName, EndSeq, _, Pid}] ->
+        [#row{pid = Pid} = Row] when is_pid(Pid) ->
             % Found existing change feed and entry in ETS
             % Flag a need to rescan from last ETS checkpoint
-            true = ets:insert(Ets, {DbName, EndSeq, true, Pid}),
+            true = ets:insert(Ets, Row#row{rescan = true}),
             State;
         [] ->
-            % No entry in ETS. This is first time seeing this db shard. Notify
-            % user with a found callback. Insert checkpoint entry in ETS to
-            % start from 0. And start a change feed.
-            Pid = start_changes_reader(DbName, 0),
-            true = ets:insert(Ets, {DbName, 0, false, Pid}),
-            Mod = State#state.mod,
-            Ctx = Mod:db_found(DbName, State#state.ctx),
-            State#state{ctx = Ctx, pids = Pids#{Pid => DbName}}
+            % No entry in ETS. This is first time seeing this db shard.
+            case should_wait_for_shard_map(DbName) of
+                false ->
+                    % This is a local db or a shard file which is in the shard
+                    % map. Notify user with a db_found callback. Insert checkpoint
+                    % entry in ETS to start from 0, and start a change feed.
+                    Pid = start_changes_reader(DbName, 0),
+                    true = ets:insert(Ets, #row{dbname = DbName, pid = Pid}),
+                    Mod = State#state.mod,
+                    Ctx = Mod:db_found(DbName, State#state.ctx),
+                    State#state{ctx = Ctx, pids = Pids#{Pid => DbName}};
+                true ->
+                    % This is a shard file which is not in the shard map. This may
+                    % happen during user managed shard moves. Avoid issuing any
+                    % callbacks until the shard appears in the shard map. Only then,
+                    % call the found callback and rescan from 0
+                    true = ets:insert(Ets, #row{dbname = DbName, wait_shard_map = true}),
+                    State
+            end
     end.
 
 start_changes_reader(DbName, Since) ->
@@ -233,7 +323,7 @@ changes_reader_cb(_, _, Acc) ->
 
 scan_all_dbs(Server, DbSuffix) when is_pid(Server) ->
     ok = scan_local_db(Server, DbSuffix),
-    {ok, Db} = mem3_util:ensure_exists(shards_db()),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     ChangesFun = couch_changes:handle_db_changes(#changes_args{}, nil, Db),
     ChangesFun({fun scan_changes_cb/3, {Server, DbSuffix, 1}}),
     couch_db:close(Db).
@@ -252,7 +342,7 @@ scan_changes_cb({change, {Change}, _}, _, {_Server, DbSuffix, _Count} = Acc) ->
                     Acc;
                 {true, false} ->
                     Shards = local_shards(DbName),
-                    lists:foldl(fun notify_fold/2, Acc, Shards)
+                    sets:fold(fun notify_fold/2, Acc, Shards)
             end
     end;
 scan_changes_cb(_, _, Acc) ->
@@ -261,15 +351,13 @@ scan_changes_cb(_, _, Acc) ->
 is_deleted(Change) ->
     couch_util:get_value(<<"deleted">>, Change, false).
 
-shards_db() ->
-    config:get("mem3", "shards_db", "_dbs").
-
-local_shards(DbName) ->
+local_shards(Db0) ->
+    Db = mem3:dbname(Db0),
     try
-        [ShardName || #shard{name = ShardName} <- mem3:local_shards(DbName)]
+        sets:from_list([S || #shard{name = S} <- mem3:local_shards(Db)], [{version, 2}])
     catch
         error:database_does_not_exist ->
-            []
+            sets:new([{version, 2}])
     end.
 
 notify_fold(DbName, {Server, DbSuffix, Count}) ->
@@ -324,14 +412,19 @@ couch_multidb_changes_test_() ->
             fun setup/0,
             fun teardown/1,
             [
-                ?TDEF_FE(t_handle_call_change),
+                ?TDEF_FE(t_handle_call_change_in_shard_map),
+                ?TDEF_FE(t_handle_call_change_not_in_shard_map),
+                ?TDEF_FE(t_handle_call_change_stale_entry),
                 ?TDEF_FE(t_handle_call_change_filter_design_docs),
                 ?TDEF_FE(t_handle_call_checkpoint_new),
                 ?TDEF_FE(t_handle_call_checkpoint_existing),
                 ?TDEF_FE(t_handle_call_checkpoint_stale_changes_pid),
-                ?TDEF_FE(t_handle_info_created),
+                ?TDEF_FE(t_handle_info_created_in_shard_map),
+                ?TDEF_FE(t_handle_info_created_not_in_shard_map),
                 ?TDEF_FE(t_handle_info_deleted),
-                ?TDEF_FE(t_handle_info_updated),
+                ?TDEF_FE(t_handle_info_deleted_mismatched_suffix),
+                ?TDEF_FE(t_handle_info_updated_new_shard),
+                ?TDEF_FE(t_handle_info_updated_shard_not_in_map),
                 ?TDEF_FE(t_handle_info_other_event),
                 ?TDEF_FE(t_handle_info_created_other_db),
                 ?TDEF_FE(t_handle_info_scanner_exit_normal),
@@ -348,6 +441,13 @@ couch_multidb_changes_test_() ->
                 ?TDEF_FE(t_handle_call_resume_scan_chfeed_no_ets_entry),
                 ?TDEF_FE(t_handle_call_resume_scan_chfeed_ets_entry),
                 ?TDEF_FE(t_handle_call_resume_scan_no_chfeed_ets_entry),
+                ?TDEF_FE(t_created_shard_not_in_shard_map),
+                ?TDEF_FE(t_created_node_local_shard),
+                ?TDEF_FE(t_created_then_shard_appears_in_shard_map),
+                ?TDEF_FE(t_resume_scan_while_waiting_for_shard_map),
+                ?TDEF_FE(t_created_then_shard_disappears_from_shard_map),
+                ?TDEF_FE(t_check_shards_db_holdoff_time_works),
+                ?TDEF_FE(t_check_shards_db_fold),
                 ?TDEF_FE(t_start_link),
                 ?TDEF_FE(t_start_link_no_ddocs),
                 ?TDEF_FE(t_misc_gen_server_callbacks)
@@ -358,6 +458,7 @@ couch_multidb_changes_test_() ->
 setup_all() ->
     mock_logs(),
     mock_callback_mod(),
+    meck:new(mem3, [passthrough]),
     meck:expect(couch_event, register_all, 1, ok),
     test_util:start_applications([config]),
     meck:expect(mem3_util, ensure_exists, 1, {ok, dbs}),
@@ -395,21 +496,48 @@ setup() ->
         couch_changes,
         couch_db,
         couch_event,
-        couch_log
+        couch_log,
+        mem3
     ]).
 
 teardown(_) ->
     ok.
 
-t_handle_call_change(_) ->
-    State = mock_state(),
+t_handle_call_change_in_shard_map(_) ->
+    Tid = mock_ets(),
+    State = mock_state(Tid, self()),
     Change = change_row(<<"blah">>),
     handle_call_ok({change, ?DBNAME, Change}, State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, wait_shard_map = false}, Row),
     ?assert(meck:validate(?MOD)),
     ?assert(meck:called(?MOD, db_change, [?DBNAME, Change, zig])).
 
+t_handle_call_change_not_in_shard_map(_) ->
+    Tid = mock_ets(),
+    State = mock_state(Tid, self()),
+    Change = change_row(<<"blah">>),
+    ets:insert(Tid, #row{dbname = ?DBNAME, pid = self(), wait_shard_map = true}),
+    handle_call_ok({change, ?DBNAME, Change}, State),
+    ?assert(meck:validate(?MOD)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, wait_shard_map = true}, Row),
+    ?assertNot(meck:called(?MOD, db_change, [?DBNAME, Change, zig])).
+
+t_handle_call_change_stale_entry(_) ->
+    Tid = mock_ets(),
+    State = mock_state(Tid, self()),
+    Change = change_row(<<"blah">>),
+    ets:update_element(Tid, ?DBNAME, {#row.pid, otherpid}),
+    handle_call_ok({change, ?DBNAME, Change}, State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, wait_shard_map = false}, Row),
+    ?assert(meck:validate(?MOD)),
+    ?assertNot(meck:called(?MOD, db_change, [?DBNAME, Change, zig])).
+
 t_handle_call_change_filter_design_docs(_) ->
-    State0 = mock_state(),
+    Tid = mock_ets(),
+    State0 = mock_state(Tid, self()),
     State = State0#state{skip_ddocs = true},
     Change = change_row(<<"_design/blah">>),
     handle_call_ok({change, ?DBNAME, Change}, State),
@@ -418,49 +546,103 @@ t_handle_call_change_filter_design_docs(_) ->
 
 t_handle_call_checkpoint_new(_) ->
     Tid = mock_ets(),
-    State = mock_state(Tid, cpid),
-    handle_call_ok({checkpoint, ?DBNAME, 1}, cpid, State),
-    ?assertEqual([{?DBNAME, 1, false, cpid}], ets:tab2list(Tid)),
+    State = mock_state(Tid, self()),
+    handle_call_ok({checkpoint, ?DBNAME, 1}, self(), State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 1, rescan = false}, Row),
+    ?assertEqual(self(), Row#row.pid),
     ets:delete(Tid).
 
 t_handle_call_checkpoint_existing(_) ->
     Tid = mock_ets(),
-    State = mock_state(Tid, cpid),
-    handle_call_ok({checkpoint, ?DBNAME, 2}, cpid, State),
-    ?assertEqual([{?DBNAME, 2, false, cpid}], ets:tab2list(Tid)),
+    State = mock_state(Tid, self()),
+    handle_call_ok({checkpoint, ?DBNAME, 2}, self(), State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 2, rescan = false}, Row),
+    ?assertEqual(self(), Row#row.pid),
     ets:delete(Tid).
 
 t_handle_call_checkpoint_stale_changes_pid(_) ->
     Tid = mock_ets(),
-    State = mock_state(Tid, cpid),
+    State = mock_state(Tid, self()),
     handle_call_ok({checkpoint, ?DBNAME, 42}, other, State),
-    ?assertEqual([{?DBNAME, 0, false, cpid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, rescan = false}, Row),
+    ?assertEqual(self(), Row#row.pid),
     ets:delete(Tid).
 
-t_handle_info_created(_) ->
+t_handle_info_created_in_shard_map(_) ->
     Tid = mock_ets(),
-    State = mock_state(Tid),
+    State = mock_state(Tid, self()),
+    mock_local_shard(),
     handle_info_check({'$couch_event', ?DBNAME, created}, State),
-    ?assert(meck:validate(?MOD)),
-    ?assert(meck:called(?MOD, db_created, [?DBNAME, zig])).
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, rescan = false}, Row),
+    ?assertNotEqual(self(), Row#row.pid).
+
+t_handle_info_created_not_in_shard_map(_) ->
+    Tid = mock_ets(),
+    State = mock_state(Tid, self()),
+    mock_non_local_shard(),
+    handle_info_check({'$couch_event', ?DBNAME, created}, State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(
+        #row{
+            dbname = ?DBNAME,
+            end_seq = 0,
+            rescan = false,
+            pid = undefined,
+            wait_shard_map = true
+        },
+        Row
+    ).
 
 t_handle_info_deleted(_) ->
-    State = mock_state(),
+    Tid = mock_ets(),
+    State = mock_state(Tid, self()),
     handle_info_check({'$couch_event', ?DBNAME, deleted}, State),
     ?assert(meck:validate(?MOD)),
+    ?assertEqual([], ets:lookup(Tid, ?DBNAME)),
     ?assert(meck:called(?MOD, db_deleted, [?DBNAME, zig])).
 
-t_handle_info_updated(_) ->
+t_handle_info_deleted_mismatched_suffix(_) ->
+    Tid = mock_ets(),
+    State = mock_state(Tid, self()),
+    handle_info_check({'$couch_event', <<"otherdb">>, deleted}, State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, rescan = false}, Row),
+    ?assertEqual(self(), Row#row.pid),
+    ?assertNot(meck:called(?MOD, db_deleted, [<<"otherdb">>, zig])).
+
+t_handle_info_updated_new_shard(_) ->
     Tid = mock_ets(),
     State = mock_state(Tid),
+    mock_local_shard(),
     handle_info_check({'$couch_event', ?DBNAME, updated}, State),
     ?assert(meck:validate(?MOD)),
     ?assert(meck:called(?MOD, db_found, [?DBNAME, zig])).
 
+t_handle_info_updated_shard_not_in_map(_) ->
+    Tid = mock_ets(),
+    State = mock_state(Tid),
+    mock_non_local_shard(),
+    handle_info_check({'$couch_event', ?DBNAME, updated}, State),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(
+        #row{
+            dbname = ?DBNAME,
+            end_seq = 0,
+            rescan = false,
+            pid = undefined,
+            wait_shard_map = true
+        },
+        Row
+    ),
+    ?assertNot(meck:called(?MOD, db_found, [?DBNAME, zig])).
+
 t_handle_info_other_event(_) ->
     State = mock_state(),
     handle_info_check({'$couch_event', ?DBNAME, somethingelse}, State),
-    ?assertNot(meck:called(?MOD, db_created, [?DBNAME, somethingelse])),
     ?assertNot(meck:called(?MOD, db_deleted, [?DBNAME, somethingelse])),
     ?assertNot(meck:called(?MOD, db_found, [?DBNAME, somethingelse])).
 
@@ -510,7 +692,7 @@ t_handle_info_change_feed_exited(_) ->
 t_handle_info_change_feed_exited_and_need_rescan(_) ->
     Tid = mock_ets(),
     State = mock_state(Tid, cpid),
-    true = ets:insert(Tid, {?DBNAME, 1, true, cpid}),
+    ets:update_element(Tid, ?DBNAME, {#row.rescan, true}),
     Res = handle_info({'EXIT', cpid, normal}, State),
     ?assertMatch({noreply, _}, Res),
     {noreply, RState} = Res,
@@ -518,7 +700,9 @@ t_handle_info_change_feed_exited_and_need_rescan(_) ->
     [{Pid, ?DBNAME}] = maps:to_list(RState#state.pids),
     ?assert(is_pid(Pid)),
     % rescan flag should have been reset to false
-    ?assertEqual([{?DBNAME, 1, false, Pid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{rescan = false}, Row),
+    ?assertEqual(Pid, Row#row.pid),
     ChArgs = kill_mock_changes_reader_and_get_its_args(Pid),
     ?assertEqual({self(), ?DBNAME}, ChArgs),
     ets:delete(Tid).
@@ -546,8 +730,10 @@ t_spawn_changes_reader(_) ->
 
 t_changes_reader_cb_change(_) ->
     {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, []),
+    #state{tid = Tid} = sys:get_state(Pid),
     Change = change_row(<<"blah">>),
     ChArg = {change, Change, ignore},
+    ets:insert(Tid, #row{dbname = ?DBNAME, pid = self()}),
     {Pid, ?DBNAME} = changes_reader_cb(ChArg, chtype, {Pid, ?DBNAME}),
     ?assert(meck:called(?MOD, db_change, [?DBNAME, Change, zig])),
     unlink(Pid),
@@ -557,16 +743,19 @@ t_changes_reader_cb_stop(_) ->
     {ok, ServerPid} = start_link(?SUFFIX, ?MOD, zig, []),
     #state{tid = Tid} = sys:get_state(ServerPid),
     ChPid = self(),
-    ets:insert(Tid, {?DBNAME, 1, false, ChPid}),
     sys:replace_state(ServerPid, fun(#state{} = OldSt) ->
         OldSt#state{pids = #{ChPid => ?DBNAME}}
     end),
+    ets:insert(Tid, #row{dbname = ?DBNAME, end_seq = 1, pid = ChPid}),
     ChArg = {stop, 11},
     {ServerPid, ?DBNAME} = changes_reader_cb(ChArg, chtype, {ServerPid, ?DBNAME}),
     % We checkpoint on stop, check if checkpointed at correct sequence
     #state{tid = Tid, pids = Pids} = sys:get_state(ServerPid),
     ?assertMatch(#{ChPid := ?DBNAME}, Pids),
-    ?assertEqual([{?DBNAME, 11, false, ChPid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 11, rescan = false}, Row),
+    % Until the change feed exits it's pid will still be in the ets table
+    ?assertEqual(ChPid, Row#row.pid),
     unlink(ServerPid),
     exit(ServerPid, kill).
 
@@ -576,13 +765,16 @@ t_changes_reader_cb_other(_) ->
 t_handle_call_resume_scan_no_chfeed_no_ets_entry(_) ->
     Tid = mock_ets(),
     State = mock_state(Tid),
-    RState = resume_scan(?DBNAME, State),
+    mock_local_shard(),
+    {noreply, RState} = handle_cast({resume_scan, ?DBNAME}, State),
     % Check if called db_found callback
     ?assert(meck:called(?MOD, db_found, [?DBNAME, zig])),
     % Check if started a change reader
     [{Pid, ?DBNAME}] = maps:to_list(RState#state.pids),
     % Check if inserted checkpoint entry in ets starting at 0
-    ?assertEqual([{?DBNAME, 0, false, Pid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, rescan = false}, Row),
+    ?assertEqual(Pid, Row#row.pid),
     ChArgs = kill_mock_changes_reader_and_get_its_args(Pid),
     ?assertEqual({self(), ?DBNAME}, ChArgs),
     ?assert(
@@ -605,7 +797,9 @@ t_handle_call_resume_scan_chfeed_no_ets_entry(_) ->
     State = mock_state(Tid, Pid),
     resume_scan(?DBNAME, State),
     % Check ets checkpoint is set to 0 and rescan = true
-    ?assertEqual([{?DBNAME, 0, true, Pid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 0, rescan = true}, Row),
+    ?assertEqual(Pid, Row#row.pid),
     ets:delete(Tid),
     kill_mock_changes_reader_and_get_its_args(Pid).
 
@@ -613,22 +807,26 @@ t_handle_call_resume_scan_chfeed_ets_entry(_) ->
     Tid = mock_ets(),
     Pid = start_changes_reader(?DBNAME, 1),
     State = mock_state(Tid, Pid),
-    true = ets:insert(Tid, [{?DBNAME, 2, false, Pid}]),
+    ets:insert(Tid, #row{dbname = ?DBNAME, end_seq = 2, pid = Pid}),
     resume_scan(?DBNAME, State),
     % Check ets checkpoint is set to same endseq but rescan = true
-    ?assertEqual([{?DBNAME, 2, true, Pid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 2, rescan = true}, Row),
+    ?assertEqual(Pid, Row#row.pid),
     ets:delete(Tid),
     kill_mock_changes_reader_and_get_its_args(Pid).
 
 t_handle_call_resume_scan_no_chfeed_ets_entry(_) ->
     Tid = mock_ets(),
-    true = ets:insert(Tid, [{?DBNAME, 1, true, undefined}]),
     State = mock_state(Tid),
+    ets:insert(Tid, #row{dbname = ?DBNAME, end_seq = 1, rescan = true}),
     RState = resume_scan(?DBNAME, State),
     % Check if started a change reader
     [{Pid, ?DBNAME}] = maps:to_list(RState#state.pids),
     % Check if reset rescan to false but kept same endseq
-    ?assertEqual([{?DBNAME, 1, false, Pid}], ets:tab2list(Tid)),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, end_seq = 1, rescan = false}, Row),
+    ?assertEqual(Pid, Row#row.pid),
     ChArgs = kill_mock_changes_reader_and_get_its_args(Pid),
     ?assertEqual({self(), ?DBNAME}, ChArgs),
     ?assert(
@@ -644,6 +842,157 @@ t_handle_call_resume_scan_no_chfeed_ets_entry(_) ->
         ])
     ),
     ets:delete(Tid).
+
+t_created_shard_not_in_shard_map(_) ->
+    {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, []),
+    #state{tid = Tid} = sys:get_state(Pid),
+    mock_non_local_shard(),
+    Pid ! {'$couch_event', ?DBNAME, created},
+    wait_ets(Tid, ?DBNAME, #row.wait_shard_map, true),
+    [Row] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, pid = undefined, wait_shard_map = true}, Row),
+    unlink(Pid),
+    exit(Pid, kill).
+
+t_created_node_local_shard(_) ->
+    {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, []),
+    #state{tid = Tid} = sys:get_state(Pid),
+    mock_non_local_shard(),
+    % Use the ?SUFFIX as the node local db example
+    % This is like _replicator being a suffix for foo/_replicator
+    Pid ! {'$couch_event', ?DBNAME, created},
+    Pid ! {'$couch_event', ?SUFFIX, created},
+    wait_ets(Tid, ?DBNAME, #row.wait_shard_map, true),
+    wait_ets(Tid, ?SUFFIX, #row.wait_shard_map, false),
+    [RowShard] = ets:lookup(Tid, ?DBNAME),
+    ?assertMatch(#row{dbname = ?DBNAME, pid = undefined, wait_shard_map = true}, RowShard),
+    [RowNodeLocal] = ets:lookup(Tid, ?SUFFIX),
+    ?assertMatch(#row{dbname = ?SUFFIX, wait_shard_map = false}, RowNodeLocal),
+    unlink(Pid),
+    exit(Pid, kill).
+
+t_created_then_shard_appears_in_shard_map(_) ->
+    {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, [{shards_db_check_msec, 100}]),
+    #state{tid = Tid} = sys:get_state(Pid),
+    mock_non_local_shard(),
+    Pid ! {'$couch_event', ?DBNAME, created},
+    wait_ets(Tid, ?DBNAME, #row.wait_shard_map, true),
+    [Row1] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, pid = undefined, wait_shard_map = true}, Row1),
+    mock_local_shard(),
+    % When shard map updates, it should trigger a db shard map check
+    Pid ! {'$couch_event', mem3_sync:shards_db(), updated},
+    wait_ets(Tid, ?DBNAME, #row.wait_shard_map, false),
+    [Row2] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, wait_shard_map = false}, Row2),
+    unlink(Pid),
+    exit(Pid, kill).
+
+t_resume_scan_while_waiting_for_shard_map(_) ->
+    {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, [{shards_db_check_msec, 100}]),
+    #state{tid = Tid} = sys:get_state(Pid),
+    mock_non_local_shard(),
+    Pid ! {'$couch_event', ?DBNAME, created},
+    wait_ets(Tid, ?DBNAME, #row.wait_shard_map, true),
+    lists:foreach(
+        fun(_) ->
+            Pid ! {'$couch_event', ?DBNAME, updated},
+            timer:sleep(10)
+        end,
+        lists:seq(1, 10)
+    ),
+    % After sending a few update to the shard, it should still be waiting for the
+    % shard map to update and no changes pid should be spawned
+    [Row1] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, pid = undefined, wait_shard_map = true}, Row1),
+    unlink(Pid),
+    exit(Pid, kill).
+
+t_created_then_shard_disappears_from_shard_map(_) ->
+    {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, [{shards_db_check_msec, 100}]),
+    #state{tid = Tid} = sys:get_state(Pid),
+    mock_local_shard(),
+    Pid ! {'$couch_event', ?DBNAME, created},
+    wait_ets(Tid, ?DBNAME, #row.wait_shard_map, false),
+    [Row1] = ets:tab2list(Tid),
+    ?assertMatch(#row{dbname = ?DBNAME, wait_shard_map = false}, Row1),
+    ?assert(is_pid(Row1#row.pid)),
+    mock_non_local_shard(),
+    % When shard map updates, it should trigger a db shard map check
+    Pid ! {'$couch_event', mem3_sync:shards_db(), updated},
+    wait_ets_deleted(Tid, ?DBNAME),
+    unlink(Pid),
+    exit(Pid, kill).
+
+t_check_shards_db_holdoff_time_works(_) ->
+    {ok, Pid} = start_link(?SUFFIX, ?MOD, zig, [{shards_db_check_msec, 10000}]),
+    mock_non_local_shard(),
+    meck:reset(mem3),
+    Dbs = mem3_sync:shards_db(),
+    lists:foreach(
+        fun(_) ->
+            Pid ! {'$couch_event', Dbs, updated},
+            timer:sleep(10)
+        end,
+        lists:seq(1, 5)
+    ),
+    ?assertEqual(0, meck:num_calls(mem3, local_shards, 1)),
+    #state{tref = TRef} = sys:get_state(Pid),
+    ?assert(is_reference(TRef)),
+    ?assert(erlang:read_timer(TRef) > 5000),
+    unlink(Pid),
+    exit(Pid, kill).
+
+t_check_shards_db_fold(_) ->
+    Tid = mock_ets(),
+    ets:insert(Tid, [
+        #row{dbname = <<"nodelocal">>, wait_shard_map = false},
+        #row{dbname = <<"shards/00000000-1fffffff/a.0123456789">>, wait_shard_map = true},
+        #row{dbname = <<"shards/20000000-3fffffff/a.0123456789">>, wait_shard_map = true},
+        #row{dbname = <<"shards/40000000-5fffffff/a.0123456789">>, wait_shard_map = false},
+        #row{dbname = <<"shards/60000000-7fffffff/a.0123456789">>, wait_shard_map = false},
+        #row{dbname = <<"shards/80000000-9fffffff/a.0123456789">>, wait_shard_map = true},
+        #row{dbname = <<"shards/00000000-1fffffff/x.0123456789">>, wait_shard_map = true},
+        #row{dbname = <<"shards/20000000-3fffffff/x.0123456789">>, wait_shard_map = false},
+        #row{dbname = <<"shards/40000000-5fffffff/x.0123456789">>, wait_shard_map = false},
+        #row{dbname = <<"shards/60000000-7fffffff/x.0123456789">>, wait_shard_map = true},
+        #row{dbname = <<"shards/80000000-9fffffff/x.0123456789">>, wait_shard_map = true}
+    ]),
+    {CheckAdded, CheckRemoved} = ets:foldl(fun shards_db_fold/2, {#{}, #{}}, Tid),
+    ?assertMatch(#{<<"a">> := _, <<"x">> := _}, CheckAdded),
+    ?assertMatch(#{<<"a">> := _, <<"x">> := _}, CheckRemoved),
+    #{<<"a">> := AddedA, <<"x">> := AddedX} = CheckAdded,
+    #{<<"a">> := RemovedA, <<"x">> := RemovedX} = CheckRemoved,
+    ?assertEqual(
+        [
+            <<"shards/00000000-1fffffff/a.0123456789">>,
+            <<"shards/20000000-3fffffff/a.0123456789">>,
+            <<"shards/80000000-9fffffff/a.0123456789">>
+        ],
+        lists:sort(sets:to_list(AddedA))
+    ),
+    ?assertEqual(
+        [
+            <<"shards/00000000-1fffffff/x.0123456789">>,
+            <<"shards/60000000-7fffffff/x.0123456789">>,
+            <<"shards/80000000-9fffffff/x.0123456789">>
+        ],
+        lists:sort(sets:to_list(AddedX))
+    ),
+    ?assertEqual(
+        [
+            <<"shards/40000000-5fffffff/a.0123456789">>,
+            <<"shards/60000000-7fffffff/a.0123456789">>
+        ],
+        lists:sort(sets:to_list(RemovedA))
+    ),
+    ?assertEqual(
+        [
+            <<"shards/20000000-3fffffff/x.0123456789">>,
+            <<"shards/40000000-5fffffff/x.0123456789">>
+        ],
+        lists:sort(sets:to_list(RemovedX))
+    ).
 
 t_start_link(_) ->
     {ok, Pid} = start_link(?SUFFIX, ?MOD, nil, []),
@@ -679,7 +1028,8 @@ t_start_link_no_ddocs(_) ->
     exit(Pid, kill).
 
 t_misc_gen_server_callbacks(_) ->
-    ?assertEqual(ok, terminate(reason, state)).
+    ?assertEqual(ok, terminate(reason, state)),
+    ?assertEqual({noreply, state}, handle_info(bogus_message, state)).
 
 scan_dbs_test_() ->
     {
@@ -688,6 +1038,13 @@ scan_dbs_test_() ->
             Ctx = test_util:start_couch([mem3, fabric]),
             GlobalDb = ?tempdb(),
             ok = fabric:create_db(GlobalDb, [?CTX]),
+            DeleteGlobalDb = ?tempdb(),
+            ok = fabric:create_db(DeleteGlobalDb, [?CTX]),
+            fabric:delete_db(DeleteGlobalDb, [?CTX]),
+            TmpDb = ?tempdb(),
+            DeleteDbWithSuffix = <<TmpDb/binary, "/", GlobalDb/binary>>,
+            ok = fabric:create_db(DeleteDbWithSuffix, [?CTX]),
+            fabric:delete_db(DeleteDbWithSuffix, [?CTX]),
             #shard{name = LocalDb} = hd(mem3:local_shards(GlobalDb)),
             {Ctx, GlobalDb, LocalDb}
         end,
@@ -705,10 +1062,10 @@ scan_dbs_test_() ->
     }.
 
 t_find_shard({_, DbName, _}) ->
-    ?assertEqual(2, length(local_shards(DbName))).
+    ?assertEqual(2, sets:size(local_shards(DbName))).
 
 t_shard_not_found(_) ->
-    ?assertEqual([], local_shards(?tempdb())).
+    ?assertEqual(0, sets:size(local_shards(?tempdb()))).
 
 t_pass_local({_, _, LocalDb}) ->
     scan_local_db(self(), LocalDb),
@@ -760,7 +1117,6 @@ mock_logs() ->
 
 mock_callback_mod() ->
     meck:new(?MOD, [non_strict]),
-    meck:expect(?MOD, db_created, fun(_DbName, Ctx) -> Ctx end),
     meck:expect(?MOD, db_deleted, fun(_DbName, Ctx) -> Ctx end),
     meck:expect(?MOD, db_found, fun(_DbName, Ctx) -> Ctx end),
     meck:expect(?MOD, db_change, fun(_DbName, _Change, Ctx) -> Ctx end).
@@ -793,7 +1149,7 @@ mock_changes_reader() ->
     ).
 
 mock_ets() ->
-    ets:new(multidb_test_ets, [set, public]).
+    ets:new(multidb_test_ets, [set, public, {keypos, #row.dbname}]).
 
 mock_state() ->
     #state{
@@ -802,7 +1158,10 @@ mock_state() ->
         suffix = ?SUFFIX,
         event_server = esref,
         scanner = spid,
-        pids = #{}
+        pids = #{},
+        shards_db = <<"_dbs">>,
+        shards_db_check_msec = 99999999,
+        tref = undefined
     }.
 
 mock_state(Ets) ->
@@ -811,8 +1170,36 @@ mock_state(Ets) ->
 
 mock_state(Ets, Pid) ->
     State = mock_state(Ets),
-    ets:insert(State#state.tid, {?DBNAME, 0, false, Pid}),
+    MockRow = #row{dbname = ?DBNAME, pid = Pid},
+    ets:insert(State#state.tid, MockRow),
     State#state{pids = #{Pid => ?DBNAME}}.
+
+mock_local_shard() ->
+    meck:expect(mem3, local_shards, 1, [#shard{name = ?DBNAME}]).
+
+mock_non_local_shard() ->
+    meck:expect(mem3, local_shards, 1, []).
+
+wait_ets(Tid, Key, Field, Value) ->
+    test_util:wait(fun() ->
+        case ets:lookup(Tid, Key) of
+            [Obj] ->
+                case element(Field, Obj) == Value of
+                    true -> ok;
+                    false -> wait
+                end;
+            _ ->
+                wait
+        end
+    end).
+
+wait_ets_deleted(Tid, Key) ->
+    test_util:wait(fun() ->
+        case ets:lookup(Tid, Key) of
+            [] -> ok;
+            [_] -> wait
+        end
+    end).
 
 change_row(Id) when is_binary(Id) ->
     {[
@@ -823,7 +1210,7 @@ change_row(Id) when is_binary(Id) ->
     ]}.
 
 handle_call_ok(Msg, State) ->
-    handle_call_ok(Msg, from, State).
+    handle_call_ok(Msg, self(), State).
 
 handle_call_ok(Msg, FromPid, State) ->
     FromTag = make_ref(),

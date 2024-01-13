@@ -40,7 +40,8 @@
     jobs/0,
     job/1,
     restart_job/1,
-    update_job_stats/2
+    update_job_stats/2,
+    get_interval_msec/0
 ]).
 
 %% config_listener callbacks
@@ -205,6 +206,9 @@ restart_job(JobId) ->
 update_job_stats(JobId, Stats) ->
     gen_server:cast(?MODULE, {update_job_stats, JobId, Stats}).
 
+get_interval_msec() ->
+    config:get_integer("replicator", "interval", ?DEFAULT_SCHEDULER_INTERVAL).
+
 %% gen_server functions
 
 init(_) ->
@@ -218,11 +222,7 @@ init(_) ->
     ?MODULE = ets:new(?MODULE, EtsOpts),
     ok = couch_replicator_share:init(),
     ok = config:listen_for_changes(?MODULE, nil),
-    Interval = config:get_integer(
-        "replicator",
-        "interval",
-        ?DEFAULT_SCHEDULER_INTERVAL
-    ),
+    Interval = get_interval_msec(),
     MaxJobs = config:get_integer("replicator", "max_jobs", ?DEFAULT_MAX_JOBS),
     MaxChurn = config:get_integer(
         "replicator",
