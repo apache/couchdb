@@ -93,15 +93,13 @@ meta = [
   //   node_label: 'ppc64le'
   // ],
 
-  // Exclude until hex.pm downloads are resolved
-  //   https://github.com/linuxone-community-cloud/tickets/issues/58
-  // 'bullseye-s390x': [
-  //   name: 'Debian 11 s390x',
-  //   spidermonkey_vsn: '78',
-  //   enable_nouveau: true,
-  //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-  //   node_label: 's390x'
-  // ],
+  'bullseye-s390x': [
+    name: 'Debian 11 s390x',
+    spidermonkey_vsn: '78',
+    enable_nouveau: true,
+    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    node_label: 's390x'
+  ],
 
   'bullseye': [
     name: 'Debian 11',
