@@ -83,15 +83,14 @@ meta = [
   //   node_label: 'arm64v8'
   // ],
 
-  // Exclude while OSU rebuilds the image
-  // 'bullseye-ppc64': [
-  //   name: 'Debian 11 POWER',
-  //   spidermonkey_vsn: '78',
-  //   enable_nouveau: true,
-  //   enable_clouseau: true,
-  //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-  //   node_label: 'ppc64le'
-  // ],
+  'bullseye-ppc64': [
+    name: 'Debian 11 POWER',
+    spidermonkey_vsn: '78',
+    enable_nouveau: true,
+    enable_clouseau: true,
+    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    node_label: 'ppc64le'
+  ],
 
   'bullseye-s390x': [
     name: 'Debian 11 s390x',
