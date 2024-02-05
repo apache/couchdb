@@ -93,7 +93,7 @@ def main():
         if ctx["cmd"]:
             run_command(ctx, ctx["cmd"])
         else:
-            join(ctx, cluster_port(ctx, 1), *ctx["admin"])
+            join(ctx, cluster_port(ctx, ctx["node_number_seed"]), *ctx["admin"])
 
 
 def setup():
@@ -174,11 +174,11 @@ def get_args_parser():
         "--haproxy-port", dest="haproxy_port", default="5984", help="HAProxy port"
     )
     parser.add_option(
-        "--node-number",
-        dest="node_number",
+        "--node-number-seed",
+        dest="node_number_seed",
         type=int,
         default=1,
-        help="The node number to seed them when creating the node(s)",
+        help="The node number to seed them when creating nodes",
     )
     parser.add_option(
         "-c",
@@ -280,8 +280,8 @@ def setup_context(opts, args):
         "no_join": opts.no_join,
         "enable_erlang_views": opts.enable_erlang_views,
         "admin": opts.admin.split(":", 1) if opts.admin else None,
-        "nodes": ["node%d" % (i + opts.node_number) for i in range(opts.nodes)],
-        "node_number": opts.node_number,
+        "nodes": ["node%d" % (i + opts.node_number_seed) for i in range(opts.nodes)],
+        "node_number_seed": opts.node_number_seed,
         "degrade_cluster": opts.degrade_cluster,
         "devdir": os.path.dirname(fpath),
         "rootdir": os.path.dirname(os.path.dirname(fpath)),
@@ -342,7 +342,7 @@ def check_boot_script(ctx):
 def setup_configs(ctx):
     for idx, node in enumerate(ctx["nodes"]):
         cluster_port, backend_port, prometheus_port = get_ports(
-            ctx, idx + ctx["node_number"]
+            ctx, idx + ctx["node_number_seed"]
         )
         env = {
             "prefix": toposixpath(ctx["rootdir"]),
@@ -908,7 +908,7 @@ def boot_nodes(ctx):
     nouveau_proc = maybe_boot_nouveau(ctx)
     if nouveau_proc is not None:
         ctx["procs"].append(nouveau_proc)
-    for idx in [(i + ctx["node_number"]) for i in range(ctx["N"])]:
+    for idx in [(i + ctx["node_number_seed"]) for i in range(ctx["N"])]:
         clouseau_proc = maybe_boot_clouseau(ctx, idx)
         if clouseau_proc is not None:
             ctx["procs"].append(clouseau_proc)
@@ -920,11 +920,12 @@ def ensure_all_nodes_alive(ctx):
         for num in range(ctx["N"]):
             if status[num]:
                 continue
-            local_port = cluster_port(ctx, num + 1)
+            idnode = ctx["node_number_seed"] + num
+            local_port = cluster_port(ctx, idnode)
             url = "http://127.0.0.1:{0}/".format(local_port)
             try:
                 check_node_alive(url)
-                maybe_check_clouseau_node_alive(ctx, num + 1)
+                maybe_check_clouseau_node_alive(ctx, idnode)
             except:
                 pass
             else:
@@ -1018,10 +1019,10 @@ def boot_node(ctx, node):
 
 @log("Running cluster setup")
 def cluster_setup(ctx):
-    lead_port = cluster_port(ctx, 1)
+    lead_port = cluster_port(ctx, ctx["node_number_seed"])
     if enable_cluster(ctx["N"], lead_port, *ctx["admin"]):
         for num in range(1, ctx["N"]):
-            node_port = cluster_port(ctx, num + 1)
+            node_port = cluster_port(ctx, ctx["node_number_seed"] + num)
             node_name = ctx["nodes"][num]
             enable_cluster(ctx["N"], node_port, *ctx["admin"])
             add_node(lead_port, node_name, node_port, *ctx["admin"])
