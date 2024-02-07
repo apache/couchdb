@@ -107,6 +107,7 @@ pbkdf2(PRF, Password, Salt, Iterations, KeyLen) when
     Iterations > 0,
     KeyLen > 0
 ->
+    couch_stats:increment_counter([couchdb, password_hashing_slow]),
     DerivedKey = fast_pbkdf2:pbkdf2(PRF, Password, Salt, Iterations, KeyLen),
     couch_util:to_hex_bin(DerivedKey);
 pbkdf2(PRF, Password, Salt, Iterations, KeyLen) when

@@ -403,6 +403,9 @@
     "query with update=false works",
     "view updates properly remove old keys"
   ],
+  "PasswordCacheTest": [
+    "password cache"
+  ],
   "ProxyAuthTest": [
     "proxy auth with secret",
     "proxy auth without secret"
