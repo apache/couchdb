@@ -24,6 +24,7 @@ debian/
 log
 apache-couchdb-*/
 bin/
+clouseau/
 /config.erl
 *.tar.gz
 *.tar.bz2
