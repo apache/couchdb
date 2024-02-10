@@ -129,7 +129,7 @@ defmodule PasswordCacheTest do
     save_doc(db_name, user1)
 
     # Wait for auth cache to notice password change
-    :timer.sleep(5000)
+    :timer.sleep(5500)
 
     # Slow rejection for wrong password
     assert_cache(:expect_slow, "user1", "wrong_password", :expect_login_fail)
