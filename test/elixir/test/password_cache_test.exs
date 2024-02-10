@@ -3,24 +3,24 @@ defmodule PasswordCacheTest do
 
   @moduletag :authentication
 
-  @tag :with_db
-  test "password cache", context do
-    db_name = context[:db_name]
+  @users_db "_users"
 
-    server_config = [
-      %{
-        :section => "chttpd_auth",
-        :key => "authentication_db",
-        :value => db_name
-      },
-      %{
-        :section => "httpd",
-        :key => "authentication_handlers",
-        :value => "{couch_httpd_auth, default_authentication_handler}"
-      }
-    ]
+  @moduletag config: [
+    {
+      "chttpd_auth",
+      "authentication_db",
+      @users_db
+    }
+  ]
 
-    run_on_modified_server(server_config, fn -> test_fun(db_name) end)
+  setup do
+    reset_db(@users_db)
+    wait_for_design_auth(@users_db)
+    on_exit(&tear_down/0)
+  end
+
+  defp tear_down do
+    reset_db(@users_db)
   end
 
   defp fast() do
@@ -110,8 +110,8 @@ defmodule PasswordCacheTest do
     Map.put(result, "_rev", resp.body["rev"])
   end
 
-  defp test_fun(db_name) do
-    user1 = make_user(db_name, "user1")
+  test "password hash cache" do
+    user1 = make_user(@users_db, "user1")
 
     # cache misses mean slow auth
     assert_cache(:expect_slow, "user1", "wrong_password", :expect_login_fail)
@@ -126,10 +126,7 @@ defmodule PasswordCacheTest do
 
     # change password
     user1 = Map.replace!(user1, "password", "new_password")
-    save_doc(db_name, user1)
-
-    # Wait for auth cache to notice password change
-    :timer.sleep(5500)
+    save_doc(@users_db, user1)
 
     # Slow rejection for wrong password
     assert_cache(:expect_slow, "user1", "wrong_password", :expect_login_fail)
