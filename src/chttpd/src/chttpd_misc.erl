@@ -301,7 +301,10 @@ handle_resource_status_req(#httpd{method = 'POST'} = Req) ->
         case Fun() of
             Map when is_map(Map) ->
                 {maps:fold(
-                    fun(K,V,A) -> [{ToJson(K), V} | A] end,
+                    fun
+                        (_K,0,A) -> A; %% TODO: Skip 0 value entries?
+                        (K,V,A) -> [{ToJson(K), V} | A]
+                    end,
                     [], Map)};
             List when is_list(List) ->
                 List
