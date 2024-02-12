@@ -440,7 +440,13 @@ group_by(KeyFun, ValFun, AggFun, Fold) ->
         Val = ValFun(Ele),
         CurrVal = maps:get(Key, Acc, 0),
         NewVal = AggFun(CurrVal, Val),
-        maps:put(Key, NewVal, Acc)
+        %% TODO: should we skip here? how to make this optional?
+        case NewVal > 0 of
+            true ->
+                maps:put(Key, NewVal, Acc);
+            false ->
+                Acc
+        end
     end,
     Fold(FoldFun, #{}, ?MODULE).
 
@@ -449,12 +455,15 @@ group_by(KeyFun, ValFun, AggFun, Fold) ->
 sorted(Map) when is_map(Map) ->
     lists:sort(fun({_K1, A}, {_K2, B}) -> B < A end, maps:to_list(Map)).
 
+shortened(L) ->
+    lists:sublist(L, 10).
+
 
 %% eg: sorted_by([username, dbname, mfa], ioq_calls)
 %% eg: sorted_by([dbname, mfa], doc_reads)
-sorted_by(KeyFun) -> sorted(count_by(KeyFun)).
-sorted_by(KeyFun, ValFun) -> sorted(group_by(KeyFun, ValFun)).
-sorted_by(KeyFun, ValFun, AggFun) -> sorted(group_by(KeyFun, ValFun, AggFun)).
+sorted_by(KeyFun) -> shortened(sorted(count_by(KeyFun))).
+sorted_by(KeyFun, ValFun) -> shortened(sorted(group_by(KeyFun, ValFun))).
+sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, AggFun))).
 
 
 term_to_flat_json({shutdown, Reason0}) when is_atom(Reason0) ->
@@ -489,7 +498,7 @@ to_flat_json(#rctx{}=Rctx) ->
     #rctx{
         updated_at = TP,
         started_at = TInit,
-        pid_ref = {Pid, Ref},
+        pid_ref = {Pid0, Ref0},
         mfa = MFA0,
         nonce = Nonce0,
         from = From0,
@@ -509,7 +518,9 @@ to_flat_json(#rctx{}=Rctx) ->
         changes_returned = ChangesReturned,
         ioq_calls = IoqCalls
     } = Rctx,
-    PidRef = {term_to_flat_json(Pid), term_to_flat_json(Ref)},
+    Pid = term_to_flat_json(Pid0),
+    Ref = term_to_flat_json(Ref0),
+    PidRef = <<Pid/binary, ":", Ref/binary>>,
     MFA = case MFA0 of
         {M0, F0, A0} ->
             M = atom_to_binary(M0),
@@ -524,8 +535,10 @@ to_flat_json(#rctx{}=Rctx) ->
             throw({error, {unexpected, OtherMFA}})
     end,
     From = case From0 of
-        {Parent, ParentRef} ->
-            {term_to_flat_json(Parent), term_to_flat_json(ParentRef)};
+        {Parent0, ParentRef0} ->
+            Parent = term_to_flat_json(Parent0),
+            ParentRef = term_to_flat_json(ParentRef0),
+            <<Parent/binary, ":", ParentRef/binary>>;
         undefined ->
             null
     end,
