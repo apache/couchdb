@@ -104,6 +104,7 @@ handle_request(#httpd{path_parts = [DbName | RestParts], method = Method} = Req)
             do_db_req(Req, fun db_req/2);
         {_, [SecondPart | _]} ->
             Handler = chttpd_handlers:db_handler(SecondPart, fun db_req/2),
+            couch_stats_resource_tracker:set_context_handler_fun(Handler),
             do_db_req(Req, Handler)
     end.
 

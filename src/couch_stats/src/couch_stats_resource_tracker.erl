@@ -157,6 +157,7 @@
     state = alive,
     dbname,
     username,
+    path,
 
     %% Stats counters
     db_open = 0,
@@ -387,6 +388,7 @@ field(#rctx{type=Val}, type) -> convert_type(Val);
 field(#rctx{state=Val}, state) -> Val;
 field(#rctx{dbname=Val}, dbname) -> Val;
 field(#rctx{username=Val}, username) -> Val;
+field(#rctx{path=Val}, path) -> Val;
 field(#rctx{db_open=Val}, db_open) -> Val;
 field(#rctx{docs_read=Val}, docs_read) -> Val;
 field(#rctx{rows_read=Val}, rows_read) -> Val;
@@ -580,6 +582,8 @@ to_flat_json(#rctx{}=Rctx) ->
     }.
 
 
+convert_mfa(MFA) when is_list(MFA)  ->
+    list_to_binary(MFA);
 convert_mfa({M0, F0, A0}) ->
     M = atom_to_binary(M0),
     F = atom_to_binary(F0),
@@ -666,8 +670,10 @@ create_coordinator_context(#httpd{} = Req, Path) ->
             PidRef = get_pid_ref(), %% this will instantiate a new PidRef
             Rctx = #rctx{
                 pid_ref = PidRef,
-                type = {coordinator, Verb, [$/ | Path]},
-                nonce = Nonce
+                %%type = {coordinator, Verb, Path},
+                type = {coordinator, Verb, init},
+                nonce = Nonce,
+                path = list_to_binary([$/ | Path])
             },
             track(Rctx),
             erlang:put(?DELTA_TZ, Rctx),
@@ -697,7 +703,9 @@ set_context_handler_fun(Fun) when is_function(Fun) ->
             ok;
         true ->
             FunName = erlang:fun_to_list(Fun),
-            catch case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.mfa, FunName}]) of
+            #rctx{type={coordinator, Verb, _}} = get_resource(),
+            Update = [{#rctx.type, {coordinator, Verb, FunName}}],
+            catch case ets:update_element(?MODULE, get_pid_ref(), Update) of
                 false ->
                     Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
                     io:format("UPDATING HANDLER FUN[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [FunName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
