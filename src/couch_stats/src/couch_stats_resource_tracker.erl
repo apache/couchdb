@@ -596,7 +596,7 @@ convert_type(Atom) when is_atom(Atom) ->
     atom_to_binary(Atom);
 convert_type({coordinator, Verb0, Atom0}) when is_atom(Atom0) ->
     Verb = atom_to_binary(Verb0),
-    Atom = list_to_binary(Atom0),
+    Atom = atom_to_binary(Atom0),
     <<"coordinator:", Verb/binary, ":", Atom/binary>>;
 convert_type({coordinator, Verb0, Path0}) ->
     Verb = atom_to_binary(Verb0),
