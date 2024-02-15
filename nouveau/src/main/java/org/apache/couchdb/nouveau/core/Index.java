@@ -39,7 +39,7 @@ public abstract class Index implements Closeable {
     private long updateSeq;
     private long purgeSeq;
     private boolean deleteOnClose = false;
-    private final Semaphore permits = new Semaphore(Integer.MAX_VALUE);
+    private final Semaphore semaphore = new Semaphore(Integer.MAX_VALUE);
 
     protected Index(final long updateSeq, final long purgeSeq) {
         this.updateSeq = updateSeq;
@@ -47,11 +47,11 @@ public abstract class Index implements Closeable {
     }
 
     public final boolean tryAcquire() {
-        return permits.tryAcquire();
+        return semaphore.tryAcquire();
     }
 
     public final void release() {
-        permits.release();
+        semaphore.release();
     }
 
     public final IndexInfo info() throws IOException {
@@ -130,9 +130,9 @@ public abstract class Index implements Closeable {
     @Override
     public final void close() throws IOException {
         // Ensures exclusive access to the index before closing.
-        permits.acquireUninterruptibly(Integer.MAX_VALUE);
+        semaphore.acquireUninterruptibly(Integer.MAX_VALUE);
         doClose();
-        // Never release permits.
+        // Never release semaphore.
     }
 
     protected abstract void doClose() throws IOException;
@@ -146,7 +146,7 @@ public abstract class Index implements Closeable {
     }
 
     public final boolean isActive() {
-        return permits.availablePermits() < Integer.MAX_VALUE || permits.hasQueuedThreads();
+        return semaphore.availablePermits() < Integer.MAX_VALUE || semaphore.hasQueuedThreads();
     }
 
     protected final void assertUpdateSeqProgress(final long matchSeq, final long updateSeq)
