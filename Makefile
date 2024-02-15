@@ -557,7 +557,7 @@ nouveau-test: nouveau-test-gradle nouveau-test-elixir
 .PHONY: nouveau-test-gradle
 nouveau-test-gradle: couch nouveau
 ifeq ($(with_nouveau), true)
-	@cd nouveau && ./gradlew test
+	@cd nouveau && ./gradlew test --info
 endif
 
 .PHONY: nouveau-test-elixir
