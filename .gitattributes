@@ -1,0 +1,3 @@
+nouveau/**/* text eol=lf
+nouveau/**/*.bat text eol=crlf
+nouveau/**/*.jar binary
