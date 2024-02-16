@@ -16,5 +16,6 @@
     totalQuorumDocsExamined = 0,
     resultsReturned = 0,
     executionStartTime,
-    executionTimeMs
+    executionTimeMs,
+    dbname
 }).

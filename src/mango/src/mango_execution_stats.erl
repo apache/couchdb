@@ -21,7 +21,7 @@
     incr_docs_examined/2,
     incr_quorum_docs_examined/1,
     incr_results_returned/1,
-    log_start/1,
+    log_start/2,
     log_end/1,
     log_stats/1,
     maybe_add_stats/4,
@@ -42,7 +42,8 @@ to_json(Stats) ->
         {total_docs_examined, Stats#execution_stats.totalDocsExamined},
         {total_quorum_docs_examined, Stats#execution_stats.totalQuorumDocsExamined},
         {results_returned, Stats#execution_stats.resultsReturned},
-        {execution_time_ms, Stats#execution_stats.executionTimeMs}
+        {execution_time_ms, Stats#execution_stats.executionTimeMs},
+        {dbname, Stats#execution_stats.dbname}
     ]}.
 
 to_map(Stats) ->
@@ -51,6 +52,7 @@ to_map(Stats) ->
         total_docs_examined => Stats#execution_stats.totalDocsExamined,
         total_quorum_docs_examined => Stats#execution_stats.totalQuorumDocsExamined,
         results_returned => Stats#execution_stats.resultsReturned,
+        dbname => Stats#execution_stats.dbname,
         execution_time_ms => Stats#execution_stats.executionTimeMs
     }.
 
@@ -81,9 +83,10 @@ incr_results_returned(Stats) ->
         resultsReturned = Stats#execution_stats.resultsReturned + 1
     }.
 
-log_start(Stats) ->
+log_start(Stats, DbName) ->
     Stats#execution_stats{
-        executionStartTime = os:timestamp()
+        executionStartTime = os:timestamp(),
+        dbname = DbName
     }.
 
 log_end(Stats) ->

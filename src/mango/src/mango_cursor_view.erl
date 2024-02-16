@@ -211,10 +211,11 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
     UserAccumulator :: any(),
     Result :: {ok, UserAccumulator} | {error, any()}.
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
+    DbName = couch_db:name(Db),
     Cursor = Cursor0#cursor{
         user_fun = UserFun,
         user_acc = UserAcc,
-        execution_stats = mango_execution_stats:log_start(Stats)
+        execution_stats = mango_execution_stats:log_start(Stats, DbName)
     },
     case Cursor#cursor.ranges of
         [empty] ->
@@ -993,7 +994,8 @@ execute_test_() ->
         fun() ->
             meck:new(foo, [non_strict]),
             meck:new(fabric),
-            meck:new(chttpd_stats)
+            meck:new(chttpd_stats),
+            meck:expect(couch_db, name, fun(A) when is_atom(A) -> atom_to_binary(A) end)
         end,
         fun(_) -> meck:unload() end,
         [
@@ -1174,6 +1176,7 @@ t_execute_ok_query_view(_) ->
 
 t_execute_ok_all_docs_with_execution_stats(_) ->
     Bookmark = bookmark,
+    DbName = db,
     TotalKeysExamined = 33,
     TotalDocsExamined = 12,
     TotalQuorumDocsExamined = 0,
@@ -1184,7 +1187,8 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
             totalDocsExamined = TotalDocsExamined,
             totalQuorumDocsExamined = TotalQuorumDocsExamined,
             resultsReturned = ResultsReturned,
-            executionStartTime = {0, 0, 0}
+            executionStartTime = {0, 0, 0},
+            dbname = DbName
         },
     Stats =
         {[
@@ -1192,7 +1196,8 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
             {total_docs_examined, TotalDocsExamined},
             {total_quorum_docs_examined, TotalQuorumDocsExamined},
             {results_returned, ResultsReturned},
-            {execution_time_ms, '_'}
+            {execution_time_ms, '_'},
+            {dbname, DbName}
         ]},
     UserFnDefinition =
         [
@@ -1209,7 +1214,7 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     Cursor =
         #cursor{
             index = Index,
-            db = db,
+            db = DbName,
             selector = Selector,
             fields = Fields,
             ranges = [{'$gte', start_key, '$lte', end_key}],
