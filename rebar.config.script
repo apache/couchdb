@@ -110,7 +110,6 @@ SubDirs = [
     "src/couch_epi",
     "src/config",
     "src/couch_log",
-    "src/khash",
     "src/b64url",
     "src/exxhash",
     "src/ets_lru",

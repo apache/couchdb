@@ -153,7 +153,6 @@ defmodule CouchDBTest.Mixfile do
       "proper",
       "mochiweb",
       "meck",
-      "khash",
       "hyper",
       "fauxton"
     ]

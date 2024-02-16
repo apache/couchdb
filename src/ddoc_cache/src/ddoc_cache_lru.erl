@@ -88,15 +88,13 @@ init(_) ->
         ] ++ BaseOpts,
     ets:new(?CACHE, CacheOpts),
     ets:new(?LRU, [ordered_set, {write_concurrency, true}] ++ BaseOpts),
-    {ok, Pids} = khash:new(),
-    {ok, Dbs} = khash:new(),
     {ok, Evictor} = couch_event:link_listener(
         ?MODULE, handle_db_event, nil, [all_dbs]
     ),
     ?EVENT(lru_init, nil),
     {ok, #st{
-        pids = Pids,
-        dbs = Dbs,
+        pids = #{},
+        dbs = #{},
         evictor = Evictor
     }}.
 
@@ -107,25 +105,21 @@ terminate(_Reason, St) ->
     end,
     ok.
 
-handle_call({start, Key, Default}, _From, St) ->
-    #st{
-        pids = Pids,
-        dbs = Dbs
-    } = St,
+handle_call({start, Key, Default}, _From, #st{} = St) ->
     case ets:lookup(?CACHE, Key) of
         [] ->
             MaxSize = config:get_integer("ddoc_cache", "max_size", 104857600),
             case trim(St, max(0, MaxSize)) of
-                ok ->
+                {ok, #st{pids = Pids, dbs = Dbs} = St1} ->
                     true = ets:insert_new(?CACHE, #entry{key = Key}),
                     {ok, Pid} = ddoc_cache_entry:start_link(Key, Default),
                     true = ets:update_element(?CACHE, Key, {#entry.pid, Pid}),
-                    ok = khash:put(Pids, Pid, Key),
-                    store_key(Dbs, Key, Pid),
-                    {reply, {ok, Pid}, St};
-                full ->
+                    Pids1 = Pids#{Pid => Key},
+                    Dbs1 = store_key(Dbs, Key, Pid),
+                    {reply, {ok, Pid}, St1#st{dbs = Dbs1, pids = Pids1}};
+                {full, #st{} = St1} ->
                     ?EVENT(full, Key),
-                    {reply, full, St}
+                    {reply, full, St1}
             end;
         [#entry{pid = Pid}] ->
             {reply, {ok, Pid}, St}
@@ -139,63 +133,22 @@ handle_cast({evict, DbName}, St) ->
 handle_cast({refresh, DbName, DDocIds}, St) ->
     gen_server:abcast(mem3:nodes(), ?MODULE, {do_refresh, DbName, DDocIds}),
     {noreply, St};
-handle_cast({do_evict, DbName}, St) ->
-    #st{
-        dbs = Dbs
-    } = St,
-    ToRem =
-        case khash:lookup(Dbs, DbName) of
-            {value, DDocIds} ->
-                AccOut = khash:fold(
-                    DDocIds,
-                    fun(_, Keys, Acc1) ->
-                        khash:to_list(Keys) ++ Acc1
-                    end,
-                    []
-                ),
-                ?EVENT(evicted, DbName),
-                AccOut;
-            not_found ->
-                ?EVENT(evict_noop, DbName),
-                []
-        end,
-    lists:foreach(
-        fun({Key, Pid}) ->
-            remove_entry(St, Key, Pid)
-        end,
-        ToRem
-    ),
-    khash:del(Dbs, DbName),
-    {noreply, St};
-handle_cast({do_refresh, DbName, DDocIdList}, St) ->
-    #st{
-        dbs = Dbs
-    } = St,
+handle_cast({do_evict, DbName}, #st{dbs = Dbs} = St) ->
+    ToRem = get_entries(DbName, Dbs),
+    case ToRem of
+        [] -> ?EVENT(evict_noop, DbName);
+        [_ | _] -> ?EVENT(evicted, DbName)
+    end,
+    St1 = lists:foldl(fun remove_entry/2, St, ToRem),
+    {noreply, St1#st{dbs = maps:remove(DbName, Dbs)}};
+handle_cast({do_refresh, DbName, DDocIdList}, #st{dbs = Dbs} = St) ->
     % We prepend no_ddocid to the DDocIdList below
     % so that we refresh all custom and validation
     % function entries which load data from all
     % design documents.
-    case khash:lookup(Dbs, DbName) of
-        {value, DDocIds} ->
-            lists:foreach(
-                fun(DDocId) ->
-                    case khash:lookup(DDocIds, DDocId) of
-                        {value, Keys} ->
-                            khash:fold(
-                                Keys,
-                                fun(_, Pid, _) ->
-                                    ddoc_cache_entry:refresh(Pid)
-                                end,
-                                nil
-                            );
-                        not_found ->
-                            ok
-                    end
-                end,
-                [no_ddocid | DDocIdList]
-            );
-        not_found ->
-            ok
+    case Dbs of
+        #{DbName := DDocIds} -> do_refresh(DDocIds, [no_ddocid | DDocIdList]);
+        _ -> ok
     end,
     {noreply, St};
 handle_cast(Msg, St) ->
@@ -203,17 +156,12 @@ handle_cast(Msg, St) ->
 
 handle_info({'EXIT', Pid, Reason}, #st{evictor = Pid} = St) ->
     {stop, Reason, St};
-handle_info({'EXIT', Pid, normal}, St) ->
+handle_info({'EXIT', Pid, normal}, #st{pids = Pids, dbs = Dbs} = St) ->
     % This clause handles when an entry starts
     % up but encounters an error or uncacheable
     % response from its recover call.
-    #st{
-        pids = Pids
-    } = St,
-    {value, Key} = khash:lookup(Pids, Pid),
-    khash:del(Pids, Pid),
-    remove_key(St, Key),
-    {noreply, St};
+    {Key, Pids1} = maps:take(Pid, Pids),
+    {noreply, St#st{pids = Pids1, dbs = remove_key(Dbs, Key)}};
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
 
@@ -241,54 +189,64 @@ lru_start(Key, DoInsert) ->
             ddoc_cache_entry:recover(Key)
     end.
 
-trim(_, 0) ->
-    full;
-trim(St, MaxSize) ->
+trim(#st{} = St, 0) ->
+    {full, St};
+trim(#st{} = St, MaxSize) ->
     CurSize = ets:info(?CACHE, memory) * erlang:system_info(wordsize),
     if
         CurSize =< MaxSize ->
-            ok;
+            {ok, St};
         true ->
             case ets:first(?LRU) of
                 {_Ts, Key, Pid} ->
-                    remove_entry(St, Key, Pid),
-                    trim(St, MaxSize);
+                    St1 = remove_entry({Key, Pid}, St),
+                    trim(St1, MaxSize);
                 '$end_of_table' ->
-                    full
+                    {full, St}
             end
     end.
 
-remove_entry(St, Key, Pid) ->
-    #st{
-        pids = Pids
-    } = St,
-    unlink_and_flush(Pid),
-    ddoc_cache_entry:shutdown(Pid),
-    khash:del(Pids, Pid),
-    remove_key(St, Key).
-
-store_key(Dbs, Key, Pid) ->
-    DbName = ddoc_cache_entry:dbname(Key),
-    DDocId = ddoc_cache_entry:ddocid(Key),
-    case khash:lookup(Dbs, DbName) of
-        {value, DDocIds} ->
-            case khash:lookup(DDocIds, DDocId) of
-                {value, Keys} ->
-                    khash:put(Keys, Key, Pid);
-                not_found ->
-                    {ok, Keys} = khash:from_list([{Key, Pid}]),
-                    khash:put(DDocIds, DDocId, Keys)
-            end;
-        not_found ->
-            {ok, Keys} = khash:from_list([{Key, Pid}]),
-            {ok, DDocIds} = khash:from_list([{DDocId, Keys}]),
-            khash:put(Dbs, DbName, DDocIds)
+get_entries(DbName, #{} = Dbs) ->
+    case Dbs of
+        #{DbName := DDocIds} ->
+            Fun = fun(_, Keys, Acc1) -> maps:to_list(Keys) ++ Acc1 end,
+            maps:fold(Fun, [], DDocIds);
+        _ ->
+            []
     end.
 
-remove_key(St, Key) ->
-    #st{
-        dbs = Dbs
-    } = St,
+do_refresh(#{} = DDocIdsMap, [_ | _] = DDocIdList) ->
+    Fun = fun(DDocId) ->
+        case DDocIdsMap of
+            #{DDocId := Keys} ->
+                maps:foreach(fun(_, Pid) -> ddoc_cache_entry:refresh(Pid) end, Keys);
+            _ ->
+                ok
+        end
+    end,
+    lists:foreach(Fun, [no_ddocid | DDocIdList]).
+
+remove_entry({Key, Pid}, #st{pids = Pids, dbs = Dbs} = St) ->
+    unlink_and_flush(Pid),
+    ddoc_cache_entry:shutdown(Pid),
+    St#st{pids = maps:remove(Pid, Pids), dbs = remove_key(Dbs, Key)}.
+
+store_key(#{} = Dbs, Key, Pid) ->
+    DbName = ddoc_cache_entry:dbname(Key),
+    DDocId = ddoc_cache_entry:ddocid(Key),
+    case Dbs of
+        #{DbName := DDocIds} ->
+            case DDocIds of
+                #{DDocId := Keys} ->
+                    Dbs#{DbName := DDocIds#{DDocId := Keys#{Key => Pid}}};
+                _ ->
+                    Dbs#{DbName := DDocIds#{DDocId => #{Key => Pid}}}
+            end;
+        _ ->
+            Dbs#{DbName => #{DDocId => #{Key => Pid}}}
+    end.
+
+remove_key(#{} = Dbs, Key) ->
     DbName = ddoc_cache_entry:dbname(Key),
     DDocId = ddoc_cache_entry:ddocid(Key),
 
@@ -296,25 +254,22 @@ remove_key(St, Key) ->
     % each call to ddoc_cache:open. Multiple calls to open the same
     % non-existent ddoc will create multiple cache entries with the
     % same Key but different PIDs. This can result in the following
-    % khash lookups returning not_found, so handle those corner cases.
-    case khash:lookup(Dbs, DbName) of
-        {value, DDocIds} ->
-            case khash:lookup(DDocIds, DDocId) of
-                {value, Keys} ->
-                    ok = khash:del(Keys, Key),
-                    case khash:size(Keys) of
-                        0 -> khash:del(DDocIds, DDocId);
-                        _ -> ok
-                    end,
-                    case khash:size(DDocIds) of
-                        0 -> khash:del(Dbs, DbName);
-                        _ -> ok
+    % map lookups not finding results, so handle those corner cases.
+    case Dbs of
+        #{DbName := DDocIds = #{DDocId := Keys = #{Key := _Pid}}} ->
+            Keys1 = maps:remove(Key, Keys),
+            case map_size(Keys1) of
+                0 ->
+                    DDocIds1 = maps:remove(DDocId, DDocIds),
+                    case map_size(DDocIds1) of
+                        0 -> maps:remove(DbName, Dbs);
+                        _ -> Dbs#{DbName := DDocIds1}
                     end;
-                not_found ->
-                    ok
+                _ ->
+                    Dbs#{DbName := DDocIds#{DDocId := Keys1}}
             end;
-        not_found ->
-            ok
+        _ ->
+            Dbs
     end.
 
 unlink_and_flush(Pid) ->
