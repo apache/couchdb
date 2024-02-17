@@ -13,7 +13,7 @@
 -module(mango_execution_stats).
 
 -export([
-    to_json/1,
+    to_json/1, to_json/2,
     to_map/1,
     incr_keys_examined/1,
     incr_keys_examined/2,
@@ -37,13 +37,23 @@
 -define(SHARD_STATS_KEY, mango_shard_execution_stats).
 
 to_json(Stats) ->
+    to_json(Stats, true).
+
+
+to_json(Stats, IncludeDbName) ->
+    Base = case IncludeDbName of
+        true ->
+            [{dbname, Stats#execution_stats.dbname}];
+        false ->
+            []
+    end,
     {[
         {total_keys_examined, Stats#execution_stats.totalKeysExamined},
         {total_docs_examined, Stats#execution_stats.totalDocsExamined},
         {total_quorum_docs_examined, Stats#execution_stats.totalQuorumDocsExamined},
         {results_returned, Stats#execution_stats.resultsReturned},
-        {execution_time_ms, Stats#execution_stats.executionTimeMs},
-        {dbname, Stats#execution_stats.dbname}
+        {execution_time_ms, Stats#execution_stats.executionTimeMs}
+        | Base
     ]}.
 
 to_map(Stats) ->
@@ -106,7 +116,7 @@ maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
     FinalAcc =
         case couch_util:get_value(execution_stats, Opts) of
             true ->
-                JSONValue = to_json(Stats1),
+                JSONValue = to_json(Stats1, false),
                 Arg = {add_key, execution_stats, JSONValue},
                 {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
                 FinalUserAcc;
