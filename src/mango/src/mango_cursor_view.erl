@@ -1190,14 +1190,14 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
             executionStartTime = {0, 0, 0},
             dbname = DbName
         },
+    %% Stats doesn't include dbname as it will have already been stripped out
     Stats =
         {[
             {total_keys_examined, TotalKeysExamined},
             {total_docs_examined, TotalDocsExamined},
             {total_quorum_docs_examined, TotalQuorumDocsExamined},
             {results_returned, ResultsReturned},
-            {execution_time_ms, '_'},
-            {dbname, DbName}
+            {execution_time_ms, '_'}
         ]},
     UserFnDefinition =
         [
@@ -1258,10 +1258,17 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     Parameters = [
         db, [{user_ctx, user_ctx}], fun mango_cursor_view:handle_all_docs_message/2, Cursor1, Args
     ],
+    meck:new(couch_log, [passthrough]),
+    %% Pattern matching on DbName in the fun head results in a shadowed variable
+    %% warning. Creating a new variable and testing in the guard works around this.
+    meck:expect(couch_log, report,
+        fun("mango-stats", #{dbname := DbName1}) when DbName1 =:= DbName -> true end),
+    meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
     meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
     meck:expect(chttpd_stats, incr_reads, [TotalDocsExamined], meck:val(ok)),
     meck:expect(fabric, all_docs, Parameters, meck:val({ok, Cursor2})),
     ?assertEqual({ok, updated_accumulator2}, execute(Cursor, fun foo:bar/2, accumulator)),
+    ?assert(meck:called(couch_log, report, '_')),
     ?assert(meck:called(fabric, all_docs, '_')).
 
 t_execute_error_1(_) ->
