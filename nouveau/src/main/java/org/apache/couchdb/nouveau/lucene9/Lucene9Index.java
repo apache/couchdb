@@ -85,7 +85,7 @@ import org.apache.lucene.search.SortedNumericSortField;
 import org.apache.lucene.search.SortedSetSortField;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.TopFieldCollector;
+import org.apache.lucene.search.TopFieldCollectorManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 
@@ -215,7 +215,7 @@ public class Lucene9Index extends Index {
             fieldDoc = null;
         }
 
-        return TopFieldCollector.createSharedManager(sort, searchRequest.getLimit(), fieldDoc, 1000);
+        return new TopFieldCollectorManager(sort, searchRequest.getLimit(), fieldDoc, 1000, false);
     }
 
     private SortField getLastSortField(final Sort sort) {
