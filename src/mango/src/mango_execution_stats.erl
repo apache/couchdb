@@ -39,14 +39,14 @@
 to_json(Stats) ->
     to_json(Stats, true).
 
-
 to_json(Stats, IncludeDbName) ->
-    Base = case IncludeDbName of
-        true ->
-            [{dbname, Stats#execution_stats.dbname}];
-        false ->
-            []
-    end,
+    Base =
+        case IncludeDbName of
+            true ->
+                [{dbname, Stats#execution_stats.dbname}];
+            false ->
+                []
+        end,
     {[
         {total_keys_examined, Stats#execution_stats.totalKeysExamined},
         {total_docs_examined, Stats#execution_stats.totalDocsExamined},

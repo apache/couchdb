@@ -1261,8 +1261,11 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     meck:new(couch_log, [passthrough]),
     %% Pattern matching on DbName in the fun head results in a shadowed variable
     %% warning. Creating a new variable and testing in the guard works around this.
-    meck:expect(couch_log, report,
-        fun("mango-stats", #{dbname := DbName1}) when DbName1 =:= DbName -> true end),
+    meck:expect(
+        couch_log,
+        report,
+        fun("mango-stats", #{dbname := DbName1}) when DbName1 =:= DbName -> true end
+    ),
     meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
     meck:expect(chttpd_stats, incr_rows, [TotalKeysExamined], meck:val(ok)),
     meck:expect(chttpd_stats, incr_reads, [TotalDocsExamined], meck:val(ok)),
