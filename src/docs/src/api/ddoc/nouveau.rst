@@ -124,7 +124,7 @@
 
 .. code-block:: http
 
-    GET /recipes/_design/cookbook/_search_info/ingredients HTTP/1.1
+    GET /recipes/_design/cookbook/_nouveau_info/ingredients HTTP/1.1
     Accept: application/json
     Host: localhost:5984
 
