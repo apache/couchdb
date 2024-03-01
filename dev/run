@@ -428,7 +428,7 @@ def generate_nouveau_config(ctx):
         content = handle.read()
 
     for key in config:
-        content = re.sub("{{%s}}" % key, str(config[key]), content)
+        content = content.replace("{{%s}}" % key, f"'{config[key]}'")
 
     with open(tgt, "w") as handle:
         handle.write(content)
@@ -540,17 +540,18 @@ def maybe_boot_nouveau(ctx):
 
 def boot_nouveau(ctx):
     config = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
+    gradle = "gradlew.bat" if os.name == "nt" else "gradlew"
     cmd = [
-        "./gradlew",
+        os.path.join(ctx["rootdir"], "nouveau", gradle),
         "run",
         "--args",
-        "server {}".format(config),
+        f"server '{config}'",
     ]
     logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
         cmd,
-        cwd="nouveau",
+        cwd=os.path.join(ctx["rootdir"], "nouveau"),
         stdin=sp.PIPE,
         stdout=log,
         stderr=sp.STDOUT,
@@ -878,7 +879,12 @@ def startup(ctx):
 def kill_processes(ctx):
     for proc in ctx["procs"]:
         if proc and proc.returncode is None:
-            proc.terminate()
+            if os.name == "nt":
+                sp.call(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)], stdout=sp.DEVNULL
+                )
+            else:
+                proc.terminate()
     ctx["procs"] = []
 
 
