@@ -420,7 +420,13 @@ group_by(KeyFun, ValFun) ->
 
 
 group_by(KeyFun, ValFun, AggFun) ->
-    group_by(KeyFun, ValFun, AggFun, fun ets:foldl/3).
+    Fold = case conf_get("fold_fun") of
+        "unsafe" ->
+            fun unsafe_foldl/3;
+        _ ->
+            fun ets:foldl/3
+    end,
+    group_by(KeyFun, ValFun, AggFun, Fold).
 
 
 %% eg: group_by(mfa, docs_read).
