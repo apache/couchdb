@@ -213,11 +213,11 @@ Base CouchDB Options
             [couchdb]
             util_driver_dir = /usr/lib/couchdb/erlang/lib/couch-1.5.0/priv/lib
 
-    .. config:option:: uuid :: CouchDB server UUID
+    .. config:option:: uuid :: CouchDB cluster UUID
 
         .. versionadded:: 1.3
 
-        Unique identifier for this CouchDB server instance. ::
+        Unique identifier for this CouchDB cluster. ::
 
             [couchdb]
             uuid = 0a959b9b8227188afc2ac26ccdf345a6
