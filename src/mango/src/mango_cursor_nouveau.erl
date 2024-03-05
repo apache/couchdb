@@ -53,6 +53,8 @@ create(Db, {Indexes, Trace}, Selector, Opts) ->
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
+
     {ok, #cursor{
         db = Db,
         index = Index,
@@ -62,7 +64,8 @@ create(Db, {Indexes, Trace}, Selector, Opts) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        execution_stats = Stats
     }}.
 
 explain(Cursor) ->
@@ -128,6 +131,8 @@ execute(Cursor, UserFun, UserAcc) ->
             {FinalUserAcc0, Stats1} = mango_execution_stats:maybe_add_stats(
                 Opts, UserFun, Stats0, FinalUserAcc
             ),
+            %% This needs Stats1 as log_end is called in maybe_add_stats
+            mango_execution_stats:log_stats(Stats1),
             FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats1, FinalUserAcc0),
             {ok, FinalUserAcc1}
     end.

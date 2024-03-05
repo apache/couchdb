@@ -13,7 +13,7 @@
 -module(mango_execution_stats).
 
 -export([
-    to_json/1,
+    to_json/1, to_json/2,
     to_map/1,
     incr_keys_examined/1,
     incr_keys_examined/2,
@@ -28,7 +28,8 @@
     shard_init/0,
     shard_incr_keys_examined/0,
     shard_incr_docs_examined/0,
-    shard_get_stats/0
+    shard_get_stats/0,
+    stats_init/0, stats_init/1
 ]).
 
 -include("mango.hrl").
@@ -36,13 +37,31 @@
 
 -define(SHARD_STATS_KEY, mango_shard_execution_stats).
 
+stats_init() ->
+    #execution_stats{}.
+
+stats_init(DbName) ->
+    Stats = stats_init(),
+    Stats#execution_stats{dbname = DbName}.
+
 to_json(Stats) ->
+    to_json(Stats, true).
+
+to_json(Stats, IncludeDbName) ->
+    Base =
+        case IncludeDbName of
+            true ->
+                [{dbname, Stats#execution_stats.dbname}];
+            false ->
+                []
+        end,
     {[
         {total_keys_examined, Stats#execution_stats.totalKeysExamined},
         {total_docs_examined, Stats#execution_stats.totalDocsExamined},
         {total_quorum_docs_examined, Stats#execution_stats.totalQuorumDocsExamined},
         {results_returned, Stats#execution_stats.resultsReturned},
         {execution_time_ms, Stats#execution_stats.executionTimeMs}
+        | Base
     ]}.
 
 to_map(Stats) ->
@@ -51,6 +70,7 @@ to_map(Stats) ->
         total_docs_examined => Stats#execution_stats.totalDocsExamined,
         total_quorum_docs_examined => Stats#execution_stats.totalQuorumDocsExamined,
         results_returned => Stats#execution_stats.resultsReturned,
+        dbname => Stats#execution_stats.dbname,
         execution_time_ms => Stats#execution_stats.executionTimeMs
     }.
 
@@ -103,7 +123,7 @@ maybe_add_stats(Opts, UserFun, Stats0, UserAcc) ->
     FinalAcc =
         case couch_util:get_value(execution_stats, Opts) of
             true ->
-                JSONValue = to_json(Stats1),
+                JSONValue = to_json(Stats1, false),
                 Arg = {add_key, execution_stats, JSONValue},
                 {_Go, FinalUserAcc} = UserFun(Arg, UserAcc),
                 FinalUserAcc;

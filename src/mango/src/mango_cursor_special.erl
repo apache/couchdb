@@ -45,6 +45,7 @@ create(Db, {Indexes, Trace0}, Selector, Opts) ->
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
     Bookmark = couch_util:get_value(bookmark, Opts),
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
 
     IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
     Trace = maps:merge(Trace0, #{sorted_index_ranges => SortedIndexRanges}),
@@ -59,7 +60,8 @@ create(Db, {Indexes, Trace0}, Selector, Opts) ->
         limit = Limit,
         skip = Skip,
         fields = Fields,
-        bookmark = Bookmark
+        bookmark = Bookmark,
+        execution_stats = Stats
     }}.
 
 explain(Cursor) ->
@@ -74,13 +76,26 @@ handle_message(Msg, Cursor) ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
-create_test() ->
+create_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:expect(couch_db, name, fun(A) when is_atom(A) -> atom_to_binary(A) end)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_create)
+        ]
+    }.
+
+t_create(_) ->
     Index = #idx{type = <<"special">>, def = all_docs},
     Indexes = [Index],
     Ranges = [{'$gt', null, '$lt', mango_json_max}],
     Trace = #{},
     Selector = {[]},
     Options = [{limit, limit}, {skip, skip}, {fields, fields}, {bookmark, bookmark}],
+    Stats = mango_execution_stats:stats_init(couch_db:name(db)),
     Cursor =
         #cursor{
             db = db,
@@ -92,7 +107,8 @@ create_test() ->
             skip = skip,
             fields = fields,
             bookmark = bookmark,
-            trace = #{sorted_index_ranges => [{Index, Ranges, 0}]}
+            trace = #{sorted_index_ranges => [{Index, Ranges, 0}]},
+            execution_stats = Stats
         },
     ?assertEqual({ok, Cursor}, create(db, {Indexes, Trace}, Selector, Options)).
 
