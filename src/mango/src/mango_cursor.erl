@@ -424,6 +424,7 @@ create_cursor(Db, {[], Trace0}, Selector, Opts) ->
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
     Bookmark = couch_util:get_value(bookmark, Opts),
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
     {ok, #cursor{
         db = Db,
         index = none,
@@ -433,7 +434,8 @@ create_cursor(Db, {[], Trace0}, Selector, Opts) ->
         limit = Limit,
         skip = Skip,
         fields = Fields,
-        bookmark = Bookmark
+        bookmark = Bookmark,
+        execution_stats = Stats
     }};
 create_cursor(Db, {Indexes, Trace0}, Selector, Opts) ->
     Trace1 = maps:merge(Trace0, #{filtered_indexes => sets:from_list(Indexes)}),
