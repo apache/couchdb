@@ -45,6 +45,7 @@ create(Db, {Indexes, Trace0}, Selector, Opts) ->
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
     Bookmark = couch_util:get_value(bookmark, Opts),
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
 
     IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
     Trace = maps:merge(Trace0, #{sorted_index_ranges => SortedIndexRanges}),
@@ -59,7 +60,8 @@ create(Db, {Indexes, Trace0}, Selector, Opts) ->
         limit = Limit,
         skip = Skip,
         fields = Fields,
-        bookmark = Bookmark
+        bookmark = Bookmark,
+        execution_stats = Stats
     }}.
 
 explain(Cursor) ->
