@@ -53,6 +53,8 @@ create(Db, {Indexes, Trace}, Selector, Opts) ->
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
+
     {ok, #cursor{
         db = Db,
         index = Index,
@@ -62,7 +64,8 @@ create(Db, {Indexes, Trace}, Selector, Opts) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        execution_stats = Stats
     }}.
 
 explain(Cursor) ->
@@ -86,7 +89,6 @@ execute(Cursor, UserFun, UserAcc) ->
         opts = Opts,
         execution_stats = Stats
     } = Cursor,
-    DbName = couch_db:name(Db),
     Query = mango_selector_text:convert(Selector),
     QueryArgs = #{
         query => Query,
@@ -95,7 +97,7 @@ execute(Cursor, UserFun, UserAcc) ->
     },
     CAcc = #cacc{
         selector = Selector,
-        dbname = DbName,
+        dbname = couch_db:name(Db),
         ddocid = ddocid(Idx),
         idx_name = mango_idx:name(Idx),
         bookmark = get_bookmark(Opts),
@@ -105,7 +107,7 @@ execute(Cursor, UserFun, UserAcc) ->
         user_fun = UserFun,
         user_acc = UserAcc,
         fields = Cursor#cursor.fields,
-        execution_stats = mango_execution_stats:log_start(Stats, DbName),
+        execution_stats = mango_execution_stats:log_start(Stats),
         documents_seen = sets:new([{version, 2}])
     },
     try

@@ -21,20 +21,28 @@
     incr_docs_examined/2,
     incr_quorum_docs_examined/1,
     incr_results_returned/1,
-    log_start/2,
+    log_start/1,
     log_end/1,
     log_stats/1,
     maybe_add_stats/4,
     shard_init/0,
     shard_incr_keys_examined/0,
     shard_incr_docs_examined/0,
-    shard_get_stats/0
+    shard_get_stats/0,
+    stats_init/0, stats_init/1
 ]).
 
 -include("mango.hrl").
 -include("mango_cursor.hrl").
 
 -define(SHARD_STATS_KEY, mango_shard_execution_stats).
+
+stats_init() ->
+    #execution_stats{}.
+
+stats_init(DbName) ->
+    Stats = stats_init(),
+    Stats#execution_stats{dbname = DbName}.
 
 to_json(Stats) ->
     to_json(Stats, true).
@@ -93,10 +101,9 @@ incr_results_returned(Stats) ->
         resultsReturned = Stats#execution_stats.resultsReturned + 1
     }.
 
-log_start(Stats, DbName) ->
+log_start(Stats) ->
     Stats#execution_stats{
-        executionStartTime = os:timestamp(),
-        dbname = DbName
+        executionStartTime = os:timestamp()
     }.
 
 log_end(Stats) ->

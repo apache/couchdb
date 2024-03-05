@@ -105,6 +105,8 @@ create(Db, {Indexes, Trace0}, Selector, Opts) ->
     IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
     Trace = maps:merge(Trace0, #{sorted_index_ranges => SortedIndexRanges}),
 
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
+
     {ok, #cursor{
         db = Db,
         index = Index,
@@ -115,7 +117,8 @@ create(Db, {Indexes, Trace0}, Selector, Opts) ->
         limit = Limit,
         skip = Skip,
         fields = Fields,
-        bookmark = Bookmark
+        bookmark = Bookmark,
+        execution_stats = Stats
     }}.
 
 -spec required_fields(#cursor{}) -> fields().
@@ -211,11 +214,10 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
     UserAccumulator :: any(),
     Result :: {ok, UserAccumulator} | {error, any()}.
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
-    DbName = couch_db:name(Db),
     Cursor = Cursor0#cursor{
         user_fun = UserFun,
         user_acc = UserAcc,
-        execution_stats = mango_execution_stats:log_start(Stats, DbName)
+        execution_stats = mango_execution_stats:log_start(Stats)
     },
     case Cursor#cursor.ranges of
         [empty] ->
@@ -907,16 +909,30 @@ composite_indexes_test() ->
     ],
     ?assertEqual(Result, composite_indexes(Indexes, Ranges)).
 
-create_test() ->
+create_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:expect(couch_db, name, fun(A) when is_atom(A) -> atom_to_binary(A) end)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_create_ok)
+        ]
+    }.
+
+t_create_ok(_) ->
     Index = #idx{type = <<"json">>, def = {[{<<"fields">>, {[]}}]}},
     Indexes = [Index],
     Trace = #{},
     Ranges = [],
     Selector = {[]},
     Options = [{limit, limit}, {skip, skip}, {fields, fields}, {bookmark, bookmark}],
+    Db = db,
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
     Cursor =
         #cursor{
-            db = db,
+            db = Db,
             index = Index,
             ranges = Ranges,
             selector = Selector,
@@ -925,9 +941,10 @@ create_test() ->
             skip = skip,
             fields = fields,
             bookmark = bookmark,
-            trace = #{sorted_index_ranges => [{Index, [], 0}]}
+            trace = #{sorted_index_ranges => [{Index, [], 0}]},
+            execution_stats = Stats
         },
-    ?assertEqual({ok, Cursor}, create(db, {Indexes, Trace}, Selector, Options)).
+    ?assertEqual({ok, Cursor}, create(Db, {Indexes, Trace}, Selector, Options)).
 
 to_selector(Map) ->
     test_util:as_selector(Map).
@@ -1009,7 +1026,9 @@ execute_test_() ->
     }.
 
 t_execute_empty(_) ->
-    Cursor = #cursor{ranges = [empty]},
+    Db = db,
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
+    Cursor = #cursor{ranges = [empty], execution_stats = Stats},
     meck:expect(fabric, all_docs, ['_', '_', '_', '_', '_'], meck:val(error)),
     meck:expect(fabric, query_view, ['_', '_', '_', '_', '_', '_'], meck:val(error)),
     ?assertEqual({ok, accumulator}, execute(Cursor, undefined, accumulator)),
@@ -1025,6 +1044,7 @@ t_execute_ok_all_docs(_) ->
     Index = #idx{type = <<"json">>, def = all_docs},
     Selector = {[]},
     Fields = all_fields,
+    Stats = mango_execution_stats:stats_init(db),
     Cursor =
         #cursor{
             index = Index,
@@ -1033,7 +1053,8 @@ t_execute_ok_all_docs(_) ->
             fields = Fields,
             ranges = [{'$gte', start_key, '$lte', end_key}],
             opts = [{user_ctx, user_ctx}],
-            bookmark = nil
+            bookmark = nil,
+            execution_stats = Stats
         },
     Cursor1 =
         Cursor#cursor{
@@ -1052,7 +1073,8 @@ t_execute_ok_all_docs(_) ->
                 #execution_stats{
                     totalKeysExamined = TotalKeysExamined,
                     totalDocsExamined = TotalDocsExamined,
-                    executionStartTime = {0, 0, 0}
+                    executionStartTime = {0, 0, 0},
+                    dbname = db
                 }
         },
     Extra =
@@ -1091,6 +1113,7 @@ t_execute_ok_query_view(_) ->
     IndexScanWarning =
         <<"The number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.">>,
     UserFnParameters2 = [{add_key, warning, IndexScanWarning}, accumulator2],
+    Stats = mango_execution_stats:stats_init(db),
     meck:expect(
         foo,
         bar,
@@ -1116,7 +1139,8 @@ t_execute_ok_query_view(_) ->
             fields = Fields,
             ranges = [{'$gte', start_key, '$lte', end_key}],
             opts = [{user_ctx, user_ctx}],
-            bookmark = nil
+            bookmark = nil,
+            execution_stats = Stats
         },
     Cursor1 =
         Cursor#cursor{
@@ -1133,6 +1157,7 @@ t_execute_ok_query_view(_) ->
             bookmark_key = undefined,
             execution_stats =
                 #execution_stats{
+                    dbname = db,
                     totalKeysExamined = TotalKeysExamined,
                     totalDocsExamined = TotalDocsExamined,
                     executionStartTime = {0, 0, 0}
@@ -1181,6 +1206,7 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     TotalDocsExamined = 12,
     TotalQuorumDocsExamined = 0,
     ResultsReturned = 20,
+    InitStats = mango_execution_stats:stats_init(couch_db:name(DbName)),
     ExecutionStats =
         #execution_stats{
             totalKeysExamined = TotalKeysExamined,
@@ -1219,7 +1245,8 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
             fields = Fields,
             ranges = [{'$gte', start_key, '$lte', end_key}],
             opts = [{user_ctx, user_ctx}, {execution_stats, true}],
-            bookmark = nil
+            bookmark = nil,
+            execution_stats = InitStats
         },
     Cursor1 =
         Cursor#cursor{
@@ -1275,6 +1302,7 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
     ?assert(meck:called(fabric, all_docs, '_')).
 
 t_execute_error_1(_) ->
+    Stats = mango_execution_stats:stats_init(db),
     Cursor =
         #cursor{
             index = #idx{type = <<"json">>, ddoc = <<"_design/ghibli">>, name = index_name},
@@ -1283,7 +1311,8 @@ t_execute_error_1(_) ->
             fields = all_fields,
             ranges = [{'$gte', start_key, '$lte', end_key}],
             opts = [{user_ctx, user_ctx}],
-            bookmark = nil
+            bookmark = nil,
+            execution_stats = Stats
         },
     Parameters = [
         db, '_', <<"ghibli">>, index_name, fun mango_cursor_view:handle_message/2, '_', '_'
@@ -1294,6 +1323,7 @@ t_execute_error_1(_) ->
     ?assertNot(meck:called(chttpd_stats, incr_reads, '_')).
 
 t_execute_error_2(_) ->
+    Stats = mango_execution_stats:stats_init(db),
     Cursor =
         #cursor{
             index = #idx{type = <<"json">>, ddoc = <<"_design/ghibli">>, name = index_name},
@@ -1302,7 +1332,8 @@ t_execute_error_2(_) ->
             fields = all_fields,
             ranges = [{'$gte', start_key, '$lte', end_key}],
             opts = [{user_ctx, user_ctx}],
-            bookmark = nil
+            bookmark = nil,
+            execution_stats = Stats
         },
     Parameters = [
         db, '_', <<"ghibli">>, index_name, fun mango_cursor_view:handle_message/2, '_', '_'

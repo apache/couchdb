@@ -50,7 +50,9 @@ create(Db, {Indexes, Trace}, Selector, Opts0) ->
                 ?MANGO_ERROR(multiple_text_indexes)
         end,
 
-    Opts = unpack_bookmark(couch_db:name(Db), Opts0),
+    DbName = couch_db:name(Db),
+    Opts = unpack_bookmark(DbName, Opts0),
+    Stats = mango_execution_stats:stats_init(DbName),
 
     DreyfusLimit = get_dreyfus_limit(),
     Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
@@ -66,7 +68,8 @@ create(Db, {Indexes, Trace}, Selector, Opts0) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        execution_stats = Stats
     }}.
 
 explain(Cursor) ->
@@ -90,7 +93,6 @@ execute(Cursor, UserFun, UserAcc) ->
         opts = Opts,
         execution_stats = Stats
     } = Cursor,
-    DbName = couch_db:name(Db),
     Query = mango_selector_text:convert(Selector),
     QueryArgs = #index_query_args{
         q = Query,
@@ -100,7 +102,7 @@ execute(Cursor, UserFun, UserAcc) ->
     },
     CAcc = #cacc{
         selector = Selector,
-        dbname = DbName,
+        dbname = couch_db:name(Db),
         ddocid = ddocid(Idx),
         idx_name = mango_idx:name(Idx),
         bookmark = get_bookmark(Opts),
@@ -110,7 +112,7 @@ execute(Cursor, UserFun, UserAcc) ->
         user_fun = UserFun,
         user_acc = UserAcc,
         fields = Cursor#cursor.fields,
-        execution_stats = mango_execution_stats:log_start(Stats, DbName),
+        execution_stats = mango_execution_stats:log_start(Stats),
         documents_seen = sets:new([{version, 2}])
     },
     try
@@ -390,8 +392,10 @@ t_create_regular(_) ->
     Limit = 10,
     Options = [{limit, Limit}, {skip, skip}, {fields, fields}, {bookmark, bookmark}],
     Options1 = [{limit, Limit}, {skip, skip}, {fields, fields}, {bookmark, unpacked_bookmark}],
+    Db = db,
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
     Cursor = #cursor{
-        db = db,
+        db = Db,
         index = Index,
         ranges = null,
         trace = Trace,
@@ -399,17 +403,20 @@ t_create_regular(_) ->
         opts = Options1,
         limit = Limit,
         skip = skip,
-        fields = fields
+        fields = fields,
+        execution_stats = Stats
     },
     meck:expect(dreyfus_bookmark, unpack, [db_name, bookmark], meck:val(unpacked_bookmark)),
-    ?assertEqual({ok, Cursor}, create(db, {Indexes, Trace}, selector, Options)).
+    ?assertEqual({ok, Cursor}, create(Db, {Indexes, Trace}, selector, Options)).
 
 t_create_no_bookmark(_) ->
     Limit = 99,
     Options = [{limit, Limit}, {skip, skip}, {fields, fields}, {bookmark, nil}],
     Options1 = [{limit, Limit}, {skip, skip}, {fields, fields}, {bookmark, []}],
+    Db = db,
+    Stats = mango_execution_stats:stats_init(couch_db:name(Db)),
     Cursor = #cursor{
-        db = db,
+        db = Db,
         index = index,
         ranges = null,
         trace = trace,
@@ -417,9 +424,10 @@ t_create_no_bookmark(_) ->
         opts = Options1,
         limit = Limit,
         skip = skip,
-        fields = fields
+        fields = fields,
+        execution_stats = Stats
     },
-    ?assertEqual({ok, Cursor}, create(db, {[index], trace}, selector, Options)).
+    ?assertEqual({ok, Cursor}, create(Db, {[index], trace}, selector, Options)).
 
 t_create_invalid_bookmark(_) ->
     Options = [{bookmark, invalid}],
