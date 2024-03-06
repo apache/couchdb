@@ -25,6 +25,12 @@
 ]).
 
 -export([
+    pause_eviction/0,
+    enable_eviction/0,
+    eviction_status/0
+]).
+
+-export([
     inc/1, inc/2,
     maybe_inc/2,
     get_pid_ref/0,
@@ -135,6 +141,8 @@
 
 
 -record(st, {
+    eviction = enabled, %% or paused
+    ev_queue = [], %% eviction queue for when eviction is paused
     eviction_delay = 10 * 1000, %% How many ms dead processes are visible
     scan_interval = 2048, %% How regularly to perfom scans
     tracking = #{} %% track active processes for eventual eviction
@@ -456,7 +464,20 @@ group_by(KeyFun, ValFun, AggFun, Fold) ->
                 Acc
         end
     end,
-    Fold(FoldFun, #{}, ?MODULE).
+    case conf_get("fold_fun") of
+        "unsafe" ->
+            %% When fold_fun is unsafe we must pause deletion of keys as
+            %% otherwise `ets:next/2` will fail when the supplied key has
+            %% already been deleted
+            pause_eviction(),
+            try
+                Fold(FoldFun, #{}, ?MODULE)
+            after
+                enable_eviction()
+            end;
+        _ ->
+            Fold(FoldFun, #{}, ?MODULE)
+    end.
 
 
 %% Sorts largest first
@@ -871,6 +892,18 @@ find_by_pid(Pid) ->
     [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
 
 
+pause_eviction() ->
+    gen_server:call(?MODULE, pause_eviction).
+
+
+enable_eviction() ->
+    gen_server:call(?MODULE, enable_eviction).
+
+
+eviction_status() ->
+    gen_server:call(?MODULE, enable_eviction).
+
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -892,6 +925,13 @@ init([]) ->
     end,
     {ok, St}.
 
+handle_call(eviction_status, _from, #st{eviction=Eviction, ev_queue=EVQ} = St) ->
+    {reply, {ok, Eviction, length(EVQ)}, St};
+handle_call(pause_eviction, _from, #st{eviction=Eviction} = St) ->
+    {reply, {ok, Eviction}, St#st{eviction=paused}};
+handle_call(enable_eviction, _from, #st{eviction=Eviction, ev_queue=EVQ} = St) ->
+    evict(EVQ),
+    {reply, {ok, Eviction}, St#st{eviction=enabled, ev_queue=[]}};
 handle_call(fetch, _from, #st{} = St) ->
     {reply, {ok, St}, St};
 handle_call({track, _}=Msg, _From, St) ->
@@ -943,8 +983,10 @@ handle_info({'DOWN', MonRef, _Type, DPid, Reason0}, #st{tracking=AT0} = St0) ->
             St0#st{tracking=AT}
     end,
     {noreply, St};
+handle_info({evict, {_Pid, _Ref}=PidRef}, #st{eviction=paused, ev_queue=EVQ}=St) ->
+    {noreply, St#st{ev_queue=[PidRef|EVQ]}};
 handle_info({evict, {_Pid, _Ref}=PidRef}, #st{}=St) ->
-    ets:delete(?MODULE, PidRef),
+    evict(PidRef),
     {noreply, St};
 handle_info(Msg, St) ->
     {stop, {unknown_info, Msg}, St}.
@@ -954,6 +996,15 @@ terminate(_Reason, _St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+evict([]) ->
+    true;
+evict([PidRef|Rest]) ->
+    evict(PidRef),
+    evict(Rest);
+evict(PidRef) ->
+    ets:delete(?MODULE, PidRef).
 
 
 maybe_track([], AT) ->
