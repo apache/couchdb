@@ -400,7 +400,7 @@ range(_, _, LCmp, Low, HCmp, High) ->
 % check on Arg by setting LCmp == HCmp = '$eq' and Low == High == Arg.
 %
 % If 1 < N < 5 (mid), then we set High to Arg and Arg has just
-% narrowed our range. HCmp is set the the '$lt' operator that was
+% narrowed our range. HCmp is set the '$lt' operator that was
 % part of the input.
 %
 % If N == 5 (high), We just set HCmp to '$lt' since its guaranteed

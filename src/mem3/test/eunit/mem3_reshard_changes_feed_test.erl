@@ -219,7 +219,7 @@ continuous_feed_should_work_during_split(#{db1 := Db}) ->
             % Add 5 extra docs to the db right after changes feed was stopped
             [UpdaterPid ! add || _ <- lists:seq(1, 5)],
 
-            % The the number of documents that updater had added
+            % The number of documents that updater had added
             Ref = make_ref(),
             UpdaterPid ! {get_state, {self(), Ref}},
             DocCount =

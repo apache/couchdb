@@ -391,7 +391,7 @@ individual_job_start_stop({Top, {Db1, _, _}}) ->
             JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
             StUrl = JobUrl ++ "/state",
 
-            % Wait for the the job to start running and intercept it in topoff1 state
+            % Wait for the job to start running and intercept it in topoff1 state
             receive
                 {JobPid, topoff1} -> ok
             end,
@@ -410,7 +410,7 @@ individual_job_start_stop({Top, {Db1, _, _}}) ->
 
             % Start the job again
             ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
-            % Wait for the the job to start running and intercept it in topoff1 state
+            % Wait for the job to start running and intercept it in topoff1 state
             receive
                 {JobPid2, topoff1} -> ok
             end,
@@ -460,7 +460,7 @@ individual_job_stop_when_cluster_stopped({Top, {Db1, _, _}}) ->
             JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
             StUrl = JobUrl ++ "/state",
 
-            % Wait for the the job to start running and intercept in topoff1
+            % Wait for the job to start running and intercept in topoff1
             receive
                 {JobPid, topoff1} -> ok
             end,
@@ -487,7 +487,7 @@ individual_job_stop_when_cluster_stopped({Top, {Db1, _, _}}) ->
             % It should be possible to resume job and it should complete
             ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
 
-            % Wait for the the job to start running and intercept in topoff1 state
+            % Wait for the job to start running and intercept in topoff1 state
             receive
                 {JobPid2, topoff1} -> ok
             end,

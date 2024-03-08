@@ -689,7 +689,7 @@ Virtual Hosts
         couchdb.local:5984 = /example
         *.couchdb.local:5984 = /example
 
-    If your CouchDB is listening on the the default HTTP port (80), or is
+    If your CouchDB is listening on the default HTTP port (80), or is
     sitting behind a proxy, then you don't need to specify a port number in the
     ``vhost`` key.
 

@@ -154,7 +154,7 @@ If we have a design document like the following:
 }
 ```
 
-Each emit would be a new key/value row in the map index. Each key row cannot exceed 8KB and and each value row cannot exceed 64KB.
+Each emit would be a new key/value row in the map index. Each key row cannot exceed 8KB and each value row cannot exceed 64KB.
 If a document is emitted as a value, that document is not allowed to exceeed 64KB.
 
 ### Key ordering
