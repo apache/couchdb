@@ -14,6 +14,8 @@
 
 -export([server_id/1, server_pid/1, send/2, recv/6]).
 
+-export([extract_delta/1]).
+
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->
     case config:get_boolean("rexi", "server_per_node", true) of
@@ -65,6 +67,16 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
 
 process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
+        Msg ->
+            process_raw_message(Msg, RefList, Keypos, Fun, Acc0, TimeoutRef)
+    after PerMsgTO ->
+        {timeout, Acc0}
+    end.
+
+process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
+    {Payload, Delta} = extract_delta(Payload0),
+    couch_stats_resource_tracker:accumulate_delta(Delta),
+    case Payload of
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
         {rexi, Ref, Msg} ->
@@ -100,6 +112,13 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             end;
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
-    after PerMsgTO ->
-        {timeout, Acc0}
     end.
+
+extract_delta({A, {delta, Delta}}) -> {{A}, Delta};
+extract_delta({A, B, {delta, Delta}}) -> {{A, B}, Delta};
+extract_delta({A, B, C, {delta, Delta}}) -> {{A, B, C}, Delta};
+extract_delta({A, B, C, D, {delta, Delta}}) -> {{A, B, C, D}, Delta};
+extract_delta({A, B, C, D, E, {delta, Delta}}) -> {{A, B, C, D, E}, Delta};
+extract_delta({A, B, C, D, E, F, {delta, Delta}}) -> {{A, B, C, D, E, F}, Delta};
+extract_delta({A, B, C, D, E, F, G, {delta, Delta}}) -> {{A, B, C, D, E, F, G}, Delta};
+extract_delta(T) -> {T, undefined}.

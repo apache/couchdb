@@ -99,12 +99,12 @@ handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers = Workers} = St) ->
     case find_worker(Ref, Workers) of
         #job{worker_pid = Pid, worker = Ref, client_pid = CPid, client = CRef} = Job ->
             case Error of
-                #error{reason = {_Class, Reason}, stack = Stack} ->
-                    notify_caller({CPid, CRef}, {Reason, Stack}),
+                #error{reason = {_Class, Reason}, stack = Stack, delta = Delta} ->
+                    notify_caller({CPid, CRef}, {Reason, Stack}, Delta),
                     St1 = save_error(Error, St),
                     {noreply, remove_job(Job, St1)};
                 _ ->
-                    notify_caller({CPid, CRef}, Error),
+                    notify_caller({CPid, CRef}, Error, edelta),
                     {noreply, remove_job(Job, St)}
             end;
         false ->
@@ -131,9 +131,12 @@ init_p(From, MFA) ->
     string() | undefined
 ) -> any().
 init_p(From, {M, F, A}, Nonce) ->
+    MFA = {M, F, length(A)},
     put(rexi_from, From),
-    put('$initial_call', {M, F, length(A)}),
+    put('$initial_call', MFA),
     put(nonce, Nonce),
+    couch_stats:create_context(From, MFA, Nonce),
+    couch_stats:maybe_track_rexi_init_p(MFA),
     try
         apply(M, F, A)
     catch
@@ -197,8 +200,14 @@ find_worker(Ref, Tab) ->
         [Worker] -> Worker
     end.
 
-notify_caller({Caller, Ref}, Reason) ->
-    rexi_utils:send(Caller, {Ref, {rexi_EXIT, Reason}}).
+notify_caller({Caller, Ref}, Reason, Delta) ->
+    Msg = case couch_stats_resource_tracker:is_enabled() of
+        true ->
+            {Ref, {rexi_EXIT, Reason}, {delta, Delta}};
+        false ->
+            {Ref, {rexi_EXIT, Reason}}
+    end,
+    rexi_utils:send(Caller, Msg).
 
 kill_worker(FromRef, #st{clients = Clients} = St) ->
     case find_worker(FromRef, Clients) of

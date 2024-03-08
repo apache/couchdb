@@ -129,7 +129,8 @@ async_server_call(Server, Caller, Request) ->
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    erlang:send(Caller, {Ref, Reply}).
+    %%erlang:send(Caller, {Ref, Reply, get_delta()}).
+    erlang:send(Caller, maybe_add_delta({Ref, Reply})).
 
 %% @equiv sync_reply(Reply, 300000)
 sync_reply(Reply) ->
@@ -214,7 +215,8 @@ stream(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, {Ref, self(), Msg}),
+            %%erlang:send(Caller, {Ref, self(), Msg, get_delta()}),
+            erlang:send(Caller, maybe_add_delta({Ref, self(), Msg})),
             ok
     catch
         throw:timeout ->
@@ -243,7 +245,7 @@ stream2(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, {Ref, self(), Msg}),
+            erlang:send(Caller, maybe_add_delta({Ref, self(), Msg})),
             ok
     catch
         throw:timeout ->
@@ -265,17 +267,23 @@ stream_last(Msg, Timeout) ->
 
 %% @equiv stream_ack(Client, 1)
 stream_ack(Client) ->
+    %% stream_ack is coordinator side only, no need to send worker deltas
     erlang:send(Client, {rexi_ack, 1}).
 
 %% @doc Ack streamed messages
 stream_ack(Client, N) ->
+    %% stream_ack is coordinator side only, no need to send worker deltas
     erlang:send(Client, {rexi_ack, N}).
 
 %% Sends a ping message to the coordinator. This is for long running
 %% operations on a node that could exceed the rexi timeout
 ping() ->
     {Caller, _} = get(rexi_from),
-    erlang:send(Caller, {rexi, '$rexi_ping'}).
+    %% It is essential ping/0 includes deltas as otherwise long running
+    %% filtered queries will be silent on usage until they finally return
+    %% a row or no results. This delay is proportional to the database size,
+    %% so instead we make sure ping/0 keeps live stats flowing.
+    erlang:send(Caller, maybe_add_delta({rexi, '$rexi_ping'})).
 
 %% internal functions %%
 
@@ -328,3 +336,23 @@ drain_acks(Count) ->
     after 0 ->
         {ok, Count}
     end.
+
+get_delta() ->
+    {delta, couch_stats_resource_tracker:make_delta()}.
+
+maybe_add_delta(T) ->
+    case couch_stats_resource_tracker:is_enabled() of
+        false ->
+            T;
+        true ->
+            add_delta(T, get_delta())
+    end.
+
+add_delta({A}, Delta) -> {A, Delta};
+add_delta({A, B}, Delta) -> {A, B, Delta};
+add_delta({A, B, C}, Delta) -> {A, B, C, Delta};
+add_delta({A, B, C, D}, Delta) -> {A, B, C, D, Delta};
+add_delta({A, B, C, D, E}, Delta) -> {A, B, C, D, E, Delta};
+add_delta({A, B, C, D, E, F}, Delta) -> {A, B, C, D, E, F, Delta};
+add_delta({A, B, C, D, E, F, G}, Delta) -> {A, B, C, D, E, F, G, Delta};
+add_delta(T, _Delta) -> T.

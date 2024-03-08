@@ -221,6 +221,7 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq0) ->
+    couch_util:clear_pdict(), %% Make sure we start clean, everytime
     erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
     handle_request_int(MochiReq).
@@ -323,6 +324,9 @@ handle_request_int(MochiReq) ->
     % Save client socket so that it can be monitored for disconnects
     chttpd_util:mochiweb_client_req_set(MochiReq),
 
+    %% This is probably better in before_request, but having Path is nice
+    couch_stats_resource_tracker:create_coordinator_context(HttpReq0, Path),
+
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
             {ok, HttpReq1} ->
@@ -347,12 +351,14 @@ handle_request_int(MochiReq) ->
         #httpd_resp{status = ok, response = Resp} ->
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
-            couch_log:error("Response abnormally terminated: ~p", [Reason]),
+            couch_log:error("Response abnormally terminated: ~w", [Reason]),
             exit({shutdown, Reason})
     end.
 
 before_request(HttpReq) ->
     try
+        %% TODO: re-enable this here once we have Path
+        %% couch_stats_resource_tracker:create_coordinator_context(HttpReq),
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
     catch
@@ -372,6 +378,7 @@ after_request(HttpReq, HttpResp0) ->
     HttpResp2 = update_stats(HttpReq, HttpResp1),
     chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
+    %%couch_stats_resource_tracker:close_context(),
     HttpResp2.
 
 process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
@@ -409,6 +416,7 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
             HandlerKey,
             fun chttpd_db:handle_request/1
         ),
+        couch_stats_resource_tracker:set_context_handler_fun(HandlerFun),
         AuthorizedReq = chttpd_auth:authorize(
             possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1
