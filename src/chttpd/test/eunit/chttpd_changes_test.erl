@@ -891,20 +891,11 @@ teardown_basic({Ctx, DbUrl}) ->
     teardown_ctx({Ctx, DbUrl}).
 
 create_db(Top, Db, Params) ->
-    case req(put, Top ++ Db ++ Params) of
-        {201, #{}} ->
-            ok;
-        Error ->
-            error({failed_to_create_test_db, Db, Error})
-    end.
+    {201, #{}} = req(put, Top ++ Db ++ Params),
+    ok.
 
 delete_db(DbUrl) ->
-    case req(delete, DbUrl) of
-        {200, #{}} ->
-            ok;
-        Error ->
-            error({failed_to_delete_test_db, DbUrl, Error})
-    end.
+    {200, #{}} = req(delete, DbUrl).
 
 doc_fun({Id, Revs, Deleted}) ->
     Doc = #{
