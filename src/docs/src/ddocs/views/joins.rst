@@ -417,7 +417,7 @@ now have the data we need to display a post with all associated comments,
 retrieved via a single ``GET`` request.
 
 You may be asking what the 0 and 1 parts of the keys are for. They're simply
-to ensure that the post document is always sorted before the the associated
+to ensure that the post document is always sorted before the associated
 comment documents. So when you get back the results from this view for a
 specific post, you'll know that the first row contains the data for the blog
 post itself, and the remaining rows contain the comment data.

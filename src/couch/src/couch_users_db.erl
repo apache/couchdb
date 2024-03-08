@@ -186,7 +186,7 @@ validate_password(ClearPassword) ->
             ok
     end.
 
-% Get the RegExp out of the tuple and combine the the error message.
+% Get the RegExp out of the tuple and combine the error message.
 % First is with a Reason string.
 get_password_regexp_and_error_msg({RegExp, Reason}) when
     is_list(RegExp) andalso is_list(Reason) andalso

@@ -235,7 +235,7 @@ handle_info(shutdown, State) ->
     {stop, shutdown, State};
 handle_info({'EXIT', Pid, {spawn_ok, Proc0, undefined = _From}}, State) ->
     % Use ets:take/2 to assert that opener existed before removing. Also assert that
-    % the pid matches and the the client was a bogus client
+    % the pid matches and the client was a bogus client
     [{Pid, #client{from = undefined}}] = ets:take(?OPENING, Pid),
     Proc = Proc0#proc{client = undefined},
     link(Proc#proc.pid),

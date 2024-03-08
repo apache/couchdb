@@ -104,7 +104,7 @@ b. as in a, but without the Fauxton bits, just POST to /_cluster_setup
 - this request will do this:
  - on the “setup coordination node”:
   - check if we have an Erlang Cookie Secret. If not, generate
-    a UUID and set the erlang cookie to to that UUID.
+    a UUID and set the erlang cookie to that UUID.
     - store the cookie in config.ini, re-set_cookie() on startup.
   - make a POST request to the node specified in the body above
     using the admin credentials in the body above:

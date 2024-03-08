@@ -55,7 +55,7 @@ documents as we walk through how views work:
         "_rev":"4A3BBEE711",
 
         "title":"Bought a Cat",
-        "body":"I went to the the pet store earlier and brought home a little kitty...",
+        "body":"I went to the pet store earlier and brought home a little kitty...",
         "date":"2009/02/17 21:13:39"
     }
 
