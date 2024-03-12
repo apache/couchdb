@@ -162,7 +162,7 @@ smoosh_utils_test_() ->
         foreach,
         fun() ->
             meck:new(calendar, [passthrough, unstick]),
-            meck:expect(config, get, fun(_, _, Default) -> Default end)
+            test_util:mock(config)
         end,
         fun(_) ->
             meck:unload()

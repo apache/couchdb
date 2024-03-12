@@ -359,7 +359,7 @@ strip_url_creds_test_() ->
     {
         setup,
         fun() ->
-            meck:expect(config, get, fun(_, _, Default) -> Default end)
+            test_util:mock(config)
         end,
         fun(_) ->
             meck:unload()

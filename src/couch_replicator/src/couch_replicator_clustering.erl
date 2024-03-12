@@ -223,7 +223,7 @@ t_unstable_callback() ->
 
 setup_all() ->
     meck:expect(couch_log, notice, 2, ok),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     meck:expect(config, listen_for_changes, 2, ok),
     meck:expect(couch_stats, update_gauge, 2, ok),
     meck:expect(couch_replicator_notifier, notify, 1, ok).

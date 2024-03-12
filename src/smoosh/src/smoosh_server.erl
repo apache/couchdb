@@ -569,13 +569,13 @@ setup_all() ->
     Ctx = setup_all_no_mock(),
     Pid = list_to_pid("<0.0.0>"),
     meck:expect(couch_index_server, get_index, 3, {ok, Pid}),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     Ctx.
 
 setup_all_no_mock() ->
     Ctx = test_util:start_couch([couch_log]),
     meck:new([config, couch_index, couch_index_server], [passthrough]),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     Ctx.
 
 teardown_all(Ctx) ->

@@ -67,8 +67,9 @@ all() ->
     lists:sort(gen_server:call(?MODULE, all, infinity)).
 
 get_integer(Section, Key, Default) when is_integer(Default) ->
+    Val = get(Section, Key, Default),
     try
-        to_integer(get(Section, Key, Default))
+        to_integer(Val)
     catch
         error:badarg ->
             Default
@@ -90,8 +91,9 @@ to_integer(Bin) when is_binary(Bin) ->
     list_to_integer(binary_to_list(Bin)).
 
 get_float(Section, Key, Default) when is_float(Default) ->
+    Val = get(Section, Key, Default),
     try
-        to_float(get(Section, Key, Default))
+        to_float(Val)
     catch
         error:badarg ->
             Default
@@ -115,8 +117,9 @@ to_float(Bin) when is_binary(Bin) ->
     list_to_float(binary_to_list(Bin)).
 
 get_boolean(Section, Key, Default) when is_boolean(Default) ->
+    Val = get(Section, Key, Default),
     try
-        to_boolean(get(Section, Key, Default))
+        to_boolean(Val)
     catch
         error:badarg ->
             Default

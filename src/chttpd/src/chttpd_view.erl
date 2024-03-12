@@ -197,7 +197,8 @@ setup_all() ->
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
     meck:expect(fabric, query_view, 7, {ok, #vacc{}}),
     meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
-    meck:expect(chttpd, end_delayed_json_response, 1, ok).
+    meck:expect(chttpd, end_delayed_json_response, 1, ok),
+    test_util:mock(config).
 
 teardown_all(_) ->
     meck:unload().

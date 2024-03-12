@@ -2395,7 +2395,7 @@ setup_purge_seq() ->
     meck:new(couch_log, [passthrough]),
     meck:new(config, [passthrough]),
     meck:new(couch_db_plugin, [passthrough]),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     ok.
 
 teardown_purge_seq(_) ->
