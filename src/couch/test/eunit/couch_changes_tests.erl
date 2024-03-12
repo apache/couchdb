@@ -16,6 +16,43 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(TIMEOUT, 6000).
+-define(ViewDDoc,
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/app">>},
+            {<<"language">>, <<"javascript">>},
+            {<<"views">>,
+                {[
+                    {<<"valid">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {"
+                                " if (doc._id == 'doc1') {"
+                                " emit(doc); "
+                                "} }"
+                            >>}
+                        ]}}
+                ]}}
+        ]}
+    )
+).
+-define(CustomDDoc,
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/app">>},
+            {<<"language">>, <<"javascript">>},
+            {<<"filters">>,
+                {[
+                    {<<"valid">>, <<
+                        "function(doc) {"
+                        " if (doc._id == 'doc1') {"
+                        " return true; "
+                        "} }"
+                    >>}
+                ]}}
+        ]}
+    )
+).
 
 -record(row, {
     id,
@@ -79,7 +116,6 @@ changes_test_() ->
                 filter_by_custom_function(),
                 filter_by_filter_function(),
                 filter_by_view(),
-                style_and_include_docs(),
                 style_and_include_docs_with_revtree()
             ]
         }
@@ -186,22 +222,6 @@ continuous_feed() ->
         }
     }.
 
-style_and_include_docs() ->
-    {
-        "Style and include_docs",
-        {
-            foreach,
-            fun setup/0,
-            fun teardown/1,
-            [
-                ?TDEF_FE(t_style_main_only),
-                ?TDEF_FE(t_style_main_only_with_include_docs),
-                ?TDEF_FE(t_style_all_docs),
-                ?TDEF_FE(t_style_all_docs_with_include_docs)
-            ]
-        }
-    }.
-
 style_and_include_docs_with_revtree() ->
     {
         "Style and include_docs with revtree",
@@ -211,9 +231,39 @@ style_and_include_docs_with_revtree() ->
             fun teardown/1,
             [
                 ?TDEF_FE(t_style_main_only_with_revtree),
-                ?TDEF_FE(t_style_main_only_with_include_docs_with_revtree),
                 ?TDEF_FE(t_style_all_docs_with_revtree),
-                ?TDEF_FE(t_style_all_docs_with_include_docs_with_revtree)
+                ?TDEF_FE(t_style_main_only_with_include_docs_with_revtree),
+                ?TDEF_FE(t_style_all_docs_with_include_docs_with_revtree),
+                ?TDEF_FE(t_style_main_only_with_include_docs_conflicts_with_revtree),
+                ?TDEF_FE(t_style_all_docs_with_include_docs_conflicts_with_revtree),
+
+                ?TDEF_FE(t_doc_ids_style_main_only_with_revtree),
+                ?TDEF_FE(t_doc_ids_style_all_docs_with_revtree),
+                ?TDEF_FE(t_doc_ids_style_main_only_with_include_docs_with_revtree),
+                ?TDEF_FE(t_doc_ids_style_all_docs_with_include_docs_with_revtree),
+                ?TDEF_FE(t_doc_ids_style_main_only_with_include_docs_conflicts_with_revtree),
+                ?TDEF_FE(t_doc_ids_style_all_docs_with_include_docs_conflicts_with_revtree),
+
+                ?TDEF_FE(t_selector_style_main_only_with_revtree),
+                ?TDEF_FE(t_selector_style_all_docs_with_revtree),
+                ?TDEF_FE(t_selector_style_main_only_with_include_docs_with_revtree),
+                ?TDEF_FE(t_selector_style_all_docs_with_include_docs_with_revtree),
+                ?TDEF_FE(t_selector_style_main_only_with_include_docs_conflicts_with_revtree),
+                ?TDEF_FE(t_selector_style_all_docs_with_include_docs_conflicts_with_revtree),
+
+                ?TDEF_FE(t_view_style_main_only_with_revtree),
+                ?TDEF_FE(t_view_style_all_docs_with_revtree),
+                ?TDEF_FE(t_view_style_main_only_with_include_docs_with_revtree),
+                ?TDEF_FE(t_view_style_all_docs_with_include_docs_with_revtree),
+                ?TDEF_FE(t_view_style_main_only_with_include_docs_conflicts_with_revtree),
+                ?TDEF_FE(t_view_style_all_docs_with_include_docs_conflicts_with_revtree),
+
+                ?TDEF_FE(t_custom_style_main_only_with_revtree),
+                ?TDEF_FE(t_custom_style_all_docs_with_revtree),
+                ?TDEF_FE(t_custom_style_main_only_with_include_docs_with_revtree),
+                ?TDEF_FE(t_custom_style_all_docs_with_include_docs_with_revtree),
+                ?TDEF_FE(t_custom_style_main_only_with_include_docs_conflicts_with_revtree),
+                ?TDEF_FE(t_custom_style_all_docs_with_include_docs_conflicts_with_revtree)
             ]
         }
     }.
@@ -538,10 +588,9 @@ t_receive_heartbeats(_) ->
     ?assert(Heartbeats3 > Heartbeats2).
 
 t_filter_by_doc_attribute({DbName, _}) ->
-    DDocId = <<"_design/app">>,
     DDoc = couch_doc:from_json_obj(
         {[
-            {<<"_id">>, DDocId},
+            {<<"_id">>, <<"_design/app">>},
             {<<"language">>, <<"javascript">>},
             {<<"filters">>,
                 {[
@@ -647,82 +696,6 @@ t_filter_by_erlang_view({DbName, _}) ->
     ?assertMatch([#row{seq = 6, id = <<"doc3">>}], Rows),
     ?assertEqual(UpSeq, LastSeq).
 
-t_style_main_only({DbName, _}) ->
-    ChArgs = #changes_args{style = main_only},
-    Req = {json_req, null},
-    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
-    ?assertEqual(9, length(Rows)),
-    ?assertEqual(UpSeq, LastSeq),
-    ?assertMatch(
-        [
-            #row{seq = 1, id = <<"doc1">>},
-            #row{seq = 2, id = <<"doc2">>},
-            #row{seq = 4, id = <<"doc4">>},
-            #row{seq = 5, id = <<"doc5">>},
-            #row{seq = 6, id = <<"doc3">>},
-            #row{seq = 7, id = <<"doc6">>},
-            #row{seq = 8, id = <<"_design/foo">>},
-            #row{seq = 9, id = <<"doc7">>},
-            #row{seq = 10, id = <<"doc8">>}
-        ],
-        Rows
-    ).
-
-t_style_main_only_with_include_docs({DbName, Revs}) ->
-    ChArgs = #changes_args{style = main_only, include_docs = true},
-    Req = {json_req, null},
-    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
-    ?assertEqual(9, length(Rows)),
-    ?assertEqual(UpSeq, LastSeq),
-    FirstRev = element(1, Revs),
-    [FirstRow | _] = Rows,
-    ?assertMatch(
-        #row{
-            seq = 1,
-            id = <<"doc1">>,
-            doc = {[{<<"_id">>, <<"doc1">>}, {<<"_rev">>, FirstRev}]}
-        },
-        FirstRow
-    ).
-
-t_style_all_docs({DbName, _}) ->
-    ChArgs = #changes_args{style = all_docs},
-    Req = {json_req, null},
-    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
-    ?assertEqual(9, length(Rows)),
-    ?assertEqual(UpSeq, LastSeq),
-    ?assertMatch(
-        [
-            #row{seq = 1, id = <<"doc1">>},
-            #row{seq = 2, id = <<"doc2">>},
-            #row{seq = 4, id = <<"doc4">>},
-            #row{seq = 5, id = <<"doc5">>},
-            #row{seq = 6, id = <<"doc3">>},
-            #row{seq = 7, id = <<"doc6">>},
-            #row{seq = 8, id = <<"_design/foo">>},
-            #row{seq = 9, id = <<"doc7">>},
-            #row{seq = 10, id = <<"doc8">>}
-        ],
-        Rows
-    ).
-
-t_style_all_docs_with_include_docs({DbName, Revs}) ->
-    ChArgs = #changes_args{style = all_docs, include_docs = true},
-    Req = {json_req, null},
-    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
-    ?assertEqual(9, length(Rows)),
-    ?assertEqual(UpSeq, LastSeq),
-    FirstRev = element(1, Revs),
-    [FirstRow | _] = Rows,
-    ?assertMatch(
-        #row{
-            seq = 1,
-            id = <<"doc1">>,
-            doc = {[{<<"_id">>, <<"doc1">>}, {<<"_rev">>, FirstRev}]}
-        },
-        FirstRow
-    ).
-
 t_style_main_only_with_revtree({DbName, _}) ->
     ChArgs = #changes_args{style = main_only},
     Req = {json_req, null},
@@ -730,7 +703,7 @@ t_style_main_only_with_revtree({DbName, _}) ->
     ?assertEqual(2, length(Rows)),
     ?assertEqual(4, LastSeq),
     ?assertEqual(4, UpSeq),
-    ?assertMatch(
+    ?assertEqual(
         [
             #row{
                 seq = 3,
@@ -743,46 +716,6 @@ t_style_main_only_with_revtree({DbName, _}) ->
                 id = <<"doc2">>,
                 deleted = true,
                 doc = nil,
-                revs = [<<"1-m">>]
-            }
-        ],
-        Rows
-    ).
-
-t_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
-    ChArgs = #changes_args{
-        style = main_only,
-        include_docs = true,
-        conflicts = true
-    },
-    Req = {json_req, null},
-    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
-    ?assertEqual(2, length(Rows)),
-    ?assertEqual(4, LastSeq),
-    ?assertEqual(4, UpSeq),
-    ?assertMatch(
-        [
-            #row{
-                seq = 3,
-                id = <<"doc1">>,
-                doc =
-                    {[
-                        {<<"_id">>, <<"doc1">>},
-                        {<<"_rev">>, <<"2-y">>},
-                        {<<"_conflicts">>, [<<"2-x">>]}
-                    ]},
-                revs = [<<"2-y">>]
-            },
-            #row{
-                seq = 4,
-                id = <<"doc2">>,
-                deleted = true,
-                doc =
-                    {[
-                        {<<"_id">>, <<"doc2">>},
-                        {<<"_rev">>, <<"1-m">>},
-                        {<<"_deleted">>, true}
-                    ]},
                 revs = [<<"1-m">>]
             }
         ],
@@ -796,12 +729,12 @@ t_style_all_docs_with_revtree({DbName, _}) ->
     ?assertEqual(2, length(Rows)),
     ?assertEqual(4, UpSeq),
     ?assertEqual(4, LastSeq),
-    ?assertMatch(
+    ?assertEqual(
         [
             #row{
                 seq = 3,
                 id = <<"doc1">>,
-                revs = [<<"2-y">>, <<"2-x">>]
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
             },
             #row{
                 seq = 4,
@@ -813,18 +746,17 @@ t_style_all_docs_with_revtree({DbName, _}) ->
         Rows
     ).
 
-t_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+t_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
     ChArgs = #changes_args{
-        style = all_docs,
-        include_docs = true,
-        conflicts = true
+        style = main_only,
+        include_docs = true
     },
     Req = {json_req, null},
     {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
     ?assertEqual(2, length(Rows)),
     ?assertEqual(4, LastSeq),
     ?assertEqual(4, UpSeq),
-    ?assertMatch(
+    ?assertEqual(
         [
             #row{
                 seq = 3,
@@ -832,10 +764,47 @@ t_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
                 doc =
                     {[
                         {<<"_id">>, <<"doc1">>},
-                        {<<"_rev">>, <<"2-y">>},
-                        {<<"_conflicts">>, [<<"2-x">>]}
+                        {<<"_rev">>, <<"2-y">>}
                     ]},
-                revs = [<<"2-y">>, <<"2-x">>]
+                revs = [<<"2-y">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc2">>},
+                        {<<"_rev">>, <<"1-m">>},
+                        {<<"_deleted">>, true}
+                    ]},
+                revs = [<<"1-m">>]
+            }
+        ],
+        Rows
+    ).
+
+t_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        include_docs = true
+    },
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
             },
             #row{
                 seq = 4,
@@ -848,6 +817,733 @@ t_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
                         {<<"_deleted">>, true}
                     ]},
                 revs = [<<"1-m">>, <<"1-l">>]
+            }
+        ],
+        Rows
+    ).
+
+t_style_main_only_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc2">>},
+                        {<<"_rev">>, <<"1-m">>},
+                        {<<"_deleted">>, true}
+                    ]},
+                revs = [<<"1-m">>]
+            }
+        ],
+        Rows
+    ).
+
+t_style_all_docs_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, null},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(2, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            },
+            #row{
+                seq = 4,
+                id = <<"doc2">>,
+                deleted = true,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc2">>},
+                        {<<"_rev">>, <<"1-m">>},
+                        {<<"_deleted">>, true}
+                    ]},
+                revs = [<<"1-m">>, <<"1-l">>]
+            }
+        ],
+        Rows
+    ).
+
+t_doc_ids_style_main_only_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_doc_ids"
+    },
+    DocIds = [<<"doc1">>, <<"doc3">>, <<"doc9999">>],
+    Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_doc_ids_style_all_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_doc_ids"
+    },
+    DocIds = [<<"doc1">>, <<"doc3">>, <<"doc9999">>],
+    Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_doc_ids_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_doc_ids",
+        include_docs = true
+    },
+    DocIds = [<<"doc1">>, <<"doc3">>, <<"doc9999">>],
+    Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_doc_ids_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_doc_ids",
+        include_docs = true
+    },
+    DocIds = [<<"doc1">>, <<"doc3">>, <<"doc9999">>],
+    Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_doc_ids_style_main_only_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_doc_ids",
+        include_docs = true,
+        conflicts = true
+    },
+    DocIds = [<<"doc1">>, <<"doc3">>, <<"doc9999">>],
+    Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_doc_ids_style_all_docs_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_doc_ids",
+        include_docs = true,
+        conflicts = true
+    },
+    DocIds = [<<"doc1">>, <<"doc3">>, <<"doc9999">>],
+    Req = {json_req, {[{<<"doc_ids">>, DocIds}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_selector_style_main_only_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_selector"
+    },
+    LteDoc1 = {[{<<"$lte">>, <<"doc1">>}]},
+    Selector = {[{<<"_id">>, LteDoc1}]},
+    Req = {json_req, {[{<<"selector">>, Selector}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc = nil,
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_selector_style_all_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_selector"
+    },
+    LteDoc1 = {[{<<"$lte">>, <<"doc1">>}]},
+    Selector = {[{<<"_id">>, LteDoc1}]},
+    Req = {json_req, {[{<<"selector">>, Selector}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_selector_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_selector",
+        include_docs = true
+    },
+    LteDoc1 = {[{<<"$lte">>, <<"doc1">>}]},
+    Selector = {[{<<"_id">>, LteDoc1}]},
+    Req = {json_req, {[{<<"selector">>, Selector}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_selector_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_selector",
+        include_docs = true
+    },
+    LteDoc1 = {[{<<"$lte">>, <<"doc1">>}]},
+    Selector = {[{<<"_id">>, LteDoc1}]},
+    Req = {json_req, {[{<<"selector">>, Selector}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_selector_style_main_only_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_selector",
+        include_docs = true,
+        conflicts = true
+    },
+    LteDoc1 = {[{<<"$lte">>, <<"doc1">>}]},
+    Selector = {[{<<"_id">>, LteDoc1}]},
+    Req = {json_req, {[{<<"selector">>, Selector}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_selector_style_all_docs_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_selector",
+        include_docs = true,
+        conflicts = true
+    },
+    LteDoc1 = {[{<<"$lte">>, <<"doc1">>}]},
+    Selector = {[{<<"_id">>, LteDoc1}]},
+    Req = {json_req, {[{<<"selector">>, Selector}]}},
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(4, UpSeq),
+    ?assertEqual(4, LastSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_view_style_main_only_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_view"
+    },
+    Req = {json_req, {[{<<"query">>, {[{<<"view">>, <<"app/valid">>}]}}]}},
+    ok = update_ddoc(DbName, ?ViewDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_view_style_all_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_view"
+    },
+    Req = {json_req, {[{<<"query">>, {[{<<"view">>, <<"app/valid">>}]}}]}},
+    ok = update_ddoc(DbName, ?ViewDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_view_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_view",
+        include_docs = true
+    },
+    Req = {json_req, {[{<<"query">>, {[{<<"view">>, <<"app/valid">>}]}}]}},
+    ok = update_ddoc(DbName, ?ViewDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_view_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_view",
+        include_docs = true
+    },
+    Req = {json_req, {[{<<"query">>, {[{<<"view">>, <<"app/valid">>}]}}]}},
+    ok = update_ddoc(DbName, ?ViewDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_view_style_main_only_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "_view",
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, {[{<<"query">>, {[{<<"view">>, <<"app/valid">>}]}}]}},
+    ok = update_ddoc(DbName, ?ViewDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_view_style_all_docs_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "_view",
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, {[{<<"query">>, {[{<<"view">>, <<"app/valid">>}]}}]}},
+    ok = update_ddoc(DbName, ?ViewDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_custom_style_main_only_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "app/valid"
+    },
+    Req = {json_req, null},
+    ok = update_ddoc(DbName, ?CustomDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_custom_style_all_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "app/valid"
+    },
+    Req = {json_req, null},
+    ok = update_ddoc(DbName, ?CustomDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_custom_style_main_only_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "app/valid",
+        include_docs = true
+    },
+    Req = {json_req, null},
+    ok = update_ddoc(DbName, ?CustomDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_custom_style_all_docs_with_include_docs_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "app/valid",
+        include_docs = true
+    },
+    Req = {json_req, null},
+    ok = update_ddoc(DbName, ?CustomDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
+            }
+        ],
+        Rows
+    ).
+
+t_custom_style_main_only_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = main_only,
+        filter = "app/valid",
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, null},
+    ok = update_ddoc(DbName, ?CustomDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>]
+            }
+        ],
+        Rows
+    ).
+
+t_custom_style_all_docs_with_include_docs_conflicts_with_revtree({DbName, _}) ->
+    ChArgs = #changes_args{
+        style = all_docs,
+        filter = "app/valid",
+        include_docs = true,
+        conflicts = true
+    },
+    Req = {json_req, null},
+    ok = update_ddoc(DbName, ?CustomDDoc),
+    {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
+    ?assertEqual(1, length(Rows)),
+    ?assertEqual(5, LastSeq),
+    ?assertEqual(5, UpSeq),
+    ?assertEqual(
+        [
+            #row{
+                seq = 3,
+                id = <<"doc1">>,
+                doc =
+                    {[
+                        {<<"_id">>, <<"doc1">>},
+                        {<<"_rev">>, <<"2-y">>},
+                        {<<"_conflicts">>, [<<"2-x">>]}
+                    ]},
+                revs = [<<"2-y">>, <<"2-x">>, <<"2-d">>]
             }
         ],
         Rows
@@ -1110,6 +1806,7 @@ setup_with_revtree() ->
     {ok, Db1} = couch_db:reopen(Db),
     update_replicated(Db1, [
         doc(<<"doc1">>, [<<"y">>, <<"z">>]),
+        doc(<<"doc1">>, [<<"d">>, <<"z">>], true),
         doc(<<"doc2">>, [<<"m">>], true)
     ]),
     ok = couch_db:close(Db1),

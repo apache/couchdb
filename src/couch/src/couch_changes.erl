@@ -19,7 +19,7 @@
     wait_updated/3,
     get_rest_updated/1,
     configure_filter/4,
-    filter/3,
+    filter/5,
     handle_db_event/3,
     handle_view_event/3,
     send_changes_doc_ids/6,
@@ -225,44 +225,71 @@ configure_filter(FilterName, Style, Req, Db) ->
             throw({bad_request, Msg})
     end.
 
-filter(Db, #full_doc_info{} = FDI, Filter) ->
-    filter(Db, couch_doc:to_doc_info(FDI), Filter);
-filter(_Db, DocInfo, {default, Style}) ->
-    apply_style(DocInfo, Style);
-filter(_Db, DocInfo, {doc_ids, Style, DocIds}) ->
-    case lists:member(DocInfo#doc_info.id, DocIds) of
-        true ->
-            apply_style(DocInfo, Style);
-        false ->
-            []
+filter(Db, #full_doc_info{} = FDI, Filter, IncludeDocs, Conflicts) ->
+    filter(Db, couch_doc:to_doc_info(FDI), Filter, IncludeDocs, Conflicts);
+filter(_Db, DocInfo, {default, Style}, _IncludeDocs, _Conflicts) ->
+    {[], apply_style(DocInfo, Style)};
+filter(_Db, DocInfo, {doc_ids, Style, DocIds}, _IncludeDocs, _Conflicts) ->
+    Revs =
+        case lists:member(DocInfo#doc_info.id, DocIds) of
+            true ->
+                apply_style(DocInfo, Style);
+            false ->
+                []
+        end,
+    {[], Revs};
+filter(_Db, DocInfo, {design_docs, Style}, _IncludeDocs, _Conflicts) ->
+    Revs =
+        case DocInfo#doc_info.id of
+            <<"_design", _/binary>> ->
+                apply_style(DocInfo, Style);
+            _ ->
+                []
+        end,
+    {[], Revs};
+filter(Db, DocInfo, {selector, all_docs, {Selector, _Fields}}, true, true) ->
+    {DocWin, Docs} = open_all_revs_include_doc(Db, DocInfo),
+    Passes = [mango_selector:match(Selector, couch_doc:to_json_obj(Doc, [])) || Doc <- Docs],
+    {DocWin, filter_revs(Passes, Docs)};
+filter(Db, DocInfo, {selector, Style, {Selector, _Fields}}, IncludeDocs, Conflicts) ->
+    Docs = open_revs(Db, DocInfo, Style, Conflicts),
+    Passes = [mango_selector:match(Selector, couch_doc:to_json_obj(Doc, [])) || Doc <- Docs],
+    case IncludeDocs of
+        true -> {Docs, filter_revs(Passes, Docs)};
+        false -> {[], filter_revs(Passes, Docs)}
     end;
-filter(Db, DocInfo, {selector, Style, {Selector, _Fields}}) ->
-    Docs = open_revs(Db, DocInfo, Style),
-    Passes = [
-        mango_selector:match(Selector, couch_doc:to_json_obj(Doc, []))
-     || Doc <- Docs
-    ],
-    filter_revs(Passes, Docs);
-filter(_Db, DocInfo, {design_docs, Style}) ->
-    case DocInfo#doc_info.id of
-        <<"_design", _/binary>> ->
-            apply_style(DocInfo, Style);
-        _ ->
-            []
-    end;
-filter(Db, DocInfo, {view, Style, DDoc, VName}) ->
-    Docs = open_revs(Db, DocInfo, Style),
+filter(Db, DocInfo, {view, all_docs, DDoc, VName}, true, true) ->
+    {DocWin, Docs} = open_all_revs_include_doc(Db, DocInfo),
     {ok, Passes} = couch_query_servers:filter_view(Db, DDoc, VName, Docs),
-    filter_revs(Passes, Docs);
-filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}) ->
+    {DocWin, filter_revs(Passes, Docs)};
+filter(Db, DocInfo, {view, Style, DDoc, VName}, IncludeDocs, Conflicts) ->
+    Docs = open_revs(Db, DocInfo, Style, Conflicts),
+    {ok, Passes} = couch_query_servers:filter_view(Db, DDoc, VName, Docs),
+    case IncludeDocs of
+        true -> {Docs, filter_revs(Passes, Docs)};
+        false -> {[], filter_revs(Passes, Docs)}
+    end;
+filter(Db, DocInfo, {custom, all_docs, Req0, DDoc, FName}, true, true) ->
     Req =
         case Req0 of
             {json_req, _} -> Req0;
             #httpd{} -> {json_req, chttpd_external:json_req_obj(Req0, Db)}
         end,
-    Docs = open_revs(Db, DocInfo, Style),
+    {DocWin, Docs} = open_all_revs_include_doc(Db, DocInfo),
     {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
-    filter_revs(Passes, Docs).
+    {DocWin, filter_revs(Passes, Docs)};
+filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}, IncludeDocs, Conflicts) ->
+    Req =
+        case Req0 of
+            {json_req, _} -> Req0;
+            #httpd{} -> {json_req, chttpd_external:json_req_obj(Req0, Db)}
+        end,
+    Docs = open_revs(Db, DocInfo, Style, Conflicts),
+    {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
+    case IncludeDocs of
+        true -> {Docs, filter_revs(Passes, Docs)};
+        false -> {[], filter_revs(Passes, Docs)}
+    end.
 
 get_view_qs({json_req, {Props}}) ->
     {Query} = couch_util:get_value(<<"query">>, Props, {[]}),
@@ -357,16 +384,31 @@ apply_style(#doc_info{revs = Revs}, main_only) ->
 apply_style(#doc_info{revs = Revs}, all_docs) ->
     [{[{<<"rev">>, couch_doc:rev_to_str(R)}]} || #rev_info{rev = R} <- Revs].
 
-open_revs(Db, DocInfo, Style) ->
+open_revs(Db, DocInfo, Style, Conflicts) ->
     DocInfos =
         case Style of
             main_only -> [DocInfo];
             all_docs -> [DocInfo#doc_info{revs = [R]} || R <- DocInfo#doc_info.revs]
         end,
-    OpenOpts = [deleted, conflicts],
+    OpenOpts =
+        case Conflicts of
+            true -> [deleted, conflicts];
+            false -> [deleted]
+        end,
     % Relying on list comprehensions to silence errors
     OpenResults = [couch_db:open_doc(Db, DI, OpenOpts) || DI <- DocInfos],
     [Doc || {ok, Doc} <- OpenResults].
+
+open_all_revs_include_doc(Db, DocInfo) ->
+    DocInfos = [DocInfo#doc_info{revs = [R]} || R <- DocInfo#doc_info.revs],
+    OpenOpts = [deleted, conflicts],
+    OpenResults = [couch_db:open_doc(Db, DI, OpenOpts) || DI <- DocInfos],
+    Docs = [Doc || {ok, Doc} <- OpenResults],
+    [Doc1 | RestDocs] = Docs,
+    RestRevs = [Doc#doc.revs || Doc <- RestDocs, Doc#doc.deleted =:= false],
+    Conflicts = [{conflicts, [{Pos, RevId} || {Pos, [RevId]} <- RestRevs]}],
+    Doc2 = Doc1#doc{meta = Conflicts},
+    {[Doc2], Docs}.
 
 filter_revs(Passes, Docs) ->
     lists:flatmap(
@@ -611,12 +653,14 @@ changes_enumerator(Value, Acc) ->
         prepend = Prepend,
         user_acc = UserAcc,
         limit = Limit,
+        include_docs = IncludeDocs,
+        conflicts = Conflicts,
         resp_type = ResponseType,
         db = Db,
         timeout = Timeout,
         timeout_fun = TimeoutFun
     } = maybe_upgrade_changes_acc(Acc),
-    Results0 = filter(Db, Value, Filter),
+    {_, Results0} = filter(Db, Value, Filter, IncludeDocs, Conflicts),
     Results = [Result || Result <- Results0, Result /= null],
     Seq =
         case Value of

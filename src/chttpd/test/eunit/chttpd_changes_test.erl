@@ -153,6 +153,18 @@ changes_include_docs_test_() ->
         ]
     }.
 
+changes_open_doc_times_test_() ->
+    {
+        foreach,
+        fun setup_basic/0,
+        fun teardown_basic/1,
+        [
+            ?TDEF_FE(t_selector_open_doc_times),
+            ?TDEF_FE(t_js_filter_open_doc_times),
+            ?TDEF_FE(t_view_open_doc_times)
+        ]
+    }.
+
 t_basic({_, DbUrl}) ->
     Res = {Seq, Pending, Rows} = changes(DbUrl),
     ?assertEqual(8, Seq),
@@ -853,8 +865,39 @@ t_view_all_docs_conflicts_include_docs({_, DbUrl}) ->
     ?assertEqual(Res1, Res2),
     delete_ddocs(DDocUrl, Rev).
 
-% Utility functions
+t_selector_open_doc_times({_, DbUrl}) ->
+    Body = #{<<"selector">> => #{<<"_id">> => ?DOC1}},
+    F = "?filter=_selector",
+    I = "&include_docs=true",
+    S = "&style=all_docs",
+    Filter = called_times(fun() -> changes_post(DbUrl, Body, F) end, DbUrl),
+    FilterDocs = called_times(fun() -> changes_post(DbUrl, Body, F ++ I) end, DbUrl),
+    FilterAllDocs = called_times(fun() -> changes_post(DbUrl, Body, F ++ I ++ S) end, DbUrl),
+    ?assertEqual({3, 3, 5}, {Filter, FilterDocs, FilterAllDocs}).
 
+t_js_filter_open_doc_times({_, DbUrl}) ->
+    {DDocUrl, Rev} = create_ddocs(DbUrl, ?DOC1, custom),
+    F = "?filter=filters/f",
+    I = "&include_docs=true",
+    S = "&style=all_docs",
+    Filter = called_times(fun() -> changes(DbUrl, F) end, DbUrl),
+    FilterDocs = called_times(fun() -> changes(DbUrl, F ++ I) end, DbUrl),
+    FilterAllDocs = called_times(fun() -> changes(DbUrl, F ++ I ++ S) end, DbUrl),
+    ?assertEqual({4, 4, 6}, {Filter, FilterDocs, FilterAllDocs}),
+    delete_ddocs(DDocUrl, Rev).
+
+t_view_open_doc_times({_, DbUrl}) ->
+    {DDocUrl, Rev} = create_ddocs(DbUrl, ?DOC1, view),
+    F = "?filter=_view&view=views/v",
+    I = "&include_docs=true",
+    S = "&style=all_docs",
+    Filter = called_times(fun() -> changes(DbUrl, F) end, DbUrl),
+    FilterDocs = called_times(fun() -> changes(DbUrl, F ++ I) end, DbUrl),
+    FilterAllDocs = called_times(fun() -> changes(DbUrl, F ++ S ++ I) end, DbUrl),
+    ?assertEqual({4, 4, 6}, {Filter, FilterDocs, FilterAllDocs}),
+    delete_ddocs(DDocUrl, Rev).
+
+% Utility functions
 setup_ctx(DbCreateParams) ->
     Ctx = test_util:start_couch([chttpd]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
@@ -883,6 +926,7 @@ setup_basic() ->
     CfgKey = "changes_doc_ids_optimization_threshold",
     ok = config:set("couchdb", CfgKey, "2", _Persist = false),
     meck:new(couch_changes, [passthrough]),
+    meck:new(couch_db, [passthrough]),
     {Ctx, DbUrl}.
 
 teardown_basic({Ctx, DbUrl}) ->
@@ -891,20 +935,11 @@ teardown_basic({Ctx, DbUrl}) ->
     teardown_ctx({Ctx, DbUrl}).
 
 create_db(Top, Db, Params) ->
-    case req(put, Top ++ Db ++ Params) of
-        {201, #{}} ->
-            ok;
-        Error ->
-            error({failed_to_create_test_db, Db, Error})
-    end.
+    {201, #{}} = req(put, Top ++ Db ++ Params),
+    ok.
 
 delete_db(DbUrl) ->
-    case req(delete, DbUrl) of
-        {200, #{}} ->
-            ok;
-        Error ->
-            error({failed_to_delete_test_db, DbUrl, Error})
-    end.
+    {200, #{}} = req(delete, DbUrl).
 
 doc_fun({Id, Revs, Deleted}) ->
     Doc = #{
@@ -1033,3 +1068,23 @@ seq(<<_/binary>> = Seq) ->
     binary_to_integer(NumStr);
 seq(null) ->
     null.
+
+called_times(ReqFun, DbUrl) ->
+    meck:reset(couch_db),
+    ReqFun(),
+    open_doc_calls(DbUrl).
+
+open_doc_calls(DbUrl) ->
+    #{path := "/" ++ DbName0} = uri_string:parse(DbUrl),
+    DbName = ?l2b(DbName0),
+    FoldFun =
+        fun([Db, IdOrDocInfo, _Opts], Acc) ->
+            case {mem3:dbname(couch_db:name(Db)), IdOrDocInfo} of
+                {DbName, #doc_info{}} -> Acc + 1;
+                _ -> Acc
+            end
+        end,
+    lists:foldl(FoldFun, 0, meck_history(couch_db, open_doc, 3)).
+
+meck_history(Mod, Fun, Arity) ->
+    [A || {_Pid, {_M, F, A}, _R} <- meck:history(Mod), F =:= Fun, length(A) =:= Arity].
