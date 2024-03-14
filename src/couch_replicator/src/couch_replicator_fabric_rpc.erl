@@ -23,29 +23,26 @@
 docs(DbName, Options, Args0) ->
     set_io_priority(DbName, Options),
     #mrargs{skip = Skip, limit = Limit, extra = Extra} = Args0,
-    FilterStates = proplists:get_value(filter_states, Extra),
     Args = Args0#mrargs{skip = 0, limit = Skip + Limit},
     HealthThreshold = couch_replicator_scheduler:health_threshold(),
     {ok, Db} = couch_db:open_int(DbName, Options),
-    Acc = {DbName, FilterStates, HealthThreshold},
+    Acc = {DbName, HealthThreshold, Extra},
     couch_mrview:query_all_docs(Db, Args, fun docs_cb/2, Acc).
 
 docs_cb({meta, Meta}, Acc) ->
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
-docs_cb({row, Row}, {DbName, States, HealthThreshold} = Acc) ->
-    Id = couch_util:get_value(id, Row),
-    Doc = couch_util:get_value(doc, Row),
-    ViewRow = #view_row{
-        id = Id,
-        key = couch_util:get_value(key, Row),
-        value = couch_util:get_value(value, Row)
-    },
+docs_cb({row, Props}, {DbName, HealthThreshold, Options} = Acc) ->
+    States = couch_util:get_value(filter_states, Options),
+    Id = couch_util:get_value(id, Props),
+    Doc = couch_util:get_value(doc, Props),
     case rep_doc_state(DbName, Id, Doc, States, HealthThreshold) of
         skip ->
             ok;
         Other ->
-            ok = rexi:stream2(ViewRow#view_row{doc = Other})
+            ViewRow0 = fabric_view_row:from_props(Props, Options),
+            ViewRow = fabric_view_row:set_doc(ViewRow0, Other),
+            ok = rexi:stream2(ViewRow)
     end,
     {ok, Acc};
 docs_cb(complete, Acc) ->
@@ -95,3 +92,112 @@ rep_doc_state(Shard, Id, {[_ | _]} = Doc, States, HealthThreshold) ->
 
 get_doc_state({Props}) ->
     couch_util:get_value(state, Props).
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+docs_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> ok end,
+        [
+            ?TDEF_FE(t_docs)
+        ]
+    }.
+
+t_docs(_) ->
+    Options1 = [],
+    Options2 = [{io_priority, priority}],
+    QueryArgs1 = #mrargs{skip = 3, limit = 7, extra = extra},
+    QueryArgs2 = #mrargs{skip = 0, limit = 10, extra = extra},
+    Accumulator = {db_name, health_threshold, extra},
+    meck:expect(couch_replicator_scheduler, health_threshold, [], meck:val(health_threshold)),
+    meck:expect(couch_db, open_int, [db_name, '_'], meck:val({ok, db})),
+    meck:expect(
+        couch_mrview,
+        query_all_docs,
+        [db, QueryArgs2, '_', Accumulator],
+        meck:val(all_docs)
+    ),
+    ?assertEqual(all_docs, docs(db_name, Options1, QueryArgs1)),
+    IoPrio1 = get(io_priority),
+    ?assertEqual({interactive, db_name}, IoPrio1),
+    ?assertEqual(all_docs, docs(db_name, Options2, QueryArgs1)),
+    IoPrio2 = get(io_priority),
+    ?assertEqual(priority, IoPrio2).
+
+docs_cb_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(mem3),
+            meck:new(rexi)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_docs_cb_meta),
+            ?TDEF_FE(t_docs_cb_row_skip),
+            ?TDEF_FE(t_docs_cb_row),
+            ?TDEF_FE(t_docs_cb_complete)
+        ]
+    }.
+
+t_docs_cb_meta(_) ->
+    Meta = {meta, meta},
+    meck:expect(rexi, stream2, [Meta], meck:val(ok)),
+    ?assertEqual({ok, accumulator}, docs_cb(Meta, accumulator)).
+
+t_docs_cb_row_skip(_) ->
+    Accumulator1 = {db_name, health_threshold, []},
+    Accumulator2 = {db_name, health_threshold, [{view_row_map, true}]},
+    Row = {row, [{id, <<"_design/ddoc">>}, {doc, doc}]},
+    meck:reset(rexi),
+    meck:expect(rexi, stream2, ['_'], undefined),
+    ?assertEqual({ok, Accumulator1}, docs_cb(Row, Accumulator1)),
+    ?assertNot(meck:called(rexi, stream2, '_')),
+    meck:reset(rexi),
+    meck:expect(rexi, stream2, ['_'], undefined),
+    ?assertEqual({ok, Accumulator2}, docs_cb(Row, Accumulator2)),
+    ?assertNot(meck:called(rexi, stream2, '_')).
+
+t_docs_cb_row(_) ->
+    Accumulator1 = {db_name, health_threshold, [{filter_states, []}]},
+    Accumulator2 = {db_name, health_threshold, [{filter_states, []}, {view_row_map, true}]},
+    Doc = {[{<<"_id">>, id}, {<<"_rev">>, rev}]},
+    DocInfo1 = {[{state, other}]},
+    DocInfo2 = {[{state, null}]},
+    EtsInfo = {[{state, other}]},
+    Row = {row, [{id, id}, {doc, Doc}]},
+    ViewRow1 = #view_row{id = id, doc = DocInfo1},
+    ViewRow2 = {view_row, #{id => id, doc => EtsInfo}},
+    ViewRow3 = {view_row, #{id => id, doc => undecided}},
+    meck:expect(mem3, dbname, [db_name], meck:val(mem3_db_name)),
+    meck:expect(couch_replicator, info_from_doc, [mem3_db_name, Doc], meck:val(DocInfo1)),
+    meck:expect(rexi, stream2, [ViewRow1], meck:val(ok)),
+    ?assertEqual({ok, Accumulator1}, docs_cb(Row, Accumulator1)),
+    meck:expect(couch_replicator, info_from_doc, [mem3_db_name, Doc], meck:val(DocInfo2)),
+    meck:expect(
+        couch_replicator_doc_processor,
+        doc_lookup,
+        [db_name, id, health_threshold],
+        meck:val({ok, EtsInfo})
+    ),
+    meck:expect(rexi, stream2, [ViewRow2], meck:val(ok)),
+    ?assertEqual({ok, Accumulator2}, docs_cb(Row, Accumulator2)),
+    meck:expect(couch_replicator, info_from_doc, [mem3_db_name, Doc], meck:val(DocInfo2)),
+    meck:expect(
+        couch_replicator_doc_processor,
+        doc_lookup,
+        [db_name, id, health_threshold],
+        meck:val({error, not_found})
+    ),
+    meck:expect(rexi, stream2, [ViewRow3], meck:val(ok)),
+    ?assertEqual({ok, Accumulator2}, docs_cb(Row, Accumulator2)).
+
+t_docs_cb_complete(_) ->
+    meck:expect(rexi, stream_last, [complete], meck:val(ok)),
+    ?assertEqual({ok, accumulator}, docs_cb(complete, accumulator)).
+
+-endif.

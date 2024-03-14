@@ -202,10 +202,12 @@ base_args(#cursor{index = Idx, selector = Selector, fields = Fields} = Cursor) -
 
             {ignore_partition_query_limit, true},
 
-            % Request execution statistics in a map.  The purpose of this option is
-            % to maintain interoperability on version upgrades.
-            % TODO remove this option in a later version.
-            {execution_stats_map, true}
+            % The purpose of the following options is to maintain
+            % interoperability on version upgrades:
+            % - Return execution statistics in a map
+            {execution_stats_map, true},
+            % - Return view rows in a map
+            {view_row_map, true}
         ]
     }.
 
@@ -350,14 +352,10 @@ view_cb({meta, Meta}, Acc) ->
     set_mango_msg_timestamp(),
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
-view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
+view_cb({row, Props}, #mrargs{extra = Options} = Acc) ->
     mango_execution_stats:shard_incr_keys_examined(),
     couch_stats:increment_counter([mango, keys_examined]),
-    ViewRow = #view_row{
-        id = couch_util:get_value(id, Row),
-        key = couch_util:get_value(key, Row),
-        doc = couch_util:get_value(doc, Row)
-    },
+    ViewRow = fabric_view_row:from_props(Props, Options),
     % This supports receiving our "arguments" either as just the `selector`
     % or in the new record in `callback_args`. This is to support mid-upgrade
     % clusters where the non-upgraded coordinator nodes will send the older style.
@@ -383,14 +381,15 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
             % However, this oddness is confined to being visible in this module.
             case match_and_extract_doc(Doc, Selector, Fields) of
                 {match, FinalDoc} ->
-                    FinalViewRow = ViewRow#view_row{doc = FinalDoc},
-                    ok = rexi:stream2(FinalViewRow),
+                    ViewRow1 = fabric_view_row:set_doc(ViewRow, FinalDoc),
+                    ok = rexi:stream2(ViewRow1),
                     set_mango_msg_timestamp();
                 {no_match, undefined} ->
                     maybe_send_mango_ping()
             end
         end,
-    case {ViewRow#view_row.doc, CoveringIndex} of
+    ViewRowDoc = fabric_view_row:get_doc(ViewRow),
+    case {ViewRowDoc, CoveringIndex} of
         {null, _} ->
             maybe_send_mango_ping();
         {undefined, Index = #idx{}} ->
@@ -440,14 +439,15 @@ match_and_extract_doc(Doc, Selector, Fields) ->
             {no_match, undefined}
     end.
 
--spec derive_doc_from_index(#idx{}, #view_row{}) -> term().
-derive_doc_from_index(Index, #view_row{id = DocId, key = KeyData}) ->
+-spec derive_doc_from_index(#idx{}, view_row()) -> term().
+derive_doc_from_index(Index, Row) ->
     Keys =
-        case KeyData of
+        case fabric_view_row:get_key(Row) of
             {p, _Partition, KeyValues} -> KeyValues;
             KeyValues -> KeyValues
         end,
     Columns = mango_idx:columns(Index),
+    DocId = fabric_view_row:get_id(Row),
     lists:foldr(
         fun({Column, Key}, Doc) -> mango_doc:set_field(Doc, Column, Key) end,
         mango_doc:set_field({[]}, <<"_id">>, DocId),
@@ -747,7 +747,8 @@ base_opts_test() ->
                 covering_index => undefined
             }},
             {ignore_partition_query_limit, true},
-            {execution_stats_map, true}
+            {execution_stats_map, true},
+            {view_row_map, true}
         ],
     MRArgs =
         #mrargs{
@@ -869,8 +870,10 @@ derive_doc_from_index_test() ->
         },
     DocId = doc_id,
     Keys = [key1, key2],
-    ViewRow = #view_row{id = DocId, key = Keys},
+    ViewRowOld = #view_row{id = DocId, key = Keys},
+    ViewRow = {view_row, #{id => DocId, key => Keys}},
     Doc = {[{<<"_id">>, DocId}, {<<"field2">>, key2}, {<<"field1">>, key1}]},
+    ?assertEqual(Doc, derive_doc_from_index(Index, ViewRowOld)),
     ?assertEqual(Doc, derive_doc_from_index(Index, ViewRow)).
 
 derive_doc_from_index_partitioned_test() ->
@@ -881,8 +884,10 @@ derive_doc_from_index_partitioned_test() ->
         },
     DocId = doc_id,
     Keys = [key1, key2],
-    ViewRow = #view_row{id = DocId, key = {p, partition, Keys}},
+    ViewRowOld = #view_row{id = DocId, key = {p, partition, Keys}},
+    ViewRow = {view_row, #{id => DocId, key => {p, partition, Keys}}},
     Doc = {[{<<"_id">>, DocId}, {<<"field2">>, key2}, {<<"field1">>, key1}]},
+    ?assertEqual(Doc, derive_doc_from_index(Index, ViewRowOld)),
     ?assertEqual(Doc, derive_doc_from_index(Index, ViewRow)).
 
 composite_indexes_test() ->
@@ -1087,7 +1092,8 @@ t_execute_ok_all_docs(_) ->
                 covering_index => undefined
             }},
             {ignore_partition_query_limit, true},
-            {execution_stats_map, true}
+            {execution_stats_map, true},
+            {view_row_map, true}
         ],
     Args =
         #mrargs{
@@ -1173,7 +1179,8 @@ t_execute_ok_query_view(_) ->
                 covering_index => undefined
             }},
             {ignore_partition_query_limit, true},
-            {execution_stats_map, true}
+            {execution_stats_map, true},
+            {view_row_map, true}
         ],
     Args =
         #mrargs{
@@ -1271,7 +1278,8 @@ t_execute_ok_all_docs_with_execution_stats(_) ->
                 covering_index => undefined
             }},
             {ignore_partition_query_limit, true},
-            {execution_stats_map, true}
+            {execution_stats_map, true},
+            {view_row_map, true}
         ],
     Args =
         #mrargs{
@@ -1360,7 +1368,9 @@ view_cb_test_() ->
             ?TDEF_FE(t_view_cb_row_missing_doc_triggers_quorum_fetch),
             ?TDEF_FE(t_view_cb_row_matching_covered_doc),
             ?TDEF_FE(t_view_cb_row_non_matching_covered_doc),
-            ?TDEF_FE(t_view_cb_row_backwards_compatible),
+            ?TDEF_FE(t_view_cb_row_backwards_compatible_callback_args),
+            ?TDEF_FE(t_view_cb_row_backwards_compatible_view_row_standard),
+            ?TDEF_FE(t_view_cb_row_backwards_compatible_view_row_quorum_fetch),
             ?TDEF_FE(t_view_cb_complete_shard_stats_v1),
             ?TDEF_FE(t_view_cb_complete_shard_stats_v2),
             ?TDEF_FE(t_view_cb_ok)
@@ -1374,8 +1384,8 @@ t_view_cb_meta(_) ->
 
 t_view_cb_row_matching_regular_doc(_) ->
     Row = [{id, id}, {key, key}, {doc, doc}],
-    Result = #view_row{id = id, key = key, doc = doc},
-    meck:expect(rexi, stream2, [Result], meck:val(ok)),
+    ViewRow = {view_row, #{id => id, key => key, doc => doc}},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
     Accumulator =
         #mrargs{
             extra = [
@@ -1383,7 +1393,8 @@ t_view_cb_row_matching_regular_doc(_) ->
                     selector => {[]},
                     fields => all_fields,
                     covering_index => undefined
-                }}
+                }},
+                {view_row_map, true}
             ]
         },
     mango_execution_stats:shard_init(),
@@ -1401,7 +1412,8 @@ t_view_cb_row_non_matching_regular_doc(_) ->
                     selector => {[{<<"field">>, {[{<<"$exists">>, true}]}}]},
                     fields => all_fields,
                     covering_index => undefined
-                }}
+                }},
+                {view_row_map, true}
             ]
         },
     mango_execution_stats:shard_init(),
@@ -1419,7 +1431,8 @@ t_view_cb_row_null_doc(_) ->
                     selector => {[]},
                     fields => all_fields,
                     covering_index => undefined
-                }}
+                }},
+                {view_row_map, true}
             ]
         },
     mango_execution_stats:shard_init(),
@@ -1429,7 +1442,7 @@ t_view_cb_row_null_doc(_) ->
 
 t_view_cb_row_missing_doc_triggers_quorum_fetch(_) ->
     Row = [{id, id}, {key, key}, {doc, undefined}],
-    ViewRow = #view_row{id = id, key = key, doc = undefined},
+    ViewRow = {view_row, #{id => id, key => key}},
     meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
     Accumulator =
         #mrargs{
@@ -1438,7 +1451,8 @@ t_view_cb_row_missing_doc_triggers_quorum_fetch(_) ->
                     selector => {[]},
                     fields => all_fields,
                     covering_index => undefined
-                }}
+                }},
+                {view_row_map, true}
             ]
         },
     mango_execution_stats:shard_init(),
@@ -1449,14 +1463,14 @@ t_view_cb_row_matching_covered_doc(_) ->
     Keys = [key1, key2],
     Row = [{id, id}, {key, Keys}, {doc, undefined}],
     Doc = {[{<<"field1">>, key1}, {<<"field2">>, key2}]},
-    Result = #view_row{id = id, key = Keys, doc = Doc},
+    ViewRow = {view_row, #{id => id, key => Keys, doc => Doc}},
     Fields = [<<"field1">>, <<"field2">>],
     Index =
         #idx{
             type = <<"json">>,
             def = {[{<<"fields">>, {[{<<"field1">>, undefined}, {<<"field2">>, undefined}]}}]}
         },
-    meck:expect(rexi, stream2, [Result], meck:val(ok)),
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
     Accumulator =
         #mrargs{
             extra = [
@@ -1464,7 +1478,8 @@ t_view_cb_row_matching_covered_doc(_) ->
                     selector => {[]},
                     fields => Fields,
                     covering_index => Index
-                }}
+                }},
+                {view_row_map, true}
             ]
         },
     mango_execution_stats:shard_init(),
@@ -1487,7 +1502,8 @@ t_view_cb_row_non_matching_covered_doc(_) ->
                     selector => {[{<<"field">>, {[{<<"$exists">>, true}]}}]},
                     fields => Fields,
                     covering_index => Index
-                }}
+                }},
+                {view_row_map, true}
             ]
         },
     mango_execution_stats:shard_init(),
@@ -1495,7 +1511,7 @@ t_view_cb_row_non_matching_covered_doc(_) ->
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assertNot(meck:called(rexi, stream2, '_')).
 
-t_view_cb_row_backwards_compatible(_) ->
+t_view_cb_row_backwards_compatible_callback_args(_) ->
     Row = [{id, id}, {key, key}, {doc, null}],
     meck:expect(rexi, stream2, ['_'], undefined),
     Accumulator = #mrargs{extra = [{selector, {[]}}]},
@@ -1503,6 +1519,24 @@ t_view_cb_row_backwards_compatible(_) ->
     put(mango_last_msg_timestamp, os:timestamp()),
     ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
     ?assertNot(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_backwards_compatible_view_row_standard(_) ->
+    Row = [{id, id}, {key, key}, {doc, doc}],
+    ViewRow = #view_row{id = id, key = key, doc = doc},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    Accumulator = #mrargs{extra = [{selector, {[]}}]},
+    mango_execution_stats:shard_init(),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')).
+
+t_view_cb_row_backwards_compatible_view_row_quorum_fetch(_) ->
+    Row = [{id, id}, {key, key}, {doc, undefined}],
+    ViewRow = #view_row{id = id, key = key, doc = undefined},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    Accumulator = #mrargs{extra = [{selector, {[]}}]},
+    mango_execution_stats:shard_init(),
+    ?assertEqual({ok, Accumulator}, view_cb({row, Row}, Accumulator)),
+    ?assert(meck:called(rexi, stream2, '_')).
 
 t_view_cb_complete_shard_stats_v1(_) ->
     meck:expect(rexi, stream2, [{execution_stats, {docs_examined, '_'}}], meck:val(ok)),

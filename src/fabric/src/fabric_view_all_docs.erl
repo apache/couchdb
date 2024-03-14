@@ -14,7 +14,7 @@
 
 -export([go/5]).
 % exported for spawn
--export([open_doc/4]).
+-export([open_doc/5]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -70,7 +70,7 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
             _ -> DocOptions0
         end,
     SpawnFun = fun(Key) ->
-        spawn_monitor(?MODULE, open_doc, [DbName, Options ++ DocOptions1, Key, IncludeDocs])
+        spawn_monitor(?MODULE, open_doc, [DbName, Options ++ DocOptions1, Key, IncludeDocs, Extra])
     end,
     MaxJobs = all_docs_concurrency(),
     %% namespace can be _set_ to `undefined`, so we want simulate enum here
@@ -187,6 +187,15 @@ shards(Db, Args) ->
         end,
     fabric_view:get_shards(Db, NewArgs).
 
+handle_row(Row0, {Worker, _} = Source, State) ->
+    #collector{query_args = Args, counters = Counters0, rows = Rows0} = State,
+    Dir = Args#mrargs.direction,
+    Row = fabric_view_row:set_worker(Row0, Source),
+    Rows = merge_row(Dir, Row, Rows0),
+    Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
+    State1 = State#collector{rows = Rows, counters = Counters1},
+    fabric_view:maybe_send_row(State1).
+
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
@@ -257,13 +266,10 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
                 update_seq = UpdateSeq0
             }}
     end;
-handle_message(#view_row{} = Row, {Worker, From}, State) ->
-    #collector{query_args = Args, counters = Counters0, rows = Rows0} = State,
-    Dir = Args#mrargs.direction,
-    Rows = merge_row(Dir, Row#view_row{worker = {Worker, From}}, Rows0),
-    Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    State1 = State#collector{rows = Rows, counters = Counters1},
-    fabric_view:maybe_send_row(State1);
+handle_message(#view_row{} = Row, {_, _} = Source, State) ->
+    handle_row(Row, Source, State);
+handle_message({view_row, #{}} = Row, {_, _} = Source, State) ->
+    handle_row(Row, Source, State);
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters});
@@ -273,10 +279,19 @@ handle_message({execution_stats, _} = Msg, {_, From}, St) ->
     rexi:stream_ack(From),
     {Go, St#collector{user_acc = Acc}}.
 
-merge_row(fwd, Row, Rows) ->
-    lists:keymerge(#view_row.id, [Row], Rows);
-merge_row(rev, Row, Rows) ->
-    lists:rkeymerge(#view_row.id, [Row], Rows).
+merge_row(Dir, Row, Rows) ->
+    lists:merge(
+        fun(RowA, RowB) ->
+            IdA = fabric_view_row:get_id(RowA),
+            IdB = fabric_view_row:get_id(RowB),
+            case Dir of
+                fwd -> IdA < IdB;
+                rev -> IdA > IdB
+            end
+        end,
+        [Row],
+        Rows
+    ).
 
 all_docs_concurrency() ->
     Value = config:get("fabric", "all_docs_concurrency", "10"),
@@ -297,19 +312,24 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
         _ ->
             {{value, {Pid, Ref}}, RestPids} = queue:out(Pids),
             Timeout = fabric_util:all_docs_timeout(),
+            Receive = fun(Row) ->
+                case Callback(fabric_view_row:transform(Row), AccIn) of
+                    {ok, Acc} ->
+                        doc_receive_loop(
+                            Keys, RestPids, SpawnFun, MaxJobs, Callback, Acc
+                        );
+                    {stop, Acc} ->
+                        cancel_read_pids(RestPids),
+                        {ok, Acc}
+                end
+            end,
             receive
                 {'DOWN', Ref, process, Pid, Row} ->
                     case Row of
                         #view_row{} ->
-                            case Callback(fabric_view:transform_row(Row), AccIn) of
-                                {ok, Acc} ->
-                                    doc_receive_loop(
-                                        Keys, RestPids, SpawnFun, MaxJobs, Callback, Acc
-                                    );
-                                {stop, Acc} ->
-                                    cancel_read_pids(RestPids),
-                                    {ok, Acc}
-                            end;
+                            Receive(Row);
+                        {view_row, #{}} ->
+                            Receive(Row);
                         Error ->
                             cancel_read_pids(RestPids),
                             Callback({error, Error}, AccIn)
@@ -319,9 +339,11 @@ doc_receive_loop(Keys, Pids, SpawnFun, MaxJobs, Callback, AccIn) ->
             end
     end.
 
-open_doc(DbName, Options, Id, IncludeDocs) ->
-    try open_doc_int(DbName, Options, Id, IncludeDocs) of
+open_doc(DbName, Options, Id, IncludeDocs, Extra) ->
+    try open_doc_int(DbName, Options, Id, IncludeDocs, Extra) of
         #view_row{} = Row ->
+            exit(Row);
+        {view_row, #{}} = Row ->
             exit(Row)
     catch
         Type:Reason:Stack ->
@@ -331,25 +353,25 @@ open_doc(DbName, Options, Id, IncludeDocs) ->
             exit({Id, Reason})
     end.
 
-open_doc_int(DbName, Options, Id, IncludeDocs) ->
+open_doc_int(DbName, Options, Id, IncludeDocs, Extra) ->
     Row =
         case fabric:open_doc(DbName, Id, [deleted | Options]) of
             {not_found, missing} ->
                 Doc = undefined,
-                #view_row{key = Id};
+                fabric_view_row:from_props([{key, Id}], Extra);
             {ok, #doc{deleted = true, revs = Revs}} ->
                 Doc = null,
                 {RevPos, [RevId | _]} = Revs,
                 Value = {[{rev, couch_doc:rev_to_str({RevPos, RevId})}, {deleted, true}]},
-                #view_row{key = Id, id = Id, value = Value};
+                fabric_view_row:from_props([{key, Id}, {id, Id}, {value, Value}], Extra);
             {ok, #doc{revs = Revs} = Doc0} ->
                 Doc = couch_doc:to_json_obj(Doc0, Options),
                 {RevPos, [RevId | _]} = Revs,
                 Value = {[{rev, couch_doc:rev_to_str({RevPos, RevId})}]},
-                #view_row{key = Id, id = Id, value = Value}
+                fabric_view_row:from_props([{key, Id}, {id, Id}, {value, Value}], Extra)
         end,
     if
-        IncludeDocs -> Row#view_row{doc = Doc};
+        IncludeDocs -> fabric_view_row:set_doc(Row, Doc);
         true -> Row
     end.
 
@@ -385,3 +407,476 @@ filter_keys_by_namespace(Keys, Namespace) when Namespace =:= <<"_local">> ->
     );
 filter_keys_by_namespace(Keys, _Namespace) ->
     Keys.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+handle_message_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(foo, [non_strict]),
+            meck:new(fabric_view)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_handle_message_rexi_down),
+            ?TDEF_FE(t_handle_message_rexi_exit),
+            ?TDEF_FE(t_handle_message_meta_zero),
+            ?TDEF_FE(t_handle_message_meta),
+            ?TDEF_FE(t_handle_message_row),
+            ?TDEF_FE(t_handle_message_complete),
+            ?TDEF_FE(t_handle_message_execution_stats)
+        ]
+    }.
+
+t_handle_message_rexi_down(_) ->
+    Message = {rexi_DOWN, undefined, {undefined, node}, undefined},
+    meck:expect(fabric_view, check_down_shards, [state, node], meck:val(fabric_view_result)),
+    ?assertEqual(fabric_view_result, handle_message(Message, source, state)).
+
+t_handle_message_rexi_exit(_) ->
+    Message = {rexi_EXIT, reason},
+    meck:expect(
+        fabric_view, handle_worker_exit, [state, source, reason], meck:val(fabric_view_result)
+    ),
+    ?assertEqual(fabric_view_result, handle_message(Message, source, state)).
+
+t_handle_message_meta_zero(_) ->
+    Meta1 = [{total, 3}, {offset, 2}, {update_seq, 1}],
+    Meta2 = [{total, null}, {offset, null}, {update_seq, null}],
+    Worker = {worker1, from},
+    Counters1 = [{worker1, 0}, {worker2, 0}],
+    Counters2 = [{worker1, 1}, {worker2, 0}],
+    State1 = #collector{counters = Counters1, total_rows = 0, update_seq = nil, offset = 0},
+    State2 = #collector{counters = Counters2, total_rows = 3, update_seq = nil, offset = 2},
+    State3 = #collector{counters = Counters1, total_rows = null, update_seq = null, offset = null},
+    State4 = #collector{counters = Counters2, total_rows = null, update_seq = null, offset = null},
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({ok, State2}, handle_message({meta, Meta1}, Worker, State1)),
+    ?assertEqual({ok, State4}, handle_message({meta, Meta2}, Worker, State3)).
+
+t_handle_message_meta(_) ->
+    Meta1 = [{total, 10}, {offset, 2}, {update_seq, seq}],
+    Meta2 = [{total, 10}, {offset, 5}, {update_seq, packed_seq}],
+    Meta3 = [{total, 10}, {offset, 5}],
+    Meta4 = [{total, null}, {offset, null}, {update_seq, null}],
+    Worker = {worker1, from},
+    Counters1 = [{worker1, 0}, {worker2, 3}, {worker3, 5}],
+    Counters2 = [{worker1, 0}, {worker2, 2}, {worker3, 4}],
+    State1 = #collector{
+        counters = Counters1,
+        total_rows = 0,
+        update_seq = [],
+        offset = 0,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = accumulator1
+    },
+    State2 = #collector{
+        counters = Counters1,
+        total_rows = 0,
+        update_seq = nil,
+        offset = 0,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = accumulator2
+    },
+    State3 = #collector{
+        counters = Counters1,
+        total_rows = 0,
+        update_seq = [],
+        offset = 0,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = accumulator3
+    },
+    State4 = #collector{
+        counters = Counters2,
+        total_rows = 10,
+        update_seq = [],
+        offset = 5,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator1
+    },
+    State5 = #collector{
+        counters = Counters2,
+        total_rows = 10,
+        update_seq = nil,
+        offset = 5,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator2
+    },
+    State6 = #collector{
+        counters = Counters2,
+        total_rows = null,
+        update_seq = [],
+        offset = null,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator3
+    },
+    meck:expect(fabric_view_changes, pack_seqs, [[{worker1, seq}]], meck:val(packed_seq)),
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    meck:expect(foo, bar, [{meta, Meta2}, accumulator1], meck:val({go1, updated_accumulator1})),
+    ?assertEqual({go1, State4}, handle_message({meta, Meta1}, Worker, State1)),
+    meck:expect(foo, bar, [{meta, Meta3}, accumulator2], meck:val({go2, updated_accumulator2})),
+    ?assertEqual({go2, State5}, handle_message({meta, Meta1}, Worker, State2)),
+    meck:expect(foo, bar, [{meta, Meta4}, accumulator3], meck:val({go3, updated_accumulator3})),
+    ?assertEqual({go3, State6}, handle_message({meta, Meta4}, Worker, State3)).
+
+t_handle_message_row(_) ->
+    Worker = {worker, from},
+    QueryArgs1 = #mrargs{direction = fwd},
+    QueryArgs2 = #mrargs{direction = rev},
+    Counters1 = [{worker, 1}],
+    Counters2 = [{worker, 2}],
+    Row1 = #view_row{id = id2, key = key2, doc = doc2},
+    Row2 = {view_row, #{id => id2, key => key2, doc => doc2}},
+    Rows11 = #view_row{id = id1, key = key1, doc = doc1},
+    Rows12 = #view_row{id = id2, key = key2, doc = doc2, worker = Worker},
+    Rows13 = #view_row{id = id3, key = key3, doc = doc3},
+    Rows21 = {view_row, #{id => id1, key => key1}},
+    Rows22 = {view_row, #{id => id2, key => key2, doc => doc2, worker => Worker}},
+    Rows23 = {view_row, #{id => id3, key => key3}},
+    Rows1 = [Rows11, Rows13],
+    Rows2 = [Rows23, Rows21],
+    Rows3 = [Rows11, Rows12, Rows13],
+    Rows4 = [Rows23, Rows22, Rows21],
+    State1 = #collector{query_args = QueryArgs1, counters = Counters1, rows = Rows1},
+    State2 = #collector{query_args = QueryArgs2, counters = Counters1, rows = Rows2},
+    State3 = #collector{query_args = QueryArgs1, counters = Counters2, rows = Rows3},
+    State4 = #collector{query_args = QueryArgs2, counters = Counters2, rows = Rows4},
+    meck:expect(fabric_view, maybe_send_row, [State3], meck:val(send_row1)),
+    ?assertEqual(send_row1, handle_message(Row1, Worker, State1)),
+    meck:expect(fabric_view, maybe_send_row, [State4], meck:val(send_row2)),
+    ?assertEqual(send_row2, handle_message(Row2, Worker, State2)).
+
+t_handle_message_complete(_) ->
+    Worker = worker,
+    Counters1 = [{Worker, 6}],
+    Counters2 = [{Worker, 7}],
+    State1 = #collector{counters = Counters1},
+    State2 = #collector{counters = Counters2},
+    meck:expect(fabric_view, maybe_send_row, [State2], meck:val(maybe_row)),
+    ?assertEqual(maybe_row, handle_message(complete, Worker, State1)).
+
+t_handle_message_execution_stats(_) ->
+    Message = {execution_stats, stats},
+    Source = {worker, from},
+    meck:expect(foo, bar, [Message, accumulator], meck:val({go, updated_accumulator})),
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    State1 = #collector{callback = fun foo:bar/2, user_acc = accumulator},
+    State2 = #collector{callback = fun foo:bar/2, user_acc = updated_accumulator},
+    ?assertEqual({go, State2}, handle_message(Message, Source, State1)).
+
+open_doc_test_() ->
+    {
+        foreach,
+        fun() -> meck:new(fabric) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_open_doc_not_found),
+            ?TDEF_FE(t_open_doc_deleted),
+            ?TDEF_FE(t_open_doc),
+            ?TDEF_FE(t_open_doc_error)
+        ]
+    }.
+
+t_open_doc_not_found(_) ->
+    Extra1 = [],
+    Extra2 = [{view_row_map, true}],
+    Options1 = [],
+    Options2 = [deleted],
+    Row1 = #view_row{key = id, doc = undefined},
+    Row2 = {view_row, #{key => id}},
+    meck:expect(fabric, open_doc, [db, id, Options2], meck:val({not_found, missing})),
+    {_, Ref1} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, true, Extra1]),
+    receive
+        {'DOWN', Ref1, _, _, Result1} ->
+            ?assertEqual(Row1, Result1)
+    end,
+    {_, Ref2} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, false, Extra2]),
+    receive
+        {'DOWN', Ref2, _, _, Result2} ->
+            ?assertEqual(Row2, Result2)
+    end.
+
+t_open_doc_deleted(_) ->
+    Extra1 = [],
+    Extra2 = [{view_row_map, true}],
+    Options1 = [],
+    Options2 = [deleted],
+    Revs = {1, [<<"foo">>]},
+    Doc = #doc{deleted = true, revs = Revs},
+    Value = {[{rev, <<"1-foo">>}, {deleted, true}]},
+    Row1 = #view_row{key = id, id = id, value = Value, doc = null},
+    Row2 = {view_row, #{key => id, id => id, value => Value, doc => null}},
+    meck:expect(fabric, open_doc, [db, id, Options2], meck:val({ok, Doc})),
+    {_, Ref1} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, true, Extra1]),
+    receive
+        {'DOWN', Ref1, _, _, Result1} ->
+            ?assertEqual(Row1, Result1)
+    end,
+    {_, Ref2} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, true, Extra2]),
+    receive
+        {'DOWN', Ref2, _, _, Result2} ->
+            ?assertEqual(Row2, Result2)
+    end.
+
+t_open_doc(_) ->
+    Extra1 = [],
+    Extra2 = [{view_row_map, true}],
+    Options1 = [],
+    Options2 = [deleted],
+    Revs = {1, [<<"foo">>]},
+    Doc = #doc{revs = Revs, id = <<"bar">>},
+    DocJson = {[{<<"_id">>, <<"bar">>}, {<<"_rev">>, <<"1-foo">>}]},
+    Value = {[{rev, <<"1-foo">>}]},
+    Row1 = #view_row{key = id, id = id, value = Value, doc = DocJson},
+    Row2 = {view_row, #{key => id, id => id, value => Value, doc => DocJson}},
+    meck:expect(fabric, open_doc, [db, id, Options2], meck:val({ok, Doc})),
+    {_, Ref1} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, true, Extra1]),
+    receive
+        {'DOWN', Ref1, _, _, Result1} ->
+            ?assertEqual(Row1, Result1)
+    end,
+    {_, Ref2} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, true, Extra2]),
+    receive
+        {'DOWN', Ref2, _, _, Result2} ->
+            ?assertEqual(Row2, Result2)
+    end.
+
+t_open_doc_error(_) ->
+    Extra = [],
+    Options1 = [],
+    Options2 = [deleted],
+    Exception = {id, reason},
+    meck:expect(fabric, open_doc, [db, id, Options2], meck:raise(error, reason)),
+    meck:expect(
+        couch_log,
+        error,
+        ["_all_docs open error: ~s ~s :: ~w ~w", [db, id, {error, reason}, '_']],
+        meck:val(ok)
+    ),
+    {_, Ref} = spawn_monitor(?MODULE, open_doc, [db, Options1, id, true, Extra]),
+    receive
+        {'DOWN', Ref, _, _, Result} ->
+            ?assertEqual(Exception, Result)
+    end.
+
+doc_receive_loop_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(foo, [non_strict]),
+            meck:new(fabric_util)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_doc_receive_loop_empty),
+            ?TDEF_FE(t_doc_receive_loop),
+            ?TDEF_FE(t_doc_receive_loop_error),
+            ?TDEF_FE(t_doc_receive_loop_timeout)
+        ]
+    }.
+
+t_doc_receive_loop_empty(_) ->
+    Keys = [],
+    Pids = queue:new(),
+    ?assertEqual(
+        {ok, accumulator},
+        doc_receive_loop(Keys, Pids, undefined, undefined, undefined, accumulator)
+    ).
+
+t_doc_receive_loop(_) ->
+    Keys = [key1, key2, key3],
+    Pids = queue:from_list([]),
+    MaxJobs = 4,
+    Props1 = {row, [{id, id1}, {key, key1}, {value, value1}]},
+    Props2 = {row, [{id, id2}, {key, key2}, {value, value2}]},
+    Row1 = #view_row{id = id1, key = key1, value = value1},
+    Row2 = {view_row, #{id => id2, key => key2, value => value2}},
+    meck:expect(
+        foo,
+        spawned,
+        [
+            {[key1], meck:raise(exit, Row1)},
+            {[key2], meck:raise(exit, Row2)}
+        ]
+    ),
+    meck:expect(foo, spawn, fun(K) -> spawn_monitor(foo, spawned, [K]) end),
+    meck:expect(
+        foo,
+        callback,
+        [
+            {[Props1, accumulator1], meck:val({ok, accumulator2})},
+            {[Props2, accumulator2], meck:val({stop, accumulator3})}
+        ]
+    ),
+    meck:expect(fabric_util, all_docs_timeout, [], meck:val(1000)),
+    ?assertEqual(
+        {ok, accumulator3},
+        doc_receive_loop(Keys, Pids, fun foo:spawn/1, MaxJobs, fun foo:callback/2, accumulator1)
+    ).
+
+t_doc_receive_loop_error(_) ->
+    Keys = [key1, key2, key3],
+    Pids = queue:from_list([]),
+    MaxJobs = 3,
+    meck:expect(foo, spawned, [key1], meck:raise(exit, error)),
+    meck:expect(foo, spawn, fun(K) -> spawn_monitor(foo, spawned, [K]) end),
+    meck:expect(foo, callback, [{error, error}, accumulator1], meck:val({ok, accumulator2})),
+    meck:expect(fabric_util, all_docs_timeout, [], meck:val(1000)),
+    ?assertEqual(
+        {ok, accumulator2},
+        doc_receive_loop(Keys, Pids, fun foo:spawn/1, MaxJobs, fun foo:callback/2, accumulator1)
+    ).
+
+t_doc_receive_loop_timeout(_) ->
+    Keys = [key1, key2, key3],
+    Pids = queue:from_list([]),
+    MaxJobs = 3,
+    meck:expect(foo, spawned, fun(key1) -> timer:sleep(infinity) end),
+    meck:expect(foo, spawn, fun(K) -> spawn_monitor(foo, spawned, [K]) end),
+    meck:expect(foo, callback, ['_', '_'], undefined),
+    meck:expect(fabric_util, all_docs_timeout, [], meck:val(1)),
+    ?assertEqual(
+        timeout,
+        doc_receive_loop(Keys, Pids, fun foo:spawn/1, MaxJobs, fun foo:callback/2, accumulator1)
+    ),
+    ?assertNot(meck:called(foo, callback, '_')).
+
+merge_row_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> ok end,
+        [
+            ?TDEF_FE(t_merge_row_record_fwd),
+            ?TDEF_FE(t_merge_row_record_rev),
+            ?TDEF_FE(t_merge_row_map_fwd),
+            ?TDEF_FE(t_merge_row_map_rev),
+            ?TDEF_FE(t_merge_row_mixed_fwd),
+            ?TDEF_FE(t_merge_row_mixed_rev)
+        ]
+    }.
+
+t_merge_row_record_fwd(_) ->
+    RowX1 = #view_row{id = 4},
+    Row1 = #view_row{id = 1},
+    Row2 = #view_row{id = 3},
+    Row3 = #view_row{id = 5},
+    Row4 = #view_row{id = 7},
+    Rows = [Row1, Row2, Row3, Row4],
+    Expected1 = [Row1, Row2, RowX1, Row3, Row4],
+    ?assertEqual(Expected1, merge_row(fwd, RowX1, Rows)),
+    RowX2 = #view_row{id = 0},
+    Expected2 = [RowX2, Row1, Row2, Row3, Row4],
+    ?assertEqual(Expected2, merge_row(fwd, RowX2, Rows)),
+    RowX3 = #view_row{id = 8},
+    Expected3 = [Row1, Row2, Row3, Row4, RowX3],
+    ?assertEqual(Expected3, merge_row(fwd, RowX3, Rows)),
+    RowX4 = #view_row{id = 5},
+    Expected4 = [Row1, Row2, RowX4, Row3, Row4],
+    ?assertEqual(Expected4, merge_row(fwd, RowX4, Rows)).
+
+t_merge_row_record_rev(_) ->
+    RowX1 = #view_row{id = 5},
+    Row1 = #view_row{id = 2},
+    Row2 = #view_row{id = 4},
+    Row3 = #view_row{id = 6},
+    Row4 = #view_row{id = 8},
+    Rows = [Row4, Row3, Row2, Row1],
+    Expected1 = [Row4, Row3, RowX1, Row2, Row1],
+    ?assertEqual(Expected1, merge_row(rev, RowX1, Rows)),
+    RowX2 = #view_row{id = 1},
+    Expected2 = [Row4, Row3, Row2, Row1, RowX2],
+    ?assertEqual(Expected2, merge_row(rev, RowX2, Rows)),
+    RowX3 = #view_row{id = 9},
+    Expected3 = [RowX3, Row4, Row3, Row2, Row1],
+    ?assertEqual(Expected3, merge_row(rev, RowX3, Rows)),
+    RowX4 = #view_row{id = 6},
+    Expected4 = [Row4, Row3, RowX4, Row2, Row1],
+    ?assertEqual(Expected4, merge_row(rev, RowX4, Rows)).
+
+t_merge_row_map_fwd(_) ->
+    RowX1 = {view_row, #{id => 4}},
+    Row1 = {view_row, #{id => 1}},
+    Row2 = {view_row, #{id => 3}},
+    Row3 = {view_row, #{id => 5}},
+    Row4 = {view_row, #{id => 7}},
+    Rows = [Row1, Row2, Row3, Row4],
+    Expected1 = [Row1, Row2, RowX1, Row3, Row4],
+    ?assertEqual(Expected1, merge_row(fwd, RowX1, Rows)),
+    RowX2 = {view_row, #{id => 0}},
+    Expected2 = [RowX2, Row1, Row2, Row3, Row4],
+    ?assertEqual(Expected2, merge_row(fwd, RowX2, Rows)),
+    RowX3 = {view_row, #{id => 8}},
+    Expected3 = [Row1, Row2, Row3, Row4, RowX3],
+    ?assertEqual(Expected3, merge_row(fwd, RowX3, Rows)),
+    RowX4 = {view_row, #{id => 5}},
+    Expected4 = [Row1, Row2, RowX4, Row3, Row4],
+    ?assertEqual(Expected4, merge_row(fwd, RowX4, Rows)).
+
+t_merge_row_map_rev(_) ->
+    RowX1 = {view_row, #{id => 5}},
+    Row1 = {view_row, #{id => 2}},
+    Row2 = {view_row, #{id => 4}},
+    Row3 = {view_row, #{id => 6}},
+    Row4 = {view_row, #{id => 8}},
+    Rows = [Row4, Row3, Row2, Row1],
+    Expected1 = [Row4, Row3, RowX1, Row2, Row1],
+    ?assertEqual(Expected1, merge_row(rev, RowX1, Rows)),
+    RowX2 = {view_row, #{id => 1}},
+    Expected2 = [Row4, Row3, Row2, Row1, RowX2],
+    ?assertEqual(Expected2, merge_row(rev, RowX2, Rows)),
+    RowX3 = {view_row, #{id => 9}},
+    Expected3 = [RowX3, Row4, Row3, Row2, Row1],
+    ?assertEqual(Expected3, merge_row(rev, RowX3, Rows)),
+    RowX4 = {view_row, #{id => 6}},
+    Expected4 = [Row4, Row3, RowX4, Row2, Row1],
+    ?assertEqual(Expected4, merge_row(rev, RowX4, Rows)).
+
+t_merge_row_mixed_fwd(_) ->
+    RowX1 = #view_row{id = 4},
+    Row1 = {view_row, #{id => 1}},
+    Row2 = {view_row, #{id => 3}},
+    Row3 = #view_row{id = 5},
+    Row4 = {view_row, #{id => 7}},
+    Rows = [Row1, Row2, Row3, Row4],
+    Expected1 = [Row1, Row2, RowX1, Row3, Row4],
+    ?assertEqual(Expected1, merge_row(fwd, RowX1, Rows)),
+    RowX2 = {view_row, #{id => 0}},
+    Expected2 = [RowX2, Row1, Row2, Row3, Row4],
+    ?assertEqual(Expected2, merge_row(fwd, RowX2, Rows)),
+    RowX3 = {view_row, #{id => 8}},
+    Expected3 = [Row1, Row2, Row3, Row4, RowX3],
+    ?assertEqual(Expected3, merge_row(fwd, RowX3, Rows)),
+    RowX4 = {view_row, #{id => 5}},
+    Expected4 = [Row1, Row2, Row3, RowX4, Row4],
+    ?assertEqual(Expected4, merge_row(fwd, RowX4, Rows)).
+
+t_merge_row_mixed_rev(_) ->
+    RowX1 = {view_row, #{id => 5}},
+    Row1 = #view_row{id = 2},
+    Row2 = #view_row{id = 4},
+    Row3 = {view_row, #{id => 6}},
+    Row4 = #view_row{id = 8},
+    Rows = [Row4, Row3, Row2, Row1],
+    Expected1 = [Row4, Row3, RowX1, Row2, Row1],
+    ?assertEqual(Expected1, merge_row(rev, RowX1, Rows)),
+    RowX2 = #view_row{id = 1},
+    Expected2 = [Row4, Row3, Row2, Row1, RowX2],
+    ?assertEqual(Expected2, merge_row(rev, RowX2, Rows)),
+    RowX3 = #view_row{id = 9},
+    Expected3 = [RowX3, Row4, Row3, Row2, Row1],
+    ?assertEqual(Expected3, merge_row(rev, RowX3, Rows)),
+    RowX4 = #view_row{id = 6},
+    Expected4 = [Row4, Row3, RowX4, Row2, Row1],
+    ?assertEqual(Expected4, merge_row(rev, RowX4, Rows)).
+
+-endif.

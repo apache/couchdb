@@ -15,7 +15,6 @@
 -export([
     remove_overlapping_shards/2,
     maybe_send_row/1,
-    transform_row/1,
     keydict/1,
     extract_view/4,
     get_shards/2,
@@ -164,7 +163,7 @@ maybe_send_row(State) ->
                 {Row0, NewState} ->
                     Row1 = possibly_embed_doc(NewState, Row0),
                     Row2 = detach_partition(Row1),
-                    Row3 = transform_row(Row2),
+                    Row3 = fabric_view_row:transform(Row2),
                     case Callback(Row3, AccIn) of
                         {stop, Acc} ->
                             {stop, NewState#collector{user_acc = Acc, limit = Limit - 1}};
@@ -183,30 +182,22 @@ maybe_send_row(State) ->
 %% the values contain "_id" then use the "_id"s
 %% to retrieve documents and embed in result
 possibly_embed_doc(
-    _State,
-    #view_row{id = reduced} = Row
-) ->
-    Row;
-possibly_embed_doc(
-    _State,
-    #view_row{value = undefined} = Row
-) ->
-    Row;
-possibly_embed_doc(
     #collector{db_name = DbName, query_args = Args},
-    #view_row{key = _Key, id = _Id, value = Value, doc = _Doc} = Row
+    Row
 ) ->
+    IsReduced = fabric_view_row:get_id(Row) == reduced,
     #mrargs{include_docs = IncludeDocs} = Args,
-    case IncludeDocs andalso is_tuple(Value) of
+    Value = fabric_view_row:get_value(Row),
+    case (not IsReduced) andalso IncludeDocs andalso is_tuple(Value) of
         true ->
             {Props} = Value,
-            Rev0 = couch_util:get_value(<<"_rev">>, Props),
             case couch_util:get_value(<<"_id">>, Props) of
                 null ->
-                    Row#view_row{doc = null};
+                    fabric_view_row:set_doc(Row, null);
                 undefined ->
                     Row;
                 IncId ->
+                    Rev0 = couch_util:get_value(<<"_rev">>, Props),
                     % use separate process to call fabric:open_doc
                     % to not interfere with current call
                     {Pid, Ref} = spawn_monitor(fun() ->
@@ -215,21 +206,25 @@ possibly_embed_doc(
                                 undefined ->
                                     case fabric:open_doc(DbName, IncId, []) of
                                         {ok, NewDoc} ->
-                                            Row#view_row{doc = couch_doc:to_json_obj(NewDoc, [])};
+                                            fabric_view_row:set_doc(
+                                                Row, couch_doc:to_json_obj(NewDoc, [])
+                                            );
                                         {not_found, _} ->
-                                            Row#view_row{doc = null};
+                                            fabric_view_row:set_doc(Row, null);
                                         Else ->
-                                            Row#view_row{doc = {error, Else}}
+                                            fabric_view_row:set_doc(Row, {error, Else})
                                     end;
                                 Rev0 ->
                                     Rev = couch_doc:parse_rev(Rev0),
                                     case fabric:open_revs(DbName, IncId, [Rev], []) of
                                         {ok, [{ok, NewDoc}]} ->
-                                            Row#view_row{doc = couch_doc:to_json_obj(NewDoc, [])};
+                                            fabric_view_row:set_doc(
+                                                Row, couch_doc:to_json_obj(NewDoc, [])
+                                            );
                                         {ok, [{{not_found, _}, Rev}]} ->
-                                            Row#view_row{doc = null};
+                                            fabric_view_row:set_doc(Row, null);
                                         Else ->
-                                            Row#view_row{doc = {error, Else}}
+                                            fabric_view_row:set_doc(Row, {error, Else})
                                     end
                             end
                         )
@@ -239,14 +234,15 @@ possibly_embed_doc(
                             Resp
                     end
             end;
-        _ ->
+        false ->
             Row
     end.
 
-detach_partition(#view_row{key = {p, _Partition, Key}} = Row) ->
-    Row#view_row{key = Key};
-detach_partition(#view_row{} = Row) ->
-    Row.
+detach_partition(Row) ->
+    case fabric_view_row:get_key(Row) of
+        {p, _Partition, Key} -> fabric_view_row:set_key(Row, Key);
+        _Key -> Row
+    end.
 
 keydict(undefined) ->
     undefined;
@@ -262,20 +258,21 @@ keydict(Keys) ->
 
 get_next_row(#collector{rows = []}) ->
     throw(complete);
-get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
+get_next_row(#collector{reducer = RedSrc} = State0) when RedSrc =/= undefined ->
     #collector{
-        query_args = #mrargs{direction = Dir},
+        query_args = #mrargs{direction = Dir, extra = Options},
         keys = Keys,
-        rows = RowDict,
+        rows = RowDict0,
         lang = Lang,
         counters = Counters0,
         collation = Collation
-    } = St,
-    {Key, RestKeys} = find_next_key(Keys, Dir, Collation, RowDict),
-    case reduce_row_dict_take(Key, RowDict, Collation) of
-        {Records, NewRowDict} ->
+    } = State0,
+    {Key, RestKeys} = find_next_key(Keys, Dir, Collation, RowDict0),
+    case reduce_row_dict_take(Key, RowDict0, Collation) of
+        {Records, RowDict} ->
             Counters = lists:foldl(
-                fun(#view_row{worker = {Worker, From}}, CntrsAcc) ->
+                fun(Row, CntrsAcc) ->
+                    {Worker, From} = fabric_view_row:get_worker(Row),
                     case From of
                         {Pid, _} when is_pid(Pid) ->
                             gen_server:reply(From, ok);
@@ -287,17 +284,20 @@ get_next_row(#collector{reducer = RedSrc} = St) when RedSrc =/= undefined ->
                 Counters0,
                 Records
             ),
-            Wrapped = [[V] || #view_row{value = V} <- Records],
+            Wrapped = [[fabric_view_row:get_value(R)] || R <- Records],
             {ok, [Reduced]} = couch_query_servers:rereduce(Lang, [RedSrc], Wrapped),
             {ok, Finalized} = couch_query_servers:finalize(RedSrc, Reduced),
-            NewSt = St#collector{keys = RestKeys, rows = NewRowDict, counters = Counters},
-            {#view_row{key = Key, id = reduced, value = Finalized}, NewSt};
+            State = State0#collector{keys = RestKeys, rows = RowDict, counters = Counters},
+            ViewRow = fabric_view_row:from_props(
+                [{key, Key}, {id, reduced}, {value, Finalized}], Options
+            ),
+            {ViewRow, State};
         error ->
-            get_next_row(St#collector{keys = RestKeys})
+            get_next_row(State0#collector{keys = RestKeys})
     end;
 get_next_row(State) ->
     #collector{rows = [Row | Rest], counters = Counters0} = State,
-    {Worker, From} = Row#view_row.worker,
+    {Worker, From} = fabric_view_row:get_worker(Row),
     rexi:stream_ack(From),
     Counters1 = fabric_dict:update_counter(Worker, -1, Counters0),
     {Row, State#collector{rows = Rest, counters = Counters1}}.
@@ -337,19 +337,6 @@ find_next_key([], _, _, _) ->
     throw(complete);
 find_next_key([Key | Rest], _, _, _) ->
     {Key, Rest}.
-
-transform_row(#view_row{value = {[{reduce_overflow_error, Msg}]}}) ->
-    {row, [{key, null}, {id, error}, {value, reduce_overflow_error}, {reason, Msg}]};
-transform_row(#view_row{key = Key, id = reduced, value = Value}) ->
-    {row, [{key, Key}, {value, Value}]};
-transform_row(#view_row{key = Key, id = undefined}) ->
-    {row, [{key, Key}, {id, error}, {value, not_found}]};
-transform_row(#view_row{key = Key, id = Id, value = Value, doc = undefined}) ->
-    {row, [{id, Id}, {key, Key}, {value, Value}]};
-transform_row(#view_row{key = Key, id = _Id, value = _Value, doc = {error, Reason}}) ->
-    {row, [{id, error}, {key, Key}, {value, Reason}]};
-transform_row(#view_row{key = Key, id = Id, value = Value, doc = Doc}) ->
-    {row, [{id, Id}, {key, Key}, {value, Value}, {doc, Doc}]}.
 
 compare(fwd, <<"raw">>, A, B) -> A < B;
 compare(rev, <<"raw">>, A, B) -> B < A;
@@ -574,5 +561,301 @@ mk_shard(Name, Range) ->
     Node = list_to_atom(Name),
     BName = list_to_binary(Name),
     #shard{name = BName, node = Node, range = Range}.
+
+possibly_embed_doc_test_() ->
+    {
+        foreach,
+        fun() -> meck:new(fabric) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_possibly_embed_doc_reduced),
+            ?TDEF_FE(t_possibly_embed_doc_no_docs),
+            ?TDEF_FE(t_possible_embed_doc_no_props),
+            ?TDEF_FE(t_possible_embed_doc_id_null),
+            ?TDEF_FE(t_possible_embed_doc_id_undefined),
+            ?TDEF_FE(t_possible_embed_doc_no_rev),
+            ?TDEF_FE(t_possible_embed_doc_no_rev_doc_not_found),
+            ?TDEF_FE(t_possible_embed_doc_no_rev_doc_error),
+            ?TDEF_FE(t_possible_embed_doc),
+            ?TDEF_FE(t_possible_embed_doc_not_found),
+            ?TDEF_FE(t_possible_embed_doc_error)
+        ]
+    }.
+
+t_possibly_embed_doc_reduced(_) ->
+    State = #collector{query_args = #mrargs{}},
+    Row1 = #view_row{id = reduced},
+    Row2 = {view_row, #{id => reduced}},
+    ?assertEqual(Row1, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row2, possibly_embed_doc(State, Row2)).
+
+t_possibly_embed_doc_no_docs(_) ->
+    QueryArgs = #mrargs{include_docs = false},
+    State = #collector{query_args = QueryArgs},
+    Row1 = #view_row{id = id},
+    Row2 = {view_row, #{id => id}},
+    ?assertEqual(Row1, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row2, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_no_props(_) ->
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{query_args = QueryArgs},
+    Row1 = #view_row{id = id},
+    Row2 = {view_row, #{id => id}},
+    ?assertEqual(Row1, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row2, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_id_null(_) ->
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{query_args = QueryArgs},
+    Value = {[{<<"_id">>, null}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = null},
+    Row4 = {view_row, #{id => id, value => Value, doc => null}},
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_id_undefined(_) ->
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{query_args = QueryArgs},
+    Value = {[{<<"_id">>, undefined}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    ?assertEqual(Row1, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row2, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_no_rev(_) ->
+    DbName = <<"db">>,
+    Id = <<"id">>,
+    DocId = <<"doc_id">>,
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{db_name = DbName, query_args = QueryArgs},
+    Value = {[{<<"_id">>, Id}]},
+    NewDoc = #doc{id = DocId},
+    EmbeddedDoc = {[{<<"_id">>, DocId}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = EmbeddedDoc},
+    Row4 = {view_row, #{id => id, value => Value, doc => EmbeddedDoc}},
+    meck:expect(fabric, open_doc, [DbName, Id, []], meck:val({ok, NewDoc})),
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_no_rev_doc_not_found(_) ->
+    DbName = <<"db">>,
+    Id = <<"id">>,
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{db_name = DbName, query_args = QueryArgs},
+    Value = {[{<<"_id">>, Id}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = null},
+    Row4 = {view_row, #{id => id, value => Value, doc => null}},
+    meck:expect(fabric, open_doc, [DbName, Id, []], meck:val({not_found, undefined})),
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_no_rev_doc_error(_) ->
+    DbName = <<"db">>,
+    Id = <<"id">>,
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{db_name = DbName, query_args = QueryArgs},
+    Value = {[{<<"_id">>, Id}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = {error, fabric_error}},
+    Row4 = {view_row, #{id => id, value => Value, doc => {error, fabric_error}}},
+    meck:expect(fabric, open_doc, [DbName, Id, []], meck:val(fabric_error)),
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc(_) ->
+    DbName = <<"db">>,
+    Id = <<"id">>,
+    Rev = <<"1-foo">>,
+    ParsedRev = {1, <<"foo">>},
+    DocId = <<"doc_id">>,
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{db_name = DbName, query_args = QueryArgs},
+    Value = {[{<<"_id">>, Id}, {<<"_rev">>, Rev}]},
+    NewDoc = #doc{id = DocId},
+    EmbeddedDoc = {[{<<"_id">>, DocId}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = EmbeddedDoc},
+    Row4 = {view_row, #{id => id, value => Value, doc => EmbeddedDoc}},
+    meck:expect(fabric, open_revs, [DbName, Id, [ParsedRev], []], meck:val({ok, [{ok, NewDoc}]})),
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_not_found(_) ->
+    DbName = <<"db">>,
+    Id = <<"id">>,
+    Rev = <<"1-foo">>,
+    ParsedRev = {1, <<"foo">>},
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{db_name = DbName, query_args = QueryArgs},
+    Value = {[{<<"_id">>, Id}, {<<"_rev">>, Rev}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = null},
+    Row4 = {view_row, #{id => id, value => Value, doc => null}},
+    meck:expect(
+        fabric,
+        open_revs,
+        [DbName, Id, [ParsedRev], []],
+        meck:val({ok, [{{not_found, undefined}, ParsedRev}]})
+    ),
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+t_possible_embed_doc_error(_) ->
+    DbName = <<"db">>,
+    Id = <<"id">>,
+    Rev = <<"1-foo">>,
+    ParsedRev = {1, <<"foo">>},
+    QueryArgs = #mrargs{include_docs = true},
+    State = #collector{db_name = DbName, query_args = QueryArgs},
+    Value = {[{<<"_id">>, Id}, {<<"_rev">>, Rev}]},
+    Row1 = #view_row{id = id, value = Value},
+    Row2 = {view_row, #{id => id, value => Value}},
+    Row3 = #view_row{id = id, value = Value, doc = {error, fabric_error}},
+    Row4 = {view_row, #{id => id, value => Value, doc => {error, fabric_error}}},
+    meck:expect(fabric, open_revs, [DbName, Id, [ParsedRev], []], meck:val(fabric_error)),
+    ?assertEqual(Row3, possibly_embed_doc(State, Row1)),
+    ?assertEqual(Row4, possibly_embed_doc(State, Row2)).
+
+detach_partition_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> ok end,
+        [
+            ?TDEF_FE(t_detach_partition_partition_record),
+            ?TDEF_FE(t_detach_partition_no_partition_record),
+            ?TDEF_FE(t_detach_partition_partition_map),
+            ?TDEF_FE(t_detach_partition_no_partition_map)
+        ]
+    }.
+
+t_detach_partition_partition_record(_) ->
+    ViewRow1 = #view_row{key = {p, partition, key}},
+    ViewRow2 = #view_row{key = key},
+    ?assertEqual(ViewRow2, detach_partition(ViewRow1)).
+
+t_detach_partition_no_partition_record(_) ->
+    ViewRow = #view_row{key = key},
+    ?assertEqual(ViewRow, detach_partition(ViewRow)).
+
+t_detach_partition_partition_map(_) ->
+    ViewRow1 = {view_row, #{key => {p, partition, key}}},
+    ViewRow2 = {view_row, #{key => key}},
+    ?assertEqual(ViewRow2, detach_partition(ViewRow1)).
+
+t_detach_partition_no_partition_map(_) ->
+    ViewRow = {view_row, #{key => key}},
+    ?assertEqual(ViewRow, detach_partition(ViewRow)).
+
+get_next_row_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> ok end,
+        [
+            ?TDEF_FE(t_get_next_row_end),
+            ?TDEF_FE(t_get_next_row_map),
+            ?TDEF_FE(t_get_next_row_reduce)
+        ]
+    }.
+
+t_get_next_row_end(_) ->
+    State = #collector{rows = []},
+    ?assertThrow(complete, get_next_row(State)).
+
+t_get_next_row_map(_) ->
+    Rest = [row2, row3],
+    Counters1 = [{worker, 8}],
+    Counters2 = [{worker, 7}],
+    Row1 = #view_row{worker = {worker, from}},
+    Row2 = {view_row, #{worker => {worker, from}}},
+    State1 = #collector{rows = [Row1 | Rest], counters = Counters1},
+    State2 = #collector{rows = [Row2 | Rest], counters = Counters1},
+    State3 = #collector{rows = Rest, counters = Counters2},
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({Row1, State3}, get_next_row(State1)),
+    ?assertEqual({Row2, State3}, get_next_row(State2)).
+
+t_get_next_row_reduce(_) ->
+    QueryArgs1 = #mrargs{direction = fwd, extra = []},
+    QueryArgs2 = #mrargs{direction = fwd, extra = [{view_row_map, true}]},
+    KeysRest = [key2, key3],
+    Key = key1,
+    Keys = [key0, Key | KeysRest],
+    W1From = list_to_pid("<0.4.1>"),
+    W2From = list_to_pid("<0.4.2>"),
+    ViewRows1 = [
+        #view_row{value = value1, worker = {worker1, W1From}},
+        #view_row{value = value2, worker = {worker2, W2From}},
+        #view_row{value = value3, worker = {worker2, W2From}}
+    ],
+    ViewRows2 = [
+        {view_row, #{value => value1, worker => {worker1, W1From}}},
+        {view_row, #{value => value2, worker => {worker2, W2From}}},
+        {view_row, #{value => value3, worker => {worker2, W2From}}}
+    ],
+    Values = [[value1], [value2], [value3]],
+    RowDict1 = dict:from_list([{key1, ViewRows1}, {key2, undefined}, {key3, undefined}]),
+    RowDict2 = dict:from_list([{key1, ViewRows2}, {key2, undefined}, {key3, undefined}]),
+    RowDict3 = dict:from_list([{key2, undefined}, {key3, undefined}]),
+    Language = <<"language">>,
+    Collation = <<"raw">>,
+    Counters1 = [{worker1, 3}, {worker2, 5}],
+    Counters2 = [{worker1, 2}, {worker2, 3}],
+    State1 = #collector{
+        query_args = QueryArgs1,
+        keys = Keys,
+        rows = RowDict1,
+        lang = Language,
+        counters = Counters1,
+        collation = Collation,
+        reducer = reducer
+    },
+    State2 = #collector{
+        query_args = QueryArgs2,
+        keys = Keys,
+        rows = RowDict2,
+        lang = Language,
+        counters = Counters1,
+        collation = Collation,
+        reducer = reducer
+    },
+    State3 = #collector{
+        query_args = QueryArgs1,
+        keys = KeysRest,
+        rows = RowDict3,
+        lang = Language,
+        collation = Collation,
+        counters = Counters2,
+        reducer = reducer
+    },
+    State4 = #collector{
+        query_args = QueryArgs2,
+        keys = KeysRest,
+        rows = RowDict3,
+        lang = Language,
+        collation = Collation,
+        counters = Counters2,
+        reducer = reducer
+    },
+    Row1 = #view_row{key = Key, id = reduced, value = finalized},
+    Row2 = {view_row, #{key => Key, id => reduced, value => finalized}},
+    meck:expect(rexi, stream_ack, ['_'], meck:val(ok)),
+    meck:expect(
+        couch_query_servers, rereduce, [Language, [reducer], Values], meck:val({ok, [reduced]})
+    ),
+    meck:expect(couch_query_servers, finalize, [reducer, reduced], meck:val({ok, finalized})),
+    ?assertEqual({Row1, State3}, get_next_row(State1)),
+    ?assertEqual({Row2, State4}, get_next_row(State2)).
 
 -endif.

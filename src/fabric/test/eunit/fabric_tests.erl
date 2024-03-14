@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 cleanup_index_files_test_() ->
     {
@@ -238,3 +239,67 @@ delete_ddoc(DbName, DDocId) ->
     {ok, DDoc0} = fabric:open_doc(DbName, DDocId, [?ADMIN_CTX]),
     DDoc = DDoc0#doc{deleted = true, body = {[]}},
     fabric:update_doc(DbName, DDoc, [?ADMIN_CTX]).
+
+design_docs_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_design_docs_configuration),
+            ?TDEF_FE(t_design_docs_configuration_io_priority)
+        ]
+    }.
+
+t_design_docs_configuration(_) ->
+    DbName = <<"db">>,
+    AdminCtx = [?ADMIN_CTX],
+    QueryArgs =
+        #mrargs{
+            include_docs = true,
+            extra = [{namespace, <<"_design">>}, {view_row_map, true}]
+        },
+    meck:expect(
+        fabric, all_docs, [DbName, AdminCtx, '_', [], QueryArgs], meck:val(all_docs_result)
+    ),
+    ?assertEqual(all_docs_result, fabric:design_docs(DbName)).
+
+t_design_docs_configuration_io_priority(_) ->
+    DbName = <<"db">>,
+    AdminCtx = [?ADMIN_CTX],
+    QueryArgs =
+        #mrargs{
+            include_docs = true,
+            extra = [{namespace, <<"_design">>}, {io_priority, io_priority}, {view_row_map, true}]
+        },
+    meck:expect(
+        fabric, all_docs, [DbName, AdminCtx, '_', [], QueryArgs], meck:val(all_docs_result)
+    ),
+    put(io_priority, io_priority),
+    ?assertEqual(all_docs_result, fabric:design_docs(DbName)).
+
+query_view_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_query_view_configuration)
+        ]
+    }.
+
+t_query_view_configuration({_Ctx, DbName}) ->
+    DDocName = <<"foo">>,
+    ViewName = <<"bar">>,
+    QueryArgs =
+        #mrargs{
+            view_type = map,
+            start_key_docid = <<>>,
+            end_key_docid = <<255>>,
+            extra = [{view_row_map, true}]
+        },
+    Options = [],
+    Accumulator = [],
+    Parameters = [DbName, Options, '_', ViewName, QueryArgs, '_', Accumulator, '_'],
+    meck:expect(fabric_view_map, go, Parameters, meck:val(fabric_view_map_results)),
+    ?assertEqual(fabric_view_map_results, fabric:query_view(DbName, DDocName, ViewName)).

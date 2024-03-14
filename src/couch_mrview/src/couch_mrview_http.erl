@@ -472,7 +472,7 @@ row_to_json(Id0, Row) ->
 parse_params(#httpd{} = Req, Keys) ->
     parse_params(chttpd:qs(Req), Keys);
 parse_params(Props, Keys) ->
-    Args = #mrargs{},
+    Args = #mrargs{extra = [{view_row_map, true}]},
     parse_params(Props, Keys, Args).
 
 parse_params(Props, Keys, Args) ->
@@ -511,13 +511,16 @@ parse_body_and_query(Req, Keys) ->
         #mrargs{
             keys = Keys,
             group = undefined,
-            group_level = undefined
+            group_level = undefined,
+            extra = [{view_row_map, true}]
         },
         [keep_group_level]
     ).
 
 parse_body_and_query(Req, {Props}, Keys) ->
-    Args = #mrargs{keys = Keys, group = undefined, group_level = undefined},
+    Args = #mrargs{
+        keys = Keys, group = undefined, group_level = undefined, extra = [{view_row_map, true}]
+    },
     BodyArgs0 = parse_params(Props, Keys, Args, [decoded]),
     BodyArgs1 =
         case is_view(Req) of

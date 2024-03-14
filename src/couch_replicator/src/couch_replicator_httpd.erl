@@ -135,11 +135,12 @@ handle_scheduler_docs(Db, Req) when is_binary(Db) ->
     VArgs0 = couch_mrview_http:parse_params(Req, undefined),
     StatesQs = chttpd:qs_value(Req, "states"),
     States = couch_replicator_httpd_util:parse_replication_state_filter(StatesQs),
+    Extra = VArgs0#mrargs.extra,
     VArgs1 = VArgs0#mrargs{
         view_type = map,
         include_docs = true,
         reduce = false,
-        extra = [{filter_states, States}]
+        extra = [{filter_states, States} | Extra]
     },
     VArgs2 = couch_mrview_util:validate_args(VArgs1),
     Opts = [{user_ctx, Req#httpd.user_ctx}],

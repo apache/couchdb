@@ -53,9 +53,6 @@
          keys_examined => non_neg_integer()
     }.
 
--type row_property_key() :: id | key | value | doc.
--type row_properties() :: [{row_property_key(), any()}].
-
 -type reason() :: needs_text_search
 		| field_mismatch
 		| sort_order_mismatch
