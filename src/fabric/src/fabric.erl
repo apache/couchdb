@@ -442,7 +442,8 @@ changes(DbName, Callback, Acc0, Options) ->
 
 %% @equiv query_view(DbName, DesignName, ViewName, #mrargs{})
 query_view(DbName, DesignName, ViewName) ->
-    query_view(DbName, DesignName, ViewName, #mrargs{}).
+    QueryArgs = #mrargs{extra = [{view_row_map, true}]},
+    query_view(DbName, DesignName, ViewName, QueryArgs).
 
 %% @equiv query_view(DbName, DesignName,
 %%                     ViewName, fun default_callback/2, [], QueryArgs)
@@ -545,10 +546,11 @@ end_changes() ->
 %% @doc retrieve all the design docs from a database
 -spec design_docs(dbname()) -> {ok, [json_obj()]} | {error, Reason :: term()}.
 design_docs(DbName) ->
+    Extra0 = [{view_row_map, true}],
     Extra =
         case get(io_priority) of
-            undefined -> [];
-            Else -> [{io_priority, Else}]
+            undefined -> Extra0;
+            Else -> [{io_priority, Else} | Extra0]
         end,
     QueryArgs0 = #mrargs{
         include_docs = true,

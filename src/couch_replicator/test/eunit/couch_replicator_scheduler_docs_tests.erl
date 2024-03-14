@@ -131,17 +131,22 @@ t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
     Body = test_util:wait(
         fun() ->
             case req(get, SchedulerDocsUrl) of
-                {200, #{<<"docs">> := [_ | _]} = Decoded} -> Decoded;
-                {_, #{}} -> wait
+                {200, #{<<"docs">> := [_ | _]} = Decoded} ->
+                    Decoded;
+                {_, #{<<"error">> := Error, <<"reason">> := Reason}} ->
+                    ?debugVal(Error, 100),
+                    ?debugVal(binary_to_list(Reason), 100);
+                {_, #{}} ->
+                    wait
             end
         end,
         14000,
         1000
     ),
+    ?assertNotEqual(Body, timeout),
     Docs = maps:get(<<"docs">>, Body),
     TotalRows = maps:get(<<"total_rows">>, Body),
-    ?assertEqual(TotalRows, length(Docs)),
-    ok.
+    ?assertEqual(TotalRows, length(Docs)).
 
 t_local_docs_can_be_written({_Ctx, {RepDb, _, _}}) ->
     DocUrl1 = rep_doc_url(RepDb, <<"_local/doc1">>),

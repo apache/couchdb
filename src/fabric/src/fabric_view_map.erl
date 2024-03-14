@@ -121,6 +121,37 @@ go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
             {ok, Resp}
     end.
 
+handle_stop(State) ->
+    #collector{callback = Callback} = State,
+    {_, Acc} = Callback(complete, State#collector.user_acc),
+    {stop, State#collector{user_acc = Acc}}.
+
+handle_non_sorted(Row, {_, From}, State) ->
+    #collector{callback = Callback, user_acc = AccIn, limit = Limit} = State,
+    {Go, Acc} = Callback(fabric_view_row:transform(Row), AccIn),
+    rexi:stream_ack(From),
+    {Go, State#collector{user_acc = Acc, limit = Limit - 1}}.
+
+handle_sorted(Row0, {Worker, _} = Source, State) ->
+    #collector{
+        query_args = #mrargs{direction = Dir},
+        counters = Counters0,
+        rows = Rows0,
+        keys = KeyDict0,
+        collation = Collation
+    } = State,
+    Row = fabric_view_row:set_worker(Row0, Source),
+    {Rows, KeyDict} = merge_row(
+        Dir,
+        Collation,
+        KeyDict0,
+        Row,
+        Rows0
+    ),
+    Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
+    State1 = State#collector{rows = Rows, counters = Counters1, keys = KeyDict},
+    fabric_view:maybe_send_row(State1).
+
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
@@ -176,40 +207,25 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
             }}
     end;
 handle_message(#view_row{}, {_, _}, #collector{sorted = false, limit = 0} = State) ->
-    #collector{callback = Callback} = State,
-    {_, Acc} = Callback(complete, State#collector.user_acc),
-    {stop, State#collector{user_acc = Acc}};
-handle_message(#view_row{} = Row, {_, From}, #collector{sorted = false} = St) ->
-    #collector{callback = Callback, user_acc = AccIn, limit = Limit} = St,
-    {Go, Acc} = Callback(fabric_view:transform_row(Row), AccIn),
-    rexi:stream_ack(From),
-    {Go, St#collector{user_acc = Acc, limit = Limit - 1}};
-handle_message(#view_row{} = Row, {Worker, From}, State) ->
-    #collector{
-        query_args = #mrargs{direction = Dir},
-        counters = Counters0,
-        rows = Rows0,
-        keys = KeyDict0,
-        collation = Collation
-    } = State,
-    {Rows, KeyDict} = merge_row(
-        Dir,
-        Collation,
-        KeyDict0,
-        Row#view_row{worker = {Worker, From}},
-        Rows0
-    ),
-    Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    State1 = State#collector{rows = Rows, counters = Counters1, keys = KeyDict},
-    fabric_view:maybe_send_row(State1);
+    handle_stop(State);
+handle_message(#view_row{} = Row, {_, _} = Source, #collector{sorted = false} = State) ->
+    handle_non_sorted(Row, Source, State);
+handle_message(#view_row{} = Row, {_, _} = Source, State) ->
+    handle_sorted(Row, Source, State);
+handle_message({view_row, #{}}, {_, _}, #collector{sorted = false, limit = 0} = State) ->
+    handle_stop(State);
+handle_message({view_row, #{}} = Row, {_, _} = Source, #collector{sorted = false} = State) ->
+    handle_non_sorted(Row, Source, State);
+handle_message({view_row, #{}} = Row, {_, _} = Source, State) ->
+    handle_sorted(Row, Source, State);
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters});
-handle_message({execution_stats, _} = Msg, {_, From}, St) ->
-    #collector{callback = Callback, user_acc = AccIn} = St,
+handle_message({execution_stats, _} = Msg, {_, From}, State) ->
+    #collector{callback = Callback, user_acc = AccIn} = State,
     {Go, Acc} = Callback(Msg, AccIn),
     rexi:stream_ack(From),
-    {Go, St#collector{user_acc = Acc}};
+    {Go, State#collector{user_acc = Acc}};
 handle_message(ddoc_updated, _Worker, State) ->
     {stop, State};
 handle_message(insufficient_storage, _Worker, State) ->
@@ -217,7 +233,11 @@ handle_message(insufficient_storage, _Worker, State) ->
 
 merge_row(Dir, Collation, undefined, Row, Rows0) ->
     Rows1 = lists:merge(
-        fun(#view_row{key = KeyA, id = IdA}, #view_row{key = KeyB, id = IdB}) ->
+        fun(RowA, RowB) ->
+            KeyA = fabric_view_row:get_key(RowA),
+            KeyB = fabric_view_row:get_key(RowB),
+            IdA = fabric_view_row:get_id(RowA),
+            IdB = fabric_view_row:get_id(RowB),
             compare(Dir, Collation, {KeyA, IdA}, {KeyB, IdB})
         end,
         [Row],
@@ -240,12 +260,17 @@ merge_row(Dir, Collation, KeyDict0, Row, Rows0) ->
             _ ->
                 fun couch_ejson_compare:less/2
         end,
-    case maybe_update_keydict(Row#view_row.key, KeyDict0, CmpFun) of
+    Key = fabric_view_row:get_key(Row),
+    case maybe_update_keydict(Key, KeyDict0, CmpFun) of
         undefined ->
             {Rows0, KeyDict0};
         KeyDict1 ->
             Rows1 = lists:merge(
-                fun(#view_row{key = A, id = IdA}, #view_row{key = B, id = IdB}) ->
+                fun(RowA, RowB) ->
+                    A = fabric_view_row:get_key(RowA),
+                    B = fabric_view_row:get_key(RowB),
+                    IdA = fabric_view_row:get_id(RowA),
+                    IdB = fabric_view_row:get_id(RowB),
                     case {Dir, CmpFun(A, B)} of
                         {fwd, 0} ->
                             IdA < IdB;
@@ -296,3 +321,298 @@ key_index(KeyA, [{KeyB, Value} | KVs], CmpFun) ->
         0 -> Value;
         _ -> key_index(KeyA, KVs, CmpFun)
     end.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+handle_message_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(foo, [non_strict]),
+            meck:new(fabric_view)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_handle_message_rexi_down),
+            ?TDEF_FE(t_handle_message_rexi_exit),
+            ?TDEF_FE(t_handle_message_meta_zero),
+            ?TDEF_FE(t_handle_message_meta),
+            ?TDEF_FE(t_handle_message_limit),
+            ?TDEF_FE(t_handle_message_non_sorted),
+            ?TDEF_FE(t_handle_message_sorted),
+            ?TDEF_FE(t_handle_message_complete),
+            ?TDEF_FE(t_handle_message_execution_stats),
+            ?TDEF_FE(t_handle_message_ddoc_updated),
+            ?TDEF_FE(t_handle_message_insufficient_storage)
+        ]
+    }.
+
+t_handle_message_rexi_down(_) ->
+    Message = {rexi_DOWN, undefined, {undefined, node}, undefined},
+    meck:expect(fabric_view, check_down_shards, [state, node], meck:val(fabric_view_result)),
+    ?assertEqual(fabric_view_result, handle_message(Message, source, state)).
+
+t_handle_message_rexi_exit(_) ->
+    Message = {rexi_EXIT, reason},
+    meck:expect(
+        fabric_view, handle_worker_exit, [state, source, reason], meck:val(fabric_view_result)
+    ),
+    ?assertEqual(fabric_view_result, handle_message(Message, source, state)).
+
+t_handle_message_meta_zero(_) ->
+    Meta = [{total, 3}, {offset, 2}, {update_seq, 1}],
+    Worker = {worker1, from},
+    Counters1 = [{worker1, 0}, {worker2, 0}],
+    Counters2 = [{worker1, 1}, {worker2, 0}],
+    State1 = #collector{counters = Counters1, total_rows = 0, update_seq = nil, offset = 0},
+    State2 = #collector{counters = Counters2, total_rows = 3, update_seq = nil, offset = 2},
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({ok, State2}, handle_message({meta, Meta}, Worker, State1)).
+
+t_handle_message_meta(_) ->
+    Meta1 = [{total, 10}, {offset, 2}, {update_seq, seq}],
+    Meta2 = [{total, 10}, {offset, 5}, {update_seq, packed_seq}],
+    Meta3 = [{total, 10}, {offset, 5}],
+    Worker = {worker1, from},
+    Counters1 = [{worker1, 0}, {worker2, 3}, {worker3, 5}],
+    Counters2 = [{worker1, 0}, {worker2, 2}, {worker3, 4}],
+    State1 = #collector{
+        counters = Counters1,
+        total_rows = 0,
+        update_seq = [],
+        offset = 0,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = accumulator1
+    },
+    State2 = #collector{
+        counters = Counters1,
+        total_rows = 0,
+        update_seq = nil,
+        offset = 0,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = accumulator2
+    },
+    State3 = #collector{
+        counters = Counters2,
+        total_rows = 10,
+        update_seq = [],
+        offset = 5,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator1
+    },
+    State4 = #collector{
+        counters = Counters2,
+        total_rows = 10,
+        update_seq = nil,
+        offset = 5,
+        skip = 3,
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator2
+    },
+    meck:expect(
+        foo,
+        bar,
+        [
+            {[{meta, Meta2}, accumulator1], meck:val({go1, updated_accumulator1})},
+            {[{meta, Meta3}, accumulator2], meck:val({go2, updated_accumulator2})}
+        ]
+    ),
+    meck:expect(fabric_view_changes, pack_seqs, [[{worker1, seq}]], meck:val(packed_seq)),
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({go1, State3}, handle_message({meta, Meta1}, Worker, State1)),
+    ?assertEqual({go2, State4}, handle_message({meta, Meta1}, Worker, State2)).
+
+t_handle_message_limit(_) ->
+    State1 = #collector{
+        sorted = false, limit = 0, callback = fun foo:bar/2, user_acc = accumulator
+    },
+    State2 = #collector{
+        sorted = false, limit = 0, callback = fun foo:bar/2, user_acc = updated_accumulator
+    },
+    Worker = {worker, from},
+    Row1 = #view_row{},
+    Row2 = {view_row, #{}},
+    meck:expect(foo, bar, [complete, accumulator], meck:val({go, updated_accumulator})),
+    meck:expect(rexi, stream_ack, [from], undefined),
+    ?assertEqual({stop, State2}, handle_message(Row1, Worker, State1)),
+    ?assertEqual({stop, State2}, handle_message(Row2, Worker, State1)),
+    ?assertNot(meck:called(rexi, stream_ack, '_')).
+
+t_handle_message_non_sorted(_) ->
+    State1 = #collector{
+        sorted = false, limit = 10, callback = fun foo:bar/2, user_acc = accumulator
+    },
+    State2 = #collector{
+        sorted = false, limit = 9, callback = fun foo:bar/2, user_acc = updated_accumulator
+    },
+    Worker = {worker, from},
+    Row1 = #view_row{id = id, key = key, doc = doc},
+    Row2 = {view_row, #{id => id, key => key, doc => doc}},
+    Props = {row, [{id, id}, {key, key}, {value, undefined}, {doc, doc}]},
+    meck:expect(foo, bar, [Props, accumulator], meck:val({go, updated_accumulator})),
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({go, State2}, handle_message(Row1, Worker, State1)),
+    ?assertEqual({go, State2}, handle_message(Row2, Worker, State1)).
+
+t_handle_message_sorted(_) ->
+    QueryArgs = #mrargs{direction = fwd},
+    Counters1 = [{worker, 1}],
+    Counters2 = [{worker, 2}],
+    Worker = {worker, from},
+    Row1 = #view_row{id = id2, key = key2, doc = doc2},
+    Row2 = {view_row, #{id => id2, key => key2, doc => doc2}},
+    Props = {row, [{id, id2}, {key, key2}, {value, undefined}, {doc, doc2}]},
+    Rows11 = #view_row{id = id1, key = key1, doc = doc1},
+    Rows12 = #view_row{id = id2, key = key2, doc = doc2, worker = Worker},
+    Rows13 = #view_row{id = id3, key = key3, doc = doc3},
+    Rows21 = {view_row, #{id => id1, key => key1}},
+    Rows22 = {view_row, #{id => id2, key => key2, doc => doc2, worker => Worker}},
+    Rows23 = {view_row, #{id => id3, key => key3}},
+    Rows1 = [Rows11, Rows13],
+    Rows2 = [Rows21, Rows23],
+    Rows3 = [Rows11, Rows12, Rows13],
+    Rows4 = [Rows21, Rows22, Rows23],
+    State1 = #collector{
+        sorted = true,
+        limit = 10,
+        callback = fun foo:bar/2,
+        user_acc = accumulator,
+        query_args = QueryArgs,
+        counters = Counters1,
+        rows = Rows1,
+        collation = <<"raw">>
+    },
+    State2 = #collector{
+        sorted = true,
+        limit = 10,
+        callback = fun foo:bar/2,
+        user_acc = accumulator,
+        query_args = QueryArgs,
+        counters = Counters1,
+        rows = Rows2,
+        collation = <<"raw">>
+    },
+    State3 = #collector{
+        sorted = true,
+        limit = 10,
+        callback = fun foo:bar/2,
+        user_acc = accumulator,
+        query_args = QueryArgs,
+        counters = Counters2,
+        rows = Rows3,
+        collation = <<"raw">>
+    },
+    State4 = #collector{
+        sorted = true,
+        limit = 10,
+        callback = fun foo:bar/2,
+        user_acc = accumulator,
+        query_args = QueryArgs,
+        counters = Counters2,
+        rows = Rows4,
+        collation = <<"raw">>
+    },
+    meck:expect(foo, bar, [Props, accumulator], meck:val({go, updated_accumulator})),
+    meck:expect(
+        fabric_view,
+        maybe_send_row,
+        [
+            {[State3], meck:val(next_row1)},
+            {[State4], meck:val(next_row2)}
+        ]
+    ),
+    ?assertEqual(next_row1, handle_message(Row1, Worker, State1)),
+    ?assertEqual(next_row2, handle_message(Row2, Worker, State2)).
+
+t_handle_message_complete(_) ->
+    Worker = worker,
+    Counters1 = [{Worker, 6}],
+    Counters2 = [{Worker, 7}],
+    State1 = #collector{counters = Counters1},
+    State2 = #collector{counters = Counters2},
+    meck:expect(fabric_view, maybe_send_row, [State2], meck:val(maybe_row)),
+    ?assertEqual(maybe_row, handle_message(complete, Worker, State1)).
+
+t_handle_message_execution_stats(_) ->
+    Message = {execution_stats, stats},
+    Source = {worker, from},
+    meck:expect(foo, bar, [Message, accumulator], meck:val({go, updated_accumulator})),
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    State1 = #collector{callback = fun foo:bar/2, user_acc = accumulator},
+    State2 = #collector{callback = fun foo:bar/2, user_acc = updated_accumulator},
+    ?assertEqual({go, State2}, handle_message(Message, Source, State1)).
+
+t_handle_message_ddoc_updated(_) ->
+    ?assertEqual({stop, state}, handle_message(ddoc_updated, source, state)).
+
+t_handle_message_insufficient_storage(_) ->
+    ?assertEqual({stop, state}, handle_message(insufficient_storage, source, state)).
+
+merge_row_test_() ->
+    {
+        foreach,
+        fun() -> ok end,
+        fun(_) -> ok end,
+        [
+            ?TDEF_FE(t_merge_row_no_keys),
+            ?TDEF_FE(t_merge_row_raw),
+            ?TDEF_FE(t_merge_row)
+        ]
+    }.
+
+t_merge_row_no_keys(_) ->
+    Row1 = #view_row{id = id2, key = <<"key2">>},
+    Rows11 = #view_row{id = id1, key = <<"key1">>},
+    Rows13 = #view_row{id = id3, key = <<"key3">>},
+    Rows1 = [Rows11, Rows13],
+    Rows3 = [Rows11, Row1, Rows13],
+    Row2 = {view_row, #{id => id2, key => <<"key2">>}},
+    Rows21 = {view_row, #{id => id1, key => <<"key1">>}},
+    Rows23 = {view_row, #{id => id3, key => <<"key3">>}},
+    Rows2 = [Rows23, Rows21],
+    Rows4 = [Rows23, Row2, Rows21],
+    ?assertEqual({Rows3, undefined}, merge_row(fwd, <<"raw">>, undefined, Row1, Rows1)),
+    ?assertEqual({Rows3, undefined}, merge_row(fwd, <<"collation">>, undefined, Row1, Rows1)),
+    ?assertEqual({Rows4, undefined}, merge_row(rev, <<"raw">>, undefined, Row2, Rows2)),
+    ?assertEqual({Rows4, undefined}, merge_row(rev, <<"collation">>, undefined, Row2, Rows2)).
+
+t_merge_row_raw(_) ->
+    Keys1 = dict:from_list([{key1, id1}, {key2, id2}, {key3, id3}]),
+    Keys2 = dict:from_list([{key1, id1}, {key2, id2}, {key3, id3}]),
+    Row1 = #view_row{id = id22, key = key2},
+    Rows11 = #view_row{id = id1, key = key1},
+    Rows13 = #view_row{id = id3, key = key3},
+    Rows1 = [Rows11, Rows13],
+    Rows3 = [Rows11, Row1, Rows13],
+    Row2 = {view_row, #{id => id22, key => key2}},
+    Rows21 = {view_row, #{id => id1, key => key1}},
+    Rows23 = {view_row, #{id => id3, key => key3}},
+    Rows2 = [Rows23, Rows21],
+    Rows4 = [Row2, Rows23, Rows21],
+    ?assertEqual({Rows3, Keys2}, merge_row(fwd, <<"raw">>, Keys1, Row1, Rows1)),
+    ?assertEqual({Rows4, Keys2}, merge_row(rev, <<"raw">>, Keys1, Row2, Rows2)).
+
+t_merge_row(_) ->
+    Row1 = #view_row{id = id2, key = <<"key2">>},
+    Rows11 = #view_row{id = id1, key = <<"key1">>},
+    Rows13 = #view_row{id = id2, key = <<"key2">>},
+    Rows1 = [Rows11, Rows13],
+    Rows3 = [Rows11, Row1, Rows13],
+    Row2 = {view_row, #{id => id2, key => <<"key2">>}},
+    Rows21 = {view_row, #{id => id1, key => <<"key1">>}},
+    Rows23 = {view_row, #{id => id2, key => <<"key2">>}},
+    Rows2 = [Rows23, Rows21],
+    Rows4 = [Rows23, Rows21, Row2],
+    Keys1 = dict:from_list([{<<"key1">>, id1}, {<<"key2">>, id2}]),
+    Keys2 = dict:from_list([]),
+    ?assertEqual({Rows3, Keys1}, merge_row(fwd, <<"collation">>, Keys1, Row1, Rows1)),
+    ?assertEqual({Rows4, Keys1}, merge_row(rev, <<"collation">>, Keys1, Row2, Rows2)),
+    ?assertEqual({Rows1, Keys2}, merge_row(fwd, <<"collation">>, Keys2, Row1, Rows1)),
+    ?assertEqual({Rows4, Keys1}, merge_row(fwd, <<"raw">>, Keys1, Row2, Rows2)).
+
+-endif.

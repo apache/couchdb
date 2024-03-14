@@ -123,6 +123,16 @@ go2(DbName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
         end
     end.
 
+handle_row(Row0, {Worker, _} = Source, State) ->
+    #collector{counters = Counters0, rows = Rows0} = State,
+    true = fabric_dict:is_key(Worker, Counters0),
+    Row = fabric_view_row:set_worker(Row0, Source),
+    Key = fabric_view_row:get_key(Row),
+    Rows = dict:append(Key, Row, Rows0),
+    C1 = fabric_dict:update_counter(Worker, 1, Counters0),
+    State1 = State#collector{rows = Rows, counters = C1},
+    fabric_view:maybe_send_row(State1).
+
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
@@ -165,13 +175,10 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
                 user_acc = Acc
             }}
     end;
-handle_message(#view_row{key = Key} = Row, {Worker, From}, State) ->
-    #collector{counters = Counters0, rows = Rows0} = State,
-    true = fabric_dict:is_key(Worker, Counters0),
-    Rows = dict:append(Key, Row#view_row{worker = {Worker, From}}, Rows0),
-    C1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    State1 = State#collector{rows = Rows, counters = C1},
-    fabric_view:maybe_send_row(State1);
+handle_message(#view_row{} = Row, {_, _} = Source, State) ->
+    handle_row(Row, Source, State);
+handle_message({view_row, #{}} = Row, {_, _} = Source, State) ->
+    handle_row(Row, Source, State);
 handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
     true = fabric_dict:is_key(Worker, Counters0),
     C1 = fabric_dict:update_counter(Worker, 1, Counters0),
@@ -183,3 +190,132 @@ handle_message(insufficient_storage, _Worker, State) ->
 
 os_proc_needed(<<"_", _/binary>>) -> false;
 os_proc_needed(_) -> true.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+handle_message_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(foo, [non_strict]),
+            meck:new(fabric_view)
+        end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_handle_message_rexi_down),
+            ?TDEF_FE(t_handle_message_rexi_exit),
+            ?TDEF_FE(t_handle_message_meta_zero),
+            ?TDEF_FE(t_handle_message_meta),
+            ?TDEF_FE(t_handle_message_row),
+            ?TDEF_FE(t_handle_message_complete),
+            ?TDEF_FE(t_handle_message_ddoc_updated),
+            ?TDEF_FE(t_handle_message_insufficient_storage)
+        ]
+    }.
+
+t_handle_message_rexi_down(_) ->
+    Message = {rexi_DOWN, undefined, {undefined, node}, undefined},
+    meck:expect(fabric_view, check_down_shards, [state, node], meck:val(fabric_view_result)),
+    ?assertEqual(fabric_view_result, handle_message(Message, source, state)).
+
+t_handle_message_rexi_exit(_) ->
+    Message = {rexi_EXIT, reason},
+    meck:expect(
+        fabric_view, handle_worker_exit, [state, source, reason], meck:val(fabric_view_result)
+    ),
+    ?assertEqual(fabric_view_result, handle_message(Message, source, state)).
+
+t_handle_message_meta_zero(_) ->
+    Meta = [{total, 3}, {offset, 2}, {update_seq, 1}],
+    Worker = {worker1, from},
+    Counters1 = [{worker1, 0}, {worker2, 0}],
+    Counters2 = [{worker1, 1}, {worker2, 0}],
+    State1 = #collector{counters = Counters1, update_seq = nil},
+    State2 = #collector{counters = Counters2, update_seq = nil},
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({ok, State2}, handle_message({meta, Meta}, Worker, State1)).
+
+t_handle_message_meta(_) ->
+    Meta1 = [{update_seq, seq}],
+    Meta2 = [{update_seq, packed_seq}],
+    Meta3 = [],
+    Worker = {worker1, from},
+    Counters1 = [{worker1, 0}, {worker2, 3}, {worker3, 5}],
+    Counters2 = [{worker1, 0}, {worker2, 2}, {worker3, 4}],
+    State1 = #collector{
+        counters = Counters1,
+        update_seq = [],
+        callback = fun foo:bar/2,
+        user_acc = accumulator1
+    },
+    State2 = #collector{
+        counters = Counters1,
+        update_seq = nil,
+        callback = fun foo:bar/2,
+        user_acc = accumulator2
+    },
+    State3 = #collector{
+        counters = Counters2,
+        update_seq = [],
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator1
+    },
+    State4 = #collector{
+        counters = Counters2,
+        update_seq = nil,
+        callback = fun foo:bar/2,
+        user_acc = updated_accumulator2
+    },
+    meck:expect(
+        foo,
+        bar,
+        [
+            {[{meta, Meta2}, accumulator1], meck:val({go1, updated_accumulator1})},
+            {[{meta, Meta3}, accumulator2], meck:val({go2, updated_accumulator2})}
+        ]
+    ),
+    meck:expect(fabric_view_changes, pack_seqs, [[{worker1, seq}]], meck:val(packed_seq)),
+    meck:expect(rexi, stream_ack, [from], meck:val(ok)),
+    ?assertEqual({go1, State3}, handle_message({meta, Meta1}, Worker, State1)),
+    ?assertEqual({go2, State4}, handle_message({meta, Meta1}, Worker, State2)).
+
+t_handle_message_row(_) ->
+    Worker = {worker, from},
+    Counters1 = [{worker, 3}],
+    Counters2 = [{worker, 4}],
+    Row1 = #view_row{key = key1},
+    Row11 = #view_row{key = key1, worker = Worker},
+    Rows1 = dict:from_list([{key1, []}, {key2, []}, {key3, []}]),
+    Rows3 = dict:from_list([{key1, [Row11]}, {key2, []}, {key3, []}]),
+    Row2 = {view_row, #{key => key1}},
+    Row21 = {view_row, #{key => key1, worker => Worker}},
+    Rows2 = dict:from_list([{key1, []}, {key2, []}, {key3, []}]),
+    Rows4 = dict:from_list([{key1, [Row21]}, {key2, []}, {key3, []}]),
+    State1 = #collector{counters = Counters1, rows = Rows1},
+    State2 = #collector{counters = Counters1, rows = Rows2},
+    State3 = #collector{counters = Counters2, rows = Rows3},
+    State4 = #collector{counters = Counters2, rows = Rows4},
+    meck:expect(fabric_view, maybe_send_row, [
+        {[State3], meck:val(maybe_row1)}, {[State4], meck:val(maybe_row2)}
+    ]),
+    ?assertEqual(maybe_row1, handle_message(Row1, Worker, State1)),
+    ?assertEqual(maybe_row2, handle_message(Row2, Worker, State2)).
+
+t_handle_message_complete(_) ->
+    Worker = worker,
+    Counters1 = [{Worker, 6}],
+    Counters2 = [{Worker, 7}],
+    State1 = #collector{counters = Counters1},
+    State2 = #collector{counters = Counters2},
+    meck:expect(fabric_view, maybe_send_row, [State2], meck:val(maybe_row)),
+    ?assertEqual(maybe_row, handle_message(complete, Worker, State1)).
+
+t_handle_message_ddoc_updated(_) ->
+    ?assertEqual({stop, state}, handle_message(ddoc_updated, source, state)).
+
+t_handle_message_insufficient_storage(_) ->
+    ?assertEqual({stop, state}, handle_message(insufficient_storage, source, state)).
+
+-endif.

@@ -273,7 +273,8 @@ query_all_docs(Db, Args0, Callback, Acc) ->
     all_docs_fold(Db, Args2, Callback, Acc1).
 
 query_view(Db, DDoc, VName) ->
-    query_view(Db, DDoc, VName, #mrargs{}).
+    Args = #mrargs{extra = [{view_row_map, true}]},
+    query_view(Db, DDoc, VName, Args).
 
 query_view(Db, DDoc, VName, Args) when is_list(Args) ->
     query_view(Db, DDoc, VName, to_mrargs(Args), fun default_cb/2, []);
@@ -325,7 +326,7 @@ get_view_info(Db, DDoc, VName) ->
         Db,
         DDoc,
         VName,
-        #mrargs{}
+        #mrargs{extra = [{view_row_map, true}]}
     ),
 
     %% get the total number of rows
@@ -763,7 +764,7 @@ to_mrargs(KeyList) ->
             Index = lookup_index(couch_util:to_existing_atom(Key)),
             setelement(Index, Acc, Value)
         end,
-        #mrargs{},
+        #mrargs{extra = [{view_row_map, true}]},
         KeyList
     ).
 

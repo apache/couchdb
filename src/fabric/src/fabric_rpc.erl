@@ -187,7 +187,8 @@ reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db = Db},
-    couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
+    Callback = fun(Msg, Acc) -> reduce_cb(Msg, Acc, Args#mrargs.extra) end,
+    couch_mrview:query_view(Db, DDoc, ViewName, Args, Callback, VAcc0).
 
 create_db(DbName) ->
     create_db(DbName, []).
@@ -491,14 +492,9 @@ view_cb({meta, Meta}, Acc) ->
     % Map function starting
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
-view_cb({row, Row}, Acc) ->
+view_cb({row, Props}, #mrargs{extra = Options} = Acc) ->
     % Adding another row
-    ViewRow = #view_row{
-        id = couch_util:get_value(id, Row),
-        key = couch_util:get_value(key, Row),
-        value = couch_util:get_value(value, Row),
-        doc = couch_util:get_value(doc, Row)
-    },
+    ViewRow = fabric_view_row:from_props(Props, Options),
     ok = rexi:stream2(ViewRow),
     {ok, Acc};
 view_cb(complete, Acc) ->
@@ -510,24 +506,22 @@ view_cb(ok, ddoc_updated) ->
 view_cb(ok, insufficient_storage) ->
     rexi:reply({ok, insufficient_storage}).
 
-reduce_cb({meta, Meta}, Acc) ->
+reduce_cb({meta, Meta}, Acc, _Options) ->
     % Map function starting
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
-reduce_cb({row, Row}, Acc) ->
+reduce_cb({row, Props}, Acc, Options) ->
     % Adding another row
-    ok = rexi:stream2(#view_row{
-        key = couch_util:get_value(key, Row),
-        value = couch_util:get_value(value, Row)
-    }),
+    ViewRow = fabric_view_row:from_props(Props, Options),
+    ok = rexi:stream2(ViewRow),
     {ok, Acc};
-reduce_cb(complete, Acc) ->
+reduce_cb(complete, Acc, _Options) ->
     % Finish view output
     ok = rexi:stream_last(complete),
     {ok, Acc};
-reduce_cb(ok, ddoc_updated) ->
+reduce_cb(ok, ddoc_updated, _Options) ->
     rexi:reply({ok, ddoc_updated});
-reduce_cb(ok, insufficient_storage) ->
+reduce_cb(ok, insufficient_storage, _Options) ->
     rexi:reply({ok, insufficient_storage}).
 
 changes_enumerator(#full_doc_info{} = FDI, Acc) ->
@@ -712,7 +706,7 @@ uuid(Db) ->
     binary:part(Uuid, {0, Prefix}).
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 maybe_filtered_json_doc_no_filter_test() ->
     Body = {[{<<"a">>, 1}]},
@@ -728,5 +722,95 @@ maybe_filtered_json_doc_with_filter_test() ->
     Filter = {selector, main_only, {some_selector, Fields}},
     {JDocProps} = maybe_filtered_json_doc(Doc, [], Filter),
     ?assertEqual(JDocProps, [{<<"a">>, 1}]).
+
+view_cb_test_() ->
+    {
+        foreach,
+        fun() -> meck:new(rexi) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_view_cb_meta),
+            ?TDEF_FE(t_view_cb_row_record),
+            ?TDEF_FE(t_view_cb_row_map),
+            ?TDEF_FE(t_view_cb_complete),
+            ?TDEF_FE(t_view_cb_ddoc_updated),
+            ?TDEF_FE(t_view_cb_insufficient_storage)
+        ]
+    }.
+
+t_view_cb_meta(_) ->
+    meck:expect(rexi, stream2, [{meta, meta}], meck:val(ok)),
+    ?assertEqual({ok, acc}, view_cb({meta, meta}, acc)).
+
+t_view_cb_row_record(_) ->
+    Acc = #mrargs{},
+    Props = [{id, id}, {key, key}, {value, value}],
+    ViewRow = #view_row{id = id, key = key, value = value},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    ?assertEqual({ok, Acc}, view_cb({row, Props}, Acc)).
+
+t_view_cb_row_map(_) ->
+    Acc = #mrargs{extra = [{view_row_map, true}]},
+    Props = [{id, id}, {key, key}, {value, value}],
+    ViewRow = {view_row, #{id => id, key => key, value => value}},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    ?assertEqual({ok, Acc}, view_cb({row, Props}, Acc)).
+
+t_view_cb_complete(_) ->
+    meck:expect(rexi, stream_last, [complete], meck:val(ok)),
+    ?assertEqual({ok, acc}, view_cb(complete, acc)).
+
+t_view_cb_ddoc_updated(_) ->
+    meck:expect(rexi, reply, [{ok, ddoc_updated}], meck:val(ok)),
+    ?assertEqual(ok, view_cb(ok, ddoc_updated)).
+
+t_view_cb_insufficient_storage(_) ->
+    meck:expect(rexi, reply, [{ok, insufficient_storage}], meck:val(ok)),
+    ?assertEqual(ok, view_cb(ok, insufficient_storage)).
+
+reduce_cb_test_() ->
+    {
+        foreach,
+        fun() -> meck:new(rexi) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_reduce_cb_meta),
+            ?TDEF_FE(t_reduce_cb_row_record),
+            ?TDEF_FE(t_reduce_cb_row_map),
+            ?TDEF_FE(t_reduce_cb_complete),
+            ?TDEF_FE(t_reduce_cb_ddoc_updated),
+            ?TDEF_FE(t_reduce_cb_insufficient_storage)
+        ]
+    }.
+
+t_reduce_cb_meta(_) ->
+    meck:expect(rexi, stream2, [{meta, meta}], meck:val(ok)),
+    ?assertEqual({ok, acc}, reduce_cb({meta, meta}, acc, options)).
+
+t_reduce_cb_row_record(_) ->
+    Options = [],
+    Props = [{id, id}, {key, key}, {value, value}],
+    ViewRow = #view_row{id = id, key = key, value = value},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    ?assertEqual({ok, acc}, reduce_cb({row, Props}, acc, Options)).
+
+t_reduce_cb_row_map(_) ->
+    Options = [{view_row_map, true}],
+    Props = [{id, id}, {key, key}, {value, value}],
+    ViewRow = {view_row, #{id => id, key => key, value => value}},
+    meck:expect(rexi, stream2, [ViewRow], meck:val(ok)),
+    ?assertEqual({ok, acc}, reduce_cb({row, Props}, acc, Options)).
+
+t_reduce_cb_complete(_) ->
+    meck:expect(rexi, stream_last, [complete], meck:val(ok)),
+    ?assertEqual({ok, acc}, reduce_cb(complete, acc, options)).
+
+t_reduce_cb_ddoc_updated(_) ->
+    meck:expect(rexi, reply, [{ok, ddoc_updated}], meck:val(ok)),
+    ?assertEqual(ok, reduce_cb(ok, ddoc_updated, options)).
+
+t_reduce_cb_insufficient_storage(_) ->
+    meck:expect(rexi, reply, [{ok, insufficient_storage}], meck:val(ok)),
+    ?assertEqual(ok, reduce_cb(ok, insufficient_storage, options)).
 
 -endif.
