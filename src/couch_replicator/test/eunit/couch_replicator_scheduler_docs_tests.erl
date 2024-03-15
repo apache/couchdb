@@ -133,6 +133,9 @@ t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
             case req(get, SchedulerDocsUrl) of
                 {200, #{<<"docs">> := [_ | _]} = Decoded} ->
                     Decoded;
+                {_, #{<<"error">> := (<<"unknown_error">> = Error), <<"reason">> := StackTrace}} ->
+                    ?debugVal(Error),
+                    ?debugVal(StackTrace, 100);
                 {_, #{<<"error">> := Error, <<"reason">> := Reason}} ->
                     ?debugVal(Error, 100),
                     ?debugVal(binary_to_list(Reason), 100);
@@ -143,7 +146,7 @@ t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
         14000,
         1000
     ),
-    ?assertNotEqual(Body, timeout),
+    ?assertMatch(#{<<"docs">> := _, <<"total_rows">> := _}, Body),
     Docs = maps:get(<<"docs">>, Body),
     TotalRows = maps:get(<<"total_rows">>, Body),
     ?assertEqual(TotalRows, length(Docs)).
