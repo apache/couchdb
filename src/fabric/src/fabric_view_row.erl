@@ -18,9 +18,11 @@
     get_value/1,
     get_doc/1,
     get_worker/1,
+    get_stats/1,
     set_key/2,
     set_doc/2,
     set_worker/2,
+    set_stats/2,
     transform/1
 ]).
 
@@ -91,6 +93,14 @@ set_worker(#view_row{} = Row, Worker) ->
 set_worker({view_row, #{} = Row}, Worker) ->
     {view_row, Row#{worker => Worker}}.
 
+get_stats({view_row, #{stats := Stats}}) ->
+    Stats;
+get_stats({view_row, #{}}) ->
+    undefined.
+
+set_stats({view_row, #{} = Row}, Stats) ->
+    {view_row, Row#{stats => Stats}}.
+
 transform(#view_row{value = {[{reduce_overflow_error, Msg}]}}) ->
     {row, [{key, null}, {id, error}, {value, reduce_overflow_error}, {reason, Msg}]};
 transform(#view_row{key = Key, id = reduced, value = Value}) ->
@@ -109,8 +119,13 @@ transform({view_row, #{} = Row0}) ->
     Value = maps:get(value, Row0, undefined),
     Doc = maps:get(doc, Row0, undefined),
     Worker = maps:get(worker, Row0, undefined),
+    Stats = maps:get(stats, Row0, undefined),
     Row = #view_row{id = Id, key = Key, value = Value, doc = Doc, worker = Worker},
-    transform(Row).
+    {row, Props} = RowProps = transform(Row),
+    case Stats of
+        undefined -> RowProps;
+        #{} -> {row, [{stats, Stats} | Props]}
+    end.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

@@ -73,6 +73,75 @@ class ExecutionStatsTests(mango.UserDocsTests):
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
 
+    def test_reporting_consistency(self):
+        cases = [
+            {
+                "title": "with limit",
+                "selector": {"age": {"$lte": 42}},
+                "fields": ["name", "email", "age"],
+                "limit": 3,
+                "total_keys_examined": 4,
+                "total_docs_examined": 4,
+                "results_returned": 3,
+            },
+            {
+                "title": "partial matches",
+                "selector": {"favorites": {"$elemMatch": {"$eq": "Erlang"}}},
+                "fields": ["name", "email", "twitter"],
+                "limit": 200,
+                "total_keys_examined": 15,
+                "total_docs_examined": 15,
+                "results_returned": 6,
+            },
+            {
+                "title": "no matches, using _all_docs",
+                "selector": {"foo": "bar"},
+                "fields": [],
+                "limit": 200,
+                "total_keys_examined": 25,
+                "total_docs_examined": 25,
+                "results_returned": 0,
+            },
+            {
+                "title": "no matches, indexed column (no keys examined)",
+                "selector": {"name.first": "Lee", "name.last": "Jackson"},
+                "fields": ["email", "twitter"],
+                "limit": 200,
+                "total_keys_examined": 0,
+                "total_docs_examined": 0,
+                "results_returned": 0,
+            },
+            {
+                "title": "no matches, indexed column",
+                "selector": {"favorites": {"$elemMatch": {"$eq": "Haskell"}}},
+                "fields": ["name", "email", "twitter"],
+                "limit": 200,
+                "total_keys_examined": 15,
+                "total_docs_examined": 15,
+                "results_returned": 0,
+            },
+        ]
+
+        for case in cases:
+            with self.subTest(scenario=case["title"]):
+                resp = self.db.find(
+                    case["selector"],
+                    fields=case["fields"],
+                    limit=case["limit"],
+                    return_raw=True,
+                    executionStats=True,
+                )
+                executionStats = resp["execution_stats"]
+                self.assertEqual(
+                    executionStats["total_keys_examined"], case["total_keys_examined"]
+                )
+                self.assertEqual(
+                    executionStats["total_docs_examined"], case["total_docs_examined"]
+                )
+                self.assertEqual(
+                    executionStats["results_returned"], case["results_returned"]
+                )
+
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ExecutionStatsTests_Text(mango.UserDocsTextTests):
