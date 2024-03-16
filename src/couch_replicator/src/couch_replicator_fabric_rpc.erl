@@ -17,7 +17,6 @@
 ]).
 
 -include_lib("fabric/include/fabric.hrl").
--include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 docs(DbName, Options, Args0) ->
@@ -80,6 +79,10 @@ rep_doc_state(Shard, Id, {[_ | _]} = Doc, States, HealthThreshold) ->
                     HealthThreshold
                 )
             of
+                {ok, nil} ->
+                    % Could have been just completed. Let the coordinator
+                    % try to refetch it.
+                    undecided;
                 {ok, EtsInfo} ->
                     State = get_doc_state(EtsInfo),
                     couch_replicator_utils:filter_state(State, States, EtsInfo);
