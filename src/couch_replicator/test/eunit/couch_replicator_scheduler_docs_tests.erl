@@ -133,10 +133,7 @@ t_scheduler_docs_total_rows({_Ctx, {RepDb, Source, Target}}) ->
             case req(get, SchedulerDocsUrl) of
                 {200, #{<<"docs">> := [_ | _]} = Decoded} ->
                     Decoded;
-                {_, #{<<"error">> := Error, <<"reason">> := Reason}} ->
-                    ?debugVal(Error, 100),
-                    ?debugVal(binary_to_list(Reason), 100);
-                {_, #{}} ->
+                {200, #{<<"docs">> := []}} ->
                     wait
             end
         end,

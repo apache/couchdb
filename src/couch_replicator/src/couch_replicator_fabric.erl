@@ -18,7 +18,6 @@
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
--include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 docs(DbName, Options, QueryArgs, Callback, Acc) ->
@@ -167,6 +166,9 @@ maybe_fetch_and_filter_doc(Id, undecided, State) ->
         {ok, {Props} = DocInfo} ->
             DocState = couch_util:get_value(state, Props),
             couch_replicator_utils:filter_state(DocState, FilterStates, DocInfo);
+        {ok, nil} ->
+            % could have just completed
+            skip;
         {error, not_found} ->
             % could have been deleted
             skip
