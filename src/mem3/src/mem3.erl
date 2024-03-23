@@ -32,6 +32,8 @@
 -export([belongs/2, owner/3]).
 -export([get_placement/1]).
 -export([ping/1, ping/2]).
+-export([ping_nodes/0, ping_nodes/1, ping_nodes/2]).
+-export([dead_nodes/0, dead_nodes/1]).
 -export([db_is_current/1]).
 -export([shard_creation_time/1]).
 -export([generate_shard_suffix/0]).
@@ -40,7 +42,6 @@
 -export([name/1, node/1, range/1, engine/1]).
 
 -include_lib("mem3/include/mem3.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(PING_TIMEOUT_IN_MS, 60000).
 
@@ -423,30 +424,126 @@ engine(Opts) when is_list(Opts) ->
 %% Check whether a node is up or down
 %%  side effect: set up a connection to Node if there not yet is one.
 
--spec ping(Node :: atom()) -> pong | pang.
+-spec ping(node()) -> pos_integer() | Error :: term().
 
 ping(Node) ->
-    ping(Node, ?PING_TIMEOUT_IN_MS).
+    [{Node, Res}] = ping_nodes([Node]),
+    Res.
 
--spec ping(Node :: atom(), Timeout :: pos_integer()) -> pong | pang.
+-spec ping(node(), Timeout :: pos_integer()) -> pos_integer() | Error :: term().
 
 ping(Node, Timeout) when is_atom(Node) ->
-    %% The implementation of the function is copied from
-    %% lib/kernel/src/net_adm.erl with addition of a Timeout
-    case
-        catch gen:call(
-            {net_kernel, Node},
-            '$gen_call',
-            {is_auth, node()},
-            Timeout
-        )
-    of
-        {ok, yes} ->
-            pong;
-        _ ->
-            erlang:disconnect_node(Node),
-            pang
+    [{Node, Res}] = ping_nodes([Node], Timeout),
+    Res.
+
+-spec ping_nodes() -> [{node(), pos_integer() | Error :: term()}].
+
+ping_nodes() ->
+    ping_nodes(live_cluster_nodes(), ?PING_TIMEOUT_IN_MS).
+
+-spec ping_nodes(Timeout :: pos_integer()) -> [{node(), pos_integer() | Error :: term()}].
+
+ping_nodes(Timeout) when is_integer(Timeout), Timeout > 0 ->
+    ping_nodes(live_cluster_nodes(), Timeout).
+
+ping_nodes(Nodes, Timeout) ->
+    PidRefs = [spawn_monitor(fun() -> exit(do_ping(N, Timeout)) end) || N <- Nodes],
+    Refs = maps:from_keys([Ref || {_Pid, Ref} <- PidRefs], true),
+    UntilMSec = erlang:monotonic_time(millisecond) + Timeout,
+    Results = gather_ping_results(Refs, UntilMSec, #{}),
+    Fun = fun(Node, {_Pid, Ref}) -> {Node, map_get(Ref, Results)} end,
+    lists:sort(lists:zipwith(Fun, Nodes, PidRefs)).
+
+% Gather ping results but use an absolute time limit to avoid
+% waiting up to Timeout's worth of time per individual node.
+%
+gather_ping_results(Refs, _Until, Results) when map_size(Refs) == 0 ->
+    Results;
+gather_ping_results(Refs, Until, Results) ->
+    Timeout = Until - erlang:monotonic_time(millisecond),
+    case Timeout >= 0 of
+        true ->
+            receive
+                {'DOWN', Ref, _, _, Res} when is_map_key(Ref, Refs) ->
+                    Refs1 = maps:remove(Ref, Refs),
+                    Results1 = Results#{Ref => Res},
+                    gather_ping_results(Refs1, Until, Results1)
+            after min(100, Timeout) ->
+                gather_ping_results(Refs, Until, Results)
+            end;
+        false ->
+            Fun = fun(Ref, true, Acc) ->
+                erlang:demonitor(Ref, [flush]),
+                Acc#{Ref => timeout}
+            end,
+            maps:fold(Fun, Results, Refs)
     end.
+
+live_cluster_nodes() ->
+    mem3_util:live_nodes() -- [node()].
+
+do_ping(Node, Timeout) ->
+    T0 = erlang:monotonic_time(),
+    % This is the function called by net_adm ping. One difference is that
+    % net_adm ping on a failure will also forcibly disconnect a node
+    % which we don't do here:
+    %  https://github.com/erlang/otp/blob/master/lib/kernel/src/net_adm.erl#L97
+    try gen_server:call({net_kernel, Node}, {is_auth, node()}, Timeout) of
+        yes ->
+            erlang:convert_time_unit(erlang:monotonic_time() - T0, native, microsecond);
+        Error ->
+            Error
+    catch
+        exit:{GenServerErr, _Stack} ->
+            GenServerErr;
+        Tag:Err ->
+            {Tag, Err}
+    end.
+
+-spec dead_nodes() -> [node() | Error :: term()].
+
+%% @doc Returns a list of dead nodes from the cluster.
+%%
+%% "dead" node is a node which appears in the mem3:nodes() list but is not
+%% connected. Dead nodes are included in the result if it's considered
+%% "dead" by any of the reachable nodes or doesn't respond or timeout when
+%% queried by the multicall/2.
+%%
+%% dead_nodes(TimeoutInMSec) will use the timeout for the rpc:multicall. If any
+%% node fails to respond in that time, it will be added to the dead nodes
+%% response list as well.
+%%
+%% The default timeout is 30 seconds
+%%
+dead_nodes() ->
+    dead_nodes(?PING_TIMEOUT_IN_MS).
+
+-spec dead_nodes(Timeout :: pos_integer()) -> [node() | Error :: term()].
+
+dead_nodes(Timeout) when is_integer(Timeout), Timeout > 0 ->
+    % Here we are trying to detect overlapping partitions where not all the
+    % nodes connect to each other. For example: n1 connects to n2 and n3, but
+    % n2 and n3 are not connected.
+    DeadFun = fun() ->
+        Expected = ordsets:from_list(mem3:nodes()),
+        Live = ordsets:from_list(mem3_util:live_nodes()),
+        Dead = ordsets:subtract(Expected, Live),
+        ordsets:to_list(Dead)
+    end,
+    {Responses, BadNodes} = multicall(DeadFun, Timeout),
+    AccF = lists:foldl(
+        fun
+            (Dead, Acc) when is_list(Dead) -> ordsets:union(Acc, Dead);
+            (Error, Acc) -> ordsets:union(Acc, [Error])
+        end,
+        ordsets:from_list(BadNodes),
+        Responses
+    ),
+    ordsets:to_list(AccF).
+
+multicall(Fun, Timeout) when is_integer(Timeout), Timeout > 0 ->
+    F = fun() -> catch Fun() end,
+    rpc:multicall(erlang, apply, [F, []], Timeout).
 
 db_is_current(#shard{name = Name}) ->
     db_is_current(Name);

@@ -314,7 +314,8 @@ get_stats() ->
         {process_limit, erlang:system_info(process_limit)},
         {message_queues, {MessageQueuesHist ++ MessageQueues}},
         {internal_replication_jobs, mem3_sync:get_backlog()},
-        {distribution, {get_distribution_stats()}}
+        {distribution, {get_distribution_stats()}},
+        {distribution_events, mem3_distribution:events()}
     ].
 
 db_pid_stats_formatted() ->

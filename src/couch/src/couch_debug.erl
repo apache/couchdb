@@ -43,7 +43,15 @@
     restart/1,
     restart_busy/2,
     restart_busy/3,
-    restart_busy/4
+    restart_busy/4,
+    dead_nodes/0,
+    dead_nodes/1,
+    ping/1,
+    ping/2,
+    ping_nodes/0,
+    ping_nodes/1,
+    ping_nodes/2,
+    node_events/0
 ]).
 
 -export([
@@ -85,7 +93,10 @@ help() ->
         print_report,
         print_report_with_info_width,
         restart,
-        restart_busy
+        restart_busy,
+        dead_nodes,
+        ping_nodes,
+        node_events
     ].
 
 -spec help(Function :: function_name()) -> ok.
@@ -434,6 +445,49 @@ help(analyze_resource_hoggers) ->
         An example workflow is to call `resource_hoggers_snapshot(memory_info(Pids))` and pass this to `analyze_resource_hoggers/2`
         along with the number of top processes to include in result, TopN. See `couch_debug:help(resource_hoggers_snapshot)` for an 
         example and more info.
+
+        ---
+    ", []);
+help(dead_nodes) ->
+    io:format("
+        dead_nodes()
+        dead_nodes(Timeout)
+        --------------------------------
+
+        Get the list of 'dead' nodes, that is node which appears in the
+        mem3:nodes() list but are not connected to some nodes of the cluster.
+
+        ---
+    ", []);
+help(ping) ->
+    io:format("
+        ping(Node)
+        ping(Node, Timeout)
+        --------------------------------
+
+        Ping a node and return either a time in microseconds or an error term.
+
+        ---
+    ", []);
+help(ping_nodes) ->
+    io:format("
+        ping_nodes()
+        ping_nodes(Timeout)
+        ping_nodes(Nodes, Timeout)
+        --------------------------------
+
+        Ping the list of currently connected nodes. Return a list of {Node,
+        Result} tuples where Result is either a time in microseconds or an
+        error term.
+
+        ---
+    ", []);
+help(node_events) ->
+    io:format("
+        node_events()
+        --------------------------------
+
+        Return the list of nodeup/nodedown events for each node in the cluster.
 
         ---
     ", []);
@@ -909,6 +963,30 @@ restart_busy(ProcessList, Threshold, DelayInMsec, Property) when
         end,
         busy(ProcessList, Threshold, Property)
     ).
+
+dead_nodes() ->
+    mem3:dead_nodes().
+
+dead_nodes(Timeout) ->
+    mem3:dead_nodes(Timeout).
+
+ping(Node) ->
+    mem3:ping(Node).
+
+ping(Node, Timeout) ->
+    mem3:ping(Node, Timeout).
+
+ping_nodes() ->
+    mem3:ping_nodes().
+
+ping_nodes(Timeout) ->
+    mem3:ping_nodes(Timeout).
+
+ping_nodes(Nodes, Timeout) ->
+    mem3:ping_nodes(Nodes, Timeout).
+
+node_events() ->
+    mem3_distribution:events().
 
 %% Pretty print functions
 
