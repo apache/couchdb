@@ -101,7 +101,7 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, State) ->
     #state{counters = Counters0} = State,
     case fabric_util:remove_down_workers(Counters0, NodeRef, []) of
         {ok, Counters1} ->
-            {ok, Counters1};
+            {ok, State#state{counters = Counters1}};
         error ->
             {error, {nodedown, <<"progress not possible">>}}
     end;
