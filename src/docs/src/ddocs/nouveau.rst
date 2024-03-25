@@ -35,7 +35,7 @@ database. An index builds after processing one search request or after the serve
 a document update. The ``index`` function takes the following parameters:
 
 #. Field type - The type of the field, can be ``string``, ``text``, ``double``
-   or ``stored``.
+   or ``stored``. See :ref:`Field Types <ddoc/nouveau/field_types>` for more information.
 #. Field name - The name of the field you want to use when you query the index.
    If you set this parameter to ``default``, then this field is queried if no field is
    specified in the query syntax.
@@ -62,6 +62,37 @@ results from deeper in the result set.
 
 A nouveau index will inherit the partitioning type from the ``options.partitioned`` field
 of the design document that contains it.
+
+.. _ddoc/nouveau/field_types:
+
+Field Types
+===========
+
+Nouveau currently supports four field types, each of which has different semantics to the
+others.
+
+Text
+    A text field is the most common field type, the field value is analyzed at
+    index time to permit efficient querying by the individual words within it
+    (and wildcards, and regex, etc). This field type is not appropriate for
+    sorting, range queries and faceting.
+
+String
+    A string field indexes the fields value as a single token without
+    analysis (that is, no case-folding, no common suffixes are removed,
+    etc). This field type is recommended for sorting and faceting. You *can*
+    search on string fields but you must specify the ``keyword`` analyzer in the
+    index definition for this field to ensure that your queries are not
+    analyzed.
+
+Double
+    A double field requires a number value and is appropriate for sorting,
+    range queries and range faceting.
+
+Stored
+    A stored field stores the field value into the index without
+    analysis. The value is returned with search results but you cannot search,
+    sort, range or facet over a stored field.
 
 Index functions
 ===============
