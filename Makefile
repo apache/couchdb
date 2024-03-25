@@ -375,12 +375,6 @@ xref:
 	@./build-aux/xref-helper.sh $(REBAR) $(DIALYZE_OPTS)
 
 
-.PHONY: introspect
-# target: introspect - Check for commits difference between rebar.config and repository
-introspect:
-	@$(REBAR) -r update-deps
-	@build-aux/introspect
-
 ################################################################################
 # Distributing
 ################################################################################
