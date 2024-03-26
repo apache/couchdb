@@ -336,12 +336,6 @@ dialyze: .rebar
 xref:
 	@$(REBAR) --keep-going --recursive xref $(DIALYZE_OPTS)
 
-.PHONY: introspect
-# target: introspect - Check for commits difference between rebar.config and repository
-introspect:
-	@$(REBAR) -r update-deps
-	@escript build-aux\introspect
-
 
 ################################################################################
 # Distributing
