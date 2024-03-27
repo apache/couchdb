@@ -76,7 +76,7 @@ var Views = (function() {
     } else if (err.name == "InternalError") {
       throw(["fatal", err.name, err.message]);
     }
-    var message = "function raised exception " + err.toSource();
+    var message = "function raised exception " + errstr(err);
     if (doc) message += " with doc._id " + doc._id;
     log(message);
   };

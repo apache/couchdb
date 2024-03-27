@@ -20,7 +20,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-./configure --enable-nouveau --enable-clouseau
+./configure --enable-nouveau --enable-clouseau --js-engine=${JS_ENGINE}
 make check || (make build-report && false)
 '''
 
@@ -252,6 +252,10 @@ pipeline {
           axis {
             name 'SM_VSN'
             values '78'
+          }
+          axis {
+            name 'JS_ENGINE'
+            values 'quickjs', 'spidermonkey'
           }
         }
 

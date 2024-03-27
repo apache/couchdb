@@ -28,6 +28,7 @@
 -export([lock/2, unlock/1]).
 -export([db_updated/1]).
 -export([num_servers/0, couch_server/1, couch_dbs_pid_to_name/1, couch_dbs/1]).
+-export([get_js_engine/0, with_spidermonkey/0]).
 -export([aggregate_queue_len/0, get_spidermonkey_version/0]).
 -export([names/0]).
 -export([try_lock/2, unlock/2]).
@@ -90,7 +91,18 @@ get_stats() ->
         lists:foldl(Fun, {0, 0}, lists:seq(1, num_servers())),
     [{start_time, ?l2b(Time)}, {dbs_open, Open}].
 
+get_js_engine() ->
+    list_to_binary(config:get("couchdb", "js_engine", ?COUCHDB_JS_ENGINE)).
+
 get_spidermonkey_version() -> list_to_binary(?COUCHDB_SPIDERMONKEY_VERSION).
+
+with_spidermonkey() ->
+    % The case match is just an extra assert that we got a correctly configured
+    % value from rebar config script
+    case ?COUCHDB_WITH_SPIDERMONKEY of
+        true -> true;
+        false -> false
+    end.
 
 sup_start_link(N) ->
     gen_server:start_link({local, couch_server(N)}, couch_server, [N], []).

@@ -51,6 +51,17 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]}
     UcaVer = couch_ejson_compare:get_uca_version(),
     ColVer = couch_ejson_compare:get_collator_version(),
     Hashes = crypto:supports(hashs),
+    EngineName = couch_server:get_js_engine(),
+    JsEngine =
+        case EngineName of
+            <<"spidermonkey">> ->
+                #{
+                    name => EngineName,
+                    version => couch_server:get_spidermonkey_version()
+                };
+            _Other ->
+                #{name => EngineName}
+        end,
     send_json(Req, 200, #{
         erlang => #{
             version => ?l2b(?COUCHDB_ERLANG_VERSION),
@@ -62,10 +73,7 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]}
             collation_algorithm_version => couch_util:version_to_binary(UcaVer),
             collator_version => couch_util:version_to_binary(ColVer)
         },
-        javascript_engine => #{
-            name => <<"spidermonkey">>,
-            version => couch_server:get_spidermonkey_version()
-        }
+        javascript_engine => JsEngine
     });
 handle_node_req(#httpd{path_parts = [_, _Node, <<"_versions">>]} = Req) ->
     send_method_not_allowed(Req, "GET");

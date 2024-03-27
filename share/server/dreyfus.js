@@ -20,7 +20,7 @@ var Dreyfus = (function() {
     } else if (err[0] == "fatal") {
       throw(err);
     }
-    var message = "function raised exception " + err.toSource();
+    var message = "function raised exception " + errstr(err);
     if (doc) message += " with doc._id " + doc._id;
     log(message);
   };
