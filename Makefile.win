@@ -386,7 +386,7 @@ endif
 ifeq ($(with_nouveau), true)
 	-@mkdir rel\couchdb\nouveau
 	@cd nouveau && .\gradlew installDist
-	@xcopy nouveau\build\install\nouveau rel\couchdb /E /I
+	@xcopy nouveau\build\install\nouveau rel\couchdb\nouveau /E /I
 endif
 
 	@echo ... done
