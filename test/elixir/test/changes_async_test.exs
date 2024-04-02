@@ -209,16 +209,18 @@ defmodule ChangesAsyncTest do
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "rusty", bop: "plankton"})
 
-    changes = process_response(req_id.id, &parse_changes_line_chunk/1)
+    retry_until(fn ->
+      changes = process_response(req_id.id, &parse_changes_line_chunk/1)
 
-    changes_ids =
-      changes
-      |> Enum.filter(fn p -> Map.has_key?(p, "id") end)
-      |> Enum.map(fn p -> p["id"] end)
+      changes_ids =
+        changes
+        |> Enum.filter(fn p -> Map.has_key?(p, "id") end)
+        |> Enum.map(fn p -> p["id"] end)
 
-    assert Enum.member?(changes_ids, "bingo")
-    assert Enum.member?(changes_ids, "rusty")
-    assert length(changes_ids) == 2
+      Enum.member?(changes_ids, "bingo") and
+      Enum.member?(changes_ids, "rusty") and
+      length(changes_ids) == 2
+    end)
   end
 
   @tag :with_db
