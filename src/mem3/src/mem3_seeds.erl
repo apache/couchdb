@@ -30,11 +30,9 @@
     ready = false,
     seeds = [],
     jobref = nil,
-    % nested proplist keyed on node name
-    status = []
+    % map keyed on node name
+    status = #{}
 }).
-
--define(REPLICATION_INTERVAL, 60000).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -54,29 +52,26 @@ get_status() ->
 
 init([]) ->
     Seeds = get_seeds(),
-    InitStatus = [{Seed, {[]}} || Seed <- Seeds],
-    State = #st{
+    Ready =
+        case Seeds of
+            [] -> true;
+            _ -> false
+        end,
+    St = #st{
         seeds = Seeds,
-        ready =
-            case Seeds of
-                [] -> true;
-                _ -> false
-            end,
+        ready = Ready,
         jobref = start_replication(Seeds),
-        status = InitStatus
+        status = maps:from_keys(Seeds, #{})
     },
-    {ok, State}.
+    {ok, St}.
 
 handle_call(get_status, _From, St) ->
-    Status =
-        {[
-            {status,
-                case St#st.ready of
-                    true -> ok;
-                    false -> seeding
-                end},
-            {seeds, {St#st.status}}
-        ]},
+    Ready =
+        case St#st.ready of
+            true -> ok;
+            false -> seeding
+        end,
+    Status = #{status => Ready, seeds => St#st.status},
     {reply, {ok, Status}, St}.
 
 handle_cast(_Msg, St) ->
@@ -100,16 +95,14 @@ start_replication([Seed | _]) ->
         exit({ok, Reply})
     end).
 
-update_state(State, {ok, Data}) ->
-    #st{seeds = [Current | Tail], status = Status} = State,
-    Report =
-        {[
-            {timestamp, list_to_binary(mem3_util:iso8601_timestamp())},
-            {last_replication_status, ok},
-            format_data(Data)
-        ]},
-    NewStatus = lists:ukeymerge(1, [{Current, Report}], Status),
-    Ready = is_ready(State#st.ready, Data),
+update_state(#st{} = St, {ok, Data}) ->
+    #st{seeds = [Current | Tail], status = #{} = Status} = St,
+    Report = #{
+        timestamp => list_to_binary(mem3_util:iso8601_timestamp()),
+        pending_updates => lists:foldl(fun pending_updates/2, #{}, Data),
+        last_replication_status => ok
+    },
+    Ready = is_ready(St#st.ready, Data),
     case Ready of
         true ->
             Seeds = Tail ++ [Current],
@@ -119,31 +112,29 @@ update_state(State, {ok, Data}) ->
             Seeds = [Current | Tail],
             Job = start_replication([Current | Tail])
     end,
-    State#st{
+    St#st{
         seeds = Seeds,
         jobref = Job,
         ready = Ready,
-        status = NewStatus
+        status = Status#{Current => Report}
     };
-update_state(State, {_Error, _Stack}) ->
-    #st{seeds = [Current | Tail], status = Status} = State,
-    Report =
-        {[
-            {timestamp, list_to_binary(mem3_util:iso8601_timestamp())},
-            {last_replication_status, error}
-        ]},
-    NewStatus = lists:ukeymerge(1, [{Current, Report}], Status),
+update_state(#st{} = St, {_Error, _Stack}) ->
+    #st{seeds = [Current | Tail], status = #{} = Status} = St,
+    Report = #{
+        timestamp => list_to_binary(mem3_util:iso8601_timestamp()),
+        last_replication_status => error
+    },
     Seeds = Tail ++ [Current],
     if
-        not State#st.ready ->
+        not St#st.ready ->
             erlang:send_after(1000, self(), start_replication);
         true ->
             ok
     end,
-    State#st{
+    St#st{
         seeds = Seeds,
         jobref = nil,
-        status = NewStatus
+        status = Status#{Current => Report}
     }.
 
 is_ready(true, _) ->
@@ -151,18 +142,12 @@ is_ready(true, _) ->
 is_ready(false, Data) ->
     lists:all(fun({_DbName, Pending}) -> Pending =:= {ok, 0} end, Data).
 
-format_data(Data) ->
-    Formatted = lists:map(
-        fun({DbName, Status}) ->
-            case Status of
-                {ok, Pending} when is_number(Pending) ->
-                    {DbName, Pending};
-                {error, Tag} ->
-                    {DbName, list_to_binary(io_lib:format("~p", [Tag]))};
-                _Else ->
-                    {DbName, unknown_error}
-            end
-        end,
-        Data
-    ),
-    {pending_updates, {Formatted}}.
+pending_updates({DbName, Status}, #{} = Acc) ->
+    case Status of
+        {ok, Pending} when is_number(Pending) ->
+            Acc#{DbName => Pending};
+        {error, Tag} ->
+            Acc#{DbName => list_to_binary(io_lib:format("~p", [Tag]))};
+        _Else ->
+            Acc#{DbName => unknown_error}
+    end.
