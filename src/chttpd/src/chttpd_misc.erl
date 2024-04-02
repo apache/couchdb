@@ -304,16 +304,14 @@ handle_uuids_req(Req) ->
 handle_up_req(#httpd{method = 'GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of
         "true" ->
-            send_json(Req, 404, {[{status, maintenance_mode}]});
+            send_json(Req, 404, #{status => maintenance_mode});
         "nolb" ->
-            send_json(Req, 404, {[{status, nolb}]});
+            send_json(Req, 404, #{status => nolb});
         _ ->
-            {ok, {Status}} = mem3_seeds:get_status(),
-            case couch_util:get_value(status, Status) of
-                ok ->
-                    send_json(Req, 200, {Status});
-                seeding ->
-                    send_json(Req, 404, {Status})
+            {ok, #{} = Status} = mem3_seeds:get_status(),
+            case Status of
+                #{status := ok} -> send_json(Req, 200, Status);
+                #{status := seeding} -> send_json(Req, 404, Status)
             end
     end;
 handle_up_req(Req) ->
