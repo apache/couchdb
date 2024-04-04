@@ -765,10 +765,10 @@ set_context_username(UserName) ->
             end
     end.
 
-track(#rctx{}=Rctx) ->
+track(#rctx{pid_ref=PidRef}) ->
     %% TODO: should this block or not? If no, what cleans up zombies?
     %% gen_server:call(?MODULE, {track, PR}).
-    gen_server:cast(?MODULE, {track, Rctx}).
+    gen_server:cast(?MODULE, {track, PidRef}).
 
 
 make_delta() ->
@@ -940,7 +940,7 @@ handle_call({track, _}=Msg, _From, St) ->
 handle_call(Msg, _From, St) ->
     {stop, {unknown_call, Msg}, error, St}.
 
-handle_cast({track, #rctx{pid_ref=PidRef}}, #st{tracking=AT0} = St0) ->
+handle_cast({track, {_,_}=PidRef}, #st{tracking=AT0} = St0) ->
     AT = maybe_track(PidRef, AT0),
     {noreply, St0#st{tracking=AT}};
 handle_cast(Msg, St) ->
