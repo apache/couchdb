@@ -75,8 +75,8 @@ defmodule NouveauTest do
     assert resp.status_code in [201]
   end
 
-  def create_ddoc(db_name, opts \\ %{}) do
-    default_ddoc = %{
+  def create_ddoc(db_name, ddoc \\
+    %{
       nouveau: %{
         bar: %{
           default_analyzer: "standard",
@@ -88,10 +88,7 @@ defmodule NouveauTest do
           """
         }
       }
-    }
-
-    ddoc = Enum.into(opts, default_ddoc)
-
+    }) do
     resp = Couch.put("/#{db_name}/_design/foo", body: ddoc)
     assert resp.status_code in [201]
     assert Map.has_key?(resp.body, "ok") == true
@@ -261,7 +258,7 @@ defmodule NouveauTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
-    resp = Couch.post(url, body: %{q: "*:*", sort: "foo<string>", include_docs: true})
+    resp = Couch.post(url, body: %{q: "*:*", sort: "foo", include_docs: true})
     assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc3", "doc1", "doc4", "doc2"]
@@ -274,7 +271,7 @@ defmodule NouveauTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
-    resp = Couch.post(url, body: %{q: "*:*", sort: "-foo<string>", include_docs: true})
+    resp = Couch.post(url, body: %{q: "*:*", sort: "-foo", include_docs: true})
     assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc2", "doc4", "doc1", "doc3"]
@@ -287,7 +284,7 @@ defmodule NouveauTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
-    resp = Couch.post(url, body: %{q: "*:*", sort: "bar<double>", include_docs: true})
+    resp = Couch.post(url, body: %{q: "*:*", sort: "bar", include_docs: true})
     assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc1", "doc3", "doc4", "doc2"]
@@ -300,7 +297,7 @@ defmodule NouveauTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/foo/_nouveau/bar"
-    resp = Couch.post(url, body: %{q: "*:*", sort: "-bar<double>", include_docs: true})
+    resp = Couch.post(url, body: %{q: "*:*", sort: "-bar", include_docs: true})
     assert_status_code(resp, 200)
     ids = get_ids(resp)
     assert ids == ["doc2", "doc4", "doc3", "doc1"]
@@ -603,6 +600,26 @@ defmodule NouveauTest do
     db_info = info(db_name)
     assert seq(db_info["update_seq"]) == resp.body["search_index"]["update_seq"]
     assert seq(db_info["purge_seq"]) == resp.body["search_index"]["purge_seq"]
+  end
+
+  @tag :with_db
+  test "index same field with different field types", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name, %{
+      nouveau: %{
+        bar: %{
+          default_analyzer: "standard",
+          index: """
+            function (doc) {
+              index("string", "foo", "bar", {store: true});
+              index("double", "foo", 12.0, {store: true});
+            }
+          """
+        }}})
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "foo:bar", include_docs: true})
+    assert_status_code(resp, 400)
   end
 
   def seq(str) do

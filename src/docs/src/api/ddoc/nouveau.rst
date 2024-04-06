@@ -62,13 +62,12 @@
         Example: ``{"bar":[{"label":"cheap","min":0,"max":100}]}``
     :query json sort: Specifies the sort order of the results.
         The default sort order is relevance. A JSON string of the form
-        ``"fieldname<type>"`` or ``"-fieldname<type>"`` for descending order, where
-        fieldname is the name of a string or number field, and ``type`` is either
-        ``double`` or ``string``. You can use a single string to sort by one field
-        or an array of strings to sort by several fields in the same order as the
-        array.
-        Some examples are ``"relevance"``, ``"bar<string>"``,
-        ``"-foo<double>"`` and [``"-foo<double>"``, ``"bar<string>"``].
+        ``"fieldname"`` or ``"-fieldname"`` for descending order, where
+        fieldname is the name of a string or double field. You can use a single string
+        to sort by one field or an array of strings to sort by several fields in the
+        same order as the array.
+        Some examples are ``"relevance"``, ``"bar"``, ``"-foo"`` and
+        [``"-foo"``, ``"bar"``].
     :query boolean update: Set to ``false`` to allow the use of an out-of-date index.
 
     :>header Content-Type: - :mimetype:`application/json`

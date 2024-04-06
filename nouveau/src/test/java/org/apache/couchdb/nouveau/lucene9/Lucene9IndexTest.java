@@ -100,7 +100,7 @@ public class Lucene9IndexTest {
             }
             final SearchRequest request = new SearchRequest();
             request.setQuery("*:*");
-            request.setSort(List.of("foo<string>"));
+            request.setSort(List.of("foo"));
             final SearchResults results = index.search(request);
             assertThat(results.getTotalHits()).isEqualTo(count);
         } finally {

@@ -26,6 +26,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
     @JsonSubTypes.Type(value = IntWrapper.class, name = "int"),
     @JsonSubTypes.Type(value = LongWrapper.class, name = "long"),
     @JsonSubTypes.Type(value = StringWrapper.class, name = "string"),
+    @JsonSubTypes.Type(value = NullWrapper.class, name = "null"),
 })
 public class PrimitiveWrapper<T> {
 

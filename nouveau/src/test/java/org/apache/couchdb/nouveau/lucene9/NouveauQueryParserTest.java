@@ -15,10 +15,13 @@ package org.apache.couchdb.nouveau.lucene9;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.text.NumberFormat;
 import java.util.Locale;
+import java.util.Map;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.flexible.standard.config.PointsConfig;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TermRangeQuery;
@@ -35,82 +38,69 @@ public class NouveauQueryParserTest {
 
     @BeforeAll
     public static void setup() {
-        qp = new NouveauQueryParser(new StandardAnalyzer(), Locale.US);
+        var locale = Locale.US;
+        var pointsConfigMap = Map.of("num", new PointsConfig(NumberFormat.getInstance(locale), Double.class));
+        qp = new NouveauQueryParser(new StandardAnalyzer(), pointsConfigMap);
     }
 
     @Test
     public void testTermQuery() throws Exception {
-        assertThat(qp.parse("foo:bar", DEFAULT_FIELD)).isEqualTo(new TermQuery(new Term("foo", "bar")));
+        assertThat(qp.parse("txt:bar", DEFAULT_FIELD)).isEqualTo(new TermQuery(new Term("txt", "bar")));
     }
 
     @Test
     public void testPrefixQuery() throws Exception {
-        assertThat(qp.parse("foo:bar*", DEFAULT_FIELD)).isEqualTo(new PrefixQuery(new Term("foo", "bar")));
+        assertThat(qp.parse("txt:bar*", DEFAULT_FIELD)).isEqualTo(new PrefixQuery(new Term("txt", "bar")));
     }
 
     @Test
     public void testWildcardQuery() throws Exception {
-        assertThat(qp.parse("foo:ba*r", DEFAULT_FIELD)).isEqualTo(new WildcardQuery(new Term("foo", "ba*r")));
+        assertThat(qp.parse("txt:ba*r", DEFAULT_FIELD)).isEqualTo(new WildcardQuery(new Term("txt", "ba*r")));
     }
 
     @Test
     public void testStringRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[bar TO foo]", DEFAULT_FIELD))
-                .isEqualTo(new TermRangeQuery("foo", new BytesRef("bar"), new BytesRef("foo"), true, true));
+        assertThat(qp.parse("txt:[bar TO foo]", DEFAULT_FIELD))
+                .isEqualTo(new TermRangeQuery("txt", new BytesRef("bar"), new BytesRef("foo"), true, true));
     }
 
     @Test
-    public void testMixedRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[12.0 TO foo]", DEFAULT_FIELD))
-                .isEqualTo(new TermRangeQuery("foo", new BytesRef("12.0"), new BytesRef("foo"), true, true));
+    public void testPointQuery() throws Exception {
+        assertThat(qp.parse("num:12", DEFAULT_FIELD)).isEqualTo(DoublePoint.newExactQuery("num", 12.0));
     }
 
     @Test
-    public void testInferredPointQuery() throws Exception {
-        assertThat(qp.parse("foo:12", DEFAULT_FIELD)).isEqualTo(DoublePoint.newExactQuery("foo", 12.0));
-    }
-
-    @Test
-    public void testInferredPointRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[1 TO 12]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {12}));
+    public void testPointRangeQuery() throws Exception {
+        assertThat(qp.parse("num:[1 TO 12]", DEFAULT_FIELD))
+                .isEqualTo(DoublePoint.newRangeQuery("num", new double[] {1}, new double[] {12}));
     }
 
     @Test
     public void testOpenLeftPointRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[* TO 100.0]", DEFAULT_FIELD))
+        assertThat(qp.parse("num:[* TO 100.0]", DEFAULT_FIELD))
                 .isEqualTo(
-                        DoublePoint.newRangeQuery("foo", new double[] {Double.NEGATIVE_INFINITY}, new double[] {100}));
+                        DoublePoint.newRangeQuery("num", new double[] {Double.NEGATIVE_INFINITY}, new double[] {100}));
     }
 
     @Test
     public void testOpenRightPointRangeQuery() throws Exception {
-        assertThat(qp.parse("foo:[1.0 TO *]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {Double.POSITIVE_INFINITY}));
-    }
-
-    @Test
-    public void testOpenLeftPointRangeQueryLegacy() throws Exception {
-        assertThat(qp.parse("foo:[-Infinity TO 100.0]", DEFAULT_FIELD))
-                .isEqualTo(
-                        DoublePoint.newRangeQuery("foo", new double[] {Double.NEGATIVE_INFINITY}, new double[] {100}));
-    }
-
-    @Test
-    public void testOpenRightPointRangeQueryLegacy() throws Exception {
-        assertThat(qp.parse("foo:[1.0 TO Infinity]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {1}, new double[] {Double.POSITIVE_INFINITY}));
+        assertThat(qp.parse("num:[1.0 TO *]", DEFAULT_FIELD))
+                .isEqualTo(DoublePoint.newRangeQuery("num", new double[] {1}, new double[] {Double.POSITIVE_INFINITY}));
     }
 
     @Test
     public void testLocales() throws Exception {
-        var us = new NouveauQueryParser(new StandardAnalyzer(), Locale.US);
-        var de = new NouveauQueryParser(new StandardAnalyzer(), Locale.GERMAN);
+        var us = new NouveauQueryParser(
+                new StandardAnalyzer(),
+                Map.of("num", new PointsConfig(NumberFormat.getInstance(Locale.US), Double.class)));
+        var de = new NouveauQueryParser(
+                new StandardAnalyzer(),
+                Map.of("num", new PointsConfig(NumberFormat.getInstance(Locale.GERMANY), Double.class)));
 
-        assertThat(us.parse("foo:[10.0 TO 20.0]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {10}, new double[] {20}));
+        assertThat(us.parse("num:[10.0 TO 20.0]", DEFAULT_FIELD))
+                .isEqualTo(DoublePoint.newRangeQuery("num", new double[] {10}, new double[] {20}));
 
-        assertThat(de.parse("foo:[10.0 TO 20.0]", DEFAULT_FIELD))
-                .isEqualTo(DoublePoint.newRangeQuery("foo", new double[] {100}, new double[] {200}));
+        assertThat(de.parse("num:[10.0 TO 20.0]", DEFAULT_FIELD))
+                .isEqualTo(DoublePoint.newRangeQuery("num", new double[] {100}, new double[] {200}));
     }
 }

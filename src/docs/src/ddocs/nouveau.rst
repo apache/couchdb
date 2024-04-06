@@ -94,6 +94,10 @@ Stored
     analysis. The value is returned with search results but you cannot search,
     sort, range or facet over a stored field.
 
+.. warning:: the type of any specific field is determined by the first index
+             call. Attempts to index a different type into the same field will
+             throw an exception and prevent the index from building.
+
 Index functions
 ===============
 
