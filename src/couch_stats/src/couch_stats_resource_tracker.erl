@@ -38,8 +38,10 @@
 ]).
 
 -export([
-    create_context/0, create_context/1, create_context/3,
+    close_pid_ref/0, close_pid_ref/1,
+    create_context/3,
     create_coordinator_context/1, create_coordinator_context/2,
+    destroy_context/0, destroy_context/1,
     is_enabled/0,
     get_resource/0,
     get_resource/1,
@@ -194,6 +196,9 @@ tnow() ->
 
 is_enabled() ->
     config:get_boolean(?MODULE_STRING, "enabled", true).
+
+should_scan() ->
+    config:get_boolean(?MODULE_STRING, "scans_enabled", false).
 
 db_opened() -> inc(db_opened).
 doc_read() -> inc(docs_read).
@@ -354,6 +359,8 @@ update_counter(Field, Count) ->
     is_enabled() andalso update_counter(get_pid_ref(), Field, Count).
 
 
+update_counter(undefined, _Field, _Count) ->
+    ok;
 update_counter({_Pid,_Ref}=PidRef, Field, Count) ->
     %% TODO: mem3 crashes without catch, why do we lose the stats table?
     is_enabled() andalso catch ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
@@ -635,43 +642,56 @@ convert_type({worker, M0, F0}) ->
     <<"worker:", M/binary, ":", F/binary>>.
 
 get_pid_ref() ->
+    get(?PID_REF).
+
+
+create_pid_ref() ->
     case get(?PID_REF) of
         undefined ->
-            Ref = make_ref(),
-            set_pid_ref({self(), Ref});
-        PidRef ->
-            PidRef
-    end.
-
-
-create_context() ->
-    is_enabled() andalso create_context(self()).
-
-
-create_context(Pid) ->
-    case is_enabled() of
-        false ->
             ok;
-        true ->
-            Ref = make_ref(),
-            Rctx = make_record(Pid, Ref),
-            track(Rctx),
-            create_resource(Rctx),
-            Rctx
-    end.
+        PidRef0 ->
+            %% TODO: what to do when it already exists?
+            throw({epidexist, PidRef0}),
+            close_pid_ref(PidRef0)
+    end,
+    PidRef = {self(), make_ref()},
+    set_pid_ref(PidRef),
+    PidRef.
+
+
+close_pid_ref() ->
+    close_pid_ref(get_pid_ref()).
+
+
+close_pid_ref(undefined) ->
+    undefined;
+close_pid_ref(_PidRef) ->
+    erase(?PID_REF).
+
+destroy_context() ->
+    destroy_context(get_pid_ref()).
+
+
+destroy_context(undefined) ->
+    ok;
+destroy_context({_, _} = PidRef) ->
+    close_pid_ref(PidRef),
+    gen_server:cast(?MODULE, {destroy, PidRef}),
+    ok.
 
 
 create_resource(#rctx{} = Rctx) ->
     %% true = ets:insert(?MODULE, Rctx).
     catch ets:insert(?MODULE, Rctx).
 
+
 %% add type to disnguish coordinator vs rpc_worker
 create_context(From, {M,F,_A} = MFA, Nonce) ->
     case is_enabled() of
         false ->
-            ok;
+            undefined;
         true ->
-            PidRef = get_pid_ref(), %% this will instantiate a new PidRef
+            PidRef = create_pid_ref(),
             %% TODO: extract user_ctx and db/shard from
             Rctx = #rctx{
                 pid_ref = PidRef,
@@ -683,7 +703,7 @@ create_context(From, {M,F,_A} = MFA, Nonce) ->
             track(Rctx),
             erlang:put(?DELTA_TZ, Rctx),
             create_resource(Rctx),
-            Rctx
+            PidRef
     end.
 
 create_coordinator_context(#httpd{path_parts=Parts} = Req) ->
@@ -698,7 +718,7 @@ create_coordinator_context(#httpd{} = Req, Path) ->
                 method = Verb,
                 nonce = Nonce
             } = Req,
-            PidRef = get_pid_ref(), %% this will instantiate a new PidRef
+            PidRef = create_pid_ref(),
             Rctx = #rctx{
                 pid_ref = PidRef,
                 %%type = {coordinator, Verb, Path},
@@ -709,15 +729,20 @@ create_coordinator_context(#httpd{} = Req, Path) ->
             track(Rctx),
             erlang:put(?DELTA_TZ, Rctx),
             create_resource(Rctx),
-            Rctx
+            PidRef
     end.
 
 set_context_dbname(DbName) ->
+    set_context_dbname(DbName, get_pid_ref()).
+
+set_context_dbname(_, undefined) ->
+    ok;
+set_context_dbname(DbName, PidRef) ->
     case is_enabled() of
         false ->
             ok;
         true ->
-            catch case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.dbname, DbName}]) of
+            catch case ets:update_element(?MODULE, PidRef, [{#rctx.dbname, DbName}]) of
                 false ->
                     Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
                     io:format("UPDATING DBNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [DbName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
@@ -729,6 +754,11 @@ set_context_dbname(DbName) ->
     end.
 
 set_context_handler_fun(Fun) when is_function(Fun) ->
+    set_context_handler_fun(Fun, get_pid_ref()).
+
+set_context_handler_fun(_, undefined) ->
+    ok;
+set_context_handler_fun(Fun, PidRef) when is_function(Fun) ->
     case is_enabled() of
         false ->
             ok;
@@ -736,7 +766,7 @@ set_context_handler_fun(Fun) when is_function(Fun) ->
             FunName = erlang:fun_to_list(Fun),
             #rctx{type={coordinator, Verb, _}} = get_resource(),
             Update = [{#rctx.type, {coordinator, Verb, FunName}}],
-            catch case ets:update_element(?MODULE, get_pid_ref(), Update) of
+            catch case ets:update_element(?MODULE, PidRef, Update) of
                 false ->
                     Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
                     io:format("UPDATING HANDLER FUN[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [FunName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
@@ -750,11 +780,16 @@ set_context_handler_fun(Fun) when is_function(Fun) ->
 set_context_username(null) ->
     ok;
 set_context_username(UserName) ->
+    set_context_username(UserName, get_pid_ref()).
+
+set_context_username(_, undefined) ->
+    ok;
+set_context_username(UserName, PidRef) ->
     case is_enabled() of
         false ->
             ok;
         true ->
-            catch case ets:update_element(?MODULE, get_pid_ref(), [{#rctx.username, UserName}]) of
+            catch case ets:update_element(?MODULE, PidRef, [{#rctx.username, UserName}]) of
                 false ->
                     Stk = try throw(42) catch _:_:Stk0 -> Stk0 end,
                     io:format("UPDATING USERNAME[~p] FAILURE WITH CONTEXT: ~p AND STACK:~n~pFOO:: ~p~n~n", [UserName, get_resource(), Stk, process_info(self(), current_stacktrace)]),
@@ -852,11 +887,15 @@ make_delta(#rctx{}, _) ->
     #{error => missing_fin_rctx}.
 
 make_delta_base() ->
-    Ref = make_ref(),
+    make_delta_base(get_pid_ref()).
+
+%% TODO: what to do when PidRef=undefined?
+make_delta_base(PidRef) ->
     %% TODO: extract user_ctx and db/shard from request
     Now = tnow(),
     #rctx{
-        pid_ref = {self(), Ref},
+        pid_ref = PidRef,
+        %% TODO: confirm this subtraction works
         started_at = Now - 100, %% give us 100ms rewind time for missing T0
         updated_at = Now
     }.
@@ -871,6 +910,8 @@ set_pid_ref(PidRef) ->
 get_resource() ->
     get_resource(get_pid_ref()).
 
+get_resource(undefined) ->
+    undefined;
 get_resource(PidRef) ->
     catch case ets:lookup(?MODULE, PidRef) of
         [#rctx{}=TP] ->
@@ -878,9 +919,6 @@ get_resource(PidRef) ->
         [] ->
             undefined
     end.
-
-make_record(Pid, Ref) ->
-    #rctx{pid_ref = {Pid, Ref}}.
 
 
 find_unmonitored() ->
@@ -917,7 +955,7 @@ init([]) ->
         {keypos, #rctx.pid_ref}
     ]),
     St = #st{},
-    case is_enabled() of
+    case is_enabled() andalso should_scan() of
         false ->
             ok;
         true ->
@@ -938,8 +976,11 @@ handle_call({track, _}=Msg, _From, St) ->
     {noreply, St1} = handle_cast(Msg, St),
     {reply, ok, St1};
 handle_call(Msg, _From, St) ->
-    {stop, {unknown_call, Msg}, error, St}.
+    {stop, {unknown_call, Msg}, St}.
 
+handle_cast({destroy, {_,_}=PidRef}, #st{tracking=AT0} = St0) ->
+    AT = destroy_context_int(PidRef, AT0, <<"shutdown:completed">>),
+    {noreply, St0#st{tracking=AT}};
 handle_cast({track, {_,_}=PidRef}, #st{tracking=AT0} = St0) ->
     AT = maybe_track(PidRef, AT0),
     {noreply, St0#st{tracking=AT}};
@@ -951,38 +992,21 @@ handle_info(scan, #st{tracking=AT0} = St0) ->
     AT = maybe_track(Unmonitored, AT0),
     _TimerRef = erlang:send_after(St0#st.scan_interval, self(), scan),
     {noreply, St0#st{tracking=AT}};
-handle_info({'DOWN', MonRef, _Type, DPid, Reason0}, #st{tracking=AT0} = St0) ->
-    %% io:format("CSRT:HI(~p)~n", [{'DOWN', MonRef, Type, DPid, Reason}]),
-    St = case maps:get(MonRef, AT0, undefined) of
-        undefined ->
-            io:format("ERROR: UNEXPECTED MISSING MONITOR IN TRACKING TABLE: {~p, ~p}~n", [MonRef, DPid]),
-            St0;
-        {RPid, _Ref} = PidRef ->
-            if
-                RPid =:= DPid -> ok;
-                true -> erlang:halt(io_lib:format("CSRT:HI PID MISMATCH ABORT: ~p =/= ~p~n", [DPid, RPid]))
-            end,
-            %% remove double bookkeeping
-            AT = maps:remove(MonRef, maps:remove(PidRef, AT0)),
-            %% TODO: Assert Pid matches Object
-            %% update process state in live table
-            %% TODO: decide whether we want the true match to crash this process on failure
-            %% true = ets:update_element(?MODULE, PidRef,
-            Reason = case Reason0 of
-                {shutdown, Shutdown0} ->
-                    Shutdown = atom_to_binary(Shutdown0),
-                    <<"shutdown: ", Shutdown/binary>>;
-                Reason0 ->
-                    Reason0
-            end,
-            ets:update_element(?MODULE, PidRef,
-                [{#rctx.state, {down, Reason}}, {#rctx.updated_at, tnow()}]),
-            log_process_lifetime_report(PidRef),
-            %% Delay eviction to allow human visibility on short lived pids
-            erlang:send_after(St0#st.eviction_delay, self(), {evict, PidRef}),
-            St0#st{tracking=AT}
+handle_info({'DOWN', MonRef, _Type, _DPid, Reason0}, #st{tracking=AT0} = St) ->
+    Reason = case Reason0 of
+        {shutdown, Shutdown0} ->
+            Shutdown = atom_to_binary(Shutdown0),
+            <<"shutdown: ", Shutdown/binary>>;
+        Reason0 ->
+            Reason0
     end,
-    {noreply, St};
+    %% TODO: moving to destroy_context_int lost assertion against RPid =:= DPid
+    %%        if
+    %%            RPid =:= DPid -> ok;
+    %%            true -> erlang:halt(...)
+    %%        end,
+    AT = destroy_context_int(MonRef, AT0, Reason),
+    {noreply, St#st{tracking=AT}};
 handle_info({evict, {_Pid, _Ref}=PidRef}, #st{eviction=paused, ev_queue=EVQ}=St) ->
     {noreply, St#st{ev_queue=[PidRef|EVQ]}};
 handle_info({evict, {_Pid, _Ref}=PidRef}, #st{}=St) ->
@@ -996,6 +1020,34 @@ terminate(_Reason, _St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+destroy_context_int(MonRef, AT0, Reason) when is_reference(MonRef) ->
+    demonitor(MonRef, [flush]),
+    case maps:get(MonRef, AT0, undefined) of
+        undefined ->
+            io:format("ERROR: UNEXPECTED MISSING MONITOR IN TRACKING TABLE: {~p, ~p}~n", [MonRef, Reason]),
+            throw({error, emissing});
+        {_Pid, _Ref} = PidRef ->
+            AT = maps:remove(MonRef, maps:remove(PidRef, AT0)),
+            %% TODO: Assert Pid matches Object from MonRef DOWN msg
+            destroy_context_int(PidRef, AT, Reason)
+    end;
+destroy_context_int({_Pid, _Ref}=PidRef, AT0, Reason) ->
+    AT = case maps:get(PidRef, AT0, undefined) of
+        undefined ->
+            AT0;
+        MonRef ->
+            demonitor(MonRef, [flush]),
+            maps:remove(MonRef, maps:remove(PidRef, AT0))
+    end,
+    ets:update_element(?MODULE, PidRef,
+        [{#rctx.state, {down, Reason}}, {#rctx.updated_at, tnow()}]),
+    log_process_lifetime_report(PidRef),
+    %% Delay eviction to allow human visibility on short lived pids
+    %%erlang:send_after(St0#st.eviction_delay, self(), {evict, PidRef}),
+    erlang:send_after(0, self(), {evict, PidRef}),
+    AT.
 
 
 evict([]) ->
@@ -1025,8 +1077,11 @@ maybe_track([{Pid,_Ref} = PidRef | PidRefs], AT) ->
     maybe_track(PidRefs, AT1).
 
 log_process_lifetime_report(PidRef) ->
-    %% More safely assert this can't ever be undefined
-    #rctx{} = Rctx = get_resource(PidRef),
+    is_enabled() andalso log_process_lifetime_report(PidRef, get_resource(PidRef)).
+
+log_process_lifetime_report(_PidRef, undefined) ->
+    ok;
+log_process_lifetime_report(_PidRef, #rctx{} = Rctx) ->
     %% TODO: catch error out of here, report crashes on depth>1 json
     %%io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
     case is_enabled() andalso should_log(Rctx) of

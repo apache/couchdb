@@ -378,7 +378,7 @@ after_request(HttpReq, HttpResp0) ->
     HttpResp2 = update_stats(HttpReq, HttpResp1),
     chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
-    %%couch_stats_resource_tracker:close_context(),
+    couch_stats_resource_tracker:destroy_context(),
     HttpResp2.
 
 process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->

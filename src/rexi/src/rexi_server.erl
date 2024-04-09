@@ -104,7 +104,7 @@ handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers = Workers} = St) ->
                     St1 = save_error(Error, St),
                     {noreply, remove_job(Job, St1)};
                 _ ->
-                    notify_caller({CPid, CRef}, Error, edelta),
+                    notify_caller({CPid, CRef}, Error, undefined),
                     {noreply, remove_job(Job, St)}
             end;
         false ->
@@ -135,14 +135,16 @@ init_p(From, {M, F, A}, Nonce) ->
     put(rexi_from, From),
     put('$initial_call', MFA),
     put(nonce, Nonce),
-    couch_stats:create_context(From, MFA, Nonce),
-    couch_stats:maybe_track_rexi_init_p(MFA),
     try
+        couch_stats_resource_tracker:create_context(From, MFA, Nonce),
+        couch_stats:maybe_track_rexi_init_p(MFA),
         apply(M, F, A)
     catch
         exit:normal ->
+            couch_stats_resource_tracker:destroy_context(),
             ok;
         Class:Reason:Stack0 ->
+            couch_stats_resource_tracker:destroy_context(),
             Stack = clean_stack(Stack0),
             {ClientPid, _ClientRef} = From,
             couch_log:error(
@@ -162,8 +164,11 @@ init_p(From, {M, F, A}, Nonce) ->
                 reason = {Class, Reason},
                 mfa = {M, F, A},
                 nonce = Nonce,
+                delta = couch_stats_resource_tracker:make_delta(),
                 stack = Stack
             })
+    after
+        couch_stats_resource_tracker:destroy_context()
     end.
 
 %% internal
