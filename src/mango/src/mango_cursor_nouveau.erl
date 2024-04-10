@@ -76,7 +76,7 @@ explain(Cursor) ->
     [
         {query, mango_selector_text:convert(Selector)},
         {partition, get_partition(Opts, null)},
-        {sort, sort_query(Opts, Selector)}
+        {sort, sort_query(Opts)}
     ].
 
 execute(Cursor, UserFun, UserAcc) ->
@@ -93,7 +93,7 @@ execute(Cursor, UserFun, UserAcc) ->
     QueryArgs = #{
         query => Query,
         partition => get_partition(Opts, null),
-        sort => sort_query(Opts, Selector)
+        sort => sort_query(Opts)
     },
     CAcc = #cacc{
         selector = Selector,
@@ -233,7 +233,7 @@ apply_user_fun(CAcc, Doc) ->
 %% Convert Query to Nouveau sort specifications
 %% Convert <<"Field">>, <<"desc">> to <<"-Field">>
 %% and append to the nouveau query
-sort_query(Opts, Selector) ->
+sort_query(Opts) ->
     {sort, {Sort}} = lists:keyfind(sort, 1, Opts),
     SortList = lists:map(
         fun(SortField) ->
@@ -243,15 +243,7 @@ sort_query(Opts, Selector) ->
                     {Field, <<"desc">>} -> {desc, Field};
                     Field when is_binary(Field) -> {asc, Field}
                 end,
-            SField0 = mango_selector_text:append_sort_type(RawSortField, Selector),
-            %% ugly fixup below
-            SField =
-                case SField0 of
-                    <<Prefix:(size(SField0) - 8)/binary, "<number>">> ->
-                        <<Prefix/binary, "<double>">>;
-                    Else ->
-                        Else
-                end,
+            SField = mango_util:lucene_escape_user(RawSortField),
             case Dir of
                 asc ->
                     SField;

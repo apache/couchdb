@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -50,6 +51,7 @@ import org.apache.couchdb.nouveau.core.ser.DoubleWrapper;
 import org.apache.couchdb.nouveau.core.ser.FloatWrapper;
 import org.apache.couchdb.nouveau.core.ser.IntWrapper;
 import org.apache.couchdb.nouveau.core.ser.LongWrapper;
+import org.apache.couchdb.nouveau.core.ser.NullWrapper;
 import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 import org.apache.couchdb.nouveau.core.ser.StringWrapper;
 import org.apache.lucene.analysis.Analyzer;
@@ -67,16 +69,22 @@ import org.apache.lucene.facet.StringValueFacetCounts;
 import org.apache.lucene.facet.range.DoubleRangeFacetCounts;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
 import org.apache.lucene.search.BooleanClause.Occur;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.CollectorManager;
+import org.apache.lucene.search.FieldComparator;
+import org.apache.lucene.search.FieldComparatorSource;
 import org.apache.lucene.search.FieldDoc;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.LeafFieldComparator;
 import org.apache.lucene.search.MultiCollectorManager;
+import org.apache.lucene.search.Pruning;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Scorable;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.search.Sort;
@@ -93,11 +101,12 @@ public class Lucene9Index extends Index {
 
     private static final Sort DEFAULT_SORT =
             new Sort(SortField.FIELD_SCORE, new SortField("_id", SortField.Type.STRING));
-    private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)(?:<(\\w+)>)$");
+    private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)$");
 
     private final Analyzer analyzer;
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
+    private final Lucene9IndexSchema schema;
 
     public Lucene9Index(
             final Analyzer analyzer,
@@ -109,6 +118,7 @@ public class Lucene9Index extends Index {
         this.analyzer = Objects.requireNonNull(analyzer);
         this.writer = Objects.requireNonNull(writer);
         this.searcherManager = Objects.requireNonNull(searcherManager);
+        this.schema = initSchema(writer);
     }
 
     @Override
@@ -134,6 +144,7 @@ public class Lucene9Index extends Index {
     public void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException {
         final Term docIdTerm = docIdTerm(docId);
         final Document doc = toDocument(docId, request);
+        schema.update(request.getFields());
         writer.updateDocument(docIdTerm, doc);
     }
 
@@ -148,7 +159,13 @@ public class Lucene9Index extends Index {
         if (!writer.hasUncommittedChanges()) {
             return false;
         }
-        writer.setLiveCommitData(Map.of("update_seq", Long.toString(updateSeq), "purge_seq", Long.toString(purgeSeq))
+        writer.setLiveCommitData(Map.of(
+                        "update_seq",
+                        Long.toString(updateSeq),
+                        "purge_seq",
+                        Long.toString(purgeSeq),
+                        "_schema",
+                        schema.toString())
                 .entrySet());
         writer.commit();
         return true;
@@ -339,11 +356,11 @@ public class Lucene9Index extends Index {
         final String last = sort.get(sort.size() - 1);
         // Append _id field if not already present.
         switch (last) {
-            case "-_id<string>":
-            case "_id<string>":
+            case "-_id":
+            case "_id":
                 break;
             default:
-                sort.add("_id<string>");
+                sort.add("_id");
         }
         return convertSort(sort);
     }
@@ -365,13 +382,18 @@ public class Lucene9Index extends Index {
             throw new WebApplicationException(sortString + " is not a valid sort parameter", Status.BAD_REQUEST);
         }
         final boolean reverse = "-".equals(m.group(1));
-        switch (m.group(3)) {
-            case "string":
+
+        var type = schema.getType(m.group(2));
+        if (type == null) {
+            return new UnknownSortField(m.group(2), reverse);
+        }
+        switch (type) {
+            case STRING:
                 return new SortedSetSortField(m.group(2), reverse);
-            case "double":
+            case DOUBLE:
                 return new SortedNumericSortField(m.group(2), SortField.Type.DOUBLE, reverse);
             default:
-                throw new WebApplicationException(m.group(3) + " is not a valid sort type", Status.BAD_REQUEST);
+                throw new WebApplicationException("can't sort on field " + m.group(2), Status.BAD_REQUEST);
         }
     }
 
@@ -469,6 +491,8 @@ public class Lucene9Index extends Index {
                 fields[i] = new LongWrapper((long) fieldDoc.fields[i]);
             } else if (fieldDoc.fields[i] instanceof Float) {
                 fields[i] = new FloatWrapper((float) fieldDoc.fields[i]);
+            } else if (fieldDoc.fields[i] == null) {
+                fields[i] = new NullWrapper();
             } else {
                 throw new WebApplicationException(fieldDoc.fields[i].getClass() + " is not valid", Status.BAD_REQUEST);
             }
@@ -489,7 +513,10 @@ public class Lucene9Index extends Index {
     }
 
     private Query parse(final SearchRequest request) {
-        var queryParser = new NouveauQueryParser(analyzer, request.getLocale());
+        var locale = request.getLocale() != null ? request.getLocale() : Locale.getDefault();
+        var pointsConfigMap = schema.toPointsConfigMap(locale);
+        var queryParser = new NouveauQueryParser(analyzer, pointsConfigMap);
+
         Query result;
         try {
             result = queryParser.parse(request.getQuery(), "default");
@@ -505,9 +532,88 @@ public class Lucene9Index extends Index {
         return result;
     }
 
+    private Lucene9IndexSchema initSchema(IndexWriter writer) {
+        var commitData = writer.getLiveCommitData();
+        if (commitData == null) {
+            return Lucene9IndexSchema.emptySchema();
+        }
+        for (var entry : commitData) {
+            if (entry.getKey().equals("_schema")) {
+                return Lucene9IndexSchema.fromString(entry.getValue());
+            }
+        }
+        return Lucene9IndexSchema.emptySchema();
+    }
+
     @Override
     public String toString() {
         return "Lucene9Index [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager
                 + "]";
+    }
+
+    /**
+     * This shard is unaware of the type of a sort field as no document within it currently has that field. This
+     * custom sort field therefore assumes all documents have null for this field and therefore all hits are equal.
+     */
+    private static final class UnknownSortField extends SortField {
+
+        private static final FieldComparatorSource COMPARATOR = new FieldComparatorSource() {
+
+            @Override
+            public FieldComparator<?> newComparator(String fieldname, int numHits, Pruning pruning, boolean reversed) {
+                return new FieldComparator<Void>() {
+
+                    @Override
+                    public int compare(int slot1, int slot2) {
+                        return 0;
+                    }
+
+                    @Override
+                    public void setTopValue(Void value) {
+                        // empty
+                    }
+
+                    @Override
+                    public Void value(int slot) {
+                        return null;
+                    }
+
+                    @Override
+                    public LeafFieldComparator getLeafComparator(LeafReaderContext context) throws IOException {
+                        return new LeafFieldComparator() {
+
+                            @Override
+                            public void setBottom(int slot) throws IOException {
+                                // empty
+                            }
+
+                            @Override
+                            public int compareBottom(int doc) throws IOException {
+                                return 0;
+                            }
+
+                            @Override
+                            public int compareTop(int doc) throws IOException {
+                                return 0;
+                            }
+
+                            @Override
+                            public void copy(int slot, int doc) throws IOException {
+                                // empty
+                            }
+
+                            @Override
+                            public void setScorer(Scorable scorer) throws IOException {
+                                // empty
+                            }
+                        };
+                    }
+                };
+            }
+        };
+
+        private UnknownSortField(final String fieldName, final boolean reverse) {
+            super(fieldName, COMPARATOR, reverse);
+        }
     }
 }

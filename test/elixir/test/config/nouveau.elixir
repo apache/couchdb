@@ -25,6 +25,7 @@
     "mango (partitioned)",
     "delete",
     "purge",
-    "purge with conflicts"
+    "purge with conflicts",
+    "index same field with different field types"
   ]
 }

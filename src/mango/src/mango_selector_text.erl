@@ -309,11 +309,11 @@ range(gt, Arg) ->
     [<<"{">>, value_str(Arg), <<" TO ", Max/binary, "]">>].
 
 get_range(min, Arg) when is_number(Arg) ->
-    <<"-Infinity">>;
+    <<"*">>;
 get_range(min, _Arg) ->
     <<"\"\"">>;
 get_range(max, Arg) when is_number(Arg) ->
-    <<"Infinity">>;
+    <<"*">>;
 get_range(max, _Arg) ->
     <<"\u0x10FFFF">>.
 
@@ -493,8 +493,7 @@ convert_default_test() ->
 
 convert_lt_test() ->
     ?assertEqual(
-        {op_field,
-            {[[<<"field">>], <<":">>, <<"number">>], [<<"[-Infinity TO ">>, <<"42">>, <<"}">>]}},
+        {op_field, {[[<<"field">>], <<":">>, <<"number">>], [<<"[* TO ">>, <<"42">>, <<"}">>]}},
         convert_selector(#{<<"field">> => #{<<"$lt">> => 42}})
     ),
     ?assertEqual(
@@ -514,8 +513,7 @@ convert_lt_test() ->
 
 convert_lte_test() ->
     ?assertEqual(
-        {op_field,
-            {[[<<"field">>], <<":">>, <<"number">>], [<<"[-Infinity TO ">>, <<"42">>, <<"]">>]}},
+        {op_field, {[[<<"field">>], <<":">>, <<"number">>], [<<"[* TO ">>, <<"42">>, <<"]">>]}},
         convert_selector(#{<<"field">> => #{<<"$lte">> => 42}})
     ),
     ?assertEqual(
@@ -566,8 +564,7 @@ convert_ne_test() ->
 
 convert_gte_test() ->
     ?assertEqual(
-        {op_field,
-            {[[<<"field">>], <<":">>, <<"number">>], [<<"[">>, <<"42">>, <<" TO Infinity]">>]}},
+        {op_field, {[[<<"field">>], <<":">>, <<"number">>], [<<"[">>, <<"42">>, <<" TO *]">>]}},
         convert_selector(#{<<"field">> => #{<<"$gte">> => 42}})
     ),
     ?assertEqual(
@@ -587,8 +584,7 @@ convert_gte_test() ->
 
 convert_gt_test() ->
     ?assertEqual(
-        {op_field,
-            {[[<<"field">>], <<":">>, <<"number">>], [<<"{">>, <<"42">>, <<" TO Infinity]">>]}},
+        {op_field, {[[<<"field">>], <<":">>, <<"number">>], [<<"{">>, <<"42">>, <<" TO *]">>]}},
         convert_selector(#{<<"field">> => #{<<"$gt">> => 42}})
     ),
     ?assertEqual(
