@@ -1001,6 +1001,8 @@ handle_info({'DOWN', MonRef, _Type, _DPid, Reason0}, #st{tracking=AT0} = St) ->
             Reason0
     end,
     %% TODO: moving to destroy_context_int lost assertion against RPid =:= DPid
+    %% NOTE: we can't flush with demonitor, so we might get a DOWN message for
+    %%   an already destroyed context.
     %%        if
     %%            RPid =:= DPid -> ok;
     %%            true -> erlang:halt(...)
@@ -1023,11 +1025,11 @@ code_change(_OldVsn, St, _Extra) ->
 
 
 destroy_context_int(MonRef, AT0, Reason) when is_reference(MonRef) ->
-    demonitor(MonRef, [flush]),
+    drop_monitor(MonRef),
     case maps:get(MonRef, AT0, undefined) of
         undefined ->
-            io:format("ERROR: UNEXPECTED MISSING MONITOR IN TRACKING TABLE: {~p, ~p}~n", [MonRef, Reason]),
-            throw({error, emissing});
+            %% Due to not flushing in demonitor we can now get an extra DOWN msg
+            AT0;
         {_Pid, _Ref} = PidRef ->
             AT = maps:remove(MonRef, maps:remove(PidRef, AT0)),
             %% TODO: Assert Pid matches Object from MonRef DOWN msg
@@ -1038,7 +1040,7 @@ destroy_context_int({_Pid, _Ref}=PidRef, AT0, Reason) ->
         undefined ->
             AT0;
         MonRef ->
-            demonitor(MonRef, [flush]),
+            drop_monitor(MonRef),
             maps:remove(MonRef, maps:remove(PidRef, AT0))
     end,
     ets:update_element(?MODULE, PidRef,
@@ -1048,6 +1050,11 @@ destroy_context_int({_Pid, _Ref}=PidRef, AT0, Reason) ->
     %%erlang:send_after(St0#st.eviction_delay, self(), {evict, PidRef}),
     erlang:send_after(0, self(), {evict, PidRef}),
     AT.
+
+
+drop_monitor(MonRef) ->
+    %% can't use [flush] here or we melt erts_internal:flush_monitor_messages/3
+    demonitor(MonRef).
 
 
 evict([]) ->
@@ -1071,7 +1078,7 @@ maybe_track([{Pid,_Ref} = PidRef | PidRefs], AT) ->
             Mon = erlang:monitor(process, Pid),
             %% TODO: decide whether we want the true match to crash this process on failure
             %%true = ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
-            ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
+            should_scan() andalso ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, Mon}]),
             maps:put(Mon, PidRef, maps:put(PidRef, Mon, AT))
     end,
     maybe_track(PidRefs, AT1).
