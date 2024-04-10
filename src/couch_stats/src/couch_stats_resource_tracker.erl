@@ -913,7 +913,16 @@ get_resource() ->
 get_resource(undefined) ->
     undefined;
 get_resource(PidRef) ->
-    catch case ets:lookup(?MODULE, PidRef) of
+    catch get_resource_int(PidRef).
+
+
+get_resource_int() ->
+    get_resource_int(get_pid_ref()).
+
+get_resource_int(undefined) ->
+    undefined;
+get_resource_int(PidRef) ->
+    case ets:lookup(?MODULE, PidRef) of
         [#rctx{}=TP] ->
             TP;
         [] ->
@@ -1043,7 +1052,7 @@ destroy_context_int({_Pid, _Ref}=PidRef, AT0, Reason) ->
             drop_monitor(MonRef),
             maps:remove(MonRef, maps:remove(PidRef, AT0))
     end,
-    ets:update_element(?MODULE, PidRef,
+    should_scan() andalso ets:update_element(?MODULE, PidRef,
         [{#rctx.state, {down, Reason}}, {#rctx.updated_at, tnow()}]),
     log_process_lifetime_report(PidRef),
     %% Delay eviction to allow human visibility on short lived pids
@@ -1083,21 +1092,23 @@ maybe_track([{Pid,_Ref} = PidRef | PidRefs], AT) ->
     end,
     maybe_track(PidRefs, AT1).
 
-log_process_lifetime_report(PidRef) ->
-    is_enabled() andalso log_process_lifetime_report(PidRef, get_resource(PidRef)).
 
-log_process_lifetime_report(_PidRef, undefined) ->
-    ok;
-log_process_lifetime_report(_PidRef, #rctx{} = Rctx) ->
+log_process_lifetime_report(PidRef) ->
     %% TODO: catch error out of here, report crashes on depth>1 json
     %%io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
-    case is_enabled() andalso should_log(Rctx) of
+    %% TODO: clean this up
+    case is_enabled() andalso is_logging_enabled() of
         true ->
-            couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx));
+            Rctx = get_resource_int(PidRef),
+            should_log(Rctx) andalso
+                couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx));
         false ->
             ok
     end.
 
+
+is_logging_enabled() ->
+    logging_enabled() =/= false.
 
 logging_enabled() ->
     case conf_get("log_pid_usage_report", "coordinator") of
