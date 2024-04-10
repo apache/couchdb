@@ -127,6 +127,7 @@ open(Db, State0) ->
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
                     NewSt = init_and_upgrade_state(Db, Fd, State, Header),
+                    ok = commit(NewSt),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
                 % end of upgrade code for <= 2.x
