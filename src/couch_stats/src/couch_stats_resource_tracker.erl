@@ -48,7 +48,8 @@
     set_context_dbname/1,
     set_context_handler_fun/1,
     set_context_username/1,
-    track/1,
+    track/1, tracker/1,
+    stop_tracker/0, stop_tracker/1, stop_tracker/2,
     should_track/1
 ]).
 
@@ -140,6 +141,7 @@
 -define(DELTA_TA, csrt_delta_ta).
 -define(DELTA_TZ, csrt_delta_tz). %% T Zed instead of T0
 -define(PID_REF, csrt_pid_ref). %% track local ID
+-define(TRACKER_PID, csrt_tracker). %% tracker pid
 
 
 -record(st, {
@@ -675,6 +677,7 @@ destroy_context() ->
 destroy_context(undefined) ->
     ok;
 destroy_context({_, _} = PidRef) ->
+    stop_tracker(PidRef),
     close_pid_ref(PidRef),
     gen_server:cast(?MODULE, {destroy, PidRef}),
     ok.
@@ -800,10 +803,79 @@ set_context_username(UserName, PidRef) ->
             end
     end.
 
-track(#rctx{pid_ref=PidRef}) ->
+track(#rctx{}=Rctx) ->
+    case conf_get("spawn_monitor", "true") of
+        "true" ->
+            track(Rctx, spawn_monitor);
+        _ ->
+            track(Rctx, gen_server)
+    end.
+
+track(#rctx{pid_ref=PidRef}, spawn_monitor) ->
+    case get_tracker() of
+        undefined ->
+            Pid = spawn(?MODULE, tracker, [PidRef]),
+            put_tracker(Pid);
+        Pid when is_pid(Pid) ->
+            Pid
+    end;
+track(#rctx{pid_ref=PidRef}, gen_server) ->
     %% TODO: should this block or not? If no, what cleans up zombies?
     %% gen_server:call(?MODULE, {track, PR}).
     gen_server:cast(?MODULE, {track, PidRef}).
+
+get_tracker() ->
+    get(?TRACKER_PID).
+
+put_tracker(Pid) when is_pid(Pid) ->
+    put(?TRACKER_PID, Pid).
+
+tracker({Pid, _Ref}=PidRef) ->
+    MonRef = erlang:monitor(process, Pid),
+    should_scan() andalso catch ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, MonRef}]),
+    receive
+        stop ->
+            %% TODO: do we need cleanup here?
+            %%cleanup_tracker(PidRef, <<"shutdown:stopped">>),
+            demonitor(MonRef),
+            ok;
+        {'DOWN', MonRef, _Type, _0DPid, Reason0} ->
+            Reason = case Reason0 of
+                {shutdown, Shutdown0} ->
+                    Shutdown = atom_to_binary(Shutdown0),
+                    <<"shutdown: ", Shutdown/binary>>;
+                Reason0 ->
+                    Reason0
+            end,
+            cleanup_tracker(PidRef, Reason)
+    end.
+
+cleanup_tracker(PidRef, Reason) ->
+    case is_logging_enabled() andalso get_resource(PidRef) of
+        #rctx{} = Rctx ->
+            should_log(Rctx) andalso log_process_lifetime_report(PidRef, Rctx);
+        _ ->
+            ok
+    end,
+    %% update stats
+    should_scan() andalso catch ets:update_element(?MODULE, PidRef,
+            [{#rctx.state, {down, Reason}}, {#rctx.updated_at, tnow()}]),
+    catch evict(PidRef).
+
+
+stop_tracker() ->
+    stop_tracker(get_tracker(), get_pid_ref()).
+
+stop_tracker({_Pid, _Ref}=PidRef) ->
+    stop_tracker(get_tracker(), PidRef);
+stop_tracker(Pid) when is_pid(Pid) ->
+    stop_tracker(Pid, get_pid_ref()).
+
+stop_tracker(undefined, _) ->
+    ok;
+stop_tracker(Pid, PidRef) ->
+    should_scan() andalso catch ets:update_element(?MODULE, PidRef, [{#rctx.mon_ref, undefined}]),
+    Pid ! stop.
 
 
 make_delta() ->
@@ -915,9 +987,6 @@ get_resource(undefined) ->
 get_resource(PidRef) ->
     catch get_resource_int(PidRef).
 
-
-get_resource_int() ->
-    get_resource_int(get_pid_ref()).
 
 get_resource_int(undefined) ->
     undefined;
@@ -1100,12 +1169,13 @@ log_process_lifetime_report(PidRef) ->
     case is_enabled() andalso is_logging_enabled() of
         true ->
             Rctx = get_resource_int(PidRef),
-            should_log(Rctx) andalso
-                couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx));
+            should_log(Rctx) andalso log_process_lifetime_report(PidRef, Rctx);
         false ->
             ok
     end.
 
+log_process_lifetime_report(_PidRef, Rctx) ->
+    couch_log:report("csrt-pid-usage-lifetime", to_flat_json(Rctx)).
 
 is_logging_enabled() ->
     logging_enabled() =/= false.
@@ -1121,10 +1191,14 @@ logging_enabled() ->
     end.
 
 
+should_log(undefined) ->
+    false;
 should_log(#rctx{}=Rctx) ->
     should_log(Rctx, logging_enabled()).
 
 
+should_log(undefined, _) ->
+    false;
 should_log(#rctx{}, true) ->
     true;
 should_log(#rctx{}, false) ->
