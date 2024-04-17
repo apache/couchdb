@@ -595,6 +595,9 @@ is_exported(Mod, F, A) ->
 
 % Shard selection
 
+shards(<<?DESIGN_DOC_PREFIX, _/binary>>, {Props}) when is_list(Props) ->
+    % In case the shard map has a design document in it
+    [];
 shards(DbName, {Props = [_ | _]}) ->
     Shards = lists:sort(mem3_util:build_shards(DbName, Props)),
     Fun = fun({R, SList}) ->
