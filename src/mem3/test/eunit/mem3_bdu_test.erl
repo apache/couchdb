@@ -38,6 +38,10 @@ start_couch() ->
     test_util:start_couch([mem3, chttpd]).
 
 stop_couch(Ctx) ->
+    % Clear the shards db since we added a design doc
+    % to it and we don't want it to affect other tests
+    ShardsDb = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    ok = couch_server:delete(ShardsDb, [?ADMIN_CTX]),
     test_util:stop_couch(Ctx).
 
 mem3_bdu_shard_doc_test_() ->
