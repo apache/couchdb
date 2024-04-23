@@ -20,22 +20,34 @@ start_link() ->
 
 init(_Args) ->
     Children = [
-        {couch_replication_event, {gen_event, start_link, [{local, couch_replication}]}, permanent,
-            brutal_kill, worker, dynamic},
-        {couch_replicator_pg, {couch_replicator_pg, start_link, []}, permanent, 1000, worker, [pg]},
-        {couch_replicator_clustering, {couch_replicator_clustering, start_link, []}, permanent,
-            brutal_kill, worker, [couch_replicator_clustering]},
-        {couch_replicator_connection, {couch_replicator_connection, start_link, []}, permanent,
-            brutal_kill, worker, [couch_replicator_connection]},
-        {couch_replicator_rate_limiter, {couch_replicator_rate_limiter, start_link, []}, permanent,
-            brutal_kill, worker, [couch_replicator_rate_limiter]},
-        {couch_replicator_scheduler_sup, {couch_replicator_scheduler_sup, start_link, []},
-            permanent, infinity, supervisor, [couch_replicator_scheduler_sup]},
-        {couch_replicator_scheduler, {couch_replicator_scheduler, start_link, []}, permanent,
-            brutal_kill, worker, [couch_replicator_scheduler]},
-        {couch_replicator_doc_processor, {couch_replicator_doc_processor, start_link, []},
-            permanent, brutal_kill, worker, [couch_replicator_doc_processor]},
-        {couch_replicator_db_changes, {couch_replicator_db_changes, start_link, []}, permanent,
-            brutal_kill, worker, [couch_multidb_changes]}
+        #{
+            id => couch_replication_event,
+            start => {gen_event, start_link, [{local, couch_replication}]},
+            modules => dynamic
+        },
+        #{
+            id => couch_replicator_pg,
+            start => {couch_replicator_pg, start_link, []},
+            shutdown => 1000,
+            modules => [pg]
+        },
+        worker(couch_replicator_clustering),
+        worker(couch_replicator_connection),
+        worker(couch_replicator_rate_limiter),
+        sup(couch_replicator_scheduler_sup),
+        worker(couch_replicator_scheduler),
+        worker(couch_replicator_doc_processor),
+        #{
+            id => couch_replicator_db_changes,
+            start => {couch_replicator_db_changes, start_link, []},
+            modules => [couch_multidb_changes]
+        }
     ],
-    {ok, {{rest_for_one, 10, 1}, Children}}.
+    SupFlags = #{strategy => rest_for_one, intensity => 10, period => 1},
+    {ok, {SupFlags, Children}}.
+
+worker(Mod) ->
+    #{id => Mod, start => {Mod, start_link, []}}.
+
+sup(Mod) ->
+    #{id => Mod, type => supervisor, start => {Mod, start_link, []}, shutdown => infinity}.
