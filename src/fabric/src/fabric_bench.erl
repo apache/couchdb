@@ -109,24 +109,20 @@ go(Db, #{} = Opts0) when is_binary(Db) ->
     ok.
 
 old_enough_db(Db) when is_binary(Db) ->
-    case string:prefix(Db, ?PREFIX) of
-        nomatch ->
-            false;
-        Ts when is_binary(Ts) ->
-            NowUSec = os:system_time(microsecond),
-            try binary_to_integer(Ts) of
-                AgeUSec when (NowUSec - AgeUSec) > ?MAX_DB_AGE_USEC ->
-                    true;
-                _ ->
-                    false
-            catch
-                _:_ ->
-                    false
-            end
+    Ts = string:prefix(Db, ?PREFIX),
+    NowUSec = os:system_time(microsecond),
+    try binary_to_integer(Ts) of
+        AgeUSec when (NowUSec - AgeUSec) > ?MAX_DB_AGE_USEC ->
+            true;
+        _ ->
+            false
+    catch
+        _:_ ->
+            false
     end.
 
 delete_old_dbs() ->
-    {ok, Dbs} = fabric:all_dbs(),
+    {ok, Dbs} = fabric:all_dbs(<<?PREFIX>>),
     [ok = fabric:delete_db(Db) || Db <- Dbs, old_enough_db(Db)],
     ok.
 
