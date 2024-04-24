@@ -212,6 +212,7 @@ get_interval_msec() ->
 %% gen_server functions
 
 init(_) ->
+    process_flag(trap_exit, true),
     config:enable_feature('scheduler'),
     EtsOpts = [
         named_table,
@@ -316,7 +317,10 @@ handle_info(reschedule, State) ->
     erlang:cancel_timer(State#state.timer),
     Timer = erlang:send_after(State#state.interval, self(), reschedule),
     {noreply, State#state{timer = Timer}};
-handle_info({'DOWN', _Ref, process, Pid, normal}, State) ->
+handle_info({'EXIT', Pid, Reason}, #state{stats_pid = Pid} = State) ->
+    couch_log:error("~p : stats updater died: ~p", [?MODULE, Reason]),
+    {stop, {status_updater_died, Reason}, State};
+handle_info({'EXIT', Pid, normal}, State) ->
     {ok, Job} = job_by_pid(Pid),
     couch_log:notice("~p: Job ~p completed normally", [?MODULE, Job#job.id]),
     Interval = State#state.interval,
@@ -324,7 +328,7 @@ handle_info({'DOWN', _Ref, process, Pid, normal}, State) ->
     remove_job_int(Job),
     update_running_jobs_stats(State#state.stats_pid),
     {noreply, State};
-handle_info({'DOWN', _Ref, process, Pid, Reason0}, State) ->
+handle_info({'EXIT', Pid, Reason0}, State) ->
     {ok, Job} = job_by_pid(Pid),
     Reason =
         case Reason0 of
@@ -623,29 +627,18 @@ start_job_int(#job{pid = Pid}, _State) when Pid /= undefined ->
     ok;
 start_job_int(#job{} = Job0, State) ->
     Job = maybe_optimize_job_for_rate_limiting(Job0),
-    case couch_replicator_scheduler_sup:start_child(Job#job.rep) of
+    case couch_replicator_scheduler_job:start_link(Job#job.rep) of
         {ok, Child} ->
-            Ref = monitor(process, Child),
-            ok = update_state_started(Job, Child, Ref, State),
+            ok = update_state_started(Job, Child, State),
             couch_log:notice(
                 "~p: Job ~p started as ~p",
                 [?MODULE, Job#job.id, Child]
             );
-        {error, {already_started, OtherPid}} when node(OtherPid) =:= node() ->
-            Ref = monitor(process, OtherPid),
-            ok = update_state_started(Job, OtherPid, Ref, State),
-            couch_log:notice(
-                "~p: Job ~p already running as ~p. Most likely"
-                " because replicator scheduler was restarted",
-                [?MODULE, Job#job.id, OtherPid]
-            );
-        {error, {already_started, OtherPid}} when node(OtherPid) =/= node() ->
-            CrashMsg = "Duplicate replication running on another node",
-            couch_log:notice(
-                "~p: Job ~p already running as ~p. Most likely"
-                " because a duplicate replication is running on another node",
-                [?MODULE, Job#job.id, OtherPid]
-            ),
+        {error, {already_started, OtherPid}} ->
+            Node = node(OtherPid),
+            CrashMsg = "Duplicate replication running on " ++ atom_to_list(Node),
+            LogMsg = "~p: Job ~p already running as ~p on node ~s",
+            couch_log:warning(LogMsg, [?MODULE, Job#job.id, OtherPid, Node]),
             ok = update_state_crashed(Job, CrashMsg, State);
         {error, Reason} ->
             couch_log:notice(
@@ -658,14 +651,10 @@ start_job_int(#job{} = Job0, State) ->
 -spec stop_job_int(#job{}, #state{}) -> ok | {error, term()}.
 stop_job_int(#job{pid = undefined}, _State) ->
     ok;
-stop_job_int(#job{} = Job, State) ->
-    ok = couch_replicator_scheduler_sup:terminate_child(Job#job.pid),
-    demonitor(Job#job.monitor, [flush]),
+stop_job_int(#job{pid = Pid} = Job, State) when is_pid(Pid) ->
+    ok = couch_replicator_scheduler_job:stop(Pid),
     ok = update_state_stopped(Job, State),
-    couch_log:notice(
-        "~p: Job ~p stopped as ~p",
-        [?MODULE, Job#job.id, Job#job.pid]
-    ).
+    couch_log:notice("~p: Job ~p stopped as ~p", [?MODULE, Job#job.id, Pid]).
 
 -spec remove_job_int(#job{}) -> true.
 remove_job_int(#job{} = Job) ->
@@ -704,15 +693,15 @@ job_by_id(Id) ->
 
 -spec update_state_stopped(#job{}, #state{}) -> ok.
 update_state_stopped(Job, State) ->
-    Job1 = reset_job_process(Job),
+    Job1 = Job#job{pid = undefined},
     Job2 = update_history(Job1, stopped, os:timestamp(), State),
     true = ets:insert(?MODULE, Job2),
     couch_stats:increment_counter([couch_replicator, jobs, stops]),
     ok.
 
--spec update_state_started(#job{}, pid(), reference(), #state{}) -> ok.
-update_state_started(Job, Pid, Ref, State) ->
-    Job1 = set_job_process(Job, Pid, Ref),
+-spec update_state_started(#job{}, pid(), #state{}) -> ok.
+update_state_started(Job, Pid, State) when is_pid(Pid) ->
+    Job1 = Job#job{pid = Pid},
     Job2 = update_history(Job1, started, os:timestamp(), State),
     true = ets:insert(?MODULE, Job2),
     couch_stats:increment_counter([couch_replicator, jobs, starts]),
@@ -720,19 +709,11 @@ update_state_started(Job, Pid, Ref, State) ->
 
 -spec update_state_crashed(#job{}, any(), #state{}) -> ok.
 update_state_crashed(Job, Reason, State) ->
-    Job1 = reset_job_process(Job),
+    Job1 = Job#job{pid = undefined},
     Job2 = update_history(Job1, {crashed, Reason}, os:timestamp(), State),
     true = ets:insert(?MODULE, Job2),
     couch_stats:increment_counter([couch_replicator, jobs, crashes]),
     ok.
-
--spec set_job_process(#job{}, pid(), reference()) -> #job{}.
-set_job_process(#job{} = Job, Pid, Ref) when is_pid(Pid), is_reference(Ref) ->
-    Job#job{pid = Pid, monitor = Ref}.
-
--spec reset_job_process(#job{}) -> #job{}.
-reset_job_process(#job{} = Job) ->
-    Job#job{pid = undefined, monitor = undefined}.
 
 -spec reschedule(#state{}) -> ok.
 reschedule(#state{interval = Interval} = State) ->
@@ -1253,7 +1234,7 @@ t_jobs_dont_churn_if_there_are_available_running_slots() ->
         reschedule(mock_state(2, 2)),
         ?assertEqual({2, 0}, run_stop_count()),
         ?assertEqual([], jobs_stopped()),
-        ?assertEqual(0, meck:num_calls(couch_replicator_scheduler_sup, start_child, 1))
+        ?assertEqual(0, meck:num_calls(couch_replicator_scheduler_job, start_link, 1))
     end).
 
 t_start_only_pending_jobs_do_not_churn_existing_ones() ->
@@ -1263,7 +1244,7 @@ t_start_only_pending_jobs_do_not_churn_existing_ones() ->
             continuous_running(2)
         ]),
         reschedule(mock_state(2, 2)),
-        ?assertEqual(1, meck:num_calls(couch_replicator_scheduler_sup, start_child, 1)),
+        ?assertEqual(1, meck:num_calls(couch_replicator_scheduler_job, start_link, 1)),
         ?assertEqual([], jobs_stopped()),
         ?assertEqual({2, 0}, run_stop_count())
     end).
@@ -1379,7 +1360,7 @@ t_if_transient_job_crashes_it_gets_removed() ->
         ?assertEqual(1, ets:info(?MODULE, size)),
         State = #state{max_history = 3, stats_pid = self()},
         {noreply, State} = handle_info(
-            {'DOWN', r1, process, Pid, failed},
+            {'EXIT', Pid, failed},
             State
         ),
         ?assertEqual(0, ets:info(?MODULE, size))
@@ -1403,7 +1384,7 @@ t_if_permanent_job_crashes_it_stays_in_ets() ->
             stats_pid = self()
         },
         {noreply, State} = handle_info(
-            {'DOWN', r1, process, Pid, failed},
+            {'EXIT', Pid, failed},
             State
         ),
         ?assertEqual(1, ets:info(?MODULE, size)),
@@ -1532,11 +1513,11 @@ setup_all() ->
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(couch_log, warning, 2, ok),
     meck:expect(couch_log, error, 2, ok),
-    meck:expect(couch_replicator_scheduler_sup, terminate_child, 1, ok),
+    meck:expect(couch_replicator_scheduler_job, stop, 1, ok),
     meck:expect(couch_stats, increment_counter, 1, ok),
     meck:expect(couch_stats, update_gauge, 2, ok),
     Pid = mock_pid(),
-    meck:expect(couch_replicator_scheduler_sup, start_child, 1, {ok, Pid}),
+    meck:expect(couch_replicator_scheduler_job, start_link, 1, {ok, Pid}),
     couch_replicator_share:init().
 
 teardown_all(_) ->
@@ -1547,7 +1528,7 @@ teardown_all(_) ->
 setup() ->
     meck:reset([
         couch_log,
-        couch_replicator_scheduler_sup,
+        couch_replicator_scheduler_job,
         couch_stats,
         config
     ]).
@@ -1632,8 +1613,7 @@ continuous_running(Id) when is_integer(Id) ->
         id = Id,
         history = [started(Started), added()],
         rep = continuous_rep(),
-        pid = Pid,
-        monitor = monitor(process, Pid)
+        pid = Pid
     }.
 
 oneshot(Id) when is_integer(Id) ->
@@ -1648,8 +1628,7 @@ oneshot_running(Id) when is_integer(Id) ->
         id = Id,
         history = [started(Started), added()],
         rep = rep(),
-        pid = Pid,
-        monitor = monitor(process, Pid)
+        pid = Pid
     }.
 
 testjob(Hist) when is_list(Hist) ->

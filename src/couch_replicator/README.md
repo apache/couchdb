@@ -183,11 +183,6 @@ A description of each child:
     healthy again. The next time it crashes its sequence of consecutive crashes
     will restart at 1.
 
- * `couch_replicator_scheduler_sup`: This module is a supervisor for running
-   replication tasks. The most interesting thing about it is perhaps that it is
-   not used to restart children. The scheduler handles restarts and error
-   handling backoffs.
-
  * `couch_replicator_doc_processor`: The doc processor component is in charge
    of processing replication document updates, turning them into replication
    jobs and adding those jobs to the scheduler. Unfortunately the only reason

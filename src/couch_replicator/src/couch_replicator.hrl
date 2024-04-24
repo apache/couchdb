@@ -54,6 +54,5 @@
     id :: job_id() | '$1' | '_',
     rep :: #rep{} | '_',
     pid :: undefined | pid() | '$1' | '_',
-    monitor :: undefined | reference() | '_',
     history :: history() | '_'
 }).
