@@ -15,7 +15,8 @@
 -behaviour(gen_server).
 
 -export([
-    start_link/1
+    start_link/1,
+    stop/1
 ]).
 
 -export([
@@ -101,6 +102,19 @@ start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
         {no, OtherPid} ->
             {error, {already_started, OtherPid}}
     end.
+
+stop(Pid) when is_pid(Pid) ->
+    Ref = erlang:monitor(process, Pid),
+    unlink(Pid),
+    ok = gen_server:stop(Pid, shutdown, infinity),
+    receive
+        {'DOWN', Ref, _, _, Reason} -> Reason
+    end,
+    receive
+        {'EXIT', Pid, _} -> ok
+    after 0 -> ok
+    end,
+    ok.
 
 init(InitArgs) ->
     {ok, InitArgs, 0}.

@@ -34,7 +34,6 @@ init(_Args) ->
         worker(couch_replicator_clustering),
         worker(couch_replicator_connection),
         worker(couch_replicator_rate_limiter),
-        sup(couch_replicator_scheduler_sup),
         worker(couch_replicator_scheduler),
         worker(couch_replicator_doc_processor),
         #{
@@ -48,6 +47,3 @@ init(_Args) ->
 
 worker(Mod) ->
     #{id => Mod, start => {Mod, start_link, []}}.
-
-sup(Mod) ->
-    #{id => Mod, type => supervisor, start => {Mod, start_link, []}, shutdown => infinity}.
