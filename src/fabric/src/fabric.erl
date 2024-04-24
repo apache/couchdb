@@ -84,19 +84,9 @@ all_dbs() ->
 %% @doc returns a list of all database names
 -spec all_dbs(Prefix :: iodata()) -> {ok, [binary()]}.
 all_dbs(Prefix) when is_binary(Prefix) ->
-    Length = byte_size(Prefix),
-    MatchingDbs = mem3:fold_shards(
-        fun(#shard{dbname = DbName}, Acc) ->
-            case DbName of
-                <<Prefix:Length/binary, _/binary>> ->
-                    [DbName | Acc];
-                _ ->
-                    Acc
-            end
-        end,
-        []
-    ),
-    {ok, lists:usort(MatchingDbs)};
+    FoldFun = fun(DbName, Acc) -> [DbName | Acc] end,
+    DbNames = mem3:fold_dbs(Prefix, FoldFun, []),
+    {ok, lists:reverse(DbNames)};
 %% @equiv all_dbs(list_to_binary(Prefix))
 all_dbs(Prefix) when is_list(Prefix) ->
     all_dbs(list_to_binary(Prefix)).

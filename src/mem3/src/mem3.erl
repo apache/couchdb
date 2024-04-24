@@ -25,6 +25,7 @@
     ushards/1, ushards/2
 ]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
+-export([fold_dbs/2, fold_dbs/3]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
@@ -217,6 +218,12 @@ shard_creation_time(DbName0) ->
 
 fold_shards(Fun, Acc) ->
     mem3_shards:fold(Fun, Acc).
+
+fold_dbs(Fun, Acc) when is_function(Fun, 2) ->
+    mem3_shards:fold_dbs(<<>>, Fun, Acc).
+
+fold_dbs(<<Prefix/binary>>, Fun, Acc) when is_function(Fun, 2) ->
+    mem3_shards:fold_dbs(Prefix, Fun, Acc).
 
 sync_security() ->
     mem3_sync_security:go().

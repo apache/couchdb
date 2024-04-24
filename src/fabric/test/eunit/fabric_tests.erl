@@ -303,3 +303,47 @@ t_query_view_configuration({_Ctx, DbName}) ->
     Parameters = [DbName, Options, '_', ViewName, QueryArgs, '_', Accumulator, '_'],
     meck:expect(fabric_view_map, go, Parameters, meck:val(fabric_view_map_results)),
     ?assertEqual(fabric_view_map_results, fabric:query_view(DbName, DDocName, ViewName)).
+
+fabric_all_dbs_test_() ->
+    {
+        foreach,
+        fun setup_fabric/0,
+        fun teardown_fabric/1,
+        [
+            ?TDEF_FE(t_get_all_dbs),
+            ?TDEF_FE(t_prefix_works)
+        ]
+    }.
+
+t_get_all_dbs(_) ->
+    Db1 = <<"a">>,
+    Db2 = <<"b">>,
+    Db3 = <<"a/b">>,
+    [fabric:create_db(Db) || Db <- [Db1, Db2, Db3]],
+    ?assertEqual({ok, [<<"a">>, <<"a/b">>, <<"b">>]}, fabric:all_dbs()).
+
+t_prefix_works(_) ->
+    DbList = ["a0", "a", "aa", "ab", "aa/", "a//a", "a/b", "a/"],
+    [fabric:create_db(list_to_binary(Db)) || Db <- DbList],
+    AllExpect = lists:sort([list_to_binary(Db) || Db <- DbList]),
+    ?assertEqual({ok, AllExpect}, fabric:all_dbs()),
+    ?assertEqual({ok, AllExpect}, fabric:all_dbs(<<>>)),
+    ?assertEqual({ok, []}, fabric:all_dbs(<<"b">>)),
+    ?assertEqual({ok, [<<"a/">>, <<"a//a">>, <<"a/b">>]}, fabric:all_dbs(<<"a/">>)),
+    ?assertEqual({ok, [<<"a0">>]}, fabric:all_dbs(<<"a0">>)),
+    ?assertEqual({ok, []}, fabric:all_dbs(<<"/">>)),
+    ?assertEqual({ok, AllExpect}, fabric:all_dbs(<<"a">>)),
+    ?assertEqual({ok, [<<"aa">>, <<"aa/">>]}, fabric:all_dbs(<<"aa">>)).
+
+setup_fabric() ->
+    Ctx = test_util:start_couch([fabric]),
+    ok = clear_shards_db(),
+    Ctx.
+
+teardown_fabric(Ctx) ->
+    ok = clear_shards_db(),
+    test_util:stop_couch(Ctx).
+
+clear_shards_db() ->
+    ShardsDb = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    couch_server:delete(ShardsDb, [?ADMIN_CTX]).

@@ -21,6 +21,7 @@
 -export([start_link/0]).
 -export([opts_for_db/1]).
 -export([for_db/1, for_db/2, for_docid/2, for_docid/3, get/3, local/1, fold/2]).
+-export([fold_dbs/3]).
 -export([for_shard_range/1]).
 -export([set_max_size/1]).
 -export([get_changes_pid/0]).
@@ -172,6 +173,23 @@ fold(Fun, Acc) ->
         {ok, LastAcc} = couch_db:fold_docs(Db, fun fold_fun/2, FAcc),
         {_Db, _UFun, UAcc} = LastAcc,
         UAcc
+    after
+        couch_db:close(Db)
+    end.
+
+fold_dbs(<<Prefix/binary>>, Fun, Acc0) when is_function(Fun, 2) ->
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
+    Len = byte_size(Prefix),
+    FoldFun = fun(#full_doc_info{id = Id}, Acc) ->
+        case Id of
+            <<Prefix:Len/binary, _/binary>> -> {ok, Fun(Id, Acc)};
+            <<_/binary>> -> {stop, Acc}
+        end
+    end,
+    Opts = [{start_key, Prefix}],
+    try
+        {ok, LastAcc} = couch_db:fold_docs(Db, FoldFun, Acc0, Opts),
+        LastAcc
     after
         couch_db:close(Db)
     end.
