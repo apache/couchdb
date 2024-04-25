@@ -284,10 +284,9 @@ CouchDB allows for any number of conflicting documents to exist
 simultaneously in the database, with each database instance deterministically
 deciding which document is the "winner" and which are conflicts. Only the
 winning document can appear in views, while "losing" conflicts are still
-accessible and remain in the database until deleted or purged during
-database compaction. Because conflict documents are still regular documents,
-they replicate just like regular documents and are subject to the same
-security and validation rules.
+accessible and remain in the database until deleted. Because conflict
+documents are still regular documents, they replicate just like regular
+documents and are subject to the same security and validation rules.
 
 When distributed edit conflicts occur, every database replica sees the same
 winning revision and each has the opportunity to resolve the conflict.
