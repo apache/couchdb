@@ -316,24 +316,53 @@ fabric_all_dbs_test_() ->
     }.
 
 t_get_all_dbs(_) ->
-    Db1 = <<"a">>,
-    Db2 = <<"b">>,
-    Db3 = <<"a/b">>,
-    [fabric:create_db(Db) || Db <- [Db1, Db2, Db3]],
-    ?assertEqual({ok, [<<"a">>, <<"a/b">>, <<"b">>]}, fabric:all_dbs()).
+    DbList = [<<"aaa">>, <<"a+b">>, <<"a$c">>, <<"aaa/bbb">>],
+    ?assertEqual(ok, create_dbs(DbList)),
+    ExpectList = lists:sort(DbList),
+    ?assertEqual({ok, ExpectList}, fabric:all_dbs()),
+    ?assertEqual(ok, delete_dbs(DbList)).
 
 t_prefix_works(_) ->
-    DbList = ["a0", "a", "aa", "ab", "aa/", "a//a", "a/b", "a/"],
-    [fabric:create_db(list_to_binary(Db)) || Db <- DbList],
+    DbList = [
+        "aaa0",
+        "aaa+",
+        "aaa(",
+        "aa",
+        "a",
+        "aaaa",
+        "aaa/y",
+        "aaa/x",
+        "aaa/x$",
+        "aaa/x/z",
+        "aaa$"
+    ],
+    ?assertEqual(ok, create_dbs(DbList)),
     AllExpect = lists:sort([list_to_binary(Db) || Db <- DbList]),
     ?assertEqual({ok, AllExpect}, fabric:all_dbs()),
     ?assertEqual({ok, AllExpect}, fabric:all_dbs(<<>>)),
+    ?assertEqual({ok, []}, fabric:all_dbs(<<"$">>)),
     ?assertEqual({ok, []}, fabric:all_dbs(<<"b">>)),
-    ?assertEqual({ok, [<<"a/">>, <<"a//a">>, <<"a/b">>]}, fabric:all_dbs(<<"a/">>)),
-    ?assertEqual({ok, [<<"a0">>]}, fabric:all_dbs(<<"a0">>)),
-    ?assertEqual({ok, []}, fabric:all_dbs(<<"/">>)),
     ?assertEqual({ok, AllExpect}, fabric:all_dbs(<<"a">>)),
-    ?assertEqual({ok, [<<"aa">>, <<"aa/">>]}, fabric:all_dbs(<<"aa">>)).
+    ?assertEqual({ok, AllExpect -- [<<"a">>, <<"aa">>]}, fabric:all_dbs(<<"aaa">>)),
+    ?assertEqual({ok, [<<"aaa0">>]}, fabric:all_dbs(<<"aaa0">>)),
+    ?assertEqual({ok, [<<"aaa+">>]}, fabric:all_dbs(<<"aaa+">>)),
+    ?assertEqual({ok, [<<"aaa(">>]}, fabric:all_dbs(<<"aaa(">>)),
+    ?assertEqual({ok, [<<"aaaa">>]}, fabric:all_dbs(<<"aaaa">>)),
+    ?assertEqual({ok, [<<"aaa/x$">>]}, fabric:all_dbs(<<"aaa/x$">>)),
+    ?assertEqual({ok, [<<"aaa/x">>, <<"aaa/x$">>, <<"aaa/x/z">>]}, fabric:all_dbs(<<"aaa/x">>)),
+    ?assertEqual({ok, [<<"aaa/x/z">>]}, fabric:all_dbs(<<"aaa/x/z">>)),
+    ?assertEqual({ok, [<<"aaa/x/z">>]}, fabric:all_dbs(<<"aaa/x/">>)),
+    TripleASlash = lists:sort([<<"aaa/x">>, <<"aaa/y">>, <<"aaa/x$">>, <<"aaa/x/z">>]),
+    ?assertEqual({ok, TripleASlash}, fabric:all_dbs(<<"aaa/">>)),
+    ?assertEqual(ok, delete_dbs(DbList)).
+
+create_dbs(DbList) ->
+    Fun = fun(DbName) -> ok = fabric:create_db(DbName) end,
+    lists:foreach(Fun, DbList).
+
+delete_dbs(DbList) ->
+    Fun = fun(DbName) -> ok = fabric:delete_db(DbName) end,
+    lists:foreach(Fun, DbList).
 
 setup_fabric() ->
     Ctx = test_util:start_couch([fabric]),
