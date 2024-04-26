@@ -335,7 +335,10 @@ terminate(Reason, Srv) ->
     ok.
 
 handle_config_change("couchdb", "database_dir", _, _, N) ->
-    exit(couch_server(N), config_change),
+    case whereis(couch_server(N)) of
+        Pid when is_pid(Pid) -> exit(Pid, {shutdown, config_change});
+        undefined -> ok
+    end,
     remove_handler;
 handle_config_change("couchdb", "update_lru_on_read", "true", _, N) ->
     gen_server:call(couch_server(N), {set_update_lru_on_read, true}),
@@ -719,8 +722,8 @@ handle_cast({close_db_if_idle, DbName}, Server) ->
 handle_cast(Msg, Server) ->
     {stop, {unknown_cast_message, Msg}, Server}.
 
-handle_info({'EXIT', _Pid, config_change}, Server) ->
-    {stop, config_change, Server};
+handle_info({'EXIT', _Pid, {shutdown, config_change}}, Server) ->
+    {stop, {shutdown, config_change}, Server};
 handle_info({'EXIT', Pid, Reason}, Server) ->
     case ets:lookup(couch_dbs_pid_to_name(Server), Pid) of
         [{Pid, DbName}] ->
