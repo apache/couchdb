@@ -477,7 +477,7 @@ config.erl:
 src\docs\build:
 	@echo 'Building docs...'
 ifeq ($(with_docs), 1)
-	@cd src\docs && make.bat html && make.bat man
+	@cd src\docs && setup.bat && make.bat html && make.bat man
 endif
 
 
