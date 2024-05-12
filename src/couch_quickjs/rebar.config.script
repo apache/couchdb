@@ -17,7 +17,7 @@ Msys = "msys2_shell.cmd -defterm -no-start -ucrt64 -here -lc ".
 
 PreHooks = [
     {"(linux|darwin)", compile, "make CONFIG_LTO=y -C quickjs -j8 libquickjs.lto.a qjsc"},
-    {"freebsd", compile, "gmake CONFIG_LTO=y -C quickjs -j8 libquickjs.lto.a qjsc"},
+    {"freebsd", compile, "gmake -C quickjs -j8 libquickjs.a qjsc"},
     {"win32", compile, Msys ++ "'make -C quickjs qjsc'"},
     {"(linux|darwin|freebsd|win32)", compile, "escript build_js.escript compile"}
 ].
@@ -29,14 +29,24 @@ PostHooks = [
     {"(linux|darwin|freebsd|win32)", clean, "escript build_js.escript clean"}
 ].
 
-UnixEnv = [
-    {"CFLAGS", "$CFLAGS -flto -g -Wall -DCONFIG_LTO=y -O2 -Iquickjs"},
-    {"LDFLAGS", "$LDFLAGS -flto -lm quickjs/libquickjs.lto.a"},
+% We're not building a driver just an executable so we don't
+% need all the Erlang/OTP headers and libraries
+ResetFlags = [
     {"ERL_CFLAGS", ""},
     {"ERL_LDFLAGS", ""},
     {"EXE_CFLAGS", ""},
     {"EXE_LDFLAGS", ""}
 ].
+
+LinuxDarwinEnv = [
+    {"CFLAGS", "$CFLAGS -flto -g -Wall -DCONFIG_LTO=y -O2 -Iquickjs"},
+    {"LDFLAGS", "$LDFLAGS -flto -lm quickjs/libquickjs.lto.a"}
+] ++ ResetFlags.
+
+FreeBSDEnv  = [
+    {"CFLAGS", "$CFLAGS -g -Wall -O2 -Iquickjs"},
+    {"LDFLAGS", "$LDFLAGS -lm -lpthread quickjs/libquickjs.a"}
+] ++ ResetFlags.
 
 WindowsEnv = [
     {"CFLAGS", "-D_GNU_SOURCE -DCONFIG_BIGNUM -O2 -fwrapv -DCONFIG_VERSION=\\\"0\\\" -Iquickjs"},
@@ -62,8 +72,10 @@ WindowsMainjsSrc = WindowsBaseSrc ++ UnixMainjsSrc.
 WindowsCoffeeSrc = WindowsBaseSrc ++ UnixCoffeeSrc.
 
 PortSpecs = [
-    {"(linux|darwin|freebsd)", "priv/couchjs_mainjs", UnixMainjsSrc, [{env, UnixEnv}]},
-    {"(linux|darwin|freebsd)", "priv/couchjs_coffee", UnixCoffeeSrc, [{env, UnixEnv}]},
+    {"(linux|darwin)", "priv/couchjs_mainjs", UnixMainjsSrc, [{env, LinuxDarwinEnv}]},
+    {"(linux|darwin)", "priv/couchjs_coffee", UnixCoffeeSrc, [{env, LinuxDarwinEnv}]},
+    {"freebsd", "priv/couchjs_mainjs", UnixMainjsSrc, [{env, FreeBSDEnv}]},
+    {"freebsd", "priv/couchjs_coffee", UnixCoffeeSrc, [{env, FreeBSDEnv}]},
     {"win32", "priv/couchjs_mainjs.exe", WindowsMainjsSrc, [{env, WindowsEnv}]},
     {"win32", "priv/couchjs_coffee.exe", WindowsCoffeeSrc, [{env, WindowsEnv}]}
 ].
