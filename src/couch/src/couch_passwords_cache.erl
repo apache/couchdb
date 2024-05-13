@@ -72,4 +72,4 @@ insert(AuthModule, UserName, Password, Salt) when
 
 hash(Password, Salt) ->
     couch_stats:increment_counter([couchdb, password_hashing_fast]),
-    fast_pbkdf2:pbkdf2(sha256, Password, Salt, ?FAST_ITERATIONS, ?SHA256_OUTPUT_LEN).
+    crypto:pbkdf2_hmac(sha256, Password, Salt, ?FAST_ITERATIONS, ?SHA256_OUTPUT_LEN).
