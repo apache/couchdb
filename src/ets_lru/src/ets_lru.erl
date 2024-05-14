@@ -18,6 +18,7 @@
     stop/1,
 
     insert/3,
+    update_counter/3,
     lookup/2,
     match/3,
     match_object/3,
@@ -74,6 +75,9 @@ lookup(LRU, Key) ->
 
 insert(LRU, Key, Val) ->
     gen_server:call(LRU, {insert, Key, Val}).
+
+update_counter(LRU, Key, Incr) when is_integer(Incr) ->
+    gen_server:call(LRU, {update_counter, Key, Incr}).
 
 remove(LRU, Key) ->
     gen_server:call(LRU, {remove, Key}).
@@ -172,6 +176,23 @@ handle_call({insert, Key, Val}, _From, St) ->
             true = ets:insert(St#st.atimes, {NewATime, Key});
         [] ->
             Entry = #entry{key = Key, val = Val, atime = NewATime, ctime = NewATime},
+            true = ets:insert(St#st.objects, Entry),
+            true = ets:insert(St#st.atimes, {NewATime, Key}),
+            true = ets:insert(St#st.ctimes, {NewATime, Key})
+    end,
+    {reply, ok, St, 0};
+handle_call({update_counter, Key, Incr}, _From, St) ->
+    NewATime = strict_monotonic_time(St#st.time_unit),
+    Pattern = #entry{key = Key, atime = '$1', val = '$2', _ = '_'},
+    case ets:match(St#st.objects, Pattern) of
+        [[ATime, Val]] ->
+            true = ets:update_element(St#st.objects, Key, [
+                {#entry.val, Val + Incr}, {#entry.atime, NewATime}
+            ]),
+            true = ets:delete(St#st.atimes, ATime),
+            true = ets:insert(St#st.atimes, {NewATime, Key});
+        [] ->
+            Entry = #entry{key = Key, val = Incr, atime = NewATime, ctime = NewATime},
             true = ets:insert(St#st.objects, Entry),
             true = ets:insert(St#st.atimes, {NewATime, Key}),
             true = ets:insert(St#st.ctimes, {NewATime, Key})
