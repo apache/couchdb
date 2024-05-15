@@ -1,4 +1,4 @@
-Sphinx==7.2.6
+Sphinx==7.3.7
 sphinx-rtd-theme==2.0.0
 sphinxcontrib-httpdomain==1.8.1
 sphinxcontrib-jquery==4.1

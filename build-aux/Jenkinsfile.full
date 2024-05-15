@@ -31,6 +31,14 @@ meta = [
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
+  'centos9': [
+    name: 'CentOS 9',
+    spidermonkey_vsn: '78',
+    enable_nouveau: true,
+    enable_clouseau: true,
+    image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
+  ],
+
   'focal': [
     name: 'Ubuntu 20.04',
     spidermonkey_vsn: '68',
@@ -80,6 +88,14 @@ meta = [
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
+  'bookworm-quickjs': [
+    name: 'Debian 12 with QuickJS',
+    disable_spidermonkey: true,
+    enable_nouveau: true,
+    enable_clouseau: true,
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
+  ],
+
   'freebsd-x86_64': [
      name: 'FreeBSD',
      spidermonkey_vsn: '91',
@@ -106,7 +122,11 @@ meta = [
 ]
 
 def String configure(config) {
-  result = "./configure --skip-deps --spidermonkey-version ${config.spidermonkey_vsn}"
+  if (config.disable_spidermonkey) {
+      result = "./configure --skip-deps --disable-spidermonkey"
+  } else {
+      result = "./configure --skip-deps --spidermonkey-version ${config.spidermonkey_vsn}"
+  }
   if (config.enable_nouveau) {
     result += " --enable-nouveau"
   }
@@ -359,24 +379,31 @@ pipeline {
         unstash 'tarball'
         unarchive mapping: ['pkgs/' : '.']
 
-        sh( label: 'Build Debian repo', script: '''
-            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el8 $BRANCH_NAME/source
+        sh( label: 'Setup repo dirs', script: '''
+            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el8 $BRANCH_NAME/el9 $BRANCH_NAME/source
             git clone https://github.com/apache/couchdb-pkg
-            for plat in bullseye focal
+          ''' )
+
+        sh( label: 'Build Debian repo', script: '''
+            for plat in bullseye bookworm focal
             do
               reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
             done
           ''' )
 
-        sh( label: 'Build CentOS repos', script: '''
-            #cp js/centos-8/*rpm pkgs/centos8
-            cd pkgs/centos8 && createrepo_c --database .
+        sh( label: 'Build CentOS 8', script: '''
+            (cd pkgs/centos8 && createrepo_c --database .)
+          ''' )
+
+        sh( label: 'Build CentOS 9', script: '''
+            (cd pkgs/centos9 && createrepo_c --database .)
           ''' )
 
         sh( label: 'Build unified repo', script: '''
             mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
             mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
             mv pkgs/centos8/* $BRANCH_NAME/el8
+            mv pkgs/centos9/* $BRANCH_NAME/el9
             mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
             cd $BRANCH_NAME/source
             ls -1tr | head -n -10 | xargs -d '\n' rm -f --
