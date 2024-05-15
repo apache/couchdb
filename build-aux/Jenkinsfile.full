@@ -97,20 +97,20 @@ meta = [
   ],
 
   'freebsd-x86_64': [
-     name: 'FreeBSD',
+     name: 'FreeBSD x86_64',
      spidermonkey_vsn: '91',
      enable_clouseau: false,
      gnu_make: 'gmake'
   ],
 
-  // Disable temporarily until issue 4916
-  // is resolved
-  // 'freebsd-arm64': [
-  //    name: 'FreeBSD',
-  //    spidermonkey_vsn: '91',
-  //    enable_clouseau: false,
-  //    gnu_make: 'gmake'
-  // ],
+  // Spidermonkey 91 has issues on ARM64 FreeBSD
+  // use QuickJS for now
+  'freebsd-arm64': [
+     name: 'FreeBSD ARM64 QuickJS',
+     disable_spidermonkey: true,
+     enable_clouseau: false,
+     gnu_make: 'gmake'
+  ],
 
  'macos': [
     name: 'macOS',
