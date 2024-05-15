@@ -1,4 +1,4 @@
-nose2==0.11.0
+nose2==0.13.0
 # requests 2.27.1 is the highest supported version
 # on ubuntu 18 and centos 7 CI workers
 requests==2.27.1
