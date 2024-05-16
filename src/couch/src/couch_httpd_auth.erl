@@ -306,7 +306,7 @@ get_roles_claim(Claims) ->
     end.
 
 get_configured_claims() ->
-    Claims = config:get("jwt_auth", "required_claims", ""),
+    Claims = config:get("jwt_auth", "required_claims", "exp"),
     Re = "((?<key1>[a-z]+)|{(?<key2>[a-z]+)\s*,\s*\"(?<val>[^\"]+)\"})",
     case re:run(Claims, Re, [global, {capture, [key1, key2, val], binary}]) of
         nomatch when Claims /= "" ->
