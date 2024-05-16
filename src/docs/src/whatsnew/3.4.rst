@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 .. Licensed under the Apache License, Version 2.0 (the "License"); you may not
 .. use this file except in compliance with the License. You may obtain a copy of
 .. the License at
@@ -109,6 +110,7 @@ Features and Enhancements
   list.
 * :ghissue:`4404`: Respond with 503 immediately if search not available.
 * :ghissue:`4347`: Remove failed ``couch_plugins`` experiment.
+* :ghissue:`5046`: JWT: require valid `exp` claim by default
 
 Performance
 -----------
@@ -229,7 +231,23 @@ Builds
 ------
 * :ghissue:`4840`: Add Debian 12 (bookworm) to CI and binary packages.
 
+.. _release/3.4.x/breakingchanges:
+
 Other
 -----
+
+Breaking Changes
+================
+
+* :ghissue:`5046`: JWT: require valid `exp` claim by default
+
+  Users of JWT rightly expect tokens to be considered invalid once they expire. It
+  is a surprise to some that this requires a change to the default
+  configuration. In the interest of security we will now require a valid `exp`
+  claim in tokens. Administrators can disable the check by changing
+  `required_claims` back to the empty string.
+
+  We recommend adding `nbf` as a required claim if you know your tokens  will
+  include it.
 
 What’s new, Scooby-Doo?
