@@ -41,7 +41,6 @@
 }).
 
 -record(view_row, {key, id, value, doc, worker}).
--record(change, {key, id, value, deleted=false, doc, worker}).
 
 -type row_property_key() :: id | key | value | doc | worker.
 -type row_properties() :: [{row_property_key(), any()}].

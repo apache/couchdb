@@ -124,15 +124,9 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
                     Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
                 _ ->
                     {ok, AccTimeout} = Callback(timeout, AccOut),
-                    ?MODULE:keep_sending_changes(
-                        DbName,
-                        Args#changes_args{limit = Limit2},
-                        Callback,
-                        LastSeq,
-                        AccTimeout,
-                        Timeout,
-                        UpListen,
-                        T0
+                    Args1 = Args#changes_args{limit = Limit2},
+                    keep_sending_changes(
+                        DbName, Args1, Callback, LastSeq, AccTimeout, Timeout, UpListen, T0
                     )
             end
     end.
@@ -201,15 +195,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
                         end,
                         Workers
                     ),
-                    send_changes(
-                        DbName,
-                        Workers,
-                        LiveSeqs,
-                        ChangesArgs,
-                        Callback,
-                        AccIn,
-                        Timeout
-                    )
+                    send_changes(DbName, Workers, LiveSeqs, ChangesArgs, Callback, AccIn, Timeout)
                 after
                     fabric_streams:cleanup(Workers)
                 end;
@@ -270,9 +256,6 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
-% Temporary upgrade clause - Case 24236
-handle_message({complete, Key}, Worker, State) when is_tuple(Key) ->
-    handle_message({complete, [{seq, Key}, {pending, 0}]}, Worker, State);
 handle_message({change, Props}, {Worker, _}, #collector{limit = 0} = State) ->
     O0 = State#collector.offset,
     O1 =
@@ -295,9 +278,7 @@ handle_message({complete, Props}, Worker, #collector{limit = 0} = State) ->
                 O0
         end,
     maybe_stop(State#collector{offset = O1});
-handle_message({no_pass, Props}, {Worker, From}, #collector{limit = 0} = State) when
-    is_list(Props)
-->
+handle_message({no_pass, [_ | _] = Props}, {Worker, From}, #collector{limit = 0} = State) ->
     #collector{counters = S0, offset = O0} = State,
     O1 =
         case fabric_dict:lookup_element(Worker, O0) of
@@ -309,16 +290,6 @@ handle_message({no_pass, Props}, {Worker, From}, #collector{limit = 0} = State) 
     S1 = fabric_dict:store(Worker, couch_util:get_value(seq, Props), S0),
     rexi:stream_ack(From),
     maybe_stop(State#collector{counters = S1, offset = O1});
-handle_message(#change{} = Row, {Worker, From}, St) ->
-    Change =
-        {change, [
-            {seq, Row#change.key},
-            {id, Row#change.id},
-            {changes, Row#change.value},
-            {deleted, Row#change.deleted},
-            {doc, Row#change.doc}
-        ]},
-    handle_message(Change, {Worker, From}, St);
 handle_message({change, Props}, {Worker, From}, St) ->
     #collector{
         callback = Callback,
@@ -341,9 +312,6 @@ handle_message({change, Props}, {Worker, From}, St) ->
     {Go, Acc} = Callback(changes_row(Props2), AccIn),
     rexi:stream_ack(From),
     {Go, St#collector{counters = S1, offset = O1, limit = Limit - 1, user_acc = Acc}};
-%% upgrade clause
-handle_message({no_pass, Seq}, From, St) when is_integer(Seq) ->
-    handle_message({no_pass, [{seq, Seq}]}, From, St);
 handle_message({no_pass, Props}, {Worker, From}, St) ->
     Seq = couch_util:get_value(seq, Props),
     #collector{counters = S0} = St,
@@ -351,7 +319,7 @@ handle_message({no_pass, Props}, {Worker, From}, St) ->
     S1 = fabric_dict:store(Worker, Seq, S0),
     rexi:stream_ack(From),
     {ok, St#collector{counters = S1}};
-handle_message({complete, Props}, Worker, State) ->
+handle_message({complete, [_ | _] = Props}, Worker, State) ->
     Key = couch_util:get_value(seq, Props),
     #collector{
         counters = S0,
