@@ -100,7 +100,7 @@ ddoc(#st{sid = SId} = St, DbName, #doc{id = DDocId} = DDoc) ->
     ?INFO(#{sid => SId, db => DbName, ddoc => DDocId}),
     #st{ddoc_cnt = Cnt} = St,
     St1 = St#st{ddoc_cnt = Cnt + 1},
-    #doc{body = {Props = [_ | _]}} = DDoc,
+    #doc{body = {Props}} = DDoc,
     case couch_util:get_value(<<"language">>, Props, <<"javascript">>) of
         <<"javascript">> -> {ok, process_ddoc(St1, DbName, DDoc)};
         _ -> {ok, St1}
@@ -401,6 +401,9 @@ vdu_load(#st{qjs_proc = Qjs, sm_proc = Sm}, VDU) ->
         false -> throw({validate, {vdu, QjsRes, SmRes}})
     end.
 
+vdu_doc_validate(#st{}, _DDocId, undefined, _Doc) ->
+    % No VDU
+    ok;
 vdu_doc_validate(#st{} = St, DDocId, _VDU, Doc) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
     QjsRes = vdu_doc(Qjs, DDocId, Doc),
