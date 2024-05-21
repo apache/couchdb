@@ -543,9 +543,7 @@ example used with an index on the field ``"year"``:
 
     {
         "year": {
-            "$gte": 1900
-        },
-        "year": {
+            "$gte": 1900,
             "$lte": 1903
         },
         "$not": {
@@ -564,15 +562,13 @@ example used with an index on the field ``"year"``:
 
     {
         "year": {
-            "$gte": 1900
-        },
-        "year": {
+            "$gte": 1900.
             "$lte": 1910
         },
         "$nor": [
             { "year": 1901 },
             { "year": 1905 },
-            {  "year": 1907 }
+            { "year": 1907 }
         ]
     }
 
