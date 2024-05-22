@@ -52,7 +52,7 @@
     #{
         selector => selector(),
         fields => fields(),
-        covering_index => 'maybe'(#idx{})
+        covering_index => possibly(#idx{})
     }.
 
 -type mrargs_extra_item() ::
@@ -67,7 +67,7 @@
 -spec viewcbargs_new(Selector, Fields, CoveringIndex) -> ViewCBArgs when
     Selector :: selector(),
     Fields :: fields(),
-    CoveringIndex :: 'maybe'(#idx{}),
+    CoveringIndex :: possibly(#idx{}),
     ViewCBArgs :: viewcbargs().
 viewcbargs_new(Selector, Fields, CoveringIndex) ->
     #{
@@ -76,7 +76,7 @@ viewcbargs_new(Selector, Fields, CoveringIndex) ->
         covering_index => CoveringIndex
     }.
 
--spec viewcbargs_get(Key, Args) -> 'maybe'(term()) when
+-spec viewcbargs_get(Key, Args) -> possibly(term()) when
     Key :: selector | fields | covering_index,
     Args :: viewcbargs().
 viewcbargs_get(selector, Args) when is_map(Args) ->
@@ -468,7 +468,7 @@ view_cb(ok, ddoc_updated) ->
 -spec match_and_extract_doc(Doc, Selector, Fields) -> Result when
     Doc :: ejson(),
     Selector :: selector(),
-    Fields :: 'maybe'(fields()),
+    Fields :: possibly(fields()),
     Result :: {match, term()} | {no_match, undefined}.
 match_and_extract_doc(Doc, Selector, Fields) ->
     case mango_selector:match(Selector, Doc) of

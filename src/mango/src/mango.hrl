@@ -22,7 +22,7 @@
 
 -define(MANGO_ERROR(R), throw({mango_error, ?MODULE, R})).
 
--type maybe(A) :: A | undefined.
+-type possibly(A) :: A | undefined.
 
 -type abstract_text_selector() :: {'op_and', [abstract_text_selector()]}
 				| {'op_or', [abstract_text_selector()]}

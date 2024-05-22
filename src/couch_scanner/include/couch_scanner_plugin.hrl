@@ -21,4 +21,4 @@
 -define(WARN(FMT, ARGS), ?LOG(warning, FMT, ARGS, #{})).
 -define(WARN(FMT, ARGS, META), ?LOG(warning, FMT, ARGS, META)).
 -define(DEBUG(FMT, ARGS), ?LOG(debug, FMT, ARGS, #{fn => ?FUNCTION_NAME})).
--define(DEBUG(FMT, ARGS, META), ?LOG(debug, FMT, ARGS, META#{fn => ?FUNCTION_NAME})).
+-define(DEBUG(FMT, ARGS, META), ?LOG(debug, FMT, ARGS, maps:merge(META, #{fn => ?FUNCTION_NAME}))).
