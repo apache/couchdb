@@ -182,6 +182,9 @@ all_docs_cb({row, Row}, Acc) ->
 all_docs_cb({meta, _}, Acc) ->
     {ok, Acc};
 all_docs_cb(complete, Acc) ->
+    {ok, Acc};
+all_docs_cb(Error, Acc) ->
+    io:format(standard_error, "~n! error in all_docs_cb: ~p!~n", [Error]),
     {ok, Acc}.
 
 get_changes(Db, Opts) ->
