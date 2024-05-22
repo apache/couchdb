@@ -386,22 +386,49 @@ http_response({error, Error}, #state{session_url = Url, user = User}) ->
     {error, {session_request_failed, Url, User, Error}}.
 
 -spec parse_cookie(list()) -> {ok, age(), string()} | {error, term()}.
-parse_cookie(Headers0) ->
-    Headers = mochiweb_headers:make(Headers0),
-    case mochiweb_headers:get_value("Set-Cookie", Headers) of
-        undefined ->
+parse_cookie(Headers) ->
+    case get_cookies(Headers) of
+        [] ->
             {error, cookie_not_found};
-        CookieHeader ->
-            CookieKVs = mochiweb_cookies:parse_cookie(CookieHeader),
-            CaseInsKVs = mochiweb_headers:make(CookieKVs),
-            case mochiweb_headers:get_value("AuthSession", CaseInsKVs) of
-                undefined ->
-                    {error, cookie_format_invalid};
-                Cookie ->
-                    MaxAge = parse_max_age(CaseInsKVs),
-                    {ok, MaxAge, Cookie}
+        [_ | _] = Cookies ->
+            case get_auth_session_cookies_and_age(Cookies) of
+                [] -> {error, cookie_format_invalid};
+                [{Cookie, MaxAge} | _] -> {ok, MaxAge, Cookie}
             end
     end.
+
+% Return list of cookies from headers, each as a KV list.
+% For example:
+%  [
+%    [{"AuthSession", "foo"}, {"max-age", "1"}],
+%    [{"ApiKey", "Secret"}, {"HttpOnly", []}]
+%  ]
+%
+-spec get_cookies(list()) -> [list()].
+get_cookies(Headers) ->
+    Headers1 = mochiweb_headers:make(Headers),
+    Headers2 = mochiweb_headers:to_list(Headers1),
+    Fun = fun({K, V}) ->
+        case string:equal(K, "Set-Cookie", true) of
+            true -> {true, mochiweb_cookies:parse_cookie(V)};
+            false -> false
+        end
+    end,
+    lists:filtermap(Fun, Headers2).
+
+% From a list of cookies, pick out only AuthSession cookies.
+% Return a list of {Cookie, MaxAge} tuples
+%
+-spec get_auth_session_cookies_and_age([list()]) -> [{string(), age()}].
+get_auth_session_cookies_and_age(Cookies) ->
+    Fun = fun(CookieKVs) ->
+        CaseInsKVs = mochiweb_headers:make(CookieKVs),
+        case mochiweb_headers:get_value("AuthSession", CaseInsKVs) of
+            undefined -> false;
+            Cookie -> {true, {Cookie, parse_max_age(CaseInsKVs)}}
+        end
+    end,
+    lists:filtermap(Fun, Cookies).
 
 -spec parse_max_age(list()) -> age().
 parse_max_age(CaseInsKVs) ->
@@ -724,5 +751,60 @@ parse_max_age_test_() ->
             {"1234567890", 1234567890}
         ]
     ].
+
+get_cookies_test() ->
+    ?assertEqual([], get_cookies([])),
+    ?assertEqual([], get_cookies([{"abc", ""}])),
+    ?assertEqual([], get_cookies([{"abc", "def"}])),
+    ?assertEqual([], get_cookies([{"xset-cookie", "c=v"}])),
+    ?assertEqual([], get_cookies([{"set-cookiee", "c=v"}])),
+    ?assertEqual([[]], get_cookies([{"set-cookie", ""}])),
+    ?assertEqual([[{"c", "v"}]], get_cookies([{"Set-cOokie", "c=v"}])),
+    ?assertEqual(
+        [[{"c", "v"}, {"HttpOnly", []}]],
+        get_cookies([
+            {"Set-COOkiE", "c=v;HttpOnly"}
+        ])
+    ),
+    ?assertEqual(
+        [[{"c", "v"}]],
+        get_cookies([
+            {"Foo", "Bar"},
+            {"Set-cOokie", "c=v"}
+        ])
+    ),
+    ?assertEqual(
+        [
+            [{"c1", "v1"}, {"x", "y"}],
+            [{"c2", "v2"}, {"z", ""}]
+        ],
+        get_cookies([
+            {"Set-cOokie", "c1=v1;x=y"},
+            {"Other", "Foo;Bar"},
+            {"sEt-cookie", "c2=v2;z"}
+        ])
+    ).
+
+get_auth_session_cookies_and_age_test() ->
+    ?assertEqual([], get_auth_session_cookies_and_age([])),
+    ?assertEqual([], get_auth_session_cookies_and_age([[{"c", "v"}]])),
+    ?assertEqual(
+        [{"x", undefined}],
+        get_auth_session_cookies_and_age([
+            [{"c", "v"}], [{"AuthSession", "x"}], [{"z", "w"}]
+        ])
+    ),
+    ?assertEqual(
+        [
+            {"x", 10},
+            {"y", 20},
+            {"z", undefined}
+        ],
+        get_auth_session_cookies_and_age([
+            [{"AuthSession", "x"}, {"Max-Age", "10"}, {"HttpOnly", ""}],
+            [{"AuthSession", "y"}, {"Max-Age", "20"}],
+            [{"AuthSession", "z"}, {"Foo", "Bar"}]
+        ])
+    ).
 
 -endif.
