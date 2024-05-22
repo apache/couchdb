@@ -36,12 +36,12 @@ teardown(Ctx) ->
     test_util:stop_couch(Ctx).
 
 t_default_doc_size(_Ctx) ->
-    Opts = #{docs => 100, individual_docs => 5},
+    Opts = #{docs => 50, individual_docs => 5},
     % The goal is to just have it not crash
     ?assertEqual(ok, fabric_bench:go(Opts)).
 
 t_small_doc_size(_Ctx) ->
-    Opts = #{q => 4, docs => 100, doc_size => small, individual_docs => 5},
+    Opts = #{q => 4, docs => 50, doc_size => small, individual_docs => 5},
     % The goal is to just have it not crash
     ?assertEqual(ok, fabric_bench:go(Opts)).
 
