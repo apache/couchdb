@@ -111,6 +111,7 @@ Features and Enhancements
 * :ghissue:`4404`: Respond with 503 immediately if search not available.
 * :ghissue:`4347`: Remove failed ``couch_plugins`` experiment.
 * :ghissue:`5046`: JWT: require valid `exp` claim by default
+* :ghissue:`5065`: Update Fauxton UI to version v1.3.1
 
 Performance
 -----------
