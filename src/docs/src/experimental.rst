@@ -37,6 +37,8 @@ sent for everything in /_utils.
 
 Then restart CouchDB.
 
+.. _nouveauconfig:
+
 Nouveau Server (new Apache Lucene integration)
 ==============================================
 

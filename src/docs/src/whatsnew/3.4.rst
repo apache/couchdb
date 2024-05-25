@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 .. Licensed under the Apache License, Version 2.0 (the "License"); you may not
 .. use this file except in compliance with the License. You may obtain a copy of
 .. the License at
@@ -26,6 +25,20 @@
 Version 3.4.0
 =============
 
+Breaking Changes
+----------------
+
+* :ghissue:`5046`: JWT: require valid ``exp`` claim by default
+
+  Users of JWT rightly expect tokens to be considered invalid once they expire. It
+  is a surprise to some that this requires a change to the default
+  configuration. In the interest of security we will now require a valid ``exp``
+  claim in tokens. Administrators can disable the check by changing
+  ``required_claims`` back to the empty string.
+
+  We recommend adding ``nbf`` as a required claim if you know your tokens will
+  include it.
+
 Highlights
 ----------
 
@@ -42,8 +55,40 @@ Highlights
   implementation of Lucene-based full-text search for CouchDB. Please test
   this thoroughly and report back any issues you might find.
 
-  - Installation instructions // TODO LINK
-  - Report a bug // TODO LINK
+  - :ref:`Setup instructions <nouveauconfig>`
+  - :ref:`Usage <ddoc/nouveau>`
+  - `Report a bug`_.
+
+.. _Report a bug: https://github.com/apache/couchdb/issues/new/choose
+
+* :ghissue:`4627`: Add `QuickJS`_ as a JavaScript engine option.
+
+.. _QuickJS: https://bellard.org/quickjs/`
+
+  Advantages over SpiderMonkey:
+
+  - significantly smaller and easier to integrate codebase. We're using ~6
+    C files vs 700+ SM91 C++ files.
+  - Built with Apache CouchDB as opposed having to maintain a separate
+    SpiderMonkey package for OSs that don’t support it
+    (\*cough*RedHat9\*cough\*).
+  - Better sandboxing support.
+  - Preliminary test results show multiple performance improvements.
+
+      - 4x faster than SpiderMonkey 1.8.5.
+      - 5x faster than SpiderMonkey 91.
+      - 6x reduced memory usage per ``couchjs`` process (5MB vs 30MB).
+
+  - Allows compiling JavaScript bytecode ahead of time.
+  - QuickJS can be built alongside SpiderMonkey and toggled on/off at runtime::
+
+          ./configure --dev --js-engine=quickjs
+
+  - This makes it the default engine. But SpiderMonkey can still be set in the
+    config option::
+
+          [couchdb]
+          js_engine = spidermonkey | quickjs
 
 * :ghissue:`4570`, :ghissue:`4578`, :ghissue:`4576`: Adopt xxHash in favour
   of md5 for ``couch_file`` checksums and ETag calculation. 30% performance
@@ -66,11 +111,28 @@ Highlights
 * :ghissue:`4847`: Require auth for ``_replicate`` endpoint. This continues
   the 3.x closed-by-default design goal.
 
-* Many small small performance improvements, see Performance section // TODO LINK
+* Many small small performance improvements, see :ref:`the Performance
+  section <performance430>`.
 
 Features and Enhancements
 -------------------------
 
+* :ghissue:`5069`: Update Fauxton to v1.3.1.
+* :ghissue:`5067`: Support Erlang/OTP 27.
+* :ghissue:`5053`: Use the built-in ``crypto:pbkdf2_hmac`` function.
+* :ghissue:`5036`: Remove ``replication_job_supervisor``.
+* :ghissue:`5035`: Modernise ``couch_replicator_supervisor``.
+* :ghissue:`5019`: Remove unused build files.
+* :ghissue:`5017`: Remove unused ``boot_dev_cluster.sh``.
+* :ghissue:`5014`: Add Couch Scanner module.
+* :ghissue:`5013`: Improve dist diagnostics.
+* :ghissue:`4990`: Add ``dbname`` to mango exec stats.
+* :ghissue:`4987`: Replace ``khash`` with maps in ``ddoc_cache_lru``.
+* :ghissue:`4984`: Fabric: switch to maps for view rows.
+* :ghissue:`4979`: Git ignore top level ``clouseau`` directory.
+* :ghissue:`4977`: Replace ``khash`` with maps in ``couch_event_server``.
+* :ghissue:`4976`: Add metrics for fast vs slow password hashing.
+* :ghissue:`4965`: Handle multiple response copies for ``_purged_infos`` API.
 * :ghissue:`4878`: Add an option to scrub some sensitive headers from external
   json.
 * :ghissue:`4834`: Wait for newly set admin creds to be hashed in setup.
@@ -113,14 +175,17 @@ Features and Enhancements
 * :ghissue:`5046`: JWT: require valid `exp` claim by default
 * :ghissue:`5065`: Update Fauxton UI to version v1.3.1
 
+.. _performance430:
+
 Performance
 -----------
 
+* :ghissue:`5037`: Optimise ``fabric:all_dbs()``.
+* :ghissue:`4911`: Optimise and clean up ``couch_multidb_changes``.
 * :ghissue:`4852`: Optimise ``_active_tasks``.
-* :ghissue:`4811`: Prevent delayed opener error from crashing index servers.
 * :ghissue:`4786`, :ghissue:`4789`: Add extra timing stats for ``couch_js``
   engine commands.
-* :ghissue:`4679`: Fix multipart parse “attachment longer than expected”
+* :ghissue:`4679`: Fix multipart parse ``attachment longer than expected``
   error.
 * :ghissue:`4672`: Remove ``folsom`` and reimplement required functionality
   with new Erlang/OTP primitives resulting in up to 19x faster histogram
@@ -133,7 +198,6 @@ Performance
 * :ghissue:`4598`: Speed up internal replicator.
 * :ghissue:`4507`, :ghissue:`4525`: Add more prometheus metrics.
 * :ghissue:`4505`: Treat JavaScript internal errors as fatal.
-* :ghissue:`4503`: Add ``error_info`` clause for ``410 Gone``.
 * :ghissue:`4494`: Treat single-element keys as key.
 * :ghissue:`4473`: Avoid re-compiling filter view functions.
 * :ghissue:`4401`: Enforce doc ids ``_changes`` filter optimisation limit and
@@ -143,16 +207,35 @@ Performance
 Bugfixes
 --------
 
+* :ghissue:`5066`: Handle multiple ``Set-Cookie`` headers in replicator session
+  plugin.
+* :ghissue:`5060`: Cleanup a few clauses in ``fabric_view_changes``.
+* :ghissue:`5030`: Always commit if we upgrade 2.x view files. Fixes
+  misleading ``wrong signature`` error.
+* :ghissue:`5025`: Fix ``seedlist`` to not return duplicate json keys.
+* :ghissue:`5008`: Fix case clause error in replicator ``_scheduler/docs``
+  response.
+* :ghissue:`5000`: Remove repetitive word in source commends (5000!).
+* :ghissue:`4962`: Make multidb changes shard map aware.
+* :ghissue:`4958`: Mango: use rolling execution statistics.
+* :ghissue:`4921`: Make sure to reply to ``couch_index_server`` clients.
+* :ghissue:`4910`: ``couch_passwords:verify`` should always return false for
+  bad inputs.
+* :ghissue:`4908`: Mango: communicate rows read for global stats collection.
+* :ghissue:`4906`: Flush ``chttpd_db`` monitor refs on demonitor.
+* :ghissue:`4904`: Git ignore all .hypothesis directories.
 * :ghissue:`4887`: Look up search node name in config for weatherreport.
 * :ghissue:`4837`: Fix update bug in ``ets_lru``.
+* :ghissue:`4811`: Prevent delayed opener error from crashing index servers.
 * :ghissue:`4794`: Fix incorrect raising of ``database_does_not_exist`` error.
 * :ghissue:`4784`: Fix parsing of node name from ``ERL_FLAGS1``
   in ``remsh``.
 * :ghissue:`4782`, :ghissue:`4891`: Mango: prevent occasional
   duplication of paginated text results.
-* :ghissue:`4761`: Fix badrecord error when replicator is logging http usage.
+* :ghissue:`4761`: Fix badrecord error when replicator is logging HTTP usage.
 * :ghissue:`4759`: TLS: use HTTP rules for hostname verification.
-* :ghissue:`4758`: Remove sensitive headers from the mochiweb request in pdict.
+* :ghissue:`4758`: Remove sensitive headers from the ``mochiweb`` request
+  in ``pdict``.
 * :ghissue:`4751`: Mango: correct behaviour of ``fields`` on ``_explain``.
 * :ghissue:`4722`: Fix badmatch error when purge requests time out.
 * :ghissue:`4716`: Fix pending count for reverse changes feed.
@@ -178,6 +261,7 @@ Bugfixes
 * :ghissue:`4514`: GET invalid path under ``_index`` should not cause
   500 response.
 * :ghissue:`4509`: Make ``remsh`` work with quoted cookie.
+* :ghissue:`4503`: Add ``error_info`` clause for ``410 Gone``.
 * :ghissue:`4491`: Fix ``couch_index`` to avoid crashes under certain
   conditions.
 * :ghissue:`4485`: Catch and log any error from ``mem3:local_shards`` in
@@ -197,6 +281,28 @@ Bugfixes
 Tests
 -----
 
+* :ghissue:`5068`: Fix flakiness in ``fabric_bench``.
+* :ghissue:`5054`: Update a few deps and improve CI.
+* :ghissue:`5050`: Update CI OSes.
+* :ghissue:`5048`: Update CI Erlang versions.
+* :ghissue:`5040`: Fix invalid call to ``exit/2`` in ``couch_server``.
+* :ghissue:`5039`: Improve fabric ``all_dbs`` test.
+* :ghissue:`5024`: Fix flaky ``_changes`` async test.
+* :ghissue:`4982`: Fix flaky password hashing test.
+* :ghissue:`4980`: Fix password test timeout.
+* :ghissue:`4973`: Handling node number configuration in ``dev/run``.
+* :ghissue:`4959`: Enable Clouseau for more platforms.
+* :ghissue:`4953`: Improve retries in dev/run cluster setup.
+* :ghissue:`4947`: Add tests for ``_changes`` endpoint.
+* :ghissue:`4938`: Add tests for ``_changes`` with different parameters.
+* :ghissue:`4903`: Add extra rev tree changes tests.
+* :ghissue:`4902`: Fix flaky tests by increasing timeout.
+* :ghissue:`4900`: More flaky fixes for cluster setup.
+* :ghissue:`4899`: Reduce EUnit log noise.
+* :ghissue:`4898`: Simplify ``couch_changes_tests.erl`` using macro
+  ``?TDEF_FE``.
+* :ghissue:`4893`: Relax restriction on ``[admins]`` in dev ``local.ini``.
+* :ghissue:`4889`: Do not use admin party for integration tests.
 * :ghissue:`4873`: Fix test for `text` index creation.
 * :ghissue:`4863`: Fix flaky ``users_db_security`` test.
 * :ghissue:`4808`: Fix flaky ``couch_stream`` test.
@@ -218,6 +324,20 @@ Tests
 Docs
 ----
 
+* :ghissue:`5063`: Fix duplicate keys in find query.
+* :ghissue:`5045`: Create Python ``virtualenv`` on Windows for docs.
+* :ghissue:`5038`: Fix small detail about conflicts in Overview section.
+* :ghissue:`4999`: Change server instance to cluster for UUID docs.
+* :ghissue:`4955`: Revamp the installation instructions for FreeBSD.
+* :ghissue:`4951`: Add extension for copying code blocks with just one click.
+* :ghissue:`4950`: Improve changes feed API documentation.
+* :ghissue:`4948`: Update Sphinx package version to 7.2.6.
+* :ghissue:`4946`: Update Sphinx/RTD dependencies.
+* :ghissue:`4942`: Fix invalid JSON in ``_db_updates`` example.
+* :ghissue:`4940`: Re-wrote snap installation guide lines for 3.3.
+* :ghissue:`4933`: Set docs version numbers dynamically from file.
+* :ghissue:`4928`: Add missing installation OSes for convenience binaries.
+* :ghissue:`4925`: Break long lines for better readability within tables.
 * :ghissue:`4774`: Amend description of ``use_index`` on ``/{db}/_find``.
 * :ghissue:`4743`: Ban the laster monster.
 * :ghissue:`4684`: Add ``_design_docs/queries`` and
@@ -226,7 +346,6 @@ Docs
 * :ghissue:`4636`: Clarify default quorum calculation.
 * :ghissue:`4561`: Clarify encoding length in performance section.
 * :ghissue:`4402`: Fix example code in partitioned databases.
-* :ghissue:`4379`: match description of ``$mod`` with reality.
 
 Builds
 ------
@@ -236,19 +355,5 @@ Builds
 
 Other
 -----
-
-Breaking Changes
-================
-
-* :ghissue:`5046`: JWT: require valid `exp` claim by default
-
-  Users of JWT rightly expect tokens to be considered invalid once they expire. It
-  is a surprise to some that this requires a change to the default
-  configuration. In the interest of security we will now require a valid `exp`
-  claim in tokens. Administrators can disable the check by changing
-  `required_claims` back to the empty string.
-
-  We recommend adding `nbf` as a required claim if you know your tokens  will
-  include it.
 
 What’s new, Scooby-Doo?
