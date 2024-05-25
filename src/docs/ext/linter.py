@@ -107,7 +107,7 @@ def silent_scream(file):
         else:
             IGNORE_ERROR = False
 
-        match = re.match("\s*.. lint: ignore errors for the next (\d+) line?", line)
+        match = re.match(r"\s*.. lint: ignore errors for the next (\d+) line?", line)
         if match:
             # +1 for empty line right after comment
             counter = int(match.group(1)) + 1
