@@ -57,7 +57,7 @@ scheduler_docs_test_main_db_test_() ->
         fun setup_main_replicator_db/0,
         fun teardown/1,
         [
-            ?TDEF_FE(t_scheduler_docs_total_rows, 10)
+            ?TDEF_FE(t_scheduler_docs_total_rows, 15)
         ]
     }.
 
@@ -67,7 +67,7 @@ scheduler_docs_test_prefixed_db_test_() ->
         fun setup_prefixed_replicator_db/0,
         fun teardown/1,
         [
-            ?TDEF_FE(t_scheduler_docs_total_rows, 10)
+            ?TDEF_FE(t_scheduler_docs_total_rows, 15)
         ]
     }.
 
