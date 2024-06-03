@@ -760,8 +760,8 @@ t_detach_partition_no_partition_map(_) ->
 get_next_row_test_() ->
     {
         foreach,
-        fun() -> ok end,
-        fun(_) -> ok end,
+        fun() -> meck:new([rexi, couch_query_servers]) end,
+        fun(_) -> meck:unload() end,
         [
             ?TDEF_FE(t_get_next_row_end),
             ?TDEF_FE(t_get_next_row_map),
