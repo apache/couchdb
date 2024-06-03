@@ -19,3 +19,5 @@
 /quickjs/test_fib.c
 /quickjs/.github
 compile_commands.json
+priv/bundle_*.js
+priv/couchjs_*

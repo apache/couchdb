@@ -43,7 +43,7 @@ main(["compile"]) ->
             ok
     end;
 main(["clean"]) ->
-    rm("priv/bundle_*.js"),
+    file:del_dir_r("priv"),
     rm("c_src/couchjs_*_bytecode.c");
 main(Arg) ->
     io:format(standard_error, "Expected a 'compile' or 'clean' arg. Got:~p", [Arg]),
@@ -98,6 +98,7 @@ cp_if_different(From, To) ->
 concat(Sources, Target) ->
     SourceBins = [fread(P) || P <- Sources],
     TargetBin =  iolist_to_binary(["(function () {\n"] ++ SourceBins ++ ["})();\n"]),
+    ok = filelib:ensure_dir(Target),
     fwrite(Target, TargetBin).
 
 fread(Path) ->
