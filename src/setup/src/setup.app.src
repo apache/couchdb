@@ -12,7 +12,7 @@
 
 {application, setup, [
     {description, "Implements `_cluster_setup` and manages the setup of a CouchDB cluster"},
-    {vsn, "1"},
+    {vsn, git},
     {registered, []},
     {applications, [
         kernel,
