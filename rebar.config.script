@@ -86,7 +86,6 @@ end.
 case VerList of
     % Leave example around if we have to exlude specific versions
     % [22, 0, N | _] when N < 5 -> BadErlang(VerString);
-    [24, 3, 4, N | _] when N < 17 -> BadErlang(VerString);
     [25, 3, 2, N | _] when N < 10 -> BadErlang(VerString);
     [26, 2, N | _] when N < 3 -> BadErlang(VerString);
     _ -> ok
@@ -194,7 +193,7 @@ end.
 AddConfig = [
     {cover_enabled, true},
     {cover_print_enabled, true},
-    {require_otp_vsn, "24|25|26|27"},
+    {require_otp_vsn, "25|26|27"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},

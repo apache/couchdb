@@ -312,7 +312,7 @@ indexable_fields({[]}) ->
     [];
 indexable_fields(Selector) ->
     TupleTree = mango_selector_text:convert([], Selector),
-    couch_lists:uniq(indexable_fields([], TupleTree)).
+    lists:uniq(indexable_fields([], TupleTree)).
 
 indexable_fields(Fields, {op_and, Args}) when is_list(Args) ->
     lists:foldl(
