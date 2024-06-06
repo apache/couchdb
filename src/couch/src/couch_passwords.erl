@@ -132,7 +132,6 @@ pbkdf2(PRF, Password, Salt, Iterations, KeyLen) when
     throw({forbidden, Msg}).
 
 %% verify two lists for equality without short-circuits to avoid timing attacks.
--if((?OTP_RELEASE) >= 25).
 verify(ListA, ListB) when is_list(ListA), is_list(ListB) ->
     verify(?l2b(ListA), ?l2b(ListB));
 verify(BinA, BinB) when is_binary(BinA), is_binary(BinB), byte_size(BinA) == byte_size(BinB) ->
@@ -141,25 +140,3 @@ verify(BinA, BinB) when is_binary(BinA), is_binary(BinB) ->
     false;
 verify(_A, _B) ->
     false.
--else.
--spec verify(string(), string(), integer()) -> boolean().
-verify([X | RestX], [Y | RestY], Result) ->
-    verify(RestX, RestY, (X bxor Y) bor Result);
-verify([], [], Result) ->
-    Result == 0.
-
--spec verify
-    (binary(), binary()) -> boolean();
-    (list(), list()) -> boolean().
-verify(<<X/binary>>, <<Y/binary>>) ->
-    verify(?b2l(X), ?b2l(Y));
-verify(X, Y) when is_list(X) and is_list(Y) ->
-    case length(X) == length(Y) of
-        true ->
-            verify(X, Y, 0);
-        false ->
-            false
-    end;
-verify(_X, _Y) ->
-    false.
--endif.

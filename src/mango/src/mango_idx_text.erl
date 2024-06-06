@@ -320,7 +320,7 @@ indexable_fields({[]}) ->
     [];
 indexable_fields(Selector) ->
     TupleTree = mango_selector_text:convert([], Selector),
-    couch_lists:uniq(indexable_fields([], TupleTree)).
+    lists:uniq(indexable_fields([], TupleTree)).
 
 -spec indexable_fields(Fields, abstract_text_selector()) -> Fields when
     Fields :: [binary()].
