@@ -174,6 +174,9 @@ search(#index{} = Index, QueryArgs) ->
     case Resp of
         {ok, "200", _, RespBody} ->
             {ok, jiffy:decode(RespBody, [return_maps])};
+        {ok, "409", _, _} ->
+            %% Index was not current enough.
+            {error, stale_index};
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
         {error, Reason} ->
@@ -186,6 +189,7 @@ set_update_seq(ConnPid, #index{} = Index, MatchSeq, UpdateSeq) ->
         update_seq => UpdateSeq
     },
     set_seq(ConnPid, Index, ReqBody).
+
 set_purge_seq(ConnPid, #index{} = Index, MatchSeq, PurgeSeq) ->
     ReqBody = #{
         match_purge_seq => MatchSeq,

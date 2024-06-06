@@ -87,6 +87,7 @@ public abstract class Index implements Closeable {
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults search(final SearchRequest request) throws IOException {
+        assertMinSeqs(request.getMinUpdateSeq(), request.getMinPurgeSeq());
         return doSearch(request);
     }
 
@@ -181,5 +182,14 @@ public abstract class Index implements Closeable {
         assert Thread.holdsLock(this);
         assertPurgeSeqProgress(matchSeq, purgeSeq);
         this.purgeSeq = purgeSeq;
+    }
+
+    protected final void assertMinSeqs(final long minUpdateSeq, final long minPurgeSeq) throws StaleIndexException {
+        if (this.updateSeq < minUpdateSeq) {
+            throw new StaleIndexException(false, minUpdateSeq, this.updateSeq);
+        }
+        if (this.purgeSeq < minPurgeSeq) {
+            throw new StaleIndexException(true, minPurgeSeq, this.purgeSeq);
+        }
     }
 }

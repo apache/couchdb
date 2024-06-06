@@ -26,6 +26,7 @@ import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.github.benmanes.caffeine.cache.Weigher;
 import io.dropwizard.lifecycle.Managed;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
 import java.io.File;
@@ -68,10 +69,13 @@ public final class IndexManager implements Managed {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexManager.class);
 
+    @PositiveOrZero
     private int maxIndexesOpen;
 
+    @PositiveOrZero
     private int commitIntervalSeconds;
 
+    @PositiveOrZero
     private int idleSeconds;
 
     private Path rootDir;

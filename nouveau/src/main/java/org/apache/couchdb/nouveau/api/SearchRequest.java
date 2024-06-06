@@ -21,6 +21,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -31,6 +32,12 @@ public class SearchRequest {
 
     @NotNull
     private String query;
+
+    @PositiveOrZero
+    private long minUpdateSeq;
+
+    @PositiveOrZero
+    private long minPurgeSeq;
 
     private Locale locale;
 
@@ -62,6 +69,24 @@ public class SearchRequest {
     @JsonProperty
     public String getQuery() {
         return query;
+    }
+
+    public void setMinUpdateSeq(final long minUpdateSeq) {
+        this.minUpdateSeq = minUpdateSeq;
+    }
+
+    @JsonProperty
+    public long getMinUpdateSeq() {
+        return minUpdateSeq;
+    }
+
+    public void setMinPurgeSeq(final long minPurgeSeq) {
+        this.minPurgeSeq = minPurgeSeq;
+    }
+
+    @JsonProperty
+    public long getMinPurgeSeq() {
+        return minPurgeSeq;
     }
 
     public void setLocale(final Locale locale) {
@@ -154,7 +179,8 @@ public class SearchRequest {
 
     @Override
     public String toString() {
-        return "SearchRequest [query=" + query + ", locale=" + locale + ", sort=" + sort + ", limit=" + limit
-                + ", after=" + after + ", counts=" + counts + ", ranges=" + ranges + "]";
+        return "SearchRequest [query=" + query + ", min_update_seq=" + minUpdateSeq + ", min_purge_seq=" + minPurgeSeq
+                + ", locale=" + locale + ", sort=" + sort + ", limit=" + limit + ", after=" + after + ", counts="
+                + counts + ", ranges=" + ranges + "]";
     }
 }

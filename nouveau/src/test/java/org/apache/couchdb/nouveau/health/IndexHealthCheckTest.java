@@ -30,9 +30,11 @@ public class IndexHealthCheckTest {
     @Test
     public void testIndexHealthCheck(@TempDir final Path tempDir) throws Exception {
         var manager = new IndexManager();
-        manager.setCommitIntervalSeconds(1);
-        manager.setObjectMapper(new ObjectMapper());
+        manager.setCommitIntervalSeconds(30);
+        manager.setIdleSeconds(60);
+        manager.setMaxIndexesOpen(1);
         manager.setMetricRegistry(new MetricRegistry());
+        manager.setObjectMapper(new ObjectMapper());
         manager.setRootDir(tempDir);
         manager.setScheduler(Scheduler.systemScheduler());
         manager.setSearcherFactory(new SearcherFactory());
