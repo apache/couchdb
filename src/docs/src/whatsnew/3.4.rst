@@ -63,7 +63,7 @@ Highlights
 
 * :ghissue:`4627`: Add `QuickJS`_ as a JavaScript engine option.
 
-.. _QuickJS: https://bellard.org/quickjs/`
+.. _QuickJS: https://bellard.org/quickjs/
 
   Advantages over SpiderMonkey:
 
