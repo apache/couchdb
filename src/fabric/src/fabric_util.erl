@@ -139,6 +139,10 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
         receive
             {Ref, {ok, Db}} ->
                 {ok, Db};
+            %% TODO: switch to using rexi_utils:extract_delta
+            {Ref, {ok, Db}, {delta, Delta}} ->
+                couch_stats_resource_tracker:accumulate_delta(Delta),
+                {ok, Db};
             {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
                 throw(Error);
             {Ref, {'rexi_EXIT', {{forbidden, _} = Error, _}}} ->
