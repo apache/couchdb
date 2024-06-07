@@ -60,6 +60,16 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
 
 process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
+        Msg ->
+            process_raw_message(Msg, RefList, Keypos, Fun, Acc0, TimeoutRef)
+    after PerMsgTO ->
+        {timeout, Acc0}
+    end.
+
+process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
+    {Payload, Delta} = csrt:extract_delta(Payload0),
+    csrt:accumulate_delta(Delta),
+    case Payload of
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
         {rexi, Ref, Msg} ->
@@ -95,6 +105,4 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
             end;
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
-    after PerMsgTO ->
-        {timeout, Acc0}
     end.
