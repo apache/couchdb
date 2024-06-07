@@ -323,6 +323,9 @@ handle_request_int(MochiReq) ->
     % Save client socket so that it can be monitored for disconnects
     chttpd_util:mochiweb_client_req_set(MochiReq),
 
+    %% This is probably better in before_request, but having Path is nice
+    couch_stats_resource_tracker:create_coordinator_context(HttpReq0, Path),
+
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
             {ok, HttpReq1} ->
@@ -372,6 +375,7 @@ after_request(HttpReq, HttpResp0) ->
     HttpResp2 = update_stats(HttpReq, HttpResp1),
     chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
+    couch_stats_resource_tracker:destroy_context(),
     HttpResp2.
 
 process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
@@ -409,6 +413,7 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
             HandlerKey,
             fun chttpd_db:handle_request/1
         ),
+        couch_stats_resource_tracker:set_context_handler_fun(HandlerFun),
         AuthorizedReq = chttpd_auth:authorize(
             possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1
