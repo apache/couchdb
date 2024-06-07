@@ -472,6 +472,8 @@ reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
 
 get_node(#btree{fd = Fd}, NodePos) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
+    %% TODO: wire in csrt tracking
+    couch_stats:increment_counter([couchdb, btree, get_node, NodeType]),
     {NodeType, NodeList}.
 
 write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
@@ -480,6 +482,7 @@ write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     % now write out each chunk and return the KeyPointer pairs for those nodes
     ToWrite = [{NodeType, Chunk} || Chunk <- Chunks],
     WriteOpts = [{compression, Comp}],
+    couch_stats:increment_counter([couchdb, btree, write_node, NodeType]),
     {ok, PtrSizes} = couch_file:append_terms(Fd, ToWrite, WriteOpts),
     {ok, group_kps(Bt, NodeType, Chunks, PtrSizes)}.
 

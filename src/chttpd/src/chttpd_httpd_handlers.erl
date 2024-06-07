@@ -20,6 +20,7 @@ url_handler(<<"_utils">>) -> fun chttpd_misc:handle_utils_dir_req/1;
 url_handler(<<"_all_dbs">>) -> fun chttpd_misc:handle_all_dbs_req/1;
 url_handler(<<"_dbs_info">>) -> fun chttpd_misc:handle_dbs_info_req/1;
 url_handler(<<"_active_tasks">>) -> fun chttpd_misc:handle_task_status_req/1;
+url_handler(<<"_active_resources">>) -> fun chttpd_misc:handle_resource_status_req/1;
 url_handler(<<"_scheduler">>) -> fun couch_replicator_httpd:handle_scheduler_req/1;
 url_handler(<<"_node">>) -> fun chttpd_node:handle_node_req/1;
 url_handler(<<"_reload_query_servers">>) -> fun chttpd_misc:handle_reload_query_servers_req/1;
