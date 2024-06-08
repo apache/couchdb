@@ -18,7 +18,7 @@
 -include("nouveau.hrl").
 
 %% public api
--export([outdated/1]).
+-export([outdated/1, get_db_info/1]).
 
 %% callbacks
 -export([update/1]).

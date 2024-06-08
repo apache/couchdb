@@ -24,10 +24,19 @@
 -include("nouveau.hrl").
 -import(nouveau_util, [index_path/1]).
 
-search(DbName, #index{} = Index0, QueryArgs) ->
+search(DbName, #index{} = Index0, QueryArgs0) ->
     %% Incorporate the shard name into the record.
     Index1 = Index0#index{dbname = DbName},
-    Update = maps:get(update, QueryArgs, true),
+
+    %% get minimum seqs for search
+    {MinUpdateSeq, MinPurgeSeq} = nouveau_index_updater:get_db_info(Index1),
+
+    %% Incorporate min seqs into the query args.
+    QueryArgs1 = QueryArgs0#{
+        min_update_seq => MinUpdateSeq,
+        min_purge_seq => MinPurgeSeq
+    },
+    Update = maps:get(update, QueryArgs1, true),
 
     %% check if index is up to date
     case Update andalso nouveau_index_updater:outdated(Index1) of
@@ -45,7 +54,13 @@ search(DbName, #index{} = Index0, QueryArgs) ->
     end,
 
     %% Run the search
-    rexi:reply(nouveau_api:search(Index1, QueryArgs)).
+    case nouveau_api:search(Index1, QueryArgs1) of
+        {error, stale_index} ->
+            %% try again.
+            search(DbName, Index0, QueryArgs0);
+        Else ->
+            rexi:reply(Else)
+    end.
 
 info(DbName, #index{} = Index0) ->
     %% Incorporate the shard name into the record.
