@@ -27,7 +27,6 @@ ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../
 ROOTDIR=${ERTS_BIN_DIR%/*}
 START_ERL=$(cat "$ROOTDIR/releases/start_erl.data")
 ERTS_VSN=${START_ERL% *}
-APP_VSN=${START_ERL#* }
 BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
 
 PROGNAME=${0##*/}
@@ -128,11 +127,11 @@ if [ -z "${COOKIE}" ]; then
 fi
 
 if [ -z "$TLSCONF" ]; then
-  exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
+  exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/start_clean" \
       -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie "$COOKIE" \
       "$@"
 else
-  exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
+  exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/start_clean" \
       -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie "$COOKIE" \
       -proto_dist inet_tls -ssl_dist_optfile $TLSCONF \
       "$@"
