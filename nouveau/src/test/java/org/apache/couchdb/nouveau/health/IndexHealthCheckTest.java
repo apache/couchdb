@@ -15,10 +15,9 @@ package org.apache.couchdb.nouveau.health;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.codahale.metrics.MetricRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.benmanes.caffeine.cache.Scheduler;
 import java.nio.file.Path;
+import java.util.concurrent.Executors;
 import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.lucene.search.SearcherFactory;
@@ -33,10 +32,9 @@ public class IndexHealthCheckTest {
         manager.setCommitIntervalSeconds(30);
         manager.setIdleSeconds(60);
         manager.setMaxIndexesOpen(1);
-        manager.setMetricRegistry(new MetricRegistry());
         manager.setObjectMapper(new ObjectMapper());
         manager.setRootDir(tempDir);
-        manager.setScheduler(Scheduler.systemScheduler());
+        manager.setScheduledExecutorService(Executors.newScheduledThreadPool(2));
         manager.setSearcherFactory(new SearcherFactory());
         manager.start();
 

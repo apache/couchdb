@@ -17,7 +17,6 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.concurrent.Semaphore;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexInfo;
@@ -39,19 +38,10 @@ public abstract class Index implements Closeable {
     private long updateSeq;
     private long purgeSeq;
     private boolean deleteOnClose = false;
-    private final Semaphore semaphore = new Semaphore(Integer.MAX_VALUE);
 
     protected Index(final long updateSeq, final long purgeSeq) {
         this.updateSeq = updateSeq;
         this.purgeSeq = purgeSeq;
-    }
-
-    public final boolean tryAcquire() {
-        return semaphore.tryAcquire();
-    }
-
-    public final void release() {
-        semaphore.release();
     }
 
     public final IndexInfo info() throws IOException {
@@ -130,10 +120,7 @@ public abstract class Index implements Closeable {
 
     @Override
     public final void close() throws IOException {
-        // Ensures exclusive access to the index before closing.
-        semaphore.acquireUninterruptibly(Integer.MAX_VALUE);
         doClose();
-        // Never release semaphore.
     }
 
     protected abstract void doClose() throws IOException;
@@ -144,10 +131,6 @@ public abstract class Index implements Closeable {
 
     public synchronized void setDeleteOnClose(final boolean deleteOnClose) {
         this.deleteOnClose = deleteOnClose;
-    }
-
-    public final boolean isActive() {
-        return semaphore.availablePermits() < Integer.MAX_VALUE || semaphore.hasQueuedThreads();
     }
 
     protected final void assertUpdateSeqProgress(final long matchSeq, final long updateSeq)
