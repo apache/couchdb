@@ -47,6 +47,7 @@ public final class IndexHealthCheck extends HealthCheck {
 
             final SearchRequest searchRequest = new SearchRequest();
             searchRequest.setQuery("_id:foo");
+            searchRequest.setMinUpdateSeq(1);
 
             final SearchResults searchResults = indexResource.searchIndex(name, searchRequest);
             if (searchResults.getTotalHits() == 1) {

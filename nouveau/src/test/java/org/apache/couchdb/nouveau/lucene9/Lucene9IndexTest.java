@@ -33,6 +33,7 @@ import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.core.Index;
+import org.apache.couchdb.nouveau.core.StaleIndexException;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderException;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
@@ -80,6 +81,7 @@ public class Lucene9IndexTest {
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
+            request.setMinUpdateSeq(count);
             request.setQuery("*:*");
             final SearchResults results = index.search(request);
             assertThat(results.getTotalHits()).isEqualTo(count);
@@ -99,6 +101,7 @@ public class Lucene9IndexTest {
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
+            request.setMinUpdateSeq(count);
             request.setQuery("*:*");
             request.setSort(List.of("foo"));
             final SearchResults results = index.search(request);
@@ -119,6 +122,7 @@ public class Lucene9IndexTest {
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
+            request.setMinUpdateSeq(count);
             request.setQuery("*:*");
             request.setCounts(List.of("bar"));
             final SearchResults results = index.search(request);
@@ -139,6 +143,7 @@ public class Lucene9IndexTest {
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
+            request.setMinUpdateSeq(count);
             request.setQuery("*:*");
             request.setRanges(Map.of(
                     "bar",
@@ -170,6 +175,22 @@ public class Lucene9IndexTest {
             assertThrows(
                     UpdatesOutOfOrderException.class,
                     () -> index.update("foo", new DocumentUpdateRequest(2, 1, null, fields)));
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testMinSeq(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            // Require min seq 1 on new, empty index should fail.
+            assertThrows(StaleIndexException.class, () -> {
+                final SearchRequest request = new SearchRequest();
+                request.setMinUpdateSeq(1);
+                request.setQuery("*:*");
+                index.search(request);
+            });
         } finally {
             cleanup(index);
         }
