@@ -796,7 +796,7 @@ setup_all() ->
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(couch_log, warning, 2, ok),
     meck:expect(couch_log, error, 2, ok),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     meck:expect(config, listen_for_changes, 2, ok),
     meck:expect(couch_replicator_clustering, owner, 2, node()),
     meck:expect(

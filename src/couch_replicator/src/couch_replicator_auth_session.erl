@@ -692,7 +692,7 @@ httpdb(Url) ->
 setup_all() ->
     meck:expect(couch_replicator_httpc_pool, get_worker, 1, {ok, worker}),
     meck:expect(couch_replicator_httpc_pool, release_worker_sync, 2, ok),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    test_util:mock(config),
     mock_http_cookie_response("Abc"),
     ok.
 

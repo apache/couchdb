@@ -142,7 +142,7 @@ persist_unpersist_test_() ->
     {
         foreach,
         fun() ->
-            meck:expect(config, get, fun(_, _, Default) -> Default end)
+            test_util:mock(config)
         end,
         fun(_) ->
             meck:unload()

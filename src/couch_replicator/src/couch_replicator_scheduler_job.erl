@@ -1211,7 +1211,7 @@ format_status_test_() ->
     }.
 
 meck_config() ->
-    meck:expect(config, get, fun(_, _, Default) -> Default end).
+    test_util:mock(config).
 
 t_scheduler_job_format_status(_) ->
     Source = <<"http://u:p@h1/d1">>,
