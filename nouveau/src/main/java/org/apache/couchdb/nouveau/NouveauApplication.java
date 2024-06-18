@@ -13,7 +13,6 @@
 
 package org.apache.couchdb.nouveau;
 
-import com.github.benmanes.caffeine.cache.Scheduler;
 import io.dropwizard.core.Application;
 import io.dropwizard.core.setup.Environment;
 import io.swagger.v3.jaxrs2.integration.resources.OpenApiResource;
@@ -54,13 +53,12 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setCommitIntervalSeconds(configuration.getCommitIntervalSeconds());
         indexManager.setIdleSeconds(configuration.getIdleSeconds());
         indexManager.setMaxIndexesOpen(configuration.getMaxIndexesOpen());
-        indexManager.setMetricRegistry(environment.metrics());
         final ScheduledExecutorService schedulerExecutorService = environment
                 .lifecycle()
                 .scheduledExecutorService("index-manager-%d")
                 .threads(configuration.getSchedulerThreadCount())
                 .build();
-        indexManager.setScheduler(Scheduler.forScheduledExecutorService(schedulerExecutorService));
+        indexManager.setScheduledExecutorService(schedulerExecutorService);
         indexManager.setSearcherFactory(new ParallelSearcherFactory(ForkJoinPool.commonPool()));
         indexManager.setObjectMapper(environment.getObjectMapper());
         indexManager.setRootDir(configuration.getRootDir());

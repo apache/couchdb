@@ -13,18 +13,7 @@
 
 package org.apache.couchdb.nouveau.core;
 
-import static com.codahale.metrics.MetricRegistry.name;
-
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.benmanes.caffeine.cache.AsyncCacheLoader;
-import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.RemovalCause;
-import com.github.benmanes.caffeine.cache.RemovalListener;
-import com.github.benmanes.caffeine.cache.Scheduler;
-import com.github.benmanes.caffeine.cache.Weigher;
 import io.dropwizard.lifecycle.Managed;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.ws.rs.WebApplicationException;
@@ -34,12 +23,16 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.time.Duration;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.Objects;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Stream;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
@@ -52,7 +45,6 @@ import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.checkerframework.checker.index.qual.NonNegative;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,9 +54,49 @@ import org.slf4j.LoggerFactory;
  */
 public final class IndexManager implements Managed {
 
+    private class LRUMap extends LinkedHashMap<String, IndexHolder> {
+
+        private int capacity;
+
+        private LRUMap(final int capacity) {
+            super(capacity, 0.75f, true);
+            this.capacity = capacity;
+        }
+
+        @Override
+        protected boolean removeEldestEntry(final java.util.Map.Entry<String, IndexHolder> eldest) {
+            if (size() > capacity) {
+                schedulerExecutorService.execute(() -> {
+                    try {
+                        unload(eldest.getKey(), false);
+                    } catch (final InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        LOGGER.warn("Interrupted while evicting eldest entry {}", eldest.getKey(), e);
+                    } catch (final IOException e) {
+                        LOGGER.warn("I/O exception while evicting eldest entry {}", eldest.getKey(), e);
+                    }
+                });
+            }
+            return false;
+        }
+    }
+
     @FunctionalInterface
     public interface IndexFunction<V, R> {
         R apply(final V value) throws IOException;
+    }
+
+    private enum HolderState {
+        NOT_LOADED,
+        LOADED,
+        UNLOADED
+    }
+
+    private static class IndexHolder {
+        private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+        private ScheduledFuture<?> commitFuture;
+        private HolderState state = HolderState.NOT_LOADED;
+        private Index index;
     }
 
     private static final Logger LOGGER = LoggerFactory.getLogger(IndexManager.class);
@@ -82,33 +114,97 @@ public final class IndexManager implements Managed {
 
     private ObjectMapper objectMapper;
 
-    private MetricRegistry metricRegistry;
-
-    private Scheduler scheduler;
+    private ScheduledExecutorService schedulerExecutorService;
 
     private SearcherFactory searcherFactory;
 
-    private AsyncLoadingCache<String, Index> cache;
+    private LRUMap cache;
 
-    private StripedLock<String> lock;
+    private StripedLock<String> createLock;
 
     public <R> R with(final String name, final IndexFunction<Index, R> indexFun)
             throws IOException, InterruptedException {
+        retry:
         while (true) {
             if (!exists(name)) {
                 throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
             }
+            final IndexHolder holder;
+            synchronized (cache) {
+                holder = cache.computeIfAbsent(name, (k) -> new IndexHolder());
+            }
+            // CachedData pattern from ReentrantReadWriteLock javadoc
+            holder.lock.readLock().lock();
 
-            final CompletableFuture<Index> future = cache.get(name);
-            final Index index = future.join();
-
-            if (index.tryAcquire()) {
+            // Load if not already loaded.
+            if (holder.state == HolderState.NOT_LOADED) {
+                holder.lock.readLock().unlock();
+                holder.lock.writeLock().lock();
                 try {
-                    return indexFun.apply(index);
+                    if (holder.state == HolderState.NOT_LOADED) {
+                        holder.index = load(name);
+                        holder.commitFuture = this.schedulerExecutorService.scheduleWithFixedDelay(
+                                commitFun(name, holder),
+                                commitIntervalSeconds,
+                                commitIntervalSeconds,
+                                TimeUnit.SECONDS);
+                        holder.state = HolderState.LOADED;
+                    }
+                    holder.lock.readLock().lock();
                 } finally {
-                    index.release();
+                    holder.lock.writeLock().unlock();
                 }
             }
+
+            try {
+                switch (holder.state) {
+                    case NOT_LOADED:
+                        throw new IllegalStateException();
+                    case UNLOADED:
+                        Thread.sleep(1000);
+                        continue retry;
+                    case LOADED:
+                        return indexFun.apply(holder.index);
+                }
+            } finally {
+                holder.lock.readLock().unlock();
+            }
+        }
+    }
+
+    public void unload(final String name, final boolean forceDelete) throws IOException, InterruptedException {
+        final IndexHolder holder;
+        synchronized (cache) {
+            holder = cache.computeIfAbsent(name, (k) -> new IndexHolder());
+        }
+        holder.lock.writeLock().lock();
+        try {
+            switch (holder.state) {
+                case LOADED:
+                    if (forceDelete) {
+                        holder.index.setDeleteOnClose(true);
+                    }
+                    LOGGER.info("closing {}", name);
+                    try {
+                        close(name, holder);
+                    } catch (final IOException e) {
+                        LOGGER.error("I/O exception when evicting {}", name, e);
+                    }
+                    holder.state = HolderState.UNLOADED;
+                    holder.index = null;
+                    synchronized (cache) {
+                        cache.remove(name, holder);
+                    }
+                    break;
+                case NOT_LOADED:
+                case UNLOADED:
+                    if (forceDelete) {
+                        IOUtils.rm(indexRootPath(name));
+                    }
+                    break;
+            }
+        } finally {
+            holder.lock.writeLock().unlock();
         }
     }
 
@@ -118,7 +214,7 @@ public final class IndexManager implements Managed {
             return;
         }
 
-        final Lock lock = this.lock.writeLock(name);
+        final Lock lock = this.createLock.writeLock(name);
         lock.lock();
         try {
             if (exists(name)) {
@@ -164,8 +260,8 @@ public final class IndexManager implements Managed {
                 final String relativeName = rootDir.relativize(p).toString();
                 try {
                     deleteIndex(relativeName);
-                } catch (final IOException e) {
-                    LOGGER.error("I/O exception deleting " + p, e);
+                } catch (final IOException | InterruptedException e) {
+                    LOGGER.error("Exception deleting {}", p, e);
                 }
                 // Clean any newly empty directories.
                 do {
@@ -180,18 +276,8 @@ public final class IndexManager implements Managed {
         }
     }
 
-    private void deleteIndex(final String name) throws IOException {
-        final CompletableFuture<Index> future = cache.asMap().remove(name);
-        if (future == null) {
-            return;
-        }
-        final Index index = future.getNow(null);
-        if (index != null) {
-            index.setDeleteOnClose(true);
-            close(name, index);
-        } else {
-            IOUtils.rm(indexRootPath(name));
-        }
+    private void deleteIndex(final String name) throws IOException, InterruptedException {
+        unload(name, true);
     }
 
     public void setMaxIndexesOpen(int maxIndexesOpen) {
@@ -214,12 +300,8 @@ public final class IndexManager implements Managed {
         this.objectMapper = objectMapper;
     }
 
-    public void setMetricRegistry(final MetricRegistry metricRegistry) {
-        this.metricRegistry = metricRegistry;
-    }
-
-    public void setScheduler(final Scheduler scheduler) {
-        this.scheduler = scheduler;
+    public void setScheduledExecutorService(ScheduledExecutorService schedulerExecutorService) {
+        this.schedulerExecutorService = schedulerExecutorService;
     }
 
     public void setSearcherFactory(final SearcherFactory searcherFactory) {
@@ -228,27 +310,38 @@ public final class IndexManager implements Managed {
 
     @Override
     public void start() throws IOException {
-        cache = Caffeine.newBuilder()
-                .recordStats(() -> new MetricsStatsCounter(metricRegistry, name(IndexManager.class, "cache")))
-                .initialCapacity(maxIndexesOpen)
-                .maximumWeight(maxIndexesOpen)
-                .weigher(new IndexWeigher())
-                .expireAfterAccess(Duration.ofSeconds(idleSeconds))
-                .refreshAfterWrite(Duration.ofSeconds(commitIntervalSeconds))
-                .scheduler(scheduler)
-                .evictionListener(new IndexEvictionListener())
-                .buildAsync(new AsyncIndexLoader());
-        lock = new StripedLock<String>(100);
+        Objects.requireNonNull(this.objectMapper, "objectMapper must not be null");
+        Objects.requireNonNull(this.rootDir, "rootDir must not be null");
+        Objects.requireNonNull(this.searcherFactory, "searcherFactory must not be null");
+        Objects.requireNonNull(this.schedulerExecutorService, "schedulerExecutorService must not be null");
+
+        this.cache = new LRUMap(this.maxIndexesOpen);
+        this.createLock = new StripedLock<String>(100);
+    }
+
+    private Runnable commitFun(final String name, final IndexHolder holder) {
+        return () -> {
+            holder.lock.readLock().lock();
+            try {
+                if (holder.index.commit()) {
+                    LOGGER.info("committed {}", name);
+                }
+            } catch (final IOException e) {
+                LOGGER.warn("I/O exception while committing " + name, e);
+            } finally {
+                holder.lock.readLock().unlock();
+            }
+        };
     }
 
     @Override
     public void stop() throws IOException, InterruptedException {
-        final var it = cache.asMap().entrySet().iterator();
-        while (it.hasNext()) {
-            var e = it.next();
-            LOGGER.info("closing {} during shutdown", e.getKey());
-            close(e.getKey(), e.getValue());
-            it.remove();
+        synchronized (cache) {
+            var names = new HashSet<String>(cache.keySet());
+            for (var name : names) {
+                unload(name, false);
+            }
+            cache.clear();
         }
     }
 
@@ -276,115 +369,50 @@ public final class IndexManager implements Managed {
         throw new WebApplicationException(name + " attempts to escape from index root directory", Status.BAD_REQUEST);
     }
 
-    private class IndexEvictionListener implements RemovalListener<String, Index> {
-
-        public void onRemoval(String name, Index index, RemovalCause cause) {
-            LOGGER.info("closing {} for cause {}", name, cause);
-            try {
-                close(name, index);
-            } catch (final IOException e) {
-                LOGGER.error("I/O exception when evicting " + name, e);
-            }
-        }
+    private Index load(final String name) throws IOException {
+        LOGGER.info("opening {}", name);
+        final Path path = indexPath(name);
+        final IndexDefinition indexDefinition = loadIndexDefinition(name);
+        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
+        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
+        final IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        config.setUseCompoundFile(false);
+        final IndexWriter writer = new IndexWriter(dir, config);
+        final long updateSeq = getSeq(writer, "update_seq");
+        final long purgeSeq = getSeq(writer, "purge_seq");
+        final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
+        return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
     }
 
-    private class IndexWeigher implements Weigher<String, Index> {
-
-        @Override
-        public @NonNegative int weigh(String key, Index value) {
-            // Pin active indexes
-            return value.isActive() ? 0 : 1;
-        }
-    }
-
-    private class AsyncIndexLoader implements AsyncCacheLoader<String, Index> {
-
-        @Override
-        public CompletableFuture<? extends Index> asyncLoad(String name, Executor executor) throws Exception {
-            final CompletableFuture<Index> future = new CompletableFuture<Index>();
-
-            executor.execute(() -> {
-                LOGGER.info("opening {}", name);
-                final Path path = indexPath(name);
-                Index result;
-                try {
-                    final IndexDefinition indexDefinition = loadIndexDefinition(name);
-                    final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
-                    final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
-                    final IndexWriterConfig config = new IndexWriterConfig(analyzer);
-                    config.setUseCompoundFile(false);
-                    final IndexWriter writer = new IndexWriter(dir, config);
-                    final long updateSeq = getSeq(writer, "update_seq");
-                    final long purgeSeq = getSeq(writer, "purge_seq");
-                    final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-                    result = new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
-                    future.complete(result);
-                } catch (IOException e) {
-                    future.completeExceptionally(e);
-                }
-            });
-
-            return future;
-        }
-
-        @Override
-        public CompletableFuture<? extends Index> asyncReload(String name, Index index, Executor executor)
-                throws Exception {
-            executor.execute(() -> {
-                if (index.tryAcquire()) {
-                    try {
-                        if (index.commit()) {
-                            LOGGER.info("committed {}", name);
-                        }
-                    } catch (final IOException e) {
-                        LOGGER.warn("I/O exception while committing " + name, e);
-                    } finally {
-                        index.release();
-                    }
-                }
-            });
-            return CompletableFuture.completedFuture(index);
-        }
-
-        private long getSeq(final IndexWriter writer, final String key) throws IOException {
-            final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
-            if (commitData == null) {
-                return 0L;
-            }
-            for (Map.Entry<String, String> entry : commitData) {
-                if (entry.getKey().equals(key)) {
-                    return Long.parseLong(entry.getValue());
-                }
-            }
+    private long getSeq(final IndexWriter writer, final String key) throws IOException {
+        final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
+        if (commitData == null) {
             return 0L;
         }
-    }
-
-    private void close(final String name, final CompletableFuture<Index> future) throws IOException {
-        final Index index = future.getNow(null);
-        if (index != null) {
-            close(name, index);
+        for (Map.Entry<String, String> entry : commitData) {
+            if (entry.getKey().equals(key)) {
+                return Long.parseLong(entry.getValue());
+            }
         }
+        return 0L;
     }
 
-    private void close(final String name, final Index index) throws IOException {
+    private void close(final String name, final IndexHolder holder) throws IOException {
+        if (!holder.lock.isWriteLockedByCurrentThread()) {
+            throw new IllegalStateException();
+        }
+        holder.commitFuture.cancel(true);
         IOUtils.runAll(
                 () -> {
-                    if (index.tryAcquire()) {
-                        try {
-                            if (index.commit()) {
-                                LOGGER.debug("committed {} before close", name);
-                            }
-                        } finally {
-                            index.release();
-                        }
+                    if (holder.index.commit()) {
+                        LOGGER.debug("committed {} before close", name);
                     }
                 },
                 () -> {
-                    index.close();
+                    holder.index.close();
                 },
                 () -> {
-                    if (index.isDeleteOnClose()) {
+                    if (holder.index.isDeleteOnClose()) {
                         IOUtils.rm(indexRootPath(name));
                     }
                 });
