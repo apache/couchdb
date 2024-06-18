@@ -13,6 +13,7 @@
 -module(couch_replicator_utils).
 
 -export([
+    owner/2,
     replication_id/2,
     sum_stats/2,
     is_deleted/1,
@@ -34,6 +35,7 @@
 
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("mem3/include/mem3.hrl").
 -include("couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include_lib("public_key/include/public_key.hrl").
@@ -42,6 +44,16 @@
     get_value/2,
     get_value/3
 ]).
+
+-spec owner(Dbname :: binary(), DocId :: binary()) -> node().
+owner(<<"shards/", _/binary>> = ShardName, DocId) ->
+    DbName = mem3:dbname(ShardName),
+    Live = [node() | nodes()],
+    Shards = mem3:shards(DbName, DocId),
+    Nodes = [N || #shard{node = N} <- Shards, lists:member(N, Live)],
+    mem3:owner(DbName, DocId, Nodes);
+owner(_ShardName, _DocId) ->
+    node().
 
 rep_error_to_binary(Error) ->
     couch_util:to_binary(error_reason(Error)).

@@ -178,13 +178,13 @@ health_threshold() ->
         ?DEFAULT_HEALTH_THRESHOLD_SEC
     ).
 
--spec find_jobs_by_dbname(binary()) -> list(#rep{}).
+-spec find_jobs_by_dbname(binary()) -> list(rep_id()).
 find_jobs_by_dbname(DbName) ->
     Rep = #rep{db_name = DbName, _ = '_'},
     MatchSpec = #job{id = '$1', rep = Rep, _ = '_'},
     [RepId || [RepId] <- ets:match(?MODULE, MatchSpec)].
 
--spec find_jobs_by_doc(binary(), binary()) -> list(#rep{}).
+-spec find_jobs_by_doc(binary(), binary()) -> list(rep_id()).
 find_jobs_by_doc(DbName, DocId) ->
     Rep = #rep{db_name = DbName, doc_id = DocId, _ = '_'},
     MatchSpec = #job{id = '$1', rep = Rep, _ = '_'},

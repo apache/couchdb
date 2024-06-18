@@ -14,28 +14,11 @@ the list.
 
 A description of each child:
 
- * `couch_replication_event`: Starts a gen_event publication bus to handle some
-    replication related events. This used for example, to publish cluster
-    membership changes by the `couch_replicator_clustering` process. But is
-    also used in replication tests to monitor for replication events.
+ * `couch_replication_event`: Starts a gen_event publication bus to publish
+    replication related events. This used to wait for replication jobs in
+    couch_replicator and in tests to monitor for replication events.
     Notification is performed via the `couch_replicator_notifier:notify/1`
-    function. It's the first (left-most) child because
-    `couch_replicator_clustering` uses it.
-
- * `couch_replicator_clustering`: This module maintains cluster membership
-    information for the replication application and provides functions to check
-    ownership of replication jobs. A cluster membership change is published via
-    the `gen_event` event server named `couch_replication_event` as previously
-    covered. Published events are `{cluster, stable}` when cluster membership
-    has stabilized, that it, no node membership changes in a given period, and
-    `{cluster, unstable}` which indicates there was a recent change to the
-    cluster membership and now it's considered unstable. Listeners for cluster
-    membership change include `couch_replicator_doc_processor` and
-    `couch_replicator_db_changes`. When doc processor gets an `{cluster,
-    stable}` event it will remove all the replication jobs not belonging to the
-    current node. When `couch_replicator_db_changes` gets a `{cluster,
-    stable}` event, it will restart the `couch_multidb_changes` process it
-    controls, which will launch an new scan of all the replicator databases.
+    function.
 
   * `couch_replicator_connection`: Maintains a global replication connection
     pool. It allows reusing connections across replication tasks. The main
@@ -273,8 +256,5 @@ A description of each child:
         of replications running, having each one checking their filter often is
         not a good idea.
 
- * `couch_replicator_db_changes`: This process specializes and configures
-   `couch_multidb_changes` so that it looks for `_replicator` suffixed shards
-   and makes sure to restart it when node membership changes.
 
 
