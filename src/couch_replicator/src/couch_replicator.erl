@@ -179,19 +179,15 @@ restart_job(JobId0) ->
 -spec active_doc(binary(), binary()) -> {ok, {[_]}} | {error, not_found}.
 active_doc(DbName, DocId) ->
     try
-        Shards = mem3:shards(DbName),
-        Live = [node() | nodes()],
-        Nodes = lists:usort([
-            N
-         || #shard{node = N} <- Shards,
-            lists:member(N, Live)
-        ]),
-        Owner = mem3:owner(DbName, DocId, Nodes),
+        Owner = couch_replicator_utils:owner(DbName, DocId),
         case active_doc_rpc(DbName, DocId, [Owner]) of
             {ok, DocInfo} ->
                 {ok, DocInfo};
             {error, not_found} ->
-                active_doc_rpc(DbName, DocId, Nodes -- [Owner])
+                Shards = mem3:shards(DbName, DocId),
+                Live = [node() | nodes()] -- [Owner],
+                Nodes = [N || #shard{node = N} <- Shards, lists:member(N, Live)],
+                active_doc_rpc(DbName, DocId, Nodes)
         end
     catch
         % Might be a local database

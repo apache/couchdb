@@ -19,7 +19,6 @@
         couch_replicator_rate_limiter,
         couch_replicator_connection,
         couch_replication,  % couch_replication_event gen_event
-        couch_replicator_clustering,
         couch_replicator_scheduler,
         couch_replicator_doc_processor
     ]},

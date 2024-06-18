@@ -31,16 +31,10 @@ init(_Args) ->
             shutdown => 1000,
             modules => [pg]
         },
-        worker(couch_replicator_clustering),
         worker(couch_replicator_connection),
         worker(couch_replicator_rate_limiter),
         worker(couch_replicator_scheduler),
-        worker(couch_replicator_doc_processor),
-        #{
-            id => couch_replicator_db_changes,
-            start => {couch_replicator_db_changes, start_link, []},
-            modules => [couch_multidb_changes]
-        }
+        worker(couch_replicator_doc_processor)
     ],
     SupFlags = #{strategy => rest_for_one, intensity => 10, period => 1},
     {ok, {SupFlags, Children}}.
