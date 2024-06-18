@@ -91,10 +91,8 @@ handle_info({'DOWN', IndexerRef, process, _Pid, Reason}, State) ->
             true = ets:delete(?BY_REF, IndexerRef),
             [{_, Index, Queue0}] = ets:lookup(?BY_DBSIG, DbSig),
             {{value, From}, Queue1} = queue:out(Queue0),
-            case Reason of
-                ok ->
-                    gen_server:reply(From, ok);
-                {error, Msg} ->
+            if
+                Reason /= ok ->
                     couch_log:error(
                         "~p: db:~s ddoc:~s index:~s failed with: ~p",
                         [
@@ -102,11 +100,13 @@ handle_info({'DOWN', IndexerRef, process, _Pid, Reason}, State) ->
                             mem3:dbname(Index#index.dbname),
                             Index#index.ddoc_id,
                             Index#index.name,
-                            Msg
+                            Reason
                         ]
-                    ),
-                    gen_server:reply(From, {error, Msg})
+                    );
+                true ->
+                    ok
             end,
+            gen_server:reply(From, Reason),
             case queue:is_empty(Queue1) of
                 true ->
                     true = ets:delete(?BY_DBSIG, DbSig);
