@@ -56,28 +56,8 @@ public final class IndexManager implements Managed {
 
     private class LRUMap extends LinkedHashMap<String, IndexHolder> {
 
-        private int capacity;
-
         private LRUMap(final int capacity) {
             super(capacity, 0.75f, true);
-            this.capacity = capacity;
-        }
-
-        @Override
-        protected boolean removeEldestEntry(final java.util.Map.Entry<String, IndexHolder> eldest) {
-            if (size() > capacity) {
-                schedulerExecutorService.execute(() -> {
-                    try {
-                        unload(eldest.getKey(), false);
-                    } catch (final InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        LOGGER.warn("Interrupted while evicting eldest entry {}", eldest.getKey(), e);
-                    } catch (final IOException e) {
-                        LOGGER.warn("I/O exception while evicting eldest entry {}", eldest.getKey(), e);
-                    }
-                });
-            }
-            return false;
         }
     }
 
@@ -124,11 +104,14 @@ public final class IndexManager implements Managed {
 
     public <R> R with(final String name, final IndexFunction<Index, R> indexFun)
             throws IOException, InterruptedException {
+        evictIfOverCapacity();
+
         retry:
         while (true) {
             if (!exists(name)) {
                 throw new WebApplicationException("Index does not exist", Status.NOT_FOUND);
             }
+
             final IndexHolder holder;
             synchronized (cache) {
                 holder = cache.computeIfAbsent(name, (k) -> new IndexHolder());
@@ -169,6 +152,19 @@ public final class IndexManager implements Managed {
             } finally {
                 holder.lock.readLock().unlock();
             }
+        }
+    }
+
+    private void evictIfOverCapacity() throws IOException, InterruptedException {
+        while (true) {
+            final String candidate;
+            synchronized (cache) {
+                if (cache.size() <= maxIndexesOpen) {
+                    return;
+                }
+                candidate = cache.entrySet().iterator().next().getKey();
+            }
+            unload(candidate, false);
         }
     }
 
