@@ -25,7 +25,8 @@
     command,
     port,
     timeout = 5000,
-    idle
+    idle,
+    log_level
 }).
 
 start_link(Command) ->
@@ -52,7 +53,6 @@ prompt(Pid, Data) ->
 
 readline(#os_proc{} = OsProc) ->
     Res = readline(OsProc, []),
-    couch_io_logger:log_input(Res),
     Res.
 readline(#os_proc{port = Port} = OsProc, Acc) ->
     receive
@@ -73,12 +73,13 @@ readline(#os_proc{port = Port} = OsProc, Acc) ->
             throw({os_process_error, Err})
     after OsProc#os_proc.timeout ->
         catch port_close(Port),
+        log(OsProc, "OS Process ~p Timed out :: ~p msec", [Port, OsProc#os_proc.timeout]),
         throw({os_process_error, "OS process timed out."})
     end.
 
 readjson(OsProc) when is_record(OsProc, os_proc) ->
     Line = iolist_to_binary(readline(OsProc)),
-    couch_log:debug("OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
+    log(OsProc, "OS Process ~p Output :: ~s", [OsProc#os_proc.port, Line]),
     try
         % Don't actually parse the whole JSON. Just try to see if it's
         % a command or a doc map/reduce/filter/show/list/update output.
@@ -129,23 +130,26 @@ pick_command1(_) ->
 
 % gen_server API
 init([Command]) ->
-    couch_io_logger:start(os:getenv("COUCHDB_IO_LOG_DIR")),
     PrivDir = couch_util:priv_dir(),
     Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     V = config:get("query_server_config", "os_process_idle_limit", "300"),
     IdleLimit = list_to_integer(V) * 1000,
+    LogLevel = log_level(os:getenv("COUCHDB_IO_LOG_LEVEL")),
     T0 = erlang:monotonic_time(),
     OsProc = #os_proc{
         command = Command,
         port = open_port({spawn, Spawnkiller ++ " " ++ Command}, ?PORT_OPTIONS),
-        idle = IdleLimit
+        idle = IdleLimit,
+        log_level = LogLevel
     },
     KillCmd = iolist_to_binary(readline(OsProc)),
     T1 = erlang:monotonic_time(),
     DtUSec = erlang:convert_time_unit(T1 - T0, native, microsecond),
     bump_time_stat(spawn_proc, DtUSec),
     Pid = self(),
-    couch_log:debug("OS Process Start :: ~p", [OsProc#os_proc.port]),
+    [CmdLog | _] = string:split(Command, " "),
+    CmdLog1 = filename:basename(CmdLog),
+    log(OsProc, "OS Process ~p Started :: ~p", [OsProc#os_proc.port, CmdLog1]),
     couch_stats:increment_counter([couchdb, query_server, process_starts]),
     spawn(fun() ->
         % this ensure the real os process is killed when this process dies.
@@ -154,14 +158,9 @@ init([Command]) ->
     end),
     {ok, OsProc, IdleLimit}.
 
-terminate(Reason, #os_proc{port = Port}) ->
+terminate(Reason, #os_proc{port = Port} = OsProc) ->
     catch port_close(Port),
-    case Reason of
-        normal ->
-            couch_io_logger:stop_noerror();
-        Error ->
-            couch_io_logger:stop_error(Error)
-    end,
+    log(OsProc, "OS Process ~p Terminated :: ~p", [Port, Reason]),
     ok.
 
 handle_call({set_timeout, TimeOut}, _From, #os_proc{idle = Idle} = OsProc) ->
@@ -170,8 +169,7 @@ handle_call({prompt, Data}, _From, #os_proc{idle = Idle} = OsProc) ->
     try
         couch_stats:increment_counter([couchdb, query_server, process_prompts]),
         JsonData = ?JSON_ENCODE(Data),
-        couch_log:debug("OS Process ~p Input  :: ~s", [OsProc#os_proc.port, JsonData]),
-        couch_io_logger:log_output(JsonData),
+        log(OsProc, "OS Process ~p Input :: ~s", [OsProc#os_proc.port, JsonData]),
         T0 = erlang:monotonic_time(),
         true = port_command(OsProc#os_proc.port, [JsonData, $\n]),
         Response = readjson(OsProc),
@@ -215,7 +213,7 @@ handle_info({Port, {exit_status, Status}}, #os_proc{port = Port} = OsProc) ->
     couch_stats:increment_counter([couchdb, query_server, process_error_exits]),
     {stop, {exit_status, Status}, OsProc};
 handle_info(Msg, #os_proc{idle = Idle} = OsProc) ->
-    couch_log:debug("OS Proc: Unknown info: ~p", [Msg]),
+    log(OsProc, "OS Process ~p Unknown info :: ~p", [OsProc#os_proc.port, Msg]),
     {noreply, OsProc, Idle}.
 
 killer(KillCmd) ->
@@ -253,3 +251,19 @@ bump_cmd_time_stat(Cmd, USec) when is_list(Cmd), is_integer(USec) ->
 bump_time_stat(Stat, USec) when is_atom(Stat), is_integer(USec) ->
     couch_stats:increment_counter([couchdb, query_server, calls, Stat]),
     couch_stats:increment_counter([couchdb, query_server, time, Stat], USec).
+
+log_level("debug") ->
+    debug;
+log_level("info") ->
+    info;
+log_level("notice") ->
+    notice;
+log_level("warning") ->
+    warning;
+log_level("error") ->
+    error;
+log_level(_) ->
+    debug.
+
+log(#os_proc{log_level = LogLevel}, Fmt, Args) ->
+    couch_log:LogLevel(Fmt, Args).
