@@ -18,7 +18,6 @@ CD "%ROOTDIR%"
 
 SET /P START_ERL= < releases\start_erl.data
 FOR /F "tokens=1" %%G IN ("%START_ERL%") DO SET ERTS_VSN=%%G
-FOR /F "tokens=2" %%G IN ("%START_ERL%") DO SET APP_VSN=%%G
 
 set BINDIR=%ROOTDIR%/erts-%ERTS_VSN%/bin
 set EMU=beam
@@ -29,9 +28,9 @@ IF NOT DEFINED COUCHDB_QUERY_SERVER_JAVASCRIPT SET COUCHDB_QUERY_SERVER_JAVASCRI
 IF NOT DEFINED COUCHDB_QUERY_SERVER_COFFEESCRIPT SET COUCHDB_QUERY_SERVER_COFFEESCRIPT={{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js
 IF NOT DEFINED COUCHDB_FAUXTON_DOCROOT SET COUCHDB_FAUXTON_DOCROOT={{fauxton_root}}
 
-"%BINDIR%\erl" -boot "%ROOTDIR%\releases\%APP_VSN%\couchdb" ^
+"%BINDIR%\erl" -boot "%ROOTDIR%\releases\couchdb" ^
 -args_file "%ROOTDIR%\etc\vm.args" ^
 -epmd "%BINDIR%\epmd.exe" ^
--config "%ROOTDIR%\releases\%APP_VSN%\sys.config" %*
+-config "%ROOTDIR%\releases\sys.config" %*
 
 :: EXIT /B
