@@ -121,8 +121,9 @@ var DDoc = (function() {
 function handleError(e) {
     if (e === null) {
       // internal error, another possibility when out of memory
-      // nothing to do except rethrow and let main.c catch it and exit(1)
-      throw(null);
+      // we tell the client it was a fatal error by dying
+      respond(["error", "internal_error", null]);
+      return false;
     }
     const type = e[0];
     if (type == "fatal") {
