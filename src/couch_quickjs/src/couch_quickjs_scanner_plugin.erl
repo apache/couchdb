@@ -43,9 +43,8 @@
     max_shards = 4,
     max_docs = 1000,
     max_step = 1000,
-    % These match defaults in couch_mrview_updater
-    max_batch_items = 100,
-    max_batch_size = 16777216
+    max_batch_items = 50,
+    max_batch_size = 8388608
 }).
 
 % DDoc fields
@@ -131,37 +130,17 @@ doc_id(#st{doc_cnt = C} = St, _DocId, _Db) ->
     {ok, St#st{doc_cnt = C + 1}}.
 
 doc(#st{} = St, Db, #doc{id = DocId} = Doc) ->
-    #st{
-        sid = SId,
-        ddocs = DDocs,
-        docs = Docs,
-        docs_size = DocsSize,
-        max_batch_items = MaxItems,
-        max_batch_size = MaxSize
-    } = St,
+    #st{sid = SId} = St,
     JsonDoc = couch_query_servers:json_doc(Doc),
-    DDocFun = fun(DDocId, #{} = DDoc) ->
-        try
-            Filters = maps:get(?FILTERS, DDoc, undefined),
-            filter_doc_validate(St, DDocId, Filters, JsonDoc),
-            VDU = maps:get(?VDU, DDoc, undefined),
-            vdu_doc_validate(St, DDocId, VDU, JsonDoc)
-        catch
-            throw:{validate, Error} ->
-                Meta = #{sid => SId, db => Db, ddoc => DDocId, doc => DocId},
-                ?WARN("doc validation failed ~p", [Error], Meta)
-        end
-    end,
-    maps:foreach(DDocFun, DDocs),
-    DocsSize1 = DocsSize + ?term_size(JsonDoc),
-    case DocsSize1 < MaxSize andalso length(Docs) < MaxItems of
-        true ->
-            St1 = St#st{docs = [JsonDoc | Docs], docs_size = DocsSize1},
-            {ok, St1};
-        false ->
-            {_Db, St1} = maps:fold(fun views_validate/3, {Db, St}, DDocs),
-            St2 = St1#st{docs = [], docs_size = 0},
-            {ok, St2}
+    try
+        St1 = maybe_reset_and_teach_ddocs(St),
+        process_doc_filter_and_vdu(St1, Db, DocId, JsonDoc),
+        process_doc_views(St1, Db, JsonDoc)
+    catch
+        Tag:Err:Stack ->
+            Meta = #{sid => SId, db => Db, doc => DocId},
+            ?ERR("doc validation exception ~p:~p:~p", [Tag, Err, Stack], Meta),
+            {ok, St}
     end.
 
 db_closing(#st{docs = []} = St, _Db) ->
@@ -197,23 +176,67 @@ process_ddoc(#st{} = St, DbName, #doc{} = DDoc0) ->
                 views_load(St1, maps:get(?VIEWS, DDoc, undefined)),
                 filters_load(St1, maps:get(?FILTERS, DDoc, undefined)),
                 vdu_load(St1, maps:get(?VDU, DDoc, undefined)),
-                reset_procs(St1),
-                teach_ddoc_validate(St1, DDocId, DDoc),
-                St1#st{ddocs = DDocs#{DDocId => DDoc}}
+                St2 = start_or_reset_procs(St1),
+                teach_ddoc_validate(St2, DDocId, DDoc),
+                St2#st{ddocs = DDocs#{DDocId => DDoc}}
             catch
                 throw:{validate, Error} ->
                     Meta = #{sid => SId, db => DbName, ddoc => DDocId},
                     ?WARN("ddoc validation failed ~p", [Error], Meta),
-                    St1
+                    St1;
+                Tag:Err:Stack ->
+                    Meta = #{sid => SId, db => DbName, ddoc => DDocId},
+                    ?ERR("ddoc validation exception ~p:~p:~p", [Tag, Err, Stack], Meta)
             end;
         false ->
             St
     end.
 
+process_doc_filter_and_vdu(#st{} = St, Db, DocId, JsonDoc) ->
+    #st{sid = SId, ddocs = DDocs} = St,
+    DDocFun = fun(DDocId, #{} = DDoc) ->
+        try
+            Filters = maps:get(?FILTERS, DDoc, undefined),
+            filter_doc_validate(St, DDocId, Filters, JsonDoc),
+            VDU = maps:get(?VDU, DDoc, undefined),
+            vdu_doc_validate(St, DDocId, VDU, JsonDoc)
+        catch
+            throw:{validate, Error} ->
+                Meta = #{sid => SId, db => Db, ddoc => DDocId, doc => DocId},
+                ?WARN("doc validation failed ~p", [Error], Meta)
+        end
+    end,
+    try
+        maps:foreach(DDocFun, DDocs)
+    catch
+        Tag:Err:Stack ->
+            Meta = #{sid => SId, db => Db, doc => DocId},
+            ?ERR("Exception when validating doc ~p:~p:~p", [Tag, Err, Stack], Meta)
+    end.
+
+process_doc_views(#st{} = St, Db, JsonDoc) ->
+    #st{
+        ddocs = DDocs,
+        docs = Docs,
+        docs_size = DocsSize,
+        max_batch_items = MaxItems,
+        max_batch_size = MaxSize
+    } = St,
+    DocsSize1 = DocsSize + ?term_size(JsonDoc),
+    case DocsSize1 < MaxSize andalso length(Docs) < MaxItems of
+        true ->
+            St1 = St#st{docs = [JsonDoc | Docs], docs_size = DocsSize1},
+            {ok, St1};
+        false ->
+            {_Db, St1} = maps:fold(fun views_validate/3, {Db, St}, DDocs),
+            St2 = St1#st{docs = [], docs_size = 0},
+            {ok, St2}
+    end.
+
 views_validate(DDocId, #{?VIEWS := Views} = DDoc, {Db, #st{} = St0}) when
     map_size(Views) > 0
 ->
-    St = reset_procs(St0),
+    St = start_or_reset_procs(St0),
     #st{sid = SId, docs = Docs} = St,
     try
         lib_load(St, maps:get(?LIB, DDoc, undefined)),
@@ -226,6 +249,10 @@ views_validate(DDocId, #{?VIEWS := Views} = DDoc, {Db, #st{} = St0}) when
         throw:{validate, Error} ->
             Meta = #{sid => SId, db => Db, ddoc => DDocId},
             ?WARN("view validation failed ~p", [Error], Meta),
+            {Db, St};
+        Tag:Err:Stack ->
+            Meta = #{sid => SId, db => Db, ddoc => DDocId},
+            ?ERR("view validation exception ~p:~p:~p", [Tag, Err, Stack], Meta),
             {Db, St}
     end;
 views_validate(_DDocId, #{} = _DDoc, {Db, #st{} = St}) ->
@@ -235,8 +262,8 @@ views_validate(_DDocId, #{} = _DDoc, {Db, #st{} = St}) ->
 mapred_fold({Props = [_ | _]} = Doc, {ViewList = [_ | _], #st{} = St}) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
     DocId = couch_util:get_value(<<"_id">>, Props),
-    QjsMapRes = map_doc(Qjs, Doc),
     SmMapRes = map_doc(Sm, Doc),
+    QjsMapRes = map_doc(Qjs, Doc),
     case QjsMapRes == SmMapRes of
         true -> ok;
         false -> throw({validate, {map_doc, DocId, QjsMapRes, SmMapRes}})
@@ -252,8 +279,8 @@ mapred_fold({Props = [_ | _]} = Doc, {ViewList = [_ | _], #st{} = St}) ->
     {ViewList, St}.
 
 reset_per_db_state(#st{qjs_proc = QjsProc, sm_proc = SmProc} = St) ->
-    proc_stop(QjsProc),
     proc_stop(SmProc),
+    proc_stop(QjsProc),
     St#st{
         ddocs = #{},
         docs = [],
@@ -263,8 +290,8 @@ reset_per_db_state(#st{qjs_proc = QjsProc, sm_proc = SmProc} = St) ->
     }.
 
 start_or_reset_procs(#st{} = St) ->
-    St1 = start_or_reset_qjs_proc(St),
-    start_or_reset_sm_proc(St1).
+    St1 = start_or_reset_sm_proc(St),
+    start_or_reset_qjs_proc(St1).
 
 start_or_reset_qjs_proc(#st{qjs_proc = undefined} = St) ->
     Cmd = couch_quickjs:mainjs_cmd(),
@@ -277,6 +304,9 @@ start_or_reset_qjs_proc(#st{qjs_proc = #proc{} = Proc} = St) ->
         true = proc_reset(Proc),
         St
     catch
+        exit:{noproc, _} ->
+            proc_stop(Proc),
+            start_or_reset_qjs_proc(St#st{qjs_proc = undefined});
         Tag:Err ->
             ?WARN("failed to reset QuickJS proc ~p:~p", [Tag, Err]),
             proc_stop(Proc),
@@ -294,6 +324,9 @@ start_or_reset_sm_proc(#st{sm_proc = #proc{} = Proc} = St) ->
         true = proc_reset(Proc),
         St
     catch
+        exit:{noproc, _} ->
+            proc_stop(Proc),
+            start_or_reset_sm_proc(St#st{sm_proc = undefined});
         Tag:Err ->
             ?WARN("failed to reset Spidermonkey proc ~p:~p", [Tag, Err]),
             proc_stop(Proc),
@@ -303,8 +336,8 @@ start_or_reset_sm_proc(#st{sm_proc = #proc{} = Proc} = St) ->
 lib_load(#st{}, undefined) ->
     ok;
 lib_load(#st{qjs_proc = Qjs, sm_proc = Sm}, #{} = Lib) ->
-    QjsRes = add_lib(Qjs, Lib),
     SmRes = add_lib(Sm, Lib),
+    QjsRes = add_lib(Qjs, Lib),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {add_lib, QjsRes, SmRes}})
@@ -325,8 +358,8 @@ view_load(#st{} = St, Name, View) ->
 add_fun_load(#st{}, _, undefined) ->
     ok;
 add_fun_load(#st{qjs_proc = Qjs, sm_proc = Sm}, Name, Src) ->
-    QjsRes = add_fun(Qjs, Src),
     SmRes = add_fun(Sm, Src),
+    QjsRes = add_fun(Qjs, Src),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {add_fun, Name, QjsRes, SmRes}})
@@ -343,16 +376,16 @@ reduce_filter_map({{_Name, #{}}, _KVs}) ->
 view_reduce_validate(#st{} = St, ReduceKVs) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
     RedFun = fun({Name, RedSrc, KVs}) ->
-        QjsRedRes = reduce(Qjs, RedSrc, KVs),
         SmRedRes = reduce(Sm, RedSrc, KVs),
+        QjsRedRes = reduce(Qjs, RedSrc, KVs),
         case QjsRedRes == SmRedRes of
             true -> ok;
             false -> throw({validate, {reduce, Name, QjsRedRes, SmRedRes}})
         end,
         case QjsRedRes of
             [true, [_ | _] = RedVals] ->
-                QjsRRedRes = rereduce(Qjs, RedSrc, RedVals),
                 SmRRedRes = rereduce(Sm, RedSrc, RedVals),
+                QjsRRedRes = rereduce(Qjs, RedSrc, RedVals),
                 case QjsRRedRes == SmRRedRes of
                     true -> ok;
                     false -> throw({validate, {rereduce, Name, QjsRRedRes, SmRRedRes}})
@@ -370,8 +403,8 @@ filters_load(#st{} = St, #{} = Filters) ->
     maps:foreach(Fun, Filters).
 
 filter_load(#st{qjs_proc = Qjs, sm_proc = Sm}, Name, Filter) ->
-    QjsRes = add_fun(Qjs, Filter),
     SmRes = add_fun(Sm, Filter),
+    QjsRes = add_fun(Qjs, Filter),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {filter, Name, QjsRes, SmRes}})
@@ -382,8 +415,8 @@ filter_doc_validate(#st{}, _, undefined, _) ->
 filter_doc_validate(#st{} = St, DDocId, #{} = Filters, Doc) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
     Fun = fun(FName, _) ->
-        QjsRes = filter_doc(Qjs, DDocId, FName, Doc),
         SmRes = filter_doc(Sm, DDocId, FName, Doc),
+        QjsRes = filter_doc(Qjs, DDocId, FName, Doc),
         case QjsRes == SmRes of
             true -> ok;
             false -> throw({validate, {filter_doc, FName, QjsRes, SmRes}})
@@ -394,8 +427,8 @@ filter_doc_validate(#st{} = St, DDocId, #{} = Filters, Doc) ->
 vdu_load(#st{}, undefined) ->
     ok;
 vdu_load(#st{qjs_proc = Qjs, sm_proc = Sm}, VDU) ->
-    QjsRes = add_fun(Qjs, VDU),
     SmRes = add_fun(Sm, VDU),
+    QjsRes = add_fun(Qjs, VDU),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {vdu, QjsRes, SmRes}})
@@ -406,25 +439,46 @@ vdu_doc_validate(#st{}, _DDocId, undefined, _Doc) ->
     ok;
 vdu_doc_validate(#st{} = St, DDocId, _VDU, Doc) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
-    QjsRes = vdu_doc(Qjs, DDocId, Doc),
     SmRes = vdu_doc(Sm, DDocId, Doc),
+    QjsRes = vdu_doc(Qjs, DDocId, Doc),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {vdu_doc, QjsRes, SmRes}})
     end.
 
 teach_ddoc_validate(#st{qjs_proc = Qjs, sm_proc = Sm}, DDocId, DDoc) ->
-    QjsRes = teach_ddoc(Qjs, DDocId, DDoc),
     SmRes = teach_ddoc(Sm, DDocId, DDoc),
+    QjsRes = teach_ddoc(Qjs, DDocId, DDoc),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {teach_ddoc, DDocId, QjsRes, SmRes}})
     end.
 
-reset_procs(#st{qjs_proc = #proc{} = QjsProc, sm_proc = #proc{} = SmProc} = St) ->
-    true = proc_reset(QjsProc),
-    true = proc_reset(SmProc),
-    St.
+% During view validation if a JS process crashes and exists the next filter and
+% vdu validation for the same db will fail as the "taught" design documents
+% will not be in loaded in the JS process ddoc cache. To make sure we continue
+% validating, try to restart the process and reload all the ddocs.
+%
+maybe_reset_and_teach_ddocs(#st{ddocs = DDocs} = St) ->
+    St1 =
+        case is_proc_alive(St#st.sm_proc) of
+            true ->
+                St;
+            false ->
+                StSm = start_or_reset_sm_proc(St),
+                FunSm = fun(DDocId, DDoc) -> teach_ddoc(StSm#st.sm_proc, DDocId, DDoc) end,
+                maps:foreach(FunSm, DDocs),
+                StSm
+        end,
+    case is_proc_alive(St#st.qjs_proc) of
+        true ->
+            St1;
+        false ->
+            StQjs = start_or_reset_qjs_proc(St1),
+            FunQjs = fun(DDocId, DDoc) -> teach_ddoc(StQjs#st.qjs_proc, DDocId, DDoc) end,
+            maps:foreach(FunQjs, DDocs),
+            StQjs
+    end.
 
 % Proc commands
 
@@ -449,17 +503,19 @@ add_fun(#proc{} = Proc, <<_/binary>> = FunSrc) ->
     prompt(Proc, [<<"add_fun">>, FunSrc]).
 
 filter_doc(#proc{} = Proc, DDocId, FName, {[_ | _]} = Doc) ->
-    prompt(Proc, [<<"ddoc">>, DDocId, [<<"filters">>, FName], [[Doc], #{}]]).
+    % Add a mock request object so param access doesn't throw a TypeError
+    MockReq = #{<<"query">> => #{}},
+    prompt(Proc, [<<"ddoc">>, DDocId, [<<"filters">>, FName], [[Doc], MockReq]]).
 
 vdu_doc(#proc{} = Proc, DDocId, {[_ | _]} = Doc) ->
     prompt(Proc, [<<"ddoc">>, DDocId, [<<"validate_doc_update">>], [Doc, Doc]]).
 
 teach_ddoc(#proc{} = Proc, DDocId, DDoc) ->
-    true = prompt(Proc, [<<"ddoc">>, <<"new">>, DDocId, DDoc]).
+    prompt(Proc, [<<"ddoc">>, <<"new">>, DDocId, DDoc]).
 
 proc_reset(#proc{} = Proc) ->
     Timeout = config:get_integer("couchdb", "os_process_timeout", 5000),
-    Cfg = [{<<"reduce_limit">>, true}, {<<"timeout">>, Timeout}],
+    Cfg = [{<<"timeout">>, Timeout}],
     Result = prompt(Proc, [<<"reset">>, {Cfg}]),
     proc_set_timeout(Proc, Timeout),
     Result.
@@ -467,6 +523,9 @@ proc_reset(#proc{} = Proc) ->
 % End proc commands
 
 % Proc utils
+
+is_proc_alive(#proc{pid = Pid}) ->
+    is_process_alive(Pid).
 
 proc(Pid) ->
     #proc{
