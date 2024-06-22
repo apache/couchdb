@@ -373,7 +373,6 @@ static JSContext* new_cx(const couch_args* args) {
     BAIL("Could not create JSRuntime");
   }
 
-  JS_SetMemoryLimit(rt, args->stack_size);
   JS_SetMaxStackSize(rt, args->stack_size);
 
   cx = JS_NewContextRaw(rt);
@@ -501,4 +500,3 @@ int main(int argc, const char* argv[])
 
     return EXIT_SUCCESS;
 }
-
