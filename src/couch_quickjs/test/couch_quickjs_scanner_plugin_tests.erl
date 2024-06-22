@@ -53,6 +53,7 @@ setup() ->
     ok = add_doc(DbName, ?DOC4, #{a => w}),
     ok = add_doc(DbName, ?DOC5, #{a => u}),
     config:set(atom_to_list(?PLUGIN), "max_batch_items", "1", false),
+    reset_stats(),
     {Ctx, DbName}.
 
 teardown({Ctx, DbName}) ->
@@ -260,6 +261,22 @@ t_empty_ddoc({_, DbName}) ->
             ok
     end.
 
+reset_stats() ->
+    Counters = [
+        [couchdb, query_server, process_error_exits],
+        [couchdb, query_server, process_errors],
+        [couchdb, query_server, process_exits]
+    ],
+    [reset_counter(C) || C <- Counters].
+
+reset_counter(Counter) ->
+    case couch_stats:sample(Counter) of
+        0 ->
+            ok;
+        N when is_integer(N), N > 0 ->
+            couch_stats:decrement_counter(Counter, N)
+    end.
+
 config_delete_section(Section) ->
     [config:delete(K, V, false) || {K, V} <- config:get(Section)].
 
@@ -306,6 +323,12 @@ ddoc_filter(Doc) ->
                 "   return true;\n"
                 " }\n"
                 "}"
+            >>,
+            f_use_req => <<
+                "function (doc, req) {\n"
+                "    if (doc.a == req.query.foo) {return true;} \n"
+                "    return false; \n"
+                "}\n"
             >>
         }
     }.
@@ -313,7 +336,7 @@ ddoc_filter(Doc) ->
 ddoc_view(Doc) ->
     Doc#{
         views => #{
-            v => #{
+            v1 => #{
                 map => <<
                     "function(doc) {\n"
                     "  if(doc.a == 'x') {\n"
@@ -342,6 +365,26 @@ ddoc_view(Doc) ->
                     " }\n"
                     "}"
                 >>
-            }
+            },
+            v_large_reduce => #{
+                map => <<
+                    "function(doc) {\n"
+                    "  if(doc.a == 'x') {\n"
+                    "    r = doc.a.search(/(x+)/); emit(r, RegExp.$1)\n"
+                    "  } else {\n"
+                    "    for(i=0;i<10000;i++) {emit(doc.a, doc.a)};\n"
+                    "  }\n"
+                    "}"
+                >>,
+                reduce => <<
+                    "function(ks, vs, rereduce) {\n"
+                    "  return {'ks1': ks, 'ks2': k2, 'vs1': v2, 'v2':v2};\n"
+                    "}"
+                >>
+            },
+            v_expr_fun1 => #{map => <<"(function(doc) {emit(1,2)})\n">>},
+            v_expr_fun2 => #{map => <<"(function(doc) {emit(3,4)});">>},
+            v_expr_fun3 => #{map => <<"y=9;\n(function(doc) {emit(5,y)})">>},
+            v_expr_fun4 => #{map => <<"x=10; function(doc) {emit(x,6)}\n">>}
         }
     }.
