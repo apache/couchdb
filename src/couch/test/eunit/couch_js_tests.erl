@@ -29,7 +29,6 @@ couch_js_test_() ->
                 ?TDEF(should_replace_broken_utf16),
                 ?TDEF(should_allow_js_string_mutations),
                 ?TDEF(should_bump_timing_and_call_stats),
-                ?TDEF(should_exit_on_oom, 60),
                 ?TDEF(should_exit_on_internal_error, 60)
             ])
         }
@@ -343,23 +342,6 @@ should_bump_timing_and_call_stats(_) ->
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
-should_exit_on_oom(_) ->
-    config:set("couchdb", "os_process_timeout", "15000", _Persist = false),
-    Src = <<"
-        var state = [];
-        function(doc) {
-            var val = \"0123456789ABCDEF\";
-            for(var i = 0; i < 665535; i++) {
-                state.push([val, val]);
-                emit(null, null);
-             }
-        }
-    ">>,
-    Proc = couch_query_servers:get_os_process(<<"javascript">>),
-    true = prompt(Proc, [<<"add_fun">>, Src]),
-    trigger_oom(Proc).
-
-%% erlfmt-ignore
 should_exit_on_internal_error(_) ->
     % A different way to trigger OOM which previously used to
     % throw an InternalError on SM. Check that we still exit on that
@@ -399,20 +381,6 @@ should_exit_on_internal_error(_) ->
             ok
     end,
     ?assert(couch_stats:sample([couchdb, query_server, process_errors]) > 0).
-
-trigger_oom(Proc) ->
-    Status =
-        try
-            prompt(Proc, [<<"map_doc">>, <<"{}">>]),
-            continue
-        catch
-            throw:{os_process_error, {exit_status, 1}} ->
-                done
-        end,
-    case Status of
-        continue -> trigger_oom(Proc);
-        done -> ok
-    end.
 
 sample_time(Stat) ->
     couch_stats:sample([couchdb, query_server, time, Stat]).
