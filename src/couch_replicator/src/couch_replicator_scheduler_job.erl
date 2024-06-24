@@ -106,7 +106,11 @@ start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
 stop(Pid) when is_pid(Pid) ->
     Ref = erlang:monitor(process, Pid),
     unlink(Pid),
-    ok = gen_server:stop(Pid, shutdown, infinity),
+    % In the rare case the job is already stopping as we try to stop it, it
+    % won't return ok but exit the calling process, usually the scheduler, so
+    % we guard against that. See:
+    %  www.erlang.org/doc/apps/stdlib/gen_server.html#stop/3
+    catch gen_server:stop(Pid, shutdown, infinity),
     receive
         {'DOWN', Ref, _, _, Reason} -> Reason
     end,
