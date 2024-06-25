@@ -98,7 +98,7 @@ handle_scheduler_req(
         {db_and_doc, Db, DocId} ->
             handle_scheduler_doc(Db, DocId, Req);
         {error, invalid} ->
-            throw(bad_request)
+            throw({bad_request, <<"Invalid path">>})
     end;
 handle_scheduler_req(#httpd{method = 'GET'} = Req) ->
     send_json(Req, 404, {[{error, <<"not found">>}]});
@@ -168,8 +168,12 @@ parse_unquoted_docs_path([_, _ | _] = Unquoted) ->
         [?REPDB] ->
             {db_only, filename:join(BeforeRDb ++ [?REPDB])};
         [?REPDB, DocId] ->
-            {db_and_doc, filename:join(BeforeRDb ++ [?REPDB]), DocId}
-    end.
+            {db_and_doc, filename:join(BeforeRDb ++ [?REPDB]), DocId};
+        [_ | _] ->
+            {error, invalid}
+    end;
+parse_unquoted_docs_path(Path) when is_list(Path) ->
+    {error, invalid}.
 
 -ifdef(TEST).
 
@@ -184,7 +188,10 @@ unquoted_scheduler_docs_path_test_() ->
             {{db_only, <<"a/b/_replicator">>}, [<<"a">>, <<"b">>, ?REPDB]},
             {{db_and_doc, <<"_replicator">>, <<"x">>}, [?REPDB, <<"x">>]},
             {{db_and_doc, <<"a/_replicator">>, <<"x">>}, [<<"a">>, ?REPDB, <<"x">>]},
-            {{error, invalid}, [<<"a/_replicator">>, <<"x">>]}
+            {{error, invalid}, [<<"a/_replicator">>, <<"x">>]},
+            {{error, invalid}, [<<"foo">>]},
+            {{error, invalid}, [<<"a">>, <<"b">>, ?REPDB, <<"z">>, <<"w">>]},
+            {{error, invalid}, [?REPDB, <<"z">>, <<"w">>]}
         ]
     ].
 
