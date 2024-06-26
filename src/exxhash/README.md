@@ -19,8 +19,10 @@ exxhash:xxhash128(Binary)
 Updating
 ===
 
-xxHash was vendored from https://cyan4973.github.io/xxHash/
+xxHash was originally vendored from https://cyan4973.github.io/xxHash/
 with commit SHA f4bef929aa854e9f52a303c5e58fd52855a0ecfa
+
+Updated on 2024-06-26 from commit SHA 805c00b68fa754200ada0c207ffeaa7a4409377c
 
 Only these two files are used from the original library:
   `c_src/xxhash.h`
