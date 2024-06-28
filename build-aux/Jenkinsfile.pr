@@ -20,7 +20,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-./configure --enable-nouveau --enable-clouseau --js-engine=${JS_ENGINE}
+./configure --with-nouveau --with-clouseau --js-engine=${JS_ENGINE}
 make check || (make build-report && false)
 '''
 
@@ -218,7 +218,7 @@ pipeline {
       steps {
         sh '''
           rm -rf apache-couchdb-*
-          ./configure --spidermonkey-version 78 --enable-nouveau --enable-clouseau
+          ./configure --spidermonkey-version 78 --with-nouveau --with-clouseau
           make dist
           chmod -R a+w * .
         '''
