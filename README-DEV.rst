@@ -154,7 +154,7 @@ Configure the source by running::
 
 If you intend to run the test suites with Clouseau::
 
-    ./configure --enable-clouseau
+    ./configure --with-clouseau
 
 If you don't want to build Fauxton or documentation specify
 ``--disable-fauxton`` and/or ``--disable-docs`` arguments for ``configure`` to

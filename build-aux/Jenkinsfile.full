@@ -26,40 +26,40 @@ meta = [
   'centos8': [
     name: 'CentOS 8',
     spidermonkey_vsn: '60',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
   'centos9': [
     name: 'CentOS 9',
     spidermonkey_vsn: '78',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
   ],
 
   'focal': [
     name: 'Ubuntu 20.04',
     spidermonkey_vsn: '68',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
   'jammy': [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
   'bullseye-ppc64': [
     name: 'Debian 11 POWER',
     spidermonkey_vsn: '78',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 'ppc64le'
   ],
@@ -67,7 +67,7 @@ meta = [
   'bullseye-s390x': [
     name: 'Debian 11 s390x',
     spidermonkey_vsn: '78',
-    enable_nouveau: true,
+    with_nouveau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
     node_label: 's390x'
   ],
@@ -75,24 +75,24 @@ meta = [
   'bullseye': [
     name: 'Debian 11',
     spidermonkey_vsn: '78',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
   'bookworm': [
     name: 'Debian 12',
     spidermonkey_vsn: '78',
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
   'bookworm-quickjs': [
     name: 'Debian 12 with QuickJS',
     disable_spidermonkey: true,
-    enable_nouveau: true,
-    enable_clouseau: true,
+    with_nouveau: true,
+    with_clouseau: true,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
@@ -100,7 +100,7 @@ meta = [
   // 'freebsd-x86_64': [
   //    name: 'FreeBSD x86_64',
   //    spidermonkey_vsn: '91',
-  //    enable_clouseau: false,
+  //    with_clouseau: false,
   //    gnu_make: 'gmake'
   // ],
 
@@ -109,15 +109,15 @@ meta = [
   'freebsd-arm64': [
      name: 'FreeBSD ARM64 QuickJS',
      disable_spidermonkey: true,
-     enable_clouseau: false,
+     with_clouseau: false,
      gnu_make: 'gmake'
   ],
 
  'macos': [
     name: 'macOS',
     spidermonkey_vsn: '91',
-    enable_nouveau: false,
-    enable_clouseau: true,
+    with_nouveau: false,
+    with_clouseau: true,
     gnu_make: 'make'
   ]
 ]
@@ -128,11 +128,11 @@ def String configure(config) {
   } else {
       result = "./configure --skip-deps --spidermonkey-version ${config.spidermonkey_vsn}"
   }
-  if (config.enable_nouveau) {
-    result += " --enable-nouveau"
+  if (config.with_nouveau) {
+    result += " --with-nouveau"
   }
-  if (config.enable_clouseau) {
-    result += " --enable-clouseau"
+  if (config.with_clouseau) {
+    result += " --with-clouseau"
   }
   return result
 }
@@ -319,7 +319,7 @@ pipeline {
       steps {
         timeout(time: 15, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-          sh "./configure --spidermonkey-version 78 --enable-nouveau"
+          sh "./configure --spidermonkey-version 78 --with-nouveau"
           sh 'make dist'
         }
       }
