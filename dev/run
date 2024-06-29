@@ -93,7 +93,7 @@ def main():
         if ctx["cmd"]:
             run_command(ctx, ctx["cmd"])
         else:
-            join(ctx, cluster_port(ctx, ctx["node_number_seed"]), *ctx["admin"])
+            join(ctx, cluster_port(ctx, ctx["node_number_seed"]), *ctx["admin"], os.path.join(ctx["devdir"], "logs"))
 
 
 def setup():
@@ -1176,9 +1176,10 @@ def create_system_databases(host, port):
     "Developers cluster is set up at http://127.0.0.1:{lead_port}.\n"
     "Admin username: {user}\n"
     "Password: {password}\n"
+    "Logs: {log_dir}\n"
     "Time to hack!"
 )
-def join(ctx, lead_port, user, password):
+def join(ctx, lead_port, user, password, log_dir):
     while True:
         for proc in ctx["procs"]:
             if proc is not None and proc.returncode is not None:
