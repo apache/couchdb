@@ -93,7 +93,12 @@ def main():
         if ctx["cmd"]:
             run_command(ctx, ctx["cmd"])
         else:
-            join(ctx, cluster_port(ctx, ctx["node_number_seed"]), *ctx["admin"], os.path.join(ctx["devdir"], "logs"))
+            join(
+                ctx,
+                cluster_port(ctx, ctx["node_number_seed"]),
+                *ctx["admin"],
+                os.path.join(ctx["devdir"], "logs"),
+            )
 
 
 def setup():
