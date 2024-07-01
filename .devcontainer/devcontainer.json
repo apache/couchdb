@@ -23,7 +23,7 @@
     // Your code will live inside the volume created for the container under /workspace.
     "workspaceMount": "target=/workspaces/couchdb,type=volume",
     "workspaceFolder": "/workspaces/couchdb",
-    "postCreateCommand": "./configure --enable-nouveau --enable-clouseau && make",
+    "postCreateCommand": "./configure --with-nouveau --with-clouseau && make",
 
     "customizations": {
         "vscode": {

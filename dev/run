@@ -603,9 +603,9 @@ log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
 @log("Start Clouseau node clouseau{idx}")
 def boot_clouseau(ctx, idx):
     configure_cmd = (
-        "&.\\configure.ps1 -EnableClouseau"
+        "&.\\configure.ps1 -WithClouseau"
         if platform.system() == "Windows"
-        else "./configure --enable-clouseau"
+        else "./configure --with-clouseau"
     )
     clouseau_dir = ctx["clouseau_dir"]
 

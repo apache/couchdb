@@ -8,8 +8,8 @@
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
   -DisableSpiderMonkey       do not use SpiderMonkey as JS engine (default false)
-  -EnableNouveau             enable the new experiemtal search module (default false)
-  -EnableClouseau            enable the Clouseau search module (default false)
+  -WithNouveau               build the new experiemtal search module (default false)
+  -WithClouseau              build the Clouseau search module (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
@@ -50,8 +50,8 @@ Param(
     [switch]$Test = $false,
     [switch]$DisableFauxton = $false, # do not build Fauxton
     [switch]$DisableDocs = $false, # do not build any documentation or manpages
-    [switch]$EnableNouveau = $false, # dont use new search module by default
-    [switch]$EnableClouseau = $false, # do not use Clouseau by default
+    [switch]$WithNouveau = $false, # dont use new search module by default
+    [switch]$WithClouseau = $false, # do not use Clouseau by default
     [switch]$SkipDeps = $false, # do not update erlang dependencies
     [switch]$DisableProper = $false, # a compilation pragma. proper is a kind of automated test suite
     [switch]$DisableSpiderMonkey = $false, # do not use SpiderMonkey as JS engine
@@ -145,8 +145,6 @@ $InstallDir="$LibDir\couchdb"
 $LogFile="$LogDir\couch.log"
 $BuildFauxton = [int](-not $DisableFauxton)
 $BuildDocs = [int](-not $DisableDocs)
-$WithNouveau = ($EnableNouveau).ToString().ToLower()
-$WithClouseau = $(If ($EnableClouseau) {1} else {0})
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 $WithProper = (-not $DisableProper).ToString().ToLower()
 $ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
@@ -182,7 +180,6 @@ $CouchDBConfig = @"
 {prefix, "."}.
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
-{nouveau_enable, "$WithNouveau"}.
 {nouveau_index_dir, "./data/nouveau"}.
 {nouveau_url, "http://127.0.0.1:5987"}.
 {nouveau_port, 5987}.
@@ -310,7 +307,7 @@ if ((Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue) -eq $null)
 
 $ClouseauDir = "$rootdir\clouseau"
 
-if ($EnableClouseau)
+if ($WithClouseau)
 {
 
     if (Test-Path $ClouseauDir) {
