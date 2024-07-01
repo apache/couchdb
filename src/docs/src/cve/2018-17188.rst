@@ -28,7 +28,7 @@ Description
 ===========
 
 Prior to CouchDB version 2.3.0, CouchDB allowed for runtime-configuration of key
-components of the database. In some cases, this lead to vulnerabilities where
+components of the database. In some cases, this led to vulnerabilities where
 CouchDB admin users could access the underlying operating system as the CouchDB
 user. Together with other vulnerabilities, it allowed full system entry for
 unauthenticated users.
