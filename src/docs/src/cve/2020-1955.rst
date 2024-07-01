@@ -38,7 +38,7 @@ The new `require_valid_user_except_for_up` is an off-by-default setting
 that was meant to allow requiring valid credentials for all endpoints
 except for the `/_up` endpoint.
 
-However, the implementation of this made an error that lead to not
+However, the implementation of this made an error that led to not
 enforcing credentials on any endpoint, when enabled.
 
 CouchDB versions :ref:`3.0.1 <release/3.0.1>` and :ref:`3.1.0
