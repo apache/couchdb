@@ -50,12 +50,16 @@
 -include("config.hrl").
 
 -record(config, {
-    ini_files = undefined,
-    write_filename = undefined
+    % Mix of *.ini files and *.d dirs
+    ini_files_dirs,
+    % Just *.ini files: original *.ini + expanded *.d dirs
+    ini_files,
+    % The file we write config values to
+    write_filename
 }).
 
-start_link(IniFiles) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, IniFiles, []).
+start_link(IniFilesDirs) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, IniFilesDirs, []).
 
 stop() ->
     gen_server:cast(?MODULE, stop).
@@ -245,22 +249,23 @@ listen_for_changes(CallbackModule, InitialState) ->
 subscribe_for_changes(Subscription) ->
     config_notifier:subscribe(Subscription).
 
-init(IniFiles) ->
+init(IniFilesDirs) ->
     enable_early_features(),
     ets:new(?MODULE, [named_table, set, protected, {read_concurrency, true}]),
+    IniFiles = expand_dirs(IniFilesDirs),
     maps:foreach(
         fun(K, V) ->
             true = ets:insert(?MODULE, {K, V})
         end,
         ini_map(IniFiles)
     ),
-    WriteFile =
-        case IniFiles of
-            [_ | _] -> lists:last(IniFiles);
-            _ -> undefined
-        end,
     debug_config(),
-    {ok, #config{ini_files = IniFiles, write_filename = WriteFile}}.
+    Config = #config{
+        ini_files_dirs = IniFilesDirs,
+        ini_files = IniFiles,
+        write_filename = get_write_file(IniFiles)
+    },
+    {ok, Config}.
 
 handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),
@@ -330,9 +335,11 @@ handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
         Else ->
             {reply, Else, Config}
     end;
-handle_call(reload, _From, Config) ->
+handle_call(reload, _From, #config{} = Config) ->
+    #config{ini_files_dirs = IniFilesDirs} = Config,
+    IniFiles = expand_dirs(IniFilesDirs),
     % Update ets with ini values.
-    IniMap = ini_map(Config#config.ini_files),
+    IniMap = ini_map(IniFiles),
     maps:foreach(
         fun({Sec, Key} = K, V) ->
             VExisting = get(Sec, Key, V),
@@ -368,7 +375,11 @@ handle_call(reload, _From, Config) ->
         nil,
         ?MODULE
     ),
-    {reply, ok, Config}.
+    Config1 = Config#config{
+        ini_files = IniFiles,
+        write_filename = get_write_file(IniFiles)
+    },
+    {reply, ok, Config1}.
 
 handle_cast(stop, State) ->
     {stop, normal, State};
@@ -453,6 +464,25 @@ read_ini_file(IniFile) ->
             Msg = list_to_binary(io_lib:format(Fmt, [IniFilename])),
             couch_log:error("~s~n", [Msg]),
             throw({startup_error, Msg})
+    end.
+
+get_write_file([_ | _] = IniFiles) ->
+    lists:last(IniFiles);
+get_write_file(_) ->
+    undefined.
+
+% Takes a list of files and directories with *.ini files, and expands
+% the directories inline with individual *.ini files
+expand_dirs(IniFilesDirs) ->
+    lists:flatmap(fun expand_dirs_fmap/1, IniFilesDirs).
+
+expand_dirs_fmap(File) ->
+    case filelib:is_dir(File) of
+        true ->
+            Fun = fun(IniFile) -> filename:join(File, IniFile) end,
+            lists:map(Fun, lists:sort(filelib:wildcard("*.ini", File)));
+        false ->
+            [File]
     end.
 
 remove_comments(Line) ->
