@@ -22,14 +22,13 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    config_sup:start_link(get_ini_files()).
+    config_sup:start_link(get_ini_files_dirs()).
 
 stop(_State) ->
     ok.
 
-get_ini_files() ->
-    IniFiles = hd([L || L <- [command_line(), env(), default()], L =/= skip]),
-    lists:flatmap(fun expand_dirs/1, IniFiles).
+get_ini_files_dirs() ->
+    hd([L || L <- [command_line(), env(), default()], L =/= skip]).
 
 env() ->
     case application:get_env(config, ini_files) of
@@ -56,11 +55,3 @@ default() ->
         filename:join(Etc, "local.d")
     ],
     lists:filter(fun filelib:is_file/1, Default).
-
-expand_dirs(File) ->
-    case filelib:is_dir(File) of
-        true ->
-            lists:sort(filelib:wildcard(File ++ "/*.ini"));
-        false ->
-            [File]
-    end.

@@ -55,6 +55,8 @@
     FileName
 end).
 
+-define(TEMP_CONFIG_DIR, "temp_config.d").
+
 setup() ->
     setup(?CONFIG_CHAIN).
 
@@ -112,21 +114,33 @@ handle_config_terminate(Self, Reason, {Pid, State}) ->
     ok.
 
 setup_ini() ->
-    Chain = [write_ini(F) || F <- ["default.ini", "local.ini"]],
+    Chain = [write_ini(F) || F <- ["default.ini", "local.ini", ?TEMP_CONFIG_DIR]],
     {Chain, setup(Chain)}.
 
 teardown_ini({Chain, Apps}) ->
-    lists:foreach(
-        fun(Path) -> ok = file:delete(Path) end,
-        Chain
-    ),
+    lists:foreach(fun delete_ini/1, Chain),
     teardown(Apps).
 
-write_ini(FileName) ->
-    Path = filename:join([?TEMPDIR, FileName]),
-    Data = io_lib:format("[section]\nfile = ~s\n", [FileName]),
-    ok = file:write_file(Path, Data),
-    Path.
+write_ini(FileOrDir) ->
+    case filename:extension(FileOrDir) of
+        ".ini" ->
+            Path = filename:join([?TEMPDIR, FileOrDir]),
+            Data = io_lib:format("[section]\nfile = ~s\n", [FileOrDir]),
+            ok = file:write_file(Path, Data),
+            Path;
+        ".d" ->
+            Path = filename:join([?TEMPDIR, FileOrDir]),
+            ok = filelib:ensure_path(Path),
+            Path
+    end.
+
+delete_ini(FileOrDir) ->
+    case filename:extension(FileOrDir) of
+        ".ini" ->
+            ok = file:delete(FileOrDir);
+        ".d" ->
+            ok = file:del_dir_r(FileOrDir)
+    end.
 
 config_delete_reload_restart_test_() ->
     {
@@ -137,6 +151,17 @@ config_delete_reload_restart_test_() ->
         [
             fun non_persistent_set_delete_reload_restart/0,
             fun persistent_set_delete_reload_restart/0
+        ]
+    }.
+
+config_reload_find_new_init_files_test_() ->
+    {
+        "Reload should find newly added .ini file in .d dirs",
+        foreach,
+        fun setup_ini/0,
+        fun teardown_ini/1,
+        [
+            fun reload_finds_new_ini_file/0
         ]
     }.
 
@@ -773,6 +798,20 @@ non_persistent_set_delete_reload_restart() ->
     % Avoid race with config loading .ini files
     wait_config_get("section", "file", "local.ini"),
     ?assertEqual("local.ini", config:get("section", "file")).
+
+reload_finds_new_ini_file() ->
+    config:set("foo", "bar", "baz"),
+    ?assertEqual(ok, config:reload()),
+    ?assertEqual("baz", config:get("foo", "bar")),
+    DirPath = filename:join([?TEMPDIR, ?TEMP_CONFIG_DIR]),
+    ?assert(filelib:is_dir(DirPath)),
+    IniPath = filename:join(DirPath, "10-extra.ini"),
+    ok = file:write_file(IniPath, "[foo]\nbar = zab\n"),
+    ?assertEqual(ok, config:reload()),
+    wait_config_get("foo", "bar", "zab"),
+    config:set("foo", "bar", "zag"),
+    % 10-extra.ini is also the file we write to
+    ?assertEqual({ok, <<"[foo]\nbar = zag\n">>}, file:read_file(IniPath)).
 
 wait_config_get(Sec, Key, Val) ->
     test_util:wait(
