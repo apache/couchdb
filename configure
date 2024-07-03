@@ -49,9 +49,6 @@ ARCH="$(uname -m)"
 ERLANG_VER="$(run_erlang 'io:put_chars(erlang:system_info(otp_release)).')"
 ERLANG_OS="$(run_erlang 'case os:type() of {OS, _} -> io:format("~s~n", [OS]) end.')"
 
-. ${rootdir}/version.mk
-COUCHDB_VERSION=${vsn_major}.${vsn_minor}.${vsn_patch}
-
 display_help () {
     cat << EOF
 Usage: $basename [OPTION]
