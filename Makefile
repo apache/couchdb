@@ -409,11 +409,11 @@ release: all
 	@cp bin/weatherreport rel/couchdb/bin/weatherreport
 
 ifeq ($(with_spidermonkey), true)
-	@mkdir rel/couchdb/server
+	@mkdir -p rel/couchdb/share/server
 	@cp src/couch/priv/couchjs rel/couchdb/bin/couchjs
-	@cp share/server/main.js rel/couchdb/server/main.js
-	@cp share/server/main-ast-bypass.js rel/couchdb/server/main-ast-bypass.js
-	@cp share/server/main-coffee.js rel/couchdb/server/main-coffee.js
+	@cp share/server/main.js rel/couchdb/share/server/main.js
+	@cp share/server/main-ast-bypass.js rel/couchdb/share/server/main-ast-bypass.js
+	@cp share/server/main-coffee.js rel/couchdb/share/server/main-coffee.js
 endif
 
 ifeq ($(with_fauxton), 1)

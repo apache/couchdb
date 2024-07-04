@@ -368,11 +368,11 @@ release: all
 	-@rmdir /s/q rel\couchdb >NUL 2>&1 || true
 	@$(REBAR) generate
 ifeq ($(with_spidermonkey), true)
-	@mkdir rel\couchdb\server
+	@mkdir rel\couchdb\share\server
 	@copy src\couch\priv\couchjs.exe rel\couchdb\bin\couchjs.exe
-	@copy share\server\main.js rel\couchdb\server\main.js
-	@copy share\server\main-ast-bypass.js rel\couchdb\server\main-ast-bypass.js
-	@copy share\server\main-coffee.js rel\couchdb\server\main-coffee.js
+	@copy share\server\main.js rel\couchdb\share\server\main.js
+	@copy share\server\main-ast-bypass.js rel\couchdb\share\server\main-ast-bypass.js
+	@copy share\server\main-coffee.js rel\couchdb\share\server\main-coffee.js
 endif
 
 ifeq ($(with_fauxton), 1)
