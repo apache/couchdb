@@ -172,8 +172,9 @@ process_ddoc(#st{} = St, DbName, #doc{} = DDoc0) ->
         true ->
             St1 = start_or_reset_procs(St),
             try
-                lib_load(St1, maps:get(?LIB, DDoc, undefined)),
-                views_load(St1, maps:get(?VIEWS, DDoc, undefined)),
+                Views = maps:get(?VIEWS, DDoc, undefined),
+                lib_load(St1, Views),
+                views_load(St1, valid_views(Views)),
                 filters_load(St1, maps:get(?FILTERS, DDoc, undefined)),
                 vdu_load(St1, maps:get(?VDU, DDoc, undefined)),
                 St2 = start_or_reset_procs(St1),
@@ -182,11 +183,12 @@ process_ddoc(#st{} = St, DbName, #doc{} = DDoc0) ->
             catch
                 throw:{validate, Error} ->
                     Meta = #{sid => SId, db => DbName, ddoc => DDocId},
-                    ?WARN("ddoc validation failed ~p", [Error], Meta),
+                    validation_warning("ddoc validation failed ~p", Error, Meta),
                     St1;
                 Tag:Err:Stack ->
                     Meta = #{sid => SId, db => DbName, ddoc => DDocId},
-                    ?ERR("ddoc validation exception ~p:~p:~p", [Tag, Err, Stack], Meta)
+                    ?ERR("ddoc validation exception ~p:~p:~p", [Tag, Err, Stack], Meta),
+                    St1
             end;
         false ->
             St
@@ -203,7 +205,7 @@ process_doc_filter_and_vdu(#st{} = St, Db, DocId, JsonDoc) ->
         catch
             throw:{validate, Error} ->
                 Meta = #{sid => SId, db => Db, ddoc => DDocId, doc => DocId},
-                ?WARN("doc validation failed ~p", [Error], Meta)
+                validation_warning("doc validation failed ~p", Error, Meta)
         end
     end,
     try
@@ -233,14 +235,14 @@ process_doc_views(#st{} = St, Db, JsonDoc) ->
             {ok, St2}
     end.
 
-views_validate(DDocId, #{?VIEWS := Views} = DDoc, {Db, #st{} = St0}) when
+views_validate(DDocId, #{?VIEWS := Views}, {Db, #st{} = St0}) when
     map_size(Views) > 0
 ->
     St = start_or_reset_procs(St0),
     #st{sid = SId, docs = Docs} = St,
     try
-        lib_load(St, maps:get(?LIB, DDoc, undefined)),
-        ViewList = lists:sort(maps:to_list(Views)),
+        lib_load(St, Views),
+        ViewList = lists:sort(maps:to_list(valid_views(Views))),
         Fun = fun({Name, #{?MAP := Src}}) -> add_fun_load(St, Name, Src) end,
         lists:foreach(Fun, ViewList),
         {[_ | _], St1 = #st{}} = lists:foldl(fun mapred_fold/2, {ViewList, St}, Docs),
@@ -248,7 +250,7 @@ views_validate(DDocId, #{?VIEWS := Views} = DDoc, {Db, #st{} = St0}) when
     catch
         throw:{validate, Error} ->
             Meta = #{sid => SId, db => Db, ddoc => DDocId},
-            ?WARN("view validation failed ~p", [Error], Meta),
+            validation_warning("view validation failed ~p", Error, Meta),
             {Db, St};
         Tag:Err:Stack ->
             Meta = #{sid => SId, db => Db, ddoc => DDocId},
@@ -333,21 +335,36 @@ start_or_reset_sm_proc(#st{sm_proc = #proc{} = Proc} = St) ->
             start_or_reset_sm_proc(St#st{sm_proc = undefined})
     end.
 
-lib_load(#st{}, undefined) ->
-    ok;
-lib_load(#st{qjs_proc = Qjs, sm_proc = Sm}, #{} = Lib) ->
-    SmRes = add_lib(Sm, Lib),
-    QjsRes = add_lib(Qjs, Lib),
-    case QjsRes == SmRes of
-        true -> ok;
-        false -> throw({validate, {add_lib, QjsRes, SmRes}})
-    end.
+valid_views(#{} = Views) ->
+    Fun = fun
+        (?LIB, _) -> false;
+        (<<_/binary>>, #{?MAP := <<_/binary>>}) -> true;
+        (_, _) -> false
+    end,
+    maps:filter(Fun, Views);
+valid_views(_) ->
+    #{}.
 
-views_load(#st{}, undefined) ->
-    ok;
+lib_load(#st{qjs_proc = Qjs, sm_proc = Sm}, #{} = Views) ->
+    case maps:get(?LIB, Views, undefined) of
+        Lib when is_map(Lib) andalso map_size(Lib) > 0 ->
+            SmRes = add_lib(Sm, Lib),
+            QjsRes = add_lib(Qjs, Lib),
+            case QjsRes == SmRes of
+                true -> ok;
+                false -> throw({validate, {add_lib, QjsRes, SmRes}})
+            end;
+        _ ->
+            ok
+    end;
+lib_load(#st{}, _) ->
+    ok.
+
 views_load(#st{} = St, #{} = Views) ->
     Fun = fun(Name, #{} = View) -> view_load(St, Name, View) end,
-    maps:foreach(Fun, Views).
+    maps:foreach(Fun, Views);
+views_load(#st{}, _) ->
+    ok.
 
 view_load(#st{} = St, Name, View) ->
     #{?MAP := MapSrc} = View,
@@ -355,15 +372,15 @@ view_load(#st{} = St, Name, View) ->
     RedSrc = maps:get(?REDUCE, View, undefined),
     add_fun_load(St, Name, RedSrc).
 
-add_fun_load(#st{}, _, undefined) ->
-    ok;
-add_fun_load(#st{qjs_proc = Qjs, sm_proc = Sm}, Name, Src) ->
+add_fun_load(#st{qjs_proc = Qjs, sm_proc = Sm}, Name, <<_/binary>> = Src) ->
     SmRes = add_fun(Sm, Src),
     QjsRes = add_fun(Qjs, Src),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {add_fun, Name, QjsRes, SmRes}})
-    end.
+    end;
+add_fun_load(#st{}, _, _) ->
+    ok.
 
 reduce_filter_map({{_Name, #{?REDUCE := <<"_", _/binary>>}}, _KVs}) ->
     % Likely built-in view
@@ -396,11 +413,11 @@ view_reduce_validate(#st{} = St, ReduceKVs) ->
     end,
     lists:foreach(RedFun, ReduceKVs).
 
-filters_load(#st{}, undefined) ->
-    ok;
 filters_load(#st{} = St, #{} = Filters) ->
     Fun = fun(Name, Filter) -> filter_load(St, Name, Filter) end,
-    maps:foreach(Fun, Filters).
+    maps:foreach(Fun, Filters);
+filters_load(#st{}, _) ->
+    ok.
 
 filter_load(#st{qjs_proc = Qjs, sm_proc = Sm}, Name, Filter) ->
     SmRes = add_fun(Sm, Filter),
@@ -410,8 +427,6 @@ filter_load(#st{qjs_proc = Qjs, sm_proc = Sm}, Name, Filter) ->
         false -> throw({validate, {filter, Name, QjsRes, SmRes}})
     end.
 
-filter_doc_validate(#st{}, _, undefined, _) ->
-    ok;
 filter_doc_validate(#st{} = St, DDocId, #{} = Filters, Doc) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
     Fun = fun(FName, _) ->
@@ -422,29 +437,30 @@ filter_doc_validate(#st{} = St, DDocId, #{} = Filters, Doc) ->
             false -> throw({validate, {filter_doc, FName, QjsRes, SmRes}})
         end
     end,
-    maps:foreach(Fun, Filters).
+    maps:foreach(Fun, Filters);
+filter_doc_validate(#st{}, _, _, _) ->
+    ok.
 
-vdu_load(#st{}, undefined) ->
-    ok;
-vdu_load(#st{qjs_proc = Qjs, sm_proc = Sm}, VDU) ->
+vdu_load(#st{qjs_proc = Qjs, sm_proc = Sm}, <<_/binary>> = VDU) ->
     SmRes = add_fun(Sm, VDU),
     QjsRes = add_fun(Qjs, VDU),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {vdu, QjsRes, SmRes}})
-    end.
+    end;
+vdu_load(#st{}, _) ->
+    ok.
 
-vdu_doc_validate(#st{}, _DDocId, undefined, _Doc) ->
-    % No VDU
-    ok;
-vdu_doc_validate(#st{} = St, DDocId, _VDU, Doc) ->
+vdu_doc_validate(#st{} = St, DDocId, _VDU = <<_/binary>>, Doc) ->
     #st{qjs_proc = Qjs, sm_proc = Sm} = St,
     SmRes = vdu_doc(Sm, DDocId, Doc),
     QjsRes = vdu_doc(Qjs, DDocId, Doc),
     case QjsRes == SmRes of
         true -> ok;
         false -> throw({validate, {vdu_doc, QjsRes, SmRes}})
-    end.
+    end;
+vdu_doc_validate(#st{}, _DDocId, _VDU, _Doc) ->
+    ok.
 
 teach_ddoc_validate(#st{qjs_proc = Qjs, sm_proc = Sm}, DDocId, DDoc) ->
     SmRes = teach_ddoc(Sm, DDocId, DDoc),
@@ -480,6 +496,29 @@ maybe_reset_and_teach_ddocs(#st{ddocs = DDocs} = St) ->
             StQjs
     end.
 
+validation_warning(Fmt, Error, #{} = Meta) when is_list(Fmt), is_tuple(Error) ->
+    case expected_error(Error) of
+        true -> ok;
+        false -> ?WARN(Fmt, [Error], Meta)
+    end.
+
+% Malformed documents and functions will fail with different error messages
+% Eliminate some false positives to avoid polluting the logs with junk
+%
+expected_error({Op, QjsRes, SmRes}) when is_atom(Op) ->
+    expected_error(QjsRes, SmRes);
+expected_error({Op, _Name, QjsRes, SmRes}) when is_atom(Op) ->
+    expected_error(QjsRes, SmRes);
+expected_error(_) ->
+    false.
+
+expected_error({error, {_, compilation_error, _}}, {error, {_, compilation_error, _}}) ->
+    true;
+expected_error({error, {_, <<"TypeError">>, _}}, {error, {_, <<"TypeError">>, _}}) ->
+    true;
+expected_error(_, _) ->
+    false.
+
 % Proc commands
 
 add_lib(#proc{} = Proc, #{} = Lib) ->
@@ -494,13 +533,13 @@ reduce(#proc{} = Proc, <<_/binary>> = Src, KVs) ->
 rereduce(#proc{} = Proc, <<_/binary>> = Src, Vals) ->
     prompt(Proc, [<<"rereduce">>, [Src], Vals]).
 
-add_fun(#proc{}, undefined) ->
-    ok;
 add_fun(#proc{}, <<"_", _/binary>>) ->
     % Built-in reduce likely
     ok;
 add_fun(#proc{} = Proc, <<_/binary>> = FunSrc) ->
-    prompt(Proc, [<<"add_fun">>, FunSrc]).
+    prompt(Proc, [<<"add_fun">>, FunSrc]);
+add_fun(#proc{}, _) ->
+    ok.
 
 filter_doc(#proc{} = Proc, DDocId, FName, {[_ | _]} = Doc) ->
     % Add a mock request object so param access doesn't throw a TypeError
