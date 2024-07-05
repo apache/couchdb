@@ -60,6 +60,16 @@ defmodule CopyDocTest do
       Couch.request(
         :copy,
         "/#{db_name}/doc_to_be_copied2",
+        headers: [Destination: "_invalid_doc_id?rev=#{rev}"]
+      )
+
+    assert resp.status_code == 400
+    assert resp.body["reason"] == "Only reserved document ids may start with underscore."
+
+    resp =
+      Couch.request(
+        :copy,
+        "/#{db_name}/doc_to_be_copied2",
         headers: [Destination: "doc_to_be_overwritten?rev=#{rev}"]
       )
 
