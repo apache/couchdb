@@ -1200,6 +1200,7 @@ db_doc_req(#httpd{method = 'COPY', user_ctx = Ctx} = Req, Db, SourceDocId) ->
         end,
     {TargetDocId0, TargetRevs} = couch_httpd_db:parse_copy_destination_header(Req),
     TargetDocId = list_to_binary(chttpd:unquote(TargetDocId0)),
+    couch_db:validate_docid(Db, TargetDocId),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
