@@ -97,7 +97,7 @@ def main():
                 ctx,
                 cluster_port(ctx, ctx["node_number_seed"]),
                 *ctx["admin"],
-                os.path.join(ctx["devdir"], "logs"),
+                "./" + os.path.relpath(os.path.join(ctx["devdir"], "logs")),
             )
 
 
