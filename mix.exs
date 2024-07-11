@@ -93,7 +93,7 @@ defmodule CouchDBTest.Mixfile do
       {:jiffy, path: path("jiffy")},
       {:jwtf, path: path("jwtf")},
       {:ibrowse, path: path("ibrowse"), override: true},
-      {:credo, "~> 1.6.4", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "~> 1.7.7", only: [:dev, :test, :integration], runtime: false}
     ]
 
     # Some deps may be missing during source check
