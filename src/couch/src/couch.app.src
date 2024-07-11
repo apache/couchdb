@@ -48,7 +48,6 @@
         couch_event,
         ioq,
         couch_stats,
-        hyper,
         couch_dist,
         couch_quickjs
     ]},
