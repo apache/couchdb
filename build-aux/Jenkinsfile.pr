@@ -39,7 +39,7 @@ pipeline {
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
     // Parameters for the matrix build
-    DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bullseye-erlang'
+    DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
     // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
@@ -50,7 +50,7 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '25.3.2.12'
+    LOW_ERLANG_VER = '25.3.2.13'
   }
 
   options {
@@ -247,7 +247,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '25.3.2.12', '26.2.5'
+            values '25.3.2.13', '26.2.5.2'
           }
           axis {
             name 'SM_VSN'

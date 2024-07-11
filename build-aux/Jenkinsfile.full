@@ -14,11 +14,11 @@
 // the License.
 
 // Erlang version embedded in binary packages
-ERLANG_VERSION = '25.3.2.12'
+ERLANG_VERSION = '25.3.2.13'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '25.3.2.12'
+MINIMUM_ERLANG_VERSION = '25.3.2.13'
 
 // We create parallel build / test / package stages for each OS using the metadata
 // in this map. Adding a new OS should ideally only involve adding a new entry here.
@@ -55,25 +55,25 @@ meta = [
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
-  'bullseye-ppc64': [
-    name: 'Debian 11 POWER',
+  'bookworm-ppc64': [
+    name: 'Debian POWER',
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
     node_label: 'ppc64le'
   ],
 
-  'bullseye-s390x': [
-    name: 'Debian 11 s390x',
+  'bookworm-s390x': [
+    name: 'Debian s390x',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
     node_label: 's390x'
   ],
 
   'bullseye': [
-    name: 'Debian 11',
+    name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
@@ -81,7 +81,7 @@ meta = [
   ],
 
   'bookworm': [
-    name: 'Debian 12',
+    name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
