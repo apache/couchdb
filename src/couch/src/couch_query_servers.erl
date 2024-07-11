@@ -96,8 +96,8 @@ group_reductions_results(List) ->
     end.
 
 finalize(<<"_approx_count_distinct", _/binary>>, Reduction) ->
-    true = hyper:is_hyper(Reduction),
-    {ok, round(hyper:card(Reduction))};
+    true = couch_hyper:is_hyper(Reduction),
+    {ok, round(couch_hyper:card(Reduction))};
 finalize(<<"_stats", _/binary>>, Unpacked) ->
     {ok, pack_stats(Unpacked)};
 finalize(_RedSrc, Reduction) ->
@@ -377,13 +377,13 @@ get_number(Key, Props) ->
 approx_count_distinct(reduce, KVs) ->
     lists:foldl(
         fun([[Key, _Id], _Value], Filter) ->
-            hyper:insert(?term_to_bin(Key), Filter)
+            couch_hyper:insert(?term_to_bin(Key), Filter)
         end,
-        hyper:new(11),
+        couch_hyper:new(11),
         KVs
     );
 approx_count_distinct(rereduce, Reds) ->
-    hyper:union([Filter || [_, Filter] <- Reds]).
+    couch_hyper:union([Filter || [_, Filter] <- Reds]).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 -spec validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
