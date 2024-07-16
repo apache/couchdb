@@ -32,6 +32,8 @@
 
 -export([features/0, enable_feature/1, disable_feature/1, is_enabled/1]).
 
+-export([node_name/0, check_distribution_mode/0]).
+
 -export([listen_for_changes/2]).
 -export([subscribe_for_changes/1]).
 
@@ -41,6 +43,8 @@
 -export([is_sensitive/2]).
 
 -define(FEATURES, features).
+
+-define(NODE_NAME, node_name).
 
 -define(TIMEOUT, 30000).
 -define(INVALID_SECTION, <<"Invalid configuration section">>).
@@ -243,6 +247,40 @@ enable_early_features() ->
             ok
     end.
 
+% Use this function to return the configured node name. This name is guaranteed
+% to stay the same even during shutdown, for instance, when `node()` may start
+% returning `nonode@nohost` after the dist controller stops. Use in cases when
+% we intend to perist the name on disk, like the header epochs list.
+%
+node_name() ->
+    % '%not_configured' is an invalid node name, unlike 'undefined'
+    case persistent_term:get({?MODULE, ?NODE_NAME}, '$not_configured') of
+        '$not_configured' ->
+            Name = node(),
+            ok = persistent_term:put({?MODULE, ?NODE_NAME}, Name),
+            Name;
+        Name when is_atom(Name) ->
+            Name
+    end.
+
+check_distribution_mode() ->
+    HasNameArg = init:get_argument(name) =/= error,
+    HasSNameArg = init:get_argument(sname) =/= error,
+    case {HasNameArg orelse HasSNameArg, node_name()} of
+        {true, 'nonode@nohost'} ->
+            {error, unexpected_standalone_mode};
+        {true, Name} when is_atom(Name), Name =:= node() ->
+            % expected in distributed mode
+            ok;
+        {true, Name} when is_atom(Name), Name =/= node() ->
+            {error, unexpected_node_name_change};
+        {false, 'nonode@nohost'} ->
+            % expected standalone mode
+            ok;
+        {false, Name} when is_atom(Name), Name =/= 'nonode@nohost' ->
+            {error, unexpected_distributed_mode}
+    end.
+
 listen_for_changes(CallbackModule, InitialState) ->
     config_listener_mon:subscribe(CallbackModule, InitialState).
 
@@ -265,7 +303,17 @@ init(IniFilesDirs) ->
         ini_files = IniFiles,
         write_filename = get_write_file(IniFiles)
     },
-    {ok, Config}.
+    % This is one of the earliest calls from our
+    % applications. We both set and assert that we have the
+    % correct node name and distribution mode.
+    case check_distribution_mode() of
+        ok ->
+            {ok, Config};
+        {error, Msg} ->
+            erlang:display(Msg),
+            timer:sleep(500),
+            halt(1)
+    end.
 
 handle_call(all, _From, Config) ->
     Resp = lists:sort((ets:tab2list(?MODULE))),

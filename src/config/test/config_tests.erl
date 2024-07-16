@@ -813,6 +813,36 @@ reload_finds_new_ini_file() ->
     % 10-extra.ini is also the file we write to
     ?assertEqual({ok, <<"[foo]\nbar = zag\n">>}, file:read_file(IniPath)).
 
+node_name_test_() ->
+    {
+        foreach,
+        fun setup_node_name/0,
+        fun teardown_node_name/1,
+        [
+            ?TDEF_FE(t_node_name),
+            ?TDEF_FE(t_check_distributed_mode)
+        ]
+    }.
+
+setup_node_name() ->
+    persistent_term:erase({config, node_name}).
+
+teardown_node_name(_) ->
+    persistent_term:erase({config, node_name}).
+
+t_node_name(_) ->
+    ?assertEqual(not_there, persistent_term:get({config, node_name}, not_there)),
+    ?assertEqual(node(), config:node_name()),
+    ?assertEqual(node(), persistent_term:get({config, node_name})),
+    ?assertEqual(node(), config:node_name()).
+
+t_check_distributed_mode(_) ->
+    % We can't mock init so we do the best we can with standalone args
+    persistent_term:put({config, node_name}, 'nonode@nohost'),
+    ?assertEqual(ok, config:check_distribution_mode()),
+    persistent_term:put({config, node_name}, 'foo@127.0.0.1'),
+    ?assertEqual({error, unexpected_distributed_mode}, config:check_distribution_mode()).
+
 wait_config_get(Sec, Key, Val) ->
     test_util:wait(
         fun() ->
