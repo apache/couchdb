@@ -55,14 +55,16 @@ meta = [
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
-  'bookworm-ppc64': [
-    name: 'Debian POWER',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
-    node_label: 'ppc64le'
-  ],
+  // Not coming back after upgrade+reboot. Hopefully it needs
+  // a hard reboot, but until then let's skip to keep our CI green.
+  // 'bookworm-ppc64': [
+  //   name: 'Debian POWER',
+  //   spidermonkey_vsn: '78',
+  //   with_nouveau: true,
+  //   with_clouseau: true,
+  //   image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
+  //   node_label: 'ppc64le'
+  // ],
 
   'bookworm-s390x': [
     name: 'Debian s390x',
