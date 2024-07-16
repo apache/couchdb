@@ -100,7 +100,7 @@ def setup():
     opts, args = setup_argparse()
     ctx = setup_context(opts, args)
     setup_logging(ctx)
-    setup_dirs(ctx)
+    setup_log_dir(log_dir(ctx))
     check_beams(ctx)
     check_boot_script(ctx)
     setup_configs(ctx)
@@ -307,9 +307,13 @@ def setup_context(opts, args):
     }
 
 
-@log("Setup environment")
-def setup_dirs(ctx):
-    ensure_dir_exists(ctx["devdir"], "logs")
+@log("Setup log dir: {log_dir}")
+def setup_log_dir(log_dir):
+    ensure_dir_exists(log_dir)
+
+
+def log_dir(ctx):
+    return os.path.join(ctx["devdir"], "logs")
 
 
 def ensure_dir_exists(root, *segments):
@@ -525,7 +529,7 @@ def boot_haproxy(ctx):
         return
     config = os.path.join(ctx["devdir"], "lib", "haproxy.cfg")
     cmd = [ctx["haproxy"], "-f", config]
-    logfname = os.path.join(ctx["devdir"], "logs", "haproxy.log")
+    logfname = os.path.join(log_dir(ctx), "haproxy.log")
     log = open(logfname, "w")
     env = os.environ.copy()
     if "HAPROXY_PORT" not in env:
@@ -547,7 +551,7 @@ def boot_nouveau(ctx):
         "--args",
         f"server '{config}'",
     ]
-    logfname = os.path.join(ctx["devdir"], "logs", "nouveau.log")
+    logfname = os.path.join(log_dir(ctx), "nouveau.log")
     log = open(logfname, "w")
     return sp.Popen(
         cmd,
@@ -642,7 +646,7 @@ def boot_clouseau(ctx, idx):
                 "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
             )
 
-    logfname = os.path.join(ctx["devdir"], "logs", "clouseau{}.log".format(idx))
+    logfname = os.path.join(log_dir(ctx), "clouseau{}.log".format(idx))
     log = open(logfname, "w")
     separator = ";" if platform.system() == "Windows" else ":"
 
@@ -1015,7 +1019,7 @@ def boot_node(ctx, node):
         mode = "wb"
     else:
         mode = "r+b"
-    logfname = os.path.join(ctx["devdir"], "logs", "%s.log" % node)
+    logfname = os.path.join(log_dir(ctx), "%s.log" % node)
     log = open(logfname, mode)
     if "extra_args" in ctx and ctx["extra_args"]:
         cmd += ctx["extra_args"].split(" ")
