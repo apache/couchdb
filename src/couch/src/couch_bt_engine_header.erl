@@ -41,6 +41,8 @@
     compacted_seq/1
 ]).
 
+-include_lib("stdlib/include/assert.hrl").
+
 % This should be updated anytime a header change happens that requires more
 % than filling in new defaults.
 %
@@ -261,6 +263,7 @@ upgrade_uuid(#db_header{} = Header) ->
     end.
 
 upgrade_epochs(#db_header{} = Header) ->
+    Node = config:node_name(),
     NewEpochs =
         case Header#db_header.epochs of
             undefined ->
@@ -269,14 +272,16 @@ upgrade_epochs(#db_header{} = Header) ->
                 % was always an implicit assumption that a file was
                 % owned since eternity by the node it was on. This
                 % just codifies that assumption.
-                [{node(), 0}];
-            [{Node, _} | _] = Epochs0 when Node == node() ->
+                [{Node, 0}];
+            [{Node, S} | _] = Epochs0 ->
+                assert_monotonic_update_seq(Header, S),
                 % Current node is the current owner of this db
                 Epochs0;
-            Epochs1 ->
+            [{_OtherNode, S} | _] = Epochs1 ->
+                assert_monotonic_update_seq(Header, S),
                 % This node is taking over ownership of this db
                 % and marking the update sequence where it happened.
-                [{node(), Header#db_header.update_seq} | Epochs1]
+                [{Node, Header#db_header.update_seq} | Epochs1]
         end,
     % Its possible for a node to open a db and claim
     % ownership but never make a write to the db. This
@@ -284,6 +289,15 @@ upgrade_epochs(#db_header{} = Header) ->
     % changed the database.
     DedupedEpochs = remove_dup_epochs(NewEpochs),
     Header#db_header{epochs = DedupedEpochs}.
+
+assert_monotonic_update_seq(#db_header{update_seq = CurrentUpdateSeq}, LatestEpochSeq) ->
+    ?assert(
+        LatestEpochSeq =< CurrentUpdateSeq,
+        "Latest epoch seq " ++
+            integer_to_list(LatestEpochSeq) ++
+            " should not be higher than current update seq " ++
+            integer_to_list(CurrentUpdateSeq)
+    ).
 
 % This is slightly relying on the udpate_seq's being sorted
 % in epochs due to how we only ever push things onto the
@@ -435,6 +449,10 @@ upgrade_epochs_test() ->
     % Headers with epochs stay the same after upgrades
     NewNewHeader = upgrade(NowOwnedHeader),
     ?assertEqual(OwnedEpochs, epochs(NewNewHeader)),
+
+    % Assertion failure if we try to regress update seq
+    RegressedHeader = NowOwnedHeader#db_header{update_seq = 5},
+    ?assertError({assert, _}, upgrade(RegressedHeader)),
 
     % Getting a reset header maintains the epoch data
     ResetHeader = from(NewNewHeader),
