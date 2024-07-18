@@ -11,25 +11,14 @@
 % the License.
 
 -module(rexi).
--export([start/0, stop/0, restart/0]).
+
 -export([cast/2, cast/3, cast/4, kill/2, kill_all/1]).
--export([reply/1, sync_reply/1, sync_reply/2]).
+-export([reply/1]).
 -export([async_server_call/2, async_server_call/3]).
--export([stream_init/0, stream_init/1]).
 -export([stream_start/1, stream_cancel/1]).
--export([stream/1, stream/2, stream/3, stream_ack/1, stream_ack/2]).
--export([stream2/1, stream2/2, stream2/3, stream_last/1, stream_last/2]).
+-export([stream_ack/1]).
+-export([stream2/1, stream_last/1, stream_last/2]).
 -export([ping/0]).
-
-start() ->
-    application:start(rexi).
-
-stop() ->
-    application:stop(rexi).
-
-restart() ->
-    stop(),
-    start().
 
 %% @equiv cast(Node, self(), MFA)
 -spec cast(node(), {atom(), atom(), list()}) -> reference().
@@ -131,10 +120,6 @@ reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
     erlang:send(Caller, {Ref, Reply}).
 
-%% @equiv sync_reply(Reply, 300000)
-sync_reply(Reply) ->
-    sync_reply(Reply, 300000).
-
 %% @doc convenience function to reply to caller and wait for response.  Message
 %% is of the form {OriginalRef, {self(),reference()}, Reply}, which enables the
 %% original caller to respond back.
@@ -148,33 +133,6 @@ sync_reply(Reply, Timeout) ->
             Response
     after Timeout ->
         timeout
-    end.
-
-%% @equiv stream_init(300000)
-stream_init() ->
-    stream_init(300000).
-
-%% @doc Initialize an RPC stream that involves sending multiple
-%% messages back to the coordinator.
-%%
-%% This should be called by rexi workers. It blocks until the
-%% coordinator responds with whether this worker should proceed.
-%% This function will either return with `ok` or call
-%% `erlang:exit/1`.
--spec stream_init(pos_integer()) -> ok.
-stream_init(Timeout) ->
-    case sync_reply(rexi_STREAM_INIT, Timeout) of
-        rexi_STREAM_START ->
-            ok;
-        rexi_STREAM_CANCEL ->
-            exit(normal);
-        timeout ->
-            couch_stats:increment_counter(
-                [rexi, streams, timeout, init_stream]
-            ),
-            exit(timeout);
-        Else ->
-            exit({invalid_stream_message, Else})
     end.
 
 %% @doc Start a worker stream
@@ -197,38 +155,9 @@ stream_start({Pid, _Tag} = From) when is_pid(Pid) ->
 stream_cancel({Pid, _Tag} = From) when is_pid(Pid) ->
     gen_server:reply(From, rexi_STREAM_CANCEL).
 
-%% @equiv stream(Msg, 100, 300000)
-stream(Msg) ->
-    stream(Msg, 10, 300000).
-
-%% @equiv stream(Msg, Limit, 300000)
-stream(Msg, Limit) ->
-    stream(Msg, Limit, 300000).
-
-%% @doc convenience function to stream messages to caller while blocking when
-%% a specific number of messages are outstanding. Message is of the form
-%% {OriginalRef, self(), Reply}, which enables the original caller to ack.
--spec stream(any(), integer(), pos_integer() | infinity) -> any().
-stream(Msg, Limit, Timeout) ->
-    try maybe_wait(Limit, Timeout) of
-        {ok, Count} ->
-            put(rexi_unacked, Count + 1),
-            {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, {Ref, self(), Msg}),
-            ok
-    catch
-        throw:timeout ->
-            couch_stats:increment_counter([rexi, streams, timeout, stream]),
-            exit(timeout)
-    end.
-
 %% @equiv stream2(Msg, 5, 300000)
 stream2(Msg) ->
     Limit = config:get_integer("rexi", "stream_limit", 5),
-    stream2(Msg, Limit).
-
-%% @equiv stream2(Msg, Limit, 300000)
-stream2(Msg, Limit) ->
     stream2(Msg, Limit, 300000).
 
 %% @doc Stream a message back to the coordinator. It limits the
@@ -263,13 +192,9 @@ stream_last(Msg, Timeout) ->
     rexi:reply(Msg),
     ok.
 
-%% @equiv stream_ack(Client, 1)
+%% @doc Ack streamed messages
 stream_ack(Client) ->
     erlang:send(Client, {rexi_ack, 1}).
-
-%% @doc Ack streamed messages
-stream_ack(Client, N) ->
-    erlang:send(Client, {rexi_ack, N}).
 
 %% Sends a ping message to the coordinator. This is for long running
 %% operations on a node that could exceed the rexi timeout
@@ -297,6 +222,7 @@ init_stream(Timeout) ->
         rexi_STREAM_CANCEL ->
             exit(normal);
         timeout ->
+            couch_stats:increment_counter([rexi, streams, timeout, init_stream]),
             exit(timeout);
         Else ->
             exit({invalid_stream_message, Else})

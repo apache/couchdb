@@ -12,7 +12,7 @@
 
 -module(rexi_utils).
 
--export([server_id/1, server_pid/1, send/2, recv/6]).
+-export([server_pid/1, send/2, recv/6]).
 
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->

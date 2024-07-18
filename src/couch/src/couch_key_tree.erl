@@ -57,7 +57,6 @@
     get_full_key_paths/2,
     get_key_leafs/2,
     map/2,
-    map_leafs/2,
     mapfold/3,
     multi_merge/2,
     merge/2,
@@ -474,20 +473,6 @@ mapfold_simple(Fun, Acc, Pos, [{Key, Value, SubTree} | RestTree]) ->
     {SubTree2, Acc3} = mapfold_simple(Fun, Acc2, Pos + 1, SubTree),
     {RestTree2, Acc4} = mapfold_simple(Fun, Acc3, Pos, RestTree),
     {[{Key, Value2, SubTree2} | RestTree2], Acc4}.
-
-map_leafs(_Fun, []) ->
-    [];
-map_leafs(Fun, [{Pos, Tree} | Rest]) ->
-    [NewTree] = map_leafs_simple(Fun, Pos, [Tree]),
-    [{Pos, NewTree} | map_leafs(Fun, Rest)].
-
-map_leafs_simple(_Fun, _Pos, []) ->
-    [];
-map_leafs_simple(Fun, Pos, [{Key, Value, []} | RestTree]) ->
-    Value2 = Fun({Pos, Key}, Value),
-    [{Key, Value2, []} | map_leafs_simple(Fun, Pos, RestTree)];
-map_leafs_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
-    [{Key, Value, map_leafs_simple(Fun, Pos + 1, SubTree)} | map_leafs_simple(Fun, Pos, RestTree)].
 
 stem(Trees, Limit) ->
     try
