@@ -1681,7 +1681,7 @@ JSRuntime *JS_NewRuntime2(const JSMallocFunctions *mf, void *opaque)
     rt->stack_size = JS_DEFAULT_STACK_SIZE;
     JS_UpdateStackTop(rt);
 
-    rt->current_exception = JS_NULL;
+    rt->current_exception = JS_UNINITIALIZED;
 
     return rt;
  fail:
@@ -6398,13 +6398,13 @@ JSValue JS_GetException(JSContext *ctx)
     JSValue val;
     JSRuntime *rt = ctx->rt;
     val = rt->current_exception;
-    rt->current_exception = JS_NULL;
+    rt->current_exception = JS_UNINITIALIZED;
     return val;
 }
 
 JS_BOOL JS_HasException(JSContext *ctx)
 {
-    return !JS_IsNull(ctx->rt->current_exception);
+    return !JS_IsUninitialized(ctx->rt->current_exception);
 }
 
 static void dbuf_put_leb128(DynBuf *s, uint32_t v)
@@ -15321,7 +15321,7 @@ static int JS_IteratorClose(JSContext *ctx, JSValueConst enum_obj,
 
     if (is_exception_pending) {
         ex_obj = ctx->rt->current_exception;
-        ctx->rt->current_exception = JS_NULL;
+        ctx->rt->current_exception = JS_UNINITIALIZED;
         res = -1;
     } else {
         ex_obj = JS_UNDEFINED;
@@ -18674,7 +18674,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                     JS_IteratorClose(ctx, sp[-1], TRUE);
                 } else {
                     *sp++ = rt->current_exception;
-                    rt->current_exception = JS_NULL;
+                    rt->current_exception = JS_UNINITIALIZED;
                     pc = b->byte_code_buf + pos;
                     goto restart;
                 }
@@ -46165,8 +46165,10 @@ static JSValue js_proxy_get(JSContext *ctx, JSValueConst obj, JSAtom atom,
     if (JS_IsException(ret))
         return JS_EXCEPTION;
     res = JS_GetOwnPropertyInternal(ctx, &desc, JS_VALUE_GET_OBJ(s->target), atom);
-    if (res < 0)
+    if (res < 0) {
+        JS_FreeValue(ctx, ret);
         return JS_EXCEPTION;
+    }
     if (res) {
         if ((desc.flags & (JS_PROP_GETSET | JS_PROP_CONFIGURABLE | JS_PROP_WRITABLE)) == 0) {
             if (!js_same_value(ctx, desc.value, ret)) {
