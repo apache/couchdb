@@ -100,7 +100,7 @@ initialize_nodelist() ->
     DbName = mem3_sync:nodes_db(),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
-    insert_if_missing(Db, [node() | mem3_seeds:get_seeds()]),
+    insert_if_missing(Db, [config:node_name() | mem3_seeds:get_seeds()]),
     Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
     Seq.

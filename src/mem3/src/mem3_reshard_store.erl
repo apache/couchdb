@@ -213,7 +213,7 @@ job_from_ejson({Props}) ->
         job_state = binary_to_atom(JobState, utf8),
         split_state = binary_to_atom(SplitState, utf8),
         state_info = state_info_from_ejson(StateInfo),
-        node = node(),
+        node = config:node_name(),
         start_time = TStarted,
         update_time = TUpdated,
         source = mem3_reshard:shard_from_name(Source),
@@ -228,7 +228,7 @@ state_from_ejson(#state{} = State, {Props}) ->
     State#state{
         state = binary_to_atom(StateVal, utf8),
         state_info = state_info_from_ejson(StateInfo),
-        node = node(),
+        node = config:node_name(),
         update_time = TUpdated
     }.
 

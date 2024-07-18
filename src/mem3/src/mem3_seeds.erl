@@ -43,8 +43,8 @@ get_seeds() ->
             [];
         List ->
             Nodes = string:tokens(List, ","),
-            Seeds = [list_to_atom(Node) || Node <- Nodes] -- [node()],
-            mem3_util:rotate_list(node(), Seeds)
+            Seeds = [list_to_atom(Node) || Node <- Nodes] -- [config:node_name()],
+            mem3_util:rotate_list(config:node_name(), Seeds)
     end.
 
 get_status() ->
