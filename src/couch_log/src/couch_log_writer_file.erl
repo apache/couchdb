@@ -82,7 +82,7 @@ write(Entry, St) ->
     Args = [
         couch_log_util:level_to_string(Level),
         TimeStamp,
-        node(),
+        config:node_name(),
         Pid,
         MsgId
     ],

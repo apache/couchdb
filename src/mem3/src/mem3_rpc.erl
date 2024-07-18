@@ -116,7 +116,7 @@ load_checkpoint_rpc(DbName, SourceNode, SourceUUID, FilterHash) ->
                 {ok, Doc} ->
                     rexi:reply({ok, {NewId, Doc}});
                 {not_found, _} ->
-                    OldId = mem3_rep:make_local_id(SourceNode, node()),
+                    OldId = mem3_rep:make_local_id(SourceNode, config:node_name()),
                     case couch_db:open_doc(Db, OldId, []) of
                         {ok, Doc} ->
                             rexi:reply({ok, {NewId, Doc}});
@@ -134,7 +134,7 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
         {ok, Db} ->
             NewEntry = {
                 [
-                    {<<"target_node">>, atom_to_binary(node(), utf8)},
+                    {<<"target_node">>, atom_to_binary(config:node_name(), utf8)},
                     {<<"target_uuid">>, couch_db:get_uuid(Db)},
                     {<<"target_seq">>, couch_db:get_update_seq(Db)}
                 ] ++ NewEntry0

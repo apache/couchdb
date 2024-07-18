@@ -61,7 +61,7 @@ go(Source, Target) ->
     go(Source, Target, []).
 
 go(DbName, Node, Opts) when is_binary(DbName), is_atom(Node) ->
-    go(#shard{name = DbName, node = node()}, #shard{name = DbName, node = Node}, Opts);
+    go(#shard{name = DbName, node = config:node_name()}, #shard{name = DbName, node = Node}, Opts);
 go(#shard{} = Source0, #shard{} = Target0, Opts) ->
     Source = add_range(Source0),
     Target = add_range(Target0),
@@ -219,7 +219,7 @@ verify_purge_checkpoint(DbName, Props) ->
 find_source_seq(SrcDb, TgtNode, TgtUUIDPrefix, TgtSeq) ->
     case find_repl_doc(SrcDb, TgtUUIDPrefix) of
         {ok, TgtUUID, Doc} ->
-            SrcNode = atom_to_binary(node(), utf8),
+            SrcNode = atom_to_binary(config:node_name(), utf8),
             find_source_seq_int(Doc, SrcNode, TgtNode, TgtUUID, TgtSeq);
         {not_found, _} ->
             couch_log:warning(
@@ -497,7 +497,7 @@ calculate_start_seq(Db, FilterHash, #tgt{shard = TgtShard} = Tgt) ->
     {NewDocId, Doc} = mem3_rpc:load_checkpoint(
         Node,
         Name,
-        node(),
+        config:node_name(),
         UUID,
         FilterHash
     ),
@@ -731,7 +731,7 @@ update_locals(Target, Db, Seq) ->
     #tgt{shard = TgtShard, localid = Id, history = History} = Target,
     #shard{node = Node, name = Name} = TgtShard,
     NewEntry = [
-        {<<"source_node">>, atom_to_binary(node(), utf8)},
+        {<<"source_node">>, atom_to_binary(config:node_name(), utf8)},
         {<<"source_uuid">>, couch_db:get_uuid(Db)},
         {<<"source_seq">>, Seq},
         {<<"timestamp">>, list_to_binary(mem3_util:iso8601_timestamp())}

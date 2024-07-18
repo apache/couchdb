@@ -270,9 +270,9 @@ initial_sync() ->
 
 initial_sync(Live) ->
     sync_nodes_and_dbs(),
-    Acc = {node(), Live, []},
+    Acc = {config:node_name(), Live, []},
     {_, _, Shards} = mem3_shards:fold(fun initial_sync_fold/2, Acc),
-    submit_replication_tasks(node(), Live, Shards).
+    submit_replication_tasks(config:node_name(), Live, Shards).
 
 initial_sync_fold(#shard{dbname = Db} = Shard, {LocalNode, Live, AccShards}) ->
     case AccShards of

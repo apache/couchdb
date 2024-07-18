@@ -612,7 +612,7 @@ state_id() ->
 
 -spec job_id(#job{}) -> binary().
 job_id(#job{source = #shard{name = SourceName}}) ->
-    HashInput = [SourceName, atom_to_binary(node(), utf8)],
+    HashInput = [SourceName, atom_to_binary(config:node_name(), utf8)],
     IdHashList = couch_util:to_hex(crypto:hash(sha256, HashInput)),
     IdHash = iolist_to_binary(IdHashList),
     Prefix = iolist_to_binary(io_lib:format("~3..0B", [?JOB_ID_VERSION])),
@@ -646,7 +646,7 @@ target_ranges([Begin, End], Split) when
 
 -spec build_shard([non_neg_integer()], binary(), binary()) -> #shard{}.
 build_shard(Range, DbName, Suffix) ->
-    Shard = #shard{dbname = DbName, range = Range, node = node()},
+    Shard = #shard{dbname = DbName, range = Range, node = config:node_name()},
     mem3_util:name_shard(Shard, <<".", Suffix/binary>>).
 
 -spec running_jobs() -> [#job{}].

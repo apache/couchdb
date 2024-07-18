@@ -574,7 +574,7 @@ create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
     ok.
 
 mem3_rep_checkpoint_doc(SourceDb, TargetDb, Timestamp, Seq) ->
-    Node = atom_to_binary(node(), utf8),
+    Node = atom_to_binary(config:node_name(), utf8),
     SourceUUID = couch_db:get_uuid(SourceDb),
     TargetUUID = couch_db:get_uuid(TargetDb),
     History =

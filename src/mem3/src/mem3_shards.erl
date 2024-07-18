@@ -160,8 +160,9 @@ get(DbName, Node, Range) ->
 local(DbName) when is_list(DbName) ->
     local(list_to_binary(DbName));
 local(DbName) ->
+    ThisNode = config:node_name(),
     Pred = fun
-        (#shard{node = Node}) when Node == node() -> true;
+        (#shard{node = Node}) when Node == ThisNode -> true;
         (_) -> false
     end,
     lists:filter(Pred, for_db(DbName)).
@@ -403,7 +404,7 @@ changes_callback({change, {Change}, _}, _) ->
                                 create_if_missing(mem3:name(S))
                              || S <-
                                     Shards,
-                                mem3:node(S) =:= node()
+                                mem3:node(S) =:= config:node_name()
                             ]
                     end
             end

@@ -131,7 +131,7 @@ shards_int(DbName, Options) ->
             %% and view_all_docs
             [
                 #ordered_shard{
-                    node = node(),
+                    node = config:node_name(),
                     name = ShardDbName,
                     dbname = ShardDbName,
                     range = [0, (2 bsl 31) - 1],
@@ -144,7 +144,7 @@ shards_int(DbName, Options) ->
             %% and view_all_docs
             [
                 #shard{
-                    node = node(),
+                    node = config:node_name(),
                     name = ShardDbName,
                     dbname = ShardDbName,
                     range = [0, (2 bsl 31) - 1],
@@ -363,10 +363,10 @@ group_by_proximity(Shards) ->
 
 group_by_proximity(Shards, ZoneMap) ->
     {Local, Remote} = lists:partition(
-        fun(S) -> mem3:node(S) =:= node() end,
+        fun(S) -> mem3:node(S) =:= config:node_name() end,
         Shards
     ),
-    LocalZone = proplists:get_value(node(), ZoneMap),
+    LocalZone = proplists:get_value(config:node_name(), ZoneMap),
     Fun = fun(S) -> proplists:get_value(mem3:node(S), ZoneMap) =:= LocalZone end,
     {SameZone, DifferentZone} = lists:partition(Fun, Remote),
     {Local, SameZone, DifferentZone}.

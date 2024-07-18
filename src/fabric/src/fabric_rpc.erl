@@ -89,7 +89,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
     DbOpenOptions = Args#changes_args.db_open_options ++ DbOptions,
     case get_or_create_db(DbName, DbOpenOptions) of
         {ok, Db} ->
-            StartSeq = calculate_start_seq(Db, node(), StartVector),
+            StartSeq = calculate_start_seq(Db, config:node_name(), StartVector),
             Enum = fun changes_enumerator/2,
             Opts = [{dir, Dir}],
             Pending0 =
@@ -406,7 +406,7 @@ read_repair_filter(DbName, Docs, NodeRevs, Options) ->
 % as the read_repair option to update_docs.
 read_repair_filter(Db, Docs, NodeRevs) ->
     [#doc{id = DocId} | _] = Docs,
-    NonLocalNodeRevs = [NR || {N, _} = NR <- NodeRevs, N /= node()],
+    NonLocalNodeRevs = [NR || {N, _} = NR <- NodeRevs, N /= config:node_name()],
     Nodes = lists:usort([Node || {Node, _} <- NonLocalNodeRevs]),
     NodeSeqs = get_node_seqs(Db, Nodes),
 

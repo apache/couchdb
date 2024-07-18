@@ -37,7 +37,7 @@ write(Entry, St) ->
     Fmt = "<~B>~s ~p ~s ",
     Args = [
         level_for_journald(Level),
-        node(),
+        config:node_name(),
         Pid,
         MsgId
     ],
