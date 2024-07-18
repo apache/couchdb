@@ -515,7 +515,7 @@ maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
 %% aren't sharded. So for now when a local db is specified as the source or
 %% the target, it's hacked to make it a full url and treated as a remote.
 possibly_hack(#httpd{path_parts = [<<"_replicate">>]} = Req) ->
-    {Props0} = chttpd:json_body_obj(Req),
+    {Props0} = json_body_obj(Req),
     Props1 = fix_uri(Req, Props0, <<"source">>),
     Props2 = fix_uri(Req, Props1, <<"target">>),
     Req#httpd{req_body = {Props2}};
@@ -824,7 +824,7 @@ etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
 etag_match(Req, CurrentEtag) ->
     EtagsToMatch0 = string:tokens(
-        chttpd:header_value(Req, "If-None-Match", ""), ", "
+        header_value(Req, "If-None-Match", ""), ", "
     ),
     EtagsToMatch = lists:map(fun strip_weak_prefix/1, EtagsToMatch0),
     lists:member(CurrentEtag, EtagsToMatch).
@@ -839,7 +839,7 @@ etag_respond(Req, CurrentEtag, RespFun) ->
         true ->
             % the client has this in their cache.
             Headers = [{"ETag", CurrentEtag}],
-            chttpd:send_response(Req, 304, Headers, <<>>);
+            send_response(Req, 304, Headers, <<>>);
         false ->
             % Run the function.
             RespFun()
@@ -970,7 +970,7 @@ send_delayed_error(#delayed_resp{resp = Resp, req = Req}, Reason) ->
 close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
     % Use a separate chunk to close the streamed array to maintain strict
     % compatibility with earlier versions. See COUCHDB-2724
-    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
+    {ok, R1} = send_delayed_chunk(Resp, Buffer),
     send_delayed_chunk(R1, Terminator);
 close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
     send_delayed_chunk(Resp, [Buffer | Terminator]).
@@ -1020,7 +1020,7 @@ start_delayed_response(#delayed_resp{} = DelayedResp) ->
     {ok, DelayedResp}.
 
 buffer_response(Req) ->
-    case chttpd:qs_value(Req, "buffer_response") of
+    case qs_value(Req, "buffer_response") of
         "false" ->
             false;
         "true" ->
@@ -1350,7 +1350,7 @@ send_chunked_error(Resp, Error) ->
     send_chunk(Resp, []).
 
 send_redirect(Req, Path) ->
-    Headers = [{"Location", chttpd:absolute_uri(Req, Path)}],
+    Headers = [{"Location", absolute_uri(Req, Path)}],
     send_response(Req, 301, Headers, <<>>).
 
 server_header() ->

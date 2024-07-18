@@ -19,10 +19,10 @@
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([validate_utf8/1, to_hex/1, to_hex_bin/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
--export([proplist_apply_field/2, json_apply_field/2]).
+-export([json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1, json_decode/2]).
--export([verify/2, simple_call/2, shutdown_sync/1]).
+-export([verify/2, shutdown_sync/1]).
 -export([get_value/2, get_value/3, set_value/3]).
 -export([reorder_results/2, reorder_results/3]).
 -export([url_strip_password/1]).
@@ -157,20 +157,6 @@ shutdown_sync(Pid) ->
         erlang:demonitor(MRef, [flush])
     end.
 
-simple_call(Pid, Message) ->
-    MRef = erlang:monitor(process, Pid),
-    try
-        Pid ! {self(), Message},
-        receive
-            {Pid, Result} ->
-                Result;
-            {'DOWN', MRef, _, _, Reason} ->
-                exit(Reason)
-        end
-    after
-        erlang:demonitor(MRef, [flush])
-    end.
-
 validate_utf8(Data) when is_list(Data) ->
     validate_utf8(?l2b(Data));
 validate_utf8(Bin) when is_binary(Bin) ->
@@ -275,10 +261,6 @@ get_nested_json_value(Value, []) ->
     Value;
 get_nested_json_value(_NotJSONObj, _) ->
     throw({not_found, json_mismatch}).
-
-proplist_apply_field(H, L) ->
-    {R} = json_apply_field(H, {L}),
-    R.
 
 json_apply_field(H, {L}) ->
     json_apply_field(H, L, []).

@@ -130,7 +130,7 @@
 %
 
 -export([open/1, open/2, get_fd/1, get_state/1]).
--export([add/2, merge/1, merge/2, sort/1, iter/1, next/1]).
+-export([add/2, merge/2, iter/1, next/1]).
 -export([num_kvs/1, num_merges/1]).
 
 -record(ems, {
@@ -187,13 +187,6 @@ add(Ems, KVs) ->
         num_kvs = Ems#ems.num_kvs + length(KVs),
         num_bb = Ems#ems.num_bb + 1
     }}.
-
-sort(#ems{} = Ems) ->
-    {ok, Ems1} = merge(Ems),
-    iter(Ems1).
-
-merge(Ems) ->
-    merge(Ems, fun(_) -> ok end).
 
 merge(#ems{root = undefined} = Ems, _Reporter) ->
     {ok, Ems};

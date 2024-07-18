@@ -28,7 +28,6 @@
     db_close/1,
     get_db_info/1,
     get_pending_count/2,
-    get_view_info/3,
     update_doc/3,
     update_doc/4,
     update_docs/3,
@@ -153,17 +152,6 @@ get_pending_count(#httpdb{} = Db, Seq) ->
     send_req(Db, Options, fun(200, _, {Props}) ->
         {ok, couch_util:get_value(<<"pending">>, Props, null)}
     end).
-
-get_view_info(#httpdb{} = Db, DDocId, ViewName) ->
-    Path = io_lib:format("~s/_view/~s/_info", [DDocId, ViewName]),
-    send_req(
-        Db,
-        [{path, Path}],
-        fun(200, _, {Props}) ->
-            {VInfo} = couch_util:get_value(<<"view_index">>, Props, {[]}),
-            {ok, VInfo}
-        end
-    ).
 
 ensure_full_commit(#httpdb{} = Db) ->
     send_req(

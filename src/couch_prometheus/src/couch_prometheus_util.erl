@@ -16,8 +16,7 @@
     couch_to_prom/3,
     to_bin/1,
     to_prom/4,
-    to_prom/2,
-    to_prom_summary/2
+    to_prom/2
 ]).
 
 couch_to_prom([couch_log, level, alert], Info, _All) ->
