@@ -16,12 +16,7 @@
 
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->
-    case config:get_boolean("rexi", "server_per_node", true) of
-        true ->
-            list_to_atom("rexi_server_" ++ atom_to_list(Node));
-        _ ->
-            rexi_server
-    end.
+    list_to_atom("rexi_server_" ++ atom_to_list(Node)).
 
 %% @doc Return a {server_id(node()), Node} Pid name for the given Node.
 server_pid(Node) ->

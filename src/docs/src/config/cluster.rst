@@ -111,14 +111,6 @@ RPC Performance Tuning
     This flag determines how many messages will be buffered before the local
     server starts dropping messages. Default value is ``2000``.
 
-    .. config:option:: server_per_node :: Enable or disable one local `gen_server` \
-        process per node
-
-    By default, rexi will spawn one local gen_server process for each node in
-    the cluster. Disabling this flag will cause CouchDB to use a single process
-    for all RPC communication, which is not recommended in high throughput
-    deployments.
-
     .. config:option:: stream_limit :: Number of send messages without waiting \
         for acknowledgement from the coordinator
 

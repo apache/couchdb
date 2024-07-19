@@ -132,7 +132,7 @@ filter_exact_copies(#shard{range = Range0} = Shard0, Shards, Cb) ->
     ).
 
 stop_worker(#shard{ref = Ref, node = Node}) ->
-    rexi:kill(Node, Ref).
+    rexi:kill_all([{Node, Ref}]).
 
 maybe_send_row(#collector{limit = 0} = State) ->
     #collector{counters = Counters, user_acc = AccIn, callback = Callback} = State,
