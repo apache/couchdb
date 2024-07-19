@@ -22,6 +22,9 @@ start_link(Args) ->
 init([]) ->
     {ok,
         {{rest_for_one, 3, 10}, [
+            % TODO: Compatibility clause rexi_server. This was used by
+            % server_per_node=false mode once After 3.4+ releases, this can be
+            % removed.
             {
                 rexi_server,
                 {rexi_server, start_link, [rexi_server]},

@@ -79,6 +79,9 @@ handle_cast({doit, {ClientPid, ClientRef} = From, Nonce, MFA}, State) ->
     },
     {noreply, add_job(Job, State)};
 handle_cast({kill, FromRef}, St) ->
+    % TODO: Compatibility clause. This is left to handle mixed cluster
+    % upgrades. Old nodes may still send {kill, Ref} message from rexi:kill.
+    % Remove in somme future 3.4+ version.
     kill_worker(FromRef, St),
     {noreply, St};
 handle_cast({kill_all, FromRefs}, St) ->

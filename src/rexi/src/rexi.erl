@@ -12,9 +12,8 @@
 
 -module(rexi).
 
--export([cast/2, cast/3, cast/4, kill/2, kill_all/1]).
+-export([cast/2, cast/3, cast/4, kill_all/1]).
 -export([reply/1]).
--export([async_server_call/2, async_server_call/3]).
 -export([stream_start/1, stream_cancel/1]).
 -export([stream_ack/1]).
 -export([stream2/1, stream_last/1, stream_last/2]).
@@ -56,63 +55,21 @@ cast(Node, Caller, MFA, Options) ->
             cast(Node, Caller, MFA)
     end.
 
-%% @doc Sends an async kill signal to the remote process associated with Ref.
-%% No rexi_EXIT message will be sent.
--spec kill(node(), reference()) -> ok.
-kill(Node, Ref) ->
-    rexi_utils:send(rexi_utils:server_pid(Node), cast_msg({kill, Ref})),
-    ok.
-
 %% @doc Sends an async kill signal to the remote processes associated with Refs.
 %% No rexi_EXIT message will be sent.
 -spec kill_all([{node(), reference()}]) -> ok.
 kill_all(NodeRefs) when is_list(NodeRefs) ->
-    %% use_kill_all is available since version 3.0. When performing a rolling
-    %% cluster upgrade from 2.x, set this value to false, then revert it back
-    %% to default (true) after all nodes have been upgraded.
-    case config:get_boolean("rexi", "use_kill_all", true) of
-        true ->
-            PerNodeMap = lists:foldl(
-                fun({Node, Ref}, Acc) ->
-                    maps:update_with(
-                        Node,
-                        fun(Refs) ->
-                            [Ref | Refs]
-                        end,
-                        [Ref],
-                        Acc
-                    )
-                end,
-                #{},
-                NodeRefs
-            ),
-            maps:map(
-                fun(Node, Refs) ->
-                    ServerPid = rexi_utils:server_pid(Node),
-                    rexi_utils:send(ServerPid, cast_msg({kill_all, Refs}))
-                end,
-                PerNodeMap
-            );
-        false ->
-            lists:foreach(fun({Node, Ref}) -> kill(Node, Ref) end, NodeRefs)
-    end,
-    ok.
-
-%% @equiv async_server_call(Server, self(), Request)
--spec async_server_call(pid() | {atom(), node()}, any()) -> reference().
-async_server_call(Server, Request) ->
-    async_server_call(Server, self(), Request).
-
-%% @doc Sends a properly formatted gen_server:call Request to the Server and
-%% returns the reference which the Server will include in its reply.  The
-%% function acts more like cast() than call() in that the server process
-%% is not monitored.  Clients who want to know if the server is alive should
-%% monitor it themselves before calling this function.
--spec async_server_call(pid() | {atom(), node()}, pid(), any()) -> reference().
-async_server_call(Server, Caller, Request) ->
-    Ref = make_ref(),
-    rexi_utils:send(Server, {'$gen_call', {Caller, Ref}, Request}),
-    Ref.
+    % #{N1 => [Ref1, Ref2], N2 => [Ref3], ...}
+    KeyFun = fun({Node, _Ref}) -> Node end,
+    ValFun = fun({_Node, Ref}) -> Ref end,
+    PerNodeMap = maps:groups_from_list(KeyFun, ValFun, NodeRefs),
+    maps:foreach(
+        fun(Node, Refs) ->
+            ServerPid = rexi_utils:server_pid(Node),
+            rexi_utils:send(ServerPid, cast_msg({kill_all, Refs}))
+        end,
+        PerNodeMap
+    ).
 
 %% @doc convenience function to reply to the original rexi Caller.
 -spec reply(any()) -> any().
