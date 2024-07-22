@@ -18,7 +18,8 @@
 
 -export([
     start_link/1,
-    status/0
+    status/0,
+    aggregate_queue_len/1
 ]).
 
 -export([
@@ -41,6 +42,9 @@ start_link(ChildMod) ->
 
 status() ->
     gen_server:call(?MODULE, status).
+
+aggregate_queue_len(ChildMod) ->
+    lists:sum([message_queue_len(ServerId) || ServerId <- server_ids(ChildMod)]).
 
 % Mem3 cluster callbacks
 
@@ -151,3 +155,14 @@ stop_server(ChildMod, ChildId) ->
 
 sup_module(ChildMod) ->
     list_to_atom(lists:concat([ChildMod, "_sup"])).
+
+message_queue_len(ServerId) when is_atom(ServerId) ->
+    case whereis(ServerId) of
+        Pid when is_pid(Pid) ->
+            case process_info(Pid, message_queue_len) of
+                {message_queue_len, Length} -> Length;
+                undefined -> 0
+            end;
+        undefined ->
+            0
+    end.
