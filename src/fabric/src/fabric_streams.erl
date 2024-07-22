@@ -17,7 +17,9 @@
     start/3,
     start/4,
     start/5,
-    cleanup/1
+    cleanup/1,
+    spawn_worker_cleaner/3,
+    add_worker_to_cleaner/2
 ]).
 
 -include_lib("fabric/include/fabric.hrl").

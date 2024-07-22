@@ -61,6 +61,8 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
         replacements = Replacements,
         ring_opts = RingOpts
     },
+    ClientReq = chttpd_util:mochiweb_client_req_get(),
+    fabric_streams:spawn_worker_cleaner(self(), Workers, ClientReq),
     try
         rexi_utils:recv(
             Workers,
@@ -72,7 +74,7 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
         )
     after
         rexi_monitor:stop(RexiMon),
-        fabric_util:cleanup(Workers)
+        fabric_streams:cleanup(Workers)
     end;
 go(DbName, DDoc, IndexName, OldArgs) ->
     go(DbName, DDoc, IndexName, dreyfus_util:upgrade(OldArgs)).
