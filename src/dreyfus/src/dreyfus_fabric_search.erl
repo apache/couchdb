@@ -113,6 +113,8 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
         replacements = Replacements,
         ring_opts = RingOpts
     },
+    ClientReq = chttpd_util:mochiweb_client_req_get(),
+    fabric_streams:spawn_worker_cleaner(self(), Workers, ClientReq),
     RexiMon = fabric_util:create_monitors(Workers),
     try
         rexi_utils:recv(
@@ -144,7 +146,7 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
             {error, Reason}
     after
         rexi_monitor:stop(RexiMon),
-        fabric_util:cleanup(Workers)
+        fabric_streams:cleanup(Workers)
     end.
 
 handle_message({ok, #top_docs{} = NewTopDocs}, Shard, State0) ->
