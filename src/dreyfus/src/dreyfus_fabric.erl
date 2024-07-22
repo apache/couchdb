@@ -136,6 +136,7 @@ handle_replacement(
             NewCounters = lists:foldl(
                 fun(Repl, CounterAcc) ->
                     NewCounter = start_replacement(StartFun, StartArgs, Repl),
+                    fabric_streams:add_worker_to_cleaner(self(), NewCounter),
                     fabric_dict:store(NewCounter, nil, CounterAcc)
                 end,
                 OldCounters,
