@@ -36,25 +36,11 @@
 static bool enableSharedMemory = true;
 static bool enableToSource = true;
 
-static JSClassOps global_ops = {
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    JS_GlobalObjectTraceHook
-};
-
 /* The class of the global object. */
 static JSClass global_class = {
     "global",
     JSCLASS_GLOBAL_FLAGS,
-    &global_ops
+    &JS::DefaultGlobalClassOps
 };
 
 static JSObject*
@@ -240,7 +226,7 @@ static JSFunctionSpec global_functions[] = {
 
 
 static bool
-csp_allows(JSContext* cx, JS::HandleString code)
+csp_allows(JSContext* cx, JS::RuntimeCode, JS::HandleString code)
 {
     couch_args* args = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     if(args->eval) {
