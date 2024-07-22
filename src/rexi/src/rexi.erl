@@ -18,6 +18,7 @@
 -export([stream_ack/1]).
 -export([stream2/1, stream_last/1, stream_last/2]).
 -export([ping/0]).
+-export([aggregate_server_queue_len/0, aggregate_buffer_queue_len/0]).
 
 %% @equiv cast(Node, self(), MFA)
 -spec cast(node(), {atom(), atom(), list()}) -> reference().
@@ -158,6 +159,12 @@ stream_ack(Client) ->
 ping() ->
     {Caller, _} = get(rexi_from),
     erlang:send(Caller, {rexi, '$rexi_ping'}).
+
+aggregate_server_queue_len() ->
+    rexi_server_mon:aggregate_queue_len(rexi_server).
+
+aggregate_buffer_queue_len() ->
+    rexi_server_mon:aggregate_queue_len(rexi_buffer).
 
 %% internal functions %%
 

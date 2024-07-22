@@ -405,17 +405,28 @@ get_distribution_stats() ->
 message_queues() ->
     MessageQueuesAgg = [
         {couch_server, couch_server:aggregate_queue_len()},
-        {index_server, couch_index_server:aggregate_queue_len()}
+        {index_server, couch_index_server:aggregate_queue_len()},
+        {rexi_server, rexi:aggregate_server_queue_len()},
+        {rexi_buffer, rexi:aggregate_buffer_queue_len()}
     ],
-    MessageQueuesReg = lists:map(
-        fun(Name) ->
-            Type = message_queue_len,
-            {Type, Length} = process_info(whereis(Name), Type),
-            {Name, Length}
-        end,
-        registered()
-    ),
+    MessageQueuesReg = lists:filtermap(fun message_queue/1, registered()),
     MessageQueuesAgg ++ MessageQueuesReg.
+
+message_queue(rexi_server) ->
+    % Compatibility clause. Remove in 3.4+ version when singleton
+    % rexi_server is removed.
+    false;
+message_queue(Name) ->
+    Pid = whereis(Name),
+    case is_pid(Pid) of
+        true ->
+            case process_info(Pid, message_queue_len) of
+                {message_queue_len, Length} -> {true, {Name, Length}};
+                undefined -> false
+            end;
+        false ->
+            false
+    end.
 
 %% Workaround for https://bugs.erlang.org/browse/ERL-1355
 run_queues() ->

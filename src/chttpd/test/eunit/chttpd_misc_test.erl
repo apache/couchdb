@@ -181,6 +181,59 @@ t_multiple_uuids(Url) ->
     ?assert(Uuid1 /= Uuid2),
     ?assert(Uuid1 /= Uuid3).
 
+system_test_() ->
+    {
+        "chttpd _node/_local/_system endpoint tests",
+        {
+            setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    ?TDEF_FE(t_system)
+                ]
+            }
+        }
+    }.
+
+t_system(Url) ->
+    {ok, Code, _, Body} = req_get(Url ++ "/_node/_local/_system"),
+    ?assertEqual(200, Code),
+    % The body is quite large, so test a general subset of functionality:
+    %   - Metrics from the VM (context_switches), some simple, and some histograms
+    %   - Custom computed metrics like internal_replication_jobs
+    %   - Simple, histogrammed and aggregated message queues, from the vm/dependencies/couch services
+    %
+    ?assertMatch(
+        #{
+            <<"context_switches">> := _,
+            <<"distribution">> := #{},
+            <<"internal_replication_jobs">> := _,
+            <<"memory">> := #{
+                <<"binary">> := _,
+                <<"processes">> := _
+            },
+            <<"message_queues">> := #{
+                <<"couch_db_updater">> := #{},
+                <<"couch_event_server">> := _,
+                <<"couch_file">> := #{},
+                <<"couch_server">> := _,
+                <<"couch_server_1">> := _,
+                <<"ibrowse">> := _,
+                <<"index_server">> := _,
+                <<"index_server_1">> := _,
+                <<"init">> := _,
+                <<"logger">> := _,
+                <<"rexi_buffer">> := _,
+                <<"rexi_server">> := _
+            }
+        },
+        Body
+    ).
+
 req_get(Url) ->
     {ok, Code, Headers, Body} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
     {ok, Code, Headers, jiffy:decode(Body, [return_maps])}.
