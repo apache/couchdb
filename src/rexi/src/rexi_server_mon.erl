@@ -43,6 +43,14 @@ start_link(ChildMod) ->
 status() ->
     gen_server:call(?MODULE, status).
 
+aggregate_queue_len(rexi_buffer) ->
+    % rexi_buffer acts as an explicit message queue. In order to get useful
+    % metrics from it we really need to add both its process' message queue and
+    % already buffered messages.
+    ServerIds = server_ids(rexi_buffer),
+    MQLengths = [message_queue_len(ServerId) || ServerId <- ServerIds],
+    BufLengths = [rexi_buffer:get_buffered_count(ServerId) || ServerId <- ServerIds],
+    lists:sum(MQLengths) + lists:sum(BufLengths);
 aggregate_queue_len(ChildMod) ->
     lists:sum([message_queue_len(ServerId) || ServerId <- server_ids(ChildMod)]).
 
