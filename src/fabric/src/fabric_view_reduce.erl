@@ -31,9 +31,9 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, VName, Args),
     Repls = fabric_ring:get_shard_replacements(DbName, Shards),
     StartFun = fun(Shard) ->
-        hd(fabric_util:submit_jobs([Shard], fabric_rpc, reduce_view, RPCArgs))
+        hd(fabric_streams:submit_jobs([Shard], fabric_rpc, reduce_view, RPCArgs))
     end,
-    Workers0 = fabric_util:submit_jobs(Shards, fabric_rpc, reduce_view, RPCArgs),
+    Workers0 = fabric_streams:submit_jobs(Shards, fabric_rpc, reduce_view, RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
         case
