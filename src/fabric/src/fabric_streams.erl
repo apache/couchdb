@@ -13,6 +13,7 @@
 -module(fabric_streams).
 
 -export([
+    submit_jobs/4,
     start/2,
     start/3,
     start/4,
@@ -26,6 +27,23 @@
 -include_lib("mem3/include/mem3.hrl").
 
 -define(WORKER_CLEANER, fabric_worker_cleaner).
+
+% This is the streams equivalent of fabric_util:submit_jobs/4. Besides
+% submitting the jobs it also starts the worker cleaner and adds each started
+% job to the cleaner first before the job is submitted.
+%
+submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
+    % Create refs first and add them to the cleaner to ensure if our process
+    % gets killed, the remote workers will be cleaned up as well.
+    RefFun = fun(#shard{} = Shard) -> Shard#shard{ref = make_ref()} end,
+    Workers = lists:map(RefFun, Shards),
+    ClientReq = chttpd_util:mochiweb_client_req_get(),
+    spawn_worker_cleaner(self(), Workers, ClientReq),
+    SubmitFun = fun(#shard{node = Node, name = ShardName, ref = Ref}) ->
+        rexi:cast_ref(Ref, Node, {Module, EndPoint, [ShardName | ExtraArgs]})
+    end,
+    ok = lists:foreach(SubmitFun, Workers),
+    Workers.
 
 start(Workers, Keypos) ->
     start(Workers, Keypos, undefined, undefined).
@@ -158,38 +176,48 @@ handle_stream_start(Else, _, _) ->
 % Spawn an auxiliary rexi worker cleaner. This will be used in cases
 % when the coordinator (request) process is forceably killed and doesn't
 % get a chance to process its `after` fabric:clean/1 clause.
-spawn_worker_cleaner(Coordinator, Workers, ClientReq) ->
+spawn_worker_cleaner(Coordinator, Workers, ClientReq) when
+    is_pid(Coordinator), is_list(Workers)
+->
     case get(?WORKER_CLEANER) of
         undefined ->
             Pid = spawn(fun() ->
                 erlang:monitor(process, Coordinator),
-                cleaner_loop(Coordinator, Workers, ClientReq)
+                NodeRefSet = set_from_list(shards_to_node_refs(Workers)),
+                cleaner_loop(Coordinator, NodeRefSet, ClientReq)
             end),
             put(?WORKER_CLEANER, Pid),
             Pid;
-        ExistingCleaner ->
+        ExistingCleaner when is_pid(ExistingCleaner) ->
             ExistingCleaner
     end.
 
-cleaner_loop(Pid, Workers, ClientReq) ->
+cleaner_loop(Pid, NodeRefSet, ClientReq) ->
     CheckMSec = chttpd_util:mochiweb_client_req_check_msec(),
     receive
-        {add_worker, Pid, Worker} ->
-            cleaner_loop(Pid, [Worker | Workers], ClientReq);
+        {add_node_ref, Pid, {_, _} = NodeRef} ->
+            cleaner_loop(Pid, sets:add_element(NodeRef, NodeRefSet), ClientReq);
         {'DOWN', _, _, Pid, _} ->
-            fabric_util:cleanup(Workers)
+            rexi:kill_all(sets:to_list(NodeRefSet))
     after CheckMSec ->
         chttpd_util:stop_client_process_if_disconnected(Pid, ClientReq),
-        cleaner_loop(Pid, Workers, ClientReq)
+        cleaner_loop(Pid, NodeRefSet, ClientReq)
     end.
 
-add_worker_to_cleaner(CoordinatorPid, Worker) ->
+add_worker_to_cleaner(CoordinatorPid, #shard{node = Node, ref = Ref}) ->
     case get(?WORKER_CLEANER) of
         CleanerPid when is_pid(CleanerPid) ->
-            CleanerPid ! {add_worker, CoordinatorPid, Worker};
+            CleanerPid ! {add_node_ref, CoordinatorPid, {Node, Ref}};
         _ ->
             ok
     end.
+
+set_from_list(List) when is_list(List) ->
+    sets:from_list(List, [{version, 2}]).
+
+shards_to_node_refs(Workers) when is_list(Workers) ->
+    Fun = fun(#shard{node = Node, ref = Ref}) -> {Node, Ref} end,
+    lists:map(Fun, Workers).
 
 -ifdef(TEST).
 
@@ -207,7 +235,8 @@ worker_cleaner_test_() ->
                 ?TDEF_FE(does_not_fire_if_cleanup_called),
                 ?TDEF_FE(should_clean_additional_worker_too),
                 ?TDEF_FE(coordinator_is_killed_if_client_disconnects),
-                ?TDEF_FE(coordinator_is_not_killed_if_client_is_connected)
+                ?TDEF_FE(coordinator_is_not_killed_if_client_is_connected),
+                ?TDEF_FE(submit_jobs_sets_up_cleaner)
             ]
         }
     }.
@@ -349,6 +378,68 @@ coordinator_is_not_killed_if_client_is_connected(_) ->
     Coord ! die,
     receive
         {'DOWN', CleanerRef, _, _, _} -> ok
+    end.
+
+submit_jobs_sets_up_cleaner(_) ->
+    meck:reset(rexi),
+    erase(?WORKER_CLEANER),
+    Shards = [
+        #shard{node = 'n1'},
+        #shard{node = 'n2'}
+    ],
+    meck:expect(rexi, cast_ref, fun(Ref, _, _) -> Ref end),
+    {Coord, CoordRef} = spawn_monitor(fun() ->
+        Workers = submit_jobs(Shards, fabric_rpc, potatoes, []),
+        receive
+            {get_workers_and_cleaner, From} ->
+                From ! {Workers, get(?WORKER_CLEANER)},
+                timer:sleep(999999)
+        end
+    end),
+    Coord ! {get_workers_and_cleaner, self()},
+    {Workers, Cleaner} =
+        receive
+            Msg -> Msg
+        end,
+    ?assert(is_pid(Cleaner)),
+    ?assert(is_process_alive(Cleaner)),
+    ?assert(is_process_alive(Coord)),
+    CheckWorkerFun = fun(#shard{node = Node, ref = Ref}) ->
+        ?assert(is_reference(Ref)),
+        {Node, Ref}
+    end,
+    NodeRefs = lists:map(CheckWorkerFun, Workers),
+    ?assertEqual(length(Shards), length(Workers)),
+    ?assertEqual(length(lists:usort(NodeRefs)), length(NodeRefs)),
+    % Were the jobs actually submitted?
+    meck:wait(2, rexi, cast_ref, '_', 1000),
+    % If we kill the coordinator, the cleaner should kill the workers
+    meck:reset(rexi),
+    CleanupMon = erlang:monitor(process, Cleaner),
+    exit(Coord, kill),
+    receive
+        {'DOWN', CoordRef, _, _, WorkerReason} ->
+            ?assertEqual(killed, WorkerReason)
+    after 1000 ->
+        ?assert(is_process_alive(Coord))
+    end,
+    % Cleaner should do the cleanup
+    meck:wait(1, rexi, kill_all, '_', 1000),
+    History = meck:history(rexi),
+    ?assertMatch([{_, {rexi, kill_all, _}, ok}], History),
+    [{Pid, {rexi, kill_all, Args}, ok}] = History,
+    % It was the cleaner who called it
+    ?assertEqual(Cleaner, Pid),
+    ?assertMatch([[{_, _}, {_, _}]], Args),
+    [NodeRefsKilled] = Args,
+    % The node refs killed are the ones we expect
+    ?assertEqual(lists:sort(NodeRefs), lists:sort(NodeRefsKilled)),
+    % Cleanup process should exit when done
+    receive
+        {'DOWN', CleanupMon, _, _, CleanerReason} ->
+            ?assertEqual(normal, CleanerReason)
+    after 1000 ->
+        ?assert(is_process_alive(Cleaner))
     end.
 
 setup() ->

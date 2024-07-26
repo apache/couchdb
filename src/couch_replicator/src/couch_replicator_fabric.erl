@@ -22,7 +22,7 @@
 
 docs(DbName, Options, QueryArgs, Callback, Acc) ->
     Shards = mem3:shards(DbName),
-    Workers0 = fabric_util:submit_jobs(
+    Workers0 = fabric_streams:submit_jobs(
         Shards, couch_replicator_fabric_rpc, docs, [Options, QueryArgs]
     ),
     RexiMon = fabric_util:create_monitors(Workers0),

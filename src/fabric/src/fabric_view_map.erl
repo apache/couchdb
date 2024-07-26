@@ -40,9 +40,9 @@ go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
     Repls = fabric_ring:get_shard_replacements(DbName, Shards),
     RPCArgs = [DocIdAndRev, View, WorkerArgs, Options],
     StartFun = fun(Shard) ->
-        hd(fabric_util:submit_jobs([Shard], fabric_rpc, map_view, RPCArgs))
+        hd(fabric_streams:submit_jobs([Shard], fabric_rpc, map_view, RPCArgs))
     end,
-    Workers0 = fabric_util:submit_jobs(Shards, fabric_rpc, map_view, RPCArgs),
+    Workers0 = fabric_streams:submit_jobs(Shards, fabric_rpc, map_view, RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
         case
