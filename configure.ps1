@@ -190,7 +190,7 @@ $CouchDBConfig = @"
 {user, "$CouchDBUser"}.
 {js_engine, "$JSEngine"}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
-{with_spidermonkey, "$WithSpiderMonkey"}.
+{with_spidermonkey, $WithSpiderMonkey}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
@@ -248,7 +248,7 @@ $ConfigERL = @"
 {erlang_md5, $ErlangMD5}.
 {js_engine, "$JSEngine"}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
-{with_spidermonkey, "$WithSpiderMonkey"}.
+{with_spidermonkey, $WithSpiderMonkey}.
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
 

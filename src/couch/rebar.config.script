@@ -69,10 +69,10 @@ JsEngine = case lists:keyfind(js_engine, 1, CouchConfig) of
 end.
 
 WithSpidermonkey = case {lists:keyfind(with_spidermonkey, 1, CouchConfig), JsEngine} of
-    {{_, "false"}, "spidermonkey"} ->
-         io:format(standard_error, "Spidermonkey is disabled, select another default js_enigine ~n", []),
+    {{_, false}, "spidermonkey"} ->
+         io:format(standard_error, "Spidermonkey is disabled, select another default js_engine ~n", []),
          erlang:halt(1);
-    {{_, "false"}, _} ->
+    {{_, false}, _} ->
          false;
     {_, _} ->
          true

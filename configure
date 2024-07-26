@@ -387,7 +387,7 @@ cat > rel/couchdb.config << EOF
 {user, "$COUCHDB_USER"}.
 {js_engine, "$JS_ENGINE"}.
 {spidermonkey_version, "$SM_VSN"}.
-{with_spidermonkey, "$WITH_SPIDERMONKEY"}.
+{with_spidermonkey, $WITH_SPIDERMONKEY}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
@@ -427,7 +427,7 @@ cat > $rootdir/config.erl << EOF
 {erlang_md5, $ERLANG_MD5}.
 {js_engine, "$JS_ENGINE"}.
 {spidermonkey_version, "$SM_VSN"}.
-{with_spidermonkey, "$WITH_SPIDERMONKEY"}.
+{with_spidermonkey, $WITH_SPIDERMONKEY}.
 EOF
 
 install_local_rebar() {
