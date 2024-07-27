@@ -26,12 +26,12 @@ ERLFMT_VERSION="v1.3.0"
 
 # TEST=0
 WITH_PROPER="true"
-WITH_FAUXTON=1
-WITH_DOCS=1
+WITH_FAUXTON="true"
+WITH_DOCS="true"
 WITH_NOUVEAU="false"
-WITH_CLOUSEAU=0
+WITH_CLOUSEAU="false"
 ERLANG_MD5="false"
-SKIP_DEPS=0
+SKIP_DEPS="false"
 WITH_SPIDERMONKEY="true"
 
 run_erlang() {
@@ -94,13 +94,13 @@ parse_opts() {
                 ;;
 
             --disable-fauxton)
-                WITH_FAUXTON=0
+                WITH_FAUXTON="false"
                 shift
                 continue
                 ;;
 
             --disable-docs)
-                WITH_DOCS=0
+                WITH_DOCS="false"
                 shift
                 continue
                 ;;
@@ -116,7 +116,7 @@ parse_opts() {
 		            echo "Warning: Clouseau is not working with OTP 26 or later at the moment, therefore it is not configured.  Continue in 5 seconds..."
 		            sleep 5
 		        else
-		            WITH_CLOUSEAU=1
+		            WITH_CLOUSEAU="true"
 		        fi
 		        shift
 		        continue
@@ -129,22 +129,22 @@ parse_opts() {
                 ;;
 
             --dev)
-                WITH_DOCS=0
-                WITH_FAUXTON=0
+                WITH_DOCS="false"
+                WITH_FAUXTON="false"
                 shift
                 continue
                 ;;
 
             --dev-with-nouveau)
-                WITH_DOCS=0
-                WITH_FAUXTON=0
+                WITH_DOCS="false"
+                WITH_FAUXTON="false"
                 WITH_NOUVEAU="true"
                 shift
                 continue
                 ;;
 
             --skip-deps)
-                SKIP_DEPS=1
+                SKIP_DEPS="true"
                 shift
                 continue
                 ;;
@@ -533,12 +533,12 @@ if [ -z "${ERLFMT}" ]; then
     ERLFMT=${rootdir}/bin/erlfmt
 fi
 
-if [ $WITH_CLOUSEAU -ne 0 ]; then
+if [ "$WITH_CLOUSEAU" = "true" ]; then
     install_local_clouseau
 fi
 
 # only update dependencies, when we are not in a release tarball
-if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
+if [ -d .git ] && [ "$SKIP_DEPS" = "false" ]; then
     echo "==> updating dependencies"
     ${REBAR} get-deps update-deps
 fi

@@ -143,8 +143,8 @@ If ($LASTEXITCODE -ne 0) {
 $PackageAuthorName="The Apache Software Foundation"
 $InstallDir="$LibDir\couchdb"
 $LogFile="$LogDir\couch.log"
-$BuildFauxton = [int](-not $DisableFauxton)
-$BuildDocs = [int](-not $DisableDocs)
+$BuildFauxton = (-not $DisableFauxton).ToString().ToLower()
+$BuildDocs = (-not $DisableDocs).ToString().ToLower()
 $Hostname = [System.Net.Dns]::GetHostEntry([string]"localhost").HostName
 $WithProper = (-not $DisableProper).ToString().ToLower()
 $ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
@@ -232,8 +232,8 @@ man_dir = $ManDir
 
 with_fauxton = $BuildFauxton
 with_docs = $BuildDocs
-with_nouveau = $WithNouveau
-with_clouseau = $WithClouseau
+with_nouveau = $($WithNouveau.ToString().ToLower())
+with_clouseau = $($WithClouseau.ToString().ToLower())
 
 user = $CouchDBUser
 
@@ -318,7 +318,7 @@ if ($WithClouseau)
     if ($ClouseauMethod -eq "dist") {
 	Write-Verbose "===> fetching Clouseau from $ClouseauDistUrl..."
 
-	New-Item -Path $ClouseauDir -ItemType Directory | Out-File Null
+	New-Item -Path $ClouseauDir -ItemType Directory | Out-Null
 
 	$Slf4jVersion = "1.7.36"
 	$ClouseauDistUrl = $ClouseauUri -f $ClouseauVersion
