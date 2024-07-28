@@ -246,7 +246,7 @@ elixir: elixir-init devclean
 
 ifneq ($(CLOUSEAU_DIR),)
 _WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
-else ifeq ($(with_clouseau), 1)
+else ifeq ($(with_clouseau), true)
 _WITH_CLOUSEAU="--with-clouseau"
 endif
 
@@ -375,12 +375,12 @@ ifeq ($(with_spidermonkey), true)
 	@copy share\server\main-coffee.js rel\couchdb\share\server\main-coffee.js
 endif
 
-ifeq ($(with_fauxton), 1)
+ifeq ($(with_fauxton), true)
 	-@mkdir rel\couchdb\share
 	-@xcopy share\www rel\couchdb\share\www /E/I
 endif
 
-ifeq ($(with_docs), 1)
+ifeq ($(with_docs), true)
 	-@mkdir rel\couchdb\share\www\docs
 	-@mkdir rel\couchdb\share\docs
 ifeq ($(IN_RELEASE), true)
@@ -485,13 +485,13 @@ config.erl:
 
 src\docs\build:
 	@echo 'Building docs...'
-ifeq ($(with_docs), 1)
+ifeq ($(with_docs), true)
 	@cd src\docs && setup.bat && make.bat html && make.bat man
 endif
 
 
 share\www:
-ifeq ($(with_fauxton), 1)
+ifeq ($(with_fauxton), true)
 	@echo 'Building Fauxton'
 	@cd src\fauxton && npm install && .\node_modules\.bin\grunt couchdb
 endif
