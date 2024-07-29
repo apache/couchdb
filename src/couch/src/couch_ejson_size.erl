@@ -32,7 +32,7 @@ encoded_size(List) when is_list(List) ->
     1 + lists:sum([encoded_size(V) + 1 || V <- List]);
 %% Floats.
 
-encoded_size(0.0) ->
+encoded_size(+0.0) ->
     3;
 encoded_size(1.0) ->
     3;
