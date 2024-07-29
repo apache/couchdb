@@ -139,7 +139,7 @@ init_p(From, {M, F, A}, Nonce) ->
     put('$initial_call', MFA),
     put(nonce, Nonce),
     try
-        couch_stats_resource_tracker:create_context(From, MFA, Nonce),
+        couch_stats_resource_tracker:create_worker_context(From, MFA, Nonce),
         couch_stats:maybe_track_rexi_init_p(MFA),
         apply(M, F, A)
     catch
