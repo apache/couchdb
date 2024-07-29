@@ -418,6 +418,7 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
             possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1
         ),
+        couch_stats_resource_tracker:set_context_username(AuthorizedReq),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
     catch
         ErrorType:Error:Stack ->
