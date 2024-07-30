@@ -49,7 +49,11 @@ java {
 }
 
 jar {
-    manifest.attributes('Multi-Release': 'true')
+    manifest {
+        attributes(
+            'Multi-Release': 'true',
+            "Class-Path": configurations.runtimeClasspath.collect { it.getName() }.join(' '))
+    }
 }
 
 spotless {
@@ -81,4 +85,9 @@ tasks.withType(Javadoc) {
 tasks.withType(AbstractArchiveTask) {
     preserveFileTimestamps = false
     reproducibleFileOrder = true
+}
+
+
+startScripts {
+    classpath = files(jar.archiveFileName)
 }
