@@ -273,9 +273,14 @@ upgrade_epochs(#db_header{} = Header) ->
                 % owned since eternity by the node it was on. This
                 % just codifies that assumption.
                 [{Node, 0}];
-            [{Node, S} | _] = Epochs0 ->
-                assert_monotonic_update_seq(Header, S),
+            [{Node, _S} | _] = Epochs0 ->
                 % Current node is the current owner of this db
+                %
+                % During regular updates we could assert that update sequence
+                % doesn't regress here. However, when compacting the new header
+                % starts at update_seq = 0 and continues incrementing as the
+                % compaction proceeds. In that case the epochs sequence could
+                % be regressing.
                 Epochs0;
             [{_OtherNode, S} | _] = Epochs1 ->
                 assert_monotonic_update_seq(Header, S),
@@ -450,13 +455,23 @@ upgrade_epochs_test() ->
     NewNewHeader = upgrade(NowOwnedHeader),
     ?assertEqual(OwnedEpochs, epochs(NewNewHeader)),
 
-    % Assertion failure if we try to regress update seq
-    RegressedHeader = NowOwnedHeader#db_header{update_seq = 5},
-    ?assertError({assert, _}, upgrade(RegressedHeader)),
+    % During compaction new header sequence will be 0 after new header init,
+    % while the epoch sequence copied from the old shard file might be >0
+    CompactionHeader = NowOwnedHeader#db_header{update_seq = 0},
+    ?assertEqual(CompactionHeader, upgrade(CompactionHeader)),
+
+    % When nodes are different we do assert sequence regression
+    NotOwnedHighSeq = set(NewHeader, [
+        {update_seq, 4},
+        {epochs, [{'someothernode@someotherhost', 5}]}
+    ]),
+    ?assertError({assert, _}, upgrade(NotOwnedHighSeq)),
 
     % Getting a reset header maintains the epoch data
     ResetHeader = from(NewNewHeader),
-    ?assertEqual(OwnedEpochs, epochs(ResetHeader)).
+    ?assertEqual(OwnedEpochs, epochs(ResetHeader)),
+    % Getting a reset header resets the update_seq back to 0.
+    ?assertEqual(0, ResetHeader#db_header.update_seq).
 
 get_uuid_from_old_header_test() ->
     Vsn5Header = mk_header(5),
