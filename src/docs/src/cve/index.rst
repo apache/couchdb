@@ -16,6 +16,13 @@
 Security Issues / CVEs
 ======================
 
+In the event of a CVE, the Apache CouchDB project will publish a fix as
+a patch to the current release series and its immediate predecessor only
+(e.g, if the current release is 3.3.3 and the predecessor is 3.2.3, we
+would publish a 3.3.4 release and a 3.2.4 release).
+
+Further backports may be published at our discretion.
+
 .. toctree::
     :maxdepth: 1
     :glob:
