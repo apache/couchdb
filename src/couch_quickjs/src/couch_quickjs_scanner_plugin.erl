@@ -514,7 +514,11 @@ expected_error(_) ->
 
 expected_error({error, {_, compilation_error, _}}, {error, {_, compilation_error, _}}) ->
     true;
+expected_error({error, {_, {compilation_error, _}}}, {error, {_, {compilation_error, _}}}) ->
+    true;
 expected_error({error, {_, <<"TypeError">>, _}}, {error, {_, <<"TypeError">>, _}}) ->
+    true;
+expected_error({error, {_, {<<"TypeError">>, _}}}, {error, {_, {<<"TypeError">>, _}}}) ->
     true;
 expected_error(_, _) ->
     false.
