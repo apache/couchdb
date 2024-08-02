@@ -16,7 +16,6 @@
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
--include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo) when
@@ -66,15 +65,8 @@ go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
                 after
                     fabric_streams:cleanup(Workers)
                 end;
-            {timeout, NewState} ->
-                DefunctWorkers = fabric_util:remove_done_workers(
-                    NewState#stream_acc.workers,
-                    waiting
-                ),
-                fabric_util:log_timeout(
-                    DefunctWorkers,
-                    "map_view"
-                ),
+            {timeout, DefunctWorkers} ->
+                fabric_util:log_timeout(DefunctWorkers, "map_view"),
                 Callback({error, timeout}, Acc);
             {error, Error} ->
                 Callback({error, Error}, Acc)
