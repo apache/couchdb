@@ -23,8 +23,15 @@
     add_worker_to_cleaner/2
 ]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
+
+-record(stream_acc, {
+    workers,
+    ready,
+    start_fun,
+    replacements,
+    ring_opts
+}).
 
 -define(WORKER_CLEANER, fabric_worker_cleaner).
 
@@ -77,7 +84,12 @@ start(Workers0, Keypos, StartFun, Replacements, RingOpts) ->
                 Workers
             ),
             {ok, AckedWorkers};
+        {timeout, #stream_acc{workers = Defunct}} ->
+            cleanup(Workers0),
+            DefunctWorkers = fabric_util:remove_done_workers(Defunct, waiting),
+            {timeout, DefunctWorkers};
         Else ->
+            cleanup(Workers0),
             Else
     end.
 
@@ -165,10 +177,7 @@ handle_stream_start(rexi_STREAM_INIT, {Worker, From}, St) ->
                     {stop, St#stream_acc{workers = [], ready = Ready1}}
             end
     end;
-handle_stream_start({ok, Error}, _, St) when Error == ddoc_updated; Error == insufficient_storage ->
-    WaitingWorkers = [W || {W, _} <- St#stream_acc.workers],
-    ReadyWorkers = [W || {W, _} <- St#stream_acc.ready],
-    cleanup(WaitingWorkers ++ ReadyWorkers),
+handle_stream_start({ok, Error}, _, _) when Error == ddoc_updated; Error == insufficient_storage ->
     {stop, Error};
 handle_stream_start(Else, _, _) ->
     exit({invalid_stream_start, Else}).
@@ -236,7 +245,9 @@ worker_cleaner_test_() ->
                 ?TDEF_FE(should_clean_additional_worker_too),
                 ?TDEF_FE(coordinator_is_killed_if_client_disconnects),
                 ?TDEF_FE(coordinator_is_not_killed_if_client_is_connected),
-                ?TDEF_FE(submit_jobs_sets_up_cleaner)
+                ?TDEF_FE(submit_jobs_sets_up_cleaner),
+                ?TDEF_FE(cleanup_called_on_timeout),
+                ?TDEF_FE(cleanup_called_on_error)
             ]
         }
     }.
@@ -442,7 +453,39 @@ submit_jobs_sets_up_cleaner(_) ->
         ?assert(is_process_alive(Cleaner))
     end.
 
+cleanup_called_on_timeout(_) ->
+    Ref1 = make_ref(),
+    Ref2 = make_ref(),
+    W1 = #shard{node = 'n1', ref = Ref1},
+    W2 = #shard{node = 'n2', ref = Ref2},
+    Workers = [W1, W2],
+    meck:expect(rexi_utils, recv, fun(_, _, _, Acc, _, _) ->
+        {timeout, Acc#stream_acc{workers = [{W2, waiting}]}}
+    end),
+    meck:reset(fabric_util),
+    Res = start(Workers, #shard.ref, undefined, undefined, []),
+    ?assertEqual({timeout, [W2]}, Res),
+    ?assert(meck:called(fabric_util, cleanup, 1)).
+
+cleanup_called_on_error(_) ->
+    Ref1 = make_ref(),
+    Ref2 = make_ref(),
+    W1 = #shard{node = 'n1', ref = Ref1},
+    W2 = #shard{node = 'n2', ref = Ref2},
+    Workers = [W1, W2],
+    meck:expect(rexi_utils, recv, fun(_, _, _, _, _, _) ->
+        {error, foo}
+    end),
+    meck:reset(fabric_util),
+    Res = start(Workers, #shard.ref, undefined, undefined, []),
+    ?assertEqual({error, foo}, Res),
+    ?assert(meck:called(fabric_util, cleanup, 1)).
+
 setup() ->
+    ok = meck:new(rexi_utils, [passthrough]),
+    ok = meck:new(config, [passthrough]),
+    ok = meck:new(fabric_util, [passthrough]),
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok = meck:expect(rexi, kill_all, fun(_) -> ok end),
     % Speed up disconnect socket timeout for the test to 200 msec
     ok = meck:expect(chttpd_util, mochiweb_client_req_check_msec, 0, 200).

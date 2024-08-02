@@ -37,14 +37,8 @@ go(Db, Options, #mrargs{keys = undefined} = QueryArgs, Callback, Acc) ->
                 after
                     fabric_streams:cleanup(Workers)
                 end;
-            {timeout, NewState} ->
-                DefunctWorkers = fabric_util:remove_done_workers(
-                    NewState#stream_acc.workers, waiting
-                ),
-                fabric_util:log_timeout(
-                    DefunctWorkers,
-                    "all_docs"
-                ),
+            {timeout, DefunctWorkers} ->
+                fabric_util:log_timeout(DefunctWorkers, "all_docs"),
                 Callback({error, timeout}, Acc);
             {error, Error} ->
                 Callback({error, Error}, Acc)

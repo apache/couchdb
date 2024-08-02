@@ -32,14 +32,6 @@
     update_seq
 }).
 
--record(stream_acc, {
-    workers,
-    ready,
-    start_fun,
-    replacements,
-    ring_opts
-}).
-
 -record(view_row, {key, id, value, doc, worker}).
 
 -type row_property_key() :: id | key | value | doc | worker.
