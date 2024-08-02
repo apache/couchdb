@@ -16,33 +16,34 @@
 -include("couch_server_int.hrl").
 
 new() ->
-    {gb_trees:empty(), dict:new()}.
+    % {gb_trees(UniqueInt -> DbName), #{DbName => UniqueInt}}
+    {gb_trees:empty(), #{}}.
 
-insert(DbName, {Tree0, Dict0}) ->
+insert(DbName, {Tree0, #{} = Dict0}) ->
     Lru = couch_util:unique_monotonic_integer(),
-    {gb_trees:insert(Lru, DbName, Tree0), dict:store(DbName, Lru, Dict0)}.
+    {gb_trees:insert(Lru, DbName, Tree0), Dict0#{DbName => Lru}}.
 
-update(DbName, {Tree0, Dict0}) ->
-    case dict:find(DbName, Dict0) of
-        {ok, Old} ->
+update(DbName, {Tree0, #{} = Dict0}) ->
+    case Dict0 of
+        #{DbName := Old} ->
             New = couch_util:unique_monotonic_integer(),
             Tree = gb_trees:insert(New, DbName, gb_trees:delete(Old, Tree0)),
-            Dict = dict:store(DbName, New, Dict0),
-            {Tree, Dict};
-        error ->
-            % We closed this database before processing the update.  Ignore
+            {Tree, Dict0#{DbName := New}};
+        #{} ->
             {Tree0, Dict0}
     end.
 
 %% Attempt to close the oldest idle database.
-close({Tree, _} = Cache) ->
-    close_int(gb_trees:next(gb_trees:iterator(Tree)), Cache).
+close({Tree, #{}} = Cache) ->
+    close_int(gb_trees:smallest(Tree), Cache).
 
 %% internals
 
-close_int(none, _) ->
+% none is returned by the gb_trees iterator when it reaches the end
+%
+close_int(none, {_Tree, #{}} = _Cache) ->
     false;
-close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
+close_int({Lru, DbName}, {Tree, #{} = Dict} = Cache) ->
     CouchDbs = couch_server:couch_dbs(DbName),
     CouchDbsPidToName = couch_server:couch_dbs_pid_to_name(DbName),
 
@@ -53,14 +54,19 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
                     true = ets:delete(CouchDbs, DbName),
                     true = ets:delete(CouchDbsPidToName, Pid),
                     exit(Pid, kill),
-                    {true, {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)}};
+                    {true, {gb_trees:delete(Lru, Tree), maps:remove(DbName, Dict)}};
                 false ->
                     true = couch_server:unlock(CouchDbs, DbName),
                     couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
-                    close_int(gb_trees:next(Iter), update(DbName, Cache))
+                    NewCache = {NewTree, _} = update(DbName, Cache),
+                    close_int(larger(Lru, NewTree), NewCache)
             end;
         false ->
             NewTree = gb_trees:delete(Lru, Tree),
-            NewIter = gb_trees:iterator(NewTree),
-            close_int(gb_trees:next(NewIter), {NewTree, dict:erase(DbName, Dict)})
+            close_int(larger(Lru, NewTree), {NewTree, maps:remove(DbName, Dict)})
     end.
+
+% Compat function. In OTP 27 can use gb_tree:larger/2
+%
+larger(Key, Tree) ->
+    gb_trees:next(gb_trees:iterator_from(Key, Tree)).
