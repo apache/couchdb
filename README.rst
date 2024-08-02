@@ -97,6 +97,13 @@ Fauxton. To fix the admin party you have to run ``./dev/run`` with the ``admin``
 flag, e.g. ``./dev/run --admin=username:password``. If you want to have an
 admin-party, just omit the flag.
 
+Support Policy
+--------------
+
+CouchDB supports the current and the last feature release line. For example,
+when a new version (e.g. 3.4) is released, the version two releases prior
+(e.g. 3.2) becomes end-of-life (EOL).
+
 Contributing to CouchDB
 -----------------------
 
