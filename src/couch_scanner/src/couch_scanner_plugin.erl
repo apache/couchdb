@@ -360,13 +360,16 @@ scan_docs(#st{} = St, #shard{name = ShardDbName}) ->
     St1 = rate_limit(St, shard),
     case couch_db:open_int(ShardDbName, [?ADMIN_CTX]) of
         {ok, Db} ->
-            St2 = St1#st{db = Db},
-            St3 = db_opened_callback(St2),
-            {ok, St4} = couch_db:fold_docs(Db, fun scan_docs_fold/2, St3, []),
-            St5 = db_closing_callback(St4),
-            couch_db:close(Db),
-            erlang:garbage_collect(),
-            St5#st{db = undefined};
+            try
+                St2 = St1#st{db = Db},
+                St3 = db_opened_callback(St2),
+                {ok, St4} = couch_db:fold_docs(Db, fun scan_docs_fold/2, St3, []),
+                St5 = db_closing_callback(St4),
+                erlang:garbage_collect(),
+                St5#st{db = undefined}
+            after
+                couch_db:close(Db)
+            end;
         {not_found, _} ->
             St1
     end.
