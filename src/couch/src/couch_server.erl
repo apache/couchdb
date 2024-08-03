@@ -520,13 +520,6 @@ open_async_int(Server, DbName, Options) ->
             Error1
     end.
 
-handle_call(close_lru, _From, #server{lru = Lru} = Server) ->
-    case couch_lru:close(Lru) of
-        {true, NewLru} ->
-            {reply, ok, db_closed(Server#server{lru = NewLru}, [])};
-        false ->
-            {reply, {error, all_dbs_active}, Server}
-    end;
 handle_call(open_dbs_count, _From, Server) ->
     {reply, Server#server.dbs_open, Server};
 handle_call({set_update_lru_on_read, UpdateOnRead}, _From, Server) ->
