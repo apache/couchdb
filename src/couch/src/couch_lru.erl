@@ -15,34 +15,43 @@
 
 -include("couch_server_int.hrl").
 
+-type cache() :: {gb_trees:tree(), #{binary() => pos_integer()}}.
+
+-spec new() -> cache().
 new() ->
-    {gb_trees:empty(), dict:new()}.
+    {gb_trees:empty(), #{}}.
 
-insert(DbName, {Tree0, Dict0}) ->
+-spec insert(binary(), cache()) -> cache().
+insert(DbName, {Tree0, #{} = Map0}) ->
     Lru = couch_util:unique_monotonic_integer(),
-    {gb_trees:insert(Lru, DbName, Tree0), dict:store(DbName, Lru, Dict0)}.
+    {gb_trees:insert(Lru, DbName, Tree0), Map0#{DbName => Lru}}.
 
-update(DbName, {Tree0, Dict0}) ->
-    case dict:find(DbName, Dict0) of
-        {ok, Old} ->
+-spec update(binary(), cache()) -> cache().
+update(DbName, {Tree0, #{} = Map0}) ->
+    case Map0 of
+        #{DbName := Old} ->
             New = couch_util:unique_monotonic_integer(),
             Tree = gb_trees:insert(New, DbName, gb_trees:delete(Old, Tree0)),
-            Dict = dict:store(DbName, New, Dict0),
-            {Tree, Dict};
-        error ->
+            {Tree, Map0#{DbName := New}};
+        #{} ->
             % We closed this database before processing the update.  Ignore
-            {Tree0, Dict0}
+            {Tree0, Map0}
     end.
 
-%% Attempt to close the oldest idle database.
+%% Attempt to close the oldest idle database. This function also cleans deleted
+%% and locked entries from the Lru and also bumps busy entries until the first
+%% idle entry is found. If not entry is found it returns `false`. In that case
+%% all bumped entries are lost as heap garbage.
+
+-spec close(cache()) -> {true, cache()} | false.
 close({Tree, _} = Cache) ->
     close_int(gb_trees:next(gb_trees:iterator(Tree)), Cache).
 
 %% internals
 
-close_int(none, _) ->
+close_int(none, {_Tree, #{}}) ->
     false;
-close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
+close_int({Lru, DbName, Iter}, {Tree, #{} = Map} = Cache) ->
     CouchDbs = couch_server:couch_dbs(DbName),
     CouchDbsPidToName = couch_server:couch_dbs_pid_to_name(DbName),
 
@@ -53,7 +62,7 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
                     true = ets:delete(CouchDbs, DbName),
                     true = ets:delete(CouchDbsPidToName, Pid),
                     exit(Pid, kill),
-                    {true, {gb_trees:delete(Lru, Tree), dict:erase(DbName, Dict)}};
+                    {true, {gb_trees:delete(Lru, Tree), maps:remove(DbName, Map)}};
                 false ->
                     true = couch_server:unlock(CouchDbs, DbName),
                     couch_stats:increment_counter([couchdb, couch_server, lru_skip]),
@@ -62,5 +71,166 @@ close_int({Lru, DbName, Iter}, {Tree, Dict} = Cache) ->
         false ->
             NewTree = gb_trees:delete(Lru, Tree),
             NewIter = gb_trees:iterator(NewTree),
-            close_int(gb_trees:next(NewIter), {NewTree, dict:erase(DbName, Dict)})
+            close_int(gb_trees:next(NewIter), {NewTree, maps:remove(DbName, Map)})
     end.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+-define(DB1, <<"db1">>).
+-define(DB2, <<"db2">>).
+
+couch_lru_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_new),
+            ?TDEF_FE(t_insert),
+            ?TDEF_FE(t_insert_duplicate),
+            ?TDEF_FE(t_update),
+            ?TDEF_FE(t_close_empty),
+            ?TDEF_FE(t_close_unlocked_idle),
+            ?TDEF_FE(t_close_bump_busy_all),
+            ?TDEF_FE(t_close_bump_busy_one),
+            ?TDEF_FE(t_close_entry_one_is_missing)
+        ]
+    }.
+
+t_new(_) ->
+    Cache = new(),
+    ?assertMatch({_, _}, Cache),
+    {Tree, Map} = Cache,
+    ?assert(gb_trees:is_empty(Tree)),
+    ?assert(is_map(Map) andalso map_size(Map) == 0).
+
+t_insert(_) ->
+    {Tree, Map} = insert(?DB1, new()),
+    ?assertEqual(1, gb_trees:size(Tree)),
+    ?assertEqual(1, map_size(Map)),
+    ?assertMatch(#{?DB1 := _}, Map),
+    #{?DB1 := Int} = Map,
+    ?assert(is_integer(Int)),
+    ?assert(Int > 0),
+    ?assertEqual([{Int, ?DB1}], gb_trees:to_list(Tree)).
+
+t_insert_duplicate(_) ->
+    % We technically allow this, but is this right? Should we always use update
+    % instead which would reap the old LRU entry
+    %
+    {Tree, Map} = insert(?DB1, insert(?DB1, new())),
+    ?assertEqual(2, gb_trees:size(Tree)),
+    ?assertEqual(1, map_size(Map)),
+    ?assertMatch(#{?DB1 := _}, Map),
+    ?assertMatch([{_, ?DB1}, {_, ?DB1}], gb_trees:to_list(Tree)).
+
+t_update(_) ->
+    % Insert followed by update.
+    {Tree, Map} = update(?DB1, insert(?DB1, new())),
+    ?assertEqual(1, gb_trees:size(Tree)),
+    ?assertEqual(1, map_size(Map)),
+    ?assertMatch(#{?DB1 := _}, Map),
+    #{?DB1 := Int} = Map,
+    ?assertEqual([{Int, ?DB1}], gb_trees:to_list(Tree)).
+
+t_close_empty(_) ->
+    ?assertEqual(false, close(new())).
+
+t_close_unlocked_idle({Dbs, DbsPids, [Pid1, _]}) ->
+    % There is one db handle and it's idle. It should get closed.
+    Cache = insert(?DB1, new()),
+    Res = close(Cache),
+    ?assertMatch({true, {_, #{}}}, Res),
+    {true, {Tree, Map}} = Res,
+    ?assert(gb_trees:is_empty(Tree)),
+    ?assert(is_map(Map) andalso map_size(Map) == 0),
+    ?assertNot(is_process_alive(Pid1)),
+    ?assertEqual([], ets:lookup(Dbs, ?DB1)),
+    ?assertEqual([], ets:lookup(DbsPids, Pid1)).
+
+t_close_bump_busy_all({_Dbs, _DbsPids, [Pid1, _]}) ->
+    % There is one db handle and it's busy. We should stay up.
+    Cache = insert(?DB1, new()),
+    meck:expect(couch_db, is_idle, 1, false),
+    % Yeah, it is odd that we're throwing away the updated cache by returning
+    % just false if we don't end up finding an idle Db.
+    meck:reset(couch_stats),
+    ?assertEqual(false, close(Cache)),
+    ?assertEqual(1, meck:num_calls(couch_stats, increment_counter, 1)),
+    ?assert(is_process_alive(Pid1)).
+
+t_close_bump_busy_one({Dbs, DbsPids, [Pid1, Pid2]}) ->
+    % One busy handle gets bumped, the idle one closed.
+    {_, Map} = Cache = insert(?DB2, insert(?DB1, new())),
+    meck:expect(couch_db, is_idle, fun
+        (?DB1) -> false;
+        (?DB2) -> true
+    end),
+    meck:reset(couch_stats),
+    {true, {Tree1, Map1}} = close(Cache),
+    ?assert(is_process_alive(Pid1)),
+    ?assertNot(is_process_alive(Pid2)),
+    ?assertEqual(1, ets:info(Dbs, size)),
+    ?assertEqual(1, ets:info(DbsPids, size)),
+    ?assertEqual(1, meck:num_calls(couch_stats, increment_counter, 1)),
+    ?assert(is_process_alive(Pid1)),
+    ?assertEqual(1, gb_trees:size(Tree1)),
+    ?assertEqual(1, map_size(Map1)),
+    % The ?DB1 entry should have been bumped
+    #{?DB1 := OldInt} = Map,
+    #{?DB1 := NewInt} = Map1,
+    ?assert(NewInt > OldInt),
+    ?assertEqual([{NewInt, ?DB1}], gb_trees:to_list(Tree1)).
+
+t_close_entry_one_is_missing({Dbs, _, [_Pid1, Pid2]}) ->
+    % Two entries but one is missing from db ets
+    % it should be auto-removed from LRU
+    Cache = insert(?DB2, insert(?DB1, new())),
+    ets:delete(Dbs, ?DB1),
+    {true, {Tree1, Map1}} = close(Cache),
+    % One entry was removed, one was closed. There should be
+    % nothing left in the LRU.
+    ?assert(gb_trees:is_empty(Tree1)),
+    ?assert(is_map(Map1)),
+    ?assertEqual(0, map_size(Map1)),
+    ?assertNot(is_process_alive(Pid2)).
+
+setup() ->
+    Pid1 = spawn(fun() ->
+        receive
+            something -> ok
+        end
+    end),
+    Pid2 = spawn(fun() ->
+        receive
+            something -> ok
+        end
+    end),
+    Dbs = ets:new(unique_name(), [named_table, public, {keypos, #entry.name}]),
+    DbsPids = ets:new(unique_name(), [named_table, public]),
+    ets:insert(Dbs, #entry{name = ?DB1, db = ?DB1, pid = Pid1, lock = unlocked}),
+    ets:insert(Dbs, #entry{name = ?DB2, db = ?DB2, pid = Pid2, lock = unlocked}),
+    ets:insert(DbsPids, {Pid1, ?DB1}),
+    ets:insert(DbsPids, {Pid2, ?DB2}),
+    meck:new(couch_server, [passthrough]),
+    meck:expect(couch_server, couch_dbs, fun(_) -> Dbs end),
+    meck:expect(couch_server, couch_dbs_pid_to_name, fun(_) -> DbsPids end),
+    meck:expect(couch_db, is_idle, 1, true),
+    meck:expect(couch_stats, increment_counter, 1, ok),
+    {Dbs, DbsPids, [Pid1, Pid2]}.
+
+teardown({Dbs, DbsPids, [Pid1, Pid2]}) ->
+    ets:delete(Dbs),
+    ets:delete(DbsPids),
+    exit(Pid1, kill),
+    exit(Pid2, kill),
+    meck:unload().
+
+unique_name() ->
+    Mod = atom_to_list(?MODULE),
+    Unique = erlang:unique_integer([positive, monotonic]),
+    list_to_atom(Mod ++ "_" ++ integer_to_list(Unique)).
+
+-endif.
