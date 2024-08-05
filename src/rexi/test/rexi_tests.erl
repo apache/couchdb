@@ -75,6 +75,7 @@ t_cast(_) ->
     Ref = rexi:cast(node(), {?MODULE, rpc_test_fun, [potato]}),
     {Res, Dict} =
         receive
+            {Ref, {R, D}, {delta, _}} -> {R, maps:from_list(D)};
             {Ref, {R, D}} -> {R, maps:from_list(D)}
         end,
     ?assertEqual(potato, Res),
@@ -99,7 +100,12 @@ t_cast_explicit_caller(_) ->
         receive
             {'DOWN', CallerRef, _, _, Exit} -> Exit
         end,
-    ?assertMatch({Ref, {potato, [_ | _]}}, Result).
+    case couch_stats_resource_tracker:is_enabled() of
+        true ->
+            ?assertMatch({Ref, {potato, [_ | _]}, {delta, _}}, Result);
+        false ->
+            ?assertMatch({Ref, {potato, [_ | _]}}, Result)
+    end.
 
 t_cast_ref(_) ->
     put(nonce, yesh),
@@ -180,6 +186,7 @@ t_cast_error(_) ->
     Ref = rexi:cast(node(), self(), {?MODULE, rpc_test_fun, [{error, tomato}]}, []),
     Res =
         receive
+            {Ref, RexiExit, {delta, _}} -> RexiExit;
             {Ref, RexiExit} -> RexiExit
         end,
     ?assertMatch({rexi_EXIT, {tomato, [{?MODULE, rpc_test_fun, 1, _} | _]}}, Res).
@@ -188,6 +195,7 @@ t_kill(_) ->
     Ref = rexi:cast(node(), {?MODULE, rpc_test_fun, [{sleep, 10000}]}),
     WorkerPid =
         receive
+            {Ref, {sleeping, Pid}, {delta, _}} -> Pid;
             {Ref, {sleeping, Pid}} -> Pid
         end,
     ?assert(is_process_alive(WorkerPid)),
@@ -207,18 +215,23 @@ t_ping(_) ->
     rexi:cast(node(), {?MODULE, rpc_test_fun, [ping]}),
     Res =
         receive
+            {rexi, Ping, {delta, _}} -> Ping;
             {rexi, Ping} -> Ping
         end,
     ?assertEqual('$rexi_ping', Res).
 
 stream_init(Ref) ->
     receive
+        {Ref, From, rexi_STREAM_INIT, {delta, _}} ->
+            From;
         {Ref, From, rexi_STREAM_INIT} ->
             From
     end.
 
 recv(Ref) when is_reference(Ref) ->
     receive
+        {Ref, _, Msg, {delta, _}} -> Msg;
+        {Ref, Msg, {delta, _}} -> Msg;
         {Ref, _, Msg} -> Msg;
         {Ref, Msg} -> Msg
     after 500 -> timeout
