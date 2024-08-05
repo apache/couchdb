@@ -22,25 +22,31 @@ new() ->
     {gb_trees:empty(), #{}}.
 
 -spec insert(binary(), cache()) -> cache().
-insert(DbName, {Tree0, #{} = Map0}) ->
-    Lru = couch_util:unique_monotonic_integer(),
-    {gb_trees:insert(Lru, DbName, Tree0), Map0#{DbName => Lru}}.
+insert(DbName, {Tree, #{} = Map} = Cache) ->
+    case Map of
+        #{DbName := Old} ->
+            update_int(Old, DbName, Cache);
+        #{} ->
+            New = couch_util:unique_monotonic_integer(),
+            {gb_trees:insert(New, DbName, Tree), Map#{DbName => New}}
+    end.
+
+%% Update bumps the entry but only if it already exists. If it doesn't exist,
+%% it won't be inserted.
 
 -spec update(binary(), cache()) -> cache().
-update(DbName, {Tree0, #{} = Map0}) ->
-    case Map0 of
+update(DbName, {Tree, #{} = Map} = Cache) ->
+    case Map of
         #{DbName := Old} ->
-            New = couch_util:unique_monotonic_integer(),
-            Tree = gb_trees:insert(New, DbName, gb_trees:delete(Old, Tree0)),
-            {Tree, Map0#{DbName := New}};
+            update_int(Old, DbName, Cache);
         #{} ->
             % We closed this database before processing the update.  Ignore
-            {Tree0, Map0}
+            {Tree, Map}
     end.
 
 %% Attempt to close the oldest idle database. This function also cleans deleted
 %% and locked entries from the Lru and also bumps busy entries until the first
-%% idle entry is found. If not entry is found it returns `false`. In that case
+%% idle entry is found. If no entry is found, it returns `false`. In that case
 %% all bumped entries are lost as heap garbage.
 
 -spec close(cache()) -> {true, cache()} | false.
@@ -48,6 +54,11 @@ close({Tree, _} = Cache) ->
     close_int(gb_trees:next(gb_trees:iterator(Tree)), Cache).
 
 %% internals
+
+update_int(Old, DbName, {Tree, #{} = Map}) ->
+    New = couch_util:unique_monotonic_integer(),
+    Tree1 = gb_trees:insert(New, DbName, gb_trees:delete(Old, Tree)),
+    {Tree1, Map#{DbName := New}}.
 
 close_int(none, {_Tree, #{}}) ->
     false;
@@ -91,11 +102,13 @@ couch_lru_test_() ->
             ?TDEF_FE(t_insert),
             ?TDEF_FE(t_insert_duplicate),
             ?TDEF_FE(t_update),
+            ?TDEF_FE(t_update_non_existent),
             ?TDEF_FE(t_close_empty),
             ?TDEF_FE(t_close_unlocked_idle),
             ?TDEF_FE(t_close_bump_busy_all),
             ?TDEF_FE(t_close_bump_busy_one),
-            ?TDEF_FE(t_close_entry_one_is_missing)
+            ?TDEF_FE(t_close_entry_one_is_missing),
+            ?TDEF_FE(t_multiple_inserts_and_close)
         ]
     }.
 
@@ -121,14 +134,23 @@ t_insert_duplicate(_) ->
     % instead which would reap the old LRU entry
     %
     {Tree, Map} = insert(?DB1, insert(?DB1, new())),
-    ?assertEqual(2, gb_trees:size(Tree)),
+    ?assertEqual(1, gb_trees:size(Tree)),
     ?assertEqual(1, map_size(Map)),
     ?assertMatch(#{?DB1 := _}, Map),
-    ?assertMatch([{_, ?DB1}, {_, ?DB1}], gb_trees:to_list(Tree)).
+    ?assertMatch([{_, ?DB1}], gb_trees:to_list(Tree)).
 
 t_update(_) ->
     % Insert followed by update.
     {Tree, Map} = update(?DB1, insert(?DB1, new())),
+    ?assertEqual(1, gb_trees:size(Tree)),
+    ?assertEqual(1, map_size(Map)),
+    ?assertMatch(#{?DB1 := _}, Map),
+    #{?DB1 := Int} = Map,
+    ?assertEqual([{Int, ?DB1}], gb_trees:to_list(Tree)).
+
+t_update_non_existent(_) ->
+    % Updating a non-existent item is a no-op
+    {Tree, Map} = update(?DB2, insert(?DB1, new())),
     ?assertEqual(1, gb_trees:size(Tree)),
     ?assertEqual(1, map_size(Map)),
     ?assertMatch(#{?DB1 := _}, Map),
@@ -197,17 +219,19 @@ t_close_entry_one_is_missing({Dbs, _, [_Pid1, Pid2]}) ->
     ?assertEqual(0, map_size(Map1)),
     ?assertNot(is_process_alive(Pid2)).
 
+t_multiple_inserts_and_close(_) ->
+    % Insert same entry twice, then close. Previously insert had a bug where a
+    % double insert would add two tree entries for a single map entry. Then,
+    % during the close traversal, if one instances was busy and the other idle,
+    % we'd crash with function clause in a function clause in gb_trees:delete/2
+    % (See issue #5166 for details)
+    {_, Map} = Cache = insert(?DB1, insert(?DB1, new())),
+    meck:expect(couch_db, is_idle, 1, meck:seq([meck:val(false), meck:val(true)])),
+    ?assertEqual(false, close(Cache)).
+
 setup() ->
-    Pid1 = spawn(fun() ->
-        receive
-            something -> ok
-        end
-    end),
-    Pid2 = spawn(fun() ->
-        receive
-            something -> ok
-        end
-    end),
+    Pid1 = spawn(fun() -> timer:sleep(9999999) end),
+    Pid2 = spawn(fun() -> timer:sleep(9999999) end),
     Dbs = ets:new(unique_name(), [named_table, public, {keypos, #entry.name}]),
     DbsPids = ets:new(unique_name(), [named_table, public]),
     ets:insert(Dbs, #entry{name = ?DB1, db = ?DB1, pid = Pid1, lock = unlocked}),
