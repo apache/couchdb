@@ -79,7 +79,7 @@
 new() ->
     #db_header{
         uuid = couch_uuids:random(),
-        epochs = [{node(), 0}]
+        epochs = [{config:node_name(), 0}]
     }.
 
 from(Header0) ->
