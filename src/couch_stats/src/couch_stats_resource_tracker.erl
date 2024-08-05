@@ -503,7 +503,6 @@ set_context_username(#httpd{user_ctx = Ctx}, PidRef) ->
 set_context_username(#user_ctx{name = Name}, PidRef) ->
     set_context_username(Name, PidRef);
 set_context_username(UserName, PidRef) ->
-    io:format("SETTING USERNAME TO: ~p~n", [UserName]),
     is_enabled() andalso update_element(PidRef, [{#rctx.username, UserName}]).
 
 destroy_context() ->
