@@ -282,8 +282,13 @@ upgrade_epochs(#db_header{} = Header) ->
                 % compaction proceeds. In that case the epochs sequence could
                 % be regressing.
                 Epochs0;
-            [{_OtherNode, S} | _] = Epochs1 ->
-                assert_monotonic_update_seq(Header, S),
+            [{_OtherNode, S} | _] = Epochs0 when Header#db_header.update_seq < S ->
+                % When compacting the new header starts at update_seq = 0 and
+                % continues incrementing as the compaction proceeds. In that
+                % case the epochs sequence could be regressing. So if we detect
+                % a regression we don't update the epochs list.
+                Epochs0;
+            [{_OtherNode, _S} | _] = Epochs1 ->
                 % This node is taking over ownership of this db
                 % and marking the update sequence where it happened.
                 [{Node, Header#db_header.update_seq} | Epochs1]
@@ -294,15 +299,6 @@ upgrade_epochs(#db_header{} = Header) ->
     % changed the database.
     DedupedEpochs = remove_dup_epochs(NewEpochs),
     Header#db_header{epochs = DedupedEpochs}.
-
-assert_monotonic_update_seq(#db_header{update_seq = CurrentUpdateSeq}, LatestEpochSeq) ->
-    ?assert(
-        LatestEpochSeq =< CurrentUpdateSeq,
-        "Latest epoch seq " ++
-            integer_to_list(LatestEpochSeq) ++
-            " should not be higher than current update seq " ++
-            integer_to_list(CurrentUpdateSeq)
-    ).
 
 % This is slightly relying on the udpate_seq's being sorted
 % in epochs due to how we only ever push things onto the
@@ -460,12 +456,13 @@ upgrade_epochs_test() ->
     CompactionHeader = NowOwnedHeader#db_header{update_seq = 0},
     ?assertEqual(CompactionHeader, upgrade(CompactionHeader)),
 
-    % When nodes are different we do assert sequence regression
+    % When nodes are different, if sequence regression is not recorded as that's
+    % what happens during compaction.we do assert sequence regression
     NotOwnedHighSeq = set(NewHeader, [
         {update_seq, 4},
         {epochs, [{'someothernode@someotherhost', 5}]}
     ]),
-    ?assertError({assert, _}, upgrade(NotOwnedHighSeq)),
+    ?assertEqual(NotOwnedHighSeq, upgrade(NotOwnedHighSeq)),
 
     % Getting a reset header maintains the epoch data
     ResetHeader = from(NewNewHeader),
