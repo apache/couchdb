@@ -162,7 +162,7 @@ Features and Enhancements
 * :ghissue:`4575`: Add ``{verify, verify_peer}`` for TLS validation.
 * :ghissue:`4569`: Mango: add ``keys_examined`` for ``execution_stats``.
 * :ghissue:`4558`: Make Erlang/OTP 24 the minimum supported Erlang version.
-* :ghissue:`4503`: Make timeouts for ``_view`` and ``_search`` configurable.
+* :ghissue:`4513`: Make timeouts for ``_view`` and ``_search`` configurable.
 * :ghissue:`4483`: Add RFC5424 compliant report logging.
 * :ghissue:`4475`: Add type and descriptions to prometheus output.
 * :ghissue:`4443`: Automatically enable FIPS mode at runtime.
