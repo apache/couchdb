@@ -1762,8 +1762,6 @@ containing only the requested individual statistic.
         couchdb_couch_replicator_checkpoints_failure_total 0
         # TYPE couchdb_couch_replicator_checkpoints_total counter
         couchdb_couch_replicator_checkpoints_total 0
-        # TYPE couchdb_couch_replicator_cluster_is_stable gauge
-        couchdb_couch_replicator_cluster_is_stable 1
         # TYPE couchdb_couch_replicator_connection_acquires_total counter
         couchdb_couch_replicator_connection_acquires_total 0
         # TYPE couchdb_couch_replicator_connection_closes_total counter
