@@ -95,8 +95,15 @@ start(Workers0, Keypos, StartFun, Replacements, RingOpts) ->
 
 cleanup(Workers) ->
     % Stop the auxiliary cleaner process as we got to the point where cleanup
-    % happesn in the regular fashion so we don't want to send 2x the number kill
-    % messages
+    % happens in the regular fashion and we don't want to send 2x the number
+    % of kill messages.
+    %
+    % First, we run the cleanup/1 function, then, we stop the cleaner;
+    % otherwise there is a tiny risk we get killed after we stop the process
+    % and before finish calling cleanup/1. This early, forced process kill may
+    % happen when running the recovery login in the ddoc cache.
+    %
+    Res = fabric_util:cleanup(Workers),
     case get(?WORKER_CLEANER) of
         CleanerPid when is_pid(CleanerPid) ->
             erase(?WORKER_CLEANER),
@@ -104,7 +111,7 @@ cleanup(Workers) ->
         _ ->
             ok
     end,
-    fabric_util:cleanup(Workers).
+    Res.
 
 handle_stream_start({rexi_DOWN, _, {_, NodeRef}, _}, _, St) ->
     #stream_acc{workers = Workers, ready = Ready, ring_opts = RingOpts} = St,
