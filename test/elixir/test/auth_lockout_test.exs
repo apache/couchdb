@@ -56,10 +56,9 @@ defmodule AuthLockoutTest do
     end
 
     # warning?
-    resp = Couch.get("/_all_dbs",
+    _resp = Couch.get("/_all_dbs",
       no_auth: true,
       headers:  [authorization: "Basic #{:base64.encode("chttpd_auth_lockout:baz")}"]
     )
   end
-
 end
