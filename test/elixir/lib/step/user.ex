@@ -33,7 +33,7 @@ defmodule Couch.Test.Setup.Step.User do
 
   def setup(_setup, %__MODULE__{roles: roles} = step) do
     users_db = IO.chardata_to_string(
-      :config.get('chttpd_auth', 'authentication_db', '_users'))
+      :config.get("chttpd_auth", "authentication_db", "_users"))
     if not Utils.db_exists?(users_db) do
       on_exit fn ->
         :fabric.delete_db(users_db, [@admin])
@@ -46,7 +46,7 @@ defmodule Couch.Test.Setup.Step.User do
       name = Utils.random_name("admin")
       pass = Utils.random_password()
       :config.set(
-        'admins', String.to_charlist(name), String.to_charlist(pass), false)
+        "admins", String.to_charlist(name), String.to_charlist(pass), false)
       %{step |
         name: name,
         password: pass,

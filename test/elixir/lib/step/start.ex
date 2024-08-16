@@ -40,13 +40,13 @@ defmodule Couch.Test.Setup.Step.Start do
     test_config = setup |> Setup.get(:test_config) |> Step.Config.get()
     protocol = test_config[:backdoor][:protocol] || "http"
     test_ctx = :test_util.start_couch(extra_apps)
-    addr = :config.get('couch_httpd', 'bind_address', '127.0.0.1')
+    addr = :config.get("couch_httpd", "bind_address", "127.0.0.1")
     port = :mochiweb_socket_server.get(:couch_httpd, :port)
     backdoor_url = "#{protocol}://#{addr}:#{port}"
     clustered_url =
       if :chttpd in extra_apps do
         protocol = test_config[:clustered][:protocol] || "http"
-        addr = :config.get('chttpd', 'bind_address', '127.0.0.1')
+        addr = :config.get("chttpd", "bind_address", "127.0.0.1")
         port = :mochiweb_socket_server.get(:chttpd, :port)
         "#{protocol}://#{addr}:#{port}"
       else
