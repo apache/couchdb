@@ -596,7 +596,7 @@ validate_config_update(Sec, Key, Val) ->
     end.
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 to_integer_test() ->
     ?assertEqual(1, to_integer(1)),
@@ -612,7 +612,8 @@ to_float_test() ->
     ?assertEqual(1.0, to_float(<<"1.0">>)),
     ?assertEqual(1.0, to_float("1.0")),
     ?assertEqual(-1.1, to_float("-01.1")),
-    ?assertEqual(0.0, to_float("-0.0")),
+    ?assertEqual(0.0, to_float("0.0")),
+    ?assertEquiv(0.0, to_float("-0.0")),
     ?assertEqual(0.0, to_float("+0.0")),
     ok.
 
