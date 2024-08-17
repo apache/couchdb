@@ -50,7 +50,7 @@ defmodule CouchDBTest.Mixfile do
     [
       app: :couchdbtest,
       version: "0.1.0",
-      elixir: "~> 1.13",
+      elixir: "~> 1.15",
       lockfile: Path.expand("mix.lock", __DIR__),
       deps_path: Path.expand("src", __DIR__),
       build_path: Path.expand("_build", __DIR__),
