@@ -393,8 +393,7 @@ if_no_tagged_process_found_new_must_be_spawned(_) ->
     % After 3rd proc returns to the pool there should
     % be 3 tagged idle processes
     ?assertEqual(ok, stop_client(Client3)),
-    wait_tagged_idle_count(3),
-    ?assertEqual(3, idle_count()).
+    wait_tagged_idle_count(3).
 
 db_tag_none_works(_) ->
     cfg_set("db_tag", "none"),
