@@ -467,6 +467,7 @@ install: release
 # target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
+	@mix clean --deps
 	@rm -rf .rebar/
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
