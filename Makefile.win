@@ -424,6 +424,7 @@ install: release
 # target: clean - Remove build artifacts
 clean:
 	@$(REBAR) -r clean
+	-@mix clean --deps || true
 	-@rmdir /s/q .rebar >NUL 2>&1 || true
 	-@del /f/q bin\couchjs.exe >NUL 2>&1 || true
 	-@rmdir /s/q src\*\ebin >NUL 2>&1 || true
