@@ -28,7 +28,7 @@ recover(<<"pause", _/binary>>) ->
     end,
     {ok, paused};
 recover(<<"big", _/binary>>) ->
-    {ok, [couch_rand:uniform() || _ <- lists:seq(1, 8192)]};
+    {ok, [rand:uniform() || _ <- lists:seq(1, 8192)]};
 recover(DbName) ->
     {ok, DbName}.
 

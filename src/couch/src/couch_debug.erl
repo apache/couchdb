@@ -1137,7 +1137,7 @@ random_processes(Acc, Depth) ->
     end.
 
 oneof(Options) ->
-    lists:nth(couch_rand:uniform(length(Options)), Options).
+    lists:nth(rand:uniform(length(Options)), Options).
 
 tree() ->
     [InitialPid | _] = Processes = random_processes(5),

@@ -275,7 +275,7 @@ choose_shards(DbName, Nodes, Options) ->
     mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
 
 rotate_rand(Nodes) ->
-    {A, B} = lists:split(couch_rand:uniform(length(Nodes)), Nodes),
+    {A, B} = lists:split(rand:uniform(length(Nodes)), Nodes),
     B ++ A.
 
 get_placement(Options) ->

@@ -72,5 +72,5 @@ check_levels(TestLevel, [CfgLevel | RestLevels]) ->
     check_levels(TestLevel, RestLevels).
 
 new_msg() ->
-    Bin = list_to_binary([couch_rand:uniform(255) || _ <- lists:seq(1, 16)]),
+    Bin = list_to_binary([rand:uniform(255) || _ <- lists:seq(1, 16)]),
     couch_util:to_hex(Bin).
