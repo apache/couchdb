@@ -360,7 +360,7 @@ should_find_missing_leaves_large_test() ->
         Seed = {1647, 841737, 351137},
         {_, Tree} = test_util:revtree_generate(1000, 0.2, 5, Seed),
         Seq = lists:seq(1, 1000),
-        Revs1 = [{couch_rand:uniform(1000), test_util:random_rev()} || _ <- Seq],
+        Revs1 = [{rand:uniform(1000), test_util:random_rev()} || _ <- Seq],
         Revs2 = couch_key_tree:find_missing(Tree, Revs1),
         ?assertEqual(lists:sort(Revs1), lists:sort(Revs2))
     end).

@@ -520,7 +520,7 @@ startup_jitter() ->
         "startup_jitter",
         ?STARTUP_JITTER_DEFAULT
     ),
-    couch_rand:uniform(erlang:max(1, Jitter)).
+    rand:uniform(erlang:max(1, Jitter)).
 
 headers_strip_creds([], Acc) ->
     lists:reverse(Acc);

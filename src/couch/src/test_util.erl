@@ -487,7 +487,7 @@ random_rev() ->
     couch_util:to_hex_bin(crypto:strong_rand_bytes(16)).
 
 shuffle(List) ->
-    Paired = [{couch_rand:uniform(), I} || I <- List],
+    Paired = [{rand:uniform(), I} || I <- List],
     Sorted = lists:sort(Paired),
     [I || {_, I} <- Sorted].
 

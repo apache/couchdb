@@ -207,7 +207,7 @@ make_next_request(#state{} = State) ->
         {false, true} ->
             choose_next_request(#state.background, State);
         {false, false} ->
-            case couch_rand:uniform() < State#state.ratio of
+            case rand:uniform() < State#state.ratio of
                 true ->
                     choose_next_request(#state.background, State);
                 false ->

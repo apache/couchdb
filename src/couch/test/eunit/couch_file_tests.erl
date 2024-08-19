@@ -340,14 +340,14 @@ check_header_recovery(CheckFun) ->
     ok.
 
 write_random_data(Fd) ->
-    write_random_data(Fd, 100 + couch_rand:uniform(1000)).
+    write_random_data(Fd, 100 + rand:uniform(1000)).
 
 write_random_data(Fd, 0) ->
     {ok, Bytes} = couch_file:bytes(Fd),
     {ok, (1 + Bytes div ?BLOCK_SIZE) * ?BLOCK_SIZE};
 write_random_data(Fd, N) ->
     Choices = [foo, bar, <<"bizzingle">>, "bank", ["rough", stuff]],
-    Term = lists:nth(couch_rand:uniform(4) + 1, Choices),
+    Term = lists:nth(rand:uniform(4) + 1, Choices),
     {ok, _, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N - 1).
 
@@ -466,7 +466,7 @@ nuke_dir_test_() ->
                     File0 = ?tempfile() ++ ".couch",
                     RootDir = filename:dirname(File0),
                     BaseName = filename:basename(File0),
-                    Seed = couch_rand:uniform(8999999999) + 999999999,
+                    Seed = rand:uniform(8999999999) + 999999999,
                     DDocDir = io_lib:format("db.~b_design", [Seed]),
                     ViewDir = filename:join([RootDir, DDocDir]),
                     file:make_dir(ViewDir),
