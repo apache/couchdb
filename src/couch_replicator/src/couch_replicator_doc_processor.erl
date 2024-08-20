@@ -674,7 +674,7 @@ start_delay_msec() ->
     DefaultSec = ?DEFAULT_START_DELAY_MSEC div 1000,
     % We're using a compatiblity config setting (cluster_start_period) to avoid
     % introducting a new config value.
-    MSec = config:get_integer("replicator", "cluster_start_period", DefaultSec),
+    MSec = 1000 * config:get_integer("replicator", "cluster_start_period", DefaultSec),
     max(MSec, ?MIN_START_DELAY_MSEC).
 
 -ifdef(TEST).
