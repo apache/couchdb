@@ -221,8 +221,8 @@ init([]) ->
         {read_concurrency, true},
         {write_concurrency, true}
     ]),
-    StartDelayMSec = start_delay_msec(),
-    {ok, schedule_membership_timer(#st{}), StartDelayMSec}.
+    erlang:send_after(start_delay_msec(), self(), delayed_init),
+    {ok, schedule_membership_timer(#st{})}.
 
 handle_call({updated, Id, Rep, Filter, Owner}, _From, #st{} = St) ->
     ok = updated_doc(Id, Rep, Filter, Owner),
@@ -242,7 +242,7 @@ handle_call(get_docs, _From, #st{} = St) ->
 handle_cast(Msg, #st{} = St) ->
     {stop, {error, unexpected_message, Msg}, St}.
 
-handle_info(timeout, #st{} = St) ->
+handle_info(delayed_init, #st{} = St) ->
     {noreply, start_scanner(St)};
 handle_info({'DOWN', _, _, _, #doc_worker_result{} = WRes}, #st{} = St) ->
     #doc_worker_result{id = Id, wref = Ref, result = Res} = WRes,
