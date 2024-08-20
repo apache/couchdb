@@ -104,7 +104,7 @@ kill_all(NodeRefs) when is_list(NodeRefs) ->
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    erlang:send(Caller, maybe_add_delta({Ref, Reply})).
+    erlang:send(Caller, rexi_utils:maybe_add_delta({Ref, Reply})).
 
 %% Private function used by stream2 to initialize the stream. Message is of the
 %% form {OriginalRef, {self(),reference()}, Reply}, which enables the
@@ -188,7 +188,7 @@ stream2(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, maybe_add_delta({Ref, self(), Msg})),
+            erlang:send(Caller, rexi_utils:maybe_add_delta({Ref, self(), Msg})),
             ok
     catch
         throw:timeout ->
@@ -226,7 +226,7 @@ ping() ->
     %% filtered queries will be silent on usage until they finally return
     %% a row or no results. This delay is proportional to the database size,
     %% so instead we make sure ping/0 keeps live stats flowing.
-    erlang:send(Caller, maybe_add_delta({rexi, '$rexi_ping'})).
+    erlang:send(Caller, rexi_utils:maybe_add_delta({rexi, '$rexi_ping'})).
 
 aggregate_server_queue_len() ->
     rexi_server_mon:aggregate_queue_len(rexi_server).
@@ -285,12 +285,4 @@ drain_acks(Count) ->
         {rexi_ack, N} -> drain_acks(Count - N)
     after 0 ->
         {ok, Count}
-    end.
-
-maybe_add_delta(T) ->
-    case couch_stats_resource_tracker:is_enabled() of
-        false ->
-            T;
-        true ->
-            rexi_utils:add_delta(T, rexi_utils:get_delta())
     end.

@@ -14,6 +14,7 @@
 
 -export([server_pid/1, send/2, recv/6]).
 -export([add_delta/2, extract_delta/1, get_delta/0]).
+-export([maybe_add_delta/1, maybe_add_delta/2]).
 
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->
@@ -128,3 +129,27 @@ extract_delta(T) -> {T, undefined}.
 
 get_delta() ->
     {delta, couch_stats_resource_tracker:make_delta()}.
+
+maybe_add_delta(T) ->
+    case couch_stats_resource_tracker:is_enabled() of
+        false ->
+            T;
+        true ->
+            %% Call add_elta/2 directly instead of maybe_add_delta/2 to avoid
+            %% redundant is_enabled check, or the pre-emptive get_delta/0
+            add_delta(T, rexi_utils:get_delta())
+    end.
+
+%% Allow for externally provided Delta in error handling scenarios
+%% eg in cases like rexi_server:notify_caller
+maybe_add_delta(T, undefined) ->
+    T;
+maybe_add_delta(T, Delta) when is_map(Delta) ->
+    maybe_add_delta(T, {delta, Delta});
+maybe_add_delta(T, {delta, _} = Delta) ->
+    case couch_stats_resource_tracker:is_enabled() of
+        false ->
+            T;
+        true ->
+            add_delta(T, Delta)
+    end.
