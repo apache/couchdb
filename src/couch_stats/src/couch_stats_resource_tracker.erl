@@ -100,6 +100,8 @@
 -define(COUCH_SERVER_OPEN, db_open).
 -define(COUCH_BT_GET_KP_NODE, get_kp_node).
 -define(COUCH_BT_GET_KV_NODE, get_kv_node).
+-define(COUCH_BT_WRITE_KP_NODE, write_kp_node).
+-define(COUCH_BT_WRITE_KV_NODE, write_kv_node).
 -define(COUCH_JS_FILTER, js_filter).
 -define(COUCH_JS_FILTER_ERROR, js_filter_error).
 -define(COUCH_JS_FILTERED_DOCS, js_filtered_docs).
@@ -143,7 +145,9 @@
     %% TODO: switch record definitions to be macro based, eg:
     %% ?COUCH_BT_GET_KP_NODE = 0,
     get_kv_node = 0,
-    get_kp_node = 0
+    get_kp_node = 0,
+    write_kv_node = 0,
+    write_kp_node = 0
 }).
 
 %%
@@ -390,8 +394,10 @@ to_json(#rctx{}=Rctx) ->
         js_filter_error = JSFilterErrors,
         js_filtered_docs = JSFilteredDocss,
         type = Type,
-        get_kp_node = KpNodes,
-        get_kv_node = KvNodes,
+        get_kp_node = GetKpNodes,
+        get_kv_node = GetKvNodes,
+        %%write_kp_node = WriteKpNodes,
+        %%write_kv_node = WriteKvNodes,
         changes_returned = ChangesReturned,
         ioq_calls = IoqCalls
     } = Rctx,
@@ -412,8 +418,10 @@ to_json(#rctx{}=Rctx) ->
         js_filtered_docs => JSFilteredDocss,
         rows_read => RowsRead,
         type => convert_type(Type),
-        kp_nodes => KpNodes,
-        kv_nodes => KvNodes,
+        get_kp_nodes => GetKpNodes,
+        get_kv_nodes => GetKvNodes,
+        %%write_kp_nodes => WriteKpNodes,
+        %%write_kv_nodes => WriteKvNodes,
         changes_returned => ChangesReturned,
         ioq_calls => IoqCalls
     }.
@@ -564,10 +572,17 @@ maybe_inc([fabric_rpc, view, rows_read], Val) ->
     inc(?ROWS_READ, Val);
 maybe_inc([couchdb, couch_server, open], Val) ->
     inc(?DB_OPEN, Val);
-maybe_inc([couchdb, btree, kp_node], Val) ->
+maybe_inc([couchdb, btree, get_node, kp_node], Val) ->
     inc(?COUCH_BT_GET_KP_NODE, Val);
-maybe_inc([couchdb, btree, kv_node], Val) ->
+maybe_inc([couchdb, btree, get_node, kv_node], Val) ->
     inc(?COUCH_BT_GET_KV_NODE, Val);
+%% The write_node logic won't pickup writes as none of the RPC
+%% processes actually perform the write operation
+%% TODO: bubble up induced work from other processes
+maybe_inc([couchdb, btree, write_node, kp_node], Val) ->
+    inc(?COUCH_BT_WRITE_KP_NODE, Val);
+maybe_inc([couchdb, btree, write_node, kv_node], Val) ->
+    inc(?COUCH_BT_WRITE_KV_NODE, Val);
 maybe_inc([couchdb, query_server, js_filter_error], Val) ->
     inc(?COUCH_JS_FILTER_ERROR, Val);
 maybe_inc([couchdb, query_server, js_filter], Val) ->
@@ -762,9 +777,6 @@ tracker({Pid, _Ref}=PidRef) ->
     end.
 
 log_process_lifetime_report(PidRef) ->
-    %% TODO: catch error out of here, report crashes on depth>1 json
-    %%io:format("CSRT RCTX: ~p~n", [to_flat_json(Rctx)]),
-    %% TODO: clean this up
     case is_enabled() andalso is_logging_enabled() of
         true ->
             Rctx = get_resource_raw(PidRef),
@@ -782,7 +794,8 @@ is_logging_enabled() ->
     logging_enabled() =/= false.
 
 logging_enabled() ->
-    case conf_get("log_pid_usage_report", "coordinator") of
+    %%case conf_get("log_pid_usage_report", "coordinator") of
+    case conf_get("log_pid_usage_report", "true") of
         "coordinator" ->
             coordinator;
         "true" ->
