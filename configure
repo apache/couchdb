@@ -43,7 +43,7 @@ JS_ENGINE=${JS_ENGINE:-"spidermonkey"}
 SM_VSN=${SM_VSN:-"91"}
 CLOUSEAU_MTH=${CLOUSEAU_MTH:-"dist"}
 CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases/download/%s/clouseau-%s-dist.zip"}
-CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.22.0"}
+CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.23.1"}
 CLOUSEAU_DIR="$(pwd)"/clouseau
 ARCH="$(uname -m)"
 ERLANG_VER="$(run_erlang 'io:put_chars(erlang:system_info(otp_release)).')"
@@ -111,16 +111,11 @@ parse_opts() {
                 continue
                 ;;
 
-	        --with-clouseau)
-		        if [ "${ERLANG_VER}" -gt 25 ]; then
-		            echo "Warning: Clouseau is not working with OTP 26 or later at the moment, therefore it is not configured.  Continue in 5 seconds..."
-		            sleep 5
-		        else
-		            WITH_CLOUSEAU="true"
-		        fi
-		        shift
-		        continue
-		        ;;
+            --with-clouseau)
+                WITH_CLOUSEAU="true"
+                shift
+                continue
+                ;;
 
             --erlang-md5)
                 ERLANG_MD5="true"
@@ -475,24 +470,35 @@ check_local_clouseau_dir() {
     fi
 }
 
+fetch_file() {
+    _file_name="$1"
+    _file_url="$2"
+
+    if ! curl -sSL --max-redirs 1 -o "$_file_name" "$_file_url"; then
+	printf "ERROR: %s could not be downloaded.\n" "$_file_url" >&2
+	exit 1
+    fi
+}
+
 install_local_clouseau() {
     case "$CLOUSEAU_MTH" in
 	dist)
 	    _DIST_URL=$(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN")
 	    _MAVEN_BASE_URI=https://repo1.maven.org/maven2
+	    _LOGBACK_DIST_URL="$_MAVEN_BASE_URI"/ch/qos/logback
 
-	    _SLF4J_SIMPLE_VSN=${SLF4J_SIMPLE_VERSION:-1.7.36}
-	    _SLF4J_SIMPLE_JAR=slf4j-simple-"$_SLF4J_SIMPLE_VSN".jar
-	    _SLF4J_SIMPLE_URL="$_MAVEN_BASE_URI"/org/slf4j/slf4j-simple/"$_SLF4J_SIMPLE_VSN"/"$_SLF4J_SIMPLE_JAR"
+	    : "${LOGBACK_VERSION:=1.2.13}"
+	    _LOGBACK_CORE_JAR=logback-core-"$LOGBACK_VERSION".jar
+	    _LOGBACK_CORE_URL="$_LOGBACK_DIST_URL"/logback-core/"$LOGBACK_VERSION"/"$_LOGBACK_CORE_JAR"
+	    _LOGBACK_CLASSIC_JAR=logback-classic-"$LOGBACK_VERSION".jar
+	    _LOGBACK_CLASSIC_URL="$_LOGBACK_DIST_URL"/logback-classic/"$LOGBACK_VERSION"/"$_LOGBACK_CLASSIC_JAR"
 
 	    check_local_clouseau_dir "$CLOUSEAU_DIR"
 	    mkdir -p "$CLOUSEAU_DIR"
 
 	    echo "Fetching Clouseau from $_DIST_URL..."
-	    if ! curl -sSL --max-redirs 1 -o clouseau.zip "$_DIST_URL"; then
-		printf "ERROR: %s could not be downloaded.\n" "$_DIST_URL" >&2
-		exit 1
-	    fi
+
+	    fetch_file clouseau.zip "$_DIST_URL"
 
 	    if ! unzip -q -j clouseau.zip -d "$CLOUSEAU_DIR"; then
 		printf "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted.\n" >&2
@@ -501,10 +507,10 @@ install_local_clouseau() {
 
 	    rm clouseau.zip
 
-	    if ! curl -sSL --max-redirs 1 -o "$CLOUSEAU_DIR"/"$_SLF4J_SIMPLE_JAR" "$_SLF4J_SIMPLE_URL"; then
-		printf "ERROR: %s could not be downloaded.\n" "$_SLF4J_SIMPLE_URL" >&2
-		exit 1
-	    fi
+	    echo "Fetching Logback $LOGBACK_VERSION from $_LOGBACK_DIST_URL..."
+
+	    fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CORE_JAR" "$_LOGBACK_CORE_URL"
+	    fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CLASSIC_JAR" "$_LOGBACK_CLASSIC_URL"
 	    ;;
 
 	git)

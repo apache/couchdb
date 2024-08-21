@@ -14,9 +14,9 @@
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
   -JSEngine ENGINE           select JS engine to use (spidermonkey or quickjs) (default spidermonkey)
-  -ClouseauVersion VSN       select the version of Clouseau to use (default 2.22.0)
+  -ClouseauVersion VSN       select the version of Clouseau to use (default 2.23.1)
   -ClouseauMethod MTH        method for Clouseau to deploy: git or dist (default dist)
-  -ClouseauUri URI           location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.22.0/clouseau-2.22.0-dist.zip)
+  -ClouseauUri URI           location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.23.1/clouseau-2.23.1-dist.zip)
 
   Installation directories:
   -Prefix PREFIX             install architecture-independent files in PREFIX
@@ -66,9 +66,9 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauVersion = "2.22.0", # select the version of Clouseau to use (default 2.22.0)
+    [string]$ClouseauVersion = "2.23.1", # select the version of Clouseau to use (default 2.23.1)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.22.0/clouseau-2.22.0-dist.zip)
+    [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.23.1/clouseau-2.23.1-dist.zip)
     [ValidateNotNullOrEmpty()]
     [string]$Prefix = "C:\Program Files\Apache\CouchDB", # install architecture-independent file location (default C:\Program Files\Apache\CouchDB)
     [ValidateNotNullOrEmpty()]
@@ -321,10 +321,12 @@ if ($WithClouseau)
 
 	New-Item -Path $ClouseauDir -ItemType Directory | Out-Null
 
-	$Slf4jVersion = "1.7.36"
+	$LogbackVersion = "1.2.13"
 	$ClouseauDistUrl = $ClouseauUri -f $ClouseauVersion
-	$Slf4jSimpleJar = "slf4j-simple-$Slf4jVersion.jar"
-	$Slf4jSimpleUrl = "https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/$Slf4jVersion/$Slf4jSimpleJar"
+	$LogbackCoreJar = "logback-core-$LogbackVersion.jar"
+	$LogbackCoreJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-core/$LogbackVersion/$LogbackCoreJar"
+	$LogbackClassicJar = "logback-classic-$LogbackVersion.jar"
+	$LogbackClassicJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-classic/$LogbackVersion/$LogbackClassicJar"
 
 	Set-Variable ProgressPreference SilentlyContinue
 	Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
@@ -342,9 +344,15 @@ if ($WithClouseau)
 	Remove-Item "$ClouseauDir\clouseau-$ClouseauVersion"
 	Remove-Item clouseau.zip
 
-	Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$Slf4jSimpleJar" $Slf4jSimpleUrl
+	Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackCoreJar" $LogbackCoreJarUrl
 	If ($LASTEXITCODE -ne 0) {
-	    Write-Output "ERROR: $Slf4jSimpleJarUrl could not be downloaded."
+	    Write-Output "ERROR: $LogbackCoreJarUrl could not be downloaded."
+	    exit 1
+	}
+
+	Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackClassicJar" $LogbackClassicJarUrl
+	If ($LASTEXITCODE -ne 0) {
+	    Write-Output "ERROR: $LogbackClassicJarUrl could not be downloaded."
 	    exit 1
 	}
     }
