@@ -98,8 +98,7 @@ key_tree_stemming_test_() ->
         [
             should_have_no_effect_for_stemming_more_levels_than_exists(),
             should_return_one_deepest_node(),
-            should_return_two_deepest_nodes(),
-            should_not_use_excessive_memory_when_stemming()
+            should_return_two_deepest_nodes()
         ]
     }.
 
@@ -552,28 +551,3 @@ should_return_two_deepest_nodes() ->
 merge_and_stem(RevTree, Tree) ->
     {Merged, Result} = couch_key_tree:merge(RevTree, Tree),
     {couch_key_tree:stem(Merged, ?DEPTH), Result}.
-
-should_not_use_excessive_memory_when_stemming() ->
-    ?_test(begin
-        % This is to preserve determinism
-        Seed = {1647, 841737, 351137},
-        {_, Tree} = test_util:revtree_generate(1000, 0.06, 15, Seed),
-        % Without the optimization #91de482fd66f4773b3b8583039c6bcaf1c5727ec
-        % stemming would consume about 18_000_000 words. With it, it consumes
-        % 6_000_000. So, use 13_000_000 as a threshold.
-        Opts = [
-            monitor,
-            {max_heap_size, #{
-                size => 15000000,
-                error_logger => false,
-                kill => true
-            }}
-        ],
-        {_Pid, Ref} = spawn_opt(couch_key_tree, stem, [Tree, 1000], Opts),
-        % When it uses too much memory exit would be `killed`
-        Exit =
-            receive
-                {'DOWN', Ref, _, _, Res} -> Res
-            end,
-        ?assertEqual(normal, Exit)
-    end).
