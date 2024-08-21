@@ -592,14 +592,21 @@ def generate_default_clouseau_ini(path):
         )
 
 
-def generate_default_log4j_properties(path):
-    print("(generate default log4j.properties)")
+def generate_default_logback_properties(path):
+    print("(generate default logback.xml)")
     with open(path, "w") as handle:
         handle.write(
-            """log4j.rootLogger=debug, CONSOLE
-log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
-log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
-log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} %c [%p] %m%n
+            """<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{ISO8601} %c [%p] %m%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="debug">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>
 """
         )
 
@@ -714,9 +721,11 @@ def boot_clouseau(ctx, idx):
     if not os.path.exists(clouseau_ini):
         generate_default_clouseau_ini(clouseau_ini)
 
-    log4j_properties = os.path.join(clouseau_dir, "log4j.properties")
-    if not os.path.exists(log4j_properties):
-        generate_default_log4j_properties(log4j_properties)
+    logback_properties = os.path.join(clouseau_dir, "logback.xml")
+    if not os.path.exists(logback_properties):
+        generate_default_logback_properties(logback_properties)
+
+    classpath = separator.join([classpath, clouseau_dir])  # for logback.xml
 
     clouseau_name = "clouseau{}@127.0.0.1".format(idx)
     clouseau_indexes_dir = os.path.join(ctx["devdir"], "clouseau{}".format(idx), "data")
@@ -745,7 +754,6 @@ def boot_clouseau(ctx, idx):
             "-XX:+CMSParallelRemarkEnabled",
             "-cp",
             classpath,
-            "-Dlog4j.configuration=file:{}".format(log4j_properties),
             "-Dclouseau.name={}".format(clouseau_name),
             "-Dclouseau.dir={}".format(clouseau_indexes_dir),
         ]
