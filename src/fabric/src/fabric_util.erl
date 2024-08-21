@@ -149,6 +149,9 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
                         throw(Error);
                     {Ref, Reason} ->
                         couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
+                        get_shard(Rest, Opts, Timeout, Factor);
+                    _ ->
+                        ?LOG_UNEXPECTED_MSG(Msg),
                         get_shard(Rest, Opts, Timeout, Factor)
                 end
         after Timeout ->
