@@ -187,10 +187,12 @@ maybe_resubmit(State, #job{name = DbName, node = Node} = Job) ->
     case lists:member(DbName, local_dbs()) of
         true ->
             case find_next_node() of
-                Node ->
+                Node when Node =/= node() ->
                     add_to_queue(State, Job);
                 _ ->
-                    % don't resubmit b/c we have a new replication target
+                    % don't resubmit b/c we have a new replication target and
+                    % don't push to self, as it's a no-op (push/2 has a guard
+                    % for it but the topology might have changed since)
                     State
             end;
         false ->
@@ -302,12 +304,35 @@ sync_push(ShardName, N) ->
     gen_server:call(mem3_sync, {push, #job{name = ShardName, node = N}}, infinity).
 
 find_next_node() ->
-    LiveNodes = [node() | nodes()],
-    AllNodes0 = lists:sort(mem3:nodes()),
-    AllNodes1 = [X || X <- AllNodes0, lists:member(X, LiveNodes)],
-    AllNodes = AllNodes1 ++ [hd(AllNodes1)],
-    [_Self, Next | _] = lists:dropwhile(fun(N) -> N =/= node() end, AllNodes),
-    Next.
+    Self = node(),
+    LiveNodes = [Self | nodes()],
+    Mem3Nodes = mem3:nodes(),
+    find_next_node(Self, LiveNodes, Mem3Nodes).
+
+find_next_node(Self, LiveNodes, Mem3Nodes) ->
+    SortedMem3Nodes = lists:sort(Mem3Nodes),
+    LiveMem3Nodes = [N || N <- SortedMem3Nodes, lists:member(N, LiveNodes)],
+    case LiveMem3Nodes of
+        [] ->
+            % No live mem3 nodes. Strange. Return self as we can always
+            % replicate to ourselves, which is just a no-op.
+            Self;
+        [H | _] ->
+            % Append the first item to the end so dropwhile/2 can loop around
+            % and find it, if it's supposed to be the result. For instance in
+            % case of [x, n] and the current node as n, next node would be x,
+            % so we make [x, n, x], so dropwhile/2 drops x and n, and stops at
+            % [n, x = Next | _] then returns x.
+            LiveMem3Nodes1 = LiveMem3Nodes ++ [H],
+            case lists:dropwhile(fun(N) -> N =/= Self end, LiveMem3Nodes1) of
+                [] ->
+                    % We're not in the mem3 set of nodes. Also, strange. Return
+                    % self anyway as we can replicate to ourselves.
+                    Self;
+                [_Self, Next | _] ->
+                    Next
+            end
+    end.
 
 %% @doc Finds the next {DbName,Node} pair in the list of waiting replications
 %% which does not correspond to an already running replication
@@ -364,3 +389,19 @@ maybe_redirect(Node) ->
             couch_log:debug("Redirecting push from ~p to ~p", [Node, Redirect]),
             list_to_existing_atom(Redirect)
     end.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+find_next_node_test() ->
+    ?assertEqual(n, find_next_node(n, [n], [])),
+    ?assertEqual(n, find_next_node(n, [n], [n])),
+    ?assertEqual(x, find_next_node(n, [a, n, x], [a, n, x])),
+    ?assertEqual(a, find_next_node(n, [a, n], [a, n])),
+    ?assertEqual(n, find_next_node(n, [a, n], [a])),
+    ?assertEqual(x, find_next_node(n, [n, x], [x, n])),
+    ?assertEqual(x, find_next_node(n, [n, x], [n, x])),
+    ?assertEqual(a, find_next_node(n, [a, n, x], [a, n, y])).
+
+-endif.
