@@ -581,8 +581,11 @@ proc(Pid) ->
     }.
 
 prompt(#proc{} = Proc, Prompt) ->
+    % Make sure to transform ejson with key values {[{K, V}, ...]} to
+    % one containing maps to avoid false positives resulting from
+    % differences in json key encoding order
     try
-        couch_query_servers:proc_prompt(Proc, Prompt)
+        couch_util:ejson_to_map(couch_query_servers:proc_prompt(Proc, Prompt))
     catch
         Tag:Err ->
             {error, {Tag, Err}}
