@@ -421,6 +421,13 @@ ddoc_view(Doc) ->
             v_expr_fun1 => #{map => <<"(function(doc) {emit(1,2)})\n">>},
             v_expr_fun2 => #{map => <<"(function(doc) {emit(3,4)});">>},
             v_expr_fun3 => #{map => <<"y=9;\n(function(doc) {emit(5,y)})">>},
-            v_expr_fun4 => #{map => <<"x=10; function(doc) {emit(x,6)}\n">>}
+            v_expr_fun4 => #{map => <<"x=10; function(doc) {emit(x,6)}\n">>},
+            v_emit_map1 => #{
+                map => <<
+                    "function(doc){ \n",
+                    "  emit(42, {NaN:1, \"2\": 1}); \n"
+                    "};\n"
+                >>
+            }
         }
     }.

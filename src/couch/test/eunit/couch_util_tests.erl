@@ -193,3 +193,16 @@ json_decode_test_() ->
         ?_assertEqual({[]}, couch_util:json_decode(<<"{}">>, [])),
         ?_assertEqual(#{}, couch_util:json_decode(<<"{}">>, [return_maps]))
     ].
+
+ejson_to_map_test() ->
+    ?assertEqual(0, couch_util:ejson_to_map(0)),
+    ?assertEqual(true, couch_util:ejson_to_map(true)),
+    ?assertEqual(0.1, couch_util:ejson_to_map(0.1)),
+    ?assertEqual(#{}, couch_util:ejson_to_map(#{})),
+    ?assertEqual(#{a => b}, couch_util:ejson_to_map(#{a => b})),
+    ?assertEqual([], couch_util:ejson_to_map([])),
+    ?assertEqual([1], couch_util:ejson_to_map([1])),
+    ?assertEqual(#{}, couch_util:ejson_to_map({[]})),
+    ?assertEqual(#{a => 1, b => 2}, couch_util:ejson_to_map({[{b, 2}, {a, 1}]})),
+    ?assertEqual(#{<<"a">> => [1, #{}]}, couch_util:ejson_to_map({[{<<"a">>, [1, {[]}]}]})),
+    ?assertEqual([#{true => 1}], couch_util:ejson_to_map([{[{true, 1}]}])).

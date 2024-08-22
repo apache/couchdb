@@ -46,6 +46,7 @@
 -export([verify_hash_names/2]).
 -export([get_config_hash_algorithms/0]).
 -export([remove_sensitive_data/1]).
+-export([ejson_to_map/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -852,3 +853,12 @@ remove_sensitive_data(KVList) ->
     KVList1 = lists:keyreplace(<<"password">>, 1, KVList, {<<"password">>, <<"****">>}),
     % some KVList entries are atoms, so test fo this too
     lists:keyreplace(password, 1, KVList1, {password, <<"****">>}).
+
+ejson_to_map(#{} = Val) ->
+    maps:map(fun(_, V) -> ejson_to_map(V) end, Val);
+ejson_to_map(Val) when is_list(Val) ->
+    lists:map(fun(V) -> ejson_to_map(V) end, Val);
+ejson_to_map({Val}) when is_list(Val) ->
+    maps:from_list(lists:map(fun({K, V}) -> {K, ejson_to_map(V)} end, Val));
+ejson_to_map(Val) ->
+    Val.
