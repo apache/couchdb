@@ -63,6 +63,9 @@ changes_test_() ->
             ?TDEF(t_longpoll),
             ?TDEF(t_limit_zero),
             ?TDEF(t_continuous_limit_zero),
+            ?TDEF(t_continuous_limit_under_total),
+            ?TDEF(t_continuous_limit_exact_total),
+            ?TDEF(t_continuous_limit_over_total),
             ?TDEF(t_limit_one),
             ?TDEF(t_since_now),
             ?TDEF(t_continuous_since_now),
@@ -271,8 +274,23 @@ t_limit_zero({_, DbUrl}) ->
     ?assertEqual({0, 3, []}, changes(DbUrl, Params)).
 
 t_continuous_limit_zero({_, DbUrl}) ->
-    Params = "?feed=continuous&timeout=10&limit=0",
+    Params = "?feed=continuous&limit=0",
     ?assertEqual({0, 3, []}, changes(DbUrl, Params)).
+
+t_continuous_limit_under_total({_, DbUrl}) ->
+    Params = "?feed=continuous&&limit=1",
+    ?assertEqual({6, 2, [{6, {?DOC1, <<"2-c">>}, ?LEAFREV}]}, changes(DbUrl, Params)).
+
+t_continuous_limit_exact_total({_, DbUrl}) ->
+    Params = "?feed=continuous&limit=3",
+    ?assertMatch({8, 0, [{6, _, _}, {7, _, _}, {8, _, _}]}, changes(DbUrl, Params)).
+
+t_continuous_limit_over_total({_, DbUrl}) ->
+    Params = "?feed=continuous&timeout=600&limit=4",
+    T0 = erlang:monotonic_time(millisecond),
+    ?assertMatch({8, 0, [_, _, _]}, changes(DbUrl, Params)),
+    DtMSec = erlang:monotonic_time(millisecond) - T0,
+    ?assert(DtMSec > 500).
 
 t_limit_one({_, DbUrl}) ->
     Params = "?limit=1",
