@@ -26,6 +26,7 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_map_only, 10),
             ?TDEF_FE(t_vdu_only, 10),
             ?TDEF_FE(t_filter_only, 10),
+            ?TDEF_FE(t_filter_with_expected_error, 10),
             ?TDEF_FE(t_empty_ddoc, 10)
         ]
     }.
@@ -231,6 +232,27 @@ t_filter_only({_, DbName}) ->
             ok
     end.
 
+t_filter_with_expected_error({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_filter_error(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assertEqual(1, num_calls(db, ['_', DbName])),
+            ?assertEqual(1, num_calls(ddoc, ['_', DbName, '_'])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(10, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start, complete and no warning as we expected the error, so 2 total only
+            ?assertEqual(2, log_calls(warning));
+        false ->
+            ok
+    end.
+
 t_empty_ddoc({_, DbName}) ->
     ok = add_doc(DbName, ?DDOC1, #{}),
     meck:reset(couch_scanner_server),
@@ -330,6 +352,13 @@ ddoc_filter(Doc) ->
                 "    return false; \n"
                 "}\n"
             >>
+        }
+    }.
+
+ddoc_filter_error(Doc) ->
+    Doc#{
+        filters => #{
+            f => <<"function(doc, req) {throw(\"foo\");}">>
         }
     }.
 

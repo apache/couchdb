@@ -520,6 +520,8 @@ expected_error({error, {_, <<"TypeError">>, _}}, {error, {_, <<"TypeError">>, _}
     true;
 expected_error({error, {_, {<<"TypeError">>, _}}}, {error, {_, {<<"TypeError">>, _}}}) ->
     true;
+expected_error({error, {_, {<<"unnamed_error">>, _}}}, {error, {_, {<<"unnamed_error">>, _}}}) ->
+    true;
 expected_error(_, _) ->
     false.
 
