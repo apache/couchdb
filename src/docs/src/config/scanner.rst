@@ -126,31 +126,31 @@ settings in their ``[$plugin]`` section.
 
     .. config:option:: $string
 
-        Skip over databases if their names contain any of the strings in this section. ::
+        Skip over databases if their names match any of these regexes. ::
 
             [$plugin.skip_dbs]
-            string1 = true
-            string2 = true
+            regex1 = a|b
+            regex2 = bar(.*)baz
 
 .. config:section:: $plugin.skip_ddocs :: Skip design documents
 
     .. config:option:: $string
 
-        Skip over design documents if their DocIDs contain any of the strings in this section. ::
+        Skip over design documents if their DocIDs match any of these regexes. ::
 
             [$plugin.skip_ddocs]
-            string1 = true
-            string2 = true
+            regex1 = x|y|z
+            regex2 = c(d|e)f
 
 .. config:section:: $plugin.skip_docs :: Skip documents
 
     .. config:option:: $string
 
-        Skip over documents if their DocIds contain any of the strings in this section. ::
+        Skip over documents if their DocIds match any of the regexes. ::
 
             [$plugin.skip_docs]
-            string1 = true
-            string2 = true
+            regex1 = k|l
+            regex2 = mno$
 
 .. config:section:: couch_scanner_plugin_find.regexes :: Configure the "Find" plugin
 
