@@ -136,30 +136,34 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
-        receive
-            Msg0 ->
-                {Msg, Delta} = rexi_utils:extract_delta(Msg0),
-                couch_stats_resource_tracker:accumulate_delta(Delta),
-                case Msg of
-                    {Ref, {ok, Db}} ->
-                        {ok, Db};
-                    {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
-                        throw(Error);
-                    {Ref, {'rexi_EXIT', {{forbidden, _} = Error, _}}} ->
-                        throw(Error);
-                    {Ref, Reason} ->
-                        couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
-                        get_shard(Rest, Opts, Timeout, Factor);
-                    _ ->
-                        ?LOG_UNEXPECTED_MSG(Msg),
-                        get_shard(Rest, Opts, Timeout, Factor)
-                end
-        after Timeout ->
-            couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
-            get_shard(Rest, Opts, Factor * Timeout, Factor)
-        end
+        await_shard_response(Ref, Name, Rest, Opts, Factor, Timeout)
     after
         rexi_monitor:stop(Mon)
+    end.
+
+await_shard_response(Ref, Name, Rest, Opts, Factor, Timeout) ->
+    receive
+        Msg0 ->
+            {Msg, Delta} = rexi_utils:extract_delta(Msg0),
+            couch_stats_resource_tracker:accumulate_delta(Delta),
+            case Msg of
+                {Ref, {ok, Db}} ->
+                    {ok, Db};
+                {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
+                    throw(Error);
+                {Ref, {'rexi_EXIT', {{forbidden, _} = Error, _}}} ->
+                    throw(Error);
+                {Ref, Reason} ->
+                    couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
+                    get_shard(Rest, Opts, Timeout, Factor);
+                %% {OldRef, {ok, Db}} -> <-- stale db resp that got here late, should we do something?
+                _ ->
+                    %% Got a message from an old Ref that timed out, try again
+                    await_shard_response(Ref, Name, Rest, Opts, Factor, Timeout)
+            end
+    after Timeout ->
+        couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
+        get_shard(Rest, Opts, Factor * Timeout, Factor)
     end.
 
 get_db_timeout(N, Factor, MinTimeout, infinity) ->
