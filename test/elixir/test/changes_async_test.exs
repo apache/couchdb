@@ -104,6 +104,88 @@ defmodule ChangesAsyncTest do
   end
 
   @tag :with_db
+  test "eventsource changes with limit under", context do
+    db_name = context[:db_name]
+
+    check_empty_db(db_name)
+
+    create_doc(db_name, sample_doc_foo())
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+
+    req_id =
+      Rawresp.get("/#{db_name}/_changes?feed=eventsource&limit=1",
+        stream_to: self(),
+        direct: worker_pid
+      )
+
+    :ok = wait_for_headers(req_id.id, 200)
+
+    create_doc_bar(db_name, "bar")
+
+    changes = process_response(req_id.id, &parse_event/1)
+    assert length(changes) == 1
+    assert Enum.at(changes, 0)["id"] == "foo"
+
+    HTTPotion.stop_worker_process(worker_pid)
+  end
+
+  @tag :with_db
+  test "eventsource changes with limit exact", context do
+    db_name = context[:db_name]
+
+    check_empty_db(db_name)
+
+    create_doc(db_name, sample_doc_foo())
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+
+    req_id =
+      Rawresp.get("/#{db_name}/_changes?feed=eventsource&limit=2",
+        stream_to: self(),
+        direct: worker_pid
+      )
+
+    :ok = wait_for_headers(req_id.id, 200)
+
+    create_doc_bar(db_name, "bar")
+
+    changes = process_response(req_id.id, &parse_event/1)
+    assert length(changes) == 2
+    assert Enum.at(changes, 0)["id"] == "foo"
+    assert Enum.at(changes, 1)["id"] == "bar"
+
+    HTTPotion.stop_worker_process(worker_pid)
+  end
+
+  @tag :with_db
+  test "eventsource changes with limit over", context do
+    db_name = context[:db_name]
+
+    check_empty_db(db_name)
+
+    create_doc(db_name, sample_doc_foo())
+
+    t0 = :erlang.monotonic_time(:millisecond)
+
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+
+    req_id =
+      Rawresp.get("/#{db_name}/_changes?feed=eventsource&timeout=1100&limit=2",
+        stream_to: self(),
+        direct: worker_pid
+      )
+
+    changes = process_response(req_id.id, &parse_event/1, 5000)
+
+    dt_msec = :erlang.monotonic_time(:millisecond) - t0
+
+    assert length(changes) == 1
+    assert Enum.at(changes, 0)["id"] == "foo"
+    assert dt_msec > 1000
+
+    HTTPotion.stop_worker_process(worker_pid)
+  end
+
+  @tag :with_db
   test "eventsource no junk in response", context do
     db_name = context[:db_name]
 

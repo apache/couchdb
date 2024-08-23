@@ -99,7 +99,7 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
     MaintenanceMode = config:get("couchdb", "maintenance_mode"),
     NewEpoch = get_changes_epoch() > erlang:get(changes_epoch),
     if
-        Limit2 =< 0, Feed == "continuous";
+        Limit2 =< 0, (Feed == "continuous" orelse Feed == "eventsource");
         Limit > Limit2, Feed == "longpoll";
         MaintenanceMode == "true";
         MaintenanceMode == "nolb";
