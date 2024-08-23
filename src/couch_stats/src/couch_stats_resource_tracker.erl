@@ -794,8 +794,7 @@ is_logging_enabled() ->
     logging_enabled() =/= false.
 
 logging_enabled() ->
-    %%case conf_get("log_pid_usage_report", "coordinator") of
-    case conf_get("log_pid_usage_report", "true") of
+    case conf_get("log_pid_usage_report", "coordinator") of
         "coordinator" ->
             coordinator;
         "true" ->
