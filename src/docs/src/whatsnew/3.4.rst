@@ -39,6 +39,14 @@ Breaking Changes
   We recommend adding ``nbf`` as a required claim if you know your tokens will
   include it.
 
+* :ghissue:`5203`: Continuous change feeds with ``descending=true&limit=N``
+
+  Changes requests with ``feed=continuous&descending=true&limit=N``, when ``N``
+  is greater than the number of db updates, will no longer wait on db changes
+  and then repeatedly re-send the first few update sequences. The request will
+  return immediately after all the existing update sequences are streamed back
+  to the client.
+
 Highlights
 ----------
 
