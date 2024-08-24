@@ -73,6 +73,10 @@ changes_test_() ->
             ?TDEF(t_style_all_docs),
             ?TDEF(t_reverse),
             ?TDEF(t_continuous_reverse),
+            ?TDEF(t_continuous_reverse_limit_0),
+            ?TDEF(t_continuous_reverse_limit_under_total),
+            ?TDEF(t_continuous_reverse_limit_exact_total),
+            ?TDEF(t_continuous_reverse_limit_over_total),
             ?TDEF(t_reverse_limit_zero),
             ?TDEF(t_reverse_limit_one),
             ?TDEF(t_seq_interval),
@@ -363,6 +367,22 @@ t_continuous_reverse({_, DbUrl}) ->
         ],
         Rows
     ).
+
+t_continuous_reverse_limit_0({_, DbUrl}) ->
+    Params = "?feed=continuous&descending=true&limit=0",
+    ?assertEqual({8, 3, []}, changes(DbUrl, Params)).
+
+t_continuous_reverse_limit_under_total({_, DbUrl}) ->
+    Params = "?feed=continuous&descending=true&limit=1",
+    ?assertMatch({8, 2, [{8, _, _}]}, changes(DbUrl, Params)).
+
+t_continuous_reverse_limit_exact_total({_, DbUrl}) ->
+    Params = "?feed=continuous&descending=true&limit=3",
+    ?assertMatch({6, 0, [{8, _, _}, {7, _, _}, {6, _, _}]}, changes(DbUrl, Params)).
+
+t_continuous_reverse_limit_over_total({_, DbUrl}) ->
+    Params = "?feed=continuous&descending=true&limit=999",
+    ?assertMatch({6, 0, [{8, _, _}, {7, _, _}, {6, _, _}]}, changes(DbUrl, Params)).
 
 t_reverse_q8({_, DbUrl}) ->
     Params = "?descending=true",

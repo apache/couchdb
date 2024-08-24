@@ -87,7 +87,7 @@ go(DbName, "normal", Options, Callback, Acc0) ->
     end.
 
 keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0) ->
-    #changes_args{limit = Limit, feed = Feed, heartbeat = Heartbeat} = Args,
+    #changes_args{limit = Limit, feed = Feed, heartbeat = Heartbeat, dir = Dir} = Args,
     {ok, Collector} = send_changes(DbName, Args, Callback, Seqs, AccIn, Timeout),
     #collector{
         limit = Limit2,
@@ -98,13 +98,15 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
     LastSeq = pack_seqs(NewSeqs),
     MaintenanceMode = config:get("couchdb", "maintenance_mode"),
     NewEpoch = get_changes_epoch() > erlang:get(changes_epoch),
+    PendingCount = pending_count(Offset),
     if
+        Dir == rev, is_integer(PendingCount), PendingCount =< 0;
         Limit2 =< 0, (Feed == "continuous" orelse Feed == "eventsource");
         Limit > Limit2, Feed == "longpoll";
         MaintenanceMode == "true";
         MaintenanceMode == "nolb";
         NewEpoch ->
-            Callback({stop, LastSeq, pending_count(Offset)}, AccOut0);
+            Callback({stop, LastSeq, PendingCount}, AccOut0);
         true ->
             {ok, AccOut} = Callback(waiting_for_updates, AccOut0),
             WaitForUpdate = wait_db_updated(UpListen),
@@ -118,11 +120,11 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
                 end,
             case {Heartbeat, AccumulatedTime > Max, WaitForUpdate} of
                 {_, _, changes_feed_died} ->
-                    Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
+                    Callback({stop, LastSeq, PendingCount}, AccOut);
                 {undefined, _, timeout} ->
-                    Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
+                    Callback({stop, LastSeq, PendingCount}, AccOut);
                 {_, true, timeout} ->
-                    Callback({stop, LastSeq, pending_count(Offset)}, AccOut);
+                    Callback({stop, LastSeq, PendingCount}, AccOut);
                 _ ->
                     {ok, AccTimeout} = Callback(timeout, AccOut),
                     Args1 = Args#changes_args{limit = Limit2},
