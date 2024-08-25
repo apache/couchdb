@@ -236,7 +236,15 @@ handle_request_int(MochiReq) ->
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
-    {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
+    {Path0, _, _} = mochiweb_util:urlsplit_path(RawUri),
+    Path =
+        case Path0 of
+            "/" ++ ValidPath ->
+                ValidPath;
+            InvalidPath ->
+                couch_stats:increment_counter([couchdb, httpd, aborted_requests]),
+                exit({shutdown, invalid_path})
+        end,
 
     % get requested path
     RequestedPath =
