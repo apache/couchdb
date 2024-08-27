@@ -63,9 +63,9 @@
 
 %% aggregate query api
 -export([
-    active/0,
-    active_coordinators/0,
-    active_workers/0,
+    active/0, active/1,
+    active_coordinators/0, active_coordinators/1,
+    active_workers/0, active_workers/1,
 
     count_by/1,
     group_by/2, group_by/3,
@@ -87,6 +87,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("stdlib/include/ms_transform.hrl").
 
 %% Module pdict markers
 -define(DELTA_TA, csrt_delta_ta).
@@ -219,23 +220,26 @@ active() -> active_int(all).
 active_coordinators() -> active_int(coordinators).
 active_workers() -> active_int(workers).
 
+%% active_json() or active(json)?
+active(json) -> to_json_list(active_int(all)).
+active_coordinators(json) -> to_json_list(active_int(coordinators)).
+active_workers(json) -> to_json_list(active_int(workers)).
+
 
 active_int(coordinators) ->
     select_by_type(coordinators);
 active_int(workers) ->
     select_by_type(workers);
 active_int(all) ->
-    lists:map(fun to_json/1, ets:tab2list(?MODULE)).
+    select_by_type(all).
 
 
 select_by_type(coordinators) ->
-    ets:select(couch_stats_resource_tracker,
-        [{#rctx{type = {coordinator,'_','_'}, _ = '_'}, [], ['$_']}]);
+    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = {coordinator, _, _}} = R) -> R end));
 select_by_type(workers) ->
-    ets:select(couch_stats_resource_tracker,
-        [{#rctx{type = {worker,'_','_'}, _ = '_'}, [], ['$_']}]);
+    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = {worker, _, _}} = R) -> R end));
 select_by_type(all) ->
-    lists:map(fun to_json/1, ets:tab2list(?MODULE)).
+    ets:tab2list(?MODULE).
 
 find_by_pid(Pid) ->
     [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
@@ -362,6 +366,11 @@ convert_type(null) ->
 convert_type(undefined) ->
     null.
 
+convert_path(undefined) ->
+    null;
+convert_path(Path) when is_binary(Path) ->
+    Path.
+
 convert_pidref({Parent0, ParentRef0}) ->
     Parent = convert_pid(Parent0),
     ParentRef = convert_ref(ParentRef0),
@@ -386,6 +395,7 @@ to_json(#rctx{}=Rctx) ->
         nonce = Nonce,
         from = From,
         dbname = DbName,
+        path = Path,
         username = UserName,
         db_open = DbOpens,
         docs_read = DocsRead,
@@ -410,6 +420,7 @@ to_json(#rctx{}=Rctx) ->
         nonce => Nonce,
         from => convert_pidref(From),
         dbname => DbName,
+        path => convert_path(Path),
         username => UserName,
         db_open => DbOpens,
         docs_read => DocsRead,
@@ -755,6 +766,7 @@ track(#rctx{pid_ref=PidRef}) ->
     end.
 
 tracker({Pid, _Ref}=PidRef) ->
+    %%io:format("[~p]SPAWNED IN A TRACKER FOR ~p~n", [self(), PidRef]),
     MonRef = erlang:monitor(process, Pid),
     receive
         stop ->
@@ -763,7 +775,9 @@ tracker({Pid, _Ref}=PidRef) ->
             catch evict(PidRef),
             demonitor(MonRef),
             ok;
-        {'DOWN', MonRef, _Type, _0DPid, _Reason0} ->
+        {'DOWN', MonRef, _Type, _0DPid, Reason0} ->
+            destroy_context(PidRef),
+            io:format("[~p]SPAWNED IN A TRACKER FOR ~p:: GOT DOWN WITH {~p}~n", [self(), Pid, Reason0]),
             %% TODO: should we pass reason to log_process_lifetime_report?
             %% Reason = case Reason0 of
             %%     {shutdown, Shutdown0} ->
@@ -876,6 +890,9 @@ conf_get(Key) ->
 
 conf_get(Key, Default) ->
     config:get(?MODULE_STRING, Key, Default).
+
+to_json_list(List) when is_list(List) ->
+    lists:map(fun to_json/1, List).
 
 %%
 %% Process lifetime logging api
