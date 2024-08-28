@@ -766,7 +766,6 @@ track(#rctx{pid_ref=PidRef}) ->
     end.
 
 tracker({Pid, _Ref}=PidRef) ->
-    %%io:format("[~p]SPAWNED IN A TRACKER FOR ~p~n", [self(), PidRef]),
     MonRef = erlang:monitor(process, Pid),
     receive
         stop ->
@@ -775,9 +774,8 @@ tracker({Pid, _Ref}=PidRef) ->
             catch evict(PidRef),
             demonitor(MonRef),
             ok;
-        {'DOWN', MonRef, _Type, _0DPid, Reason0} ->
+        {'DOWN', MonRef, _Type, _0DPid, _Reason0} ->
             destroy_context(PidRef),
-            io:format("[~p]SPAWNED IN A TRACKER FOR ~p:: GOT DOWN WITH {~p}~n", [self(), Pid, Reason0]),
             %% TODO: should we pass reason to log_process_lifetime_report?
             %% Reason = case Reason0 of
             %%     {shutdown, Shutdown0} ->
