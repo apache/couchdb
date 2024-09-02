@@ -40,7 +40,7 @@
     create_worker_context/3,
     destroy_context/0, destroy_context/1,
 
-    get_resource/0, get_resource/1, get_resource_raw/1,
+    get_resource/0, get_resource/1,
 
     set_context_dbname/1, set_context_dbname/2,
     set_context_handler_fun/1, set_context_handler_fun/2,
@@ -74,6 +74,7 @@
 
     find_by_pid/1,
     find_by_pidref/1,
+    find_by_nonce/1,
     find_workers_by_pidref/1
 ]).
 
@@ -193,12 +194,7 @@ get_resource() ->
 get_resource(undefined) ->
     undefined;
 get_resource(PidRef) ->
-    catch get_resource_raw(PidRef).
-
-get_resource_raw(undefined) ->
-    undefined;
-get_resource_raw(PidRef) ->
-    case ets:lookup(?MODULE, PidRef) of
+    catch case ets:lookup(?MODULE, PidRef) of
         [#rctx{}=Rctx] ->
             Rctx;
         [] ->
@@ -240,6 +236,9 @@ select_by_type(workers) ->
     ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = {worker, _, _}} = R) -> R end));
 select_by_type(all) ->
     ets:tab2list(?MODULE).
+
+find_by_nonce(Nonce) ->
+    ets:match_object(?MODULE, ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
 
 find_by_pid(Pid) ->
     [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
@@ -634,7 +633,7 @@ should_track(_Metric) ->
     false.
 
 ioq_called() ->
-    is_enabled() andalso inc(ioq_calls).
+    inc(ioq_calls).
 
 accumulate_delta(Delta) when is_map(Delta) ->
     %% TODO: switch to creating a batch of updates to invoke a single
@@ -784,6 +783,7 @@ tracker({Pid, _Ref}=PidRef) ->
             %%     Reason0 ->
             %%         Reason0
             %% end,
+            %% TODO: should we send the induced work delta to the coordinator?
             log_process_lifetime_report(PidRef),
             catch evict(PidRef)
     end.
@@ -791,7 +791,7 @@ tracker({Pid, _Ref}=PidRef) ->
 log_process_lifetime_report(PidRef) ->
     case is_enabled() andalso is_logging_enabled() of
         true ->
-            Rctx = get_resource_raw(PidRef),
+            Rctx = get_resource(PidRef),
             case should_log(Rctx) of
                true ->
                     couch_log:report("csrt-pid-usage-lifetime", to_json(Rctx));
