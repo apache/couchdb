@@ -105,6 +105,8 @@ start_link(https) ->
     Port = config:get("ssl", "port", "6984"),
     {ok, Ciphers} = couch_util:parse_term(config:get("ssl", "ciphers", "undefined")),
     {ok, Versions} = couch_util:parse_term(config:get("ssl", "tls_versions", "undefined")),
+    {ok, SignatureAlgs} = couch_util:parse_term(config:get("ssl", "signature_algs", "undefined")),
+    {ok, NamedCurves} = couch_util:parse_term(config:get("ssl", "ecc_curves", "undefined")),
     {ok, SecureRenegotiate} = couch_util:parse_term(
         config:get("ssl", "secure_renegotiate", "undefined")
     ),
@@ -116,7 +118,9 @@ start_link(https) ->
             {password, config:get("ssl", "password", undefined)},
             {secure_renegotiate, SecureRenegotiate},
             {versions, Versions},
-            {ciphers, Ciphers}
+            {ciphers, Ciphers},
+            {signature_algs, SignatureAlgs},
+            {eccs, NamedCurves}
         ],
 
     case

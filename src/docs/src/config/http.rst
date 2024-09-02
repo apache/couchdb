@@ -326,12 +326,12 @@ HTTP Server Options
 
 .. _config/ssl:
 
-HTTPS (SSL/TLS) Options
+HTTPS (TLS) Options
 =======================
 
-.. config:section:: ssl :: HTTPS (SSL/TLS) Options
+.. config:section:: ssl :: HTTPS (TLS) Options
 
-    CouchDB supports TLS/SSL natively, without the use of a proxy server.
+    CouchDB supports TLS natively, without the use of a proxy server.
 
     HTTPS setup can be tricky, but the configuration in CouchDB was designed to
     be as easy as possible. All you need is two files; a certificate and a
@@ -471,7 +471,7 @@ HTTPS (SSL/TLS) Options
 
     .. config:option:: fail_if_no_peer_cert :: Require presence of client certificate if certificate verification is enabled
 
-        Set to ``true`` to terminate the TLS/SSL handshake with a
+        Set to ``true`` to terminate the TLS handshake with a
         ``handshake_failure`` alert message if the client does not send a
         certificate. Only used if ``verify_ssl_certificates`` is ``true``. If set
         to ``false`` it will only fail if the client sends an invalid certificate
@@ -497,12 +497,26 @@ HTTPS (SSL/TLS) Options
             [ssl]
             ciphers = ["ECDHE-ECDSA-AES128-SHA256", "ECDHE-ECDSA-AES128-SHA"]
 
-    .. config:option:: tls_versions :: Specify permitted server SSL/TLS protocol versions
+    .. config:option:: tls_versions :: Specify permitted server TLS protocol versions
 
-        Set to a list of permitted SSL/TLS protocol versions::
+        Set to a list of permitted TLS protocol versions::
 
             [ssl]
-            tls_versions = [tlsv1 | 'tlsv1.1' | 'tlsv1.2']
+            tls_versions = ['tlsv1.2']
+
+    .. config:option:: signature_algs :: Specify signature algorithms
+
+        Set to a list of permitted TLS signature algorithms::
+
+            [ssl]
+            signature_algs = [{sha512,ecdsa}]
+
+    .. config:option:: ecc_curves :: Specify permitted ECC curves
+
+        Set to a list of permitted ECC curves::
+
+            [ssl]
+            ecc_curves = [x25519]
 
 .. _cors:
 .. _config/cors:
