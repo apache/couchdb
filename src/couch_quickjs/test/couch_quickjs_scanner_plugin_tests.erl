@@ -418,6 +418,7 @@ ddoc_view(Doc) ->
                 >>
             },
             v_type_error => #{map => <<"function(doc){emit(doc.missing.foo,1);}">>},
+            v_syntax_error => #{map => <<"function(doc){emit(JSON.parse([]),1);}">>},
             v_expr_fun1 => #{map => <<"(function(doc) {emit(1,2)})\n">>},
             v_expr_fun2 => #{map => <<"(function(doc) {emit(3,4)});">>},
             v_expr_fun3 => #{map => <<"y=9;\n(function(doc) {emit(5,y)})">>},

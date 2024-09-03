@@ -522,6 +522,8 @@ expected_error({error, {_, {<<"TypeError">>, _}}}, {error, {_, {<<"TypeError">>,
     true;
 expected_error({error, {_, {<<"unnamed_error">>, _}}}, {error, {_, {<<"unnamed_error">>, _}}}) ->
     true;
+expected_error({error, {_, {<<"SyntaxError">>, _}}}, {error, {_, {<<"SyntaxError">>, _}}}) ->
+    true;
 expected_error(_, _) ->
     false.
 
