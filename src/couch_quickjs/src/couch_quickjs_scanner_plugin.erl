@@ -56,6 +56,10 @@
 -define(LIB, <<"lib">>).
 -define(VDU, <<"validate_doc_update">>).
 
+% Avoid checking indeterministic functions. They always show as false positives
+%
+-define(INTEDERMINISM_HEURISTICS, [<<"Math.random()">>, <<"Date.now()">>, <<"new Date()">>]).
+
 % Behavior callbacks
 
 start(SId, #{}) ->
@@ -337,13 +341,23 @@ start_or_reset_sm_proc(#st{sm_proc = #proc{} = Proc} = St) ->
 
 valid_views(#{} = Views) ->
     Fun = fun
-        (?LIB, _) -> false;
-        (<<_/binary>>, #{?MAP := <<_/binary>>}) -> true;
-        (_, _) -> false
+        (?LIB, _) ->
+            false;
+        (<<_/binary>>, #{?MAP := <<MapFun/binary>>, ?REDUCE := <<RedFun/binary>>}) ->
+            no_indeterminism(MapFun) andalso no_indeterminism(RedFun);
+        (<<_/binary>>, #{?MAP := <<MapFun/binary>>}) ->
+            no_indeterminism(MapFun);
+        (_, _) ->
+            false
     end,
     maps:filter(Fun, Views);
 valid_views(_) ->
     #{}.
+
+% Math.random(), Date.now() or new Date() will always show as false postives
+%
+no_indeterminism(<<FunSrc/binary>>) ->
+    binary:match(FunSrc, ?INTEDERMINISM_HEURISTICS) =:= nomatch.
 
 lib_load(#st{qjs_proc = Qjs, sm_proc = Sm}, #{} = Views) ->
     case maps:get(?LIB, Views, undefined) of
