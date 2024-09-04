@@ -527,13 +527,24 @@ expected_error({error, {_, {<<"SyntaxError">>, _}}}, {error, {_, {<<"SyntaxError
 expected_error(_, _) ->
     false.
 
+map_sort_kvs(KVs) when is_list(KVs) ->
+    lists:sort(KVs);
+map_sort_kvs(KVs) ->
+    KVs.
+
 % Proc commands
 
 add_lib(#proc{} = Proc, #{} = Lib) ->
     true = prompt(Proc, [<<"add_lib">>, Lib]).
 
 map_doc(#proc{} = Proc, {[_ | _]} = Doc) ->
-    prompt(Proc, [<<"map_doc">>, Doc]).
+    % couch_mrview_updater:insert_results/4 sorts the KVs, so we have to do the
+    % same. Otherwise, we risk showing false positives if emit order changes
+    % between engine versions, for instance.
+    case prompt(Proc, [<<"map_doc">>, Doc]) of
+        Results when is_list(Results) -> lists:map(fun map_sort_kvs/1, Results);
+        Results -> Results
+    end.
 
 reduce(#proc{} = Proc, <<_/binary>> = Src, KVs) ->
     prompt(Proc, [<<"reduce">>, [Src], KVs]).

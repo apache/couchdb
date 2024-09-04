@@ -27,7 +27,8 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_vdu_only, 10),
             ?TDEF_FE(t_filter_only, 10),
             ?TDEF_FE(t_filter_with_expected_error, 10),
-            ?TDEF_FE(t_empty_ddoc, 10)
+            ?TDEF_FE(t_empty_ddoc, 10),
+            ?TDEF_FE(t_multi_emit_map, 10)
         ]
     }.
 
@@ -283,6 +284,26 @@ t_empty_ddoc({_, DbName}) ->
             ok
     end.
 
+t_multi_emit_map({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_view_multi_emit(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assert(num_calls(doc, 3) >= 5),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start and complete = 2, no errors
+            ?assertEqual(2, log_calls(warning));
+        false ->
+            ok
+    end.
+
 reset_stats() ->
     Counters = [
         [couchdb, query_server, process_error_exits],
@@ -428,6 +449,37 @@ ddoc_view(Doc) ->
                     "function(doc){ \n",
                     "  emit(42, {NaN:1, \"2\": 1}); \n"
                     "};\n"
+                >>
+            }
+        }
+    }.
+
+ddoc_view_multi_emit(Doc) ->
+    % String.prototype.startsWith used as a differentiator between
+    % SM and QuickJS. Make both emit items in different order. But at the
+    % end of the day, that doesn't matter as those are sorted anyway
+    Doc#{
+        views => #{
+            v1 => #{
+                map => <<
+                    "function(doc) {\n"
+                    "  if(String.prototype.startsWith === undefined) {\n"
+                    "    emit(42,1); emit(40,2); emit(42,3); emit(39,4);\n"
+                    "  } else {\n"
+                    "    emit(40,2); emit(39,4); emit(42,1); emit(42,3)\n"
+                    "  }\n"
+                    "}"
+                >>
+            },
+            v2 => #{
+                map => <<
+                    "function(doc) {\n"
+                    "  if(String.prototype.startsWith === undefined) {\n"
+                    "    emit(99,1); emit(98,2);\n"
+                    "  } else {\n"
+                    "    emit(98,2); emit(99,1)\n"
+                    "  }\n"
+                    "}"
                 >>
             }
         }
