@@ -245,7 +245,7 @@ handle_request_int(MochiReq) ->
         case Path0 of
             "/" ++ ValidPath ->
                 ValidPath;
-            InvalidPath ->
+            _ ->
                 couch_stats:increment_counter([couchdb, httpd, aborted_requests]),
                 exit({shutdown, invalid_path})
         end,
