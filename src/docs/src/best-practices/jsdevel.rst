@@ -46,3 +46,254 @@ tips and tricks that will ease the difficulty.
 
 - Be sure to guard all document accesses to avoid exceptions when fields
   or subfields are missing: ``if (doc && doc.myarray && doc.myarray.length)...``
+
+===========================
+JavaScript engine versions
+===========================
+
+Until version 3.4 Apache CouchDB used only Spidermonkey as the it's
+underlying JavaScript engine. With version 3.4, it's possible to configure
+CouchDB to use QuickJS.
+
+Recent versions of CouchDB may use the node-local ``_versions`` API endpoint to
+get the current engine type and version:
+
+.. code-block:: bash
+
+   % http http://adm:pass@localhost:5984/_node/_local/_versions | jq '.javascript_engine'
+   {
+     "version": "1.8.5",
+     "name": "spidermonkey"
+   }
+
+Spidermonkey version compatibility
+==================================
+
+Depending on the CouchDB version and what's available on supported operating
+systems, the Spidermonkey version may be any one of these: 1.8.5, 60, 68, 78,
+86 or 91. Sometimes there are differences in supported features between
+versions. Usually later versions only add features, so views will work on
+version upgrades. However, there are a few exceptions to this. These are a few
+known regression or discrepancies between versions:
+
+1. ``for each (var x in ...)``
+
+  Version ``1.8.5`` supports the ``for each (var x in ...)`` looping
+  expression. That's not a standard JavaScript syntax and is not supported in
+  later versions:
+
+.. code-block:: bash
+
+   % js
+   js>  for each (var x in [1,2]) {print(x)}
+   1
+   2
+
+   % js91
+   js> for each (var x in [1,2]) {print(x)}
+   typein:1:4 SyntaxError: missing ( after for:
+   typein:1:4 for each (var x in [1,2]) {print(x)}
+   typein:1:4 ....^
+
+2. E4X (ECMAScript for XML)
+
+   This is not supported in versions greater than ``1.8.5``. This feature may
+   be inadvertently triggered when inserting a ``.`` character between a
+   variable and ``(``. That would compile on ``1.8.5`` and throw a
+   ``SyntaxError`` on other versions:
+
+.. code-block:: bash
+
+   % js
+   js> var xml = <root><x></x></root>
+   js> xml.(x)
+   <root>
+     <x/>
+   </root>
+
+   % js91
+   js>  var xml = <root><x></x></root>
+   typein:1:11 SyntaxError: expected expression, got '<':
+   typein:1:11  var xml = <root><x></x></root>
+   typein:1:11 ...........^
+
+3. ``toLocaleFormat(...)`` function.
+
+   This ``Date`` function is not present in versions greater than ``1.8.5``:
+
+.. code-block:: bash
+
+   % js
+   js> d = new Date("Dec 1, 2015 3:22:46 PM")
+   (new Date(1449001366000))
+   js> d.toLocaleFormat("%Y-%m-%d")
+   "2015-12-01"
+
+   % js91
+   js> d = new Date("Dec 1, 2015 3:22:46 PM")
+   (new Date(1449001366000))
+   js> d.toLocaleFormat("%Y-%m-%d")
+   typein:2:3 TypeError: d.toLocaleFormat is not a function
+
+4. Invalid expressions following ``function(){...}`` are not ignored any longer
+   and will throw an error.
+
+   Previously, in versions less than or equal to ``1.8.5`` it was possible add
+   any expression following the main function definition and they were mostly
+   ignored:
+
+.. code-block:: bash
+
+   $ http put $DB/db/_design/d4 views:='{"v1":{"map":"function(doc){emit(1,2);} if(x) a"}}'
+   HTTP/1.1 201 Created
+   {
+       "id": "_design/d4",
+       "ok": true,
+       "rev": "1-08a7d8b139e52f5f3df5bc27e20eeff1"
+   }
+
+   % http $DB/db/_design/d4/_view/v1
+   HTTP/1.1 200 OK
+   {
+       "offset": 0,
+       "rows": [
+           {
+               "id": "doc1",
+               "key": 1,
+               "value": 2
+           }
+       ],
+       "total_rows": 1
+   }
+
+  With higher versions of spidermonkey, that would throw a compilation error:
+
+.. code-block:: bash
+
+    $ http put $DB/db/_design/d4 views:='{"v1":{"map":"function(doc){emit(1,2);} if(x) a"}}'
+    HTTP/1.1 400 Bad Request
+    {
+        "error": "compilation_error",
+        "reason": "Compilation of the map function in the 'v1' view failed: ..."
+    }
+
+5. Object key order.
+
+   Object key order may change between versions, so any views which rely on
+   that order may emit different results depending on the engine version:
+
+.. code-block:: bash
+
+   % js
+   js> r={}; ["Xyz", "abc", 1].forEach(function(v) {r[v]=v;}); Object.keys(r)
+   ["Xyz", "abc", "1"]
+
+   % js91
+   js> r={}; ["Xyz", "abc", 1].forEach(function(v) {r[v]=v;}); Object.keys(r)
+   ["1", "Xyz", "abc"]
+
+Using QuickJS
+=============
+
+The QuickJS-based JavaScript engine is available as of CouchDB version 3.4. It
+has to be explicitly enabled via ``[couchdb] js_engine = quickjs`` and
+restarting the service.
+
+Generally, QuickJS engine is a bit faster, consumes less memory, and provides
+slightly better isolation between contexts by re-creating the whole javascript
+engine runtime on every ``reset`` command.
+
+To try building invidual views using QuickJS, even when the default engine is
+SpiderMonkey, can use the ``"javascript_quickjs"`` as the view language,
+instead of ``"javascript"``. Just that view will be rebuilt using the QuickJS
+engine. However, when switching back to ``"javascript"`` the view will have to
+be re-built again.
+
+QuickJS vs Spidermonkey incompatibilities
+============================================
+
+The QuickJS engine is quite compatible with Spidermonkey version 91. The same
+incompatibilities between 1.8.5 and 91 are also present between 1.8.5 and
+QuickJS. So, when switching from 1.8.5 to QuickJS see the ``Spidermonkey version
+compatibility`` section above.
+
+These are a few incompatibilties between Spidermonkey 91 and QuickJS engine:
+
+1. ``RegExp.$1``, ..., ``RegExp.$9``
+
+This is a deprecated JavaScript feature that's not available in QuickJS.
+https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/RegExp/n
+
+2. ``Date.toString()`` doesn't include the timezone name, just the offset.
+
+.. code-block:: bash
+
+   % qjs > (new Date()).toString();
+   "Thu Sep 05 2024 17:03:23 GMT-0400"
+
+   % js91
+   js>  (new Date()).toString();
+   "Thu Sep 05 2024 17:04:03 GMT-0400 (EDT)"
+
+Scanning for QuickJS incompatibilities
+======================================
+
+CouchDB version 3.4 and higher include a background scanner which can be used
+traverse all the databases and design documents and run them agaiinst
+Spidermonkey and the QuickJS engine and report any discrepancies in the logs.
+That could be a useful run before deciding to switch to QuickJS as the default
+JavaScript engine.
+
+The scanner can be enabled with:
+
+.. code-block:: ini
+
+   [couch_scanner_plugins]
+   couch_quickjs_scanner_plugin = true
+
+And configured to run at a predetermined time or on a periodic schedule. For
+instance:
+
+.. code-block:: ini
+
+   [couch_quickjs_scanner_plugin]
+   after = 2024-09-05T18:10:00
+   repeat = 1_day
+
+It won't start until after the specified time and then it will run about once
+every 24 hours.
+
+The logs will indicate when the scan starts and finishes:
+
+.. code-block:: text
+
+   couch_quickjs_scanner_plugin s:1725559802-c615220453e6 starting
+   ...
+   couch_quickjs_scanner_plugin s:1725559802-c615220453e6 completed
+
+During scanning discrepancies are reported in the log as. The reports may look
+like:
+
+.. code-block:: text
+
+   couch_quickjs_scanner_plugin s:1725559802-c615220453e6
+   db:mydb/40000000-5fffffff
+   ddoc:_design/mydesign
+   view validation failed
+   {map_doc,<<"doc1">>, $quickjs_res, $sm_res}
+
+The ``s:...`` field indicates which scan session it belongs to, which db and
+shard range it found the issue on, followed by the design document, and the
+document ID. Then, the ``{map_doc, ..., ...}`` tuple indicates which operation
+failed (mapping a document) where the 2nd element is the result from the
+QuickJS engine, and the 3rd is the result from the Spidermonkey engine.
+
+Sometimes it maybe needed to ignore some databases or design documents. That
+can be done with a number of regular expression patterns in the
+``[couch_quickjs_scanner_plugin.skip_dbs]`` config section:
+
+.. code-block:: ini
+
+   [couch_quickjs_scanner_plugin.skip_dbs]
+   pattern1 = bar.*
+   pattern2 = .*foo
