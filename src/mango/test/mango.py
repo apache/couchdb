@@ -26,7 +26,7 @@ import user_docs
 import limit_docs
 
 
-COUCH_HOST = "http://127.0.0.1:15984"
+COUCH_HOST = os.environ.get("COUCH_HOST") or "http://127.0.0.1:15984"
 COUCH_USER = os.environ.get("COUCH_USER")
 COUCH_PASS = os.environ.get("COUCH_PASS")
 
