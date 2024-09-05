@@ -120,6 +120,8 @@ class Database(object):
                     # db exists and it is empty -- exit condition is met
                     return
                 self.delete()
+            else:
+                r.raise_for_status()
             self.create()
             time.sleep(k * 0.1)
         raise Exception(
