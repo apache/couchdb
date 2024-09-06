@@ -271,8 +271,7 @@ The logs will indicate when the scan starts and finishes:
    ...
    couch_quickjs_scanner_plugin s:1725559802-c615220453e6 completed
 
-During scanning discrepancies are reported in the log as. The reports may look
-like:
+During scanning discrepancies are reported in the log. They may look like:
 
 .. code-block:: text
 
