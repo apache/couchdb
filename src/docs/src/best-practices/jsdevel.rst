@@ -51,7 +51,7 @@ tips and tricks that will ease the difficulty.
 JavaScript engine versions
 ===========================
 
-Until version 3.4 Apache CouchDB used only Spidermonkey as the it's
+Until version 3.4 Apache CouchDB used only SpiderMonkey as the it's
 underlying JavaScript engine. With version 3.4, it's possible to configure
 CouchDB to use QuickJS.
 
@@ -66,11 +66,11 @@ get the current engine type and version:
      "name": "spidermonkey"
    }
 
-Spidermonkey version compatibility
+SpiderMonkey version compatibility
 ==================================
 
 Depending on the CouchDB version and what's available on supported operating
-systems, the Spidermonkey version may be any one of these: 1.8.5, 60, 68, 78,
+systems, the SpiderMonkey version may be any one of these: 1.8.5, 60, 68, 78,
 86 or 91. Sometimes there are differences in supported features between
 versions. Usually later versions only add features, so views will work on
 version upgrades. However, there are a few exceptions to this. These are a few
@@ -166,7 +166,7 @@ known regression or discrepancies between versions:
        "total_rows": 1
    }
 
-  With higher versions of spidermonkey, that would throw a compilation error:
+  With higher versions of SpiderMonkey, that would throw a compilation error:
 
 .. code-block:: bash
 
@@ -209,15 +209,15 @@ instead of ``"javascript"``. Just that view will be rebuilt using the QuickJS
 engine. However, when switching back to ``"javascript"`` the view will have to
 be re-built again.
 
-QuickJS vs Spidermonkey incompatibilities
+QuickJS vs SpiderMonkey incompatibilities
 ============================================
 
-The QuickJS engine is quite compatible with Spidermonkey version 91. The same
+The QuickJS engine is quite compatible with SpiderMonkey version 91. The same
 incompatibilities between 1.8.5 and 91 are also present between 1.8.5 and
-QuickJS. So, when switching from 1.8.5 to QuickJS see the ``Spidermonkey version
+QuickJS. So, when switching from 1.8.5 to QuickJS see the ``SpiderMonkey version
 compatibility`` section above.
 
-These are a few incompatibilties between Spidermonkey 91 and QuickJS engine:
+These are a few incompatibilties between SpiderMonkey 91 and QuickJS engine:
 
 1. ``RegExp.$1``, ..., ``RegExp.$9``
 
@@ -240,7 +240,7 @@ Scanning for QuickJS incompatibilities
 
 CouchDB version 3.4 and higher include a background scanner which can be used
 traverse all the databases and design documents and run them agaiinst
-Spidermonkey and the QuickJS engine and report any discrepancies in the logs.
+SpiderMonkey and the QuickJS engine and report any discrepancies in the logs.
 That could be a useful run before deciding to switch to QuickJS as the default
 JavaScript engine.
 
@@ -260,7 +260,7 @@ instance:
    after = 2024-09-05T18:10:00
    repeat = 1_day
 
-It won't start until after the specified time and then it will run about once
+It will not start until after the specified time and then it will run about once
 every 24 hours.
 
 The logs will indicate when the scan starts and finishes:
@@ -286,7 +286,7 @@ The ``s:...`` field indicates which scan session it belongs to, which db and
 shard range it found the issue on, followed by the design document, and the
 document ID. Then, the ``{map_doc, ..., ...}`` tuple indicates which operation
 failed (mapping a document) where the 2nd element is the result from the
-QuickJS engine, and the 3rd is the result from the Spidermonkey engine.
+QuickJS engine, and the 3rd is the result from the SpiderMonkey engine.
 
 Sometimes it maybe needed to ignore some databases or design documents. That
 can be done with a number of regular expression patterns in the
