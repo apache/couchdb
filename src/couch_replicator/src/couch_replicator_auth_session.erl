@@ -266,20 +266,7 @@ process_auth_failure(Epoch, #state{epoch = Epoch} = State) ->
 
 -spec get_session_url(string()) -> string().
 get_session_url(Url) ->
-    #url{
-        protocol = Proto,
-        host = Host,
-        port = Port
-    } = ibrowse_lib:parse_url(Url),
-    WithPort = lists:concat([Proto, "://", Host, ":", Port]),
-    case lists:prefix(WithPort, Url) of
-        true ->
-            % Explicit port specified in the original url
-            WithPort ++ "/_session";
-        false ->
-            % Implicit proto default port was used
-            lists:concat([Proto, "://", Host, "/_session"])
-    end.
+    uri_string:resolve("/_session", Url).
 
 -spec schedule_refresh(non_neg_integer(), #state{}) -> #state{}.
 schedule_refresh(T, #state{next_refresh = Tc} = State) when T < Tc ->
@@ -518,7 +505,13 @@ get_session_url_test_() ->
             {"http://127.0.0.1/db", "http://127.0.0.1/_session"},
             {"http://host/x/y/z", "http://host/_session"},
             {"http://host:5984/db", "http://host:5984/_session"},
-            {"https://host/db?q=1", "https://host/_session"}
+            {"https://host/db?q=1", "https://host/_session"},
+            {"http://[71bf:b7e0:a889:52d5:24a7:fe76:3253:0900]:5984?q=4",
+                "http://[71bf:b7e0:a889:52d5:24a7:fe76:3253:0900]:5984/_session"},
+            {"http://[199f:6f5:f092:ce3e:2b:8062:fa8f:4901]?q=2&n=1",
+                "http://[199f:6f5:f092:ce3e:2b:8062:fa8f:4901]/_session"},
+            {"http://[::1]", "http://[::1]/_session"},
+            {"http://[::1]:1", "http://[::1]:1/_session"}
         ]
     ].
 
