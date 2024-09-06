@@ -234,20 +234,20 @@ set_basic_auth_creds(User, Pass, #httpdb{} = HttpDb) when
 
 -spec extract_creds_from_url(string()) ->
     {ok, {string() | undefined, string() | undefined}, string()}
-    | {error, term()}.
+    | {error, term(), term()}.
 extract_creds_from_url(Url) ->
-    case ibrowse_lib:parse_url(Url) of
-        {error, Error} ->
-            {error, Error};
-        #url{username = undefined, password = undefined} ->
-            {ok, {undefined, undefined}, Url};
-        #url{protocol = Proto, username = User, password = Pass} ->
-            % Excise user and pass parts from the url. Try to keep the host,
-            % port and path as they were in the original.
-            Prefix = lists:concat([Proto, "://", User, ":", Pass, "@"]),
-            Suffix = lists:sublist(Url, length(Prefix) + 1, length(Url) + 1),
-            NoCreds = lists:concat([Proto, "://", Suffix]),
-            {ok, {User, Pass}, NoCreds}
+    case uri_string:parse(Url) of
+        {error, Type, Error} ->
+            {error, Type, Error};
+        #{userinfo := UserPass} = UriMap ->
+            UriMap1 = maps:remove(userinfo, UriMap),
+            NoCreds = uri_string:recompose(UriMap1),
+            case string:split(UserPass, ":") of
+                [User, Pass] -> {ok, {User, Pass}, NoCreds};
+                [_] -> {ok, {undefined, undefined}, NoCreds}
+            end;
+        #{} ->
+            {ok, {undefined, undefined}, Url}
     end.
 
 % Normalize basic auth credentials so they are set only in the auth props
@@ -265,7 +265,7 @@ normalize_basic_auth(#httpdb{} = HttpDb) ->
         case extract_creds_from_url(Url) of
             {ok, Creds = {_, _}, UrlNoCreds} ->
                 {Creds, UrlNoCreds};
-            {error, _Error} ->
+            {error, _Tag, _Detail} ->
                 % Don't crash replicator if user provided an invalid
                 % userinfo part
                 {undefined, undefined}
@@ -601,6 +601,24 @@ normalize_basic_creds_test_() ->
                 #httpdb{
                     url = "http://[2001:db8:a1b:12f9::1]/db",
                     auth_props = auth_props("u", "p")
+                }
+            },
+            {
+                #httpdb{url = "http://u:p@[::1]:42/db?q=2"},
+                #httpdb{
+                    url = "http://[::1]:42/db?q=2",
+                    auth_props = auth_props("u", "p")
+                }
+            },
+            {
+                #httpdb{url = "http://secretjunk@[::1]:42/db?q=2"},
+                #httpdb{url = "http://[::1]:42/db?q=2"}
+            },
+            {
+                #httpdb{url = "http://u:p:p@[::1]:42/db?q=2"},
+                #httpdb{
+                    url = "http://[::1]:42/db?q=2",
+                    auth_props = auth_props("u", "p:p")
                 }
             },
             {
