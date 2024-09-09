@@ -65,7 +65,7 @@ Highlights
 
   - :ref:`Setup instructions <nouveauconfig>`
   - :ref:`Usage <ddoc/nouveau>`
-  - `Report a bug`_.
+  - `Report a bug`_
 
 .. _Report a bug: https://github.com/apache/couchdb/issues/new/choose
 
@@ -290,7 +290,7 @@ Bugfixes
 * :ghissue:`4837`: Fix update bug in ``ets_lru``.
 * :ghissue:`4811`: Prevent delayed opener error from crashing index servers.
 * :ghissue:`4794`: Fix incorrect raising of ``database_does_not_exist`` error.
-* :ghissue:`4784`: Fix parsing of node name from ``ERL_FLAGS1``
+* :ghissue:`4784`: Fix parsing of node name from ``ERL_FLAGS``
   in ``remsh``.
 * :ghissue:`4782`, :ghissue:`4891`: Mango: prevent occasional
   duplication of paginated text results.
@@ -338,7 +338,7 @@ Bugfixes
   ``fabric_doc_update``.
 * :ghissue:`4353`: Fix replication ``job_link``.
 * :ghissue:`4348`: Fix undefined function warning in weatherreport.
-* :ghissue:`4343`: Fix undef when parsing replication doc body.
+* :ghissue:`4343`: Fix ``undef`` when parsing replication doc body.
 
 Tests
 -----
@@ -418,7 +418,7 @@ Docs
 * :ghissue:`4928`: Add missing installation OSes for convenience binaries.
 * :ghissue:`4925`: Break long lines for better readability within tables.
 * :ghissue:`4774`: Amend description of ``use_index`` on ``/{db}/_find``.
-* :ghissue:`4743`: Ban the laster monster.
+* :ghissue:`4743`: Ban the last monster.
 * :ghissue:`4684`: Add ``_design_docs/queries`` and
   ``_local_docs/queries``.
 * :ghissue:`4645`: Add authentication data to examples.
