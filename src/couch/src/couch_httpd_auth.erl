@@ -28,7 +28,7 @@
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1, handle_session_req/2]).
 
--export([authenticate/4, verify_totp/2]).
+-export([verify_totp/2]).
 -export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
 -export([maybe_value/3]).
 
@@ -39,6 +39,8 @@
 ]).
 
 -compile({no_auto_import, [integer_to_binary/1, integer_to_binary/2]}).
+
+-define(LOCKOUT_MSG, <<"Account is temporarily locked due to multiple authentication failures">>).
 
 party_mode_handler(Req) ->
     case
@@ -111,7 +113,7 @@ default_authentication_handler(Req, AuthModule) ->
                     reject_if_totp(UserProps),
                     UserName = ?l2b(User),
                     Password = ?l2b(Pass),
-                    case authenticate(AuthModule, UserName, Password, UserProps) of
+                    case authenticate(Req, AuthModule, UserName, Password, UserProps) of
                         true ->
                             couch_password_hasher:maybe_upgrade_password_hash(
                                 AuthModule, UserName, Password, UserProps
@@ -500,7 +502,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
             nil -> {ok, [], nil};
             Result -> Result
         end,
-    case authenticate(AuthModule, UserName, Password, UserProps) of
+    case authenticate(Req, AuthModule, UserName, Password, UserProps) of
         true ->
             verify_totp(UserProps, Form),
             couch_password_hasher:maybe_upgrade_password_hash(
@@ -619,19 +621,30 @@ extract_username(Form) ->
 maybe_value(_Key, undefined, _Fun) -> [];
 maybe_value(Key, Else, Fun) -> [{Key, Fun(Else)}].
 
-authenticate(AuthModule, UserName, Password, UserProps) ->
+authenticate(Req, AuthModule, UserName, Password, UserProps) ->
     UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<>>),
+    case couch_auth_lockout:is_locked_out(Req, UserName, UserSalt) of
+        true ->
+            lockout_warning(Req, UserName),
+            throw({forbidden, ?LOCKOUT_MSG});
+        false ->
+            ok
+    end,
     case couch_passwords_cache:authenticate(AuthModule, UserName, Password, UserSalt) of
         not_found ->
             case authenticate_int(Password, UserSalt, UserProps) of
                 false ->
+                    ok = couch_auth_lockout:lockout(Req, UserName, UserSalt),
                     false;
                 true ->
                     couch_passwords_cache:insert(AuthModule, UserName, Password, UserSalt),
                     true
             end;
-        Result when is_boolean(Result) ->
-            Result
+        false ->
+            ok = couch_auth_lockout:lockout(Req, UserName, UserSalt),
+            false;
+        true ->
+            true
     end.
 
 authenticate_int(Pass, UserSalt, UserProps) ->
@@ -795,5 +808,12 @@ authentication_warning(#httpd{mochi_req = Req}, User) ->
     Peer = Req:get(peer),
     couch_log:warning(
         "~p: Authentication failed for user ~s from ~s",
+        [?MODULE, User, Peer]
+    ).
+
+lockout_warning(#httpd{mochi_req = Req}, User) ->
+    Peer = Req:get(peer),
+    couch_log:warning(
+        "~p: Authentication rejected for locked-out user ~s from ~s",
         [?MODULE, User, Peer]
     ).

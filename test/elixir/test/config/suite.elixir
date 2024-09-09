@@ -46,6 +46,10 @@
   "AuthCacheTest": [
     "auth cache management"
   ],
+  "AuthLockoutTest": [
+    "lockout after multiple failed authentications",
+    "lockout warning after multiple failed authentications"
+  ],
   "BasicsTest": [
     "'+' in document name should encode to '+'",
     "'+' in document name should encode to space",

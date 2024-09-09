@@ -33,6 +33,17 @@ init([]) ->
                         {max_idle, config:get_integer("couch_passwords_cache", "max_idle", 600_000)}
                     ]
                 ]},
+                permanent, 5000, worker, [ets_lru]},
+            {couch_lockout_lru,
+                {ets_lru, start_link, [
+                    couch_lockout_lru,
+                    [
+                        {max_objects,
+                            config:get_integer("couch_auth_lockout", "max_objects", 10_000)},
+                        {max_lifetime,
+                            config:get_integer("couch_auth_lockout", "max_lifetime", 300_000)}
+                    ]
+                ]},
                 permanent, 5000, worker, [ets_lru]}
         ] ++ couch_servers(),
     {ok, {{one_for_one, 10, 3600}, Children}}.

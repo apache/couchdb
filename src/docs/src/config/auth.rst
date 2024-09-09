@@ -549,3 +549,47 @@ Authentication Configuration
 
         That's all, you are done with the migration from ``roles_claim_name`` to
         ``roles_claim_path`` Easy, isn't it?
+
+.. config:section:: couch_auth_lockout :: Automatic User Lockout
+
+    .. config:option:: mode :: lockout mode
+
+        When set to ``off`` (the default), CouchDB will not track repeated
+        authentication failures.
+
+        When set to ``warn``, CouchDB will log a warning when repeated
+        authentication failures occur for a specific user and client IP address.
+
+        When set to ``enforce``, CouchDB will will reject requests with a
+        403 status code if repeated authentication failures occur for a
+        specific user and client IP address. ::
+
+            [couch_auth_lockout]
+            mode = enforce
+
+    .. config:option:: threshold :: lockout threshold
+
+        When ``threshold`` (default ``5``) number of failed authentication requests
+        happen within the same ``max_lifetime`` period, CouchDB will lock out further
+        authentication attempts for the rest of the ``max_lifetime`` period if
+        ``mode`` is set to ``enforce``. ::
+
+            [couch_auth_lockout]
+            threshold = 5
+
+    .. config:option:: max_objects :: maximum number of username, IP pairs to track
+
+        The maximum number of username+IP pairs that CouchDB will track, to limit
+        memory usage. Defaults to ``10,000``. Changes to this setting are only picked
+        up at CouchDB start or restart time. ::
+
+           [couch_auth_lockout]
+           max_objects = 10000
+
+    .. config:option:: max_lifetime :: maximum duration of lockout period
+
+        The maximum duration of the lockout period, measured in milliseconds.
+        Changes to this setting are only picked up at CouchDB start or restart time. ::
+
+           [couch_auth_lockout]
+           max_lifetime = 300000
