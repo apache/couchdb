@@ -125,6 +125,16 @@ Highlights
 Features and Enhancements
 -------------------------
 
+* :ghissue:`5212`: Allow configuring TLS ``signature_algs`` and ``eccs`` curves
+  for the clustered port.
+* :ghissue:`5136`: Print log dir on ``dev/run`` startup.
+* :ghissue:`5150`: Ensure ``rexi_buffer`` metric includes the internal buffered
+  messages.
+* :ghissue:`5145`: Add aggregate ``rexi_server`` and ``rexi_buffer`` message
+  queue metrics.
+* :ghissue:`5093`, :ghissue:`5178`: Ensure replication jobs migrate after any
+  the shard map changes.
+* :ghissue:`5079`: Move to Erlang 25 minimum.
 * :ghissue:`5069`: Update Fauxton to v1.3.1.
 * :ghissue:`5067`: Support Erlang/OTP 27.
 * :ghissue:`5053`: Use the built-in ``crypto:pbkdf2_hmac`` function.
@@ -146,13 +156,13 @@ Features and Enhancements
 * :ghissue:`4834`: Wait for newly set admin creds to be hashed in setup.
 * :ghissue:`4821`: Do not fail compactions if the last step is delayed
   by ``ioq``.
-* :ghissue:`4810`: Mango: add ``$beginsWith`` operator .
+* :ghissue:`4810`: Mango: add ``$beginsWith`` operator.
 * :ghissue:`4769`: Improve replicator error handling.
 * :ghissue:`4766`: Add new HTTP endpoint ``/_node/_local/_smoosh/status``.
 * :ghissue:`4736`: Stop client process and clean up if client disconnects.
 * :ghissue:`4703`: Add ``_purged_infos`` endpoint.
 * :ghissue:`4685`: Add ``"CouchDB-Replicator/..."`` user agent to
-  replicator ``/_session`` requests
+  replicator ``/_session`` requests.
 * :ghissue:`4680`: Shard splitting: allow resumption of failed jobs and
   make timeout configurable.
 * :ghissue:`4677`: Crash replication jobs on unexpected ``4xx`` errors.
@@ -180,14 +190,17 @@ Features and Enhancements
   list.
 * :ghissue:`4404`: Respond with 503 immediately if search not available.
 * :ghissue:`4347`: Remove failed ``couch_plugins`` experiment.
-* :ghissue:`5046`: JWT: require valid `exp` claim by default
-* :ghissue:`5065`: Update Fauxton UI to version v1.3.1
+* :ghissue:`5046`: JWT: require valid `exp` claim by default.
+* :ghissue:`5065`: Update Fauxton UI to version v1.3.1.
 
 .. _performance430:
 
 Performance
 -----------
 
+* :ghissue:`5172`: Remove ``unique_integer`` bottleneck from ``couch_lru``.
+* :ghissue:`5168`: Update ``couch_lru`` to use maps.
+* :ghissue:`5104`: Update xxhash from upstream tag ``v0.8.2``.
 * :ghissue:`5037`: Optimise ``fabric:all_dbs()``.
 * :ghissue:`4911`: Optimise and clean up ``couch_multidb_changes``.
 * :ghissue:`4852`: Optimise ``_active_tasks``.
@@ -215,6 +228,47 @@ Performance
 Bugfixes
 --------
 
+* :ghissue:`5223`, :ghissue:`5228`, :ghissue:`5226`: Fix handling IPv6
+  addresses for ``_session`` endpoints in replicator.
+* :ghissue:`5191`, :ghissue:`5193`: Fix error loop with system freeze when
+  removing a node from a cluster.
+* :ghissue:`5188`: Fix units for replicator ``cluster_start_period`` config
+  setting.
+* :ghissue:`5185`: Use an explicit message for replicator doc processor delayed
+  init. Fixes a rare case when the replicator will never start scanning and
+  monitoring ``_replicator`` dbs for changes.
+* :ghissue:`5184`: Remove compatibility ``couch_rand`` module.
+* :ghissue:`5179`: Do not leak ``fabric_rpc`` workers if coordinator is killed.
+* :ghissue:`5205`: Cleanly abort responses when path doesn't start with slash.
+* :ghissue:`5204`, :ghissue:`5203`, :ghissue:`5200`, :ghissue:`5201`: Fix
+  continuous changes feeds with a limit greater than total.
+* :ghissue:`5169`: Make sure we never get an inconsistent ``couch_lru`` cache.
+* :ghissue:`5167`: Remove unused ``close_lru`` ``gen_server`` call.
+* :ghissue:`5160`: Ensure we run fabric worker cleanup in more cases.
+* :ghissue:`5158`: Fix PowerShell ``PSScriptAnalyzer`` warnings.
+* :ghissue:`5153`, :ghissue:`5156`: Upgrade recon and fix Erlang/OTP 27
+  compiler warnings.
+* :ghissue:`5154`: Replace ``0/1`` to ``false/true`` for config keys.
+* :ghissue:`5152`: Improve worker cleanup on early coordinator exit to reduce
+  the occurrence of spurious ``exit:timeout`` errors in the log.
+* :ghissue:`5151`: Use atom for config key ``with_spidermonkey``.
+* :ghissue:`5147`: Add passively closed client monitoring to search.
+* :ghissue:`5144`: Cleanup deprecated and unused functionality in ``rexi``.
+* :ghissue:`5143`: Remove unused external functions and local external calls.
+* :ghissue:`5130`, :ghissue:`5132`, :ghissue:`5138`, :ghissue:`5163`,
+  :ghissue:`5170`: Implement persistent node names.
+* :ghissue:`5131`: Remove unused ``couch_db_header`` module.
+* :ghissue:`5084`, :ghissue:`5126`: Simplify and fix hyper. Remove external
+  ``hyper`` dependency.
+* :ghissue:`5117`, :ghissue:`5118`: Validate target doc id for COPY method.
+* :ghissue:`5111`, :ghissue:`5114`: Make sure config reload finds new ``.ini``
+  files in ``.d`` directories.
+* :ghissue:`5110`: Remove last remnant of snap install in ``./configure``.
+  That happens in ``couchdb-pkg`` now.
+* :ghissue:`5089`, :ghissue:`5103`: Fix ``_scheduler/docs/...`` path 500 errors.
+* :ghissue:`5101`: Fix replicator scheduler job stopping crash.
+* :ghissue:`5100`: Simplify ``couchdb.cmd.in`` and remove app version.
+* :ghissue:`5097`: Remove ``couch_io_logger`` module.
 * :ghissue:`5066`: Handle multiple ``Set-Cookie`` headers in replicator session
   plugin.
 * :ghissue:`5060`: Cleanup a few clauses in ``fabric_view_changes``.
@@ -289,6 +343,19 @@ Bugfixes
 Tests
 -----
 
+* :ghissue:`5219`: Allow for overriding the host on running Mango tests.
+* :ghissue:`5192`: Clean elixir build artifacts with ``make clean``.
+* :ghissue:`5190`: Remove flaky couch key tree test.
+* :ghissue:`5187`: Do not test SpiderMonkey libs when it is disabled on Windows.
+* :ghissue:`5183`: Remove redundant and racy assertion in the
+  ``couchdb_os_proc_pool`` test.
+* :ghissue:`5182`: Set minimum Elixir version to 1.15.
+* :ghissue:`5180`: Bump Clouseau to 2.23.1 in CI.
+* :ghissue:`5128`: Update Erlang in CI, support Elixir 1.17.
+* :ghissue:`5102`: Use a shorter ``4000`` msec replicator scheduling interval
+  for tests.
+* :ghissue:`5078`, :ghissue:`5085`: Make app and release versions uniform.
+  Remove the unused ``rel`` version.
 * :ghissue:`5068`: Fix flakiness in ``fabric_bench``.
 * :ghissue:`5054`: Update a few deps and improve CI.
 * :ghissue:`5050`: Update CI OSes.
@@ -317,7 +384,7 @@ Tests
 * :ghissue:`4806`: Mango: do not skip json tests when Clouseau installed.
 * :ghissue:`4803`: Fix flaky ``ddoc_cache`` test some more.
 * :ghissue:`4765`: Fix flaky mem3 reshard test.
-* :ghissue:`4763`: Plug hole in unit test coverage of view curser functions.
+* :ghissue:`4763`: Plug hole in unit test coverage of view cursor functions.
 * :ghissue:`4726`: Support Elixir 1.15.
 * :ghissue:`4691`: ``make elixir`` should match what we run in CI.
 * :ghissue:`4632`: Fix test database recreation logic.
@@ -332,6 +399,10 @@ Tests
 Docs
 ----
 
+* :ghissue:`5221`: Add notes about JavaScript engine compatibility issues and
+  how to use the new scanner feature.
+* :ghissue:`5162`: Update CVE backport policy.
+* :ghissue:`5134`: Remove ``JSON2`` reference as we no longer ship our own JSON.
 * :ghissue:`5063`: Fix duplicate keys in find query.
 * :ghissue:`5045`: Create Python ``virtualenv`` on Windows for docs.
 * :ghissue:`5038`: Fix small detail about conflicts in Overview section.
