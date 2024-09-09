@@ -110,6 +110,7 @@ class Database(object):
 
     def recreate(self):
         NUM_TRIES = 10
+        NON_RECOVERABLE = [401, 402, 403, 412, 413]
 
         for k in range(NUM_TRIES):
             r = self.sess.get(self.url)
@@ -120,7 +121,7 @@ class Database(object):
                     # db exists and it is empty -- exit condition is met
                     return
                 self.delete()
-            else:
+            elif r.status_code in NON_RECOVERABLE:
                 r.raise_for_status()
             self.create()
             time.sleep(k * 0.1)
