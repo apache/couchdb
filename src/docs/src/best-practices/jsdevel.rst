@@ -135,7 +135,24 @@ known regression or discrepancies between versions:
    js> d.toLocaleFormat("%Y-%m-%d")
    typein:2:3 TypeError: d.toLocaleFormat is not a function
 
-4. Invalid expressions following ``function(){...}`` are not ignored any longer
+4. ``toLocaleString(...)`` function.
+
+  SpiderMonkey 1.8.5 ignored locale strings. Later versions started to
+  return the correct format:
+
+.. code-block:: bash
+
+   % js
+   js > (new Date("2019-01-15T19:32:52.915Z")).toLocaleString('en-US')
+   "Tue Jan 15 14:32:52 2019"
+
+   % js91
+   js > (new Date("2019-01-15T19:32:52.915Z")).toLocaleString('en-US')
+   "01/15/2019, 02:32:52 PM"
+
+Spidermonkey 91 output also match QuickJS and v8.
+
+5. Invalid expressions following ``function(){...}`` are not ignored any longer
    and will throw an error.
 
    Previously, in versions less than or equal to ``1.8.5`` it was possible add
@@ -177,7 +194,7 @@ known regression or discrepancies between versions:
         "reason": "Compilation of the map function in the 'v1' view failed: ..."
     }
 
-5. Object key order.
+6. Object key order.
 
    Object key order may change between versions, so any views which rely on
    that order may emit different results depending on the engine version:
