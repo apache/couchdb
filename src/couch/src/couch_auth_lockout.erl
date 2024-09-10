@@ -61,7 +61,7 @@ lockout(#httpd{} = Req, UserName, UserSalt) ->
     end.
 
 lockout_mode() ->
-    case config:get("chttpd_auth_lockout", "mode", "off") of
+    case config:get("chttpd_auth_lockout", "mode", "enforce") of
         "off" ->
             off;
         "warn" ->
