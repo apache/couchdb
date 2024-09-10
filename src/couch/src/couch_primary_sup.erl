@@ -39,9 +39,9 @@ init([]) ->
                     couch_lockout_lru,
                     [
                         {max_objects,
-                            config:get_integer("couch_auth_lockout", "max_objects", 10_000)},
+                            config:get_integer("chttpd_auth_lockout", "max_objects", 10_000)},
                         {max_lifetime,
-                            config:get_integer("couch_auth_lockout", "max_lifetime", 300_000)}
+                            config:get_integer("chttpd_auth_lockout", "max_lifetime", 300_000)}
                     ]
                 ]},
                 permanent, 5000, worker, [ets_lru]}

@@ -61,7 +61,7 @@ lockout(#httpd{} = Req, UserName, UserSalt) ->
     end.
 
 lockout_mode() ->
-    case config:get("couch_auth_lockout", "mode", "off") of
+    case config:get("chttpd_auth_lockout", "mode", "off") of
         "off" ->
             off;
         "warn" ->
@@ -73,7 +73,7 @@ lockout_mode() ->
     end.
 
 lockout_threshold() ->
-    config:get_integer("couch_auth_lockout", "threshold", 5).
+    config:get_integer("chttpd_auth_lockout", "threshold", 5).
 
 peer(#httpd{mochi_req = MochiReq}) ->
     Socket = mochiweb_request:get(socket, MochiReq),
