@@ -40,7 +40,7 @@
 
 maybe_upgrade_password_hash(AuthModule, UserName, Password, UserProps) ->
     UpgradeEnabled = config:get_boolean("chttpd_auth", "upgrade_hash_on_auth", true),
-    IsAdmin = is_admin(UserProps),
+    IsAdmin = is_admin(UserName),
     NeedsUpgrade = needs_upgrade(UserProps),
     InProgress = in_progress(AuthModule, UserName),
     if
@@ -106,9 +106,8 @@ hash_admin_passwords_int(Persist) ->
         couch_passwords:get_unhashed_admins()
     ).
 
-is_admin(UserProps) ->
-    Roles = couch_util:get_value(<<"roles">>, UserProps, []),
-    lists:member(<<"_admin">>, Roles).
+is_admin(UserName) ->
+    config:get("admins", ?b2l(UserName)) /= undefined.
 
 needs_upgrade(UserProps) ->
     CurrentScheme = couch_util:get_value(<<"password_scheme">>, UserProps),
