@@ -75,7 +75,7 @@ Highlights
 
   Advantages over SpiderMonkey:
 
-  - significantly smaller and easier to integrate codebase. We're using ~6
+  - Significantly smaller and easier to integrate codebase. We're using ~6
     C files vs 700+ SM91 C++ files.
   - Built with Apache CouchDB as opposed having to maintain a separate
     SpiderMonkey package for OSs that don’t support it
@@ -97,6 +97,11 @@ Highlights
 
           [couchdb]
           js_engine = spidermonkey | quickjs
+
+  - CouchDB also now includes a scanner plugin that, when enabled, can scan all
+    design docs in all your databases in the background and report
+    incompatibilities between SpiderMonkey and QuickJS. This allows you to
+    safely migrate to QuickJS.
 
 * :ghissue:`4570`, :ghissue:`4578`, :ghissue:`4576`: Adopt xxHash in favour
   of md5 for ``couch_file`` checksums and ETag calculation. 30% performance
@@ -122,8 +127,8 @@ Highlights
 * :ghissue:`5032`: Temporarily block access by client IP for repeated
   authentication failures. Can be disabled in config.
 
-* Many small small performance improvements, see :ref:`the Performance
-  section <performance430>`.
+* Many small performance improvements, see :ref:`the Performance
+  section <performance340>`.
 
 Features and Enhancements
 -------------------------
@@ -196,7 +201,7 @@ Features and Enhancements
 * :ghissue:`5046`: JWT: require valid `exp` claim by default.
 * :ghissue:`5065`: Update Fauxton UI to version v1.3.1.
 
-.. _performance430:
+.. _performance340:
 
 Performance
 -----------
