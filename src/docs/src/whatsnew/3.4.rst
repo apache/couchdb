@@ -115,6 +115,11 @@ Highlights
   Entries in the password hash cache are time-limited, unused entries are
   automatically deleted, and there is a capacity bound.
 
+  Existing hashed user doc entries will be automatically upgraded
+  during the next successful authentication. To disable auto-upgrading
+  set the ``[chttpd_auth] upgrade_hash_on_auth`` config setting to
+  ``false``.
+
 * :ghissue:`4512`: Mango: add keys-only covering indexes. Improves query
   response times for certain queries up to 10x at p(95).
 
