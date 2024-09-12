@@ -387,6 +387,16 @@ Authentication Configuration
             [chttpd_auth]
             x_auth_username = X-Auth-CouchDB-UserName
 
+    .. config:option:: upgrade_hash_on_auth :: Auto-upgrade user auth docs on next auth call
+
+        .. versionadded:: 3.4
+
+        Upgrade user auth docs during the next successful
+        authentication using the current password hashing settings. ::
+
+            [chttpd_auth]
+            upgrade_hash_on_auth = true
+
 .. config:section:: jwt_auth :: JWT Authentication
 
     .. config:option:: required_claims :: Mandatory claims in JWT tokens
@@ -396,7 +406,7 @@ Authentication Configuration
         is sent if any are missing. ::
 
             [jwt_auth]
-                required_claims = exp,iat
+            required_claims = exp,iat
 
     .. config:option:: roles_claim_name :: Optional CouchDB roles claim in JWT token \
         (deprecated)
