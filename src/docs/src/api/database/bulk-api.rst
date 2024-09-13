@@ -603,10 +603,10 @@ Sending multiple queries to a database
                     "rev": "1-4a7e4ae49c4366eaed8edeaea8f784ad",
                 },
                 {
-                    "id": "bar",
+                    "id": "bar"
                 }
                 {
-                    "id": "baz",
+                    "id": "baz"
                 }
             ]
         }
