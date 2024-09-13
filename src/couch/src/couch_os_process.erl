@@ -130,31 +130,30 @@ pick_command1(_) ->
 
 % gen_server API
 init([Command]) ->
-    PrivDir = couch_util:priv_dir(),
-    Spawnkiller = "\"" ++ filename:join(PrivDir, "couchspawnkillable") ++ "\"",
     V = config:get("query_server_config", "os_process_idle_limit", "300"),
     IdleLimit = list_to_integer(V) * 1000,
     LogLevel = log_level(os:getenv("COUCHDB_IO_LOG_LEVEL")),
     T0 = erlang:monotonic_time(),
+    Port = open_port({spawn, Command}, ?PORT_OPTIONS),
+    {os_pid, OsPid} = erlang:port_info(Port, os_pid),
     OsProc = #os_proc{
         command = Command,
-        port = open_port({spawn, Spawnkiller ++ " " ++ Command}, ?PORT_OPTIONS),
+        port = Port,
         idle = IdleLimit,
         log_level = LogLevel
     },
-    KillCmd = iolist_to_binary(readline(OsProc)),
     T1 = erlang:monotonic_time(),
     DtUSec = erlang:convert_time_unit(T1 - T0, native, microsecond),
     bump_time_stat(spawn_proc, DtUSec),
     Pid = self(),
     [CmdLog | _] = string:split(Command, " "),
     CmdLog1 = filename:basename(CmdLog),
-    log(OsProc, "OS Process ~p Started :: ~p", [OsProc#os_proc.port, CmdLog1]),
+    log(OsProc, "OS Process pid:~p port:~p Started :: ~p", [OsPid, Port, CmdLog1]),
     couch_stats:increment_counter([couchdb, query_server, process_starts]),
     spawn(fun() ->
         % this ensure the real os process is killed when this process dies.
         erlang:monitor(process, Pid),
-        killer(?b2l(KillCmd))
+        killer(OsPid)
     end),
     {ok, OsProc, IdleLimit}.
 
@@ -216,12 +215,19 @@ handle_info(Msg, #os_proc{idle = Idle} = OsProc) ->
     log(OsProc, "OS Process ~p Unknown info :: ~p", [OsProc#os_proc.port, Msg]),
     {noreply, OsProc, Idle}.
 
-killer(KillCmd) ->
+kill_command(OsPid) ->
+    OsPid1 = integer_to_list(OsPid),
+    case os:type() of
+        {win32, _} -> "taskkill /f /pid " ++ OsPid1;
+        {_, _} -> "kill -9 " ++ OsPid1
+    end.
+
+killer(OsPid) when is_integer(OsPid), OsPid > 0 ->
     receive
         _ ->
-            os:cmd(KillCmd)
+            os:cmd(kill_command(OsPid))
     after 1000 ->
-        killer(KillCmd)
+        killer(OsPid)
     end.
 
 bump_cmd_time_stat(Cmd, USec) when is_list(Cmd), is_integer(USec) ->
