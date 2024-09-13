@@ -236,16 +236,12 @@ SpidermonkeySpecs = case WithSpidermonkey of
     false -> []
 end.
 
-BaseSpecs = SpidermonkeySpecs ++ [
+PortSpecs = SpidermonkeySpecs ++ [
         % ejson_compare
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
         {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
         {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
-].
-
-SpawnSpec = [
-    {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
 ].
 
 %% hack required until switch to enc/rebar3
@@ -254,15 +250,6 @@ PortEnvOverrides = [
     "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"}
 ].
 
-PortSpecs = case os:type() of
-    {win32, _} ->
-        BaseSpecs ++ SpawnSpec;
-    _ ->
-        {ok, CSK} = file:read_file("priv/spawnkillable/couchspawnkillable.sh"),
-        ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
-        os:cmd("chmod +x priv/couchspawnkillable"),
-        BaseSpecs
-end.
 PlatformDefines = [
    {platform_define, "win32", 'WINDOWS'}
 ].
