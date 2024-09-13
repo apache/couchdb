@@ -560,14 +560,15 @@ Sending multiple queries to a database
 
     This method can be called to query several documents in bulk. It is well
     suited for fetching a specific revision of documents, as replicators do for
-    example, or for getting revision history.
+    example, or for getting revision history.  Refer to the
+    :ref:`document endpoint <api/doc>` documentation for  a complete
+    description of the available query parameters.
 
     :param db: Database name
     :<header Accept: - :mimetype:`application/json`
                      - :mimetype:`multipart/related`
                      - :mimetype:`multipart/mixed`
     :<header Content-Type: :mimetype:`application/json`
-    :query boolean revs: Give the revisions history
     :<json array docs: List of document objects, with ``id``, and optionally
       ``rev`` and ``atts_since``
     :>header Content-Type: - :mimetype:`application/json`
