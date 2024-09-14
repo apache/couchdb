@@ -36,13 +36,11 @@ quickjs_test_() ->
 
 t_get_mainjs_cmd(_) ->
     Cmd = couch_quickjs:mainjs_cmd(),
-    ?assert(filelib:is_file(Cmd)),
-    ?assertEqual("quickjs", os_cmd(Cmd ++ " -V")).
+    ?assertEqual(0, os_cmd(Cmd ++ " -V")).
 
 t_get_coffee_cmd(_) ->
     Cmd = couch_quickjs:coffee_cmd(),
-    ?assert(filelib:is_file(Cmd)),
-    ?assertEqual("quickjs", os_cmd(Cmd ++ " -V")).
+    ?assertEqual(0, os_cmd(Cmd ++ " -V")).
 
 t_can_configure_memory_limit(_) ->
     Limit = integer_to_list(4 * 1024 * 1024),
@@ -51,7 +49,7 @@ t_can_configure_memory_limit(_) ->
     ?assert(is_list(Cmd)),
     Expect = "-M " ++ Limit,
     ?assertEqual(Expect, string:find(Cmd, Expect)),
-    ?assertEqual("quickjs", os_cmd(Cmd ++ " -V")).
+    ?assertEqual(0, os_cmd(Cmd ++ " -V")).
 
 t_bad_memory_limit(_) ->
     Limit = integer_to_list(42),
@@ -60,9 +58,11 @@ t_bad_memory_limit(_) ->
     ?assert(is_list(Cmd)),
     ExpectCmd = "-M " ++ Limit,
     ?assertEqual(ExpectCmd, string:find(Cmd, ExpectCmd)),
-    Res = os_cmd(Cmd ++ " -V"),
-    ExpectRes = "Invalid stack size",
-    ?assertEqual(ExpectRes, string:find(Res, ExpectRes)).
+    ?assertEqual(1, os_cmd(Cmd ++ " -V")).
 
 os_cmd(Cmd) ->
-    string:trim(os:cmd(Cmd)).
+    Opts = [stream, {line, 4096}, binary, exit_status, hide],
+    Port = open_port({spawn, Cmd}, Opts),
+    receive
+        {Port, {exit_status, Status}} -> Status
+    end.

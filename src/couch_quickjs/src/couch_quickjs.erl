@@ -26,12 +26,12 @@
 mainjs_cmd() ->
     Path = filename:join([priv_dir(), "couchjs_mainjs" ++ ext()]),
     check_path(Path),
-    apply_config(Path).
+    apply_config("\"" ++ Path ++ "\"").
 
 coffee_cmd() ->
     Path = filename:join([priv_dir(), "couchjs_coffee" ++ ext()]),
     check_path(Path),
-    apply_config(Path).
+    apply_config("\"" ++ Path ++ "\"").
 
 priv_dir() ->
     case code:priv_dir(couch_quickjs) of
