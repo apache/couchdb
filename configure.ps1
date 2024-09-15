@@ -157,8 +157,20 @@ if ($JSEngine -eq "quickjs") {
 
 # If spidermonkey was disabled but JS_ENGINE set to "spidermonkey", reset it to "quickjs"
 if ( ($WithSpiderMonkey -eq "false" ) -and ($JsEngine -eq "spidermonkey" ) ) {
-   Write-Verbose "NOTICE: Spidermonkey was disabled, but JsEngine=spidermonkey. Setting JsEngine=quickjs"
-   $JsEngine = "quickjs"
+    Write-Verbose "NOTICE: Spidermonkey was disabled, but JsEngine=spidermonkey. Setting JsEngine=quickjs"
+    $JsEngine = "quickjs"
+}
+
+# If we're in a release tarball and we don't have proper, then mark it as skipped
+if ( (-Not (Test-Path ".git")) -and ($WithProper -eq "true") -and (-Not (Test-Path "src\proper")) ) {
+    $WithProper = "false"
+}
+
+# If we're in a release tarball and we don't have spidermonkey, then mark it as skipped and enable quickjs
+if ( (-Not (Test-Path ".git")) -and ($WithSpiderMonkey -eq "true") -and (-Not (Test-Path "src\couch\priv\couch_js")) ) {
+    Write-Verbose "NOTICE: Spidermonkey was disabled in release tarball. Setting JsEngine=quickjs"
+    $WithSpiderMonkey = "false"
+    $JsEngine = "quickjs"
 }
 
 Write-Verbose "==> configuring couchdb in rel\couchdb.config"
