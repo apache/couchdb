@@ -1124,7 +1124,7 @@ random_processes(Acc, Depth) ->
                 end);
             open_port ->
                 spawn_link(fun() ->
-                    Port = erlang:open_port({spawn, "sleep 10"}, []),
+                    Port = erlang:open_port({spawn, "sleep 10"}, [hide]),
                     true = erlang:link(Port),
                     Caller ! {Ref, random_processes(Depth - 1)},
                     receive
