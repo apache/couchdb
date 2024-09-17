@@ -109,7 +109,7 @@ Highlights
 
 * :ghissue:`4814`: Introduce PBKDF2-SHA256 for password hashing. The existing
   PBKDF2-SHA1 variant is now deprecated. Increases the default iteration count
-  to ``6000000``. Also introduce a password hash in-memory cache with a low
+  to ``600000``. Also introduce a password hash in-memory cache with a low
   iteration number, to keep interactive requests fast for a fixed time.
 
   Entries in the password hash cache are time-limited, unused entries are
