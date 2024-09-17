@@ -116,7 +116,7 @@ needs_upgrade(UserProps) ->
     TargetPRF = ?l2b(chttpd_util:get_chttpd_auth_config("pbkdf2_prf", "sha256")),
     CurrentIterations = couch_util:get_value(<<"iterations">>, UserProps),
     TargetIterations = chttpd_util:get_chttpd_auth_config_integer(
-        "iterations", 6000000
+        "iterations", 600000
     ),
     case {TargetScheme, TargetIterations, TargetPRF} of
         {CurrentScheme, CurrentIterations, _} when CurrentScheme == <<"simple">> ->
