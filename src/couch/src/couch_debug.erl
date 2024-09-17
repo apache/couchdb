@@ -1147,7 +1147,13 @@ setup() ->
     tree().
 
 teardown({_InitialPid, Processes, _Tree}) ->
-    [exit(Pid, normal) || Pid <- Processes].
+    [
+        begin
+            (catch unlink(Pid)),
+            exit(Pid, kill)
+        end
+     || Pid <- Processes
+    ].
 
 link_tree_test_() ->
     {
