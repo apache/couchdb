@@ -16,7 +16,7 @@
 Nouveau Server Installation
 ===========================
 
-.. versionadded:: 4.0
+.. versionadded:: 3.4.0
 
 .. highlight:: ini
 
