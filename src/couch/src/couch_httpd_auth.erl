@@ -109,14 +109,19 @@ default_authentication_handler(Req, AuthModule) ->
             case AuthModule:get_user_creds(Req, User) of
                 nil ->
                     throw({unauthorized, <<"Name or password is incorrect.">>});
-                {ok, UserProps, _AuthCtx} ->
+                {ok, UserProps, AuthCtx} ->
                     reject_if_totp(UserProps),
                     UserName = ?l2b(User),
                     Password = ?l2b(Pass),
                     case authenticate(Req, AuthModule, UserName, Password, UserProps) of
                         true ->
                             couch_password_hasher:maybe_upgrade_password_hash(
-                                AuthModule, UserName, Password, UserProps
+                                Req,
+                                UserName,
+                                Password,
+                                UserProps,
+                                AuthModule,
+                                AuthCtx
                             ),
                             Req#httpd{
                                 user_ctx = #user_ctx{
@@ -497,7 +502,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
     UserName = ?l2b(extract_username(Form)),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
     couch_log:debug("Attempt Login: ~s", [UserName]),
-    {ok, UserProps, _AuthCtx} =
+    {ok, UserProps, AuthCtx} =
         case AuthModule:get_user_creds(Req, UserName) of
             nil -> {ok, [], nil};
             Result -> Result
@@ -506,7 +511,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
         true ->
             verify_totp(UserProps, Form),
             couch_password_hasher:maybe_upgrade_password_hash(
-                AuthModule, UserName, Password, UserProps
+                Req, UserName, Password, UserProps, AuthModule, AuthCtx
             ),
             % setup the session cookie
             Secret = ?l2b(ensure_cookie_auth_secret()),
