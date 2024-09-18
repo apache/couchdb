@@ -2191,7 +2191,7 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
     Nouveau endpoints require a running nouveau server.
     See :ref:`Nouveau Server Installation <install/nouveau>` for details.
 
-.. versionadded:: 4.0
+.. versionadded:: 3.4.0
 
 .. http:post:: /_nouveau_analyze
     :synopsis: Tests the results of analyzer tokenization

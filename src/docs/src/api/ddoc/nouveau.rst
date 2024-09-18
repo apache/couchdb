@@ -24,7 +24,7 @@
     Nouveau endpoints require a running nouveau server.
     See :ref:`Nouveau Server Installation <install/nouveau>` for details.
 
-.. versionadded:: 4.0
+.. versionadded:: 3.4.0
 
 .. http:get:: /{db}/_design/{ddoc}/_nouveau/{index}
     :synopsis: Returns results for the specified nouveau index
@@ -52,7 +52,7 @@
     :query number limit: Limit the number of the returned documents to the specified
         number. For a grouped search, this parameter limits the number of documents per
         group.
-    :query string query: Required. The Lucene query string.
+    :query string q: Required. The Lucene query string.
     :query json ranges: This field defines ranges for numeric search fields. The
         value is a JSON object where the fields names are numeric search fields,
         and the values of the fields are arrays of JSON objects. The objects
@@ -107,7 +107,7 @@
     Nouveau endpoints require a running nouveau server.
     See :ref:`Nouveau Server Installation <install/nouveau>` for details.
 
-.. versionadded:: 4.0
+.. versionadded:: 3.4.0
 
 .. http:get:: /{db}/_design/{ddoc}/_nouveau_info/{index}
     :synopsis: Returns metadata for the specified nouveau index
