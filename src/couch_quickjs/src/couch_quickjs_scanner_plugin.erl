@@ -247,10 +247,16 @@ views_validate(DDocId, #{?VIEWS := Views}, {Db, #st{} = St0}) when
     try
         lib_load(St, Views),
         ViewList = lists:sort(maps:to_list(valid_views(Views))),
-        Fun = fun({Name, #{?MAP := Src}}) -> add_fun_load(St, Name, Src) end,
-        lists:foreach(Fun, ViewList),
-        {[_ | _], St1 = #st{}} = lists:foldl(fun mapred_fold/2, {ViewList, St}, Docs),
-        {Db, St1}
+        case ViewList of
+            [_ | _] ->
+                Fun = fun({Name, #{?MAP := Src}}) -> add_fun_load(St, Name, Src) end,
+                lists:foreach(Fun, ViewList),
+                {[_ | _], St1 = #st{}} = lists:foldl(fun mapred_fold/2, {ViewList, St}, Docs),
+                {Db, St1};
+            [] ->
+                % There may be no valid views left
+                {Db, St}
+        end
     catch
         throw:{validate, Error} ->
             Meta = #{sid => SId, db => Db, ddoc => DDocId},
