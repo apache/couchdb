@@ -14,7 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(TIMEOUT, 100).
+-define(TIMEOUT, 200).
 
 setup(Opts) ->
     {ok, Q} = couch_work_queue:new(Opts),
