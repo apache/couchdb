@@ -395,7 +395,7 @@ Authentication Configuration
         authentication using the current password hashing settings. ::
 
             [chttpd_auth]
-            upgrade_hash_on_auth = true
+            upgrade_hash_on_auth = false
 
 .. config:section:: jwt_auth :: JWT Authentication
 
