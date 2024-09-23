@@ -31,6 +31,23 @@ Highlights
 * :ghissue:`5255`: Set ``upgrade_hash_on_auth`` to ``false`` to disable
   automatic password hashing upgrades.
 
+Bufixes
+-------
+
+* :ghissue:`5254`: Handle the case when the QuickJS scanner has no
+  valid views.
+
+Tests
+-----
+
+* :ghissue:`5253`: Increase timeout for couch_work_queue test.
+
+Docs
+----
+
+* :ghissue:`5256`: Explain holding off 3.4.0 binaries and the reason
+  for making a 3.4.1 release.
+
 .. _release/3.4.0:
 
 Version 3.4.0
