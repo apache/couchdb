@@ -24,7 +24,7 @@
     handle_info/2
 ]).
 
--export([maybe_upgrade_password_hash/4, hash_admin_passwords/1]).
+-export([maybe_upgrade_password_hash/6, hash_admin_passwords/1]).
 
 -export([worker_loop/1]).
 
@@ -38,7 +38,7 @@
 %%% Public functions
 %%%===================================================================
 
-maybe_upgrade_password_hash(AuthModule, UserName, Password, UserProps) ->
+maybe_upgrade_password_hash(Req, UserName, Password, UserProps, AuthModule, AuthCtx) ->
     UpgradeEnabled = config:get_boolean("chttpd_auth", "upgrade_hash_on_auth", false),
     IsDoc = is_doc(UserProps),
     NeedsUpgrade = needs_upgrade(UserProps),
@@ -46,7 +46,8 @@ maybe_upgrade_password_hash(AuthModule, UserName, Password, UserProps) ->
     if
         UpgradeEnabled andalso IsDoc andalso NeedsUpgrade andalso not InProgress ->
             gen_server:cast(
-                ?MODULE, {upgrade_password_hash, AuthModule, UserName, Password, UserProps}
+                ?MODULE,
+                {upgrade_password_hash, Req, UserName, Password, UserProps, AuthModule, AuthCtx}
             );
         true ->
             ok
@@ -72,11 +73,13 @@ init(_Args) ->
 handle_call(Msg, _From, #state{} = State) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, State}.
 
-handle_cast({upgrade_password_hash, AuthModule, UserName, Password, UserProps}, State) ->
+handle_cast(
+    {upgrade_password_hash, Req, UserName, Password, UserProps, AuthModule, AuthCtx}, State
+) ->
     case ets:insert_new(?IN_PROGRESS_ETS, {{AuthModule, UserName}}) of
         true ->
             State#state.worker_pid !
-                {upgrade_password_hash, AuthModule, UserName, Password, UserProps};
+                {upgrade_password_hash, Req, UserName, Password, UserProps, AuthModule, AuthCtx};
         false ->
             ok
     end,
@@ -136,14 +139,16 @@ start_worker_loop(State) ->
 
 worker_loop(Parent) ->
     receive
-        {upgrade_password_hash, AuthModule, UserName, Password, UserProps} ->
-            couch_log:notice("upgrading stored password hash for '~s'", [UserName]),
-            upgrade_password_hash(AuthModule, Password, UserProps),
-            erlang:send_after(5000, Parent, {done, AuthModule, UserName})
+        {upgrade_password_hash, Req, UserName, Password, UserProps, AuthModule, AuthCtx} ->
+            couch_log:notice("upgrading stored password hash for '~s' (~p)", [UserName, AuthCtx]),
+            upgrade_password_hash(Req, UserName, Password, UserProps, AuthModule, AuthCtx),
+            erlang:send_after(5000, Parent, {done, AuthModule, UserName});
+        _Msg ->
+            ignore
     end,
     worker_loop(Parent).
 
-upgrade_password_hash(AuthModule, Password, UserProps0) ->
+upgrade_password_hash(Req, _UserName, Password, UserProps0, AuthModule, AuthCtx) ->
     UserProps1 = [{<<"password">>, Password}, {<<"preserve_salt">>, true} | UserProps0],
     NewUserDoc = couch_doc:from_json_obj({UserProps1}),
-    catch AuthModule:update_user_creds(nil, NewUserDoc, ?ADMIN_CTX).
+    catch AuthModule:update_user_creds(Req, NewUserDoc, AuthCtx).
