@@ -336,6 +336,14 @@ defmodule UsersDbSecurityTest do
       "3"
     })
 
+    # make changing PRF regenerates derived_key and salt on next
+    # password change
+    set_config({
+      "chttpd_auth",
+      "upgrade_hash_on_auth",
+      "true"
+    })
+
     tom_doc5 = Map.put(tom_doc4, "password", "couch")
     # 201 if the save does the update, 409 if the async password hasher got there first.
     save_as(@users_db, tom_doc5, user: "tom", pwd: "couch", expect_response: [201, 409])
