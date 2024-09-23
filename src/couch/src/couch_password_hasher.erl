@@ -39,7 +39,7 @@
 %%%===================================================================
 
 maybe_upgrade_password_hash(AuthModule, UserName, Password, UserProps) ->
-    UpgradeEnabled = config:get_boolean("chttpd_auth", "upgrade_hash_on_auth", true),
+    UpgradeEnabled = config:get_boolean("chttpd_auth", "upgrade_hash_on_auth", false),
     IsDoc = is_doc(UserProps),
     NeedsUpgrade = needs_upgrade(UserProps),
     InProgress = in_progress(AuthModule, UserName),
