@@ -20,10 +20,45 @@
     :depth: 1
     :local:
 
+.. _release/3.4.1:
+
+Version 3.4.1
+=============
+
+Highlights
+----------
+
+* :ghissue:`5255`: Set ``upgrade_hash_on_auth`` to ``false`` to disable
+  automatic password hashing upgrades.
+
 .. _release/3.4.0:
 
 Version 3.4.0
 =============
+
+Warning
+-------
+
+CouchDB version 3.4.0 includes a feature to automatically upgrade password
+hashes to a newer algorithm and a configuration option that enables this feature
+by default. As a consequence, if you are upgrading to CouchDB version 3.4.0 from
+an earlier version and then have to roll back to the earlier version, some of
+your ``_users`` documents might have already automatically ugpraded to the new
+algorithm. Your older version of CouchDB does not understand the resulting
+password hash and cannot authenticate the user any more until the earlier
+password hash is restored manually by an adminstrator.
+
+As a result, the CouchDB team has decided to issue a 3.4.1 release setting the
+configuration option to disable this new auto-upgrade feature.
+
+The issue was found after the formal 3.4.0 release process has concluded, so
+the source release is available normally, but the CouchDB team has not made
+3.4.0 convenience binaries available. The team recommends to upgrade to 3.4.1
+instead when it is available.
+
+The CouchDB team also recommends enabling the feature by setting the
+``upgrade_hash_on_auth`` configuration option to ``true`` as soon as you are
+safely running on 3.4.1 and have no more need to roll back the version.
 
 Breaking Changes
 ----------------
