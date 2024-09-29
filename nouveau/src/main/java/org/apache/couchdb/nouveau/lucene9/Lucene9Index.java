@@ -232,7 +232,7 @@ public class Lucene9Index extends Index {
             fieldDoc = null;
         }
 
-        return new TopFieldCollectorManager(sort, searchRequest.getLimit(), fieldDoc, 1000, false);
+        return new TopFieldCollectorManager(sort, searchRequest.getLimit(), fieldDoc, 1000);
     }
 
     private SortField getLastSortField(final Sort sort) {
