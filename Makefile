@@ -474,11 +474,9 @@ clean:
 	@rm -rf src/*/ebin
 	@rm -rf src/*/.rebar
 	@rm -rf src/*/priv/*.so
-	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-ast-bypass.js share/server/main-coffee.js
 	@rm -rf tmp dev/data dev/lib dev/logs
 	@rm -rf src/mango/.venv
-	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f src/couch_dist/certs/out
