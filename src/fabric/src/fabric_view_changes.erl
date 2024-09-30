@@ -101,7 +101,8 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
     PendingCount = pending_count(Offset),
     if
         Dir == rev, is_integer(PendingCount), PendingCount =< 0;
-        Limit2 =< 0, (Feed == "continuous" orelse Feed == "eventsource");
+        Limit2 =< 0, Feed == "continuous", Heartbeat == undefined;
+        Limit2 =< 0, Feed == "eventsource", Heartbeat == undefined;
         Limit > Limit2, Feed == "longpoll";
         MaintenanceMode == "true";
         MaintenanceMode == "nolb";
