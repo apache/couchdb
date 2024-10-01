@@ -14,7 +14,6 @@
 
 -export([go/3]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -140,13 +139,22 @@ read_repair(#acc{dbname = DbName, replies = Replies, node_revs = NodeRevs}) ->
             choose_reply(Docs);
         [#doc{id = Id} | _] ->
             Opts = [?ADMIN_CTX, ?REPLICATED_CHANGES, {read_repair, NodeRevs}],
-            Res = fabric:update_docs(DbName, Docs, Opts),
-            case Res of
-                {ok, []} ->
-                    couch_stats:increment_counter([fabric, read_repairs, success]);
-                _ ->
-                    couch_stats:increment_counter([fabric, read_repairs, failure]),
-                    couch_log:notice("read_repair ~s ~s ~p", [DbName, Id, Res])
+            case fabric_util:is_replicator_db(DbName) of
+                true ->
+                    % Skip read_repair for _replicator shards. We might have
+                    % gotten the result of after_doc_read/2 with a fake patched
+                    % revision and stripped creds. Let the internal replicator
+                    % handle all that
+                    ok;
+                false ->
+                    Res = fabric:update_docs(DbName, Docs, Opts),
+                    case Res of
+                        {ok, []} ->
+                            couch_stats:increment_counter([fabric, read_repairs, success]);
+                        _ ->
+                            couch_stats:increment_counter([fabric, read_repairs, failure]),
+                            couch_log:notice("read_repair ~s ~s ~p", [DbName, Id, Res])
+                    end
             end,
             choose_reply(Docs);
         [] ->
@@ -228,6 +236,7 @@ open_doc_test_() ->
                 t_handle_message_reply(),
                 t_store_node_revs(),
                 t_read_repair(),
+                t_no_read_repair_for_replicator(),
                 t_handle_response_quorum_met(),
                 t_get_doc_info()
             ]
@@ -517,6 +526,24 @@ t_read_repair() ->
         ?assertEqual(bar, read_repair(Acc4))
     end).
 
+t_no_read_repair_for_replicator() ->
+    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
+
+    ?_test(begin
+        meck:expect(couch_log, notice, fun(_, _) -> ok end),
+        meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+
+        % Test no read_repair took place
+        meck:reset(fabric),
+        Acc0 = #acc{
+            dbname = <<"dbname1/_replicator">>,
+            replies = [fabric_util:kv(Foo1, 1)]
+        },
+        ?assertEqual(Foo1, read_repair(Acc0)),
+        timer:sleep(100),
+        ?assertNot(meck:called(fabric, update_docs, ['_', '_', '_']))
+    end).
+
 t_handle_response_quorum_met() ->
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
@@ -528,6 +555,7 @@ t_handle_response_quorum_met() ->
         meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
 
         BasicOkAcc = #acc{
+            dbname = <<"dbname1">>,
             state = r_met,
             replies = [fabric_util:kv(Foo1, 2)],
             q_reply = Foo1
@@ -535,6 +563,7 @@ t_handle_response_quorum_met() ->
         ?assertEqual(Foo1, handle_response(BasicOkAcc)),
 
         WithAncestorsAcc = #acc{
+            dbname = <<"dbname1">>,
             state = r_met,
             replies = [fabric_util:kv(Foo1, 1), fabric_util:kv(Foo2, 2)],
             q_reply = Foo2
@@ -544,6 +573,7 @@ t_handle_response_quorum_met() ->
         % This also checks when the quorum isn't the most recent
         % revision.
         DeeperWinsAcc = #acc{
+            dbname = <<"dbname1">>,
             state = r_met,
             replies = [fabric_util:kv(Foo1, 2), fabric_util:kv(Foo2, 1)],
             q_reply = Foo1
@@ -553,6 +583,7 @@ t_handle_response_quorum_met() ->
         % Check that we return the proper doc based on rev
         % (ie, pos is equal)
         BiggerRevWinsAcc = #acc{
+            dbname = <<"dbname1">>,
             state = r_met,
             replies = [fabric_util:kv(Foo1, 1), fabric_util:kv(Bar1, 2)],
             q_reply = Bar1
