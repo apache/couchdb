@@ -31,7 +31,11 @@
 % to delete it. At some point in the future, remove this logic altogether.
 -define(REP_DESIGN_DOC, <<"_design/_replicator">>).
 -define(OWNER, <<"owner">>).
--define(CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]}}).
+% Use an atom as the replicator application role. Users cannot create atom
+% roles, only binaries. This way we ensure nobody can pretend to be the
+% replicator app.
+-define(REPLICATOR_ROLE, replicator).
+-define(CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>, ?REPLICATOR_ROLE]}}).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
 remove_state_fields(DbName, DocId) ->
@@ -232,7 +236,7 @@ before_doc_update(#doc{} = Doc, _Db, ?REPLICATED_CHANGES) ->
     Doc;
 before_doc_update(#doc{body = {Body}} = Doc, Db, _UpdateType) ->
     #user_ctx{roles = Roles, name = Name} = couch_db:get_user_ctx(Db),
-    IsReplicator = lists:member(<<"_replicator">>, Roles),
+    IsReplicator = lists:member(?REPLICATOR_ROLE, Roles),
     Doc1 =
         case IsReplicator of
             true -> Doc;
@@ -271,7 +275,10 @@ before_doc_update_owner(Other, Name, Db, #doc{body = {Body}} = Doc) ->
 after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
     Doc;
 after_doc_read(#doc{body = {Body}} = Doc, Db) ->
-    #user_ctx{name = Name} = couch_db:get_user_ctx(Db),
+    Ctx = #user_ctx{roles = Roles, name = Name} = couch_db:get_user_ctx(Db),
+    IsReplicator = lists:member(?REPLICATOR_ROLE, Roles),
+    % Internal replicator opens dbs with the ?ADMIN_CTX macro
+    IsInternalRepl = (Ctx == ?ADMIN_USER),
     case (catch couch_db:check_is_admin(Db)) of
         ok ->
             Doc;
@@ -279,7 +286,15 @@ after_doc_read(#doc{body = {Body}} = Doc, Db) ->
             case get_value(?OWNER, Body) of
                 Name ->
                     Doc;
+                _Other when (IsReplicator orelse IsInternalRepl) ->
+                    % When the replicator itself updates the doc don't patch it with a fake
+                    % rev and strip the creds
+                    Doc;
                 _Other ->
+                    % Not admin, user name doesn't match, and it's not the
+                    % replicator app: this is another user reading it. Strip
+                    % the creds and make up a fake "rev" since we're returning
+                    % a technically non-existent document body
                     Source = strip_credentials(get_value(<<"source">>, Body)),
                     Target = strip_credentials(get_value(<<"target">>, Body)),
                     NewBody0 = ?replace(Body, <<"source">>, Source),
@@ -430,7 +445,12 @@ replicator_can_update_docs_test_() ->
                 ?TDEF_FE(t_update_doc_completed),
                 ?TDEF_FE(t_update_failed),
                 ?TDEF_FE(t_update_triggered),
-                ?TDEF_FE(t_update_error)
+                ?TDEF_FE(t_update_error),
+                ?TDEF_FE(t_after_doc_read_as_admin),
+                ?TDEF_FE(t_after_doc_read_as_replicator),
+                ?TDEF_FE(t_after_doc_read_internal_replicator),
+                ?TDEF_FE(t_after_doc_read_matching_owner),
+                ?TDEF_FE(t_after_doc_read_not_matching_owner)
             ]
         }
     }.
@@ -520,5 +540,87 @@ t_update_error(DbName) ->
     ?assertEqual(undefined, Stats),
     RepId = get_value(<<"_replication_id">>, Props),
     ?assertEqual(null, RepId).
+
+t_after_doc_read_as_admin(DbName) ->
+    DocId = <<"doc1">>,
+    Map = #{
+        <<"source">> => <<"https://user1:pass1@localhost:5984/db1">>,
+        <<"target">> => <<"https://user2:pass2@localhost:5984/db2">>,
+        ?OWNER => <<"o1">>
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Ctx = {user_ctx, #user_ctx{name = <<"o2">>, roles = [<<"_admin">>, <<"potato">>]}},
+    Map1 = read_doc(DbName, DocId, Ctx),
+    ?assertEqual(Map, Map1).
+
+t_after_doc_read_as_replicator(DbName) ->
+    DocId = <<"doc1">>,
+    Map = #{
+        <<"source">> => <<"https://user1:pass1@localhost:5984/db1">>,
+        <<"target">> => <<"https://user2:pass2@localhost:5984/db2">>,
+        ?OWNER => <<"o1">>
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Ctx = {user_ctx, #user_ctx{name = <<"o2">>, roles = [?REPLICATOR_ROLE, <<"potato">>]}},
+    Map1 = read_doc(DbName, DocId, Ctx),
+    ?assertEqual(Map, Map1).
+
+t_after_doc_read_internal_replicator(DbName) ->
+    DocId = <<"doc1">>,
+    Map = #{
+        <<"source">> => <<"https://user1:pass1@localhost:5984/db1">>,
+        <<"target">> => <<"https://user2:pass2@localhost:5984/db2">>,
+        ?OWNER => <<"o1">>
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Map1 = read_doc(DbName, DocId, ?ADMIN_CTX),
+    ?assertEqual(Map, Map1).
+
+t_after_doc_read_matching_owner(DbName) ->
+    DocId = <<"doc1">>,
+    Map = #{
+        <<"source">> => <<"https://user1:pass1@localhost:5984/db1">>,
+        <<"target">> => <<"https://user2:pass2@localhost:5984/db2">>,
+        ?OWNER => <<"o1">>
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Ctx = {user_ctx, #user_ctx{name = <<"o1">>, roles = [<<"tomato">>, <<"potato">>]}},
+    Map1 = read_doc(DbName, DocId, Ctx),
+    ?assertEqual(Map, Map1).
+
+t_after_doc_read_not_matching_owner(DbName) ->
+    DocId = <<"doc1">>,
+    Map = #{
+        <<"source">> => <<"https://user1:pass1@localhost:5984/db1">>,
+        <<"target">> => <<"https://user2:pass2@localhost:5984/db2">>,
+        ?OWNER => <<"o1">>
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Ctx = {user_ctx, #user_ctx{name = <<"o2">>, roles = [<<"tomato">>, <<"potato">>]}},
+    Map1 = read_doc(DbName, DocId, Ctx),
+    StrippedMap = #{
+        <<"source">> => <<"https://localhost:5984/db1">>,
+        <<"target">> => <<"https://localhost:5984/db2">>,
+        ?OWNER => <<"o1">>
+    },
+    ?assertEqual(StrippedMap, Map1).
+
+ejson_from_map(#{} = Map) ->
+    ?JSON_DECODE(?JSON_ENCODE(Map)).
+
+ejson_to_map({L} = EJson) when is_list(L) ->
+    ?JSON_DECODE(?JSON_ENCODE(EJson), [return_maps]).
+
+write_doc(DbName, DocId, #{} = Map) ->
+    Doc = #doc{id = DocId, body = ejson_from_map(Map)},
+    couch_util:with_db(DbName, fun(Db) ->
+        couch_db:update_doc(Db, Doc, [])
+    end).
+
+read_doc(DbName, DocId, Ctx) ->
+    {ok, Db} = couch_db:open(DbName, [Ctx]),
+    {ok, Doc} = couch_db:open_doc(Db, DocId),
+    couch_db:close(Db),
+    ejson_to_map(Doc#doc.body).
 
 -endif.
