@@ -33,6 +33,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, nil, []).
 
 init(_) ->
+    couch_util:set_mqd_off_heap(?MODULE),
     {ok, #st{
         by_pid = #{},
         by_dbname = #{}
