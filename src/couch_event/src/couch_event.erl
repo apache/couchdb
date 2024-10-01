@@ -44,13 +44,13 @@ stop_listener(Pid) ->
     couch_event_listener_mfa:stop(Pid).
 
 register(Pid, DbName) ->
-    gen_server:call(?SERVER, {register, Pid, [DbName]}).
+    gen_server:call(?SERVER, {register, Pid, [DbName]}, infinity).
 
 register_many(Pid, DbNames) when is_list(DbNames) ->
-    gen_server:call(?SERVER, {register, Pid, DbNames}).
+    gen_server:call(?SERVER, {register, Pid, DbNames}, infinity).
 
 register_all(Pid) ->
-    gen_server:call(?SERVER, {register, Pid, [all_dbs]}).
+    gen_server:call(?SERVER, {register, Pid, [all_dbs]}, infinity).
 
 unregister(Pid) ->
-    gen_server:call(?SERVER, {unregister, Pid}).
+    gen_server:call(?SERVER, {unregister, Pid}, infinity).
