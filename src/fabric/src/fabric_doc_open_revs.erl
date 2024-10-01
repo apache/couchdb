@@ -200,10 +200,14 @@ dict_replies(Dict, [Reply | Rest]) ->
     dict_replies(NewDict, Rest).
 
 maybe_read_repair(Db, IsTree, Replies, NodeRevs, ReplyCount, DoRepair) ->
+    % Do not read repair replicator docs because after_doc_read/2 callback
+    % might have patched them with a fake rev and we wouldn't want to write
+    % those back to disk. Let the internal replicator sync the shards instead.
     Docs =
-        case IsTree of
-            true -> tree_repair_docs(Replies, DoRepair);
-            false -> dict_repair_docs(Replies, ReplyCount)
+        case {fabric_util:is_replicator_db(Db), IsTree} of
+            {true, _} -> [];
+            {_, true} -> tree_repair_docs(Replies, DoRepair);
+            {_, false} -> dict_repair_docs(Replies, ReplyCount)
         end,
     case Docs of
         [] ->
@@ -347,6 +351,7 @@ teardown(_) ->
 
 state0(Revs, Latest) ->
     #state{
+        dbname = <<"dbname">>,
         worker_count = 3,
         workers =
             [#shard{node = 'node1'}, #shard{node = 'node2'}, #shard{node = 'node3'}],
@@ -381,6 +386,7 @@ open_doc_revs_test_() ->
                 ?TDEF_FE(check_basic_response),
                 ?TDEF_FE(check_finish_quorum),
                 ?TDEF_FE(check_finish_quorum_newer),
+                ?TDEF_FE(check_finish_quorum_replicator),
                 ?TDEF_FE(check_no_quorum_on_second),
                 ?TDEF_FE(check_done_on_third),
                 ?TDEF_FE(check_specific_revs_first_msg),
@@ -457,6 +463,21 @@ check_finish_quorum_newer(_) ->
         [{_, {fabric, update_docs, [_, _, _]}, _}],
         meck:history(fabric)
     ).
+
+check_finish_quorum_replicator(_) ->
+    % We count a descendant of a revision for quorum so
+    % foo1 should count for foo2 which means we're finished.
+    % Since we use a replicator shard read_repair doesn't trigger
+    W1 = #shard{node = 'node1'},
+    W2 = #shard{node = 'node2'},
+    S0 = state0(all, false),
+    S1 = S0#state{dbname = <<"foo/_replicator">>},
+    {ok, S2} = handle_message({ok, [foo1(), bar1()]}, W1, S1),
+    Expect = {stop, [bar1(), foo2()]},
+    ok = meck:reset(fabric),
+    ?assertEqual(Expect, handle_message({ok, [foo2(), bar1()]}, W2, S2)),
+    timer:sleep(100),
+    ?assertNot(meck:called(fabric, update_docs, ['_', '_', '_'])).
 
 check_no_quorum_on_second(_) ->
     % Quorum not yet met for the foo revision so we
