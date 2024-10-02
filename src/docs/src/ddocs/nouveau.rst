@@ -543,12 +543,12 @@ they use the default field, as demonstrated in the following examples:
 .. code-block:: text
 
     // Herbivores that are 2m long or less
-    diet:herbivore AND min_length:[-Infinity TO 2]
+    diet:herbivore AND min_length:[* TO 2]
 
 .. code-block:: text
 
     // Mammals that are at least 1.5m long
-    class:mammal AND min_length:[1.5 TO Infinity]
+    class:mammal AND min_length:[1.5 TO *]
 
 .. code-block:: text
 
@@ -708,7 +708,7 @@ brackets (``[``, ``]``). Exclusive range queries are denoted by curly brackets (
 
 .. code-block:: text
 
-    ?q=*:*&ranges={"price":{"cheap":"[0 TO 100]","expensive":"{100 TO Infinity}"}}
+    ?q=*:*&ranges={"price":{"cheap":"[0 TO 100]","expensive":"{100 TO *}"}}
 
 *Example results after a ranges check on a faceted search:*
 
