@@ -692,23 +692,17 @@ Ranges
 .. note::
     The ``ranges`` option is only available when making global queries.
 
-The ``range`` facet syntax reuses the standard Lucene syntax for ranges to return counts
-of results that fit into each specified category. Inclusive range queries are denoted by
-brackets (``[``, ``]``). Exclusive range queries are denoted by curly brackets (``{``,
-``}``).
-
-.. note::
-    The ``range`` operation works only if the indexed values are numbers. The indexed
-    values cannot be mixed types. For example, if 100 strings are indexed, and one number,
-    then the index cannot be used for ``range`` operations. You can check the type by
-    using the ``typeof`` operator, and convert it by using the ``parseInt``,
-    ``parseFloat``, or ``.toString()`` functions.
+The value of the range parameter is a JSON object where the fields names are double
+fields, and the values of the fields are arrays of JSON objects. The objects
+must have a ``label``, ``min`` and ``max`` value (of type string, double, double
+respectively), and optional ``min_inclusive`` and ``max_inclusive`` properties
+(defaulting to ``true`` if not specified).
 
 *Example of a request that uses faceted search for matching ranges:*
 
 .. code-block:: text
 
-    ?q=*:*&ranges={"price":{"cheap":"[0 TO 100]","expensive":"{100 TO *}"}}
+    ?q=*:*&ranges={"price":[{"label":"cheap","min":0,"max":"100","max_inclusive":false},{"label":"expensive","min":100}]}
 
 *Example results after a ranges check on a faceted search:*
 
