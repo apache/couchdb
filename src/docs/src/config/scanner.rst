@@ -87,7 +87,7 @@ Scanner Options
 
 .. config:section:: couch_scanner_plugins :: Enable Scanner Plugins
 
-    .. config:option:: $plugin
+    .. config:option:: {plugin}
 
         Which plugins are enabled. By default plugins are disabled. ::
 
@@ -96,10 +96,10 @@ Scanner Options
             couch_scanner_plugin_find = false
             couch_quickjs_scanner_plugin = false
 
-.. config:section:: $plugin :: General Plugin Settings
+.. config:section:: {plugin} :: General Plugin Settings
 
 These settings apply to all the plugins. Some plugins may also have individual
-settings in their ``[$plugin]`` section.
+settings in their ``[{plugin}]`` section.
 
     .. config:option:: after
 
@@ -108,55 +108,55 @@ settings in their ``[$plugin]`` section.
         (ex. ``1712338014``) or date/time: ``YYYY-MM-DD``, ``YYYY-MM-DDTHH``,
         ``YYYY-MM-DDTHH:MM``. Times are in UTC. ::
 
-         [$plugin]
+         [{plugin}]
          after = restart
 
     .. config:option:: repeat
 
         Run the plugin periodically. By default it will run once after node the
-        node starts. Possible period formats are: ``$num_$timeunit`` (ex.:
+        node starts. Possible period formats are: ``{num}_{timeunit}`` (ex.:
         ``1000_sec``, ``30_min``, ``8_hours``, ``24_hour``, ``2_days``,
-        ``3_weeks``, ``1_month``) or ``$weekday`` (ex.: ``mon``, ``monday``,
+        ``3_weeks``, ``1_month``) or ``{weekday}`` (ex.: ``mon``, ``monday``,
         ``Thu``, etc.) ::
 
-          [$plugin]
+          [{plugin}]
           repeat = restart
 
-.. config:section:: $plugin.skip_dbs :: Skip databases
+.. config:section:: {plugin}.skip_dbs :: Skip databases
 
-    .. config:option:: $string
+    .. config:option:: {tag}
 
         Skip over databases if their names match any of these regexes. ::
 
-            [$plugin.skip_dbs]
+            [{plugin}.skip_dbs]
             regex1 = a|b
             regex2 = bar(.*)baz
 
-.. config:section:: $plugin.skip_ddocs :: Skip design documents
+.. config:section:: {plugin}.skip_ddocs :: Skip design documents
 
-    .. config:option:: $string
+    .. config:option:: {tag}
 
         Skip over design documents if their DocIDs match any of these regexes. ::
 
-            [$plugin.skip_ddocs]
+            [{plugin}.skip_ddocs]
             regex1 = x|y|z
             regex2 = c(d|e)f
 
-.. config:section:: $plugin.skip_docs :: Skip documents
+.. config:section:: {plugin}.skip_docs :: Skip documents
 
-    .. config:option:: $string
+    .. config:option:: {tag}
 
         Skip over documents if their DocIds match any of the regexes. ::
 
-            [$plugin.skip_docs]
+            [{plugin}.skip_docs]
             regex1 = k|l
             regex2 = mno$
 
 .. config:section:: couch_scanner_plugin_find.regexes :: Configure the "Find" plugin
 
-    .. config:option:: $tag
+    .. config:option:: {tag}
 
-        Configure regular expressions to find. The format is $tag = $regex
+        Configure regular expressions to find. The format is {tag} = {regex}
         Reports will be emitted to the log as warnings mentioning only their
         tag. By default, no regular expressions are defined and the plugin will
         run but won't report anything. ::
