@@ -222,13 +222,13 @@ class IndexSelectionTests:
                     raise AssertionError("did not fail on invalid index name")
 
     def test_use_index_without_fallback(self):
-        with self.subTest(use_index="valid"):
+        with self.subTest(use_index="valid", fallback_available=None):
             docs = self.db.find(
                 {"manager": True}, use_index="manager", allow_fallback=False
             )
             assert len(docs) > 0
 
-        with self.subTest(use_index="invalid"):
+        with self.subTest(use_index="invalid", fallback_available=True):
             try:
                 self.db.find(
                     {"manager": True}, use_index="invalid", allow_fallback=False
@@ -236,15 +236,53 @@ class IndexSelectionTests:
             except Exception as e:
                 self.assertEqual(e.response.status_code, 400)
             else:
-                raise AssertionError("did not fail on invalid index")
+                raise AssertionError("did not fail on invalid index for use_index")
 
-        with self.subTest(use_index="empty"):
+        with self.subTest(use_index="empty", fallback_available=True):
             try:
-                self.db.find({"manager": True}, use_index=[], allow_fallback=False)
+                docs = self.db.find(
+                    {"manager": True}, use_index=[], allow_fallback=False
+                )
+                assert len(docs) > 0
+            except Exception as e:
+                raise AssertionError(
+                    "fail due to missing use_index with suitable indexes"
+                )
+
+        with self.subTest(use_index="empty", fallback_available=False):
+            try:
+                self.db.find({"company": "foobar"}, use_index=[], allow_fallback=False)
             except Exception as e:
                 self.assertEqual(e.response.status_code, 400)
             else:
-                raise AssertionError("did not fail due to missing use_index")
+                raise AssertionError(
+                    "did not fail due to missing use_index without suitable indexes"
+                )
+
+        with self.subTest(use_index="invalid", fallback_available=False):
+            try:
+                self.db.find(
+                    {"company": "foobar"}, use_index="invalid", allow_fallback=False
+                )
+            except Exception as e:
+                self.assertEqual(e.response.status_code, 400)
+            else:
+                raise AssertionError("did not fail on invalid index for use_index")
+
+    def test_index_without_fallback(self):
+        try:
+            docs = self.db.find({"manager": True}, allow_fallback=False)
+            assert len(docs) > 0
+        except Exception as e:
+            raise AssertionError("fail on usable indexes")
+
+    def test_no_index_without_fallback(self):
+        try:
+            self.db.find({"company": "foobar"}, allow_fallback=False)
+        except Exception as e:
+            self.assertEqual(e.response.status_code, 400)
+        else:
+            raise AssertionError("did not fail on no usable indexes")
 
 
 class JSONIndexSelectionTests(mango.UserDocsTests, IndexSelectionTests):
