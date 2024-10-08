@@ -209,6 +209,21 @@ Spidermonkey 91 output also match QuickJS and v8.
    js> r={}; ["Xyz", "abc", 1].forEach(function(v) {r[v]=v;}); Object.keys(r)
    ["1", "Xyz", "abc"]
 
+7. String ``match(undefined)``
+
+   Spidermonkey 1.8.5 returns ``null`` for ``match(undefined)`` while versions
+   starting with at least ``78`` return ``[""]``.
+
+.. code-block:: bash
+
+   % js
+   js> "abc".match(undefined)
+   null
+
+   % js91
+   js> "abc".match(undefined)
+   [""]
+
 Using QuickJS
 =============
 
