@@ -158,6 +158,35 @@ public class Lucene9IndexTest {
     }
 
     @Test
+    public void testTopN(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            final int count = 50;
+            for (int i = 1; i <= count; i++) {
+                final Collection<Field> fields = List.of(new StringField("bar", "bar", false));
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                index.update("doc" + i, request);
+            }
+
+            for (int i = count + 1; i <= (count * 2) + 5; i++) {
+                final Collection<Field> fields = List.of(new StringField("bar", "baz", false));
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                index.update("doc" + i, request);
+            }
+
+            final SearchRequest request = new SearchRequest();
+            request.setMinUpdateSeq(count);
+            request.setQuery("*:*");
+            request.setCounts(List.of("bar"));
+            request.setTopN(1);
+            final SearchResults results = index.search(request);
+            assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count + 5)));
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
     public void testOutOfOrder(@TempDir Path path) throws IOException {
         Index index = setup(path);
         try {

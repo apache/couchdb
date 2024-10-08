@@ -16,6 +16,7 @@
 -module(nouveau_httpd).
 
 -include_lib("couch/include/couch_db.hrl").
+-include("nouveau_int.hrl").
 
 -export([
     handle_analyze_req/1,
@@ -68,6 +69,7 @@ handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName
         locale => chttpd:qs_value(Req, "locale"),
         partition => chttpd:qs_value(Req, "partition"),
         limit => chttpd:qs_value(Req, "limit"),
+        top_n => chttpd:qs_value(Req, "top_n"),
         sort => chttpd:qs_value(Req, "sort"),
         ranges => chttpd:qs_value(Req, "ranges"),
         counts => chttpd:qs_value(Req, "counts"),
@@ -87,6 +89,7 @@ handle_search_req_int(
         locale => maps:get(<<"locale">>, ReqBody, undefined),
         partition => chttpd:qs_value(Req, "partition"),
         limit => maps:get(<<"limit">>, ReqBody, undefined),
+        top_n => maps:get(<<"top_n">>, ReqBody, undefined),
         sort => json_or_undefined(<<"sort">>, ReqBody),
         ranges => json_or_undefined(<<"ranges">>, ReqBody),
         counts => json_or_undefined(<<"counts">>, ReqBody),
@@ -227,6 +230,19 @@ validate_query_arg(update, undefined) ->
     true;
 validate_query_arg(update, Bool) when is_boolean(Bool) ->
     Bool;
+validate_query_arg(top_n, undefined) ->
+    ?TOP_N_DEFAULT;
+validate_query_arg(top_n, TopN) when is_integer(TopN), TopN > 0 ->
+    TopN;
+validate_query_arg(top_n, TopN) when is_integer(TopN) ->
+    throw({query_parse_error, <<"top_n parameter must be greater than zero">>});
+validate_query_arg(top_n, TopN) when is_list(TopN) ->
+    try
+        list_to_integer(TopN)
+    catch
+        error:badarg ->
+            throw({query_parse_error, <<"top_n parameter must be an integer">>})
+    end;
 validate_query_arg(update, "false") ->
     false;
 validate_query_arg(update, "true") ->

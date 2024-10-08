@@ -55,7 +55,7 @@ public class SearchRequest {
     private PrimitiveWrapper<?>[] after;
 
     @Min(1)
-    @Max(100)
+    @Max(1000)
     private int topN = 10;
 
     public SearchRequest() {
