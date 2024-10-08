@@ -159,15 +159,18 @@ simplify_hit(#{} = Hit) ->
     Hit#{<<"fields">> => simplify_fields(Fields)}.
 
 simplify_fields(Fields) when is_list(Fields) ->
-    Fun = fun(Field, Acc) ->
-        {Key, Value} = simplify_field(Field),
-        Acc#{Key => Value}
+    Grouped = maps:groups_from_list(
+        fun(#{<<"name">> := Name}) -> Name end,
+        fun(#{<<"value">> := Value}) -> Value end,
+        Fields
+    ),
+    %% If stored field has only one value, return it directly,
+    %% otherwise, return an array of them.
+    Fun = fun
+        (_, [V]) -> V;
+        (_, V) -> V
     end,
-    lists:foldl(Fun, #{}, Fields).
-
-simplify_field(#{<<"@type">> := <<"stored">>} = Field) ->
-    #{<<"name">> := Key, <<"value">> := Value} = Field,
-    {Key, Value}.
+    maps:map(Fun, Grouped).
 
 merge_fun(Sort) ->
     fun(HitA, HitB) ->

@@ -8,6 +8,7 @@
     "search returns all items (paginated)",
     "search for foo:bar",
     "search for numeric ranges with locales",
+    "multiple values for stored field",
     "sort by string field (asc)",
     "sort by string field (desc)",
     "sort by numeric field (asc)",

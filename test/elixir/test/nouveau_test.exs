@@ -252,6 +252,37 @@ defmodule NouveauTest do
   end
 
   @tag :with_db
+  test "multiple values for stored field", context do
+    db_name = context[:db_name]
+    resp = Couch.post("/#{db_name}/_bulk_docs",
+      headers: ["Content-Type": "application/json"],
+      body: %{:docs => [
+        %{"_id" => "doc1", "colors" =>
+           ["red", "orange", "yellow", "green", "blue", "indigo", "violet"]}]}
+    )
+    assert resp.status_code in [201]
+    create_ddoc(db_name,
+      %{
+        nouveau: %{
+          bar: %{
+            default_analyzer: "standard",
+            index: """
+            function (doc) {
+            doc.colors.forEach((color) =>
+              index('string', 'color', color, {'store': true}));
+            }
+            """
+          }
+        }
+      })
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert Enum.at(resp.body["hits"], 0)["doc"]["colors"] ==
+      ["red", "orange", "yellow", "green", "blue", "indigo", "violet"]
+  end
+
+  @tag :with_db
   test "sort by string field (asc)", context do
     db_name = context[:db_name]
     create_search_docs(db_name)
