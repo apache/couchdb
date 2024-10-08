@@ -51,6 +51,7 @@ public class SearchRequestTest {
         result.setQuery("*:*");
         result.setLimit(10);
         result.setCounts(List.of("bar"));
+        result.setTopN(5);
         result.setRanges(Map.of("foo", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))));
         return result;
     }

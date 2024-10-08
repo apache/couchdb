@@ -380,6 +380,23 @@ defmodule NouveauTest do
   end
 
   @tag :with_db
+  test "top_n", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "*:*", ranges: %{bar: [
+      %{label: "cheap", max: 42},
+      %{label: "expensive", min: 42, min_inclusive: false}]},
+      top_n: 1,
+      include_docs: true})
+    assert_status_code(resp, 200)
+    %{:body => %{"ranges" => ranges}} = resp
+    assert ranges == %{"bar" => %{"cheap" => 3}}
+  end
+
+  @tag :with_db
   test "mango search by number", context do
     db_name = context[:db_name]
     create_search_docs(db_name)

@@ -19,6 +19,7 @@
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include("nouveau_int.hrl").
 
 -record(state, {
     limit,
@@ -39,13 +40,20 @@ go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     Shards = get_shards(DbName, QueryArgs0),
     {PackedBookmark, #{limit := Limit, sort := Sort} = QueryArgs1} =
         maps:take(bookmark, QueryArgs0),
+    TopN = maps:get(top_n, QueryArgs1, ?TOP_N_DEFAULT),
     Bookmark = nouveau_bookmark:unpack(DbName, PackedBookmark),
     Counters0 = lists:map(
         fun(#shard{} = Shard) ->
             After = maps:get(Shard#shard.range, Bookmark, null),
+            %% scale TopN by number of shards so we don't clip a global topN
+            %% label just because it wasn't in the topN locally.
             Ref = rexi:cast(
                 Shard#shard.node,
-                {nouveau_rpc, search, [Shard#shard.name, Index, QueryArgs1#{'after' => After}]}
+                {nouveau_rpc, search, [
+                    Shard#shard.name,
+                    Index,
+                    QueryArgs1#{'after' => After, top_n => TopN * length(Shards)}
+                ]}
             ),
             Shard#shard{ref = Ref}
         end,
@@ -72,7 +80,7 @@ go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     of
         {ok, SearchResults} ->
             NewBookmark = nouveau_bookmark:update(DbName, Bookmark, SearchResults),
-            {ok, simplify_hits(SearchResults#{bookmark => NewBookmark})};
+            {ok, top_n_facets(simplify_hits(SearchResults#{bookmark => NewBookmark}), TopN)};
         {error, Reason} ->
             {error, Reason}
     after
@@ -126,10 +134,10 @@ merge_search_results(A, B, #state{} = State) ->
             State#state.limit
         ),
         <<"counts">> => merge_facets(
-            maps:get(<<"counts">>, A, null), maps:get(<<"counts">>, B, null), State#state.limit
+            maps:get(<<"counts">>, A, null), maps:get(<<"counts">>, B, null)
         ),
         <<"ranges">> => merge_facets(
-            maps:get(<<"ranges">>, A, null), maps:get(<<"ranges">>, B, null), State#state.limit
+            maps:get(<<"ranges">>, A, null), maps:get(<<"ranges">>, B, null)
         )
     }.
 
@@ -215,11 +223,42 @@ convert_item(Item) ->
             maps:get(<<"value">>, Item)
     end.
 
-merge_facets(FacetsA, null, _Limit) ->
+top_n_facets(SearchResults, TopN) ->
+    SearchResults#{
+        <<"counts">> => top_n_facets(<<"counts">>, SearchResults, TopN),
+        <<"ranges">> => top_n_facets(<<"ranges">>, SearchResults, TopN)
+    }.
+
+top_n_facets(Key, SearchResults, TopN) ->
+    Facets = maps:get(Key, SearchResults, null),
+    top_n_facets_int(Facets, TopN).
+
+top_n_facets_int(null, _TopN) ->
+    null;
+top_n_facets_int(Facets, TopN) when is_map(Facets), is_integer(TopN), TopN > 0 ->
+    MapFun = fun(_, Group) ->
+        maps:from_list(
+            lists:sublist(
+                lists:sort(fun facet_sort/2, maps:to_list(Group)),
+                TopN
+            )
+        )
+    end,
+    maps:map(MapFun, Facets).
+
+%% sort by value (high to low), tie-break on label (lowest wins)
+facet_sort({_K1, V1}, {_K2, V2}) when V1 > V2 ->
+    true;
+facet_sort({_K1, V1}, {_K2, V2}) when V1 < V2 ->
+    false;
+facet_sort({K1, V}, {K2, V}) ->
+    couch_ejson_compare:less_json(K1, K2).
+
+merge_facets(FacetsA, null) ->
     FacetsA;
-merge_facets(null, FacetsB, _Limit) ->
+merge_facets(null, FacetsB) ->
     FacetsB;
-merge_facets(FacetsA, FacetsB, _Limit) ->
+merge_facets(FacetsA, FacetsB) ->
     Combiner = fun(_, V1, V2) -> maps:merge_with(fun(_, V3, V4) -> V3 + V4 end, V1, V2) end,
     maps:merge_with(Combiner, FacetsA, FacetsB).
 
