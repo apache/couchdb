@@ -636,6 +636,9 @@ field. If you do not create separate indexes for each field, you must include on
 documents that contain all the fields. Verify that the fields exist in each document by
 using a single ``if`` statement.
 
+The ``top_n`` query parameter controls how many facets, per grouping, are returned,
+defaulting to 10, to a maximum of 1000.
+
 *Example if statement to verify that the required fields exist in each document:*
 
 .. code-block:: javascript

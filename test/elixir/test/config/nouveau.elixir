@@ -16,6 +16,7 @@
     "counts",
     "ranges",
     "ranges (open)",
+    "top_n",
     "mango search by number",
     "mango search by string",
     "mango search by text",
