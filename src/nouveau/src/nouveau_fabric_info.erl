@@ -23,7 +23,14 @@ go(DbName, DDocId, IndexName) when is_binary(DDocId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", DDocId/binary>>, [ejson_body]),
     go(DbName, DDoc, IndexName);
 go(DbName, DDoc, IndexName) ->
-    {ok, Index} = nouveau_util:design_doc_to_index(DbName, DDoc, IndexName),
+    case nouveau_util:design_doc_to_index(DbName, DDoc, IndexName) of
+        {ok, Index} ->
+            go(DbName, DDoc, IndexName, Index);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+go(DbName, DDoc, IndexName, Index) ->
     Shards = mem3:shards(DbName),
     Counters0 = lists:map(
         fun(#shard{} = Shard) ->

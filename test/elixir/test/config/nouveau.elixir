@@ -28,6 +28,7 @@
     "delete",
     "purge",
     "purge with conflicts",
-    "index same field with different field types"
+    "index same field with different field types",
+    "index not found"
   ]
 }

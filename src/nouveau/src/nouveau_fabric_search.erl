@@ -36,7 +36,14 @@ go(DbName, GroupId, IndexName, QueryArgs0) when is_binary(GroupId) ->
     ),
     go(DbName, DDoc, IndexName, QueryArgs0);
 go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
-    {ok, Index} = nouveau_util:design_doc_to_index(DbName, DDoc, IndexName),
+    case nouveau_util:design_doc_to_index(DbName, DDoc, IndexName) of
+        {ok, Index} ->
+            go(DbName, DDoc, IndexName, QueryArgs0, Index);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+go(DbName, #doc{} = DDoc, IndexName, QueryArgs0, Index) ->
     Shards = get_shards(DbName, QueryArgs0),
     {PackedBookmark, #{limit := Limit, sort := Sort} = QueryArgs1} =
         maps:take(bookmark, QueryArgs0),
