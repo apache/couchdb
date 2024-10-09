@@ -50,8 +50,7 @@
         Defaults to the JDK default locale if not specified. Some examples are ``de``
         , ``us``, ``gb``.
     :query number limit: Limit the number of the returned documents to the specified
-        number. For a grouped search, this parameter limits the number of documents per
-        group.
+        number.
     :query string q: Required. The Lucene query string.
     :query json ranges: This field defines ranges for numeric search fields. The
         value is a JSON object where the fields names are numeric search fields,
@@ -68,6 +67,8 @@
         same order as the array.
         Some examples are ``"relevance"``, ``"bar"``, ``"-foo"`` and
         [``"-foo"``, ``"bar"``].
+    :query number top_n: Limit the number of facets returned by group, defaulting to 10
+        with a maximum of 1000.
     :query boolean update: Set to ``false`` to allow the use of an out-of-date index.
 
     :>header Content-Type: - :mimetype:`application/json`

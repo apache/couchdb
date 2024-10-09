@@ -5,6 +5,7 @@
     "counts": [
         "bar"
     ],
+    "top_n": 5,
     "ranges": {
         "foo": [
             {
