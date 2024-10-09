@@ -27,6 +27,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 import org.apache.couchdb.nouveau.api.DoubleField;
 import org.apache.couchdb.nouveau.api.Field;
+import org.apache.couchdb.nouveau.api.StoredField;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.api.TextField;
 import org.apache.lucene.queryparser.flexible.standard.config.PointsConfig;
@@ -36,7 +37,8 @@ final class Lucene9IndexSchema {
     public enum Type {
         STRING,
         TEXT,
-        DOUBLE;
+        DOUBLE,
+        STORED;
 
         private static Type fromField(final Field field) {
             if (field instanceof StringField) {
@@ -45,6 +47,8 @@ final class Lucene9IndexSchema {
                 return TEXT;
             } else if (field instanceof DoubleField) {
                 return DOUBLE;
+            } else if (field instanceof StoredField) {
+                return STORED;
             }
             throw new IllegalArgumentException(field + " not supported");
         }
