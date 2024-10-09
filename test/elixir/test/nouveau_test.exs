@@ -84,6 +84,7 @@ defmodule NouveauTest do
             function (doc) {
               index("string", "foo", doc.foo, {store: true});
               index("double", "bar", doc.bar, {store: true});
+              index("stored", "baz", doc.foo);
             }
           """
         }
@@ -597,15 +598,15 @@ defmodule NouveauTest do
 
     assert hit1["doc"]["_id"] == "doc1"
     assert hit1["doc"]["_rev"] == "1-a"
-    assert hit1["fields"] == %{"bar" => 0.0, "foo" => "baz"}
+    assert hit1["fields"] == %{"bar" => 0.0, "foo" => "baz", "baz" => "baz"}
 
     assert hit2["doc"]["_id"] == "doc3"
     assert hit2["doc"]["_rev"] == "2-c"
-    assert hit2["fields"] == %{"bar" => 13.0, "foo" => "barX"}
+    assert hit2["fields"] == %{"bar" => 13.0, "foo" => "barX", "baz" => "barX"}
 
     assert hit3["doc"]["_id"] == "doc4"
     assert hit3["doc"]["_rev"] == "1-b"
-    assert hit3["fields"] == %{"bar" => 43.0, "foo" => "fooX"}
+    assert hit3["fields"] == %{"bar" => 43.0, "foo" => "fooX", "baz" => "fooX"}
 
     # purge docs
     purge_body = %{
@@ -627,7 +628,7 @@ defmodule NouveauTest do
     # doc1: 2-c deleted was purged, 1-a is still the winner
     assert hit1["doc"]["_id"] == "doc1"
     assert hit1["doc"]["_rev"] == "1-a"
-    assert hit1["fields"] ==  %{"bar" => 0.0, "foo" => "baz"}
+    assert hit1["fields"] ==  %{"bar" => 0.0, "foo" => "baz", "baz" => "baz"}
 
     # doc2: doc was deleted and now it's completely purged
 
@@ -636,7 +637,7 @@ defmodule NouveauTest do
     # doc4: 2-c was purged, 1-a is the new winner
     assert hit2["doc"]["_id"] == "doc4"
     assert hit2["doc"]["_rev"] == "1-a"
-    assert hit2["fields"] == %{"bar" => 42.0, "foo" => "foo"}
+    assert hit2["fields"] == %{"bar" => 42.0, "foo" => "foo", "baz" => "foo"}
 
     resp = Couch.get("/#{db_name}")
     db_purge_seq = resp.body["purge_seq"]
