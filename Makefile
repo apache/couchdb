@@ -19,6 +19,7 @@ include version.mk
 REBAR?=$(CURDIR)/bin/rebar
 REBAR3?=$(CURDIR)/bin/rebar3
 ERLFMT?=$(CURDIR)/bin/erlfmt
+GRADLE?=$(CURDIR)/nouveau/gradlew
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -437,7 +438,7 @@ endif
 
 ifeq ($(with_nouveau), true)
 	@mkdir rel/couchdb/nouveau
-	@cd nouveau && ./gradlew installDist
+	@cd nouveau && $(GRADLE) installDist
 	@cp -R nouveau/build/install/nouveau rel/couchdb
 endif
 
@@ -481,7 +482,7 @@ clean:
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 	@rm -f src/couch_dist/certs/out
 ifeq ($(with_nouveau), true)
-	@cd nouveau && ./gradlew clean
+	@cd nouveau && $(GRADLE) clean
 endif
 
 
@@ -549,20 +550,21 @@ derived:
 ################################################################################
 
 .PHONY: nouveau
-# Build nouveau
+# target: nouveau - Build nouveau
 nouveau:
 ifeq ($(with_nouveau), true)
-	@cd nouveau && ./gradlew spotlessApply
-	@cd nouveau && ./gradlew build -x test
+	@cd nouveau && $(GRADLE) spotlessApply
+	@cd nouveau && $(GRADLE) build -x test
 endif
 
 .PHONY: nouveau-test
+# target: nouveau-test - Run nouveau tests
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
 nouveau-test-gradle: couch nouveau
 ifeq ($(with_nouveau), true)
-	@cd nouveau && ./gradlew test --info --rerun
+	@cd nouveau && $(GRADLE) test --info --rerun
 endif
 
 .PHONY: nouveau-test-elixir
