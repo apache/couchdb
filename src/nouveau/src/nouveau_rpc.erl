@@ -39,6 +39,7 @@ search(DbName, #index{} = Index0, QueryArgs0) ->
     Update = maps:get(update, QueryArgs1, true),
 
     %% check if index is up to date
+    T0 = erlang:monotonic_time(),
     case Update andalso nouveau_index_updater:outdated(Index1) of
         true ->
             case nouveau_index_manager:update_index(Index1) of
@@ -52,9 +53,13 @@ search(DbName, #index{} = Index0, QueryArgs0) ->
         {error, Reason} ->
             rexi:reply({error, Reason})
     end,
+    T1 = erlang:monotonic_time(),
+    UpdateLatency = erlang:convert_time_unit(T1 - T0, native, millisecond),
 
     %% Run the search
     case nouveau_api:search(Index1, QueryArgs1) of
+        {ok, Response} ->
+            rexi:reply({ok, Response#{update_latency => UpdateLatency}});
         {error, stale_index} ->
             %% try again.
             search(DbName, Index0, QueryArgs0);
