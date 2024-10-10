@@ -102,5 +102,7 @@ handle_message({'EXIT', _}, Worker, {Counters, Acc}) ->
             {error, {nodedown, <<"progress not possible">>}}
     end.
 
+merge_info(signature, Val, Val) ->
+    Val;
 merge_info(_Key, Val1, Val2) ->
     Val1 + Val2.

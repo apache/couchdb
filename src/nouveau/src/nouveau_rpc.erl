@@ -65,7 +65,13 @@ search(DbName, #index{} = Index0, QueryArgs0) ->
 info(DbName, #index{} = Index0) ->
     %% Incorporate the shard name into the record.
     Index1 = Index0#index{dbname = DbName},
-    rexi:reply(nouveau_api:index_info(Index1)).
+    case nouveau_api:index_info(Index1) of
+        {ok, Info0} ->
+            Info1 = Info0#{signature => Index0#index.sig},
+            rexi:reply({ok, Info1});
+        {error, Reason} ->
+            rexi:reply({error, Reason})
+    end.
 
 cleanup(DbName, Exclusions) ->
     nouveau_api:delete_path(nouveau_util:index_name(DbName), Exclusions),
