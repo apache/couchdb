@@ -105,7 +105,6 @@
 -define(COUCH_BT_WRITE_KP_NODE, write_kp_node).
 -define(COUCH_BT_WRITE_KV_NODE, write_kv_node).
 -define(COUCH_JS_FILTER, js_filter).
--define(COUCH_JS_FILTER_ERROR, js_filter_error).
 -define(COUCH_JS_FILTERED_DOCS, js_filtered_docs).
 -define(IOQ_CALLS, ioq_calls).
 -define(ROWS_READ, rows_read).
@@ -141,7 +140,6 @@
     io_bytes_written = 0,
     js_evals = 0,
     js_filter = 0,
-    js_filter_error = 0,
     js_filtered_docs = 0,
     mango_eval_match = 0,
     %% TODO: switch record definitions to be macro based, eg:
@@ -273,7 +271,6 @@ field(#rctx{io_bytes_read=Val}, io_bytes_read) -> Val;
 field(#rctx{io_bytes_written=Val}, io_bytes_written) -> Val;
 field(#rctx{js_evals=Val}, js_evals) -> Val;
 field(#rctx{js_filter=Val}, js_filter) -> Val;
-field(#rctx{js_filter_error=Val}, js_filter_error) -> Val;
 field(#rctx{js_filtered_docs=Val}, js_filtered_docs) -> Val;
 field(#rctx{mango_eval_match=Val}, mango_eval_match) -> Val;
 field(#rctx{get_kv_node=Val}, get_kv_node) -> Val;
@@ -400,7 +397,6 @@ to_json(#rctx{}=Rctx) ->
         docs_read = DocsRead,
         rows_read = RowsRead,
         js_filter = JSFilters,
-        js_filter_error = JSFilterErrors,
         js_filtered_docs = JSFilteredDocss,
         type = Type,
         get_kp_node = GetKpNodes,
@@ -424,7 +420,6 @@ to_json(#rctx{}=Rctx) ->
         db_open => DbOpens,
         docs_read => DocsRead,
         js_filter => JSFilters,
-        js_filter_error => JSFilterErrors,
         js_filtered_docs => JSFilteredDocss,
         rows_read => RowsRead,
         type => convert_type(Type),
@@ -593,11 +588,9 @@ maybe_inc([couchdb, btree, write_node, kp_node], Val) ->
     inc(?COUCH_BT_WRITE_KP_NODE, Val);
 maybe_inc([couchdb, btree, write_node, kv_node], Val) ->
     inc(?COUCH_BT_WRITE_KV_NODE, Val);
-maybe_inc([couchdb, query_server, js_filter_error], Val) ->
-    inc(?COUCH_JS_FILTER_ERROR, Val);
-maybe_inc([couchdb, query_server, js_filter], Val) ->
+maybe_inc([couchdb, query_server, calls, ddoc_filter], Val) ->
     inc(?COUCH_JS_FILTER, Val);
-maybe_inc([couchdb, query_server, js_filtered_docs], Val) ->
+maybe_inc([couchdb, query_server, volume, ddoc_filter], Val) ->
     inc(?COUCH_JS_FILTERED_DOCS, Val);
 maybe_inc(_Metric, _Val) ->
     %%io:format("SKIPPING MAYBE_INC METRIC[~p]: ~p~n", [Val, Metric]),
@@ -702,7 +695,6 @@ make_delta(#rctx{}=TA, #rctx{}=TB) ->
     Delta = #{
         docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
         js_filter => TB#rctx.js_filter - TA#rctx.js_filter,
-        js_filter_error => TB#rctx.js_filter_error - TA#rctx.js_filter_error,
         js_filtered_docs => TB#rctx.js_filtered_docs - TA#rctx.js_filtered_docs,
         rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
         changes_returned => TB#rctx.changes_returned - TA#rctx.changes_returned,

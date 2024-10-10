@@ -240,8 +240,9 @@ bump_cmd_time_stat(Cmd, USec) when is_list(Cmd), is_integer(USec) ->
             bump_time_stat(ddoc_new, USec);
         [<<"ddoc">>, _, [<<"validate_doc_update">> | _] | _] ->
             bump_time_stat(ddoc_vdu, USec);
-        [<<"ddoc">>, _, [<<"filters">> | _] | _] ->
-            bump_time_stat(ddoc_filter, USec);
+        [<<"ddoc">>, _, [<<"filters">> | _], [Docs | _] | _] ->
+            bump_time_stat(ddoc_filter, USec),
+            bump_volume_stat(ddoc_filter, Docs);
         [<<"ddoc">> | _] ->
             bump_time_stat(ddoc_other, USec);
         _ ->
@@ -251,6 +252,12 @@ bump_cmd_time_stat(Cmd, USec) when is_list(Cmd), is_integer(USec) ->
 bump_time_stat(Stat, USec) when is_atom(Stat), is_integer(USec) ->
     couch_stats:increment_counter([couchdb, query_server, calls, Stat]),
     couch_stats:increment_counter([couchdb, query_server, time, Stat], USec).
+
+bump_volume_stat(ddoc_filter=Stat, Docs) when is_atom(Stat), is_list(Docs) ->
+    couch_stats:increment_counter([couchdb, query_server, volume, Stat, length(Docs)]);
+bump_volume_stat(_, _) ->
+    %% TODO: handle other stats?
+    ok.
 
 log_level("debug") ->
     debug;
