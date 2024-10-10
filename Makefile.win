@@ -22,6 +22,7 @@ REBAR?=$(CURDIR)/bin/rebar.cmd
 PYTHON=python.exe
 ERLFMT?=$(CURDIR)/bin/erlfmt.cmd
 MAKE=make -f Makefile.win
+GRADLE?=$(CURDIR)/nouveau/gradlew.bat
 # REBAR?=$(shell where rebar.cmd)
 
 # Handle the following scenarios:
@@ -394,7 +395,7 @@ endif
 
 ifeq ($(with_nouveau), true)
 	-@mkdir rel\couchdb\nouveau
-	@cd nouveau && .\gradlew installDist
+	@cd nouveau && $(GRADLE) installDist
 	@xcopy nouveau\build\install\nouveau rel\couchdb\nouveau /E /I
 endif
 
@@ -440,7 +441,7 @@ clean:
 	-@del /f/q src\couch\priv\couch_js\config.h >NUL 2>&1 || true
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log >NUL 2>&1 || true
 ifeq ($(with_nouveau), true)
-	@cd nouveau && .\gradlew clean
+	@cd nouveau && $(GRADLE) clean
 endif
 
 .PHONY: distclean
@@ -517,7 +518,8 @@ derived:
 # target: nouveau - Build nouveau
 nouveau:
 ifeq ($(with_nouveau), true)
-	@cd nouveau && .\gradlew build -x test
+	@cd nouveau && $(GRADLE) spotlessApply
+	@cd nouveau && $(GRADLE) build -x test
 endif
 
 .PHONY: nouveau-test
@@ -527,7 +529,8 @@ nouveau-test: nouveau-test-gradle nouveau-test-elixir
 .PHONY: nouveau-test-gradle
 nouveau-test-gradle: couch nouveau
 ifeq ($(with_nouveau), true)
-	@cd nouveau && .\gradlew test --info --rerun
+	@cd nouveau && $(GRADLE) test --info --rerun
+	
 endif
 
 .PHONY: nouveau-test-elixir
