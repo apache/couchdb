@@ -51,9 +51,9 @@ tips and tricks that will ease the difficulty.
 JavaScript engine versions
 ===========================
 
-Until version 3.4 Apache CouchDB used only SpiderMonkey as the it's
-underlying JavaScript engine. With version 3.4, it's possible to configure
-CouchDB to use QuickJS.
+Until version 3.4 Apache CouchDB used only SpiderMonkey as its underlying
+JavaScript engine. With version 3.4, it's possible to configure CouchDB to use
+QuickJS.
 
 Recent versions of CouchDB may use the node-local ``_versions`` API endpoint to
 get the current engine type and version:
