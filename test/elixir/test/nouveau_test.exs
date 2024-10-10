@@ -170,6 +170,7 @@ defmodule NouveauTest do
     assert Map.get(info, "disk_size") > 0
     assert Map.get(info, "num_docs") > 0
     assert Map.get(info, "update_seq") > 0
+    assert String.length(Map.get(info, "signature")) > 0
   end
 
   @tag :with_db
