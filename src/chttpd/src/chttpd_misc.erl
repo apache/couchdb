@@ -237,7 +237,7 @@ handle_resource_status_req(#httpd{method = 'POST'} = Req) ->
     GroupBy = fun couch_stats_resource_tracker:group_by/2,
     SortedBy1 = fun couch_stats_resource_tracker:sorted_by/1,
     SortedBy2 = fun couch_stats_resource_tracker:sorted_by/2,
-    ConvertEle = fun(K) -> list_to_existing_atom(binary_to_list(K)) end,
+    ConvertEle = fun erlang:binary_to_existing_atom/1,
     ConvertList = fun(L) -> [ConvertEle(E) || E <- L] end,
     ToJson = fun couch_stats_resource_tracker:term_to_flat_json/1,
     JsonKeys = fun(PL) -> [[ToJson(K), V] || {K, V} <- PL] end,
