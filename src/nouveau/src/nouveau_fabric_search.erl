@@ -145,6 +145,9 @@ merge_search_results(A, B, #state{} = State) ->
         ),
         <<"ranges">> => merge_facets(
             maps:get(<<"ranges">>, A, null), maps:get(<<"ranges">>, B, null)
+        ),
+        update_latency => max(
+            maps:get(update_latency, A, 0), maps:get(update_latency, B, 0)
         )
     }.
 
