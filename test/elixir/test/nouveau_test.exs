@@ -682,6 +682,18 @@ defmodule NouveauTest do
     assert_status_code(resp, 404)
   end
 
+  @tag :with_db
+  test "meta", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert resp.body["update_latency"] > 0
+  end
+
   def seq(str) do
     String.to_integer(hd(Regex.run(~r/^[0-9]+/, str)))
   end

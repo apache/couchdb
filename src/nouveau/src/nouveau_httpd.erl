@@ -113,7 +113,8 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
                     DbName, maps:get(<<"hits">>, SearchResults), IncludeDocs
                 ),
                 <<"counts">> => maps:get(<<"counts">>, SearchResults, null),
-                <<"ranges">> => maps:get(<<"ranges">>, SearchResults, null)
+                <<"ranges">> => maps:get(<<"ranges">>, SearchResults, null),
+                <<"update_latency">> => maps:get(update_latency, SearchResults)
             },
             HitCount = length(maps:get(<<"hits">>, RespBody)),
             incr_stats(HitCount, IncludeDocs),

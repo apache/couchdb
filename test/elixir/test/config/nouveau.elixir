@@ -29,6 +29,7 @@
     "purge",
     "purge with conflicts",
     "index same field with different field types",
-    "index not found"
+    "index not found",
+    "meta"
   ]
 }
