@@ -248,15 +248,24 @@ is_enabled() ->
 %% Aggregate query API
 %%
 
-active() -> active_int(all).
-active_coordinators() -> active_int(coordinators).
-active_workers() -> active_int(workers).
+active() ->
+    active_int(all).
+
+active_coordinators() ->
+    active_int(coordinators).
+
+active_workers() ->
+    active_int(workers).
 
 %% active_json() or active(json)?
-active(json) -> to_json_list(active_int(all)).
-active_coordinators(json) -> to_json_list(active_int(coordinators)).
-active_workers(json) -> to_json_list(active_int(workers)).
+active(json) ->
+    to_json_list(active_int(all)).
 
+active_coordinators(json) ->
+    to_json_list(active_int(coordinators)).
+
+active_workers(json) ->
+    to_json_list(active_int(workers)).
 
 active_int(coordinators) ->
     select_by_type(coordinators);
@@ -264,7 +273,6 @@ active_int(workers) ->
     select_by_type(workers);
 active_int(all) ->
     select_by_type(all).
-
 
 select_by_type(coordinators) ->
     ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = {coordinator, _, _}} = R) -> R end));
