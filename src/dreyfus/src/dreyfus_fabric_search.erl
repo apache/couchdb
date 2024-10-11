@@ -27,7 +27,8 @@
     counters,
     start_args,
     replacements,
-    ring_opts
+    ring_opts,
+    meta = #{}
 }).
 
 go(DbName, GroupId, IndexName, QueryArgs) when is_binary(GroupId) ->
@@ -127,7 +128,7 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
         )
     of
         {ok, Result} ->
-            #state{top_docs = TopDocs} = Result,
+            #state{top_docs = TopDocs, meta = Meta} = Result,
             #top_docs{
                 total_hits = TotalHits,
                 hits = Hits,
@@ -136,11 +137,11 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
             } = TopDocs,
             case RawBookmark of
                 true ->
-                    {ok, Bookmark, TotalHits, Hits, Counts, Ranges};
+                    {ok, Bookmark, TotalHits, Hits, Counts, Ranges, Meta};
                 false ->
                     Bookmark1 = dreyfus_bookmark:update(Sort, Bookmark, Hits),
                     Hits1 = remove_sortable(Hits),
-                    {ok, Bookmark1, TotalHits, Hits1, Counts, Ranges}
+                    {ok, Bookmark1, TotalHits, Hits1, Counts, Ranges, Meta}
             end;
         {error, Reason} ->
             {error, Reason}
@@ -149,7 +150,7 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
         fabric_streams:cleanup(Workers)
     end.
 
-handle_message({ok, #top_docs{} = NewTopDocs}, Shard, State0) ->
+handle_message({ok, #top_docs{} = NewTopDocs, Meta}, Shard, State0) ->
     State = upgrade_state(State0),
     #state{top_docs = TopDocs, limit = Limit, sort = Sort} = State,
     case fabric_dict:lookup_element(Shard, State#state.counters) of
@@ -161,9 +162,11 @@ handle_message({ok, #top_docs{} = NewTopDocs}, Shard, State0) ->
             C2 = fabric_view:remove_overlapping_shards(Shard, C1),
             Sortable = make_sortable(Shard, NewTopDocs),
             MergedTopDocs = merge_top_docs(TopDocs, Sortable, Limit, Sort),
+            MergedMeta = merge_meta(Meta, State#state.meta),
             State1 = State#state{
                 counters = C2,
-                top_docs = MergedTopDocs
+                top_docs = MergedTopDocs,
+                meta = MergedMeta
             },
             case fabric_dict:any(nil, C2) of
                 true ->
@@ -172,6 +175,9 @@ handle_message({ok, #top_docs{} = NewTopDocs}, Shard, State0) ->
                     {stop, State1}
             end
     end;
+% upgrade clause
+handle_message({ok, #top_docs{} = TopDocs}, Shard, State) ->
+    handle_message({ok, TopDocs, #{}}, Shard, State);
 % upgrade clause
 handle_message({ok, {top_docs, UpdateSeq, TotalHits, Hits}}, Shard, State) ->
     TopDocs = #top_docs{
@@ -279,6 +285,13 @@ sort_facets(Facets) ->
 
 sum_element(N, T1, T2) ->
     element(N, T1) + element(N, T2).
+
+merge_meta(#{} = A, #{} = B) ->
+    #{
+        update_latency => max(
+            maps:get(update_latency, A, 0), maps:get(update_latency, B, 0)
+        )
+    }.
 
 upgrade_state({state, Limit, Sort, TopDocs, Counters}) ->
     #state{

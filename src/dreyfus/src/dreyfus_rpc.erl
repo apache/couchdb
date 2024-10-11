@@ -48,10 +48,18 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
                 {ok, Pid} ->
+                    T0 = erlang:monotonic_time(),
                     case dreyfus_index:await(Pid, MinSeq) of
                         {ok, IndexPid, _Seq} ->
-                            Result = dreyfus_index:Fun(IndexPid, QueryArgs),
-                            rexi:reply(Result);
+                            T1 = erlang:monotonic_time(),
+                            UpdateLatency = erlang:convert_time_unit(T1 - T0, native, millisecond),
+                            Meta = #{update_latency => UpdateLatency},
+                            case dreyfus_index:Fun(IndexPid, QueryArgs) of
+                                {ok, #top_docs{} = TopDocs} ->
+                                    rexi:reply({ok, TopDocs, Meta});
+                                Else ->
+                                    rexi:reply(Else)
+                            end;
                         % obsolete clauses, remove after upgrade
                         ok ->
                             Result = dreyfus_index:Fun(Pid, QueryArgs),

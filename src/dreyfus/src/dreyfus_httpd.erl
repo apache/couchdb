@@ -68,7 +68,7 @@ handle_search_req(
                                 {rows, Hits}
                             ]}
                         );
-                    {ok, Bookmark0, TotalHits, Hits0, Counts0, Ranges0} ->
+                    {ok, Bookmark0, TotalHits, Hits0, Counts0, Ranges0, Meta} ->
                         Hits = hits_to_json(DbName, IncludeDocs, Hits0),
                         Bookmark = dreyfus_bookmark:pack(Bookmark0),
                         Counts =
@@ -87,6 +87,7 @@ handle_search_req(
                             end,
                         send_json(Req, 200, {
                             [
+                                {update_latency, maps:get(update_latency, Meta, 0)},
                                 {total_rows, TotalHits},
                                 {bookmark, Bookmark},
                                 {rows, Hits}
