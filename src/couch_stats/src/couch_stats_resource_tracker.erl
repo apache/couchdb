@@ -26,64 +26,71 @@
 
 %% PidRef API
 -export([
-    get_pid_ref/0,
-    set_pid_ref/1,
+    close_pid_ref/0,
+    close_pid_ref/1,
     create_pid_ref/0,
-    close_pid_ref/0, close_pid_ref/1
+    get_pid_ref/0,
+    set_pid_ref/1
 ]).
 
 %% Context API
 -export([
-    create_resource/1,
     create_context/5,
     create_coordinator_context/2,
+    create_resource/1,
     create_worker_context/3,
-    destroy_context/0, destroy_context/1,
-
-    get_resource/0, get_resource/1,
-
-    set_context_dbname/1, set_context_dbname/2,
-    set_context_handler_fun/1, set_context_handler_fun/2,
-    set_context_username/1, set_context_username/2
+    destroy_context/0,
+    destroy_context/1,
+    get_resource/0,
+    get_resource/1,
+    set_context_dbname/1,
+    set_context_dbname/2,
+    set_context_handler_fun/1,
+    set_context_handler_fun/2,
+    set_context_username/1,
+    set_context_username/2
 ]).
 
 %% stats collection api
 -export([
-    is_enabled/0,
-
-    inc/1, inc/2,
-    maybe_inc/2,
     accumulate_delta/1,
-    make_delta/0,
-
+    inc/1,
+    inc/2,
     ioq_called/0,
-
+    is_enabled/0,
+    make_delta/0,
+    maybe_inc/2,
     should_track/1
 ]).
 
 %% aggregate query api
 -export([
-    active/0, active/1,
-    active_coordinators/0, active_coordinators/1,
-    active_workers/0, active_workers/1,
-
+    active/0,
+    active/1,
+    active_coordinators/0,
+    active_coordinators/1,
+    active_workers/0,
+    active_workers/1,
     count_by/1,
-    group_by/2, group_by/3,
-    sorted/1,
-    sorted_by/1, sorted_by/2, sorted_by/3,
-
+    find_by_nonce/1,
     find_by_pid/1,
     find_by_pidref/1,
-    find_by_nonce/1,
-    find_workers_by_pidref/1
+    find_workers_by_pidref/1,
+    group_by/2,
+    group_by/3,
+    sorted/1,
+    sorted_by/1,
+    sorted_by/2,
+    sorted_by/3
 ]).
 
 %% Process lifetime reporting api
 -export([
-    log_process_lifetime_report/1,
     is_logging_enabled/0,
+    log_process_lifetime_report/1,
     logging_enabled/0,
-    should_log/1, should_log/2,
+    should_log/1,
+    should_log/2,
     tracker/1
 ]).
 
