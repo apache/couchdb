@@ -247,7 +247,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '25.3.2.13', '26.2.5.2', '27.0.1'
+            values '25.3.2.13', '26.2.5.4', '27.1.1'
           }
           axis {
             name 'SM_VSN'
