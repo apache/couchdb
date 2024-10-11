@@ -114,6 +114,37 @@
 -define(FRPC_CHANGES_ROW, changes_processed).
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
+-define(STATS_TO_KEYS, #{
+    [mango, evaluate_selector] => ?MANGO_EVAL_MATCH,
+    [couchdb, database_reads] => ?DB_OPEN_DOC,
+    [fabric_rpc, changes, processed] => ?FRPC_CHANGES_ROW,
+    [fabric_rpc, changes, returned] => ?FRPC_CHANGES_RETURNED,
+    [fabric_rpc, view, rows_read] => ?ROWS_READ,
+    [couchdb, couch_server, open] => ?DB_OPEN,
+    [couchdb, btree, get_node, kp_node] => ?COUCH_BT_GET_KP_NODE,
+    [couchdb, btree, get_node, kv_node] => ?COUCH_BT_GET_KV_NODE,
+    [couchdb, btree, write_node, kp_node] => ?COUCH_BT_WRITE_KP_NODE,
+    [couchdb, btree, write_node, kv_node] => ?COUCH_BT_WRITE_KV_NODE,
+    [couchdb, query_server, calls, ddoc_filter] => ?COUCH_JS_FILTER,
+    [couchdb, query_server, volume, ddoc_filter] => ?COUCH_JS_FILTERED_DOCS
+}).
+
+-define(KEYS_TO_FIELDS, #{
+    ?DB_OPEN => #rctx.?DB_OPEN,
+    ?ROWS_READ => #rctx.?ROWS_READ,
+    ?FRPC_CHANGES_RETURNED => #rctx.?FRPC_CHANGES_RETURNED,
+    ?IOQ_CALLS => #rctx.?IOQ_CALLS,
+    ?COUCH_JS_FILTER => #rctx.?COUCH_JS_FILTER,
+    ?COUCH_JS_FILTERED_DOCS => #rctx.?COUCH_JS_FILTERED_DOCS,
+    ?MANGO_EVAL_MATCH => #rctx.?MANGO_EVAL_MATCH,
+    ?DB_OPEN_DOC => #rctx.?DB_OPEN_DOC,
+    ?FRPC_CHANGES_ROW => #rctx.?ROWS_READ, %% TODO: rework double use of rows_read
+    ?COUCH_BT_GET_KP_NODE => #rctx.?COUCH_BT_GET_KP_NODE,
+    ?COUCH_BT_GET_KV_NODE => #rctx.?COUCH_BT_GET_KV_NODE,
+    ?COUCH_BT_WRITE_KP_NODE => #rctx.?COUCH_BT_WRITE_KP_NODE,
+    ?COUCH_BT_WRITE_KV_NODE => #rctx.?COUCH_BT_WRITE_KV_NODE
+}).
+
 -record(st, {}).
 
 -record(rctx, {
@@ -533,68 +564,22 @@ destroy_context({_, _} = PidRef) ->
 inc(Key) ->
     inc(Key, 1).
 
-%% TODO: inc(io_bytes_read, N) ->
-%% TODO: inc(io_bytes_written, N) ->
-%% TODO: inc(js_evals, N) ->
-inc(?DB_OPEN, N) ->
-    update_counter(#rctx.?DB_OPEN, N);
-inc(?ROWS_READ, N) ->
-    update_counter(#rctx.?ROWS_READ, N);
-inc(?FRPC_CHANGES_RETURNED, N) ->
-    update_counter(#rctx.?FRPC_CHANGES_RETURNED, N);
-inc(?IOQ_CALLS, N) ->
-    update_counter(#rctx.?IOQ_CALLS, N);
-inc(?COUCH_JS_FILTER, N) ->
-    update_counter(#rctx.?COUCH_JS_FILTER, N);
-inc(?COUCH_JS_FILTER_ERROR, N) ->
-    update_counter(#rctx.?COUCH_JS_FILTER_ERROR, N);
-inc(?COUCH_JS_FILTERED_DOCS, N) ->
-    update_counter(#rctx.?COUCH_JS_FILTERED_DOCS, N);
-inc(?MANGO_EVAL_MATCH, N) ->
-    update_counter(#rctx.?MANGO_EVAL_MATCH, N);
-inc(?DB_OPEN_DOC, N) ->
-    update_counter(#rctx.?DB_OPEN_DOC, N);
-inc(?FRPC_CHANGES_ROW, N) ->
-    update_counter(#rctx.?ROWS_READ, N); %% TODO: rework double use of rows_read
-inc(?COUCH_BT_GET_KP_NODE, N) ->
-    update_counter(#rctx.?COUCH_BT_GET_KP_NODE, N);
-inc(?COUCH_BT_GET_KV_NODE, N) ->
-    update_counter(#rctx.?COUCH_BT_GET_KV_NODE, N);
-inc(_, _) ->
-    %% inc needs to allow unknown types to pass for accumulate_update to handle
-    %% updates from nodes with newer data formats
-    0.
+inc(Key, N) ->
+    case maps:is_key(Key, ?KEYS_TO_FIELDS) of
+        true ->
+            update_counter(maps:get(Key, ?KEYS_TO_FIELDS), N);
+        false ->
+            0
+    end.
 
-maybe_inc([mango, evaluate_selector], Val) ->
-    inc(?MANGO_EVAL_MATCH, Val);
-maybe_inc([couchdb, database_reads], Val) ->
-    inc(?DB_OPEN_DOC, Val);
-maybe_inc([fabric_rpc, changes, processed], Val) ->
-    inc(?FRPC_CHANGES_ROW, Val);
-maybe_inc([fabric_rpc, changes, returned], Val) ->
-    inc(?FRPC_CHANGES_RETURNED, Val);
-maybe_inc([fabric_rpc, view, rows_read], Val) ->
-    inc(?ROWS_READ, Val);
-maybe_inc([couchdb, couch_server, open], Val) ->
-    inc(?DB_OPEN, Val);
-maybe_inc([couchdb, btree, get_node, kp_node], Val) ->
-    inc(?COUCH_BT_GET_KP_NODE, Val);
-maybe_inc([couchdb, btree, get_node, kv_node], Val) ->
-    inc(?COUCH_BT_GET_KV_NODE, Val);
-%% The write_node logic won't pickup writes as none of the RPC
-%% processes actually perform the write operation
-%% TODO: bubble up induced work from other processes
-maybe_inc([couchdb, btree, write_node, kp_node], Val) ->
-    inc(?COUCH_BT_WRITE_KP_NODE, Val);
-maybe_inc([couchdb, btree, write_node, kv_node], Val) ->
-    inc(?COUCH_BT_WRITE_KV_NODE, Val);
-maybe_inc([couchdb, query_server, calls, ddoc_filter], Val) ->
-    inc(?COUCH_JS_FILTER, Val);
-maybe_inc([couchdb, query_server, volume, ddoc_filter], Val) ->
-    inc(?COUCH_JS_FILTERED_DOCS, Val);
-maybe_inc(_Metric, _Val) ->
-    %%io:format("SKIPPING MAYBE_INC METRIC[~p]: ~p~n", [Val, Metric]),
-    0.
+
+maybe_inc(Stat, Val) ->
+    case maps:is_key(Stat, ?STATS_TO_KEYS) of
+        true ->
+            inc(maps:get(Stat, ?STATS_TO_KEYS), Val);
+        false ->
+            0
+    end.
 
 %% TODO: update stats_descriptions.cfg for relevant apps
 should_track([fabric_rpc, all_docs, spawned]) ->
@@ -902,3 +887,30 @@ stop_tracker(undefined) ->
 stop_tracker(Pid) when is_pid(Pid) ->
     Pid ! stop.
 
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+couch_stats_resource_tracker_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_static_map_translations)
+        ]
+    }.
+
+setup() ->
+    test_util:start_couch().
+
+teardown(Ctx) ->
+    test_util:stop_couch(Ctx).
+
+t_static_map_translations(_) ->
+    ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, maps:values(?STATS_TO_KEYS))),
+    %% TODO: properly handle ioq_calls field
+    ?assertEqual(lists:sort(maps:values(?STATS_TO_KEYS)), lists:delete(ioq_calls, lists:sort(maps:keys(?KEYS_TO_FIELDS)))).
+
+-endif.
