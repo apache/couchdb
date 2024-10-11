@@ -18,10 +18,7 @@
     start_link/0,
     init/1,
     handle_call/3,
-    handle_cast/2,
-    handle_info/2,
-    code_change/3,
-    terminate/2
+    handle_cast/2
 ]).
 
 %% PidRef API
@@ -836,15 +833,6 @@ handle_call(Msg, _From, St) ->
 
 handle_cast(Msg, St) ->
     {stop, {unknown_cast, Msg}, St}.
-
-handle_info(Msg, St) ->
-    {stop, {unknown_info, Msg}, St}.
-
-terminate(_Reason, _St) ->
-    ok.
-
-code_change(_OldVsn, St, _Extra) ->
-    {ok, St}.
 
 %%
 %% private functions
