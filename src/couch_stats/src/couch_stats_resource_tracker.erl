@@ -823,16 +823,14 @@ init([]) ->
     ]),
     {ok, #st{}}.
 
-handle_call(fetch, _from, #st{} = St) ->
-    {reply, {ok, St}, St};
 handle_call({call_search, _}, _From, St) ->
     %% TODO: provide isolated search queries here
     {reply, ok, St};
-handle_call(Msg, _From, St) ->
-    {stop, {unknown_call, Msg}, St}.
+handle_call(_, _From, State) ->
+    {reply, ok, State}.
 
-handle_cast(Msg, St) ->
-    {stop, {unknown_cast, Msg}, St}.
+handle_cast(_Msg, State) ->
+    {noreply, State, 0}.
 
 %%
 %% private functions
