@@ -30,7 +30,7 @@ go(DbName, DDoc, IndexName) ->
             {error, Reason}
     end.
 
-go(DbName, DDoc, IndexName, Index) ->
+go(DbName, _DDoc, _IndexName, Index) ->
     Shards = mem3:shards(DbName),
     Counters0 = lists:map(
         fun(#shard{} = Shard) ->
