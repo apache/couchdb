@@ -29,6 +29,7 @@ clouseau/
 *.tar.gz
 *.tar.bz2
 dev/*.beam
+dev/clouseau*
 dev/devnode.*
 dev/lib/
 dev/logs/
