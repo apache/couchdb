@@ -20,6 +20,60 @@
     :depth: 1
     :local:
 
+.. _release/3.4.2:
+
+Version 3.4.2
+=============
+
+Highlights
+----------
+
+* :ghissue:`5262`: Enable ``supportsConcurrency`` in
+  ``TopFieldCollectorManagerSet``. This fixes an issue which prevented
+  creating larger indexes in Nouveau.
+
+* :ghissue:`5299`: Use LTO and static linking for QuickJS on Windows.
+
+Performance
+-----------
+
+* :ghissue:`5268`: Improve performance of ``couch_event_server`` under
+  load.
+
+Features
+--------
+
+* :ghissue:`5272`: Upgrade Nouveau Lucene to 9.12.0.
+* :ghissue:`5286`: Add ``?top_n=X`` Nouveau parameter for facets.
+* :ghissue:`5290`: Send a ``404`` code for a missing Nouveau index.
+* :ghissue:`5292`: Add signature to ``_nouveau_info`` response.
+* :ghissue:`5293`: Make Nouveau Gradle script choosable.
+* :ghissue:`5294`: Return time spent waiting to update Nouveau index
+  before query starts.
+
+Bufixes
+-------
+* :ghissue:`5274`: Use normal Lucene syntax for unbounded ranges in
+  Nouveau.
+* :ghissue:`5270`: Do not generate conflicts from the replicator
+  application.
+* :ghissue:`5285`: Fix emitting multiple indexes per field per doc
+  returning the last indexed value with ``{"store": true}``.
+* :ghissue:`5289`: Fix stored field in search results.
+* :ghissue:`5298`: Fix unused variable compiler warning in Nouveau.
+
+Docs
+----
+
+* :ghissue:`5260`: Correct default ``q`` value in ``POST /{db}``
+  section.
+* :ghissue:`5281`: Use ``{var}`` format for parameters instead of
+  ``$var`` for scanner docs.
+* :ghissue:`5280`: Sync suggested fabric timeout settings with the
+  sources.
+* :ghissue:`5287`: Document ``String.prototype.match(undefined)``
+  Spidermonkey 1.8.5 vs Spidermonkey 78+ incompatibility.
+
 .. _release/3.4.1:
 
 Version 3.4.1
