@@ -16,7 +16,6 @@
 
 -include("dreyfus.hrl").
 -include_lib("mem3/include/mem3.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -export([go/4]).
 
