@@ -14,7 +14,6 @@
 
 -module(dreyfus_index_manager).
 -behaviour(gen_server).
--include_lib("couch/include/couch_db.hrl").
 -include("dreyfus.hrl").
 
 -define(BY_SIG, dreyfus_by_sig).
