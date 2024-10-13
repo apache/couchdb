@@ -12,10 +12,7 @@
 
 -module(dreyfus_config_test).
 
--include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
--define(TIMEOUT, 1000).
 
 start() ->
     test_util:start_couch([dreyfus]).

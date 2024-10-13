@@ -15,7 +15,6 @@
 -module(dreyfus_fabric).
 -export([get_json_docs/2, handle_error_message/7]).
 
--include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include("dreyfus.hrl").
 
