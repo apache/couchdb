@@ -19,7 +19,6 @@
 -define(DDOC_ID, <<"_design/black_list_doc">>).
 -define(INDEX_NAME, <<"my_index">>).
 -define(DBNAME, <<"mydb">>).
--define(TIMEOUT, 1000).
 
 start() ->
     test_util:start_couch([dreyfus]).

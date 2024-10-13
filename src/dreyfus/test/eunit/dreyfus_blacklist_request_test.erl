@@ -13,11 +13,8 @@
 -module(dreyfus_blacklist_request_test).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_log/include/couch_log.hrl").
 -include_lib("dreyfus/include/dreyfus.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
--define(TIMEOUT, 1000).
 
 start() ->
     test_util:start_couch([dreyfus]),
