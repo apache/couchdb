@@ -78,6 +78,7 @@ src/unicode_util_compat/
 src/file_system/
 src/rebar3/
 src/erlfmt/
+src/*.erl
 tmp/
 
 src/couch/*.o
