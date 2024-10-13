@@ -18,7 +18,7 @@ Msys = "msys2_shell.cmd -defterm -no-start -ucrt64 -here -lc ".
 PreHooks = [
     {"(linux|darwin)", compile, "make CONFIG_LTO=y -C quickjs -j8 libquickjs.lto.a qjsc"},
     {"freebsd", compile, "gmake -C quickjs -j8 libquickjs.a qjsc"},
-    {"win32", compile, Msys ++ "'make -C quickjs qjsc'"},
+    {"win32", compile, Msys ++ "'make CONFIG_LTO=y -C quickjs -j8 libquickjs.lto.a qjsc'"},
     {"(linux|darwin|freebsd|win32)", compile, "escript build_js.escript compile"}
 ].
 
@@ -49,7 +49,8 @@ FreeBSDEnv  = [
 ] ++ ResetFlags.
 
 WindowsEnv = [
-    {"CFLAGS", "-D_GNU_SOURCE -DCONFIG_BIGNUM -O2 -fwrapv -DCONFIG_VERSION=\\\"0\\\" -Iquickjs"},
+    {"CFLAGS", "-flto -D_GNU_SOURCE -DCONFIG_BIGNUM -DCONFIG_LTO=y -O2 -fwrapv -DCONFIG_VERSION=\\\"0\\\" -Iquickjs"},
+    {"LDFLAGS", "$LDFLAGS -flto -lm -Wl,-Bstatic -lpthread quickjs/libquickjs.lto.a"},
     {"EXE_CC_TEMPLATE", "gcc.exe -g -c $CFLAGS $PORT_IN_FILES -o $PORT_OUT_FILE"},
     {"EXE_LINK_TEMPLATE", "gcc.exe -g -lm $PORT_IN_FILES $LDFLAGS -o $PORT_OUT_FILE"}
 ].
