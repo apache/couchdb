@@ -170,8 +170,6 @@ init_p(From, {M, F, A}, Nonce) ->
                 nonce = Nonce,
                 stack = Stack
             })
-    after
-        couch_stats_resource_tracker:destroy_context()
     end.
 
 %% internal
