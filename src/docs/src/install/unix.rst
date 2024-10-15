@@ -161,7 +161,7 @@ You should have the following installed:
 * `Erlang OTP (25, 26, 27)      <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
-* `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91) <https://spidermonkey.dev/>`_
+* `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91, 128) <https://spidermonkey.dev/>`_
 * `GNU Make                     <http://www.gnu.org/software/make/>`_
 * `GNU Compiler Collection      <http://gcc.gnu.org/>`_
 * `help2man                     <http://www.gnu.org/s/help2man/>`_
@@ -211,7 +211,7 @@ Fedora 36
 
 On Fedora 36, you may need these packages in addition to the ones listed above:
 
-* `mozjs91-devel`
+* `mozjs128-devel`
 * `erlang-rebar`
 
 If the system contains dangling links to Erlang chunk files, the compiler will

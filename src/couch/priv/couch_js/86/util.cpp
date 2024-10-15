@@ -324,13 +324,22 @@ couch_error(JSContext* cx, JSErrorReport* report)
         msg << " at ";
 
         if(report->filename) {
+#if MOZJS_MAJOR_VERSION < 128
             msg << report->filename;
+#else  // MOZJS_MAJOR_VERSION >= 128
+            msg << report->filename.c_str();
+#endif
         } else {
             msg << "<unknown>";
         }
 
         if(report->lineno) {
+#if MOZJS_MAJOR_VERSION < 128
             msg << ':' << report->lineno << ':' << report->column;
+#else  // MOZJS_MAJOR_VERSION >= 128
+            msg << ':' << report->lineno << ':' <<
+                report->column.oneOriginValue();
+#endif
         }
 
         goto done;

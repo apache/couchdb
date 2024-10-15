@@ -96,8 +96,8 @@ You can run CouchDB with `--enable-tls` mode, which will automatically generate
 vm.args, certificates, and configuration files.
 
 ```bash
-./configure --dev --spidermonkey-version 91 && make && ./dev/run -t
-./configure --dev --spidermonkey-version 91 && make && ./dev/run --enable-tls
+./configure --dev --spidermonkey-version 128 && make && ./dev/run -t
+./configure --dev --spidermonkey-version 128 && make && ./dev/run --enable-tls
 
 ./dev/remsh-tls
 (node1@127.0.0.1)1> net_kernel:nodes_info().
@@ -130,8 +130,8 @@ vm.args, certificates, and configuration files.
 You can also set specific nodes to use TCP:
 
 ```bash
-./configure --dev --spidermonkey-version 91 && make && ./dev/run -t --no-tls node2@127.0.0.1
-./configure --dev --spidermonkey-version 91 && make && ./dev/run -t --no-tls node2,node3
+./configure --dev --spidermonkey-version 128 && make && ./dev/run -t --no-tls node2@127.0.0.1
+./configure --dev --spidermonkey-version 128 && make && ./dev/run -t --no-tls node2,node3
 
 ./dev/remsh-tls
 (node1@127.0.0.1)1> net_kernel:nodes_info().

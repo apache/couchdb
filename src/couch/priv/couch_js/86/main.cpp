@@ -37,17 +37,19 @@ static bool enableSharedMemory = true;
 static bool enableToSource = true;
 
 static JSClassOps global_ops = {
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    JS_GlobalObjectTraceHook
+    nullptr, // addProperty
+    nullptr, // delProperty
+    nullptr, // enumerate
+    nullptr, // newEnumerate
+    nullptr, // resolve
+    nullptr, // mayResolve
+    nullptr, // finalize
+    nullptr, // call
+#if MOZJS_MAJOR_VERSION < 128
+    nullptr, // hasInstance, version <= 91
+#endif  // MOZJS_MAJOR_VERSION < 128
+    nullptr, // construct
+    JS_GlobalObjectTraceHook // trace
 };
 
 /* The class of the global object. */
@@ -240,7 +242,11 @@ static JSFunctionSpec global_functions[] = {
 
 
 static bool
+#if MOZJS_MAJOR_VERSION < 128
 csp_allows(JSContext* cx, JS::HandleString code)
+#else  // MOZJS_MAJOR_VERSION >= 128
+csp_allows(JSContext* cx, JS::RuntimeCode kind, JS::HandleString code)
+#endif
 {
     couch_args* args = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     if(args->eval) {
@@ -252,8 +258,8 @@ csp_allows(JSContext* cx, JS::HandleString code)
 
 
 static JSSecurityCallbacks security_callbacks = {
-    csp_allows,
-    nullptr
+    csp_allows, // contentSecurityPolicyAllows
+    nullptr // subsumes
 };
 
 int runWithContext(JSContext* cx, couch_args* args) {
