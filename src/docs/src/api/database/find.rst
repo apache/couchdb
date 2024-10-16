@@ -19,11 +19,11 @@
 .. http:post:: /{db}/_find
     :synopsis: Find documents within a given database.
 
-    Find documents using a declarative JSON querying syntax.
-    Queries will use custom indexes, specified using the :ref:`_index <api/db/find/index>`
-    endpoint, if available.
-    Otherwise, they use the built-in :ref:`_all_docs <api/db/all_docs>` index, which
-    can be arbitrarily slow.
+    Find documents using a declarative JSON querying syntax.  Queries
+    will use custom indexes, specified using the :ref:`_index
+    <api/db/find/index>` endpoint, if available.  Otherwise, when
+    allowed, they use the built-in :ref:`_all_docs <api/db/all_docs>`
+    index, which can be arbitrarily slow.
 
     :param db: Database name
 
@@ -50,6 +50,14 @@
         is attempted. Therefore that is more like a hint. When
         fallback occurs, the details are given in the ``warning``
         field of the response. *Optional*
+    :<json boolean allow_fallback: Tell if it is allowed to fall back
+        to another valid index.  This can happen on running a query
+        with an index specified by ``use_index`` which is not deemed
+        usable, or when only the built-in :ref:`_all_docs
+        <api/db/all_docs>` index would be picked in lack of indexes
+        available to support the query.  Disabling this fallback logic
+        causes the endpoint immediately return an error in such cases.
+        Default is ``true``. *Optional*
     :<json boolean conflicts: Include conflicted documents if ``true``.
         Intended use is to easily find conflicted documents, without an
         index or view. Default is ``false``. *Optional*
@@ -1498,7 +1506,8 @@ it easier to take advantage of future improvements to query planning
                 "stale": false,
                 "update": true,
                 "stable": false,
-                "execution_stats": false
+                "execution_stats": false,
+                "allow_fallback": true
             },
             "limit": 2,
             "skip": 0,
