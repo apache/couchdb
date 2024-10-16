@@ -32,12 +32,11 @@ to install CouchDB is to use the convenience binary packages:
 * CentOS/RHEL 7
 * CentOS/RHEL 8
 * CentOS/RHEL 9 (with caveats: depends on EPEL repository)
-* Debian 10 (buster)
 * Debian 11 (bullseye)
 * Debian 12 (bookworm)
-* Ubuntu 18.04 (bionic)
 * Ubuntu 20.04 (focal)
 * Ubuntu 22.04 (jammy)
+* Ubuntu 24.04 (noble)
 
 These RedHat-style rpm packages and Debian-style deb packages will install CouchDB at
 ``/opt/couchdb`` and ensure CouchDB is run at system startup by the appropriate init
@@ -161,7 +160,7 @@ You should have the following installed:
 * `Erlang OTP (25, 26, 27)      <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
-* `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91) <https://spidermonkey.dev/>`_
+* `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91, 102, 115, 128) <https://spidermonkey.dev/>`_
 * `GNU Make                     <http://www.gnu.org/software/make/>`_
 * `GNU Compiler Collection      <http://gcc.gnu.org/>`_
 * `help2man                     <http://www.gnu.org/s/help2man/>`_
