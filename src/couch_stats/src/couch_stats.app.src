@@ -13,8 +13,12 @@
 {application, couch_stats, [
     {description, "Simple statistics collection"},
     {vsn, git},
-    {registered, [couch_stats_aggregator, couch_stats_process_tracker]},
-    {applications, [kernel, stdlib]},
+    {registered, [
+        couch_stats_aggregator,
+        couch_stats_process_tracker,
+        couch_stats_resource_tracker
+    ]},
+    {applications, [kernel, stdlib, couch_log]},
     {mod, {couch_stats_app, []}},
     {env, []}
 ]}.
