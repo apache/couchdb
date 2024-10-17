@@ -235,7 +235,11 @@ t_filter_only({_, DbName}) ->
     end.
 
 t_filter_with_expected_error({_, DbName}) ->
-    ok = add_doc(DbName, ?DDOC1, ddoc_filter_error(#{})),
+    % Put filters with errors in different ddocs so than each be tested in isolation
+    ok = add_doc(DbName, <<"_design/ddoc_custom_error">>, ddoc_filter_custom_error(#{})),
+    ok = add_doc(DbName, <<"_design/ddoc_type_error">>, ddoc_filter_type_error(#{})),
+    ok = add_doc(DbName, <<"_design/ddoc_syntax_error">>, ddoc_filter_syntax_error(#{})),
+    ok = add_doc(DbName, <<"_design/ddoc_reference_error">>, ddoc_filter_reference_error(#{})),
     meck:reset(couch_scanner_server),
     meck:reset(?PLUGIN),
     config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
@@ -245,9 +249,9 @@ t_filter_with_expected_error({_, DbName}) ->
         true ->
             ?assertEqual(1, num_calls(complete, 1)),
             ?assertEqual(1, num_calls(db, ['_', DbName])),
-            ?assertEqual(1, num_calls(ddoc, ['_', DbName, '_'])),
+            ?assertEqual(4, num_calls(ddoc, ['_', DbName, '_'])),
             ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
-            ?assertEqual(10, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(40, couch_stats:sample([couchdb, query_server, process_errors])),
             ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
             % start, complete and no warning as we expected the error, so 2 total only
             ?assertEqual(2, log_calls(warning));
@@ -397,12 +401,17 @@ ddoc_filter(Doc) ->
         }
     }.
 
-ddoc_filter_error(Doc) ->
-    Doc#{
-        filters => #{
-            f => <<"function(doc, req) {throw(\"foo\");}">>
-        }
-    }.
+ddoc_filter_custom_error(Doc) ->
+    Doc#{filters => #{f => <<"function(doc, req) {throw(\"foo\");}">>}}.
+
+ddoc_filter_type_error(Doc) ->
+    Doc#{filters => #{f => <<"function(doc, req){if(doc.missing.foo){return false;}}">>}}.
+
+ddoc_filter_syntax_error(Doc) ->
+    Doc#{filters => #{f => <<"function(doc, req){JSON.parse([]); return true;}">>}}.
+
+ddoc_filter_reference_error(Doc) ->
+    Doc#{filters => #{f => <<"function(doc, req){if(potato){return true;}}">>}}.
 
 ddoc_view(Doc) ->
     Doc#{
@@ -461,6 +470,7 @@ ddoc_view(Doc) ->
             },
             v_type_error => #{map => <<"function(doc){emit(doc.missing.foo,1);}">>},
             v_syntax_error => #{map => <<"function(doc){emit(JSON.parse([]),1);}">>},
+            v_reference_error => #{map => <<"function(doc){emit(potato,1);}">>},
             v_expr_fun1 => #{map => <<"(function(doc) {emit(1,2)})\n">>},
             v_expr_fun2 => #{map => <<"(function(doc) {emit(3,4)});">>},
             v_expr_fun3 => #{map => <<"y=9;\n(function(doc) {emit(5,y)})">>},
