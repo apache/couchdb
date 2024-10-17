@@ -544,6 +544,8 @@ expected_error({error, {_, {<<"unnamed_error">>, _}}}, {error, {_, {<<"unnamed_e
     true;
 expected_error({error, {_, {<<"SyntaxError">>, _}}}, {error, {_, {<<"SyntaxError">>, _}}}) ->
     true;
+expected_error({error, {_, {<<"ReferenceError">>, _}}}, {error, {_, {<<"ReferenceError">>, _}}}) ->
+    true;
 expected_error(_, _) ->
     false.
 
