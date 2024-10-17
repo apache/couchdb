@@ -2115,7 +2115,7 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 
         {
             "javascript_engine": {
-                "version": "91",
+                "version": "128",
                 "name": "spidermonkey"
             },
             "erlang": {

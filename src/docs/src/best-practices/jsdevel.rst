@@ -71,7 +71,7 @@ SpiderMonkey version compatibility
 
 Depending on the CouchDB version and what's available on supported operating
 systems, the SpiderMonkey version may be any one of these: 1.8.5, 60, 68, 78,
-86 or 91. Sometimes there are differences in supported features between
+86, 91 or 128. Sometimes there are differences in supported features between
 versions. Usually later versions only add features, so views will work on
 version upgrades. However, there are a few exceptions to this. These are a few
 known regression or discrepancies between versions:
@@ -89,7 +89,7 @@ known regression or discrepancies between versions:
    1
    2
 
-   % js91
+   % js128
    js> for each (var x in [1,2]) {print(x)}
    typein:1:4 SyntaxError: missing ( after for:
    typein:1:4 for each (var x in [1,2]) {print(x)}
@@ -111,7 +111,7 @@ known regression or discrepancies between versions:
      <x/>
    </root>
 
-   % js91
+   % js128
    js>  var xml = <root><x></x></root>
    typein:1:11 SyntaxError: expected expression, got '<':
    typein:1:11  var xml = <root><x></x></root>
@@ -129,7 +129,7 @@ known regression or discrepancies between versions:
    js> d.toLocaleFormat("%Y-%m-%d")
    "2015-12-01"
 
-   % js91
+   % js128
    js> d = new Date("Dec 1, 2015 3:22:46 PM")
    (new Date(1449001366000))
    js> d.toLocaleFormat("%Y-%m-%d")
@@ -146,11 +146,11 @@ known regression or discrepancies between versions:
    js > (new Date("2019-01-15T19:32:52.915Z")).toLocaleString('en-US')
    "Tue Jan 15 14:32:52 2019"
 
-   % js91
+   % js128
    js > (new Date("2019-01-15T19:32:52.915Z")).toLocaleString('en-US')
    "01/15/2019, 02:32:52 PM"
 
-Spidermonkey 91 output also match QuickJS and v8.
+Spidermonkey 128 output also match QuickJS and v8.
 
 5. Invalid expressions following ``function(){...}`` are not ignored any longer
    and will throw an error.
@@ -205,7 +205,7 @@ Spidermonkey 91 output also match QuickJS and v8.
    js> r={}; ["Xyz", "abc", 1].forEach(function(v) {r[v]=v;}); Object.keys(r)
    ["Xyz", "abc", "1"]
 
-   % js91
+   % js128
    js> r={}; ["Xyz", "abc", 1].forEach(function(v) {r[v]=v;}); Object.keys(r)
    ["1", "Xyz", "abc"]
 
@@ -220,7 +220,7 @@ Spidermonkey 91 output also match QuickJS and v8.
    js> "abc".match(undefined)
    null
 
-   % js91
+   % js128
    js> "abc".match(undefined)
    [""]
 
@@ -244,12 +244,12 @@ be re-built again.
 QuickJS vs SpiderMonkey incompatibilities
 ============================================
 
-The QuickJS engine is quite compatible with SpiderMonkey version 91. The same
-incompatibilities between 1.8.5 and 91 are also present between 1.8.5 and
+The QuickJS engine is quite compatible with SpiderMonkey version 128. The same
+incompatibilities between 1.8.5 and 128 are also present between 1.8.5 and
 QuickJS. So, when switching from 1.8.5 to QuickJS see the ``SpiderMonkey version
 compatibility`` section above.
 
-These are a few incompatibilties between SpiderMonkey 91 and QuickJS engine:
+These are a few incompatibilties between SpiderMonkey 128 and QuickJS engine:
 
 1. ``RegExp.$1``, ..., ``RegExp.$9``
 
@@ -263,7 +263,7 @@ https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects
    % qjs > (new Date()).toString();
    "Thu Sep 05 2024 17:03:23 GMT-0400"
 
-   % js91
+   % js128
    js>  (new Date()).toString();
    "Thu Sep 05 2024 17:04:03 GMT-0400 (EDT)"
 

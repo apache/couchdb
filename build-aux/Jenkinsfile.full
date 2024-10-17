@@ -49,7 +49,7 @@ meta = [
 
   'jammy': [
     name: 'Ubuntu 22.04',
-    spidermonkey_vsn: '91',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
@@ -99,7 +99,7 @@ meta = [
   // Temp disable until worker is back
   // 'freebsd-x86_64': [
   //    name: 'FreeBSD x86_64',
-  //    spidermonkey_vsn: '91',
+  //    spidermonkey_vsn: '128',
   //    with_clouseau: false,
   //    gnu_make: 'gmake'
   // ],
@@ -118,7 +118,7 @@ meta = [
  // but works for the other workers.
  'macos': [
     name: 'macOS',
-    spidermonkey_vsn: '91',
+    spidermonkey_vsn: '128',
     with_nouveau: false,
     with_clouseau: false,
     gnu_make: 'make'
