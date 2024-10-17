@@ -142,6 +142,7 @@ init([]) ->
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_QUERY_SERVER_")),
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
     ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
+    ets:insert(?SERVERS, [{"SELECTOR", {mango_simple_proc, start_link, []}}]),
     maybe_configure_erlang_native_servers(),
     configure_js_engine(couch_server:get_js_engine()),
 
