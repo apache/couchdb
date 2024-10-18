@@ -282,6 +282,7 @@ class Database(object):
         update=True,
         executionStats=False,
         partition=None,
+        allow_fallback=None,
     ):
         body = {
             "selector": selector,
@@ -301,6 +302,8 @@ class Database(object):
             body["update"] = False
         if executionStats == True:
             body["execution_stats"] = True
+        if allow_fallback is not None:
+            body["allow_fallback"] = allow_fallback
         body = json.dumps(body)
         if partition:
             ppath = "_partition/{}/".format(partition)

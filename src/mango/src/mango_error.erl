@@ -48,6 +48,28 @@ info(mango_json_bookmark, {invalid_bookmark, BadBookmark}) ->
         <<"invalid_bookmark">>,
         fmt("Invalid bookmark value: ~s", [?JSON_ENCODE(BadBookmark)])
     };
+info(mango_cursor, {invalid_index, []}) ->
+    {
+        400,
+        <<"invalid_index">>,
+        <<"You must specify an index with the `use_index` parameter.">>
+    };
+info(mango_cursor, {invalid_index, [DDocName]}) ->
+    {
+        400,
+        <<"invalid_index">>,
+        fmt("_design/~s specified by `use_index` could not be found or it is not suitable.", [
+            DDocName
+        ])
+    };
+info(mango_cursor, {invalid_index, [DDocName, ViewName]}) ->
+    {
+        400,
+        <<"invalid_index">>,
+        fmt("_design/~s, ~s specified by `use_index` could not be found or it is not suitable.", [
+            DDocName, ViewName
+        ])
+    };
 info(mango_cursor_text, {invalid_bookmark, BadBookmark}) ->
     {
         400,
@@ -230,6 +252,12 @@ info(mango_opts, {invalid_bulk_docs, Val}) ->
             "Bulk Delete requires an array of non-null docids. Docids: ~w",
             [Val]
         )
+    };
+info(mango_opts, {invalid_index_name, Val}) ->
+    {
+        400,
+        <<"invalid_index_name">>,
+        fmt("Invalid index name: ~w", [Val])
     };
 info(mango_opts, {invalid_ejson, Val}) ->
     {
