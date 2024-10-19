@@ -93,6 +93,8 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
         "91";
     {_, "102"} ->
         "102";
+    {_, "115"} ->
+        "115";
     undefined ->
         "91";
     {_, Unsupported} ->
@@ -121,6 +123,8 @@ CouchJSConfig = case SMVsn of
         "priv/couch_js/86/config.h";
     "102" ->
         "priv/couch_js/102/config.h";
+    "115" ->
+        "priv/couch_js/115/config.h";
     _ ->
         "priv/couch_js/" ++ SMVsn ++ "/config.h"
 end.
@@ -196,6 +200,10 @@ end.
         {
             "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-102 -I/usr/local/include/mozjs-102 -I/opt/homebrew/include/mozjs-102/ -std=c++17 -Wno-invalid-offsetof",
             "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-102 -lm"
+    {unix, _} when SMVsn == "115" ->
+        {
+            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-115 -I/usr/local/include/mozjs-115 -I/opt/homebrew/include/mozjs-115/ -std=c++17 -Wno-invalid-offsetof",
+            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-115 -lm"
         };
     {win32, _} when SMVsn == "91" ->
         {
@@ -206,6 +214,10 @@ end.
         {
             "/std:c++17 /DXP_WIN",
             "$LDFLAGS mozjs-102.lib"
+    {win32, _} when SMVsn == "115" ->
+        {
+            "/std:c++17 /DXP_WIN",
+            "$LDFLAGS mozjs-115.lib"
         }
 end.
 
@@ -217,6 +229,7 @@ CouchJSSrc = case SMVsn of
     "86" -> ["priv/couch_js/86/*.cpp"];
     "91" -> ["priv/couch_js/86/*.cpp"];
     "102" -> ["priv/couch_js/102/*.cpp"]
+    "115" -> ["priv/couch_js/115/*.cpp"]
 end.
 
 CouchJSEnv = case SMVsn of
