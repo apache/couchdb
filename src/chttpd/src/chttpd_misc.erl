@@ -68,15 +68,10 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_features() ->
-    case dreyfus:available() of
-        true -> [search];
-        false -> []
-    end ++
-        case nouveau:enabled() of
-            true -> [nouveau];
-            false -> []
-        end ++
-        config:features().
+    HasSearch = [search || dreyfus:available()],
+    HasNouveau = [nouveau || nouveau:enabled()],
+    JsEngine = [E || (E = couch_server:get_js_engine()) /= <<"spidermonkey">>],
+    HasSearch ++ HasNouveau ++ JsEngine ++ config:features().
 
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, get_docroot()).
