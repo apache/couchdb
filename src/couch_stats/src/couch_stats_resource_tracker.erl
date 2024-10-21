@@ -738,7 +738,6 @@ tracker({Pid, _Ref}=PidRef) ->
             catch evict(PidRef),
             ok;
         {'DOWN', MonRef, _Type, _0DPid, _Reason0} ->
-            destroy_context(PidRef),
             %% TODO: should we pass reason to log_process_lifetime_report?
             %% Reason = case Reason0 of
             %%     {shutdown, Shutdown0} ->
