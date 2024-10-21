@@ -32,6 +32,7 @@ teardown(_Url) ->
     Persist = false,
     ok = config:delete("couchdb", "maintenance_mode", Persist = false),
     ok = config:delete("cluster", "seedlist", Persist = false),
+    ok = config:delete("couchdb", "js_engine", Persist = false),
     ok = config:delete("admins", ?USER, Persist = false).
 
 welcome_test_() ->
@@ -88,7 +89,12 @@ should_have_features(Url) ->
     {ok, 200, _, Body2} = req_get(Url),
     #{<<"features">> := Features2} = Body2,
     ?assert(is_list(Features2)),
-    ?assertNot(lists:member(<<"snek">>, Features2)).
+    ?assertNot(lists:member(<<"snek">>, Features2)),
+    config:set("couchdb", "js_engine", "quickjs", false),
+    {ok, 200, _, Body3} = req_get(Url),
+    #{<<"features">> := Features3} = Body3,
+    ?assert(lists:member(<<"quickjs">>, Features3)),
+    config:delete("couchdb", "js_engine", false).
 
 up_test_() ->
     {
