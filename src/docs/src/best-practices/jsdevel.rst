@@ -224,6 +224,29 @@ Spidermonkey 91 output also match QuickJS and v8.
    js> "abc".match(undefined)
    [""]
 
+8. The ``toISOString()`` throws an error on invalid ``Date`` objects.
+
+SpiderMonkey version ``1.8.5`` does not throw an error when calling
+``toISOString()`` on invalid ``Date`` objects, but SpiderMonkey versions at
+least ``78+`` do:
+
+.. code-block:: bash
+
+  % js
+  js>  (new Date(undefined)).toISOString()
+  "Invalid Date"
+
+  % js91
+  js> (new Date(undefined)).toISOString()
+  typein:1:23 RangeError: invalid date
+  Stack:
+    @typein:1:23
+
+This can affect views emitting an invalid date object. Previousy, the view
+might have emitted the "Invalid Date" string, while in later SpiderMonkey
+engines all the emit results from that document will be skipped, since view
+functions skip view results if an exception is thrown.
+
 Using QuickJS
 =============
 
