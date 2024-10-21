@@ -21,7 +21,12 @@
 
     Accessing the root of a CouchDB instance returns meta information about the
     instance. The response is a JSON structure containing information about the
-    server, including a welcome message and the version of the server.
+    server, including a welcome message, version of the server, and a list of
+    ``features``. The ``features`` elements may change depending on which
+    configuration options are enabled (for example, ``quickjs`` if it's set as
+    the default JavasScript engine), or which additional components are
+    installed and configured (for example the ``nouveau`` text indexing
+    application).
 
     :<header Accept: - :mimetype:`application/json`
                      - :mimetype:`text/plain`
@@ -42,20 +47,26 @@
     .. code-block:: http
 
         HTTP/1.1 200 OK
-        Cache-Control: must-revalidate
-        Content-Length: 179
+        Content-Length: 247
         Content-Type: application/json
-        Date: Sat, 10 Aug 2013 06:33:33 GMT
-        Server: CouchDB (Erlang/OTP)
+        Date: Mon, 21 Oct 2024 21:53:51 GMT
+        Server: CouchDB/3.4.2 (Erlang OTP/25)
 
         {
             "couchdb": "Welcome",
-            "uuid": "85fb71bf700c17267fef77535820e371",
+            "features": [
+                "access-ready",
+                "partitioned",
+                "pluggable-storage-engines",
+                "reshard",
+                "scheduler"
+            ],
+            "git_sha": "6e5ad2a5c",
+            "uuid": "9ddf59457dbb8772316cf06fc5e5a2e4",
             "vendor": {
-                "name": "The Apache Software Foundation",
-                "version": "1.3.1"
+                "name": "The Apache Software Foundation"
             },
-            "version": "1.3.1"
+            "version": "3.4.2"
         }
 
 .. _api/server/active_tasks:
