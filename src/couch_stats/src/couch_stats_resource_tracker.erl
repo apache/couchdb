@@ -736,7 +736,6 @@ tracker({Pid, _Ref}=PidRef) ->
             %% TODO: do we need cleanup here?
             log_process_lifetime_report(PidRef),
             catch evict(PidRef),
-            demonitor(MonRef),
             ok;
         {'DOWN', MonRef, _Type, _0DPid, _Reason0} ->
             destroy_context(PidRef),
