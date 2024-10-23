@@ -178,13 +178,13 @@ var Loop = function() {
 };
 
 // Seal all the globals to prevent modification.
-seal(Couch, true);
-seal(JSON, true);
-seal(Mime, true);
-seal(Render, true);
-seal(Filter, true);
-seal(Views, true);
-seal(isArray, true);
-seal(log, true);
+deepFreeze(Couch);
+deepFreeze(JSON);
+deepFreeze(Mime);
+deepFreeze(Render);
+deepFreeze(Filter);
+deepFreeze(Views);
+deepFreeze(isArray);
+deepFreeze(log);
 
 Loop();
