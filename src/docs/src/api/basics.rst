@@ -543,7 +543,12 @@ specific request types are provided in the corresponding API call reference.
 
 - ``403 - Forbidden``
 
-  The requested item or operation is forbidden.
+  The requested item or operation is forbidden. This might be because;
+
+  * Your user name or roles do not match the security object of the database
+  * The request requires administrator privileges but you don't have them
+  * You've made too many requests with invalid credentials and have been
+    temporarily locked out.
 
 - ``404 - Not Found``
 
