@@ -26,6 +26,29 @@
 #include "help.h"
 #include "util.h"
 
+const char*
+get_spidermonkey_version() {
+    const char *JAVASCRIPT = "JavaScript-C";
+    int js_len = strlen(JAVASCRIPT);
+
+    // JS_GetImplementationVersion()
+    // returns "JavaScript-CMAJOR.MINOR.PATCH"
+    const char *FULLVERSION = JS_GetImplementationVersion();
+    int fv_len = strlen(FULLVERSION);
+
+    const char* foundJSString = strstr(FULLVERSION,JAVASCRIPT);
+    if (foundJSString != NULL) {
+        //trim off "JavaScript-C",
+        char *buf = (char*) malloc((fv_len - js_len + 1) * sizeof(char));
+        strncpy(buf, &FULLVERSION[js_len], fv_len - js_len);
+        buf[fv_len - js_len] = '\0';
+        return buf;
+    } else {
+        //something changed in JS_GetImplementationVersion(), return original
+        return FULLVERSION;
+    }
+}
+
 std::string
 js_to_string(JSContext* cx, JS::HandleValue val)
 {
@@ -301,13 +324,13 @@ couch_error(JSContext* cx, JSErrorReport* report)
         msg << " at ";
 
         if(report->filename) {
-            msg << report->filename;
+            msg << report->filename.c_str();
         } else {
             msg << "<unknown>";
         }
 
         if(report->lineno) {
-            msg << ':' << report->lineno << ':' << report->column;
+            msg << ':' << report->lineno << ':' << report->column.oneOriginValue();
         }
 
         goto done;

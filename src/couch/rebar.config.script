@@ -126,9 +126,9 @@ CouchJSConfig = case SMVsn of
     "102" ->
         "priv/couch_js/102/config.h";
     "115" ->
-        "priv/couch_js/115/config.h";
+        "priv/couch_js/102/config.h";
     "128" ->
-        "priv/couch_js/128/config.h";
+        "priv/couch_js/102/config.h";
     _ ->
         "priv/couch_js/" ++ SMVsn ++ "/config.h"
 end.
@@ -245,8 +245,8 @@ CouchJSSrc = case SMVsn of
     "86" -> ["priv/couch_js/86/*.cpp"];
     "91" -> ["priv/couch_js/86/*.cpp"];
     "102" -> ["priv/couch_js/102/*.cpp"];
-    "115" -> ["priv/couch_js/115/*.cpp"];
-    "128" -> ["priv/couch_js/128/*.cpp"]
+    "115" -> ["priv/couch_js/102/*.cpp"];
+    "128" -> ["priv/couch_js/102/*.cpp"]
 end.
 
 CouchJSEnv = case SMVsn of
