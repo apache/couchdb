@@ -98,6 +98,8 @@ public abstract class Index implements Closeable {
 
     protected abstract boolean doCommit(final long updateSeq, final long purgeSeq) throws IOException;
 
+    public abstract java.util.Collection<String> snapshot() throws IOException;
+
     public final synchronized void setUpdateSeq(final long matchSeq, final long updateSeq) throws IOException {
         if (updateSeq < this.updateSeq) {
             throw new WebApplicationException(

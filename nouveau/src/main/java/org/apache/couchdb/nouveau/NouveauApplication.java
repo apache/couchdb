@@ -29,6 +29,7 @@ import org.apache.couchdb.nouveau.lucene9.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
+import org.apache.couchdb.nouveau.tasks.SnapshotTask;
 
 public class NouveauApplication extends Application<NouveauApplicationConfiguration> {
 
@@ -81,6 +82,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
         // configure tasks
         environment.admin().addTask(new CloseAllIndexesTask(indexManager));
+        environment.admin().addTask(new SnapshotTask(indexManager));
 
         // Swagger
         environment.jersey().register(new OpenApiResource());

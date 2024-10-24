@@ -36,6 +36,7 @@ import org.apache.couchdb.nouveau.core.Index;
 import org.apache.couchdb.nouveau.core.StaleIndexException;
 import org.apache.couchdb.nouveau.core.UpdatesOutOfOrderException;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.*;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.misc.store.DirectIODirectory;
@@ -54,6 +55,8 @@ public class Lucene9IndexTest {
         final Directory dir = new DirectIODirectory(FSDirectory.open(path));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setUseCompoundFile(false);
+        config.setIndexDeletionPolicy(
+                new PersistentSnapshotDeletionPolicy(new KeepOnlyLastCommitDeletionPolicy(), dir));
         final IndexWriter writer = new IndexWriter(dir, config);
         final SearcherManager searcherManager = new SearcherManager(writer, null);
         return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager);
@@ -286,6 +289,22 @@ public class Lucene9IndexTest {
             info = index.info();
             assertThat(info.getNumDocs()).isEqualTo(0);
             assertThat(info.getPurgeSeq()).isEqualTo(3);
+        } finally {
+            cleanup(index);
+        }
+    }
+
+    @Test
+    public void testSnapshot(@TempDir Path path) throws IOException {
+        Index index = setup(path);
+        try {
+            final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
+            index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
+            index.commit();
+
+            var files = index.snapshot();
+
+            assertThat(files).isEqualTo(1);
         } finally {
             cleanup(index);
         }

@@ -38,8 +38,11 @@ import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
 import org.apache.couchdb.nouveau.lucene9.Lucene9Index;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.index.IndexDeletionPolicy;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.KeepOnlyLastCommitDeletionPolicy;
+import org.apache.lucene.index.PersistentSnapshotDeletionPolicy;
 import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
@@ -373,6 +376,9 @@ public final class IndexManager implements Managed {
         final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setUseCompoundFile(false);
+        final IndexDeletionPolicy indexDeletionPolicy =
+                new PersistentSnapshotDeletionPolicy(new KeepOnlyLastCommitDeletionPolicy(), dir);
+        config.setIndexDeletionPolicy(indexDeletionPolicy);
         final IndexWriter writer = new IndexWriter(dir, config);
         final long updateSeq = getSeq(writer, "update_seq");
         final long purgeSeq = getSeq(writer, "purge_seq");

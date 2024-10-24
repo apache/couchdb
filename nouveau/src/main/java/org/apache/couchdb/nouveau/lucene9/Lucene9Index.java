@@ -25,6 +25,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -70,6 +71,7 @@ import org.apache.lucene.facet.range.DoubleRangeFacetCounts;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.PersistentSnapshotDeletionPolicy;
 import org.apache.lucene.index.StoredFields;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.flexible.core.QueryNodeException;
@@ -214,6 +216,12 @@ public class Lucene9Index extends Index {
         } finally {
             searcherManager.release(searcher);
         }
+    }
+
+    public Collection<String> snapshot() throws IOException {
+        final PersistentSnapshotDeletionPolicy policy =
+                (PersistentSnapshotDeletionPolicy) writer.getConfig().getIndexDeletionPolicy();
+        return policy.snapshot().getFileNames();
     }
 
     private CollectorManager<?, ? extends TopDocs> hitCollector(final SearchRequest searchRequest) {
