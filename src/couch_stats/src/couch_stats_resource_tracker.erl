@@ -15,6 +15,11 @@
 -behaviour(gen_server).
 
 -export([
+    new/0,
+    tnow/0
+]).
+
+-export([
     start_link/0,
     init/1,
     handle_call/3,
@@ -153,8 +158,8 @@
 
 -record(rctx, {
     %% Metadata
-    started_at = tnow(),
-    updated_at = tnow(),
+    started_at = ?MODULE:tnow(),
+    updated_at = ?MODULE:tnow(),
     pid_ref,
     mfa,
     nonce,
@@ -192,6 +197,8 @@
 %%
 %% PidRef operations
 %%
+
+new() -> #rctx{}.
 
 get_pid_ref() ->
     get(?PID_REF).
