@@ -14,6 +14,7 @@
 
 -behaviour(gen_server).
 
+%% TODO: delete these exports after csrt_logger experiment concluded
 -export([
     new/0,
     tnow/0
@@ -37,7 +38,7 @@
 
 %% Context API
 -export([
-    create_context/5,
+    create_context/2,
     create_coordinator_context/2,
     create_resource/1,
     create_worker_context/3,
@@ -49,6 +50,7 @@
     set_context_dbname/2,
     set_context_handler_fun/1,
     set_context_handler_fun/2,
+    set_context_handler_fun/3,
     set_context_username/1,
     set_context_username/2
 ]).
@@ -156,18 +158,28 @@
 
 -record(st, {}).
 
+-record(rpc_worker, {
+    mod :: atom()  | '_',
+    func :: atom()  | '_',
+    from :: {pid(), reference()} | '_'
+}).
+
+-record(coordinator, {
+    mod :: atom()  | '_',
+    func :: atom()  | '_',
+    method :: atom() | '_',
+    path :: binary() | '_'
+}).
+
 -record(rctx, {
     %% Metadata
     started_at = ?MODULE:tnow(),
     updated_at = ?MODULE:tnow(),
     pid_ref,
-    mfa,
     nonce,
-    from,
-    type = unknown, %% unknown/background/system/rpc/coordinator/fabric_rpc/etc_rpc/etc
+    type, %% #coordinator{}/#rpc_worker{}/#replication_worker{}/#compaction_worker
     dbname,
     username,
-    path,
 
     %% Stats counters
     db_open = 0,
@@ -216,9 +228,7 @@ create_pid_ref() ->
             throw({epidexist, PidRef0}),
             close_pid_ref(PidRef0)
     end,
-    PidRef = {self(), make_ref()},
-    set_pid_ref(PidRef),
-    PidRef.
+    {self(), make_ref()}.
 
 close_pid_ref() ->
     close_pid_ref(get_pid_ref()).
@@ -279,9 +289,9 @@ active_int(all) ->
     select_by_type(all).
 
 select_by_type(coordinators) ->
-    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = {coordinator, _, _}} = R) -> R end));
+    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = #coordinator{}} = R) -> R end));
 select_by_type(workers) ->
-    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = {worker, _, _}} = R) -> R end));
+    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = #rpc_worker{}} = R) -> R end));
 select_by_type(all) ->
     ets:tab2list(?MODULE).
 
@@ -295,7 +305,7 @@ find_by_pidref(PidRef) ->
     [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef, _ = '_'})].
 
 find_workers_by_pidref(PidRef) ->
-    [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{from=PidRef, _ = '_'})].
+    [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}, _ = '_'})].
 
 field(#rctx{pid_ref=Val}, pid_ref) -> Val;
 %% NOTE: Pros and cons to doing these convert functions here
@@ -304,13 +314,12 @@ field(#rctx{pid_ref=Val}, pid_ref) -> Val;
 %% be jiffy:encode'able. The tricky bit is dynamically encoding the group_by
 %% structure provided by the caller of *_by aggregator functions below.
 %% For now, we just always return jiffy:encode'able data types.
-field(#rctx{mfa=Val}, mfa) -> convert_mfa(Val);
 field(#rctx{nonce=Val}, nonce) -> Val;
-field(#rctx{from=Val}, from) -> Val;
+%%field(#rctx{from=Val}, from) -> Val;
 field(#rctx{type=Val}, type) -> convert_type(Val);
 field(#rctx{dbname=Val}, dbname) -> Val;
 field(#rctx{username=Val}, username) -> Val;
-field(#rctx{path=Val}, path) -> Val;
+%%field(#rctx{path=Val}, path) -> Val;
 field(#rctx{db_open=Val}, db_open) -> Val;
 field(#rctx{docs_read=Val}, docs_read) -> Val;
 field(#rctx{rows_read=Val}, rows_read) -> Val;
@@ -381,41 +390,18 @@ sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, A
 %% Conversion API for outputting JSON
 %%
 
-convert_mfa(MFA) when is_list(MFA)  ->
-    list_to_binary(MFA);
-convert_mfa({M0, F0, A0}) ->
+convert_type(#coordinator{method=Verb0, path=Path, mod=M0, func=F0}) ->
     M = atom_to_binary(M0),
     F = atom_to_binary(F0),
-    A = integer_to_binary(A0),
-    <<M/binary, ":", F/binary, "/", A/binary>>;
-convert_mfa(null) ->
-    null;
-convert_mfa(undefined) ->
-    null.
-
-convert_type(Atom) when is_atom(Atom) ->
-    atom_to_binary(Atom);
-convert_type({coordinator, Verb0, Atom0}) when is_atom(Atom0) ->
     Verb = atom_to_binary(Verb0),
-    Atom = atom_to_binary(Atom0),
-    <<"coordinator:", Verb/binary, ":", Atom/binary>>;
-convert_type({coordinator, Verb0, Path0}) ->
-    Verb = atom_to_binary(Verb0),
-    Path = list_to_binary(Path0),
-    <<"coordinator:", Verb/binary, ":", Path/binary>>;
-convert_type({worker, M0, F0}) ->
+    <<"coordinator-{", M/binary, ":", F/binary, "}:", Verb/binary, ":", Path/binary>>;
+convert_type(#rpc_worker{mod=M0, func=F0, from=From0}) ->
     M = atom_to_binary(M0),
     F = atom_to_binary(F0),
-    <<"worker:", M/binary, ":", F/binary>>;
-convert_type(null) ->
-    null;
+    From = convert_pidref(From0),
+    <<"rpc_worker-{", From/binary, "}:", M/binary, ":", F/binary>>;
 convert_type(undefined) ->
     null.
-
-convert_path(undefined) ->
-    null;
-convert_path(Path) when is_binary(Path) ->
-    Path.
 
 convert_pidref({Parent0, ParentRef0}) ->
     Parent = convert_pid(Parent0),
@@ -437,11 +423,8 @@ to_json(#rctx{}=Rctx) ->
         updated_at => Rctx#rctx.updated_at,
         started_at => Rctx#rctx.started_at,
         pid_ref => convert_pidref(Rctx#rctx.pid_ref),
-        mfa => convert_mfa(Rctx#rctx.mfa),
         nonce => Rctx#rctx.nonce,
-        from => convert_pidref(Rctx#rctx.from),
         dbname => Rctx#rctx.dbname,
-        path => convert_path(Rctx#rctx.path),
         username => Rctx#rctx.username,
         db_open => Rctx#rctx.db_open,
         docs_read => Rctx#rctx.docs_read,
@@ -464,44 +447,40 @@ to_json(#rctx{}=Rctx) ->
 create_resource(#rctx{} = Rctx) ->
     catch ets:insert(?MODULE, Rctx).
 
-create_worker_context(From, {M,F,_A} = MFA, Nonce) ->
+create_worker_context(From, {M,F,_A}, Nonce) ->
     case is_enabled() of
         true ->
-            create_context(MFA, {worker, M, F}, null, From, Nonce);
+            Type = #rpc_worker{from=From, mod=M, func=F},
+            create_context(Type, Nonce);
         false ->
             false
     end.
 
-create_coordinator_context(#httpd{} = Req, Path0) ->
+create_coordinator_context(#httpd{method=Verb, nonce=Nonce}, Path0) ->
     case is_enabled() of
         true ->
-            #httpd{
-                method = Verb,
-                nonce = Nonce
-                %%path_parts = Parts
-            } = Req,
-            %%Path = list_to_binary([$/ | io_lib:format("~p", [Parts])]),
             Path = list_to_binary([$/ | Path0]),
-            Type = {coordinator, Verb, init},
-            create_context(null, Type, Path, null, Nonce);
+            Type = #coordinator{method=Verb, path=Path},
+            create_context(Type, Nonce);
         false ->
             false
     end.
 
-create_context(MFA, Type, Path, From, Nonce) ->
-    PidRef = create_pid_ref(),
-    Rctx = #rctx{
-        from = From,
-        pid_ref = PidRef,
-        mfa = MFA,
-        nonce = Nonce,
-        path = Path,
-        type = Type
-    },
+create_context(Type, Nonce) ->
+    Rctx = new_context(Type, Nonce),
+    set_pid_ref(Rctx#rctx.pid_ref),
     erlang:put(?DELTA_TZ, Rctx),
     create_resource(Rctx),
     track(Rctx),
-    PidRef.
+    Rctx#rctx.pid_ref.
+
+%% Might be useful to export this but the internal worker types aren't exported
+new_context(Type, Nonce) ->
+    #rctx{
+       nonce = Nonce,
+       pid_ref = create_pid_ref(),
+       type = Type
+    }.
 
 set_context_dbname(DbName) ->
     set_context_dbname(DbName, get_pid_ref()).
@@ -512,17 +491,28 @@ set_context_dbname(DbName, PidRef) ->
     is_enabled() andalso update_element(PidRef, [{#rctx.dbname, DbName}]).
 
 set_context_handler_fun(Fun) when is_function(Fun) ->
-    set_context_handler_fun(Fun, get_pid_ref()).
-set_context_handler_fun(_, undefined) ->
-    ok;
-set_context_handler_fun(Fun, PidRef) when is_function(Fun) ->
     case is_enabled() of
         false ->
             ok;
         true ->
-            FunName = erlang:fun_to_list(Fun),
-            #rctx{type={coordinator, Verb, _}} = get_resource(),
-            Update = [{#rctx.type, {coordinator, Verb, FunName}}],
+            FProps = erlang:fun_info(Fun),
+            Mod = proplists:get_value(module, FProps),
+            Func = proplists:get_value(name, FProps),
+            set_context_handler_fun(Mod, Func)
+    end.
+
+set_context_handler_fun(Mod, Func) when is_atom(Mod) andalso is_atom(Func) ->
+    set_context_handler_fun(Mod, Func, get_pid_ref()).
+
+set_context_handler_fun(_, _, undefined) ->
+    ok;
+set_context_handler_fun(Mod, Func, PidRef) when is_atom(Mod) andalso is_atom(Func) ->
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            #rctx{type=#coordinator{}=Coordinator} = get_resource(),
+            Update = [{#rctx.type, Coordinator#coordinator{mod=Mod, func=Func}}],
             update_element(PidRef, Update)
     end.
 
@@ -796,9 +786,9 @@ should_log(#rctx{}, true) ->
     true;
 should_log(#rctx{}, false) ->
     false;
-should_log(#rctx{type = {coordinator, _, _}}, coordinator) ->
+should_log(#rctx{type = #coordinator{}}, coordinator) ->
     true;
-should_log(#rctx{type = {worker, fabric_rpc, FName}}, _) ->
+should_log(#rctx{type = #rpc_worker{mod=fabric_rpc, func=FName}}, _) ->
     case conf_get("log_fabric_rpc") of
         "true" ->
             true;
