@@ -40,15 +40,18 @@ You need to enable nouveau in CouchDB configuration;
 Installation of Binary Packages
 ===============================
 
-The nouveau server code is contained in a single ``jar`` file that ships with a compatible
-CouchDB release, named ``server-$version-dist.jar``
+The Java side of nouveau is a set of ``jar`` files, one for nouveau itself and the rest
+for dependencies (like Lucene and Dropwizard).
 
 To start the nouveau server::
 
-    java -jar /path/to/server-$version-dist.jar server /path/to/nouveau.yaml
+    java -jar /path/to/nouveau.jar server /path/to/nouveau.yaml
+
+Ensure that all the jar files from the release are in the same directory as
+nouveau.jar
 
 We ship a basic ``nouveau.yaml`` configuration with useful defaults;
-that file for details.
+see that file for details.
 
 **nouveau.yaml**::
 
