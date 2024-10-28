@@ -157,6 +157,7 @@ escriptize: couch
 check: all
 	@$(MAKE) xref
 	@$(MAKE) eunit
+	@$(MAKE) eunit-search
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
 	@$(MAKE) elixir-search
@@ -181,6 +182,29 @@ eunit: couch
             COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
 
+ifneq ($(CLOUSEAU_DIR),)
+_WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
+else ifeq ($(with_clouseau), true)
+_WITH_CLOUSEAU="--with-clouseau"
+endif
+
+.PHONY: eunit-search
+# target: eunit-search - Run search EUnit tests, requires a configured Clouseau instance
+eunit-search: export ESOpts = 1
+eunit-search: export BUILDDIR = $(CURDIR)
+eunit-search: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
+eunit-search: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+eunit-search: couch devclean
+ifneq ($(_WITH_CLOUSEAU),)
+	@find . -name "clouseau_rpc_test.beam" -delete
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
+	@dev/run -n 1 -q -a adm:pass \
+		"$(_WITH_CLOUSEAU)" \
+		"$(TEST_OPTS)" \
+		--no-eval 'COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit apps=dreyfus suites=clouseau_rpc_test'
+else
+	@echo "Warning: Clouseau is not enabled, \`eunit-search\` cannot be run."
+endif
 
 setup-eunit: export BUILDDIR = $(CURDIR)
 setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
@@ -272,7 +296,6 @@ endif
 
 .PHONY: elixir-search
 # target: elixir-search - Run search tests, requires a configured Clouseau instance
-elixir-search: export MIX_ENV=integration
 elixir-search: elixir-init devclean
 ifneq ($(_WITH_CLOUSEAU), )
 	@dev/run -n 1 -q -a adm:pass \

@@ -188,6 +188,12 @@ MakeDep = fun
         {AppName, ".*", {git, Url, Version}, Options}
 end.
 
+ESOpts =
+    case os:getenv("ESOpts") of
+        false -> [];
+        _ -> [{d, 'WITH_CLOUSEAU'}]
+    end.
+
 AddConfig = [
     {cover_enabled, true},
     {cover_print_enabled, true},
@@ -196,7 +202,7 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}]},
+    {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}] ++ ESOpts},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {xref_checks, [undefined_function_calls, undefined_functions]},
     {plugins, [eunit_plugin]},
