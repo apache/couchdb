@@ -247,6 +247,21 @@ might have emitted the "Invalid Date" string, while in later SpiderMonkey
 engines all the emit results from that document will be skipped, since view
 functions skip view results if an exception is thrown.
 
+9. Invalid JavaScript before function definition
+
+SpiderMoneky version ``1.8.5`` allowed the invalid ``term : function(...)``
+syntax. So a view function like the following worked and produced successfull
+view results. In later version, at least as of ``78+``, that function will fail
+with a compilation error:
+
+.. code-block:: javascript
+
+   "views": {
+            "v1": {
+                 "map": "foo : function(doc){emit(doc._id, 1);}"
+        }
+    }
+
 Using QuickJS
 =============
 
