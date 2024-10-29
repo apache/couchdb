@@ -381,4 +381,10 @@ defmodule BasicsTest do
     assert head_response.headers["X-Couch-Request-ID"]
     assert head_response.headers["X-CouchDB-Body-Time"]
   end
+
+  @tag :with_db
+  test "request ID can be specified at the client", context do
+    resp = Couch.get("/", headers: ["X-Couch-Request-ID": "123abc"])
+    assert resp.headers["X-Couch-Request-ID"] == "123abc"
+  end
 end

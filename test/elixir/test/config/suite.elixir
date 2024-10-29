@@ -81,7 +81,8 @@
     "Welcome endpoint",
     "_all_docs POST error when multi-get is not a {'key': [...]} structure",
     "_bulk_docs POST error when body not an object",
-    "oops, the doc id got lost in code nirwana"
+    "oops, the doc id got lost in code nirwana",
+    "request ID can be specified at the client"
   ],
   "BatchSaveTest": [
     "batch post",
