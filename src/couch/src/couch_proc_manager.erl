@@ -139,11 +139,7 @@ init([]) ->
     % Lang -> number of procs spawn for that lang
     ets:new(?COUNTERS, [named_table]),
 
-    ets:insert(?SERVERS, get_servers_from_env("COUCHDB_QUERY_SERVER_")),
-    ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
-    ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
-    maybe_configure_erlang_native_servers(),
-    configure_js_engine(couch_server:get_js_engine()),
+    ok = configure_language_servers(),
 
     {ok, #state{
         config = get_proc_config(),
@@ -221,7 +217,7 @@ handle_cast(reload_config, State) ->
         hard_limit = get_hard_limit(),
         soft_limit = get_soft_limit()
     },
-    maybe_configure_erlang_native_servers(),
+    ok = configure_language_servers(),
     lists:foreach(
         fun({Lang, _}) ->
             ok = flush_waiters(NewState, Lang)
@@ -288,6 +284,9 @@ handle_config_change("native_query_servers", _, _, _, _) ->
     gen_server:cast(?MODULE, reload_config),
     {ok, undefined};
 handle_config_change("query_server_config", _, _, _, _) ->
+    gen_server:cast(?MODULE, reload_config),
+    {ok, undefined};
+handle_config_change("couchdb", "js_engine", _, _, _) ->
     gen_server:cast(?MODULE, reload_config),
     {ok, undefined};
 handle_config_change(_, _, _, _, _) ->
@@ -511,6 +510,17 @@ get_servers_from_env(Spec) ->
         end,
         os:getenv()
     ).
+
+configure_language_servers() ->
+    ets:delete_all_objects(?SERVERS),
+    % NOTE: process environment variables cannot be altered except by
+    % debugging the process or via os:putenv/2 calls.
+    ets:insert(?SERVERS, get_servers_from_env("COUCHDB_QUERY_SERVER_")),
+    ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
+    ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
+    maybe_configure_erlang_native_servers(),
+    configure_js_engine(couch_server:get_js_engine()),
+    ok.
 
 get_query_server(LangStr) ->
     case ets:lookup(?SERVERS, string:to_upper(LangStr)) of
