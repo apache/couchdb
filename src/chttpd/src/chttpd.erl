@@ -435,10 +435,10 @@ nonce(MochiReq) ->
     case MochiReq:get_header_value("X-Couch-Request-ID") of
         undefined ->
             new_nonce();
-        Value when length(Value) > 10 ->
+        Value when length(Value) > 36 ->
             new_nonce();
         Value ->
-            case lists:all(fun is_hex/1, Value) of
+            case lists:all(fun is_valid_nonce_char/1, Value) of
                 true ->
                     Value;
                 false ->
@@ -449,14 +449,15 @@ nonce(MochiReq) ->
 new_nonce() ->
     couch_util:to_hex(crypto:strong_rand_bytes(5)).
 
-%% copied from mochiweb_util.erl
-is_hex(C) when
-    ((C >= $0 andalso C =< $9) orelse
-        (C >= $a andalso C =< $f) orelse
-        (C >= $A andalso C =< $F))
+is_valid_nonce_char(C) when
+    (C >= $0 andalso C =< $9) orelse
+        (C >= $a andalso C =< $z) orelse
+        (C >= $A andalso C =< $Z) orelse
+        C == $- orelse
+        C == $_
 ->
     true;
-is_hex(_) ->
+is_valid_nonce_char(_) ->
     false.
 
 catch_error(_HttpReq, throw, {http_head_abort, Resp}, _Stack) ->

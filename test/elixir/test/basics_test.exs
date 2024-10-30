@@ -384,7 +384,8 @@ defmodule BasicsTest do
 
   @tag :with_db
   test "request ID can be specified at the client", context do
-    resp = Couch.get("/", headers: ["X-Couch-Request-ID": "123abc"])
-    assert resp.headers["X-Couch-Request-ID"] == "123abc"
+    uuid = "E7498DE1-B661-42FA-943D-17F890143068"
+    resp = Couch.get("/", headers: ["X-Couch-Request-ID": uuid])
+    assert resp.headers["X-Couch-Request-ID"] == uuid
   end
 end
