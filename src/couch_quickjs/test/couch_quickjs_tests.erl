@@ -33,7 +33,8 @@ quickjs_test_() ->
             ?TDEF_FE(t_get_coffee_cmd),
             ?TDEF_FE(t_can_configure_memory_limit),
             ?TDEF_FE(t_bad_memory_limit),
-            ?TDEF_FE(t_couch_jsengine_config_triggers_proc_server_reload)
+            ?TDEF_FE(t_couch_jsengine_config_triggers_proc_server_reload),
+            ?TDEF_FE(t_invalid_jsengine_config)
         ]
     }.
 
@@ -92,6 +93,26 @@ t_couch_jsengine_config_triggers_proc_server_reload(_) ->
             % We should be back to the original default
             ?assertEqual(OldVal, get_proc_manager_default_js())
     end.
+
+t_invalid_jsengine_config(_) ->
+    config:delete("couchdb", "js_engine", false),
+    Default = couch_server:get_js_engine(),
+    ProcManagerPid = whereis(couch_proc_manager),
+    ?assert(is_process_alive(ProcManagerPid)),
+    % Try invalid settings
+    config:set("couchdb", "js_engine", "non_existent_test_engine", false),
+    % Wait to make sure couch_proc_manager hasn't crashed
+    timer:sleep(100),
+    ?assertEqual(ProcManagerPid, whereis(couch_proc_manager)),
+    ?assertEqual(Default, couch_server:get_js_engine()),
+    % Use valid settings
+    config:set("couchdb", "js_engine", "spidermonkey", false),
+    ?assertEqual(<<"spidermonkey">>, couch_server:get_js_engine()),
+    config:set("couchdb", "js_engine", "quickjs", false),
+    ?assertEqual(<<"quickjs">>, couch_server:get_js_engine()),
+    % Return back to the defaults by deleting the config
+    config:delete("couchdb", "js_engine", false),
+    ?assertEqual(Default, couch_server:get_js_engine()).
 
 os_cmd(Cmd) ->
     Opts = [stream, {line, 4096}, binary, exit_status, hide],
