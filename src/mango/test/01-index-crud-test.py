@@ -80,7 +80,7 @@ class IndexCrudTests(mango.DbPerClass):
                 raise AssertionError("bad create index")
 
     def test_bad_ddocs(self):
-        bad_ddocs = ["", True, False, 1.5, {"foo": "bar"}, [None, False]]
+        bad_ddocs = ["", "_design/", True, False, 1.5, {"foo": "bar"}, [None, False]]
         for bd in bad_ddocs:
             try:
                 self.db.create_index(["foo"], ddoc=bd)
