@@ -87,6 +87,7 @@ handle_index_req(#httpd{method = 'POST', path_parts = [_, _]} = Req, Db) ->
     {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx), DbOpts),
     Id = Idx#idx.ddoc,
     Name = Idx#idx.name,
+    ok = couch_doc:validate_docid(DDoc#doc.id, couch_db:name(Db)),
     Status =
         case mango_idx:add(DDoc, Idx) of
             {ok, DDoc} ->
