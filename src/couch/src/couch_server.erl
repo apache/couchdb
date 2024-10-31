@@ -42,6 +42,7 @@
 -define(MAX_DBS_OPEN, 500).
 -define(RELISTEN_DELAY, 5000).
 -define(DEFAULT_ENGINE, "couch").
+-define(AVAILABLE_JS_ENGINES, ["spidermonkey", "quickjs"]).
 
 -record(server, {
     root_dir = [],
@@ -92,7 +93,12 @@ get_stats() ->
     [{start_time, ?l2b(Time)}, {dbs_open, Open}].
 
 get_js_engine() ->
-    list_to_binary(config:get("couchdb", "js_engine", ?COUCHDB_JS_ENGINE)).
+    Engine = config:get("couchdb", "js_engine", ?COUCHDB_JS_ENGINE),
+    % If user misconfigured it by accident, don't crash, use defaults
+    case lists:member(Engine, ?AVAILABLE_JS_ENGINES) of
+        true -> list_to_binary(Engine);
+        false -> list_to_binary(?COUCHDB_JS_ENGINE)
+    end.
 
 get_spidermonkey_version() -> list_to_binary(?COUCHDB_SPIDERMONKEY_VERSION).
 
