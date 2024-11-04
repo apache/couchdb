@@ -393,12 +393,16 @@ scan_docs_fold(#full_doc_info{id = Id} = FDI, #st{} = St) ->
 scan_doc(#full_doc_info{} = FDI, #st{} = St) ->
     #st{db = Db, callbacks = Cbks, pst = PSt} = St,
     St1 = rate_limit(St, doc),
-    {ok, #doc{} = Doc} = couch_db:open_doc(Db, FDI, [ejson_body]),
-    #{doc := DocCbk} = Cbks,
-    {Go, PSt1} = DocCbk(PSt, Db, Doc),
-    case Go of
-        ok -> {ok, St1#st{pst = PSt1}};
-        stop -> {stop, St1#st{pst = PSt1}}
+    case couch_db:open_doc(Db, FDI, [ejson_body]) of
+        {ok, #doc{} = Doc} ->
+            #{doc := DocCbk} = Cbks,
+            {Go, PSt1} = DocCbk(PSt, Db, Doc),
+            case Go of
+                ok -> {ok, St1#st{pst = PSt1}};
+                stop -> {stop, St1#st{pst = PSt1}}
+            end;
+        {not_found, _} ->
+            {ok, St1}
     end.
 
 maybe_checkpoint(#st{checkpoint_sec = LastCheckpointTSec} = St) ->
