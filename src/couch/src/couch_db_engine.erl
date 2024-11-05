@@ -263,6 +263,9 @@
 % the database.
 -callback get_update_seq(DbHandle :: db_handle()) -> UpdateSeq :: non_neg_integer().
 
+% The current drop sequence of the database.
+-callback get_drop_seq(DbHandle :: db_handle()) -> DropSeq :: non_neg_integer().
+
 % Whenever a database is created it should generate a
 % persistent UUID for identification in case the shard should
 % ever need to be moved between nodes in a cluster.
@@ -296,6 +299,14 @@
 -callback set_update_seq(
     DbHandle :: db_handle(),
     UpdateSeq :: non_neg_integer()
+) ->
+    {ok, NewDbHandle :: db_handle()}.
+
+% Set the drop sequence of the database.
+-callback set_drop_seq(
+    DbHandle :: db_handle(),
+    UuidPrefix :: binary,
+    DropSeq :: non_neg_integer()
 ) ->
     {ok, NewDbHandle :: db_handle()}.
 
@@ -680,6 +691,7 @@
     get_size_info/1,
     get_partition_info/2,
     get_update_seq/1,
+    get_drop_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
@@ -688,6 +700,7 @@
     set_props/2,
 
     set_update_seq/2,
+    set_drop_seq/3,
 
     open_docs/2,
     open_local_docs/2,
@@ -841,6 +854,10 @@ get_update_seq(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_update_seq(EngineState).
 
+get_drop_seq(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_drop_seq(EngineState).
+
 get_uuid(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_uuid(EngineState).
@@ -868,6 +885,11 @@ set_props(#db{} = Db, Props) ->
 set_update_seq(#db{} = Db, UpdateSeq) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_update_seq(EngineState, UpdateSeq),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+set_drop_seq(#db{} = Db, UuidPrefix, UpdateSeq) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_drop_seq(EngineState, UuidPrefix, UpdateSeq),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 open_docs(#db{} = Db, DocIds) ->
