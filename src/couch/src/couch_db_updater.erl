@@ -153,6 +153,7 @@ handle_cast(start_compact, Db) ->
             {noreply, Db, idle_limit()}
     end;
 handle_cast({compact_done, _Engine, CompactInfo}, #db{} = OldDb) ->
+    couch_log:error("~n handle_cast(compact_done) CompactInfo: ~pm OldDb: ~p~n", [CompactInfo, OldDb]),
     {ok, NewDb} = couch_db_engine:finish_compaction(OldDb, CompactInfo),
     {noreply, NewDb};
 handle_cast(wakeup, Db) ->

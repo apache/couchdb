@@ -395,7 +395,6 @@ from_disk_term(StreamSrc, {Base, Extended}) when
 ->
     store(Extended, from_disk_term(StreamSrc, Base));
 from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, DiskLen, RevPos, Md5, Enc, Generation}) ->
-    couch_log:error("~n from_disk_term-2 Generation: ~p~n", [Generation]),
     {ok, Stream} = open_stream(StreamSrc, Sp, Generation),
     #att{
         name = Name,

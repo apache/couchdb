@@ -65,7 +65,6 @@ cpse_admin_only_security(DbName) ->
     cpse_util:shutdown_db(Db1),
 
     {ok, Db2} = couch_db:reopen(Db1),
-    couch_log:error("~n~n~n~n~s -> ~s~n~n", [couch_db:name(Db1), couch_db:name(Db2)]),
     ?assertEqual(?ADMIN_ONLY_SEC_PROPS, couch_db:get_security(Db2)).
 
 cpse_set_security(DbName) ->

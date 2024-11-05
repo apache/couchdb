@@ -14,13 +14,13 @@ ls -lah dev/lib/node1/data/shards/00000000-ffffffff/
 sleep 5
 ls -lah dev/lib/node1/data/shards/00000000-ffffffff/
 
-$CURL $COUCH/asd/foo
-$CURL $COUCH/asd/bar/zomg
-ls -lah dev/lib/node1/data/shards/00000000-ffffffff/
-
-# TODO second compaction
-# $CURL -X POST -Hcontent-type:application/json $COUCH/asd/_compact
+# $CURL $COUCH/asd/foo
+# $CURL $COUCH/asd/bar/zomg
 # ls -lah dev/lib/node1/data/shards/00000000-ffffffff/
-# sleep 5
+
+# second compaction
+# $CURL -X POST -Hcontent-type:application/json $COUCH/asd/_compact
+# sleep 3
+# ls -lah dev/lib/node1/data/shards/00000000-ffffffff/
 
 # hexdump -C dev/lib/node1/data/shards/00000000-ffffffff/asd.*.couch

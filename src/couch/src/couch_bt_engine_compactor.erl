@@ -25,7 +25,8 @@
     old_st,
     new_st,
     meta_fd,
-    retry
+    retry,
+    generation = 0
 }).
 
 -record(comp_header, {
@@ -53,6 +54,7 @@ max_generation() -> ?MAX_GENERATION.
 start(#st{} = St, DbName, Options, Parent) ->
     erlang:put(io_priority, {db_compact, DbName}),
     couch_log:debug("Compaction process spawned for db \"~s\"", [DbName]),
+    couch_log:error("Compaction process spawned for db \"~s\"", [DbName]),
 
     couch_db_engine:trigger_on_compact(DbName),
 
@@ -91,6 +93,7 @@ start(#st{} = St, DbName, Options, Parent) ->
     gen_server:cast(Parent, Msg).
 
 open_compaction_files(DbName, OldSt, Options) ->
+    couch_log:error("~n compactor: open_compaction_files(DbName: ~p)~n", [DbName]),
     #st{
         filepath = DbFilePath,
         header = SrcHdr
@@ -141,7 +144,7 @@ open_compaction_files(DbName, OldSt, Options) ->
                 ok = reset_compaction_file(MetaFd, Header),
                 Generations0 = couch_bt_engine_header:generations(Header),
                 Generations = increment_generation(Generations0),
-                % we need one more generation to compact into, maybe
+                % we need one more generation to compact into
                 GenFds = couch_bt_engine:open_generation_files(DbFilePath, Generations, Options),
                 Fds = [DataFd] ++ GenFds,
                 St0 = couch_bt_engine:init_state(DataFile, Fds, Header, Options),
@@ -156,7 +159,6 @@ open_compaction_files(DbName, OldSt, Options) ->
         end,
     unlink(DataFd),
     erlang:monitor(process, MetaFd),
-    couch_log:error("~n open_compaction_files() CompSt: ~p~n", [CompSt]),
     {ok, CompSt}.
 
 copy_purge_info(#comp_st{} = CompSt) ->
@@ -408,7 +410,6 @@ set_generation(St, _) ->
     St.
 
 copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
-    couch_log:error("~n~n copy_docs(St: ~p, NewSt: ~p~nn", [St, NewSt]),
     DocInfoIds = [Id || #doc_info{id = Id} <- MixedInfos],
     LookupResults = couch_btree:lookup(St#st.id_tree, DocInfoIds),
     % COUCHDB-968, make sure we prune duplicates during compaction
@@ -638,10 +639,10 @@ copy_meta_data(#comp_st{new_st = St} = CompSt) ->
 compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
     ?COMP_EVENT(before_final_sync),
     Generations = couch_bt_engine_header:generations(St0#st.header),
-    NewHeader = couch_bt_engine_header:set(St0#st.header, generations, increment_generation(Generations)),
+    NewGenerations = increment_generation(Generations),
+    NewHeader = couch_bt_engine_header:set(St0#st.header, generations, NewGenerations),
     St1 = St0#st{header = NewHeader},
     {ok, St2} = couch_bt_engine:commit_data(St1),
-    couch_log:error("~n compact_final_sync St0: ~p~n, St1: ~p~n, St3: ~p~n", [St0, St1, St2]),
     ?COMP_EVENT(after_final_sync),
     CompSt#comp_st{
         new_st = St2

@@ -174,18 +174,18 @@ init(FilePath, Options) ->
                         Header0
                 end
         end,
-
+    couch_log:error("~n bt_engine:init() Header: ~p~n", [Header]),
     Generations = couch_bt_engine_header:generations(Header),
-
     Fds0 = maybe_open_generation_files(FilePath, Generations , Options),
     Fds = [Fd] ++ Fds0,
     {ok, init_state(FilePath, Fds, Header, Options)}.
 
 maybe_open_generation_files(FilePath, Generations, Options) ->
-    case lists:member(compacting, Options) of
-        true -> [];
-        false -> open_generation_files(FilePath, Generations, Options)
-    end.
+    NewGenerations = case lists:member(compacting, Options) of
+        true -> Generations;
+        false -> Generations + 1
+    end,
+    open_generation_files(FilePath, NewGenerations, Options).
 
 
 terminate(_Reason, St) ->
@@ -617,7 +617,6 @@ open_read_stream(#st{} = St, StreamSt) ->
     {ok, {couch_bt_engine_stream, {St#st.fd, StreamSt}}}.
 
 open_read_stream(#st{} = St, Generation, StreamSt) ->
-    couch_log:error("~nopen_read_stream/3, St: ~p St.fds: ~p, Generation: ~p~n", [St, St#st.fds, Generation]),
     Fd = get_fd(St#st.fds, Generation),
     {ok, {couch_bt_engine_stream, {Fd, StreamSt}}}.
 
@@ -673,7 +672,8 @@ start_compaction(St, DbName, Options, Parent) ->
     {ok, St, Pid}.
 
 finish_compaction(OldState, DbName, Options, CompactFilePath) ->
-    {ok, NewState1} = ?MODULE:init(CompactFilePath, [compacting | Options]),
+    {ok, NewState1} = ?MODULE:init(CompactFilePath, [compaction | Options]),
+    couch_log:error("~n finish_compaction: OldState: ~p, NewState1: ~p~n", [OldState, NewState1]),
     OldSeq = get_update_seq(OldState),
     NewSeq = get_update_seq(NewState1),
     case OldSeq == NewSeq of
@@ -887,7 +887,6 @@ open_db_file(FilePath, Options) ->
 open_generation_file(FilePath, Generation, Options) ->
     GenFilePath = string:replace(FilePath, ".couch",
         "." ++ integer_to_list(Generation)++ ".couch", trailing),
-    couch_log:error("~n open_generation_file(FilePath: ~p) GenFilePath: ~p~n", [FilePath, GenFilePath]),
     case catch open_db_file(GenFilePath, [nologifmissing | Options]) of
         {ok, Db} ->
             Db;
@@ -1279,6 +1278,8 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     OldFds = OldSt#st.fds,
     Fds = open_missing_generation_files(FilePath, OldFds),
 
+    couch_log:error("~n finish_compaction_int() OldSt: ~p, NewSt1: ~p, OldFds: ~p, Fds: ~p~n", [OldSt, NewSt1, OldFds, Fds]),
+
     % We're finished with our old state
     decref(OldSt),
 
@@ -1288,7 +1289,6 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
         filepath = FilePath,
         fds = Fds
     },
-    couch_log:error("~n fninish_compaction_int NewSt2: ~p OldFDs ~p, Fds ~p~n", [NewSt3, OldFds, Fds]),
 
     {ok,
         NewSt3,
