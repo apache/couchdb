@@ -50,6 +50,7 @@
     get_revs_limit/1,
     get_security/1,
     get_update_seq/1,
+    get_drop_seq/1,
     get_user_ctx/1,
     get_uuid/1,
     get_purge_seq/1,
@@ -66,6 +67,7 @@
     set_purge_infos_limit/2,
     set_security/2,
     set_user_ctx/2,
+    set_drop_seq/3,
 
     load_validation_funs/1,
     reload_validation_funs/1,
@@ -554,6 +556,9 @@ get_committed_update_seq(#db{committed_update_seq = Seq}) ->
 get_update_seq(#db{} = Db) ->
     couch_db_engine:get_update_seq(Db).
 
+get_drop_seq(#db{} = Db) ->
+    couch_db_engine:get_drop_seq(Db).
+
 get_user_ctx(#db{user_ctx = UserCtx}) ->
     UserCtx;
 get_user_ctx(?OLD_DB_REC = Db) ->
@@ -795,6 +800,10 @@ set_security(_, _) ->
 
 set_user_ctx(#db{} = Db, UserCtx) ->
     {ok, Db#db{user_ctx = UserCtx}}.
+
+set_drop_seq(#db{main_pid = Pid} = Db, UuidPrefix, DropSeq) ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {set_drop_seq, UuidPrefix, DropSeq}).
 
 validate_security_object(SecProps) ->
     Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),
