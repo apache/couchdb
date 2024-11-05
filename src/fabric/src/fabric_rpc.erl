@@ -51,7 +51,8 @@
     reduce_view/5,
     group_info/3,
     update_mrview/4,
-    get_uuid/1
+    get_uuid/1,
+    set_drop_seq/4
 ]).
 
 -include_lib("fabric/include/fabric.hrl").
@@ -346,6 +347,9 @@ compact(ShardName, DesignName) ->
 
 get_uuid(DbName) ->
     with_db(DbName, [], {couch_db, get_uuid, []}).
+
+set_drop_seq(DbName, UuidPrefix, DropSeq, Options) ->
+    with_db(DbName, Options, {couch_db, set_drop_seq, [UuidPrefix, DropSeq]}).
 
 %%
 %% internal

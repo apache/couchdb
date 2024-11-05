@@ -33,7 +33,8 @@
     set_purge_infos_limit/3,
     get_purged_infos/1,
     compact/1, compact/2,
-    get_partition_info/2
+    get_partition_info/2,
+    calculate_drop_seq/1
 ]).
 
 % Documents
@@ -118,6 +119,11 @@ get_db_info(DbName) ->
     ]}.
 get_partition_info(DbName, Partition) ->
     fabric_db_partition_info:go(dbname(DbName), Partition).
+
+-spec calculate_drop_seq(dbname()) ->
+    {ok, [{node(), binary(), non_neg_integer()}]}.
+calculate_drop_seq(DbName) ->
+    fabric_drop_seq:go(dbname(DbName)).
 
 %% @doc the number of docs in a database
 %% @equiv get_doc_count(DbName, <<"_all_docs">>)
