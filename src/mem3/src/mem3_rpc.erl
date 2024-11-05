@@ -141,6 +141,7 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
             },
             Body =
                 {[
+                    {<<"dbname">>, DbName},
                     {<<"seq">>, SourceSeq},
                     {<<"target_uuid">>, couch_db:get_uuid(Db)},
                     {<<"history">>, add_checkpoint(NewEntry, History0)}
