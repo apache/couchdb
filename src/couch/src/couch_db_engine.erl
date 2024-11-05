@@ -299,6 +299,13 @@
 ) ->
     {ok, NewDbHandle :: db_handle()}.
 
+% Set the drop sequence of the database.
+-callback set_drop_seq(
+    DbHandle :: db_handle(),
+    DropSeq :: non_neg_integer()
+) ->
+    {ok, NewDbHandle :: db_handle()}.
+
 % This function will be called by many processes concurrently.
 % It should return a #full_doc_info{} record or not_found for
 % every provided DocId in the order those DocId's appear in

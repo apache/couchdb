@@ -44,6 +44,7 @@
     get_size_info/1,
     get_partition_info/2,
     get_update_seq/1,
+    get_drop_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
@@ -52,6 +53,7 @@
     set_props/2,
 
     set_update_seq/2,
+    set_drop_seq/2,
 
     open_docs/2,
     open_local_docs/2,
@@ -325,6 +327,9 @@ get_props(#st{header = Header} = St) ->
 
 get_update_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, update_seq).
+
+get_drop_seq(#st{header = Header}) ->
+    couch_bt_engine_header:get(Header, drop_seq).
 
 get_uuid(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, uuid).
@@ -798,6 +803,14 @@ set_update_seq(#st{header = Header} = St, UpdateSeq) ->
     {ok, St#st{
         header = couch_bt_engine_header:set(Header, [
             {update_seq, UpdateSeq}
+        ]),
+        needs_commit = true
+    }}.
+
+set_drop_seq(#st{header = Header} = St, DropSeq) when is_integer(DropSeq) ->
+    {ok, St#st{
+        header = couch_bt_engine_header:set(Header, [
+            {drop_seq, DropSeq}
         ]),
         needs_commit = true
     }}.
