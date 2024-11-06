@@ -29,7 +29,8 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_filter_with_expected_error, 10),
             ?TDEF_FE(t_empty_ddoc, 10),
             ?TDEF_FE(t_multi_emit_map, 10),
-            ?TDEF_FE(t_non_deterministic_views, 10)
+            ?TDEF_FE(t_non_deterministic_views, 10),
+            ?TDEF_FE(t_handle_list_functions_in_maps, 10)
         ]
     }.
 
@@ -329,6 +330,26 @@ t_non_deterministic_views({_, DbName}) ->
             ok
     end.
 
+t_handle_list_functions_in_maps({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_use_list_funs_in_maps(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assert(num_calls(doc, 3) >= 5),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start and complete = 2, no errors
+            ?assertEqual(2, log_calls(warning));
+        false ->
+            ok
+    end.
+
 reset_stats() ->
     Counters = [
         [couchdb, query_server, process_error_exits],
@@ -517,9 +538,7 @@ ddoc_view_multi_emit(Doc) ->
     }.
 
 ddoc_view_non_determinism(Doc) ->
-    % String.prototype.startsWith used as a differentiator between
-    % SM and QuickJS. Make both emit items in different order. But at the
-    % end of the day, that doesn't matter as those are sorted anyway
+    % Test some functions with random and date values.
     Doc#{
         views => #{
             v1 => #{
@@ -534,6 +553,23 @@ ddoc_view_non_determinism(Doc) ->
             v4 => #{
                 map => <<"function(doc) {emit(1,2);}">>,
                 reduce => <<"function(ks, vs, rr){return Date.now();}">>
+            }
+        }
+    }.
+
+ddoc_use_list_funs_in_maps(Doc) ->
+    % If users call list functions from their maps, we used to crash
+    % the scanner process with a function_clause.
+    Doc#{
+        views => #{
+            v1 => #{
+                map => <<
+                    "function(head, req) { \n"
+                    "var row;\n"
+                    "start({headers: {'Content-Type': 'text/plain'}});\n"
+                    "while(row = getRow()) {send('x'); send('y');}\n"
+                    "}"
+                >>
             }
         }
     }.

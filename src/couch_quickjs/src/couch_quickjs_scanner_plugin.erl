@@ -258,6 +258,11 @@ views_validate(DDocId, #{?VIEWS := Views}, {Db, #st{} = St0}) when
                 {Db, St}
         end
     catch
+        throw:restart_procs ->
+            #st{qjs_proc = Qjs, sm_proc = Sm} = St,
+            proc_stop(Sm),
+            proc_stop(Qjs),
+            {Db, St#st{qjs_proc = undefined, sm_proc = undefined}};
         throw:{validate, Error} ->
             Meta = #{sid => SId, db => Db, ddoc => DDocId},
             validation_warning("view validation failed ~p", Error, Meta),
@@ -280,15 +285,26 @@ mapred_fold({Props = [_ | _]} = Doc, {ViewList = [_ | _], #st{} = St}) ->
         true -> ok;
         false -> throw({validate, {map_doc, DocId, QjsMapRes, SmMapRes}})
     end,
-    case QjsMapRes of
-        [_ | _] ->
-            MapResZip = lists:zip(ViewList, QjsMapRes),
-            ReduceKVs = lists:filtermap(fun reduce_filter_map/1, MapResZip),
-            view_reduce_validate(St, ReduceKVs);
-        _ ->
-            ok
-    end,
-    {ViewList, St}.
+    % Calling list functions from a map will result in a result list
+    % longer than the number of views, so we match that the view list
+    % and the results match
+    case length(QjsMapRes) =:= length(ViewList) of
+        true ->
+            case QjsMapRes of
+                [_ | _] ->
+                    MapResZip = lists:zip(ViewList, QjsMapRes),
+                    ReduceKVs = lists:filtermap(fun reduce_filter_map/1, MapResZip),
+                    view_reduce_validate(St, ReduceKVs);
+                _ ->
+                    ok
+            end,
+            {ViewList, St};
+        false ->
+            % Exit early as calling list functions from a map leads to breaking the
+            % query protocol. To avoid the messed up state affecting other views
+            % exit early and restart the processes.
+            throw(restart_procs)
+    end.
 
 reset_per_db_state(#st{qjs_proc = QjsProc, sm_proc = SmProc} = St) ->
     proc_stop(SmProc),
@@ -604,6 +620,8 @@ proc_reset(#proc{} = Proc) ->
 
 % Proc utils
 
+is_proc_alive(undefined) ->
+    false;
 is_proc_alive(#proc{pid = Pid}) ->
     is_process_alive(Pid).
 
