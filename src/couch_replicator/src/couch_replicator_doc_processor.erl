@@ -95,10 +95,7 @@ db_change(DbName, {ChangeProps} = Change, Server) ->
     try
         ok = process_change(DbName, Change)
     catch
-        exit:{Error, {gen_server, call, [?MODULE, _, _]}} ->
-            ErrMsg = "~p exited ~p while processing change from db ~p",
-            couch_log:error(ErrMsg, [?MODULE, Error, DbName]);
-        _Tag:Error ->
+        throw:{bad_rep_doc, Error} ->
             {RepProps} = get_json_value(doc, ChangeProps),
             DocId = get_json_value(<<"_id">>, RepProps),
             couch_replicator_docs:update_failed(DbName, DocId, Error)
@@ -737,7 +734,12 @@ t_regular_change(_) ->
 % Handle cases where doc processor exits or crashes while processing a change
 t_change_with_doc_processor_crash(_) ->
     mock_existing_jobs_lookup([]),
-    ?assertEqual(acc, db_change(?EXIT_DB, change(), acc)),
+    try
+        db_change(?EXIT_DB, change(), acc)
+    catch
+        Tag:Err ->
+            ?assertMatch({exit, {kapow, _}}, {Tag, Err})
+    end,
     ?assert(failed_state_not_updated()).
 
 % Regular change, parse to a #rep{} and then add job but there is already
