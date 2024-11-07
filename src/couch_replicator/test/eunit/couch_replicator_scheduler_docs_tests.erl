@@ -31,6 +31,7 @@ setup_replicator_db(Prefix) ->
     RepDb.
 
 setup_main_replicator_db() ->
+    meck:new(couch_replicator_utils, [passthrough]),
     {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
     RepDb = setup_replicator_db(<<>>),
     {Ctx, {RepDb, Source, Target}}.
@@ -47,6 +48,7 @@ setup_prefixed_replicator_db_with_update_docs_true() ->
     {Ctx, {RepDb, Source, Target}}.
 
 teardown({Ctx, {RepDb, Source, Target}}) ->
+    meck:unload(),
     ok = fabric:delete_db(RepDb, [?ADMIN_CTX]),
     config:delete("replicator", "update_docs", _Persist = false),
     couch_replicator_test_helper:test_teardown({Ctx, {Source, Target}}).
@@ -114,6 +116,16 @@ t_replicator_doc_state_fields_update_docs_true_test_() ->
         with([
             ?TDEF(t_doc_fields_are_updated, 15),
             ?TDEF(t_doc_fields_are_ignored, 15)
+        ])
+    }.
+
+t_replicator_doc_doesnt_fail_when_mem3_breaks_test_() ->
+    {
+        setup,
+        fun setup_main_replicator_db/0,
+        fun teardown/1,
+        with([
+            ?TDEF(t_doc_doesnt_fail_when_mem3_breaks, 30)
         ])
     }.
 
@@ -238,6 +250,37 @@ t_doc_fields_are_ignored({_Ctx, {RepDb, Source, Target}}) ->
         },
         StateDoc
     ).
+
+t_doc_doesnt_fail_when_mem3_breaks({_Ctx, {RepDb, Source, Target}}) ->
+    SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
+    TargetUrl = couch_replicator_test_helper:cluster_db_url(Target),
+    RepDoc = #{
+        <<"source">> => SourceUrl,
+        <<"target">> => TargetUrl
+    },
+    % Make owner function fail once
+    meck:expect(
+        couch_replicator_utils,
+        owner,
+        2,
+        meck:seq([
+            meck:raise(error, badarg),
+            meck:passthrough()
+        ])
+    ),
+    RepDocUrl = rep_doc_url(RepDb, ?docid()),
+    {201, _} = req(put, RepDocUrl, RepDoc),
+    StateDoc = test_util:wait(
+        fun() ->
+            case req(get, RepDocUrl) of
+                {200, #{<<"_replication_state">> := <<"completed">>} = StDoc} -> StDoc;
+                {_, #{}} -> wait
+            end
+        end,
+        14000,
+        1000
+    ),
+    ?assertMatch(#{<<"_replication_state">> := <<"completed">>}, StateDoc).
 
 rep_doc_url(RepDb, DocId) when is_binary(RepDb) ->
     rep_doc_url(binary_to_list(RepDb), DocId);
