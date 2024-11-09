@@ -23,7 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
-import org.apache.couchdb.nouveau.lucene9.ParallelSearcherFactory;
+import org.apache.couchdb.nouveau.lucene.ParallelSearcherFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
