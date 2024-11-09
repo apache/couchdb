@@ -259,7 +259,8 @@ log_format_meta(Mod, #{} = Meta) ->
     Db = {"db:~s ", format_db(maps:get(db, Meta, undefined))},
     DDocId = {"ddoc:~s ", maps:get(ddoc, Meta, undefined)},
     DocId = {"doc:~s ", maps:get(doc, Meta, undefined)},
-    FmtArgs = [{"~s ", Mod}, SId, Fun, Db, DDocId, DocId],
+    Index = {"index:~s ", maps:get(index, Meta, undefined)},
+    FmtArgs = [{"~s ", Mod}, SId, Fun, Db, DDocId, Index, DocId],
     lists:unzip([{Fmt, Arg} || {Fmt, Arg} <- FmtArgs, Arg /= undefined]).
 
 format_db(undefined) ->
