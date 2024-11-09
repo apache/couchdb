@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -63,7 +63,7 @@ import org.apache.lucene.analysis.tr.TurkishAnalyzer;
 import org.apache.lucene.util.Version;
 import org.junit.jupiter.api.Test;
 
-public class Lucene9AnalyzerFactoryTest {
+public class LuceneAnalyzerFactoryTest {
 
     @Test
     public void testkeyword() throws Exception {
@@ -259,7 +259,7 @@ public class Lucene9AnalyzerFactoryTest {
     public void testFieldAnalyzers() throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition(
                 Version.LATEST.major, "standard", Map.of("english", "english", "thai", "thai", "email", "email"));
-        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
+        final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         assertThat(analyzer).isInstanceOf(PerFieldAnalyzerWrapper.class);
         final Method m = PerFieldAnalyzerWrapper.class.getDeclaredMethod("getWrappedAnalyzer", String.class);
         m.setAccessible(true);
@@ -271,12 +271,12 @@ public class Lucene9AnalyzerFactoryTest {
 
     @Test
     public void testUnknownAnalyzer() throws Exception {
-        assertThrows(WebApplicationException.class, () -> Lucene9AnalyzerFactory.newAnalyzer("foo"));
+        assertThrows(WebApplicationException.class, () -> LuceneAnalyzerFactory.newAnalyzer("foo"));
     }
 
     private void assertAnalyzer(final String name, final Class<? extends Analyzer> clazz) throws Exception {
-        assertThat(Lucene9AnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
-        assertThat(Lucene9AnalyzerFactory.fromDefinition(new IndexDefinition(Version.LATEST.major, name, null)))
+        assertThat(LuceneAnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
+        assertThat(LuceneAnalyzerFactory.fromDefinition(new IndexDefinition(Version.LATEST.major, name, null)))
                 .isInstanceOf(clazz);
     }
 }

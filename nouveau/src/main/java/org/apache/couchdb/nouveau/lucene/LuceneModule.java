@@ -11,16 +11,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import com.fasterxml.jackson.core.Version;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import org.apache.lucene.search.Query;
 
-public class Lucene9Module extends SimpleModule {
+public class LuceneModule extends SimpleModule {
 
-    public Lucene9Module() {
-        super("lucene9", Version.unknownVersion());
+    public LuceneModule() {
+        super("lucene", Version.unknownVersion());
 
         // Query
         addSerializer(Query.class, new QuerySerializer());
