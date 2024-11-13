@@ -95,11 +95,13 @@
     logging_enabled/0,
     should_log/1,
     should_log/2,
-    tracker/1
+    tracker/1,
+    to_json/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
+-include_lib("couch_stats_resource_tracker.hrl").
 
 %% Module pdict markers
 -define(DELTA_TA, csrt_delta_ta).
@@ -158,50 +160,6 @@
 
 -record(st, {}).
 
--record(rpc_worker, {
-    mod :: atom()  | '_',
-    func :: atom()  | '_',
-    from :: {pid(), reference()} | '_'
-}).
-
--record(coordinator, {
-    mod :: atom()  | '_',
-    func :: atom()  | '_',
-    method :: atom() | '_',
-    path :: binary() | '_'
-}).
-
--record(rctx, {
-    %% Metadata
-    started_at = ?MODULE:tnow(),
-    updated_at = ?MODULE:tnow(),
-    pid_ref,
-    nonce,
-    type, %% #coordinator{}/#rpc_worker{}/#replication_worker{}/#compaction_worker
-    dbname,
-    username,
-
-    %% Stats counters
-    db_open = 0,
-    docs_read = 0,
-    rows_read = 0,
-    changes_processed = 0,
-    changes_returned = 0,
-    ioq_calls = 0,
-    io_bytes_read = 0,
-    io_bytes_written = 0,
-    js_evals = 0,
-    js_filter = 0,
-    js_filtered_docs = 0,
-    mango_eval_match = 0,
-    %% TODO: switch record definitions to be macro based, eg:
-    %% ?COUCH_BT_GET_KP_NODE = 0,
-    get_kv_node = 0,
-    get_kp_node = 0,
-    write_kv_node = 0,
-    write_kp_node = 0
-}).
-
 %%
 %% Public API
 %%
@@ -220,14 +178,6 @@ set_pid_ref(PidRef) ->
     PidRef.
 
 create_pid_ref() ->
-    case get_pid_ref() of
-        undefined ->
-            ok;
-        PidRef0 ->
-            %% TODO: what to do when it already exists?
-            throw({epidexist, PidRef0}),
-            close_pid_ref(PidRef0)
-    end,
     {self(), make_ref()}.
 
 close_pid_ref() ->
@@ -751,12 +701,17 @@ tracker({Pid, _Ref}=PidRef) ->
 log_process_lifetime_report(PidRef) ->
     case is_enabled() andalso is_logging_enabled() of
         true ->
-            Rctx = get_resource(PidRef),
-            case should_log(Rctx) of
-               true ->
-                    couch_log:report("csrt-pid-usage-lifetime", to_json(Rctx));
+            case conf_get("logger_type", "csrt_logger") of
+                "csrt_logger" ->
+                    csrt_logger:maybe_report(PidRef);
                 _ ->
-                    ok
+                    Rctx = get_resource(PidRef),
+                    case should_log(Rctx) of
+                       true ->
+                            couch_log:report("csrt-pid-usage-lifetime", to_json(Rctx));
+                        _ ->
+                            ok
+                    end
             end;
         false ->
             ok

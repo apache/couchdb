@@ -13,66 +13,47 @@
 -module(csrt_logger).
 
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([
     start_link/0,
     init/1,
     handle_call/3,
-    handle_cast/2
+    handle_cast/2,
+    handle_info/2
 ]).
 
 -export([
     log_level/0,
     log_level/1,
-    maybe_report/1
+    maybe_report/1,
+    maybe_report_old/1,
+    get_matchers/0
 ]).
+
+%% Config update subscription API
+-export([
+    subscribe_changes/0,
+    handle_config_change/5,
+    handle_config_terminate/3
+]).
+
+%% Matchers
+-export([
+    matcher_on_docs_read/1,
+    matcher_on_worker_changes_processed/1,
+    matcher_on_ioq_calls/1,
+    matcher_on_nonce/1,
+    matcher_on_nonce_comp/1
+]).
+
+-include_lib("stdlib/include/ms_transform.hrl").
+-include_lib("couch_stats_resource_tracker.hrl").
 
 -record(st, {
     should_track,
     matchers = #{}
 }).
-
-%% TODO: switch to include for record def
--record(rctx, {
-    %% Metadata
-    started_at,
-    updated_at,
-    pid_ref,
-    mfa,
-    nonce,
-    from,
-    type = unknown, %% unknown/background/system/rpc/coordinator/fabric_rpc/etc_rpc/etc
-    dbname,
-    username,
-    path,
-
-    %% Stats counters
-    db_open = 0,
-    docs_read = 0,
-    rows_read = 0,
-    changes_processed = 0,
-    changes_returned = 0,
-    ioq_calls = 0,
-    io_bytes_read = 0,
-    io_bytes_written = 0,
-    js_evals = 0,
-    js_filter = 0,
-    js_filtered_docs = 0,
-    mango_eval_match = 0,
-    %% TODO: switch record definitions to be macro based, eg:
-    %% ?COUCH_BT_GET_KP_NODE = 0,
-    get_kv_node = 0,
-    get_kp_node = 0,
-    write_kv_node = 0,
-    write_kp_node = 0
-}).
-
--record(rpc_worker, {
-    mod,
-    func
-}).
-
--record(coordinator, {}).
 
 -define(CSRT_CONTEXTS, [
    #rpc_worker{mod=fabric_rpc, func=all_docs},
@@ -98,6 +79,46 @@
 ]).
 
 -define(NO_LOG, 0).
+-define(DEFAULT_LEVEL, coordinators).
+
+-define(MATCHERS_KEY, {?MODULE, all_csrt_matchers}).
+-define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
+-define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
+
+%%
+%% Matchers
+%%
+
+matcher_on_docs_read(Threshold)
+        when is_integer(Threshold) andalso Threshold > 0 ->
+    ets:fun2ms(fun(#rctx{docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
+
+matcher_on_nonce(Nonce) ->
+    ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end).
+
+matcher_on_nonce_comp(Nonce) ->
+    ets:match_spec_compile(ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
+
+matcher_on_worker_changes_processed(Threshold)
+        when is_integer(Threshold) andalso Threshold > 0 ->
+    ets:fun2ms(
+        fun(
+            #rctx{
+                changes_processed=Processed,
+                changes_returned=Returned
+            } = R
+        ) when (Processed - Returned) >= Threshold ->
+            R
+        end
+    ).
+
+matcher_on_ioq_calls(Threshold)
+        when is_integer(Threshold) andalso Threshold > 0 ->
+    ets:fun2ms(fun(#rctx{ioq_calls=IOQCalls} = R) when IOQCalls >= Threshold -> R end).
+
+%%
+%% Public API
+%%
 
 log_level(all) -> 9;
 log_level(all_workers) -> 4;
@@ -110,15 +131,33 @@ log_level(none) -> ?NO_LOG;
 log_level(_) -> ?NO_LOG.
 
 log_level() ->
-    config:get_atom("couch_stats_resource_tracker", "log_level", none).
+    Level = config:get("couch_stats_resource_tracker", "log_level", "coordinators"),
+    try
+        log_level(list_to_existing_atom(Level))
+    catch
+        _:_ ->
+            log_level(?DEFAULT_LEVEL)
+    end.
+
 
 maybe_report(PidRef) ->
+    Rctx = couch_stats_resource_tracker:get_resource(PidRef),
+    case is_match(Rctx) of
+        true ->
+            report(Rctx),
+            ok;
+        false ->
+            ok
+    end.
+
+maybe_report_old(PidRef) ->
     Level = log_level(),
     case Level > ?NO_LOG of
         true ->
             Rctx = couch_stats_resource_tracker:get_resource(PidRef),
             RLevel = log_level(Rctx),
-            case RLevel =< Level of
+            %% io:format("CSRT LOGGER TRIGGERING{~p} ~p =<? ~p~n", [Rctx#rctx.type, RLevel, Level]),
+            case RLevel >= Level of
                 true ->
                     %% NOTE: we drop the PidRef here, it's now safe to delete the ets entry
                     Msg = {maybe_report, Rctx, RLevel, Level},
@@ -138,8 +177,14 @@ find_matches(RContexts, Matchers) when is_list(RContexts) andalso is_map(Matcher
         Matchers
     ).
 
-is_match(#rctx{}=R, Matchers) when is_map(Matchers) ->
-    maps:size(find_matches([R], Matchers)) > 0.
+get_matchers() ->
+    persistent_term:get(?MATCHERS_KEY, #{}).
+
+is_match(#rctx{}=Rctx) ->
+    is_match(Rctx, get_matchers()).
+
+is_match(#rctx{}=Rctx, Matchers) when is_map(Matchers) ->
+    maps:size(find_matches([Rctx], Matchers)) > 0.
 
 %% default.ini:
 %% [csrt]
@@ -150,7 +195,7 @@ is_match(#rctx{}=R, Matchers) when is_map(Matchers) ->
 %% worker.fabric_rpc.map_view = true
 %% worker.fabric_rpc.reduce_view = true
 create_tracking_map() ->
-    lists:fold(fun(Ele, Acc) ->
+    lists:foldl(fun(Ele, Acc) ->
         Key = case Ele of
             #rpc_worker{mod=M0, func=F0} ->
                 M = atom_to_list(M0),
@@ -166,11 +211,14 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
+    ok = initialize_matchers(),
+    ok = subscribe_changes(),
     {ok, #st{should_track=create_tracking_map()}}.
 
 handle_call({register, Name, MSpec}, _From, #st{matchers=Matchers}=St) ->
     case add_matcher(Name, MSpec, Matchers) of
         {ok, Matchers1} ->
+            set_matchers_term(Matchers1),
             {reply, ok, St#st{matchers=Matchers1}};
         {error, badarg}=Error ->
             {reply, Error, St}
@@ -178,11 +226,21 @@ handle_call({register, Name, MSpec}, _From, #st{matchers=Matchers}=St) ->
 handle_call({maybe_report, #rctx{}=Rctx, RLevel, Level}, _From, St) ->
     ok = maybe_report_int(Rctx, RLevel, Level, St),
     {reply, ok, St};
+handle_call(reload_matchers, _From, St) ->
+    couch_log:warning("Reloading persistent term matchers", []),
+    ok = initialize_matchers(),
+    {reply, ok, St};
 handle_call(_, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State, 0}.
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
+handle_info(_Msg, St) ->
+    {noreply, St}.
 
 %% TODO: should we use originally defined log level? or St#st.level?
 %% ShouldLog = log_level(Rctx) > St#st.log_level
@@ -218,4 +276,68 @@ add_matcher(Name, MSpec, Matchers) ->
     end.
 
 is_tracked(#rctx{type=Type}, Trackers) ->
-    maps:is_key(Type, Trackers) andalso true =:= maps:get(Type, Trackers).
+    Res = maps:is_key(Type, Trackers) andalso true =:= maps:get(Type, Trackers),
+    Res.
+
+set_matchers_term(Matchers) when is_map(Matchers) ->
+    persistent_term:put({?MODULE, all_csrt_matchers}, Matchers).
+
+initialize_matchers() ->
+    DefaultMatchers = [
+        {docs_read, fun matcher_on_docs_read/1, 1000},
+        %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
+        %%{slow_reqs, fun matcher_on_slow_reqs/1, 10000},
+        {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
+        {ioq_calls, fun matcher_on_ioq_calls/1, 10000}
+    ],
+    Matchers = lists:foldl(
+        fun({Name0, MatchGenFunc, Threshold0}, Matchers0) when is_atom(Name0) ->
+            Name = atom_to_list(Name0),
+            case matcher_enabled(Name) of
+                true ->
+                    Threshold = matcher_threshold(Name, Threshold0),
+                    %% TODO: handle errors from Func
+                    case add_matcher(Name, MatchGenFunc(Threshold), Matchers0) of
+                        {ok, Matchers1} ->
+                            Matchers1;
+                        {error, badarg} ->
+                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [?MODULE, Name]),
+                            Matchers0
+                    end;
+                false ->
+                    Matchers0
+            end
+        end,
+        #{},
+        DefaultMatchers
+    ),
+    couch_log:warning("Initialized ~p CSRT Logger matchers", [maps:size(Matchers)]),
+    persistent_term:put(?MATCHERS_KEY, Matchers),
+    ok.
+
+
+matcher_enabled(Name) when is_list(Name) ->
+    %% TODO: fix
+    %% config:get_boolean(?CONF_MATCHERS_ENABLED, Name, false).
+    config:get_boolean(?CONF_MATCHERS_ENABLED, Name, true).
+
+matcher_threshold(Name, Default)
+        when is_list(Name) andalso is_integer(Default) andalso Default > 0 ->
+    config:get_integer(?CONF_MATCHERS_THRESHOLD, Name, Default).
+
+subscribe_changes() ->
+    config:listen_for_changes(?MODULE, nil).
+
+handle_config_change(?CONF_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
+    ok = gen_server:call(?MODULE, reload_matchers, infinity),
+    {ok, St};
+handle_config_change(?CONF_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
+    ok = gen_server:call(?MODULE, reload_matchers, infinity),
+    {ok, St};
+handle_config_change(_Sec, _Key, _Val, _Persist, St) ->
+    {ok, St}.
+
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_, _, _) ->
+    erlang:send_after(5000, whereis(?MODULE), restart_config_listener).
