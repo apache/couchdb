@@ -63,10 +63,10 @@ DDOC = {
                 function(doc){
                   index("default", doc._id);
                   if(doc.min_length){
-                    index("min_length", doc.min_length, {"store": "yes"});
+                    index("min_length", doc.min_length, {"store": "true"});
                   }
                   if (doc['class']){
-                    index("class", doc['class'], {"store": "yes"});
+                    index("class", doc['class'], {"store": "true"});
                   }
                 }
             """
