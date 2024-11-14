@@ -14,7 +14,6 @@ import copy
 import mango
 import unittest
 import json
-from textwrap import dedent
 
 BOOLEN_ADB_DOC = {
     "_id": "hoary_marmot",
@@ -60,19 +59,17 @@ DDOC = {
     "_id": "_design/views101",
     "indexes": {
         "animals": {
-            "index": dedent(
-                """\
+            "index": """
                 function(doc){
-                  index(\"default\", doc._id);
+                  index("default", doc._id);
                   if(doc.min_length){
-                    index(\"min_length\", doc.min_length, {\"store\": \"yes\"});
+                    index("min_length", doc.min_length, {"store": "yes"});
                   }
                   if (doc['class']){
-                    index(\"class\", doc['class'], {\"store\": \"yes\"});
+                    index("class", doc['class'], {"store": "yes"});
                   }
                 }
             """
-            )
         }
     },
 }
