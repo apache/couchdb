@@ -43,5 +43,6 @@ Where ``{db}`` is the name of any database.
     shard
     changes
     compact
+    cleanup
     security
     misc
