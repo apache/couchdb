@@ -306,7 +306,7 @@ handle_request_int(MochiReq) ->
             Other -> Other
         end,
 
-    Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
+    Nonce = nonce(MochiReq),
 
     HttpReq0 = #httpd{
         mochi_req = MochiReq,
@@ -430,6 +430,35 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
         ErrorType:Error:Stack ->
             {HttpReq, catch_error(HttpReq, ErrorType, Error, Stack)}
     end.
+
+nonce(MochiReq) ->
+    case MochiReq:get_header_value("X-Couch-Request-ID") of
+        undefined ->
+            new_nonce();
+        Value when length(Value) > 36 ->
+            new_nonce();
+        Value ->
+            case lists:all(fun is_valid_nonce_char/1, Value) of
+                true ->
+                    Value;
+                false ->
+                    new_nonce()
+            end
+    end.
+
+new_nonce() ->
+    couch_util:to_hex(crypto:strong_rand_bytes(5)).
+
+is_valid_nonce_char(C) when
+    (C >= $0 andalso C =< $9) orelse
+        (C >= $a andalso C =< $z) orelse
+        (C >= $A andalso C =< $Z) orelse
+        C == $- orelse
+        C == $_
+->
+    true;
+is_valid_nonce_char(_) ->
+    false.
 
 catch_error(_HttpReq, throw, {http_head_abort, Resp}, _Stack) ->
     {ok, Resp};

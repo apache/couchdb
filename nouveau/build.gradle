@@ -32,6 +32,7 @@ dependencies {
     implementation group: 'org.apache.lucene', name: 'lucene-analysis-kuromoji', version: luceneVersion
     implementation group: 'org.apache.lucene', name: 'lucene-facet', version: luceneVersion
     implementation group: 'org.apache.lucene', name: 'lucene-misc', version: luceneVersion
+    implementation group: 'org.apache.lucene', name: 'lucene-backward-codecs', version: luceneVersion
 
     def swaggerVersion = '2.2.8'
     implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-jakarta', version: swaggerVersion

@@ -329,7 +329,7 @@ scan_ddocs_fold({meta, _}, #st{} = Acc) ->
     {ok, Acc};
 scan_ddocs_fold({row, RowProps}, #st{} = Acc) ->
     DDoc = couch_util:get_value(doc, RowProps),
-    scan_ddoc(couch_doc:from_json_obj(DDoc), Acc);
+    scan_ddoc(ejson_to_doc(DDoc), Acc);
 scan_ddocs_fold(complete, #st{} = Acc) ->
     {ok, Acc};
 scan_ddocs_fold({error, Error}, _Acc) ->
@@ -393,12 +393,16 @@ scan_docs_fold(#full_doc_info{id = Id} = FDI, #st{} = St) ->
 scan_doc(#full_doc_info{} = FDI, #st{} = St) ->
     #st{db = Db, callbacks = Cbks, pst = PSt} = St,
     St1 = rate_limit(St, doc),
-    {ok, #doc{} = Doc} = couch_db:open_doc(Db, FDI, [ejson_body]),
-    #{doc := DocCbk} = Cbks,
-    {Go, PSt1} = DocCbk(PSt, Db, Doc),
-    case Go of
-        ok -> {ok, St1#st{pst = PSt1}};
-        stop -> {stop, St1#st{pst = PSt1}}
+    case couch_db:open_doc(Db, FDI, [ejson_body]) of
+        {ok, #doc{} = Doc} ->
+            #{doc := DocCbk} = Cbks,
+            {Go, PSt1} = DocCbk(PSt, Db, Doc),
+            case Go of
+                ok -> {ok, St1#st{pst = PSt1}};
+                stop -> {stop, St1#st{pst = PSt1}}
+            end;
+        {not_found, _} ->
+            {ok, St1}
     end.
 
 maybe_checkpoint(#st{checkpoint_sec = LastCheckpointTSec} = St) ->
@@ -632,6 +636,13 @@ fold_ddocs(Fun, #st{dbname = DbName} = Acc) ->
         error:database_does_not_exist ->
             Acc
     end.
+
+% Simple ejson to #doc{} function to avoid all the extra validation in from_json_obj/1.
+% We just got these docs from the cluster, they are already saved on disk.
+ejson_to_doc({[_ | _] = Props}) ->
+    {value, {_, DocId}, Props1} = lists:keytake(<<"_id">>, 1, Props),
+    Props2 = [{K, V} || {K, V} <- Props1, binary:first(K) =/= $_],
+    #doc{id = DocId, body = {Props2}}.
 
 % Skip patterns
 

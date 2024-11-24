@@ -29,7 +29,11 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_filter_with_expected_error, 10),
             ?TDEF_FE(t_empty_ddoc, 10),
             ?TDEF_FE(t_multi_emit_map, 10),
-            ?TDEF_FE(t_non_deterministic_views, 10)
+            ?TDEF_FE(t_non_deterministic_views, 10),
+            ?TDEF_FE(t_handle_list_functions_in_maps, 10),
+            ?TDEF_FE(t_doc_updates, 10),
+            ?TDEF_FE(t_clouseau, 10),
+            ?TDEF_FE(t_nouveau, 10)
         ]
     }.
 
@@ -329,6 +333,86 @@ t_non_deterministic_views({_, DbName}) ->
             ok
     end.
 
+t_handle_list_functions_in_maps({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_use_list_funs_in_maps(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assert(num_calls(doc, 3) >= 5),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start and complete = 2, no errors
+            ?assertEqual(2, log_calls(warning));
+        false ->
+            ok
+    end.
+
+t_doc_updates({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_update(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assert(num_calls(doc, 3) >= 5),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start and complete = 2 + 5 warnings = 7
+            ?assertEqual(7, log_calls(warning));
+        false ->
+            ok
+    end.
+
+t_clouseau({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_clouseau(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assert(num_calls(doc, 3) >= 5),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start and complete = 2 + 3 warnings = 5
+            ?assertEqual(5, log_calls(warning));
+        false ->
+            ok
+    end.
+
+t_nouveau({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_nouveau(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case {couch_server:with_spidermonkey(), nouveau:enabled()} of
+        {true, true} ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assert(num_calls(doc, 3) >= 5),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start and complete = 2 + 3 warnings = 5
+            ?assertEqual(5, log_calls(warning));
+        {_, _} ->
+            ok
+    end.
+
 reset_stats() ->
     Counters = [
         [couchdb, query_server, process_error_exits],
@@ -517,9 +601,7 @@ ddoc_view_multi_emit(Doc) ->
     }.
 
 ddoc_view_non_determinism(Doc) ->
-    % String.prototype.startsWith used as a differentiator between
-    % SM and QuickJS. Make both emit items in different order. But at the
-    % end of the day, that doesn't matter as those are sorted anyway
+    % Test some functions with random and date values.
     Doc#{
         views => #{
             v1 => #{
@@ -534,6 +616,94 @@ ddoc_view_non_determinism(Doc) ->
             v4 => #{
                 map => <<"function(doc) {emit(1,2);}">>,
                 reduce => <<"function(ks, vs, rr){return Date.now();}">>
+            }
+        }
+    }.
+
+ddoc_use_list_funs_in_maps(Doc) ->
+    % If users call list functions from their maps, we used to crash
+    % the scanner process with a function_clause.
+    Doc#{
+        views => #{
+            v1 => #{
+                map => <<
+                    "function(head, req) { \n"
+                    "var row;\n"
+                    "start({headers: {'Content-Type': 'text/plain'}});\n"
+                    "while(row = getRow()) {send('x'); send('y');}\n"
+                    "}"
+                >>
+            }
+        }
+    }.
+
+ddoc_update(Doc) ->
+    % If users call list functions from their maps, we used to crash
+    % the scanner process with a function_clause.
+    Doc#{
+        updates => #{
+            u1 => <<
+                "function(doc, req) {\n"
+                "  doc.a.search(/(x+)/); \n"
+                "  if (RegExp.$1 === undefined) {\n"
+                "    return [null, 'no_dollar_one']; \n"
+                "  } else { \n"
+                "    return [null, 'got_dollar_one'];\n"
+                "  }\n"
+                "}"
+            >>
+        }
+    }.
+
+ddoc_clouseau(Doc) ->
+    Doc#{
+        indexes => #{
+            idx1 => #{
+                <<"default_analyzer">> => <<"english">>,
+                <<"index">> => <<
+                    "function(doc) {\n"
+                    "  index('a', doc.a, {'store': true}); \n"
+                    "  index('fourtytwo', 42, {'store': false}); \n"
+                    "}"
+                >>
+            },
+            idx2 => #{
+                <<"index">> => <<
+                    "function(doc) {\n"
+                    "  doc.a.search(/(x+)/); \n"
+                    "  if (RegExp.$1 === undefined) {\n"
+                    "      index('dollar_one', 'nope') \n"
+                    "  } else { \n"
+                    "      index('dollar_one', 'yup') \n"
+                    "  }\n"
+                    "}"
+                >>
+            }
+        }
+    }.
+
+ddoc_nouveau(Doc) ->
+    Doc#{
+        nouveau => #{
+            idx1 => #{
+                <<"index">> => <<
+                    "function(doc) {\n"
+                    "  index('string', 'a', doc.a, {'store': true}); \n"
+                    "  index('double', 'fourtytwo', 42, {'store': false}); \n"
+                    "}"
+                >>
+            },
+            idx2 => #{
+                <<"index">> => <<
+                    "function(doc) {\n"
+                    "  doc.a.search(/(x+)/); \n"
+                    "  if (RegExp.$1 === undefined) {\n"
+                    "      index('string', 'dollar_one', 'nope') \n"
+                    "  } else { \n"
+                    "      index('string', 'dollar_one', 'yup') \n"
+                    "  }\n"
+                    "}"
+                >>
             }
         }
     }.

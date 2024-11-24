@@ -180,6 +180,16 @@ Request Headers
 
   The use of the ``Content-type`` on a request is highly recommended.
 
+- ``X-Couch-Request-ID``
+
+  (Optional) CouchDB will add a ``X-Couch-Request-ID`` header to every response
+  in order to help users correlate any problem with the CouchDB log.
+
+  If this header is present on the request (as long as the header value is
+  no longer than 36 characters from the set ``0-9a-zA-z-_``) this value will be
+  used internally as the request ``nonce``, which appears in logs, and will also
+  be returned as the ``X-Couch-Request-ID`` response header.
+
 Response Headers
 ----------------
 
@@ -543,7 +553,12 @@ specific request types are provided in the corresponding API call reference.
 
 - ``403 - Forbidden``
 
-  The requested item or operation is forbidden.
+  The requested item or operation is forbidden. This might be because;
+
+  * Your user name or roles do not match the security object of the database
+  * The request requires administrator privileges but you don't have them
+  * You've made too many requests with invalid credentials and have been
+    temporarily locked out.
 
 - ``404 - Not Found``
 
