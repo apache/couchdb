@@ -35,7 +35,7 @@ DOCS1 = [
 
 class SupportStableAndUpdate(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         # Hack to prevent auto-indexer from foiling update=False test
         # https://github.com/apache/couchdb/issues/2313
         self.db.save_doc(
