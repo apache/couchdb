@@ -641,7 +641,7 @@ fold_ddocs(Fun, #st{dbname = DbName} = Acc) ->
 % We just got these docs from the cluster, they are already saved on disk.
 ejson_to_doc({[_ | _] = Props}) ->
     {value, {_, DocId}, Props1} = lists:keytake(<<"_id">>, 1, Props),
-    Props2 = [{K, V} || {K, V} <- Props1, binary:first(K) =/= $_],
+    Props2 = [{K, V} || {K, V} <- Props1, K =:= <<>> orelse binary:first(K) =/= $_],
     #doc{id = DocId, body = {Props2}}.
 
 % Skip patterns
