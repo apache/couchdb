@@ -20,7 +20,7 @@ CONFLICT = [{"_id": "doc", "_rev": "1-23202479633c2b380f79507a776743d5", "a": 1}
 
 class ChooseCorrectIndexForDocs(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOC))
         self.db.save_docs_with_conflicts(copy.deepcopy(CONFLICT))
 
