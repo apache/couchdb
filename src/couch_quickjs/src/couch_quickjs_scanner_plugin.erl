@@ -64,6 +64,31 @@
 %
 -define(INTEDERMINISM_HEURISTICS, [<<"Math.random()">>, <<"Date.now()">>, <<"new Date()">>]).
 
+% Mock JS request object. Used by filter and update handlers
+% See https://docs.couchdb.org/en/stable/json-structure.html#request-object
+-define(MOCK_REQ, #{
+    <<"info">> => #{
+        <<"committed_update_seq">> => 42,
+        <<"db_name">> => <<"foo">>,
+        <<"doc_count">> => 42,
+        <<"doc_del_count">> => 42,
+        <<"sizes">> => #{<<"active">> => 42, <<"disk">> => 42, <<"external">> => 42}
+    },
+    <<"query">> => #{},
+    <<"body">> => #{},
+    <<"method">> => <<"POST">>,
+    <<"headers">> => #{},
+    <<"form">> => #{},
+    <<"cookie">> => #{},
+    <<"userCtx">> => #{},
+    <<"secObj">> => #{},
+    <<"path">> => [<<"a">>, <<"b">>, <<"c">>],
+    <<"requested_path">> => [<<"a">>, <<"b">>, <<"c">>],
+    <<"raw_path">> => <<"a/b/c">>,
+    <<"peer">> => <<"127.0.0.1">>,
+    <<"uuid">> => <<"2f3aaf5c54d94f982f384c6f8000197b">>
+}).
+
 % Behavior callbacks
 
 start(SId, #{}) ->
@@ -716,6 +741,8 @@ expected_error({error, {_, {<<"SyntaxError">>, _}}}, {error, {_, {<<"SyntaxError
     true;
 expected_error({error, {_, {<<"ReferenceError">>, _}}}, {error, {_, {<<"ReferenceError">>, _}}}) ->
     true;
+expected_error({error, {_, {<<"render_error">>, _}}}, {error, {_, {<<"render_error">>, _}}}) ->
+    true;
 expected_error(_, _) ->
     false.
 
@@ -767,13 +794,12 @@ nouveau_index_doc(#proc{} = Proc, {[_ | _]} = Doc) ->
 
 filter_doc(#proc{} = Proc, DDocId, FName, {[_ | _]} = Doc) ->
     % Add a mock request object so param access doesn't throw a TypeError
-    MockReq = #{<<"query">> => #{}},
-    prompt(Proc, [<<"ddoc">>, DDocId, [<<"filters">>, FName], [[Doc], MockReq]]).
+    prompt(Proc, [<<"ddoc">>, DDocId, [<<"filters">>, FName], [[Doc], ?MOCK_REQ]]).
 
 update_doc(#proc{} = Proc, DDocId, UName, {[_ | _] = Props} = Doc) ->
     % Use a mock object. It's better than nothing at least. We don't know
     % what the user might post.
-    MockReq = #{<<"body">> => #{}, <<"method">> => <<"POST">>, <<"headers">> => #{}},
+    MockReq = ?MOCK_REQ,
     MockReq1 =
         case couch_util:get_value(<<"_id">>, Props) of
             Id when is_binary(Id) -> MockReq#{<<"id">> => Id};
