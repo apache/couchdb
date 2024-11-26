@@ -17,7 +17,7 @@ import unittest
 
 class LongRunningMangoTest(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         docs = []
         for i in range(100000):
             docs.append({"_id": str(i), "another": "field"})

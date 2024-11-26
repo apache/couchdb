@@ -28,7 +28,7 @@ def to_utf8_bytes(list):
 
 class BeginsWithOperator(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
         self.db.create_index(["location"])
         self.db.create_index(["name", "location"])
