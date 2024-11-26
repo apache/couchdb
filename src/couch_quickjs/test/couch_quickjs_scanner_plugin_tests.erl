@@ -651,7 +651,17 @@ ddoc_update(Doc) ->
                 "    return [null, 'got_dollar_one'];\n"
                 "  }\n"
                 "}"
-            >>
+            >>,
+            u2 => <<
+                "function(doc, req) {\n"
+                "  if (typeof(req.form) === 'object') {\n"
+                "    return [null, 'has_form']; \n"
+                "  } else { \n"
+                "    return [null, 'no_form'];\n"
+                "  }\n"
+                "}"
+            >>,
+            u3 => <<"function(doc, req) {throw('Potato')}">>
         }
     }.
 
