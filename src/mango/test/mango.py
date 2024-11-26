@@ -80,10 +80,7 @@ class Concurrently(object):
 
 
 class Database(object):
-    def __init__(
-        self,
-        dbname,
-    ):
+    def __init__(self, dbname):
         self.dbname = dbname
         self.sess = requests.session()
         self.sess.auth = (COUCH_USER, COUCH_PASS)
@@ -107,24 +104,19 @@ class Database(object):
 
     def delete(self):
         r = self.sess.delete(self.url)
+        r.raise_for_status()
 
     def recreate(self):
-        NUM_TRIES = 10
-
-        for k in range(NUM_TRIES):
-            r = self.sess.get(self.url)
-            if r.status_code == 200:
-                db_info = r.json()
-                docs = db_info["doc_count"] + db_info["doc_del_count"]
-                if docs == 0:
-                    # db exists and it is empty -- exit condition is met
-                    return
-                self.delete()
-            self.create()
-            time.sleep(k * 0.1)
-        raise Exception(
-            "Failed to recreate the database after {} tries".format(NUM_TRIES)
-        )
+        r = self.sess.get(self.url)
+        if r.status_code == 200:
+            db_info = r.json()
+            docs = db_info["doc_count"] + db_info["doc_del_count"]
+            if docs == 0:
+                # db is not in use, no need to recreate
+                return
+            self.delete()
+        self.create()
+        self.recreate()
 
     def save_doc(self, doc):
         self.save_docs([doc])
@@ -356,8 +348,21 @@ class DbPerClass(unittest.TestCase):
         if clean_up_dbs():
             klass.db.delete()
 
-    def setUp(self):
-        self.db = self.__class__.db
+    def setUp(self, db_per_test=False, partitioned=False):
+        if db_per_test:
+            self.db = Database(random_db_name())
+            self.db.create(q=1, n=1, partitioned=partitioned)
+            self.db_per_test = db_per_test
+        else:
+            self.db = self.__class__.db
+
+    def tearDown(self):
+        if (
+            hasattr(self, "db_per_test")
+            and self.__getattribute__("db_per_test")
+            and clean_up_dbs()
+        ):
+            self.db.delete()
 
 
 class UserDocsTests(DbPerClass):
