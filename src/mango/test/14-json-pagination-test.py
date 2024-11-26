@@ -33,7 +33,7 @@ DOCS = [
 
 class PaginateJsonDocs(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
 
     def test_all_docs_paginate_to_end(self):

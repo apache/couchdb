@@ -50,7 +50,7 @@ DOCS = [
 
 class ChooseCorrectIndexForDocs(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
 
     def test_choose_index_with_one_field_in_index(self):

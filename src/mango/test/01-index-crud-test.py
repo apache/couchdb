@@ -25,7 +25,7 @@ DOCS = [
 
 class IndexCrudTests(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
 
     def test_bad_fields(self):
         bad_fields = [
@@ -352,7 +352,7 @@ class IndexCrudTests(mango.DbPerClass):
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class IndexCrudTextTests(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
 
     def test_create_text_idx(self):
         fields = [
