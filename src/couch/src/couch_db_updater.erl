@@ -451,10 +451,9 @@ add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     NewESAcc = ExternalSize + ESAcc,
     NewAttsAcc = lists:umerge(AttSizes, AttsAcc),
     {NewASAcc, NewESAcc, NewAttsAcc};
-add_sizes(_, #leaf{atts = AttSizes}, Acc) ->
+add_sizes(_, #leaf{}, Acc) ->
     % For intermediate nodes external and active contribution is 0
-    {ASAcc, ESAcc, AttsAcc} = Acc,
-    {ASAcc, ESAcc, lists:umerge(AttSizes, AttsAcc)}.
+    Acc.
 
 upgrade_sizes(#size_info{} = SI) ->
     SI;
