@@ -79,7 +79,9 @@
     count_changes_since/2,
 
     start_compaction/4,
-    finish_compaction/4
+    finish_compaction/4,
+
+    get_registered_replication_peers/1
 ]).
 
 -export([
@@ -97,6 +99,7 @@
 
     local_tree_split/1,
     local_tree_join/2,
+    local_tree_reduce/2,
 
     purge_tree_split/1,
     purge_tree_join/2,
@@ -781,6 +784,67 @@ local_tree_join(Id, {Rev, BodyData}) when is_integer(Rev) ->
         body = BodyData
     }.
 
+local_tree_reduce(reduce, []) ->
+    #{};
+local_tree_reduce(reduce, Docs) ->
+    Vals = lists:map(fun extract_seqs/1, Docs),
+    local_tree_merge(Vals);
+local_tree_reduce(rereduce, Reds) ->
+    local_tree_merge(Reds).
+
+local_tree_merge(Vals) ->
+    lists:foldl(
+        fun(Map, Acc) ->
+            maps:merge_with(
+                fun(_, V1, V2) ->
+                    erlang:min(V1, V2)
+                end,
+                Map,
+                Acc
+            )
+        end,
+        #{},
+        Vals
+    ).
+
+extract_seqs(#doc{} = Doc) ->
+    {Props} = Doc#doc.body,
+    case {Doc#doc.id, couch_util:get_value(<<"source_last_seq">>, Props)} of
+        {<<?LOCAL_DOC_PREFIX, "shard-sync-", _/binary>>, _} ->
+            Range = couch_util:get_value(<<"range">>, Props),
+            case Range of
+                undefined ->
+                    #{};
+                [RS, RE] ->
+                    {History} = couch_util:get_value(<<"history">>, Props, {[]}),
+                    [{_SourceNode, [{Latest} | _]} | _] = History,
+                    TargetNode = couch_util:get_value(<<"target_node">>, Latest),
+                    TargetSeq = couch_util:get_value(<<"target_seq">>, Latest),
+                    #{{binary_to_existing_atom(TargetNode), RS, RE} => TargetSeq}
+            end;
+        {<<?LOCAL_DOC_PREFIX, "mrview-", _/binary>>, _} ->
+            Node = couch_util:get_value(<<"node">>, Props),
+            [RS, RE] = couch_util:get_value(<<"range">>, Props),
+            Seq = couch_util:get_value(<<"seq">>, Props),
+            #{{Node, RS, RE} => Seq};
+        {<<?LOCAL_DOC_PREFIX, "purge-mrview-", _/binary>>, _} ->
+            #{};
+        {_, SourceLastSeq} ->
+            opaque_seq_to_seen_map(SourceLastSeq)
+    end.
+
+opaque_seq_to_seen_map(Opaque) ->
+    Seq = fabric_view_changes:decode_seq(Opaque),
+    maps:from_list(
+        lists:map(
+            fun
+                ({N, [RS, RE], S}) when is_integer(S) -> {{N, RS, RE}, S};
+                ({N, [RS, RE], {S, _, N}}) when is_integer(S) -> {{N, RS, RE}, S}
+            end,
+            Seq
+        )
+    ).
+
 purge_tree_split({PurgeSeq, UUID, DocId, Revs}) ->
     {UUID, {PurgeSeq, DocId, Revs}}.
 
@@ -877,6 +941,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     {ok, LocalTree} = couch_btree:open(LocalTreeState, Fd, [
         {split, fun ?MODULE:local_tree_split/1},
         {join, fun ?MODULE:local_tree_join/2},
+        {reduce, fun ?MODULE:local_tree_reduce/2},
         {compression, Compression}
     ]),
 
@@ -1227,3 +1292,6 @@ is_file(Path) ->
         {ok, #file_info{type = directory}} -> true;
         _ -> false
     end.
+
+get_registered_replication_peers(#st{} = St) ->
+    couch_btree:full_reduce(St#st.local_tree).

@@ -36,6 +36,7 @@
 -export([get_collator_versions/1]).
 -export([compact_on_collator_upgrade/0]).
 -export([commit_on_header_upgrade/0]).
+-export([get_mrview_checkpoints/1]).
 
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
@@ -114,18 +115,27 @@ get_signatures(Db) ->
 % Returns a map of `Sig => DocId` elements for all the purge view
 % checkpoint docs. Sig is a hex-encoded binary.
 %
-get_purge_checkpoints(DbName) when is_binary(DbName) ->
-    couch_util:with_db(DbName, fun get_purge_checkpoints/1);
-get_purge_checkpoints(Db) ->
+get_purge_checkpoints(DbOrName) ->
+    get_registered_peers(DbOrName, <<?LOCAL_DOC_PREFIX, "purge-mrview-">>).
+
+% Returns a map of `Sig => DocId` elements for all the mrview
+% checkpoint docs. Sig is a hex-encoded binary.
+%
+get_mrview_checkpoints(DbOrName) ->
+    get_registered_peers(DbOrName, <<?LOCAL_DOC_PREFIX, "mrview-">>).
+
+get_registered_peers(DbName, Prefix) when is_binary(DbName), is_binary(Prefix) ->
+    couch_util:with_db(DbName, fun(Db) -> get_registered_peers(Db, Prefix) end);
+get_registered_peers(Db, Prefix) ->
     FoldFun = fun(#doc{id = Id}, Acc) ->
         case Id of
-            <<?LOCAL_DOC_PREFIX, "purge-mrview-", Sig/binary>> ->
+            <<Prefix:(byte_size(Prefix))/binary, Sig/binary>> ->
                 {ok, Acc#{Sig => Id}};
             _ ->
                 {stop, Acc}
         end
     end,
-    Opts = [{start_key, <<?LOCAL_DOC_PREFIX, "purge-mrview-">>}],
+    Opts = [{start_key, Prefix}],
     {ok, Signatures = #{}} = couch_db:fold_local_docs(Db, FoldFun, #{}, Opts),
     Signatures.
 

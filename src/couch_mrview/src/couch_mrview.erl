@@ -578,6 +578,10 @@ should_skip_local_document(_IncludeSys = false, #doc{
     id = <<"_local/shard-sync", _/binary>>, body = {Props}
 }) ->
     contains_fields([<<"target_uuid">>, <<"seq">>], Props);
+should_skip_local_document(_IncludeSys = false, #doc{
+    id = <<"_local/mrview", _/binary>>, body = {Props}
+}) ->
+    contains_fields([<<"source_last_seq">>], Props);
 should_skip_local_document(_IncludeSys, _Doc) ->
     false.
 

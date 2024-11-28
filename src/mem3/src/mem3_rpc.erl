@@ -140,11 +140,13 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
                 ] ++ NewEntry0
             },
             Body =
-                {[
-                    {<<"seq">>, SourceSeq},
-                    {<<"target_uuid">>, couch_db:get_uuid(Db)},
-                    {<<"history">>, add_checkpoint(NewEntry, History0)}
-                ]},
+                {
+                    [
+                        {<<"seq">>, SourceSeq},
+                        {<<"target_uuid">>, couch_db:get_uuid(Db)},
+                        {<<"history">>, add_checkpoint(NewEntry, History0)}
+                    ] ++ range(DbName)
+                },
             Doc = #doc{id = Id, body = Body},
             rexi:reply(
                 try couch_db:update_doc(Db, Doc, []) of
@@ -162,6 +164,11 @@ save_checkpoint_rpc(DbName, Id, SourceSeq, NewEntry0, History0) ->
         Error ->
             rexi:reply(Error)
     end.
+
+range(<<"shards/", _/binary>> = DbName) ->
+    [{<<"range">>, mem3:range(DbName)}];
+range(_) ->
+    [].
 
 find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
     erlang:put(io_priority, {internal_repl, DbName}),

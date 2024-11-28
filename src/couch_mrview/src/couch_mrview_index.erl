@@ -129,12 +129,14 @@ open(Db, State0) ->
                     NewSt = init_and_upgrade_state(Db, Fd, State, Header),
                     ok = commit(NewSt),
                     ensure_local_purge_doc(Db, NewSt),
+                    write_peer_checkpoint(Db, NewSt),
                     {ok, NewSt};
                 % end of upgrade code for <= 2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
                     NewSt = init_and_upgrade_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
+                    write_peer_checkpoint(Db, NewSt),
                     check_collator_versions(DbName, NewSt),
                     {ok, NewSt};
                 {ok, {WrongSig, _}} ->
@@ -144,6 +146,7 @@ open(Db, State0) ->
                     ),
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
+                    write_peer_checkpoint(Db, NewSt),
                     {ok, NewSt};
                 {ok, Else} ->
                     couch_log:error(
@@ -152,10 +155,12 @@ open(Db, State0) ->
                     ),
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
+                    write_peer_checkpoint(Db, NewSt),
                     {ok, NewSt};
                 no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
+                    write_peer_checkpoint(Db, NewSt),
                     {ok, NewSt}
             end;
         {error, Reason} = Error ->
@@ -210,7 +215,13 @@ finish_update(State) ->
 
 commit(State) ->
     Header = {State#mrst.sig, couch_mrview_util:make_header(State)},
-    couch_file:write_header(State#mrst.fd, Header).
+    case couch_file:write_header(State#mrst.fd, Header) of
+        ok ->
+            write_peer_checkpoint(State),
+            ok;
+        Else ->
+            Else
+    end.
 
 compact(Db, State, Opts) ->
     couch_mrview_compactor:compact(Db, State, Opts).
@@ -361,3 +372,34 @@ check_collator_versions(DbName, #mrst{} = Mrst) ->
         false ->
             ok
     end.
+
+write_peer_checkpoint(#mrst{} = State) ->
+    couch_util:with_db(State#mrst.db_name, fun(Db) ->
+        write_peer_checkpoint(Db, State)
+    end).
+
+write_peer_checkpoint(Db, #mrst{} = State) ->
+    Sig = ?l2b(couch_index_util:hexsig(State#mrst.sig)),
+    DocId = <<?LOCAL_DOC_PREFIX, "mrview-", Sig/binary>>,
+    BaseDoc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"type">>, <<"mrview-checkpoint">>},
+            {<<"node">>, node()},
+            {<<"range">>, range(State#mrst.db_name)},
+            {<<"seq">>, State#mrst.update_seq}
+        ]}
+    ),
+    Doc =
+        case couch_db:open_doc(Db, DocId, []) of
+            {ok, #doc{revs = Revs}} ->
+                BaseDoc#doc{revs = Revs};
+            {not_found, _} ->
+                BaseDoc
+        end,
+    {ok, _} = couch_db:update_doc(Db, Doc, []).
+
+range(<<"shards/", _/binary>> = DbName) ->
+    mem3:range(DbName);
+range(_) ->
+    [0, 1].

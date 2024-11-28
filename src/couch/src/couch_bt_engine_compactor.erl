@@ -307,16 +307,43 @@ copy_compact(#comp_st{} = CompSt) ->
         )
     ),
 
+    DropSeq =
+        case DbName of
+            <<"shards/", _/binary>> ->
+                [RS, RE] = mem3:range(DbName),
+                {ok, RegisteredPeers} = fabric:get_registered_replication_peers(
+                    mem3:dbname(DbName)
+                ),
+                maps:get({node(), RS, RE}, RegisteredPeers, 0);
+            _ ->
+                0
+        end,
+
+    couch_log:warning("Compaction process for db '~s' will drop deleted docs <= ~B", [
+        DbName, DropSeq
+    ]),
+
     EnumBySeqFun =
         fun(
             DocInfo,
             _Offset,
             {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}
         ) ->
+            Id =
+                case DocInfo of
+                    #full_doc_info{} -> DocInfo#full_doc_info.id;
+                    #doc_info{} -> DocInfo#doc_info.id
+                end,
             Seq =
                 case DocInfo of
                     #full_doc_info{} -> DocInfo#full_doc_info.update_seq;
                     #doc_info{} -> DocInfo#doc_info.high_seq
+                end,
+            Deleted =
+                case DocInfo of
+                    #full_doc_info{} -> DocInfo#full_doc_info.deleted;
+                    % Older versions stored #doc_info records in the seq_tree.
+                    #doc_info{} -> false
                 end,
 
             AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
@@ -335,6 +362,9 @@ copy_compact(#comp_st{} = CompSt) ->
                             {ok, NewSt3} = couch_bt_engine:set_update_seq(NewSt2, Seq),
                             {ok, {NewSt3, [], 0, AccCopiedSize2}}
                     end;
+                Deleted andalso Seq =< DropSeq ->
+                    couch_log:warning("dropped deleted doc ~s", [Id]),
+                    {ok, {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}};
                 true ->
                     {ok, {AccNewSt, [DocInfo | AccUncopied], AccUncopiedSize2, AccCopiedSize}}
             end

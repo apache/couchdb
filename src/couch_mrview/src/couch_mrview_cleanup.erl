@@ -14,7 +14,7 @@
 
 -export([
     run/1,
-    cleanup_purges/3,
+    cleanup_checkpoints/3,
     cleanup_indices/2
 ]).
 
@@ -25,14 +25,14 @@ run(Db) ->
     Checkpoints = couch_mrview_util:get_purge_checkpoints(Db),
     {ok, Db1} = couch_db:reopen(Db),
     Sigs = couch_mrview_util:get_signatures(Db1),
-    ok = cleanup_purges(Db1, Sigs, Checkpoints),
+    ok = cleanup_checkpoints(Db1, Sigs, Checkpoints),
     ok = cleanup_indices(Sigs, Indices).
 
-cleanup_purges(DbName, Sigs, Checkpoints) when is_binary(DbName) ->
+cleanup_checkpoints(DbName, Sigs, Checkpoints) when is_binary(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->
-        cleanup_purges(Db, Sigs, Checkpoints)
+        cleanup_checkpoints(Db, Sigs, Checkpoints)
     end);
-cleanup_purges(Db, #{} = Sigs, #{} = CheckpointsMap) ->
+cleanup_checkpoints(Db, #{} = Sigs, #{} = CheckpointsMap) ->
     InactiveMap = maps:without(maps:keys(Sigs), CheckpointsMap),
     InactiveCheckpoints = maps:values(InactiveMap),
     DeleteFun = fun(DocId) -> delete_checkpoint(Db, DocId) end,
@@ -57,7 +57,7 @@ delete_file(File) ->
 
 delete_checkpoint(Db, DocId) ->
     DbName = couch_db:name(Db),
-    LogMsg = "~p : deleting inactive purge checkpoint ~s : ~s",
+    LogMsg = "~p : deleting inactive checkpoint ~s : ~s",
     couch_log:debug(LogMsg, [?MODULE, DbName, DocId]),
     try couch_db:open_doc(Db, DocId, []) of
         {ok, Doc = #doc{}} ->

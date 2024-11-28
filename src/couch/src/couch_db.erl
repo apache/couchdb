@@ -129,7 +129,9 @@
     validate_dbname/1,
 
     make_doc/5,
-    new_revid/1
+    new_revid/1,
+
+    get_registered_replication_peers/1
 ]).
 
 -export([
@@ -2130,6 +2132,9 @@ purge_client_warn_lag(Updated, DbName, DocId) when is_integer(Updated) ->
 purge_client_warn_lag(Updated, DbName, DocId) ->
     Log = "~p : Purge checkpoint ~p : ~s has an invalid updated value: ~p",
     couch_log:error(Log, [?MODULE, DbName, DocId, Updated]).
+
+get_registered_replication_peers(#db{} = Db) ->
+    couch_db_engine:get_registered_replication_peers(Db).
 
 -ifdef(TEST).
 

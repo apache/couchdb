@@ -23,6 +23,7 @@
     delete_db/1,
     delete_db/2,
     get_db_info/1,
+    get_registered_replication_peers/1,
     get_doc_count/1, get_doc_count/2,
     set_revs_limit/3,
     set_security/2, set_security/3,
@@ -106,6 +107,9 @@ all_dbs(Prefix) when is_list(Prefix) ->
     ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
+
+get_registered_replication_peers(DbName) ->
+    fabric_registered_replication_peers:go(dbname(DbName)).
 
 %% @doc returns the size of a given partition
 -spec get_partition_info(dbname(), Partition :: binary()) ->
@@ -570,10 +574,10 @@ reset_validation_funs(DbName) ->
     ].
 
 %% @doc clean up index files for all Dbs
--spec cleanup_index_files() -> [ok].
+-spec cleanup_index_files() -> ok.
 cleanup_index_files() ->
     {ok, Dbs} = fabric:all_dbs(),
-    [cleanup_index_files(Db) || Db <- Dbs].
+    lists:foreach(fun cleanup_index_files/1, Dbs).
 
 %% @doc clean up index files for a specific db
 -spec cleanup_index_files(dbname()) -> ok.
@@ -591,15 +595,16 @@ cleanup_local_indices_and_purge_checkpoints([]) ->
 cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
     AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
     AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
+    AllCheckpoints = lists:map(fun couch_mrview_util:get_mrview_checkpoints/1, Dbs),
     Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
-    ok = cleanup_purges(Sigs, AllPurges, Dbs),
+    ok = cleanup_checkpoints(Sigs, AllPurges ++ AllCheckpoints, Dbs),
     ok = cleanup_indices(Sigs, AllIndices).
 
-cleanup_purges(Sigs, AllPurges, Dbs) ->
-    Fun = fun(DbPurges, Db) ->
-        couch_mrview_cleanup:cleanup_purges(Db, Sigs, DbPurges)
+cleanup_checkpoints(Sigs, AllCheckpoints, Dbs) ->
+    Fun = fun(Checkpoints, Db) ->
+        couch_mrview_cleanup:cleanup_checkpoints(Db, Sigs, Checkpoints)
     end,
-    lists:zipwith(Fun, AllPurges, Dbs),
+    lists:zipwith(Fun, AllCheckpoints, Dbs),
     ok.
 
 cleanup_indices(Sigs, AllIndices) ->
@@ -609,7 +614,7 @@ cleanup_indices(Sigs, AllIndices) ->
     lists:foreach(Fun, AllIndices).
 
 %% @doc clean up index files for a specific db on all nodes
--spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
+-spec cleanup_index_files_all_nodes(dbname()) -> ok.
 cleanup_index_files_all_nodes(DbName) ->
     lists:foreach(
         fun(Node) ->
