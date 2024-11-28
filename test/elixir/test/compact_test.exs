@@ -8,14 +8,11 @@ defmodule CompactTest do
   This is a port of compact.js
   """
 
-  @att_doc_id "att_doc"
+  @att_doc_id1 "att_doc1"
+  @att_doc_id2 "att_doc2"
   @att_name "foo.txt"
-  @att_plaintext "This is plain text"
+  @att_plaintext String.duplicate("This is plain text", 100)
 
-  # Need to investigate why compaction is not compacting (or compactor cannot complete)
-  # Refer:- https://github.com/apache/couchdb/pull/2127
-  @tag :pending
-  @tag :skip_on_jenkins
   @tag :with_db
   test "compaction reduces size of deleted docs", context do
     db = context[:db_name]
@@ -40,7 +37,9 @@ defmodule CompactTest do
 
     retry_until(fn ->
       assert get_info(db)["instance_start_time"] == start_time
+      assert Couch.get("/#{db}").body["doc_count"] == 1
       assert_attachment_available(db)
+      assert_deleted_attachment_not_available(db)
       info = get_info(db)
       final_data_size = info["sizes"]["active"]
       final_disk_size = info["sizes"]["file"]
@@ -51,10 +50,15 @@ defmodule CompactTest do
   end
 
   defp assert_attachment_available(db) do
-    resp = Couch.get("/#{db}/#{@att_doc_id}/#{@att_name}")
+    resp = Couch.get("/#{db}/#{@att_doc_id1}/#{@att_name}")
     assert resp.body == @att_plaintext
     assert resp.headers["content-type"] == "text/plain"
-    assert Couch.get("/#{db}").body["doc_count"] == 1
+  end
+
+  defp assert_deleted_attachment_not_available(db) do
+    resp = Couch.get("/#{db}/#{@att_doc_id2}/#{@att_name}")
+    assert resp.status_code == 404
+    assert resp.body == %{"error" => "not_found", "reason" => "deleted"}
   end
 
   defp populate(db) do
@@ -63,16 +67,28 @@ defmodule CompactTest do
     assert resp.status_code in [201, 202]
     docs = rev(docs, resp.body)
 
-    doc = %{
-      _id: "#{@att_doc_id}",
+    doc1 = %{
+      _id: "#{@att_doc_id1}",
       _attachments: %{
         "#{@att_name}": %{content_type: "text/plain", data: Base.encode64(@att_plaintext)}
       }
     }
 
-    resp = Couch.put("/#{db}/#{doc._id}", body: doc)
+    resp = Couch.put("/#{db}/#{doc1._id}", body: doc1)
     assert resp.status_code in [201, 202]
-    docs
+
+    doc2 = %{
+      _id: "#{@att_doc_id2}",
+      _attachments: %{
+        "#{@att_name}": %{content_type: "text/plain", data: Base.encode64(@att_plaintext)}
+      }
+    }
+
+    resp = Couch.put("/#{db}/#{doc2._id}", body: doc2)
+    assert resp.status_code in [201, 202]
+
+    att_rev2 = resp.body["rev"]
+    docs ++ [%{"_id": "#{doc2._id}", "_rev": att_rev2}]
   end
 
   defp delete(db, docs) do
