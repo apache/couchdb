@@ -97,6 +97,7 @@
 
     local_tree_split/1,
     local_tree_join/2,
+    local_tree_reduce/2,
 
     purge_tree_split/1,
     purge_tree_join/2,
@@ -781,6 +782,50 @@ local_tree_join(Id, {Rev, BodyData}) when is_integer(Rev) ->
         body = BodyData
     }.
 
+local_tree_reduce(reduce, []) ->
+    #{};
+local_tree_reduce(reduce, Docs) ->
+    Vals = lists:map(fun extract_seqs/1, Docs),
+    local_tree_merge(Vals);
+local_tree_reduce(rereduce, Reds) ->
+    local_tree_merge(Reds).
+
+local_tree_merge(Vals) ->
+    lists:foldl(
+      fun(Map, Acc) ->
+              maps:merge_with(
+                fun(_, V1, V2) ->
+                        erlang:min(V1, V2)
+                end,
+                Map,
+                Acc
+               )
+      end,
+      #{},
+      Vals
+     ).
+
+extract_seqs(#doc{} = Doc) ->
+    {Body} = Doc#doc.body,
+    case couch_util:get_value(<<"source_last_seq">>, Body) of
+        Opaque when is_binary(Opaque) ->
+            opaque_seq_to_seen_map(Opaque);
+        _ ->
+            #{}
+    end.
+
+opaque_seq_to_seen_map(Opaque) ->
+    Seq = fabric_view_changes:decode_seq(Opaque),
+    maps:from_list(
+      lists:map(
+        fun
+            ({N, R, S}) when is_integer(S) -> {{N, R}, S};
+            ({N, R, {S, _, N}}) when is_integer(S) -> {{N, R}, S}
+        end,
+        Seq
+       )
+     ).
+
 purge_tree_split({PurgeSeq, UUID, DocId, Revs}) ->
     {UUID, {PurgeSeq, DocId, Revs}}.
 
@@ -877,6 +922,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     {ok, LocalTree} = couch_btree:open(LocalTreeState, Fd, [
         {split, fun ?MODULE:local_tree_split/1},
         {join, fun ?MODULE:local_tree_join/2},
+        {reduce, fun ?MODULE:local_tree_reduce/2},
         {compression, Compression}
     ]),
 
