@@ -339,7 +339,7 @@ mango-test: devclean all
 		--admin=adm:pass \
 		--no-eval "\
 COUCH_USER=adm COUCH_PASS=pass \
-src/mango/.venv/bin/nose2 -F -s src/mango/test -c src/mango/unittest.cfg $(MANGO_TEST_OPTS)"
+src/mango/.venv/bin/nose2 -s src/mango/test -c src/mango/unittest.cfg $(MANGO_TEST_OPTS)"
 
 
 .PHONY: weatherreport-test
