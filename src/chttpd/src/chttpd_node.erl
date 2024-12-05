@@ -62,7 +62,25 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]}
             _Other ->
                 #{name => EngineName}
         end,
-    send_json(Req, 200, #{
+    ClouseauVer =
+        case clouseau_rpc:version() of
+            {ok, null} -> <<"2.x-dev">>;
+            {ok, V} -> V;
+            _ -> undefined
+        end,
+    SearchResponse =
+        case ClouseauVer of
+            undefined ->
+                #{};
+            Version ->
+                #{
+                    search => #{
+                        name => clouseau,
+                        version => Version
+                    }
+                }
+        end,
+    BaseResponse = #{
         erlang => #{
             version => ?l2b(?COUCHDB_ERLANG_VERSION),
             supported_hashes => Hashes
@@ -74,7 +92,9 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]}
             collator_version => couch_util:version_to_binary(ColVer)
         },
         javascript_engine => JsEngine
-    });
+    },
+    Response = maps:merge(BaseResponse, SearchResponse),
+    send_json(Req, 200, Response);
 handle_node_req(#httpd{path_parts = [_, _Node, <<"_versions">>]} = Req) ->
     send_method_not_allowed(Req, "GET");
 % GET /_node/$node/_config
