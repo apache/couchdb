@@ -29,11 +29,12 @@ setup() ->
     Url.
 
 teardown(_Url) ->
+    meck:unload(),
     Persist = false,
-    ok = config:delete("couchdb", "maintenance_mode", Persist = false),
-    ok = config:delete("cluster", "seedlist", Persist = false),
-    ok = config:delete("couchdb", "js_engine", Persist = false),
-    ok = config:delete("admins", ?USER, Persist = false).
+    ok = config:delete("couchdb", "maintenance_mode", Persist),
+    ok = config:delete("cluster", "seedlist", Persist),
+    ok = config:delete("couchdb", "js_engine", Persist),
+    ok = config:delete("admins", ?USER, Persist).
 
 welcome_test_() ->
     {
@@ -187,9 +188,11 @@ t_multiple_uuids(Url) ->
     ?assert(Uuid1 /= Uuid2),
     ?assert(Uuid1 /= Uuid3).
 
-system_test_() ->
+-define(MOCKED_CLOUSEAU_VERSION, <<"2.24.0">>).
+
+node_test_() ->
     {
-        "chttpd _node/_local/_system endpoint tests",
+        "chttpd _node/{node_name}/* endpoint tests",
         {
             setup,
             fun chttpd_test_util:start_couch/0,
@@ -199,7 +202,9 @@ system_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    ?TDEF_FE(t_system)
+                    ?TDEF_FE(t_system),
+                    ?TDEF_FE(t_versions_with_clouseau),
+                    ?TDEF_FE(t_versions_without_clouseau)
                 ]
             }
         }
@@ -235,6 +240,42 @@ t_system(Url) ->
                 <<"logger">> := _,
                 <<"rexi_buffer">> := _,
                 <<"rexi_server">> := _
+            }
+        },
+        Body
+    ).
+
+t_versions_with_clouseau(Url) ->
+    ok = meck:expect(clouseau_rpc, version, 0, {ok, ?MOCKED_CLOUSEAU_VERSION}),
+    {ok, Code, _, Body} = req_get(Url ++ "/_node/_local/_versions"),
+    ?assertEqual(200, Code),
+    ?assertMatch(
+        #{
+            <<"javascript_engine">> := #{<<"name">> := _},
+            <<"collation_driver">> := #{<<"name">> := <<"libicu">>},
+            <<"erlang">> := #{
+                <<"supported_hashes">> := [_ | _],
+                <<"version">> := _
+            },
+            <<"clouseau">> := #{
+                <<"version">> := ?MOCKED_CLOUSEAU_VERSION
+            }
+        },
+        Body
+    ).
+
+t_versions_without_clouseau(Url) ->
+    ok = meck:expect(clouseau_rpc, version, 0, {'EXIT', noconnection}),
+    {ok, Code, _, Body} = req_get(Url ++ "/_node/_local/_versions"),
+    ?assertEqual(200, Code),
+    ?assertNot(maps:is_key(<<"search">>, Body)),
+    ?assertMatch(
+        #{
+            <<"javascript_engine">> := #{<<"name">> := _},
+            <<"collation_driver">> := #{<<"name">> := <<"libicu">>},
+            <<"erlang">> := #{
+                <<"supported_hashes">> := [_ | _],
+                <<"version">> := _
             }
         },
         Body
