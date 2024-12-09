@@ -2094,7 +2094,10 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
     :synopsis: Returns system-level server version informations
 
     The ``_versions`` resource returns a JSON object containing various
-    system-level informations for the running server.
+    system-level information for the running server.
+
+    Optionally, if a ``clouseau`` search node is detected, its version
+    will also be displayed.
 
     The literal string ``_local`` serves as an alias for the local node name, so
     for all stats URLs, ``{node-name}`` may be replaced with ``_local``, to
@@ -2136,6 +2139,9 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
                     "sha224",
                     "sha256",
                 ]
+            },
+            "clouseau": {
+                "version": "2.24.0"
             },
             "collation_driver": {
                 "name": "libicu",
