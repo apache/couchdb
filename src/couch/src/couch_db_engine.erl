@@ -658,6 +658,12 @@
 ) ->
     {ok, CompactedDbHandle :: db_handle(), CompactorPid :: pid() | undefined}.
 
+-callback get_registered_replication_peers(DbHandle :: db_handle()) ->
+    {ok, #{
+        {node(), StartRange :: non_neg_integer(), EndRange :: non_neg_integer()} => Seq :: non_neg_integer()
+    }}
+    | {error, Reason :: term()}.
+
 -export([
     exists/2,
     delete/4,
@@ -723,7 +729,9 @@
 
     start_compaction/1,
     finish_compaction/2,
-    trigger_on_compact/1
+    trigger_on_compact/1,
+
+    get_registered_replication_peers/1
 ]).
 
 exists(Engine, DbPath) ->
@@ -1032,3 +1040,7 @@ get_ddocs(DbName) ->
         {ok, Docs} = couch_db:fold_design_docs(Db, FoldFun, [], []),
         {ok, lists:reverse(Docs)}
     end).
+
+get_registered_replication_peers(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_registered_replication_peers(EngineState).

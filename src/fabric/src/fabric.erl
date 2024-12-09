@@ -23,6 +23,7 @@
     delete_db/1,
     delete_db/2,
     get_db_info/1,
+    get_registered_replication_peers/1,
     get_doc_count/1, get_doc_count/2,
     set_revs_limit/3,
     set_security/2, set_security/3,
@@ -106,6 +107,9 @@ all_dbs(Prefix) when is_list(Prefix) ->
     ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
+
+get_registered_replication_peers(DbName) ->
+    fabric_registered_replication_peers:go(dbname(DbName)).
 
 %% @doc returns the size of a given partition
 -spec get_partition_info(dbname(), Partition :: binary()) ->

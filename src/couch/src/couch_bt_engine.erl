@@ -79,7 +79,9 @@
     count_changes_since/2,
 
     start_compaction/4,
-    finish_compaction/4
+    finish_compaction/4,
+
+    get_registered_replication_peers/1
 ]).
 
 -export([
@@ -792,18 +794,18 @@ local_tree_reduce(rereduce, Reds) ->
 
 local_tree_merge(Vals) ->
     lists:foldl(
-      fun(Map, Acc) ->
-              maps:merge_with(
+        fun(Map, Acc) ->
+            maps:merge_with(
                 fun(_, V1, V2) ->
-                        erlang:min(V1, V2)
+                    erlang:min(V1, V2)
                 end,
                 Map,
                 Acc
-               )
-      end,
-      #{},
-      Vals
-     ).
+            )
+        end,
+        #{},
+        Vals
+    ).
 
 extract_seqs(#doc{} = Doc) ->
     {Body} = Doc#doc.body,
@@ -817,14 +819,14 @@ extract_seqs(#doc{} = Doc) ->
 opaque_seq_to_seen_map(Opaque) ->
     Seq = fabric_view_changes:decode_seq(Opaque),
     maps:from_list(
-      lists:map(
-        fun
-            ({N, R, S}) when is_integer(S) -> {{N, R}, S};
-            ({N, R, {S, _, N}}) when is_integer(S) -> {{N, R}, S}
-        end,
-        Seq
-       )
-     ).
+        lists:map(
+            fun
+                ({N, R, S}) when is_integer(S) -> {{N, R}, S};
+                ({N, R, {S, _, N}}) when is_integer(S) -> {{N, R}, S}
+            end,
+            Seq
+        )
+    ).
 
 purge_tree_split({PurgeSeq, UUID, DocId, Revs}) ->
     {UUID, {PurgeSeq, DocId, Revs}}.
@@ -1273,3 +1275,6 @@ is_file(Path) ->
         {ok, #file_info{type = directory}} -> true;
         _ -> false
     end.
+
+get_registered_replication_peers(#st{} = St) ->
+    couch_btree:full_reduce(St#st.local_tree).

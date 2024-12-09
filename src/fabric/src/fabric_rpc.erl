@@ -51,7 +51,8 @@
     reduce_view/5,
     group_info/3,
     update_mrview/4,
-    get_uuid/1
+    get_uuid/1,
+    get_registered_replication_peers/1
 ]).
 
 -include_lib("fabric/include/fabric.hrl").
@@ -346,6 +347,9 @@ compact(ShardName, DesignName) ->
 
 get_uuid(DbName) ->
     with_db(DbName, [], {couch_db, get_uuid, []}).
+
+get_registered_replication_peers(DbName) ->
+    with_db(DbName, [], {couch_db, get_registered_replication_peers, []}).
 
 %%
 %% internal
