@@ -11,6 +11,7 @@
 % the License.
 
 -record(error, {
+    delta,
     timestamp,
     reason,
     mfa,

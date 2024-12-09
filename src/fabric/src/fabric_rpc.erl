@@ -493,6 +493,11 @@ view_cb({meta, Meta}, Acc) ->
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
 view_cb({row, Props}, #mrargs{extra = Options} = Acc) ->
+    %% TODO: distinguish between rows and docs
+    %% TODO: wire in csrt tracking
+    %% TODO: distinguish between all_docs vs view call
+    couch_stats:increment_counter([fabric_rpc, view, rows_read]),
+    %%couch_stats_resource_tracker:inc(rows_read),
     % Adding another row
     ViewRow = fabric_view_row:from_props(Props, Options),
     ok = rexi:stream2(ViewRow),
@@ -529,6 +534,7 @@ changes_enumerator(#full_doc_info{} = FDI, Acc) ->
 changes_enumerator(#doc_info{id = <<"_local/", _/binary>>, high_seq = Seq}, Acc) ->
     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Acc#fabric_changes_acc.pending - 1}};
 changes_enumerator(DocInfo, Acc) ->
+    couch_stats:increment_counter([fabric_rpc, changes, processed]),
     #fabric_changes_acc{
         db = Db,
         args = #changes_args{
@@ -569,6 +575,7 @@ changes_enumerator(DocInfo, Acc) ->
     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Pending - 1}}.
 
 changes_row(Changes, Docs, DocInfo, Acc) ->
+    couch_stats:increment_counter([fabric_rpc, changes, returned]),
     #fabric_changes_acc{db = Db, pending = Pending, epochs = Epochs} = Acc,
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DocInfo,
     {change, [
@@ -667,6 +674,14 @@ clean_stack(S) ->
     ).
 
 set_io_priority(DbName, Options) ->
+    couch_stats_resource_tracker:set_context_dbname(DbName),
+    %% TODO: better approach here than using proplists?
+    case proplists:get_value(user_ctx, Options) of
+        undefined ->
+            ok;
+        #user_ctx{name = UserName} ->
+            couch_stats_resource_tracker:set_context_username(UserName)
+    end,
     case lists:keyfind(io_priority, 1, Options) of
         {io_priority, Pri} ->
             erlang:put(io_priority, Pri);
