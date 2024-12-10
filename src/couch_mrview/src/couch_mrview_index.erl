@@ -210,7 +210,13 @@ finish_update(State) ->
 
 commit(State) ->
     Header = {State#mrst.sig, couch_mrview_util:make_header(State)},
-    couch_file:write_header(State#mrst.fd, Header).
+    case couch_file:write_header(State#mrst.fd, Header) of
+        ok ->
+            write_peer_checkpoint(State),
+            ok;
+        Else ->
+            Else
+    end.
 
 compact(Db, State, Opts) ->
     couch_mrview_compactor:compact(Db, State, Opts).
@@ -361,3 +367,31 @@ check_collator_versions(DbName, #mrst{} = Mrst) ->
         false ->
             ok
     end.
+
+write_peer_checkpoint(#mrst{} = State) ->
+    Sig = ?l2b(couch_index_util:hexsig(State#mrst.sig)),
+    DocId = <<?LOCAL_DOC_PREFIX, "mrview-", Sig/binary>>,
+    BaseDoc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"type">>, <<"mrview-checkpoint">>},
+            {<<"node">>, node()},
+            {<<"range">>, range(State#mrst.db_name)},
+            {<<"seq">>, State#mrst.update_seq}
+        ]}
+    ),
+    couch_util:with_db(State#mrst.db_name, fun(Db) ->
+        Doc =
+            case couch_db:open_doc(Db, DocId, []) of
+                {ok, #doc{revs = Revs}} ->
+                    BaseDoc#doc{revs = Revs};
+                {not_found, _} ->
+                    BaseDoc
+            end,
+        couch_db:update_doc(Db, Doc, [])
+    end).
+
+range(<<"shards/", _/binary>> = DbName) ->
+    mem3:range(DbName);
+range(_) ->
+    [0, 1].

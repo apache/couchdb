@@ -821,6 +821,13 @@ extract_seqs(#doc{} = Doc) ->
                     SourceSeq = couch_util:get_value(<<"source_seq">>, Latest),
                     #{{binary_to_existing_atom(N), RS, RE} => SourceSeq}
             end;
+        {<<?LOCAL_DOC_PREFIX, "mrview-", _/binary>>, _} ->
+            Node = couch_util:get_value(<<"node">>, Props),
+            [RS, RE] = couch_util:get_value(<<"range">>, Props),
+            Seq = couch_util:get_value(<<"seq">>, Props),
+            #{{Node, RS, RE} => Seq};
+        {<<?LOCAL_DOC_PREFIX, "purge-mrview-", _/binary>>, _} ->
+            #{};
         {_, SourceLastSeq} ->
             opaque_seq_to_seen_map(SourceLastSeq)
     end.
