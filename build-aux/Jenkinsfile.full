@@ -55,6 +55,14 @@ meta = [
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
+  'noble': [
+    name: 'Ubuntu 24.04',
+    spidermonkey_vsn: '115',
+    with_nouveau: true,
+    with_clouseau: true,
+    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
+  ],
+
   'bookworm-ppc64': [
     name: 'Debian POWER',
     spidermonkey_vsn: '78',
