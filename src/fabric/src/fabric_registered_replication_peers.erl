@@ -50,7 +50,9 @@ handle_message({ok, Reds}, Shard, {Counters, Resps}) ->
             {ok, {Counters1, Resps1}};
         {stop, Resps1} ->
             FinalRed = fabric_dict:fold(
-                fun(_, Red, Acc) -> couch_bt_engine:local_tree_reduce(rereduce, [Red, Acc]) end, #{}, Resps1
+                fun(_, Red, Acc) -> couch_bt_engine:local_tree_reduce(rereduce, [Red, Acc]) end,
+                #{},
+                Resps1
             ),
             {stop, FinalRed}
     end;

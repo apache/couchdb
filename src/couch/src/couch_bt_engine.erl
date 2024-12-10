@@ -808,12 +808,21 @@ local_tree_merge(Vals) ->
     ).
 
 extract_seqs(#doc{} = Doc) ->
-    {Body} = Doc#doc.body,
-    case couch_util:get_value(<<"source_last_seq">>, Body) of
-        Opaque when is_binary(Opaque) ->
-            opaque_seq_to_seen_map(Opaque);
-        _ ->
-            #{}
+    {Props} = Doc#doc.body,
+    case {Doc#doc.id, couch_util:get_value(<<"source_last_seq">>, Props)} of
+        {<<?LOCAL_DOC_PREFIX, "shard-sync-", _/binary>>, _} ->
+            Range = couch_util:get_value(<<"range">>, Props),
+            case Range of
+                undefined ->
+                    #{};
+                [RS, RE] ->
+                    {History} = couch_util:get_value(<<"history">>, Props, {[]}),
+                    [{N, [{Latest} | _]} | _] = History,
+                    SourceSeq = couch_util:get_value(<<"source_seq">>, Latest),
+                    #{{binary_to_existing_atom(N), RS, RE} => SourceSeq}
+            end;
+        {_, SourceLastSeq} ->
+            opaque_seq_to_seen_map(SourceLastSeq)
     end.
 
 opaque_seq_to_seen_map(Opaque) ->
@@ -821,8 +830,8 @@ opaque_seq_to_seen_map(Opaque) ->
     maps:from_list(
         lists:map(
             fun
-                ({N, R, S}) when is_integer(S) -> {{N, R}, S};
-                ({N, R, {S, _, N}}) when is_integer(S) -> {{N, R}, S}
+                ({N, [RS, RE], S}) when is_integer(S) -> {{N, RS, RE}, S};
+                ({N, [RS, RE], {S, _, N}}) when is_integer(S) -> {{N, RS, RE}, S}
             end,
             Seq
         )
