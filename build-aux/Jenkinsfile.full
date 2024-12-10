@@ -117,7 +117,8 @@ meta = [
  // but works for the other workers.
  'macos': [
     name: 'macOS',
-    spidermonkey_vsn: '91',
+    // spidermonkey_vsn: '91',
+    disable_spidermonkey: true, // tmp disable until SM>91 support lands
     with_nouveau: false,
     with_clouseau: false,
     gnu_make: 'make'
