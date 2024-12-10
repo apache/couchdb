@@ -55,15 +55,7 @@ meta = [
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
-  'noble-sm102': [
-    name: 'Ubuntu 24.04',
-    spidermonkey_vsn: '102',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
-  ],
-
-  'noble-sm115': [
+  'noble': [
     name: 'Ubuntu 24.04',
     spidermonkey_vsn: '115',
     with_nouveau: true,
