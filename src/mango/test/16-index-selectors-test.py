@@ -82,7 +82,7 @@ oldschoolddoctext = {
 
 class IndexSelectorJson(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
 
     def test_saves_partial_filter_selector_in_index(self):
@@ -189,7 +189,7 @@ class IndexSelectorJson(mango.DbPerClass):
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class IndexSelectorText(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
 
     def test_saves_partialfilterselector_in_index(self):

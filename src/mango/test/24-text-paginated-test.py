@@ -24,7 +24,7 @@ class PaginatedResultsTest(mango.DbPerClass):
     UPDATES = 25
 
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.create_text_index(
             analyzer="keyword",
             default_field={},

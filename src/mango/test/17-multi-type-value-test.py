@@ -52,7 +52,7 @@ class MultiValueFieldTests:
 
 class MultiValueFieldJSONTests(mango.DbPerClass, MultiValueFieldTests):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
         self.db.create_index(["name"])
         self.db.create_index(["age", "name"])
@@ -65,5 +65,5 @@ class MultiValueFieldJSONTests(mango.DbPerClass, MultiValueFieldTests):
 
 class MultiValueFieldAllDocsTests(mango.DbPerClass, MultiValueFieldTests):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))

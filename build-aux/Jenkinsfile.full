@@ -104,13 +104,12 @@ meta = [
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
-  // Temp disable until worker is back
-  // 'freebsd-x86_64': [
-  //    name: 'FreeBSD x86_64',
-  //    spidermonkey_vsn: '91',
-  //    with_clouseau: false,
-  //    gnu_make: 'gmake'
-  // ],
+  'freebsd-x86_64': [
+      name: 'FreeBSD x86_64',
+      spidermonkey_vsn: '91',
+      with_clouseau: false,
+      gnu_make: 'gmake'
+  ],
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
   // use QuickJS for now
@@ -126,7 +125,8 @@ meta = [
  // but works for the other workers.
  'macos': [
     name: 'macOS',
-    spidermonkey_vsn: '91',
+    // spidermonkey_vsn: '91',
+    disable_spidermonkey: true, // tmp disable until SM>91 support lands
     with_nouveau: false,
     with_clouseau: false,
     gnu_make: 'make'

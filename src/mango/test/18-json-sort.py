@@ -25,7 +25,7 @@ DOCS = [
 
 class JSONIndexSortOptimisations(mango.DbPerClass):
     def setUp(self):
-        self.db.recreate()
+        super().setUp(db_per_test=True)
         self.db.save_docs(copy.deepcopy(DOCS))
 
     def test_works_for_basic_case(self):
