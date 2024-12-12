@@ -20,6 +20,21 @@
     :depth: 1
     :local:
 
+.. TODO: Move to 3.5.x.rst if we release 3.5.0 first
+
+.. _release/3.4.3:
+
+Version 3.4.3
+=============
+
+Features
+--------
+* :ghissue:`5321`: Support SpiderMonkey versions 102, 115 and 128 and add
+  Ubuntu 24.04 to CI and binary packages. Special thanks to `Fedor Indutny`_
+  for his help.
+
+.. _Fedor Indutny: http://github.com/indutny
+
 .. _release/3.4.2:
 
 Version 3.4.2
