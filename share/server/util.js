@@ -116,7 +116,14 @@ var Couch = {
         "Expression does not eval to a function. (" + source.toString() + ")"]);
     };
   },
-  recursivelySeal : deepFreeze
+  recursivelySeal: function (obj) {
+    seal(obj);
+    for (var propname in obj) {
+      if (typeof obj[propname] == "object") {
+        arguments.callee(obj[propname]);
+      }
+    }
+  },
 };
 
 function errstr(e) {
@@ -157,10 +164,10 @@ function deepFreeze(object) {
     const propNames = Reflect.ownKeys(object);
 
     // Freeze properties before freezing self
-    for (const name of propNames) {
-        const value = object[name];
+    for (var i in propNames) {
+        const value = object[propNames[i]];
 
-        if (((value && typeof value === "object") || typeof value === "function")) {
+        if ((value && typeof value === "object") || typeof value === "function") {
             deepFreeze(value);
         }
     }
