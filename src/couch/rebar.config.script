@@ -222,17 +222,17 @@ end.
         };
     {win32, _} when SMVsn == "102" ->
         {
-            "/std:c++17 /DXP_WIN",
+            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-102.lib"
          };
     {win32, _} when SMVsn == "115" ->
         {
-            "/std:c++17 /DXP_WIN",
+            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-115.lib"
         };
     {win32, _} when SMVsn == "128" ->
         {
-            "/std:c++17 /DXP_WIN",
+            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-128.lib"
         }
 end.
