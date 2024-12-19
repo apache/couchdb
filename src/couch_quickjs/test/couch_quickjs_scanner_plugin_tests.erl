@@ -25,6 +25,7 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_filter_map, 10),
             ?TDEF_FE(t_map_only, 10),
             ?TDEF_FE(t_vdu_only, 10),
+            ?TDEF_FE(t_non_deterministic_vdu, 10),
             ?TDEF_FE(t_filter_only, 10),
             ?TDEF_FE(t_filter_with_expected_error, 10),
             ?TDEF_FE(t_empty_ddoc, 10),
@@ -201,6 +202,39 @@ t_vdu_only({_, DbName}) ->
             ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
             % start, complete and 1 vdu only = 3 total
             ?assertEqual(3, log_calls(warning));
+        false ->
+            ok
+    end.
+
+t_non_deterministic_vdu({_, DbName}) ->
+    ok = add_doc(DbName, ?DDOC1, ddoc_non_deterministic_vdu(#{})),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(start, 2)),
+    case couch_server:with_spidermonkey() of
+        true ->
+            ?assertEqual(1, num_calls(complete, 1)),
+            ?assertEqual(2, num_calls(checkpoint, 1)),
+            ?assertEqual(1, num_calls(db, ['_', DbName])),
+            ?assertEqual(1, num_calls(ddoc, ['_', DbName, '_'])),
+            ?assert(num_calls(shards, 2) >= 1),
+            DbOpenedCount = num_calls(db_opened, 2),
+            ?assert(DbOpenedCount >= 2),
+            ?assertEqual(1, num_calls(doc_id, ['_', ?DOC1, '_'])),
+            ?assertEqual(1, num_calls(doc_id, ['_', ?DOC2, '_'])),
+            ?assertEqual(1, num_calls(doc_id, ['_', ?DOC3, '_'])),
+            ?assertEqual(1, num_calls(doc_id, ['_', ?DOC4, '_'])),
+            ?assertEqual(1, num_calls(doc_id, ['_', ?DOC5, '_'])),
+            ?assert(num_calls(doc, 3) >= 5),
+            DbClosingCount = num_calls(db_closing, 2),
+            ?assertEqual(DbOpenedCount, DbClosingCount),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_error_exits])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_errors])),
+            ?assertEqual(0, couch_stats:sample([couchdb, query_server, process_exits])),
+            % start, complete and no vdu warning because it has a Math.random(), so 2 total
+            ?assertEqual(2, log_calls(warning));
         false ->
             ok
     end.
@@ -463,6 +497,19 @@ ddoc_vdu(Doc) ->
         >>
     }.
 
+ddoc_non_deterministic_vdu(Doc) ->
+    Doc#{
+        validate_doc_update => <<
+            "function(newdoc, olddoc, userctx, sec){\n"
+            " if (Math.random() > 0.5) {\n"
+            "    throw('forbidden');\n"
+            " } else {\n"
+            "    return true\n"
+            " }\n"
+            "}"
+        >>
+    }.
+
 ddoc_filter(Doc) ->
     Doc#{
         filters => #{
@@ -481,7 +528,8 @@ ddoc_filter(Doc) ->
                 "    if (doc.a == req.query.foo) {return true;} \n"
                 "    return false; \n"
                 "}\n"
-            >>
+            >>,
+            f_non_deterministic => <<"function(doc, req) {return new Date();}}">>
         }
     }.
 
@@ -661,7 +709,8 @@ ddoc_update(Doc) ->
                 "  }\n"
                 "}"
             >>,
-            u3 => <<"function(doc, req) {throw('Potato')}">>
+            u3 => <<"function(doc, req) {throw('Potato')}">>,
+            u4_non_deterministic => <<"function(doc, req) {throw(Date.now())}">>
         }
     }.
 
