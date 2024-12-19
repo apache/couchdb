@@ -210,13 +210,16 @@ process_ddoc(#st{} = St, DbName, #doc{} = DDoc0) ->
                 Views = maps:get(?VIEWS, DDoc, undefined),
                 Clouseau = maps:get(?CLOUSEAU, DDoc, undefined),
                 Nouveau = maps:get(?NOUVEAU, DDoc, undefined),
+                Filters = maps:get(?FILTERS, DDoc, undefined),
+                Updates = maps:get(?UPDATES, DDoc, undefined),
+                Vdu = maps:get(?VDU, DDoc, undefined),
                 lib_load(St1, Views),
-                views_load(St1, valid_views(Views)),
+                views_load(St1, views(Views)),
                 clouseau_load(St1, indexes(Clouseau)),
                 nouveau_load(St1, indexes(Nouveau)),
-                filters_load(St1, maps:get(?FILTERS, DDoc, undefined)),
-                updates_load(St1, maps:get(?UPDATES, DDoc, undefined)),
-                vdu_load(St1, maps:get(?VDU, DDoc, undefined)),
+                filters_load(St1, filters(Filters)),
+                updates_load(St1, updates(Updates)),
+                vdu_load(St1, vdu(Vdu)),
                 St2 = start_or_reset_procs(St1),
                 teach_ddoc_validate(St2, DDocId, DDoc),
                 St2#st{ddocs = DDocs#{DDocId => DDoc}}
@@ -239,11 +242,11 @@ process_ddoc_functions(#st{} = St, Db, DocId, JsonDoc) ->
     DDocFun = fun(DDocId, #{} = DDoc) ->
         try
             Filters = maps:get(?FILTERS, DDoc, undefined),
-            filter_doc_validate(St, DDocId, Filters, JsonDoc),
             VDU = maps:get(?VDU, DDoc, undefined),
-            vdu_doc_validate(St, DDocId, VDU, JsonDoc),
             Updates = maps:get(?UPDATES, DDoc, undefined),
-            update_doc_validate(St, DDocId, Updates, JsonDoc)
+            filter_doc_validate(St, DDocId, filters(Filters), JsonDoc),
+            vdu_doc_validate(St, DDocId, vdu(VDU), JsonDoc),
+            update_doc_validate(St, DDocId, updates(Updates), JsonDoc)
         catch
             throw:{validate, Error} ->
                 Meta = #{sid => SId, db => Db, ddoc => DDocId, doc => DocId},
@@ -286,7 +289,7 @@ views_validate(DDocId, #{?VIEWS := Views}, {Db, #st{} = St0}) when
     #st{sid = SId, docs = Docs} = St,
     try
         lib_load(St, Views),
-        ViewList = lists:sort(maps:to_list(valid_views(Views))),
+        ViewList = lists:sort(maps:to_list(views(Views))),
         case ViewList of
             [_ | _] ->
                 Fun = fun({Name, #{?MAP := Src}}) -> add_fun_load(St, Name, Src) end,
@@ -475,7 +478,7 @@ start_or_reset_sm_proc(#st{sm_proc = #proc{} = Proc} = St) ->
             start_or_reset_sm_proc(St#st{sm_proc = undefined})
     end.
 
-valid_views(#{} = Views) ->
+views(#{} = Views) ->
     Fun = fun
         (?LIB, _) ->
             false;
@@ -487,7 +490,7 @@ valid_views(#{} = Views) ->
             false
     end,
     maps:filter(Fun, Views);
-valid_views(_) ->
+views(_) ->
     #{}.
 
 indexes(#{} = Indexes) ->
@@ -503,6 +506,32 @@ indexes(#{} = Indexes) ->
     maps:fold(Fun, #{}, Indexes);
 indexes(_) ->
     #{}.
+
+updates(#{} = Updates) ->
+    Fun = fun
+        (<<_/binary>>, <<FunSrc/binary>>) -> no_indeterminism(FunSrc);
+        (_, _) -> false
+    end,
+    maps:filter(Fun, Updates);
+updates(_) ->
+    #{}.
+
+filters(#{} = Filters) ->
+    Fun = fun
+        (<<_/binary>>, <<FunSrc/binary>>) -> no_indeterminism(FunSrc);
+        (_, _) -> false
+    end,
+    maps:filter(Fun, Filters);
+filters(_) ->
+    #{}.
+
+vdu(<<FunSrc/binary>>) ->
+    case no_indeterminism(FunSrc) of
+        true -> FunSrc;
+        false -> undefined
+    end;
+vdu(_) ->
+    undefined.
 
 % Math.random(), Date.now() or new Date() will always show as false postives
 %
