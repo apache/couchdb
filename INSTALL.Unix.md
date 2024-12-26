@@ -66,7 +66,7 @@ You can install the dependencies by running:
         build-essential pkg-config erlang erlang-reltool \
         libicu-dev libmozjs-60-dev python3
 
-Your distribution may have `libmozjs-68-dev` instead of 60. Both are supported.
+Your distribution may have `libmozjs-68-dev` instead of 60. Both are supported. Newer versions of `libmozjs-...-dev` may also work; you can find which are available using `apt-cache search libmozjs`.
 
 You can install Node.JS [NodeSource](https://github.com/nodesource/distributions#installation-instructions).
 
