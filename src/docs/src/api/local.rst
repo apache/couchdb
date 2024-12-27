@@ -113,6 +113,7 @@ A list of the available methods and URL paths are provided below:
       that this is not the number of rows returned in the actual query.
     :>json number update_seq: Current update sequence for the database
     :code 200: Request completed successfully
+    :code 403: Forbidden
 
     **Request**:
 
@@ -178,6 +179,9 @@ A list of the available methods and URL paths are provided below:
 .. http:post:: /{db}/_local_docs
     :synopsis: Returns a built-in view of all local (non-replicating) documents
       in this database
+
+    :param db: Database name
+    :code 403: Forbidden
 
     :method:`POST` `_local_docs` functionality supports identical parameters and behavior
     as specified in the :get:`/{db}/_local_docs` API but allows for the query string
@@ -260,6 +264,7 @@ A list of the available methods and URL paths are provided below:
     :code 200: Request completed successfully
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Forbidden
     :code 404: Specified database is missing
     :code 500: Query execution error
 
