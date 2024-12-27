@@ -551,9 +551,11 @@ specific request types are provided in the corresponding API call reference.
   The item requested was not available using the supplied authorization, or
   authorization was not supplied.
 
+.. _error/403:
+
 - ``403 - Forbidden``
 
-  The requested item or operation is forbidden. This might be because;
+  The requested item or operation is forbidden. This might be because:
 
   * Your user name or roles do not match the security object of the database
   * The request requires administrator privileges but you don't have them
