@@ -22,7 +22,9 @@
     len_docs,
     w,
     grouped_docs,
-    reply
+    reply,
+    update_options,
+    started = []
 }).
 
 go(_, [], _) ->
@@ -33,10 +35,8 @@ go(DbName, AllDocs0, Opts) ->
     validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
     Options = lists:delete(all_or_nothing, Opts),
     GroupedDocs = lists:map(
-        fun({#shard{name = Name, node = Node} = Shard, Docs}) ->
-            Docs1 = untag_docs(Docs),
-            Ref = rexi:cast(Node, {fabric_rpc, update_docs, [Name, Docs1, Options]}),
-            {Shard#shard{ref = Ref}, Docs}
+        fun({#shard{} = Shard, Docs}) ->
+            {Shard#shard{ref = make_ref()}, Docs}
         end,
         group_docs_by_shard(DbName, AllDocs)
     ),
@@ -44,6 +44,7 @@ go(DbName, AllDocs0, Opts) ->
     RexiMon = fabric_util:create_monitors(Workers),
     W = couch_util:get_value(w, Options, integer_to_list(mem3:quorum(DbName))),
     Acc0 = #acc{
+        update_options = Options,
         waiting_count = length(Workers),
         len_docs = length(AllDocs),
         w = list_to_integer(W),
@@ -51,7 +52,8 @@ go(DbName, AllDocs0, Opts) ->
         reply = dict:new()
     },
     Timeout = fabric_util:request_timeout(),
-    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
+    Acc1 = start_leaders(Acc0),
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc1, infinity, Timeout) of
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
@@ -101,6 +103,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
         reply = DocReplyDict0
     } = Acc0,
     {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
+    Acc1 = start_followers(Worker, Acc0),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),
     case {WaitingCount, dict:size(DocReplyDict)} of
         {1, _} ->
@@ -115,7 +118,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
             % we've got at least one reply for each document, let's take a look
             case dict:fold(fun maybe_reply/3, {stop, W, []}, DocReplyDict) of
                 continue ->
-                    {ok, Acc0#acc{
+                    {ok, Acc1#acc{
                         waiting_count = WaitingCount - 1,
                         grouped_docs = NewGrpDocs,
                         reply = DocReplyDict
@@ -124,7 +127,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
                     {stop, {ok, FinalReplies}}
             end;
         _ ->
-            {ok, Acc0#acc{
+            {ok, Acc1#acc{
                 waiting_count = WaitingCount - 1, grouped_docs = NewGrpDocs, reply = DocReplyDict
             }}
     end;
@@ -317,6 +320,52 @@ group_docs_by_shard(DbName, Docs) ->
             Docs
         )
     ).
+
+%% use 'lowest' node that hosts this shard range as leader
+is_leader(Worker, Workers) ->
+    Worker == lists:min([W || W <- Workers, W#shard.range == Worker#shard.range]).
+
+start_leaders(#acc{} = Acc0) ->
+    #acc{grouped_docs = GroupedDocs} = Acc0,
+    {Workers, _} = lists:unzip(GroupedDocs),
+    Started = lists:foldl(
+        fun({Worker, Docs}, RefAcc) ->
+            case is_leader(Worker, Workers) of
+                true ->
+                    start_worker(Worker, Docs, Acc0),
+                    [Worker#shard.ref | RefAcc];
+                false ->
+                    RefAcc
+            end
+        end,
+        [],
+        GroupedDocs
+    ),
+    Acc0#acc{started = lists:append([Started, Acc0#acc.started])}.
+
+start_followers(#shard{} = Leader, #acc{} = Acc0) ->
+    Followers = [
+        {Worker, _Docs}
+     || {Worker, _Docs} <- Acc0#acc.grouped_docs,
+        Worker#shard.range == Leader#shard.range,
+        not lists:member(Worker#shard.ref, Acc0#acc.started)
+    ],
+    lists:foreach(
+        fun({Worker, Docs}) ->
+            start_worker(Worker, Docs, Acc0)
+        end,
+        Followers
+    ),
+    Started = [Ref || {#shard{ref = Ref}, _Docs} <- Followers],
+    Acc0#acc{started = lists:append([Started, Acc0#acc.started])}.
+
+start_worker(#shard{ref = Ref} = Worker, Docs, #acc{} = Acc0) when is_reference(Ref) ->
+    #shard{name = Name, node = Node} = Worker,
+    #acc{update_options = UpdateOptions} = Acc0,
+    rexi:cast_ref(Ref, Node, {fabric_rpc, update_docs, [Name, untag_docs(Docs), UpdateOptions]}),
+    ok;
+start_worker(#shard{ref = undefined}, _Docs, #acc{}) ->
+    ok.
 
 append_update_replies([], [], DocReplyDict) ->
     DocReplyDict;
