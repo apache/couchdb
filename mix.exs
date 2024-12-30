@@ -54,7 +54,7 @@ defmodule CouchDBTest.Mixfile do
       lockfile: Path.expand("mix.lock", __DIR__),
       deps_path: Path.expand("src", __DIR__),
       build_path: Path.expand("_build", __DIR__),
-      compilers: [:elixir, :app],
+      compilers: [:elixir, :app, :leex, :yecc],
       start_permanent: Mix.env() == :prod,
       build_embedded: Mix.env() == :prod,
       deps: deps(),
