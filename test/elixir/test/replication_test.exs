@@ -1307,7 +1307,7 @@ defmodule ReplicationTest do
       is_ddoc = String.starts_with?(doc["_id"], "_design/")
 
       case doc["integer"] do
-        N when (N >= 10 and N < 15) or is_ddoc ->
+        n when (n >= 10 and n < 15) or is_ddoc ->
           resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
           atts = resp.body["_attachments"]
           assert is_map(atts)
