@@ -71,12 +71,7 @@ defmodule CouchDBTest.Mixfile do
   end
 
   # Run "mix help compile.app" to learn about applications.
-  def application do
-    [
-      extra_applications: [:logger],
-      applications: [:httpotion]
-    ]
-  end
+  def application, do: [applications: [:logger, :httpotion]]
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["test/elixir/lib", "test/elixir/test/support"]
@@ -85,20 +80,27 @@ defmodule CouchDBTest.Mixfile do
 
   # Run "mix help deps" to learn about dependencies.
   defp deps() do
-    deps_list = [
+    deps1 = [
       {:junit_formatter, "~> 3.0", only: [:dev, :test, :integration]},
       {:httpotion, ">= 3.1.3", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.12", only: :test},
-      {:b64url, path: path("b64url")},
-      {:jiffy, path: path("jiffy")},
-      {:jwtf, path: path("jwtf")},
       {:ibrowse, path: path("ibrowse"), override: true},
       {:credo, "~> 1.7.7", only: [:dev, :test, :integration], runtime: false}
     ]
 
+    extra_deps = [:b64url, :jiffy, :jwtf, :meck, :mochiweb]
+    deps2 = Enum.map(extra_deps, &{&1, path: path(&1)})
+
+    deps_list = deps1 ++ deps2
+
+    [:config, :couch, :fabric]
+    |> Enum.map(&path("#{&1}/ebin"))
+    |> Enum.map(&String.to_charlist/1)
+    |> Enum.each(&:code.add_patha/1)
+
     # Some deps may be missing during source check
     # Besides we don't want to spend time checking them anyway
-    List.foldl([:b64url, :jiffy, :jwtf, :ibrowse], deps_list, fn dep, acc ->
+    List.foldl([:ibrowse | extra_deps], deps_list, fn dep, acc ->
       if File.dir?(acc[dep][:path]) do
         acc
       else
@@ -107,10 +109,7 @@ defmodule CouchDBTest.Mixfile do
     end)
   end
 
-  defp path(app) do
-    lib_dir = Path.expand("src", __DIR__)
-    Path.expand(app, lib_dir)
-  end
+  defp path(app), do: Path.expand("src/#{app}", __DIR__)
 
   def get_test_paths(:test) do
     Path.wildcard("src/*/test/exunit") |> Enum.filter(&File.dir?/1)
@@ -123,9 +122,7 @@ defmodule CouchDBTest.Mixfile do
     ["test/elixir/test" | integration_tests]
   end
 
-  def get_test_paths(_) do
-    []
-  end
+  def get_test_paths(_), do: []
 
   defp get_deps_paths() do
     deps = [
