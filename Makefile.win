@@ -215,7 +215,8 @@ ifeq ($(with_nouveau), false)
 endif
 
 .PHONY: elixir-init
-elixir-init: MIX_ENV=integration
+elixir-init: export MIX_ENV=integration
+elixir-init: export ELIXIR_ERL_OPTIONS=+fnu
 elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
@@ -268,6 +269,7 @@ endif
 .PHONY: elixir-source-checks
 # target: elixir-source-checks - Check source code formatting of Elixir test files
 elixir-source-checks: export MIX_ENV=integration
+elixir-source-checks: export ELIXIR_ERL_OPTIONS=+fnu
 elixir-source-checks: elixir-init
 	@mix format --check-formatted
 	@mix credo
