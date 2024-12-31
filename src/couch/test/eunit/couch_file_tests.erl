@@ -80,15 +80,23 @@ read_write_test_() ->
                     ?TDEF_FE(should_increase_file_size_on_write),
                     ?TDEF_FE(should_return_current_file_size_on_write),
                     ?TDEF_FE(should_write_and_read_term),
+                    ?TDEF_FE(should_read_write_multiple_terms),
                     ?TDEF_FE(should_write_and_read_binary),
                     ?TDEF_FE(should_write_and_read_large_binary),
                     ?TDEF_FE(should_return_term_as_binary_for_reading_binary),
                     ?TDEF_FE(should_read_term_written_as_binary),
-                    ?TDEF_FE(should_read_iolist),
                     ?TDEF_FE(should_fsync),
+                    ?TDEF_FE(should_fsync_by_path),
                     ?TDEF_FE(should_update_fsync_stats),
                     ?TDEF_FE(should_not_read_beyond_eof),
-                    ?TDEF_FE(should_truncate)
+                    ?TDEF_FE(should_truncate),
+                    ?TDEF_FE(should_set_db_pid),
+                    ?TDEF_FE(should_update_last_read_time),
+                    ?TDEF_FE(should_open_read_only),
+                    ?TDEF_FE(should_apply_overwrite_create_option),
+                    ?TDEF_FE(should_error_on_creation_if_exists),
+                    ?TDEF_FE(should_close_on_idle),
+                    ?TDEF_FE(should_crash_on_unexpected_cast)
                 ]
             }
         }
@@ -108,9 +116,16 @@ should_write_and_read_term(Fd) ->
     {ok, Pos, _} = couch_file:append_term(Fd, foo),
     ?assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
 
+should_read_write_multiple_terms(Fd) ->
+    {ok, [{Pos1, _}, {Pos2, _}]} = couch_file:append_terms(Fd, [foo, bar]),
+    ?assertMatch({ok, [bar, foo]}, couch_file:pread_terms(Fd, [Pos2, Pos1])).
+
 should_write_and_read_binary(Fd) ->
-    {ok, Pos, _} = couch_file:append_binary(Fd, <<"fancy!">>),
-    ?assertMatch({ok, <<"fancy!">>}, couch_file:pread_binary(Fd, Pos)).
+    {ok, Pos1, _} = couch_file:append_binary(Fd, <<"fancy!">>),
+    ?assertMatch({ok, <<"fancy!">>}, couch_file:pread_binary(Fd, Pos1)),
+    {ok, Pos2, _} = couch_file:append_binary(Fd, ["foo", $m, <<"bam">>]),
+    {ok, Bin} = couch_file:pread_binary(Fd, Pos2),
+    ?assertMatch(<<"foombam">>, Bin).
 
 should_return_term_as_binary_for_reading_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_term(Fd, foo),
@@ -126,15 +141,15 @@ should_write_and_read_large_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, BigBin),
     ?assertMatch({ok, BigBin}, couch_file:pread_binary(Fd, Pos)).
 
-should_read_iolist(Fd) ->
-    %% append_binary == append_iolist?
-    %% Possible bug in pread_iolist or iolist() -> append_binary
-    {ok, Pos, _} = couch_file:append_binary(Fd, ["foo", $m, <<"bam">>]),
-    {ok, IoList} = couch_file:pread_iolist(Fd, Pos),
-    ?assertMatch(<<"foombam">>, iolist_to_binary(IoList)).
-
 should_fsync(Fd) ->
     ?assertMatch(ok, couch_file:sync(Fd)).
+
+should_fsync_by_path(Fd) ->
+    {_, Path} = couch_file:process_info(Fd),
+    Count1 = couch_stats:sample([fsync, count]),
+    ?assertMatch(ok, couch_file:sync(Path)),
+    Count2 = couch_stats:sample([fsync, count]),
+    ?assert(Count2 > Count1).
 
 should_update_fsync_stats(Fd) ->
     Count0 = couch_stats:sample([fsync, count]),
@@ -159,9 +174,7 @@ should_not_read_beyond_eof(_) ->
     ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
     file:close(Io),
     unlink(Fd),
-    ExpectExit = {bad_return_value, {read_beyond_eof, Filepath}},
-    ExpectError = {badmatch, {'EXIT', ExpectExit}},
-    ?assertError(ExpectError, couch_file:pread_binary(Fd, Pos)),
+    ?assertMatch({error, {read_beyond_eof, Filepath, _, _}}, couch_file:pread_binary(Fd, Pos)),
     catch file:close(Fd).
 
 should_truncate(Fd) ->
@@ -171,6 +184,101 @@ should_truncate(Fd) ->
     {ok, _, _} = couch_file:append_binary(Fd, BigBin),
     ok = couch_file:truncate(Fd, Size),
     ?assertMatch({ok, foo}, couch_file:pread_term(Fd, 0)).
+
+should_set_db_pid(Fd) ->
+    FakeDbFun = fun() ->
+        receive
+            Reason -> exit(Reason)
+        end
+    end,
+    FakeDbPid1 = spawn(FakeDbFun),
+    ?assertEqual(ok, couch_file:set_db_pid(Fd, FakeDbPid1)),
+    % Now replace it with another one
+    FakeDbPid2 = spawn(FakeDbFun),
+    ?assertEqual(ok, couch_file:set_db_pid(Fd, FakeDbPid2)),
+    FakeDbPid1 ! die,
+    ?assertEqual(ok, couch_file:sync(Fd)),
+    ?assert(is_process_alive(Fd)),
+    % Can't monitor the couch_file or it won't register as idle and won't exit
+    FakeDbPid2 ! die,
+    test_util:wait(
+        fun() ->
+            case is_process_alive(Fd) of
+                true -> wait;
+                false -> ok
+            end
+        end,
+        5000,
+        100
+    ),
+    ?assertNot(is_process_alive(Fd)).
+
+should_update_last_read_time(Fd) ->
+    {ok, Pos, _} = couch_file:append_term(Fd, foo),
+    ReadTs1 = couch_file:last_read(Fd),
+    ?assertMatch({_, _, _}, ReadTs1),
+    {ok, foo} = couch_file:pread_term(Fd, Pos),
+    ReadTs2 = couch_file:last_read(Fd),
+    ?assertMatch({_, _, _}, ReadTs2),
+    ?assert(ReadTs2 > ReadTs1).
+
+should_open_read_only(Fd) ->
+    {_, Path} = couch_file:process_info(Fd),
+    {ok, Pos, _} = couch_file:append_term(Fd, foo),
+    {ok, Fd1} = couch_file:open(Path, [read_only]),
+    ?assertEqual({ok, foo}, couch_file:pread_term(Fd1, Pos)),
+    ?assertMatch({error, _}, couch_file:append_binary(Fd1, <<"bar">>)),
+    ?assertMatch({error, _}, couch_file:append_term(Fd1, bar)),
+    ?assertMatch({error, _}, couch_file:append_terms(Fd1, [bar, baz])),
+    catch couch_file:close(Fd1).
+
+should_apply_overwrite_create_option(Fd) ->
+    {_, Path} = couch_file:process_info(Fd),
+    {ok, Pos, _} = couch_file:append_term(Fd, foo),
+    ?assertEqual(ok, couch_file:close(Fd)),
+    {ok, Fd1} = couch_file:open(Path, [create, overwrite]),
+    unlink(Fd1),
+    ExpectError = {error, {read_beyond_eof, Path, Pos, 0}},
+    ?assertEqual(ExpectError, couch_file:pread_term(Fd1, Pos)).
+
+should_error_on_creation_if_exists(Fd) ->
+    {_, Path} = couch_file:process_info(Fd),
+    {ok, _, _} = couch_file:append_term(Fd, foo),
+    ?assertEqual(ok, couch_file:close(Fd)),
+    ?assertEqual({error, eexist}, couch_file:open(Path, [create])).
+
+should_close_on_idle(Fd) ->
+    % If something is monitoring it, it's considered "not idle" so shouldn't close
+    Ref = monitor(process, Fd),
+    Fd ! maybe_close,
+    ?assertEqual(ok, couch_file:sync(Fd)),
+    ?assert(true, is_process_alive(Fd)),
+    demonitor(Ref, [flush]),
+    % Nothing is monitoring it, now it should close
+    Fd ! maybe_close,
+    test_util:wait(
+        fun() ->
+            case is_process_alive(Fd) of
+                true -> wait;
+                false -> ok
+            end
+        end,
+        5000,
+        100
+    ),
+    ?assertNot(is_process_alive(Fd)).
+
+should_crash_on_unexpected_cast(Fd) ->
+    % Crash a newly opened one as Fd is linked to the test process
+    {_, Path} = couch_file:process_info(Fd),
+    {ok, Fd1} = couch_file:open(Path, [read_only]),
+    true = unlink(Fd1),
+    Ref = monitor(process, Fd1),
+    ok = gen_server:cast(Fd1, potato),
+    receive
+        {'DOWN', Ref, _, _, Reason} ->
+            ?assertEqual({invalid_cast, potato}, Reason)
+    end.
 
 pread_limit_test_() ->
     {
@@ -207,9 +315,13 @@ should_not_read_more_than_pread_limit(_) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
     unlink(Fd),
-    ExpectExit = {bad_return_value, {exceed_pread_limit, Filepath, 50000}},
-    ExpectError = {badmatch, {'EXIT', ExpectExit}},
-    ?assertError(ExpectError, couch_file:pread_binary(Fd, Pos)),
+    Ref = monitor(process, Fd),
+    ExpectError = {error, {exceed_pread_limit, Filepath, 50000}},
+    ?assertEqual(ExpectError, couch_file:pread_binary(Fd, Pos)),
+    receive
+        {'DOWN', Ref, _, _, Reason} ->
+            ?assertEqual(ExpectError, Reason)
+    end,
     catch file:close(Fd).
 
 header_test_() ->
