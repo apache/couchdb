@@ -59,7 +59,7 @@ defmodule ViewPaginationTest do
 
     query_function = "function(doc) { emit(doc.integer, null); }"
 
-    100..0
+    100..0//-1
     |> Enum.filter(fn number -> rem(number, 10) === 0 end)
     |> Enum.map(&(&1 - 1))
     |> Enum.filter(&(&1 > 0))
