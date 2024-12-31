@@ -88,7 +88,7 @@ defmodule UUIDsTest do
 
     Enum.reduce(resp.body["uuids"], fn curr, acc ->
       assert String.length(curr) == 14 + String.length(@utc_id_suffix)
-      assert String.slice(curr, 14..-1) == @utc_id_suffix
+      assert String.slice(curr, 14..-1//-1) == @utc_id_suffix
       assert curr > acc
       curr
     end)
