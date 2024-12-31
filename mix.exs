@@ -50,7 +50,7 @@ defmodule CouchDBTest.Mixfile do
     [
       app: :couchdbtest,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.17",
       lockfile: Path.expand("mix.lock", __DIR__),
       deps_path: Path.expand("src", __DIR__),
       build_path: Path.expand("_build", __DIR__),
@@ -81,11 +81,11 @@ defmodule CouchDBTest.Mixfile do
   # Run "mix help deps" to learn about dependencies.
   defp deps() do
     deps1 = [
-      {:junit_formatter, "~> 3.0", only: [:dev, :test, :integration]},
-      {:httpotion, ">= 3.1.3", only: [:dev, :test, :integration], runtime: false},
-      {:excoveralls, "~> 0.12", only: :test},
+      {:junit_formatter, "~> 3.4", only: [:dev, :test, :integration]},
+      {:httpotion, ">= 3.2.0", only: [:dev, :test, :integration], runtime: false},
+      {:excoveralls, "~> 0.18.3", only: :test},
       {:ibrowse, path: path("ibrowse"), override: true},
-      {:credo, "~> 1.7.7", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "~> 1.7.11", only: [:dev, :test, :integration], runtime: false}
     ]
 
     extra_deps = [:b64url, :jiffy, :jwtf, :meck, :mochiweb]
