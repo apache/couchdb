@@ -570,7 +570,7 @@ Authentication Configuration
         When set to ``warn``, CouchDB will log a warning when repeated
         authentication failures occur for a specific user and client IP address.
 
-        When set to ``enforce`` (the default), CouchDB will will reject requests with a
+        When set to ``enforce`` (the default), CouchDB will reject requests with a
         403 status code if repeated authentication failures occur for a
         specific user and client IP address. ::
 
