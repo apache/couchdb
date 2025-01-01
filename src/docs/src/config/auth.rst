@@ -564,13 +564,13 @@ Authentication Configuration
 
     .. config:option:: mode :: lockout mode
 
-        When set to ``off`` (the default), CouchDB will not track repeated
+        When set to ``off``, CouchDB will not track repeated
         authentication failures.
 
         When set to ``warn``, CouchDB will log a warning when repeated
         authentication failures occur for a specific user and client IP address.
 
-        When set to ``enforce``, CouchDB will will reject requests with a
+        When set to ``enforce`` (the default), CouchDB will will reject requests with a
         403 status code if repeated authentication failures occur for a
         specific user and client IP address. ::
 
