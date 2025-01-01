@@ -74,24 +74,32 @@ go(DbName, AllDocs0, Opts) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Worker, #acc{} = Acc0) ->
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, Worker, #acc{} = Acc0) ->
     #acc{grouped_docs = GroupedDocs} = Acc0,
     NewGrpDocs = [X || {#shard{node = N}, _} = X <- GroupedDocs, N =/= NodeRef],
-    skip_message(Acc0#acc{waiting_count = length(NewGrpDocs), grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = length(NewGrpDocs), grouped_docs = NewGrpDocs},
+    Acc2 = start_followers(Worker, Acc1),
+    skip_message(Acc2);
 handle_message({rexi_EXIT, _}, Worker, #acc{} = Acc0) ->
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs},
+    Acc2 = start_followers(Worker, Acc1),
+    skip_message(Acc2);
 handle_message({error, all_dbs_active}, Worker, #acc{} = Acc0) ->
     % treat it like rexi_EXIT, the hope at least one copy will return successfully
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs},
+    Acc2 = start_followers(Worker, Acc1),
+    skip_message(Acc2);
 handle_message(internal_server_error, Worker, #acc{} = Acc0) ->
     % happens when we fail to load validation functions in an RPC worker
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs},
+    Acc2 = start_followers(Worker, Acc1),
+    skip_message(Acc2);
 handle_message(attachment_chunk_received, _Worker, #acc{} = Acc0) ->
     {ok, Acc0};
 handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
