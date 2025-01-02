@@ -40,7 +40,7 @@ from pbkdf2 import pbkdf2_hex
 
 COMMON_SALT = uuid.uuid4().hex
 
-from urllib.request import urlopen
+from urllib.request import *
 import http.client as httpclient
 
 
@@ -942,7 +942,7 @@ def ensure_all_nodes_alive(ctx):
             local_port = cluster_port(ctx, idnode)
             url = "http://127.0.0.1:{0}/".format(local_port)
             try:
-                check_node_alive(url)
+                check_node_alive(url, *ctx["admin"])
                 maybe_check_clouseau_node_alive(ctx, idnode)
             except:
                 pass
@@ -957,8 +957,15 @@ def ensure_all_nodes_alive(ctx):
 
 
 @log("Check node at {url}")
-def check_node_alive(url):
+def check_node_alive(url, user, pswd):
     error = None
+
+    PasswordMgr = HTTPPasswordMgrWithDefaultRealm()
+    PasswordMgr.add_password(None, url, user, pswd)
+    AuthHandler = HTTPBasicAuthHandler(PasswordMgr)
+    opener = build_opener(AuthHandler)
+    install_opener(opener)
+
     for _ in range(10):
         try:
             with contextlib.closing(urlopen(url)):
