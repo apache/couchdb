@@ -320,7 +320,7 @@ pipeline {
       agent {
         docker {
           label 'docker'
-          image "apache/couchdbci-debian:bullseye-erlang-${MINIMUM_ERLANG_VERSION}"
+          image "apache/couchdbci-debian:bookworm-erlang-${MINIMUM_ERLANG_VERSION}"
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
           registryCredentialsId 'dockerhub_creds'
