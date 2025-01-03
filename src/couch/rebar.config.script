@@ -222,17 +222,17 @@ end.
         };
     {win32, _} when SMVsn == "102" ->
         {
-            "/std:c++17 /DXP_WIN",
+            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-102.lib"
          };
     {win32, _} when SMVsn == "115" ->
         {
-            "/std:c++17 /DXP_WIN",
+            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-115.lib"
         };
     {win32, _} when SMVsn == "128" ->
         {
-            "/std:c++17 /DXP_WIN",
+            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-128.lib"
         }
 end.
@@ -262,12 +262,31 @@ CouchJSEnv = case SMVsn of
         ]
 end.
 
+BrewIcuPrefixCmd = "brew --prefix icu4c".
+GenericIcuIncludePaths = "-I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include".
+GenericIcuLibPaths = "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib".
+
+WithBrew = case os:find_executable("brew") of
+    false -> false;
+    _ -> true
+end.
+
+IcuIncludePath = case WithBrew of
+    false -> GenericIcuIncludePaths;
+    true -> "-I" ++ string:strip(os:cmd(BrewIcuPrefixCmd), right, $\n) ++ "/include"
+end.
+
+IcuLibPath = case WithBrew of
+    false -> GenericIcuLibPaths;
+    true -> "-L" ++ string:strip(os:cmd(BrewIcuPrefixCmd), right, $\n) ++ "/lib"
+end.
+
 IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
           {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"},
           {"LDFLAGS", "$LDFLAGS"},
           {"CFLAGS", "$CFLAGS"}].
-IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include"},
-                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib"}].
+IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX " ++ IcuIncludePath},
+                {"LDFLAGS", IcuLibPath}].
 IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
              {"LDFLAGS", "-L/usr/local/lib"}].
 IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},

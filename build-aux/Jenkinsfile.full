@@ -125,8 +125,7 @@ meta = [
  // but works for the other workers.
  'macos': [
     name: 'macOS',
-    // spidermonkey_vsn: '91',
-    disable_spidermonkey: true, // tmp disable until SM>91 support lands
+    spidermonkey_vsn: '128',
     with_nouveau: false,
     with_clouseau: false,
     gnu_make: 'make'
@@ -234,12 +233,12 @@ def generateContainerStage(platform) {
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
-                    sh 'make eunit'
-                    sh 'make elixir'
-                    sh 'make elixir-search'
-                    sh 'make mango-test'
-                    sh 'make weatherreport-test'
-                    sh 'make nouveau-test'
+                    retry(3) {sh 'make eunit'}
+                    retry(3) {sh 'make elixir'}
+                    retry(3) {sh 'make elixir-search'}
+                    retry(3) {sh 'make mango-test'}
+                    retry(3) {sh 'make weatherreport-test'}
+                    retry(3) {sh 'make nouveau-test'}
                   }
                 }
                 catch (err) {

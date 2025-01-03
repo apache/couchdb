@@ -88,7 +88,7 @@ defmodule CompactTest do
     assert resp.status_code in [201, 202]
 
     att_rev2 = resp.body["rev"]
-    docs ++ [%{"_id": "#{doc2._id}", "_rev": att_rev2}]
+    docs ++ [%{_id: "#{doc2._id}", _rev: att_rev2}]
   end
 
   defp delete(db, docs) do

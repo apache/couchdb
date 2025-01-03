@@ -137,13 +137,13 @@ defmodule NouveauTest do
       "status code: #{resp.status_code}, resp body: #{:jiffy.encode(resp.body)}"
   end
 
-  test "user-agent header is forbidden", context do
+  test "user-agent header is forbidden", _context do
     resp = Couch.get("http://127.0.0.1:5987",
       headers: ["User-Agent": "couchdb"])
     assert_status_code(resp, 403)
   end
 
-  test "search analyze", context do
+  test "search analyze", _context do
     url = "/_nouveau_analyze"
     resp = Couch.post(url,
       headers: ["Content-Type": "application/json"],
@@ -585,7 +585,7 @@ defmodule NouveauTest do
   @tag :with_db
   test "purge with conflicts", context do
     db_name = context[:db_name]
-    create_resp = create_conflicted_search_docs(db_name)
+    _create_resp = create_conflicted_search_docs(db_name)
     create_ddoc(db_name)
 
     search_url = "/#{db_name}/_design/foo/_nouveau/bar"
@@ -621,7 +621,7 @@ defmodule NouveauTest do
 
     resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
     assert_status_code(resp, 200)
-    hits = Enum.sort(resp.body["hits"])
+    _hits = Enum.sort(resp.body["hits"])
 
     assert get_total_hits(resp) == 2
     [hit1, hit2] = Enum.sort(resp.body["hits"])
