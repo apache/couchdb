@@ -35,6 +35,7 @@
     :code 200: Request completed successfully
     :code 400: Invalid database name
     :code 401: Read privilege required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 415: Bad :header:`Content-Type` value
     :code 500: Internal server error or timeout
 
@@ -125,6 +126,7 @@
     :>json array nodes: List of nodes serving a replica of the shard
     :code 200: Request completed successfully
     :code 401: Read privilege required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Database or document not found
     :code 500: Internal server error or timeout
 
@@ -186,6 +188,7 @@
     :code 202: Request accepted
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Database not found
     :code 500: Internal server error or timeout
 
