@@ -136,6 +136,8 @@
     :>json array results: Changes made to a database
     :code 200: Request completed successfully
     :code 400: Bad request
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     The ``results`` field of database changes:
 

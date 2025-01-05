@@ -80,6 +80,8 @@
     :>json object members: Object with two fields as ``names`` and ``roles``.
       See description above for more info.
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -138,6 +140,7 @@
     :>json boolean ok: Operation status
     :code 200: Request completed successfully
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 

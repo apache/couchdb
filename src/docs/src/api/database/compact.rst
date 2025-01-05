@@ -54,6 +54,7 @@
     :code 202: Compaction request has been accepted
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 415: Bad :header:`Content-Type` value
 
     **Request**:
@@ -107,6 +108,7 @@
     :code 202: Compaction request has been accepted
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Design document not found
     :code 415: Bad :header:`Content-Type` value
 
@@ -167,6 +169,8 @@
     :>json boolean ok: Operation status
     :code 201: Commit completed successfully
     :code 400: Invalid database name
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 415: Bad :header:`Content-Type` value
 
     **Request**:
@@ -219,6 +223,7 @@
     :code 202: Compaction request has been accepted
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 415: Bad :header:`Content-Type` value
 
     **Request**:

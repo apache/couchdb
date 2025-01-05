@@ -48,6 +48,8 @@
     :code 202: Request was accepted, and was completed successfully on at least
                one replica, but quorum was not reached.
     :code 400: Invalid database name or JSON payload
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 415: Bad :header:`Content-Type` value
     :code 500: Internal server error or timeout
 
@@ -193,6 +195,8 @@ following behavior:
                            - :mimetype:`text/plain; charset=utf-8`
     :code 200: Request completed successfully
     :code 400: Invalid database name
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -244,6 +248,8 @@ following behavior:
     :>header Content-Type: - :mimetype:`application/json`
                            - :mimetype:`text/plain; charset=utf-8`
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -294,6 +300,8 @@ following behavior:
     :>json boolean ok: Operation status
     :code 200: Request completed successfully
     :code 400: Invalid JSON data
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -346,6 +354,8 @@ following behavior:
       revisions
     :code 200: Request completed successfully
     :code 400: Invalid database name or JSON payload
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -425,6 +435,8 @@ following behavior:
       for specified document and its current revision in requested database
     :code 200: Request completed successfully
     :code 400: Invalid database name or JSON payload
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -485,6 +497,8 @@ following behavior:
     :>header Content-Type: - :mimetype:`application/json`
                            - :mimetype:`text/plain; charset=utf-8`
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -525,6 +539,8 @@ following behavior:
     :>json boolean ok: Operation status
     :code 200: Request completed successfully
     :code 400: Invalid JSON data
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
