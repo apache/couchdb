@@ -638,7 +638,7 @@ The Replication Log SHOULD contain the following fields:
 - **source_last_seq** (*number*): Last processed Checkpoint. Shortcut to
   the ``recorded_seq`` field of the latest ``history`` object. **Required**
 
-This request MAY fall with a :statuscode:`404` response:
+This request MAY fail with a :statuscode:`404` response:
 
     **Request**:
 
