@@ -99,6 +99,7 @@
     :code 200: Request completed successfully
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Requested database not found
     :code 500: Query execution error
 
@@ -370,6 +371,7 @@ built using MapReduce Views.
     :code 200: Index created successfully or already exists
     :code 400: Invalid request
     :code 401: Admin permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Database not found
     :code 500: Execution error
 
@@ -471,6 +473,7 @@ present, including those which have ``null`` values.
     :code 200: Success
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Execution error
 
     **Request**:
@@ -540,6 +543,7 @@ present, including those which have ``null`` values.
     :code 200: Success
     :code 400: Invalid request
     :code 401: Writer permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Index not found
     :code 500: Execution error
 
@@ -590,6 +594,8 @@ present, including those which have ``null`` values.
 
    :code 200: Success
    :code 400: Invalid request
+   :code 401: Unauthorized request to a protected API
+   :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
    :code 404: Requested database not found
    :code 500: Execution error
 
@@ -683,6 +689,7 @@ present, including those which have ``null`` values.
     :code 200: Request completed successfully
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Execution error
 
     **Request**:
