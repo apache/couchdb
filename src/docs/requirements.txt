@@ -3,3 +3,6 @@ sphinx-rtd-theme==3.0.2
 sphinxcontrib-httpdomain==1.8.1
 sphinxcontrib-jquery==4.1
 sphinx-copybutton==0.5.2
+# Pygments 2.19.0 improperly renders .ini files
+# See https://github.com/pygments/pygments/issues/2834
+pygments>=2.18.0,!=2.19.0
