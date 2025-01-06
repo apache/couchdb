@@ -3,3 +3,4 @@ sphinx-rtd-theme==3.0.2
 sphinxcontrib-httpdomain==1.8.1
 sphinxcontrib-jquery==4.1
 sphinx-copybutton==0.5.2
+pygments @ git+https://github.com/pygments/pygments.git@a9858663ed85219ed7475f5877b22b9cb49f660f
