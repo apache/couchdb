@@ -21,6 +21,7 @@ github:
     squash: true
     rebase: true
     merge: true
+  del_branch_on_merge: true
   protected_branches:
     main:
       required_status_checks:
