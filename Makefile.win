@@ -442,6 +442,7 @@ clean:
 	-@rmdir /s/q src\mango\.venv >NUL 2>&1 || true
 	-@del /f/q src\couch\priv\couch_js\config.h >NUL 2>&1 || true
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log >NUL 2>&1 || true
+	-@rmdir /s/q src\docs\build src\docs\.venv >NUL 2>&1 || true
 ifeq ($(with_nouveau), true)
 	@cd nouveau && $(GRADLE) clean
 endif
@@ -452,12 +453,10 @@ distclean: clean
 	-@del install.mk >NUL 2>&1 || true
 	-@del config.erl >NUL 2>&1 || true
 	-@del rel\couchdb.config >NUL 2>&1 || true
-ifneq ($(IN_RELEASE), true)
-# when we are in a release, don’t delete the
-# copied sources, generated docs, or fauxton
 	-@rmdir /s/q rel\couchdb >NUL 2>&1 || true
+ifneq ($(IN_RELEASE), true)
+    # when we are in a release, don’t delete Fauxton
 	-@rmdir /s/q share\www >NUL 2>&1 || true
-	-@rmdir /s/q src\docs >NUL 2>&1 || true
 endif
 
 
