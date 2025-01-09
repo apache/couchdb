@@ -26,7 +26,6 @@
 
 %% couch_stats_resource_tracker API
 -export([
-    create_context/3,
     maybe_track_rexi_init_p/1
 ]).
 
@@ -115,17 +114,14 @@ now_sec() ->
 -spec maybe_track_local_counter(any(), any()) -> ok.
 maybe_track_local_counter(Name, Val) when is_integer(Val) andalso Val > 0 ->
     %%io:format("maybe_track_local[~p]: ~p~n", [Val, Name]),
-    couch_stats_resource_tracker:maybe_inc(Name, Val),
+    csrt:maybe_inc(Name, Val),
     ok;
 maybe_track_local_counter(_, _) ->
     ok.
 
-create_context(From, MFA, Nonce) ->
-    couch_stats_resource_tracker:create_context(From, MFA, Nonce).
-
 maybe_track_rexi_init_p({M, F, _A}) ->
     Metric = [M, F, spawned],
-    case couch_stats_resource_tracker:should_track(Metric) of
+    case csrt:should_track(Metric) of
         true -> increment_counter(Metric);
         false -> ok
     end.

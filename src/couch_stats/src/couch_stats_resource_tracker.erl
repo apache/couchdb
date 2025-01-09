@@ -104,6 +104,7 @@
 -include_lib("couch_stats_resource_tracker.hrl").
 
 %% Module pdict markers
+-ifdef(foo).
 -define(DELTA_TA, csrt_delta_ta).
 -define(DELTA_TZ, csrt_delta_tz). %% T Zed instead of T0
 -define(PID_REF, csrt_pid_ref). %% track local ID
@@ -157,6 +158,7 @@
     ?COUCH_BT_WRITE_KP_NODE => #rctx.?COUCH_BT_WRITE_KP_NODE,
     ?COUCH_BT_WRITE_KV_NODE => #rctx.?COUCH_BT_WRITE_KV_NODE
 }).
+-endif.
 
 -record(st, {}).
 
