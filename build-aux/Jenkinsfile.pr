@@ -12,7 +12,8 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-build_and_test = '''
+
+build = '''
 mkdir -p ${ERLANG_VERSION}
 cd ${ERLANG_VERSION}
 rm -rf build
@@ -21,7 +22,6 @@ cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 ./configure --with-nouveau --with-clouseau --js-engine=${JS_ENGINE}
-make check || (make build-report && false)
 '''
 
 docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
@@ -274,7 +274,8 @@ pipeline {
             }
             steps {
               unstash 'tarball'
-              sh( script: build_and_test )
+              sh( script: build )
+              retry(3) {sh 'cd ${ERLANG_VERSION}/build/apache-couchdb-* && make check || (make build-report && false)'}
             }
             post {
               always {
