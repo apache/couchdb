@@ -10,334 +10,211 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_logger).
-
--behaviour(gen_server).
--behaviour(config_listener).
-
--export([
-    start_link/0,
-    init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2
-]).
-
--export([
-    log_level/0,
-    log_level/1,
-    maybe_report/1,
-    maybe_report_old/1,
-    get_matchers/0
-]).
-
-%% Config update subscription API
--export([
-    subscribe_changes/0,
-    handle_config_change/5,
-    handle_config_terminate/3
-]).
-
-%% Matchers
--export([
-    matcher_on_docs_read/1,
-    matcher_on_worker_changes_processed/1,
-    matcher_on_ioq_calls/1,
-    matcher_on_nonce/1,
-    matcher_on_nonce_comp/1
-]).
+-module(csrt_logger2).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
 
--record(st, {
-    should_track,
-    matchers = #{}
-}).
-
--define(CSRT_CONTEXTS, [
-   #rpc_worker{mod=fabric_rpc, func=all_docs},
-   #rpc_worker{mod=fabric_rpc, func=changes},
-   #rpc_worker{mod=fabric_rpc, func=map_view},
-   #rpc_worker{mod=fabric_rpc, func=reduce_view},
-   #rpc_worker{mod=fabric_rpc, func=get_all_security},
-   #rpc_worker{mod=fabric_rpc, func=open_doc},
-   #rpc_worker{mod=fabric_rpc, func=update_docs},
-   #rpc_worker{mod=fabric_rpc, func=open_shard},
-   #rpc_worker{mod=mango_cursor, func=view}
-   %% enable all: #worker{}
-   %% TODO: add coordinator/etc
-   %% #coordinator{mod=chttpd_db:}
+%% Process lifetime logging api
+-export([
+    get_tracker/0,
+    is_logging_enabled/0,
+    log_process_lifetime_report/1,
+    put_tracker/1,
+    stop_tracker/0,
+    stop_tracker/1,
+    track/1,
+    tracker/1
 ]).
 
--define(CSRT_LOG_LEVELS, [
-    {all, 9},
-    {workers_too, 4},
-    {custom, 2},
-    {coordinators, 1},
-    {none, 0}
+%% JSON Conversion API
+-export([
+    convert_type/1,
+    convert_pidref/1,
+    convert_pid/1,
+    convert_ref/1,
+    to_json/1
 ]).
 
--define(NO_LOG, 0).
--define(DEFAULT_LEVEL, coordinators).
+%% Raw API that bypasses is_enabled checks
+-export([
+    do_lifetime_report/1,
+    do_status_report/1,
+    do_report/2,
+    maybe_report/2
+]).
 
--define(MATCHERS_KEY, {?MODULE, all_csrt_matchers}).
--define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
--define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
-
-%%
-%% Matchers
-%%
-
-matcher_on_docs_read(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
-
-matcher_on_nonce(Nonce) ->
-    ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end).
-
-matcher_on_nonce_comp(Nonce) ->
-    ets:match_spec_compile(ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
-
-matcher_on_worker_changes_processed(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(
-        fun(
-            #rctx{
-                changes_processed=Processed,
-                changes_returned=Returned
-            } = R
-        ) when (Processed - Returned) >= Threshold ->
-            R
-        end
-    ).
-
-matcher_on_ioq_calls(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{ioq_calls=IOQCalls} = R) when IOQCalls >= Threshold -> R end).
-
-%%
-%% Public API
-%%
-
-log_level(all) -> 9;
-log_level(all_workers) -> 4;
-log_level(rpc_workers) -> 3;
-log_level(#rctx{type=#rpc_worker{}}) -> 3;
-log_level(custom) -> 2;
-log_level(coordinators) -> 1;
-log_level(#rctx{type=#coordinator{}}) -> 1;
-log_level(none) -> ?NO_LOG;
-log_level(_) -> ?NO_LOG.
-
-log_level() ->
-    Level = config:get("couch_stats_resource_tracker", "log_level", "coordinators"),
-    try
-        log_level(list_to_existing_atom(Level))
-    catch
-        _:_ ->
-            log_level(?DEFAULT_LEVEL)
+track(#rctx{pid_ref=PidRef}) ->
+    case get_tracker() of
+        undefined ->
+            Pid = spawn(?MODULE, tracker, [PidRef]),
+            put_tracker(Pid),
+            Pid;
+        Pid when is_pid(Pid) ->
+            Pid
     end.
 
-
-maybe_report(PidRef) ->
-    Rctx = csrt:get_resource(PidRef),
-    case is_match(Rctx) of
-        true ->
-            report(Rctx),
+tracker({Pid, _Ref}=PidRef) ->
+    MonRef = erlang:monitor(process, Pid),
+    receive
+        stop ->
+            %% TODO: do we need cleanup here?
+            log_process_lifetime_report(PidRef),
+            csrt_server:destroy_context(PidRef),
             ok;
-        false ->
+        {'DOWN', MonRef, _Type, _0DPid, _Reason0} ->
+            %% TODO: should we pass reason to log_process_lifetime_report?
+            %% Reason = case Reason0 of
+            %%     {shutdown, Shutdown0} ->
+            %%         Shutdown = atom_to_binary(Shutdown0),
+            %%         <<"shutdown: ", Shutdown/binary>>;
+            %%     Reason0 ->
+            %%         Reason0
+            %% end,
+            %% TODO: should we send the induced work delta to the coordinator?
+            log_process_lifetime_report(PidRef),
+            csrt_server:destroy_context(PidRef),
             ok
     end.
 
-maybe_report_old(PidRef) ->
-    Level = log_level(),
-    case Level > ?NO_LOG of
+log_process_lifetime_report(PidRef) ->
+    case csrt:is_enabled() andalso is_logging_enabled() of
         true ->
-            Rctx = csrt:get_resource(PidRef),
-            RLevel = log_level(Rctx),
-            %% io:format("CSRT LOGGER TRIGGERING{~p} ~p =<? ~p~n", [Rctx#rctx.type, RLevel, Level]),
-            case RLevel >= Level of
-                true ->
-                    %% NOTE: we drop the PidRef here, it's now safe to delete the ets entry
-                    Msg = {maybe_report, Rctx, RLevel, Level},
-                    gen_server:cast(get_server(), Msg);
-                false ->
-                    ok
+            case csrt:conf_get("logger_type", "csrt_logger") of
+                "csrt_logger" ->
+                    csrt_logger:maybe_report(PidRef);
+                _ ->
+                    Rctx = csrt_server:get_resource(PidRef),
+                    case should_log(Rctx) of
+                       true ->
+                            do_lifetime_report(Rctx);
+                        _ ->
+                            ok
+                    end
             end;
         false ->
             ok
     end.
 
-find_matches(RContexts, Matchers) when is_list(RContexts) andalso is_map(Matchers) ->
-    maps:filter(
-        fun(_Name, {_MSpec, CompMSpec}) ->
-            catch [] =/= ets:match_spec_run(RContexts, CompMSpec)
-        end,
-        Matchers
-    ).
+is_logging_enabled() ->
+    logging_enabled() =/= false.
 
-get_matchers() ->
-    persistent_term:get(?MATCHERS_KEY, #{}).
+logging_enabled() ->
+    case csrt:conf_get("log_pid_usage_report", "coordinator") of
+        "coordinator" ->
+            coordinator;
+        "true" ->
+            true;
+        _ ->
+            false
+    end.
 
-is_match(#rctx{}=Rctx) ->
-    is_match(Rctx, get_matchers()).
+should_log(undefined) ->
+    false;
+should_log(#rctx{}=Rctx) ->
+    should_log(Rctx, logging_enabled()).
 
-is_match(#rctx{}=Rctx, Matchers) when is_map(Matchers) ->
-    maps:size(find_matches([Rctx], Matchers)) > 0.
-
-%% default.ini:
-%% [csrt]
-%% enabled = false
-%%
-%% [csrt.should_log]
-%% worker.fabric_rpc.all_docs = true
-%% worker.fabric_rpc.map_view = true
-%% worker.fabric_rpc.reduce_view = true
-create_tracking_map() ->
-    lists:foldl(fun(Ele, Acc) ->
-        Key = case Ele of
-            #rpc_worker{mod=M0, func=F0} ->
-                M = atom_to_list(M0),
-                F = atom_to_list(F0),
-                "worker." ++ M ++ "." ++ F
-            %% TODO: #coordinator{} ->
-        end,
-        Enabled = config:get_boolean("csrt.should_log", Key, true),
-        maps:put(Ele, Enabled, Acc)
-    end, #{}, ?CSRT_CONTEXTS).
-
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init([]) ->
-    ok = initialize_matchers(),
-    ok = subscribe_changes(),
-    {ok, #st{should_track=create_tracking_map()}}.
-
-handle_call({register, Name, MSpec}, _From, #st{matchers=Matchers}=St) ->
-    case add_matcher(Name, MSpec, Matchers) of
-        {ok, Matchers1} ->
-            set_matchers_term(Matchers1),
-            {reply, ok, St#st{matchers=Matchers1}};
-        {error, badarg}=Error ->
-            {reply, Error, St}
+should_log(undefined, _) ->
+    false;
+should_log(#rctx{}, true) ->
+    true;
+should_log(#rctx{}, false) ->
+    false;
+should_log(#rctx{type = #coordinator{}}, coordinator) ->
+    true;
+should_log(#rctx{type = #rpc_worker{mod=fabric_rpc, func=FName}}, _) ->
+    case csrt:conf_get("log_fabric_rpc") of
+        "true" ->
+            true;
+        undefined ->
+            false;
+        Name ->
+            Name =:= atom_to_list(FName)
     end;
-handle_call({maybe_report, #rctx{}=Rctx, RLevel, Level}, _From, St) ->
-    ok = maybe_report_int(Rctx, RLevel, Level, St),
-    {reply, ok, St};
-handle_call(reload_matchers, _From, St) ->
-    couch_log:warning("Reloading persistent term matchers", []),
-    ok = initialize_matchers(),
-    {reply, ok, St};
-handle_call(_, _From, State) ->
-    {reply, ok, State}.
+should_log(#rctx{}, _) ->
+    false.
 
-handle_cast(_Msg, State) ->
-    {noreply, State, 0}.
+%% TODO: decide on API
+maybe_report(_ReportName, PidRef) ->
+    log_process_lifetime_report(PidRef).
 
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
-    {noreply, State};
-handle_info(_Msg, St) ->
-    {noreply, St}.
+do_lifetime_report(Rctx) ->
+    do_report("csrt-pid-usage-lifetime", Rctx).
 
-%% TODO: should we use originally defined log level? or St#st.level?
-%% ShouldLog = log_level(Rctx) > St#st.log_level
-maybe_report_int(#rctx{}=Rctx, RLevel, Level, #st{}) when RLevel >= Level ->
-    report(Rctx);
-maybe_report_int(#rctx{}=Rctx, _RLevel, _Level, #st{matchers=Matchers, should_track=Trackers}) ->
-    case is_tracked(Rctx, Trackers) orelse is_match(Rctx, Matchers) of
-        true ->
-            report(Rctx);
-        false ->
-            ok
-    end.
+do_status_report(Rctx) ->
+    do_report("csrt-pid-usage-status", Rctx).
 
-report(Rctx) ->
-    couch_log:report(
-        "csrt-pid-usage-lifetime",
-        csrt:to_json(Rctx)
-    ).
+do_report(ReportName, #rctx{}=Rctx) ->
+    couch_log:report(ReportName, to_json(Rctx)).
 
-get_server() ->
-    %% TODO: shard servers like couch_server/etc
-    ?MODULE.
+%%
+%% Conversion API for outputting JSON
+%%
 
-add_matcher(Name, MSpec, Matchers) ->
-    try ets:match_spec_compile(MSpec) of
-        CompMSpec ->
-            %% TODO: handle already registered name case
-            Matchers1 = maps:put(Name, {MSpec, CompMSpec}, Matchers),
-            {ok, Matchers1}
-    catch
-        error:badarg ->
-            {error, badarg}
-    end.
+convert_type(#coordinator{method=Verb0, path=Path, mod=M0, func=F0}) ->
+    M = atom_to_binary(M0),
+    F = atom_to_binary(F0),
+    Verb = atom_to_binary(Verb0),
+    <<"coordinator-{", M/binary, ":", F/binary, "}:", Verb/binary, ":", Path/binary>>;
+convert_type(#rpc_worker{mod=M0, func=F0, from=From0}) ->
+    M = atom_to_binary(M0),
+    F = atom_to_binary(F0),
+    From = convert_pidref(From0),
+    <<"rpc_worker-{", From/binary, "}:", M/binary, ":", F/binary>>;
+convert_type(undefined) ->
+    null.
 
-is_tracked(#rctx{type=Type}, Trackers) ->
-    Res = maps:is_key(Type, Trackers) andalso true =:= maps:get(Type, Trackers),
-    Res.
+convert_pidref({Parent0, ParentRef0}) ->
+    Parent = convert_pid(Parent0),
+    ParentRef = convert_ref(ParentRef0),
+    <<Parent/binary, ":", ParentRef/binary>>;
+convert_pidref(null) ->
+    null;
+convert_pidref(undefined) ->
+    null.
 
-set_matchers_term(Matchers) when is_map(Matchers) ->
-    persistent_term:put({?MODULE, all_csrt_matchers}, Matchers).
+convert_pid(Pid) when is_pid(Pid) ->
+    list_to_binary(pid_to_list(Pid)).
 
-initialize_matchers() ->
-    DefaultMatchers = [
-        {docs_read, fun matcher_on_docs_read/1, 1000},
-        %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
-        %%{slow_reqs, fun matcher_on_slow_reqs/1, 10000},
-        {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
-        {ioq_calls, fun matcher_on_ioq_calls/1, 10000}
-    ],
-    Matchers = lists:foldl(
-        fun({Name0, MatchGenFunc, Threshold0}, Matchers0) when is_atom(Name0) ->
-            Name = atom_to_list(Name0),
-            case matcher_enabled(Name) of
-                true ->
-                    Threshold = matcher_threshold(Name, Threshold0),
-                    %% TODO: handle errors from Func
-                    case add_matcher(Name, MatchGenFunc(Threshold), Matchers0) of
-                        {ok, Matchers1} ->
-                            Matchers1;
-                        {error, badarg} ->
-                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [?MODULE, Name]),
-                            Matchers0
-                    end;
-                false ->
-                    Matchers0
-            end
-        end,
-        #{},
-        DefaultMatchers
-    ),
-    couch_log:warning("Initialized ~p CSRT Logger matchers", [maps:size(Matchers)]),
-    persistent_term:put(?MATCHERS_KEY, Matchers),
-    ok.
+convert_ref(Ref) when is_reference(Ref) ->
+    list_to_binary(ref_to_list(Ref)).
 
+to_json(#rctx{}=Rctx) ->
+    #{
+        updated_at => Rctx#rctx.updated_at,
+        started_at => Rctx#rctx.started_at,
+        pid_ref => convert_pidref(Rctx#rctx.pid_ref),
+        nonce => Rctx#rctx.nonce,
+        dbname => Rctx#rctx.dbname,
+        username => Rctx#rctx.username,
+        db_open => Rctx#rctx.db_open,
+        docs_read => Rctx#rctx.docs_read,
+        js_filter => Rctx#rctx.js_filter,
+        js_filtered_docs => Rctx#rctx.js_filtered_docs,
+        rows_read => Rctx#rctx.rows_read,
+        type => convert_type(Rctx#rctx.type),
+        get_kp_node => Rctx#rctx.get_kp_node,
+        get_kv_node => Rctx#rctx.get_kv_node,
+        write_kp_node => Rctx#rctx.write_kp_node,
+        write_kv_node => Rctx#rctx.write_kv_node,
+        changes_returned => Rctx#rctx.changes_returned,
+        ioq_calls => Rctx#rctx.ioq_calls
+    }.
 
-matcher_enabled(Name) when is_list(Name) ->
-    %% TODO: fix
-    %% config:get_boolean(?CONF_MATCHERS_ENABLED, Name, false).
-    config:get_boolean(?CONF_MATCHERS_ENABLED, Name, true).
+%%
+%% Process lifetime logging api
+%%
 
-matcher_threshold(Name, Default)
-        when is_list(Name) andalso is_integer(Default) andalso Default > 0 ->
-    config:get_integer(?CONF_MATCHERS_THRESHOLD, Name, Default).
+get_tracker() ->
+    get(?TRACKER_PID).
 
-subscribe_changes() ->
-    config:listen_for_changes(?MODULE, nil).
+put_tracker(Pid) when is_pid(Pid) ->
+    put(?TRACKER_PID, Pid).
 
-handle_config_change(?CONF_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
-    ok = gen_server:call(?MODULE, reload_matchers, infinity),
-    {ok, St};
-handle_config_change(?CONF_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
-    ok = gen_server:call(?MODULE, reload_matchers, infinity),
-    {ok, St};
-handle_config_change(_Sec, _Key, _Val, _Persist, St) ->
-    {ok, St}.
+stop_tracker() ->
+    stop_tracker(get_tracker()).
 
-handle_config_terminate(_, stop, _) ->
+stop_tracker(undefined) ->
     ok;
-handle_config_terminate(_, _, _) ->
-    erlang:send_after(5000, whereis(?MODULE), restart_config_listener).
+stop_tracker(Pid) when is_pid(Pid) ->
+    Pid ! stop.
