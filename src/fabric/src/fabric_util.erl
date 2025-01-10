@@ -145,7 +145,7 @@ await_shard_response(Ref, Name, Rest, Opts, Factor, Timeout) ->
     receive
         Msg0 ->
             {Msg, Delta} = rexi_utils:extract_delta(Msg0),
-            couch_stats_resource_tracker:accumulate_delta(Delta),
+            csrt:accumulate_delta(Delta),
             case Msg of
                 {Ref, {ok, Db}} ->
                     {ok, Db};

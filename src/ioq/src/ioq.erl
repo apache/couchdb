@@ -59,7 +59,7 @@ call_search(Fd, Msg, Metadata) ->
     call(Fd, Msg, Metadata).
 
 call(Fd, Msg, Metadata) ->
-    couch_stats_resource_tracker:ioq_called(),
+    csrt:ioq_called(),
     Priority = io_class(Msg, Metadata),
     case bypass(Priority) of
         true ->

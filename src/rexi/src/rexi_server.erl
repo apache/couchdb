@@ -139,15 +139,15 @@ init_p(From, {M, F, A}, Nonce) ->
     put('$initial_call', MFA),
     put(nonce, Nonce),
     try
-        couch_stats_resource_tracker:create_worker_context(From, MFA, Nonce),
+        csrt:create_worker_context(From, MFA, Nonce),
         couch_stats:maybe_track_rexi_init_p(MFA),
         apply(M, F, A)
     catch
         exit:normal ->
-            couch_stats_resource_tracker:destroy_context(),
+            csrt:destroy_context(),
             ok;
         Class:Reason:Stack0 ->
-            couch_stats_resource_tracker:destroy_context(),
+            csrt:destroy_context(),
             Stack = clean_stack(Stack0),
             {ClientPid, _ClientRef} = From,
             couch_log:error(
@@ -163,7 +163,7 @@ init_p(From, {M, F, A}, Nonce) ->
                 ]
             ),
             exit(#error{
-                delta = couch_stats_resource_tracker:make_delta(),
+                delta = csrt:make_delta(),
                 timestamp = os:timestamp(),
                 reason = {Class, Reason},
                 mfa = {M, F, A},

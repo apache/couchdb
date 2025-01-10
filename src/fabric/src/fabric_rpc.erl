@@ -497,7 +497,7 @@ view_cb({row, Props}, #mrargs{extra = Options} = Acc) ->
     %% TODO: wire in csrt tracking
     %% TODO: distinguish between all_docs vs view call
     couch_stats:increment_counter([fabric_rpc, view, rows_read]),
-    %%couch_stats_resource_tracker:inc(rows_read),
+    %%csrt:inc(rows_read),
     % Adding another row
     ViewRow = fabric_view_row:from_props(Props, Options),
     ok = rexi:stream2(ViewRow),
@@ -674,13 +674,13 @@ clean_stack(S) ->
     ).
 
 set_io_priority(DbName, Options) ->
-    couch_stats_resource_tracker:set_context_dbname(DbName),
+    csrt:set_context_dbname(DbName),
     %% TODO: better approach here than using proplists?
     case proplists:get_value(user_ctx, Options) of
         undefined ->
             ok;
         #user_ctx{name = UserName} ->
-            couch_stats_resource_tracker:set_context_username(UserName)
+            csrt:set_context_username(UserName)
     end,
     case lists:keyfind(io_priority, 1, Options) of
         {io_priority, Pri} ->

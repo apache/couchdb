@@ -141,7 +141,7 @@ log_level() ->
 
 
 maybe_report(PidRef) ->
-    Rctx = couch_stats_resource_tracker:get_resource(PidRef),
+    Rctx = csrt:get_resource(PidRef),
     case is_match(Rctx) of
         true ->
             report(Rctx),
@@ -154,7 +154,7 @@ maybe_report_old(PidRef) ->
     Level = log_level(),
     case Level > ?NO_LOG of
         true ->
-            Rctx = couch_stats_resource_tracker:get_resource(PidRef),
+            Rctx = csrt:get_resource(PidRef),
             RLevel = log_level(Rctx),
             %% io:format("CSRT LOGGER TRIGGERING{~p} ~p =<? ~p~n", [Rctx#rctx.type, RLevel, Level]),
             case RLevel >= Level of
@@ -257,7 +257,7 @@ maybe_report_int(#rctx{}=Rctx, _RLevel, _Level, #st{matchers=Matchers, should_tr
 report(Rctx) ->
     couch_log:report(
         "csrt-pid-usage-lifetime",
-        couch_stats_resource_tracker:to_json(Rctx)
+        csrt:to_json(Rctx)
     ).
 
 get_server() ->

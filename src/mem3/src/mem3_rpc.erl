@@ -393,7 +393,7 @@ wait_message(Node, Ref, Mon, Timeout) ->
 
 process_raw_message(Msg0, Node, Ref, Mon, Timeout) ->
     {Msg, Delta} = rexi_utils:extract_delta(Msg0),
-    couch_stats_resource_tracker:accumulate_delta(Delta),
+    csrt:accumulate_delta(Delta),
     case Msg of
         {Ref, {ok, Reply}} ->
             Reply;

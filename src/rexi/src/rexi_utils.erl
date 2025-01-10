@@ -70,7 +70,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
 
 process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
     {Payload, Delta} = extract_delta(Payload0),
-    couch_stats_resource_tracker:accumulate_delta(Delta),
+    csrt:accumulate_delta(Delta),
     case Payload of
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
@@ -128,10 +128,10 @@ extract_delta({A, B, C, D, E, F, G, {delta, Delta}}) -> {{A, B, C, D, E, F, G}, 
 extract_delta(T) -> {T, undefined}.
 
 get_delta() ->
-    {delta, couch_stats_resource_tracker:make_delta()}.
+    {delta, csrt:make_delta()}.
 
 maybe_add_delta(T) ->
-    case couch_stats_resource_tracker:is_enabled() of
+    case csrt:is_enabled() of
         false ->
             T;
         true ->
@@ -147,7 +147,7 @@ maybe_add_delta(T, undefined) ->
 maybe_add_delta(T, Delta) when is_map(Delta) ->
     maybe_add_delta(T, {delta, Delta});
 maybe_add_delta(T, {delta, _} = Delta) ->
-    case couch_stats_resource_tracker:is_enabled() of
+    case csrt:is_enabled() of
         false ->
             T;
         true ->
