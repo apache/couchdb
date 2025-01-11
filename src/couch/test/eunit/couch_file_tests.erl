@@ -20,9 +20,11 @@
 
 setup() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    meck:new(file, [passthrough, unstick]),
     Fd.
 
 teardown(Fd) ->
+    meck:unload(file),
     case is_process_alive(Fd) of
         true -> ok = couch_file:close(Fd);
         false -> ok
@@ -70,7 +72,7 @@ read_write_test_() ->
         "Common file read/write tests",
         {
             setup,
-            fun() -> test_util:start_couch() end,
+            fun test_util:start_couch/0,
             fun test_util:stop_couch/1,
             {
                 foreach,
@@ -89,6 +91,8 @@ read_write_test_() ->
                     ?TDEF_FE(should_fsync_by_path),
                     ?TDEF_FE(should_update_fsync_stats),
                     ?TDEF_FE(should_not_read_beyond_eof),
+                    ?TDEF_FE(should_not_read_beyond_eof_when_externally_truncated),
+                    ?TDEF_FE(should_catch_pread_failure),
                     ?TDEF_FE(should_truncate),
                     ?TDEF_FE(should_set_db_pid),
                     ?TDEF_FE(should_update_last_read_time),
@@ -174,7 +178,35 @@ should_not_read_beyond_eof(_) ->
     ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
     file:close(Io),
     unlink(Fd),
-    ?assertMatch({error, {read_beyond_eof, Filepath, _, _}}, couch_file:pread_binary(Fd, Pos)),
+    ?assertMatch(
+        {error, {read_beyond_eof, Filepath, _, _, _, _}}, couch_file:pread_binary(Fd, Pos)
+    ),
+    catch file:close(Fd).
+
+should_not_read_beyond_eof_when_externally_truncated(_) ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    Bin = list_to_binary(lists:duplicate(100, 0)),
+    {ok, Pos, _Size} = couch_file:append_binary(Fd, Bin),
+    {_, Filepath} = couch_file:process_info(Fd),
+    %% corrupt db file by truncating it
+    {ok, Io} = file:open(Filepath, [read, write, binary]),
+    % 4 (len) + 1 byte
+    {ok, _} = file:position(Io, Pos + 5),
+    ok = file:truncate(Io),
+    file:close(Io),
+    unlink(Fd),
+    ?assertMatch(
+        {error, {read_beyond_eof, Filepath, _, _, _, _}}, couch_file:pread_binary(Fd, Pos)
+    ),
+    catch file:close(Fd).
+
+should_catch_pread_failure(_) ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Pos, _Size} = couch_file:append_binary(Fd, <<"x">>),
+    {_, Filepath} = couch_file:process_info(Fd),
+    meck:expect(file, pread, 2, {error, einval}),
+    unlink(Fd),
+    ?assertMatch({error, {pread, Filepath, einval, {0, _}}}, couch_file:pread_terms(Fd, [Pos])),
     catch file:close(Fd).
 
 should_truncate(Fd) ->
@@ -238,7 +270,7 @@ should_apply_overwrite_create_option(Fd) ->
     ?assertEqual(ok, couch_file:close(Fd)),
     {ok, Fd1} = couch_file:open(Path, [create, overwrite]),
     unlink(Fd1),
-    ExpectError = {error, {read_beyond_eof, Path, Pos, 0}},
+    ExpectError = {error, {read_beyond_eof, Path, Pos, 5, 0, 0}},
     ?assertEqual(ExpectError, couch_file:pread_term(Fd1, Pos)).
 
 should_error_on_creation_if_exists(Fd) ->
@@ -279,50 +311,6 @@ should_crash_on_unexpected_cast(Fd) ->
         {'DOWN', Ref, _, _, Reason} ->
             ?assertEqual({invalid_cast, potato}, Reason)
     end.
-
-pread_limit_test_() ->
-    {
-        "Read limit tests",
-        {
-            setup,
-            fun() ->
-                Ctx = test_util:start_couch([ioq]),
-                config:set("couchdb", "max_pread_size", "50000", _Persist = false),
-                Ctx
-            end,
-            fun(Ctx) ->
-                config:delete("couchdb", "max_pread_size", _Persist = false),
-                test_util:stop_couch(Ctx)
-            end,
-            {
-                foreach,
-                fun setup/0,
-                fun teardown/1,
-                [
-                    ?TDEF_FE(should_increase_file_size_on_write),
-                    ?TDEF_FE(should_return_current_file_size_on_write),
-                    ?TDEF_FE(should_write_and_read_term),
-                    ?TDEF_FE(should_write_and_read_binary),
-                    ?TDEF_FE(should_not_read_more_than_pread_limit)
-                ]
-            }
-        }
-    }.
-
-should_not_read_more_than_pread_limit(_) ->
-    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
-    {_, Filepath} = couch_file:process_info(Fd),
-    BigBin = list_to_binary(lists:duplicate(100000, 0)),
-    {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
-    unlink(Fd),
-    Ref = monitor(process, Fd),
-    ExpectError = {error, {exceed_pread_limit, Filepath, 50000}},
-    ?assertEqual(ExpectError, couch_file:pread_binary(Fd, Pos)),
-    receive
-        {'DOWN', Ref, _, _, Reason} ->
-            ?assertEqual(ExpectError, Reason)
-    end,
-    catch file:close(Fd).
 
 header_test_() ->
     {

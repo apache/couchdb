@@ -32,8 +32,7 @@
     fd,
     is_sys,
     eof = 0,
-    db_monitor,
-    pread_limit = 0
+    db_monitor
 }).
 
 % public API
@@ -413,7 +412,6 @@ last_read(Fd) when is_pid(Fd) ->
 
 init({Filepath, Options, ReturnPid, Ref}) ->
     OpenOptions = file_open_options(Options),
-    Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),
     update_read_timestamp(),
     case lists:member(create, Options) of
@@ -436,7 +434,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = fsync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}};
+                                    {ok, #file{fd = Fd, is_sys = IsSys}};
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -444,7 +442,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}}
+                            {ok, #file{fd = Fd, is_sys = IsSys}}
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -461,7 +459,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit}};
+                            {ok, #file{fd = Fd, eof = Eof, is_sys = IsSys}};
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -692,34 +690,44 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
             find_newest_header(Fd, LocationSizes)
     end.
 
-read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
+read_multi_raw_iolists_int(#file{fd = Fd, eof = Eof} = File, PosLens) ->
     MapFun = fun({Pos, Len}) -> get_pread_locnum(File, Pos, Len) end,
     LocNums = lists:map(MapFun, PosLens),
-    {ok, Bins} = file:pread(Fd, LocNums),
     ZipFun = fun({Pos, TotalBytes}, Bin) ->
-        <<RawBin:TotalBytes/binary>> = Bin,
-        {remove_block_prefixes(Pos rem ?SIZE_BLOCK, RawBin), Pos + TotalBytes}
+        case is_binary(Bin) andalso byte_size(Bin) == TotalBytes of
+            true ->
+                {remove_block_prefixes(Pos rem ?SIZE_BLOCK, Bin), Pos + TotalBytes};
+            false ->
+                couch_stats:increment_counter([pread, exceed_eof]),
+                {ok, CurEof} = file:position(File#file.fd, eof),
+                {_Fd, Filepath} = get(couch_file_fd),
+                throw_stop({read_beyond_eof, Filepath, Pos, TotalBytes, Eof, CurEof}, File)
+        end
     end,
-    lists:zipwith(ZipFun, LocNums, Bins).
+    case file:pread(Fd, LocNums) of
+        {ok, Bins} ->
+            lists:zipwith(ZipFun, LocNums, Bins);
+        {error, Error} ->
+            {_Fd, Filepath} = get(couch_file_fd),
+            throw_stop({pread, Filepath, Error, hd(LocNums)}, File)
+    end.
 
-get_pread_locnum(#file{} = File, Pos, Len) ->
-    #file{eof = Eof, pread_limit = PreadLimit} = File,
+get_pread_locnum(#file{eof = Eof} = File, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
     case Pos + TotalBytes of
         Size when Size > Eof ->
             couch_stats:increment_counter([pread, exceed_eof]),
+            {ok, CurEof} = file:position(File#file.fd, eof),
             {_Fd, Filepath} = get(couch_file_fd),
-            ErrEof = {error, {read_beyond_eof, Filepath, Pos, Eof}},
-            throw({stop, ErrEof, ErrEof, File});
-        Size when Size > PreadLimit ->
-            couch_stats:increment_counter([pread, exceed_limit]),
-            {_Fd, Filepath} = get(couch_file_fd),
-            ErrPread = {error, {exceed_pread_limit, Filepath, PreadLimit}},
-            throw({stop, ErrPread, ErrPread, File});
+            throw_stop({read_beyond_eof, Filepath, Pos, TotalBytes, Eof, CurEof}, File);
         _ ->
             {Pos, TotalBytes}
     end.
+
+throw_stop(Error, #file{} = File) ->
+    % This follows the gen_server reply via a throw pattern
+    throw({stop, {error, Error}, {error, Error}, File}).
 
 -spec extract_checksum(iolist()) -> {iolist(), binary()}.
 extract_checksum(FullIoList) ->
@@ -861,12 +869,6 @@ process_info(Pid) ->
 
 update_read_timestamp() ->
     put(read_timestamp, os:timestamp()).
-
-get_pread_limit() ->
-    case config:get_integer("couchdb", "max_pread_size", 0) of
-        N when N > 0 -> N;
-        _ -> infinity
-    end.
 
 %% in event of a partially successful write.
 reset_eof(#file{} = File) ->
