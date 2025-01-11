@@ -100,7 +100,7 @@ t_cast_explicit_caller(_) ->
         receive
             {'DOWN', CallerRef, _, _, Exit} -> Exit
         end,
-    case couch_stats_resource_tracker:is_enabled() of
+    case csrt:is_enabled() of
         true ->
             ?assertMatch({Ref, {potato, [_ | _]}, {delta, _}}, Result);
         false ->

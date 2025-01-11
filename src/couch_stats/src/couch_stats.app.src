@@ -16,7 +16,8 @@
     {registered, [
         couch_stats_aggregator,
         couch_stats_process_tracker,
-        couch_stats_resource_tracker
+        csrt_server,
+        csrt_logger
     ]},
     {applications, [kernel, stdlib, couch_log]},
     {mod, {couch_stats_app, []}},

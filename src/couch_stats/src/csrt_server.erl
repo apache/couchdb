@@ -30,11 +30,13 @@
     new_context/2,
     set_context_dbname/2,
     set_context_username/2,
-    set_context_type/2
+    set_context_type/2,
+    update_counter/3
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
+
 
 -record(st, {}).
 
@@ -102,6 +104,12 @@ get_resource(PidRef) ->
         [] ->
             undefined
     end.
+
+update_counter(undefined, _Field, _Count) ->
+    ok;
+update_counter({_Pid,_Ref}=PidRef, Field, Count) ->
+    %% TODO: mem3 crashes without catch, why do we lose the stats table?
+    catch ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
 
 %%
 %% gen_server callbacks

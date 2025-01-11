@@ -284,6 +284,7 @@ get_missing_revs(DbName, IdRevsList, Options) ->
     with_db(DbName, Options, {couch_db, get_missing_revs, [IdRevsList]}).
 
 update_docs(DbName, Docs0, Options) ->
+    csrt:docs_written(length(Docs0)),
     {Docs1, Type} =
         case couch_util:get_value(read_repair, Options) of
             NodeRevs when is_list(NodeRevs) ->

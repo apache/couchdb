@@ -101,7 +101,7 @@ t_no_config_db_create_fails_for_shard_rpc(DbName) ->
         receive
             Resp0 -> Resp0
         end,
-    case couch_stats_resource_tracker:is_enabled() of
+    case csrt:is_enabled() of
         true ->
             ?assertMatch( %% allow for {Ref, {rexi_EXIT, error}, {delta, D}}
                 {Ref, {'rexi_EXIT', {{error, missing_target}, _}}, _},

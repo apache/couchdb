@@ -239,7 +239,7 @@ handle_resource_status_req(#httpd{method = 'POST'} = Req) ->
     SortedBy2 = fun csrt:sorted_by/2,
     ConvertEle = fun erlang:binary_to_existing_atom/1,
     ConvertList = fun(L) -> [ConvertEle(E) || E <- L] end,
-    ToJson = fun csrt:to_json/1,
+    ToJson = fun csrt_util:to_json/1,
     JsonKeys = fun(PL) -> [[ToJson(K), V] || {K, V} <- PL] end,
 
     Fun = case {Action, Key, Val} of

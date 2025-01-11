@@ -94,7 +94,7 @@ field(#rctx{pid_ref=Val}, pid_ref) -> Val;
 field(#rctx{nonce=Val}, nonce) -> Val;
 %%field(#rctx{from=Val}, from) -> Val;
 %% TODO: fix this, perhaps move it all to csrt_util?
-field(#rctx{type=Val}, type) -> csrt_logger:convert_type(Val);
+field(#rctx{type=Val}, type) -> csrt_util:convert_type(Val);
 field(#rctx{dbname=Val}, dbname) -> Val;
 field(#rctx{username=Val}, username) -> Val;
 %%field(#rctx{path=Val}, path) -> Val;
@@ -165,5 +165,5 @@ sorted_by(KeyFun, ValFun) -> shortened(sorted(group_by(KeyFun, ValFun))).
 sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, AggFun))).
 
 to_json_list(List) when is_list(List) ->
-    lists:map(fun csrt_logger:to_json/1, List).
+    lists:map(fun csrt_util:to_json/1, List).
 

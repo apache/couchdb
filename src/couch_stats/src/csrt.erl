@@ -54,12 +54,34 @@
 %% stats collection api
 -export([
     accumulate_delta/1,
+    docs_written/1,
     inc/1,
     inc/2,
     ioq_called/0,
     make_delta/0,
     maybe_inc/2,
     should_track/1
+]).
+
+%% aggregate query api
+-export([
+    active/0,
+    active/1,
+    active_coordinators/0,
+    active_coordinators/1,
+    active_workers/0,
+    active_workers/1,
+    count_by/1,
+    find_by_nonce/1,
+    find_by_pid/1,
+    find_by_pidref/1,
+    find_workers_by_pidref/1,
+    group_by/2,
+    group_by/3,
+    sorted/1,
+    sorted_by/1,
+    sorted_by/2,
+    sorted_by/3
 ]).
 
 %%
@@ -134,12 +156,7 @@ set_context_dbname(_, undefined) ->
 set_context_dbname(DbName, PidRef) ->
     is_enabled() andalso csrt_server:set_context_dbname(DbName, PidRef).
 
-set_context_handler_fun(Fun) ->
-    set_context_handler_fun(Fun, get_pid_ref()).
-
-set_context_handler_fun(_, undefined) ->
-    ok;
-set_context_handler_fun(Fun, PidRef) when is_function(Fun) ->
+set_context_handler_fun(Fun) when is_function(Fun) ->
     case is_enabled() of
         false ->
             ok;
@@ -147,12 +164,27 @@ set_context_handler_fun(Fun, PidRef) when is_function(Fun) ->
             FProps = erlang:fun_info(Fun),
             Mod = proplists:get_value(module, FProps),
             Func = proplists:get_value(name, FProps),
-            Rctx = get_resource(PidRef),
-            %% TODO: #coordinator{} assumption needs to adapt for other types
-            #coordinator{} = Coordinator0 = csrt_server:get_context_type(Rctx),
-            Coordinator = Coordinator0#coordinator{mod=Mod, func=Func},
-            csrt_server:set_context_type(Coordinator, PidRef)
+            update_handler_fun(Mod, Func, get_pid_ref())
     end.
+
+set_context_handler_fun(Mod, Func)
+        when is_atom(Mod) andalso is_atom(Func)  ->
+    case is_enabled() of
+        false ->
+            ok;
+        true ->
+            update_handler_fun(Mod, Func, get_pid_ref())
+    end.
+
+update_handler_fun(_, _, undefined) ->
+    ok;
+update_handler_fun(Mod, Func, PidRef) ->
+    Rctx = get_resource(PidRef),
+    %% TODO: #coordinator{} assumption needs to adapt for other types
+    #coordinator{} = Coordinator0 = csrt_server:get_context_type(Rctx),
+    Coordinator = Coordinator0#coordinator{mod=Mod, func=Func},
+    csrt_server:set_context_type(Coordinator, PidRef),
+    ok.
 
 set_context_username(null) ->
     ok;
@@ -187,7 +219,7 @@ destroy_context({_, _} = PidRef) ->
 %%
 
 is_enabled() ->
-    config:get_boolean(?MODULE_STRING, "enabled", true).
+    csrt_util:is_enabled().
 
 get_resource() ->
     get_resource(get_pid_ref()).
@@ -206,10 +238,6 @@ do_report(ReportName, PidRef) ->
 %%
 %% Stat collection API
 %%
-
-%% monotonic time now in millisecionds
-tnow() ->
-    erlang:monotonic_time(millisecond).
 
 inc(Key) ->
     inc(Key, 1).
@@ -262,6 +290,9 @@ should_track(_Metric) ->
 
 ioq_called() ->
     inc(ioq_calls).
+
+docs_written(N) ->
+    inc(docs_written, N).
 
 accumulate_delta(Delta) when is_map(Delta) ->
     %% TODO: switch to creating a batch of updates to invoke a single
@@ -329,6 +360,7 @@ make_delta() ->
 make_delta(#rctx{}=TA, #rctx{}=TB) ->
     Delta = #{
         docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
+        docs_written => TB#rctx.docs_written - TA#rctx.docs_written,
         js_filter => TB#rctx.js_filter - TA#rctx.js_filter,
         js_filtered_docs => TB#rctx.js_filtered_docs - TA#rctx.js_filtered_docs,
         rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
@@ -350,7 +382,7 @@ make_delta(#rctx{}, _) ->
 %% TODO: what to do when PidRef=undefined?
 make_delta_base(PidRef) ->
     %% TODO: extract user_ctx and db/shard from request
-    Now = tnow(),
+    Now = csrt_util:tnow(),
     #rctx{
         pid_ref = PidRef,
         %% TODO: confirm this subtraction works
@@ -365,13 +397,7 @@ set_delta_a(TA) ->
     erlang:put(?DELTA_TA, TA).
 
 update_counter(Field, Count) ->
-    is_enabled() andalso update_counter(get_pid_ref(), Field, Count).
-
-update_counter(undefined, _Field, _Count) ->
-    ok;
-update_counter({_Pid,_Ref}=PidRef, Field, Count) ->
-    %% TODO: mem3 crashes without catch, why do we lose the stats table?
-    is_enabled() andalso catch ets:update_counter(?MODULE, PidRef, {Field, Count}, #rctx{pid_ref=PidRef}).
+    is_enabled() andalso csrt_server:update_counter(get_pid_ref(), Field, Count).
 
 
 conf_get(Key) ->
@@ -382,5 +408,88 @@ conf_get(Key, Default) ->
     config:get(?MODULE_STRING, Key, Default).
 
 %%
+%% aggregate query api
+%%
+
+active() ->
+    csrt_query:active().
+
+active(Type) ->
+    csrt_query:active(Type).
+
+active_coordinators() ->
+    csrt_query:active_coordinators().
+
+active_coordinators(Type) ->
+    csrt_query:active_coordinators(Type).
+
+active_workers() ->
+    csrt_query:active_workers().
+
+active_workers(Type) ->
+    csrt_query:active_workers(Type).
+
+count_by(Key) ->
+    csrt_query:count_by(Key).
+
+find_by_nonce(Nonce) ->
+    csrt_query:find_by_nonce(Nonce).
+
+find_by_pid(Pid) ->
+    csrt_query:find_by_pid(Pid).
+
+find_by_pidref(PidRef) ->
+    csrt_query:find_by_pidref(PidRef).
+
+find_workers_by_pidref(PidRef) ->
+    csrt_query:find_workers_by_pidref(PidRef).
+
+group_by(Key, Val) ->
+    csrt_query:group_by(Key, Val).
+
+group_by(Key, Val, Agg) ->
+    csrt_query:group_by(Key, Val, Agg).
+
+sorted(Map) ->
+    csrt_query:sorted(Map).
+
+sorted_by(Key) ->
+    csrt_query:sorted_by(Key).
+
+sorted_by(Key, Val) ->
+    csrt_query:sorted_by(Key, Val).
+
+sorted_by(Key, Val, Agg) ->
+    csrt_query:sorted_by(Key, Val, Agg).
+
+%%
 %% Internal Operations assuming is_enabled() == true
 %%
+
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+couch_stats_resource_tracker_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_static_map_translations)
+        ]
+    }.
+
+setup() ->
+    test_util:start_couch().
+
+teardown(Ctx) ->
+    test_util:stop_couch(Ctx).
+
+t_static_map_translations(_) ->
+    ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, maps:values(?STATS_TO_KEYS))),
+    %% TODO: properly handle ioq_calls field
+    ?assertEqual(lists:sort(maps:values(?STATS_TO_KEYS)), lists:delete(docs_written, lists:delete(ioq_calls, lists:sort(maps:keys(?KEYS_TO_FIELDS))))).
+
+-endif.

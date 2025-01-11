@@ -10,6 +10,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+-define(CSRT, "csrt").
+
 %% CSRT pdict markers
 -define(DELTA_TA, csrt_delta_ta).
 -define(DELTA_TZ, csrt_delta_tz). %% T Zed instead of T0
@@ -27,6 +29,7 @@
 -define(COUCH_JS_FILTER, js_filter).
 -define(COUCH_JS_FILTERED_DOCS, js_filtered_docs).
 -define(IOQ_CALLS, ioq_calls).
+-define(DOCS_WRITTEN, docs_written).
 -define(ROWS_READ, rows_read).
 
 %% TODO: overlap between this and couch btree fold invocations
@@ -53,6 +56,7 @@
     ?DB_OPEN => #rctx.?DB_OPEN,
     ?ROWS_READ => #rctx.?ROWS_READ,
     ?FRPC_CHANGES_RETURNED => #rctx.?FRPC_CHANGES_RETURNED,
+    ?DOCS_WRITTEN => #rctx.?DOCS_WRITTEN,
     ?IOQ_CALLS => #rctx.?IOQ_CALLS,
     ?COUCH_JS_FILTER => #rctx.?COUCH_JS_FILTER,
     ?COUCH_JS_FILTERED_DOCS => #rctx.?COUCH_JS_FILTERED_DOCS,
@@ -80,8 +84,8 @@
 
 -record(rctx, {
     %% Metadata
-    started_at = csrt:tnow(),
-    updated_at = csrt:tnow(),
+    started_at = csrt_util:tnow(),
+    updated_at = csrt_util:tnow(),
     pid_ref,
     nonce,
     type, %% #coordinator{}/#rpc_worker{}/#replication_worker{}/#compaction_worker
@@ -91,6 +95,7 @@
     %% Stats counters
     db_open = 0,
     docs_read = 0,
+    docs_written = 0,
     rows_read = 0,
     changes_processed = 0,
     changes_returned = 0,
