@@ -599,7 +599,12 @@ format_status(_Opt, [PDict, #file{} = File]) ->
 
 fsync(Fd) ->
     T0 = erlang:monotonic_time(),
-    Res = file:sync(Fd),
+    % We do not rely on mtime/atime for our safety/consitency so we can use
+    % fdatasync. As of version 25 OTP will use:
+    %  - On Linux/BSDs: fdatasync()
+    %  - On Window: FlushFileBuffers() i.e. the same as for file:sync/1
+    %  - On MacOS: fcntl(fd,F_FULLFSYNC/F_BARRIERFSYNC)
+    Res = file:datasync(Fd),
     T1 = erlang:monotonic_time(),
     % Since histograms can consume floating point values we can measure in
     % nanoseconds, then turn it into floating point milliseconds
