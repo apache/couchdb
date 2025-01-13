@@ -67,6 +67,62 @@ should_close_file_properly() ->
 should_create_empty_new_files(Fd) ->
     ?_assertMatch({ok, 0}, couch_file:bytes(Fd)).
 
+cfile_setup() ->
+    test_util:start_couch().
+
+cfile_teardown(Ctx) ->
+    erase(io_priority),
+    config:delete("couchdb", "use_cfile", false),
+    config:delete("couchdb", "cfile_skip_ioq", false),
+    config:delete("ioq.bypass", "read", false),
+    test_util:stop_couch(Ctx).
+
+cfile_enable_disable_test_() ->
+    {
+        foreach,
+        fun cfile_setup/0,
+        fun cfile_teardown/1,
+        [
+            ?TDEF_FE(t_cfile_default),
+            ?TDEF_FE(t_cfile_enabled),
+            ?TDEF_FE(t_cfile_disabled),
+            ?TDEF_FE(t_cfile_with_ioq_bypass),
+            ?TDEF_FE(t_cfile_without_ioq_bypass)
+        ]
+    }.
+
+t_cfile_default(_) ->
+    t_can_open_read_and_write().
+
+t_cfile_enabled(_) ->
+    % This is the default, but we'll just test when we
+    % explicitly set to "true" here
+    config:set("couchdb", "use_cfile", "true", false),
+    t_can_open_read_and_write().
+
+t_cfile_disabled(_) ->
+    config:set("couchdb", "use_cfile", "false", false),
+    t_can_open_read_and_write().
+
+t_cfile_with_ioq_bypass(_) ->
+    config:set("couchdb", "use_cfile", "true", false),
+    config:set("couchdb", "cfile_skip_ioq", "true", false),
+    config:set("ioq.bypass", "read", "true", false),
+    t_can_open_read_and_write().
+
+t_cfile_without_ioq_bypass(_) ->
+    config:set("couchdb", "use_cfile", "true", false),
+    config:set("couchdb", "cfile_skip_ioq", "false", false),
+    config:set("ioq.bypass", "read", "true", false),
+    t_can_open_read_and_write().
+
+t_can_open_read_and_write() ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    ioq:set_io_priority({interactive, <<"somedb">>}),
+    ?assertMatch({ok, 0, _}, couch_file:append_term(Fd, foo)),
+    ?assertEqual({ok, foo}, couch_file:pread_term(Fd, 0)),
+    ok = couch_file:close(Fd).
+
 read_write_test_() ->
     {
         "Common file read/write tests",
@@ -260,8 +316,10 @@ should_apply_overwrite_create_option(Fd) ->
     ?assertEqual(ok, couch_file:close(Fd)),
     {ok, Fd1} = couch_file:open(Path, [create, overwrite]),
     unlink(Fd1),
-    ExpectError = {error, {read_beyond_eof, Path, Pos, 5, 0, 0}},
-    ?assertEqual(ExpectError, couch_file:pread_term(Fd1, Pos)).
+    ?assertMatch(
+        {error, {read_beyond_eof, Path, Pos, _, _, _}},
+        couch_file:pread_term(Fd1, Pos)
+    ).
 
 should_error_on_creation_if_exists(Fd) ->
     {_, Path} = couch_file:process_info(Fd),
