@@ -31,7 +31,7 @@ to install CouchDB is to use the convenience binary packages:
 
 * CentOS/RHEL 7
 * CentOS/RHEL 8
-* CentOS/RHEL 9 (with caveats)
+* CentOS/RHEL 9 (with caveats: depends on EPEL repository)
 * Debian 10 (buster)
 * Debian 11 (bullseye)
 * Debian 12 (bookworm)
