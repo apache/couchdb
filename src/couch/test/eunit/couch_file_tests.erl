@@ -95,7 +95,6 @@ read_write_test_() ->
                     ?TDEF_FE(should_catch_pread_failure),
                     ?TDEF_FE(should_truncate),
                     ?TDEF_FE(should_set_db_pid),
-                    ?TDEF_FE(should_update_last_read_time),
                     ?TDEF_FE(should_open_read_only),
                     ?TDEF_FE(should_apply_overwrite_create_option),
                     ?TDEF_FE(should_error_on_creation_if_exists),
@@ -244,15 +243,6 @@ should_set_db_pid(Fd) ->
         100
     ),
     ?assertNot(is_process_alive(Fd)).
-
-should_update_last_read_time(Fd) ->
-    {ok, Pos, _} = couch_file:append_term(Fd, foo),
-    ReadTs1 = couch_file:last_read(Fd),
-    ?assertMatch({_, _, _}, ReadTs1),
-    {ok, foo} = couch_file:pread_term(Fd, Pos),
-    ReadTs2 = couch_file:last_read(Fd),
-    ?assertMatch({_, _, _}, ReadTs2),
-    ?assert(ReadTs2 > ReadTs1).
 
 should_open_read_only(Fd) ->
     {_, Path} = couch_file:process_info(Fd),

@@ -180,14 +180,6 @@
 -callback decref(DbHandle :: db_handle()) -> ok.
 -callback monitored_by(DbHande :: db_handle()) -> [pid()].
 
-% This is called in the context of couch_db_updater:handle_info/2
-% and should return the timestamp of the last activity of
-% the database. If a storage has no notion of activity or the
-% value would be hard to report its ok to just return the
-% result of os:timestamp/0 as this will just disable idle
-% databases from automatically closing.
--callback last_activity(DbHandle :: db_handle()) -> erlang:timestamp().
-
 % All of the get_* functions may be called from many
 % processes concurrently.
 
@@ -673,8 +665,6 @@
     decref/1,
     monitored_by/1,
 
-    last_activity/1,
-
     get_engine/1,
     get_compacted_seq/1,
     get_del_doc_count/1,
@@ -790,10 +780,6 @@ decref(#db{} = Db) ->
 monitored_by(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:monitored_by(EngineState).
-
-last_activity(#db{} = Db) ->
-    #db{engine = {Engine, EngineState}} = Db,
-    Engine:last_activity(EngineState).
 
 get_engine(#db{} = Db) ->
     #db{engine = {Engine, _}} = Db,

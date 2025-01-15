@@ -45,7 +45,6 @@
 -export([append_terms/2, append_terms/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
--export([last_read/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, format_status/2]).
@@ -404,16 +403,11 @@ init_status_error(ReturnPid, Ref, Error) ->
     ReturnPid ! {Ref, self(), Error},
     ignore.
 
-last_read(Fd) when is_pid(Fd) ->
-    Now = os:timestamp(),
-    couch_util:process_dict_get(Fd, read_timestamp, Now).
-
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
     OpenOptions = file_open_options(Options),
     IsSys = lists:member(sys_db, Options),
-    update_read_timestamp(),
     case lists:member(create, Options) of
         true ->
             filelib:ensure_dir(Filepath),
@@ -493,7 +487,6 @@ terminate(_Reason, #file{fd = Fd}) ->
 handle_call(close, _From, #file{fd = Fd} = File) ->
     {stop, normal, file:close(Fd), File#file{fd = nil}};
 handle_call({pread_iolists, PosL}, _From, File) ->
-    update_read_timestamp(),
     LocNums1 = [{Pos, 4} || Pos <- PosL],
     DataSizes = read_multi_raw_iolists_int(File, LocNums1),
     MapFun = fun({LenIoList, NextPos}) ->
@@ -871,9 +864,6 @@ is_idle(#file{is_sys = false}) ->
 
 process_info(Pid) ->
     couch_util:process_dict_get(Pid, couch_file_fd).
-
-update_read_timestamp() ->
-    put(read_timestamp, os:timestamp()).
 
 %% in event of a partially successful write.
 reset_eof(#file{} = File) ->
