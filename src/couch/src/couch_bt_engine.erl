@@ -30,8 +30,6 @@
     decref/1,
     monitored_by/1,
 
-    last_activity/1,
-
     get_compacted_seq/1,
     get_del_doc_count/1,
     get_disk_version/1,
@@ -211,9 +209,6 @@ monitored_by(St) ->
         _ ->
             []
     end.
-
-last_activity(#st{fd = Fd}) ->
-    couch_file:last_read(Fd).
 
 get_compacted_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, compacted_seq).
