@@ -318,7 +318,7 @@ some commit message conventions.
 [9]: https://gist.github.com/robertpainsi/b632364184e70900af4ab688decf6f53
 [10]: https://www.freecodecamp.org/news/writing-good-commit-messages-a-practical-guide
 [11]: mailto:security@couchdb.apache.org?subject=Security
-[12]: https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github
+[12]: https://egghead.io/courses/how-to-contribute-to-an-open-source-project-on-github
 [13]: https://help.github.com/fork-a-repo
 [14]: https://github.com/apache/couchdb/tree/main/src/docs
 [15]: https://help.github.com/articles/using-pull-requests

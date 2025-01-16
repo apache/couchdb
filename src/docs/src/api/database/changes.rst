@@ -779,14 +779,14 @@ amount of duplicated code.
     they are ready to handle documents with *alien* structure without panic.
 
 .. note::
-    Using ``_view`` filter doesn't queries the view index files, so you cannot
+    Using ``_view`` filter doesn't query the view index files, so you cannot
     use common :ref:`view query parameters <api/ddoc/view>` to additionally
     filter the changes feed by index key. Also, CouchDB doesn't returns
     the result instantly as it does for views - it really uses the specified
     map function as filter.
 
     Moreover, you cannot make such filters dynamic e.g. process the request
-    query parameters or handle the :ref:`userctx_object` - the map function is
+    query parameters or handle the :ref:`userctx_object` - the map function
     only operates with the document.
 
 **Request**:
