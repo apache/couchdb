@@ -342,7 +342,7 @@ initialize_matchers() ->
         #{},
         DefaultMatchers
     ),
-    couch_log:warning("Initialized ~p CSRT Logger matchers", [maps:size(Matchers)]),
+    couch_log:notice("Initialized ~p CSRT Logger matchers", [maps:size(Matchers)]),
     persistent_term:put(?MATCHERS_KEY, Matchers),
     ok.
 

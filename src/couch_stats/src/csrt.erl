@@ -369,7 +369,7 @@ make_delta(#rctx{}=TA, #rctx{}=TB) ->
         get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
         db_open => TB#rctx.db_open - TA#rctx.db_open,
         ioq_calls => TB#rctx.ioq_calls - TA#rctx.ioq_calls,
-        dt => TB#rctx.updated_at - TA#rctx.updated_at
+        dt => csrt_util:make_dt(TA#rctx.updated_at, TB#rctx.updated_at)
     },
     %% TODO: reevaluate this decision
     %% Only return non zero (and also positive) delta fields
@@ -401,11 +401,11 @@ update_counter(Field, Count) ->
 
 
 conf_get(Key) ->
-    conf_get(Key, undefined).
+    csrt_util:conf_get(Key).
 
 
 conf_get(Key, Default) ->
-    config:get(?MODULE_STRING, Key, Default).
+    csrt_util:conf_get(Key, Default).
 
 %%
 %% aggregate query api
