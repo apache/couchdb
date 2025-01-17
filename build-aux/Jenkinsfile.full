@@ -63,16 +63,14 @@ meta = [
     image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
   ],
 
-  // Was notified it suffered a disk failure. It does seem to sometimes
-  // run jobs but they also seems to keep failing even after 2-3 retries
-  // 'bookworm-ppc64': [
-  //   name: 'Debian POWER',
-  //   spidermonkey_vsn: '78',
-  //   with_nouveau: true,
-  //   with_clouseau: true,
-  //   image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
-  //   node_label: 'ppc64le'
-  // ],
+  'bookworm-ppc64': [
+    name: 'Debian POWER',
+    spidermonkey_vsn: '78',
+    with_nouveau: true,
+    with_clouseau: true,
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
+    node_label: 'ppc64le'
+  ],
 
   'bookworm-s390x': [
     name: 'Debian s390x',
