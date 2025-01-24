@@ -44,10 +44,6 @@ function create_nouveau_sandbox() {
   return sandbox;
 };
 
-function seal(obj, flag) {
-  Object.freeze(obj);
-};
-
 // This is a copy from loop.js
 var DDoc = (function() {
   var ddoc_dispatch = {
