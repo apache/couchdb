@@ -116,14 +116,7 @@ var Couch = {
         "Expression does not eval to a function. (" + source.toString() + ")"]);
     };
   },
-  recursivelySeal: function (obj) {
-    seal(obj);
-    for (var propname in obj) {
-      if (typeof obj[propname] == "object") {
-        arguments.callee(obj[propname]);
-      }
-    }
-  },
+  recursivelySeal: deepFreeze,
 };
 
 function errstr(e) {
@@ -155,13 +148,26 @@ function isArray(obj) {
   return toString.call(obj) === "[object Array]";
 }
 
+function getPropNames(object) {
+  if (typeof Reflect === 'undefined') {
+    return Object.getOwnPropertyNames(object);
+  } else {
+    return Reflect.ownKeys(object);
+  }
+}
+
 function deepFreeze(object) {
     if (Object.isFrozen(object)) {
         return object;
     }
     Object.freeze(object);
     // Retrieve the property names defined on object
-    const propNames = Reflect.ownKeys(object);
+    // `Reflect.ownKeys()` gives us all own property name strings as well as
+    // symbols, so it is a bit more complete, but it is a newer JS API, so we
+    // fall back on `Object.getOwnPropertyNames()` in JS engines that don’t
+    // understand symbols yet (SpiderMonkey 1.8.5). It is a safe fallback
+    // because until then object keys can only be strings.
+    const propNames = getPropNames(object);
 
     // Freeze properties before freezing self
     for (var i in propNames) {
