@@ -101,7 +101,7 @@ handle_call({queue, Item, _}, _From, #q{worker = {W, _Max}} = Q) ->
     {reply, ok, Q#q{worker = undefined}, hibernate};
 handle_call({dequeue, _Max}, _From, #q{worker = {_, _}}) ->
     % Something went wrong - the same or a different worker is
-    % trying to dequeue an item. We only only allow one worker to wait
+    % trying to dequeue an item. We only allow one worker to wait
     % for work at a time, so we exit with an error.
     exit(multiple_workers_error);
 handle_call({dequeue, Max}, From, #q{worker = undefined, items = Count} = Q) ->
