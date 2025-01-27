@@ -29,9 +29,8 @@
     max_items,
     items = 0,
     size = 0,
-    work_waiters = [],
-    close_on_dequeue = false,
-    multi_workers = false
+    worker = undefined,
+    close_on_dequeue = false
 }).
 
 new(Options) ->
@@ -72,15 +71,17 @@ close(Wq) ->
 init(Options) ->
     Q = #q{
         max_size = couch_util:get_value(max_size, Options, nil),
-        max_items = couch_util:get_value(max_items, Options, nil),
-        multi_workers = couch_util:get_value(multi_workers, Options, false)
+        max_items = couch_util:get_value(max_items, Options, nil)
     },
     {ok, Q, hibernate}.
 
-terminate(_Reason, #q{work_waiters = Workers}) ->
-    lists:foreach(fun({W, _}) -> gen_server:reply(W, closed) end, Workers).
+terminate(_Reason, #q{worker = undefined}) ->
+    ok;
+terminate(_Reason, #q{worker = {W, _}}) ->
+    gen_server:reply(W, closed),
+    ok.
 
-handle_call({queue, Item, Size}, From, #q{work_waiters = []} = Q0) ->
+handle_call({queue, Item, Size}, From, #q{worker = undefined} = Q0) ->
     Q = Q0#q{
         size = Q0#q.size + Size,
         items = Q0#q.items + 1,
@@ -95,23 +96,20 @@ handle_call({queue, Item, Size}, From, #q{work_waiters = []} = Q0) ->
         false ->
             {reply, ok, Q, hibernate}
     end;
-handle_call({queue, Item, _}, _From, #q{work_waiters = [{W, _Max} | Rest]} = Q) ->
+handle_call({queue, Item, _}, _From, #q{worker = {W, _Max}} = Q) ->
     gen_server:reply(W, {ok, [Item]}),
-    {reply, ok, Q#q{work_waiters = Rest}, hibernate};
-handle_call({dequeue, Max}, From, Q) ->
-    #q{work_waiters = Workers, multi_workers = Multi, items = Count} = Q,
-    case {Workers, Multi} of
-        {[_ | _], false} ->
-            exit("Only one caller allowed to wait for this work at a time");
-        {[_ | _], true} ->
-            {noreply, Q#q{work_waiters = Workers ++ [{From, Max}]}};
-        _ ->
-            case Count of
-                0 ->
-                    {noreply, Q#q{work_waiters = Workers ++ [{From, Max}]}};
-                C when C > 0 ->
-                    deliver_queue_items(Max, Q)
-            end
+    {reply, ok, Q#q{worker = undefined}, hibernate};
+handle_call({dequeue, _Max}, _From, #q{worker = {_, _}}) ->
+    % Something went wrong - the same or a different worker is
+    % trying to dequeue an item. We only allow one worker to wait
+    % for work at a time, so we exit with an error.
+    exit(multiple_workers_error);
+handle_call({dequeue, Max}, From, #q{worker = undefined, items = Count} = Q) ->
+    case Count of
+        0 ->
+            {noreply, Q#q{worker = {From, Max}}};
+        C when C > 0 ->
+            deliver_queue_items(Max, Q)
     end;
 handle_call(item_count, _From, Q) ->
     {reply, Q#q.items, Q};
