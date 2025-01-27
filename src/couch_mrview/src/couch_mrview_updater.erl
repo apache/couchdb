@@ -132,7 +132,7 @@ process_doc(#doc{id = Id} = Doc, Seq, #mrst{doc_acc = Acc} = State) ->
 finish_update(#mrst{doc_acc = Acc} = State) ->
     if
         Acc /= [] ->
-            couch_work_queue:queue(State#mrst.doc_queue, Acc);
+            couch_work_queue:queue(State#mrst.doc_queue, lists:reverse(Acc));
         true ->
             ok
     end,
