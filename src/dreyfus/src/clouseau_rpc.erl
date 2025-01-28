@@ -294,7 +294,21 @@ connected() ->
             true;
         false ->
             % We might have just booted up, so let's ping
-            pong == net_adm:ping(clouseau())
+            case net_adm:ping(clouseau()) of
+                pong ->
+                    % We can ping, but is the main process up?
+                    %
+                    % In versions 2.x (at least) this was a possibility
+                    %  > clouseau_rpc:version().
+                    %     {'EXIT',noconnection}
+                    %
+                    case (catch version()) of
+                        {ok, _} -> true;
+                        _ -> false
+                    end;
+                _ ->
+                    false
+            end
     end.
 
 rpc(Ref, Msg) ->
