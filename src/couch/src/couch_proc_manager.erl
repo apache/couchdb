@@ -288,6 +288,11 @@ handle_config_change("query_server_config", _, _, _, _) ->
     {ok, undefined};
 handle_config_change("couchdb", "js_engine", _, _, _) ->
     gen_server:cast(?MODULE, reload_config),
+    % Besides reloading the config to switch the engine for the new procs, run
+    % reload to kill all free and then released procs in the pool. This way we
+    % ensure all the procs will be recycled and using the new engine as soon as
+    % possible
+    spawn(fun() -> reload() end),
     {ok, undefined};
 handle_config_change(_, _, _, _, _) ->
     {ok, undefined}.

@@ -78,14 +78,43 @@ t_couch_jsengine_config_triggers_proc_server_reload(_) ->
                     <<"spidermonkey">> -> "quickjs"
                 end,
 
+            % Get and return one proc to the pool, and get and keep another
+            % proc during the switch. Both should be eventually be killed.
+
+            {ok, ProcKeep, _} = couch_proc_manager:get_proc(<<"javascript">>),
+            PidKeep = element(2, ProcKeep),
+            RefKeep = monitor(process, PidKeep),
+            ?assert(is_pid(PidKeep)),
+
+            {ok, ProcFree, _} = couch_proc_manager:get_proc(<<"javascript">>),
+            PidFree = element(2, ProcFree),
+            RefFree = monitor(process, PidFree),
+            % Return it back so there is one free process in the pool
+            couch_proc_manager:ret_proc(ProcFree),
+
             config:set("couchdb", "js_engine", Toggle, false),
             % couch_server:get_js_engine/0 should be visible immediately
             ?assertEqual(list_to_binary(Toggle), couch_server:get_js_engine()),
 
             wait_until_proc_manager_updates(OldVal),
             ?assertNotEqual(OldVal, get_proc_manager_default_js()),
-            NewVal = get_proc_manager_default_js(),
 
+            % Wait for the returned process to die
+            receive
+                {'DOWN', RefFree, _, _, _} -> ok
+            end,
+
+            % The one we kept should be alive, we don't want to discrupt
+            % checked-out processes while they are doing work
+            ?assert(is_process_alive(PidKeep)),
+
+            % Return the one we kept and that one should die as well
+            couch_proc_manager:ret_proc(ProcKeep),
+            receive
+                {'DOWN', RefKeep, _, _, _} -> ok
+            end,
+
+            NewVal = get_proc_manager_default_js(),
             % Toggle back to the original default (test config:delete/3)
             config:delete("couchdb", "js_engine", false),
             wait_until_proc_manager_updates(NewVal),
