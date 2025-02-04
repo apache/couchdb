@@ -854,6 +854,8 @@ do_checkpoint(State) ->
             BaseHistory =
                 [
                     {<<"session_id">>, SessionId},
+                    {<<"source">>, ?l2b(SourceName)},
+                    {<<"target">>, ?l2b(TargetName)},
                     {<<"source_last_seq">>, NewSeq},
                     {<<"replication_id_version">>, ?REP_ID_VERSION}
                 ] ++

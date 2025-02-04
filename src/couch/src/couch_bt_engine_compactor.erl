@@ -322,14 +322,15 @@ copy_compact(#comp_st{} = CompSt) ->
             Deleted =
                 case DocInfo of
                     #full_doc_info{} -> DocInfo#full_doc_info.deleted;
-                    #doc_info{} -> false % Older versions stored #doc_info records in the seq_tree.
+                    % Older versions stored #doc_info records in the seq_tree.
+                    #doc_info{} -> false
                 end,
 
             AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
             if
                 Deleted andalso Seq =< DropSeq ->
                     %% drop this document completely
-                    {ok,  {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}};
+                    {ok, {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}};
                 AccUncopiedSize2 >= BufferSize ->
                     NewSt2 = copy_docs(
                         St, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry
