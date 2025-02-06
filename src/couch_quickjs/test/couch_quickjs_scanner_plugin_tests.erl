@@ -692,6 +692,7 @@ ddoc_update(Doc) ->
         updates => #{
             u1 => <<
                 "function(doc, req) {\n"
+                "  body = JSON.parse(req.body) \n"
                 "  doc.a.search(/(x+)/); \n"
                 "  if (RegExp.$1 === undefined) {\n"
                 "    return [null, 'no_dollar_one']; \n"
@@ -702,6 +703,7 @@ ddoc_update(Doc) ->
             >>,
             u2 => <<
                 "function(doc, req) {\n"
+                "  body = JSON.parse(req.body) \n"
                 "  if (typeof(req.form) === 'object') {\n"
                 "    return [null, 'has_form']; \n"
                 "  } else { \n"
