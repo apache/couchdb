@@ -269,9 +269,9 @@ format_db(Db) when is_list(Db) ->
     format_db(list_to_binary(Db));
 format_db(Db) when is_tuple(Db) ->
     format_db(couch_db:name(Db));
-format_db(<<"shards/", B:8/binary, "-", E:8/binary, "/", Rest/binary>>) ->
+format_db(<<"shards/", _:8/binary, "-", _:8/binary, "/", Rest/binary>>) ->
     [Db, _] = binary:split(Rest, <<".">>),
-    <<Db/binary, "/", B/binary, "-", E/binary>>;
+    Db;
 format_db(<<Db/binary>>) ->
     Db.
 
@@ -354,7 +354,7 @@ log_format_test() ->
     ?assertEqual("mod db:x ", tlog(#{db => <<"x">>})),
     ?assertEqual("mod s:y f:z db:x ", tlog(#{db => "x", sid => y, fn => z})),
     Shard = <<"shards/80000000-ffffffff/db.1712291766">>,
-    ?assertEqual("mod db:db/80000000-ffffffff ", tlog(#{db => Shard})).
+    ?assertEqual("mod db:db ", tlog(#{db => Shard})).
 
 tlog(Meta) ->
     {Fmt, Args} = log_format_meta(mod, Meta),
