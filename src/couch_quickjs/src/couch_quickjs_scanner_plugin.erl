@@ -75,7 +75,7 @@
         <<"sizes">> => #{<<"active">> => 42, <<"disk">> => 42, <<"external">> => 42}
     },
     <<"query">> => #{},
-    <<"body">> => #{},
+    <<"body">> => <<"{}">>,
     <<"method">> => <<"POST">>,
     <<"headers">> => #{},
     <<"form">> => #{},
@@ -814,12 +814,16 @@ nouveau_add_fun(#proc{}, _) ->
     ok.
 
 clouseau_index_doc(#proc{} = Proc, {[_ | _]} = Doc) ->
-    [Fields | _] = prompt(Proc, [<<"index_doc">>, Doc]),
-    lists:sort(Fields).
+    case prompt(Proc, [<<"index_doc">>, Doc]) of
+        [Fields | _] -> lists:sort(Fields);
+        [] -> []
+    end.
 
 nouveau_index_doc(#proc{} = Proc, {[_ | _]} = Doc) ->
-    [Fields | _] = prompt(Proc, [<<"nouveau_index_doc">>, Doc]),
-    lists:sort(Fields).
+    case prompt(Proc, [<<"nouveau_index_doc">>, Doc]) of
+        [Fields | _] -> lists:sort(Fields);
+        [] -> []
+    end.
 
 filter_doc(#proc{} = Proc, DDocId, FName, {[_ | _]} = Doc) ->
     % Add a mock request object so param access doesn't throw a TypeError
