@@ -78,9 +78,9 @@ known regression or discrepancies between versions:
 
 1. ``for each (var x in ...)``
 
-  Version ``1.8.5`` supports the ``for each (var x in ...)`` looping
-  expression. That's not a standard JavaScript syntax and is not supported in
-  later versions:
+Version ``1.8.5`` supports the ``for each (var x in ...)`` looping
+expression. That's not a standard JavaScript syntax and is not supported in
+later versions:
 
 .. code-block:: bash
 
@@ -97,10 +97,10 @@ known regression or discrepancies between versions:
 
 2. E4X (ECMAScript for XML)
 
-   This is not supported in versions greater than ``1.8.5``. This feature may
-   be inadvertently triggered when inserting a ``.`` character between a
-   variable and ``(``. That would compile on ``1.8.5`` and throw a
-   ``SyntaxError`` on other versions:
+This is not supported in versions greater than ``1.8.5``. This feature may be
+inadvertently triggered when inserting a ``.`` character between a variable and
+``(``. That would compile on ``1.8.5`` and throw a ``SyntaxError`` on other
+versions:
 
 .. code-block:: bash
 
@@ -119,7 +119,7 @@ known regression or discrepancies between versions:
 
 3. ``toLocaleFormat(...)`` function.
 
-   This ``Date`` function is not present in versions greater than ``1.8.5``:
+This ``Date`` function is not present in versions greater than ``1.8.5``:
 
 .. code-block:: bash
 
@@ -137,8 +137,8 @@ known regression or discrepancies between versions:
 
 4. ``toLocaleString(...)`` function.
 
-  SpiderMonkey 1.8.5 ignored locale strings. Later versions started to
-  return the correct format:
+SpiderMonkey 1.8.5 ignored locale strings. Later versions started to return the
+correct format:
 
 .. code-block:: bash
 
@@ -155,9 +155,8 @@ Spidermonkey 91 output also match QuickJS and v8.
 5. Invalid expressions following ``function(){...}`` are not ignored any longer
    and will throw an error.
 
-   Previously, in versions less than or equal to ``1.8.5`` it was possible add
-   any expression following the main function definition and they were mostly
-   ignored:
+Previously, in versions less than or equal to ``1.8.5`` it was possible add any
+expression following the main function definition and they were mostly ignored:
 
 .. code-block:: bash
 
@@ -183,7 +182,7 @@ Spidermonkey 91 output also match QuickJS and v8.
        "total_rows": 1
    }
 
-  With higher versions of SpiderMonkey, that would throw a compilation error:
+With higher versions of SpiderMonkey, that would throw a compilation error:
 
 .. code-block:: bash
 
@@ -196,8 +195,8 @@ Spidermonkey 91 output also match QuickJS and v8.
 
 6. Object key order.
 
-   Object key order may change between versions, so any views which rely on
-   that order may emit different results depending on the engine version:
+Object key order may change between versions, so any views which rely on that
+order may emit different results depending on the engine version:
 
 .. code-block:: bash
 
@@ -211,8 +210,8 @@ Spidermonkey 91 output also match QuickJS and v8.
 
 7. String ``match(undefined)``
 
-   Spidermonkey 1.8.5 returns ``null`` for ``match(undefined)`` while versions
-   starting with at least ``78`` return ``[""]``.
+Spidermonkey 1.8.5 returns ``null`` for ``match(undefined)`` while versions
+starting with at least ``78`` return ``[""]``.
 
 .. code-block:: bash
 
@@ -224,7 +223,32 @@ Spidermonkey 91 output also match QuickJS and v8.
    js> "abc".match(undefined)
    [""]
 
-8. The ``toISOString()`` throws an error on invalid ``Date`` objects.
+8. String ``substring(val, start, end)``
+
+Spidermonkey ``1.8.5`` has a ``String.substring(val, start, end)`` function. That
+function is not present in at least Spidermonkey ``91`` and higher:
+
+.. code-block:: bash
+
+    % js
+    js> String.substring("abcd", 1, 2)
+    "b"
+
+    % js91
+    js> String.substring("abcd", 1, 2)
+    typein:1:8 TypeError: String.substring is not a function
+    Stack:
+        @typein:1:
+
+Use ``String.prototype.substring(start, end)`` instead:
+
+.. code-block:: bash
+
+    % js91
+    js> "abcd".substring(1, 2)
+    "b"
+
+9. The ``toISOString()`` throws an error on invalid ``Date`` objects.
 
 SpiderMonkey version ``1.8.5`` does not throw an error when calling
 ``toISOString()`` on invalid ``Date`` objects, but SpiderMonkey versions at
@@ -247,7 +271,7 @@ might have emitted the "Invalid Date" string, while in later SpiderMonkey
 engines all the emit results from that document will be skipped, since view
 functions skip view results if an exception is thrown.
 
-9. Invalid JavaScript before function definition
+10. Invalid JavaScript before function definition
 
 SpiderMoneky version ``1.8.5`` allowed the invalid ``term : function(...)``
 syntax. So a view function like the following worked and produced successfull
