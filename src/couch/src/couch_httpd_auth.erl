@@ -656,23 +656,29 @@ authenticate_int(Pass, UserSalt, UserProps) ->
     {PasswordHash, ExpectedHash} =
         case couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>) of
             <<"simple">> ->
-                {
-                    couch_passwords:simple(Pass, UserSalt),
-                    couch_util:get_value(<<"password_sha">>, UserProps, nil)
-                };
+                authenticate_int_simple(Pass, UserSalt, UserProps);
             <<"pbkdf2">> ->
-                PRF = couch_util:get_value(<<"pbkdf2_prf">>, UserProps, <<"sha">>),
-                verify_prf(PRF),
-                Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
-                verify_iterations(Iterations),
-                {
-                    couch_passwords:pbkdf2(
-                        binary_to_existing_atom(PRF), Pass, UserSalt, Iterations
-                    ),
-                    couch_util:get_value(<<"derived_key">>, UserProps, nil)
-                }
+                authenticate_int_pbkdf2(Pass, UserSalt, UserProps)
         end,
     couch_passwords:verify(PasswordHash, ExpectedHash).
+
+authenticate_int_simple(Pass, UserSalt, UserProps) ->
+    {
+        couch_passwords:simple(Pass, UserSalt),
+        couch_util:get_value(<<"password_sha">>, UserProps, nil)
+    }.
+
+authenticate_int_pbkdf2(Pass, UserSalt, UserProps) ->
+    PRF = couch_util:get_value(<<"pbkdf2_prf">>, UserProps, <<"sha">>),
+    verify_prf(PRF),
+    Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
+    verify_iterations(Iterations),
+    {
+        couch_passwords:pbkdf2(
+            binary_to_existing_atom(PRF), Pass, UserSalt, Iterations
+        ),
+        couch_util:get_value(<<"derived_key">>, UserProps, nil)
+    }.
 
 verify_iterations(Iterations) when is_integer(Iterations) ->
     Min = chttpd_util:get_chttpd_auth_config_integer("min_iterations", 1),
