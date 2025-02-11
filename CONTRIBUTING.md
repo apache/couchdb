@@ -187,7 +187,7 @@ If you never created a pull request before, welcome :tada: :smile:
 2. Clone the repo and create a branch.
 
    ```bash
-   git clone https://github.com/couchdb/couchdb
+   git clone https://github.com/apache/couchdb
    # or git clone https://gitbox.apache.org/repos/asf/couchdb.git
    cd couchdb
    git checkout -b <topic-branch-name>
