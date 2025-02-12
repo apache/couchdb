@@ -656,23 +656,32 @@ authenticate_int(Pass, UserSalt, UserProps) ->
     {PasswordHash, ExpectedHash} =
         case couch_util:get_value(<<"password_scheme">>, UserProps, <<"simple">>) of
             <<"simple">> ->
-                {
-                    couch_passwords:simple(Pass, UserSalt),
-                    couch_util:get_value(<<"password_sha">>, UserProps, nil)
-                };
+                authenticate_int_simple(Pass, UserSalt, UserProps);
             <<"pbkdf2">> ->
-                PRF = couch_util:get_value(<<"pbkdf2_prf">>, UserProps, <<"sha">>),
-                verify_prf(PRF),
-                Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
-                verify_iterations(Iterations),
-                {
-                    couch_passwords:pbkdf2(
-                        binary_to_existing_atom(PRF), Pass, UserSalt, Iterations
-                    ),
-                    couch_util:get_value(<<"derived_key">>, UserProps, nil)
-                }
+                authenticate_int_pbkdf2(Pass, UserSalt, UserProps);
+            <<"simple+pbkdf2">> ->
+                LegacyHash = couch_passwords:simple(Pass, UserSalt),
+                authenticate_int_pbkdf2(LegacyHash, UserSalt, UserProps)
         end,
     couch_passwords:verify(PasswordHash, ExpectedHash).
+
+authenticate_int_simple(Pass, UserSalt, UserProps) ->
+    {
+        couch_passwords:simple(Pass, UserSalt),
+        couch_util:get_value(<<"password_sha">>, UserProps, nil)
+    }.
+
+authenticate_int_pbkdf2(Pass, UserSalt, UserProps) ->
+    PRF = couch_util:get_value(<<"pbkdf2_prf">>, UserProps, <<"sha">>),
+    verify_prf(PRF),
+    Iterations = couch_util:get_value(<<"iterations">>, UserProps, 10000),
+    verify_iterations(Iterations),
+    {
+        couch_passwords:pbkdf2(
+            binary_to_existing_atom(PRF), Pass, UserSalt, Iterations
+        ),
+        couch_util:get_value(<<"derived_key">>, UserProps, nil)
+    }.
 
 verify_iterations(Iterations) when is_integer(Iterations) ->
     Min = chttpd_util:get_chttpd_auth_config_integer("min_iterations", 1),
@@ -822,3 +831,41 @@ lockout_warning(#httpd{mochi_req = Req}, User) ->
         "~p: Authentication rejected for locked-out user ~s from ~s",
         [?MODULE, User, Peer]
     ).
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+simple_pbkdf2_test() ->
+    Password = <<"0123456789">>,
+    Salt = couch_uuids:random(),
+    PasswordSha = couch_passwords:simple(Password, Salt),
+    ?assert(
+        authenticate_int(
+            Password,
+            Salt,
+            [
+                {<<"password_scheme">>, <<"simple">>},
+                {<<"salt">>, Salt},
+                {<<"password_sha">>, PasswordSha}
+            ]
+        )
+    ),
+
+    Iterations = 5,
+    DerivedKey = couch_passwords:pbkdf2(sha256, PasswordSha, Salt, Iterations),
+
+    ?assert(
+        authenticate_int(
+            Password,
+            Salt,
+            [
+                {<<"password_scheme">>, <<"simple+pbkdf2">>},
+                {<<"salt">>, Salt},
+                {<<"pbkdf2_prf">>, <<"sha256">>},
+                {<<"iterations">>, Iterations},
+                {<<"derived_key">>, DerivedKey}
+            ]
+        )
+    ).
+
+-endif.

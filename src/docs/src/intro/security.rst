@@ -312,6 +312,64 @@ several *mandatory* fields, that CouchDB needs for authentication:
 Additionally, you may specify any custom fields that relate to the target
 user.
 
+Password Schemes
+----------------
+
+CouchDB supports several password hashing schemes:
+
+Simple
+^^^^^^
+
+.. warning::
+
+   Deprecated
+
+The original hashing scheme (``simple`` in ``password_scheme`` field) is a
+single iteration of SHA-1 over the password combined with the salt value. It is
+too weak today, unless the password has especially high entropy.
+
+PBKDF2
+^^^^^^
+
+The PBKDF2 hashing scheme (``pbkdf2`` in ``password_scheme`` field) is a
+multiple iteration algorithm using a member of the SHA-2 family. The number of
+iterations is configurable.
+
+Simple plus PBKDF2
+^^^^^^^^^^^^^^^^^^
+
+To aid migration a combined scheme is also available (``simple+pbkdf2`` in
+``password_scheme`` field). If you have ``simple`` credentials in your
+``_users`` database that you don't wish to delete, but are currently unable to
+authenticate with, you can convert the credential to the ``simple+pbkdf2``
+scheme without needing to know the password. CouchDB will apply the ``simple``
+scheme first and then the ``pkbdf2`` algorithm to the result.
+
+Example code to convert ``simple`` to ``simple+pbkdf2`` (Python):
+
+.. code-block:: python
+
+    import hashlib
+
+    doc = fetch_user_doc(username)
+    hashlib.pbkdf2_hmac('sha256', doc['password_sha'], doc['salt'], 600000).hex()
+
+The result should be stored in the ``derived_key`` field of the user doc.
+
+Example user doc:
+
+.. code-block:: javascript
+
+    {
+      "type": "user",
+      "name": "user1",
+      "password_scheme": "simple+pbkdf2",
+      "derived_key": "result from above",
+      "pbkdf2_prf": "sha256",
+      "iterations": 600000,
+      "salt": "salthere"
+    }
+
 .. _org.couchdb.user:
 
 Why the ``org.couchdb.user:`` prefix?
