@@ -104,6 +104,29 @@ You can learn more about our contributing process here:
 
     https://github.com/apache/couchdb/blob/main/CONTRIBUTING.md
 
+Acknowledgments
+---------------
+
+This project is proudly supported by:
+
+`MacStadium <https://www.macstadium.com>`_
+
+`IBM Cloudant <https://www.ibm.com/products/cloudant>`_
+
+`Neighbourhoodie <https://neighbourhood.ie/couchdb-support>`_
+
+|6|
+
+.. |3| 
+    :target: https://www.macstadium.com
+.. |4| 
+    :target: https://www.ibm.com/products/cloudant
+.. |5|
+    :target: https://neighbourhood.ie/couchdb-support
+.. |6| image:: https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.png
+    :width: 200
+    :target: https://www.digitalocean.com
+
 Cryptographic Software Notice
 -----------------------------
 
