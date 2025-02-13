@@ -43,7 +43,7 @@ For troubleshooting or cryptic error messages, see:
 For general help, see:
 
      https://couchdb.apache.org/#mailing-list
-     
+
 We also have an IRC channel:
 
     https://web.libera.chat/#couchdb
@@ -68,15 +68,15 @@ Getting started with developing
 .. image:: https://img.shields.io/static/v1?label=Remote%20-%20Containers&message=Open&color=blue&logo=visualstudiocode
     :target: https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/apache/couchdb
 
-If you already have VS Code and Docker installed, you can click the badge above or 
-`here <https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/apache/couchdb>`_ 
-to get started. Clicking these links will cause VS Code to automatically install the 
-Remote - Containers extension if needed, clone the source code into a container volume, 
+If you already have VS Code and Docker installed, you can click the badge above or
+`here <https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/apache/couchdb>`_
+to get started. Clicking these links will cause VS Code to automatically install the
+Remote - Containers extension if needed, clone the source code into a container volume,
 and spin up a dev container for use.
 
-This ``devcontainer`` will automatically run ``./configure && make`` the first time it is created.  
-While this may take some extra time to spin up, this tradeoff means you will be able to 
-run things like ``./dev/run``, ``./dev/run --admin=admin:admin``,  ``./dev/run --with-admin-party-please``, 
+This ``devcontainer`` will automatically run ``./configure && make`` the first time it is created.
+While this may take some extra time to spin up, this tradeoff means you will be able to
+run things like ``./dev/run``, ``./dev/run --admin=admin:admin``,  ``./dev/run --with-admin-party-please``,
 and ``make check`` straight away.  Subsequent startups should be quick.
 
 **Manual Dev Setup:**
@@ -103,6 +103,34 @@ Contributing to CouchDB
 You can learn more about our contributing process here:
 
     https://github.com/apache/couchdb/blob/main/CONTRIBUTING.md
+
+Acknowledgments
+---------------
+
+This project is proudly supported by:
+
+|3|
+
+`IBM Cloudant <https://www.ibm.com/products/cloudant>`_
+
+|5|
+
+|6|
+
+|7|
+
+.. |3| image:: https://couchdb.apache.org/image/macstadium-logo.png
+    :width: 150
+    :target: https://www.macstadium.com
+.. |5| image:: https://couchdb.apache.org/image/neighbourhoodie-logo-with-n.svg
+    :width: 150
+    :target: https://neighbourhood.ie/couchdb-support
+.. |6| image:: https://opensource.nyc3.cdn.digitaloceanspaces.com/attribution/assets/PoweredByDO/DO_Powered_by_Badge_blue.png
+    :width: 150
+    :target: https://www.digitalocean.com
+.. |7| image:: https://couchdb.apache.org/image/netcup_logo_RGB_color.svg
+    :width: 150
+    :target: https://www.netcup.com
 
 Cryptographic Software Notice
 -----------------------------
