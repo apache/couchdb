@@ -124,6 +124,26 @@ function errstr(e) {
   return (e.toSource ? e.toSource() : e.toString());
 };
 
+// If we have an object which looks like an Error, then make it so it
+// can be json stringified so it keeps the message and name,
+// otherwise, most modern JS engine will stringify Error object as
+// {}. Unfortnately, because of sandboxing we cannot use `e instanceof
+// Error` as the Error object in the sandbox won't technically be the
+// same error object as the one from our wrapper JS functions, so we
+// use some "ducktyping" to detect the Error.
+//
+function error_to_json(e) {
+    if (typeof e === "object"
+        && e != null
+        && 'stack' in e
+        && 'name' in e
+        && 'message' in e
+    ) {
+        return {'error': e.name, 'message': e.message}
+    };
+    return e;
+}
+
 // prints the object as JSON, and rescues and logs any JSON.stringify() related errors
 function respond(obj) {
   try {
@@ -139,7 +159,7 @@ function log(message) {
   if (typeof message == "xml") {
     message = message.toXMLString();
   } else if (typeof message != "string") {
-    message = JSON.stringify(message);
+    message = JSON.stringify(error_to_json(message));
   }
   respond(["log", String(message)]);
 };
