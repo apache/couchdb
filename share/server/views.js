@@ -84,7 +84,7 @@ var Views = (function() {
   return {
     // view helper functions
     emit : function(key, value) {
-      map_results.push([key, value]);
+      map_results.push([key, error_to_json(value)]);
     },
     sum : function(values) {
       var rv = 0;

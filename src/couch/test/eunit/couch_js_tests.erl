@@ -18,12 +18,20 @@ couch_js_test_() ->
         "Test couchjs",
         {
             setup,
-            fun() -> test_util:start_couch([config]) end,
-            fun test_util:stop_couch/1,
+            fun() ->
+                test_util:start_couch(),
+                meck:new(couch_log, [passthrough])
+            end,
+            fun(Ctx) ->
+                meck:unload(),
+                test_util:stop_couch(Ctx)
+            end,
             with([
                 ?TDEF(should_create_sandbox),
                 ?TDEF(should_reset_properly),
                 ?TDEF(should_freeze_doc_object),
+                ?TDEF(should_emit_error_details),
+                ?TDEF(should_log_error_details),
                 ?TDEF(should_roundtrip_utf8),
                 ?TDEF(should_roundtrip_modified_utf8),
                 ?TDEF(should_replace_broken_utf16),
@@ -101,6 +109,56 @@ should_freeze_doc_object(_) ->
     ?assertEqual([[[null, 1041], [null, 1041]]], Result1),
     Result2 = prompt(Proc, [<<"map_doc">>, Doc]),
     ?assertEqual([[[null, 1041], [null, 1041]]], Result2),
+    couch_query_servers:ret_os_process(Proc).
+
+%% erlfmt-ignore
+should_emit_error_details(_) ->
+    Src = <<"
+        function(doc) {
+            try {
+               non_existent.fun_call
+            } catch (e) {
+               emit('err', e);
+            }
+        }
+    ">>,
+    Proc = couch_query_servers:get_os_process(<<"javascript">>),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
+    Result = prompt(Proc, [<<"map_doc">>,  {[{<<"foo">>, 42}]}]),
+    ?assertMatch([[[<<"err">>, {[_ | _]}]]], Result),
+    [[[<<"err">>, {ErrProps}]]] = Result,
+    ?assertEqual(<<"ReferenceError">>, couch_util:get_value(<<"error">>, ErrProps)),
+    ?assertMatch(<<_/binary>>, couch_util:get_value(<<"message">>, ErrProps)),
+    couch_query_servers:ret_os_process(Proc).
+
+%% erlfmt-ignore
+should_log_error_details(_) ->
+    Src = <<"
+        function(doc) {
+            try {
+               non_existent.fun_call
+            } catch (e) {
+               log(e);
+               emit('err', 1);
+            }
+        }
+    ">>,
+    Proc = couch_query_servers:get_os_process(<<"javascript">>),
+    true = prompt(Proc, [<<"add_fun">>, Src]),
+    meck:reset(couch_log),
+    % Don't check too specifically just that we emitted ReferenceError somewhere
+    % in there, otherwise each engine has its own error message format
+    meck:expect(couch_log, info, fun
+        ("OS Process " ++ _, [_Port, <<Msg/binary>>]) ->
+            ?assertNotEqual(nomatch, binary:match(Msg, [<<"ReferenceError">>])),
+            ok;
+        (_, _) ->
+            ok
+    end),
+    Result = prompt(Proc, [<<"map_doc">>,  {[{<<"foo">>, 42}]}]),
+    ?assertEqual([[[<<"err">>, 1]]], Result),
+    ?assert(meck:num_calls(couch_log, info, 2) >= 1),
+    meck:expect(couch_log, info, 2, meck:passthrough()),
     couch_query_servers:ret_os_process(Proc).
 
 %% erlfmt-ignore
