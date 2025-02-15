@@ -166,7 +166,6 @@ Example response when finding documents using an index:
             }
         }
 
-
 .. _find/sort:
 
 Sort Syntax
