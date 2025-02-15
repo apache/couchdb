@@ -26,6 +26,7 @@ replications.
 
     ddocs
     views/index
+    mango
     search
     nouveau
 
