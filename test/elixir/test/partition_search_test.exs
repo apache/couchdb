@@ -56,12 +56,14 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert ids == ["foo:10", "foo:2", "foo:4", "foo:6", "foo:8"]
 
     url = "/#{db_name}/_partition/bar/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert ids == ["bar:1", "bar:3", "bar:5", "bar:7", "bar:9"]
@@ -75,6 +77,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert ids == ["foo:10", "foo:2", "foo:4", "foo:6", "foo:8"]
@@ -88,6 +91,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field", limit: 3})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert ids == ["foo:10", "foo:2", "foo:4"]
@@ -95,11 +99,13 @@ defmodule PartitionSearchTest do
     %{:body => %{"bookmark" => bookmark}} = resp
 
     resp = Couch.get(url, query: %{q: "some:field", limit: 3, bookmark: bookmark})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert ids == ["foo:6", "foo:8"]
 
     resp = Couch.get(url, query: %{q: "some:field", limit: 2000, bookmark: bookmark})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert ids == ["foo:6", "foo:8"]
@@ -116,6 +122,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.post(url, body: %{:q => "some:field", :limit => 1})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
   end
 
@@ -127,6 +134,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.post(url, body: %{:q => "some:field", :limit => 1})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
   end
 
@@ -164,6 +172,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
@@ -177,6 +186,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
@@ -190,6 +200,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field", limit: 3})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_ids(resp)
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9"])
