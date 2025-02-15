@@ -651,7 +651,7 @@ multi-element ``keys``. For single-element ``keys``, treat it as a ``key``.
     $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?key="a"'
     {"rows":[{"key":null,"value":1}]}
 
-    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?keys="[\"a\"]"'
+    $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?keys=\["a"\]'
     {"rows":[{"key":null,"value":1}]}
 
     $ curl http://adm:pass@127.0.0.1:5984/db/_design/ddoc/_view/reduce'?keys=\["a","b"\]'
