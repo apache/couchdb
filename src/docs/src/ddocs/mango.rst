@@ -700,8 +700,9 @@ They primarily consist of a list of fields to index, but can also contain a :ref
 
 
 .. note::
-    Mango indexes have a type, currently ``json`` or ``text``. This document
-    covers ``json`` indexes. ``text`` indexes are handled by 3rd-party software.
+    Mango indexes have a type, currently ``json``, ``text``, ``nouveau``. This
+    document covers ``json`` indexes. ``text`` and ``nouveau`` are related to
+    the :ref:`ddoc/search` and :ref:`ddoc/nouveau` systems, respectively.
 
 .. _find/partial_indexes:
 

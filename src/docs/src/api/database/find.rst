@@ -347,9 +347,10 @@ built using MapReduce Views.
         indexes in the same document (similar to views). *Optional*
     :query string name: Name of the index. If no name is provided, a name will
         be generated automatically. *Optional*
-    :query string type: Can be ``"json"`` or ``"text"``. Defaults to ``"json"``.
+    :query string type: Can be ``"json"``, ``"text"``, or ``"nouveau"``.
+        Defaults to ``"json"``. Text and Nouveau indexes are related to those
+        features, and are only available if they're installed.
         Geospatial indexes will be supported in the future. *Optional*
-        Text indexes are supported via a third-party library. *Optional*
     :query boolean partitioned: Determines whether a JSON index is partitioned
         or global. The default value of ``partitioned`` is the ``partitioned``
         property of the database. To create a global index on a
