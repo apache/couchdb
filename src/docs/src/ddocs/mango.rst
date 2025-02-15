@@ -50,7 +50,6 @@ of function or result.
     * Field names starting with ``$`` cannot be queried ("Invalid operator: $")
     * Fields at the root of the document starting with ``_`` cannot be queried ("Bad special document member: _")
 
-
 .. _find/selectorbasics:
 
 Selector Basics
@@ -690,14 +689,15 @@ operator. But it is not always the case: for example, comparison of strings is
 done with ICU and can can give surprising results if you were expecting ASCII
 ordering. See :ref:`views/collation` for more details.
 
-
 Indexes
 =======
 
-Indexes are like indexes in most other database systems: they spend a little extra space to improve the performance of queries.
+Indexes are like indexes in most other database systems: they spend a little
+extra space to improve the performance of queries.
 
-They primarily consist of a list of fields to index, but can also contain a :ref:`selector <find/selector>` to create a :ref:`partial index <find/partial_index>`.
-
+They primarily consist of a list of fields to index, but can also contain a
+:ref:`selector <find/selector>` to create a
+:ref:`partial index <find/partial_index>`.
 
 .. note::
     Mango indexes have a type, currently ``json``, ``text``, ``nouveau``. This
