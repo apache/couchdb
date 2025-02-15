@@ -297,6 +297,7 @@ open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
 open_doc(Db, Id, Options) ->
+    %% TODO: wire in csrt tracking
     increment_stat(Db, [couchdb, database_reads]),
     case open_doc_int(Db, Id, Options) of
         {ok, #doc{deleted = true} = Doc} ->
@@ -1982,6 +1983,7 @@ increment_stat(#db{options = Options}, Stat, Count) when
 ->
     case lists:member(sys_db, Options) of
         true ->
+            %% TODO: we shouldn't leak resource usage just because it's a sys_db
             ok;
         false ->
             couch_stats:increment_counter(Stat, Count)
