@@ -504,6 +504,9 @@ field in the JSON object in the request body.
         "limit": 3
     }
 
+
+.. _ddoc/nouveau/syntax:
+
 Query syntax
 ============
 

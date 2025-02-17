@@ -46,9 +46,11 @@ of function or result.
     While CouchDB will happily store just about anything JSON, the mango system
     has limitations about what it can work with:
 
-    * Empty field names (``""``) cannot be queried ("One or more conditions is missing a field name.")
+    * Empty field names (``""``) cannot be queried ("One or more conditions is
+      missing a field name.")
     * Field names starting with ``$`` cannot be queried ("Invalid operator: $")
-    * Fields at the root of the document starting with ``_`` cannot be queried ("Bad special document member: _")
+    * Fields at the root of the document starting with ``_`` cannot be queried 
+      ("Bad special document member: _")
 
 .. _find/selectorbasics:
 
@@ -347,6 +349,8 @@ The list of combination operators:
 |                  |          | map that contains at least one key that matches  |
 |                  |          | all the specified query criteria.                |
 +------------------+----------+--------------------------------------------------+
+| ``$text``        | String   | Perform a text search                            |
++------------------+----------+--------------------------------------------------+
 
 .. _find/and:
 
@@ -527,6 +531,31 @@ Below is an example used with the primary index (``_all_docs``):
         }
     }
 
+.. _find/text:
+
+**The** ``$text`` **operator**
+
+The ``$text`` operator performs a text search using either a search or nouveau 
+index. The specifics of the query follow either 
+:ref:`search syntax <ddoc/search/syntax>` or 
+:ref:`nouveau syntax <ddoc/nouveau/syntax>` (which both use Lucene and implement
+the same syntax).
+
+.. code-block:: javascript
+
+    {
+        "_id": { "$gt": null },
+        "cameras": {
+            "$keyMapMatch": {
+                "$eq": "secondary"
+            }
+        }
+    }
+
+.. note::
+
+    Queries cannot contain more than one ``$text``
+
 .. _find/condition-operators:
 
 Condition Operators
@@ -696,13 +725,18 @@ Indexes are like indexes in most other database systems: they spend a little
 extra space to improve the performance of queries.
 
 They primarily consist of a list of fields to index, but can also contain a
-:ref:`selector <find/selector>` to create a
-:ref:`partial index <find/partial_index>`.
+:ref:`selector <find/selectors>` to create a
+:ref:`partial index <find/partial_indexes>`.
 
 .. note::
-    Mango indexes have a type, currently ``json``, ``text``, ``nouveau``. This
-    document covers ``json`` indexes. ``text`` and ``nouveau`` are related to
-    the :ref:`ddoc/search` and :ref:`ddoc/nouveau` systems, respectively.
+    Mango indexes have a type, currently ``json``, ``text``, ``nouveau``. The
+    majority of this document covers ``json`` indexes. ``text`` and ``nouveau``
+    are related to the :ref:`ddoc/search` and :ref:`ddoc/nouveau` systems,
+    respectively. (See :ref:`ddoc/mango/indexes/nouveau`.)
+
+    You will also occasionally find reference to the ``special`` index type.
+    This represents synthetic indexes produced by CouchDB itself and refers
+    exclusively to ``_all_docs``.
 
 .. _find/partial_indexes:
 
@@ -783,6 +817,41 @@ it easier to take advantage of future improvements to query planning
     documents, the index would not be valid for the query. All indexes,
     however, can be treated as if they include the special fields ``_id`` and
     ``_rev``. They **never** need to be specified in the query selector.
+
+.. _ddoc/mango/indexes/nouveau:
+
+Nouveau Indexes
+---------------
+
+Mango can also interact with the :ref:`Nouveau search system <ddoc/nouveau>`,
+using the :ref:`$text selector <find/text>` and Nouveau indexes. These indexes
+can be queried using either ``$text`` or :http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
+
+Example index:
+
+.. code-block:: json
+
+    {
+        "type": "nouveau",
+        "index": {
+            "fields": [
+                {"name": "foo", "type": "string"},
+                {"name": "bar", "type": "number"},
+                {"name": "baz", "type": "string"},
+            ],
+            "default_analyzer": "keyword",
+        }
+    }
+
+* ``fields``: ``"all_fields"`` or list of objects:
+  * ``name``: not blank 
+  * ``type``: one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
+* ``default_analyzer``: Nouveau analyzer to use, defaults to ``"keyword"``
+* ``default_field``: boolean or object of ``enabled`` and ``analyzer``
+* ``partial_filter_selector``: A :ref:`selector<find/selectors>`, causing this 
+  to be a :ref:`partial index<find/partial_indexes>`
+* ``selector``: A :ref:`selector<find/selectors>`
+
 
 Indexes and Design Documents
 ----------------------------
