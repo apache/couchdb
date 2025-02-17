@@ -17,7 +17,7 @@ Mango Queries
 In addition to :ref:`map/reduce views <viewfun>`, CouchDB supports an expressive
 query system called Mango.
 
-The mango system consists of two major concepts:
+Mango consists of two major concepts:
 
 * Selectors, which are the queries, and are passed to the mango endpoints
 * Indexes, which are a specialization of design docs used in mango queries
@@ -43,8 +43,8 @@ of function or result.
 
 .. warning::
 
-    While CouchDB will happily store just about anything JSON, the mango system
-    has limitations about what it can work with:
+    While CouchDB will happily store just about anything JSON, Mango has
+    limitations about what it can work with:
 
     * Empty field names (``""``) cannot be queried ("One or more conditions is
       missing a field name.")
@@ -354,7 +354,8 @@ The list of combination operators:
 
 .. _find/and:
 
-**The** ``$and`` **operator**
+The ``$and`` operator
+~~~~~~~~~~~~~~~~~~~~~
 
 ``$and`` operator used with two fields:
 
@@ -400,7 +401,8 @@ an example using the primary index (``_all_docs``):
 
 .. _find/or:
 
-**The** ``$or`` **operator**
+The ``$or`` operator
+~~~~~~~~~~~~~~~~~~~~
 
 The ``$or`` operator matches if any of the selectors in the array match. Below
 is an example used with an index on the field ``"year"``:
@@ -417,7 +419,8 @@ is an example used with an index on the field ``"year"``:
 
 .. _find/not:
 
-**The** ``$not`` **operator**
+The ``$not`` operator
+~~~~~~~~~~~~~~~~~~~~~
 
 The ``$not`` operator matches if the given selector does not match. Below is an
 example used with an index on the field ``"year"``:
@@ -436,7 +439,8 @@ example used with an index on the field ``"year"``:
 
 .. _find/nor:
 
-**The** ``$nor`` **operator**
+The ``$nor`` operator
+~~~~~~~~~~~~~~~~~~~~~
 
 The ``$nor`` operator matches if the given selector does not match. Below is an
 example used with an index on the field ``"year"``:
@@ -457,7 +461,8 @@ example used with an index on the field ``"year"``:
 
 .. _find/all:
 
-**The** ``$all`` **operator**
+The ``$all`` operator
+~~~~~~~~~~~~~~~~~~~~~
 
 The ``$all`` operator matches an array value if it contains all the elements of
 the argument array. Below is an example used with the primary index
@@ -476,7 +481,8 @@ the argument array. Below is an example used with the primary index
 
 .. _find/elemmatch:
 
-**The** ``$elemMatch`` **operator**
+The ``$elemMatch`` operator
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``$elemMatch`` operator matches and returns all documents that contain an
 array field with at least one element matching the supplied query criteria.
@@ -495,7 +501,8 @@ Below is an example used with the primary index (``_all_docs``):
 
 .. _find/allmatch:
 
-**The** ``$allMatch`` **operator**
+The ``$allMatch`` operator
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``$allMatch`` operator matches and returns all documents that contain an
 array field with all its elements matching the supplied query criteria. Below
@@ -514,7 +521,8 @@ is an example used with the primary index (``_all_docs``):
 
 .. _find/keymapmatch:
 
-**The** ``$keyMapMatch`` **operator**
+The ``$keyMapMatch`` operator
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``$keyMapMatch`` operator matches and returns all documents that contain a
 map that contains at least one key that matches all the specified query criteria.
@@ -533,7 +541,8 @@ Below is an example used with the primary index (``_all_docs``):
 
 .. _find/text:
 
-**The** ``$text`` **operator**
+The ``$text`` operator
+~~~~~~~~~~~~~~~~~~~~~~
 
 The ``$text`` operator performs a text search using either a search or nouveau
 index. The specifics of the query follow either
@@ -552,7 +561,7 @@ the same syntax).
         }
     }
 
-.. note::
+.. warning::
 
     Queries cannot contain more than one ``$text``
 
@@ -812,7 +821,7 @@ it easier to take advantage of future improvements to query planning
 
 .. note::
     An index with fields is only used, when the selector includes
-    all of the fields indexed. For instance, if an index contains ``["a". "b"]``
+    all of the fields indexed. For instance, if an index contains ``["a", "b"]``
     but the selector only requires field ``["a"]`` to exist in the matching
     documents, the index would not be valid for the query. All indexes,
     however, can be treated as if they include the special fields ``_id`` and
