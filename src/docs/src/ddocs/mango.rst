@@ -14,7 +14,7 @@
 Mango Queries
 =============
 
-In addition to :ref:`map/reduce views <viewfun>`, CouchDB supports a expressive
+In addition to :ref:`map/reduce views <viewfun>`, CouchDB supports an expressive
 query syntax called Mango.
 
 The mango system consists of two major concepts:
@@ -49,7 +49,7 @@ of function or result.
     * Empty field names (``""``) cannot be queried ("One or more conditions is
       missing a field name.")
     * Field names starting with ``$`` cannot be queried ("Invalid operator: $")
-    * Fields at the root of the document starting with ``_`` cannot be queried 
+    * Fields at the root of the document starting with ``_`` cannot be queried
       ("Bad special document member: _")
 
 .. _find/selectorbasics:
@@ -535,9 +535,9 @@ Below is an example used with the primary index (``_all_docs``):
 
 **The** ``$text`` **operator**
 
-The ``$text`` operator performs a text search using either a search or nouveau 
-index. The specifics of the query follow either 
-:ref:`search syntax <ddoc/search/syntax>` or 
+The ``$text`` operator performs a text search using either a search or nouveau
+index. The specifics of the query follow either
+:ref:`search syntax <ddoc/search/syntax>` or
 :ref:`nouveau syntax <ddoc/nouveau/syntax>` (which both use Lucene and implement
 the same syntax).
 
@@ -825,7 +825,8 @@ Nouveau Indexes
 
 Mango can also interact with the :ref:`Nouveau search system <ddoc/nouveau>`,
 using the :ref:`$text selector <find/text>` and Nouveau indexes. These indexes
-can be queried using either ``$text`` or :http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
+can be queried using either ``$text`` or
+:http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
 
 Example index:
 
@@ -844,14 +845,13 @@ Example index:
     }
 
 * ``fields``: ``"all_fields"`` or list of objects:
-  * ``name``: not blank 
+  * ``name``: not blank
   * ``type``: one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
 * ``default_analyzer``: Nouveau analyzer to use, defaults to ``"keyword"``
 * ``default_field``: boolean or object of ``enabled`` and ``analyzer``
-* ``partial_filter_selector``: A :ref:`selector<find/selectors>`, causing this 
+* ``partial_filter_selector``: A :ref:`selector<find/selectors>`, causing this
   to be a :ref:`partial index<find/partial_indexes>`
 * ``selector``: A :ref:`selector<find/selectors>`
-
 
 Indexes and Design Documents
 ----------------------------
