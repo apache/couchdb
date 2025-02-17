@@ -727,7 +727,7 @@ operator. But it is not always the case: for example, comparison of strings is
 done with ICU and can can give surprising results if you were expecting ASCII
 ordering. See :ref:`views/collation` for more details.
 
-.. _ddoc/mango/indexes
+.. _ddoc/mango/indexes:
 
 Indexes
 =======
@@ -902,8 +902,10 @@ Example index:
 A Nouveau index definition consists of:
 
 * **fields**: ``"all_fields"`` or list of objects:
- * **name** (`string`): not blank
- * **type** (`string`): one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
+
+  * **name** (`string`): not blank
+  * **type** (`string`): one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
+
 * **default_analyzer** (`string`): Nouveau analyzer to use, defaults to ``"keyword"``
 * **default_field**: boolean or object of ``enabled`` and ``analyzer``
 * **partial_filter_selector** (`object`): A :ref:`selector<find/selectors>`, causing this
