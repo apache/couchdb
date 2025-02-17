@@ -15,7 +15,7 @@ Mango Queries
 =============
 
 In addition to :ref:`map/reduce views <viewfun>`, CouchDB supports an expressive
-query syntax called Mango.
+query system called Mango.
 
 The mango system consists of two major concepts:
 
