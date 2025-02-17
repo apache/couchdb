@@ -337,7 +337,8 @@ built using MapReduce Views.
 
     :<header Content-Type: - :mimetype:`application/json`
 
-    :query object index: JSON object describing the index to create.
+    :query object index: JSON object describing the index to create. (Depends
+        on the type of index, see :ref:`ddoc/mango/indexes`)
     :query string ddoc: Name of the design document in which the index will be
         created. By default, each index will be created in its own design
         document.
@@ -371,14 +372,6 @@ built using MapReduce Views.
     :code 401: Admin permission required
     :code 404: Database not found
     :code 500: Execution error
-
-    The `index` parameter is a JSON object with the following fields:
-
-    - **fields** (`array`): Array of field names following the :ref:`sort
-      syntax <find/sort>`. Nested fields are also allowed, e.g. `"person.name"`.
-    - **partial_filter_selector** (`object`): A :ref:`selector <find/selectors>`
-      to apply to documents at indexing time, creating a
-      :ref:`partial index <find/partial_indexes>`. *Optional*
 
     Example of creating a new index for a field called ``foo``:
 
@@ -472,26 +465,13 @@ present, including those which have ``null`` values.
     :>header Transfer-Encoding: ``chunked``
 
     :>json number total_rows: Number of indexes.
-    :>json array indexes: Array of index definitions (see below).
+    :>json array indexes: Array of index definitions (see
+        :ref:`ddoc/mango/indexes/definitions`).
 
     :code 200: Success
     :code 400: Invalid request
     :code 401: Read permission required
     :code 500: Execution error
-
-    Index definitions are JSON objects with the following fields:
-
-    -  **ddoc** (`string`): ID of the design document the index belongs to. This ID
-       can be used to retrieve the design document containing the index,
-       by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
-       value of this field.
-    -  **name** (`string`): Name of the index.
-    -  **partitioned** (`boolean`): Partitioned (``true``) or global
-       (``false``) index.
-    -  **type** (`string`): Type of the index. Currently ``"json"`` is the only
-       supported type.
-    -  **def** (`object`): Definition of the index, containing the indexed fields
-       and the sort order: ascending or descending.
 
     **Request**:
 
