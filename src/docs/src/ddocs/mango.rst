@@ -727,6 +727,8 @@ operator. But it is not always the case: for example, comparison of strings is
 done with ICU and can can give surprising results if you were expecting ASCII
 ordering. See :ref:`views/collation` for more details.
 
+.. _ddoc/mango/indexes
+
 Indexes
 =======
 
@@ -746,6 +748,50 @@ They primarily consist of a list of fields to index, but can also contain a
     You will also occasionally find reference to the ``special`` index type.
     This represents synthetic indexes produced by CouchDB itself and refers
     exclusively to ``_all_docs``.
+
+.. _ddoc/mango/indexes/definitions:
+
+Index Definitions
+-----------------
+
+Index definitions are JSON objects with the following fields:
+
+-  **ddoc** (`string`): ID of the design document the index belongs to. This ID
+   can be used to retrieve the design document containing the index,
+   by making a ``GET`` request to ``/{db}/ddoc``, where ``ddoc`` is the
+   value of this field.
+-  **name** (`string`): Name of the index.
+-  **partitioned** (`boolean`): Partitioned (``true``) or global
+   (``false``) index.
+-  **type** (`string`): Type of the index. Can be ``"json"``, ``"text"``,
+   ``"nouveau"``, or sometimes ``"special"``.
+-  **def**/**index** (`object`): Definition of the index, depending on the type
+   (see below). Which name is used depends on the context.
+
+JSON Indexes
+------------
+
+JSON Indexes are you standard structural indexes, used by the majority of
+:ref:`selector operators<find/selectors>`.
+
+Their definition consists of:
+
+- **fields** (`array`): Array of field names following the :ref:`sort
+  syntax <find/sort>`. Nested fields are also allowed, e.g. `"person.name"`.
+- **partial_filter_selector** (`object`): A :ref:`selector <find/selectors>`
+  to apply to documents at indexing time, creating a
+  :ref:`partial index <find/partial_indexes>`. *Optional*
+
+Example:
+
+.. code-block:: javascript
+
+    {
+        "type" : "json",
+        "index": {
+            "fields": ["foo"]
+        }
+    }
 
 .. _find/partial_indexes:
 
@@ -839,7 +885,7 @@ can be queried using either ``$text`` or
 
 Example index:
 
-.. code-block:: json
+.. code-block:: javascript
 
     {
         "type": "nouveau",
@@ -853,14 +899,16 @@ Example index:
         }
     }
 
-* ``fields``: ``"all_fields"`` or list of objects:
-  * ``name``: not blank
-  * ``type``: one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
-* ``default_analyzer``: Nouveau analyzer to use, defaults to ``"keyword"``
-* ``default_field``: boolean or object of ``enabled`` and ``analyzer``
-* ``partial_filter_selector``: A :ref:`selector<find/selectors>`, causing this
+A Nouveau index definition consists of:
+
+* **fields**: ``"all_fields"`` or list of objects:
+ * **name** (`string`): not blank
+ * **type** (`string`): one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
+* **default_analyzer** (`string`): Nouveau analyzer to use, defaults to ``"keyword"``
+* **default_field**: boolean or object of ``enabled`` and ``analyzer``
+* **partial_filter_selector** (`object`): A :ref:`selector<find/selectors>`, causing this
   to be a :ref:`partial index<find/partial_indexes>`
-* ``selector``: A :ref:`selector<find/selectors>`
+* **selector** (`object`): A :ref:`selector<find/selectors>`
 
 Indexes and Design Documents
 ----------------------------
