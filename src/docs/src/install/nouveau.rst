@@ -70,3 +70,49 @@ in-progress segment merges, and finally closes all indexes. This is
 not essential and you may safely kill the JVM without letting it do
 this, though any uncommitted changes are necessarily lost. Once the
 JVM is started again this indexing work will be attempted again.
+
+Docker
+======
+
+There is a version of of the :ref:`semi-official CouchDB Docker image <install/docker>`
+available under the ``*-nouveau`` tags (eg, ``3.4-nouveau``).
+
+Compose
+-------
+
+A minimal CouchDB/Nouveau cluster can be create with this compose:
+
+.. code-block:: yaml
+
+    services:
+      couchdb:
+        image: couchdb:3
+        environment:
+          COUCHDB_USER: admin
+          COUCHDB_PASSWORD: admin
+        volumes:
+          - couchdb:/opt/couchdb/data
+        ports:
+          - 5984:5984
+        configs:
+          - source: nouveau.ini
+            target: /opt/couchdb/etc/local.d/nouveau.ini
+
+      nouveau:
+        image: couchdb:3-nouveau
+
+    volumes:
+      couchdb:
+
+    configs:
+      nouveau.ini:
+        content: |
+          [couchdb]
+          single_node=true
+          [nouveau]
+          enable = true
+          url = http://nouveau:5987
+
+.. note::
+
+    This is not production ready, but it is a quick way to get Nouveau running.
