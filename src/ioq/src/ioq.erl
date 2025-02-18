@@ -17,6 +17,7 @@
 -export([start_link/0, call/3, call_search/3]).
 -export([get_queue_lengths/0]).
 -export([get_io_priority/0, set_io_priority/1, maybe_set_io_priority/1]).
+-export([bypass/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 
 % config_listener api
@@ -59,18 +60,18 @@ call_search(Fd, Msg, Metadata) ->
     call(Fd, Msg, Metadata).
 
 call(Fd, Msg, Metadata) ->
-    Priority = io_class(Msg, Metadata),
-    case bypass(Priority) of
+    case bypass(Msg, Metadata) of
         true ->
             gen_server:call(Fd, Msg, infinity);
         false ->
-            queued_call(Fd, Msg, Priority)
+            queued_call(Fd, Msg, io_class(Msg, Metadata))
     end.
 
 get_queue_lengths() ->
     gen_server:call(?MODULE, get_queue_lengths).
 
-bypass(Priority) ->
+bypass(Msg, Metadata) ->
+    Priority = io_class(Msg, Metadata),
     case Priority of
         os_process -> config:get_boolean("ioq.bypass", "os_process", true);
         read -> config:get_boolean("ioq.bypass", "read", true);
