@@ -30,7 +30,6 @@ setup() ->
         "{couch_httpd_auth, default_authentication_handler}",
         Persist
     ),
-    ok = config:set("httpd", "backlog", "512", Persist),
     ok = config:set("chttpd", "require_valid_user", "false", Persist),
     ok = config:set("httpd", "both_exist", "get_in_httpd", Persist),
     ok = config:set("chttpd", "both_exist", "get_in_chttpd", Persist),
@@ -44,7 +43,6 @@ setup() ->
 teardown(_) ->
     Persist = false,
     ok = config:delete("httpd", "authentication_handlers", Persist),
-    ok = config:delete("httpd", "backlog", Persist),
     ok = config:delete("chttpd", "require_valid_user", Persist),
     ok = config:delete("httpd", "both_exist", Persist),
     ok = config:delete("chttpd", "both_exist", Persist),

@@ -20,6 +20,7 @@
 -export([
     start_link/0, start_link/1, start_link/2,
     stop/0,
+    get_default_server_options/0,
     handle_request/1,
     handle_request_int/1,
     primary_header_value/2,
@@ -93,7 +94,7 @@
     buffer_response = false
 }).
 
--define(DEFAULT_SERVER_OPTIONS, "[{recbuf, undefined}]").
+-define(DEFAULT_SERVER_OPTIONS, "[{recbuf, undefined}, {acceptor_pool_size, 32}, {max, 65536}]").
 -define(DEFAULT_SOCKET_OPTIONS, "[{sndbuf, 262144}, {nodelay, true}]").
 
 start_link() ->
@@ -201,6 +202,9 @@ start_link(Name, Options) ->
             io:format("Failure to start Mochiweb: ~s~n", [Reason]),
             {error, Reason}
     end.
+
+get_default_server_options() ->
+    ?DEFAULT_SERVER_OPTIONS.
 
 get_server_options(Module) ->
     ServerOptsCfg =

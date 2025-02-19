@@ -23,7 +23,6 @@
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
--define(DEFAULT_BACKLOG, 512).
 -define(DEFAULT_SERVER_OPTIONS, "[{recbuf, undefined}]").
 
 start_link(Args) ->
@@ -60,8 +59,6 @@ handle_config_change("chttpd", "bind_address", Value, _, Settings) ->
     maybe_replace(bind_address, Value, Settings);
 handle_config_change("chttpd", "port", Value, _, Settings) ->
     maybe_replace(port, Value, Settings);
-handle_config_change("chttpd", "backlog", Value, _, Settings) ->
-    maybe_replace(backlog, Value, Settings);
 handle_config_change("chttpd", "server_options", Value, _, Settings) ->
     maybe_replace(server_options, Value, Settings);
 handle_config_change(_, _, _, _, Settings) ->
@@ -71,16 +68,11 @@ handle_config_terminate(_Server, _Reason, _State) ->
     ok.
 
 settings() ->
+    DefaultOpts = chttpd:get_default_server_options(),
     [
         {bind_address, config:get("chttpd", "bind_address")},
         {port, config:get("chttpd", "port")},
-        {backlog, config:get_integer("chttpd", "backlog", ?DEFAULT_BACKLOG)},
-        {server_options,
-            config:get(
-                "chttpd",
-                "server_options",
-                ?DEFAULT_SERVER_OPTIONS
-            )}
+        {server_options, config:get("chttpd", "server_options", DefaultOpts)}
     ].
 
 maybe_replace(Key, Value, Settings) ->
