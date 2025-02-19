@@ -867,7 +867,11 @@ it easier to take advantage of future improvements to query planning
 Text Indexes
 ------------
 
-Mango can also interact with the :ref:`Search <ddoc/search>` and :ref:`Nouveau <ddoc/nouveau>` search systems, using the :ref:`$text selector <find/text>` and the appropriate index. These indexes can be queried using either ``$text`` or :http:get:`/{db}/_design/{ddoc}/_search/{index}`/:http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
+Mango can also interact with the :ref:`Search <ddoc/search>` and
+:ref:`Nouveau <ddoc/nouveau>` search systems, using the
+:ref:`$text selector <find/text>` and the appropriate index. These indexes can
+be queried using either ``$text`` or :http:get:`/{db}/_design/{ddoc}/_search/{index}`
+/ :http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
 
 Example index:
 
@@ -893,7 +897,7 @@ A Text or Nouveau index definition consists of:
   * **type** (`string`): one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
 
 * **default_analyzer** (`string`): Analyzer to use, defaults to ``"keyword"``  *Optional*
-* **default_field**: Enables the "default field" index, boolean or object of 
+* **default_field**: Enables the "default field" index, boolean or object of
   ``enabled`` and ``analyzer`` *Optional*
 * **partial_filter_selector** (`object`): A :ref:`selector<find/selectors>`, causing this
   to be a :ref:`partial index<find/partial_indexes>` *Optional*
