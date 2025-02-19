@@ -23,112 +23,118 @@ MINIMUM_ERLANG_VERSION = '25.3.2.15'
 // We create parallel build / test / package stages for each OS using the metadata
 // in this map. Adding a new OS should ideally only involve adding a new entry here.
 meta = [
-  'centos8': [
-    name: 'CentOS 8',
-    spidermonkey_vsn: '60',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
-  ],
-
-  'centos9': [
-    name: 'CentOS 9',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
-  ],
-
-  'focal': [
-    name: 'Ubuntu 20.04',
-    spidermonkey_vsn: '68',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
-  ],
-
-  'jammy': [
-    name: 'Ubuntu 22.04',
-    spidermonkey_vsn: '91',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
-  ],
-
-  'noble': [
-    name: 'Ubuntu 24.04',
-    spidermonkey_vsn: '115',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
-  ],
-
-  'bookworm-ppc64': [
-    name: 'Debian POWER',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
-    node_label: 'ppc64le'
-  ],
-
-  'bookworm-s390x': [
-    name: 'Debian s390x',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
-    node_label: 's390x'
-  ],
-
-  'bullseye': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
-  ],
-
-  'bookworm': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
-  ],
-
-  'bookworm-quickjs': [
-    name: 'Debian 12 with QuickJS',
-    disable_spidermonkey: true,
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
-  ],
-
-  'freebsd-x86_64': [
-      name: 'FreeBSD x86_64',
-      spidermonkey_vsn: '91',
-      with_clouseau: false,
-      gnu_make: 'gmake'
-  ],
-
-  // Spidermonkey 91 has issues on ARM64 FreeBSD
-  // use QuickJS for now
-  'freebsd-arm64': [
-     name: 'FreeBSD ARM64 QuickJS',
-     disable_spidermonkey: true,
-     with_clouseau: false,
-     gnu_make: 'gmake'
-  ],
-
- // Excluding clouseau for macos. This stopped working as
- // of https://github.com/apache/couchdb/pull/5180 (bump to 2.23.1)
- // but works for the other workers.
- 'macos': [
-    name: 'macOS',
+//  'centos8': [
+//    name: 'CentOS 8',
+//    spidermonkey_vsn: '60',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'centos9': [
+//    name: 'CentOS 9',
+//    spidermonkey_vsn: '78',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'focal': [
+//    name: 'Ubuntu 20.04',
+//    spidermonkey_vsn: '68',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'jammy': [
+//    name: 'Ubuntu 22.04',
+//    spidermonkey_vsn: '91',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'noble': [
+//    name: 'Ubuntu 24.04',
+//    spidermonkey_vsn: '115',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'bookworm-ppc64': [
+//    name: 'Debian POWER',
+//    spidermonkey_vsn: '78',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
+//    node_label: 'ppc64le'
+//  ],
+//
+//  'bookworm-s390x': [
+//    name: 'Debian s390x',
+//    spidermonkey_vsn: '78',
+//    with_nouveau: true,
+//    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
+//    node_label: 's390x'
+//  ],
+//
+//  'bullseye': [
+//    name: 'Debian x86_64',
+//    spidermonkey_vsn: '78',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'bookworm': [
+//    name: 'Debian x86_64',
+//    spidermonkey_vsn: '78',
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'bookworm-quickjs': [
+//    name: 'Debian 12 with QuickJS',
+//    disable_spidermonkey: true,
+//    with_nouveau: true,
+//    with_clouseau: true,
+//    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
+//  ],
+//
+//  'freebsd-x86_64': [
+//      name: 'FreeBSD x86_64',
+//      spidermonkey_vsn: '91',
+//      with_clouseau: false,
+//      gnu_make: 'gmake'
+//  ],
+//
+//  // Spidermonkey 91 has issues on ARM64 FreeBSD
+//  // use QuickJS for now
+//  'freebsd-arm64': [
+//     name: 'FreeBSD ARM64 QuickJS',
+//     disable_spidermonkey: true,
+//     with_clouseau: false,
+//     gnu_make: 'gmake'
+//  ],
+//
+// // Excluding clouseau for macos. This stopped working as
+// // of https://github.com/apache/couchdb/pull/5180 (bump to 2.23.1)
+// // but works for the other workers.
+// 'macos': [
+//    name: 'macOS',
+//    spidermonkey_vsn: '128',
+//    with_nouveau: false,
+//    with_clouseau: false,
+//    gnu_make: 'make'
+//  ],
+//
+  'win2022': [
+    name: 'Windows 2022',
     spidermonkey_vsn: '128',
-    with_nouveau: false,
-    with_clouseau: false,
-    gnu_make: 'make'
+    node_label: 'win'
   ]
 ]
 
@@ -165,47 +171,95 @@ def generateNativeStage(platform) {
     stage(platform) {
       node(platform) {
         timeout(time: 90, unit: "MINUTES") {
-          try {
-            // deleteDir is OK here because we're not inside of a Docker container!
-            deleteDir()
-            unstash 'tarball'
-            withEnv([
-              'HOME='+pwd(),
-              'PATH+USRLOCAL=/usr/local/bin',
-              'MAKE='+meta[platform].gnu_make
-            ]) {
-              sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
-              sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
-              dir( "${platform}/build" ) {
-                sh "${configure(meta[platform])}"
-                sh '$MAKE'
-                sh '$MAKE eunit'
-                sh '$MAKE elixir'
-                sh '$MAKE elixir-search'
-                sh '$MAKE mango-test'
-                sh '$MAKE weatherreport-test'
-                sh '$MAKE nouveau-test'
+          // Steps to configure and build CouchDB on *nix platforms
+          if (isUnix()) {
+            try {
+              // deleteDir is OK here because we're not inside of a Docker container!
+              deleteDir()
+              unstash 'tarball'
+              withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+              ]) {
+                sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
+                sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                dir( "${platform}/build" ) {
+                  sh "${configure(meta[platform])}"
+                  sh '$MAKE'
+                  sh '$MAKE eunit'
+                  sh '$MAKE elixir'
+                  sh '$MAKE elixir-search'
+                  sh '$MAKE mango-test'
+                  sh '$MAKE weatherreport-test'
+                  sh '$MAKE nouveau-test'
+                }
               }
             }
-          }
-          catch (err) {
-            sh 'ls -l ${WORKSPACE}'
-            withEnv([
-              'HOME='+pwd(),
-              'PATH+USRLOCAL=/usr/local/bin',
-              'MAKE='+meta[platform].gnu_make
-            ]) {
-              dir( "${platform}/build" ) {
-                sh 'ls -l'
-                sh '${MAKE} build-report'
+            catch (err) {
+              sh 'ls -l ${WORKSPACE}'
+              withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+              ]) {
+                dir( "${platform}/build" ) {
+                  sh 'ls -l'
+                  sh '${MAKE} build-report'
+                }
+              }
+              error("Build step failed with error: ${err.getMessage()}")
+            }
+            finally {
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+              sh 'killall -9 beam.smp || true'
+              sh 'rm -rf ${WORKSPACE}/*'
+            }
+          } else {
+            //steps to configure and build CouchDB on Windows platforms
+            stage("${meta[platform].name} - build & test") {
+              try {
+                // deleteDir is OK here because we're not inside of a Docker container!
+                deleteDir()
+                unstash 'tarball'
+                powershell( script: "git clone https://github.com/apache/couchdb-glazier", label: 'Cloning couchdb-glazier repository' )
+                powershell( script: "New-Item -ItemType Directory -Path ${platform}/build -Force", label: 'Create build directories' )
+                powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                dir( "${platform}/build" ) {
+                  powershell( script: """
+                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    .\\configure.ps1 -SkipDeps -WithNouveau -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    $Env:GRADLE_OPTS="-Dorg.gradle.daemon=false" make -f Makefile.win
+                  """, label: 'Configure and Build')
+                  //powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1")
+                  //powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; .\\configure.ps1 -SkipDeps -WithNouveau -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}")
+                  //powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; .\\make -f Makefile.win")
+                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit")
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir-suite")
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win exunit")
+                  powershell( script: "& ..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win mango-test")
+                  //powershell( script: '& ..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE ATM: make -f Makefile.win weatherreport-test')
+                }
+              }
+              catch (err) {
+                powershell( script: "Get-ChildItem ${WORKSPACE}")
+                dir( "${platform}/build" ) {
+                  powershell( script: 'Get-ChildItem')
+                  powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win build-report')
+                  powershell( script: 'Get-Content test-results.log')
+                }
+                error("Build step failed with error: ${err.getMessage()}")
+              }
+              finally {
+                //junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                //sh 'killall -9 beam.smp || true'
+                powershell( script: "Remove-Item ${WORKSPACE} -Force -Recurse -ErrorAction SilentlyContinue")
               }
             }
-            error("Build step failed with error: ${err.getMessage()}")
-          }
-          finally {
-            junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-            sh 'killall -9 beam.smp || true'
-            sh 'rm -rf ${WORKSPACE}/*'
+
+            stage("${meta[platform].name} - package") {
+              echo "`nTODO - Build msi package"
+            }
           }
         }
       }
@@ -365,63 +419,63 @@ pipeline {
       }
     }
 
-    stage('Publish') {
-
-      when {
-        expression { return env.BRANCH_NAME ==~ /main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
-      }
-
-      agent {
-        docker {
-          image "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        skipDefaultCheckout()
-        timeout(time: 90, unit: "MINUTES")
-      }
-
-      steps {
-        sh 'rm -rf ${WORKSPACE}/*'
-        unstash 'tarball'
-        unarchive mapping: ['pkgs/' : '.']
-
-        sh( label: 'Setup repo dirs', script: '''
-            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el8 $BRANCH_NAME/el9 $BRANCH_NAME/source
-            git clone https://github.com/apache/couchdb-pkg
-          ''' )
-
-        sh( label: 'Build Debian repo', script: '''
-            for plat in bullseye bookworm focal
-            do
-              reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
-            done
-          ''' )
-
-        sh( label: 'Build CentOS 8', script: '''
-            (cd pkgs/centos8 && createrepo_c --database .)
-          ''' )
-
-        sh( label: 'Build CentOS 9', script: '''
-            (cd pkgs/centos9 && createrepo_c --database .)
-          ''' )
-
-        sh( label: 'Build unified repo', script: '''
-            mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
-            mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
-            mv pkgs/centos8/* $BRANCH_NAME/el8
-            mv pkgs/centos9/* $BRANCH_NAME/el9
-            mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
-            cd $BRANCH_NAME/source
-            ls -1tr | head -n -10 | xargs -d '\n' rm -f --
-            cd ../..
-          ''' )
-      } // steps
-    } // stage
+//    stage('Publish') {
+//
+//      when {
+//        expression { return env.BRANCH_NAME ==~ /main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
+//      }
+//
+//      agent {
+//        docker {
+//          image "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
+//          label 'docker'
+//          args "${DOCKER_ARGS}"
+//          registryUrl 'https://docker.io/'
+//          registryCredentialsId 'dockerhub_creds'
+//        }
+//      }
+//      options {
+//        skipDefaultCheckout()
+//        timeout(time: 90, unit: "MINUTES")
+//      }
+//
+//      steps {
+//        sh 'rm -rf ${WORKSPACE}/*'
+//        unstash 'tarball'
+//        unarchive mapping: ['pkgs/' : '.']
+//
+//        sh( label: 'Setup repo dirs', script: '''
+//            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el8 $BRANCH_NAME/el9 $BRANCH_NAME/source
+//            git clone https://github.com/apache/couchdb-pkg
+//          ''' )
+//
+//        sh( label: 'Build Debian repo', script: '''
+//            for plat in bullseye bookworm focal
+//            do
+//              reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
+//            done
+//          ''' )
+//
+//        sh( label: 'Build CentOS 8', script: '''
+//            (cd pkgs/centos8 && createrepo_c --database .)
+//          ''' )
+//
+//        sh( label: 'Build CentOS 9', script: '''
+//            (cd pkgs/centos9 && createrepo_c --database .)
+//          ''' )
+//
+//        sh( label: 'Build unified repo', script: '''
+//            mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
+//            mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
+//            mv pkgs/centos8/* $BRANCH_NAME/el8
+//            mv pkgs/centos9/* $BRANCH_NAME/el9
+//            mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
+//            cd $BRANCH_NAME/source
+//            ls -1tr | head -n -10 | xargs -d '\n' rm -f --
+//            cd ../..
+//          ''' )
+//      } // steps
+//    } // stage
   } // stages
 
   post {
