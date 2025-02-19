@@ -47,10 +47,12 @@ of function or result.
     limitations about what it can work with:
 
     * Empty field names (``""``) cannot be queried ("One or more conditions is
-      missing a field name.")
-    * Field names starting with ``$`` cannot be queried ("Invalid operator: $")
+      missing a field name.").
+    * Field names starting with ``$`` must be escaped with ``\`` (eg, ``\$foo``)
+      ("Invalid operator: $").
     * Fields at the root of the document starting with ``_`` cannot be queried
-      ("Bad special document member: _")
+      ("Bad special document member: _"). Special fields like ``_id`` and
+      ``_rev`` can be queried.
 
 .. _find/selectorbasics:
 
@@ -78,15 +80,6 @@ A simple selector, inspecting specific fields:
         "title",
         "cast"
     ]
-
-You can create more complex selector expressions by combining operators.
-For best performance, it is best to combine 'combination' or
-'array logical' operators, such as ``$regex``, with an operator
-that defines a contiguous range of keys such as ``$eq``,
-``$gt``, ``$gte``, ``$lt``, ``$lte``, and ``$beginsWith``
-(but not ``$ne``). For more information about creating complex
-selector expressions, see :ref:`creating selector expressions
-<find/expressions>`.
 
 .. _find/twofields:
 
@@ -554,11 +547,7 @@ the same syntax).
 
     {
         "_id": { "$gt": null },
-        "cameras": {
-            "$keyMapMatch": {
-                "$eq": "secondary"
-            }
-        }
+        "$text": "director:George"
     }
 
 .. warning::
@@ -743,7 +732,7 @@ They primarily consist of a list of fields to index, but can also contain a
     Mango indexes have a type, currently ``json``, ``text``, ``nouveau``. The
     majority of this document covers ``json`` indexes. ``text`` and ``nouveau``
     are related to the :ref:`ddoc/search` and :ref:`ddoc/nouveau` systems,
-    respectively. (See :ref:`ddoc/mango/indexes/nouveau`.)
+    respectively. (See :ref:`ddoc/mango/indexes/text`.)
 
     You will also occasionally find reference to the ``special`` index type.
     This represents synthetic indexes produced by CouchDB itself and refers
@@ -873,15 +862,12 @@ it easier to take advantage of future improvements to query planning
     however, can be treated as if they include the special fields ``_id`` and
     ``_rev``. They **never** need to be specified in the query selector.
 
-.. _ddoc/mango/indexes/nouveau:
+.. _ddoc/mango/indexes/text:
 
-Nouveau Indexes
----------------
+Text Indexes
+------------
 
-Mango can also interact with the :ref:`Nouveau search system <ddoc/nouveau>`,
-using the :ref:`$text selector <find/text>` and Nouveau indexes. These indexes
-can be queried using either ``$text`` or
-:http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
+Mango can also interact with the :ref:`Search <ddoc/search>` and :ref:`Nouveau <ddoc/nouveau>` search systems, using the :ref:`$text selector <find/text>` and the appropriate index. These indexes can be queried using either ``$text`` or :http:get:`/{db}/_design/{ddoc}/_search/{index}`/:http:get:`/{db}/_design/{ddoc}/_nouveau/{index}`.
 
 Example index:
 
@@ -899,18 +885,19 @@ Example index:
         }
     }
 
-A Nouveau index definition consists of:
+A Text or Nouveau index definition consists of:
 
-* **fields**: ``"all_fields"`` or list of objects:
+* **fields**: The list of fields to index. ``"all_fields"`` or list of objects:
 
   * **name** (`string`): not blank
   * **type** (`string`): one of ``"text"``, ``"string"``, ``"number"``, ``"boolean"``
 
-* **default_analyzer** (`string`): Nouveau analyzer to use, defaults to ``"keyword"``
-* **default_field**: boolean or object of ``enabled`` and ``analyzer``
+* **default_analyzer** (`string`): Analyzer to use, defaults to ``"keyword"``  *Optional*
+* **default_field**: Enables the "default field" index, boolean or object of 
+  ``enabled`` and ``analyzer`` *Optional*
 * **partial_filter_selector** (`object`): A :ref:`selector<find/selectors>`, causing this
-  to be a :ref:`partial index<find/partial_indexes>`
-* **selector** (`object`): A :ref:`selector<find/selectors>`
+  to be a :ref:`partial index<find/partial_indexes>` *Optional*
+* **selector** (`object`): A :ref:`selector<find/selectors>` *Optional*
 
 Indexes and Design Documents
 ----------------------------
