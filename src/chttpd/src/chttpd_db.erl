@@ -986,18 +986,16 @@ db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
         options = Options0,
         atts_since = AttsSince
     } = parse_doc_query(Req),
-    Options = [{user_ctx, Req#httpd.user_ctx} | Options0],
+    Options1 = [{user_ctx, Req#httpd.user_ctx} | Options0],
+    Options2 =
+        case AttsSince of
+            nil -> Options1;
+            _ -> [{atts_since, AttsSince}, attachments | Options1]
+        end,
     case Revs of
         [] ->
-            Options2 =
-                if
-                    AttsSince /= nil ->
-                        [{atts_since, AttsSince}, attachments | Options];
-                    true ->
-                        Options
-                end,
             Rev =
-                case lists:member(latest, Options) of
+                case lists:member(latest, Options2) of
                     % couch_doc_open will open the winning rev despite of a rev passed
                     % https://docs.couchdb.org/en/stable/api/document/common.html?highlight=latest#get--db-docid
                     true -> nil;
@@ -1006,7 +1004,7 @@ db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
             Doc = couch_doc_open(Db, DocId, Rev, Options2),
             send_doc(Req, Doc, Options2);
         _ ->
-            case fabric:open_revs(Db, DocId, Revs, Options) of
+            case fabric:open_revs(Db, DocId, Revs, Options2) of
                 {ok, []} when Revs == all ->
                     chttpd:send_error(Req, {not_found, missing});
                 {ok, Results} ->
@@ -1021,7 +1019,7 @@ db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
                                 fun(Result, AccSeparator) ->
                                     case Result of
                                         {ok, Doc} ->
-                                            JsonDoc = couch_doc:to_json_obj(Doc, Options),
+                                            JsonDoc = couch_doc:to_json_obj(Doc, Options2),
                                             Json = ?JSON_ENCODE({[{ok, JsonDoc}]}),
                                             send_chunk(Resp, AccSeparator ++ Json);
                                         {{not_found, missing}, RevId} ->
@@ -1038,7 +1036,7 @@ db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
                             send_chunk(Resp, "]"),
                             end_json_response(Resp);
                         true ->
-                            send_docs_multipart(Req, Results, Options)
+                            send_docs_multipart(Req, Results, Options2)
                     end;
                 {error, Error} ->
                     chttpd:send_error(Req, Error)
