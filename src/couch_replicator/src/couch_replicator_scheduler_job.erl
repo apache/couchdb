@@ -854,8 +854,6 @@ do_checkpoint(State) ->
             BaseHistory =
                 [
                     {<<"session_id">>, SessionId},
-                    {<<"source">>, ?l2b(SourceName)},
-                    {<<"target">>, ?l2b(TargetName)},
                     {<<"source_last_seq">>, NewSeq},
                     {<<"replication_id_version">>, ?REP_ID_VERSION}
                 ] ++
@@ -888,6 +886,7 @@ do_checkpoint(State) ->
                 {TgtRevPos, TgtRevId} = update_checkpoint(
                     Target, TargetLog#doc{body = NewRepHistory}, target
                 ),
+                %% TODO update_checkpoint(Source, peer_checkpoint_doc(State), source),
                 NewState = State#rep_state{
                     checkpoint_history = NewRepHistory,
                     committed_seq = NewTsSeq,
@@ -913,6 +912,15 @@ do_checkpoint(State) ->
                 "instance_start_time on source and target database has changed since last checkpoint."
             >>}
     end.
+
+peer_checkpoint_doc(#rep_state{} = State) ->
+    #rep_state{
+        session_id = SessionId
+    } = State,
+    #doc{
+        id = <<"peer-checkpoint-", SessionId/binary>>,
+        body = {[{<<"update_seq">>, State#rep_state.committed_seq}]}
+    }.
 
 update_checkpoint(Db, Doc, DbType) ->
     try

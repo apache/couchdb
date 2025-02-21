@@ -29,11 +29,13 @@ go(DbName) ->
         ]
     },
     {ok, LocalDocs} = fabric:all_docs(DbName, fun all_docs_cb/2, [], MrArgs),
-%    1. find lowest update seq per {node,uuid} pair in all checkpoints excluding mem3_sync
-%    2. use mem3_sync docs to find lowest update seq on any other {node,uuids}
-%    3. issue rpc to matching shards and ask them to set drop seq if uuid matches
+    %    1. find lowest update seq per {node,uuid} pair in all peer checkpoints excluding mem3_sync
+    %    2. use mem3_sync docs to find lowest update seq on any other {node,uuids}
+    %    3. issue rpc to matching shards and ask them to set drop seq if uuid matches
 
-    lists:foldl(fun parse_replication_doc/2, [], LocalDocs).
+    PeerCheckpoints = lists:foldl(fun parse_peer_doc/2, #{}, LocalDocs),
+    ShardSyncHistory = lists:foldl(fun parse_shard_sync_doc/2, [], LocalDocs),
+    {PeerCheckpoints, ShardSyncHistory}.
 
 all_docs_cb({row, Row}, Acc0) ->
     Acc1 =
@@ -47,24 +49,25 @@ all_docs_cb({row, Row}, Acc0) ->
 all_docs_cb(_Else, Acc) ->
     {ok, Acc}.
 
-parse_replication_doc(#doc{} = Doc, Acc) ->
+parse_peer_doc(#doc{} = Doc, Acc) ->
     {Props} = Doc#doc.body,
-    ReplicationIdVersion = couch_util:get_value(<<"replication_id_version">>, Props),
-    case ReplicationIdVersion of
-        ?REP_ID_VERSION ->
-            SourceLastSeq = couch_util:get_value(<<"source_last_seq">>, Props),
-            [decode_seq(SourceLastSeq) | Acc];
+    Type = couch_util:get_value(<<"type">>, Props),
+    case Type of
+        <<"peer_checkpoint">> ->
+            UpdateSeq = couch_util:get_value(<<"update_seq">>, Props),
+            maps:merge_with(fun combine_peers/3, decode_seq(UpdateSeq), Acc);
         _Else ->
             Acc
     end.
 
 parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
     {Props} = Doc#doc.body,
-    History = couch_util:get_value(<<"history">>, Props),
-    [History | Acc];
+    {History0} = couch_util:get_value(<<"history">>, Props),
+    {_, History1} = lists:unzip(History0),
+    History2 = [[maps:from_list(I) || {I} <- H] || H <- History1],
+    [History2 | Acc];
 parse_shard_sync_doc(_Doc, Acc) ->
     Acc.
-
 
 decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
@@ -79,3 +82,5 @@ decode_seq(OpaqueSeq) ->
         Decoded
     ).
 
+combine_peers(_Key, Val1, Val2) when is_integer(Val1), is_integer(Val2) ->
+    min(Val1, Val2).
