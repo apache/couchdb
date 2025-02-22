@@ -112,6 +112,7 @@
     fold_changes/4,
     fold_changes/5,
     count_changes_since/2,
+    fold_purge_infos/3,
     fold_purge_infos/4,
     fold_purge_infos/5,
 
@@ -1804,6 +1805,10 @@ fold_changes(Db, StartSeq, UserFun, UserAcc) ->
 
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
     couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts).
+
+fold_purge_infos(Db, Fun, Acc) ->
+    StartPurgeSeq = max(0, couch_db:get_oldest_purge_seq(Db) - 1),
+    fold_purge_infos(Db, StartPurgeSeq, Fun, Acc, []).
 
 fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->
     fold_purge_infos(Db, StartPurgeSeq, Fun, Acc, []).
