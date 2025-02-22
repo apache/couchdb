@@ -25,8 +25,6 @@
 #include "erl_driver.h"
 #include "erl_nif.h"
 
-#endif
-
 static ErlNifResourceType* HANDLE_T;
 static ErlNifPid JANITOR_PID;
 
@@ -719,3 +717,5 @@ static ErlNifFunc funcs[] = {
 };
 
 ERL_NIF_INIT(couch_cfile, funcs, load, NULL, NULL, NULL);
+
+#endif

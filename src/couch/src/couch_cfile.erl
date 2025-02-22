@@ -216,16 +216,21 @@ write_1(Ref, IOVec) ->
     end.
 
 init() ->
-    PrivDir =
-        case code:priv_dir(?MODULE) of
-            {error, _} ->
-                EbinDir = filename:dirname(code:which(?MODULE)),
-                AppPath = filename:dirname(EbinDir),
-                filename:join(AppPath, "priv");
-            Path ->
-                Path
-        end,
-    erlang:load_nif(filename:join(PrivDir, "couch_cfile"), spawn_janitor()).
+    case os:type() of
+        {unix, _} ->
+            PrivDir =
+                case code:priv_dir(?MODULE) of
+                    {error, _} ->
+                        EbinDir = filename:dirname(code:which(?MODULE)),
+                        AppPath = filename:dirname(EbinDir),
+                        filename:join(AppPath, "priv");
+                    Path ->
+                        Path
+                end,
+            erlang:load_nif(filename:join(PrivDir, "couch_cfile"), spawn_janitor());
+        {_, _} ->
+            ok
+    end.
 
 % Spawn a janitor process to run all the delayed close calls on the dirty IO
 % schedulers. This is what OTP does, so we stick to the same pattern in order
@@ -255,31 +260,31 @@ loop() ->
     loop().
 
 dup_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 close_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 close_fd_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 pread_nif(_, _, _) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 eof_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 info_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 seek_nif(_, _, _) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 write_nif(_, _) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 datasync_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
 
 truncate_nif(_) ->
-    erlang:nif_error(nif_not_loaded).
+    {error, einval}.
