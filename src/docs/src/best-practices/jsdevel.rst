@@ -286,6 +286,24 @@ with a compilation error:
         }
     }
 
+11. Constant values leak out of nested scopes
+
+In Spidermonkey 1.8.5 ``const`` values leak from nested expression scopes.
+Referencing them in Spidermonkey 1.8.5 produces ``undefined``, while in
+Spidermonkey 91, QuickJS and V8 engines raises a ``ReferenceError``.
+
+.. code-block::
+
+  % js
+  js> f = function(doc){if(doc.x === 'x') { const value='inside_if'}; print(value)};
+  js> f({'x':'y'})
+  undefined
+
+  % js91
+  js> f = function(doc){if(doc.x === 'x') {const value='inside_if';}; print(value)};
+  js> f({'x':'y'})
+  typein:1:23 TypeError: can't access property "x", doc is undefined
+
 Using QuickJS
 =============
 
