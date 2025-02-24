@@ -393,7 +393,8 @@ worker_ranges(Workers) ->
     lists:usort(Ranges).
 
 get_uuid_prefix_len() ->
-    config:get_integer("fabric", "uuid_prefix_len", 7).
+    %% no longer configurable for drop_seq safety.
+    32.
 
 % If we issue multiple fabric calls from the same process we have to isolate
 % them so in case of error they don't pollute the processes dictionary or the
