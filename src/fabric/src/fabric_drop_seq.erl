@@ -53,7 +53,7 @@ parse_peer_doc(#doc{} = Doc, Acc) ->
     {Props} = Doc#doc.body,
     Type = couch_util:get_value(<<"type">>, Props),
     case Type of
-        <<"peer_checkpoint">> ->
+        <<"_peer_checkpoint">> ->
             UpdateSeq = couch_util:get_value(<<"update_seq">>, Props),
             maps:merge_with(fun combine_peers/3, decode_seq(UpdateSeq), Acc);
         _Else ->
@@ -62,10 +62,16 @@ parse_peer_doc(#doc{} = Doc, Acc) ->
 
 parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
     {Props} = Doc#doc.body,
-    {History0} = couch_util:get_value(<<"history">>, Props),
-    {_, History1} = lists:unzip(History0),
-    History2 = [[maps:from_list(I) || {I} <- H] || H <- History1],
-    [History2 | Acc];
+    {[{_Node, History}]} = couch_util:get_value(<<"history">>, Props),
+    L = [
+         {couch_util:get_value(<<"source_node">>, Item),
+          couch_util:get_value(<<"source_uuid">>, Item),
+          couch_util:get_value(<<"source_seq">>, Item),
+          couch_util:get_value(<<"target_node">>, Item),
+          couch_util:get_value(<<"target_uuid">>, Item),
+          couch_util:get_value(<<"target_seq">>, Item)
+         } || {Item} <- History],
+    L ++ Acc;
 parse_shard_sync_doc(_Doc, Acc) ->
     Acc.
 
@@ -73,8 +79,8 @@ decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
     lists:foldl(
         fun
-            ({_Node, Range, {Seq, Uuid, Node}}, Acc) ->
-                Acc#{{Node, Range, Uuid} => Seq};
+            ({_Node, _Range, {Seq, Uuid, Node}}, Acc) ->
+                Acc#{{Node, Uuid} => Seq};
             ({_Node, _Range, _Seq}, Acc) ->
                 Acc
         end,
