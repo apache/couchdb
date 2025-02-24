@@ -33,8 +33,8 @@ go(DbName) ->
     %    2. use mem3_sync docs to find lowest update seq on any other {node,uuids}
     %    3. issue rpc to matching shards and ask them to set drop seq if uuid matches
 
-    PeerCheckpoints = lists:foldl(fun parse_peer_doc/2, #{}, LocalDocs),
-    ShardSyncHistory = lists:foldl(fun parse_shard_sync_doc/2, [], LocalDocs),
+    PeerCheckpoints = parse_peer_docs(LocalDocs),
+    ShardSyncHistory = parse_shard_sync_docs(LocalDocs),
     {PeerCheckpoints, ShardSyncHistory}.
 
 all_docs_cb({row, Row}, Acc0) ->
@@ -49,6 +49,9 @@ all_docs_cb({row, Row}, Acc0) ->
 all_docs_cb(_Else, Acc) ->
     {ok, Acc}.
 
+parse_peer_docs(LocalDocs) ->
+    lists:foldl(fun parse_peer_doc/2, #{}, LocalDocs).
+
 parse_peer_doc(#doc{} = Doc, Acc) ->
     {Props} = Doc#doc.body,
     Type = couch_util:get_value(<<"type">>, Props),
@@ -60,18 +63,24 @@ parse_peer_doc(#doc{} = Doc, Acc) ->
             Acc
     end.
 
+parse_shard_sync_docs(LocalDocs) ->
+    lists:foldl(fun parse_shard_sync_doc/2, #{}, LocalDocs).
+
 parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
     {Props} = Doc#doc.body,
     {[{_Node, History}]} = couch_util:get_value(<<"history">>, Props),
-    L = [
-         {couch_util:get_value(<<"source_node">>, Item),
-          couch_util:get_value(<<"source_uuid">>, Item),
-          couch_util:get_value(<<"source_seq">>, Item),
-          couch_util:get_value(<<"target_node">>, Item),
-          couch_util:get_value(<<"target_uuid">>, Item),
-          couch_util:get_value(<<"target_seq">>, Item)
-         } || {Item} <- History],
-    L ++ Acc;
+    KeyFun = fun({Item}) ->
+        {couch_util:get_value(<<"source_uuid">>, Item),
+         binary_to_existing_atom(couch_util:get_value(<<"target_node">>, Item))}
+    end,
+    ValueFun = fun({Item}) ->
+        {
+            couch_util:get_value(<<"target_uuid">>, Item),
+            couch_util:get_value(<<"source_seq">>, Item),
+            couch_util:get_value(<<"target_seq">>, Item)
+        }
+    end,
+    maps:merge(maps:groups_from_list(KeyFun, ValueFun, History), Acc);
 parse_shard_sync_doc(_Doc, Acc) ->
     Acc.
 
@@ -79,8 +88,8 @@ decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
     lists:foldl(
         fun
-            ({_Node, _Range, {Seq, Uuid, Node}}, Acc) ->
-                Acc#{{Node, Uuid} => Seq};
+            ({_Node, Range, {Seq, Uuid, Node}}, Acc) ->
+                Acc#{{Node, Range, Uuid} => Seq};
             ({_Node, _Range, _Seq}, Acc) ->
                 Acc
         end,
