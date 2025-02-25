@@ -391,6 +391,8 @@ t_monitor_is_closing_file_handles(Path) ->
     {ok, CFd} = proc_run(Proc, couch_cfile, dup, [Fd]),
     ?assertEqual(eof, file:pread(CFd, 0, 1)),
     kill_proc(Proc),
+    % Make sure to wait until it's closed
+    test_util:wait_value(fun() -> file:pread(CFd, 0, 1) end, {error, einval}),
     ?assertEqual({error, einval}, file:pread(CFd, 0, 1)).
 
 t_concurrent_reads_512b(Path) ->
