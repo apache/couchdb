@@ -304,6 +304,37 @@ Spidermonkey 91, QuickJS and V8 engines raises a ``ReferenceError``.
   js> f({'x':'y'})
   typein:1:23 TypeError: can't access property "x", doc is undefined
 
+12. Zero-prefixed input with ``parseInt()``
+
+The ``parseInt()`` function in Spidermonkey 1.8.5 treats a leading ``0`` as
+octal (base 8) prefix. It then parses the following input as an octal number.
+Spidermonkey 91, and other modern JS engine, assume a base 10 as a default even
+when parsing numbers with leading zeros. This can be a stumbling block
+especially when parsing months and days in a date string. One way to mitigate
+this discrepancy is to use an explicit base.
+
+.. code-block::
+
+  % js
+  js> parseInt("08")
+  0
+  js> parseInt("09")
+  0
+  js> parseInt("010")
+  8
+  js> parseInt("08", 10)
+  8
+
+  % js91
+  js> parseInt("08")
+  8
+  js> parseInt("09")
+  9
+  js> parseInt("010")
+  10
+  js> parseInt("08", 10)
+  8
+
 Using QuickJS
 =============
 
