@@ -173,7 +173,7 @@ to_prom_summary(Path, Info) ->
         Percentiles
     ),
     SumMetric = path_to_name(Path ++ ["seconds", "sum"]),
-    SumStat = to_prom(SumMetric, Count * Mean),
+    SumStat = to_prom(SumMetric, (Count * Mean) / 1000),
     CountMetric = path_to_name(Path ++ ["seconds", "count"]),
     CountStat = to_prom(CountMetric, Count),
     to_prom(Metric, summary, desc(Info), Quantiles) ++ [SumStat, CountStat].
