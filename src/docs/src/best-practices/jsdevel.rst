@@ -335,6 +335,25 @@ this discrepancy is to use an explicit base.
   js> parseInt("08", 10)
   8
 
+13. Callable regular expressions
+
+Spidermonkey 1.8.5 allowed calling regular expression as a function. The call
+worked the same as calling the ``.exec()`` method.
+
+.. code-block::
+
+  % js
+  js> /.*abc$/("abc")
+  ["abc"]
+
+  % js91
+  js> /.*abc$/("abc")
+  typein:1:9 TypeError: /.*abc$/ is not a function
+  Stack:
+    @typein:1:9
+  js> /.*abc$/.exec("abc")
+  ["abc"]
+
 Using QuickJS
 =============
 
