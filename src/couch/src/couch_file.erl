@@ -21,7 +21,6 @@
 -define(SIZE_BLOCK, 16#1000).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
--define(WRITE_XXHASH_CHECKSUMS_KEY, {?MODULE, write_xxhash_checksums}).
 -define(WRITE_XXHASH_CHECKSUMS_DEFAULT, false).
 
 -type block_id() :: non_neg_integer().
@@ -54,9 +53,6 @@
 
 %% helper functions
 -export([process_info/1]).
-
-% test helper functions
--export([reset_checksum_persistent_term_config/0]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -887,22 +883,9 @@ legacy_checksums_stats_update() ->
         false -> ok
     end.
 
-reset_checksum_persistent_term_config() ->
-    persistent_term:erase(?WRITE_XXHASH_CHECKSUMS_KEY).
-
 generate_xxhash_checksums() ->
-    % Caching the config value here as we'd need to call this per file chunk
-    % and also from various processes (not just couch_file pids). Node must be
-    % restarted for the new value to take effect.
-    case persistent_term:get(?WRITE_XXHASH_CHECKSUMS_KEY, not_cached) of
-        not_cached ->
-            Default = ?WRITE_XXHASH_CHECKSUMS_DEFAULT,
-            Val = config:get_boolean("couchdb", "write_xxhash_checksums", Default),
-            persistent_term:put(?WRITE_XXHASH_CHECKSUMS_KEY, Val),
-            Val;
-        Val when is_boolean(Val) ->
-            Val
-    end.
+    Default = ?WRITE_XXHASH_CHECKSUMS_DEFAULT,
+    config:get_boolean("couchdb", "write_xxhash_checksums", Default).
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
