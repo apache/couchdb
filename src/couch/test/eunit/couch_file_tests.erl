@@ -717,8 +717,7 @@ setup_checksum() ->
 teardown_checksum({Ctx, Path}) ->
     file:delete(Path),
     meck:unload(),
-    test_util:stop_couch(Ctx),
-    couch_file:reset_checksum_persistent_term_config().
+    test_util:stop_couch(Ctx).
 
 t_write_read_xxhash_checksums({_Ctx, Path}) ->
     enable_xxhash(),
@@ -857,12 +856,10 @@ t_can_detect_block_corruption_with_legacy_checksum({_Ctx, Path}) ->
     catch couch_file:close(Fd1).
 
 enable_xxhash() ->
-    couch_file:reset_checksum_persistent_term_config(),
     reset_legacy_checksum_stats(),
     config:set("couchdb", "write_xxhash_checksums", "true", _Persist = false).
 
 disable_xxhash() ->
-    couch_file:reset_checksum_persistent_term_config(),
     reset_legacy_checksum_stats(),
     config:set("couchdb", "write_xxhash_checksums", "false", _Persist = false).
 
