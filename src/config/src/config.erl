@@ -38,12 +38,17 @@
 -export([subscribe_for_changes/1]).
 
 -export([init/1]).
--export([handle_call/3, handle_cast/2, handle_info/2]).
+-export([handle_call/3, handle_cast/2]).
+-export([terminate/2]).
 
 -export([is_sensitive/2]).
 
+% Prefixes for the persistent term namespace
+% The general shape looks like
+% {?MODULE, Prefix, ...} -> Value
+%
+-define(SETTINGS, settings).
 -define(FEATURES, features).
-
 -define(NODE_NAME, node_name).
 
 -define(TIMEOUT, 30000).
@@ -66,17 +71,17 @@ start_link(IniFilesDirs) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, IniFilesDirs, []).
 
 stop() ->
-    gen_server:cast(?MODULE, stop).
+    gen_server:stop(?MODULE).
 
 reload() ->
     gen_server:call(?MODULE, reload, ?TIMEOUT).
 
 all() ->
-    lists:sort(gen_server:call(?MODULE, all, infinity)).
+    lists:sort(lists:filtermap(fun settings_fmap_fun/1, persistent_term:get())).
 
 get_integer(Section, Key, Default) when is_integer(Default) ->
     try
-        to_integer(get(Section, Key, Default))
+        to_integer(get_value(Section, Key, Default))
     catch
         error:badarg ->
             Default
@@ -90,16 +95,16 @@ set_integer(Section, Key, Value, Persist) when is_integer(Value) ->
 set_integer(_, _, _, _) ->
     error(badarg).
 
-to_integer(List) when is_list(List) ->
-    list_to_integer(List);
 to_integer(Int) when is_integer(Int) ->
     Int;
+to_integer(List) when is_list(List) ->
+    list_to_integer(List);
 to_integer(Bin) when is_binary(Bin) ->
     list_to_integer(binary_to_list(Bin)).
 
 get_float(Section, Key, Default) when is_float(Default) ->
     try
-        to_float(get(Section, Key, Default))
+        to_float(get_value(Section, Key, Default))
     catch
         error:badarg ->
             Default
@@ -113,10 +118,10 @@ set_float(Section, Key, Value, Persist) when is_float(Value) ->
 set_float(_, _, _, _) ->
     error(badarg).
 
-to_float(List) when is_list(List) ->
-    list_to_float(List);
 to_float(Float) when is_float(Float) ->
     Float;
+to_float(List) when is_list(List) ->
+    list_to_float(List);
 to_float(Int) when is_integer(Int) ->
     list_to_float(integer_to_list(Int) ++ ".0");
 to_float(Bin) when is_binary(Bin) ->
@@ -124,7 +129,7 @@ to_float(Bin) when is_binary(Bin) ->
 
 get_boolean(Section, Key, Default) when is_boolean(Default) ->
     try
-        to_boolean(get(Section, Key, Default))
+        to_boolean(get_value(Section, Key, Default))
     catch
         error:badarg ->
             Default
@@ -140,6 +145,8 @@ set_boolean(Section, Key, false, Persist) ->
 set_boolean(_, _, _, _) ->
     error(badarg).
 
+to_boolean(Bool) when is_boolean(Bool) ->
+    Bool;
 to_boolean(List) when is_list(List) ->
     case list_to_existing_atom(List) of
         true ->
@@ -148,32 +155,17 @@ to_boolean(List) when is_list(List) ->
             false;
         _ ->
             error(badarg)
-    end;
-to_boolean(Bool) when is_boolean(Bool) ->
-    Bool.
+    end.
 
-get(Section) when is_binary(Section) ->
-    ?MODULE:get(binary_to_list(Section));
-get(Section) when is_list(Section) ->
-    Matches = ets:match(?MODULE, {{Section, '$1'}, '$2'}),
-    [{Key, Value} || [Key, Value] <- Matches].
+get(Section) ->
+    get_section(Section).
 
 get(Section, Key) ->
-    ?MODULE:get(Section, Key, undefined).
+    get_value(Section, Key, undefined).
 
-get(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
-    ?MODULE:get(binary_to_list(Section), binary_to_list(Key), Default);
-get(Section, Key, Default) when is_list(Section), is_list(Key) ->
-    case ets:lookup(?MODULE, {Section, Key}) of
-        [] when Default == undefined -> Default;
-        [] when is_boolean(Default) -> Default;
-        [] when is_float(Default) -> Default;
-        [] when is_integer(Default) -> Default;
-        [] when is_list(Default) -> Default;
-        [] when is_atom(Default) -> Default;
-        [] -> error(badarg);
-        [{_, Match}] -> Match
-    end.
+get(Section, Key, Default) ->
+    validate_value(Default),
+    get_value(Section, Key, Default).
 
 set(Section, Key, Value) ->
     ?MODULE:set(Section, Key, Value, true, nil).
@@ -185,18 +177,18 @@ set(Section, Key, Value, Persist) when is_boolean(Persist) ->
 set(Section, Key, Value, #{} = Opts) when
     is_list(Section), is_list(Key), is_list(Value)
 ->
-    gen_server:call(?MODULE, {set, Section, Key, Value, Opts}, ?TIMEOUT);
+    set_value(Section, Key, Value, Opts);
 set(Section, Key, Value, Reason) when
     is_list(Section), is_list(Key), is_list(Value)
 ->
-    ?MODULE:set(Section, Key, Value, #{persist => true, reason => Reason});
+    set_value(Section, Key, Value, #{persist => true, reason => Reason});
 set(_Sec, _Key, _Val, _Options) ->
     error(badarg).
 
 set(Section, Key, Value, Persist, Reason) when
     is_list(Section), is_list(Key), is_list(Value)
 ->
-    ?MODULE:set(Section, Key, Value, #{persist => Persist, reason => Reason}).
+    set_value(Section, Key, Value, #{persist => Persist, reason => Reason}).
 
 delete(Section, Key) when is_binary(Section) and is_binary(Key) ->
     delete(binary_to_list(Section), binary_to_list(Key));
@@ -209,13 +201,9 @@ delete(Section, Key, Reason) ->
     delete(Section, Key, true, Reason).
 
 delete(Sec, Key, Persist, Reason) when is_binary(Sec) and is_binary(Key) ->
-    delete(binary_to_list(Sec), binary_to_list(Key), Persist, Reason);
+    delete_value(binary_to_list(Sec), binary_to_list(Key), Persist, Reason);
 delete(Section, Key, Persist, Reason) when is_list(Section), is_list(Key) ->
-    gen_server:call(
-        ?MODULE,
-        {delete, Section, Key, Persist, Reason},
-        ?TIMEOUT
-    ).
+    delete_value(Section, Key, Persist, Reason).
 
 features() ->
     Map = persistent_term:get({?MODULE, ?FEATURES}, #{}),
@@ -289,14 +277,10 @@ subscribe_for_changes(Subscription) ->
 
 init(IniFilesDirs) ->
     enable_early_features(),
-    ets:new(?MODULE, [named_table, set, protected, {read_concurrency, true}]),
+    erase_all(),
     IniFiles = expand_dirs(IniFilesDirs),
-    maps:foreach(
-        fun(K, V) ->
-            true = ets:insert(?MODULE, {K, V})
-        end,
-        ini_map(IniFiles)
-    ),
+    Fun = fun({Sec, Key}, Val) -> put_value(Sec, Key, Val) end,
+    maps:foreach(Fun, ini_map(IniFiles)),
     debug_config(),
     Config = #config{
         ini_files_dirs = IniFilesDirs,
@@ -315,9 +299,6 @@ init(IniFilesDirs) ->
             halt(1)
     end.
 
-handle_call(all, _From, Config) ->
-    Resp = lists:sort((ets:tab2list(?MODULE))),
-    {reply, Resp, Config};
 handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
     Persist = maps:get(persist, Opts, true),
     Reason = maps:get(reason, Opts, nil),
@@ -330,7 +311,7 @@ handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
             ),
             {reply, {error, ValidationError}, Config};
         ok ->
-            true = ets:insert(?MODULE, {{Sec, Key}, Val}),
+            put_value(Sec, Key, Val),
             couch_log:notice(
                 "~p: [~s] ~s set to ~s for reason ~p",
                 [?MODULE, Sec, Key, LogVal, Reason]
@@ -354,11 +335,8 @@ handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
             end
     end;
 handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
-    true = ets:delete(?MODULE, {Sec, Key}),
-    couch_log:notice(
-        "~p: [~s] ~s deleted for reason ~p",
-        [?MODULE, Sec, Key, Reason]
-    ),
+    erase_value(Sec, Key),
+    couch_log:notice("~p: [~s] ~s deleted for reason ~p", [?MODULE, Sec, Key, Reason]),
     ConfigDeleteReturn =
         case {Persist, Config#config.write_filename} of
             {true, undefined} ->
@@ -370,10 +348,8 @@ handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
         end,
     IniMap = ini_map(Config#config.ini_files),
     case maps:find({Sec, Key}, IniMap) of
-        {ok, Val} ->
-            true = ets:insert(?MODULE, {{Sec, Key}, Val});
-        _ ->
-            ok
+        {ok, Val} -> put_value(Sec, Key, Val);
+        _ -> ok
     end,
     case ConfigDeleteReturn of
         ok ->
@@ -389,17 +365,16 @@ handle_call(reload, _From, #config{} = Config) ->
     % Update ets with ini values.
     IniMap = ini_map(IniFiles),
     maps:foreach(
-        fun({Sec, Key} = K, V) ->
-            VExisting = get(Sec, Key, V),
-            true = ets:insert(?MODULE, {K, V}),
+        fun({Sec, Key}, V) ->
+            VExisting = get_value(Sec, Key, undefined),
+            put_value(Sec, Key, V),
             case V =:= VExisting of
                 true ->
                     ok;
                 false ->
-                    couch_log:notice(
-                        "Reload detected config change ~s.~s = ~p",
-                        [Sec, Key, maybe_conceal(V, is_sensitive(Sec, Key))]
-                    ),
+                    Msg = "Reload detected config change ~s.~s = ~p",
+                    Args = [Sec, Key, maybe_conceal(V, is_sensitive(Sec, Key))],
+                    couch_log:notice(Msg, Args),
                     Event = {config_change, Sec, Key, V, true},
                     gen_event:sync_notify(config_event, Event)
             end
@@ -407,21 +382,18 @@ handle_call(reload, _From, #config{} = Config) ->
         IniMap
     ),
     % And remove anything in ets that wasn't on disk.
-    ets:foldl(
+    lists:foreach(
         fun
-            ({{Sec, Key} = K, _}, _) when not is_map_key(K, IniMap) ->
-                couch_log:notice(
-                    "Reload deleting in-memory config ~s.~s",
-                    [Sec, Key]
-                ),
-                ets:delete(?MODULE, K),
+            ({{Sec, Key}, _}) when not is_map_key({Sec, Key}, IniMap) ->
+                NoticeMsg = "Reload deleting in-memory config ~s.~s",
+                couch_log:notice(NoticeMsg, [Sec, Key]),
+                erase_value(Sec, Key),
                 Event = {config_change, Sec, Key, deleted, true},
                 gen_event:sync_notify(config_event, Event);
-            (_, _) ->
+            (_) ->
                 ok
         end,
-        nil,
-        ?MODULE
+        all()
     ),
     Config1 = Config#config{
         ini_files = IniFiles,
@@ -429,14 +401,11 @@ handle_call(reload, _From, #config{} = Config) ->
     },
     {reply, ok, Config1}.
 
-handle_cast(stop, State) ->
-    {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(Info, State) ->
-    couch_log:error("config:handle_info Info: ~p~n", [Info]),
-    {noreply, State}.
+terminate(_Reason, _State) ->
+    erase_all().
 
 maybe_conceal(Value, _IsSensitive = false) ->
     Value;
@@ -550,14 +519,14 @@ trim(String) ->
     string:trim(String).
 
 debug_config() ->
-    case ?MODULE:get("log", "level") of
+    case get_value("log", "level", undefined) of
         "debug" ->
             io:format("Configuration Settings:~n", []),
             lists:foreach(
                 fun({{Mod, Key}, Val}) ->
                     io:format("  [~s] ~s=~p~n", [Mod, Key, Val])
                 end,
-                lists:sort(ets:tab2list(?MODULE))
+                all()
             );
         _ ->
             ok
@@ -594,6 +563,53 @@ validate_config_update(Sec, Key, Val) ->
         {_, _, _, {match, _}, _} -> {error, ?INVALID_KEY};
         {_, _, _, _, nomatch} -> {error, ?INVALID_VALUE}
     end.
+
+%% erlfmt-ignore
+validate_value(Val) ->
+    if
+        is_boolean(Val)   -> ok;
+        is_list(Val)      -> ok;
+        is_integer(Val)   -> ok;
+        is_float(Val)     -> ok;
+        is_atom(Val)      -> ok;
+        Val =:= undefined -> ok;
+        true              -> error(badarg)
+    end.
+
+get_section(Section) when is_binary(Section) ->
+    get_section(binary_to_list(Section));
+get_section(Section) when is_list(Section) ->
+    Fun = fun
+        ({{Sec, Key}, Val}) when Sec =:= Section -> {true, {Key, Val}};
+        (_) -> false
+    end,
+    lists:filtermap(Fun, all()).
+
+get_value(Section, Key, Default) when is_list(Section), is_list(Key) ->
+    persistent_term:get({?MODULE, ?SETTINGS, Section, Key}, Default);
+get_value(Section, Key, Default) when is_binary(Section) and is_binary(Key) ->
+    get_value(binary_to_list(Section), binary_to_list(Key), Default).
+
+set_value(Section, Key, Value, #{} = Opts) ->
+    gen_server:call(?MODULE, {set, Section, Key, Value, Opts}, ?TIMEOUT).
+
+delete_value(Section, Key, Persist, Reason) ->
+    gen_server:call(?MODULE, {delete, Section, Key, Persist, Reason}, ?TIMEOUT).
+
+put_value(Section, Key, Value) ->
+    persistent_term:put({?MODULE, ?SETTINGS, Section, Key}, Value).
+
+erase_value(Section, Key) ->
+    persistent_term:erase({?MODULE, ?SETTINGS, Section, Key}).
+
+erase_all() ->
+    Fun = fun({{Sec, Key}, _}) -> erase_value(Sec, Key) end,
+    lists:foreach(Fun, all()).
+
+settings_fmap_fun({{?MODULE, ?SETTINGS, Sec, Key}, Val}) ->
+    {true, {{Sec, Key}, Val}};
+settings_fmap_fun(_) ->
+    false.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

@@ -178,6 +178,10 @@ config_get_test_() ->
                 fun should_return_undefined_atom_on_missed_option/0,
                 fun should_return_custom_default_value_on_missed_option/0,
                 fun should_only_return_default_on_missed_option/0,
+                fun should_get_integers/0,
+                fun should_get_floats/0,
+                fun should_get_booleans/0,
+                fun should_crash_on_bad_defaults/0,
                 fun should_fail_to_get_binary_value/0,
                 fun should_return_any_supported_default/0
             ]
@@ -384,7 +388,20 @@ should_handle_regex_patterns_in_key() ->
     ?assertEqual([{"pat||*", "true"}], config:get("sect1")).
 
 should_delete_config_from_file() ->
-    ?assertEqual(ok, config:delete("admins", "foo", true)).
+    ?assertEqual(ok, config:delete("admins", "foo", true)),
+    ?assertEqual(ok, config:set("admins", "foo", "600", "reasons")),
+    ?assertEqual(ok, config:set_boolean("admins", "bool", true)),
+    ?assertEqual(ok, config:set_integer("admins", "int", 42)),
+    ?assertEqual(ok, config:set_float("admins", "float", 1.5)),
+    ?assertEqual("600", config:get("admins", "foo")),
+    ?assertEqual(ok, config:delete(<<"admins">>, <<"foo">>, "reasons")),
+    ?assertEqual(ok, config:delete("admins", "bool")),
+    ?assertEqual(ok, config:delete("admins", "int")),
+    ?assertEqual(ok, config:delete(<<"admins">>, <<"float">>)),
+    ?assertEqual(undefined, config:get("admins", "foo")),
+    ?assertEqual(undefined, config:get("admins", "bool")),
+    ?assertEqual(undefined, config:get("admins", "int")),
+    ?assertEqual(undefined, config:get("admins", "float")).
 
 should_not_write_config_to_file() ->
     meck:new(config_writer),
@@ -412,6 +429,103 @@ should_return_custom_default_value_on_missed_option() ->
 
 should_only_return_default_on_missed_option() ->
     ?assertEqual("0", config:get("httpd", "port", "bar")).
+
+should_get_integers() ->
+    config:set("integers", "key", "0", false),
+    ?assertEqual(0, config:get_integer("integers", "key", 42)),
+
+    config:set("integers", "key", "0000", false),
+    ?assertEqual(0, config:get_integer("integers", "key", 42)),
+
+    config:set("integers", "key", "-1", false),
+    ?assertEqual(-1, config:get_integer("integers", "key", 42)),
+
+    config:set("integers", "key", "1", false),
+    ?assertEqual(1, config:get_integer("integers", "key", 42)),
+
+    config:set("integers", "key", "0.1", false),
+    ?assertEqual(42, config:get_integer("integers", "key", 42)),
+
+    config:set("integers", "key", "true", false),
+    ?assertEqual(42, config:get_integer("integers", "key", 42)),
+
+    config:set("integers", "key", "potato", false),
+    ?assertEqual(42, config:get_integer("integers", "key", 42)),
+
+    config:set_integer("integers", "key", 10, false),
+    ?assertEqual(10, config:get_integer("integers", "key", 42)),
+
+    ?assertError(badarg, config:set_integer("integers", "key", "10", false)),
+    ?assertError(badarg, config:set_integer("integers", "key", true, false)),
+    ?assertError(badarg, config:set_integer("integers", "key", 4.2, false)),
+    ?assertEqual(42, config:get_integer("integers", "missing_key", 42)),
+
+    config:delete("integers", "key", false).
+
+should_get_floats() ->
+    config:set("floats", "key", "0.0", false),
+    ?assertEqual(0.0, config:get_float("floats", "key", 4.2)),
+
+    config:set("floats", "key", "00.00", false),
+    ?assertEqual(0.0, config:get_float("floats", "key", 4.2)),
+
+    config:set("floats", "key", "1.0", false),
+    ?assertEqual(1.0, config:get_float("floats", "key", 4.2)),
+
+    config:set("floats", "key", "-1.0", false),
+    ?assertEqual(-1.0, config:get_float("floats", "key", 4.2)),
+
+    config:set("floats", "key", "0.1", false),
+    ?assertEqual(0.1, config:get_float("floats", "key", 4.2)),
+
+    config:set("floats", "key", "true", false),
+    ?assertEqual(4.2, config:get_float("floats", "key", 4.2)),
+
+    config:set("floats", "key", "potato", false),
+    ?assertEqual(4.2, config:get_float("floats", "key", 4.2)),
+
+    config:set_float("floats", "key", 1.5, false),
+    ?assertEqual(1.5, config:get_float("floats", "key", 4.2)),
+
+    ?assertError(badarg, config:set_float("floats", "key", 1, false)),
+    ?assertError(badarg, config:set_float("floats", "key", "potato", false)),
+
+    ?assertEqual(1.5, config:get_float("floats", "missing_key", 1.5)),
+
+    config:delete("floats", "key", false).
+
+should_get_booleans() ->
+    config:set("booleans", "key", "true", false),
+    ?assertEqual(true, config:get_boolean("booleans", "key", false)),
+
+    config:set("booleans", "key", "false", false),
+    ?assertEqual(false, config:get_boolean("booleans", "key", true)),
+
+    config:set("booleans", "key", "1", false),
+    ?assertEqual(true, config:get_boolean("booleans", "key", true)),
+    ?assertEqual(false, config:get_boolean("booleans", "key", false)),
+
+    config:set("booleans", "key", "potato", false),
+    ?assertEqual(true, config:get_boolean("booleans", "key", true)),
+    ?assertEqual(false, config:get_boolean("booleans", "key", false)),
+
+    config:set_boolean("booleans", "key", true, false),
+    ?assertEqual(true, config:get_boolean("booleans", "key", false)),
+
+    config:set_boolean("booleans", "key", false, false),
+    ?assertEqual(false, config:get_boolean("booleans", "key", true)),
+
+    ?assertError(badarg, config:set_boolean("booleans", "key", "potato", false)),
+
+    ?assertEqual(true, config:get_boolean("booleans", "missing_key", true)),
+    ?assertEqual(false, config:get_boolean("booleans", "missing_key", false)),
+
+    config:delete("booleans", "key", false).
+
+should_crash_on_bad_defaults() ->
+    ?assertError(badarg, config:get("foo", "bar", <<"bad">>)),
+    ?assertError(badarg, config:get("foo", "bar", {42, 43})),
+    ?assertError(badarg, config:get("foo", "bar", #{junk => junk})).
 
 should_fail_to_get_binary_value() ->
     ?assertException(error, badarg, config:get(<<"a">>, <<"b">>, <<"c">>)).
@@ -842,6 +956,52 @@ t_check_distributed_mode(_) ->
     ?assertEqual(ok, config:check_distribution_mode()),
     persistent_term:put({config, node_name}, 'foo@127.0.0.1'),
     ?assertEqual({error, unexpected_distributed_mode}, config:check_distribution_mode()).
+
+config_stop_cleanup_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            fun should_stop/0,
+            fun should_cleanup_persistant_map/0,
+            fun should_handle_random_messages/0
+        ]
+    }.
+
+should_stop() ->
+    Pid = whereis(config),
+    Ref = monitor(process, Pid),
+    unlink(Pid),
+    config:stop(),
+    receive
+        {'DOWN', Ref, _, _, _} -> ok
+    end,
+    ?assertNot(is_process_alive(Pid)).
+
+should_cleanup_persistant_map() ->
+    Pid = whereis(config),
+    Ref = monitor(process, Pid),
+    unlink(Pid),
+    ?assertEqual(ok, config:set("foo", "bar", "baz", false)),
+    config:stop(),
+    receive
+        {'DOWN', Ref, _, _, _} -> ok
+    end,
+    ?assertEqual(not_found, persistent_term:get({config, cfgmap}, not_found)),
+    ?assertEqual(undefined, config:get("foo", "bar")).
+
+should_handle_random_messages() ->
+    Pid = whereis(config),
+    Ref = monitor(process, Pid),
+    unlink(Pid),
+    gen_server:cast(Pid, random_cast),
+    Pid ! random_message,
+    config:stop(),
+    receive
+        {'DOWN', Ref, _, _, _} -> ok
+    end,
+    ?assertNot(is_process_alive(Pid)).
 
 wait_config_get(Sec, Key, Val) ->
     test_util:wait(

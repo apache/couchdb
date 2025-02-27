@@ -701,8 +701,8 @@ t_parse_db_url(_) ->
 
 t_parse_db_invalid_protocol(_) ->
     MeckFun = fun
-        ("replicator", "valid_endpoint_protocols", _) -> "https";
-        (_, _, Default) -> Default
+        ("replicator", "valid_endpoint_protocols") -> "https";
+        (K, V) -> meck:passthrough([K, V])
     end,
     meck:expect(config, get, MeckFun),
     PUrl = <<"http://x">>,
@@ -717,8 +717,8 @@ t_parse_db_invalid_protocol(_) ->
 
 t_parse_proxy_invalid_protocol(_) ->
     MeckFun = fun
-        ("replicator", "valid_proxy_protocols", _) -> "socks5";
-        (_, _, Default) -> Default
+        ("replicator", "valid_proxy_protocols") -> "socks5";
+        (K, V) -> meck:passthrough([K, V])
     end,
     meck:expect(config, get, MeckFun),
     Url = <<"http://a">>,
