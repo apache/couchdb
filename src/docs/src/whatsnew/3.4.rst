@@ -51,8 +51,8 @@ Features
 * :ghissue:`5294`: Return time spent waiting to update Nouveau index
   before query starts.
 
-Bufixes
--------
+Bugfixes
+--------
 * :ghissue:`5274`: Use normal Lucene syntax for unbounded ranges in
   Nouveau.
 * :ghissue:`5270`: Do not generate conflicts from the replicator
@@ -85,8 +85,8 @@ Highlights
 * :ghissue:`5255`: Set ``upgrade_hash_on_auth`` to ``false`` to disable
   automatic password hashing upgrades.
 
-Bufixes
--------
+Bugfixes
+--------
 
 * :ghissue:`5254`: Handle the case when the QuickJS scanner has no
   valid views.
