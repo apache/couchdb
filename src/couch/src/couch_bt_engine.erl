@@ -606,9 +606,16 @@ fold_purge_infos(St, StartSeq0, UserFun, UserAcc, Options) ->
     PurgeSeqTree = St#st.purge_seq_tree,
     StartSeq = StartSeq0 + 1,
     MinSeq = get_oldest_purge_seq(St),
+    % MinSeq check ensures that an index did not (somehow) miss any purges and
+    % is now out of sync with the database. Index updaters should catch the
+    % {invalid_start_purge_seq, _, _} error and reset the index. Because of
+    % this when fetching all the purges it's necessary to use max(0,
+    % couch_db:get_oldest_purge_seq(Db) - 1) as the start sequence or the
+    % couch_db:fold_purge_infos(Db, Fun, Acc) helper, which does that
+    % automatically.
     if
         MinSeq =< StartSeq -> ok;
-        true -> erlang:error({invalid_start_purge_seq, StartSeq0})
+        true -> erlang:error({invalid_start_purge_seq, StartSeq0, MinSeq})
     end,
     Wrapper = fun(Info, _Reds, UAcc) ->
         UserFun(Info, UAcc)

@@ -215,7 +215,10 @@ purge_index(Db, Mod, IdxState) ->
                         []
                     )
                 catch
-                    error:{invalid_start_purge_seq, _} ->
+                    error:{invalid_start_purge_seq, StartSeqErr, MinSeqErr} ->
+                        DbName = couch_db:name(Db),
+                        ErrMsg = "~p : ~p db:~p resetting index min purge seq: ~p start seq:~p",
+                        couch_log:error(ErrMsg, [?MODULE, Mod, DbName, MinSeqErr, StartSeqErr]),
                         exit({reset, self()})
                 end,
             Mod:update_local_purge_doc(Db, NewStateAcc),
