@@ -1,0 +1,172 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _release/3.5.x:
+
+============
+3.5.x Branch
+============
+
+.. contents::
+    :depth: 1
+    :local:
+
+.. _release/3.5.0:
+
+Version 3.5.0
+=============
+
+Highlights
+----------
+
+* :ghissue:`5399`, :ghissue:`5441`, :ghissue:`5443`: Implement parallel
+  ``pread`` calls: lets clients issue concurrent ``pread`` calls without blocking
+  each other or having to wait for all writes and ``fsync`` calls. This is
+  enabled by default and can be disabled with ``[couchdb] use_cfile = false`` in
+  the configuration.
+
+  CouchDB already employs a multiple-parallel-read and concurrent serial-write
+  design at the database engine layer, but below that in the storage engine,
+  each file representing a database shard is required to route all read / write
+  / sync requests through a single Erlang process that owns the file descriptor
+  (fd).
+
+  An Erlang process can at most execute at the speed of a single CPU core. Two
+  scenarios can lead to a starvation of the fd-owning Erlang process message
+  inbox:
+
+    - 1000s concurrent read requests with a constant stream of writes per shard,
+      or:
+    - a high latency storage devices like network block storage.
+
+  Parallel preads re-implements the Erlang ``file`` module in parts as
+  ``couch_cfile`` to allow multiple ``dup()``’d file descriptors to be used for
+  reading and writing. Writes continue to be serialised at the database engine
+  layer, but reads now are no longer blocked by writes waiting to commit.
+
+  Comes with an extensive test suite that includes property testing to ensure
+  ``couch_cfile`` behaves exactly like Erlang’s ``file`` in all other cases.
+
+  Performance is always equal or better than before. These scenarios show
+  preliminary improvements:
+
+  - random document reads: 15% more throughput
+  - read ``_all_docs``: 15% more throughput
+  - read ``_all_docs`` with ``include_docs=true``: 25% more throughput
+  - read ``_changes``: 4% more throughput
+  - single document writes: 8% more throughput
+  - 2000x concurrent clients, random document reads on a 12 node cluster: 30% more
+    throughput
+  - concurrent constant document writes and concurrent single document reads on
+    a single shard: 40% more throughput.
+
+    This feature is not available on Windows.
+
+* :ghissue:`5435`: Improve default ``chttpd_server`` options. This helps with
+  faster processing of many concurrent TCP connections.
+
+* :ghissue:`5347`: Fix attachment size calculation. This could lead to shards
+  not being scheduled for compaction correctly.
+
+Performance
+-----------
+
+* :ghissue:`5417`: Fix ``atts_since`` functionality for document ``GET``
+  requests.
+  Avoids re-replicating attachment bodies on doc updates.
+* :ghissue:`5389`: Save 1 ``write`` for each committing data to disk by using
+  ``fdatasync`` while keeping the same level of storage reliability.
+
+Features
+--------
+
+* :ghissue:`5429`: Nouveau: upgrade ``dropwizard`` to 4.0.12.
+* :ghissue:`5429`: Add ``simple+pbkdf2`` migration password scheme.
+* :ghissue:`5424`: Scanner: reduce log noise, fix QuickJS plugin mocks,
+  gracefully handle broken search indexes.
+* :ghissue:`5421`: Nouveau: upgrade Lucene to 9.12.1.
+* :ghissue:`5414`: Remove unused ``multi_workers`` option from
+  ``couch_work_queue``.
+* :ghissue:`5402`: Remove unused, undocumented and detrimental idle check
+  timeout feature.
+* :ghissue:`5359`: Remove unused, undocumented and unreliabele ``pread_limit``
+  feature from ``couch_file``.
+* :ghissue:`5385`: Clean up ``fabric_doc_update`` by introducing an ``#acc``
+  record.
+* :ghissue:`5372`: Upgrade to Elixir 1.17.
+* :ghissue:`5338`: Clouseau: show version in ``/_version`` endpoint.
+* :ghissue:`5338`: Scanner: add Nouveau and Clouseau design doc validation.
+* :ghissue:`5335`: Nouveau: support reading older Lucene 9x indexes.
+* :ghissue:`5327`, :ghissue:`5329`, :ghissue:`5419`: Allow switching JavaScript
+  engines at runtime.
+* :ghissue:`5326`, :ghissue:`5328`: Allow clients to specify HTTP request ID,
+  including UUIDs.
+* :ghissue:`5321`, :ghissue:`5366`, :ghissue:`5413`: Add support for
+  SpiderMonkey versions 102, 115 and 128.
+* :ghissue:`5317`: Add `quickjs` to the list of welcome features.
+
+Bugfixes
+--------
+
+* :ghissue:`5447`: Fix arithmetic mean in ``_prometheus``.
+* :ghissue:`5440`: Fix ``_purged_infos`` when exceeding ``purged_infos_limit``.
+* :ghissue:`5431`: Restore the ability to return ``Error`` objects from `map()`.
+* :ghissue:`5417`: Clouseau: add a version check to ``connected()`` function to
+  reliably detect if a Clouseau node is ready to be used.
+* :ghissue:`5416`: Ensure we always map the documents in order in
+  ``couch_mrview_updater``. While views still built correctly, this behaviour
+  simplifies debugging.
+* :ghissue:`5373`: Fix checksumming in ``couch_file``, consolidate similar
+  functions and bring test coverage from 66% to 90%.
+* :ghissue:`5367`: Scanner: be more resilient in the face of non-deterministic
+  functions.
+* :ghissue:`5345`: Scanner: be more resilient in the face of incomplete sample
+  data.
+* :ghissue:`5344`: Scanner: allow empty doc fields.
+* :ghissue:`5341`: Improve Mango test reliability.
+* :ghissue:`5337`: Prevent a broken ``mem3`` app from permanently failing
+  replication.
+* :ghissue:`5334`: Fix QuickJS scanner ``function_clause`` error.
+* :ghissue:`5332`: Skip deleted documents in the scanner.
+* :ghissue:`5331`: Skip validation for design docs in the scanner.
+* :ghissue:`5330`: Prevent inserting illegal design docs via Mango.
+
+Docs
+----
+
+* :ghissue:`5433`: Mango: document Nouveau index type.
+* :ghissue:`5433`: Nouveau: document Mango index type.
+* :ghissue:`5428`: Fix wrong link in example in ``CONTRIBUTING.md``.
+* :ghissue:`5400`: Clarify RHEL9 installation caveats.
+* :ghissue:`5380`, :ghissue:`5404`: Fix various typos.
+* :ghissue:`5338`: Clouseau: document version in ``/_version`` endpoint.
+* :ghissue:`5340`, :ghissue:`5412`: Nouveau: document search cleanup API.
+* :ghissue:`5316`, :ghissue:`5325`, :ghissue:`5426`, :ghissue:`5442`,
+  :ghissue:`5445`: Document various JavaScript engine incompatibilities,
+  including SpiderMonkey 1.8.5 vs. newer SpiderMonkey and SpiderMonkey vs.
+  QuickJS.
+* :ghissue:`5320`, :ghissue:`5374`: Improve auto-lockout feature documentation.
+* :ghissue:`5323`: Nouveau: improve install instructions.
+
+Tests
+_____
+
+* :ghissue:`5397`: Fix negative-steps error in Elixir tests.
+
+Builds
+------
+* :ghissue:`5360`: Use ``brew --prefix`` to find ICU paths on macOS.
+
+Other
+-----
+
+TODO Insert Closing
