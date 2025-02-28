@@ -37,20 +37,28 @@ go(DbName) ->
     ShardSyncHistory = parse_shard_sync_docs(LocalDocs),
     Shards = mem3:shards(DbName),
 
-    Foo = fun(#shard{} = Shard, Acc) ->
-        case maps:find({Shard#shard.node, Shard#shard.range}, PeerCheckpoints) of
-            {ok, Value} ->
-                [{Shard, Value} | Acc];
-            error ->
-                %% cross ref with sync docs
-                Pred = fun({_Node, Range}, _) -> Range == Shard#shard.range end,
-                maps:filter(Pred, PeerCheckpoints),
-                Acc
-        end
-    end,
-    Workers = lists:foldl(Foo, [], Shards),
+    ByRange = maps:groups_from_list(fun(Shard) ->Shard#shard.range end,
+                                fun(Shard) ->
+                                        Shard#shard.node end, Shards),
 
-    {PeerCheckpoints, ShardSyncHistory, Workers}.
+    Fun1 = fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
+        OtherNodes = maps:get(Range, ByRange, []) -- [SrcNode],
+        Fun2 = fun(TgtNode, Acc2) ->
+            History = maps:get({Range, SrcNode, TgtNode}, ShardSyncHistory, []),
+            case lists:search(fun({SourceUuid, SourceSeq, TargetUuid, TargetSeq}) ->
+                SourceSeq =< Seq end, History) of
+                {value, {SourceUuid, SourceSeq, TargetUuid, TargetSeq}} ->
+                    Acc2#{{Range, TgtNode} => {TargetUuid, TargetSeq}};
+                false ->
+                    Acc2
+            end
+        end,
+        lists:foldl(Fun2, Acc1, OtherNodes)
+    end,
+
+    Expanded = maps:fold(Fun1, PeerCheckpoints, PeerCheckpoints),
+
+    {PeerCheckpoints, ShardSyncHistory, Expanded}.
 
 all_docs_cb({row, Row}, Acc0) ->
     case lists:keyfind(doc, 1, Row) of
