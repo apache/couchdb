@@ -37,7 +37,8 @@ couch_js_test_() ->
                 ?TDEF(should_replace_broken_utf16),
                 ?TDEF(should_allow_js_string_mutations),
                 ?TDEF(should_bump_timing_and_call_stats),
-                ?TDEF(should_exit_on_internal_error, 60)
+                ?TDEF(should_exit_on_internal_error, 60),
+                ?TDEF(should_use_bigint)
             ])
         }
     }.
@@ -439,6 +440,30 @@ should_exit_on_internal_error(_) ->
             ok
     end,
     ?assert(couch_stats:sample([couchdb, query_server, process_errors]) > 0).
+
+%% erlfmt-ignore
+should_use_bigint(_) ->
+    Proc = couch_query_servers:get_os_process(<<"javascript">>),
+    Src = <<"
+         function(doc) {
+            const x = 147573952589676412928n;
+            let z = x + BigInt(doc.y);
+            emit('z', z.toString());
+        }
+    ">>,
+    case couch_server:get_js_engine() of
+        <<"quickjs">> ->
+            true = prompt(Proc, [<<"add_fun">>, Src]),
+            X = 147573952589676412928,
+            Y = 73786976294838206464,
+            Doc = {[{<<"y">>, integer_to_binary(Y)}]},
+            Result = prompt(Proc, [<<"map_doc">>, Doc]),
+            ?assertMatch([[[<<"z">>, <<_/binary>>]]], Result),
+            [[[<<"z">>, Z]]] = Result,
+            ?assertEqual(X + Y, binary_to_integer(Z));
+        <<"spidermonkey">> ->
+            ?assertThrow({compilation_error, _}, prompt(Proc, [<<"add_fun">>, Src]))
+    end.
 
 sample_time(Stat) ->
     couch_stats:sample([couchdb, query_server, time, Stat]).
