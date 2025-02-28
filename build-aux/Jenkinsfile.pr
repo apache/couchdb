@@ -64,40 +64,40 @@ pipeline {
 
   stages {
 
-    stage('Setup Env') {
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        timeout(time: 10, unit: 'MINUTES')
-      }
-      steps {
-        script {
-          env.DOCS_CHANGED = '0'
-          env.ONLY_DOCS_CHANGED = '0'
-          if ( sh(returnStatus: true, script: docs_changed) == 0 ) {
-            env.DOCS_CHANGED = '1'
-            if (sh(returnStatus: true, script: other_changes) == 1) {
-              env.ONLY_DOCS_CHANGED = '1'
-            }
-          }
-        }
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
-        }
-      }
-    } // stage 'Setup Environment'
+   stage('Setup Env') {
+     agent {
+       docker {
+         image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
+         label 'docker'
+         args "${DOCKER_ARGS}"
+         registryUrl 'https://docker.io/'
+         registryCredentialsId 'dockerhub_creds'
+       }
+     }
+     options {
+       timeout(time: 10, unit: 'MINUTES')
+     }
+     steps {
+       script {
+         env.DOCS_CHANGED = '0'
+         env.ONLY_DOCS_CHANGED = '0'
+         if ( sh(returnStatus: true, script: docs_changed) == 0 ) {
+           env.DOCS_CHANGED = '1'
+           if (sh(returnStatus: true, script: other_changes) == 1) {
+             env.ONLY_DOCS_CHANGED = '1'
+           }
+         }
+       }
+     }
+     post {
+       cleanup {
+         // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+         sh 'rm -rf ${WORKSPACE}/*'
+       }
+     }
+   } // stage 'Setup Environment'
 
-    stage('Docs Check') {
+   stage('Docs Check') {
       // Run docs `make check` stage if any docs changed
       when {
         beforeOptions true
@@ -238,7 +238,7 @@ pipeline {
     // https://issues.jenkins-ci.org/browse/JENKINS-47962
     // https://issues.jenkins-ci.org/browse/JENKINS-48050
 
-    stage('Make Check') {
+   stage('Make Check') {
       when {
         beforeOptions true
         expression { ONLY_DOCS_CHANGED == '0' }
