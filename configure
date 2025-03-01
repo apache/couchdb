@@ -58,24 +58,27 @@ system for Apache CouchDB.
 
 Options:
 
-  -h | --help                 display a short help message and exit
-  -u | --user USER            set the username to run as (defaults to $COUCHDB_USER)
-  --disable-fauxton           do not build Fauxton
-  --disable-docs              do not build any documentation or manpages
-  --with-nouveau              build the new experimental search module
-  --with-clouseau             build the Clouseau search module
-  --erlang-md5                use erlang for md5 hash operations
-  --dev                       alias for --disable-docs --disable-fauxton
-  --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
-  --clouseau-method MTH       specify the method for Clouseau to deploy: git or dist (defaults to $CLOUSEAU_MTH)
-  --clouseau-uri URI          specify the location for retrieving Clouseau (defaults $(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN"))
-  --clouseau-version VSN      specify the version (tag/branch for git) of Clouseau to use (defaults to $CLOUSEAU_VSN)
-  --skip-deps                 do not update erlang dependencies
-  --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
-  --rebar3=PATH               use rebar3 by specified path
-  --erlfmt=PATH               use erlfmt by specified path
-  --js-engine=ENGINE          use js engine: spidermonkey or quickjs, defaults to spidermonkey
-  --disable-spidermonkey      disable spidermonkey, don't try to build it
+  -h | --help                 Display this help message and exit
+  -u | --user USER            Set the username to run CouchDB as (default: $COUCHDB_USER)
+  --disable-fauxton           Exclude Fauxton web interface from the build
+  --disable-docs              Skip building documentation and manpages
+  --with-nouveau              Include the new experimental search module
+  --with-clouseau             Include the Clouseau search module
+  --erlang-md5                Use Erlang for MD5 hash operations instead of native code
+  --dev                       Shortcut for --disable-docs --disable-fauxton (dev mode)
+  --spidermonkey-version VSN  Set SpiderMonkey version (default: $SM_VSN, e.g., 91, 115)
+  --clouseau-method MTH       Set Clouseau deployment method: 'dist' (pre-built) or 'git' (source, default: $CLOUSEAU_MTH)
+  --clouseau-uri URI          Set Clouseau source URI (default: $(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN"))
+  --clouseau-version VSN      Set Clouseau version (default: $CLOUSEAU_VSN)
+  --skip-deps                 Skip updating Erlang dependencies
+  --rebar=PATH                Use specified Rebar executable (v2.6.0 to <3.0 required)
+  --rebar3=PATH               Use Rebar3 by specified path
+  --erlfmt=PATH               Use erlfmt by specified path
+  --js-engine=ENGINE          Set JS engine: 'spidermonkey' or 'quickjs' (default: $JS_ENGINE)
+  --disable-spidermonkey      Disable SpiderMonkey, falling back to QuickJS
+Example:
+  ./$basename --with-clouseau --clouseau-method git --user myuser
+    Configures CouchDB with Clouseau from Git and runs as 'myuser'.
 EOF
 }
 
@@ -427,37 +430,53 @@ EOF
 
 install_local_rebar() {
     if [ ! -x "${rootdir}/bin/rebar" ]; then
+	echo "==> Installing local Rebar..."
         if [ ! -d "${rootdir}/src/rebar" ]; then
+	    echo "Cloning Rebar repository..."
             git clone --depth 1 https://github.com/apache/couchdb-rebar.git ${rootdir}/src/rebar
         fi
+	echo "Building Rebar..."
         make -C ${rootdir}/src/rebar
+	echo "Moving Rebar binary to ${rootdir}/bin/rebar..."
         mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
+	echo "Cleaning up Rebar build artifacts..."
         make -C ${rootdir}/src/rebar clean
+	echo "Rebar installation complete."
     fi
 }
 
 install_local_rebar3() {
     if [ ! -x "${rootdir}/bin/rebar3" ]; then
+	echo "==> Installing local Rebar3..."
         if [ ! -d "${rootdir}/src/rebar3" ]; then
+	    echo "Cloning Rebar3 repository (branch: ${REBAR3_BRANCH})..."
             git clone --depth 1 --branch ${REBAR3_BRANCH} https://github.com/erlang/rebar3.git ${rootdir}/src/rebar3
         fi
+	echo "Building Rebar3..."
         cd src/rebar3
         ./bootstrap
         mv ${rootdir}/src/rebar3/rebar3 ${rootdir}/bin/rebar3
         cd ../..
+	echo "Rebar3 installation complete."
     fi
 }
 
 install_local_erlfmt() {
     if [ ! -x "${rootdir}/bin/erlfmt" ]; then
+	echo "==> Installing local erlfmt..."
         if [ ! -d "${rootdir}/src/erlfmt" ]; then
+	    echo "Cloning erlfmt repository (version: ${ERLFMT_VERSION})..."
             git clone --depth 1 --branch "${ERLFMT_VERSION}" https://github.com/WhatsApp/erlfmt.git ${rootdir}/src/erlfmt
         fi
+	echo "Building erlfmt with Rebar3..."
         cd "${rootdir}"/src/erlfmt
         ${REBAR3} as release escriptize
+	echo "Moving erlfmt binary to ${rootdir}/bin/erlfmt..."
         mv ${rootdir}/src/erlfmt/_build/release/bin/erlfmt ${rootdir}/bin/erlfmt
+	echo "Cleaning up erlfmt build artifacts..."
         ${REBAR3} clean
         cd ../..
+	echo "erlfmt installation complete."
     fi
 }
 
@@ -473,11 +492,19 @@ check_local_clouseau_dir() {
 fetch_file() {
     _file_name="$1"
     _file_url="$2"
+    _max_attempts=3
+    _attempt=1
 
-    if ! curl -sSL --max-redirs 1 -o "$_file_name" "$_file_url"; then
-	printf "ERROR: %s could not be downloaded.\n" "$_file_url" >&2
-	exit 1
-    fi
+    while [ $_attempt -le $_max_attempts ]; do
+        if curl -sSL --max-redirs 1 -o "$_file_name" "$_file_url"; then
+            return 0
+        fi
+        echo "WARNING: Attempt $_attempt of $_max_attempts failed to download $_file_url" >&2
+        _attempt=$((_attempt + 1))
+        sleep 2
+    done
+    printf "ERROR: Failed to download %s after %d attempts.\n" "$_file_url" "$_max_attempts" >&2
+    exit 1
 }
 
 install_local_clouseau() {
@@ -493,34 +520,43 @@ install_local_clouseau() {
 	    _LOGBACK_CLASSIC_JAR=logback-classic-"$LOGBACK_VERSION".jar
 	    _LOGBACK_CLASSIC_URL="$_LOGBACK_DIST_URL"/logback-classic/"$LOGBACK_VERSION"/"$_LOGBACK_CLASSIC_JAR"
 
+	    echo "==> Installing local Clouseau (dist method)..."
 	    check_local_clouseau_dir "$CLOUSEAU_DIR"
+	    echo "Creating Clouseau directory at ${CLOUSEAU_DIR}..."
 	    mkdir -p "$CLOUSEAU_DIR"
 
 	    echo "Fetching Clouseau from $_DIST_URL..."
+	    echo "Fetching Clouseau from $_DIST_URL..."
 
 	    fetch_file clouseau.zip "$_DIST_URL"
-
+	    
+	    echo "Extracting Clouseau distribution..."
 	    if ! unzip -q -j clouseau.zip -d "$CLOUSEAU_DIR"; then
 		printf "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted.\n" >&2
 		exit 1
 	    fi
 
+	    echo "Removing temporary Clouseau zip file..."
 	    rm clouseau.zip
 
 	    echo "Fetching Logback $LOGBACK_VERSION from $_LOGBACK_DIST_URL..."
-
 	    fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CORE_JAR" "$_LOGBACK_CORE_URL"
+	    echo "Fetching Logback $LOGBACK_VERSION classic from $_LOGBACK_CLASSIC_URL..."
 	    fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CLASSIC_JAR" "$_LOGBACK_CLASSIC_URL"
+	    echo "Clouseau (dist) installation complete."
 	    ;;
 
 	git)
+	    echo "==> Installing local Clouseau (git method)..."
 	    echo "Cloning Clouseau from $CLOUSEAU_URI ($CLOUSEAU_VSN)..."
 	    check_local_clouseau_dir "$CLOUSEAU_DIR"
 	    git clone --depth 1 --branch "$CLOUSEAU_VSN" "$CLOUSEAU_URI" "$CLOUSEAU_DIR"
+	    echo "Clouseau (git) installation complete."
 	    ;;
 
-	*) printf "ERROR: Invalid deployment method for Clouseau.  Please use either \`dist\` or \`git\` verbatim.\n" >&2
+	*) printf "ERROR: Invalid Clouseau deployment method '%s'. Please use either 'dist' or 'git' verbatim.\n" >&2
 	   exit 1
+	    ;;
     esac
 }
 
