@@ -291,7 +291,7 @@ Example of using explicit ``$and`` and ``$eq`` operators:
             }
         ]
     }
-
+It is entirely up to you whether you use the implicit or explicit form. The implicit form is a little easier to write if you do that by hand. The explicit form is a little easier if you programatically contract your selectors. The end result will be the same.
 .. _find/explicit_operators:
 
 Explicit Operators
