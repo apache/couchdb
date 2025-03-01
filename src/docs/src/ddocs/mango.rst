@@ -50,9 +50,6 @@ of function or result.
       missing a field name.").
     * Field names starting with ``$`` must be escaped with ``\`` (eg, ``\$foo``)
       ("Invalid operator: $").
-    * Fields at the root of the document starting with ``_`` cannot be queried
-      ("Bad special document member: _"). Special fields like ``_id`` and
-      ``_rev`` can be queried.
 
 .. _find/selectorbasics:
 
