@@ -20,7 +20,7 @@ query system called Mango.
 Mango consists of two major concepts:
 
 * Selectors, which are the queries, and are passed to the mango endpoints
-* Indexes, which are a specialization of design docs used in mango queries
+* Indexes, which are a specialization of :ref:`design docs <ddocs>` used in mango queries
 
 There are a few important endpoints for interacting with these concepts:
 
