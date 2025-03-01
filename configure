@@ -526,7 +526,6 @@ install_local_clouseau() {
 	    mkdir -p "$CLOUSEAU_DIR"
 
 	    echo "Fetching Clouseau from $_DIST_URL..."
-	    echo "Fetching Clouseau from $_DIST_URL..."
 
 	    fetch_file clouseau.zip "$_DIST_URL"
 	    
@@ -554,7 +553,7 @@ install_local_clouseau() {
 	    echo "Clouseau (git) installation complete."
 	    ;;
 
-	*) printf "ERROR: Invalid Clouseau deployment method '%s'. Please use either 'dist' or 'git' verbatim.\n" >&2
+	*) printf "ERROR: Invalid Clouseau deployment method '%s'. Valid options are 'dist' or 'git'.\n" "$CLOUSEAU_MTH" >&2
 	   exit 1
 	    ;;
     esac
