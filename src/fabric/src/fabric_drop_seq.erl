@@ -1,4 +1,4 @@
--module(fabric_drop_seq2).
+-module(fabric_drop_seq).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -12,25 +12,33 @@ go(DbName) ->
 
     {ok, {PeerCheckpoints, ShardSyncHistory}} = parse_local_docs(DbName),
 
-    Expanded = maps:fold( fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
-        OtherNodes = maps:get(Range, RangeToNodes, []) -- [SrcNode],
-        lists:foldl(fun(TgtNode, Acc2) ->
-            History = maps:get({Range, SrcNode, TgtNode}, ShardSyncHistory, []),
-            case
-                lists:search(
-                    fun({SourceUuid, SourceSeq, _TargetUuid, _TargetSeq}) ->
-                        Uuid == SourceUuid andalso SourceSeq =< Seq
-                    end,
-                    History
-                )
-            of
-                {value, {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq}} ->
-                    Acc2#{{Range, TgtNode} => {TargetUuid, TargetSeq}};
-                false ->
-                    Acc2
-            end
-        end, Acc1, OtherNodes)
-    end, PeerCheckpoints, PeerCheckpoints),
+    Expanded = maps:fold(
+        fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
+            OtherNodes = maps:get(Range, RangeToNodes, []) -- [SrcNode],
+            lists:foldl(
+                fun(TgtNode, Acc2) ->
+                    History = maps:get({Range, SrcNode, TgtNode}, ShardSyncHistory, []),
+                    case
+                        lists:search(
+                            fun({SourceUuid, SourceSeq, _TargetUuid, _TargetSeq}) ->
+                                Uuid == SourceUuid andalso SourceSeq =< Seq
+                            end,
+                            History
+                        )
+                    of
+                        {value, {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq}} ->
+                            Acc2#{{Range, TgtNode} => {TargetUuid, TargetSeq}};
+                        false ->
+                            Acc2
+                    end
+                end,
+                Acc1,
+                OtherNodes
+            )
+        end,
+        PeerCheckpoints,
+        PeerCheckpoints
+    ),
 
     Workers = lists:map(
         fun(#shard{} = Shard) ->
