@@ -42,7 +42,7 @@ go(DbName) ->
 
     Workers = lists:map(
         fun(#shard{} = Shard) ->
-            {Shard, maps:get({Shard#shard.range, Shard#shard.node}, Expanded)}
+            {Shard, maps:get({Shard#shard.range, Shard#shard.node}, Expanded, undefined)}
         end,
         Shards
     ),
