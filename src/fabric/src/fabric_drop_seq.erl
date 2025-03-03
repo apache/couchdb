@@ -1,72 +1,36 @@
-% Licensed under the Apache License, Version 2.0 (the "License"); you may not
-% use this file except in compliance with the License. You may obtain a copy of
-% the License at
-%
-%   http://www.apache.org/licenses/LICENSE-2.0
-%
-% Unless required by applicable law or agreed to in writing, software
-% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-% License for the specific language governing permissions and limitations under
-% the License.
-
--module(fabric_drop_seq).
+-module(fabric_drop_seq2).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
--include_lib("couch_replicator/src/couch_replicator.hrl").
 
 -export([go/1]).
 
 go(DbName) ->
-    MrArgs = #mrargs{
-        view_type = map,
-        include_docs = true,
-        extra = [
-            {include_system, true},
-            {namespace, <<"_local">>}
-        ]
-    },
-    {ok, LocalDocs} = fabric:all_docs(DbName, fun all_docs_cb/2, [], MrArgs),
-    %    1. find lowest update seq per {node,uuid} pair in all peer checkpoints excluding mem3_sync
-    %    2. use mem3_sync docs to find lowest update seq on any other {node,uuids}
-    %    3. issue rpc to matching shards and ask them to set drop seq if uuid matches
-
-    PeerCheckpoints = parse_peer_docs(LocalDocs),
-    ShardSyncHistory = parse_shard_sync_docs(LocalDocs),
     Shards = mem3:shards(DbName),
+    RangeToNodes = range_to_nodes(Shards),
 
-    ByRange = maps:groups_from_list(
-        fun(Shard) -> Shard#shard.range end,
-        fun(Shard) ->
-            Shard#shard.node
-        end,
-        Shards
-    ),
+    {ok, {PeerCheckpoints, ShardSyncHistory}} = parse_local_docs(DbName),
 
-    Fun1 = fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
-        OtherNodes = maps:get(Range, ByRange, []) -- [SrcNode],
-        Fun2 = fun(TgtNode, Acc2) ->
+    Expanded = maps:fold( fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
+        OtherNodes = maps:get(Range, RangeToNodes, []) -- [SrcNode],
+        lists:foldl(fun(TgtNode, Acc2) ->
             History = maps:get({Range, SrcNode, TgtNode}, ShardSyncHistory, []),
             case
                 lists:search(
-                    fun({SourceUuid, SourceSeq, TargetUuid, TargetSeq}) ->
+                    fun({SourceUuid, SourceSeq, _TargetUuid, _TargetSeq}) ->
                         Uuid == SourceUuid andalso SourceSeq =< Seq
                     end,
                     History
                 )
             of
-                {value, {SourceUuid, SourceSeq, TargetUuid, TargetSeq}} ->
+                {value, {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq}} ->
                     Acc2#{{Range, TgtNode} => {TargetUuid, TargetSeq}};
                 false ->
                     Acc2
             end
-        end,
-        lists:foldl(Fun2, Acc1, OtherNodes)
-    end,
-
-    Expanded = maps:fold(Fun1, PeerCheckpoints, PeerCheckpoints),
+        end, Acc1, OtherNodes)
+    end, PeerCheckpoints, PeerCheckpoints),
 
     Workers = lists:map(
         fun(#shard{} = Shard) ->
@@ -75,44 +39,27 @@ go(DbName) ->
         Shards
     ),
 
-    {PeerCheckpoints, ShardSyncHistory, Expanded, Workers}.
+    Workers.
 
-all_docs_cb({row, Row}, Acc0) ->
+parse_local_docs(DbName) ->
+    fabric:all_docs(DbName, fun parse_local_docs_cb/2, {#{}, #{}}, all_docs_mrargs()).
+
+parse_local_docs_cb({row, Row}, Acc) ->
     case lists:keyfind(doc, 1, Row) of
-        {doc, Doc} ->
-            {ok, [couch_doc:from_json_obj(Doc) | Acc0]};
         false ->
-            {ok, Acc0}
+            {ok, Acc};
+        {doc, Doc} ->
+            parse_local_doc(couch_doc:from_json_obj(Doc), Acc)
     end;
-all_docs_cb(_Else, Acc) ->
+parse_local_docs_cb(_Else, Acc) ->
     {ok, Acc}.
 
-parse_peer_docs(LocalDocs) ->
-    lists:foldl(fun parse_peer_doc/2, #{}, LocalDocs).
-
-parse_peer_doc(#doc{} = Doc, Acc) ->
-    {Props} = Doc#doc.body,
-    Type = couch_util:get_value(<<"type">>, Props),
-    case Type of
-        <<"_peer_checkpoint">> ->
-            UpdateSeq = couch_util:get_value(<<"update_seq">>, Props),
-            maps:merge_with(fun combine_peers/3, decode_seq(UpdateSeq), Acc);
-        _Else ->
-            Acc
-    end.
-
-combine_peers(_Key, {Uuid, Val1}, {Uuid, Val2}) when is_integer(Val1), is_integer(Val2) ->
-    {Uuid, min(Val1, Val2)}.
-
-parse_shard_sync_docs(LocalDocs) ->
-    lists:foldl(fun parse_shard_sync_doc/2, #{}, LocalDocs).
-
-parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
+parse_local_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
     {Props} = Doc#doc.body,
     case couch_util:get_value(<<"dbname">>, Props) of
         undefined ->
             %% not yet upgraded with new property
-            Acc;
+            {ok, Acc};
         DbName ->
             Range = mem3:range(DbName),
             {[{_SrcNode, History}]} = couch_util:get_value(<<"history">>, Props),
@@ -128,10 +75,38 @@ parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) -
                     couch_util:get_value(<<"target_seq">>, Item)
                 }
             end,
-            maps:merge(maps:groups_from_list(KeyFun, ValueFun, History), Acc)
+            {PeerCheckpoints, ShardSyncHistory0} = Acc,
+            ShardSyncHistory1 = maps:merge(
+                maps:groups_from_list(KeyFun, ValueFun, History), ShardSyncHistory0
+            ),
+            {ok, {PeerCheckpoints, ShardSyncHistory1}}
     end;
-parse_shard_sync_doc(_Doc, Acc) ->
-    Acc.
+parse_local_doc(#doc{id = <<"_local/peer-checkpoint-", _/binary>>} = Doc, Acc) ->
+    {Props} = Doc#doc.body,
+    case couch_util:get_value(<<"update_seq">>, Props) of
+        undefined ->
+            {ok, Acc};
+        UpdateSeq ->
+            {PeerCheckpoints0, ShardSyncHistory} = Acc,
+            PeerCheckpoints1 = maps:merge_with(
+                fun merge_peers/3, decode_seq(UpdateSeq), PeerCheckpoints0
+            ),
+            {ok, {PeerCheckpoints1, ShardSyncHistory}}
+    end;
+parse_local_doc(_Doc, Acc) ->
+    {ok, Acc}.
+
+range_to_nodes(Shards) ->
+    maps:groups_from_list(fun range/1, fun node/1, Shards).
+
+range(Shard) ->
+    Shard#shard.range.
+
+node(Shard) ->
+    Shard#shard.node.
+
+merge_peers(_Key, {Uuid, Val1}, {Uuid, Val2}) when is_integer(Val1), is_integer(Val2) ->
+    {Uuid, min(Val1, Val2)}.
 
 decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
@@ -154,3 +129,13 @@ decode_seq(OpaqueSeq) ->
         #{},
         Decoded
     ).
+
+all_docs_mrargs() ->
+    #mrargs{
+        view_type = map,
+        include_docs = true,
+        extra = [
+            {include_system, true},
+            {namespace, <<"_local">>}
+        ]
+    }.
