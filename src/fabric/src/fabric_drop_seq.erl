@@ -37,16 +37,26 @@ go(DbName) ->
     ShardSyncHistory = parse_shard_sync_docs(LocalDocs),
     Shards = mem3:shards(DbName),
 
-    ByRange = maps:groups_from_list(fun(Shard) ->Shard#shard.range end,
-                                fun(Shard) ->
-                                        Shard#shard.node end, Shards),
+    ByRange = maps:groups_from_list(
+        fun(Shard) -> Shard#shard.range end,
+        fun(Shard) ->
+            Shard#shard.node
+        end,
+        Shards
+    ),
 
     Fun1 = fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
         OtherNodes = maps:get(Range, ByRange, []) -- [SrcNode],
         Fun2 = fun(TgtNode, Acc2) ->
             History = maps:get({Range, SrcNode, TgtNode}, ShardSyncHistory, []),
-            case lists:search(fun({SourceUuid, SourceSeq, TargetUuid, TargetSeq}) ->
-                SourceSeq =< Seq end, History) of
+            case
+                lists:search(
+                    fun({SourceUuid, SourceSeq, TargetUuid, TargetSeq}) ->
+                        Uuid == SourceUuid andalso SourceSeq =< Seq
+                    end,
+                    History
+                )
+            of
                 {value, {SourceUuid, SourceSeq, TargetUuid, TargetSeq}} ->
                     Acc2#{{Range, TgtNode} => {TargetUuid, TargetSeq}};
                 false ->
@@ -58,7 +68,14 @@ go(DbName) ->
 
     Expanded = maps:fold(Fun1, PeerCheckpoints, PeerCheckpoints),
 
-    {PeerCheckpoints, ShardSyncHistory, Expanded}.
+    Workers = lists:map(
+        fun(#shard{} = Shard) ->
+            {Shard, maps:get({Shard#shard.range, Shard#shard.node}, Expanded)}
+        end,
+        Shards
+    ),
+
+    {PeerCheckpoints, ShardSyncHistory, Expanded, Workers}.
 
 all_docs_cb({row, Row}, Acc0) ->
     case lists:keyfind(doc, 1, Row) of
@@ -105,10 +122,10 @@ parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) -
             end,
             ValueFun = fun({Item}) ->
                 {
-                 couch_util:get_value(<<"source_uuid">>, Item),
-                 couch_util:get_value(<<"source_seq">>, Item),
-                 couch_util:get_value(<<"target_uuid">>, Item),
-                 couch_util:get_value(<<"target_seq">>, Item)
+                    couch_util:get_value(<<"source_uuid">>, Item),
+                    couch_util:get_value(<<"source_seq">>, Item),
+                    couch_util:get_value(<<"target_uuid">>, Item),
+                    couch_util:get_value(<<"target_seq">>, Item)
                 }
             end,
             maps:merge(maps:groups_from_list(KeyFun, ValueFun, History), Acc)
@@ -120,9 +137,18 @@ decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
     lists:foldl(
         fun
-            ({_Node, Range, {Seq, Uuid, Node}}, Acc) ->
-                Acc#{{Range, Node} => {Uuid, Seq}};
-            ({_Node, _Range, _Seq}, Acc) ->
+            ({_Node, [S, E], {Seq, Uuid, Node}}, Acc) when
+                is_integer(S),
+                is_integer(E),
+                is_integer(Seq),
+                S >= 0,
+                E > S,
+                Seq > 0,
+                is_binary(Uuid),
+                is_atom(Node)
+            ->
+                Acc#{{[S, E], Node} => {Uuid, Seq}};
+            (_Else, Acc) ->
                 Acc
         end,
         #{},
