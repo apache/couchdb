@@ -276,6 +276,8 @@ subscribe_for_changes(Subscription) ->
     config_notifier:subscribe(Subscription).
 
 init(IniFilesDirs) ->
+    % trap exits to make sure terminate/2 gets called
+    process_flag(trap_exit, true),
     enable_early_features(),
     erase_all(),
     IniFiles = expand_dirs(IniFilesDirs),
