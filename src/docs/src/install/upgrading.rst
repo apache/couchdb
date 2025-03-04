@@ -81,3 +81,24 @@ Upgrading from CouchDB 1.x
 To upgrade from CouchDB 1.x, first upgrade to a version of CouchDB 2.x.  You
 will need to convert all databases to CouchDB 2.x format first; see the Upgrade
 Notes there for instructions. Then, upgrade to CouchDB 3.x.
+
+Upgrading from CouchDB 2.x
+==========================
+
+However CouchDB is backwards compatible between 2.x and 3.x there are a few practical
+issues when upgrading. These were taken from the field upgrading a cluster with 10k dbs:
+
+#. Newer releases are most likely built using a newer Erlang/OTP version. If your
+   current CouchDB cluster is running on OTP < 23 and you are upgrading to a version
+   which is built and will be running OTP > 26 the nodes won't communicate while in
+   the rolling upgrade. If downtime is not an option then you should consider
+   a staged upgrade.
+#. When upgrading from 2.1 there is a breaking change causing errors on document
+   attachment uploads. Please 
+   `see issue: <https://github.com/apache/couchdb/issues/1578>`_
+#. There is are new default thresholds for smoosh that may or may not be present in your old config.
+   If the configuration is not adjust you may experience high cpu usage on the upgraded cluster.
+   `see issue: <https://github.com/apache/couchdb/issues/3047>`_   
+#. Make sure you have configured the :ref:`view_index_dir<config/view_index_dir>` parameter. In previous version this defaulted
+   to the value of :ref:`database_dir<config/database_dir>`. Not setting this may cause the cluster to start rebuilding all
+   views and they may end up in the wrong place on the filesystem.
