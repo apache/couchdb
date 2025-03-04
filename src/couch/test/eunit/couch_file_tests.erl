@@ -155,7 +155,9 @@ read_write_test_() ->
                     ?TDEF_FE(should_apply_overwrite_create_option),
                     ?TDEF_FE(should_error_on_creation_if_exists),
                     ?TDEF_FE(should_close_on_idle),
-                    ?TDEF_FE(should_crash_on_unexpected_cast)
+                    ?TDEF_FE(should_crash_on_unexpected_cast),
+                    ?TDEF_FE(should_handle_pread_iolist_upgrade_clause),
+                    ?TDEF_FE(should_handle_append_bin_upgrade_clause)
                 ]
             }
         }
@@ -359,6 +361,45 @@ should_crash_on_unexpected_cast(Fd) ->
         {'DOWN', Ref, _, _, Reason} ->
             ?assertEqual({invalid_cast, potato}, Reason)
     end.
+
+% Remove this test when removing pread_iolist compatibility clause for online
+% upgrades from couch_file
+%
+should_handle_pread_iolist_upgrade_clause(Fd) ->
+    Bin = <<"bin">>,
+    {ok, Pos, _} = couch_file:append_binary(Fd, Bin),
+    ResList = gen_server:call(Fd, {pread_iolists, [Pos]}, infinity),
+    ?assertMatch({ok, [{_, _}]}, ResList),
+    {ok, [{IoList1, Checksum1}]} = ResList,
+    ?assertEqual(Bin, iolist_to_binary(IoList1)),
+    ?assertEqual(<<>>, Checksum1),
+    ResSingle = gen_server:call(Fd, {pread_iolist, Pos}, infinity),
+    ?assertMatch({ok, _, _}, ResSingle),
+    {ok, IoList2, Checksum2} = ResSingle,
+    ?assertEqual(Bin, iolist_to_binary(IoList2)),
+    ?assertEqual(<<>>, Checksum2).
+
+% Remove this test when removing append_bin compatibility clause for online
+% upgrades from couch_file
+%
+should_handle_append_bin_upgrade_clause(Fd) ->
+    Bin = <<"bin">>,
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    ResList = gen_server:call(Fd, {append_bins, [Chunk]}, infinity),
+    ?assertMatch({ok, [_]}, ResList),
+    {ok, [{Pos1, Len1}]} = ResList,
+    ?assertEqual({ok, Bin}, couch_file:pread_binary(Fd, Pos1)),
+    ?assert(is_integer(Len1)),
+    % size of binary + checksum
+    ?assert(Len1 > byte_size(Bin) + 16),
+    ResSingle = gen_server:call(Fd, {append_bin, Chunk}, infinity),
+    ?assertMatch({ok, _, _}, ResSingle),
+    {ok, Pos2, Len2} = ResSingle,
+    ?assert(is_integer(Len2)),
+    % size of binary + checksum
+    ?assert(Len2 > byte_size(Bin) + 16),
+    ?assertEqual(Pos2, Len1),
+    ?assertEqual({ok, Bin}, couch_file:pread_binary(Fd, Pos2)).
 
 header_test_() ->
     {

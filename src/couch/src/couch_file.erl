@@ -529,6 +529,16 @@ terminate(_Reason, #file{fd = Fd}) ->
 
 handle_call(close, _From, #file{fd = Fd} = File) ->
     {stop, normal, file:close(Fd), File#file{fd = nil}};
+handle_call({pread_iolist, Pos}, _From, File) ->
+    % Compatibility clause. Remove after upgrading to next release after 3.5.0
+    % Attachment streams may be opened from remote nodes during the upgrade on
+    % a mixed cluster
+    Result =
+        case pread(File, [Pos]) of
+            {ok, [{IoList, Checksum}]} -> {ok, IoList, Checksum};
+            Error -> Error
+        end,
+    {reply, Result, File};
 handle_call({pread_iolists, PosL}, _From, File) ->
     {reply, pread(File, PosL), File};
 handle_call(bytes, _From, #file{} = File) ->
@@ -559,22 +569,18 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
         Error ->
             {reply, Error, File}
     end;
-handle_call({append_bins, Bins}, _From, #file{fd = Fd, eof = Pos} = File) ->
-    {BlockResps, FinalPos} = lists:mapfoldl(
-        fun(Bin, PosAcc) ->
-            Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
-            Size = iolist_size(Blocks),
-            {{Blocks, {PosAcc, Size}}, PosAcc + Size}
-        end,
-        Pos,
-        Bins
-    ),
-    {AllBlocks, Resps} = lists:unzip(BlockResps),
-    case file:write(Fd, AllBlocks) of
-        ok ->
-            {reply, {ok, Resps}, File#file{eof = FinalPos}};
-        Error ->
-            {reply, Error, reset_eof(File)}
+handle_call({append_bin, Bin}, _From, #file{} = File) ->
+    % Compatibility clause. Remove after upgrading to next release after 3.5.0
+    % Attachment streams may be opened from remote nodes during the upgrade on
+    % a mixed cluster
+    case append_bins(File, [Bin]) of
+        {{ok, [{Pos, Len}]}, File1} -> {reply, {ok, Pos, Len}, File1};
+        {Error, File1} -> {reply, Error, File1}
+    end;
+handle_call({append_bins, Bins}, _From, #file{} = File) ->
+    case append_bins(File, Bins) of
+        {{ok, Resps}, File1} -> {reply, {ok, Resps}, File1};
+        {Error, File1} -> {reply, Error, File1}
     end;
 handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     BinSize = byte_size(Bin),
@@ -617,6 +623,22 @@ format_status(_Opt, [PDict, #file{} = File]) ->
 
 eof(#file{fd = Fd}) ->
     file:position(Fd, eof).
+
+append_bins(#file{fd = Fd, eof = Pos} = File, Bins) ->
+    {BlockResps, FinalPos} = lists:mapfoldl(
+        fun(Bin, PosAcc) ->
+            Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
+            Size = iolist_size(Blocks),
+            {{Blocks, {PosAcc, Size}}, PosAcc + Size}
+        end,
+        Pos,
+        Bins
+    ),
+    {AllBlocks, Resps} = lists:unzip(BlockResps),
+    case file:write(Fd, AllBlocks) of
+        ok -> {{ok, Resps}, File#file{eof = FinalPos}};
+        Error -> {Error, reset_eof(File)}
+    end.
 
 pread(#file{} = File, PosL) ->
     LocNums1 = [{Pos, 4} || Pos <- PosL],
