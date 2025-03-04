@@ -941,7 +941,10 @@ generate_xxhash_checksums() ->
 %
 
 get_cfile(Pid) when is_pid(Pid) ->
-    case {is_process_alive(Pid), get(?CFILE_HANDLE)} of
+    % Pids could be remote when processing attachments and is_process_alive/1
+    % will throw an error then, so ensure a fallback for non-local processes
+    PidAliveAndLocal = node(Pid) =:= node() andalso is_process_alive(Pid),
+    case {PidAliveAndLocal, get(?CFILE_HANDLE)} of
         {false, _} ->
             erase(?CFILE_HANDLE),
             undefined;
