@@ -72,6 +72,15 @@ go(DbName, AllDocs0, Opts) ->
         rexi_monitor:stop(RexiMon)
     end.
 
+% upgrade clause
+handle_message(Msg, Worker, {WaitingCount, DocCount, W, GroupedDocs, Reply}) ->
+    handle_message(Msg, Worker, #acc{
+        waiting_count = WaitingCount,
+        doc_count = DocCount,
+        w = W,
+        grouped_docs = GroupedDocs,
+        reply = Reply
+    });
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Worker, #acc{} = Acc0) ->
     #acc{grouped_docs = GroupedDocs} = Acc0,
     NewGrpDocs = [X || {#shard{node = N}, _} = X <- GroupedDocs, N =/= NodeRef],
