@@ -12,6 +12,17 @@ go(DbName) ->
 
     {ok, {PeerCheckpoints, ShardSyncHistory}} = parse_local_docs(DbName),
 
+    SyncFloor = maps:fold(
+        fun({Range, _SrcNode, TgtNode}, History, Acc) ->
+            {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq} = hd(History),
+            maps:update_with(
+                {Range, TgtNode}, fun({Uuid, Seq}) -> {Uuid, Seq} end, {TargetUuid, TargetSeq}, Acc
+            )
+        end,
+        #{},
+        ShardSyncHistory
+    ),
+
     Expanded = maps:fold(
         fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
             OtherNodes = maps:get(Range, RangeToNodes, []) -- [SrcNode],
@@ -27,7 +38,19 @@ go(DbName) ->
                         )
                     of
                         {value, {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq}} ->
-                            Acc2#{{Range, TgtNode} => {TargetUuid, TargetSeq}};
+                            maps:update_with(
+                                {Range, TgtNode},
+                                fun({U, S}) when U == TargetUuid ->
+                                    case maps:find({Range, TgtNode}, SyncFloor) of
+                                        error ->
+                                            {U, min(TargetSeq, S)};
+                                        {ok, Floor} ->
+                                            {U, max(Floor, min(TargetSeq, S))}
+                                    end
+                                end,
+                                {TargetUuid, TargetSeq},
+                                Acc2
+                            );
                         false ->
                             Acc2
                     end
