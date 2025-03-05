@@ -302,7 +302,7 @@ update_docs(DbName, Docs0, Options) ->
 
 get_purged_infos(DbName) ->
     FoldFun = fun({_Seq, _UUID, Id, Revs}, Acc) -> {ok, [{Id, Revs} | Acc]} end,
-    with_db(DbName, [], {couch_db, fold_purge_infos, [0, FoldFun, []]}).
+    with_db(DbName, [], {couch_db, fold_purge_infos, [FoldFun, []]}).
 
 get_purge_seq(DbName, Options) ->
     with_db(DbName, Options, {couch_db, get_purge_seq, []}).

@@ -67,6 +67,62 @@ should_close_file_properly() ->
 should_create_empty_new_files(Fd) ->
     ?_assertMatch({ok, 0}, couch_file:bytes(Fd)).
 
+cfile_setup() ->
+    test_util:start_couch().
+
+cfile_teardown(Ctx) ->
+    erase(io_priority),
+    config:delete("couchdb", "use_cfile", false),
+    config:delete("couchdb", "cfile_skip_ioq", false),
+    config:delete("ioq.bypass", "read", false),
+    test_util:stop_couch(Ctx).
+
+cfile_enable_disable_test_() ->
+    {
+        foreach,
+        fun cfile_setup/0,
+        fun cfile_teardown/1,
+        [
+            ?TDEF_FE(t_cfile_default),
+            ?TDEF_FE(t_cfile_enabled),
+            ?TDEF_FE(t_cfile_disabled),
+            ?TDEF_FE(t_cfile_with_ioq_bypass),
+            ?TDEF_FE(t_cfile_without_ioq_bypass)
+        ]
+    }.
+
+t_cfile_default(_) ->
+    t_can_open_read_and_write().
+
+t_cfile_enabled(_) ->
+    % This is the default, but we'll just test when we
+    % explicitly set to "true" here
+    config:set("couchdb", "use_cfile", "true", false),
+    t_can_open_read_and_write().
+
+t_cfile_disabled(_) ->
+    config:set("couchdb", "use_cfile", "false", false),
+    t_can_open_read_and_write().
+
+t_cfile_with_ioq_bypass(_) ->
+    config:set("couchdb", "use_cfile", "true", false),
+    config:set("couchdb", "cfile_skip_ioq", "true", false),
+    config:set("ioq.bypass", "read", "true", false),
+    t_can_open_read_and_write().
+
+t_cfile_without_ioq_bypass(_) ->
+    config:set("couchdb", "use_cfile", "true", false),
+    config:set("couchdb", "cfile_skip_ioq", "false", false),
+    config:set("ioq.bypass", "read", "true", false),
+    t_can_open_read_and_write().
+
+t_can_open_read_and_write() ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    ioq:set_io_priority({interactive, <<"somedb">>}),
+    ?assertMatch({ok, 0, _}, couch_file:append_term(Fd, foo)),
+    ?assertEqual({ok, foo}, couch_file:pread_term(Fd, 0)),
+    ok = couch_file:close(Fd).
+
 read_write_test_() ->
     {
         "Common file read/write tests",
@@ -99,7 +155,9 @@ read_write_test_() ->
                     ?TDEF_FE(should_apply_overwrite_create_option),
                     ?TDEF_FE(should_error_on_creation_if_exists),
                     ?TDEF_FE(should_close_on_idle),
-                    ?TDEF_FE(should_crash_on_unexpected_cast)
+                    ?TDEF_FE(should_crash_on_unexpected_cast),
+                    ?TDEF_FE(should_handle_pread_iolist_upgrade_clause),
+                    ?TDEF_FE(should_handle_append_bin_upgrade_clause)
                 ]
             }
         }
@@ -260,8 +318,10 @@ should_apply_overwrite_create_option(Fd) ->
     ?assertEqual(ok, couch_file:close(Fd)),
     {ok, Fd1} = couch_file:open(Path, [create, overwrite]),
     unlink(Fd1),
-    ExpectError = {error, {read_beyond_eof, Path, Pos, 5, 0, 0}},
-    ?assertEqual(ExpectError, couch_file:pread_term(Fd1, Pos)).
+    ?assertMatch(
+        {error, {read_beyond_eof, Path, Pos, _, _, _}},
+        couch_file:pread_term(Fd1, Pos)
+    ).
 
 should_error_on_creation_if_exists(Fd) ->
     {_, Path} = couch_file:process_info(Fd),
@@ -301,6 +361,45 @@ should_crash_on_unexpected_cast(Fd) ->
         {'DOWN', Ref, _, _, Reason} ->
             ?assertEqual({invalid_cast, potato}, Reason)
     end.
+
+% Remove this test when removing pread_iolist compatibility clause for online
+% upgrades from couch_file
+%
+should_handle_pread_iolist_upgrade_clause(Fd) ->
+    Bin = <<"bin">>,
+    {ok, Pos, _} = couch_file:append_binary(Fd, Bin),
+    ResList = gen_server:call(Fd, {pread_iolists, [Pos]}, infinity),
+    ?assertMatch({ok, [{_, _}]}, ResList),
+    {ok, [{IoList1, Checksum1}]} = ResList,
+    ?assertEqual(Bin, iolist_to_binary(IoList1)),
+    ?assertEqual(<<>>, Checksum1),
+    ResSingle = gen_server:call(Fd, {pread_iolist, Pos}, infinity),
+    ?assertMatch({ok, _, _}, ResSingle),
+    {ok, IoList2, Checksum2} = ResSingle,
+    ?assertEqual(Bin, iolist_to_binary(IoList2)),
+    ?assertEqual(<<>>, Checksum2).
+
+% Remove this test when removing append_bin compatibility clause for online
+% upgrades from couch_file
+%
+should_handle_append_bin_upgrade_clause(Fd) ->
+    Bin = <<"bin">>,
+    Chunk = couch_file:assemble_file_chunk_and_checksum(Bin),
+    ResList = gen_server:call(Fd, {append_bins, [Chunk]}, infinity),
+    ?assertMatch({ok, [_]}, ResList),
+    {ok, [{Pos1, Len1}]} = ResList,
+    ?assertEqual({ok, Bin}, couch_file:pread_binary(Fd, Pos1)),
+    ?assert(is_integer(Len1)),
+    % size of binary + checksum
+    ?assert(Len1 > byte_size(Bin) + 16),
+    ResSingle = gen_server:call(Fd, {append_bin, Chunk}, infinity),
+    ?assertMatch({ok, _, _}, ResSingle),
+    {ok, Pos2, Len2} = ResSingle,
+    ?assert(is_integer(Len2)),
+    % size of binary + checksum
+    ?assert(Len2 > byte_size(Bin) + 16),
+    ?assertEqual(Pos2, Len1),
+    ?assertEqual({ok, Bin}, couch_file:pread_binary(Fd, Pos2)).
 
 header_test_() ->
     {
@@ -695,8 +794,7 @@ setup_checksum() ->
 teardown_checksum({Ctx, Path}) ->
     file:delete(Path),
     meck:unload(),
-    test_util:stop_couch(Ctx),
-    couch_file:reset_checksum_persistent_term_config().
+    test_util:stop_couch(Ctx).
 
 t_write_read_xxhash_checksums({_Ctx, Path}) ->
     enable_xxhash(),
@@ -835,12 +933,10 @@ t_can_detect_block_corruption_with_legacy_checksum({_Ctx, Path}) ->
     catch couch_file:close(Fd1).
 
 enable_xxhash() ->
-    couch_file:reset_checksum_persistent_term_config(),
     reset_legacy_checksum_stats(),
     config:set("couchdb", "write_xxhash_checksums", "true", _Persist = false).
 
 disable_xxhash() ->
-    couch_file:reset_checksum_persistent_term_config(),
     reset_legacy_checksum_stats(),
     config:set("couchdb", "write_xxhash_checksums", "false", _Persist = false).
 
