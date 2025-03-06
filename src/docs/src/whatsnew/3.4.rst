@@ -20,6 +20,98 @@
     :depth: 1
     :local:
 
+.. _release/3.4.3:
+
+Version 3.4.3
+=============
+
+Highlights
+----------
+
+* :ghissue:`5347`: Fix attachment size calculation. This could lead to shards
+  not being scheduled for compaction correctly.
+
+Performance
+-----------
+
+* :ghissue:`5437`: Fix ``atts_since`` functionality for document ``GET``
+  requests. Avoids re-replicating attachment bodies on doc updates.
+
+Features
+--------
+
+* :ghissue:`5439`: Nouveau: upgrade ``dropwizard`` to 4.0.12.
+* :ghissue:`5424`: Scanner: reduce log noise, fix QuickJS plugin mocks,
+  gracefully handle broken search indexes.
+* :ghissue:`5421`: Nouveau: upgrade Lucene to 9.12.1.
+* :ghissue:`5414`: Remove unused ``multi_workers`` option from
+  ``couch_work_queue``.
+* :ghissue:`5385`: Clean up ``fabric_doc_update`` by introducing an ``#acc``
+  record.
+* :ghissue:`5372`: Upgrade to Elixir 1.17.
+* :ghissue:`5351`: Clouseau: show version in ``/_version`` endpoint.
+* :ghissue:`5338`: Scanner: add Nouveau and Clouseau design doc validation.
+* :ghissue:`5335`: Nouveau: support reading older Lucene 9x indexes.
+* :ghissue:`5327`, :ghissue:`5329`, :ghissue:`5419`: Allow switching JavaScript
+  engines at runtime.
+* :ghissue:`5326`, :ghissue:`5328`: Allow clients to specify HTTP request ID,
+  including UUIDs.
+* :ghissue:`5321`, :ghissue:`5366`, :ghissue:`5413`: Add support for
+  SpiderMonkey versions 102, 115 and 128.
+* :ghissue:`5317`: Add `quickjs` to the list of welcome features.
+
+Bugfixes
+--------
+
+* :ghissue:`5447`: Fix arithmetic mean in ``_prometheus``.
+* :ghissue:`5440`: Fix ``_purged_infos`` when exceeding ``purged_infos_limit``.
+* :ghissue:`5431`: Restore the ability to return ``Error`` objects from `map()`.
+* :ghissue:`5417`: Clouseau: add a version check to ``connected()`` function to
+  reliably detect if a Clouseau node is ready to be used.
+* :ghissue:`5416`: Ensure we always map the documents in order in
+  ``couch_mrview_updater``. While views still built correctly, this behaviour
+  simplifies debugging.
+* :ghissue:`5373`: Fix checksumming in ``couch_file``, consolidate similar
+  functions and bring test coverage from 66% to 90%.
+* :ghissue:`5367`: Scanner: be more resilient in the face of non-deterministic
+  functions.
+* :ghissue:`5345`: Scanner: be more resilient in the face of incomplete sample
+  data.
+* :ghissue:`5344`: Scanner: allow empty doc fields.
+* :ghissue:`5341`: Improve Mango test reliability.
+* :ghissue:`5337`: Prevent a broken ``mem3`` app from permanently failing
+  replication.
+* :ghissue:`5334`: Fix QuickJS scanner ``function_clause`` error.
+* :ghissue:`5332`: Skip deleted documents in the scanner.
+* :ghissue:`5331`: Skip validation for design docs in the scanner.
+* :ghissue:`5330`: Prevent inserting illegal design docs via Mango.
+
+Docs
+----
+
+* :ghissue:`5433`: Mango: document Nouveau index type.
+* :ghissue:`5433`: Nouveau: document Mango index type.
+* :ghissue:`5428`: Fix wrong link in example in ``CONTRIBUTING.md``.
+* :ghissue:`5400`: Clarify RHEL9 installation caveats.
+* :ghissue:`5380`, :ghissue:`5404`: Fix various typos.
+* :ghissue:`5338`: Clouseau: document version in ``/_version`` endpoint.
+* :ghissue:`5340`, :ghissue:`5412`: Nouveau: document search cleanup API.
+* :ghissue:`5316`, :ghissue:`5325`, :ghissue:`5426`, :ghissue:`5442`,
+  :ghissue:`5445`: Document various JavaScript engine incompatibilities,
+  including SpiderMonkey 1.8.5 vs. newer SpiderMonkey and SpiderMonkey vs.
+  QuickJS.
+* :ghissue:`5320`, :ghissue:`5374`: Improve auto-lockout feature documentation.
+* :ghissue:`5323`: Nouveau: improve install instructions.
+
+Tests
+_____
+
+* :ghissue:`5397`: Fix negative-steps error in Elixir tests.
+
+Builds
+------
+* :ghissue:`5360`: Use ``brew --prefix`` to find ICU paths on macOS.
+
 .. _release/3.4.2:
 
 Version 3.4.2
@@ -51,8 +143,8 @@ Features
 * :ghissue:`5294`: Return time spent waiting to update Nouveau index
   before query starts.
 
-Bufixes
--------
+Bugfixes
+--------
 * :ghissue:`5274`: Use normal Lucene syntax for unbounded ranges in
   Nouveau.
 * :ghissue:`5270`: Do not generate conflicts from the replicator
@@ -85,8 +177,8 @@ Highlights
 * :ghissue:`5255`: Set ``upgrade_hash_on_auth`` to ``false`` to disable
   automatic password hashing upgrades.
 
-Bufixes
--------
+Bugfixes
+--------
 
 * :ghissue:`5254`: Handle the case when the QuickJS scanner has no
   valid views.
