@@ -44,7 +44,7 @@ Highlights
   scenarios can lead to a starvation of the fd-owning Erlang process message
   inbox:
 
-    - 1000s concurrent read requests with a constant stream of writes per shard,
+    - 1000s of concurrent read requests with a constant stream of writes per shard,
       or:
     - a high latency storage devices like network block storage.
 
