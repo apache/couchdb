@@ -286,6 +286,6 @@ meck_from_to(From, To) ->
     end).
 
 meck_chans(Type, Channels) ->
-    meck:expect(config, get, fun("smoosh", T, _) when T =:= Type -> Channels end).
+    meck:expect(config, get, fun("smoosh", T) when T =:= Type -> Channels end).
 
 -endif.

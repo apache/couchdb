@@ -129,6 +129,12 @@ meta = [
     with_nouveau: false,
     with_clouseau: false,
     gnu_make: 'make'
+  ],
+
+  'win2022': [
+    name: 'Windows 2022',
+    spidermonkey_vsn: '128',
+    node_label: 'win'
   ]
 ]
 
@@ -165,47 +171,109 @@ def generateNativeStage(platform) {
     stage(platform) {
       node(platform) {
         timeout(time: 90, unit: "MINUTES") {
-          try {
-            // deleteDir is OK here because we're not inside of a Docker container!
-            deleteDir()
-            unstash 'tarball'
-            withEnv([
-              'HOME='+pwd(),
-              'PATH+USRLOCAL=/usr/local/bin',
-              'MAKE='+meta[platform].gnu_make
-            ]) {
-              sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
-              sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
-              dir( "${platform}/build" ) {
-                sh "${configure(meta[platform])}"
-                sh '$MAKE'
-                sh '$MAKE eunit'
-                sh '$MAKE elixir'
-                sh '$MAKE elixir-search'
-                sh '$MAKE mango-test'
-                sh '$MAKE weatherreport-test'
-                sh '$MAKE nouveau-test'
+          // Steps to configure and build CouchDB on *nix platforms
+          if (isUnix()) {
+            try {
+              // deleteDir is OK here because we're not inside of a Docker container!
+              deleteDir()
+              unstash 'tarball'
+              withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+              ]) {
+                sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
+                sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                dir( "${platform}/build" ) {
+                  sh "${configure(meta[platform])}"
+                  sh '$MAKE'
+                  sh '$MAKE eunit'
+                  sh '$MAKE elixir'
+                  sh '$MAKE elixir-search'
+                  sh '$MAKE mango-test'
+                  sh '$MAKE weatherreport-test'
+                  sh '$MAKE nouveau-test'
+                }
               }
             }
-          }
-          catch (err) {
-            sh 'ls -l ${WORKSPACE}'
-            withEnv([
-              'HOME='+pwd(),
-              'PATH+USRLOCAL=/usr/local/bin',
-              'MAKE='+meta[platform].gnu_make
-            ]) {
-              dir( "${platform}/build" ) {
-                sh 'ls -l'
-                sh '${MAKE} build-report'
+            catch (err) {
+              sh 'ls -l ${WORKSPACE}'
+              withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+              ]) {
+                dir( "${platform}/build" ) {
+                  sh 'ls -l'
+                  sh '${MAKE} build-report'
+                }
+              }
+              error("Build step failed with error: ${err.getMessage()}")
+            }
+            finally {
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+              sh 'killall -9 beam.smp || true'
+              sh 'rm -rf ${WORKSPACE}/*'
+            }
+          } else {
+            //steps to configure and build CouchDB on Windows platforms
+            stage("${meta[platform].name} - build & test") {
+              try {
+                // deleteDir is OK here because we're not inside of a Docker container!
+                deleteDir()
+                unstash 'tarball'
+                powershell( script: "git clone https://github.com/apache/couchdb-glazier", label: 'Cloning couchdb-glazier repository' )
+                powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
+                powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
+                dir( "${platform}/build" ) {
+                  powershell( script: """
+                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    .\\configure.ps1 -SkipDeps -WithNouveau -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                    make -f Makefile.win release
+                  """, label: 'Configure and Build')
+
+                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit", label: 'EUnit tests')
+                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir", label: 'Elixir tests')
+
+                  powershell( script: '& .\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win elixir-search"', label: 'N/A Clouseau tests')
+
+                  powershell( script: """
+                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                    make -f Makefile.win mango-test
+                  """, label: 'Mango tests')
+
+                  powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
+
+                  powershell( script: """
+                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                    make -f Makefile.win nouveau-test
+                  """, label: 'Nouveau tests')
+                }
+
+                powershell( script: """
+                    .\\couchdb-glazier\\bin\\shell.ps1
+                    .\\couchdb-glazier\\bin\\build_installer.ps1 -Path '${platform}/build' -IncludeGitSha -DisableICEChecks
+                """, label: 'Build Windows Installer file')
+
+                archiveArtifacts artifacts: '*.msi', fingerprint: true, onlyIfSuccessful: true
+              }
+              catch (err) {
+                powershell( script: "Get-ChildItem ${WORKSPACE}")
+                dir( "${platform}/build" ) {
+                  powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win build-report')
+                  powershell( script: 'Get-Content test-results.log')
+                }
+                error("Build step failed with error: ${err.getMessage()}")
+              }
+              finally {
+                powershell( script: 'Get-ChildItem')
+                powershell( script: "Remove-Item -Path '${WORKSPACE}\\*' -Force -Recurse -ErrorAction SilentlyContinue")
+                powershell( script: 'Get-ChildItem')
               }
             }
-            error("Build step failed with error: ${err.getMessage()}")
-          }
-          finally {
-            junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-            sh 'killall -9 beam.smp || true'
-            sh 'rm -rf ${WORKSPACE}/*'
           }
         }
       }

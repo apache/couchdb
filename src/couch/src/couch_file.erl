@@ -21,7 +21,6 @@
 -define(SIZE_BLOCK, 16#1000).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
--define(WRITE_XXHASH_CHECKSUMS_KEY, {?MODULE, write_xxhash_checksums}).
 -define(WRITE_XXHASH_CHECKSUMS_DEFAULT, false).
 
 -define(USE_CFILE_DEFAULT, true).
@@ -57,9 +56,6 @@
 
 %% helper functions
 -export([process_info/1]).
-
-% test helper functions
--export([reset_checksum_persistent_term_config/0]).
 
 %%----------------------------------------------------------------------
 %% Args:   Valid Options are [create] and [create,overwrite].
@@ -533,6 +529,16 @@ terminate(_Reason, #file{fd = Fd}) ->
 
 handle_call(close, _From, #file{fd = Fd} = File) ->
     {stop, normal, file:close(Fd), File#file{fd = nil}};
+handle_call({pread_iolist, Pos}, _From, File) ->
+    % Compatibility clause. Remove after upgrading to next release after 3.5.0
+    % Attachment streams may be opened from remote nodes during the upgrade on
+    % a mixed cluster
+    Result =
+        case pread(File, [Pos]) of
+            {ok, [{IoList, Checksum}]} -> {ok, IoList, Checksum};
+            Error -> Error
+        end,
+    {reply, Result, File};
 handle_call({pread_iolists, PosL}, _From, File) ->
     {reply, pread(File, PosL), File};
 handle_call(bytes, _From, #file{} = File) ->
@@ -563,22 +569,18 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
         Error ->
             {reply, Error, File}
     end;
-handle_call({append_bins, Bins}, _From, #file{fd = Fd, eof = Pos} = File) ->
-    {BlockResps, FinalPos} = lists:mapfoldl(
-        fun(Bin, PosAcc) ->
-            Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
-            Size = iolist_size(Blocks),
-            {{Blocks, {PosAcc, Size}}, PosAcc + Size}
-        end,
-        Pos,
-        Bins
-    ),
-    {AllBlocks, Resps} = lists:unzip(BlockResps),
-    case file:write(Fd, AllBlocks) of
-        ok ->
-            {reply, {ok, Resps}, File#file{eof = FinalPos}};
-        Error ->
-            {reply, Error, reset_eof(File)}
+handle_call({append_bin, Bin}, _From, #file{} = File) ->
+    % Compatibility clause. Remove after upgrading to next release after 3.5.0
+    % Attachment streams may be opened from remote nodes during the upgrade on
+    % a mixed cluster
+    case append_bins(File, [Bin]) of
+        {{ok, [{Pos, Len}]}, File1} -> {reply, {ok, Pos, Len}, File1};
+        {Error, File1} -> {reply, Error, File1}
+    end;
+handle_call({append_bins, Bins}, _From, #file{} = File) ->
+    case append_bins(File, Bins) of
+        {{ok, Resps}, File1} -> {reply, {ok, Resps}, File1};
+        {Error, File1} -> {reply, Error, File1}
     end;
 handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     BinSize = byte_size(Bin),
@@ -621,6 +623,22 @@ format_status(_Opt, [PDict, #file{} = File]) ->
 
 eof(#file{fd = Fd}) ->
     file:position(Fd, eof).
+
+append_bins(#file{fd = Fd, eof = Pos} = File, Bins) ->
+    {BlockResps, FinalPos} = lists:mapfoldl(
+        fun(Bin, PosAcc) ->
+            Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
+            Size = iolist_size(Blocks),
+            {{Blocks, {PosAcc, Size}}, PosAcc + Size}
+        end,
+        Pos,
+        Bins
+    ),
+    {AllBlocks, Resps} = lists:unzip(BlockResps),
+    case file:write(Fd, AllBlocks) of
+        ok -> {{ok, Resps}, File#file{eof = FinalPos}};
+        Error -> {Error, reset_eof(File)}
+    end.
 
 pread(#file{} = File, PosL) ->
     LocNums1 = [{Pos, 4} || Pos <- PosL],
@@ -937,28 +955,18 @@ legacy_checksums_stats_update() ->
         false -> ok
     end.
 
-reset_checksum_persistent_term_config() ->
-    persistent_term:erase(?WRITE_XXHASH_CHECKSUMS_KEY).
-
 generate_xxhash_checksums() ->
-    % Caching the config value here as we'd need to call this per file chunk
-    % and also from various processes (not just couch_file pids). Node must be
-    % restarted for the new value to take effect.
-    case persistent_term:get(?WRITE_XXHASH_CHECKSUMS_KEY, not_cached) of
-        not_cached ->
-            Default = ?WRITE_XXHASH_CHECKSUMS_DEFAULT,
-            Val = config:get_boolean("couchdb", "write_xxhash_checksums", Default),
-            persistent_term:put(?WRITE_XXHASH_CHECKSUMS_KEY, Val),
-            Val;
-        Val when is_boolean(Val) ->
-            Val
-    end.
+    Default = ?WRITE_XXHASH_CHECKSUMS_DEFAULT,
+    config:get_boolean("couchdb", "write_xxhash_checksums", Default).
 
 % couch_cfile handling
 %
 
 get_cfile(Pid) when is_pid(Pid) ->
-    case {is_process_alive(Pid), get(?CFILE_HANDLE)} of
+    % Pids could be remote when processing attachments and is_process_alive/1
+    % will throw an error then, so ensure a fallback for non-local processes
+    PidAliveAndLocal = node(Pid) =:= node() andalso is_process_alive(Pid),
+    case {PidAliveAndLocal, get(?CFILE_HANDLE)} of
         {false, _} ->
             erase(?CFILE_HANDLE),
             undefined;
