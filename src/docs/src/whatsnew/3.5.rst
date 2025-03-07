@@ -64,8 +64,8 @@ Highlights
   - read ``_all_docs`` with ``include_docs=true``: 25% more throughput
   - read ``_changes``: 4% more throughput
   - single document writes: 8% more throughput
-  - 2000x concurrent clients, random document reads on a 12 node cluster: 30% more
-    throughput
+  - 2000x concurrent clients, random document reads on a 12 node cluster: 30%
+    more throughput
   - concurrent constant document writes and concurrent single document reads on
     a single shard: 40% more throughput.
 
@@ -80,16 +80,15 @@ Highlights
 Performance
 -----------
 
-* :ghissue:`5417`: Fix ``atts_since`` functionality for document ``GET``
-  requests.
-  Avoids re-replicating attachment bodies on doc updates.
+* :ghissue:`5437`: Fix ``atts_since`` functionality for document ``GET``
+  requests. Avoids re-replicating attachment bodies on doc updates.
 * :ghissue:`5389`: Save 1 ``write`` for each committing data to disk by using
   ``fdatasync`` while keeping the same level of storage reliability.
 
 Features
 --------
 
-* :ghissue:`5429`: Nouveau: upgrade ``dropwizard`` to 4.0.12.
+* :ghissue:`5439`: Nouveau: upgrade ``dropwizard`` to 4.0.12.
 * :ghissue:`5429`: Add ``simple+pbkdf2`` migration password scheme.
 * :ghissue:`5424`: Scanner: reduce log noise, fix QuickJS plugin mocks,
   gracefully handle broken search indexes.
@@ -103,7 +102,7 @@ Features
 * :ghissue:`5385`: Clean up ``fabric_doc_update`` by introducing an ``#acc``
   record.
 * :ghissue:`5372`: Upgrade to Elixir 1.17.
-* :ghissue:`5338`: Clouseau: show version in ``/_version`` endpoint.
+* :ghissue:`5351`: Clouseau: show version in ``/_version`` endpoint.
 * :ghissue:`5338`: Scanner: add Nouveau and Clouseau design doc validation.
 * :ghissue:`5335`: Nouveau: support reading older Lucene 9x indexes.
 * :ghissue:`5327`, :ghissue:`5329`, :ghissue:`5419`: Allow switching JavaScript
@@ -169,4 +168,4 @@ Builds
 Other
 -----
 
-TODO Insert Closing
+There’s always IOPS in the banana stand.
