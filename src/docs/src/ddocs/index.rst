@@ -13,7 +13,7 @@
 .. _indexes:
 
 ================
-Design Documents
+Querying CouchDB
 ================
 
 CouchDB supports special documents within databases known as "design

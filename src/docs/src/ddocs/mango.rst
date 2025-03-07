@@ -221,24 +221,6 @@ Again, you can make the equality operator explicit.
         }
     }
 
-An example of the ``$eq`` operator used with full text indexing:
-
-.. code-block:: javascript
-
-    {
-      "selector": {
-        "year": {
-          "$eq": 2001
-        }
-      },
-      "sort": [
-        "title:string"
-      ],
-      "fields": [
-        "title"
-      ]
-    }
-
 An example of the ``$eq`` operator used with database indexed on the field ``"year"``:
 
 .. code-block:: javascript
