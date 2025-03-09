@@ -85,6 +85,7 @@ Bugfixes
 * :ghissue:`5332`: Skip deleted documents in the scanner.
 * :ghissue:`5331`: Skip validation for design docs in the scanner.
 * :ghissue:`5330`: Prevent inserting illegal design docs via Mango.
+* :ghissue:`5463`, :ghissue:`5453`: Fix Nouveau bookmark badarith error.
 
 Docs
 ----
@@ -102,6 +103,7 @@ Docs
   QuickJS.
 * :ghissue:`5320`, :ghissue:`5374`: Improve auto-lockout feature documentation.
 * :ghissue:`5323`: Nouveau: improve install instructions.
+* :ghissue:`5434`: Document use of Nouveau docker image
 
 Tests
 _____
