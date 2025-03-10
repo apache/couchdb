@@ -29,7 +29,10 @@
     :param db: Database name
     :<header Content-Type: :mimetype:`application/json`
     :>header Content-Type: - :mimetype:`application/json`
+
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Requested database not found
 
     **Request**:
@@ -203,7 +206,10 @@
     :>json number total_rows: Number of design documents in the database. Note
       that this is not the number of rows returned in the actual query.
     :>json number update_seq: Current update sequence for the database
+
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Requested database not found
 
     **Request**:
@@ -295,6 +301,8 @@
     The returned JSON is the all documents structure, but with only the
     selected keys in the output:
 
+    **Response**:
+
     .. code-block:: javascript
 
         {
@@ -356,101 +364,102 @@ Sending multiple queries to a database
 
     :code 200: Request completed successfully
     :code 400: Invalid request
-    :code 401: Read permission required
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database is missing
     :code 500: Query execution error
 
-**Request**:
+    **Request**:
 
-.. code-block:: http
+    .. code-block:: http
 
-    POST /db/_all_docs/queries HTTP/1.1
-    Content-Type: application/json
-    Accept: application/json
-    Host: localhost:5984
+        POST /db/_all_docs/queries HTTP/1.1
+        Content-Type: application/json
+        Accept: application/json
+        Host: localhost:5984
 
-    {
-        "queries": [
-            {
-                "keys": [
-                    "meatballs",
-                    "spaghetti"
-                ]
-            },
-            {
-                "limit": 3,
-                "skip": 2
-            }
-        ]
-    }
+        {
+            "queries": [
+                {
+                    "keys": [
+                        "meatballs",
+                        "spaghetti"
+                    ]
+                },
+                {
+                    "limit": 3,
+                    "skip": 2
+                }
+            ]
+        }
 
-**Response**:
+    **Response**:
 
-.. code-block:: http
+    .. code-block:: http
 
-    HTTP/1.1 200 OK
-    Cache-Control: must-revalidate
-    Content-Type: application/json
-    Date: Wed, 20 Dec 2017 11:17:07 GMT
-    ETag: "1H8RGBCK3ABY6ACDM7ZSC30QK"
-    Server: CouchDB (Erlang/OTP)
-    Transfer-Encoding: chunked
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Type: application/json
+        Date: Wed, 20 Dec 2017 11:17:07 GMT
+        ETag: "1H8RGBCK3ABY6ACDM7ZSC30QK"
+        Server: CouchDB (Erlang/OTP)
+        Transfer-Encoding: chunked
 
-    {
-        "results" : [
-            {
-                "rows": [
-                    {
-                        "id": "meatballs",
-                        "key": "meatballs",
-                        "value": 1
-                    },
-                    {
-                        "id": "spaghetti",
-                        "key": "spaghetti",
-                        "value": 1
-                    }
-                ],
-                "total_rows": 3
-            },
-            {
-                "offset" : 2,
-                "rows" : [
-                    {
-                        "id" : "Adukiandorangecasserole-microwave",
-                        "key" : "Aduki and orange casserole - microwave",
-                        "value" : [
-                            null,
-                            "Aduki and orange casserole - microwave"
-                        ]
-                    },
-                    {
-                        "id" : "Aioli-garlicmayonnaise",
-                        "key" : "Aioli - garlic mayonnaise",
-                        "value" : [
-                            null,
-                            "Aioli - garlic mayonnaise"
-                        ]
-                    },
-                    {
-                        "id" : "Alabamapeanutchicken",
-                        "key" : "Alabama peanut chicken",
-                        "value" : [
-                            null,
-                            "Alabama peanut chicken"
-                        ]
-                    }
-                ],
-                "total_rows" : 2667
-            }
-        ]
-    }
+        {
+            "results" : [
+                {
+                    "rows": [
+                        {
+                            "id": "meatballs",
+                            "key": "meatballs",
+                            "value": 1
+                        },
+                        {
+                            "id": "spaghetti",
+                            "key": "spaghetti",
+                            "value": 1
+                        }
+                    ],
+                    "total_rows": 3
+                },
+                {
+                    "offset" : 2,
+                    "rows" : [
+                        {
+                            "id" : "Adukiandorangecasserole-microwave",
+                            "key" : "Aduki and orange casserole - microwave",
+                            "value" : [
+                                null,
+                                "Aduki and orange casserole - microwave"
+                            ]
+                        },
+                        {
+                            "id" : "Aioli-garlicmayonnaise",
+                            "key" : "Aioli - garlic mayonnaise",
+                            "value" : [
+                                null,
+                                "Aioli - garlic mayonnaise"
+                            ]
+                        },
+                        {
+                            "id" : "Alabamapeanutchicken",
+                            "key" : "Alabama peanut chicken",
+                            "value" : [
+                                null,
+                                "Alabama peanut chicken"
+                            ]
+                        }
+                    ],
+                    "total_rows" : 2667
+                }
+            ]
+        }
 
-.. Note::
-    The multiple queries are also supported in
-    :ref:`/{db}/_local_docs/queries <api/db/_local_docs/queries>` and
-    :ref:`/{db}/_design_docs/queries <api/db/_design_docs/queries>`
-    (similar to :ref:`/{db}/_all_docs/queries <api/db/_all_docs/queries>`).
+    .. Note::
+        The multiple queries are also supported in
+        :ref:`/{db}/_local_docs/queries <api/db/_local_docs/queries>` and
+        :ref:`/{db}/_design_docs/queries <api/db/_design_docs/queries>`
+        (similar to :ref:`/{db}/_all_docs/queries <api/db/_all_docs/queries>`).
 
 .. _api/db/_design_docs/queries:
 
@@ -485,69 +494,70 @@ Sending multiple queries to a database
 
     :code 200: Request completed successfully
     :code 400: Invalid request
-    :code 401: Read permission required
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database is missing
     :code 500: Query execution error
 
-**Request**:
+    **Request**:
 
-.. code-block:: http
+    .. code-block:: http
 
-    POST /db/_design_docs/queries HTTP/1.1
-    Content-Type: application/json
-    Accept: application/json
-    Host: localhost:5984
+        POST /db/_design_docs/queries HTTP/1.1
+        Content-Type: application/json
+        Accept: application/json
+        Host: localhost:5984
 
-    {
-        "queries": [
-            {
-                "keys": [
-                    "_design/recipe",
-                    "_design/not-exist",
-                    "spaghetti"
-                ]
-            }
-        ]
-    }
+        {
+            "queries": [
+                {
+                    "keys": [
+                        "_design/recipe",
+                        "_design/not-exist",
+                        "spaghetti"
+                    ]
+                }
+            ]
+        }
 
-**Response**:
+    **Response**:
 
-.. code-block:: http
+    .. code-block:: http
 
-    HTTP/1.1 200 OK
-    Cache-Control: must-revalidate
-    Content-Type: application/json
-    Date: Thu, 20 Jul 2023 20:06:44 GMT
-    Server: CouchDB (Erlang/OTP)
-    Transfer-Encoding: chunked
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Type: application/json
+        Date: Thu, 20 Jul 2023 20:06:44 GMT
+        Server: CouchDB (Erlang/OTP)
+        Transfer-Encoding: chunked
 
-    {
-        "results": [
-            {
-                "total_rows": 1,
-                "offset": null,
-                "rows": [
-                    {
-                        "id": "_design/recipe",
-                        "key": "_design/recipe",
-                        "value": {
-                            "rev": "1-ad0e29fe6b473658514742a7c2317766"
+        {
+            "results": [
+                {
+                    "total_rows": 1,
+                    "offset": null,
+                    "rows": [
+                        {
+                            "id": "_design/recipe",
+                            "key": "_design/recipe",
+                            "value": {
+                                "rev": "1-ad0e29fe6b473658514742a7c2317766"
+                            }
+                        },
+                        {
+                            "key": "_design/not-exist",
+                            "error": "not_found"
                         }
-                    },
-                    {
-                        "key": "_design/not-exist",
-                        "error": "not_found"
-                    }
-                ]
-            }
-        ]
-    }
+                    ]
+                }
+            ]
+        }
 
-.. Note::
-    /{db}/_design_docs/queries with keys will only return design documents,
-    or ``"error": "not_found"`` if the design document doesn't exist. If
-    ``key`` is not a design document id, it will not be included in the
-    response.
+    .. Note::
+        /{db}/_design_docs/queries with keys will only return design documents,
+        or ``"error": "not_found"`` if the design document doesn't exist. If
+        ``key`` is not a design document id, it will not be included in the
+        response.
 
 .. _api/db/bulk_get:
 
@@ -578,9 +588,11 @@ Sending multiple queries to a database
       value describing the error, or ``ok`` key and associated value of the
       requested document, with the additional ``_revisions`` property that lists
       the parent revisions if ``revs=true``.
+
     :code 200: Request completed successfully
     :code 400: The request provided invalid JSON data or invalid query parameter
-    :code 401: Read permission required
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Invalid database name
     :code 415: Bad :header:`Content-Type` value
 
@@ -788,8 +800,11 @@ Sending multiple queries to a database
       if document has saved without errors. *Optional*
     :>jsonarr string error: Error type. *Optional*
     :>jsonarr string reason: Error reason. *Optional*
+
     :code 201: Document(s) have been created or updated
     :code 400: The request provided invalid JSON data
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Requested database not found
 
     **Request**:
@@ -1030,25 +1045,25 @@ supplying the new ``_rev`` parameter indicating a new document revision was
 created. If the update failed, you will get an ``error`` of type ``conflict``.
 For example:
 
-   .. code-block:: javascript
+.. code-block:: javascript
 
-       [
-           {
-               "id" : "FishStew",
-               "error" : "conflict",
-               "reason" : "Document update conflict."
-           },
-           {
-               "id" : "LambStew",
-               "error" : "conflict",
-               "reason" : "Document update conflict."
-           },
-           {
-               "id" : "BeefStew",
-               "error" : "conflict",
-               "reason" : "Document update conflict."
-           }
-       ]
+   [
+       {
+           "id" : "FishStew",
+           "error" : "conflict",
+           "reason" : "Document update conflict."
+       },
+       {
+           "id" : "LambStew",
+           "error" : "conflict",
+           "reason" : "Document update conflict."
+       },
+       {
+           "id" : "BeefStew",
+           "error" : "conflict",
+           "reason" : "Document update conflict."
+       }
+   ]
 
 In this case no new revision has been created and you will need to submit the
 document update, with the correct revision tag, to update the document.

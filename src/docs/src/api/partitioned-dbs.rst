@@ -33,7 +33,12 @@ See the guide for
     It includes document and deleted document counts along with external
     and active data sizes.
 
+    :param db: Database name
+    :param partition_id: Name of the partition to query
+
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -71,9 +76,6 @@ See the guide for
 .. http:get:: /{db}/_partition/{partition_id}/_all_docs
     :synopsis: Return all docs in the specified partition
 
-    :param db: Database name
-    :param partition_id: Partition name
-
     This endpoint is a convenience endpoint for automatically setting
     bounds on the provided partition range. Similar results can be had
     by using the global ``/db/_all_docs`` endpoint with appropriately
@@ -82,6 +84,13 @@ See the guide for
     Refer to the :ref:`view endpoint <api/ddoc/view>` documentation for
     a complete description of the available query parameters and the format
     of the returned data.
+
+    :param db: Database name
+    :param partition_id: Partition name
+
+    :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -125,11 +134,6 @@ See the guide for
 .. http:get:: /{db}/_partition/{partition_id}/_design/{ddoc}/_view/{view}
     :synopsis: Execute a partitioned query
 
-    :param db: Database name
-    :param partition_id: Partition name
-    :param ddoc: Design document id
-    :param view: View name
-
     This endpoint is responsible for executing a partitioned query. The
     returned view result will only contain rows with the specified
     partition name.
@@ -137,6 +141,15 @@ See the guide for
     Refer to the :ref:`view endpoint <api/ddoc/view>` documentation for
     a complete description of the available query parameters and the format
     of the returned data.
+
+    :param db: Database name
+    :param partition_id: Partition name
+    :param ddoc: Design document id
+    :param view: View name
+
+    :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     .. code-block:: http
 
@@ -202,9 +215,6 @@ See the guide for
 .. http:post:: /{db}/_partition/{partition_id}/_find
     :synopsis: Query the partition specified by ``partition_id``
 
-    :param db: Database name
-    :param partition id: Name of the partition to query
-
     This endpoint is responsible for finding a partition query by its ID.
     The returned view result will only contain rows with the
     specified partition id.
@@ -213,6 +223,14 @@ See the guide for
     documentation for a complete description of the
     available parameters and the format
     of the returned data.
+
+    :param db: Database name
+    :param partition_id: Name of the partition to query
+
+    :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
+
 .. _api/partitioned/explain:
 
 ``/{db}/_partition/{partition_id}/_explain``
@@ -221,11 +239,15 @@ See the guide for
 .. http:post:: /{db}/_partition/{partition_id}/_explain
     :synopsis: Find index that is used with a query
 
-    :param db: Database name
-    :partition id: Name of the partition to query
-
     This endpoint shows which index is being used by the query.
 
     Refer to the :ref:`explain endpoint <api/db/find/explain>`
     documentation for a complete description of the available
     parameters and the format of the returned data.
+
+    :param db: Database name
+    :param partition_id: Name of the partition to query
+
+    :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
