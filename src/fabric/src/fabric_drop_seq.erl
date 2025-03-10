@@ -6,74 +6,70 @@
 
 -export([go/1]).
 
+-type range() :: [non_neg_integer()].
+
+-type uuid() :: binary().
+
+-type seq() :: non_neg_integer().
+
+-type peer_checkpoints() :: #{{range(), Node :: node()} => {Uuid :: uuid(), Seq :: seq()}}.
+
+-type history_item() :: {
+    SourceUuid :: uuid(), SourceSeq :: seq(), TargetUuid :: uuid(), TargetSeq :: seq()
+}.
+
+-type shard_sync_history() :: #{
+    {Range :: range(), SourceNode :: node(), TargetNode :: node()} => [history_item()]
+}.
+
 go(DbName) ->
-    Shards = mem3:shards(DbName),
-    RangeToNodes = range_to_nodes(Shards),
+    {PeerCheckpoints0, ShardSyncHistory} = parse_local_docs(DbName),
+    ShardSyncCheckpoints = latest_shard_sync_checkpoints(ShardSyncHistory),
+    PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
+    #{peercheckpoints => PeerCheckpoints0, shardsync => ShardSyncHistory, result => crossref(PeerCheckpoints1, ShardSyncHistory)}.
 
-    {ok, {PeerCheckpoints, ShardSyncHistory}} = parse_local_docs(DbName),
-
-    SyncFloor = maps:fold(
-        fun({Range, _SrcNode, TgtNode}, History, Acc) ->
-            {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq} = hd(History),
-            maps:update_with(
-                {Range, TgtNode}, fun({Uuid, Seq}) -> {Uuid, Seq} end, {TargetUuid, TargetSeq}, Acc
-            )
-        end,
-        #{},
-        ShardSyncHistory
-    ),
-
-    Expanded = maps:fold(
-        fun({Range, SrcNode}, {Uuid, Seq}, Acc1) ->
-            OtherNodes = maps:get(Range, RangeToNodes, []) -- [SrcNode],
-            lists:foldl(
-                fun(TgtNode, Acc2) ->
-                    History = maps:get({Range, SrcNode, TgtNode}, ShardSyncHistory, []),
+crossref(PeerCheckpoints0, ShardSyncHistory) ->
+    PeerCheckpoints1 = maps:fold(
+        fun({Range, Node}, {Uuid, Seq}, Acc1) ->
+            Others = maps:filter(fun({R, _S, T}, _V) -> R == Range andalso T /= Node end, ShardSyncHistory),
+            maps:fold(
+                fun({R, S, T}, H, Acc2) ->
                     case
                         lists:search(
-                            fun({SourceUuid, SourceSeq, _TargetUuid, _TargetSeq}) ->
-                                Uuid == SourceUuid andalso SourceSeq =< Seq
-                            end,
-                            History
+                            fun({SU, SS, _TU, _TS}) -> Uuid == SU andalso SS =< Seq end,
+                            H
                         )
                     of
-                        {value, {_SourceUuid, _SourceSeq, TargetUuid, TargetSeq}} ->
-                            maps:update_with(
-                                {Range, TgtNode},
-                                fun({U, S}) when U == TargetUuid ->
-                                    case maps:find({Range, TgtNode}, SyncFloor) of
-                                        error ->
-                                            {U, min(TargetSeq, S)};
-                                        {ok, Floor} ->
-                                            {U, max(Floor, min(TargetSeq, S))}
-                                    end
-                                end,
-                                {TargetUuid, TargetSeq},
-                                Acc2
-                            );
+                        {value, {_SU, _SS, TU, TS}} ->
+                            maps:merge_with(fun merge_peers/3, #{{R, T} => {TU, TS}}, Acc2);
                         false ->
                             Acc2
                     end
                 end,
-                Acc1,
-                OtherNodes
+              Acc1,
+                Others
             )
         end,
-        PeerCheckpoints,
-        PeerCheckpoints
+        PeerCheckpoints0,
+        PeerCheckpoints0
     ),
 
-    Workers = lists:map(
-        fun(#shard{} = Shard) ->
-            {Shard, maps:get({Shard#shard.range, Shard#shard.node}, Expanded, undefined)}
-        end,
-        Shards
-    ),
+    %% mem3 sync is not hub-spoke, each iteration of crossref will add
+    %% some crossreferences. we call it again if the map changes as new
+    %% crossreferences may be possible.
+    if
+        PeerCheckpoints0 == PeerCheckpoints1 ->
+            PeerCheckpoints1;
+        true ->
+            crossref(PeerCheckpoints1, ShardSyncHistory)
+    end.
 
-    Workers.
-
+-spec parse_local_docs(DbName :: binary()) -> {peer_checkpoints(), shard_sync_history()}.
 parse_local_docs(DbName) ->
-    fabric:all_docs(DbName, fun parse_local_docs_cb/2, {#{}, #{}}, all_docs_mrargs()).
+    {ok, Result} = fabric:all_docs(
+        DbName, fun parse_local_docs_cb/2, {#{}, #{}}, all_docs_mrargs()
+    ),
+    Result.
 
 parse_local_docs_cb({row, Row}, Acc) ->
     case lists:keyfind(doc, 1, Row) of
@@ -94,6 +90,7 @@ parse_local_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
         DbName ->
             Range = mem3:range(DbName),
             {[{_SrcNode, History}]} = couch_util:get_value(<<"history">>, Props),
+            {PeerCheckpoints, ShardSyncHistory0} = Acc,
             KeyFun = fun({Item}) ->
                 {Range, binary_to_existing_atom(couch_util:get_value(<<"source_node">>, Item)),
                     binary_to_existing_atom(couch_util:get_value(<<"target_node">>, Item))}
@@ -106,7 +103,7 @@ parse_local_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
                     couch_util:get_value(<<"target_seq">>, Item)
                 }
             end,
-            {PeerCheckpoints, ShardSyncHistory0} = Acc,
+
             ShardSyncHistory1 = maps:merge(
                 maps:groups_from_list(KeyFun, ValueFun, History), ShardSyncHistory0
             ),
@@ -126,15 +123,6 @@ parse_local_doc(#doc{id = <<"_local/peer-checkpoint-", _/binary>>} = Doc, Acc) -
     end;
 parse_local_doc(_Doc, Acc) ->
     {ok, Acc}.
-
-range_to_nodes(Shards) ->
-    maps:groups_from_list(fun range/1, fun node/1, Shards).
-
-range(Shard) ->
-    Shard#shard.range.
-
-node(Shard) ->
-    Shard#shard.node.
 
 merge_peers(_Key, {Uuid, Val1}, {Uuid, Val2}) when is_integer(Val1), is_integer(Val2) ->
     {Uuid, min(Val1, Val2)}.
@@ -170,3 +158,13 @@ all_docs_mrargs() ->
             {namespace, <<"_local">>}
         ]
     }.
+
+latest_shard_sync_checkpoints(ShardSyncHistory) ->
+    maps:fold(
+        fun({R, _SN, TN}, History, Acc) ->
+            {_, _, TU, TS} = hd(History),
+            maps:merge_with(fun merge_peers/3, #{{R, TN} => {TU, TS}}, Acc)
+        end,
+        #{},
+        ShardSyncHistory
+    ).
