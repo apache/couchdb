@@ -318,7 +318,9 @@ send_if_enabled(Url, Header, Method, Body) ->
 send_if_enabled(Url, Header, Method, Body, Options) ->
     case nouveau:enabled() of
         true ->
-            ibrowse:send_req(Url, Header, Method, Body, Options);
+            retry_if_connection_closes(fun() ->
+                ibrowse:send_req(Url, Header, Method, Body, Options)
+            end);
         false ->
             {error, nouveau_not_enabled}
     end.
@@ -326,7 +328,24 @@ send_if_enabled(Url, Header, Method, Body, Options) ->
 send_direct_if_enabled(ConnPid, Url, Header, Method, Body, Options) ->
     case nouveau:enabled() of
         true ->
-            ibrowse:send_req_direct(ConnPid, Url, Header, Method, Body, Options);
+            retry_if_connection_closes(fun() ->
+                ibrowse:send_req_direct(ConnPid, Url, Header, Method, Body, Options)
+            end);
         false ->
             {error, nouveau_not_enabled}
+    end.
+
+retry_if_connection_closes(Fun) ->
+    MaxRetries = max(1, config:get_integer("nouveau", "max_retries", 5)),
+    retry_if_connection_closes(Fun, MaxRetries).
+
+retry_if_connection_closes(_Fun, 0) ->
+    {error, connection_closed};
+retry_if_connection_closes(Fun, N) when is_integer(N), N > 0 ->
+    case Fun() of
+        {error, connection_closed} ->
+            timer:sleep(1000),
+            retry_if_connection_closes(Fun, N - 1);
+        Else ->
+            Else
     end.
