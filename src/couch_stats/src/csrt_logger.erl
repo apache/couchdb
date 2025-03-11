@@ -173,9 +173,13 @@ find_matches(RContexts, Matchers) when is_list(RContexts) andalso is_map(Matcher
 get_matchers() ->
     persistent_term:get(?MATCHERS_KEY, #{}).
 
+is_match(undefined) ->
+    false;
 is_match(#rctx{}=Rctx) ->
     is_match(Rctx, get_matchers()).
 
+is_match(undefined, _Matchers) ->
+    false;
 is_match(#rctx{}=Rctx, Matchers) when is_map(Matchers) ->
     maps:size(find_matches([Rctx], Matchers)) > 0.
 

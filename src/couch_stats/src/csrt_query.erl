@@ -12,6 +12,7 @@
 
 -module(csrt_query).
 
+-include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
 
 %% aggregate query api
@@ -73,16 +74,20 @@ select_by_type(all) ->
     ets:tab2list(?MODULE).
 
 find_by_nonce(Nonce) ->
-    ets:match_object(?MODULE, ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
+    %%ets:match_object(?MODULE, ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
+    [R || R <- ets:match_object(?MODULE, #rctx{nonce=Nonce})].
 
 find_by_pid(Pid) ->
-    [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
+    %%[R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
+    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}})].
 
 find_by_pidref(PidRef) ->
-    [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef, _ = '_'})].
+    %%[R || R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef, _ = '_'})].
+    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef})].
 
 find_workers_by_pidref(PidRef) ->
-    [R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}, _ = '_'})].
+    %%[R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}, _ = '_'})].
+    [R || R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}})].
 
 field(#rctx{pid_ref=Val}, pid_ref) -> Val;
 %% NOTE: Pros and cons to doing these convert functions here

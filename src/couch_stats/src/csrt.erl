@@ -88,24 +88,30 @@
 %% PidRef operations
 %%
 
+-spec get_pid_ref() -> maybe_pid_ref().
 get_pid_ref() ->
     get(?PID_REF).
 
+-spec get_pid_ref(Rctx :: rctx()) -> pid_ref().
 get_pid_ref(#rctx{pid_ref=PidRef}) ->
     PidRef.
 
+-spec set_pid_ref(PidRef :: pid_ref()) -> pid_ref().
 set_pid_ref(PidRef) ->
     erlang:put(?PID_REF, PidRef),
     PidRef.
 
+-spec create_pid_ref() -> pid_ref().
 create_pid_ref() ->
     csrt_server:create_pid_ref().
 
+-spec destroy_pid_ref() -> maybe_pid_ref().
 destroy_pid_ref() ->
     destroy_pid_ref(get_pid_ref()).
 
 %%destroy_pid_ref(undefined) ->
 %%    undefined;
+-spec destroy_pid_ref(PidRef :: maybe_pid_ref()) -> maybe_pid_ref().
 destroy_pid_ref(_PidRef) ->
     erase(?PID_REF).
 
@@ -118,6 +124,8 @@ destroy_pid_ref(_PidRef) ->
 %% create_resource(#rctx{} = Rctx) ->
 %%     csrt_server:create_resource(Rctx).
 
+-spec create_worker_context(From, MFA, Nonce) -> pid_ref() | false when
+    From :: pid_ref(), MFA :: mfa(), Nonce :: term().
 create_worker_context(From, {M,F,_A}, Nonce) ->
     case is_enabled() of
         true ->
@@ -127,6 +135,8 @@ create_worker_context(From, {M,F,_A}, Nonce) ->
             false
     end.
 
+-spec create_coordinator_context(Httpd , Path) -> pid_ref() | false when
+    Httpd :: #httpd{}, Path :: list().
 create_coordinator_context(#httpd{method=Verb, nonce=Nonce}, Path0) ->
     case is_enabled() of
         true ->
@@ -137,6 +147,7 @@ create_coordinator_context(#httpd{method=Verb, nonce=Nonce}, Path0) ->
             false
     end.
 
+-spec create_context(Type :: rctx_type(), Nonce :: term()) -> pid_ref().
 create_context(Type, Nonce) ->
     Rctx = csrt_server:new_context(Type, Nonce),
     %% TODO: which approach
@@ -148,18 +159,22 @@ create_context(Type, Nonce) ->
     csrt_logger:track(Rctx),
     PidRef.
 
+-spec set_context_dbname(DbName :: binary()) -> boolean().
 set_context_dbname(DbName) ->
     set_context_dbname(DbName, get_pid_ref()).
 
+-spec set_context_dbname(DbName, PidRef) -> boolean() when
+    DbName :: binary(), PidRef :: pid_ref() | undefined.
 set_context_dbname(_, undefined) ->
-    ok;
+    false;
 set_context_dbname(DbName, PidRef) ->
     is_enabled() andalso csrt_server:set_context_dbname(DbName, PidRef).
 
+-spec set_context_handler_fun(Fun :: function()) -> boolean().
 set_context_handler_fun(Fun) when is_function(Fun) ->
     case is_enabled() of
         false ->
-            ok;
+            false;
         true ->
             FProps = erlang:fun_info(Fun),
             Mod = proplists:get_value(module, FProps),
@@ -167,17 +182,20 @@ set_context_handler_fun(Fun) when is_function(Fun) ->
             update_handler_fun(Mod, Func, get_pid_ref())
     end.
 
+-spec set_context_handler_fun(Mod :: atom(), Func :: atom()) -> boolean().
 set_context_handler_fun(Mod, Func)
         when is_atom(Mod) andalso is_atom(Func)  ->
     case is_enabled() of
         false ->
-            ok;
+            false;
         true ->
             update_handler_fun(Mod, Func, get_pid_ref())
     end.
 
+-spec update_handler_fun(Mod, Func, PidRef) -> boolean() when
+    Mod :: atom(), Func :: atom(), PidRef :: maybe_pid_ref().
 update_handler_fun(_, _, undefined) ->
-    ok;
+    false;
 update_handler_fun(Mod, Func, PidRef) ->
     Rctx = get_resource(PidRef),
     %% TODO: #coordinator{} assumption needs to adapt for other types
@@ -186,17 +204,17 @@ update_handler_fun(Mod, Func, PidRef) ->
     csrt_server:set_context_type(Coordinator, PidRef),
     ok.
 
-set_context_username(null) ->
-    ok;
-set_context_username(undefined) ->
-    ok;
+%% @equiv set_context_username(User, get_pid_ref())
 set_context_username(User) ->
     set_context_username(User, get_pid_ref()).
 
+-spec set_context_username(User, PidRef) -> boolean() when
+    User :: null | undefined | #httpd{} | #user_ctx{} | binary(),
+    PidRef :: maybe_pid_ref().
 set_context_username(null, _) ->
-    ok;
+    false;
 set_context_username(_, undefined) ->
-    ok;
+    false;
 set_context_username(#httpd{user_ctx = Ctx}, PidRef) ->
     set_context_username(Ctx, PidRef);
 set_context_username(#user_ctx{name = Name}, PidRef) ->
@@ -204,9 +222,11 @@ set_context_username(#user_ctx{name = Name}, PidRef) ->
 set_context_username(UserName, PidRef) ->
     is_enabled() andalso csrt_server:set_context_username(UserName, PidRef).
 
+-spec destroy_context() -> ok.
 destroy_context() ->
     destroy_context(get_pid_ref()).
 
+-spec destroy_context(PidRef :: maybe_pid_ref()) -> ok.
 destroy_context(undefined) ->
     ok;
 destroy_context({_, _} = PidRef) ->
@@ -218,39 +238,43 @@ destroy_context({_, _} = PidRef) ->
 %% Public API
 %%
 
+%% @equiv csrt_util:is_enabled().
+-spec is_enabled() -> boolean().
 is_enabled() ->
     csrt_util:is_enabled().
 
+-spec get_resource() -> maybe_rctx().
 get_resource() ->
     get_resource(get_pid_ref()).
 
+-spec get_resource(PidRef :: maybe_pid_ref()) -> maybe_rctx().
 get_resource(PidRef) ->
     csrt_server:get_resource(PidRef).
 
 %% Log a CSRT report if any filters match
+-spec maybe_report(ReportName :: string(), PidRef :: pid_ref()) -> ok.
 maybe_report(ReportName, PidRef) ->
     csrt_logger:maybe_report(ReportName, PidRef).
 
 %% Direct report logic skipping should log filters
+-spec do_report(ReportName :: string(), PidRef :: pid_ref()) -> boolean().
 do_report(ReportName, PidRef) ->
-    csrt_logger:do_report(ReportName, PidRef).
+    csrt_logger:do_report(ReportName, get_resource(PidRef)).
 
 %%
 %% Stat collection API
 %%
 
+-spec inc(Key :: rctx_field()) -> non_neg_integer().
 inc(Key) ->
-    inc(Key, 1).
+    is_enabled() andalso csrt_server:inc(get_pid_ref(), Key).
 
-inc(Key, N) ->
-    case maps:is_key(Key, ?KEYS_TO_FIELDS) of
-        true ->
-            update_counter(maps:get(Key, ?KEYS_TO_FIELDS), N);
-        false ->
-            0
-    end.
+-spec inc(Key :: rctx_field(), N :: non_neg_integer()) -> non_neg_integer().
+inc(Key, N) when is_integer(N) andalso N >= 0 ->
+    is_enabled() andalso csrt_server:inc(get_pid_ref(), Key, N).
 
 
+-spec maybe_inc(Stat :: atom(), Val :: non_neg_integer()) -> non_neg_integer().
 maybe_inc(Stat, Val) ->
     case maps:is_key(Stat, ?STATS_TO_KEYS) of
         true ->
@@ -260,6 +284,7 @@ maybe_inc(Stat, Val) ->
     end.
 
 %% TODO: update stats_descriptions.cfg for relevant apps
+-spec should_track(Stat :: [atom()]) -> boolean().
 should_track([fabric_rpc, all_docs, spawned]) ->
     is_enabled();
 should_track([fabric_rpc, changes, spawned]) ->
@@ -288,19 +313,23 @@ should_track(_Metric) ->
     %%io:format("SKIPPING METRIC: ~p~n", [Metric]),
     false.
 
+-spec ioq_called() -> non_neg_integer().
 ioq_called() ->
     inc(ioq_calls).
 
 docs_written(N) ->
     inc(docs_written, N).
 
+-spec accumulate_delta(Delta :: map() | undefined) -> ok.
 accumulate_delta(Delta) when is_map(Delta) ->
     %% TODO: switch to creating a batch of updates to invoke a single
     %% update_counter rather than sequentially invoking it for each field
-    is_enabled() andalso maps:foreach(fun inc/2, Delta);
+    is_enabled() andalso maps:foreach(fun inc/2, Delta),
+    ok;
 accumulate_delta(undefined) ->
     ok.
 
+-spec make_delta() -> map().
 make_delta() ->
     TA = case get(?DELTA_TA) of
         undefined ->
@@ -357,6 +386,7 @@ make_delta() ->
     set_delta_a(TB),
     Delta.
 
+-spec make_delta(TA :: Rctx, TB :: Rctx) -> map().
 make_delta(#rctx{}=TA, #rctx{}=TB) ->
     Delta = #{
         docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
@@ -375,35 +405,50 @@ make_delta(#rctx{}=TA, #rctx{}=TB) ->
     %% Only return non zero (and also positive) delta fields
     maps:filter(fun(_K,V) -> V > 0 end, Delta);
 make_delta(_, #rctx{}) ->
-    #{error => missing_beg_rctx};
+    %%#{error => missing_beg_rctx};
+    undefined;
 make_delta(#rctx{}, _) ->
-    #{error => missing_fin_rctx}.
+    %%#{error => missing_fin_rctx}.
+    undefined.
 
-%% TODO: what to do when PidRef=undefined?
+-spec make_delta_base() -> rctx().
+make_delta_base() ->
+    make_delta_base(get_pid_ref()).
+
+%% TODO: figure this out, maybe not necessary now?
+%% ** TODO: what to do when PidRef=undefined?
+-spec make_delta_base(PidRef :: pid_ref()) -> rctx().
 make_delta_base(PidRef) ->
     %% TODO: extract user_ctx and db/shard from request
     Now = csrt_util:tnow(),
     #rctx{
         pid_ref = PidRef,
         %% TODO: confirm this subtraction works
+        %% TODO: drop this now that make_dt returns 1
         started_at = Now - 100, %% give us 100ms rewind time for missing T0
         updated_at = Now
     }.
 
-make_delta_base() ->
-    make_delta_base(get_pid_ref()).
-
+-spec set_delta_a(TA :: rctx()) -> maybe_rctx().
 set_delta_a(TA) ->
     erlang:put(?DELTA_TA, TA).
 
-update_counter(Field, Count) ->
-    is_enabled() andalso csrt_server:update_counter(get_pid_ref(), Field, Count).
+
+%% TODO: cleanup return type
+%%-spec update_counter(Field :: rctx_field(), Count :: non_neg_integer()) -> false | ok.
+%%-spec update_counter(Field :: non_neg_integer(), Count :: non_neg_integer()) -> false | ok.
+%%update_counter(_Field, Count) when Count < 0 ->
+%%    false;
+%%update_counter(Field, Count) when Count >= 0 ->
+%%    is_enabled() andalso csrt_server:update_counter(get_pid_ref(), Field, Count).
 
 
+-spec conf_get(Key :: string()) -> string().
 conf_get(Key) ->
     csrt_util:conf_get(Key).
 
 
+-spec conf_get(Key :: string(), Default :: string()) -> string().
 conf_get(Key, Default) ->
     csrt_util:conf_get(Key, Default).
 
@@ -411,24 +456,34 @@ conf_get(Key, Default) ->
 %% aggregate query api
 %%
 
+-spec active() -> [rctx()].
 active() ->
     csrt_query:active().
 
+%% TODO: ensure Type fields align with type specs
+%%-spec active(Type :: rctx_type()) -> [rctx()].
+-spec active(Type :: json) -> [rctx()].
 active(Type) ->
     csrt_query:active(Type).
 
+-spec active_coordinators() -> [coordinator_rctx()].
 active_coordinators() ->
     csrt_query:active_coordinators().
 
+%% TODO: cleanup json logic here
+-spec active_coordinators(Type :: json) -> [coordinator_rctx()].
 active_coordinators(Type) ->
     csrt_query:active_coordinators(Type).
 
+-spec active_workers() -> [rpc_worker_rctx()].
 active_workers() ->
     csrt_query:active_workers().
 
+-spec active_workers(Type :: json) -> [rpc_worker_rctx()].
 active_workers(Type) ->
     csrt_query:active_workers(Type).
 
+-spec count_by(Key :: string()) -> map().
 count_by(Key) ->
     csrt_query:count_by(Key).
 
@@ -462,6 +517,7 @@ sorted_by(Key, Val) ->
 sorted_by(Key, Val, Agg) ->
     csrt_query:sorted_by(Key, Val, Agg).
 
+%% TODO: encode that this can throw from map:get/2 on missing key
 %%
 %% Internal Operations assuming is_enabled() == true
 %%

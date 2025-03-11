@@ -69,10 +69,13 @@
     ?COUCH_BT_WRITE_KV_NODE => #rctx.?COUCH_BT_WRITE_KV_NODE
 }).
 
+-type pid_ref() :: {pid(), reference()}.
+-type maybe_pid_ref() :: pid_ref() | undefined.
+
 -record(rpc_worker, {
     mod :: atom()  | '_',
     func :: atom()  | '_',
-    from :: {pid(), reference()} | '_'
+    from :: pid_ref() | '_'
 }).
 
 -record(coordinator, {
@@ -82,34 +85,74 @@
     path :: binary() | '_'
 }).
 
+-type coordinator() :: #coordinator{}.
+-type rpc_worker() :: #rpc_worker{}.
+-type rctx_type() :: coordinator() | rpc_worker().
+
 -record(rctx, {
     %% Metadata
     started_at = csrt_util:tnow(),
     updated_at = csrt_util:tnow(),
-    pid_ref,
+    pid_ref :: maybe_pid_ref() | {'_', '_'},
     nonce,
-    type, %% #coordinator{}/#rpc_worker{}/#replication_worker{}/#compaction_worker
+    type :: rctx_type() | undefined | '_',
     dbname,
     username,
 
     %% Stats counters
     db_open = 0,
-    docs_read = 0,
-    docs_written = 0,
-    rows_read = 0,
-    changes_processed = 0,
-    changes_returned = 0,
-    ioq_calls = 0,
-    io_bytes_read = 0,
-    io_bytes_written = 0,
-    js_evals = 0,
-    js_filter = 0,
-    js_filtered_docs = 0,
-    mango_eval_match = 0,
+    docs_read = 0 :: non_neg_integer(),
+    docs_written = 0 :: non_neg_integer(),
+    rows_read = 0 :: non_neg_integer(),
+    changes_processed = 0 :: non_neg_integer(),
+    changes_returned = 0 :: non_neg_integer(),
+    ioq_calls = 0 :: non_neg_integer(),
+    io_bytes_read = 0 :: non_neg_integer(),
+    io_bytes_written = 0 :: non_neg_integer(),
+    js_evals = 0 :: non_neg_integer(),
+    js_filter = 0 :: non_neg_integer(),
+    js_filtered_docs = 0 :: non_neg_integer(),
+    mango_eval_match = 0 :: non_neg_integer(),
     %% TODO: switch record definitions to be macro based, eg:
-    %% ?COUCH_BT_GET_KP_NODE = 0,
-    get_kv_node = 0,
-    get_kp_node = 0,
-    write_kv_node = 0,
-    write_kp_node = 0
+    %% ?COUCH_BT_GET_KP_NODE = 0 :: non_neg_integer(),
+    get_kv_node = 0 :: non_neg_integer(),
+    get_kp_node = 0 :: non_neg_integer(),
+    write_kv_node = 0 :: non_neg_integer(),
+    write_kp_node = 0 :: non_neg_integer()
 }).
+
+-type rctx_field() ::
+    started_at
+        | updated_at
+        | pid_ref
+        | nonce
+        | type
+        | dbname
+        | username
+        | db_open
+        | docs_read
+        | docs_written
+        | rows_read
+        | changes_processed
+        | changes_returned
+        | ioq_calls
+        | io_bytes_read
+        | io_bytes_written
+        | js_evals
+        | js_filter
+        | js_filtered_docs
+        | mango_eval_match
+        | get_kv_node
+        | get_kp_node
+        | write_kv_node
+        | write_kp_node.
+
+-type coordinator_rctx() :: #rctx{type :: coordinator()}.
+-type rpc_worker_rctx() :: #rctx{type :: rpc_worker()}.
+-type rctx() :: #rctx{} | coordinator_rctx() | rpc_worker_rctx().
+-type maybe_rctx() :: rctx() | undefined.
+
+%% TODO: solidify nonce type
+-type nonce() :: any().
+-type dbname() :: iodata().
+-type username() :: iodata().
