@@ -156,3 +156,7 @@
 -type nonce() :: any().
 -type dbname() :: iodata().
 -type username() :: iodata().
+
+-type delta() :: map().
+-type maybe_delta() :: delta() | undefined.
+-type tagged_delta() :: {delta, maybe_delta()}.

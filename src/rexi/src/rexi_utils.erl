@@ -13,8 +13,6 @@
 -module(rexi_utils).
 
 -export([server_pid/1, send/2, recv/6]).
--export([add_delta/2, extract_delta/1, get_delta/0]).
--export([maybe_add_delta/1, maybe_add_delta/2]).
 
 %% @doc Return a rexi_server id for the given node.
 server_id(Node) ->
@@ -69,7 +67,7 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     end.
 
 process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
-    {Payload, Delta} = extract_delta(Payload0),
+    {Payload, Delta} = csrt:extract_delta(Payload0),
     csrt:accumulate_delta(Delta),
     case Payload of
         {timeout, TimeoutRef} ->
@@ -107,49 +105,4 @@ process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
             end;
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
-    end.
-
-add_delta({A}, Delta) -> {A, Delta};
-add_delta({A, B}, Delta) -> {A, B, Delta};
-add_delta({A, B, C}, Delta) -> {A, B, C, Delta};
-add_delta({A, B, C, D}, Delta) -> {A, B, C, D, Delta};
-add_delta({A, B, C, D, E}, Delta) -> {A, B, C, D, E, Delta};
-add_delta({A, B, C, D, E, F}, Delta) -> {A, B, C, D, E, F, Delta};
-add_delta({A, B, C, D, E, F, G}, Delta) -> {A, B, C, D, E, F, G, Delta};
-add_delta(T, _Delta) -> T.
-
-extract_delta({A, {delta, Delta}}) -> {{A}, Delta};
-extract_delta({A, B, {delta, Delta}}) -> {{A, B}, Delta};
-extract_delta({A, B, C, {delta, Delta}}) -> {{A, B, C}, Delta};
-extract_delta({A, B, C, D, {delta, Delta}}) -> {{A, B, C, D}, Delta};
-extract_delta({A, B, C, D, E, {delta, Delta}}) -> {{A, B, C, D, E}, Delta};
-extract_delta({A, B, C, D, E, F, {delta, Delta}}) -> {{A, B, C, D, E, F}, Delta};
-extract_delta({A, B, C, D, E, F, G, {delta, Delta}}) -> {{A, B, C, D, E, F, G}, Delta};
-extract_delta(T) -> {T, undefined}.
-
-get_delta() ->
-    {delta, csrt:make_delta()}.
-
-maybe_add_delta(T) ->
-    case csrt:is_enabled() of
-        false ->
-            T;
-        true ->
-            %% Call add_elta/2 directly instead of maybe_add_delta/2 to avoid
-            %% redundant is_enabled check, or the pre-emptive get_delta/0
-            add_delta(T, rexi_utils:get_delta())
-    end.
-
-%% Allow for externally provided Delta in error handling scenarios
-%% eg in cases like rexi_server:notify_caller
-maybe_add_delta(T, undefined) ->
-    T;
-maybe_add_delta(T, Delta) when is_map(Delta) ->
-    maybe_add_delta(T, {delta, Delta});
-maybe_add_delta(T, {delta, _} = Delta) ->
-    case csrt:is_enabled() of
-        false ->
-            T;
-        true ->
-            add_delta(T, Delta)
     end.

@@ -16,8 +16,9 @@
     is_enabled/0,
     conf_get/1,
     conf_get/2,
-    make_dt/2,
-    make_dt/3,
+    get_pid_ref/0,
+    get_pid_ref/1,
+    set_pid_ref/1,
     tnow/0,
     tutc/0,
     tutc/1
@@ -30,6 +31,23 @@
     convert_pid/1,
     convert_ref/1,
     to_json/1
+]).
+
+%% Delta API
+-export([
+    add_delta/2,
+    extract_delta/1,
+    get_delta/1,
+    get_delta_a/0,
+    get_delta_zero/0,
+    maybe_add_delta/1,
+    maybe_add_delta/2,
+    make_delta/1,
+    make_dt/2,
+    make_dt/3,
+    rctx_delta/2,
+    set_delta_a/1,
+    set_delta_zero/1
 ]).
 
 -include_lib("couch_stats_resource_tracker.hrl").
@@ -149,4 +167,114 @@ to_json(#rctx{}=Rctx) ->
         changes_returned => Rctx#rctx.changes_returned,
         ioq_calls => Rctx#rctx.ioq_calls
     }.
+
+add_delta({A}, Delta) -> {A, Delta};
+add_delta({A, B}, Delta) -> {A, B, Delta};
+add_delta({A, B, C}, Delta) -> {A, B, C, Delta};
+add_delta({A, B, C, D}, Delta) -> {A, B, C, D, Delta};
+add_delta({A, B, C, D, E}, Delta) -> {A, B, C, D, E, Delta};
+add_delta({A, B, C, D, E, F}, Delta) -> {A, B, C, D, E, F, Delta};
+add_delta({A, B, C, D, E, F, G}, Delta) -> {A, B, C, D, E, F, G, Delta};
+add_delta(T, _Delta) -> T.
+
+extract_delta({A, {delta, Delta}}) -> {{A}, Delta};
+extract_delta({A, B, {delta, Delta}}) -> {{A, B}, Delta};
+extract_delta({A, B, C, {delta, Delta}}) -> {{A, B, C}, Delta};
+extract_delta({A, B, C, D, {delta, Delta}}) -> {{A, B, C, D}, Delta};
+extract_delta({A, B, C, D, E, {delta, Delta}}) -> {{A, B, C, D, E}, Delta};
+extract_delta({A, B, C, D, E, F, {delta, Delta}}) -> {{A, B, C, D, E, F}, Delta};
+extract_delta({A, B, C, D, E, F, G, {delta, Delta}}) -> {{A, B, C, D, E, F, G}, Delta};
+extract_delta(T) -> {T, undefined}.
+
+-spec get_delta(PidRef :: maybe_pid_ref()) -> tagged_delta().
+get_delta(PidRef) ->
+    {delta, make_delta(PidRef)}.
+
+maybe_add_delta(T) ->
+    case is_enabled() of
+        false ->
+            T;
+        true ->
+            maybe_add_delta_int(T, get_delta(get_pid_ref()))
+    end.
+
+%% Allow for externally provided Delta in error handling scenarios
+%% eg in cases like rexi_server:notify_caller/3
+maybe_add_delta(T, Delta) ->
+    case is_enabled() of
+        false ->
+            T;
+        true ->
+            maybe_add_delta_int(T, Delta)
+    end.
+
+maybe_add_delta_int(T, undefined) ->
+    T;
+maybe_add_delta_int(T, Delta) when is_map(Delta) ->
+    maybe_add_delta_int(T, {delta, Delta});
+maybe_add_delta_int(T, {delta, _} = Delta) ->
+    add_delta(T, Delta).
+
+-spec make_delta(PidRef :: maybe_pid_ref()) -> maybe_delta().
+make_delta(undefined) ->
+    undefined;
+make_delta(PidRef) ->
+    TA = get_delta_a(),
+    TB = csrt_server:get_resource(PidRef),
+    Delta = rctx_delta(TA, TB),
+    set_delta_a(TB),
+    Delta.
+
+-spec rctx_delta(TA :: Rctx, TB :: Rctx) -> map().
+rctx_delta(#rctx{}=TA, #rctx{}=TB) ->
+    Delta = #{
+        docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
+        docs_written => TB#rctx.docs_written - TA#rctx.docs_written,
+        js_filter => TB#rctx.js_filter - TA#rctx.js_filter,
+        js_filtered_docs => TB#rctx.js_filtered_docs - TA#rctx.js_filtered_docs,
+        rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
+        changes_returned => TB#rctx.changes_returned - TA#rctx.changes_returned,
+        get_kp_node => TB#rctx.get_kp_node - TA#rctx.get_kp_node,
+        get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
+        db_open => TB#rctx.db_open - TA#rctx.db_open,
+        ioq_calls => TB#rctx.ioq_calls - TA#rctx.ioq_calls,
+        dt => make_dt(TA#rctx.updated_at, TB#rctx.updated_at)
+    },
+    %% TODO: reevaluate this decision
+    %% Only return non zero (and also positive) delta fields
+    %% NOTE: this can result in Delta's of the form #{dt => 1}
+    maps:filter(fun(_K,V) -> V > 0 end, Delta);
+rctx_delta(_, _) ->
+    undefined.
+
+-spec get_delta_a() -> maybe_rctx().
+get_delta_a() ->
+    erlang:get(?DELTA_TA).
+
+-spec get_delta_zero() -> maybe_rctx().
+get_delta_zero() ->
+    erlang:get(?DELTA_TZ).
+
+-spec set_delta_a(TA :: rctx()) -> maybe_rctx().
+set_delta_a(TA) ->
+    erlang:put(?DELTA_TA, TA).
+
+-spec set_delta_zero(TZ :: rctx()) -> maybe_rctx().
+set_delta_zero(TZ) ->
+    erlang:put(?DELTA_TZ, TZ).
+
+-spec get_pid_ref() -> maybe_pid_ref().
+get_pid_ref() ->
+    get(?PID_REF).
+
+-spec get_pid_ref(Rctx :: rctx()) -> pid_ref().
+get_pid_ref(#rctx{pid_ref=PidRef}) ->
+    PidRef;
+get_pid_ref(R) ->
+    throw({unexpected, R}).
+
+-spec set_pid_ref(PidRef :: pid_ref()) -> pid_ref().
+set_pid_ref(PidRef) ->
+    erlang:put(?PID_REF, PidRef),
+    PidRef.
 

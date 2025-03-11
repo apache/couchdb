@@ -144,7 +144,7 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
 await_shard_response(Ref, Name, Rest, Opts, Factor, Timeout) ->
     receive
         Msg0 ->
-            {Msg, Delta} = rexi_utils:extract_delta(Msg0),
+            {Msg, Delta} = csrt:extract_delta(Msg0),
             csrt:accumulate_delta(Delta),
             case Msg of
                 {Ref, {ok, Db}} ->

@@ -54,11 +54,17 @@
 %% stats collection api
 -export([
     accumulate_delta/1,
+    add_delta/2,
     docs_written/1,
+    extract_delta/1,
+    get_delta/0,
     inc/1,
     inc/2,
     ioq_called/0,
     make_delta/0,
+    rctx_delta/2,
+    maybe_add_delta/1,
+    maybe_add_delta/2,
     maybe_inc/2,
     should_track/1
 ]).
@@ -90,16 +96,15 @@
 
 -spec get_pid_ref() -> maybe_pid_ref().
 get_pid_ref() ->
-    get(?PID_REF).
+    csrt_util:get_pid_ref().
 
 -spec get_pid_ref(Rctx :: rctx()) -> pid_ref().
-get_pid_ref(#rctx{pid_ref=PidRef}) ->
-    PidRef.
+get_pid_ref(Rctx) ->
+    csrt_util:get_pid_ref(Rctx).
 
 -spec set_pid_ref(PidRef :: pid_ref()) -> pid_ref().
 set_pid_ref(PidRef) ->
-    erlang:put(?PID_REF, PidRef),
-    PidRef.
+    csrt_util:set_pid_ref(PidRef).
 
 -spec create_pid_ref() -> pid_ref().
 create_pid_ref() ->
@@ -115,7 +120,6 @@ destroy_pid_ref() ->
 destroy_pid_ref(_PidRef) ->
     erase(?PID_REF).
 
-%%
 %%
 %% Context lifecycle API
 %%
@@ -154,7 +158,8 @@ create_context(Type, Nonce) ->
     %% PidRef = csrt_server:pid_ref(Rctx),
     PidRef = get_pid_ref(Rctx),
     set_pid_ref(PidRef),
-    erlang:put(?DELTA_TZ, Rctx),
+    csrt_util:set_delta_zero(Rctx),
+    csrt_util:set_delta_a(Rctx),
     csrt_server:create_resource(Rctx),
     csrt_logger:track(Rctx),
     PidRef.
@@ -329,110 +334,18 @@ accumulate_delta(Delta) when is_map(Delta) ->
 accumulate_delta(undefined) ->
     ok.
 
--spec make_delta() -> map().
+-spec make_delta() -> maybe_delta().
 make_delta() ->
-    TA = case get(?DELTA_TA) of
-        undefined ->
-            %% Need to handle this better, can't just make a new T0 at T' as
-            %% the timestamps will be identical causing a divide by zero error.
-            %%
-            %% Realistically need to ensure that all invocations of database
-            %% operations sets T0 appropriately. Perhaps it's possible to do
-            %% this is the couch_db:open chain, and then similarly, in
-            %% couch_server, and uhhhh... couch_file, and...
-            %%
-            %% I think we need some type of approach for establishing a T0 that
-            %% doesn't result in outrageous deltas. For now zero out the
-            %% microseconds field, or subtract a second on the off chance that
-            %% microseconds is zero. I'm not uptodate on the latest Erlang time
-            %% libraries and don't remember how to easily get an
-            %% `os:timestamp()` out of now() - 100ms or some such.
-            %%
-            %% I think it's unavoidable that we'll have some codepaths that do
-            %% not properly instantiate the T0 at spawn resulting in needing to
-            %% do some time of "time warp" or ignoring the timing collection
-            %% entirely. Perhaps if we hoisted out the stats collection into
-            %% the primary flow of the database and funnel that through all the
-            %% function clauses we could then utilize Dialyzer to statically
-            %% analyze and assert all code paths that invoke database
-            %% operations have properly instantinated a T0 at the appropriate
-            %% start time such that we don't have to "fudge" deltas with a
-            %% missing start point, but we're a long ways from that happening
-            %% so I feel it necessary to address the NULL start time.
+    case is_enabled() of
+        false ->
+            undefined;
+        true ->
+            csrt_util:make_delta(get_pid_ref())
+    end.
 
-            %% Track how often we fail to initiate T0 correctly
-            %% Perhaps somewhat naughty we're incrementing stats from within
-            %% couch_stats itself? Might need to handle this differently
-            %% TODO: determine appropriate course of action here
-            %% io:format("~n**********MISSING STARTING DELTA************~n~n", []),
-            couch_stats:increment_counter(
-                [couchdb, csrt, delta_missing_t0]),
-                %%[couch_stats_resource_tracker, delta_missing_t0]),
-
-            case erlang:get(?DELTA_TZ) of
-                undefined ->
-                    TA0 = make_delta_base(),
-                    %% TODO: handline missing deltas, otherwise divide by zero
-                    set_delta_a(TA0),
-                    TA0;
-                TA0 ->
-                    TA0
-            end;
-        #rctx{} = TA0 ->
-            TA0
-    end,
-    TB = get_resource(),
-    Delta = make_delta(TA, TB),
-    set_delta_a(TB),
-    Delta.
-
--spec make_delta(TA :: Rctx, TB :: Rctx) -> map().
-make_delta(#rctx{}=TA, #rctx{}=TB) ->
-    Delta = #{
-        docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
-        docs_written => TB#rctx.docs_written - TA#rctx.docs_written,
-        js_filter => TB#rctx.js_filter - TA#rctx.js_filter,
-        js_filtered_docs => TB#rctx.js_filtered_docs - TA#rctx.js_filtered_docs,
-        rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
-        changes_returned => TB#rctx.changes_returned - TA#rctx.changes_returned,
-        get_kp_node => TB#rctx.get_kp_node - TA#rctx.get_kp_node,
-        get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
-        db_open => TB#rctx.db_open - TA#rctx.db_open,
-        ioq_calls => TB#rctx.ioq_calls - TA#rctx.ioq_calls,
-        dt => csrt_util:make_dt(TA#rctx.updated_at, TB#rctx.updated_at)
-    },
-    %% TODO: reevaluate this decision
-    %% Only return non zero (and also positive) delta fields
-    maps:filter(fun(_K,V) -> V > 0 end, Delta);
-make_delta(_, #rctx{}) ->
-    %%#{error => missing_beg_rctx};
-    undefined;
-make_delta(#rctx{}, _) ->
-    %%#{error => missing_fin_rctx}.
-    undefined.
-
--spec make_delta_base() -> rctx().
-make_delta_base() ->
-    make_delta_base(get_pid_ref()).
-
-%% TODO: figure this out, maybe not necessary now?
-%% ** TODO: what to do when PidRef=undefined?
--spec make_delta_base(PidRef :: pid_ref()) -> rctx().
-make_delta_base(PidRef) ->
-    %% TODO: extract user_ctx and db/shard from request
-    Now = csrt_util:tnow(),
-    #rctx{
-        pid_ref = PidRef,
-        %% TODO: confirm this subtraction works
-        %% TODO: drop this now that make_dt returns 1
-        started_at = Now - 100, %% give us 100ms rewind time for missing T0
-        updated_at = Now
-    }.
-
--spec set_delta_a(TA :: rctx()) -> maybe_rctx().
-set_delta_a(TA) ->
-    erlang:put(?DELTA_TA, TA).
-
+-spec rctx_delta(TA :: maybe_rctx(), TB :: maybe_rctx()) -> maybe_delta().
+rctx_delta(TA, TB) ->
+    csrt_util:rctx_delta(TA, TB).
 
 %% TODO: cleanup return type
 %%-spec update_counter(Field :: rctx_field(), Count :: non_neg_integer()) -> false | ok.
@@ -517,7 +430,26 @@ sorted_by(Key, Val) ->
 sorted_by(Key, Val, Agg) ->
     csrt_query:sorted_by(Key, Val, Agg).
 
-%% TODO: encode that this can throw from map:get/2 on missing key
+%%
+%% Delta API
+%%
+
+add_delta(T, Delta) ->
+    csrt_util:add_delta(T, Delta).
+
+extract_delta(T) ->
+    csrt_util:extract_delta(T).
+
+
+get_delta() ->
+    csrt_util:get_delta(get_pid_ref()).
+
+maybe_add_delta(T) ->
+    csrt_util:maybe_add_delta(T).
+
+maybe_add_delta(T, Delta) ->
+    csrt_util:maybe_add_delta(T, Delta).
+
 %%
 %% Internal Operations assuming is_enabled() == true
 %%

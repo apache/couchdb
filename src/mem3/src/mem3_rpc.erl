@@ -392,7 +392,7 @@ wait_message(Node, Ref, Mon, Timeout) ->
     end.
 
 process_raw_message(Msg0, Node, Ref, Mon, Timeout) ->
-    {Msg, Delta} = rexi_utils:extract_delta(Msg0),
+    {Msg, Delta} = csrt:extract_delta(Msg0),
     csrt:accumulate_delta(Delta),
     case Msg of
         {Ref, {ok, Reply}} ->
