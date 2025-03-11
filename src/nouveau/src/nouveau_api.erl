@@ -344,6 +344,7 @@ retry_if_connection_closes(_Fun, 0) ->
 retry_if_connection_closes(Fun, N) when is_integer(N), N > 0 ->
     case Fun() of
         {error, connection_closed} ->
+            couch_stats:increment_counter([nouveau, connection_closed_errors]),
             timer:sleep(1000),
             retry_if_connection_closes(Fun, N - 1);
         Else ->
