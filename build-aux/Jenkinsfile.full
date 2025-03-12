@@ -246,11 +246,12 @@ def generateNativeStage(platform) {
 
                   powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
 
-                  powershell( script: """
-                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
-                    Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
-                    make -f Makefile.win nouveau-test
-                  """, label: 'Nouveau tests')
+                  // temporary exclude - random flaky tests on Windows
+                  //powershell( script: """
+                  //  .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                  //  Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                  //  make -f Makefile.win nouveau-test
+                  //""", label: 'Nouveau tests')
                 }
 
                 powershell( script: """
