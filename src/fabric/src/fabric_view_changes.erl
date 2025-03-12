@@ -764,8 +764,7 @@ unpack_seq_setup() ->
     meck:new(fabric_view),
     meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
     meck:expect(mem3, shards, fun(_) -> [#shard{}] end),
-    meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end),
-    ok.
+    meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end).
 
 unpack_seqs_test_() ->
     {

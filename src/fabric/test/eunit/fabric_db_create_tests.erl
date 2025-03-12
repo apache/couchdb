@@ -26,19 +26,20 @@ main_test_() ->
     }.
 
 setup() ->
-    test_util:start_couch([fabric]).
+    Ctx = test_util:start_couch([fabric]),
+    meck:new(mem3, [passthrough]),
+    meck:new(fabric_util, [passthrough]),
+    Ctx.
 
 teardown(Ctx) ->
+    meck:unload(),
     test_util:stop_couch(Ctx).
 
 t_handle_shard_doc_conflict(_) ->
     DbName = ?tempdb(),
-    meck:new(mem3, [passthrough]),
-    meck:new(fabric_util, [passthrough]),
-    ok = meck:sequence(mem3, shards, 1, [
+    meck:sequence(mem3, shards, 1, [
         fun(_) -> meck:raise(error, database_does_not_exist) end,
         [#shard{dbname = DbName}]
     ]),
     meck:expect(fabric_util, recv, 4, {error, conflict}),
-    ?assertEqual({error, file_exists}, fabric_db_create:go(DbName, [])),
-    meck:unload().
+    ?assertEqual({error, file_exists}, fabric_db_create:go(DbName, [])).

@@ -42,6 +42,7 @@ setup() ->
     {Ctx, DbName}.
 
 teardown({Ctx, DbName}) ->
+    meck:unload(),
     fabric:delete_db(DbName),
     test_util:stop_couch(Ctx).
 

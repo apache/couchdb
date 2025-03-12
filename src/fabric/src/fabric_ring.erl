@@ -631,8 +631,7 @@ handle_response_cleanup_callback_test_() ->
 
 setup() ->
     meck:new(rexi, [passthrough]),
-    meck:expect(rexi, kill_all, 1, ok),
-    ok.
+    meck:expect(rexi, kill_all, 1, ok).
 
 teardown(_) ->
     meck:unload().
