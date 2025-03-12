@@ -29,7 +29,6 @@ setup() ->
     test_util:start_couch([fabric]).
 
 teardown(Ctx) ->
-    meck:unload(),
     test_util:stop_couch(Ctx).
 
 t_can_get_shard_uuids(_) ->

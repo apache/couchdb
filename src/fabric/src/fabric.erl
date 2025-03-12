@@ -761,7 +761,7 @@ set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 update_doc_test_() ->
     {
@@ -770,18 +770,12 @@ update_doc_test_() ->
             setup,
             fun setup/0,
             fun teardown/1,
-            fun(Ctx) ->
-                [
-                    should_throw_conflict(Ctx)
-                ]
-            end
+            with([?TDEF(should_throw_conflict)])
         }
     }.
 
 should_throw_conflict(Doc) ->
-    ?_test(begin
-        ?assertThrow(conflict, update_doc(<<"test-db">>, Doc, []))
-    end).
+    ?assertThrow(conflict, update_doc(<<"test-db">>, Doc, [])).
 
 setup() ->
     Doc = #doc{
@@ -793,25 +787,13 @@ setup() ->
         meta = []
     },
     ok = application:ensure_started(config),
-    ok = meck:expect(mem3, shards, fun(_, _) -> [] end),
-    ok = meck:expect(mem3, quorum, fun(_) -> 1 end),
-    ok = meck:expect(rexi, cast, fun(_, _) -> ok end),
-    ok = meck:expect(
-        rexi_utils,
-        recv,
-        fun(_, _, _, _, _, _) ->
-            {ok, {error, [{Doc, conflict}]}}
-        end
-    ),
-    ok = meck:expect(
-        couch_util,
-        reorder_results,
-        fun(_, [{_, Res}], _) ->
-            [Res]
-        end
-    ),
-    ok = meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
-    ok = meck:expect(rexi_monitor, stop, fun(_) -> ok end),
+    meck:expect(mem3, shards, fun(_, _) -> [] end),
+    meck:expect(mem3, quorum, fun(_) -> 1 end),
+    meck:expect(rexi, cast, fun(_, _) -> ok end),
+    meck:expect(rexi_utils, recv, fun(_, _, _, _, _, _) -> {ok, {error, [{Doc, conflict}]}} end),
+    meck:expect(couch_util, reorder_results, fun(_, [{_, Res}], _) -> [Res] end),
+    meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
+    meck:expect(rexi_monitor, stop, fun(_) -> ok end),
     Doc.
 
 teardown(_) ->

@@ -456,9 +456,9 @@ check_finish_quorum_newer(_) ->
     S0 = state0(all, false),
     {ok, S1} = handle_message({ok, [foo1(), bar1()]}, W1, S0),
     Expect = {stop, [bar1(), foo2()]},
-    ok = meck:reset(fabric),
+    meck:reset(fabric),
     ?assertEqual(Expect, handle_message({ok, [foo2(), bar1()]}, W2, S1)),
-    ok = meck:wait(fabric, update_docs, '_', 5000),
+    meck:wait(fabric, update_docs, '_', 5000),
     ?assertMatch(
         [{_, {fabric, update_docs, [_, _, _]}, _}],
         meck:history(fabric)
@@ -474,7 +474,7 @@ check_finish_quorum_replicator(_) ->
     S1 = S0#state{dbname = <<"foo/_replicator">>},
     {ok, S2} = handle_message({ok, [foo1(), bar1()]}, W1, S1),
     Expect = {stop, [bar1(), foo2()]},
-    ok = meck:reset(fabric),
+    meck:reset(fabric),
     ?assertEqual(Expect, handle_message({ok, [foo2(), bar1()]}, W2, S2)),
     timer:sleep(100),
     ?assertNot(meck:called(fabric, update_docs, ['_', '_', '_'])).

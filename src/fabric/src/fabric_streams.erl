@@ -489,13 +489,13 @@ cleanup_called_on_error(_) ->
     ?assert(meck:called(fabric_util, cleanup, 1)).
 
 setup() ->
-    ok = meck:new(rexi_utils, [passthrough]),
-    ok = meck:new(config, [passthrough]),
-    ok = meck:new(fabric_util, [passthrough]),
+    meck:new(rexi_utils, [passthrough]),
+    meck:new(config, [passthrough]),
+    meck:new(fabric_util, [passthrough]),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
-    ok = meck:expect(rexi, kill_all, fun(_) -> ok end),
+    meck:expect(rexi, kill_all, fun(_) -> ok end),
     % Speed up disconnect socket timeout for the test to 200 msec
-    ok = meck:expect(chttpd_util, mochiweb_client_req_check_msec, 0, 200).
+    meck:expect(chttpd_util, mochiweb_client_req_check_msec, 0, 200).
 
 teardown(_) ->
     meck:unload().

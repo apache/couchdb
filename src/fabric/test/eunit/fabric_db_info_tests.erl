@@ -28,7 +28,6 @@ setup() ->
     test_util:start_couch([fabric]).
 
 teardown(Ctx) ->
-    meck:unload(),
     test_util:stop_couch(Ctx).
 
 t_update_seq_has_uuids(_) ->
