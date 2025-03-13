@@ -25,6 +25,9 @@
 Upgrade Notes
 =============
 
+Windows
+-------
+
 * When upgrading from 3.x to 3.4.x, if you have not customized your
   node name in ``vm.args``, be sure to retain your original ``vm.args``
   file. The default node name has changed from ``couchdb@localhost`` to
