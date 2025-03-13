@@ -59,6 +59,8 @@ Features
 * :ghissue:`5321`, :ghissue:`5366`, :ghissue:`5413`: Add support for
   SpiderMonkey versions 102, 115 and 128.
 * :ghissue:`5317`: Add `quickjs` to the list of welcome features.
+* :ghissue:`5471`: Add ``nouveau.connection_closed_errors`` metric. Bumped when
+  ``nouveau`` retries closed connections.
 
 Bugfixes
 --------
@@ -86,6 +88,7 @@ Bugfixes
 * :ghissue:`5331`: Skip validation for design docs in the scanner.
 * :ghissue:`5330`: Prevent inserting illegal design docs via Mango.
 * :ghissue:`5463`, :ghissue:`5453`: Fix Nouveau bookmark badarith error.
+* :ghissue:`5469`: Retry closed ``nouveau`` connections.
 
 Docs
 ----
