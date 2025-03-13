@@ -20,6 +20,27 @@
     :depth: 1
     :local:
 
+.. _release/3.4.x/upgrade:
+
+Upgrade Notes
+=============
+
+Windows
+-------
+
+* When upgrading from 3.x to 3.4.x, if you have not customized your
+  node name in ``vm.args``, be sure to retain your original ``vm.args``
+  file. The default node name has changed from ``couchdb@localhost`` to
+  ``couchdb@127.0.0.1``, which can prevent CouchDB from accessing existing
+  databases on the system. You may also change the name option back to the
+  old value by setting ``-name couchdb@localhost`` in ``etc/vm.args`` by
+  hand. The default has changed to meet new guidelines and to provide
+  additional functionality in the future.
+
+  If you receive errors in the logfile, such as
+  ``internal_server_error : No DB shards could be opened.`` or in Fauxton,
+  such as ``This database failed to load.`` you need to make this change.
+
 .. _release/3.4.2:
 
 Version 3.4.2
