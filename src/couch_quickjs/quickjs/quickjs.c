@@ -34,7 +34,7 @@
 #include <math.h>
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__GLIBC__)
 #include <malloc.h>
 #elif defined(__FreeBSD__)
 #include <malloc_np.h>
@@ -363,10 +363,7 @@ typedef struct JSVarRef {
         struct {
             int __gc_ref_count; /* corresponds to header.ref_count */
             uint8_t __gc_mark; /* corresponds to header.mark/gc_obj_type */
-            uint8_t is_detached : 1;
-            uint8_t is_arg : 1;
-            uint16_t var_idx; /* index of the corresponding function variable on
-                                 the stack */
+            uint8_t is_detached;
         };
     };
     JSValue *pvalue; /* pointer to the value, either on the stack or
@@ -1708,7 +1705,7 @@ static size_t js_def_malloc_usable_size(const void *ptr)
     return _msize((void *)ptr);
 #elif defined(EMSCRIPTEN)
     return 0;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__GLIBC__)
     return malloc_usable_size((void *)ptr);
 #else
     /* change this to `return 0;` if compilation fails */
@@ -6836,15 +6833,19 @@ static JSValue JS_ThrowTypeErrorInvalidClass(JSContext *ctx, int class_id)
     return JS_ThrowTypeErrorAtom(ctx, "%s object expected", name);
 }
 
+static void JS_ThrowInterrupted(JSContext *ctx)
+{
+    JS_ThrowInternalError(ctx, "interrupted");
+    JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
+}
+
 static no_inline __exception int __js_poll_interrupts(JSContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
     ctx->interrupt_counter = JS_INTERRUPT_COUNTER_INIT;
     if (rt->interrupt_handler) {
         if (rt->interrupt_handler(rt, rt->interrupt_opaque)) {
-            /* XXX: should set a specific flag to avoid catching */
-            JS_ThrowInternalError(ctx, "interrupted");
-            JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
+            JS_ThrowInterrupted(ctx);
             return -1;
         }
     }
@@ -8601,6 +8602,8 @@ int JS_SetPropertyInternal(JSContext *ctx, JSValueConst obj,
                 goto retry2;
             } else if (!(prs->flags & JS_PROP_WRITABLE)) {
                 goto read_only_prop;
+            } else {
+                break;
             }
         }
     }
@@ -14855,16 +14858,16 @@ static JSValue js_build_arguments(JSContext *ctx, int argc, JSValueConst *argv)
     /* add the length field (cannot fail) */
     pr = add_property(ctx, p, JS_ATOM_length,
                       JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+    if (unlikely(!pr))
+        goto fail;
     pr->u.value = JS_NewInt32(ctx, argc);
 
     /* initialize the fast array part */
     tab = NULL;
     if (argc > 0) {
         tab = js_malloc(ctx, sizeof(tab[0]) * argc);
-        if (!tab) {
-            JS_FreeValue(ctx, val);
-            return JS_EXCEPTION;
-        }
+        if (!tab)
+            goto fail;
         for(i = 0; i < argc; i++) {
             tab[i] = JS_DupValue(ctx, argv[i]);
         }
@@ -14880,6 +14883,9 @@ static JSValue js_build_arguments(JSContext *ctx, int argc, JSValueConst *argv)
                       ctx->throw_type_error, ctx->throw_type_error,
                       JS_PROP_HAS_GET | JS_PROP_HAS_SET);
     return val;
+ fail:
+    JS_FreeValue(ctx, val);
+    return JS_EXCEPTION;
 }
 
 #define GLOBAL_VAR_OFFSET 0x40000000
@@ -14904,6 +14910,8 @@ static JSValue js_build_mapped_arguments(JSContext *ctx, int argc,
     /* add the length field (cannot fail) */
     pr = add_property(ctx, p, JS_ATOM_length,
                       JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+    if (unlikely(!pr))
+        goto fail;
     pr->u.value = JS_NewInt32(ctx, argc);
 
     for(i = 0; i < arg_count; i++) {
@@ -15662,10 +15670,16 @@ static JSVarRef *get_var_ref(JSContext *ctx, JSStackFrame *sf,
 {
     JSVarRef *var_ref;
     struct list_head *el;
+    JSValue *pvalue;
+
+    if (is_arg)
+        pvalue = &sf->arg_buf[var_idx];
+    else
+        pvalue = &sf->var_buf[var_idx];
 
     list_for_each(el, &sf->var_ref_list) {
         var_ref = list_entry(el, JSVarRef, var_ref_link);
-        if (var_ref->var_idx == var_idx && var_ref->is_arg == is_arg) {
+        if (var_ref->pvalue == pvalue) {
             var_ref->header.ref_count++;
             return var_ref;
         }
@@ -15677,8 +15691,6 @@ static JSVarRef *get_var_ref(JSContext *ctx, JSStackFrame *sf,
     var_ref->header.ref_count = 1;
     add_gc_object(ctx->rt, &var_ref->header, JS_GC_OBJ_TYPE_VAR_REF);
     var_ref->is_detached = FALSE;
-    var_ref->is_arg = is_arg;
-    var_ref->var_idx = var_idx;
     list_add_tail(&var_ref->var_ref_link, &sf->var_ref_list);
     if (sf->js_mode & JS_MODE_ASYNC) {
         /* The stack frame is detached and may be destroyed at any
@@ -15694,10 +15706,7 @@ static JSVarRef *get_var_ref(JSContext *ctx, JSStackFrame *sf,
     } else {
         var_ref->async_func = NULL;
     }
-    if (is_arg)
-        var_ref->pvalue = &sf->arg_buf[var_idx];
-    else
-        var_ref->pvalue = &sf->var_buf[var_idx];
+    var_ref->pvalue = pvalue;
     return var_ref;
 }
 
@@ -15925,37 +15934,33 @@ static void close_var_refs(JSRuntime *rt, JSStackFrame *sf)
 {
     struct list_head *el, *el1;
     JSVarRef *var_ref;
-    int var_idx;
 
     list_for_each_safe(el, el1, &sf->var_ref_list) {
         var_ref = list_entry(el, JSVarRef, var_ref_link);
         /* no need to unlink var_ref->var_ref_link as the list is never used afterwards */
         if (var_ref->async_func)
             async_func_free(rt, var_ref->async_func);
-        var_idx = var_ref->var_idx;
-        if (var_ref->is_arg)
-            var_ref->value = JS_DupValueRT(rt, sf->arg_buf[var_idx]);
-        else
-            var_ref->value = JS_DupValueRT(rt, sf->var_buf[var_idx]);
+        var_ref->value = JS_DupValueRT(rt, *var_ref->pvalue);
         var_ref->pvalue = &var_ref->value;
         /* the reference is no longer to a local variable */
         var_ref->is_detached = TRUE;
     }
 }
 
-static void close_lexical_var(JSContext *ctx, JSStackFrame *sf, int idx, int is_arg)
+static void close_lexical_var(JSContext *ctx, JSStackFrame *sf, int var_idx)
 {
+    JSValue *pvalue;
     struct list_head *el, *el1;
     JSVarRef *var_ref;
-    int var_idx = idx;
 
+    pvalue = &sf->var_buf[var_idx];
     list_for_each_safe(el, el1, &sf->var_ref_list) {
         var_ref = list_entry(el, JSVarRef, var_ref_link);
-        if (var_idx == var_ref->var_idx && var_ref->is_arg == is_arg) {
+        if (var_ref->pvalue == pvalue) {
             list_del(&var_ref->var_ref_link);
             if (var_ref->async_func)
                 async_func_free(ctx->rt, var_ref->async_func);
-            var_ref->value = JS_DupValue(ctx, sf->var_buf[var_idx]);
+            var_ref->value = JS_DupValue(ctx, *var_ref->pvalue);
             var_ref->pvalue = &var_ref->value;
             /* the reference is no longer to a local variable */
             var_ref->is_detached = TRUE;
@@ -17188,7 +17193,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 int idx;
                 idx = get_u16(pc);
                 pc += 2;
-                close_lexical_var(ctx, sf, idx, FALSE);
+                close_lexical_var(ctx, sf, idx);
             }
             BREAK;
 
@@ -43921,10 +43926,18 @@ fail:
     return JS_EXCEPTION;
 }
 
-BOOL lre_check_stack_overflow(void *opaque, size_t alloca_size)
+int lre_check_stack_overflow(void *opaque, size_t alloca_size)
 {
     JSContext *ctx = opaque;
     return js_check_stack_overflow(ctx->rt, alloca_size);
+}
+
+int lre_check_timeout(void *opaque)
+{
+    JSContext *ctx = opaque;
+    JSRuntime *rt = ctx->rt;
+    return (rt->interrupt_handler && 
+            rt->interrupt_handler(rt, rt->interrupt_opaque));
 }
 
 void *lre_realloc(void *opaque, void *ptr, size_t size)
@@ -43994,7 +44007,11 @@ static JSValue js_regexp_exec(JSContext *ctx, JSValueConst this_val,
                     goto fail;
             }
         } else {
-            JS_ThrowInternalError(ctx, "out of memory in regexp execution");
+            if (rc == LRE_RET_TIMEOUT) {
+                JS_ThrowInterrupted(ctx);
+            } else {
+                JS_ThrowInternalError(ctx, "out of memory in regexp execution");
+            }
             goto fail;
         }
     } else {
@@ -44190,7 +44207,11 @@ static JSValue JS_RegExpDelete(JSContext *ctx, JSValueConst this_val, JSValueCon
                         goto fail;
                 }
             } else {
-                JS_ThrowInternalError(ctx, "out of memory in regexp execution");
+                if (ret == LRE_RET_TIMEOUT) {
+                    JS_ThrowInterrupted(ctx);
+                } else {
+                    JS_ThrowInternalError(ctx, "out of memory in regexp execution");
+                }
                 goto fail;
             }
             break;
@@ -45398,6 +45419,11 @@ static int js_json_to_str(JSContext *ctx, JSONStringifyContext *jsc,
     sep1 = JS_UNDEFINED;
     tab = JS_UNDEFINED;
     prop = JS_UNDEFINED;
+
+    if (js_check_stack_overflow(ctx->rt, 0)) {
+        JS_ThrowStackOverflow(ctx);
+        goto exception;
+    }
 
     if (JS_IsObject(val)) {
         p = JS_VALUE_GET_OBJ(val);
@@ -50020,6 +50046,9 @@ static BOOL string_get_digits(const uint8_t *sp, int *pp, int *pval,
 
     p_start = p;
     while ((c = sp[p]) >= '0' && c <= '9') {
+        /* arbitrary limit to 9 digits */
+        if (v >= 100000000)
+            return FALSE;
         v = v * 10 + c - '0';
         p++;
         if (p - p_start == max_digits)
@@ -50067,7 +50096,7 @@ static BOOL string_get_tzoffset(const uint8_t *sp, int *pp, int *tzp, BOOL stric
     sgn = sp[p++];
     if (sgn == '+' || sgn == '-') {
         int n = p;
-        if (!string_get_digits(sp, &p, &hh, 1, 9))
+        if (!string_get_digits(sp, &p, &hh, 1, 0))
             return FALSE;
         n = p - n;
         if (strict && n != 2 && n != 4)
@@ -50259,7 +50288,7 @@ static BOOL js_date_parse_otherstring(const uint8_t *sp,
                 *is_local = FALSE;
             } else {
                 p++;
-                if (string_get_digits(sp, &p, &val, 1, 9)) {
+                if (string_get_digits(sp, &p, &val, 1, 0)) {
                     if (c == '-') {
                         if (val == 0)
                             return FALSE;
@@ -50270,7 +50299,7 @@ static BOOL js_date_parse_otherstring(const uint8_t *sp,
                 }
             }
         } else
-        if (string_get_digits(sp, &p, &val, 1, 9)) {
+        if (string_get_digits(sp, &p, &val, 1, 0)) {
             if (string_skip_char(sp, &p, ':')) {
                 /* time part */
                 fields[3] = val;
