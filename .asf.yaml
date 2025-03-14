@@ -17,6 +17,7 @@ github:
   features:
     issues: true
     projects: true
+    discussions: true
   enabled_merge_buttons:
     squash: true
     rebase: true
