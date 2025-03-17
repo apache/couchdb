@@ -61,6 +61,7 @@
     inc/1,
     inc/2,
     ioq_called/0,
+    js_filtered/1,
     make_delta/0,
     rctx_delta/2,
     maybe_add_delta/1,
@@ -321,6 +322,13 @@ should_track(_Metric) ->
 -spec ioq_called() -> non_neg_integer().
 ioq_called() ->
     inc(ioq_calls).
+
+%% we cannot yet use stats couchdb.query_server.*.ddoc_filter because those
+%% are collected in a dedicated process.
+%% TODO: funnel back stats from background worker processes to the RPC worker
+js_filtered(N) ->
+    inc(js_filter),
+    inc(js_filtered_docs, N).
 
 docs_written(N) ->
     inc(docs_written, N).

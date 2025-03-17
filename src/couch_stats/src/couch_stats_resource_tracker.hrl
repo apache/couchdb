@@ -48,6 +48,7 @@
     [couchdb, btree, get_node, kv_node] => ?COUCH_BT_GET_KV_NODE,
     [couchdb, btree, write_node, kp_node] => ?COUCH_BT_WRITE_KP_NODE,
     [couchdb, btree, write_node, kv_node] => ?COUCH_BT_WRITE_KV_NODE,
+    %% NOTE: these stats are not local to the RPC worker, need forwarding
     [couchdb, query_server, calls, ddoc_filter] => ?COUCH_JS_FILTER,
     [couchdb, query_server, volume, ddoc_filter] => ?COUCH_JS_FILTERED_DOCS
 }).
