@@ -84,6 +84,7 @@ notifications:
   commits: commits@couchdb.apache.org
   issues: notifications@couchdb.apache.org
   pullrequests: notifications@couchdb.apache.org
+  discussions: notifications@couchdb.apache.org
   # This would send new/closed PR notifications to dev@
   #pullrequests_status: dev@couchdb.apache.org
   # This would send individual PR comments/reviews to notifications@
