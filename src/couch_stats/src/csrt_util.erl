@@ -14,11 +14,13 @@
 
 -export([
     is_enabled/0,
+    is_enabled_init_p/0,
     conf_get/1,
     conf_get/2,
     get_pid_ref/0,
     get_pid_ref/1,
     set_pid_ref/1,
+    should_track_init_p/2,
     tnow/0,
     tutc/0,
     tutc/1
@@ -50,19 +52,36 @@
     set_delta_zero/1
 ]).
 
+%% Extra niceties and testing facilities
+-export([
+    set_fabric_init_p/2,
+    set_fabric_init_p/3
+]).
+
+
 -include_lib("couch_stats_resource_tracker.hrl").
 
 -spec is_enabled() -> boolean().
 is_enabled() ->
     config:get_boolean(?CSRT, "enabled", true).
 
+-spec is_enabled_init_p() -> boolean().
+is_enabled_init_p() ->
+    config:get_boolean(?CSRT_INIT_P, "enabled", true).
+
+-spec should_track_init_p(Mod :: atom(), Func :: atom()) -> boolean().
+should_track_init_p(fabric_rpc, Func) ->
+    config:get_boolean(?CSRT_INIT_P, fabric_conf_key(Func), false);
+should_track_init_p(_Mod, _Func) ->
+    false.
+
 -spec conf_get(Key :: list()) -> list().
 conf_get(Key) ->
-    conf_get(Key, "undefined").
+    conf_get(Key, undefined).
 
 -spec conf_get(Key :: list(), Default :: list()) -> list().
 conf_get(Key, Default) ->
-    config:get(?MODULE_STRING, Key, Default).
+    config:get(?CSRT, Key, Default).
 
 %% Monotnonic time now in native format using time forward only event tracking
 -spec tnow() -> integer().
@@ -278,3 +297,85 @@ set_pid_ref(PidRef) ->
     erlang:put(?PID_REF, PidRef),
     PidRef.
 
+%% @equiv set_fabric_init_p(Func, Enabled, true).
+-spec set_fabric_init_p(Func :: atom(), Enabled :: boolean()) -> ok.
+set_fabric_init_p(Func, Enabled) ->
+    set_fabric_init_p(Func, Enabled, true).
+
+%% Expose Persist for use in test cases outside this module
+-spec set_fabric_init_p(Func, Enabled, Persist) -> ok when
+        Func :: atom(), Enabled :: boolean(), Persist :: boolean().
+set_fabric_init_p(Func, Enabled, Persist) ->
+    Key = fabric_conf_key(Func),
+    ok = config:set_boolean(?CSRT_INIT_P, Key, Enabled, Persist).
+
+-spec fabric_conf_key(Key :: atom()) -> string().
+fabric_conf_key(Key) ->
+    %% Double underscore to separate Mod and Func
+    "fabric_rpc__" ++ atom_to_list(Key).
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+couch_stats_resource_tracker_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_should_track_init_p),
+            ?TDEF_FE(t_should_track_init_p_empty),
+            ?TDEF_FE(t_should_track_init_p_disabled),
+            ?TDEF_FE(t_should_not_track_init_p)
+        ]
+    }.
+
+setup() ->
+    test_util:start_couch().
+
+teardown(Ctx) ->
+    test_util:stop_couch(Ctx).
+
+t_should_track_init_p(_) ->
+    enable_init_p(),
+    [?assert(should_track_init_p(M, F), {M, F}) || [M, F] <- base_metrics()].
+
+t_should_track_init_p_empty(_) ->
+    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
+
+t_should_track_init_p_disabled(_) ->
+    config:set(?CSRT_INIT_P, "enabled", "false", false),
+    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
+
+t_should_not_track_init_p(_) ->
+    enable_init_p(),
+    Metrics = [
+        [couch_db, name],
+        [couch_db, get_after_doc_read_fun],
+        [couch_db, open],
+        [fabric_rpc, get_purge_seq]
+    ],
+    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- Metrics].
+
+enable_init_p() ->
+    enable_init_p(base_metrics()).
+
+enable_init_p(Metrics) ->
+    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    [set_fabric_init_p(F, true, false) || [_, F] <- Metrics].
+
+base_metrics() ->
+    [
+        [fabric_rpc, all_docs],
+        [fabric_rpc, changes],
+        [fabric_rpc, map_view],
+        [fabric_rpc, reduce_view],
+        [fabric_rpc, get_all_security],
+        [fabric_rpc, open_doc],
+        [fabric_rpc, update_docs],
+        [fabric_rpc, open_shard]
+    ].
+
+-endif.

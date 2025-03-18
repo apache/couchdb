@@ -45,6 +45,7 @@
 %% Public API
 -export([
     is_enabled/0,
+    is_enabled_init_p/0,
     do_report/2,
     maybe_report/2,
     conf_get/1,
@@ -67,7 +68,7 @@
     maybe_add_delta/1,
     maybe_add_delta/2,
     maybe_inc/2,
-    should_track/1
+    should_track_init_p/1
 ]).
 
 %% aggregate query api
@@ -249,6 +250,11 @@ destroy_context({_, _} = PidRef) ->
 is_enabled() ->
     csrt_util:is_enabled().
 
+%% @equiv csrt_util:is_enabled_init_p().
+-spec is_enabled_init_p() -> boolean().
+is_enabled_init_p() ->
+    csrt_util:is_enabled_init_p().
+
 -spec get_resource() -> maybe_rctx().
 get_resource() ->
     get_resource(get_pid_ref()).
@@ -289,34 +295,10 @@ maybe_inc(Stat, Val) ->
             0
     end.
 
-%% TODO: update stats_descriptions.cfg for relevant apps
--spec should_track(Stat :: [atom()]) -> boolean().
-should_track([fabric_rpc, all_docs, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, changes, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, changes, processed]) ->
-    is_enabled();
-should_track([fabric_rpc, changes, returned]) ->
-    is_enabled();
-should_track([fabric_rpc, map_view, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, reduce_view, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, get_all_security, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, open_doc, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, update_docs, spawned]) ->
-    is_enabled();
-should_track([fabric_rpc, open_shard, spawned]) ->
-    is_enabled();
-should_track([mango_cursor, view, all_docs]) ->
-    is_enabled();
-should_track([mango_cursor, view, idx]) ->
-    is_enabled();
-should_track(_Metric) ->
-    %%io:format("SKIPPING METRIC: ~p~n", [Metric]),
+-spec should_track_init_p(Stat :: [atom()]) -> boolean().
+should_track_init_p([Mod, Func, spawned]) ->
+    is_enabled_init_p() andalso csrt_util:should_track_init_p(Mod, Func);
+should_track_init_p(_Metric) ->
     false.
 
 -spec ioq_called() -> non_neg_integer().
@@ -473,7 +455,9 @@ couch_stats_resource_tracker_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            ?TDEF_FE(t_static_map_translations)
+            ?TDEF_FE(t_static_map_translations),
+            ?TDEF_FE(t_should_track_init_p),
+            ?TDEF_FE(t_should_not_track_init_p)
         ]
     }.
 
@@ -487,5 +471,30 @@ t_static_map_translations(_) ->
     ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, maps:values(?STATS_TO_KEYS))),
     %% TODO: properly handle ioq_calls field
     ?assertEqual(lists:sort(maps:values(?STATS_TO_KEYS)), lists:delete(docs_written, lists:delete(ioq_calls, lists:sort(maps:keys(?KEYS_TO_FIELDS))))).
+
+t_should_track_init_p(_) ->
+    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    Metrics = [
+        [fabric_rpc, all_docs, spawned],
+        [fabric_rpc, changes, spawned],
+        [fabric_rpc, map_view, spawned],
+        [fabric_rpc, reduce_view, spawned],
+        [fabric_rpc, get_all_security, spawned],
+        [fabric_rpc, open_doc, spawned],
+        [fabric_rpc, update_docs, spawned],
+        [fabric_rpc, open_shard, spawned]
+    ],
+    [csrt_util:set_fabric_init_p(F, true, false) || [_, F, _] <- Metrics],
+    [?assert(should_track_init_p(M), M) || M <- Metrics].
+
+t_should_not_track_init_p(_) ->
+    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    Metrics = [
+        [couch_db, name, spawned],
+        [couch_db, get_db_info, spawned],
+        [couch_db, open, spawned],
+        [fabric_rpc, get_purge_seq, spawned]
+    ],
+    [?assert(should_track_init_p(M) =:= false, M) || M <- Metrics].
 
 -endif.

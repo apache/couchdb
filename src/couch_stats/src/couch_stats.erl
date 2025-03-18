@@ -121,7 +121,7 @@ maybe_track_local_counter(_, _) ->
 
 maybe_track_rexi_init_p({M, F, _A}) ->
     Metric = [M, F, spawned],
-    case csrt:should_track(Metric) of
+    case csrt:should_track_init_p(Metric) of
         true -> increment_counter(Metric);
         false -> ok
     end.
