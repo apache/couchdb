@@ -73,6 +73,7 @@
 
 -type pid_ref() :: {pid(), reference()}.
 -type maybe_pid_ref() :: pid_ref() | undefined.
+-type maybe_pid() :: pid() | undefined.
 
 -record(rpc_worker, {
     mod :: atom()  | '_',
@@ -162,3 +163,6 @@
 -type delta() :: map().
 -type maybe_delta() :: delta() | undefined.
 -type tagged_delta() :: {delta, maybe_delta()}.
+
+-type matchers() :: #{atom() => {ets:match_spec(), ets:comp_match_spec()}}.
+-type maybe_matchers() :: matchers() | undefined.

@@ -15,7 +15,6 @@
 %% Process lifetime logging api
 -export([
     get_tracker/0,
-    is_logging_enabled/0,
     log_process_lifetime_report/1,
     put_tracker/1,
     stop_tracker/0,
@@ -55,9 +54,7 @@
     matcher_on_rows_read/1,
     matcher_on_worker_changes_processed/1,
     matcher_on_ioq_calls/1,
-    matcher_on_nonce/1,
-    matcher_on_nonce_comp/1,
-    matcher_on_writes/1
+    matcher_on_nonce/1
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -71,6 +68,7 @@
     matchers = #{}
 }).
 
+-spec track(Rctx :: rctx()) -> pid().
 track(#rctx{pid_ref=PidRef}) ->
     case get_tracker() of
         undefined ->
@@ -81,6 +79,7 @@ track(#rctx{pid_ref=PidRef}) ->
             Pid
     end.
 
+-spec tracker(PidRef :: pid_ref()) -> ok.
 tracker({Pid, _Ref}=PidRef) ->
     MonRef = erlang:monitor(process, Pid),
     receive
@@ -104,85 +103,43 @@ tracker({Pid, _Ref}=PidRef) ->
             ok
     end.
 
+-spec log_process_lifetime_report(PidRef :: pid_ref()) -> ok.
 log_process_lifetime_report(PidRef) ->
-    case csrt_util:is_enabled() andalso is_logging_enabled() of
+    case csrt_util:is_enabled() of
         true ->
-            %%case csrt_util:conf_get("logger_type", "csrt_logger") of
-            case csrt_util:conf_get("logger_type", "csrt_logger") of
-                "csrt_logger" ->
-                    maybe_report("csrt-pid-usage-lifetime", PidRef);
-                _ ->
-                    Rctx = csrt_server:get_resource(PidRef),
-                    case should_log(Rctx) of
-                       true ->
-                            do_lifetime_report(Rctx);
-                        _ ->
-                            ok
-                    end
-            end;
+            maybe_report("csrt-pid-usage-lifetime", PidRef);
         false ->
             ok
     end.
 
-is_logging_enabled() ->
-    logging_enabled() =/= false.
-
-logging_enabled() ->
-    case csrt_util:conf_get("log_pid_usage_report", "coordinator") of
-        "coordinator" ->
-            coordinator;
-        "true" ->
-            true;
-        _ ->
-            false
-    end.
-
-should_log(undefined) ->
-    false;
-should_log(#rctx{}=Rctx) ->
-    should_log(Rctx, logging_enabled()).
-
-should_log(undefined, _) ->
-    false;
-should_log(#rctx{}, true) ->
-    true;
-should_log(#rctx{}, false) ->
-    false;
-should_log(#rctx{type = #coordinator{}}, coordinator) ->
-    true;
-should_log(#rctx{type = #rpc_worker{mod=fabric_rpc, func=FName}}, _) ->
-    case csrt_util:conf_get("log_fabric_rpc") of
-        "true" ->
-            true;
-        undefined ->
-            false;
-        Name ->
-            Name =:= atom_to_list(FName)
-    end;
-should_log(#rctx{}, _) ->
-    false.
-
-find_matches(RContexts, Matchers) when is_list(RContexts) andalso is_map(Matchers) ->
+%% TODO: add Matchers spec
+-spec find_matches(Rctxs :: [rctx()], Matchers :: [any()]) -> matchers().
+find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
     maps:filter(
         fun(_Name, {_MSpec, CompMSpec}) ->
-            catch [] =/= ets:match_spec_run(RContexts, CompMSpec)
+            catch [] =/= ets:match_spec_run(Rctxs, CompMSpec)
         end,
         Matchers
     ).
 
+-spec get_matchers() -> matchers().
 get_matchers() ->
     persistent_term:get(?MATCHERS_KEY, #{}).
 
+-spec is_match(Rctx :: maybe_rctx()) -> boolean().
 is_match(undefined) ->
     false;
 is_match(#rctx{}=Rctx) ->
     is_match(Rctx, get_matchers()).
 
+%% TODO: add Matchers spec
+-spec is_match(Rctx :: maybe_rctx(), Matchers :: [any()]) -> boolean().
 is_match(undefined, _Matchers) ->
     false;
 is_match(#rctx{}=Rctx, Matchers) when is_map(Matchers) ->
     maps:size(find_matches([Rctx], Matchers)) > 0.
 
+-spec maybe_report(ReportName :: string(), PidRef :: maybe_pid_ref()) -> ok.
 maybe_report(ReportName, PidRef) ->
     Rctx = csrt_server:get_resource(PidRef),
     case is_match(Rctx) of
@@ -193,12 +150,15 @@ maybe_report(ReportName, PidRef) ->
             ok
     end.
 
+-spec do_lifetime_report(Rctx :: rctx()) -> boolean().
 do_lifetime_report(Rctx) ->
     do_report("csrt-pid-usage-lifetime", Rctx).
 
+-spec do_status_report(Rctx :: rctx()) -> boolean().
 do_status_report(Rctx) ->
     do_report("csrt-pid-usage-status", Rctx).
 
+-spec do_report(ReportName :: string(), Rctx :: rctx()) -> boolean().
 do_report(ReportName, #rctx{}=Rctx) ->
     couch_log:report(ReportName, csrt_util:to_json(Rctx)).
 
@@ -206,19 +166,24 @@ do_report(ReportName, #rctx{}=Rctx) ->
 %% Process lifetime logging api
 %%
 
+-spec get_tracker() -> maybe_pid().
 get_tracker() ->
     get(?TRACKER_PID).
 
+-spec put_tracker(Pid :: pid()) -> maybe_pid().
 put_tracker(Pid) when is_pid(Pid) ->
     put(?TRACKER_PID, Pid).
 
+-spec stop_tracker() -> ok.
 stop_tracker() ->
     stop_tracker(get_tracker()).
 
+-spec stop_tracker(Pid :: maybe_pid()) -> ok.
 stop_tracker(undefined) ->
     ok;
 stop_tracker(Pid) when is_pid(Pid) ->
-    Pid ! stop.
+    Pid ! stop,
+    ok.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -256,32 +221,31 @@ handle_info(_Msg, St) ->
 %% Matchers
 %%
 
+-spec matcher_on_dbname(DbName :: dbname()) -> ets:match_spec().
 matcher_on_dbname(DbName)
         when is_binary(DbName) ->
     ets:fun2ms(fun(#rctx{dbname=DbName1} = R) when DbName =:= DbName1 -> R end).
 
+-spec matcher_on_docs_read(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_docs_read(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
     ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
 
+-spec matcher_on_docs_written(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_docs_written(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
     ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_written=DocsRead} = R) when DocsRead >= Threshold -> R end).
 
+-spec matcher_on_rows_read(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_rows_read(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
     ets:fun2ms(fun(#rctx{rows_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
 
-matcher_on_writes(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{write_kp_node = WKP, write_kv_node = WKV} = R) when WKP + WKV > Threshold-> R end).
-
+-spec matcher_on_nonce(Nonce :: nonce()) -> ets:match_spec().
 matcher_on_nonce(Nonce) ->
     ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end).
 
-matcher_on_nonce_comp(Nonce) ->
-    ets:match_spec_compile(ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
-
+-spec matcher_on_worker_changes_processed(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_worker_changes_processed(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
     ets:fun2ms(
@@ -295,10 +259,13 @@ matcher_on_worker_changes_processed(Threshold)
         end
     ).
 
+-spec matcher_on_ioq_calls(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_ioq_calls(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
     ets:fun2ms(fun(#rctx{ioq_calls=IOQCalls} = R) when IOQCalls >= Threshold -> R end).
 
+-spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, badarg} when
+      Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
 add_matcher(Name, MSpec, Matchers) ->
     try ets:match_spec_compile(MSpec) of
         CompMSpec ->
@@ -310,16 +277,17 @@ add_matcher(Name, MSpec, Matchers) ->
             {error, badarg}
     end.
 
+-spec set_matchers_term(Matchers :: matchers()) -> maybe_matchers().
 set_matchers_term(Matchers) when is_map(Matchers) ->
     persistent_term:put({?MODULE, all_csrt_matchers}, Matchers).
 
+-spec initialize_matchers() -> ok.
 initialize_matchers() ->
     DefaultMatchers = [
         {docs_read, fun matcher_on_docs_read/1, 100},
         {dbname, fun matcher_on_dbname/1, <<"foo">>},
         {rows_read, fun matcher_on_rows_read/1, 100},
         {docs_written, fun matcher_on_docs_written/1, 1},
-        {btree_writes, fun matcher_on_writes/1, 1},
         %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
         %%{slow_reqs, fun matcher_on_slow_reqs/1, 10000},
         {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
@@ -351,11 +319,14 @@ initialize_matchers() ->
     ok.
 
 
+-spec matcher_enabled(Name :: string()) -> boolean().
 matcher_enabled(Name) when is_list(Name) ->
     %% TODO: fix
     %% config:get_boolean(?CONF_MATCHERS_ENABLED, Name, false).
     config:get_boolean(?CONF_MATCHERS_ENABLED, Name, true).
 
+-spec matcher_threshold(Name, Threshold) -> string() | integer() when
+      Name :: string(), Threshold :: pos_integer() | string().
 matcher_threshold("dbname", DbName) when is_binary(DbName) ->
     %% TODO: toggle Default to undefined to disallow for particular dbname
     %% TODO: sort out list vs binary
