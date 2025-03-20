@@ -14,39 +14,16 @@
 
 -module(dreyfus_fabric_cleanup).
 
--include("dreyfus.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -export([go/1]).
 
 go(DbName) ->
-    {ok, DesignDocs} = fabric:design_docs(DbName),
-    ActiveSigs = lists:usort(
-        lists:flatmap(
-            fun active_sigs/1,
-            [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
-        )
-    ),
+    ActiveSigs = dreyfus_util:active_sigs(DbName),
     cleanup_local_purge_doc(DbName, ActiveSigs),
     clouseau_rpc:cleanup(DbName, ActiveSigs),
     ok.
-
-active_sigs(#doc{body = {Fields}} = Doc) ->
-    try
-        {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
-        {IndexNames, _} = lists:unzip(RawIndexes),
-        [
-            begin
-                {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
-                Index#index.sig
-            end
-         || IndexName <- IndexNames
-        ]
-    catch
-        error:{badmatch, _Error} ->
-            []
-    end.
 
 cleanup_local_purge_doc(DbName, ActiveSigs) ->
     {ok, BaseDir} = clouseau_rpc:get_root_dir(),
