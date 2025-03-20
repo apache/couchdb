@@ -1,4 +1,7 @@
 %{
+  "DropSeqTest": [
+    "peer checkpoint - nouveau"
+  ],
   "NouveauTest": [
     "user-agent header is forbidden",
     "search analyze",

@@ -194,6 +194,7 @@ $CouchDBConfig = @"
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
 {nouveau_index_dir, "./data/nouveau"}.
+{nouveau_commit_interval, 30}.
 {nouveau_url, "http://127.0.0.1:5987"}.
 {nouveau_port, 5987}.
 {nouveau_admin_port, 5988}.

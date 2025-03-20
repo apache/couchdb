@@ -1,5 +1,5 @@
 maxIndexesOpen: 3000
-commitIntervalSeconds: 30
+commitIntervalSeconds: {{nouveau_commit_interval}}
 idleSeconds: 60
 rootDir: {{nouveau_index_dir}}
 

@@ -34,7 +34,7 @@
     get_purged_infos/1,
     compact/1, compact/2,
     get_partition_info/2,
-    calculate_drop_seq/1
+    update_drop_seq/1
 ]).
 
 % Documents
@@ -120,9 +120,9 @@ get_db_info(DbName) ->
 get_partition_info(DbName, Partition) ->
     fabric_db_partition_info:go(dbname(DbName), Partition).
 
--spec calculate_drop_seq(dbname()) ->
+-spec update_drop_seq(dbname()) ->
     {ok, [{node(), binary(), non_neg_integer()}]}.
-calculate_drop_seq(DbName) ->
+update_drop_seq(DbName) ->
     fabric_drop_seq:go(dbname(DbName)).
 
 %% @doc the number of docs in a database
@@ -587,18 +587,19 @@ cleanup_index_files() ->
 cleanup_index_files(DbName) ->
     try
         ShardNames = [mem3:name(S) || S <- mem3:local_shards(dbname(DbName))],
-        cleanup_local_indices_and_purge_checkpoints(ShardNames)
+        Sigs = couch_mrview_util:get_signatures(hd(ShardNames)),
+        couch_mrview_cleanup:cleanup_peer_checkpoints(dbname(DbName), Sigs),
+        cleanup_local_indices_and_purge_checkpoints(Sigs, ShardNames)
     catch
         error:database_does_not_exist ->
             ok
     end.
 
-cleanup_local_indices_and_purge_checkpoints([]) ->
+cleanup_local_indices_and_purge_checkpoints(_Sigs, []) ->
     ok;
-cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
+cleanup_local_indices_and_purge_checkpoints(Sigs, [_ | _] = Dbs) ->
     AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
     AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
-    Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
     ok = cleanup_purges(Sigs, AllPurges, Dbs),
     ok = cleanup_indices(Sigs, AllIndices).
 

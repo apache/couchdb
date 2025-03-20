@@ -124,6 +124,13 @@ init({DbName, Index}) ->
                         couch_db:close(Db)
                     end,
                     dreyfus_util:maybe_create_local_purge_doc(Db, Pid, Index),
+                    fabric_drop_seq:create_peer_checkpoint_doc_if_missing(
+                        DbName,
+                        <<"search">>,
+                        <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
+                        fabric_drop_seq:peer_id_from_sig(DbName, Index#index.sig),
+                        Seq
+                    ),
                     proc_lib:init_ack({ok, self()}),
                     gen_server:enter_loop(?MODULE, [], State);
                 Error ->
