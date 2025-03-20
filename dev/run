@@ -424,6 +424,7 @@ def generate_nouveau_config(ctx):
 
     config = {
         "nouveau_index_dir": os.path.join(ctx["devdir"], "lib", "nouveau"),
+        "nouveau_commit_interval": 5,
         "nouveau_port": 5987,
         "nouveau_admin_port": 5988,
     }

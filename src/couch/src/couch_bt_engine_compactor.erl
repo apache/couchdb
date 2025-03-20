@@ -330,7 +330,8 @@ copy_compact(#comp_st{} = CompSt) ->
             if
                 Deleted andalso Seq =< DropSeq ->
                     %% drop this document completely
-                    {ok, {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}};
+                    {ok, NewSt2} = couch_bt_engine:increment_drop_count(AccNewSt),
+                    {ok, {NewSt2, AccUncopied, AccUncopiedSize, AccCopiedSize}};
                 AccUncopiedSize2 >= BufferSize ->
                     NewSt2 = copy_docs(
                         St, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry
