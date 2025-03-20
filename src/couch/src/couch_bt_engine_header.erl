@@ -39,7 +39,8 @@
     uuid/1,
     epochs/1,
     compacted_seq/1,
-    drop_seq/1
+    drop_seq/1,
+    drop_count/1
 ]).
 
 -include_lib("stdlib/include/assert.hrl").
@@ -73,7 +74,8 @@
     compacted_seq,
     purge_infos_limit = 1000,
     props_ptr,
-    drop_seq = 0
+    drop_seq = 0,
+    drop_count = 0
 }).
 
 -define(PARTITION_DISK_VERSION, 8).
@@ -90,7 +92,8 @@ from(Header0) ->
         uuid = Header#db_header.uuid,
         epochs = Header#db_header.epochs,
         compacted_seq = Header#db_header.compacted_seq,
-        drop_seq = Header#db_header.drop_seq
+        drop_seq = Header#db_header.drop_seq,
+        drop_count = Header#db_header.drop_count
     }.
 
 is_header(Header) ->
@@ -181,6 +184,9 @@ compacted_seq(Header) ->
 
 drop_seq(Header) ->
     get_field(Header, drop_seq).
+
+drop_count(Header) ->
+    get_field(Header, drop_count).
 
 purge_infos_limit(Header) ->
     get_field(Header, purge_infos_limit).

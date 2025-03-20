@@ -45,6 +45,7 @@
     get_partition_info/2,
     get_update_seq/1,
     get_drop_seq/1,
+    get_drop_count/1,
     get_uuid/1,
 
     set_revs_limit/2,
@@ -54,6 +55,7 @@
 
     set_update_seq/2,
     set_drop_seq/3,
+    increment_drop_count/1,
 
     open_docs/2,
     open_local_docs/2,
@@ -330,6 +332,9 @@ get_update_seq(#st{header = Header}) ->
 
 get_drop_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, drop_seq).
+
+get_drop_count(#st{header = Header}) ->
+    couch_bt_engine_header:get(Header, drop_count).
 
 get_uuid(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, uuid).
@@ -820,12 +825,11 @@ set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
     CurrentDropSeq = get_drop_seq(St),
     Uuid = get_uuid(St),
     ActualUuidPrefix = binary:part(Uuid, 0, byte_size(ExpectedUuidPrefix)),
-
     if
-        NewDropSeq < CurrentDropSeq ->
-            {error, drop_seq_cant_decrease};
         ExpectedUuidPrefix /= ActualUuidPrefix ->
             {error, uuid_mismatch};
+        NewDropSeq < CurrentDropSeq ->
+            {error, {drop_seq_cant_decrease, CurrentDropSeq, NewDropSeq}};
         true ->
             NewSt = St#st{
                 header = couch_bt_engine_header:set(Header, [
@@ -835,6 +839,14 @@ set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
             },
             {ok, increment_update_seq(NewSt)}
     end.
+
+increment_drop_count(#st{header = Header} = St) ->
+    CurrentDropCount = get_drop_count(St),
+    NewSt = St#st{
+        header = couch_bt_engine_header:set(Header, [{drop_count, CurrentDropCount + 1}]),
+        needs_commit = true
+    },
+    {ok, NewSt}.
 
 copy_security(#st{header = Header} = St, SecProps) ->
     Options = [{compression, St#st.compression}],

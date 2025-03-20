@@ -42,6 +42,7 @@
     get_db_info/1,
     get_partition_info/2,
     get_del_doc_count/1,
+    get_drop_count/1,
     get_doc_count/1,
     get_epochs/1,
     get_filepath/1,
@@ -579,6 +580,9 @@ get_pid(#db{main_pid = Pid}) ->
 get_del_doc_count(Db) ->
     {ok, couch_db_engine:get_del_doc_count(Db)}.
 
+get_drop_count(Db) ->
+    {ok, couch_db_engine:get_drop_count(Db)}.
+
 get_doc_count(Db) ->
     {ok, couch_db_engine:get_doc_count(Db)}.
 
@@ -619,6 +623,7 @@ get_db_info(Db) ->
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
+    {ok, DropCount} = get_drop_count(Db),
     SizeInfo = couch_db_engine:get_size_info(Db),
     DiskVersion = couch_db_engine:get_disk_version(Db),
     Uuid =
@@ -641,6 +646,7 @@ get_db_info(Db) ->
         {engine, couch_db_engine:get_engine(Db)},
         {doc_count, DocCount},
         {doc_del_count, DelDocCount},
+        {drop_count, DropCount},
         {update_seq, get_update_seq(Db)},
         {purge_seq, couch_db_engine:get_purge_seq(Db)},
         {compact_running, Compactor /= nil},
