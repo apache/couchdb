@@ -55,7 +55,9 @@
 %% Extra niceties and testing facilities
 -export([
     set_fabric_init_p/2,
-    set_fabric_init_p/3
+    set_fabric_init_p/3,
+    map_to_rctx/1,
+    field/2
 ]).
 
 
@@ -184,8 +186,94 @@ to_json(#rctx{}=Rctx) ->
         write_kp_node => Rctx#rctx.write_kp_node,
         write_kv_node => Rctx#rctx.write_kv_node,
         changes_returned => Rctx#rctx.changes_returned,
+        changes_processed => Rctx#rctx.changes_processed,
         ioq_calls => Rctx#rctx.ioq_calls
     }.
+
+%% NOTE: this does not do the inverse of to_json, should it conver types?
+-spec map_to_rctx(Map :: map()) -> rctx().
+map_to_rctx(Map) ->
+    maps:fold(fun map_to_rctx_field/3, #rctx{}, Map).
+
+-spec map_to_rctx_field(Field :: rctx_field(), Val :: any(), Rctx :: rctx()) -> rctx().
+map_to_rctx_field(updated_at, Val, Rctx) ->
+    Rctx#rctx{updated_at = Val};
+map_to_rctx_field(started_at, Val, Rctx) ->
+    Rctx#rctx{started_at = Val};
+map_to_rctx_field(pid_ref, Val, Rctx) ->
+    Rctx#rctx{pid_ref = Val};
+map_to_rctx_field(nonce, Val, Rctx) ->
+    Rctx#rctx{nonce = Val};
+map_to_rctx_field(dbname, Val, Rctx) ->
+    Rctx#rctx{dbname = Val};
+map_to_rctx_field(username, Val, Rctx) ->
+    Rctx#rctx{username = Val};
+map_to_rctx_field(db_open, Val, Rctx) ->
+    Rctx#rctx{db_open = Val};
+map_to_rctx_field(docs_read, Val, Rctx) ->
+    Rctx#rctx{docs_read = Val};
+map_to_rctx_field(docs_written, Val, Rctx) ->
+    Rctx#rctx{docs_written = Val};
+map_to_rctx_field(js_filter, Val, Rctx) ->
+    Rctx#rctx{js_filter = Val};
+map_to_rctx_field(js_filtered_docs, Val, Rctx) ->
+    Rctx#rctx{js_filtered_docs = Val};
+map_to_rctx_field(rows_read, Val, Rctx) ->
+    Rctx#rctx{rows_read = Val};
+map_to_rctx_field(type, Val, Rctx) ->
+    Rctx#rctx{type = Val};
+map_to_rctx_field(get_kp_node, Val, Rctx) ->
+    Rctx#rctx{get_kp_node = Val};
+map_to_rctx_field(get_kv_node, Val, Rctx) ->
+    Rctx#rctx{get_kv_node = Val};
+map_to_rctx_field(write_kp_node, Val, Rctx) ->
+    Rctx#rctx{write_kp_node = Val};
+map_to_rctx_field(write_kv_node, Val, Rctx) ->
+    Rctx#rctx{write_kv_node = Val};
+map_to_rctx_field(changes_returned, Val, Rctx) ->
+    Rctx#rctx{changes_returned = Val};
+map_to_rctx_field(changes_processed, Val, Rctx) ->
+    Rctx#rctx{changes_processed = Val};
+map_to_rctx_field(ioq_calls, Val, Rctx) ->
+    Rctx#rctx{ioq_calls = Val}.
+
+-spec field(Field :: rctx_field(), Rctx :: rctx()) -> any().
+field(updated_at, #rctx{updated_at = Val}) ->
+    Val;
+field(started_at, #rctx{started_at = Val}) ->
+    Val;
+field(pid_ref, #rctx{pid_ref = Val}) ->
+    Val;
+field(nonce, #rctx{nonce = Val}) ->
+    Val;
+field(dbname, #rctx{dbname = Val}) ->
+    Val;
+field(username, #rctx{username = Val}) ->
+    Val;
+field(db_open, #rctx{db_open = Val}) ->
+    Val;
+field(docs_read, #rctx{docs_read = Val}) ->
+    Val;
+field(docs_written, #rctx{docs_written = Val}) ->
+    Val;
+field(js_filter, #rctx{js_filter = Val}) ->
+    Val;
+field(js_filtered_docs, #rctx{js_filtered_docs = Val}) ->
+    Val;
+field(rows_read, #rctx{rows_read = Val}) ->
+    Val;
+field(type, #rctx{type = Val}) ->
+    Val;
+field(get_kp_node, #rctx{get_kp_node = Val}) ->
+    Val;
+field(get_kv_node, #rctx{get_kv_node = Val}) ->
+    Val;
+field(changes_returned, #rctx{changes_returned = Val}) ->
+    Val;
+field(changes_processed, #rctx{changes_processed = Val}) ->
+    Val;
+field(ioq_calls, #rctx{ioq_calls = Val}) ->
+    Val.
 
 add_delta({A}, Delta) -> {A, Delta};
 add_delta({A, B}, Delta) -> {A, B, Delta};
@@ -253,6 +341,7 @@ rctx_delta(#rctx{}=TA, #rctx{}=TB) ->
         js_filtered_docs => TB#rctx.js_filtered_docs - TA#rctx.js_filtered_docs,
         rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
         changes_returned => TB#rctx.changes_returned - TA#rctx.changes_returned,
+        changes_processed => TB#rctx.changes_processed - TA#rctx.changes_processed,
         get_kp_node => TB#rctx.get_kp_node - TA#rctx.get_kp_node,
         get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
         db_open => TB#rctx.db_open - TA#rctx.db_open,

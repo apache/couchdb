@@ -164,5 +164,8 @@
 -type maybe_delta() :: delta() | undefined.
 -type tagged_delta() :: {delta, maybe_delta()}.
 
--type matchers() :: #{atom() => {ets:match_spec(), ets:comp_match_spec()}}.
+-type matcher_name() :: string(). %% TODO: switch to string to allow dynamic options
+-type matcher() :: {ets:match_spec(), ets:comp_match_spec()}.
+-type maybe_matcher() :: matcher() | undefined.
+-type matchers() :: #{matcher_name() => matcher()}.
 -type maybe_matchers() :: matchers() | undefined.

@@ -48,13 +48,18 @@
 
 %% Matchers
 -export([
+    get_matcher/1,
+    get_matchers/0,
+    is_match/1,
+    is_match/2,
     matcher_on_dbname/1,
     matcher_on_docs_read/1,
     matcher_on_docs_written/1,
     matcher_on_rows_read/1,
     matcher_on_worker_changes_processed/1,
     matcher_on_ioq_calls/1,
-    matcher_on_nonce/1
+    matcher_on_nonce/1,
+    reload_matchers/0
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -122,9 +127,17 @@ find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
         Matchers
     ).
 
+-spec reload_matchers() -> ok.
+reload_matchers() ->
+    ok = gen_server:call(?MODULE, reload_matchers, infinity).
+
 -spec get_matchers() -> matchers().
 get_matchers() ->
     persistent_term:get(?MATCHERS_KEY, #{}).
+
+-spec get_matcher(Name :: matcher_name()) -> maybe_matcher().
+get_matcher(Name) ->
+    maps:get(Name, get_matchers(), undefined).
 
 -spec is_match(Rctx :: maybe_rctx()) -> boolean().
 is_match(undefined) ->
@@ -135,6 +148,8 @@ is_match(#rctx{}=Rctx) ->
 %% TODO: add Matchers spec
 -spec is_match(Rctx :: maybe_rctx(), Matchers :: [any()]) -> boolean().
 is_match(undefined, _Matchers) ->
+    false;
+is_match(_Rctx, undefined) ->
     false;
 is_match(#rctx{}=Rctx, Matchers) when is_map(Matchers) ->
     maps:size(find_matches([Rctx], Matchers)) > 0.
@@ -229,17 +244,19 @@ matcher_on_dbname(DbName)
 -spec matcher_on_docs_read(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_docs_read(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
+    %%ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
+    ets:fun2ms(fun(#rctx{docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
 
 -spec matcher_on_docs_written(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_docs_written(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_written=DocsRead} = R) when DocsRead >= Threshold -> R end).
+    %%ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_written=DocsRead} = R) when DocsRead >= Threshold -> R end).
+    ets:fun2ms(fun(#rctx{docs_written=DocsWritten} = R) when DocsWritten >= Threshold -> R end).
 
 -spec matcher_on_rows_read(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_rows_read(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{rows_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
+    ets:fun2ms(fun(#rctx{rows_read=RowsRead} = R) when RowsRead >= Threshold -> R end).
 
 -spec matcher_on_nonce(Nonce :: nonce()) -> ets:match_spec().
 matcher_on_nonce(Nonce) ->
@@ -317,7 +334,6 @@ initialize_matchers() ->
     couch_log:notice("Initialized ~p CSRT Logger matchers", [maps:size(Matchers)]),
     persistent_term:put(?MATCHERS_KEY, Matchers),
     ok.
-
 
 -spec matcher_enabled(Name :: string()) -> boolean().
 matcher_enabled(Name) when is_list(Name) ->
