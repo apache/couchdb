@@ -242,6 +242,8 @@ matcher_on_dbname(DbName)
         when is_binary(DbName) ->
     ets:fun2ms(fun(#rctx{dbname=DbName1} = R) when DbName =:= DbName1 -> R end).
 
+-spec matcher_on_dbname_io_threshold(DbName, Threshold) -> ets:match_spec() when
+      DbName :: dbname(), Threshold :: pos_integer().
 matcher_on_dbname_io_threshold(DbName, Threshold)
         when is_binary(DbName) ->
     ets:fun2ms(fun(#rctx{dbname=DbName1, ioq_calls=IOQ, get_kv_node=KVN, get_kp_node=KPN, docs_read=Docs, rows_read=Rows, changes_processed=Chgs} = R) when DbName =:= DbName1 andalso ((IOQ > Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or (Rows >= Threshold) or (Chgs >= Threshold)) -> R end).
