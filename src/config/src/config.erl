@@ -506,6 +506,9 @@ expand_dirs_fmap(File) ->
 
 remove_comments(Line) ->
     case trim(Line) of
+        [] ->
+            % Empty line
+            "";
         [$; | _] ->
             % Comment is at the start of line after it's trimmed
             "";
