@@ -68,6 +68,7 @@
 -define(MATCHERS_KEY, {?MODULE, all_csrt_matchers}).
 -define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
 -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
+-define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
 
 -record(st, {
     matchers = #{}
@@ -241,6 +242,10 @@ matcher_on_dbname(DbName)
         when is_binary(DbName) ->
     ets:fun2ms(fun(#rctx{dbname=DbName1} = R) when DbName =:= DbName1 -> R end).
 
+matcher_on_dbname_io_threshold(DbName, Threshold)
+        when is_binary(DbName) ->
+    ets:fun2ms(fun(#rctx{dbname=DbName1, ioq_calls=IOQ, get_kv_node=KVN, get_kp_node=KPN, docs_read=Docs, rows_read=Rows, changes_processed=Chgs} = R) when DbName =:= DbName1 andalso ((IOQ > Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or (Rows >= Threshold) or (Chgs >= Threshold)) -> R end).
+
 -spec matcher_on_docs_read(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_docs_read(Threshold)
         when is_integer(Threshold) andalso Threshold > 0 ->
@@ -331,8 +336,32 @@ initialize_matchers() ->
         #{},
         DefaultMatchers
     ),
-    couch_log:notice("Initialized ~p CSRT Logger matchers", [maps:size(Matchers)]),
-    persistent_term:put(?MATCHERS_KEY, Matchers),
+    Matchers1 = lists:foldl(
+        fun({Dbname, Value}, Matchers0) ->
+            try list_to_integer(Value) of
+                Threshold when Threshold > 0 ->
+                    Name = "dbname_io__" ++ Dbname ++ "__" ++ Value,
+                    DbnameB = list_to_binary(Dbname),
+                    MSpec = matcher_on_dbname_io_threshold(DbnameB, Threshold),
+                    case add_matcher(Name, MSpec, Matchers0) of
+                        {ok, Matchers1} ->
+                            Matchers1;
+                        {error, badarg} ->
+                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [?MODULE, Name]),
+                            Matchers0
+                    end;
+                _ ->
+                    Matchers0
+            catch error:badarg ->
+                couch_log:warning("[~p] Failed to initialize dbname io matcher on: ~p", [?MODULE, Dbname])
+            end
+        end,
+        Matchers,
+        config:get(?CONF_MATCHERS_DBNAMES)
+    ),
+
+    couch_log:notice("Initialized ~p CSRT Logger matchers", [maps:size(Matchers1)]),
+    persistent_term:put(?MATCHERS_KEY, Matchers1),
     ok.
 
 -spec matcher_enabled(Name :: string()) -> boolean().

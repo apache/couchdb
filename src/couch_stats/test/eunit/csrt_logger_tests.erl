@@ -24,6 +24,7 @@
 -define(RCTX_COORDINATOR, {coordinator, foo, bar, 'GET', "/foo/_all_docs"}).
 
 -define(THRESHOLD_DBNAME, <<"foo">>).
+-define(THRESHOLD_DBNAME_IO, 91).
 -define(THRESHOLD_DOCS_READ, 123).
 -define(THRESHOLD_IOQ_CALLS, 439).
 -define(THRESHOLD_ROWS_READ, 143).
@@ -49,6 +50,7 @@ csrt_logger_matchers_test_() ->
         fun teardown/1,
         [
             ?TDEF_FE(t_matcher_on_dbname),
+            ?TDEF_FE(t_matcher_on_dbnames_io),
             ?TDEF_FE(t_matcher_on_docs_read),
             ?TDEF_FE(t_matcher_on_docs_written),
             ?TDEF_FE(t_matcher_on_rows_read),
@@ -87,6 +89,9 @@ setup() ->
     ok = config:set("csrt_logger.matchers_threshold", "ioq_calls", integer_to_list(?THRESHOLD_IOQ_CALLS), false),
     ok = config:set("csrt_logger.matchers_threshold", "rows_read", integer_to_list(?THRESHOLD_ROWS_READ), false),
     ok = config:set("csrt_logger.matchers_threshold", "worker_changes_processed", integer_to_list(?THRESHOLD_CHANGES), false),
+    ok = config:set("csrt_logger.dbnames_io", "foo", integer_to_list(?THRESHOLD_DBNAME_IO), false),
+    ok = config:set("csrt_logger.dbnames_io", "bar", integer_to_list(?THRESHOLD_DBNAME_IO), false),
+    ok = config:set("csrt_logger.dbnames_io", "foo/bar", integer_to_list(?THRESHOLD_DBNAME_IO), false),
     csrt_logger:reload_matchers(),
     #{ctx => Ctx, dbname => DbName, rctx => Rctx, rctxs => rctxs()}.
 
@@ -267,6 +272,34 @@ t_matcher_on_nonce(#{rctxs := Rctxs0}) ->
         "Rows read matcher"
     ).
 
+t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
+    Threshold = ?THRESHOLD_DBNAME_IO,
+    SThreshold = integer_to_list(Threshold),
+    DbFoo = "foo",
+    DbBar = "bar",
+    MatcherFoo = matcher_for_csrt("dbname_io__" ++ DbFoo ++ "__" ++ SThreshold),
+    MatcherBar = matcher_for_csrt("dbname_io__" ++ DbBar ++ "__" ++ SThreshold),
+    MatcherFooBar = matcher_for_csrt("dbname_io__foo/bar__" ++ SThreshold),
+    %% Add an extra Rctx with dbname foo/bar to ensure correct naming matches
+    ExtraRctx = rctx_gen(#{dbname => <<"foo/bar">>, get_kp_node => Threshold + 10}),
+    %% Make sure we have at least one match
+    Rctxs = [ExtraRctx, rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
+    ?assertEqual(
+        lists:sort(lists:filter(matcher_for_dbname_io(DbFoo, Threshold), Rctxs)),
+        lists:sort(lists:filter(MatcherFoo, Rctxs)),
+        "dbname_io foo matcher"
+    ),
+    ?assertEqual(
+        lists:sort(lists:filter(matcher_for_dbname_io(DbBar, Threshold), Rctxs)),
+        lists:sort(lists:filter(MatcherBar, Rctxs)),
+        "dbname_io bar matcher"
+    ),
+    ?assertEqual(
+        [ExtraRctx],
+        lists:sort(lists:filter(MatcherFooBar, Rctxs)),
+        "dbname_io foo/bar matcher"
+    ).
+
 load_rctx(PidRef) ->
     timer:sleep(50), %% Add slight delay to accumulate RPC response deltas
     csrt:get_resource(PidRef).
@@ -288,6 +321,15 @@ matcher_for(Field, Value, Op) ->
 matcher_for_csrt(MatcherName) ->
     Matchers = #{MatcherName => {_, _} = csrt_logger:get_matcher(MatcherName)},
     fun(Rctx) -> csrt_logger:is_match(Rctx, Matchers) end.
+
+matcher_for_dbname_io(Dbname0, Threshold) ->
+    Dbname = list_to_binary(Dbname0),
+    fun(Rctx) ->
+        DbnameA = csrt_util:field(dbname, Rctx),
+        Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read, changes_processed],
+        Vals = [{F, csrt_util:field(F, Rctx)} || F <- Fields],
+        Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun(V) -> V >= Threshold end, Vals)
+    end.
 
 nonce() ->
     couch_util:to_hex(crypto:strong_rand_bytes(5)).
