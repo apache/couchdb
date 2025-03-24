@@ -603,7 +603,12 @@ allowed_languages() ->
     Config =
         couch_proc_manager:get_servers_from_env("COUCHDB_QUERY_SERVER_") ++
             couch_proc_manager:get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_"),
-    Allowed = [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config],
+    Allowed0 = [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config],
+    Allowed =
+        case couch_proc_manager:native_query_server_enabled() of
+            true -> [<<"erlang">> | Allowed0];
+            _Else -> Allowed0
+        end,
     [<<"query">> | Allowed].
 
 config(Key, Default) ->
