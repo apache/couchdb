@@ -25,7 +25,8 @@
     new_proc/1,
     reload/0,
     terminate_stale_procs/0,
-    get_servers_from_env/1
+    get_servers_from_env/1,
+    native_query_server_enabled/0
 ]).
 
 -export([
