@@ -119,7 +119,7 @@ log_process_lifetime_report(PidRef) ->
     end.
 
 %% TODO: add Matchers spec
--spec find_matches(Rctxs :: [rctx()], Matchers :: [any()]) -> matchers().
+-spec find_matches(Rctxs :: [rctx()], Matchers :: matchers()) -> matchers().
 find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
     maps:filter(
         fun(_Name, {_MSpec, CompMSpec}) ->
@@ -147,7 +147,7 @@ is_match(#rctx{}=Rctx) ->
     is_match(Rctx, get_matchers()).
 
 %% TODO: add Matchers spec
--spec is_match(Rctx :: maybe_rctx(), Matchers :: [any()]) -> boolean().
+-spec is_match(Rctx :: maybe_rctx(), Matchers :: matchers()) -> boolean().
 is_match(undefined, _Matchers) ->
     false;
 is_match(_Rctx, undefined) ->
@@ -301,7 +301,7 @@ add_matcher(Name, MSpec, Matchers) ->
             {error, badarg}
     end.
 
--spec set_matchers_term(Matchers :: matchers()) -> maybe_matchers().
+-spec set_matchers_term(Matchers :: matchers()) -> ok.
 set_matchers_term(Matchers) when is_map(Matchers) ->
     persistent_term:put({?MODULE, all_csrt_matchers}, Matchers).
 
