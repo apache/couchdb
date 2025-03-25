@@ -225,7 +225,7 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
-                    .\\configure.ps1 -SkipDeps -WithNouveau -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    .\\configure.ps1 -SkipDeps -WithNouveau -WithClouseau -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     make -f Makefile.win release
                   """, label: 'Configure and Build')
@@ -233,7 +233,7 @@ def generateNativeStage(platform) {
                   //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit", label: 'EUnit tests')
                   //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir", label: 'Elixir tests')
 
-                  powershell( script: '& .\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win elixir-search"', label: 'N/A Clouseau tests')
+                  powershell( script: '& .\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir-search', label: 'Clouseau tests')
 
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
