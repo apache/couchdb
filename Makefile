@@ -276,7 +276,11 @@ endif
 elixir-search: export MIX_ENV=integration
 elixir-search: elixir-init devclean
 ifneq ($(_WITH_CLOUSEAU), )
-	@dev/run -n 1 -q -a adm:pass \
+	@echo "CLOUSEAU_JAVA_HOME=$(CLOUSEAU_JAVA_HOME)"
+	find /usr/local/openjdk8 || /usr/bin/true
+	find /opt/java/openjdk8 || /usr/bin/true
+	java -version || /usr/bin/true
+	dev/run -n 1 -a adm:pass \
 		"$(_WITH_CLOUSEAU)" \
 		"$(TEST_OPTS)" \
 		--locald-config test/config/test-config.ini \
