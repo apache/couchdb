@@ -120,14 +120,12 @@ meta = [
      gnu_make: 'gmake'
   ],
 
- // Excluding clouseau for macos. This stopped working as
- // of https://github.com/apache/couchdb/pull/5180 (bump to 2.23.1)
- // but works for the other workers.
  'macos': [
     name: 'macOS',
     spidermonkey_vsn: '128',
     with_nouveau: false,
-    with_clouseau: false,
+    with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
     gnu_make: 'make'
   ],
 
@@ -180,7 +178,9 @@ def generateNativeStage(platform) {
               withEnv([
                 'HOME='+pwd(),
                 'PATH+USRLOCAL=/usr/local/bin',
-                'MAKE='+meta[platform].gnu_make
+                'PATH+ERTS=/opt/homebrew/lib/erlang/bin',
+                'MAKE='+meta[platform].gnu_make,
+                'CLOUSEAU_JAVA_HOME='+meta[platform].clouseau_java_home ?: ''
               ]) {
                 sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                 sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
