@@ -47,9 +47,7 @@
     is_enabled/0,
     is_enabled_init_p/0,
     do_report/2,
-    maybe_report/2,
-    conf_get/1,
-    conf_get/2
+    maybe_report/2
 ]).
 
 %% stats collection api
@@ -344,16 +342,6 @@ rctx_delta(TA, TB) ->
 %%    false;
 %%update_counter(Field, Count) when Count >= 0 ->
 %%    is_enabled() andalso csrt_server:update_counter(get_pid_ref(), Field, Count).
-
-
--spec conf_get(Key :: string()) -> string().
-conf_get(Key) ->
-    csrt_util:conf_get(Key).
-
-
--spec conf_get(Key :: string(), Default :: string()) -> string().
-conf_get(Key, Default) ->
-    csrt_util:conf_get(Key, Default).
 
 %%
 %% aggregate query api

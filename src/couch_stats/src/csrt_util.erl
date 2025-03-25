@@ -15,8 +15,6 @@
 -export([
     is_enabled/0,
     is_enabled_init_p/0,
-    conf_get/1,
-    conf_get/2,
     get_pid_ref/0,
     get_pid_ref/1,
     set_pid_ref/1,
@@ -76,14 +74,6 @@ should_track_init_p(fabric_rpc, Func) ->
     config:get_boolean(?CSRT_INIT_P, fabric_conf_key(Func), false);
 should_track_init_p(_Mod, _Func) ->
     false.
-
--spec conf_get(Key :: list()) -> list().
-conf_get(Key) ->
-    conf_get(Key, undefined).
-
--spec conf_get(Key :: list(), Default :: list()) -> list().
-conf_get(Key, Default) ->
-    config:get(?CSRT, Key, Default).
 
 %% Monotnonic time now in native format using time forward only event tracking
 -spec tnow() -> integer().
