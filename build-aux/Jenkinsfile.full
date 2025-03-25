@@ -83,6 +83,7 @@ def generateNativeStage(platform) {
               withEnv([
                 'HOME='+pwd(),
                 'PATH+USRLOCAL=/usr/local/bin',
+                'PATH+ERTS=/opt/homebrew/lib/erlang/bin',
                 'MAKE='+meta[platform].gnu_make,
                 'CLOUSEAU_JAVA_HOME='+meta[platform].clouseau_java_home
               ]) {
