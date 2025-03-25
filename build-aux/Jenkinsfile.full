@@ -120,14 +120,11 @@ meta = [
      gnu_make: 'gmake'
   ],
 
- // Excluding clouseau for macos. This stopped working as
- // of https://github.com/apache/couchdb/pull/5180 (bump to 2.23.1)
- // but works for the other workers.
  'macos': [
     name: 'macOS',
     spidermonkey_vsn: '128',
     with_nouveau: false,
-    with_clouseau: false,
+    with_clouseau: true,
     gnu_make: 'make'
   ],
 
