@@ -27,6 +27,7 @@ meta = [
       name: 'FreeBSD x86_64',
       spidermonkey_vsn: '91',
       with_clouseau: true,
+      clouseau_java_home: '/usr/local/openjdk8',
       gnu_make: 'gmake'
   ],
 
@@ -35,6 +36,7 @@ meta = [
     spidermonkey_vsn: '128',
     with_nouveau: false,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
     gnu_make: 'make'
   ]
 ]
@@ -81,7 +83,8 @@ def generateNativeStage(platform) {
               withEnv([
                 'HOME='+pwd(),
                 'PATH+USRLOCAL=/usr/local/bin',
-                'MAKE='+meta[platform].gnu_make
+                'MAKE='+meta[platform].gnu_make,
+                'CLOUSEAU_JAVA_HOME='+meta[platform].clouseau_java_home
               ]) {
                 sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                 sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
