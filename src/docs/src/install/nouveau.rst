@@ -71,6 +71,67 @@ not essential and you may safely kill the JVM without letting it do
 this, though any uncommitted changes are necessarily lost. Once the
 JVM is started again this indexing work will be attempted again.
 
+Securing Nouveau
+================
+
+By default Nouveau uses HTTP without client authentication as it is commonly
+deployed on the same server as CouchDB itself. It is however possible to deploy
+Nouveau with robust security and this is strongly recommended when Nouveau is
+running on a separate server, even over a private network you trust.
+
+To enforce secure communications between CouchDB and the Nouveau server you need
+to modify configuration in both.
+
+We use mutual TLS to achieve private communication and ensure the identity of
+client and server.
+
+Configuring CouchDB to authenticate to Nouveau
+----------------------------------------------
+
+You can configure CouchDB to connect to a secured Nouveau server as follows;
+
+  .. code-block:: ini
+
+    [nouveau]
+    url = https://hostname:port
+    ssl_key_file = path to keyfile
+    ssl_cert_file = path to certfile
+    ssl_cacert_file = path to cacertfile
+    ssl_password = password
+
+You must set ``ssl_key_file`` and ``ssl_cert_file`` to activate client
+certificates. You might also need to set ``ssl_password`` if the
+``ssl_key_file`` is password-protected and might need to set ``ssl_cacert_file``
+if the Nouveau server's certificate is signed by a private CA.
+
+Configuring Nouveau to authenticate clients
+-------------------------------------------
+
+Nouveau is built on the dropwizard framework, which directly supports the `HTTPS
+<https://www.dropwizard.io/en/stable/manual/configuration.html#https>` transports.
+
+Acquiring or generating client and server certificates are out of scope of this
+documentation and we assume they have been created from here onward. We further
+assume the user can construct a Java keystore.
+
+in ``nouveau.yaml`` you should remove all connectors of type ``http`` and add new
+ones using ``https``;
+
+  .. code-block:: yaml
+
+    server:
+      applicationConnectors:
+        - type: https
+          port: 5987
+          keyStorePath: <path to keystore>
+          keyStorePassword: <password to keystore>
+          needClientAuth: true
+          validateCerts: true
+          validatePeers: true
+
+If you're using self-generated certificates you will also need to set the
+``trustStorePath`` and ``trustStorePassword`` attributes.
+
 Docker
 ======
 

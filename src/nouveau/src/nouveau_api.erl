@@ -315,21 +315,23 @@ send_if_enabled(Url, Header, Method) ->
 send_if_enabled(Url, Header, Method, Body) ->
     send_if_enabled(Url, Header, Method, Body, []).
 
-send_if_enabled(Url, Header, Method, Body, Options) ->
+send_if_enabled(Url, Header, Method, Body, Options0) ->
     case nouveau:enabled() of
         true ->
+            Options1 = ibrowse_options(Options0),
             retry_if_connection_closes(fun() ->
-                ibrowse:send_req(Url, Header, Method, Body, Options)
+                ibrowse:send_req(Url, Header, Method, Body, Options1)
             end);
         false ->
             {error, nouveau_not_enabled}
     end.
 
-send_direct_if_enabled(ConnPid, Url, Header, Method, Body, Options) ->
+send_direct_if_enabled(ConnPid, Url, Header, Method, Body, Options0) ->
     case nouveau:enabled() of
         true ->
+            Options1 = ibrowse_options(Options0),
             retry_if_connection_closes(fun() ->
-                ibrowse:send_req_direct(ConnPid, Url, Header, Method, Body, Options)
+                ibrowse:send_req_direct(ConnPid, Url, Header, Method, Body, Options1)
             end);
         false ->
             {error, nouveau_not_enabled}
@@ -350,3 +352,28 @@ retry_if_connection_closes(Fun, N) when is_integer(N), N > 0 ->
         Else ->
             Else
     end.
+
+ibrowse_options(BaseOptions) when is_list(BaseOptions) ->
+    CACertFile = config:get("nouveau", "ssl_cacert_file"),
+    KeyFile = config:get("nouveau", "ssl_key_file"),
+    CertFile = config:get("nouveau", "ssl_cert_file"),
+    Password = config:get("nouveau", "ssl_password"),
+    if
+        KeyFile /= undefined andalso CertFile /= undefined ->
+            CertKeyConf0 = #{
+                certfile => CertFile,
+                keyfile => KeyFile,
+                password => Password,
+                cacertfile => CACertFile
+            },
+            CertKeyConf1 = maps:filter(fun remove_undefined/2, CertKeyConf0),
+            SSLOptions = [{certs_keys, [CertKeyConf1]}],
+            [{ssl_options, SSLOptions} | BaseOptions];
+        true ->
+            BaseOptions
+    end.
+
+remove_undefined(_Key, undefined) ->
+    false;
+remove_undefined(_Key, _Value) ->
+    true.
