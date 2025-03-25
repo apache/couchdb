@@ -107,7 +107,7 @@ meta = [
   'freebsd-x86_64': [
       name: 'FreeBSD x86_64',
       spidermonkey_vsn: '91',
-      with_clouseau: false,
+      with_clouseau: true,
       gnu_make: 'gmake'
   ],
 
