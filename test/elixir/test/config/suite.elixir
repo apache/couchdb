@@ -438,7 +438,8 @@
   "ReduceBuiltinTest": [
     "Builtin count and sum reduce for key as array",
     "Builtin reduce functions",
-    "Builtin reduce functions with trailings"
+    "Builtin reduce functions with trailings",
+    "Invalid built-in reduce functions"
   ],
   "ReduceFalseTest": [
     "Basic reduce functions"

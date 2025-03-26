@@ -196,7 +196,13 @@ builtin_reduce(Re, [<<"_stats", _/binary>> | BuiltinReds], KVs, Acc) ->
     builtin_reduce(Re, BuiltinReds, KVs, [Stats | Acc]);
 builtin_reduce(Re, [<<"_approx_count_distinct", _/binary>> | BuiltinReds], KVs, Acc) ->
     Distinct = approx_count_distinct(Re, KVs),
-    builtin_reduce(Re, BuiltinReds, KVs, [Distinct | Acc]).
+    builtin_reduce(Re, BuiltinReds, KVs, [Distinct | Acc]);
+builtin_reduce(Re, [<<"_top_", N/binary>> | BuiltinReds], KVs, Acc) ->
+    Top = builtin_rank_n(Re, fun rank_fun_top/2, binary_to_integer(N), KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [Top | Acc]);
+builtin_reduce(Re, [<<"_bottom_", N/binary>> | BuiltinReds], KVs, Acc) ->
+    Bottom = builtin_rank_n(Re, fun rank_fun_bottom/2, binary_to_integer(N), KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [Bottom | Acc]).
 
 builtin_sum_rows([], Acc) ->
     Acc;
@@ -384,6 +390,21 @@ approx_count_distinct(reduce, KVs) ->
     );
 approx_count_distinct(rereduce, Reds) ->
     couch_hyper:union([Filter || [_, Filter] <- Reds]).
+
+builtin_rank_n(reduce, RankFun, N, KVs) when is_integer(N), N > 0 ->
+    Fun = fun([[_Key, _Id], Value], Acc) -> lists:umerge(RankFun, Acc, [Value]) end,
+    lists:sublist(lists:foldl(Fun, [], KVs), N);
+builtin_rank_n(rereduce, _Rank, N, []) when is_integer(N), N > 0 ->
+    [];
+builtin_rank_n(rereduce, RankFun, N, [[_, KVs0] | Rest]) when is_integer(N), N > 0 ->
+    Fun = fun([_, KVs], Acc) -> lists:umerge(RankFun, Acc, KVs) end,
+    lists:sublist(lists:foldl(Fun, KVs0, Rest), N).
+
+rank_fun_top(A, B) ->
+    couch_ejson_compare:less(A, B) >= 0.
+
+rank_fun_bottom(A, B) ->
+    couch_ejson_compare:less(A, B) =< 0.
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 -spec validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when

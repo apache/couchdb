@@ -62,7 +62,9 @@ defmodule ReduceBuiltinTest do
         :builtin_approx_count_distinct => %{
           :map => map,
           :reduce => "_approx_count_distinct"
-        }
+        },
+        :builtin_top => %{:map => map, :reduce => "_top_3"},
+        :builtin_bottom => %{:map => map, :reduce => "_bottom_3"}
       }
     }
 
@@ -80,6 +82,10 @@ defmodule ReduceBuiltinTest do
     assert value["sumsqr"] == 2 * sumsqr(num_docs)
     value = ddoc_url |> query_value("_approx_count_distinct")
     assert check_approx_distinct(num_docs, value)
+    value = ddoc_url |> query_value("_top")
+    assert value == [500, 499, 498]
+    value = ddoc_url |> query_value("_bottom")
+    assert value == [1, 2, 3]
 
     value = ddoc_url |> query_value("_sum", %{startkey: 4, endkey: 4})
     assert value == 8
@@ -87,6 +93,10 @@ defmodule ReduceBuiltinTest do
     assert value == 2
     value = ddoc_url |> query_value("_approx_count_distinct", %{startkey: 4, endkey: 4})
     assert check_approx_distinct(1, value)
+    value = ddoc_url |> query_value("_top", %{startkey: 4, endkey: 4})
+    assert value == [4]
+    value = ddoc_url |> query_value("_bottom", %{startkey: 4, endkey: 4})
+    assert value == [4]
 
     value = ddoc_url |> query_value("_sum", %{startkey: 4, endkey: 5})
     assert value == 18
@@ -94,6 +104,10 @@ defmodule ReduceBuiltinTest do
     assert value == 4
     value = ddoc_url |> query_value("_approx_count_distinct", %{startkey: 4, endkey: 5})
     assert check_approx_distinct(2, value)
+    value = ddoc_url |> query_value("_top", %{startkey: 4, endkey: 5})
+    assert value == [5, 4]
+    value = ddoc_url |> query_value("_bottom", %{startkey: 4, endkey: 5})
+    assert value == [4, 5]
 
     value = ddoc_url |> query_value("_sum", %{startkey: 4, endkey: 6})
     assert value == 30
@@ -101,6 +115,10 @@ defmodule ReduceBuiltinTest do
     assert value == 6
     value = ddoc_url |> query_value("_approx_count_distinct", %{startkey: 4, endkey: 6})
     assert check_approx_distinct(3, value)
+    value = ddoc_url |> query_value("_top", %{startkey: 4, endkey: 6})
+    assert value == [6, 5, 4]
+    value = ddoc_url |> query_value("_bottom", %{startkey: 4, endkey: 6})
+    assert value == [4, 5, 6]
 
     assert [row0, row1, row2] = ddoc_url |> query_rows("_sum", %{group: true, limit: 3})
     assert row0["value"] == 2
@@ -113,6 +131,20 @@ defmodule ReduceBuiltinTest do
     assert check_approx_distinct(1, row0["value"])
     assert check_approx_distinct(1, row1["value"])
     assert check_approx_distinct(1, row2["value"])
+
+    assert [row0, row1, row2] =
+             ddoc_url |> query_rows("_top", %{group: true, limit: 3})
+    assert row0["value"] == [1]
+    assert row1["value"] == [2]
+    assert row2["value"] == [3]
+
+
+    assert [row0, row1, row2] =
+             ddoc_url |> query_rows("_bottom", %{group: true, limit: 3})
+
+    assert row0["value"] == [1]
+    assert row1["value"] == [2]
+    assert row2["value"] == [3]
 
     1..div(500, 2)
     |> Enum.take_every(30)
@@ -279,4 +311,76 @@ defmodule ReduceBuiltinTest do
       assert Enum.at(rows, 6) == %{"key" => ["d", "c"], "value" => [10 * i, 10 * i]}
     end
   end
+
+  @tag :with_db
+  test "Invalid built-in reduce functions", context do
+    db_name = context[:db_name]
+    ddoc_url = random_ddoc(db_name)
+    map = ~s"""
+    function (doc) {emit(doc.integer, doc.integer);};
+    """
+
+    design_doc = %{
+      :views => %{
+        :view => %{:map => map, :reduce => "_random_junk"}
+      }
+    }
+    resp = Couch.put(ddoc_url, body: design_doc)
+    assert resp.status_code == 400
+    assert resp.body == %{
+        "error" => "invalid_design_doc",
+        "reason" => "`_random_junk` is not a supported reduce function."
+    }
+
+    design_doc = %{
+      :views => %{
+        :view => %{:map => map, :reduce => "_top_Foo"}
+      }
+    }
+    resp = Couch.put(ddoc_url, body: design_doc)
+    assert resp.status_code == 400
+    assert resp.body == %{
+        "error" => "invalid_design_doc",
+        "reason" => "invalid rank reducer"
+    }
+
+    design_doc = %{
+      :views => %{
+        :view => %{:map => map, :reduce => "_bottom_Foo"}
+      }
+    }
+    resp = Couch.put(ddoc_url, body: design_doc)
+    assert resp.status_code == 400
+    assert resp.body == %{
+        "error" => "invalid_design_doc",
+        "reason" => "invalid rank reducer"
+    }
+
+    design_doc = %{
+      :views => %{
+        :view => %{:map => map, :reduce => "_top_0"}
+      }
+    }
+    resp = Couch.put(ddoc_url, body: design_doc)
+    assert resp.status_code == 400
+    assert resp.body == %{
+        "error" => "invalid_design_doc",
+        "reason" => "rank value must be between 1 and 100"
+    }
+
+    design_doc = %{
+      :views => %{
+        :view => %{:map => map, :reduce => "_top_101"}
+      }
+    }
+    resp = Couch.put(ddoc_url, body: design_doc)
+    assert resp.status_code == 400
+    assert resp.body == %{
+        "error" => "invalid_design_doc",
+        "reason" => "rank value must be between 1 and 100"
+    }
+
+
+  end
+
 end

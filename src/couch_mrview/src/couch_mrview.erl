@@ -25,6 +25,8 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
+-define(MAX_RANK, 100).
+
 -record(mracc, {
     db,
     meta_sent = false,
@@ -211,6 +213,10 @@ validate(Db, DDoc) ->
                     ok;
                 ({_RedName, <<"_approx_count_distinct", _/binary>>}) ->
                     ok;
+                ({_RedName, <<"_top_", N/binary>>}) ->
+                    ok = check_rank(N);
+                ({_RedName, <<"_bottom_", N/binary>>}) ->
+                    ok = check_rank(N);
                 ({_RedName, <<"_", _/binary>> = Bad}) ->
                     Msg = ["`", Bad, "` is not a supported reduce function."],
                     throw({invalid_design_doc, Msg});
@@ -251,6 +257,18 @@ validate(Db, DDoc) ->
         {unknown_query_language, _Lang} ->
             %% Allow users to save ddocs written in unknown languages
             ok
+    end.
+
+check_rank(<<N/binary>>) ->
+    try binary_to_integer(N) of
+        Val when Val >= 1 andalso Val =< ?MAX_RANK ->
+            ok;
+        _ ->
+            Msg = ["rank value must be between 1 and ", integer_to_list(?MAX_RANK)],
+            throw({invalid_design_doc, Msg})
+    catch
+        error:badarg ->
+            throw({invalid_design_doc, "invalid rank reducer"})
     end.
 
 query_all_docs(Db, Args) ->

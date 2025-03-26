@@ -161,6 +161,21 @@ Additionally, CouchDB has a set of built-in reduce functions. These are
 implemented in Erlang and run inside CouchDB, so they are much faster than the
 equivalent JavaScript functions.
 
+.. data:: _top_N
+
+.. versionadded:: 3.5
+
+Top ``N`` values, where ``N`` can be any number between ``1`` and ``100``
+inclusive. For instance, ``_top_5`` returns the list of the top 5 values.
+
+.. data:: _bottom_N
+
+.. versionadded:: 3.5
+
+Bottom ``N`` values where ``N`` can be any number between ``1`` and ``100``
+inclusive. For instance, ``_bottom_10`` returns the list of the bottom 10
+values.
+
 .. data:: _approx_count_distinct
 
 .. versionadded:: 2.2
