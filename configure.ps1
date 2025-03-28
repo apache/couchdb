@@ -14,9 +14,9 @@
   -CouchDBUser USER          set the username to run as (defaults to current user)
   -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
   -JSEngine ENGINE           select JS engine to use (spidermonkey or quickjs) (default spidermonkey)
-  -ClouseauVersion VSN       select the version of Clouseau to use (default 2.23.1)
+  -ClouseauVersion VSN       select the version of Clouseau to use (default 2.25.0)
   -ClouseauMethod MTH        method for Clouseau to deploy: git or dist (default dist)
-  -ClouseauUri URI           location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.23.1/clouseau-2.23.1-dist.zip)
+  -ClouseauUri URI           location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.25.0/clouseau-2.25.0-dist.zip)
 
   Installation directories:
   -Prefix PREFIX             install architecture-independent files in PREFIX
@@ -66,9 +66,9 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauVersion = "2.23.1", # select the version of Clouseau to use (default 2.23.1)
+    [string]$ClouseauVersion = "2.25.0", # select the version of Clouseau to use (default 2.25.0)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.23.1/clouseau-2.23.1-dist.zip)
+    [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.25.0/clouseau-2.25.0-dist.zip)
     [ValidateNotNullOrEmpty()]
     [string]$Prefix = "C:\Program Files\Apache\CouchDB", # install architecture-independent file location (default C:\Program Files\Apache\CouchDB)
     [ValidateNotNullOrEmpty()]
