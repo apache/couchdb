@@ -124,6 +124,12 @@ def generateNativeStage(platform) {
                   "HOMEPATH=${env.HOME}"
                 ]) {
                   dir( "${platform}/build" ) {
+
+                    powershell( script: """
+                      .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      gci env:* | sort-object name
+                    """, label: 'dump environment settings')
+
                     withClouseau = meta[platform].with_clouseau ? '-WithClouseau' : ''
 
                     powershell( script: """
