@@ -100,6 +100,10 @@ finalize(<<"_approx_count_distinct", _/binary>>, Reduction) ->
     {ok, round(couch_hyper:card(Reduction))};
 finalize(<<"_stats", _/binary>>, Unpacked) ->
     {ok, pack_stats(Unpacked)};
+finalize(<<"_first", _/binary>>, {_K, _Id, V}) ->
+    {ok, V};
+finalize(<<"_last", _/binary>>, {_K, _Id, V}) ->
+    {ok, V};
 finalize(_RedSrc, Reduction) ->
     {ok, Reduction}.
 
@@ -202,7 +206,13 @@ builtin_reduce(Re, [<<"_top_", N/binary>> | BuiltinReds], KVs, Acc) ->
     builtin_reduce(Re, BuiltinReds, KVs, [Top | Acc]);
 builtin_reduce(Re, [<<"_bottom_", N/binary>> | BuiltinReds], KVs, Acc) ->
     Bottom = builtin_rank_n(Re, fun rank_fun_bottom/2, binary_to_integer(N), KVs),
-    builtin_reduce(Re, BuiltinReds, KVs, [Bottom | Acc]).
+    builtin_reduce(Re, BuiltinReds, KVs, [Bottom | Acc]);
+builtin_reduce(Re, [<<"_first", _/binary>> | BuiltinReds], KVs, Acc) ->
+    First = builtin_first_last(Re, fun builtin_cmp_first/2, KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [First | Acc]);
+builtin_reduce(Re, [<<"_last", _/binary>> | BuiltinReds], KVs, Acc) ->
+    Last = builtin_first_last(Re, fun builtin_cmp_last/2, KVs),
+    builtin_reduce(Re, BuiltinReds, KVs, [Last | Acc]).
 
 builtin_sum_rows([], Acc) ->
     Acc;
@@ -405,6 +415,39 @@ rank_fun_top(A, B) ->
 
 rank_fun_bottom(A, B) ->
     couch_ejson_compare:less(A, B) =< 0.
+
+builtin_first_last(reduce, _CmpFun, []) ->
+    [];
+builtin_first_last(reduce, CmpFun, [[[Key0, Id0], Value0] | Rest]) ->
+    lists:foldl(
+        fun([[K, Id], V], {AccK, AccId, _AccV} = Acc) ->
+            case CmpFun({K, Id}, {AccK, AccId}) of
+                true -> {K, Id, V};
+                false -> Acc
+            end
+        end,
+        {Key0, Id0, Value0},
+        Rest
+    );
+builtin_first_last(rereduce, _CmpFun, []) ->
+    [];
+builtin_first_last(rereduce, CmpFun, [[_, {K0, Id0, V0}] | Rest]) ->
+    lists:foldl(
+        fun([_, {K, Id, V}], {AccK, AccId, _AccV} = Acc) ->
+            case CmpFun({K, Id}, {AccK, AccId}) of
+                true -> {K, Id, V};
+                false -> Acc
+            end
+        end,
+        {K0, Id0, V0},
+        Rest
+    ).
+
+builtin_cmp_first(A, B) ->
+    couch_ejson_compare:less_json_ids(A, B).
+
+builtin_cmp_last(A, B) ->
+    not couch_ejson_compare:less_json_ids(A, B).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 -spec validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when

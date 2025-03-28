@@ -64,7 +64,9 @@ defmodule ReduceBuiltinTest do
           :reduce => "_approx_count_distinct"
         },
         :builtin_top => %{:map => map, :reduce => "_top_3"},
-        :builtin_bottom => %{:map => map, :reduce => "_bottom_3"}
+        :builtin_bottom => %{:map => map, :reduce => "_bottom_3"},
+        :builtin_first => %{:map => map, :reduce => "_first"},
+        :builtin_last => %{:map => map, :reduce => "_last"},
       }
     }
 
@@ -86,6 +88,10 @@ defmodule ReduceBuiltinTest do
     assert value == [500, 499, 498]
     value = ddoc_url |> query_value("_bottom")
     assert value == [1, 2, 3]
+    value = ddoc_url |> query_value("_first")
+    assert value == 1
+    value = ddoc_url |> query_value("_last")
+    assert value == 500
 
     value = ddoc_url |> query_value("_sum", %{startkey: 4, endkey: 4})
     assert value == 8
@@ -97,6 +103,10 @@ defmodule ReduceBuiltinTest do
     assert value == [4]
     value = ddoc_url |> query_value("_bottom", %{startkey: 4, endkey: 4})
     assert value == [4]
+    value = ddoc_url |> query_value("_first", %{startkey: 4, endkey: 4})
+    assert value == 4
+    value = ddoc_url |> query_value("_last", %{startkey: 4, endkey: 4})
+    assert value == 4
 
     value = ddoc_url |> query_value("_sum", %{startkey: 4, endkey: 5})
     assert value == 18
@@ -108,6 +118,10 @@ defmodule ReduceBuiltinTest do
     assert value == [5, 4]
     value = ddoc_url |> query_value("_bottom", %{startkey: 4, endkey: 5})
     assert value == [4, 5]
+    value = ddoc_url |> query_value("_first", %{startkey: 4, endkey: 5})
+    assert value == 4
+    value = ddoc_url |> query_value("_last", %{startkey: 4, endkey: 5})
+    assert value == 5
 
     value = ddoc_url |> query_value("_sum", %{startkey: 4, endkey: 6})
     assert value == 30
@@ -119,6 +133,10 @@ defmodule ReduceBuiltinTest do
     assert value == [6, 5, 4]
     value = ddoc_url |> query_value("_bottom", %{startkey: 4, endkey: 6})
     assert value == [4, 5, 6]
+    value = ddoc_url |> query_value("_first", %{startkey: 4, endkey: 6})
+    assert value == 4
+    value = ddoc_url |> query_value("_last", %{startkey: 4, endkey: 6})
+    assert value == 6
 
     assert [row0, row1, row2] = ddoc_url |> query_rows("_sum", %{group: true, limit: 3})
     assert row0["value"] == 2
@@ -145,6 +163,20 @@ defmodule ReduceBuiltinTest do
     assert row0["value"] == [1]
     assert row1["value"] == [2]
     assert row2["value"] == [3]
+
+    assert [row0, row1, row2] =
+             ddoc_url |> query_rows("_first", %{group: true, limit: 3})
+
+    assert row0["value"] == 1
+    assert row1["value"] == 2
+    assert row2["value"] == 3
+
+    assert [row0, row1, row2] =
+             ddoc_url |> query_rows("_last", %{group: true, limit: 3})
+
+    assert row0["value"] == 1
+    assert row1["value"] == 2
+    assert row2["value"] == 3
 
     1..div(500, 2)
     |> Enum.take_every(30)
