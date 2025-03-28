@@ -217,6 +217,10 @@ validate(Db, DDoc) ->
                     ok = check_rank(N);
                 ({_RedName, <<"_bottom_", N/binary>>}) ->
                     ok = check_rank(N);
+                ({_RedName, <<"_first", _/binary>>}) ->
+                    ok;
+                ({_RedName, <<"_last", _/binary>>}) ->
+                    ok;
                 ({_RedName, <<"_", _/binary>> = Bad}) ->
                     Msg = ["`", Bad, "` is not a supported reduce function."],
                     throw({invalid_design_doc, Msg});

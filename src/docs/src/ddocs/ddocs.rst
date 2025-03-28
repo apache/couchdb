@@ -161,7 +161,21 @@ Additionally, CouchDB has a set of built-in reduce functions. These are
 implemented in Erlang and run inside CouchDB, so they are much faster than the
 equivalent JavaScript functions.
 
-.. data:: _top_N
+.. data:: _first
+
+.. versionadded:: 3.5
+
+Return the value of the first row in group. For example, for a view like
+``[a,1] : x, [a,2] : y``, queried with ``group_level=1``, it would return ``[a]
+: x``.
+
+.. data:: _last
+
+.. versionadded:: 3.5
+
+Return the value of the last row in group. For example, for a view like
+``[a,1] : x, [a,2] : y``, queried with ``group_level=1``, it would return ``[a]
+: y``.
 
 .. versionadded:: 3.5
 
