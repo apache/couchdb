@@ -121,7 +121,8 @@ def generateNativeStage(platform) {
                 powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
                 powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
                 withEnv([
-                  "HOMEPATH=${env.HOME}"
+                  "HOMEPATH=${env.LOCALAPPDATA}",
+                  "HOME=${env.LOCALAPPDATA}"
                 ]) {
                   dir( "${platform}/build" ) {
 
