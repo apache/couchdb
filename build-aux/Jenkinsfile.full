@@ -176,6 +176,11 @@ def generateNativeStage(platform) {
               catch (err) {
                 powershell( script: "Get-ChildItem ${WORKSPACE}")
                 dir( "${platform}/build" ) {
+                  powershell( script: """
+                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    cat dev/logs/*.log
+                  """, label: 'Dump logs')
+
                   powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win build-report')
                   powershell( script: 'Get-Content test-results.log')
                 }
