@@ -247,9 +247,9 @@ elixir: elixir-init devclean
 		--no-eval 'mix test --trace --include test\elixir\test\config\suite.elixir --exclude test\elixir\test\config\skip.elixir $(EXUNIT_OPTS)'
 
 ifneq ($(CLOUSEAU_DIR),)
-_WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
+_WITH_CLOUSEAU="--with-clouseau --erlang-cookie=crumbles --clouseau-dir=$(CLOUSEAU_DIR)"
 else ifeq ($(with_clouseau), true)
-_WITH_CLOUSEAU="--with-clouseau"
+_WITH_CLOUSEAU="--with-clouseau --erlang-cookie=crumbles"
 endif
 
 .PHONY: elixir-search
