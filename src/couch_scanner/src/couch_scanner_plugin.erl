@@ -35,7 +35,7 @@
 % calls will be called with the same St object, and may return an updated
 % version of it.
 %
-% If the plugin hasn't completed runing and has resumed running after the node
+% If the plugin hasn't completed running and has resumed running after the node
 % was restarted or an error happened, the resume/2 function will be called.
 % That's the difference between start and resume: start/2 is called when the
 % scan starts from the beginning (first db, first shard, ...), and resume/2 is
@@ -52,7 +52,7 @@
 % checkpoint map value.
 %
 % The complete/1 callback is called when the scan has finished. The complete
-% callback should return final checkpoint map object. The last checkoint will
+% callback should return final checkpoint map object. The last checkpoint will
 % be written and then it will be passed to the start/2 callback if the plugin
 % runs again.
 %
