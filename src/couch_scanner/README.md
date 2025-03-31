@@ -88,7 +88,7 @@ checkpoint document. Plugin modules may implement the optional `checkpoint/1`
 API and save some plugin specific data alongside the database traversal
 checkpoint which gets saved automatically. For instance, it maybe useful for
 plugins to save their start up configuration to detect when it changes so they
-could restart their scanning. Or, it they want to accumulate some statistics
+could restart their scanning. Or, if they want to accumulate some statistics
 and only emit them at the end of the scan.
 
 Reading and writing to checkpoints is done in the
