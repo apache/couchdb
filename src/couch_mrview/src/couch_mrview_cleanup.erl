@@ -15,10 +15,12 @@
 -export([
     run/1,
     cleanup_purges/3,
-    cleanup_indices/2
+    cleanup_indices/2,
+    cleanup_peer_checkpoints/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 run(Db) ->
     Indices = couch_mrview_util:get_index_files(Db),
@@ -42,6 +44,38 @@ cleanup_indices(#{} = Sigs, #{} = IndexMap) ->
     Fun = fun(_, Files) -> lists:foreach(fun delete_file/1, Files) end,
     maps:map(Fun, maps:without(maps:keys(Sigs), IndexMap)),
     ok.
+
+cleanup_peer_checkpoints(DbName, Sigs) ->
+    MrArgs = #mrargs{
+        view_type = map,
+        include_docs = true,
+        start_key = <<"_local/peer-checkpoint-mrview-">>,
+        end_key = <<"_local/peer-checkpoint-mrview.">>,
+        extra = [
+            {include_system, true},
+            {namespace, <<"_local">>}
+        ]
+    },
+    {ok, {Sigs, DocsToDelete}} = fabric:all_docs(
+        DbName, fun cleanup_peer_checkpoints_cb/2, {Sigs, []}, MrArgs
+    ),
+    {ok, _} = fabric:update_docs(DbName, DocsToDelete, [?ADMIN_CTX]).
+
+cleanup_peer_checkpoints_cb({row, Row}, {KeepSigs, DocsToDelete} = Acc) ->
+    {doc, JsonDoc} = lists:keyfind(doc, 1, Row),
+    Doc = couch_doc:from_json_obj(JsonDoc),
+    #doc{
+        id = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-mrview-", SigHash/binary>>
+    } = Doc,
+    [Sig, _Hash] = binary:split(SigHash, <<"-">>),
+    case maps:is_key(Sig, KeepSigs) of
+        true ->
+            {ok, Acc};
+        false ->
+            {ok, {KeepSigs, [Doc#doc{deleted = true, body = {[]}} | DocsToDelete]}}
+    end;
+cleanup_peer_checkpoints_cb(_Else, Acc) ->
+    {ok, Acc}.
 
 delete_file(File) ->
     RootDir = couch_index_util:root_dir(),

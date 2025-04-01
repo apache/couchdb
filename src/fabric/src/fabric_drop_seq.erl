@@ -6,6 +6,11 @@
 
 -export([go/1]).
 
+-export([
+    create_peer_checkpoint_doc_if_missing/3,
+    update_peer_checkpoint_doc/3
+]).
+
 -type range() :: [non_neg_integer()].
 
 -type uuid() :: binary().
@@ -222,3 +227,62 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
         #{},
         ShardSyncHistory
     ).
+
+create_peer_checkpoint_doc_if_missing(DbName, PeerId, UpdateSeq) when
+    is_binary(DbName), is_binary(PeerId), is_integer(UpdateSeq)
+->
+    create_peer_checkpoint_doc_if_missing(DbName, PeerId, pack_seq(DbName, UpdateSeq));
+create_peer_checkpoint_doc_if_missing(DbName, PeerId, UpdateSeq) when
+    is_binary(DbName), is_binary(PeerId), is_binary(UpdateSeq)
+->
+    {_, Ref} = spawn_monitor(fun() ->
+        case fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(PeerId), [?ADMIN_CTX]) of
+            {ok, _} ->
+                ok;
+            {not_found, _} ->
+                update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq);
+            {error, Reason} ->
+                throw({checkpoint_commit_failure, Reason})
+        end
+    end),
+    receive
+        {'DOWN', Ref, _, _, ok} ->
+            ok;
+        {'DOWN', Ref, _, _, Else} ->
+            Else
+    end.
+
+update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq) when
+    is_binary(DbName), is_binary(PeerId), is_integer(UpdateSeq)
+->
+    update_peer_checkpoint_doc(DbName, PeerId, pack_seq(DbName, UpdateSeq));
+update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq) when
+    is_binary(DbName), is_binary(PeerId), is_binary(UpdateSeq)
+->
+    Doc = peer_checkpoint_doc(PeerId, UpdateSeq),
+    {_, Ref} = spawn_monitor(fun() ->
+        case fabric:update_doc(mem3:dbname(DbName), Doc, [?ADMIN_CTX]) of
+            {ok, _} ->
+                ok;
+            {error, Reason} ->
+                throw({checkpoint_commit_failure, Reason})
+        end
+    end),
+    receive
+        {'DOWN', Ref, _, _, ok} ->
+            ok;
+        {'DOWN', Ref, _, _, Else} ->
+            Else
+    end.
+
+peer_checkpoint_doc(PeerId, UpdateSeq) when is_binary(PeerId), is_binary(UpdateSeq) ->
+    #doc{id = peer_checkpoint_id(PeerId), body = {[{<<"update_seq">>, UpdateSeq}]}}.
+
+peer_checkpoint_id(PeerId) ->
+    <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", PeerId/binary>>.
+
+pack_seq(DbName, UpdateSeq) ->
+    DbUuid = couch_util:with_db(DbName, fun(Db) -> couch_db:get_uuid(Db) end),
+    Seq0 = [node(), mem3:range(DbName), {UpdateSeq, DbUuid, node()}],
+    Seq1 = couch_util:encodeBase64Url(?term_to_bin(Seq0, [compressed])),
+    <<(integer_to_binary(UpdateSeq))/binary, $-, Seq1/binary>>.
