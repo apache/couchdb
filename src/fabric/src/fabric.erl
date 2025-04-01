@@ -586,18 +586,19 @@ cleanup_index_files() ->
 cleanup_index_files(DbName) ->
     try
         ShardNames = [mem3:name(S) || S <- mem3:local_shards(dbname(DbName))],
-        cleanup_local_indices_and_purge_checkpoints(ShardNames)
+        Sigs = couch_mrview_util:get_signatures(hd(ShardNames)),
+        cleanup_local_indices_and_purge_checkpoints(Sigs, ShardNames),
+        cleanup_peer_checkpoints(DbName, Sigs)
     catch
         error:database_does_not_exist ->
             ok
     end.
 
-cleanup_local_indices_and_purge_checkpoints([]) ->
+cleanup_local_indices_and_purge_checkpoints(_Sigs, []) ->
     ok;
-cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
+cleanup_local_indices_and_purge_checkpoints(Sigs, [_ | _] = Dbs) ->
     AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
     AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
-    Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
     ok = cleanup_purges(Sigs, AllPurges, Dbs),
     ok = cleanup_indices(Sigs, AllIndices).
 
@@ -613,6 +614,9 @@ cleanup_indices(Sigs, AllIndices) ->
         couch_mrview_cleanup:cleanup_indices(Sigs, DbIndices)
     end,
     lists:foreach(Fun, AllIndices).
+
+cleanup_peer_checkpoints(DbName, Sigs) ->
+    couch_mrview_cleanup:cleanup_peer_checkpoints(DbName, Sigs).
 
 %% @doc clean up index files for a specific db on all nodes
 -spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
