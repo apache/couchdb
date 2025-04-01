@@ -33,6 +33,12 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
         write_queue = WriteQueue
     },
 
+    fabric_drop_seq:create_peer_checkpoint_doc_if_missing(
+        State#mrst.db_name,
+        peer_checkpoint_id(State),
+        State#mrst.update_seq
+    ),
+
     Self = self(),
 
     MapFun = fun() ->
@@ -381,3 +387,8 @@ maybe_notify(State, View, KVs, ToRem) ->
         [Key || {Key, _DocId} <- ToRem]
     end,
     couch_index_plugin:index_update(State, View, Updated, Removed).
+
+peer_checkpoint_id(#mrst{} = State) ->
+    Sig = couch_util:encodeBase64Url(State#mrst.sig),
+    Hash = couch_util:encodeBase64Url(crypto:hash(sha256, [atom_to_binary(node()), $0, State#mrst.db_name])),
+    <<"mrview-", Sig/binary, "-", Hash/binary>>.
