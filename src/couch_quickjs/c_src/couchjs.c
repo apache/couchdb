@@ -94,7 +94,6 @@ static void add_cx_methods(JSContext* cx) {
   JS_AddIntrinsicRegExp(cx);
   JS_AddIntrinsicMapSet(cx);
   JS_AddIntrinsicDate(cx);
-  JS_AddIntrinsicBigInt(cx);
 }
 
 // Creates a new JSContext with only the provided sandbox function

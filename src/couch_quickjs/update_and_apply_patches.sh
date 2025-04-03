@@ -39,7 +39,6 @@ rm quickjs/unicode_gen_def.h
 rm quickjs/unicode_download.sh
 rm quickjs/repl.js
 rm quickjs/qjs.c
-rm quickjs/qjscalc.js
 rm quickjs/TODO
 echo
 echo " * apply patches"

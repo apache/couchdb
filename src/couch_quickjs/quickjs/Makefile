@@ -34,7 +34,7 @@ endif
 #CONFIG_LTO=y
 # consider warnings as errors (for development)
 #CONFIG_WERROR=y
-# force 32 bit build for some utilities
+# force 32 bit build on x86_64
 #CONFIG_M32=y
 # cosmopolitan build (see https://github.com/jart/cosmopolitan)
 #CONFIG_COSMO=y
@@ -50,9 +50,6 @@ PREFIX?=/usr/local
 #CONFIG_MSAN=y
 # use UB sanitizer
 #CONFIG_UBSAN=y
-
-# include the code for BigFloat/BigDecimal and math mode
-CONFIG_BIGNUM=y
 
 OBJDIR=.obj
 
@@ -124,7 +121,7 @@ else
   HOST_CC=gcc
   CC=$(CROSS_PREFIX)gcc
   CFLAGS+=-g -Wall -MMD -MF $(OBJDIR)/$(@F).d
-  CFLAGS += -Wno-array-bounds -Wno-format-truncation
+  CFLAGS += -Wno-array-bounds -Wno-format-truncation -Wno-infinite-recursion
   ifdef CONFIG_LTO
     AR=$(CROSS_PREFIX)gcc-ar
   else
@@ -132,14 +129,18 @@ else
   endif
 endif
 STRIP?=$(CROSS_PREFIX)strip
+ifdef CONFIG_M32
+CFLAGS+=-msse2 -mfpmath=sse # use SSE math for correct FP rounding
+ifndef CONFIG_WIN32
+CFLAGS+=-m32
+LDFLAGS+=-m32
+endif
+endif
 CFLAGS+=-fwrapv # ensure that signed overflows behave as expected
 ifdef CONFIG_WERROR
 CFLAGS+=-Werror
 endif
 DEFINES:=-D_GNU_SOURCE -DCONFIG_VERSION=\"$(shell cat VERSION)\"
-ifdef CONFIG_BIGNUM
-DEFINES+=-DCONFIG_BIGNUM
-endif
 ifdef CONFIG_WIN32
 DEFINES+=-D__USE_MINGW_ANSI_STDIO # for standard snprintf behavior
 endif
@@ -201,12 +202,6 @@ else
 QJSC_CC=$(CC)
 QJSC=./qjsc$(EXE)
 endif
-ifndef CONFIG_WIN32
-PROGS+=qjscalc
-endif
-ifdef CONFIG_M32
-PROGS+=qjs32 qjs32_s
-endif
 PROGS+=libquickjs.a
 ifdef CONFIG_LTO
 PROGS+=libquickjs.lto.a
@@ -217,7 +212,11 @@ ifeq ($(CROSS_PREFIX),)
 ifndef CONFIG_ASAN
 ifndef CONFIG_MSAN
 ifndef CONFIG_UBSAN
-PROGS+=examples/hello examples/hello_module examples/test_fib
+PROGS+=examples/hello examples/test_fib
+# no -m32 option in qjsc
+ifndef CONFIG_M32
+PROGS+=examples/hello_module
+endif
 ifdef CONFIG_SHARED_LIBS
 PROGS+=examples/fib.so examples/point.so
 endif
@@ -228,12 +227,9 @@ endif
 
 all: $(OBJDIR) $(OBJDIR)/quickjs.check.o $(OBJDIR)/qjs.check.o $(PROGS)
 
-QJS_LIB_OBJS=$(OBJDIR)/quickjs.o $(OBJDIR)/libregexp.o $(OBJDIR)/libunicode.o $(OBJDIR)/cutils.o $(OBJDIR)/quickjs-libc.o $(OBJDIR)/libbf.o
+QJS_LIB_OBJS=$(OBJDIR)/quickjs.o $(OBJDIR)/dtoa.o $(OBJDIR)/libregexp.o $(OBJDIR)/libunicode.o $(OBJDIR)/cutils.o $(OBJDIR)/quickjs-libc.o
 
 QJS_OBJS=$(OBJDIR)/qjs.o $(OBJDIR)/repl.o $(QJS_LIB_OBJS)
-ifdef CONFIG_BIGNUM
-QJS_OBJS+=$(OBJDIR)/qjscalc.o
-endif
 
 HOST_LIBS=-lm -ldl -lpthread
 LIBS=-lm
@@ -282,16 +278,6 @@ QJSC_HOST_DEFINES:=-DCONFIG_CC=\"$(HOST_CC)\" -DCONFIG_PREFIX=\"$(PREFIX)\"
 $(OBJDIR)/qjsc.o: CFLAGS+=$(QJSC_DEFINES)
 $(OBJDIR)/qjsc.host.o: CFLAGS+=$(QJSC_HOST_DEFINES)
 
-qjs32: $(patsubst %.o, %.m32.o, $(QJS_OBJS))
-	$(CC) -m32 $(LDFLAGS) $(LDEXPORT) -o $@ $^ $(LIBS)
-
-qjs32_s: $(patsubst %.o, %.m32s.o, $(QJS_OBJS))
-	$(CC) -m32 $(LDFLAGS) -o $@ $^ $(LIBS)
-	@size $@
-
-qjscalc: qjs
-	ln -sf $< $@
-
 ifdef CONFIG_LTO
 LTOEXT=.lto
 else
@@ -312,12 +298,8 @@ libquickjs.fuzz.a: $(patsubst %.o, %.fuzz.o, $(QJS_LIB_OBJS))
 repl.c: $(QJSC) repl.js
 	$(QJSC) -c -o $@ -m repl.js
 
-qjscalc.c: $(QJSC) qjscalc.js
-	$(QJSC) -fbignum -c -o $@ qjscalc.js
-
 ifneq ($(wildcard unicode/UnicodeData.txt),)
-$(OBJDIR)/libunicode.o $(OBJDIR)/libunicode.m32.o $(OBJDIR)/libunicode.m32s.o \
-    $(OBJDIR)/libunicode.nolto.o: libunicode-table.h
+$(OBJDIR)/libunicode.o $(OBJDIR)/libunicode.nolto.o: libunicode-table.h
 
 libunicode-table.h: unicode_gen
 	./unicode_gen unicode $@
@@ -329,10 +311,7 @@ run-test262: $(OBJDIR)/run-test262.o $(QJS_LIB_OBJS)
 run-test262-debug: $(patsubst %.o, %.debug.o, $(OBJDIR)/run-test262.o $(QJS_LIB_OBJS))
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-run-test262-32: $(patsubst %.o, %.m32.o, $(OBJDIR)/run-test262.o $(QJS_LIB_OBJS))
-	$(CC) -m32 $(LDFLAGS) -o $@ $^ $(LIBS)
-
-# object suffix order: nolto, [m32|m32s]
+# object suffix order: nolto
 
 $(OBJDIR)/%.o: %.c | $(OBJDIR)
 	$(CC) $(CFLAGS_OPT) -c -o $@ $<
@@ -348,12 +327,6 @@ $(OBJDIR)/%.pic.o: %.c | $(OBJDIR)
 
 $(OBJDIR)/%.nolto.o: %.c | $(OBJDIR)
 	$(CC) $(CFLAGS_NOLTO) -c -o $@ $<
-
-$(OBJDIR)/%.m32.o: %.c | $(OBJDIR)
-	$(CC) -m32 $(CFLAGS_OPT) -c -o $@ $<
-
-$(OBJDIR)/%.m32s.o: %.c | $(OBJDIR)
-	$(CC) -m32 $(CFLAGS_SMALL) -c -o $@ $<
 
 $(OBJDIR)/%.debug.o: %.c | $(OBJDIR)
 	$(CC) $(CFLAGS_DEBUG) -c -o $@ $<
@@ -371,19 +344,18 @@ unicode_gen: $(OBJDIR)/unicode_gen.host.o $(OBJDIR)/cutils.host.o libunicode.c u
 	$(HOST_CC) $(LDFLAGS) $(CFLAGS) -o $@ $(OBJDIR)/unicode_gen.host.o $(OBJDIR)/cutils.host.o
 
 clean:
-	rm -f repl.c qjscalc.c out.c
+	rm -f repl.c out.c
 	rm -f *.a *.o *.d *~ unicode_gen regexp_test fuzz_eval fuzz_compile fuzz_regexp $(PROGS)
 	rm -f hello.c test_fib.c
 	rm -f examples/*.so tests/*.so
 	rm -rf $(OBJDIR)/ *.dSYM/ qjs-debug
-	rm -rf run-test262-debug run-test262-32
+	rm -rf run-test262-debug
 	rm -f run_octane run_sunspider_like
 
 install: all
 	mkdir -p "$(DESTDIR)$(PREFIX)/bin"
 	$(STRIP) qjs$(EXE) qjsc$(EXE)
 	install -m755 qjs$(EXE) qjsc$(EXE) "$(DESTDIR)$(PREFIX)/bin"
-	ln -sf qjs$(EXE) "$(DESTDIR)$(PREFIX)/bin/qjscalc$(EXE)"
 	mkdir -p "$(DESTDIR)$(PREFIX)/lib/quickjs"
 	install -m644 libquickjs.a "$(DESTDIR)$(PREFIX)/lib/quickjs"
 ifdef CONFIG_LTO
@@ -399,22 +371,17 @@ endif
 HELLO_SRCS=examples/hello.js
 HELLO_OPTS=-fno-string-normalize -fno-map -fno-promise -fno-typedarray \
            -fno-typedarray -fno-regexp -fno-json -fno-eval -fno-proxy \
-           -fno-date -fno-module-loader -fno-bigint
+           -fno-date -fno-module-loader
 
 hello.c: $(QJSC) $(HELLO_SRCS)
 	$(QJSC) -e $(HELLO_OPTS) -o $@ $(HELLO_SRCS)
 
-ifdef CONFIG_M32
-examples/hello: $(OBJDIR)/hello.m32s.o $(patsubst %.o, %.m32s.o, $(QJS_LIB_OBJS))
-	$(CC) -m32 $(LDFLAGS) -o $@ $^ $(LIBS)
-else
 examples/hello: $(OBJDIR)/hello.o $(QJS_LIB_OBJS)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
-endif
 
 # example of static JS compilation with modules
 HELLO_MODULE_SRCS=examples/hello_module.js
-HELLO_MODULE_OPTS=-fno-string-normalize -fno-map -fno-promise -fno-typedarray \
+HELLO_MODULE_OPTS=-fno-string-normalize -fno-map -fno-typedarray \
            -fno-typedarray -fno-regexp -fno-json -fno-eval -fno-proxy \
            -fno-date -m
 examples/hello_module: $(QJSC) libquickjs$(LTOEXT).a $(HELLO_MODULE_SRCS)
@@ -437,7 +404,7 @@ examples/point.so: $(OBJDIR)/examples/point.pic.o
 ###############################################################################
 # documentation
 
-DOCS=doc/quickjs.pdf doc/quickjs.html doc/jsbignum.pdf doc/jsbignum.html
+DOCS=doc/quickjs.pdf doc/quickjs.html
 
 build_doc: $(DOCS)
 
@@ -459,73 +426,40 @@ doc/%.html: doc/%.html.pre
 ifdef CONFIG_SHARED_LIBS
 test: tests/bjson.so examples/point.so
 endif
-ifdef CONFIG_M32
-test: qjs32
-endif
 
 test: qjs
 	./qjs tests/test_closure.js
 	./qjs tests/test_language.js
 	./qjs --std tests/test_builtin.js
 	./qjs tests/test_loop.js
-	./qjs tests/test_bignum.js
+	./qjs tests/test_bigint.js
 	./qjs tests/test_std.js
 	./qjs tests/test_worker.js
 ifdef CONFIG_SHARED_LIBS
-ifdef CONFIG_BIGNUM
-	./qjs --bignum tests/test_bjson.js
-else
 	./qjs tests/test_bjson.js
-endif
 	./qjs examples/test_point.js
 endif
-ifdef CONFIG_BIGNUM
-	./qjs --bignum tests/test_op_overloading.js
-	./qjs --bignum tests/test_bigfloat.js
-	./qjs --qjscalc tests/test_qjscalc.js
-endif
-ifdef CONFIG_M32
-	./qjs32 tests/test_closure.js
-	./qjs32 tests/test_language.js
-	./qjs32 --std tests/test_builtin.js
-	./qjs32 tests/test_loop.js
-	./qjs32 tests/test_bignum.js
-	./qjs32 tests/test_std.js
-	./qjs32 tests/test_worker.js
-ifdef CONFIG_BIGNUM
-	./qjs32 --bignum tests/test_op_overloading.js
-	./qjs32 --bignum tests/test_bigfloat.js
-	./qjs32 --qjscalc tests/test_qjscalc.js
-endif
-endif
 
-stats: qjs qjs32
+stats: qjs
 	./qjs -qd
-	./qjs32 -qd
 
 microbench: qjs
 	./qjs --std tests/microbench.js
 
-microbench-32: qjs32
-	./qjs32 --std tests/microbench.js
-
 ifeq ($(wildcard test262o/tests.txt),)
-test2o test2o-32 test2o-update:
+test2o test2o-update:
 	@echo test262o tests not installed
 else
 # ES5 tests (obsolete)
 test2o: run-test262
 	time ./run-test262 -t -m -c test262o.conf
 
-test2o-32: run-test262-32
-	time ./run-test262-32 -t -m -c test262o.conf
-
 test2o-update: run-test262
 	./run-test262 -t -u -c test262o.conf
 endif
 
 ifeq ($(wildcard test262/features.txt),)
-test2 test2-32 test2-update test2-default test2-check:
+test2 test2-update test2-default test2-check:
 	@echo test262 tests not installed
 else
 # Test262 tests
@@ -534,9 +468,6 @@ test2-default: run-test262
 
 test2: run-test262
 	time ./run-test262 -t -m -c test262.conf -a
-
-test2-32: run-test262-32
-	time ./run-test262-32 -t -m -c test262.conf -a
 
 test2-update: run-test262
 	./run-test262 -t -u -c test262.conf -a
@@ -547,16 +478,14 @@ endif
 
 testall: all test microbench test2o test2
 
-testall-32: all test-32 microbench-32 test2o-32 test2-32
-
-testall-complete: testall testall-32
+testall-complete: testall
 
 node-test:
 	node tests/test_closure.js
 	node tests/test_language.js
 	node tests/test_builtin.js
 	node tests/test_loop.js
-	node tests/test_bignum.js
+	node tests/test_bigint.js
 
 node-microbench:
 	node tests/microbench.js -s microbench-node.txt
