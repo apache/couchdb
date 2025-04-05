@@ -177,6 +177,8 @@ Return the value of the last row in group. For example, for a view like
 ``[a,1] : x, [a,2] : y``, queried with ``group_level=1``, it would return ``[a]
 : y``.
 
+.. data:: _top_N
+
 .. versionadded:: 3.5
 
 Top ``N`` values, where ``N`` can be any number between ``1`` and ``100``
