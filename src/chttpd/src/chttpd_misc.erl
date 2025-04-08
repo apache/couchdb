@@ -237,65 +237,68 @@ handle_resource_status_req(#httpd{method = 'POST'} = Req) ->
     ToJson = fun csrt_util:to_json/1,
     JsonKeys = fun(PL) -> [[ToJson(K), V] || {K, V} <- PL] end,
 
-    Fun = case {Action, Key, Val} of
-        {<<"count_by">>, Keys, undefined} when is_list(Keys) ->
-            Keys1 = [ConvertEle(K) || K <- Keys],
-            fun() -> CountBy(Keys1) end;
-        {<<"count_by">>, Key, undefined} ->
-            Key1 = ConvertEle(Key),
-            fun() -> CountBy(Key1) end;
-        {<<"group_by">>, Keys, Vals} when is_list(Keys) andalso is_list(Vals) ->
-            Keys1 = ConvertList(Keys),
-            Vals1 = ConvertList(Vals),
-            fun() -> GroupBy(Keys1, Vals1) end;
-        {<<"group_by">>, Key, Vals} when is_list(Vals) ->
-            Key1 = ConvertEle(Key),
-            Vals1 = ConvertList(Vals),
-            fun() -> GroupBy(Key1, Vals1) end;
-        {<<"group_by">>, Keys, Val} when is_list(Keys) ->
-            Keys1 = ConvertList(Keys),
-            Val1 = ConvertEle(Val),
-            fun() -> GroupBy(Keys1, Val1) end;
-        {<<"group_by">>, Key, Val} ->
-            Key1 = ConvertEle(Key),
-            Val1 = ConvertList(Val),
-            fun() -> GroupBy(Key1, Val1) end;
-
-        {<<"sorted_by">>, Key, undefined} ->
-            Key1 = ConvertEle(Key),
-            fun() -> JsonKeys(SortedBy1(Key1)) end;
-        {<<"sorted_by">>, Keys, undefined} when is_list(Keys) ->
-            Keys1 = [ConvertEle(K) || K <- Keys],
-            fun() -> JsonKeys(SortedBy1(Keys1)) end;
-        {<<"sorted_by">>, Keys, Vals} when is_list(Keys) andalso is_list(Vals) ->
-            Keys1 = ConvertList(Keys),
-            Vals1 = ConvertList(Vals),
-            fun() -> JsonKeys(SortedBy2(Keys1, Vals1)) end;
-        {<<"sorted_by">>, Key, Vals} when is_list(Vals) ->
-            Key1 = ConvertEle(Key),
-            Vals1 = ConvertList(Vals),
-            fun() -> JsonKeys(SortedBy2(Key1, Vals1)) end;
-        {<<"sorted_by">>, Keys, Val} when is_list(Keys) ->
-            Keys1 = ConvertList(Keys),
-            Val1 = ConvertEle(Val),
-            fun() -> JsonKeys(SortedBy2(Keys1, Val1)) end;
-        {<<"sorted_by">>, Key, Val} ->
-            Key1 = ConvertEle(Key),
-            Val1 = ConvertList(Val),
-            fun() -> JsonKeys(SortedBy2(Key1, Val1)) end;
-        _ ->
-            throw({badrequest, invalid_resource_request})
-    end,
+    Fun =
+        case {Action, Key, Val} of
+            {<<"count_by">>, Keys, undefined} when is_list(Keys) ->
+                Keys1 = [ConvertEle(K) || K <- Keys],
+                fun() -> CountBy(Keys1) end;
+            {<<"count_by">>, Key, undefined} ->
+                Key1 = ConvertEle(Key),
+                fun() -> CountBy(Key1) end;
+            {<<"group_by">>, Keys, Vals} when is_list(Keys) andalso is_list(Vals) ->
+                Keys1 = ConvertList(Keys),
+                Vals1 = ConvertList(Vals),
+                fun() -> GroupBy(Keys1, Vals1) end;
+            {<<"group_by">>, Key, Vals} when is_list(Vals) ->
+                Key1 = ConvertEle(Key),
+                Vals1 = ConvertList(Vals),
+                fun() -> GroupBy(Key1, Vals1) end;
+            {<<"group_by">>, Keys, Val} when is_list(Keys) ->
+                Keys1 = ConvertList(Keys),
+                Val1 = ConvertEle(Val),
+                fun() -> GroupBy(Keys1, Val1) end;
+            {<<"group_by">>, Key, Val} ->
+                Key1 = ConvertEle(Key),
+                Val1 = ConvertList(Val),
+                fun() -> GroupBy(Key1, Val1) end;
+            {<<"sorted_by">>, Key, undefined} ->
+                Key1 = ConvertEle(Key),
+                fun() -> JsonKeys(SortedBy1(Key1)) end;
+            {<<"sorted_by">>, Keys, undefined} when is_list(Keys) ->
+                Keys1 = [ConvertEle(K) || K <- Keys],
+                fun() -> JsonKeys(SortedBy1(Keys1)) end;
+            {<<"sorted_by">>, Keys, Vals} when is_list(Keys) andalso is_list(Vals) ->
+                Keys1 = ConvertList(Keys),
+                Vals1 = ConvertList(Vals),
+                fun() -> JsonKeys(SortedBy2(Keys1, Vals1)) end;
+            {<<"sorted_by">>, Key, Vals} when is_list(Vals) ->
+                Key1 = ConvertEle(Key),
+                Vals1 = ConvertList(Vals),
+                fun() -> JsonKeys(SortedBy2(Key1, Vals1)) end;
+            {<<"sorted_by">>, Keys, Val} when is_list(Keys) ->
+                Keys1 = ConvertList(Keys),
+                Val1 = ConvertEle(Val),
+                fun() -> JsonKeys(SortedBy2(Keys1, Val1)) end;
+            {<<"sorted_by">>, Key, Val} ->
+                Key1 = ConvertEle(Key),
+                Val1 = ConvertList(Val),
+                fun() -> JsonKeys(SortedBy2(Key1, Val1)) end;
+            _ ->
+                throw({badrequest, invalid_resource_request})
+        end,
 
     Fun1 = fun() ->
         case Fun() of
             Map when is_map(Map) ->
                 {maps:fold(
                     fun
-                        (_K,0,A) -> A; %% TODO: Skip 0 value entries?
-                        (K,V,A) -> [{ToJson(K), V} | A]
+                        %% TODO: Skip 0 value entries?
+                        (_K, 0, A) -> A;
+                        (K, V, A) -> [{ToJson(K), V} | A]
                     end,
-                    [], Map)};
+                    [],
+                    Map
+                )};
             List when is_list(List) ->
                 List
         end
@@ -322,7 +325,6 @@ handle_resource_status_req(#httpd{method = 'GET'} = Req) ->
 handle_resource_status_req(Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_method_not_allowed(Req, "GET,HEAD,POST").
-
 
 handle_replicate_req(#httpd{method = 'POST', user_ctx = Ctx, req_body = PostBody} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),

@@ -42,7 +42,6 @@ csrt_logger_works_test_() ->
         ]
     }.
 
-
 csrt_logger_matchers_test_() ->
     {
         foreach,
@@ -65,10 +64,11 @@ make_docs(Count) ->
         fun(I) ->
             #doc{
                 id = ?l2b("foo_" ++ integer_to_list(I)),
-                body={[{<<"value">>, I}]}
+                body = {[{<<"value">>, I}]}
             }
         end,
-        lists:seq(1, Count)).
+        lists:seq(1, Count)
+    ).
 
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats]),
@@ -82,18 +82,31 @@ setup() ->
     Method = 'GET',
     Path = "/" ++ ?b2l(DbName) ++ "/_all_docs",
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
-    Req = #httpd{method=Method, nonce=Nonce},
+    Req = #httpd{method = Method, nonce = Nonce},
     {_, _} = PidRef = csrt:create_coordinator_context(Req, Path),
     MArgs = #mrargs{include_docs = false},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
     Rctx = load_rctx(PidRef),
-    ok = config:set("csrt_logger.matchers_threshold", "docs_read", integer_to_list(?THRESHOLD_DOCS_READ), false),
-    ok = config:set("csrt_logger.matchers_threshold", "ioq_calls", integer_to_list(?THRESHOLD_IOQ_CALLS), false),
-    ok = config:set("csrt_logger.matchers_threshold", "rows_read", integer_to_list(?THRESHOLD_ROWS_READ), false),
-    ok = config:set("csrt_logger.matchers_threshold", "worker_changes_processed", integer_to_list(?THRESHOLD_CHANGES), false),
+    ok = config:set(
+        "csrt_logger.matchers_threshold", "docs_read", integer_to_list(?THRESHOLD_DOCS_READ), false
+    ),
+    ok = config:set(
+        "csrt_logger.matchers_threshold", "ioq_calls", integer_to_list(?THRESHOLD_IOQ_CALLS), false
+    ),
+    ok = config:set(
+        "csrt_logger.matchers_threshold", "rows_read", integer_to_list(?THRESHOLD_ROWS_READ), false
+    ),
+    ok = config:set(
+        "csrt_logger.matchers_threshold",
+        "worker_changes_processed",
+        integer_to_list(?THRESHOLD_CHANGES),
+        false
+    ),
     ok = config:set("csrt_logger.dbnames_io", "foo", integer_to_list(?THRESHOLD_DBNAME_IO), false),
     ok = config:set("csrt_logger.dbnames_io", "bar", integer_to_list(?THRESHOLD_DBNAME_IO), false),
-    ok = config:set("csrt_logger.dbnames_io", "foo/bar", integer_to_list(?THRESHOLD_DBNAME_IO), false),
+    ok = config:set(
+        "csrt_logger.dbnames_io", "foo/bar", integer_to_list(?THRESHOLD_DBNAME_IO), false
+    ),
     csrt_logger:reload_matchers(),
     #{ctx => Ctx, dbname => DbName, rctx => Rctx, rctxs => rctxs()}.
 
@@ -124,31 +137,37 @@ rctx_gen(Opts0) ->
         ioq_calls => R,
         rows_read => R,
         type => TypeGen,
-        '_do_changes' => true %% Hack because we need to modify both fields
+        %% Hack because we need to modify both fields
+        '_do_changes' => true
     },
     Opts = maps:merge(Base, Opts0),
-    csrt_util:map_to_rctx(maps:fold(
-        fun
-            %% Hack for changes because we need to modify both changes_processed
-            %% and changes_returned but the latter must be <= the former
-            ('_do_changes', V, Acc) ->
-                case V of
-                    true ->
-                        Processed = R(),
-                        Returned = (one_of([0, 0, 1, Processed, rand:uniform(Processed)]))(),
-                        maps:put(
-                            changes_processed,
-                            Processed,
-                            maps:put(changes_returned, Returned, Acc));
-                    _ ->
-                        Acc
-                end;
-            (K, F, Acc) when is_function(F) ->
-                maps:put(K, F(), Acc);
-            (K, V, Acc) ->
-                maps:put(K, V, Acc)
-        end, #{}, Opts
-    )).
+    csrt_util:map_to_rctx(
+        maps:fold(
+            fun
+                %% Hack for changes because we need to modify both changes_processed
+                %% and changes_returned but the latter must be <= the former
+                ('_do_changes', V, Acc) ->
+                    case V of
+                        true ->
+                            Processed = R(),
+                            Returned = (one_of([0, 0, 1, Processed, rand:uniform(Processed)]))(),
+                            maps:put(
+                                changes_processed,
+                                Processed,
+                                maps:put(changes_returned, Returned, Acc)
+                            );
+                        _ ->
+                            Acc
+                    end;
+                (K, F, Acc) when is_function(F) ->
+                    maps:put(K, F(), Acc);
+                (K, V, Acc) ->
+                    maps:put(K, V, Acc)
+            end,
+            #{},
+            Opts
+        )
+    ).
 
 rctxs() ->
     [rctx_gen() || _ <- lists:seq(1, ?RCTX_COUNT)].
@@ -304,7 +323,8 @@ t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
     ).
 
 load_rctx(PidRef) ->
-    timer:sleep(50), %% Add slight delay to accumulate RPC response deltas
+    %% Add slight delay to accumulate RPC response deltas
+    timer:sleep(50),
     csrt:get_resource(PidRef).
 
 view_cb({row, Row}, Acc) ->

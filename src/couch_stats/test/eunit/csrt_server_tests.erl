@@ -22,7 +22,6 @@
 
 -define(DEBUG_ENABLED, false).
 
-
 csrt_context_test_() ->
     {
         setup,
@@ -68,7 +67,7 @@ csrt_fabric_test_() ->
     {
         "CSRT fabric tests with a DDoc present",
         foreach,
-        fun() ->  setup_ddoc(<<"_design/foo">>, <<"bar">>) end,
+        fun() -> setup_ddoc(<<"_design/foo">>, <<"bar">>) end,
         fun teardown/1,
         ddoc_test_funs()
     }.
@@ -78,10 +77,11 @@ make_docs(Count) ->
         fun(I) ->
             #doc{
                 id = ?l2b("foo_" ++ integer_to_list(I)),
-                body={[{<<"value">>, I}]}
+                body = {[{<<"value">>, I}]}
             }
         end,
-        lists:seq(1, Count)).
+        lists:seq(1, Count)
+    ).
 
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats]),
@@ -107,19 +107,23 @@ setup_ddoc(DDocId, ViewName) ->
             {<<"language">>, <<"javascript">>},
             {
                 <<"views">>,
-                {[{
-                    ViewName,
-                    {[
-                        {<<"map">>, <<"function(doc) { emit(doc.value, null); }">>}
-                    ]}
-                }]}
+                {[
+                    {
+                        ViewName,
+                        {[
+                            {<<"map">>, <<"function(doc) { emit(doc.value, null); }">>}
+                        ]}
+                    }
+                ]}
             },
             {
                 <<"filters">>,
-                {[{
-                    <<"even">>,
-                    <<"function(doc) { return (doc.value % 2 == 0); }">>
-                }]}
+                {[
+                    {
+                        <<"even">>,
+                        <<"function(doc) { return (doc.value % 2 == 0); }">>
+                    }
+                ]}
             }
         ]}
     ),
@@ -245,7 +249,6 @@ t_get_doc({_Ctx, DbName, _View}) ->
     ok = nonzero_local_io_assert(Rctx, io_sum),
     ok = assert_teardown(PidRef).
 
-
 t_put_doc({_Ctx, DbName, View}) ->
     pdebug(dbname, DbName),
     DocId = "bar_put_1919",
@@ -320,7 +323,6 @@ t_changes({_Ctx, DbName, View}) ->
     ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
-
 t_changes_limit_zero({_Ctx, DbName, _View}) ->
     Context = #{
         method => 'GET',
@@ -329,7 +331,7 @@ t_changes_limit_zero({_Ctx, DbName, _View}) ->
     {PidRef, Nonce} = coordinator_context(Context),
     Rctx0 = load_rctx(PidRef),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
-    _Res = fabric:changes(DbName, fun changes_cb/2, [], #changes_args{limit=0}),
+    _Res = fabric:changes(DbName, fun changes_cb/2, [], #changes_args{limit = 0}),
     Rctx = load_rctx(PidRef),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
@@ -347,7 +349,7 @@ t_changes_limit_zero({_Ctx, DbName, _View}) ->
 t_changes_filtered({_Ctx, _DbName, _View}) ->
     false.
 
-t_changes_js_filtered({_Ctx, DbName, {DDocId, _ViewName}=View}) ->
+t_changes_js_filtered({_Ctx, DbName, {DDocId, _ViewName} = View}) ->
     pdebug(dbname, DbName),
     Method = 'GET',
     Path = "/" ++ ?b2l(DbName) ++ "/_changes",
@@ -452,7 +454,7 @@ pdebug(rctx, Rctx) ->
 pdbg(Str, Args) ->
     ?DEBUG_ENABLED andalso ?debugFmt(Str, Args).
 
-convert_pidref({_, _}=PidRef) ->
+convert_pidref({_, _} = PidRef) ->
     csrt_util:convert_pidref(PidRef);
 convert_pidref(PidRef) when is_binary(PidRef) ->
     PidRef;
@@ -466,12 +468,12 @@ rctx_assert(Rctx, Asserts0) ->
         js_filtered_docs => 0,
         write_kp_node => 0,
         write_kv_node => 0,
-        nonce  => undefined,
-        db_open  => 0,
-        rows_read  => 0,
-        docs_read  => 0,
-        docs_written  => 0,
-        pid_ref  => undefined
+        nonce => undefined,
+        db_open => 0,
+        rows_read => 0,
+        docs_read => 0,
+        docs_written => 0,
+        pid_ref => undefined
     },
     Asserts = maps:merge(
         DefaultAsserts,
@@ -528,7 +530,7 @@ ddoc_dependent_local_io_assert(Rctx, {_DDoc, _ViewName}) ->
 
 coordinator_context(#{method := Method, path := Path}) ->
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
-    Req = #httpd{method=Method, nonce=Nonce},
+    Req = #httpd{method = Method, nonce = Nonce},
     {_, _} = PidRef = csrt:create_coordinator_context(Req, Path),
     {PidRef, Nonce}.
 
@@ -548,7 +550,7 @@ assert_gt() ->
     assert_gt(0).
 
 assert_gt(N) ->
-        fun(K, RV) -> ?assert(RV > N, {K, RV, N}) end.
+    fun(K, RV) -> ?assert(RV > N, {K, RV, N}) end.
 
 assert_gte(N) ->
     fun(K, RV) -> ?assert(RV >= N, {K, RV, N}) end.
@@ -568,5 +570,6 @@ configure_filter(DbName, DDocId, Req, FName) ->
     {fetch, custom, Style, Req, DIR, FName}.
 
 load_rctx(PidRef) ->
-    timer:sleep(50), %% Add slight delay to accumulate RPC response deltas
+    %% Add slight delay to accumulate RPC response deltas
+    timer:sleep(50),
     csrt_util:to_json(csrt:get_resource(PidRef)).

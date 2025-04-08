@@ -130,22 +130,22 @@ destroy_pid_ref(_PidRef) ->
 
 -spec create_worker_context(From, MFA, Nonce) -> pid_ref() | false when
     From :: pid_ref(), MFA :: mfa(), Nonce :: term().
-create_worker_context(From, {M,F,_A}, Nonce) ->
+create_worker_context(From, {M, F, _A}, Nonce) ->
     case is_enabled() of
         true ->
-            Type = #rpc_worker{from=From, mod=M, func=F},
+            Type = #rpc_worker{from = From, mod = M, func = F},
             create_context(Type, Nonce);
         false ->
             false
     end.
 
--spec create_coordinator_context(Httpd , Path) -> pid_ref() | false when
+-spec create_coordinator_context(Httpd, Path) -> pid_ref() | false when
     Httpd :: #httpd{}, Path :: list().
-create_coordinator_context(#httpd{method=Verb, nonce=Nonce}, Path0) ->
+create_coordinator_context(#httpd{method = Verb, nonce = Nonce}, Path0) ->
     case is_enabled() of
         true ->
             Path = list_to_binary([$/ | Path0]),
-            Type = #coordinator{method=Verb, path=Path},
+            Type = #coordinator{method = Verb, path = Path},
             create_context(Type, Nonce);
         false ->
             false
@@ -188,8 +188,9 @@ set_context_handler_fun(Fun) when is_function(Fun) ->
     end.
 
 -spec set_context_handler_fun(Mod :: atom(), Func :: atom()) -> boolean().
-set_context_handler_fun(Mod, Func)
-        when is_atom(Mod) andalso is_atom(Func)  ->
+set_context_handler_fun(Mod, Func) when
+    is_atom(Mod) andalso is_atom(Func)
+->
     case is_enabled() of
         false ->
             false;
@@ -205,7 +206,7 @@ update_handler_fun(Mod, Func, PidRef) ->
     Rctx = get_resource(PidRef),
     %% TODO: #coordinator{} assumption needs to adapt for other types
     #coordinator{} = Coordinator0 = csrt_server:get_context_type(Rctx),
-    Coordinator = Coordinator0#coordinator{mod=Mod, func=Func},
+    Coordinator = Coordinator0#coordinator{mod = Mod, func = Func},
     csrt_server:set_context_type(Coordinator, PidRef),
     ok.
 
@@ -282,7 +283,6 @@ inc(Key) ->
 -spec inc(Key :: rctx_field(), N :: non_neg_integer()) -> non_neg_integer().
 inc(Key, N) when is_integer(N) andalso N >= 0 ->
     is_enabled() andalso csrt_server:inc(get_pid_ref(), Key, N).
-
 
 -spec maybe_inc(Stat :: atom(), Val :: non_neg_integer()) -> non_neg_integer().
 maybe_inc(Stat, Val) ->
@@ -418,7 +418,6 @@ add_delta(T, Delta) ->
 extract_delta(T) ->
     csrt_util:extract_delta(T).
 
-
 get_delta() ->
     csrt_util:get_delta(get_pid_ref()).
 
@@ -431,7 +430,6 @@ maybe_add_delta(T, Delta) ->
 %%
 %% Internal Operations assuming is_enabled() == true
 %%
-
 
 -ifdef(TEST).
 
@@ -458,7 +456,10 @@ teardown(Ctx) ->
 t_static_map_translations(_) ->
     ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, maps:values(?STATS_TO_KEYS))),
     %% TODO: properly handle ioq_calls field
-    ?assertEqual(lists:sort(maps:values(?STATS_TO_KEYS)), lists:delete(docs_written, lists:delete(ioq_calls, lists:sort(maps:keys(?KEYS_TO_FIELDS))))).
+    ?assertEqual(
+        lists:sort(maps:values(?STATS_TO_KEYS)),
+        lists:delete(docs_written, lists:delete(ioq_calls, lists:sort(maps:keys(?KEYS_TO_FIELDS))))
+    ).
 
 t_should_track_init_p(_) ->
     config:set(?CSRT_INIT_P, "enabled", "true", false),

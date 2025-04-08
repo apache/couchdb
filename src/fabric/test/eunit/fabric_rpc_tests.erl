@@ -103,13 +103,16 @@ t_no_config_db_create_fails_for_shard_rpc(DbName) ->
         end,
     case csrt:is_enabled() of
         true ->
-            ?assertMatch( %% allow for {Ref, {rexi_EXIT, error}, {delta, D}}
+            %% allow for {Ref, {rexi_EXIT, error}, {delta, D}}
+            ?assertMatch(
                 {Ref, {'rexi_EXIT', {{error, missing_target}, _}}, _},
-                Resp);
+                Resp
+            );
         false ->
             ?assertMatch(
                 {Ref, {'rexi_EXIT', {{error, missing_target}, _}}},
-                Resp)
+                Resp
+            )
     end.
 
 t_db_create_with_config(DbName) ->

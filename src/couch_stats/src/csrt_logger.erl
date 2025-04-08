@@ -76,7 +76,7 @@
 }).
 
 -spec track(Rctx :: rctx()) -> pid().
-track(#rctx{pid_ref=PidRef}) ->
+track(#rctx{pid_ref = PidRef}) ->
     case get_tracker() of
         undefined ->
             Pid = spawn(?MODULE, tracker, [PidRef]),
@@ -87,7 +87,7 @@ track(#rctx{pid_ref=PidRef}) ->
     end.
 
 -spec tracker(PidRef :: pid_ref()) -> ok.
-tracker({Pid, _Ref}=PidRef) ->
+tracker({Pid, _Ref} = PidRef) ->
     MonRef = erlang:monitor(process, Pid),
     receive
         stop ->
@@ -111,7 +111,7 @@ tracker({Pid, _Ref}=PidRef) ->
     end.
 
 -spec register_matcher(Name, MSpec) -> ok | {error, badarg} when
-      Name :: string(), MSpec :: ets:match_spec().
+    Name :: string(), MSpec :: ets:match_spec().
 register_matcher(Name, MSpec) ->
     gen_server:call(?MODULE, {register, Name, MSpec}).
 
@@ -149,7 +149,7 @@ get_matcher(Name) ->
 -spec is_match(Rctx :: maybe_rctx()) -> boolean().
 is_match(undefined) ->
     false;
-is_match(#rctx{}=Rctx) ->
+is_match(#rctx{} = Rctx) ->
     is_match(Rctx, get_matchers()).
 
 %% TODO: add Matchers spec
@@ -158,7 +158,7 @@ is_match(undefined, _Matchers) ->
     false;
 is_match(_Rctx, undefined) ->
     false;
-is_match(#rctx{}=Rctx, Matchers) when is_map(Matchers) ->
+is_match(#rctx{} = Rctx, Matchers) when is_map(Matchers) ->
     maps:size(find_matches([Rctx], Matchers)) > 0.
 
 -spec maybe_report(ReportName :: string(), PidRef :: maybe_pid_ref()) -> ok.
@@ -181,7 +181,7 @@ do_status_report(Rctx) ->
     do_report("csrt-pid-usage-status", Rctx).
 
 -spec do_report(ReportName :: string(), Rctx :: rctx()) -> boolean().
-do_report(ReportName, #rctx{}=Rctx) ->
+do_report(ReportName, #rctx{} = Rctx) ->
     couch_log:report(ReportName, csrt_util:to_json(Rctx)).
 
 %%
@@ -215,12 +215,12 @@ init([]) ->
     ok = subscribe_changes(),
     {ok, #st{}}.
 
-handle_call({register, Name, MSpec}, _From, #st{matchers=Matchers}=St) ->
+handle_call({register, Name, MSpec}, _From, #st{matchers = Matchers} = St) ->
     case add_matcher(Name, MSpec, Matchers) of
         {ok, Matchers1} ->
             set_matchers_term(Matchers1),
-            {reply, ok, St#st{matchers=Matchers1}};
-        {error, badarg}=Error ->
+            {reply, ok, St#st{matchers = Matchers1}};
+        {error, badarg} = Error ->
             {reply, Error, St}
     end;
 handle_call(reload_matchers, _From, St) ->
@@ -244,45 +244,67 @@ handle_info(_Msg, St) ->
 %%
 
 -spec matcher_on_dbname(DbName :: dbname()) -> ets:match_spec().
-matcher_on_dbname(DbName)
-        when is_binary(DbName) ->
-    ets:fun2ms(fun(#rctx{dbname=DbName1} = R) when DbName =:= DbName1 -> R end).
+matcher_on_dbname(DbName) when
+    is_binary(DbName)
+->
+    ets:fun2ms(fun(#rctx{dbname = DbName1} = R) when DbName =:= DbName1 -> R end).
 
 -spec matcher_on_dbname_io_threshold(DbName, Threshold) -> ets:match_spec() when
-      DbName :: dbname(), Threshold :: pos_integer().
-matcher_on_dbname_io_threshold(DbName, Threshold)
-        when is_binary(DbName) ->
-    ets:fun2ms(fun(#rctx{dbname=DbName1, ioq_calls=IOQ, get_kv_node=KVN, get_kp_node=KPN, docs_read=Docs, rows_read=Rows, changes_processed=Chgs} = R) when DbName =:= DbName1 andalso ((IOQ > Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or (Rows >= Threshold) or (Chgs >= Threshold)) -> R end).
+    DbName :: dbname(), Threshold :: pos_integer().
+matcher_on_dbname_io_threshold(DbName, Threshold) when
+    is_binary(DbName)
+->
+    ets:fun2ms(fun(
+        #rctx{
+            dbname = DbName1,
+            ioq_calls = IOQ,
+            get_kv_node = KVN,
+            get_kp_node = KPN,
+            docs_read = Docs,
+            rows_read = Rows,
+            changes_processed = Chgs
+        } = R
+    ) when
+        DbName =:= DbName1 andalso
+            ((IOQ > Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or
+                (Rows >= Threshold) or (Chgs >= Threshold))
+    ->
+        R
+    end).
 
 -spec matcher_on_docs_read(Threshold :: pos_integer()) -> ets:match_spec().
-matcher_on_docs_read(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
+matcher_on_docs_read(Threshold) when
+    is_integer(Threshold) andalso Threshold > 0
+->
     %%ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
-    ets:fun2ms(fun(#rctx{docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
+    ets:fun2ms(fun(#rctx{docs_read = DocsRead} = R) when DocsRead >= Threshold -> R end).
 
 -spec matcher_on_docs_written(Threshold :: pos_integer()) -> ets:match_spec().
-matcher_on_docs_written(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
+matcher_on_docs_written(Threshold) when
+    is_integer(Threshold) andalso Threshold > 0
+->
     %%ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_written=DocsRead} = R) when DocsRead >= Threshold -> R end).
-    ets:fun2ms(fun(#rctx{docs_written=DocsWritten} = R) when DocsWritten >= Threshold -> R end).
+    ets:fun2ms(fun(#rctx{docs_written = DocsWritten} = R) when DocsWritten >= Threshold -> R end).
 
 -spec matcher_on_rows_read(Threshold :: pos_integer()) -> ets:match_spec().
-matcher_on_rows_read(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{rows_read=RowsRead} = R) when RowsRead >= Threshold -> R end).
+matcher_on_rows_read(Threshold) when
+    is_integer(Threshold) andalso Threshold > 0
+->
+    ets:fun2ms(fun(#rctx{rows_read = RowsRead} = R) when RowsRead >= Threshold -> R end).
 
 -spec matcher_on_nonce(Nonce :: nonce()) -> ets:match_spec().
 matcher_on_nonce(Nonce) ->
     ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end).
 
 -spec matcher_on_worker_changes_processed(Threshold :: pos_integer()) -> ets:match_spec().
-matcher_on_worker_changes_processed(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
+matcher_on_worker_changes_processed(Threshold) when
+    is_integer(Threshold) andalso Threshold > 0
+->
     ets:fun2ms(
         fun(
             #rctx{
-                changes_processed=Processed,
-                changes_returned=Returned
+                changes_processed = Processed,
+                changes_returned = Returned
             } = R
         ) when (Processed - Returned) >= Threshold ->
             R
@@ -290,12 +312,13 @@ matcher_on_worker_changes_processed(Threshold)
     ).
 
 -spec matcher_on_ioq_calls(Threshold :: pos_integer()) -> ets:match_spec().
-matcher_on_ioq_calls(Threshold)
-        when is_integer(Threshold) andalso Threshold > 0 ->
-    ets:fun2ms(fun(#rctx{ioq_calls=IOQCalls} = R) when IOQCalls >= Threshold -> R end).
+matcher_on_ioq_calls(Threshold) when
+    is_integer(Threshold) andalso Threshold > 0
+->
+    ets:fun2ms(fun(#rctx{ioq_calls = IOQCalls} = R) when IOQCalls >= Threshold -> R end).
 
 -spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, badarg} when
-      Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
+    Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
 add_matcher(Name, MSpec, Matchers) ->
     try ets:match_spec_compile(MSpec) of
         CompMSpec ->
@@ -334,7 +357,9 @@ initialize_matchers() ->
                         {ok, Matchers1} ->
                             Matchers1;
                         {error, badarg} ->
-                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [?MODULE, Name]),
+                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [
+                                ?MODULE, Name
+                            ]),
                             Matchers0
                     end;
                 false ->
@@ -355,13 +380,18 @@ initialize_matchers() ->
                         {ok, Matchers1} ->
                             Matchers1;
                         {error, badarg} ->
-                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [?MODULE, Name]),
+                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [
+                                ?MODULE, Name
+                            ]),
                             Matchers0
                     end;
                 _ ->
                     Matchers0
-            catch error:badarg ->
-                couch_log:warning("[~p] Failed to initialize dbname io matcher on: ~p", [?MODULE, Dbname])
+            catch
+                error:badarg ->
+                    couch_log:warning("[~p] Failed to initialize dbname io matcher on: ~p", [
+                        ?MODULE, Dbname
+                    ])
             end
         end,
         Matchers,
@@ -379,14 +409,15 @@ matcher_enabled(Name) when is_list(Name) ->
     config:get_boolean(?CONF_MATCHERS_ENABLED, Name, true).
 
 -spec matcher_threshold(Name, Threshold) -> string() | integer() when
-      Name :: string(), Threshold :: pos_integer() | string().
+    Name :: string(), Threshold :: pos_integer() | string().
 matcher_threshold("dbname", DbName) when is_binary(DbName) ->
     %% TODO: toggle Default to undefined to disallow for particular dbname
     %% TODO: sort out list vs binary
     %%config:get_integer(?CONF_MATCHERS_THRESHOLD, binary_to_list(DbName), Default);
     DbName;
-matcher_threshold(Name, Default)
-        when is_list(Name) andalso is_integer(Default) andalso Default > 0 ->
+matcher_threshold(Name, Default) when
+    is_list(Name) andalso is_integer(Default) andalso Default > 0
+->
     config:get_integer(?CONF_MATCHERS_THRESHOLD, Name, Default).
 
 subscribe_changes() ->
