@@ -72,6 +72,8 @@ make_docs(Count) ->
 
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats]),
+    ok = meck:new(ioq, [passthrough]),
+    ok = meck:expect(ioq, bypass, fun(_, _) -> false end),
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, [{q, 8}, {n, 1}]),
     Docs = make_docs(100),
@@ -97,6 +99,7 @@ setup() ->
 
 teardown(#{ctx := Ctx, dbname := DbName}) ->
     ok = fabric:delete_db(DbName, [?ADMIN_CTX]),
+    ok = meck:unload(ioq),
     test_util:stop_couch(Ctx).
 
 rctx_gen() ->
