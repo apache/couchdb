@@ -311,16 +311,12 @@ t_changes({_Ctx, DbName, View}) ->
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
-        rows_read => assert_gte(?DB_Q),
+        changes_processed => docs_count(View),
         changes_returned => docs_count(View),
         docs_read => 0,
         docs_written => 0,
         pid_ref => PidRef
     }),
-    %% at least one rows_read and changes_returned per shard that has at least
-    %% one document in it
-    ?assert(maps:get(rows_read, Rctx) >= ?DB_Q, rows_read),
-    ?assert(maps:get(changes_returned, Rctx) >= ?DB_Q, changes_returned),
     ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
@@ -338,14 +334,12 @@ t_changes_limit_zero({_Ctx, DbName, _View}) ->
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
-        rows_read => false,
-        changes_returned => false,
+        changes_processed => assert_gte(?DB_Q),
+        changes_returned => assert_gte(?DB_Q),
         docs_read => 0,
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ?assert(maps:get(rows_read, Rctx) >= ?DB_Q, rows),
-    ?assert(maps:get(changes_returned, Rctx) >= ?DB_Q, rows),
     ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
@@ -372,7 +366,7 @@ t_changes_js_filtered({_Ctx, DbName, {DDocId, _ViewName}=View}) ->
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => assert_gte(?DB_Q),
-        rows_read => assert_gte(docs_count(View)),
+        changes_processed => assert_gte(docs_count(View)),
         changes_returned => round(?DOCS_COUNT / 2),
         docs_read => assert_gte(docs_count(View)),
         docs_written => 0,

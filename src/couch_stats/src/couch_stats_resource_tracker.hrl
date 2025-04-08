@@ -32,24 +32,24 @@
 -define(IOQ_CALLS, ioq_calls).
 -define(DOCS_WRITTEN, docs_written).
 -define(ROWS_READ, rows_read).
-
-%% TODO: overlap between this and couch btree fold invocations
-%% TODO: need some way to distinguish fols on views vs find vs all_docs
--define(FRPC_CHANGES_ROW, changes_processed).
+%% TODO: use dedicated changes_processed or use rows_read?
+%%-define(FRPC_CHANGES_PROCESSED, rows_read).
+-define(FRPC_CHANGES_PROCESSED, changes_processed).
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
 -define(STATS_TO_KEYS, #{
     [mango, evaluate_selector] => ?MANGO_EVAL_MATCH,
     [couchdb, database_reads] => ?DB_OPEN_DOC,
-    [fabric_rpc, changes, processed] => ?FRPC_CHANGES_ROW,
+    [fabric_rpc, changes, processed] => ?FRPC_CHANGES_PROCESSED,
     [fabric_rpc, changes, returned] => ?FRPC_CHANGES_RETURNED,
     [fabric_rpc, view, rows_read] => ?ROWS_READ,
     [couchdb, couch_server, open] => ?DB_OPEN,
     [couchdb, btree, get_node, kp_node] => ?COUCH_BT_GET_KP_NODE,
     [couchdb, btree, get_node, kv_node] => ?COUCH_BT_GET_KV_NODE,
+
+    %% NOTE: these stats are not local to the RPC worker, need forwarding
     [couchdb, btree, write_node, kp_node] => ?COUCH_BT_WRITE_KP_NODE,
     [couchdb, btree, write_node, kv_node] => ?COUCH_BT_WRITE_KV_NODE,
-    %% NOTE: these stats are not local to the RPC worker, need forwarding
     [couchdb, query_server, calls, ddoc_filter] => ?COUCH_JS_FILTER,
     [couchdb, query_server, volume, ddoc_filter] => ?COUCH_JS_FILTERED_DOCS
 }).
@@ -58,13 +58,13 @@
     ?DB_OPEN => #rctx.?DB_OPEN,
     ?ROWS_READ => #rctx.?ROWS_READ,
     ?FRPC_CHANGES_RETURNED => #rctx.?FRPC_CHANGES_RETURNED,
+    ?FRPC_CHANGES_PROCESSED => #rctx.?FRPC_CHANGES_PROCESSED,
     ?DOCS_WRITTEN => #rctx.?DOCS_WRITTEN,
     ?IOQ_CALLS => #rctx.?IOQ_CALLS,
     ?COUCH_JS_FILTER => #rctx.?COUCH_JS_FILTER,
     ?COUCH_JS_FILTERED_DOCS => #rctx.?COUCH_JS_FILTERED_DOCS,
     ?MANGO_EVAL_MATCH => #rctx.?MANGO_EVAL_MATCH,
     ?DB_OPEN_DOC => #rctx.?DB_OPEN_DOC,
-    ?FRPC_CHANGES_ROW => #rctx.?ROWS_READ, %% TODO: rework double use of rows_read
     ?COUCH_BT_GET_KP_NODE => #rctx.?COUCH_BT_GET_KP_NODE,
     ?COUCH_BT_GET_KV_NODE => #rctx.?COUCH_BT_GET_KV_NODE,
     ?COUCH_BT_WRITE_KP_NODE => #rctx.?COUCH_BT_WRITE_KP_NODE,
