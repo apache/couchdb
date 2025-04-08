@@ -39,7 +39,6 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
 
-
 -record(st, {}).
 
 %%
@@ -58,9 +57,9 @@ create_pid_ref() ->
 -spec new_context(Type :: rctx_type(), Nonce :: nonce()) -> rctx().
 new_context(Type, Nonce) ->
     #rctx{
-       nonce = Nonce,
-       pid_ref = create_pid_ref(),
-       type = Type
+        nonce = Nonce,
+        pid_ref = create_pid_ref(),
+        type = Type
     }.
 
 -spec set_context_dbname(DbName, PidRef) -> boolean() when
@@ -88,7 +87,7 @@ set_context_username(UserName, PidRef) ->
     update_element(PidRef, [{#rctx.username, UserName}]).
 
 -spec get_context_type(Rctx :: rctx()) -> rctx_type().
-get_context_type(#rctx{type=Type}) ->
+get_context_type(#rctx{type = Type}) ->
     Type.
 
 -spec set_context_type(Type, PidRef) -> boolean() when
@@ -103,7 +102,7 @@ create_resource(#rctx{} = Rctx) ->
 -spec destroy_resource(PidRef :: maybe_pid_ref()) -> boolean().
 destroy_resource(undefined) ->
     false;
-destroy_resource({_,_}=PidRef) ->
+destroy_resource({_, _} = PidRef) ->
     catch ets:delete(?MODULE, PidRef).
 
 -spec get_resource(PidRef :: maybe_pid_ref()) -> maybe_rctx().
@@ -111,7 +110,7 @@ get_resource(undefined) ->
     undefined;
 get_resource(PidRef) ->
     catch case ets:lookup(?MODULE, PidRef) of
-        [#rctx{}=Rctx] ->
+        [#rctx{} = Rctx] ->
             Rctx;
         [] ->
             undefined
@@ -126,17 +125,17 @@ get_rctx_field(Field) ->
     maps:get(Field, ?KEYS_TO_FIELDS).
 
 -spec update_counter(PidRef, Field, Count) -> non_neg_integer() when
-        PidRef :: maybe_pid_ref(),
-        Field :: rctx_field(),
-        Count :: non_neg_integer().
+    PidRef :: maybe_pid_ref(),
+    Field :: rctx_field(),
+    Count :: non_neg_integer().
 update_counter(undefined, _Field, _Count) ->
     0;
-update_counter({_Pid,_Ref}=PidRef, Field, Count) when Count >= 0 ->
+update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
     %% TODO: mem3 crashes without catch, why do we lose the stats table?
     case is_rctx_field(Field) of
         true ->
             Update = {get_rctx_field(Field), Count},
-            catch ets:update_counter(?MODULE, PidRef, Update, #rctx{pid_ref=PidRef});
+            catch ets:update_counter(?MODULE, PidRef, Update, #rctx{pid_ref = PidRef});
         false ->
             0
     end.
@@ -146,14 +145,14 @@ inc(PidRef, Field) ->
     inc(PidRef, Field, 1).
 
 -spec inc(PidRef, Field, N) -> non_neg_integer() when
-        PidRef :: maybe_pid_ref(),
-        Field :: rctx_field(),
-        N :: non_neg_integer().
+    PidRef :: maybe_pid_ref(),
+    Field :: rctx_field(),
+    N :: non_neg_integer().
 inc(undefined, _Field, _) ->
     0;
 inc(_PidRef, _Field, 0) ->
     0;
-inc({_Pid,_Ref}=PidRef, Field, N) when is_integer(N) andalso N >= 0 ->
+inc({_Pid, _Ref} = PidRef, Field, N) when is_integer(N) andalso N >= 0 ->
     case is_rctx_field(Field) of
         true ->
             update_counter(PidRef, Field, N);
@@ -192,7 +191,6 @@ handle_cast(_Msg, State) ->
 -spec update_element(PidRef :: maybe_pid_ref(), Updates :: [tuple()]) -> boolean().
 update_element(undefined, _Update) ->
     false;
-update_element({_Pid,_Ref}=PidRef, Update) ->
+update_element({_Pid, _Ref} = PidRef, Update) ->
     %% TODO: should we take any action when the update fails?
     catch ets:update_element(?MODULE, PidRef, Update).
-

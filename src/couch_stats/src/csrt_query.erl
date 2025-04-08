@@ -75,48 +75,48 @@ select_by_type(all) ->
 
 find_by_nonce(Nonce) ->
     %%ets:match_object(?MODULE, ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
-    [R || R <- ets:match_object(?MODULE, #rctx{nonce=Nonce})].
+    [R || R <- ets:match_object(?MODULE, #rctx{nonce = Nonce})].
 
 find_by_pid(Pid) ->
     %%[R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
-    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}})].
+    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref = {Pid, '_'}})].
 
 find_by_pidref(PidRef) ->
     %%[R || R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef, _ = '_'})].
-    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef})].
+    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref = PidRef})].
 
 find_workers_by_pidref(PidRef) ->
     %%[R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}, _ = '_'})].
-    [R || R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}})].
+    [R || R <- ets:match_object(?MODULE, #rctx{type = #rpc_worker{from = PidRef}})].
 
-field(#rctx{pid_ref=Val}, pid_ref) -> Val;
+field(#rctx{pid_ref = Val}, pid_ref) -> Val;
 %% NOTE: Pros and cons to doing these convert functions here
 %% Ideally, this would be done later so as to prefer the core data structures
 %% as long as possible, but we currently need the output of this function to
 %% be jiffy:encode'able. The tricky bit is dynamically encoding the group_by
 %% structure provided by the caller of *_by aggregator functions below.
 %% For now, we just always return jiffy:encode'able data types.
-field(#rctx{nonce=Val}, nonce) -> Val;
+field(#rctx{nonce = Val}, nonce) -> Val;
 %%field(#rctx{from=Val}, from) -> Val;
 %% TODO: fix this, perhaps move it all to csrt_util?
-field(#rctx{type=Val}, type) -> csrt_util:convert_type(Val);
-field(#rctx{dbname=Val}, dbname) -> Val;
-field(#rctx{username=Val}, username) -> Val;
+field(#rctx{type = Val}, type) -> csrt_util:convert_type(Val);
+field(#rctx{dbname = Val}, dbname) -> Val;
+field(#rctx{username = Val}, username) -> Val;
 %%field(#rctx{path=Val}, path) -> Val;
-field(#rctx{db_open=Val}, db_open) -> Val;
-field(#rctx{docs_read=Val}, docs_read) -> Val;
-field(#rctx{rows_read=Val}, rows_read) -> Val;
-field(#rctx{changes_processed=Val}, changes_processed) -> Val;
-field(#rctx{changes_returned=Val}, changes_returned) -> Val;
-field(#rctx{ioq_calls=Val}, ioq_calls) -> Val;
-field(#rctx{io_bytes_read=Val}, io_bytes_read) -> Val;
-field(#rctx{io_bytes_written=Val}, io_bytes_written) -> Val;
-field(#rctx{js_evals=Val}, js_evals) -> Val;
-field(#rctx{js_filter=Val}, js_filter) -> Val;
-field(#rctx{js_filtered_docs=Val}, js_filtered_docs) -> Val;
-field(#rctx{mango_eval_match=Val}, mango_eval_match) -> Val;
-field(#rctx{get_kv_node=Val}, get_kv_node) -> Val;
-field(#rctx{get_kp_node=Val}, get_kp_node) -> Val.
+field(#rctx{db_open = Val}, db_open) -> Val;
+field(#rctx{docs_read = Val}, docs_read) -> Val;
+field(#rctx{rows_read = Val}, rows_read) -> Val;
+field(#rctx{changes_processed = Val}, changes_processed) -> Val;
+field(#rctx{changes_returned = Val}, changes_returned) -> Val;
+field(#rctx{ioq_calls = Val}, ioq_calls) -> Val;
+field(#rctx{io_bytes_read = Val}, io_bytes_read) -> Val;
+field(#rctx{io_bytes_written = Val}, io_bytes_written) -> Val;
+field(#rctx{js_evals = Val}, js_evals) -> Val;
+field(#rctx{js_filter = Val}, js_filter) -> Val;
+field(#rctx{js_filtered_docs = Val}, js_filtered_docs) -> Val;
+field(#rctx{mango_eval_match = Val}, mango_eval_match) -> Val;
+field(#rctx{get_kv_node = Val}, get_kv_node) -> Val;
+field(#rctx{get_kp_node = Val}, get_kp_node) -> Val.
 
 curry_field(Field) ->
     fun(Ele) -> field(Ele, Field) end.
@@ -171,4 +171,3 @@ sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, A
 
 to_json_list(List) when is_list(List) ->
     lists:map(fun csrt_util:to_json/1, List).
-
