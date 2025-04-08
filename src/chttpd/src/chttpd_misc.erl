@@ -101,7 +101,7 @@ handle_utils_dir_req(#httpd{method = 'GET'} = Req, DocumentRoot) ->
             CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
             DefaultValues =
                 "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-                "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+                "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;",
             Headers = chttpd_util:maybe_add_csp_header("utils", CachingHeaders, DefaultValues),
             chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
         {_ActionKey, "", _RelativePath} ->

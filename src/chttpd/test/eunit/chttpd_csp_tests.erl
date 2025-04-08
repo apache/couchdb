@@ -125,7 +125,7 @@ should_not_return_any_csp_headers_when_disabled(_DbName) ->
 should_apply_default_policy(_DbName) ->
     ?_assertEqual(
         "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;",
         begin
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
             proplists:get_value("Content-Security-Policy", Headers)
@@ -135,7 +135,7 @@ should_apply_default_policy(_DbName) ->
 should_apply_default_policy_with_legacy_config(_DbName) ->
     ?_assertEqual(
         "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;",
         begin
             ok = config:set("csp", "utils_enable", "false", false),
             ok = config:set("csp", "enable", "true", false),

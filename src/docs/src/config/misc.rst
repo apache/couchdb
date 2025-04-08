@@ -235,7 +235,9 @@ Content-Security-Policy
         Specifies the exact header value to send. Defaults to::
 
             [csp]
-            utils_header_value = default-src 'self'; img-src 'self'; font-src *; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';
+            utils_header_value = default-src 'self'; img-src 'self'; font-src *; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;
+
+        ``blog.couchdb.org`` exists to cover the optional Fauxton News page.
 
     .. config:option:: attachments_enable :: Enable CSP-Header (attachments)
 
