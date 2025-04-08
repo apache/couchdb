@@ -260,7 +260,7 @@ bump_time_stat(Stat, USec) when is_atom(Stat), is_integer(USec) ->
     couch_stats:increment_counter([couchdb, query_server, time, Stat], USec).
 
 bump_volume_stat(ddoc_filter=Stat, Docs) when is_atom(Stat), is_list(Docs) ->
-    couch_stats:increment_counter([couchdb, query_server, volume, Stat, length(Docs)]);
+    couch_stats:increment_counter([couchdb, query_server, volume, Stat], length(Docs));
 bump_volume_stat(_, _) ->
     %% TODO: handle other stats?
     ok.
