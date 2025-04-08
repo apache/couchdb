@@ -59,6 +59,7 @@
     matcher_on_worker_changes_processed/1,
     matcher_on_ioq_calls/1,
     matcher_on_nonce/1,
+    register_matcher/2,
     reload_matchers/0
 ]).
 
@@ -108,6 +109,11 @@ tracker({Pid, _Ref}=PidRef) ->
             csrt_server:destroy_resource(PidRef),
             ok
     end.
+
+-spec register_matcher(Name, MSpec) -> ok | {error, badarg} when
+      Name :: string(), MSpec :: ets:match_spec().
+register_matcher(Name, MSpec) ->
+    gen_server:call(?MODULE, {register, Name, MSpec}).
 
 -spec log_process_lifetime_report(PidRef :: pid_ref()) -> ok.
 log_process_lifetime_report(PidRef) ->
