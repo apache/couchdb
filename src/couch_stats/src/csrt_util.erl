@@ -58,7 +58,6 @@
     field/2
 ]).
 
-
 -include_lib("couch_stats_resource_tracker.hrl").
 
 -spec is_enabled() -> boolean().
@@ -123,12 +122,12 @@ make_dt(A, B, Unit) when is_integer(A) andalso is_integer(B) andalso B > A ->
 
 -spec convert_type(T) -> binary() | null when
     T :: #coordinator{} | #rpc_worker{} | undefined.
-convert_type(#coordinator{method=Verb0, path=Path, mod=M0, func=F0}) ->
+convert_type(#coordinator{method = Verb0, path = Path, mod = M0, func = F0}) ->
     M = atom_to_binary(M0),
     F = atom_to_binary(F0),
     Verb = atom_to_binary(Verb0),
     <<"coordinator-{", M/binary, ":", F/binary, "}:", Verb/binary, ":", Path/binary>>;
-convert_type(#rpc_worker{mod=M0, func=F0, from=From0}) ->
+convert_type(#rpc_worker{mod = M0, func = F0, from = From0}) ->
     M = atom_to_binary(M0),
     F = atom_to_binary(F0),
     From = convert_pidref(From0),
@@ -156,7 +155,7 @@ convert_ref(Ref) when is_reference(Ref) ->
     list_to_binary(ref_to_list(Ref)).
 
 -spec to_json(Rctx :: rctx()) -> map().
-to_json(#rctx{}=Rctx) ->
+to_json(#rctx{} = Rctx) ->
     #{
         updated_at => tutc(Rctx#rctx.updated_at),
         started_at => tutc(Rctx#rctx.started_at),
@@ -323,7 +322,7 @@ make_delta(PidRef) ->
     Delta.
 
 -spec rctx_delta(TA :: Rctx, TB :: Rctx) -> map().
-rctx_delta(#rctx{}=TA, #rctx{}=TB) ->
+rctx_delta(#rctx{} = TA, #rctx{} = TB) ->
     Delta = #{
         docs_read => TB#rctx.docs_read - TA#rctx.docs_read,
         docs_written => TB#rctx.docs_written - TA#rctx.docs_written,
@@ -341,7 +340,7 @@ rctx_delta(#rctx{}=TA, #rctx{}=TB) ->
     %% TODO: reevaluate this decision
     %% Only return non zero (and also positive) delta fields
     %% NOTE: this can result in Delta's of the form #{dt => 1}
-    maps:filter(fun(_K,V) -> V > 0 end, Delta);
+    maps:filter(fun(_K, V) -> V > 0 end, Delta);
 rctx_delta(_, _) ->
     undefined.
 
@@ -366,7 +365,7 @@ get_pid_ref() ->
     get(?PID_REF).
 
 -spec get_pid_ref(Rctx :: rctx()) -> pid_ref().
-get_pid_ref(#rctx{pid_ref=PidRef}) ->
+get_pid_ref(#rctx{pid_ref = PidRef}) ->
     PidRef;
 get_pid_ref(R) ->
     throw({unexpected, R}).
@@ -383,7 +382,7 @@ set_fabric_init_p(Func, Enabled) ->
 
 %% Expose Persist for use in test cases outside this module
 -spec set_fabric_init_p(Func, Enabled, Persist) -> ok when
-        Func :: atom(), Enabled :: boolean(), Persist :: boolean().
+    Func :: atom(), Enabled :: boolean(), Persist :: boolean().
 set_fabric_init_p(Func, Enabled, Persist) ->
     Key = fabric_conf_key(Func),
     ok = config:set_boolean(?CSRT_INIT_P, Key, Enabled, Persist).
