@@ -147,6 +147,7 @@ init_p(From, {M, F, A}, Nonce) ->
             csrt:destroy_context(),
             ok;
         Class:Reason:Stack0 ->
+            Delta = csrt:make_delta(),
             csrt:destroy_context(),
             Stack = clean_stack(Stack0),
             {ClientPid, _ClientRef} = From,
@@ -163,7 +164,7 @@ init_p(From, {M, F, A}, Nonce) ->
                 ]
             ),
             exit(#error{
-                delta = csrt:make_delta(),
+                delta = Delta,
                 timestamp = os:timestamp(),
                 reason = {Class, Reason},
                 mfa = {M, F, A},
