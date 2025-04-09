@@ -7,8 +7,9 @@
 -export([go/1]).
 
 -export([
-    create_peer_checkpoint_doc_if_missing/3,
-    update_peer_checkpoint_doc/3
+    create_peer_checkpoint_doc_if_missing/5,
+    update_peer_checkpoint_doc/5,
+    peer_checkpoint_doc/4
 ]).
 
 -type range() :: [non_neg_integer()].
@@ -228,19 +229,25 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
         ShardSyncHistory
     ).
 
-create_peer_checkpoint_doc_if_missing(DbName, PeerId, UpdateSeq) when
+create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq) when
     is_binary(DbName), is_binary(PeerId), is_integer(UpdateSeq)
 ->
-    create_peer_checkpoint_doc_if_missing(DbName, PeerId, pack_seq(DbName, UpdateSeq));
-create_peer_checkpoint_doc_if_missing(DbName, PeerId, UpdateSeq) when
-    is_binary(DbName), is_binary(PeerId), is_binary(UpdateSeq)
+    create_peer_checkpoint_doc_if_missing(
+        DbName, Subtype, Source, PeerId, pack_seq(DbName, UpdateSeq)
+    );
+create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq) when
+    is_binary(DbName),
+    is_binary(Subtype),
+    is_binary(Source),
+    is_binary(PeerId),
+    is_binary(UpdateSeq)
 ->
     {_, Ref} = spawn_monitor(fun() ->
         case fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(PeerId), [?ADMIN_CTX]) of
             {ok, _} ->
                 ok;
             {not_found, _} ->
-                update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq);
+                update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq);
             {error, Reason} ->
                 throw({checkpoint_commit_failure, Reason})
         end
@@ -252,14 +259,22 @@ create_peer_checkpoint_doc_if_missing(DbName, PeerId, UpdateSeq) when
             Else
     end.
 
-update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq) when
-    is_binary(DbName), is_binary(PeerId), is_integer(UpdateSeq)
+update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
+    is_binary(DbName),
+    is_binary(Subtype),
+    is_binary(Source),
+    is_binary(PeerId),
+    is_integer(UpdateSeq)
 ->
-    update_peer_checkpoint_doc(DbName, PeerId, pack_seq(DbName, UpdateSeq));
-update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq) when
-    is_binary(DbName), is_binary(PeerId), is_binary(UpdateSeq)
+    update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, pack_seq(DbName, UpdateSeq));
+update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
+    is_binary(DbName),
+    is_binary(Subtype),
+    is_binary(Source),
+    is_binary(PeerId),
+    is_binary(UpdateSeq)
 ->
-    Doc = peer_checkpoint_doc(PeerId, UpdateSeq),
+    Doc = peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq),
     {_, Ref} = spawn_monitor(fun() ->
         case fabric:update_doc(mem3:dbname(DbName), Doc, [?ADMIN_CTX]) of
             {ok, _} ->
@@ -275,8 +290,20 @@ update_peer_checkpoint_doc(DbName, PeerId, UpdateSeq) when
             Else
     end.
 
-peer_checkpoint_doc(PeerId, UpdateSeq) when is_binary(PeerId), is_binary(UpdateSeq) ->
-    #doc{id = peer_checkpoint_id(PeerId), body = {[{<<"update_seq">>, UpdateSeq}]}}.
+peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq) when
+    is_binary(PeerId), is_binary(Subtype), is_binary(Source), is_binary(UpdateSeq)
+->
+    #doc{
+        id = peer_checkpoint_id(PeerId),
+        body =
+            {[
+                {<<"type">>, <<"peer-checkpoint">>},
+                {<<"subtype">>, Subtype},
+                {<<"source">>, Source},
+                {<<"update_seq">>, UpdateSeq},
+                {<<"last_updated">>, ?l2b(couch_log_util:iso8601_timestamp())}
+            ]}
+    }.
 
 peer_checkpoint_id(PeerId) ->
     <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", PeerId/binary>>.

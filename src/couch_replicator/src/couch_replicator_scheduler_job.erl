@@ -887,7 +887,7 @@ do_checkpoint(State) ->
                 {TgtRevPos, TgtRevId} = update_checkpoint(
                     Target, TargetLog#doc{body = NewRepHistory}, target
                 ),
-                update_checkpoint(Source, peer_checkpoint_doc(BaseId, NewSeq), source),
+                update_checkpoint(Source, peer_checkpoint_doc(Source, BaseId, NewSeq), source),
                 NewState = State#rep_state{
                     checkpoint_history = NewRepHistory,
                     committed_seq = NewTsSeq,
@@ -921,7 +921,7 @@ create_peer_checkpoint_doc_if_missing(#httpdb{} = Db, BaseId, SourceSeq) when
         {ok, _} ->
             ok;
         {error, <<"not_found">>} ->
-            Doc = peer_checkpoint_doc(BaseId, SourceSeq),
+            Doc = peer_checkpoint_doc(Db, BaseId, SourceSeq),
             case couch_replicator_api_wrap:update_doc(Db, Doc, []) of
                 {ok, _} ->
                     ok;
@@ -932,11 +932,16 @@ create_peer_checkpoint_doc_if_missing(#httpdb{} = Db, BaseId, SourceSeq) when
             throw({checkpoint_commit_failure, Reason})
     end.
 
-peer_checkpoint_doc(BaseId, Seq) ->
-    #doc{id = peer_checkpoint_id(BaseId), body = {[{<<"update_seq">>, Seq}]}}.
+peer_checkpoint_doc(#httpdb{} = Db, BaseId, UpdateSeq) ->
+    fabric_drop_seq:peer_checkpoint_doc(
+        peer_checkpoint_id(BaseId),
+        <<"replication">>,
+        ?l2b(couch_replicator_api_wrap:db_uri(Db)),
+        UpdateSeq
+    ).
 
 peer_checkpoint_id(BaseId) when is_list(BaseId) ->
-    ?l2b(?LOCAL_DOC_PREFIX ++ "peer-checkpoint-repl-" ++ BaseId).
+    ?l2b("repl-" ++ BaseId).
 
 update_checkpoint(Db, Doc, DbType) ->
     try
