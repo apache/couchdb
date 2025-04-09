@@ -147,6 +147,7 @@ SubDirs = [
     "src/weatherreport",
     "src/couch_prometheus",
     "src/couch_scanner",
+    "src/zoe",
     "rel"
 ].
 
