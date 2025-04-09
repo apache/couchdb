@@ -220,6 +220,8 @@ commit(State) ->
     ok = couch_file:sync(State#mrst.fd),
     fabric_drop_seq:update_peer_checkpoint_doc(
         State#mrst.db_name,
+        <<"mrview">>,
+        State#mrst.idx_name,
         couch_mrview_util:peer_checkpoint_id(State),
         State#mrst.update_seq
     ).
@@ -310,6 +312,8 @@ ensure_local_purge_doc(Db, #mrst{} = State) ->
 ensure_peer_checkpoint_doc(#mrst{} = State) ->
     fabric_drop_seq:create_peer_checkpoint_doc_if_missing(
         State#mrst.db_name,
+        <<"mrview">>,
+        State#mrst.idx_name,
         couch_mrview_util:peer_checkpoint_id(State),
         State#mrst.update_seq
     ).
