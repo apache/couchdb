@@ -2861,14 +2861,26 @@ static JSAtom JS_NewAtomStr(JSContext *ctx, JSString *p)
     return __JS_NewAtom(rt, p, JS_ATOM_TYPE_STRING);
 }
 
+/* XXX: optimize */
+static size_t count_ascii(const uint8_t *buf, size_t len)
+{
+    const uint8_t *p, *p_end;
+    p = buf;
+    p_end = buf + len;
+    while (p < p_end && *p < 128)
+        p++;
+    return p - buf;
+}
+
 /* str is UTF-8 encoded */
 JSAtom JS_NewAtomLen(JSContext *ctx, const char *str, size_t len)
 {
     JSValue val;
 
-    if (len == 0 || !is_digit(*str)) {
-        // XXX: this will not work if UTF-8 encoded str contains non ASCII bytes
-        JSAtom atom = __JS_FindAtom(ctx->rt, str, len, JS_ATOM_TYPE_STRING);
+    if (len == 0 ||
+        (!is_digit(*str) &&
+         count_ascii((const uint8_t *)str, len) == len)) {
+            JSAtom atom = __JS_FindAtom(ctx->rt, str, len, JS_ATOM_TYPE_STRING);
         if (atom)
             return atom;
     }
@@ -3810,10 +3822,8 @@ JSValue JS_NewStringLen(JSContext *ctx, const char *buf, size_t buf_len)
 
     p_start = (const uint8_t *)buf;
     p_end = p_start + buf_len;
-    p = p_start;
-    while (p < p_end && *p < 128)
-        p++;
-    len1 = p - p_start;
+    len1 = count_ascii(p_start, buf_len);
+    p = p_start + len1;
     if (len1 > JS_STRING_LEN_MAX)
         return JS_ThrowInternalError(ctx, "string too long");
     if (p == p_end) {
@@ -14711,21 +14721,15 @@ static __exception int js_operator_delete(JSContext *ctx, JSValue *sp)
     return 0;
 }
 
-static JSValue js_throw_type_error(JSContext *ctx, JSValueConst this_val,
-                                   int argc, JSValueConst *argv)
-{
-    return JS_ThrowTypeError(ctx, "invalid property access");
-}
-
 /* XXX: not 100% compatible, but mozilla seems to use a similar
    implementation to ensure that caller in non strict mode does not
    throw (ES5 compatibility) */
-static JSValue js_function_proto_caller(JSContext *ctx, JSValueConst this_val,
-                                        int argc, JSValueConst *argv)
+static JSValue js_throw_type_error(JSContext *ctx, JSValueConst this_val,
+                                   int argc, JSValueConst *argv)
 {
     JSFunctionBytecode *b = JS_GetFunctionBytecode(this_val);
-    if (!b || (b->js_mode & JS_MODE_STRICT) || !b->has_prototype) {
-        return js_throw_type_error(ctx, this_val, 0, NULL);
+    if (!b || (b->js_mode & JS_MODE_STRICT) || !b->has_prototype || argc >= 1) {
+        return JS_ThrowTypeError(ctx, "invalid property access");
     }
     return JS_UNDEFINED;
 }
@@ -22244,15 +22248,20 @@ static int __exception js_parse_property_name(JSParseState *s,
 
     prop_type = PROP_TYPE_IDENT;
     if (allow_method) {
-        if (token_is_pseudo_keyword(s, JS_ATOM_get)
-        ||  token_is_pseudo_keyword(s, JS_ATOM_set)) {
+        /* if allow_private is true (for class field parsing) and
+           get/set is following by ';' (or LF with ASI), then it
+           is a field name */
+        if ((token_is_pseudo_keyword(s, JS_ATOM_get) ||
+             token_is_pseudo_keyword(s, JS_ATOM_set)) &&
+            (!allow_private || peek_token(s, TRUE) != '\n')) {
             /* get x(), set x() */
             name = JS_DupAtom(s->ctx, s->token.u.ident.atom);
             if (next_token(s))
                 goto fail1;
             if (s->token.val == ':' || s->token.val == ',' ||
                 s->token.val == '}' || s->token.val == '(' ||
-                s->token.val == '=') {
+                s->token.val == '=' ||
+                (s->token.val == ';' && allow_private)) {
                 is_non_reserved_ident = TRUE;
                 goto ident_found;
             }
@@ -23865,7 +23874,7 @@ fail:
    present at the top level. */
 static int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
                                         int hasval, int has_ellipsis,
-                                        BOOL allow_initializer)
+                                        BOOL allow_initializer, BOOL export_flag)
 {
     int label_parse, label_assign, label_done, label_lvalue, depth_lvalue;
     int start_addr, assign_addr;
@@ -23981,7 +23990,7 @@ static int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
                         emit_op(s, OP_get_field2);
                         emit_u32(s, prop_name);
                     }
-                    if (js_parse_destructuring_element(s, tok, is_arg, TRUE, -1, TRUE) < 0)
+                    if (js_parse_destructuring_element(s, tok, is_arg, TRUE, -1, TRUE, export_flag) < 0)
                         return -1;
                     if (s->token.val == '}')
                         break;
@@ -24105,6 +24114,11 @@ static int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
             if (tok) {
                 if (js_define_var(s, var_name, tok))
                     goto var_error;
+                if (export_flag) {
+                    if (!add_export_entry(s, s->cur_func->module, var_name, var_name,
+                                          JS_EXPORT_TYPE_LOCAL))
+                        goto var_error;
+                }
                 scope = s->cur_func->scope_level;
             }
             if (s->token.val == '=') {  /* handle optional default value */
@@ -24180,7 +24194,7 @@ static int js_parse_destructuring_element(JSParseState *s, int tok, int is_arg,
                     emit_u8(s, 0);
                     emit_op(s, OP_drop);
                 }
-                if (js_parse_destructuring_element(s, tok, is_arg, TRUE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE) < 0)
+                if (js_parse_destructuring_element(s, tok, is_arg, TRUE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE, export_flag) < 0)
                     return -1;
             } else {
                 var_name = JS_ATOM_NULL;
@@ -24470,7 +24484,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
         {
             int skip_bits;
             if (js_parse_skip_parens_token(s, &skip_bits, FALSE) == '=') {
-                if (js_parse_destructuring_element(s, 0, 0, FALSE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE) < 0)
+                if (js_parse_destructuring_element(s, 0, 0, FALSE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE, FALSE) < 0)
                     return -1;
             } else {
                 if (s->token.val == '{') {
@@ -26022,7 +26036,7 @@ static __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
             if ((s->token.val == '[' || s->token.val == '{')
             &&  js_parse_skip_parens_token(s, &skip_bits, FALSE) == '=') {
                 emit_op(s, OP_undefined);
-                if (js_parse_destructuring_element(s, tok, 0, TRUE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE) < 0)
+                if (js_parse_destructuring_element(s, tok, 0, TRUE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE, export_flag) < 0)
                     return -1;
             } else {
                 return js_parse_error(s, "variable name expected");
@@ -26144,7 +26158,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
 
         if (!(s->token.val == TOK_IDENT && !s->token.u.ident.is_reserved)) {
             if (s->token.val == '[' || s->token.val == '{') {
-                if (js_parse_destructuring_element(s, tok, 0, TRUE, -1, FALSE) < 0)
+                if (js_parse_destructuring_element(s, tok, 0, TRUE, -1, FALSE, FALSE) < 0)
                     return -1;
                 has_destructuring = TRUE;
             } else {
@@ -26173,7 +26187,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
         int skip_bits;
         if ((s->token.val == '[' || s->token.val == '{')
         &&  ((tok1 = js_parse_skip_parens_token(s, &skip_bits, FALSE)) == TOK_IN || tok1 == TOK_OF)) {
-            if (js_parse_destructuring_element(s, 0, 0, TRUE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE) < 0)
+            if (js_parse_destructuring_element(s, 0, 0, TRUE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE, FALSE) < 0)
                 return -1;
         } else {
             int lvalue_label;
@@ -26848,7 +26862,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
                     if (!(s->token.val == TOK_IDENT && !s->token.u.ident.is_reserved)) {
                         if (s->token.val == '[' || s->token.val == '{') {
                             /* XXX: TOK_LET is not completely correct */
-                            if (js_parse_destructuring_element(s, TOK_LET, 0, TRUE, -1, TRUE) < 0)
+                            if (js_parse_destructuring_element(s, TOK_LET, 0, TRUE, -1, TRUE, FALSE) < 0)
                                 goto fail;
                         } else {
                             js_parse_error(s, "identifier expected");
@@ -33807,7 +33821,7 @@ static __exception int js_parse_function_decl2(JSParseState *s,
                     emit_op(s, OP_get_arg);
                     emit_u16(s, idx);
                 }
-                has_initializer = js_parse_destructuring_element(s, fd->has_parameter_expressions ? TOK_LET : TOK_VAR, 1, TRUE, -1, TRUE);
+                has_initializer = js_parse_destructuring_element(s, fd->has_parameter_expressions ? TOK_LET : TOK_VAR, 1, TRUE, -1, TRUE, FALSE);
                 if (has_initializer < 0)
                     goto fail;
                 if (has_initializer)
@@ -50723,16 +50737,14 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
     ctx->throw_type_error = JS_NewCFunction(ctx, js_throw_type_error, NULL, 0);
 
     /* add caller and arguments properties to throw a TypeError */
-    obj1 = JS_NewCFunction(ctx, js_function_proto_caller, NULL, 0);
     JS_DefineProperty(ctx, ctx->function_proto, JS_ATOM_caller, JS_UNDEFINED,
-                      obj1, ctx->throw_type_error,
+                      ctx->throw_type_error, ctx->throw_type_error,
                       JS_PROP_HAS_GET | JS_PROP_HAS_SET |
                       JS_PROP_HAS_CONFIGURABLE | JS_PROP_CONFIGURABLE);
     JS_DefineProperty(ctx, ctx->function_proto, JS_ATOM_arguments, JS_UNDEFINED,
-                      obj1, ctx->throw_type_error,
+                      ctx->throw_type_error, ctx->throw_type_error,
                       JS_PROP_HAS_GET | JS_PROP_HAS_SET |
                       JS_PROP_HAS_CONFIGURABLE | JS_PROP_CONFIGURABLE);
-    JS_FreeValue(ctx, obj1);
     JS_FreeValue(ctx, js_object_seal(ctx, JS_UNDEFINED, 1, (JSValueConst *)&ctx->throw_type_error, 1));
 
     ctx->global_obj = JS_NewObject(ctx);
