@@ -224,7 +224,8 @@ commit(State) ->
         State#mrst.idx_name,
         couch_mrview_util:peer_checkpoint_id(State),
         State#mrst.update_seq
-    ).
+    ),
+    ok.
 
 compact(Db, State, Opts) ->
     couch_mrview_compactor:compact(Db, State, Opts).
