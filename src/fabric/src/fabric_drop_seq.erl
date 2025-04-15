@@ -3,6 +3,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("fabric/include/fabric.hrl").
 
 -export([go/1]).
 
@@ -29,7 +30,8 @@
 }.
 
 go(DbName) ->
-    {PeerCheckpoints0, ShardSyncHistory} = parse_local_docs(DbName),
+    {ok, PeerCheckpoints0} = get_peer_checkpoint_docs(DbName),
+    {ok, ShardSyncHistory} = get_all_shard_sync_docs(DbName),
     ShardSyncCheckpoints = latest_shard_sync_checkpoints(ShardSyncHistory),
     PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
     PeerCheckpoints2 = crossref(PeerCheckpoints1, ShardSyncHistory),
@@ -53,7 +55,7 @@ go(DbName) ->
     ),
     Acc0 = {Workers, length(Workers) - 1},
     try
-        case fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+        case fabric_util:recv(Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0) of
             {ok, ok} ->
                 ok;
             {timeout, {WorkersDict, _}} ->
@@ -73,11 +75,11 @@ go(DbName) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message(ok, _Worker, {_Workers, 0}) ->
+handle_set_drop_seq_reply(ok, _Worker, {_Workers, 0}) ->
     {stop, ok};
-handle_message(ok, Worker, {Workers, Waiting}) ->
+handle_set_drop_seq_reply(ok, Worker, {Workers, Waiting}) ->
     {ok, {lists:delete(Worker, Workers), Waiting - 1}};
-handle_message(Error, _, _Acc) ->
+handle_set_drop_seq_reply(Error, _, _Acc) ->
     {error, Error}.
 
 crossref(PeerCheckpoints0, ShardSyncHistory) ->
@@ -118,33 +120,54 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
             crossref(PeerCheckpoints1, ShardSyncHistory)
     end.
 
--spec parse_local_docs(DbName :: binary()) -> {peer_checkpoints(), shard_sync_history()}.
-parse_local_docs(DbName) ->
-    {ok, Result} = fabric:all_docs(
-        DbName, fun parse_local_docs_cb/2, {#{}, #{}}, all_docs_mrargs()
+-spec get_all_shard_sync_docs(DbName :: binary()) -> shard_sync_history().
+get_all_shard_sync_docs(DbName) ->
+    Shards = mem3:shards(DbName),
+    Workers = fabric_util:submit_jobs(
+        Shards, fabric_rpc, all_docs, [[], shard_sync_docs_mrargs()]
     ),
-    Result.
+    Acc0 = {#{}, length(Workers) - 1},
+    RexiMon = fabric_util:create_monitors(Workers),
+    try
+        rexi_utils:recv(
+            Workers,
+            #shard.ref,
+            fun handle_shard_sync_docs_reply/3,
+            Acc0,
+            fabric_util:request_timeout(),
+            infinity
+        )
+    after
+        rexi_monitor:stop(RexiMon),
+        fabric_streams:cleanup(Workers)
+    end.
 
-parse_local_docs_cb({row, Row}, Acc) ->
-    case lists:keyfind(doc, 1, Row) of
-        false ->
-            {ok, Acc};
-        {doc, Doc} ->
-            parse_local_doc(couch_doc:from_json_obj(Doc), Acc)
-    end;
-parse_local_docs_cb(_Else, Acc) ->
-    {ok, Acc}.
+handle_shard_sync_docs_reply({rexi_DOWN, _, _, _}, _Worker, Acc) ->
+    {ok, Acc};
+handle_shard_sync_docs_reply({rexi_EXIT, _Reason}, _Worker, Acc) ->
+    {ok, Acc};
+handle_shard_sync_docs_reply(rexi_STREAM_INIT, {_Worker, From}, Acc) ->
+    gen_server:reply(From, rexi_STREAM_START),
+    {ok, Acc};
+handle_shard_sync_docs_reply({meta, _Meta}, _Worker, Acc) ->
+    {ok, Acc};
+handle_shard_sync_docs_reply(#view_row{} = Row, _Worker, {ShardSyncHistory, Count}) ->
+    Doc = couch_doc:from_json_obj(Row#view_row.doc),
+    {ok, {parse_shard_sync_doc(Doc, ShardSyncHistory), Count}};
+handle_shard_sync_docs_reply(complete, _Worker, {ShardSyncHistory, 0}) ->
+    {stop, ShardSyncHistory};
+handle_shard_sync_docs_reply(complete, _Worker, {ShardSyncHistory, Count}) ->
+    {ok, {ShardSyncHistory, Count - 1}}.
 
-parse_local_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
+parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
     {Props} = Doc#doc.body,
     case couch_util:get_value(<<"dbname">>, Props) of
         undefined ->
             %% not yet upgraded with new property
-            {ok, Acc};
+            Acc;
         DbName ->
             Range = mem3:range(DbName),
             {[{_SrcNode, History}]} = couch_util:get_value(<<"history">>, Props),
-            {PeerCheckpoints, ShardSyncHistory0} = Acc,
             KeyFun = fun({Item}) ->
                 {Range, binary_to_existing_atom(couch_util:get_value(<<"source_node">>, Item)),
                     binary_to_existing_atom(couch_util:get_value(<<"target_node">>, Item))}
@@ -157,25 +180,36 @@ parse_local_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) ->
                     couch_util:get_value(<<"target_seq">>, Item)
                 }
             end,
+            maps:merge(
+                maps:groups_from_list(KeyFun, ValueFun, History), Acc
+            )
+    end.
 
-            ShardSyncHistory1 = maps:merge(
-                maps:groups_from_list(KeyFun, ValueFun, History), ShardSyncHistory0
-            ),
-            {ok, {PeerCheckpoints, ShardSyncHistory1}}
+-spec get_peer_checkpoint_docs(DbName :: binary()) -> peer_checkpoints().
+get_peer_checkpoint_docs(DbName) ->
+    fabric:all_docs(
+        DbName, fun parse_peer_checkpoint_docs_cb/2, #{}, peer_checkpoint_docs_mrargs()
+    ).
+
+parse_peer_checkpoint_docs_cb({row, Row}, PeerCheckpoints0) ->
+    case lists:keyfind(doc, 1, Row) of
+        false ->
+            {ok, PeerCheckpoints0};
+        {doc, Doc0} ->
+            #doc{id = <<"_local/peer-checkpoint-", _/binary>>} =
+                Doc1 = couch_doc:from_json_obj(Doc0),
+            {Props} = Doc1#doc.body,
+            case couch_util:get_value(<<"update_seq">>, Props) of
+                undefined ->
+                    {ok, PeerCheckpoints0};
+                UpdateSeq ->
+                    {ok,
+                        maps:merge_with(
+                            fun merge_peers/3, decode_seq(UpdateSeq), PeerCheckpoints0
+                        )}
+            end
     end;
-parse_local_doc(#doc{id = <<"_local/peer-checkpoint-", _/binary>>} = Doc, Acc) ->
-    {Props} = Doc#doc.body,
-    case couch_util:get_value(<<"update_seq">>, Props) of
-        undefined ->
-            {ok, Acc};
-        UpdateSeq ->
-            {PeerCheckpoints0, ShardSyncHistory} = Acc,
-            PeerCheckpoints1 = maps:merge_with(
-                fun merge_peers/3, decode_seq(UpdateSeq), PeerCheckpoints0
-            ),
-            {ok, {PeerCheckpoints1, ShardSyncHistory}}
-    end;
-parse_local_doc(_Doc, Acc) ->
+parse_peer_checkpoint_docs_cb(_Else, Acc) ->
     {ok, Acc}.
 
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when is_integer(Val1), is_integer(Val2) ->
@@ -217,6 +251,18 @@ all_docs_mrargs() ->
             {include_system, true},
             {namespace, <<"_local">>}
         ]
+    }.
+
+peer_checkpoint_docs_mrargs() ->
+    (all_docs_mrargs())#mrargs{
+        start_key = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-">>,
+        end_key = <<?LOCAL_DOC_PREFIX, "peer-checkpoint.">>
+    }.
+
+shard_sync_docs_mrargs() ->
+    (all_docs_mrargs())#mrargs{
+        start_key = <<?LOCAL_DOC_PREFIX, "shard-sync-">>,
+        end_key = <<?LOCAL_DOC_PREFIX, "shard-sync.">>
     }.
 
 latest_shard_sync_checkpoints(ShardSyncHistory) ->
