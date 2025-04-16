@@ -142,10 +142,13 @@ get_all_shard_sync_docs(DbName) ->
         fabric_streams:cleanup(Workers)
     end.
 
-handle_shard_sync_docs_reply({rexi_DOWN, _, _, _}, _Worker, Acc) ->
-    {ok, Acc};
-handle_shard_sync_docs_reply({rexi_EXIT, _Reason}, _Worker, Acc) ->
-    {ok, Acc};
+%% consult every copy of every range for shard sync information but ignore failures (otherwise
+%% this only works when all nodes are up). We'll only update drop seq for a shard if we have
+%% seen all other copies have synced to it.
+handle_shard_sync_docs_reply({rexi_DOWN, _, _, _}, _Worker, {ShardSyncHistory, Count}) ->
+    {ok, {ShardSyncHistory, Count - 1}};
+handle_shard_sync_docs_reply({rexi_EXIT, _Reason}, _Worker, {ShardSyncHistory, Count}) ->
+    {ok, {ShardSyncHistory, Count - 1}};
 handle_shard_sync_docs_reply(rexi_STREAM_INIT, {_Worker, From}, Acc) ->
     gen_server:reply(From, rexi_STREAM_START),
     {ok, Acc};
