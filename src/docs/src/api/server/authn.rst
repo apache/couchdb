@@ -113,6 +113,7 @@ To obtain the first token and thus authenticate a user for the first time, the
     :code 200: Successfully authenticated
     :code 302: Redirect after successful authentication
     :code 401: Username or password wasn't recognized
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -198,6 +199,7 @@ To obtain the first token and thus authenticate a user for the first time, the
     :>json object info: Server authentication configuration
     :code 200: Successfully authenticated.
     :code 401: Username or password wasn't recognized.
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
