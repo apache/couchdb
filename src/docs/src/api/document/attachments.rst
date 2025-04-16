@@ -48,6 +48,7 @@
 
     :code 200: Attachment exists
     :code 401: Read privilege required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, document or attachment was not found
 
     **Request**:
@@ -105,6 +106,7 @@
 
     :code 200: Attachment exists
     :code 401: Read privilege required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, document or attachment was not found
 
 .. http:put:: /{db}/{docid}/{attname}
@@ -144,6 +146,7 @@
     :code 202: Request was accepted, but changes are not yet stored on disk
     :code 400: Invalid request body or parameters
     :code 401: Write privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, document or attachment was not found
     :code 409: Document's revision wasn't specified or it's not the latest
 
@@ -214,6 +217,7 @@
     :code 202: Request was accepted, but changes are not yet stored on disk
     :code 400: Invalid request body or parameters
     :code 401: Write privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, document or attachment was not found
     :code 409: Document's revision wasn't specified or it's not the latest
 
