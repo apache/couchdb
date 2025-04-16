@@ -38,6 +38,8 @@
     :query string format: Format of the returned response.
       Used by :js:func:`provides` function
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Query server error
 
     **Function**:
@@ -103,6 +105,8 @@
     :query string format: Format of the returned response.
       Used by :js:func:`provides` function
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Query server error
 
     **Function**:
@@ -171,6 +175,8 @@
     :query string format: Format of the returned response.
       Used by :js:func:`provides` function
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Query server error
 
     **Function**:
@@ -243,6 +249,8 @@
     :query string format: Format of the returned response.
       Used by :js:func:`provides` function
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Query server error
 
     **Function**:
@@ -301,6 +309,8 @@
     :>header X-Couch-Update-NewRev: Created/updated document's revision
     :code 200: No document was created or updated
     :code 201: Document was created or updated
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Query server error
 
     **Function**:
@@ -366,6 +376,8 @@
     :>header X-Couch-Update-NewRev: Created/updated document's revision
     :code 200: No document was created or updated
     :code 201: Document was created or updated
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: Query server error
 
     **Function**:
