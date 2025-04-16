@@ -103,6 +103,7 @@
     :code 200: Request completed successfully
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, design document or view is missed
 
     **Request**:
@@ -879,6 +880,7 @@ Sending multiple queries to a view
     :code 200: Request completed successfully
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, design document or view is missing
     :code 500: View function execution error
 

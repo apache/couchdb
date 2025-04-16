@@ -156,6 +156,8 @@
     :>json string name: Design document name
     :>json object view_index: :ref:`api/ddoc/view_index_info`
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 

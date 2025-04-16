@@ -85,6 +85,7 @@
     :code 200: Request completed successfully
     :code 400: Invalid request
     :code 401: Read permission required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, design document or view is missed
 
 .. note::
@@ -118,6 +119,8 @@
     :param index: Search index name
     :code 200: Request completed successfully
     :code 400: Request body is wrong (malformed or missing one of the mandatory fields)
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 500: A server error (or other kind of error) occurred
 
 **Request**:
