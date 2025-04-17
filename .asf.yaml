@@ -1,7 +1,7 @@
 # see https://cwiki.apache.org/confluence/display/INFRA/git+-+.asf.yaml+features#git.asf.yamlfeatures-GitHubsettings
 
 github:
-  description: "Seamless multi-master syncing database with an intuitive HTTP/JSON API, designed for reliability"
+  description: "Seamless multi-primary syncing database with an intuitive HTTP/JSON API, designed for reliability"
   homepage: https://couchdb.apache.org/
   labels:
     - database
