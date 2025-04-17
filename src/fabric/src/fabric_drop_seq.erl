@@ -36,7 +36,6 @@ go(DbName) ->
     PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
     PeerCheckpoints2 = crossref(PeerCheckpoints1, ShardSyncHistory),
     Shards = mem3:live_shards(DbName, [node() | nodes()]),
-    RexiMon = fabric_util:create_monitors(Shards),
     Workers = lists:filtermap(
         fun(Shard) ->
             #shard{range = Range, node = Node, name = ShardName} = Shard,
@@ -53,26 +52,33 @@ go(DbName) ->
         end,
         Shards
     ),
-    Acc0 = {Workers, length(Workers) - 1},
-    try
-        case fabric_util:recv(Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0) of
-            {ok, ok} ->
-                ok;
-            {timeout, {WorkersDict, _}} ->
-                DefunctWorkers = fabric_util:remove_done_workers(
-                    WorkersDict,
-                    nil
-                ),
-                fabric_util:log_timeout(
-                    DefunctWorkers,
-                    "set_drop_seq"
-                ),
-                {error, timeout};
-            {error, Reason} ->
-                {error, Reason}
-        end
-    after
-        rexi_monitor:stop(RexiMon)
+    if
+        Workers == [] ->
+            %% nothing to do
+            ok;
+        true ->
+            RexiMon = fabric_util:create_monitors(Shards),
+            Acc0 = {Workers, length(Workers) - 1},
+            try
+                case fabric_util:recv(Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0) of
+                    {ok, ok} ->
+                        ok;
+                    {timeout, {WorkersDict, _}} ->
+                        DefunctWorkers = fabric_util:remove_done_workers(
+                            WorkersDict,
+                            nil
+                        ),
+                        fabric_util:log_timeout(
+                            DefunctWorkers,
+                            "set_drop_seq"
+                        ),
+                        {error, timeout};
+                    {error, Reason} ->
+                        {error, Reason}
+                end
+            after
+                rexi_monitor:stop(RexiMon)
+            end
     end.
 
 handle_set_drop_seq_reply(ok, _Worker, {_Workers, 0}) ->
