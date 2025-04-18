@@ -9,7 +9,8 @@ mkdir -p ./tmp
 $REBAR --keep-going --recursive xref $DIALYZE_OPTS | \
                                       grep -v '==>' | \
                                       grep -v 'WARN' | \
-                                      grep -v hastings > ./tmp/xref-output.txt
+                                      grep -v hastings | \
+                                      sort > ./tmp/xref-output.txt
 
 # compare result against known allowed output
 DIFF=`diff -u ./tmp/xref-output.txt ./test/fixtures/allowed-xref.txt`
