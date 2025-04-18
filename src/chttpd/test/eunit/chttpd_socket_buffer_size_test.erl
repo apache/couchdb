@@ -40,7 +40,7 @@ socket_buffer_size_test_() ->
             fun teardown/2,
             [
                 {"[{recbuf, undefined}]", fun default_buffer/2},
-                {"[{recbuf, 1024}]", fun small_recbuf/2},
+                {"[{recbuf, 1024},{buffer, 1024}]", fun small_recbuf/2},
                 {"[{buffer, 1024}]", fun small_buffer/2}
             ]
         }
