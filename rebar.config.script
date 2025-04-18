@@ -191,7 +191,7 @@ end.
 AddConfig = [
     {cover_enabled, true},
     {cover_print_enabled, true},
-    {require_otp_vsn, "25|26|27"},
+    {require_otp_vsn, "25|26|27|28"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
