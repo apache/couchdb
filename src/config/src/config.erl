@@ -512,8 +512,10 @@ remove_comments(Line) ->
         NoLeadingComment when is_list(NoLeadingComment) ->
             % Check for in-line comments. In-line comments must be preceded by
             % space or a tab character.
-            [NoComments | _] = re:split(NoLeadingComment, " ;|\t;", [{return, list}]),
-            NoComments
+            case re:split(NoLeadingComment, " ;|\t;", [{return, list}]) of
+                [] -> [];
+                [NoComments | _] -> NoComments
+            end
     end.
 
 trim(String) ->

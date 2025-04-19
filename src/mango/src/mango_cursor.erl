@@ -1113,6 +1113,12 @@ extract_selector_hints_test_() ->
         ]
     }.
 
+expect_set_from_list_ordered(L) ->
+    case erlang:system_info(otp_release) of
+        N when N >= "28" -> lists:sort(L);
+        _ -> L
+    end.
+
 t_extract_selector_hints_view(_) ->
     meck:expect(dreyfus, available, [], meck:val(false)),
     meck:expect(nouveau, enabled, [], meck:val(false)),
@@ -1123,7 +1129,7 @@ t_extract_selector_hints_view(_) ->
             {[
                 {type, json},
                 {indexable_fields, ["field2"]},
-                {unindexable_fields, ["field3", "field1"]}
+                {unindexable_fields, expect_set_from_list_ordered(["field3", "field1"])}
             ]}
         ],
     ?assertEqual(Hints, extract_selector_hints(selector)).
@@ -1139,12 +1145,12 @@ t_extract_selector_hints_text(_) ->
             {[
                 {type, json},
                 {indexable_fields, ["field2"]},
-                {unindexable_fields, ["field3", "field1"]}
+                {unindexable_fields, expect_set_from_list_ordered(["field3", "field1"])}
             ]},
             {[
                 {type, text},
                 {indexable_fields, ["field1"]},
-                {unindexable_fields, ["field3", "field2"]}
+                {unindexable_fields, expect_set_from_list_ordered(["field3", "field2"])}
             ]}
         ],
     ?assertEqual(Hints, extract_selector_hints(selector)).
@@ -1160,12 +1166,12 @@ t_extract_selector_hints_nouveau(_) ->
             {[
                 {type, json},
                 {indexable_fields, ["field2"]},
-                {unindexable_fields, ["field3", "field1"]}
+                {unindexable_fields, expect_set_from_list_ordered(["field3", "field1"])}
             ]},
             {[
                 {type, nouveau},
                 {indexable_fields, ["field1"]},
-                {unindexable_fields, ["field3", "field2"]}
+                {unindexable_fields, expect_set_from_list_ordered(["field3", "field2"])}
             ]}
         ],
     ?assertEqual(Hints, extract_selector_hints(selector)).
