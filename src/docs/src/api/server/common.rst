@@ -1085,7 +1085,6 @@ error.
     :code 401: CouchDB Server Administrator privileges required
     :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
-
     **Request**:
 
     .. code-block:: http

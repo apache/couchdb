@@ -231,7 +231,7 @@ def line_length_checker(file):
                 # Ignore long lines with external links
                 continue
 
-            if line.endswith(">`_"):
+            if line.endswith(">`_") or line.endswith(">`"):
                 # Ignore long lines because of URLs
                 # TODO: need to be more smart here
                 continue
