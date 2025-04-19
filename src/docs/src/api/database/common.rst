@@ -86,6 +86,8 @@
     :>json boolean props.partitioned: (optional) If present and true, this
       indicates that the database is partitioned.
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Requested database not found
 
     **Request**:
@@ -169,6 +171,7 @@
     :code 202: Accepted (at least by one node)
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 412: Database already exists
 
     **Request**:
@@ -271,6 +274,7 @@
     :code 202: Accepted (deleted by at least one of the nodes, quorum is not met yet)
     :code 400: Invalid database name or forgotten document id by accident
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Database doesn't exist or invalid database name
 
     **Request**:
@@ -328,6 +332,7 @@
     :code 202: Document data accepted, but not yet stored on disk
     :code 400: Invalid database name
     :code 401: Write privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Database doesn't exist
     :code 409: A Conflicting Document with same ID already exists
 

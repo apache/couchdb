@@ -39,6 +39,7 @@
     :code 200: Document exists
     :code 304: Document wasn't modified since specified revision
     :code 401: Read privilege required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Document not found
 
     **Request**:
@@ -135,6 +136,7 @@
     :code 304: Document wasn't modified since specified revision
     :code 400: The format of the request or revision was invalid
     :code 401: Read privilege required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Document not found
 
     **Request**:
@@ -215,6 +217,7 @@
     :code 202: Document data accepted, but not yet stored on disk
     :code 400: Invalid request body or parameters
     :code 401: Write privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database or document ID doesn't exists
     :code 409: Document with the specified ID already exists or specified
       revision is not latest for target document
@@ -296,6 +299,7 @@
     :code 202: Request was accepted, but changes are not yet stored on disk
     :code 400: Invalid request body or parameters
     :code 401: Write privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database or document ID doesn't exists
     :code 409: Specified revision is not the latest for target document
 
@@ -372,6 +376,7 @@
     :code 202: Request was accepted, but changes are not yet stored on disk
     :code 400: Invalid request body or parameters
     :code 401: Read or write privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database, document ID  or revision doesn't exists
     :code 409: Document with the specified ID already exists or specified
       revision is not latest for target document

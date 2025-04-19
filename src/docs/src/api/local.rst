@@ -112,7 +112,10 @@ A list of the available methods and URL paths are provided below:
     :>json number total_rows: Number of local documents in the database. Note
       that this is not the number of rows returned in the actual query.
     :>json number update_seq: Current update sequence for the database
+
     :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -179,9 +182,14 @@ A list of the available methods and URL paths are provided below:
     :synopsis: Returns a built-in view of all local (non-replicating) documents
       in this database
 
-    :method:`POST` `_local_docs` functionality supports identical parameters and behavior
-    as specified in the :get:`/{db}/_local_docs` API but allows for the query string
-    parameters to be supplied as keys in a JSON object in the body of the `POST` request.
+    :method:`POST` `/{db}/_local_docs` functionality supports identical parameters and
+    behavior as specified in the :get:`/{db}/_local_docs` API but allows for the query
+    string parameters to be supplied as keys in a JSON object in the body of the
+    `POST` request.
+
+    :param db: Database name
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -202,6 +210,8 @@ A list of the available methods and URL paths are provided below:
 
     The returned JSON is the all documents structure, but with only the
     selected keys in the output:
+
+    **Response**:
 
     .. code-block:: javascript
 
@@ -259,82 +269,83 @@ A list of the available methods and URL paths are provided below:
 
     :code 200: Request completed successfully
     :code 400: Invalid request
-    :code 401: Read permission required
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
     :code 404: Specified database is missing
     :code 500: Query execution error
 
-**Request**:
+    **Request**:
 
-.. code-block:: http
+    .. code-block:: http
 
-    POST /db/_local_docs/queries HTTP/1.1
-    Content-Type: application/json
-    Accept: application/json
-    Host: localhost:5984
+        POST /db/_local_docs/queries HTTP/1.1
+        Content-Type: application/json
+        Accept: application/json
+        Host: localhost:5984
 
-    {
-        "queries": [
-            {
-                "keys": [
-                    "_local/localdoc05",
-                    "_local/not-exist",
-                    "_design/recipe",
-                    "spaghetti"
-                ]
-            }
-        ]
-    }
+        {
+            "queries": [
+                {
+                    "keys": [
+                        "_local/localdoc05",
+                        "_local/not-exist",
+                        "_design/recipe",
+                        "spaghetti"
+                    ]
+                }
+            ]
+        }
 
-**Response**:
+    **Response**:
 
-.. code-block:: http
+    .. code-block:: http
 
-    HTTP/1.1 200 OK
-    Cache-Control: must-revalidate
-    Content-Type: application/json
-    Date: Thu, 20 Jul 2023 21:45:37 GMT
-    Server: CouchDB (Erlang/OTP)
-    Transfer-Encoding: chunked
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Type: application/json
+        Date: Thu, 20 Jul 2023 21:45:37 GMT
+        Server: CouchDB (Erlang/OTP)
+        Transfer-Encoding: chunked
 
-    {
-        "results": [
-            {
-                "total_rows": null,
-                "offset": null,
-                "rows": [
-                    {
-                        "id": "_local/localdoc05",
-                        "key": "_local/localdoc05",
-                        "value": {
-                          "rev": "0-1"
+        {
+            "results": [
+                {
+                    "total_rows": null,
+                    "offset": null,
+                    "rows": [
+                        {
+                            "id": "_local/localdoc05",
+                            "key": "_local/localdoc05",
+                            "value": {
+                              "rev": "0-1"
+                            }
+                        },
+                        {
+                            "key": "_local/not-exist",
+                            "error": "not_found"
                         }
-                    },
-                    {
-                        "key": "_local/not-exist",
-                        "error": "not_found"
-                    }
-                ]
-            },
-            {
-                "total_rows": null,
-                "offset": null,
-                "rows": [
-                    {
-                      "id": "_local/localdoc04",
-                      "key": "_local/localdoc04",
-                      "value": {
-                          "rev": "0-1"
+                    ]
+                },
+                {
+                    "total_rows": null,
+                    "offset": null,
+                    "rows": [
+                        {
+                          "id": "_local/localdoc04",
+                          "key": "_local/localdoc04",
+                          "value": {
+                              "rev": "0-1"
+                            }
                         }
-                    }
-                ]
-            }
-        ]
-    }
+                    ]
+                }
+            ]
+        }
 
-.. Note::
-    Similar to :ref:`_design_docs/queries <api/db/_design_docs/queries>`,
-    /{db}/_local_docs/queries will only return local documents.
-    The difference is ``total_rows`` and ``offset`` are always ``null``.
+    .. Note::
+        Similar to :ref:`_design_docs/queries <api/db/_design_docs/queries>`,
+        /{db}/_local_docs/queries will only return local documents.
+        The difference is ``total_rows`` and ``offset`` are always ``null``.
 
 .. _api/db/_local/doc:
 
@@ -348,12 +359,18 @@ A list of the available methods and URL paths are provided below:
     a standard document in the specified database, except that the document is
     not replicated. See :get:`/{db}/{docid}`.
 
+    :param db: Database name
+    :param docid: Document ID
+
 .. http:put:: /{db}/_local/{docid}
     :synopsis: Inserts a new version of the local document
 
     Stores the specified local document. The semantics are identical to storing
     a standard document in the specified database, except that the document is
     not replicated. See :put:`/{db}/{docid}`.
+
+    :param db: Database name
+    :param docid: Document ID
 
 .. http:delete:: /{db}/_local/{docid}
     :synopsis: Deletes the local document

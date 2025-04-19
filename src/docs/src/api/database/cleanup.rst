@@ -33,6 +33,7 @@
     :code 202: Cleanup request has been accepted
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
@@ -78,6 +79,7 @@
     :code 202: Cleanup request has been accepted
     :code 400: Invalid database name
     :code 401: CouchDB Server Administrator privileges required
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
 
     **Request**:
 
