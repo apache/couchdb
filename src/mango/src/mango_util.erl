@@ -340,10 +340,10 @@ is_number_string(Value) when is_list(Value) ->
     end.
 
 cached_re(Name, RE) ->
-    case mochiglobal:get(Name) of
+    case persistent_term:get({?MODULE, Name}, undefined) of
         undefined ->
             {ok, MP} = re:compile(RE),
-            ok = mochiglobal:put(Name, MP),
+            ok = persistent_term:put({?MODULE, Name}, MP),
             MP;
         MP ->
             MP
@@ -400,6 +400,6 @@ is_number_string_test() ->
     ?assert(is_number_string("-1.0")),
     ?assertNot(is_number_string("hello")),
     ?assertNot(is_number_string("")),
-    ?assertMatch({match, _}, re:run("1.0", mochiglobal:get(mango_numstring_re))).
+    ?assertMatch({match, _}, re:run("1.0", persistent_term:get({?MODULE, mango_numstring_re}))).
 
 -endif.
