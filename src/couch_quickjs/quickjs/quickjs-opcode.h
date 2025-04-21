@@ -110,6 +110,7 @@ DEF(         return, 1, 1, 0, none)
 DEF(   return_undef, 1, 0, 0, none)
 DEF(check_ctor_return, 1, 1, 2, none)
 DEF(     check_ctor, 1, 0, 0, none)
+DEF(      init_ctor, 1, 0, 1, none)
 DEF(    check_brand, 1, 2, 2, none) /* this_obj func -> this_obj func */
 DEF(      add_brand, 1, 2, 0, none) /* this_obj home_obj -> */
 DEF(   return_async, 1, 1, 0, none)
@@ -195,7 +196,6 @@ DEF(   with_put_var, 10, 2, 1, atom_label_u8)     /* must be in the same order a
 DEF(with_delete_var, 10, 1, 0, atom_label_u8)     /* must be in the same order as scope_xxx */
 DEF(  with_make_ref, 10, 1, 0, atom_label_u8)     /* must be in the same order as scope_xxx */
 DEF(   with_get_ref, 10, 1, 0, atom_label_u8)     /* must be in the same order as scope_xxx */
-DEF(with_get_ref_undef, 10, 1, 0, atom_label_u8)
 
 DEF(   make_loc_ref, 7, 0, 2, atom_u16)
 DEF(   make_arg_ref, 7, 0, 2, atom_u16)
