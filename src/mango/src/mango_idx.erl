@@ -84,10 +84,10 @@ get_usable_indexes(Db, Selector, Opts, Kind) ->
             mango_sort_error(Db, Opts);
         {UsableIndexes, _} ->
             Trace = #{
-                all_indexes => sets:from_list(ExistingIndexes),
-                global_indexes => sets:from_list(GlobalIndexes),
-                partition_indexes => sets:from_list(PartitionIndexes),
-                usable_indexes => sets:from_list(UsableIndexes),
+                all_indexes => set_from_list(ExistingIndexes),
+                global_indexes => set_from_list(GlobalIndexes),
+                partition_indexes => set_from_list(PartitionIndexes),
+                usable_indexes => set_from_list(UsableIndexes),
                 usability_map => UsabilityMap
             },
             {UsableIndexes, Trace}
@@ -498,6 +498,9 @@ get_legacy_selector(Def) ->
         Selector -> Selector
     end.
 
+set_from_list(KVs) ->
+    sets:from_list(KVs, [{version, 2}]).
+
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
@@ -544,10 +547,10 @@ t_get_usable_indexes_empty(_) ->
     ?assertThrow(Exception2, get_usable_indexes(Database, selector, Options1, find)),
     Trace =
         #{
-            all_indexes => sets:new(),
-            global_indexes => sets:new(),
-            partition_indexes => sets:new(),
-            usable_indexes => sets:new(),
+            all_indexes => sets:new([{version, 2}]),
+            global_indexes => sets:new([{version, 2}]),
+            partition_indexes => sets:new([{version, 2}]),
+            usable_indexes => sets:new([{version, 2}]),
             usability_map => []
         },
     ?assertEqual({[], Trace}, get_usable_indexes(Database, selector, Options1, explain)),
@@ -580,10 +583,10 @@ t_get_usable_indexes_regular(_) ->
         ],
     Trace =
         #{
-            all_indexes => sets:from_list(ExistingIndexes),
-            global_indexes => sets:from_list(GlobalIndexes),
-            partition_indexes => sets:from_list(PartitionIndexes),
-            usable_indexes => sets:from_list(UsableIndexes),
+            all_indexes => set_from_list(ExistingIndexes),
+            global_indexes => set_from_list(GlobalIndexes),
+            partition_indexes => set_from_list(PartitionIndexes),
+            usable_indexes => set_from_list(UsableIndexes),
             usability_map => UsabilityMap
         },
     meck:expect(ddoc_cache, open, [Database, mango_idx], meck:val({ok, ExistingIndexes})),
@@ -636,10 +639,10 @@ t_get_usable_indexes_user_specified_index(_) ->
         ],
     Trace =
         #{
-            all_indexes => sets:from_list(ExistingIndexes),
-            global_indexes => sets:from_list(GlobalIndexes),
-            partition_indexes => sets:from_list(PartitionIndexes),
-            usable_indexes => sets:from_list(UsableIndexes),
+            all_indexes => set_from_list(ExistingIndexes),
+            global_indexes => set_from_list(GlobalIndexes),
+            partition_indexes => set_from_list(PartitionIndexes),
+            usable_indexes => set_from_list(UsableIndexes),
             usability_map => UsabilityMap
         },
     meck:expect(ddoc_cache, open, [Database, mango_idx], meck:val({ok, ExistingIndexes})),
