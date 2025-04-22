@@ -32,14 +32,12 @@
 go(DbName) ->
     {ok, PeerCheckpoints0} = get_peer_checkpoint_docs(DbName),
     {ok, ShardSyncHistory} = get_all_shard_sync_docs(DbName),
-    ShardSyncCheckpoints = latest_shard_sync_checkpoints(ShardSyncHistory),
-    PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
-    PeerCheckpoints2 = crossref(PeerCheckpoints1, ShardSyncHistory),
+    PeerCheckpoints1 = calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory),
     Shards = mem3:live_shards(DbName, [node() | nodes()]),
     Workers = lists:filtermap(
         fun(Shard) ->
             #shard{range = Range, node = Node, name = ShardName} = Shard,
-            case maps:find({Range, Node}, PeerCheckpoints2) of
+            case maps:find({Range, Node}, PeerCheckpoints1) of
                 {ok, {UuidPrefix, DropSeq}} ->
                     Ref = rexi:cast(
                         Node,
@@ -80,6 +78,12 @@ go(DbName) ->
                 rexi_monitor:stop(RexiMon)
             end
     end.
+
+-spec calculate_drop_seqs(peer_checkpoints(), shard_sync_history()) -> peer_checkpoints().
+calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory) ->
+    ShardSyncCheckpoints = latest_shard_sync_checkpoints(ShardSyncHistory),
+    PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
+    crossref(PeerCheckpoints1, ShardSyncHistory).
 
 handle_set_drop_seq_reply(ok, _Worker, {_Workers, 0}) ->
     {stop, ok};
@@ -368,3 +372,103 @@ pack_seq(DbName, UpdateSeq) ->
     Seq0 = [node(), mem3:range(DbName), {UpdateSeq, DbUuid, node()}],
     Seq1 = couch_util:encodeBase64Url(?term_to_bin(Seq0, [compressed])),
     <<(integer_to_binary(UpdateSeq))/binary, $-, Seq1/binary>>.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+empty_sync_history_means_no_change_test() ->
+    Range = [0, 10],
+    Node1 = 'node1@127.0.0.1',
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
+    ShardSyncHistory = #{},
+    ?assertEqual(PeerCheckpoints, calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)).
+
+matching_sync_history_expands_result_test() ->
+    Range = [0, 10],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
+    ShardSyncHistory = #{{Range, Node1, Node2} => [{<<"uuid1">>, 12, <<"uuid2">>, 5}]},
+    ?assertEqual(
+        #{
+            {Range, Node1} => {<<"uuid1">>, 12},
+            {Range, Node2} => {<<"uuid2">>, 5}
+        },
+        calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)
+    ).
+
+transitive_sync_history_expands_result_test() ->
+    Range = [0, 10],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    Node3 = 'node3@127.0.0.1',
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
+    ShardSyncHistory = #{
+        {Range, Node1, Node2} => [{<<"uuid1">>, 12, <<"uuid2">>, 5}],
+        {Range, Node2, Node3} => [{<<"uuid2">>, 11, <<"uuid3">>, 11}]
+    },
+    ?assertEqual(
+        #{
+            {Range, Node1} => {<<"uuid1">>, 12},
+            {Range, Node2} => {<<"uuid2">>, 5},
+            {Range, Node3} => {<<"uuid3">>, 11}
+        },
+        calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)
+    ).
+
+shard_sync_history_caps_peer_checkpoint_test() ->
+    Range = [0, 10],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
+    ShardSyncHistory = #{{Range, Node1, Node2} => [{<<"uuid1">>, 10, <<"uuid2">>, 5}]},
+    ?assertEqual(
+        #{
+            {Range, Node1} => {<<"uuid1">>, 10},
+            {Range, Node2} => {<<"uuid2">>, 5}
+        },
+        calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)
+    ).
+
+multiple_range_test() ->
+    Range1 = [0, 10],
+    Range2 = [11, 20],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    PeerCheckpoints = #{{Range1, Node1} => {<<"r1n1">>, 12}, {Range2, Node2} => {<<"r2n2">>, 20}},
+    ShardSyncHistory = #{
+        {Range1, Node1, Node2} => [{<<"r1n1">>, 10, <<"r1n2">>, 5}],
+        {Range2, Node2, Node1} => [{<<"r2n2">>, 19, <<"r2n1">>, 17}]
+    },
+    ?assertEqual(
+        #{
+            {Range1, Node1} => {<<"r1n1">>, 10},
+            {Range1, Node2} => {<<"r1n2">>, 5},
+            {Range2, Node2} => {<<"r2n2">>, 19},
+            {Range2, Node1} => {<<"r2n1">>, 17}
+        },
+        calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)
+    ).
+
+search_history_for_latest_safe_crossover_test() ->
+    Range = [0, 10],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 50}},
+    ShardSyncHistory = #{
+        {Range, Node1, Node2} => [
+            {<<"uuid1">>, 100, <<"uuid2">>, 99},
+            {<<"uuid1">>, 75, <<"uuid2">>, 76},
+            {<<"uuid1">>, 50, <<"uuid2">>, 51},
+            {<<"uuid1">>, 40, <<"uuid2">>, 41}
+        ]
+    },
+    ?assertEqual(
+        #{
+            {Range, Node1} => {<<"uuid1">>, 50},
+            {Range, Node2} => {<<"uuid2">>, 51}
+        },
+        calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)
+    ).
+
+-endif.
