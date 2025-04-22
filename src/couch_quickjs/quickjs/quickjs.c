@@ -33836,6 +33836,12 @@ static __exception int js_parse_directives(JSParseState *s)
     return js_parse_seek_token(s, &pos);
 }
 
+/* return TRUE if the keyword is forbidden only in strict mode */
+static BOOL is_strict_future_keyword(JSAtom atom)
+{
+    return (atom >= JS_ATOM_LAST_KEYWORD + 1 && atom <= JS_ATOM_LAST_STRICT_KEYWORD);
+}
+
 static int js_parse_function_check_names(JSParseState *s, JSFunctionDef *fd,
                                          JSAtom func_name)
 {
@@ -33846,13 +33852,15 @@ static int js_parse_function_check_names(JSParseState *s, JSFunctionDef *fd,
         if (!fd->has_simple_parameter_list && fd->has_use_strict) {
             return js_parse_error(s, "\"use strict\" not allowed in function with default or destructuring parameter");
         }
-        if (func_name == JS_ATOM_eval || func_name == JS_ATOM_arguments) {
+        if (func_name == JS_ATOM_eval || func_name == JS_ATOM_arguments ||
+            is_strict_future_keyword(func_name)) {
             return js_parse_error(s, "invalid function name in strict code");
         }
         for (idx = 0; idx < fd->arg_count; idx++) {
             name = fd->args[idx].var_name;
 
-            if (name == JS_ATOM_eval || name == JS_ATOM_arguments) {
+            if (name == JS_ATOM_eval || name == JS_ATOM_arguments ||
+                is_strict_future_keyword(name)) {
                 return js_parse_error(s, "invalid argument name in strict code");
             }
         }
@@ -34132,6 +34140,8 @@ static __exception int js_parse_function_decl2(JSParseState *s,
             int idx, has_initializer;
 
             if (s->token.val == TOK_ELLIPSIS) {
+                if (func_type == JS_PARSE_FUNC_SETTER)
+                    goto fail_accessor;
                 fd->has_simple_parameter_list = FALSE;
                 rest = TRUE;
                 if (next_token(s))
@@ -34245,6 +34255,7 @@ static __exception int js_parse_function_decl2(JSParseState *s,
         }
         if ((func_type == JS_PARSE_FUNC_GETTER && fd->arg_count != 0) ||
             (func_type == JS_PARSE_FUNC_SETTER && fd->arg_count != 1)) {
+        fail_accessor:
             js_parse_error(s, "invalid number of arguments for getter or setter");
             goto fail;
         }
@@ -37315,6 +37326,7 @@ static __exception int JS_ObjectDefineProperties(JSContext *ctx,
     if (JS_IsException(props))
         return -1;
     p = JS_VALUE_GET_OBJ(props);
+    /* XXX: not done in the same order as the spec */
     if (JS_GetOwnPropertyNamesInternal(ctx, &atoms, &len, p, JS_GPN_ENUM_ONLY | JS_GPN_STRING_MASK | JS_GPN_SYMBOL_MASK) < 0)
         goto exception;
     for(i = 0; i < len; i++) {
@@ -38271,16 +38283,16 @@ exception:
 static JSValue js_object_propertyIsEnumerable(JSContext *ctx, JSValueConst this_val,
                                               int argc, JSValueConst *argv)
 {
-    JSValue obj, res = JS_EXCEPTION;
-    JSAtom prop = JS_ATOM_NULL;
+    JSValue obj = JS_UNDEFINED, res = JS_EXCEPTION;
+    JSAtom prop;
     JSPropertyDescriptor desc;
     int has_prop;
 
-    obj = JS_ToObject(ctx, this_val);
-    if (JS_IsException(obj))
-        goto exception;
     prop = JS_ValueToAtom(ctx, argv[0]);
     if (unlikely(prop == JS_ATOM_NULL))
+        goto exception;
+    obj = JS_ToObject(ctx, this_val);
+    if (JS_IsException(obj))
         goto exception;
 
     has_prop = JS_GetOwnPropertyInternal(ctx, &desc, JS_VALUE_GET_OBJ(obj), prop);
@@ -44111,12 +44123,6 @@ static JSValue js_regexp_exec(JSContext *ctx, JSValueConst this_val,
                 goto fail;
         }
 
-        t = groups, groups = JS_UNDEFINED;
-        if (JS_DefinePropertyValue(ctx, obj, JS_ATOM_groups,
-                                   t, prop_flags) < 0) {
-            goto fail;
-        }
-
         t = JS_NewInt32(ctx, (capture[0] - str_buf) >> shift);
         if (JS_DefinePropertyValue(ctx, obj, JS_ATOM_index, t, prop_flags) < 0)
             goto fail;
@@ -44124,6 +44130,12 @@ static JSValue js_regexp_exec(JSContext *ctx, JSValueConst this_val,
         t = str_val, str_val = JS_UNDEFINED;
         if (JS_DefinePropertyValue(ctx, obj, JS_ATOM_input, t, prop_flags) < 0)
             goto fail;
+
+        t = groups, groups = JS_UNDEFINED;
+        if (JS_DefinePropertyValue(ctx, obj, JS_ATOM_groups,
+                                   t, prop_flags) < 0) {
+            goto fail;
+        }
 
         if (!JS_IsUndefined(indices)) {
             t = indices_groups, indices_groups = JS_UNDEFINED;
@@ -44959,7 +44971,7 @@ static JSValue js_regexp_Symbol_split(JSContext *ctx, JSValueConst this_val,
                 if (js_get_length64(ctx, &numberOfCaptures, z))
                     goto exception;
                 for(i = 1; i < numberOfCaptures; i++) {
-                    sub = JS_ToStringFree(ctx, JS_GetPropertyInt64(ctx, z, i));
+                    sub = JS_GetPropertyInt64(ctx, z, i);
                     if (JS_IsException(sub))
                         goto exception;
                     if (JS_DefinePropertyValueInt64(ctx, A, lengthA++, sub, JS_PROP_C_W_E | JS_PROP_THROW) < 0)
@@ -51269,9 +51281,10 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
                                countof(js_generator_proto_funcs));
 
     ctx->class_proto[JS_CLASS_GENERATOR_FUNCTION] = JS_NewObjectProto(ctx, ctx->function_proto);
-    obj1 = JS_NewCFunctionMagic(ctx, js_function_constructor,
-                                "GeneratorFunction", 1,
-                                JS_CFUNC_constructor_or_func_magic, JS_FUNC_GENERATOR);
+    obj1 = JS_NewCFunction3(ctx, (JSCFunction *)js_function_constructor,
+                            "GeneratorFunction", 1,
+                            JS_CFUNC_constructor_or_func_magic, JS_FUNC_GENERATOR,
+                            ctx->function_ctor);
     JS_SetPropertyFunctionList(ctx,
                                ctx->class_proto[JS_CLASS_GENERATOR_FUNCTION],
                                js_generator_function_proto_funcs,
@@ -51923,6 +51936,8 @@ static JSValue js_typed_array_with(JSContext *ctx, JSValueConst this_val,
     p = get_typed_array(ctx, this_val, /*is_dataview*/0);
     if (!p)
         return JS_EXCEPTION;
+    if (typed_array_is_detached(ctx, p))
+        return JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
 
     if (JS_ToInt64Sat(ctx, &idx, argv[0]))
         return JS_EXCEPTION;
@@ -51930,12 +51945,13 @@ static JSValue js_typed_array_with(JSContext *ctx, JSValueConst this_val,
     len = p->u.array.count;
     if (idx < 0)
         idx = len + idx;
-    if (idx < 0 || idx >= len)
-        return JS_ThrowRangeError(ctx, "invalid array index");
 
     val = JS_ToPrimitive(ctx, argv[1], HINT_NUMBER);
     if (JS_IsException(val))
         return JS_EXCEPTION;
+
+    if (typed_array_is_detached(ctx, p) || idx < 0 || idx >= len)
+        return JS_ThrowRangeError(ctx, "invalid array index");
 
     arr = js_typed_array_constructor_ta(ctx, JS_UNDEFINED, this_val,
                                         p->class_id);
@@ -52745,6 +52761,18 @@ static JSValue js_typed_array_toReversed(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
+static void slice_memcpy(uint8_t *dst, const uint8_t *src, size_t len)
+{
+    if (dst + len <= src || dst >= src + len) {
+        /* no overlap: can use memcpy */
+        memcpy(dst, src, len);
+    } else {
+        /* otherwise the spec mandates byte copy */
+        while (len-- != 0)
+            *dst++ = *src++;
+    }
+}
+
 static JSValue js_typed_array_slice(JSContext *ctx, JSValueConst this_val,
                                     int argc, JSValueConst *argv)
 {
@@ -52787,9 +52815,9 @@ static JSValue js_typed_array_slice(JSContext *ctx, JSValueConst this_val,
         if (p1 != NULL && p->class_id == p1->class_id &&
             typed_array_get_length(ctx, p1) >= count &&
             typed_array_get_length(ctx, p) >= start + count) {
-            memcpy(p1->u.array.u.uint8_ptr,
-                   p->u.array.u.uint8_ptr + (start << shift),
-                   count << shift);
+            slice_memcpy(p1->u.array.u.uint8_ptr,
+                         p->u.array.u.uint8_ptr + (start << shift),
+                         count << shift);
         } else {
             for (n = 0; n < count; n++) {
                 val = JS_GetPropertyValue(ctx, this_val, JS_NewInt32(ctx, start + n));
