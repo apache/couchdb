@@ -28,7 +28,8 @@
     info/1,
     group1/2,
     group2/2,
-    design_doc_to_indexes/1
+    design_doc_to_indexes/1,
+    peer_checkpoint_id/2
 ]).
 
 % gen_server api.
@@ -124,6 +125,13 @@ init({DbName, Index}) ->
                         couch_db:close(Db)
                     end,
                     dreyfus_util:maybe_create_local_purge_doc(Db, Pid, Index),
+                    fabric_drop_seq:create_peer_checkpoint_doc_if_missing(
+                        DbName,
+                        <<"search">>,
+                        <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
+                        peer_checkpoint_id(DbName, Index#index.sig),
+                        Seq
+                    ),
                     proc_lib:init_ack({ok, self()}),
                     gen_server:enter_loop(?MODULE, [], State);
                 Error ->
@@ -421,3 +429,10 @@ group2_int(Pid, QueryArgs0) ->
 
 info_int(Pid) ->
     clouseau_rpc:info(Pid).
+
+peer_checkpoint_id(DbName, Sig0) ->
+    Sig1 = couch_util:encodeBase64Url(Sig0),
+    Hash = couch_util:encodeBase64Url(
+        crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
+    ),
+    <<"search-", Sig1/binary, "-", Hash/binary>>.

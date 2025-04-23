@@ -60,7 +60,18 @@ update(IndexPid, Index) ->
             [Changes] = couch_task_status:get([changes_done]),
             Acc0 = {Changes, IndexPid, Db, Proc, TotalChanges, erlang:timestamp(), ExcludeIdRevs},
             {ok, _} = couch_db:fold_changes(Db, CurSeq, EnumFun, Acc0, []),
-            ok = clouseau_rpc:commit(IndexPid, NewCurSeq)
+            ok = clouseau_rpc:commit(IndexPid, NewCurSeq),
+            {ok, CommittedSeq} = clouseau_rpc:get_update_seq(IndexPid),
+            fabric_drop_seq:update_peer_checkpoint_doc(
+                DbName,
+                <<"search">>,
+                <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
+                dreyfus_index:peer_checkpoint_id(
+                    DbName,
+                    Index#index.sig
+                ),
+                CommittedSeq
+            )
         after
             ret_os_process(Proc)
         end,
