@@ -1362,4 +1362,4 @@ peer_checkpoint_id(#mrst{} = State) ->
     Hash = couch_util:encodeBase64Url(
         crypto:hash(sha256, [atom_to_binary(node()), $0, State#mrst.db_name])
     ),
-    <<"mrview-", Sig/binary, "-", Hash/binary>>.
+    <<Sig/binary, "-", Hash/binary>>.

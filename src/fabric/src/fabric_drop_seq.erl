@@ -302,7 +302,9 @@ create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq
     is_binary(UpdateSeq)
 ->
     {_, Ref} = spawn_monitor(fun() ->
-        case fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(PeerId), [?ADMIN_CTX]) of
+        case
+            fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(Subtype, PeerId), [?ADMIN_CTX])
+        of
             {ok, _} ->
                 ok;
             {not_found, _} ->
@@ -353,7 +355,7 @@ peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq) when
     is_binary(PeerId), is_binary(Subtype), is_binary(Source), is_binary(UpdateSeq)
 ->
     #doc{
-        id = peer_checkpoint_id(PeerId),
+        id = peer_checkpoint_id(Subtype, PeerId),
         body =
             {[
                 {<<"type">>, <<"peer-checkpoint">>},
@@ -364,8 +366,8 @@ peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq) when
             ]}
     }.
 
-peer_checkpoint_id(PeerId) ->
-    <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", PeerId/binary>>.
+peer_checkpoint_id(Subtype, PeerId) ->
+    <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", Subtype/binary, "-", PeerId/binary>>.
 
 pack_seq(DbName, UpdateSeq) ->
     DbUuid = couch_util:with_db(DbName, fun(Db) -> couch_db:get_uuid(Db) end),
