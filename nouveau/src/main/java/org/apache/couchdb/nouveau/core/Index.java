@@ -36,18 +36,20 @@ import org.apache.couchdb.nouveau.api.SearchResults;
 public abstract class Index implements Closeable {
 
     private long updateSeq;
+    private long committedUpdateSeq;
     private long purgeSeq;
     private boolean deleteOnClose = false;
 
     protected Index(final long updateSeq, final long purgeSeq) {
         this.updateSeq = updateSeq;
+        this.committedUpdateSeq = updateSeq;
         this.purgeSeq = purgeSeq;
     }
 
     public final IndexInfo info() throws IOException {
         final int numDocs = doNumDocs();
         final long diskSize = doDiskSize();
-        return new IndexInfo(updateSeq, purgeSeq, numDocs, diskSize);
+        return new IndexInfo(updateSeq, committedUpdateSeq, purgeSeq, numDocs, diskSize);
     }
 
     protected abstract int doNumDocs() throws IOException;
@@ -93,7 +95,13 @@ public abstract class Index implements Closeable {
             updateSeq = this.updateSeq;
             purgeSeq = this.purgeSeq;
         }
-        return doCommit(updateSeq, purgeSeq);
+        final boolean result = doCommit(updateSeq, purgeSeq);
+        if (result) {
+            synchronized (this) {
+                this.committedUpdateSeq = Math.max(this.committedUpdateSeq, updateSeq);
+            }
+        }
+        return result;
     }
 
     protected abstract boolean doCommit(final long updateSeq, final long purgeSeq) throws IOException;
