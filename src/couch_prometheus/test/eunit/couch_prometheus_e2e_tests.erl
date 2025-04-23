@@ -119,7 +119,7 @@ t_no_duplicate_metrics(Port) ->
     ?assertEqual(erlang:length(Diff), 0).
 
 get_duplicates(List) ->
-    List -- sets:to_list(sets:from_list(List)).
+    List -- sets:to_list(couch_util:set_from_list(List)).
 
 t_metric_updated(Port) ->
     % The passage of time should increment this metric

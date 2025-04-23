@@ -49,8 +49,8 @@ parse_replication_state_filter(States) when is_list(States) ->
                 Msg1 = io_lib:format("States must be one or more of ~w", [AllStates]),
                 throw({query_parse_error, ?l2b(Msg1)})
         end,
-    AllSet = sets:from_list(AllStates),
-    StatesSet = sets:from_list(AtomStates),
+    AllSet = couch_util:set_from_list(AllStates),
+    StatesSet = couch_util:set_from_list(AtomStates),
     Diff = sets:to_list(sets:subtract(StatesSet, AllSet)),
     case Diff of
         [] ->

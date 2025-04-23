@@ -151,6 +151,6 @@ rand_range(B, E) ->
 
 endpoints(Ranges) ->
     {Begins, Ends} = lists:unzip(Ranges),
-    sets:from_list(Begins ++ Ends).
+    couch_util:set_from_list(Begins ++ Ends).
 
 -endif.

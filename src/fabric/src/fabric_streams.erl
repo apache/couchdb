@@ -199,7 +199,7 @@ spawn_worker_cleaner(Coordinator, Workers, ClientReq) when
         undefined ->
             Pid = spawn(fun() ->
                 erlang:monitor(process, Coordinator),
-                NodeRefSet = set_from_list(shards_to_node_refs(Workers)),
+                NodeRefSet = couch_util:set_from_list(shards_to_node_refs(Workers)),
                 cleaner_loop(Coordinator, NodeRefSet, ClientReq)
             end),
             put(?WORKER_CLEANER, Pid),
@@ -227,9 +227,6 @@ add_worker_to_cleaner(CoordinatorPid, #shard{node = Node, ref = Ref}) ->
         _ ->
             ok
     end.
-
-set_from_list(List) when is_list(List) ->
-    sets:from_list(List, [{version, 2}]).
 
 shards_to_node_refs(Workers) when is_list(Workers) ->
     Fun = fun(#shard{node = Node, ref = Ref}) -> {Node, Ref} end,

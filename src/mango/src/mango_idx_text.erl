@@ -142,7 +142,9 @@ is_usable(Idx, Selector, _) ->
             {true, #{reason => []}};
         Cols ->
             Fields = indexable_fields(Selector),
-            Usable = sets:is_subset(set_from_list(Fields), set_from_list(Cols)),
+            Usable = sets:is_subset(
+                couch_util:set_from_list(Fields), couch_util:set_from_list(Cols)
+            ),
             Reason = [field_mismatch || not Usable],
             Details = #{reason => Reason},
             {Usable, Details}
@@ -401,9 +403,6 @@ maybe_reject_index_all_req({Def}, Db) ->
 
 forbid_index_all() ->
     config:get("mango", "index_all_disabled", "false").
-
-set_from_list(KVs) ->
-    sets:from_list(KVs, [{version, 2}]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

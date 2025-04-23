@@ -55,7 +55,7 @@ init(_) ->
     State = #state{
         update_db = UpdateDb,
         pending_update_count = 0,
-        pending_updates = sets:new([{version, 2}]),
+        pending_updates = couch_util:new_set(),
         max_event_delay = MaxEventDelay,
         dbname = global_changes_util:get_dbname()
     },
@@ -99,7 +99,7 @@ handle_cast({set_update_db, Boolean}, State0) ->
             {false, true} ->
                 State0#state{
                     update_db = Boolean,
-                    pending_updates = sets:new([{version, 2}]),
+                    pending_updates = couch_util:new_set(),
                     pending_update_count = 0,
                     last_update_time = undefined
                 };
@@ -141,7 +141,7 @@ maybe_send_updates(#state{update_db = true} = State) ->
                         0
                     ),
                     State1 = State#state{
-                        pending_updates = sets:new([{version, 2}]),
+                        pending_updates = couch_util:new_set(),
                         pending_update_count = 0,
                         last_update_time = undefined
                     },
