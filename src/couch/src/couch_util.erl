@@ -47,6 +47,7 @@
 -export([get_config_hash_algorithms/0]).
 -export([remove_sensitive_data/1]).
 -export([ejson_to_map/1]).
+-export([new_set/0, set_from_list/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -862,3 +863,16 @@ ejson_to_map({Val}) when is_list(Val) ->
     maps:from_list(lists:map(fun({K, V}) -> {K, ejson_to_map(V)} end, Val));
 ejson_to_map(Val) ->
     Val.
+
+% Set types were switched to version 2 by default in OTP 28, use this helper to
+% create version 2 sets in OTP versions < 28 as well to avoid having to deal
+% with a different ordered to_list result in tests and just ensure we always
+% use version 2, which is also more performant
+%
+% Remove after OTP >= 28 and switch to plain sets:new/0 and sets:from_list/1
+
+new_set() ->
+    sets:new([{version, 2}]).
+
+set_from_list(KVs) ->
+    sets:from_list(KVs, [{version, 2}]).

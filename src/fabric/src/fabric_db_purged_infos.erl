@@ -29,7 +29,7 @@ go(DbName) ->
     Fun = fun handle_message/3,
     Acc0 = #pacc{
         counters = fabric_dict:init(Workers, nil),
-        replies = sets:new([{version, 2}]),
+        replies = couch_util:new_set(),
         ring_opts = [{any, Shards}]
     },
     try
@@ -66,7 +66,7 @@ handle_message({rexi_EXIT, Reason}, Shard, #pacc{} = Acc) ->
     end;
 handle_message({ok, Info}, #shard{} = Shard, #pacc{} = Acc) ->
     #pacc{counters = Counters, replies = Replies} = Acc,
-    InfoSet = sets:from_list(Info, [{version, 2}]),
+    InfoSet = couch_util:set_from_list(Info),
     Replies1 = sets:union(InfoSet, Replies),
     Counters1 = fabric_dict:erase(Shard, Counters),
     case fabric_dict:size(Counters1) =:= 0 of
@@ -92,7 +92,7 @@ make_shards() ->
 init_acc(Shards) ->
     #pacc{
         counters = fabric_dict:init(Shards, nil),
-        replies = sets:new([{version, 2}]),
+        replies = couch_util:new_set(),
         ring_opts = [{any, Shards}]
     }.
 

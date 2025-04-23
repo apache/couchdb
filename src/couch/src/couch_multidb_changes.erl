@@ -200,7 +200,7 @@ handle_info(_Msg, State) ->
 
 shards_db_fold(#row{dbname = <<"shards/", _/binary>> = DbName} = Row, {Add, Remove}) ->
     Fun = fun(Dbs) -> sets:add_element(DbName, Dbs) end,
-    Init = sets:from_list([DbName], [{version, 2}]),
+    Init = couch_util:set_from_list([DbName]),
     case Row#row.wait_shard_map of
         true ->
             {maps:update_with(mem3:dbname(DbName), Fun, Init, Add), Remove};
@@ -354,10 +354,10 @@ is_deleted(Change) ->
 local_shards(Db0) ->
     Db = mem3:dbname(Db0),
     try
-        sets:from_list([S || #shard{name = S} <- mem3:local_shards(Db)], [{version, 2}])
+        couch_util:set_from_list([S || #shard{name = S} <- mem3:local_shards(Db)])
     catch
         error:database_does_not_exist ->
-            sets:new([{version, 2}])
+            couch_util:new_set()
     end.
 
 notify_fold(DbName, {Server, DbSuffix, Count}) ->

@@ -113,7 +113,7 @@ execute(Cursor, UserFun, UserAcc) ->
         user_acc = UserAcc,
         fields = Cursor#cursor.fields,
         execution_stats = mango_execution_stats:log_start(Stats),
-        documents_seen = sets:new([{version, 2}])
+        documents_seen = couch_util:new_set()
     },
     try
         case Query of
