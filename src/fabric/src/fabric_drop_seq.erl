@@ -336,19 +336,37 @@ update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
     is_binary(PeerId),
     is_binary(UpdateSeq)
 ->
-    Doc = peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq),
-    {_, Ref} = spawn_monitor(fun() ->
-        case fabric:update_doc(mem3:dbname(DbName), Doc, [?ADMIN_CTX]) of
-            {ok, _} ->
-                ok;
+    {_, OpenRef} = spawn_monitor(fun() ->
+        case
+            fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(Subtype, PeerId), [?ADMIN_CTX])
+        of
+            {ok, Doc} ->
+                exit({ok, Doc});
+            {not_found, Reason} ->
+                throw({peer_checkpoint_missing, Reason});
             {error, Reason} ->
-                throw({checkpoint_commit_failure, Reason})
+                throw({checkpoint_fetch_failure, Reason})
         end
     end),
     receive
-        {'DOWN', Ref, _, _, ok} ->
-            ok;
-        {'DOWN', Ref, _, _, Else} ->
+        {'DOWN', OpenRef, _, _, {ok, ExistingDoc}} ->
+            NewDoc0 = peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq),
+            NewDoc1 = NewDoc0#doc{revs = ExistingDoc#doc.revs},
+            {_, UpdateRef} = spawn_monitor(fun() ->
+                case fabric:update_doc(mem3:dbname(DbName), NewDoc1, [?ADMIN_CTX]) of
+                    {ok, _} ->
+                        ok;
+                    {error, Reason} ->
+                        throw({checkpoint_commit_failure, Reason})
+                end
+            end),
+            receive
+                {'DOWN', UpdateRef, _, _, ok} ->
+                    ok;
+                {'DOWN', UpdateRef, _, _, Else} ->
+                    Else
+            end;
+        {'DOWN', OpenRef, _, _, Else} ->
             Else
     end.
 
