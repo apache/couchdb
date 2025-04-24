@@ -36,7 +36,6 @@
 -export([get_collator_versions/1]).
 -export([compact_on_collator_upgrade/0]).
 -export([commit_on_header_upgrade/0]).
--export([peer_checkpoint_id/1]).
 
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
@@ -1356,10 +1355,3 @@ compact_on_collator_upgrade() ->
 
 commit_on_header_upgrade() ->
     config:get_boolean("view_upgrade", "commit_on_header_upgrade", true).
-
-peer_checkpoint_id(#mrst{} = State) ->
-    Sig = couch_util:encodeBase64Url(State#mrst.sig),
-    Hash = couch_util:encodeBase64Url(
-        crypto:hash(sha256, [atom_to_binary(node()), $0, State#mrst.db_name])
-    ),
-    <<Sig/binary, "-", Hash/binary>>.

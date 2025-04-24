@@ -28,8 +28,7 @@
     info/1,
     group1/2,
     group2/2,
-    design_doc_to_indexes/1,
-    peer_checkpoint_id/2
+    design_doc_to_indexes/1
 ]).
 
 % gen_server api.
@@ -129,7 +128,7 @@ init({DbName, Index}) ->
                         DbName,
                         <<"search">>,
                         <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
-                        peer_checkpoint_id(DbName, Index#index.sig),
+                        fabric_drop_seq:peer_id_from_sig(DbName, Index#index.sig),
                         Seq
                     ),
                     proc_lib:init_ack({ok, self()}),
@@ -429,10 +428,3 @@ group2_int(Pid, QueryArgs0) ->
 
 info_int(Pid) ->
     clouseau_rpc:info(Pid).
-
-peer_checkpoint_id(DbName, Sig0) ->
-    Sig1 = couch_util:encodeBase64Url(Sig0),
-    Hash = couch_util:encodeBase64Url(
-        crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
-    ),
-    <<Sig1/binary, "-", Hash/binary>>.

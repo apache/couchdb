@@ -66,7 +66,7 @@ update(IndexPid, Index) ->
                 DbName,
                 <<"search">>,
                 <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
-                dreyfus_index:peer_checkpoint_id(
+                fabric_drop_seq:peer_id_from_sig(
                     DbName,
                     Index#index.sig
                 ),

@@ -91,7 +91,7 @@ update(#index{} = Index) ->
                     Index#index.dbname,
                     <<"nouveau">>,
                     <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
-                    peer_checkpoint_id(Index#index.dbname, Index#index.sig),
+                    fabric_drop_seq:peer_id_from_sig(Index#index.dbname, Index#index.sig),
                     NewCurSeq
                 ),
                 Proc = get_os_process(Index#index.def_lang),
@@ -121,7 +121,7 @@ update(#index{} = Index) ->
                         Index#index.dbname,
                         <<"nouveau">>,
                         <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
-                        peer_checkpoint_id(Index#index.dbname, Index#index.sig),
+                        fabric_drop_seq:peer_id_from_sig(Index#index.dbname, Index#index.sig),
                         CommittedUpdateSeq
                     ),
                     exit(nouveau_api:set_update_seq(ConnPid, Index, Acc1#acc.update_seq, NewCurSeq))
@@ -306,10 +306,3 @@ update_local_doc(Db, #index{} = Index, PurgeSeq) ->
     DocId = nouveau_util:get_local_purge_doc_id(Index#index.sig),
     DocContent = nouveau_util:get_local_purge_doc_body(DocId, PurgeSeq, Index),
     couch_db:update_doc(Db, DocContent, []).
-
-peer_checkpoint_id(DbName, Sig0) ->
-    Sig1 = couch_util:encodeBase64Url(Sig0),
-    Hash = couch_util:encodeBase64Url(
-        crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
-    ),
-    <<Sig1/binary, "-", Hash/binary>>.

@@ -10,7 +10,8 @@
 -export([
     create_peer_checkpoint_doc_if_missing/5,
     update_peer_checkpoint_doc/5,
-    peer_checkpoint_doc/4
+    peer_checkpoint_doc/4,
+    peer_id_from_sig/2
 ]).
 
 -type range() :: [non_neg_integer()].
@@ -368,6 +369,13 @@ peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq) when
 
 peer_checkpoint_id(Subtype, PeerId) ->
     <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", Subtype/binary, "-", PeerId/binary>>.
+
+peer_id_from_sig(DbName, Sig0) ->
+    Sig1 = couch_util:encodeBase64Url(Sig0),
+    Hash = couch_util:encodeBase64Url(
+        crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
+    ),
+    <<Sig1/binary, "-", Hash/binary>>.
 
 pack_seq(DbName, UpdateSeq) ->
     DbUuid = couch_util:with_db(DbName, fun(Db) -> couch_db:get_uuid(Db) end),
