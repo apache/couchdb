@@ -71,6 +71,8 @@
     ?COUCH_BT_WRITE_KV_NODE => #rctx.?COUCH_BT_WRITE_KV_NODE
 }).
 
+-type throw(_Reason) :: no_return().
+
 -type pid_ref() :: {pid(), reference()}.
 -type maybe_pid_ref() :: pid_ref() | undefined.
 -type maybe_pid() :: pid() | undefined.
