@@ -67,6 +67,7 @@ get_system_stats() ->
         get_ets_stats(),
         get_internal_replication_jobs_stat(),
         get_membership_stat(),
+        get_membership_nodes(),
         get_distribution_stats()
     ]).
 
@@ -97,6 +98,19 @@ get_membership_stat() ->
         {[{nodes, "all_nodes"}], length(AllNodes)}
     ],
     to_prom(membership, gauge, "count of nodes in the cluster", Labels).
+
+get_membership_nodes() ->
+    Self = config:node_name(),
+    Expected = mem3:nodes() -- [Self],
+    Nodes = nodes(),
+    Disconnected = Expected -- Nodes,
+    % Extra nodes, connected but not part of mem3
+    Extra = Nodes -- Expected,
+    Connected = Nodes -- Extra,
+    ConnectedLabels = [{[{node, N}], 1} || N <- lists:sort(Connected)],
+    DisconnectedLables = [{[{node, N}], 0} || N <- lists:sort(Disconnected)],
+    Labels = ConnectedLabels ++ DisconnectedLables,
+    to_prom(membership_nodes, gauge, "cluster node connectivity", Labels).
 
 get_vm_stats() ->
     MemLabels = lists:map(
