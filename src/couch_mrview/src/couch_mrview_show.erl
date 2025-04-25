@@ -224,7 +224,8 @@ handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
             Acc = #lacc{db = Db, req = Req, qserver = QServer, lname = LName},
             case VName of
                 <<"_all_docs">> ->
-                    couch_mrview:query_all_docs(Db, Args, fun list_cb/2, Acc);
+                    ValidatedArgs = couch_mrview_util:validate_all_docs_args(Db, Args),
+                    couch_mrview:query_all_docs(Db, ValidatedArgs, fun list_cb/2, Acc);
                 _ ->
                     couch_mrview:query_view(Db, VDDoc, VName, Args, fun list_cb/2, Acc)
             end

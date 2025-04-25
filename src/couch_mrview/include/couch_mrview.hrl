@@ -54,7 +54,8 @@
     view_states=nil
 }).
 
--define(MAX_VIEW_LIMIT, 16#10000000).
+% Largest 64 bit small int: 2^59-1
+-define(MAX_VIEW_LIMIT, 16#7FFFFFFFFFFFFFF).
 
 -record(mrargs, {
     view_type,

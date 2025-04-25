@@ -15,16 +15,15 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--define(TIMEOUT, 1000).
-
 setup() ->
+    ok = config:set("query_server_config", "query_limit", "infinity", false),
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
     Db.
 
 teardown(Db) ->
     couch_db:close(Db),
     couch_server:delete(couch_db:name(Db), [?ADMIN_CTX]),
-    ok.
+    config:delete("query_server_config", "query_limit", false).
 
 all_docs_test_() ->
     {
@@ -38,23 +37,31 @@ all_docs_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_query/1,
-                    fun should_query_with_range/1,
-                    fun should_query_with_non_string_key/1,
-                    fun should_query_with_non_string_keys/1,
-                    fun should_query_with_range_and_same_keys/1,
-                    fun raise_error_query_with_range_and_different_keys/1,
-                    fun should_query_with_range_rev/1,
-                    fun should_query_with_limit_and_skip/1,
-                    fun should_query_with_include_docs/1,
-                    fun should_query_empty_views/1
+                    ?TDEF_FE(should_query),
+                    ?TDEF_FE(should_query_with_range),
+                    ?TDEF_FE(should_query_with_non_string_key),
+                    ?TDEF_FE(should_query_with_non_string_keys),
+                    ?TDEF_FE(should_query_with_range_and_same_keys),
+                    ?TDEF_FE(raise_error_query_with_range_and_different_keys),
+                    ?TDEF_FE(should_query_with_range_rev),
+                    ?TDEF_FE(should_query_with_limit_and_skip),
+                    ?TDEF_FE(should_query_with_include_docs),
+                    ?TDEF_FE(should_query_empty_views),
+                    ?TDEF_FE(http_query),
+                    ?TDEF_FE(http_query_with_range),
+                    ?TDEF_FE(http_query_with_non_string_key),
+                    ?TDEF_FE(http_query_with_range_rev),
+                    ?TDEF_FE(http_query_with_limit_and_skip),
+                    ?TDEF_FE(http_query_with_limit_and_skip_and_query_limit),
+                    ?TDEF_FE(http_query_with_query_limit_and_over_limit),
+                    ?TDEF_FE(http_query_with_include_docs)
                 ]
             }
         }
     }.
 
 should_query(Db) ->
-    Result = run_query(Db, []),
+    Result = run_query(Db, ""),
     Expect =
         {ok, [
             {meta, [{total, 11}, {offset, 0}]},
@@ -70,7 +77,7 @@ should_query(Db) ->
             mk_row(<<"9">>, <<"1-558c8487d9aee25399a91b5d31d90fe2">>),
             mk_row(<<"_design/bar">>, <<"1-a44e1dd1994a7717bf89c894ebd1f081">>)
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 should_query_with_range(Db) ->
     Result = run_query(Db, [{start_key, <<"3">>}, {end_key, <<"5">>}]),
@@ -81,18 +88,18 @@ should_query_with_range(Db) ->
             mk_row(<<"4">>, <<"1-fcaf5852c08ffb239ac8ce16c409f253">>),
             mk_row(<<"5">>, <<"1-aaac5d460fd40f9286e57b9bf12e23d2">>)
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 should_query_with_non_string_key(Db) ->
     Expect = {ok, [{meta, [{total, 11}, {offset, 0}]}]},
     [
-        ?_assertEqual(Expect, run_query(Db, [{start_key, Key}, {end_key, Key}]))
+        ?assertEqual(Expect, run_query(Db, [{start_key, Key}, {end_key, Key}]))
      || Key <- [1, a, [1, "2"], #{id => 1}]
     ].
 
 should_query_with_non_string_keys(Db) ->
     [
-        ?_assertEqual(
+        ?assertEqual(
             {ok, [
                 {meta, [{total, 11}, {offset, 0}]},
                 {row, [{id, error}, {key, Key}, {value, not_found}]}
@@ -109,14 +116,12 @@ should_query_with_range_and_same_keys(Db) ->
             {meta, [{total, 11}, {offset, 0}]},
             mk_row(<<"3">>, <<"1-7fbf84d56f8017880974402d60f5acd6">>)
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 raise_error_query_with_range_and_different_keys(Db) ->
     Error = {query_parse_error, <<"`keys` is incompatible with `key`, `start_key` and `end_key`">>},
-    [
-        ?_assertThrow(Error, run_query(Db, [{keys, [<<"1">>]}, {start_key, <<"5">>}])),
-        ?_assertThrow(Error, run_query(Db, [{keys, [<<"5">>]}, {start_key, <<"5">>}]))
-    ].
+    ?assertThrow(Error, run_query(Db, [{keys, [<<"1">>]}, {start_key, <<"5">>}])),
+    ?assertThrow(Error, run_query(Db, [{keys, [<<"5">>]}, {start_key, <<"5">>}])).
 
 should_query_with_range_rev(Db) ->
     Result = run_query(Db, [
@@ -132,7 +137,7 @@ should_query_with_range_rev(Db) ->
             mk_row(<<"4">>, <<"1-fcaf5852c08ffb239ac8ce16c409f253">>),
             mk_row(<<"3">>, <<"1-7fbf84d56f8017880974402d60f5acd6">>)
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 should_query_with_limit_and_skip(Db) ->
     Result = run_query(Db, [
@@ -147,7 +152,7 @@ should_query_with_limit_and_skip(Db) ->
             mk_row(<<"6">>, <<"1-aca21c2e7bc5f8951424fcfc5d1209d8">>),
             mk_row(<<"7">>, <<"1-4374aeec17590d82f16e70f318116ad9">>)
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 should_query_with_include_docs(Db) ->
     Result = run_query(Db, [
@@ -167,7 +172,7 @@ should_query_with_include_docs(Db) ->
             {meta, [{total, 11}, {offset, 8}]},
             {row, [{id, <<"8">>}, {key, <<"8">>}, {value, Val}, {doc, Doc}]}
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 should_query_empty_views(Db) ->
     Result = couch_mrview:query_view(Db, <<"_design/bar">>, <<"bing">>),
@@ -175,10 +180,141 @@ should_query_empty_views(Db) ->
         {ok, [
             {meta, [{total, 0}, {offset, 0}]}
         ]},
-    ?_assertEqual(Expect, Result).
+    ?assertEqual(Expect, Result).
 
 mk_row(Id, Rev) ->
     {row, [{id, Id}, {key, Id}, {value, {[{rev, Rev}]}}]}.
 
 run_query(Db, Opts) ->
     couch_mrview:query_all_docs(Db, Opts).
+
+http_query(Db) ->
+    ?assertMatch(
+        [
+            #{<<"id">> := <<"1">>, <<"key">> := <<"1">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"10">>, <<"key">> := <<"10">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"2">>, <<"key">> := <<"2">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"3">>, <<"key">> := <<"3">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"4">>, <<"key">> := <<"4">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"5">>, <<"key">> := <<"5">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"6">>, <<"key">> := <<"6">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"7">>, <<"key">> := <<"7">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"8">>, <<"key">> := <<"8">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"9">>, <<"key">> := <<"9">>, <<"value">> := #{<<"rev">> := _}},
+            #{
+                <<"id">> := <<"_design/bar">>,
+                <<"key">> := <<"_design/bar">>,
+                <<"value">> := #{<<"rev">> := _}
+            }
+        ],
+        http_query(Db, "")
+    ).
+
+http_query_with_range(Db) ->
+    ?assertMatch(
+        [
+            #{<<"id">> := <<"3">>, <<"key">> := <<"3">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"4">>, <<"key">> := <<"4">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"5">>, <<"key">> := <<"5">>, <<"value">> := #{<<"rev">> := _}}
+        ],
+        http_query(Db, "?start_key=\"3\"&end_key=\"5\"")
+    ).
+
+http_query_with_non_string_key(Db) ->
+    {Code1, Res1} = http_req(Db, "?start_key=1&end_key=1"),
+    ?assertEqual(200, Code1),
+    ?assertEqual(#{<<"offset">> => 0, <<"rows">> => [], <<"total_rows">> => 11}, Res1),
+
+    {Code2, Res2} = http_req(Db, "?start_key=a&end_key=a"),
+    ?assertEqual(400, Code2),
+    ?assertEqual(#{<<"error">> => <<"bad_request">>, <<"reason">> => <<"invalid_json">>}, Res2),
+
+    {Code3, Res3} = http_req(Db, "?start_key=\[1,\"2\"\]&end_key=\[1,\"2\"\]"),
+    ?assertEqual(200, Code3),
+    ?assertEqual(#{<<"offset">> => 0, <<"rows">> => [], <<"total_rows">> => 11}, Res3),
+
+    {Code4, Res4} = http_req(Db, "?start_key={\"id\":1}&end_key={\"id\":1}"),
+    ?assertEqual(200, Code4),
+    ?assertEqual(#{<<"offset">> => 0, <<"rows">> => [], <<"total_rows">> => 11}, Res4).
+
+http_query_with_range_rev(Db) ->
+    Params = "?descending=true&start_key=\"5\"&end_key=\"3\"&include_end=true",
+    ?assertMatch(
+        [
+            #{<<"id">> := <<"5">>, <<"key">> := <<"5">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"4">>, <<"key">> := <<"4">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"3">>, <<"key">> := <<"3">>, <<"value">> := #{<<"rev">> := _}}
+        ],
+        http_query(Db, Params)
+    ).
+
+http_query_with_limit_and_skip(Db) ->
+    Params = "?start_key=\"2\"&limit=3&skip=3",
+    ?assertMatch(
+        [
+            #{<<"id">> := <<"5">>, <<"key">> := <<"5">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"6">>, <<"key">> := <<"6">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"7">>, <<"key">> := <<"7">>, <<"value">> := #{<<"rev">> := _}}
+        ],
+        http_query(Db, Params)
+    ).
+
+http_query_with_limit_and_skip_and_query_limit(Db) ->
+    config:set("query_server_config", "query_limit", "2", false),
+    Params = "?start_key=\"3\"&skip=2",
+    ?assertMatch(
+        [
+            #{<<"id">> := <<"5">>, <<"key">> := <<"5">>, <<"value">> := #{<<"rev">> := _}},
+            #{<<"id">> := <<"6">>, <<"key">> := <<"6">>, <<"value">> := #{<<"rev">> := _}}
+        ],
+        http_query(Db, Params)
+    ).
+
+http_query_with_query_limit_and_over_limit(Db) ->
+    config:set("query_server_config", "query_limit", "2", false),
+    {Code, Res} = http_req(Db, "?limit=3"),
+    ?assertEqual(400, Code),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> := <<"Limit is too large", _/binary>>
+        },
+        Res
+    ).
+
+http_query_with_include_docs(Db) ->
+    Params = "?start_key=\"8\"&end_key=\"8\"&limit=8&include_docs=true",
+    ?assertMatch(
+        [
+            #{
+                <<"id">> := Id,
+                <<"key">> := Id,
+                <<"value">> := #{<<"rev">> := Rev},
+                <<"doc">> := #{
+                    <<"_id">> := Id,
+                    <<"_rev">> := Rev,
+                    <<"val">> := 8
+                }
+            }
+        ],
+        http_query(Db, Params)
+    ).
+
+db_url(Db) ->
+    DbName = couch_db:name(Db),
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
+    Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
+    "http://" ++ Addr ++ ":" ++ Port ++ "/" ++ ?b2l(DbName).
+
+http_req(DbName, Params) ->
+    Url = db_url(DbName) ++ "/_all_docs",
+    {ok, Code, _Headers, Body} = test_request:get(Url ++ Params),
+    Res = #{} = jiffy:decode(Body, [return_maps]),
+    {Code, Res}.
+
+http_query(DbName, Params) ->
+    Url = db_url(DbName) ++ "/_all_docs",
+    {ok, Code, _Headers, Body} = test_request:get(Url ++ Params),
+    ?assertEqual(200, Code),
+    #{<<"rows">> := Rows} = jiffy:decode(Body, [return_maps]),
+    Rows.

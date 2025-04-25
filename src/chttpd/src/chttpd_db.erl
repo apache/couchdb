@@ -948,14 +948,12 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
 
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
-    Args1 = Args0#mrargs{view_type = map},
-    Args2 = fabric_util:validate_all_docs_args(Db, Args1),
-    Args3 = set_namespace(OP, Args2),
-    Args4 = set_include_sysdocs(OP, Req, Args3),
+    Args1 = set_namespace(OP, Args0),
+    Args2 = set_include_sysdocs(OP, Req, Args1),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db = Db, req = Req, threshold = Max},
-    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args4),
+    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args2),
     {ok, Resp#vacc.resp}.
 
 view_cb({row, Row} = Msg, Acc) ->

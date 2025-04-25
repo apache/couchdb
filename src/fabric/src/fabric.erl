@@ -411,9 +411,10 @@ all_docs(DbName, Callback, Acc, QueryArgs) ->
 ) ->
     {ok, any()} | {error, Reason :: term()}.
 
-all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs) when
+all_docs(DbName, Options, Callback, Acc0, #mrargs{} = QueryArgs0) when
     is_function(Callback, 2)
 ->
+    QueryArgs = fabric_util:validate_all_docs_args(DbName, QueryArgs0),
     fabric_view_all_docs:go(dbname(DbName), opts(Options), QueryArgs, Callback, Acc0);
 %% @doc convenience function that takes a keylist rather than a record
 %% @equiv all_docs(DbName, Callback, Acc0, kl_to_query_args(QueryArgs))

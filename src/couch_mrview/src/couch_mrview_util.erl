@@ -522,11 +522,11 @@ apply_limit(ViewPartitioned, Args) ->
             {false, _} -> "query_limit"
         end,
 
-    MaxLimit = config:get_integer(
-        "query_server_config",
-        LimitType,
-        ?MAX_VIEW_LIMIT
-    ),
+    MaxLimit =
+        case config:get("query_server_config", LimitType, "infinity") of
+            "infinity" -> ?MAX_VIEW_LIMIT;
+            Val -> list_to_integer(Val)
+        end,
 
     % Set the highest limit possible if a user has not
     % specified a limit
@@ -545,7 +545,7 @@ apply_limit(ViewPartitioned, Args) ->
     end.
 
 validate_all_docs_args(Db, Args0) ->
-    Args = validate_args(Args0),
+    Args = validate_args(Args0#mrargs{view_type = map}),
 
     DbPartitioned = couch_db:is_partitioned(Db),
     Partition = get_extra(Args, partition),
@@ -557,7 +557,7 @@ validate_all_docs_args(Db, Args0) ->
             Args1 = apply_limit(true, Args),
             apply_all_docs_partition(Args1, Partition);
         _ ->
-            Args
+            apply_limit(false, Args)
     end.
 
 validate_args(Args) ->

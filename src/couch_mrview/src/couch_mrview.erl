@@ -279,20 +279,20 @@ query_all_docs(Db, Args) ->
     query_all_docs(Db, Args, fun default_cb/2, []).
 
 query_all_docs(Db, Args, Callback, Acc) when is_list(Args) ->
-    query_all_docs(Db, to_mrargs(Args), Callback, Acc);
+    Args1 = couch_mrview_util:validate_all_docs_args(Db, to_mrargs(Args)),
+    query_all_docs(Db, Args1, Callback, Acc);
 query_all_docs(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
         {ok, Info} = couch_db:get_db_info(WDb),
         couch_index_util:hexsig(couch_hash:md5_hash(?term_to_bin(Info)))
     end),
     Args1 = Args0#mrargs{view_type = map},
-    Args2 = couch_mrview_util:validate_all_docs_args(Db, Args1),
     {ok, Acc1} =
-        case Args2#mrargs.preflight_fun of
+        case Args1#mrargs.preflight_fun of
             PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
             _ -> {ok, Acc}
         end,
-    all_docs_fold(Db, Args2, Callback, Acc1).
+    all_docs_fold(Db, Args1, Callback, Acc1).
 
 query_view(Db, DDoc, VName) ->
     Args = #mrargs{extra = [{view_row_map, true}]},
