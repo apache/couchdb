@@ -129,7 +129,7 @@ destroy_pid_ref(_PidRef) ->
 %%     csrt_server:create_resource(Rctx).
 
 -spec create_worker_context(From, MFA, Nonce) -> pid_ref() | false when
-    From :: pid_ref(), MFA :: mfa(), Nonce :: term().
+    From :: pid_ref(), MFA :: mfa(), Nonce :: nonce().
 create_worker_context(From, {M, F, _A}, Nonce) ->
     case is_enabled() of
         true ->

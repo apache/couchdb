@@ -95,24 +95,27 @@ get_context_type(#rctx{type = Type}) ->
 set_context_type(Type, PidRef) ->
     update_element(PidRef, [{#rctx.type, Type}]).
 
--spec create_resource(Rctx :: rctx()) -> true.
+-spec create_resource(Rctx :: rctx()) -> boolean().
 create_resource(#rctx{} = Rctx) ->
-    catch ets:insert(?MODULE, Rctx).
+    (catch ets:insert(?MODULE, Rctx)) == true.
 
 -spec destroy_resource(PidRef :: maybe_pid_ref()) -> boolean().
 destroy_resource(undefined) ->
     false;
 destroy_resource({_, _} = PidRef) ->
-    catch ets:delete(?MODULE, PidRef).
+    (catch ets:delete(?MODULE, PidRef)) == true.
 
 -spec get_resource(PidRef :: maybe_pid_ref()) -> maybe_rctx().
 get_resource(undefined) ->
     undefined;
 get_resource(PidRef) ->
-    catch case ets:lookup(?MODULE, PidRef) of
+    try ets:lookup(?MODULE, PidRef) of
         [#rctx{} = Rctx] ->
             Rctx;
         [] ->
+            undefined
+    catch
+        _:_ ->
             undefined
     end.
 
@@ -120,7 +123,8 @@ get_resource(PidRef) ->
 is_rctx_field(Field) ->
     maps:is_key(Field, ?KEYS_TO_FIELDS).
 
--spec get_rctx_field(Field :: rctx_field()) -> non_neg_integer().
+-spec get_rctx_field(Field :: rctx_field()) -> non_neg_integer()
+    | throw({badkey, Key :: any()}).
 get_rctx_field(Field) ->
     maps:get(Field, ?KEYS_TO_FIELDS).
 
@@ -135,7 +139,12 @@ update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
     case is_rctx_field(Field) of
         true ->
             Update = {get_rctx_field(Field), Count},
-            catch ets:update_counter(?MODULE, PidRef, Update, #rctx{pid_ref = PidRef});
+            try
+                ets:update_counter(?MODULE, PidRef, Update, #rctx{pid_ref = PidRef})
+            catch
+                _:_ ->
+                    0
+            end;
         false ->
             0
     end.
@@ -152,7 +161,7 @@ inc(undefined, _Field, _) ->
     0;
 inc(_PidRef, _Field, 0) ->
     0;
-inc({_Pid, _Ref} = PidRef, Field, N) when is_integer(N) andalso N >= 0 ->
+inc({_Pid, _Ref} = PidRef, Field, N) when is_integer(N) andalso N > 0 ->
     case is_rctx_field(Field) of
         true ->
             update_counter(PidRef, Field, N);
