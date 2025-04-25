@@ -234,7 +234,7 @@ handle_cast(_Msg, State) ->
     {noreply, State, 0}.
 
 handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
+    ok = subscribe_changes(),
     {noreply, State};
 handle_info(_Msg, St) ->
     {noreply, St}.
