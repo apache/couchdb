@@ -889,8 +889,12 @@ set_update_seq(#db{} = Db, UpdateSeq) ->
 
 set_drop_seq(#db{} = Db, UuidPrefix, UpdateSeq) ->
     #db{engine = {Engine, EngineState}} = Db,
-    {ok, NewSt} = Engine:set_drop_seq(EngineState, UuidPrefix, UpdateSeq),
-    {ok, Db#db{engine = {Engine, NewSt}}}.
+    case Engine:set_drop_seq(EngineState, UuidPrefix, UpdateSeq) of
+        {ok, NewSt} ->
+            {ok, Db#db{engine = {Engine, NewSt}}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 open_docs(#db{} = Db, DocIds) ->
     #db{engine = {Engine, EngineState}} = Db,
