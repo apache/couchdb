@@ -44,7 +44,7 @@ go(DbName) ->
                         Node,
                         {fabric_rpc, set_drop_seq, [ShardName, UuidPrefix, DropSeq, [?ADMIN_CTX]]}
                     ),
-                    {true, Shard#shard{ref = Ref}};
+                    {true, Shard#shard{ref = Ref, opts = [{drop_seq, DropSeq}]}};
                 error ->
                     false
             end
@@ -57,11 +57,11 @@ go(DbName) ->
             ok;
         true ->
             RexiMon = fabric_util:create_monitors(Shards),
-            Acc0 = {Workers, length(Workers) - 1},
+            Acc0 = {#{}, length(Workers) - 1},
             try
                 case fabric_util:recv(Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0) of
-                    {ok, ok} ->
-                        ok;
+                    {ok, Results} ->
+                        {ok, Results};
                     {timeout, {WorkersDict, _}} ->
                         DefunctWorkers = fabric_util:remove_done_workers(
                             WorkersDict,
@@ -86,10 +86,25 @@ calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory) ->
     PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
     crossref(PeerCheckpoints1, ShardSyncHistory).
 
-handle_set_drop_seq_reply(ok, _Worker, {_Workers, 0}) ->
-    {stop, ok};
-handle_set_drop_seq_reply(ok, Worker, {Workers, Waiting}) ->
-    {ok, {lists:delete(Worker, Workers), Waiting - 1}};
+handle_set_drop_seq_reply(ok, Worker, {Results0, Waiting}) ->
+    DropSeq = proplists:get_value(drop_seq, Worker#shard.opts),
+    [B, E] = Worker#shard.range,
+    BHex = couch_util:to_hex(<<B:32/integer>>),
+    EHex = couch_util:to_hex(<<E:32/integer>>),
+    Range = list_to_binary([BHex, "-", EHex]),
+    Results1 = maps:merge_with(
+        fun(_Key, Val1, Val2) ->
+            maps:merge(Val1, Val2)
+        end,
+        Results0,
+        #{Range => #{Worker#shard.node => DropSeq}}
+    ),
+    if
+        Waiting == 0 ->
+            {stop, Results1};
+        true ->
+            {ok, {Results1, Waiting - 1}}
+    end;
 handle_set_drop_seq_reply(Error, _, _Acc) ->
     {error, Error}.
 

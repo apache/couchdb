@@ -395,8 +395,12 @@ handle_update_drop_seq_req(
     #httpd{method = 'POST', path_parts = [_DbName, <<"_update_drop_seq">>]} = Req, Db
 ) ->
     chttpd:validate_ctype(Req, "application/json"),
-    ok = fabric:update_drop_seq(Db),
-    send_json(Req, 201, {[{ok, true}]});
+    case fabric:update_drop_seq(Db) of
+        {ok, Results} ->
+            send_json(Req, 201, {[{ok, true}, {results, Results}]});
+        {error, Reason} ->
+            chttpd:send_error(Req, Reason)
+    end;
 handle_update_drop_seq_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
