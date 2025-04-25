@@ -357,8 +357,8 @@ update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
         of
             {ok, Doc} ->
                 exit({ok, Doc});
-            {not_found, Reason} ->
-                throw({peer_checkpoint_missing, Reason});
+            {not_found, _Reason} ->
+                exit(not_found);
             {error, Reason} ->
                 throw({checkpoint_fetch_failure, Reason})
         end
@@ -381,6 +381,8 @@ update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
                 {'DOWN', UpdateRef, _, _, Else} ->
                     Else
             end;
+        {'DOWN', OpenRef, _, _, not_found} ->
+            ok;
         {'DOWN', OpenRef, _, _, Else} ->
             Else
     end.
