@@ -285,7 +285,8 @@ query_view_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            ?TDEF_FE(t_query_view_configuration)
+            ?TDEF_FE(t_query_view_configuration),
+            ?TDEF_FE(t_query_all_docs)
         ]
     }.
 
@@ -304,6 +305,21 @@ t_query_view_configuration({_Ctx, DbName}) ->
     Parameters = [DbName, Options, '_', ViewName, QueryArgs, '_', Accumulator, '_'],
     meck:expect(fabric_view_map, go, Parameters, meck:val(fabric_view_map_results)),
     ?assertEqual(fabric_view_map_results, fabric:query_view(DbName, DDocName, ViewName)).
+
+t_query_all_docs({_Ctx, DbName}) ->
+    Cbk = fun
+        ({meta, _}, Acc) -> {ok, Acc};
+        ({row, Row}, Acc) -> {ok, [Row | Acc]};
+        (complete, Acc) -> {ok, Acc}
+    end,
+    {ok, Rows} = fabric:all_docs(binary_to_list(DbName), Cbk, [], [{limit, 2}]),
+    ?assertMatch(
+        [
+            [{id, <<"_design/foo">>} | _],
+            [{id, <<"_design/boo">>} | _]
+        ],
+        Rows
+    ).
 
 fabric_all_dbs_test_() ->
     {

@@ -241,7 +241,8 @@ do_all_docs_req(Req, Db, Keys, NS) ->
         ),
         IsAdmin = is_admin(Db),
         Callback = get_view_callback(DbName, UsersDbName, IsAdmin),
-        couch_mrview:query_all_docs(Db, Args, Callback, VAcc0)
+        ValidatedArgs = couch_mrview_util:validate_all_docs_args(Db, Args),
+        couch_mrview:query_all_docs(Db, ValidatedArgs, Callback, VAcc0)
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};

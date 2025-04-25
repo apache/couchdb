@@ -48,7 +48,8 @@
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), false),
+    ok = config:set("query_server_config", "query_limit", "100", false),
     Db = ?tempdb(),
     ok = create_db(Db),
     ok = create_docs(Db),
@@ -57,7 +58,8 @@ setup() ->
 
 teardown(Db) ->
     ok = fabric:delete_db(Db),
-    ok = config:delete("admins", ?USER, _Persist = false).
+    ok = config:delete("admins", ?USER, false),
+    ok = config:delete("query_server_config", "query_limit", false).
 
 view_test_() ->
     {
@@ -111,7 +113,11 @@ all_docs_test_() ->
                     ?TDEF_FE(t_all_docs_with_key_non_existent_docs),
                     ?TDEF_FE(t_all_docs_with_keys_non_existent_docs),
                     ?TDEF_FE(t_all_docs_with_key_deleted_docs),
-                    ?TDEF_FE(t_all_docs_with_keys_deleted_docs)
+                    ?TDEF_FE(t_all_docs_with_keys_deleted_docs),
+                    ?TDEF_FE(t_all_docs_with_limit),
+                    ?TDEF_FE(t_all_docs_with_skip),
+                    ?TDEF_FE(t_all_docs_with_limit_and_skip),
+                    ?TDEF_FE(t_all_docs_with_configured_query_limit)
                 ]
             }
         }
@@ -369,6 +375,66 @@ t_view_map_reduce_with_keys_and_group(Db) ->
     }),
     ?assertEqual(Res, Res1),
     ?assertEqual(Code, Code1).
+
+t_all_docs_with_limit(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs", "limit=2")),
+    ?assertEqual(200, Code),
+    ?assertMatch(
+        #{
+            <<"offset">> := 0,
+            <<"total_rows">> := 4,
+            <<"rows">> := [
+                #{<<"id">> := <<"_design/ddoc">>},
+                #{<<"id">> := <<"a">>}
+            ]
+        },
+        Res
+    ).
+
+t_all_docs_with_skip(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs", "skip=2")),
+    ?assertEqual(200, Code),
+    ?assertMatch(
+        #{
+            <<"offset">> := 2,
+            <<"total_rows">> := 4,
+            <<"rows">> := [
+                #{<<"id">> := <<"b">>},
+                #{<<"id">> := <<"c">>}
+            ]
+        },
+        Res
+    ).
+
+t_all_docs_with_limit_and_skip(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs", "skip=2&limit=1")),
+    ?assertEqual(200, Code),
+    ?assertMatch(
+        #{
+            <<"offset">> := 2,
+            <<"total_rows">> := 4,
+            <<"rows">> := [
+                #{<<"id">> := <<"b">>}
+            ]
+        },
+        Res
+    ).
+
+t_all_docs_with_configured_query_limit(Db) ->
+    config:set("query_server_config", "query_limit", "2", false),
+    {Code, Res} = req(get, url(Db, "_all_docs")),
+    ?assertEqual(200, Code),
+    ?assertMatch(
+        #{
+            <<"offset">> := 0,
+            <<"total_rows">> := 4,
+            <<"rows">> := [
+                #{<<"id">> := <<"_design/ddoc">>},
+                #{<<"id">> := <<"a">>}
+            ]
+        },
+        Res
+    ).
 
 %%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
 url(Db) ->

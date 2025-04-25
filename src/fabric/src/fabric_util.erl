@@ -326,6 +326,8 @@ is_partitioned(DbName0) when is_binary(DbName0) ->
 is_partitioned(Db) ->
     couch_db:is_partitioned(Db).
 
+validate_all_docs_args(DbName, Args) when is_list(DbName) ->
+    validate_all_docs_args(list_to_binary(DbName), Args);
 validate_all_docs_args(DbName, Args) when is_binary(DbName) ->
     Shards = mem3:shards(fabric:dbname(DbName)),
     Db = open_cluster_db(hd(Shards)),
