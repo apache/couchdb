@@ -197,6 +197,8 @@ index_info({?MRVIEW, DbName, MRSt}) ->
     {DbName, GroupName};
 index_info({?DREYFUS, DbName, Index}) ->
     {DbName, Index};
+index_info({?NOUVEAU, DbName, Index}) ->
+    {DbName, Index};
 index_info({?HASTINGS, DbName, Index}) ->
     {DbName, Index}.
 
