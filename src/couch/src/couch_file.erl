@@ -21,7 +21,7 @@
 -define(SIZE_BLOCK, 16#1000).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
--define(WRITE_XXHASH_CHECKSUMS_DEFAULT, false).
+-define(WRITE_XXHASH_CHECKSUMS_DEFAULT, true).
 
 -define(USE_CFILE_DEFAULT, true).
 -define(CFILE_SKIP_IOQ_DEFAULT, false).
