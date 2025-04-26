@@ -40,6 +40,8 @@ rm quickjs/unicode_download.sh
 rm quickjs/repl.js
 rm quickjs/qjs.c
 rm quickjs/TODO
+rm quickjs/readme-cosmo.txt
+
 echo
 echo " * apply patches"
 find patches -name "*.patch" -print0 | sort -z | xargs -t -0 -n 1 patch -p0 -i
