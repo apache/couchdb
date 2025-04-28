@@ -119,11 +119,21 @@ public final class IndexManager implements Managed {
             // CachedData pattern from ReentrantReadWriteLock javadoc
             holder.lock.readLock().lock();
 
-            // Load if not already loaded.
-            if (holder.state == HolderState.NOT_LOADED) {
+            // Load if not already loaded or remove if Lucene closed the index elsewhere.
+            if (holder.state == HolderState.NOT_LOADED
+                    || (holder.state == HolderState.LOADED && !holder.index.isOpen())) {
                 holder.lock.readLock().unlock();
                 holder.lock.writeLock().lock();
                 try {
+                    if (holder.state == HolderState.LOADED && !holder.index.isOpen()) {
+                        LOGGER.info("removing closed index {}", name);
+                        holder.state = HolderState.UNLOADED;
+                        holder.index = null;
+                        synchronized (cache) {
+                            cache.remove(name, holder);
+                        }
+                        continue retry;
+                    }
                     if (holder.state == HolderState.NOT_LOADED) {
                         holder.index = load(name);
                         holder.commitFuture = this.schedulerExecutorService.scheduleWithFixedDelay(

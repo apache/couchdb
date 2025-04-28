@@ -191,6 +191,11 @@ public class Lucene9Index extends Index {
     }
 
     @Override
+    public boolean doIsOpen() {
+        return writer.isOpen();
+    }
+
+    @Override
     public SearchResults doSearch(final SearchRequest request) throws IOException {
         final Query query = parse(request);
 
