@@ -822,10 +822,10 @@ set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
     ActualUuidPrefix = binary:part(Uuid, 0, byte_size(ExpectedUuidPrefix)),
 
     if
-        NewDropSeq < CurrentDropSeq ->
-            {error, drop_seq_cant_decrease};
         ExpectedUuidPrefix /= ActualUuidPrefix ->
             {error, uuid_mismatch};
+        NewDropSeq < CurrentDropSeq ->
+            {error, {drop_seq_cant_decrease, CurrentDropSeq, NewDropSeq}};
         true ->
             NewSt = St#st{
                 header = couch_bt_engine_header:set(Header, [
