@@ -176,7 +176,7 @@ handle_shard_sync_docs_reply({rexi_DOWN, _, _, _}, _Worker, {ShardSyncHistory, C
 handle_shard_sync_docs_reply({rexi_EXIT, _Reason}, _Worker, {ShardSyncHistory, Count}) ->
     {ok, {ShardSyncHistory, Count - 1}};
 handle_shard_sync_docs_reply(rexi_STREAM_INIT, {_Worker, From}, Acc) ->
-    gen_server:reply(From, rexi_STREAM_START),
+    rexi:stream_start(From),
     {ok, Acc};
 handle_shard_sync_docs_reply({meta, _Meta}, _Worker, Acc) ->
     {ok, Acc};
