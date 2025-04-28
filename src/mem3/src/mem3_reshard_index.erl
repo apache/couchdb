@@ -130,7 +130,13 @@ build_index({?MRVIEW, DbName, MRSt} = Ctx, Try) ->
         Try
     );
 build_index({?NOUVEAU, _DbName, DIndex} = Ctx, Try) ->
-    UpdateFun = fun() -> nouveau_index_updater:update(DIndex) end,
+    UpdateFun = fun() ->
+        {IndexerPid, IndexerRef} = spawn_monitor(nouveau_index_updater, update, [DIndex]),
+        receive
+            {'DOWN', IndexerRef, process, IndexerPid, Reason} ->
+                Reason
+        end
+    end,
     retry_loop(Ctx, UpdateFun, Try);
 build_index({?DREYFUS, DbName, DIndex} = Ctx, Try) ->
     await_retry(
