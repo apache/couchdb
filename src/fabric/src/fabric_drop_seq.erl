@@ -413,10 +413,16 @@ peer_id_from_sig(DbName, Sig0) ->
     <<Sig1/binary, "-", Hash/binary>>.
 
 pack_seq(DbName, UpdateSeq) ->
+    PrefixLen = fabric_util:get_uuid_prefix_len(),
     DbUuid = couch_util:with_db(DbName, fun(Db) -> couch_db:get_uuid(Db) end),
-    Seq0 = [node(), mem3:range(DbName), {UpdateSeq, DbUuid, node()}],
-    Seq1 = couch_util:encodeBase64Url(?term_to_bin(Seq0, [compressed])),
-    <<(integer_to_binary(UpdateSeq))/binary, $-, Seq1/binary>>.
+    fabric_view_changes:pack_seqs(
+        [
+            {
+                #shard{node = node(), range = mem3:range(DbName)},
+                {UpdateSeq, binary:part(DbUuid, {0, PrefixLen}), node()}
+            }
+        ]
+    ).
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
