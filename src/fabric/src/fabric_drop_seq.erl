@@ -112,14 +112,14 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
     PeerCheckpoints1 = maps:fold(
         fun({Range, Node}, {Uuid, Seq}, Acc1) ->
             Others = maps:filter(
-                fun({R, _S, T}, _V) -> R == Range andalso T /= Node end, ShardSyncHistory
+                fun({R, _S, T}, _History) -> R == Range andalso T /= Node end, ShardSyncHistory
             ),
             maps:fold(
-                fun({R, _S, T}, H, Acc2) ->
+                fun({R, _S, T}, History, Acc2) ->
                     case
                         lists:search(
                             fun({SU, SS, _TU, _TS}) -> Uuid == SU andalso SS =< Seq end,
-                            H
+                            History
                         )
                     of
                         {value, {_SU, _SS, TU, TS}} ->
