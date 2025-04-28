@@ -355,18 +355,18 @@ update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
         case
             fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(Subtype, PeerId), [?ADMIN_CTX])
         of
-            {ok, Doc} ->
-                exit({ok, Doc});
+            {ok, ExistingDoc} ->
+                exit(ExistingDoc#doc.revs);
             {not_found, _Reason} ->
-                exit(not_found);
+                exit({0, []});
             {error, Reason} ->
                 throw({checkpoint_fetch_failure, Reason})
         end
     end),
     receive
-        {'DOWN', OpenRef, _, _, {ok, ExistingDoc}} ->
+        {'DOWN', OpenRef, _, _, Revs} ->
             NewDoc0 = peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq),
-            NewDoc1 = NewDoc0#doc{revs = ExistingDoc#doc.revs},
+            NewDoc1 = NewDoc0#doc{revs = Revs},
             {_, UpdateRef} = spawn_monitor(fun() ->
                 case fabric:update_doc(mem3:dbname(DbName), NewDoc1, [?ADMIN_CTX]) of
                     {ok, _} ->
