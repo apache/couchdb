@@ -188,9 +188,6 @@ public final class IndexManager implements Managed {
                     }
                     holder.state = HolderState.UNLOADED;
                     holder.index = null;
-                    synchronized (cache) {
-                        cache.remove(name, holder);
-                    }
                     break;
                 case NOT_LOADED:
                 case UNLOADED:
@@ -200,6 +197,9 @@ public final class IndexManager implements Managed {
                     break;
             }
         } finally {
+            synchronized (cache) {
+                cache.remove(name, holder);
+            }
             holder.lock.writeLock().unlock();
         }
     }
