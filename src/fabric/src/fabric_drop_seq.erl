@@ -243,12 +243,8 @@ parse_peer_checkpoint_docs_cb(_Else, Acc) ->
 
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when is_integer(Val1), is_integer(Val2) ->
     PrefixLen = min(byte_size(Uuid1), byte_size(Uuid2)),
-    case binary:longest_common_prefix([Uuid1, Uuid2]) == PrefixLen of
-        true ->
-            {Uuid1, min(Val1, Val2)};
-        false ->
-            {Uuid2, Val2}
-    end.
+    true = binary:longest_common_prefix([Uuid1, Uuid2]) == PrefixLen,
+    {Uuid1, min(Val1, Val2)}.
 
 decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
