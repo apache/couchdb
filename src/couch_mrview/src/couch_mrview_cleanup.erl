@@ -67,7 +67,7 @@ cleanup_peer_checkpoints_cb({row, Row}, {KeepSigs, DocsToDelete} = Acc) ->
     #doc{
         id = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-mrview-", SigHash/binary>>
     } = Doc,
-    [Sig, _Hash] = binary:split(SigHash, <<"-">>),
+    [Sig, _Hash] = binary:split(SigHash, <<"$">>),
     case maps:is_key(Sig, KeepSigs) of
         true ->
             {ok, Acc};

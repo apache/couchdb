@@ -406,7 +406,7 @@ peer_id_from_sig(DbName, Sig0) ->
     Hash = couch_util:encodeBase64Url(
         crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
     ),
-    <<Sig1/binary, "-", Hash/binary>>.
+    <<Sig1/binary, "$", Hash/binary>>.
 
 pack_seq(DbName, UpdateSeq) ->
     PrefixLen = fabric_util:get_uuid_prefix_len(),
