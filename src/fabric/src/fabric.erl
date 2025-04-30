@@ -587,8 +587,8 @@ cleanup_index_files(DbName) ->
     try
         ShardNames = [mem3:name(S) || S <- mem3:local_shards(dbname(DbName))],
         Sigs = couch_mrview_util:get_signatures(hd(ShardNames)),
-        cleanup_local_indices_and_purge_checkpoints(Sigs, ShardNames),
-        cleanup_peer_checkpoints(DbName, Sigs)
+        cleanup_peer_checkpoints(DbName, Sigs),
+        cleanup_local_indices_and_purge_checkpoints(Sigs, ShardNames)
     catch
         error:database_does_not_exist ->
             ok
