@@ -10,6 +10,7 @@
 -export([
     create_peer_checkpoint_doc_if_missing/5,
     update_peer_checkpoint_doc/5,
+    cleanup_peer_checkpoint_docs/3,
     peer_checkpoint_doc/4,
     peer_id_from_sig/2
 ]).
@@ -419,6 +420,43 @@ pack_seq(DbName, UpdateSeq) ->
             }
         ]
     ).
+
+cleanup_peer_checkpoint_docs(DbName, SubType, KeepSigs) when
+    is_binary(DbName), is_binary(SubType), is_list(KeepSigs)
+->
+    MrArgs = #mrargs{
+        view_type = map,
+        include_docs = true,
+        start_key = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, "-">>,
+        end_key = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, ".">>,
+        inclusive_end = false,
+        extra = [
+            {include_system, true},
+            {namespace, <<"_local">>}
+        ]
+    },
+    {ok, {SubType, KeepSigs, DocsToDelete}} = fabric:all_docs(
+        DbName, fun cleanup_peer_checkpoints_cb/2, {SubType, KeepSigs, []}, MrArgs
+    ),
+    {ok, _} = fabric:update_docs(DbName, DocsToDelete, [?ADMIN_CTX]).
+
+cleanup_peer_checkpoints_cb({row, Row}, {SubType, KeepSigs, DocsToDelete} = Acc) ->
+    {doc, JsonDoc} = lists:keyfind(doc, 1, Row),
+    Doc = couch_doc:from_json_obj(JsonDoc),
+    #doc{
+        id =
+            <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType:(byte_size(SubType))/binary, "-",
+                SigHash/binary>>
+    } = Doc,
+    [Sig, _Hash] = binary:split(SigHash, <<"$">>),
+    case lists:member(Sig, KeepSigs) of
+        true ->
+            {ok, Acc};
+        false ->
+            {ok, {SubType, KeepSigs, [Doc#doc{deleted = true, body = {[]}} | DocsToDelete]}}
+    end;
+cleanup_peer_checkpoints_cb(_Else, Acc) ->
+    {ok, Acc}.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
