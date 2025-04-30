@@ -31,6 +31,7 @@ go(DbName) ->
             )
         ),
     Shards = mem3:shards(DbName),
+    fabric_drop_seq:cleanup_peer_checkpoint_docs(DbName, <<"nouveau">>, ActiveSigs),
     lists:foreach(
         fun(Shard) ->
             rexi:cast(Shard#shard.node, {nouveau_rpc, cleanup, [Shard#shard.name, ActiveSigs]})
