@@ -222,7 +222,7 @@ commit(State) ->
         State#mrst.db_name,
         <<"mrview">>,
         State#mrst.idx_name,
-        fabric_drop_seq:peer_id_from_sig(State#mrst.db_name, State#mrst.sig),
+        fabric_drop_seq:peer_id_from_sig(State#mrst.db_name, couch_util:to_hex_bin(State#mrst.sig)),
         State#mrst.update_seq
     ),
     ok.
@@ -315,7 +315,7 @@ ensure_peer_checkpoint_doc(#mrst{} = State) ->
         State#mrst.db_name,
         <<"mrview">>,
         State#mrst.idx_name,
-        fabric_drop_seq:peer_id_from_sig(State#mrst.db_name, State#mrst.sig),
+        fabric_drop_seq:peer_id_from_sig(State#mrst.db_name, couch_util:to_hex_bin(State#mrst.sig)),
         State#mrst.update_seq
     ).
 
