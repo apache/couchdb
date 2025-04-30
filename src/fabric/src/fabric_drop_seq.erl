@@ -402,7 +402,7 @@ peer_checkpoint_id(Subtype, PeerId) ->
     <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", Subtype/binary, "-", PeerId/binary>>.
 
 peer_id_from_sig(DbName, Sig0) ->
-    Sig1 = couch_util:encodeBase64Url(Sig0),
+    Sig1 = ?l2b(couch_util:to_hex(Sig0)),
     Hash = couch_util:encodeBase64Url(
         crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
     ),
