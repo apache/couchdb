@@ -128,8 +128,7 @@ init({DbName, Index}) ->
                         DbName,
                         <<"search">>,
                         <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
-                        fabric_drop_seq:peer_id_from_sig(DbName, Index#index.sig),
-                        Seq
+                        fabric_drop_seq:peer_id_from_sig(DbName, Index#index.sig)
                     ),
                     proc_lib:init_ack({ok, self()}),
                     gen_server:enter_loop(?MODULE, [], State);

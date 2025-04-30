@@ -678,7 +678,7 @@ init_state(Rep) ->
     StartSeq = {0, StartSeq1},
 
     SourceSeq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ),
-    create_peer_checkpoint_doc_if_missing(Source, BaseId, SourceSeq),
+    create_peer_checkpoint_doc_if_missing(Source, BaseId),
 
     #doc{body = {CheckpointHistory}} = SourceLog,
     State = #rep_state{
@@ -914,14 +914,14 @@ do_checkpoint(State) ->
             >>}
     end.
 
-create_peer_checkpoint_doc_if_missing(#httpdb{} = Db, BaseId, SourceSeq) when
-    is_list(BaseId), is_binary(SourceSeq)
+create_peer_checkpoint_doc_if_missing(#httpdb{} = Db, BaseId) when
+    is_list(BaseId)
 ->
     case couch_replicator_api_wrap:open_doc(Db, peer_checkpoint_id(BaseId), []) of
         {ok, _} ->
             ok;
         {error, <<"not_found">>} ->
-            Doc = peer_checkpoint_doc(Db, BaseId, SourceSeq),
+            Doc = peer_checkpoint_doc(Db, BaseId, <<"0">>),
             case couch_replicator_api_wrap:update_doc(Db, Doc, []) of
                 {ok, _} ->
                     ok;

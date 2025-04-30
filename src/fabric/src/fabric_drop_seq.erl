@@ -8,7 +8,7 @@
 -export([go/1]).
 
 -export([
-    create_peer_checkpoint_doc_if_missing/5,
+    create_peer_checkpoint_doc_if_missing/4,
     update_peer_checkpoint_doc/5,
     cleanup_peer_checkpoint_docs/3,
     peer_checkpoint_doc/4,
@@ -82,6 +82,10 @@ go(DbName) ->
     end.
 
 -spec calculate_drop_seqs(peer_checkpoints(), shard_sync_history()) -> peer_checkpoints().
+calculate_drop_seqs(reset, ShardSyncHistory) ->
+    maps:map(
+        fun(_Key, {Uuid, _Seq}) -> {Uuid, 0} end, latest_shard_sync_checkpoints(ShardSyncHistory)
+    );
 calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory) ->
     ShardSyncCheckpoints = latest_shard_sync_checkpoints(ShardSyncHistory),
     PeerCheckpoints1 = maps:merge_with(fun merge_peers/3, PeerCheckpoints0, ShardSyncCheckpoints),
@@ -232,6 +236,8 @@ parse_peer_checkpoint_docs_cb({row, Row}, PeerCheckpoints0) ->
             case couch_util:get_value(<<"update_seq">>, Props) of
                 undefined ->
                     {ok, PeerCheckpoints0};
+                <<"0">> ->
+                    {stop, reset};
                 UpdateSeq ->
                     {ok,
                         maps:merge_with(
@@ -301,18 +307,11 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
         ShardSyncHistory
     ).
 
-create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq) when
-    is_binary(DbName), is_binary(PeerId), is_integer(UpdateSeq)
-->
-    create_peer_checkpoint_doc_if_missing(
-        DbName, Subtype, Source, PeerId, pack_seq(DbName, UpdateSeq)
-    );
-create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq) when
+create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId) when
     is_binary(DbName),
     is_binary(Subtype),
     is_binary(Source),
-    is_binary(PeerId),
-    is_binary(UpdateSeq)
+    is_binary(PeerId)
 ->
     {_, Ref} = spawn_monitor(fun() ->
         case
@@ -321,7 +320,7 @@ create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq
             {ok, _} ->
                 ok;
             {not_found, _} ->
-                update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq);
+                update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, <<"0">>);
             {error, Reason} ->
                 throw({checkpoint_commit_failure, Reason})
         end

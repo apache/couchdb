@@ -91,8 +91,7 @@ update(#index{} = Index) ->
                     Index#index.dbname,
                     <<"nouveau">>,
                     <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
-                    fabric_drop_seq:peer_id_from_sig(Index#index.dbname, Index#index.sig),
-                    NewCurSeq
+                    fabric_drop_seq:peer_id_from_sig(Index#index.dbname, Index#index.sig)
                 ),
                 Proc = get_os_process(Index#index.def_lang),
                 try
