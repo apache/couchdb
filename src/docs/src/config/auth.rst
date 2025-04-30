@@ -390,12 +390,14 @@ Authentication Configuration
     .. config:option:: upgrade_hash_on_auth :: Auto-upgrade user auth docs on next auth call
 
         .. versionadded:: 3.4
+        .. versionchanged:: 3.5
 
-        Upgrade user auth docs during the next successful
-        authentication using the current password hashing settings. ::
+        Upgrade user auth docs during the next successful authentication using
+        the current password hashing settings. The default was changed from
+        ``false`` to ``true`` in version ``3.5.0``::
 
             [chttpd_auth]
-            upgrade_hash_on_auth = false
+            upgrade_hash_on_auth = true
 
 .. config:section:: jwt_auth :: JWT Authentication
 
