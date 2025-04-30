@@ -184,6 +184,7 @@ def generateNativeStage(platform) {
                 'MAKE='+meta[platform].gnu_make,
                 'CLOUSEAU_JAVA_HOME='+meta[platform].clouseau_java_home ?: ''
               ]) {
+                sh 'echo "JAIL_HOST: ${JAIL_HOST}"'
                 sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                 sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
                 dir( "${platform}/build" ) {
