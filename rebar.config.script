@@ -156,7 +156,7 @@ DepDescs = [
 
 %% %% Non-Erlang deps
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.3.3"}, [raw]},
+                   {tag, "v1.3.4"}, [raw]},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-6"}},
 {jiffy,            "jiffy",            {tag, "1.1.2"}},
 {mochiweb,         "mochiweb",         {tag, "v3.2.2"}},
