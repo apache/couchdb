@@ -55,7 +55,7 @@ go(DbName) ->
     if
         Workers == [] ->
             %% nothing to do
-            ok;
+            {ok, #{}};
         true ->
             RexiMon = fabric_util:create_monitors(Shards),
             Acc0 = {#{}, length(Workers) - 1},

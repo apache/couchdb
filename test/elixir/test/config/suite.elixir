@@ -211,6 +211,9 @@
     "design doc path",
     "design doc path with slash in db name"
   ],
+  "DropSeqTest": [
+    "dropped document vanishes after compaction"
+  ],
   "ErlangViewsTest": [
     "Erlang map function",
     "Erlang reduce function",
