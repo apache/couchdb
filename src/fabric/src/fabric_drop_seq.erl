@@ -367,6 +367,12 @@ update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
             {_, UpdateRef} = spawn_monitor(fun() ->
                 case fabric:update_doc(mem3:dbname(DbName), NewDoc1, [?ADMIN_CTX]) of
                     {ok, _} ->
+                        couch_log:notice(
+                            "updated peer checkpoint for db:~s, subtype:~s, source:~s, peer_id:~s, update_seq:~s",
+                            [
+                                DbName, Subtype, Source, PeerId, UpdateSeq
+                            ]
+                        ),
                         ok;
                     {error, Reason} ->
                         throw({checkpoint_commit_failure, Reason})

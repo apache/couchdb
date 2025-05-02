@@ -212,7 +212,8 @@
     "design doc path with slash in db name"
   ],
   "DropSeqTest": [
-    "dropped document vanishes after compaction"
+    "peer checkpoint - mrview",
+    "peer checkpoint - custom"
   ],
   "ErlangViewsTest": [
     "Erlang map function",

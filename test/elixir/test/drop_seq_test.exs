@@ -4,22 +4,106 @@ defmodule DropSeqTest do
   @moduletag :drop_seq
 
   @tag :with_db
-  test "dropped document vanishes after compaction", context do
+  test "peer checkpoint - mrview", context do
     db_name = context[:db_name]
     ddoc_id = "_design/foo"
+
+    create_checkpoint_fn = fn ->
+      resp = Couch.put("/#{db_name}/#{ddoc_id}", body: %{
+        views: %{
+          bar: %{
+            map: "function(doc) {}"
+          }
+        }
+      })
+      assert resp.status_code == 201
+    end
+
+    update_checkpoint_fn = fn ->
+      assert Couch.get("/#{db_name}/#{ddoc_id}/_view/bar").status_code == 200
+    end
+
+    checkpoint_test_helper(context[:db_name], create_checkpoint_fn, update_checkpoint_fn)
+  end
+
+  @tag :with_db
+  test "peer checkpoint - search", context do
+    db_name = context[:db_name]
+    ddoc_id = "_design/foo"
+
+    create_checkpoint_fn = fn ->
+      resp = Couch.put("/#{db_name}/#{ddoc_id}", body: %{
+        indexes: %{
+          bar: %{
+            index: "function(doc) {}"
+          }
+        }
+      })
+      assert resp.status_code == 201
+    end
+
+    update_checkpoint_fn = fn ->
+      assert Couch.get("/#{db_name}/#{ddoc_id}/_search/bar?q=*:*").status_code == 200
+    end
+
+    checkpoint_test_helper(context[:db_name], create_checkpoint_fn, update_checkpoint_fn)
+  end
+
+  @tag :with_db
+  test "peer checkpoint - nouveau", context do
+    db_name = context[:db_name]
+    ddoc_id = "_design/foo"
+
+    create_checkpoint_fn = fn ->
+      resp = Couch.put("/#{db_name}/#{ddoc_id}", body: %{
+        nouveau: %{
+          bar: %{
+            index: "function(doc) {}"
+          }
+        }
+      })
+      assert resp.status_code == 201
+    end
+
+    update_checkpoint_fn = fn ->
+      # need to add a new document to force nouveau update to run each time
+      # as we only advance the peer checkpoint when JVM-side nouveau has committed
+      # the index
+      assert Couch.post("/#{db_name}", body: %{}).status_code == 201
+      assert Couch.get("/#{db_name}/#{ddoc_id}/_nouveau/bar?q=*:*").status_code == 200
+    end
+
+    checkpoint_test_helper(context[:db_name], create_checkpoint_fn, update_checkpoint_fn)
+  end
+
+  @tag :with_db
+  test "peer checkpoint - custom", context do
+    db_name = context[:db_name]
+    peer_checkpoint_id = "_local/peer-checkpoint-foo"
+
+    update_checkpoint_fn = fn ->
+      resp = Couch.get("/#{db_name}")
+      assert resp.status_code == 200
+      update_seq = resp.body["update_seq"]
+
+      resp = Couch.put("/#{db_name}/#{peer_checkpoint_id}", body: %{
+        update_seq: update_seq
+      })
+      assert resp.status_code == 201
+    end
+
+    checkpoint_test_helper(context[:db_name], update_checkpoint_fn, update_checkpoint_fn)
+  end
+
+  defp checkpoint_test_helper(db_name, create_checkpoint_fn, update_checkpoint_fn) do
     doc_id = "testdoc"
 
-    # create something that will maintain a peer checkpoint
-    resp = Couch.put("/#{db_name}/#{ddoc_id}", body: %{
-      views: %{
-        bar: %{
-          map: "function(doc) { emit(); }"
-        }
-      }
-    })
-    assert resp.status_code == 201
+    drop_seq = update_drop_seq(db_name)
 
-    # create a document document
+    # create something that will create a peer checkpoint
+    create_checkpoint_fn.()
+
+    # create a document
     resp = Couch.put("/#{db_name}/#{doc_id}", body: %{})
     assert resp.status_code == 201
     rev = resp.body["rev"]
@@ -28,27 +112,13 @@ defmodule DropSeqTest do
     resp = Couch.delete("/#{db_name}/#{doc_id}?rev=#{rev}")
     assert resp.status_code == 200
 
-    # update view and its peer checkpoint
-    assert Couch.get("/#{db_name}/#{ddoc_id}/_view/bar").status_code == 200
-
-    # update drop seq
-    resp = Couch.post("/#{db_name}/_update_drop_seq")
-    retry_until(
-      fn ->
-        resp = Couch.post("/#{db_name}/_update_drop_seq")
-        assert resp.status_code == 201
-        map_size(resp.body["results"]) == 1
-      end,
-      200,
-      10_000
-    )
+    # wait for drop seq to change
+    wait_for_drop_seq_change(db_name, drop_seq, update_checkpoint_fn)
 
     # confirm deleted doc is still in _changes response
     resp = Couch.get("/#{db_name}/_changes")
     assert resp.status_code == 200
-    assert length(resp.body["results"]) == 2
-    assert Enum.at(resp.body["results"], 1)["id"] == doc_id
-    assert Enum.at(resp.body["results"], 1)["deleted"]
+    assert Enum.member?(get_ids(resp), doc_id)
 
     # compact
     compact(db_name)
@@ -56,8 +126,30 @@ defmodule DropSeqTest do
     # confirm deleted doc is not in _changes response
     resp = Couch.get("/#{db_name}/_changes")
     assert resp.status_code == 200
-    assert length(resp.body["results"]) == 1 # just the ddoc left.
+    assert !Enum.member?(get_ids(resp), doc_id)
+  end
 
+  defp wait_for_drop_seq_change(db_name, previous_drop_seq, update_checkpoint_fn) do
+    retry_until(
+      fn ->
+        update_checkpoint_fn.()
+        new_drop_seq = update_drop_seq(db_name)
+        new_drop_seq != previous_drop_seq
+      end,
+      200,
+      10_000
+    )
+  end
+
+  defp update_drop_seq(db_name) do
+    resp = Couch.post("/#{db_name}/_update_drop_seq")
+    assert resp.status_code == 201
+    resp.body["results"]
+  end
+
+  defp get_ids(resp) do
+    %{:body => %{"results" => results}} = resp
+    Enum.map(results, fn result -> result["id"] end)
   end
 
 end

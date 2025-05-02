@@ -575,5 +575,5 @@ nouveau-test-elixir: couch nouveau
 ifeq ($(with_nouveau), true)
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/config/test-config.ini \
-		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir'
+		--no-eval 'mix test --trace --include test/elixir/test/config/nouveau.elixir $(EXUNIT_OPTS)'
 endif
