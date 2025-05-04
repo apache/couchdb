@@ -311,9 +311,9 @@ follows::
 
     dev/run --with-clouseau
 
-When a specific Erlang cookie string is set in
-``rel/overlay/etc/vm.args``, the ``--erlang-cookie`` flag could be
-used to configure Clouseau to work with that::
+When a specific Erlang cookie string is needed, the
+``--erlang-cookie`` flag could be used to configure CouchDB and
+Clouseau to work with that::
 
     dev/run --with-clouseau --erlang-cookie=brumbrum
 
