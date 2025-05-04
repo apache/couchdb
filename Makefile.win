@@ -93,6 +93,10 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
 TEST_OPTS="-c startup_jitter=0 -c default_security=admin_local -c iterations=9"
 
+ifneq ($(ERLANG_COOKIE),)
+TEST_OPTS+=" --erlang-cookie=$(ERLANG_COOKIE)"
+endif
+
 ################################################################################
 # Main commands
 ################################################################################
