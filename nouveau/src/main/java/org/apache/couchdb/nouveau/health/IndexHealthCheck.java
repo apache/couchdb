@@ -32,7 +32,7 @@ public final class IndexHealthCheck extends HealthCheck {
 
     @Override
     protected Result check() throws Exception {
-        final String name = "___test9";
+        final String name = "___test10";
         try {
             indexResource.deletePath(name, null);
         } catch (IOException e) {

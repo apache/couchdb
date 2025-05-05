@@ -380,7 +380,7 @@ public final class IndexManager implements Managed {
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
-        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
+        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("10")));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
