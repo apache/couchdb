@@ -290,8 +290,8 @@ public class LuceneIndex extends Index {
             hits.add(new SearchHit(doc.get("_id"), after, fields));
         }
 
-        searchResults.setTotalHits(topDocs.totalHits.value);
-        searchResults.setTotalHitsRelation(topDocs.totalHits.relation);
+        searchResults.setTotalHits(topDocs.totalHits.value());
+        searchResults.setTotalHitsRelation(topDocs.totalHits.relation());
         searchResults.setHits(hits);
     }
 
