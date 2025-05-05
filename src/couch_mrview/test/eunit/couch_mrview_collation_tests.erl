@@ -137,7 +137,7 @@ find_matching_rows(Index, Value) ->
     ),
     lists:map(
         fun({Id, V}) ->
-            {row, [{id, list_to_binary(integer_to_list(Id))}, {key, V}, {value, 0}]}
+            {row, [{id, integer_to_binary(Id)}, {key, V}, {value, 0}]}
         end,
         Matches
     ).
@@ -206,7 +206,7 @@ make_docs() ->
         fun(V, {Docs0, Count}) ->
             Doc = couch_doc:from_json_obj(
                 {[
-                    {<<"_id">>, list_to_binary(integer_to_list(Count))},
+                    {<<"_id">>, integer_to_binary(Count)},
                     {<<"foo">>, V}
                 ]}
             ),
@@ -220,7 +220,7 @@ make_docs() ->
 rows() ->
     {Rows, _} = lists:foldl(
         fun(V, {Rows0, Count}) ->
-            Id = list_to_binary(integer_to_list(Count)),
+            Id = integer_to_binary(Count),
             Row = {row, [{id, Id}, {key, V}, {value, 0}]},
             {[Row | Rows0], Count + 1}
         end,

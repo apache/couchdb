@@ -19,7 +19,7 @@
 % gen_server callbacks
 -export([init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
--export([format_status/2]).
+-export([format_status/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
@@ -242,25 +242,33 @@ handle_info({'EXIT', _Pid, {doc_write_failed, _} = Err}, State) ->
 handle_info({'EXIT', Pid, Reason}, State) ->
     {stop, {process_died, Pid, Reason}, State}.
 
-format_status(_Opt, [_PDict, State]) ->
-    #state{
-        cp = MainJobPid,
-        loop = LoopPid,
-        source = Source,
-        target = Target,
-        readers = Readers,
-        pending_fetch = PendingFetch,
-        batch = #batch{size = BatchSize}
-    } = State,
-    [
-        {main_pid, MainJobPid},
-        {loop, LoopPid},
-        {source, couch_replicator_api_wrap:db_uri(Source)},
-        {target, couch_replicator_api_wrap:db_uri(Target)},
-        {num_readers, length(Readers)},
-        {pending_fetch, PendingFetch},
-        {batch_size, BatchSize}
-    ].
+format_status(Status) ->
+    maps:map(
+        fun
+            (state, State) ->
+                #state{
+                    cp = MainJobPid,
+                    loop = LoopPid,
+                    source = Source,
+                    target = Target,
+                    readers = Readers,
+                    pending_fetch = PendingFetch,
+                    batch = #batch{size = BatchSize}
+                } = State,
+                #{
+                    main_pid => MainJobPid,
+                    loop => LoopPid,
+                    source => couch_replicator_api_wrap:db_uri(Source),
+                    target => couch_replicator_api_wrap:db_uri(Target),
+                    num_readers => length(Readers),
+                    pending_fetch => PendingFetch,
+                    batch_size => BatchSize
+                };
+            (_, Value) ->
+                Value
+        end,
+        Status
+    ).
 
 sum_stats(Pid, Stats) when is_pid(Pid) ->
     ok = gen_server:cast(Pid, {sum_stats, Stats}).
@@ -733,23 +741,25 @@ maybe_report_stats(#state{} = State) ->
 -include_lib("eunit/include/eunit.hrl").
 
 replication_worker_format_status_test() ->
-    State = #state{
-        cp = self(),
-        loop = self(),
-        source = #httpdb{url = "http://u:p@h/d1"},
-        target = #httpdb{url = "http://u:p@h/d2"},
-        readers = [r1, r2, r3],
-        pending_fetch = nil,
-        batch = #batch{size = 5}
+    Status = #{
+        state => #state{
+            cp = self(),
+            loop = self(),
+            source = #httpdb{url = "http://u:p@h/d1"},
+            target = #httpdb{url = "http://u:p@h/d2"},
+            readers = [r1, r2, r3],
+            pending_fetch = nil,
+            batch = #batch{size = 5}
+        }
     },
-    Format = format_status(opts_ignored, [pdict, State]),
-    ?assertEqual(self(), proplists:get_value(main_pid, Format)),
-    ?assertEqual(self(), proplists:get_value(loop, Format)),
-    ?assertEqual("http://u:*****@h/d1", proplists:get_value(source, Format)),
-    ?assertEqual("http://u:*****@h/d2", proplists:get_value(target, Format)),
-    ?assertEqual(3, proplists:get_value(num_readers, Format)),
-    ?assertEqual(nil, proplists:get_value(pending_fetch, Format)),
-    ?assertEqual(5, proplists:get_value(batch_size, Format)).
+    #{state := State} = format_status(Status),
+    ?assertEqual(self(), maps:get(main_pid, State)),
+    ?assertEqual(self(), maps:get(loop, State)),
+    ?assertEqual("http://u:*****@h/d1", maps:get(source, State)),
+    ?assertEqual("http://u:*****@h/d2", maps:get(target, State)),
+    ?assertEqual(3, maps:get(num_readers, State)),
+    ?assertEqual(nil, maps:get(pending_fetch, State)),
+    ?assertEqual(5, maps:get(batch_size, State)).
 
 bulk_get_attempt_test() ->
     Now = erlang:monotonic_time(second),

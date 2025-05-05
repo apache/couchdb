@@ -375,7 +375,7 @@ produce_term(Q, Producer, Term, Wait) ->
         {item, Ref, Item} ->
             Item
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -395,7 +395,7 @@ produce(Q, Producer, Size, Wait) ->
         {item, Ref, Item} ->
             Item
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},

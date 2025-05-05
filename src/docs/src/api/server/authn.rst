@@ -516,3 +516,94 @@ https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/).
 
 Note that you don't need to request :ref:`session <api/auth/session>`
 to be authenticated by this method if the required HTTP header is provided.
+
+Two-Factor Authentication (2FA)
+===============================
+
+CouchDB supports built-in time-based one-time password (TOTP) authentication, so that 2FA
+can be enabled for any user without extra plugins or tools. Here’s how it can be set up.
+
+Setting up 2FA in CouchDB
+-------------------------
+
+1. Generate random token key
+
+A random `base32`_ string is generated and used as the user’s TOTP secret. For `example`_,
+the following command produces a secure, random key:
+
+.. _base32: https://en.wikipedia.org/wiki/Base32
+.. _example: https://support.yubico.com/hc/en-us/articles/360015668699-Generating-Base32-string-examples
+
+.. code-block:: bash
+
+    LC_ALL=C tr -dc 'A-Z2-7' </dev/urandom | head -c 32; echo
+
+2. Create a user with TOTP
+
+The TOTP settings are stored per user in the ``_users`` database. Use the generated key
+under the ``totp.key.field``:
+
+.. code-block:: bash
+
+    curl -X PUT http://admin:password@localhost:5984/_users/org.couchdb.user:USERNAME \
+    -H "Content-Type: application/json" \
+    -d '{
+        "name": "USERNAME",
+        "password": "PASSWORD",
+        "roles": [],
+        "type": "user",
+        "totp": { "key": "YOURTOKEN" }
+    }'
+
+3. Add the secret to the TOTP app
+
+Add the secret in the authenticator app. Apps like Aegis, 2FAS, Ente, Google Authenticator
+etc. can be used to generate the authentication tokens based on the TOTP key.
+
+Logging in with 2FA
+-------------------
+
+Now that the user is set up with TOTP, you can log in by sending a POST request to
+``/_session`` with ``name``, ``password``, and ``token`` from the authenticator app.
+
+**Request**:
+
+.. code-block:: http
+
+    POST /_session HTTP/1.1
+    Host: localhost:5984
+    Accept: application/json
+    Content-Type: application/json; charset=utf-8
+
+    {
+        "name": "USERNAME",
+        "password": "PASSWORD",
+        "token": "123456"
+    }
+
+**Response**:
+
+.. code-block:: javascript
+
+    {"ok": true, "name": "USERNAME", "roles": []}
+
+Reuse sessions
+--------------
+
+To reuse a session save the session cookie as such:
+
+.. code-block:: bash
+
+    curl -c cookie.txt -X POST http://localhost:5984/_session \
+        -H "Content-Type: application/json" \
+        -d '{"name": "USERNAME", "password": "PASSWORD", "token": "123456"}'
+
+Then reuse it in future requests:
+
+.. code-block:: bash
+
+    # Example using the cookie.txt
+    curl -b cookie.txt http://localhost:5984/DB_NAME/DOC_NAME
+
+    # Example passing AuthSession directly
+    curl -H "Cookie: AuthSession=AUTH_SESSION_COOKIE" http://localhost:5984/DB_NAME/DOC_NAME

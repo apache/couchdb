@@ -38,7 +38,7 @@ send(Dest, Msg) ->
 recv(Refs, Keypos, Fun, Acc0, infinity, PerMsgTO) ->
     process_mailbox(Refs, Keypos, Fun, Acc0, nil, PerMsgTO);
 recv(Refs, Keypos, Fun, Acc0, GlobalTimeout, PerMsgTO) ->
-    TimeoutRef = erlang:make_ref(),
+    TimeoutRef = make_ref(),
     TRef = erlang:send_after(GlobalTimeout, self(), {timeout, TimeoutRef}),
     try
         process_mailbox(Refs, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO)

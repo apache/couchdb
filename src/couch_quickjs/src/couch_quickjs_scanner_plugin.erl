@@ -23,6 +23,7 @@
     shards/2,
     db_opened/2,
     doc_id/3,
+    doc_fdi/3,
     doc/3,
     db_closing/2
 ]).
@@ -149,7 +150,7 @@ db_opened(#st{} = St, Db) ->
     #st{max_docs = MaxDocs, max_step = MaxStep} = St,
     {ok, DocTotal} = couch_db:get_doc_count(Db),
     Step = min(MaxStep, max(1, DocTotal div MaxDocs)),
-    {ok, St#st{doc_cnt = 0, doc_step = Step, docs = []}}.
+    {0, [], St#st{doc_cnt = 0, doc_step = Step, docs = []}}.
 
 doc_id(#st{} = St, <<?DESIGN_DOC_PREFIX, _/binary>>, _Db) ->
     {skip, St};
@@ -161,6 +162,12 @@ doc_id(#st{doc_cnt = C, doc_step = S} = St, _DocId, _Db) when C rem S /= 0 ->
     {skip, St#st{doc_cnt = C + 1}};
 doc_id(#st{doc_cnt = C} = St, _DocId, _Db) ->
     {ok, St#st{doc_cnt = C + 1}}.
+
+doc_fdi(#st{} = St, #full_doc_info{deleted = true}, _Db) ->
+    % Skip deleted; don't even open the doc body
+    {stop, St};
+doc_fdi(#st{} = St, #full_doc_info{}, _Db) ->
+    {ok, St}.
 
 doc(#st{} = St, Db, #doc{id = DocId} = Doc) ->
     #st{sid = SId} = St,

@@ -77,6 +77,9 @@ init([]) ->
         {inactivity_timeout, Interval},
         {worker_trap_exits, false}
     ]),
+    % Try loading all the OS CA certs to give users an early indication in the
+    % logs if there is an error.
+    couch_replicator_utils:cacert_get(),
     {ok, #state{close_interval = Interval, timer = Timer}}.
 
 acquire(Url) ->

@@ -349,7 +349,7 @@ next_timeout(Tab, Now, Max) ->
             infinity;
         {Time, _} ->
             TimeDiff = Now - Time,
-            erlang:max(Max - TimeDiff, 0)
+            max(Max - TimeDiff, 0)
     end.
 
 set_options(St, []) ->

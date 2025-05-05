@@ -50,7 +50,7 @@ valid() ->
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
     NodeName = node(),
-    ConnectedNodes = [NodeName | erlang:nodes()],
+    ConnectedNodes = [NodeName | nodes()],
     Members = mem3:nodes(),
     [
         {warning, {node_disconnected, N}}

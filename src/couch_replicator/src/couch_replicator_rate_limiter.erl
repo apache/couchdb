@@ -170,9 +170,9 @@ update_failure(_Key, Interval, Timestamp, Now) when
     % Ignore too frequent updates.
     Interval;
 update_failure(Key, Interval, _Timestamp, Now) ->
-    Interval1 = erlang:max(Interval, ?BASE_INTERVAL),
+    Interval1 = max(Interval, ?BASE_INTERVAL),
     Interval2 = round(Interval1 * ?BACKOFF_FACTOR),
-    Interval3 = erlang:min(Interval2, ?MAX_INTERVAL),
+    Interval3 = min(Interval2, ?MAX_INTERVAL),
     insert(Key, Interval3, Now).
 
 -spec insert(any(), interval(), msec()) -> interval().
@@ -195,7 +195,7 @@ interval_and_timestamp(Key) ->
 -spec time_decay(msec(), interval()) -> interval().
 time_decay(Dt, Interval) when Dt > ?TIME_DECAY_THRESHOLD ->
     DecayedInterval = Interval - ?TIME_DECAY_FACTOR * Dt,
-    erlang:max(round(DecayedInterval), 0);
+    max(round(DecayedInterval), 0);
 time_decay(_Dt, Interval) ->
     Interval.
 

@@ -18,6 +18,7 @@ start_link() ->
     supervisor:start_link({local, couch_primary_services}, ?MODULE, []).
 
 init([]) ->
+    ok = couch_bt_engine_cache:create_tables(),
     Children =
         [
             {couch_task_status, {couch_task_status, start_link, []}, permanent, brutal_kill, worker,
@@ -45,7 +46,7 @@ init([]) ->
                     ]
                 ]},
                 permanent, 5000, worker, [ets_lru]}
-        ] ++ couch_servers(),
+        ] ++ couch_bt_engine_cache:sup_children() ++ couch_servers(),
     {ok, {{one_for_one, 10, 3600}, Children}}.
 
 couch_servers() ->

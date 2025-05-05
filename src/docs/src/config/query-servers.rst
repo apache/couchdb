@@ -139,7 +139,9 @@ Query Servers Configuration
     .. config:option:: reduce_limit :: Reduce limit control
 
         Controls `Reduce overflow` error that raises when output of
-        :ref:`reduce functions <reducefun>` is too big::
+        :ref:`reduce functions <reducefun>` is too big. The possible values are
+        ``true``, ``false`` or ``log``. The ``log`` value will log a warning
+        instead of crashing the view ::
 
             [query_server_config]
             reduce_limit = true

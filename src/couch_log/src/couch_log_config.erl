@@ -108,7 +108,7 @@ transform(filter_fields, FieldsStr) ->
     Default = [pid, registered_name, error_info, messages],
     case parse_term(FieldsStr) of
         {ok, List} when is_list(List) ->
-            case lists:all(fun erlang:is_atom/1, List) of
+            case lists:all(fun is_atom/1, List) of
                 true ->
                     List;
                 false ->

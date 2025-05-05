@@ -300,7 +300,7 @@ toke_string(DF, <<$\\, $t, Rest/binary>>, Acc) ->
     toke_string(DF, Rest, [$\t | Acc]);
 toke_string(DF, <<$\\, $u, Rest/binary>>, Acc) ->
     {<<A, B, C, D, Data/binary>>, DF2} = must_df(DF, 4, Rest, missing_hex),
-    UTFChar = erlang:list_to_integer([A, B, C, D], 16),
+    UTFChar = list_to_integer([A, B, C, D], 16),
     if
         UTFChar == 16#FFFF orelse UTFChar == 16#FFFE ->
             err(invalid_utf_char);

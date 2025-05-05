@@ -183,7 +183,7 @@ map_function_type({Props}) ->
     end.
 
 format_type(Type) when is_atom(Type) ->
-    ?l2b(atom_to_list(Type));
+    atom_to_binary(Type);
 format_type(Types) when is_list(Types) ->
     iolist_to_binary(join(lists:map(fun atom_to_list/1, Types), <<" or ">>)).
 
@@ -287,12 +287,22 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         couch_index_util:hexsig(couch_hash:md5_hash(?term_to_bin(Info)))
     end),
     Args1 = Args0#mrargs{view_type = map},
+
+    % TODO: Compatibility clause. Remove after upgrading to next minor release
+    % after 3.5.0.
+    %
+    % As of commit 7aa8a4, args are validated in fabric. However, during online
+    % cluster upgrades, old nodes will still expect args to be validated on
+    % workers, so keep the clause around until the next minor version then
+    % remove.
+    %
+    Args2 = couch_mrview_util:validate_all_docs_args(Db, Args1),
     {ok, Acc1} =
-        case Args1#mrargs.preflight_fun of
+        case Args2#mrargs.preflight_fun of
             PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
             _ -> {ok, Acc}
         end,
-    all_docs_fold(Db, Args1, Callback, Acc1).
+    all_docs_fold(Db, Args2, Callback, Acc1).
 
 query_view(Db, DDoc, VName) ->
     Args = #mrargs{extra = [{view_row_map, true}]},
@@ -328,7 +338,7 @@ query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
             red -> red_fold(Db, View, Args, Callback, Acc)
         end
     after
-        erlang:demonitor(Ref, [flush])
+        demonitor(Ref, [flush])
     end.
 
 get_info(Db, DDoc) ->

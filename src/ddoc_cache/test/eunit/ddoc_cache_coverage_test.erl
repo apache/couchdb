@@ -37,7 +37,7 @@ stop_on_evictor_death() ->
         Lru = whereis(ddoc_cache_lru),
         State = sys:get_state(Lru),
         Evictor = element(4, State),
-        Ref = erlang:monitor(process, Lru),
+        Ref = monitor(process, Lru),
         exit(Evictor, shutdown),
         receive
             {'DOWN', Ref, _, _, Reason} ->
@@ -61,7 +61,7 @@ send_bad_messages(Name) ->
     end).
 
 wait_for_restart(Server, Fun) ->
-    Ref = erlang:monitor(process, whereis(Server)),
+    Ref = monitor(process, whereis(Server)),
     Fun(),
     receive
         {'DOWN', Ref, _, _, _} ->

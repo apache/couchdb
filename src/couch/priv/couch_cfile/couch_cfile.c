@@ -11,7 +11,15 @@
 // the License.
 
 
-#ifndef _WIN32
+// Not supported on Windows or 32 bit architectures. When not supported the NIF
+// will still build, but the API functions will return {error, einval}, and
+// we'd fallback to the regular file API then
+//
+#if !defined(_WIN32) && defined(__LP64__)
+#define COUCH_CFILE_SUPPORTED 1
+#endif
+
+#ifdef COUCH_CFILE_SUPPORTED
 
 #include <errno.h>
 #include <limits.h>
@@ -225,7 +233,7 @@ int efile_datasync(int fd, posix_errno_t* res_errno) {
 //
 static ERL_NIF_TERM dup_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
    int fd, newfd;
    handle_t* hdl;
    ErlNifRWLock *lock;
@@ -293,7 +301,7 @@ static ERL_NIF_TERM dup_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 
 static ERL_NIF_TERM close_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
 
     if (argc != 1 || !get_handle(env, argv[0], &hdl)) {
@@ -326,7 +334,7 @@ static ERL_NIF_TERM close_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[
 //
 static ERL_NIF_TERM close_fd_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[])
 {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
    int fd;
 
    if (argc != 1 || !enif_is_number(env, argv[0])) {
@@ -351,7 +359,7 @@ static ERL_NIF_TERM close_fd_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM ar
 //
 static ERL_NIF_TERM pread_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
    handle_t* hdl;
    long offset, block_size, bytes_read;
    SysIOVec io_vec[1];
@@ -413,7 +421,7 @@ static ERL_NIF_TERM pread_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
 // Follows implementation from prim_file_nif.c
 //
 static ERL_NIF_TERM write_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
     ErlNifIOVec vec, *input = &vec;
     posix_errno_t  res_errno = 0;
@@ -452,7 +460,7 @@ static ERL_NIF_TERM write_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
 }
 
 static ERL_NIF_TERM seek_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
     long result, offset;
     int whence;
@@ -502,7 +510,7 @@ static ERL_NIF_TERM seek_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]
 }
 
 static ERL_NIF_TERM datasync_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
     posix_errno_t  res_errno = 0;
 
@@ -530,7 +538,7 @@ static ERL_NIF_TERM datasync_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM ar
 }
 
 static ERL_NIF_TERM truncate_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
     off_t offset;
 
@@ -568,7 +576,7 @@ static ERL_NIF_TERM truncate_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM ar
 //
 static ERL_NIF_TERM info_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
     int fd, old_fd;
 
@@ -601,7 +609,7 @@ static ERL_NIF_TERM info_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]
 //
 static ERL_NIF_TERM eof_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-#ifndef _WIN32
+#ifdef COUCH_CFILE_SUPPORTED
     handle_t* hdl;
     struct stat data;
 

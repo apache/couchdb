@@ -42,11 +42,10 @@ go(DbName, AllDocs0, Opts) ->
     ),
     {Workers, _} = lists:unzip(GroupedDocs),
     RexiMon = fabric_util:create_monitors(Workers),
-    W = couch_util:get_value(w, Options, integer_to_list(mem3:quorum(DbName))),
     Acc0 = #acc{
         waiting_count = length(Workers),
         doc_count = length(AllDocs),
-        w = list_to_integer(W),
+        w = fabric_util:w_from_opts(DbName, Options),
         grouped_docs = GroupedDocs,
         reply = dict:new()
     },

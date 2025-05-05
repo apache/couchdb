@@ -182,16 +182,6 @@
     db_open_options = []
 }).
 
--record(btree, {
-    fd,
-    root,
-    extract_kv,
-    assemble_kv,
-    less,
-    reduce = nil,
-    compression = ?DEFAULT_COMPRESSION
-}).
-
 -record(proc, {
     pid,
     lang,

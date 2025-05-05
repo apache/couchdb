@@ -47,7 +47,14 @@ join({_, _} = RepId, Pid) when is_pid(Pid) ->
 % quicker.
 %
 leave({_, _} = RepId, Pid) when is_pid(Pid) ->
-    pg:leave(?MODULE, id(RepId), Pid).
+    try
+        pg:leave(?MODULE, id(RepId), Pid)
+    catch
+        _:_ ->
+            ok
+        % If this is called during shutdown the pg gen_server might be
+        % gone. So we avoid blocking on it or making a mess in the logs
+    end.
 
 % Determine if a replication job should start on a particular node. If it
 % should, return `yes`, otherwise return `{no, OtherPid}`. `OtherPid` is
@@ -149,5 +156,10 @@ t_should_run(_) ->
     InitPid = whereis(init),
     ok = join(RepId, InitPid),
     ?assertEqual({no, InitPid}, should_run(RepId, Pid)).
+
+couch_replicator_pg_test_leave_when_stopped_test() ->
+    RepId = {"a", "+b"},
+    Pid = self(),
+    ?assertEqual(ok, leave(RepId, Pid)).
 
 -endif.

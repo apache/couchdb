@@ -18,7 +18,7 @@
     {vsn, git},
     {applications, [
         config,
-        ibrowse,
+        gun,
         kernel,
         stdlib,
         mem3,

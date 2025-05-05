@@ -252,6 +252,8 @@ sched_exit_update(Id, #sched{} = Sched, {shutdown, reset}) ->
     couch_log:warning("~p : resetting plugin ~s", [?MODULE, Id]),
     couch_scanner_checkpoint:reset(Id),
     Sched#sched{start_time = 0, error_count = 0, reschedule = tsec()};
+sched_exit_update(_Id, #sched{} = Sched, {shutdown, stop}) ->
+    Sched#sched{start_time = 0, error_count = 0};
 sched_exit_update(Id, #sched{} = Sched, Norm) when
     Norm == shutdown; Norm == normal
 ->

@@ -27,7 +27,7 @@ start(Procs) ->
     ),
     spawn_link(fun() ->
         [notify_parent(Parent, P, noconnect) || P <- Skip],
-        [erlang:monitor(process, P) || P <- Mon],
+        [monitor(process, P) || P <- Mon],
         wait_monitors(Parent)
     end).
 

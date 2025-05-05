@@ -166,13 +166,13 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             QServer = State1#mrst.qserver,
             DocFun = fun
                 ({nil, Seq, _}, {SeqAcc, Results}) ->
-                    {erlang:max(Seq, SeqAcc), Results};
+                    {max(Seq, SeqAcc), Results};
                 ({Id, Seq, deleted}, {SeqAcc, Results}) ->
-                    {erlang:max(Seq, SeqAcc), [{Id, []} | Results]};
+                    {max(Seq, SeqAcc), [{Id, []} | Results]};
                 ({Id, Seq, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
                     {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
-                    {erlang:max(Seq, SeqAcc), [{Id, Res} | Results]}
+                    {max(Seq, SeqAcc), [{Id, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->
                 update_task(length(Docs)),
@@ -242,7 +242,7 @@ merge_results([{Seq, Results} | Rest], SeqAcc, ViewKVs, DocIdKeys) ->
         merge_results(RawResults, VKV, DIK)
     end,
     {ViewKVs1, DocIdKeys1} = lists:foldl(Fun, {ViewKVs, DocIdKeys}, Results),
-    merge_results(Rest, erlang:max(Seq, SeqAcc), ViewKVs1, DocIdKeys1).
+    merge_results(Rest, max(Seq, SeqAcc), ViewKVs1, DocIdKeys1).
 
 merge_results({DocId, []}, ViewKVs, DocIdKeys) ->
     {ViewKVs, [{DocId, []} | DocIdKeys]};

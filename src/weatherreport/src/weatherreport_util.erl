@@ -54,7 +54,7 @@ run_command(Command) ->
         "Running shell command: ~s",
         [Command]
     ),
-    Port = erlang:open_port({spawn, Command}, [exit_status, stderr_to_stdout]),
+    Port = open_port({spawn, Command}, [exit_status, stderr_to_stdout]),
     do_read(Port, []).
 
 do_read(Port, Acc) ->

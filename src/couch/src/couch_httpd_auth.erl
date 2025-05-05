@@ -381,7 +381,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                                 "timeout", 600
                             ),
                             couch_log:debug("timeout ~p", [Timeout]),
-                            case (catch erlang:list_to_integer(TimeStr, 16)) of
+                            case (catch list_to_integer(TimeStr, 16)) of
                                 TimeStamp when CurrentTime < TimeStamp + Timeout ->
                                     case lists:any(VerifyHash, HashAlgorithms) of
                                         true ->
@@ -438,7 +438,7 @@ cookie_auth_header(_Req, _Headers) ->
     [].
 
 cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
-    SessionItems = [User, erlang:integer_to_list(TimeStamp, 16)],
+    SessionItems = [User, integer_to_list(TimeStamp, 16)],
     cookie_auth_cookie(Req, Secret, SessionItems).
 
 cookie_auth_cookie(Req, Secret, SessionItems) when is_list(SessionItems) ->

@@ -273,7 +273,7 @@ remove_key(#{} = Dbs, Key) ->
     end.
 
 unlink_and_flush(Pid) ->
-    erlang:unlink(Pid),
+    unlink(Pid),
     % Its possible that the entry process has already exited before
     % we unlink it so we have to flush out a possible 'EXIT'
     % message sitting in our message queue. Notice that we're

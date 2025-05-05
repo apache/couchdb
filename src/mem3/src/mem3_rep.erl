@@ -217,20 +217,21 @@ verify_purge_checkpoint(DbName, Props) ->
 %% looking for our push replication history and choosing the
 %% largest source_seq that has a target_seq =< TgtSeq.
 find_source_seq(SrcDb, TgtNode, TgtUUIDPrefix, TgtSeq) ->
+    SrcDbName = couch_db:name(SrcDb),
     case find_repl_doc(SrcDb, TgtUUIDPrefix) of
         {ok, TgtUUID, Doc} ->
             SrcNode = atom_to_binary(config:node_name(), utf8),
-            find_source_seq_int(Doc, SrcNode, TgtNode, TgtUUID, TgtSeq);
+            find_source_seq_int(SrcDbName, Doc, SrcNode, TgtNode, TgtUUID, TgtSeq);
         {not_found, _} ->
             couch_log:warning(
                 "~p find_source_seq repl doc not_found "
                 "src_db: ~p, tgt_node: ~p, tgt_uuid_prefix: ~p, tgt_seq: ~p",
-                [?MODULE, SrcDb, TgtNode, TgtUUIDPrefix, TgtSeq]
+                [?MODULE, SrcDbName, TgtNode, TgtUUIDPrefix, TgtSeq]
             ),
             0
     end.
 
-find_source_seq_int(#doc{body = {Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
+find_source_seq_int(SrcDbName, #doc{body = {Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
     SrcNode =
         case is_atom(SrcNode0) of
             true -> atom_to_binary(SrcNode0, utf8);
@@ -262,9 +263,9 @@ find_source_seq_int(#doc{body = {Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) -
         [] ->
             couch_log:warning(
                 "~p find_source_seq_int nil useable history "
-                "src_node: ~p, tgt_node: ~p, tgt_uuid: ~p, tgt_seq: ~p, "
+                "src_db: ~s src_node: ~p, tgt_node: ~p, tgt_uuid: ~p, tgt_seq: ~p, "
                 "src_history: ~p",
-                [?MODULE, SrcNode, TgtNode, TgtUUID, TgtSeq, SrcHistory]
+                [?MODULE, SrcDbName, SrcNode, TgtNode, TgtUUID, TgtSeq, SrcHistory]
             ),
             0
     end.
@@ -434,7 +435,7 @@ push_purges(Db, BatchSize, SrcShard, Tgt, HashFun) ->
                 couch_util:get_value(<<"purge_seq">>, Props);
             {not_found, _} ->
                 Oldest = couch_db:get_oldest_purge_seq(Db),
-                erlang:max(0, Oldest - 1)
+                max(0, Oldest - 1)
         end,
     BelongsFun = fun(Id) when is_binary(Id) ->
         case TgtRange of
@@ -954,31 +955,31 @@ find_source_seq_int_test_() ->
 
 t_unknown_node(_) ->
     ?assertEqual(
-        find_source_seq_int(doc_(), <<"foo">>, <<"bing">>, <<"bar_uuid">>, 10),
+        find_source_seq_int(<<"db">>, doc_(), <<"foo">>, <<"bing">>, <<"bar_uuid">>, 10),
         0
     ).
 
 t_unknown_uuid(_) ->
     ?assertEqual(
-        find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"teapot">>, 10),
+        find_source_seq_int(<<"db">>, doc_(), <<"foo">>, <<"bar">>, <<"teapot">>, 10),
         0
     ).
 
 t_ok(_) ->
     ?assertEqual(
-        find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 100),
+        find_source_seq_int(<<"db">>, doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 100),
         100
     ).
 
 t_old_ok(_) ->
     ?assertEqual(
-        find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 84),
+        find_source_seq_int(<<"db">>, doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 84),
         50
     ).
 
 t_different_node(_) ->
     ?assertEqual(
-        find_source_seq_int(doc_(), <<"foo2">>, <<"bar">>, <<"bar_uuid">>, 92),
+        find_source_seq_int(<<"db">>, doc_(), <<"foo2">>, <<"bar">>, <<"bar_uuid">>, 92),
         31
     ).
 

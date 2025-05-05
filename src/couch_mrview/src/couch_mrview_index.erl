@@ -167,7 +167,7 @@ open(Db, State0) ->
     end.
 
 close(State) ->
-    erlang:demonitor(State#mrst.fd_monitor, [flush]),
+    demonitor(State#mrst.fd_monitor, [flush]),
     couch_file:close(State#mrst.fd).
 
 % This called after ddoc_updated event occurrs, and
@@ -178,7 +178,7 @@ close(State) ->
 % couch_file will be closed automatically after all
 % outstanding queries are done.
 shutdown(State) ->
-    erlang:demonitor(State#mrst.fd_monitor, [flush]),
+    demonitor(State#mrst.fd_monitor, [flush]),
     unlink(State#mrst.fd).
 
 delete(#mrst{db_name = DbName, sig = Sig} = State) ->

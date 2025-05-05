@@ -423,7 +423,7 @@ to_type(boolean, Arg) ->
                 true ->
                     false;
                 false ->
-                    erlang:error(badarg)
+                    error(badarg)
             end
     end;
 to_type(_Type, Arg) ->

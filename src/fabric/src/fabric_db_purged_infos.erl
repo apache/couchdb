@@ -18,8 +18,7 @@
 
 -record(pacc, {
     counters,
-    replies,
-    ring_opts
+    replies
 }).
 
 go(DbName) ->
@@ -29,8 +28,7 @@ go(DbName) ->
     Fun = fun handle_message/3,
     Acc0 = #pacc{
         counters = fabric_dict:init(Workers, nil),
-        replies = couch_util:new_set(),
-        ring_opts = [{any, Shards}]
+        replies = couch_util:new_set()
     },
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
@@ -48,17 +46,17 @@ go(DbName) ->
     end.
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, #pacc{} = Acc) ->
-    #pacc{counters = Counters, ring_opts = RingOpts} = Acc,
-    case fabric_util:remove_down_workers(Counters, NodeRef, RingOpts) of
+    #pacc{counters = Counters} = Acc,
+    case fabric_util:remove_down_workers(Counters, NodeRef, [all]) of
         {ok, NewCounters} ->
             {ok, Acc#pacc{counters = NewCounters}};
         error ->
             {error, {nodedown, <<"progress not possible">>}}
     end;
 handle_message({rexi_EXIT, Reason}, Shard, #pacc{} = Acc) ->
-    #pacc{counters = Counters, ring_opts = RingOpts} = Acc,
+    #pacc{counters = Counters} = Acc,
     NewCounters = fabric_dict:erase(Shard, Counters),
-    case fabric_ring:is_progress_possible(NewCounters, RingOpts) of
+    case fabric_ring:is_progress_possible(NewCounters, [all]) of
         true ->
             {ok, Acc#pacc{counters = NewCounters}};
         false ->
@@ -92,8 +90,7 @@ make_shards() ->
 init_acc(Shards) ->
     #pacc{
         counters = fabric_dict:init(Shards, nil),
-        replies = couch_util:new_set(),
-        ring_opts = [{any, Shards}]
+        replies = couch_util:new_set()
     }.
 
 first_result_ok_test() ->

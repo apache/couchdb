@@ -53,7 +53,7 @@ crashing_formatting_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** Generic server and some stuff",
@@ -76,7 +76,7 @@ gen_server_error_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** Generic server and some stuff",
@@ -102,7 +102,7 @@ gen_server_error_with_extra_args_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** Generic server and some stuff",
@@ -128,7 +128,7 @@ gen_fsm_error_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** State machine did a thing",
@@ -154,7 +154,7 @@ gen_fsm_error_with_extra_args_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** State machine did a thing",
@@ -180,7 +180,7 @@ gen_event_error_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** gen_event handler did a thing",
@@ -210,7 +210,7 @@ gen_event_error_test() ->
 emulator_error_test() ->
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             emulator,
             "~s~n",
@@ -230,7 +230,7 @@ normal_error_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "format thing: ~w ~w",
@@ -253,7 +253,7 @@ error_report_std_error_test() ->
     Pid = self(),
     Event = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             std_error,
@@ -274,7 +274,7 @@ supervisor_report_test() ->
     % A standard supervisor report
     Event1 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             supervisor_report,
@@ -307,7 +307,7 @@ supervisor_report_test() ->
     % in the offender blob.
     Event2 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             supervisor_report,
@@ -339,7 +339,7 @@ supervisor_report_test() ->
     % A supervisor_bridge
     Event3 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             supervisor_report,
@@ -370,7 +370,7 @@ supervisor_report_test() ->
     % Any other supervisor report
     Event4 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             supervisor_report,
@@ -391,7 +391,7 @@ crash_report_test() ->
     % A standard crash report
     Event1 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             crash_report,
@@ -425,7 +425,7 @@ crash_report_test() ->
     % A registered process crash report
     Event2 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             crash_report,
@@ -450,7 +450,7 @@ crash_report_test() ->
     % A non-exit crash report
     Event3 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             crash_report,
@@ -475,7 +475,7 @@ crash_report_test() ->
     % A extra report info
     Event4 = {
         error_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             crash_report,
@@ -504,7 +504,7 @@ warning_report_test() ->
     % A warning message
     Event1 = {
         warning_msg,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "a ~s string ~w",
@@ -522,7 +522,7 @@ warning_report_test() ->
     % A warning report
     Event2 = {
         warning_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             std_warning,
@@ -543,7 +543,7 @@ info_report_test() ->
     % An info message
     Event1 = {
         info_msg,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "an info ~s string ~w",
@@ -561,7 +561,7 @@ info_report_test() ->
     % Application exit info
     Event2 = {
         info_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             std_info,
@@ -583,7 +583,7 @@ info_report_test() ->
     % Any other std_info message
     Event3 = {
         info_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             std_info,
@@ -604,7 +604,7 @@ info_report_test() ->
     % Non-list other report
     Event4 = {
         info_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             std_info,
@@ -625,7 +625,7 @@ progress_report_test() ->
     % Application started
     Event1 = {
         info_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             progress,
@@ -643,7 +643,7 @@ progress_report_test() ->
     % Supervisor started child
     Event2 = {
         info_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             progress,
@@ -669,7 +669,7 @@ progress_report_test() ->
     %  Other progress report
     Event3 = {
         info_report,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             progress,
@@ -787,7 +787,7 @@ format_reason_test_() ->
             "bad argument in call to j:k(a, 2) at y:x/1"
         },
         {
-            {{badarity, {fun erlang:spawn/1, [a, b]}}, [{y, x, 1}]},
+            {{badarity, {fun spawn/1, [a, b]}}, [{y, x, 1}]},
             "function called with wrong arity of 2 instead of 1 at y:x/1"
         },
         {
@@ -837,7 +837,7 @@ coverage_test() ->
         do_format(
             {
                 error_report,
-                erlang:group_leader(),
+                group_leader(),
                 {self(), std_error, "foobar"}
             }
         )
@@ -852,7 +852,7 @@ coverage_test() ->
         do_format(
             {
                 error_report,
-                erlang:group_leader(),
+                group_leader(),
                 {self(), std_error, dang}
             }
         )
@@ -862,7 +862,7 @@ gen_server_error_with_last_msg_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** Generic server and some stuff",
@@ -890,7 +890,7 @@ gen_event_error_with_last_msg_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** gen_event handler did a thing",
@@ -923,7 +923,7 @@ gen_fsm_error_with_last_msg_test() ->
     Pid = self(),
     Event = {
         error,
-        erlang:group_leader(),
+        group_leader(),
         {
             Pid,
             "** State machine did a thing",

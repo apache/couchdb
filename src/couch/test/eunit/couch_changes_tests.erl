@@ -1654,7 +1654,7 @@ wait_finished({_, ConsumerRef}) ->
         {'DOWN', ConsumerRef, _, _, Msg} when Msg == normal; Msg == ok ->
             ok;
         {'DOWN', ConsumerRef, _, _, Msg} ->
-            erlang:error(
+            error(
                 {consumer_died, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -1662,7 +1662,7 @@ wait_finished({_, ConsumerRef}) ->
                 ]}
             )
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {consumer_died, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -1752,7 +1752,7 @@ maybe_pause(Parent, Acc) ->
             Parent ! {ok, Ref},
             throw({stop, Acc});
         V when V /= updated ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},

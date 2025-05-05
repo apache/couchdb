@@ -454,7 +454,7 @@ wait_target_in_sync(Source, Target) ->
     wait_target_in_sync_loop(SourceDocCount, Target, 300).
 
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
-    erlang:error(
+    error(
         {assertion_failed, [
             {module, ?MODULE},
             {line, ?LINE},

@@ -124,7 +124,7 @@ should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
     end,
     ?assertNot(is_process_alive(OpenerPid)),
     % Verify the stream itself has also died
-    StreamRef = erlang:monitor(process, StreamPid),
+    StreamRef = monitor(process, StreamPid),
     receive
         {'DOWN', StreamRef, _, _, _} -> ok
     end,

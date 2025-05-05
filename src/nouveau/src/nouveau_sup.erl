@@ -23,6 +23,7 @@ start_link() ->
 
 init(_Args) ->
     Children = [
+        child(nouveau_gun),
         child(nouveau_index_manager)
     ],
     {ok, {{one_for_one, 10, 1}, couch_epi:register_service(nouveau_epi, Children)}}.

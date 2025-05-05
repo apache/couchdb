@@ -29,7 +29,7 @@ recover(DbName) ->
         <<"not_ok">> ->
             {ruh, roh};
         <<"error">> ->
-            erlang:error(thpppt)
+            error(thpppt)
     end.
 
 start_couch() ->
@@ -193,7 +193,7 @@ do_compact(ShardName) ->
     {ok, Db} = couch_db:open_int(ShardName, []),
     try
         {ok, Pid} = couch_db:start_compact(Db),
-        Ref = erlang:monitor(process, Pid),
+        Ref = monitor(process, Pid),
         receive
             {'DOWN', Ref, _, _, _} ->
                 ok

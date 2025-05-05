@@ -147,7 +147,7 @@ open_compaction_files(DbName, OldSt, Options) ->
                 }
         end,
     unlink(DataFd),
-    erlang:monitor(process, MetaFd),
+    monitor(process, MetaFd),
     {ok, CompSt}.
 
 copy_purge_info(#comp_st{} = CompSt) ->
@@ -381,7 +381,7 @@ copy_compact(#comp_st{} = CompSt) ->
 
     % Copy general properties over
     Props = couch_bt_engine:get_props(St),
-    {ok, NewSt5} = couch_bt_engine:set_props(NewSt4, Props),
+    {ok, NewSt5} = couch_bt_engine:copy_props(NewSt4, Props),
 
     FinalUpdateSeq = couch_bt_engine:get_update_seq(St),
     {ok, NewSt6} = couch_bt_engine:set_update_seq(NewSt5, FinalUpdateSeq),
@@ -693,7 +693,7 @@ merge_lookups([#doc_info{} = DI | RestInfos], [{ok, FDI} | RestLookups]) ->
     % Assert we've matched our lookups
     if
         DI#doc_info.id == FDI#full_doc_info.id -> ok;
-        true -> erlang:error({mismatched_doc_infos, DI#doc_info.id})
+        true -> error({mismatched_doc_infos, DI#doc_info.id})
     end,
     [FDI | merge_lookups(RestInfos, RestLookups)];
 merge_lookups([FDI | RestInfos], Lookups) ->

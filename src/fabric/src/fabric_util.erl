@@ -26,6 +26,7 @@
     doc_id_and_rev/1
 ]).
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1, timeout/2]).
+-export([abs_request_timeout/0]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
 -export([open_cluster_db/1, open_cluster_db/2]).
@@ -35,13 +36,14 @@
 -export([worker_ranges/1]).
 -export([get_uuid_prefix_len/0]).
 -export([isolate/1, isolate/2]).
+-export([get_design_doc_records/1]).
+-export([w_from_opts/2, r_from_opts/2]).
 
 -compile({inline, [{doc_id_and_rev, 1}]}).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 remove_down_workers(Workers, BadNode) ->
     remove_down_workers(Workers, BadNode, []).
@@ -107,6 +109,15 @@ log_timeout(Workers, EndPoint) ->
         Workers
     ).
 
+% Return {abs, MonotonicMSec}. This is a format used by erpc to
+% provide an absolute time limit for a collection or requests
+% See https://www.erlang.org/doc/apps/kernel/erpc.html#t:timeout_time/0
+%
+abs_request_timeout() ->
+    Timeout = fabric_util:request_timeout(),
+    NowMSec = erlang:monotonic_time(millisecond),
+    {abs, NowMSec + Timeout}.
+
 remove_done_workers(Workers, WaitingIndicator) ->
     [W || {W, WI} <- fabric_dict:to_list(Workers), WI == WaitingIndicator].
 
@@ -120,7 +131,7 @@ get_db(DbName, Options) ->
     Shards =
         Local ++ lists:keysort(#shard.name, SameZone) ++ lists:keysort(#shard.name, DifferentZone),
     % suppress shards from down nodes
-    Nodes = [node() | erlang:nodes()],
+    Nodes = [node() | nodes()],
     Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
     % Only accept factors > 1, otherwise our math breaks further down
     Factor = max(2, config:get_integer("fabric", "shard_timeout_factor", 2)),
@@ -130,7 +141,7 @@ get_db(DbName, Options) ->
     get_shard(Live, Options, Timeout, Factor).
 
 get_shard([], _Opts, _Timeout, _Factor) ->
-    erlang:error({internal_server_error, "No DB shards could be opened."});
+    error({internal_server_error, "No DB shards could be opened."});
 get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
     MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
@@ -226,7 +237,7 @@ remove_ancestors([{_, {{not_found, _}, Count}} = Head | Tail], Acc) ->
 remove_ancestors([{_, {{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Acc) ->
     Descendants = lists:dropwhile(
         fun({_, {{ok, #doc{revs = {Pos2, Revs2}}}, _}}) ->
-            case lists:nthtail(erlang:min(Pos2 - Pos, length(Revs2)), Revs2) of
+            case lists:nthtail(min(Pos2 - Pos, length(Revs2)), Revs2) of
                 [] ->
                     % impossible to tell if Revs2 is a descendant - assume no
                     true;
@@ -250,38 +261,6 @@ create_monitors(Shards) ->
     MonRefs = lists:usort([rexi_utils:server_pid(N) || #shard{node = N} <- Shards]),
     rexi_monitor:start(MonRefs).
 
-%% verify only id and rev are used in key.
-update_counter_test() ->
-    Reply =
-        {ok, #doc{
-            id = <<"id">>,
-            revs = <<"rev">>,
-            body = <<"body">>,
-            atts = <<"atts">>
-        }},
-    ?assertEqual(
-        [{{<<"id">>, <<"rev">>}, {Reply, 1}}],
-        update_counter(Reply, 1, [])
-    ).
-
-remove_ancestors_test() ->
-    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
-    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
-    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
-    Bar2 = {not_found, {1, <<"bar">>}},
-    ?assertEqual(
-        [kv(Bar1, 1), kv(Foo1, 1)],
-        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1)], [])
-    ),
-    ?assertEqual(
-        [kv(Bar1, 1), kv(Foo2, 2)],
-        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1), kv(Foo2, 1)], [])
-    ),
-    ?assertEqual(
-        [kv(Bar1, 2)],
-        remove_ancestors([kv(Bar2, 1), kv(Bar1, 1)], [])
-    ).
-
 is_replicator_db(DbName) ->
     path_ends_with(DbName, <<"_replicator">>).
 
@@ -296,15 +275,12 @@ is_users_db(DbName) ->
 path_ends_with(Path, Suffix) ->
     Suffix =:= couch_db:dbname_suffix(Path).
 
-open_cluster_db(#shard{dbname = DbName, opts = Options}) ->
-    case couch_util:get_value(props, Options) of
-        Props when is_list(Props) ->
-            {ok, Db} = couch_db:clustered_db(DbName, [{props, Props}]),
-            Db;
-        _ ->
-            {ok, Db} = couch_db:clustered_db(DbName, []),
-            Db
-    end.
+open_cluster_db(#shard{dbname = DbName}) ->
+    open_cluster_db(DbName);
+open_cluster_db(DbName) when is_binary(DbName) ->
+    Props = mem3:props(DbName),
+    {ok, Db} = couch_db:clustered_db(DbName, [{props, Props}]),
+    Db.
 
 open_cluster_db(DbName, Opts) ->
     % as admin
@@ -320,25 +296,22 @@ kv(Item, Count) ->
 doc_id_and_rev(#doc{id = DocId, revs = {RevNum, [RevHash | _]}}) ->
     {DocId, {RevNum, RevHash}}.
 
-is_partitioned(DbName0) when is_binary(DbName0) ->
-    Shards = mem3:shards(fabric:dbname(DbName0)),
-    is_partitioned(open_cluster_db(hd(Shards)));
+is_partitioned(DbName) when is_binary(DbName) ->
+    is_partitioned(open_cluster_db(DbName));
 is_partitioned(Db) ->
     couch_db:is_partitioned(Db).
 
 validate_all_docs_args(DbName, Args) when is_list(DbName) ->
     validate_all_docs_args(list_to_binary(DbName), Args);
 validate_all_docs_args(DbName, Args) when is_binary(DbName) ->
-    Shards = mem3:shards(fabric:dbname(DbName)),
-    Db = open_cluster_db(hd(Shards)),
+    Db = open_cluster_db(DbName),
     validate_all_docs_args(Db, Args);
 validate_all_docs_args(Db, Args) ->
     true = couch_db:is_clustered(Db),
     couch_mrview_util:validate_all_docs_args(Db, Args).
 
 validate_args(DbName, DDoc, Args) when is_binary(DbName) ->
-    Shards = mem3:shards(fabric:dbname(DbName)),
-    Db = open_cluster_db(hd(Shards)),
+    Db = open_cluster_db(DbName),
     validate_args(Db, DDoc, Args);
 validate_args(Db, DDoc, Args) ->
     true = couch_db:is_clustered(Db),
@@ -397,6 +370,43 @@ worker_ranges(Workers) ->
 get_uuid_prefix_len() ->
     config:get_integer("fabric", "uuid_prefix_len", 7).
 
+% Get design #doc{} records. Run in an isolated process. This is often used
+% when computing signatures of various indexes
+%
+get_design_doc_records(DbName) ->
+    fabric_util:isolate(fun() ->
+        case fabric:design_docs(DbName) of
+            {ok, DDocs} when is_list(DDocs) ->
+                Fun = fun({[_ | _]} = Doc) -> couch_doc:from_json_obj(Doc) end,
+                {ok, lists:map(Fun, DDocs)};
+            Else ->
+                Else
+        end
+    end).
+
+w_from_opts(Db, Options) ->
+    quorum_from_opts(Db, couch_util:get_value(w, Options)).
+
+r_from_opts(Db, Options) ->
+    quorum_from_opts(Db, couch_util:get_value(r, Options)).
+
+quorum_from_opts(Db, Val) ->
+    try
+        if
+            is_integer(Val) ->
+                Val;
+            is_list(Val) ->
+                % Compatibility clause. Keep as long as chttpd parses r and w
+                % request parameters as lists (strings).
+                list_to_integer(Val);
+            true ->
+                mem3:quorum(Db)
+        end
+    catch
+        _:_ ->
+            mem3:quorum(Db)
+    end.
+
 % If we issue multiple fabric calls from the same process we have to isolate
 % them so in case of error they don't pollute the processes dictionary or the
 % mailbox
@@ -405,16 +415,16 @@ isolate(Fun) ->
     isolate(Fun, infinity).
 
 isolate(Fun, Timeout) ->
-    {Pid, Ref} = erlang:spawn_monitor(fun() -> exit(do_isolate(Fun)) end),
+    {Pid, Ref} = spawn_monitor(fun() -> exit(do_isolate(Fun)) end),
     receive
         {'DOWN', Ref, _, _, {'$isolres', Res}} ->
             Res;
         {'DOWN', Ref, _, _, {'$isolerr', Tag, Reason, Stack}} ->
             erlang:raise(Tag, Reason, Stack)
     after Timeout ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         exit(Pid, kill),
-        erlang:error(timeout)
+        error(timeout)
     end.
 
 do_isolate(Fun) ->
@@ -424,6 +434,41 @@ do_isolate(Fun) ->
         Tag:Reason:Stack ->
             {'$isolerr', Tag, Reason, Stack}
     end.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+%% verify only id and rev are used in key.
+update_counter_test() ->
+    Reply =
+        {ok, #doc{
+            id = <<"id">>,
+            revs = <<"rev">>,
+            body = <<"body">>,
+            atts = <<"atts">>
+        }},
+    ?assertEqual(
+        [{{<<"id">>, <<"rev">>}, {Reply, 1}}],
+        update_counter(Reply, 1, [])
+    ).
+
+remove_ancestors_test() ->
+    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
+    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
+    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
+    Bar2 = {not_found, {1, <<"bar">>}},
+    ?assertEqual(
+        [kv(Bar1, 1), kv(Foo1, 1)],
+        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1)], [])
+    ),
+    ?assertEqual(
+        [kv(Bar1, 1), kv(Foo2, 2)],
+        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1), kv(Foo2, 1)], [])
+    ),
+    ?assertEqual(
+        [kv(Bar1, 2)],
+        remove_ancestors([kv(Bar2, 1), kv(Bar1, 1)], [])
+    ).
 
 get_db_timeout_test() ->
     % Q=1, N=1
@@ -468,3 +513,32 @@ get_db_timeout_test() ->
     % request_timeout was set to infinity, with enough shards it still gets to
     % 100 min timeout at the start from the exponential logic
     ?assertEqual(100, get_db_timeout(64, 2, 100, infinity)).
+
+rw_opts_test_() ->
+    {
+        foreach,
+        fun() -> meck:new(mem3, [passthrough]) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_w_opts_get),
+            ?TDEF_FE(t_r_opts_get)
+        ]
+    }.
+
+t_w_opts_get(_) ->
+    meck:expect(mem3, quorum, 1, 3),
+    ?assertEqual(5, w_from_opts(any_db, [{w, 5}])),
+    ?assertEqual(5, w_from_opts(any_db, [{w, "5"}])),
+    ?assertEqual(3, w_from_opts(any_db, [{w, some_other_type}])),
+    ?assertEqual(3, w_from_opts(any_db, [{w, "five"}])),
+    ?assertEqual(3, w_from_opts(any_db, [])).
+
+t_r_opts_get(_) ->
+    meck:expect(mem3, quorum, 1, 3),
+    ?assertEqual(5, r_from_opts(any_db, [{other_opt, 42}, {r, 5}])),
+    ?assertEqual(5, r_from_opts(any_db, [{r, "5"}, {something_else, "xyz"}])),
+    ?assertEqual(3, r_from_opts(any_db, [{r, some_other_type}])),
+    ?assertEqual(3, r_from_opts(any_db, [{r, "five"}])),
+    ?assertEqual(3, r_from_opts(any_db, [])).
+
+-endif.

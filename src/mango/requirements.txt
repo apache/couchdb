@@ -1,5 +1,5 @@
 # nose2 0.13.0, requests, hypothesis version are driven
 # by the minimum version for python on centos 8 currently
 nose2==0.13.0
-requests==2.27.1
+requests==2.32.4
 hypothesis==6.31.6

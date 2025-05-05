@@ -21,7 +21,7 @@ Resharding
 Resharding Configuration
 ========================
 
-.. config:section:: resharding :: Resharding Configuration
+.. config:section:: reshard :: Resharding Configuration
 
     .. config:option:: max_jobs :: Maximum resharding jobs per node
 

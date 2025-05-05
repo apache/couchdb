@@ -49,7 +49,7 @@ handle_call(Msg, _From, State) ->
 
 handle_cast({track, Pid, Name}, State) ->
     couch_stats:increment_counter(Name),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     ets:insert(?MODULE, {Ref, Name}),
     {noreply, State};
 handle_cast(Msg, State) ->

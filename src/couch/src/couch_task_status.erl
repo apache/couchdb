@@ -107,7 +107,7 @@ handle_call({add_task, TaskProps}, {From, _}, Server) ->
     case ets:lookup(?MODULE, From) of
         [] ->
             true = ets:insert(?MODULE, {From, TaskProps}),
-            erlang:monitor(process, From),
+            monitor(process, From),
             {reply, ok, Server};
         [_] ->
             {reply, {add_task_error, already_registered}, Server}
@@ -130,7 +130,7 @@ handle_cast({update_status, Pid, NewProps}, Server) ->
     {noreply, Server}.
 
 handle_info({'DOWN', _MonitorRef, _Type, Pid, _Info}, Server) ->
-    %% should we also erlang:demonitor(_MonitorRef), ?
+    %% should we also demonitor(_MonitorRef), ?
     ets:delete(?MODULE, Pid),
     {noreply, Server}.
 

@@ -95,13 +95,13 @@ open_db(DbName) ->
 
 shutdown_db(Db) ->
     Pid = couch_db:get_pid(Db),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     exit(Pid, kill),
     receive
         {'DOWN', Ref, _, _, _} ->
             ok
     after ?SHUTDOWN_TIMEOUT ->
-        erlang:error(database_shutdown_timeout)
+        error(database_shutdown_timeout)
     end,
     test_util:wait(fun() ->
         case
@@ -189,7 +189,7 @@ assert_db_props(Module, Line, DbName, Props) when is_binary(DbName) ->
     catch
         error:{assertEqual, Props} ->
             {_, Rest} = proplists:split(Props, [module, line]),
-            erlang:error({assertEqual, [{module, Module}, {line, Line} | Rest]})
+            error({assertEqual, [{module, Module}, {line, Line} | Rest]})
     after
         couch_db:close(Db)
     end;
@@ -199,7 +199,7 @@ assert_db_props(Module, Line, Db, Props) ->
     catch
         error:{assertEqual, Props} ->
             {_, Rest} = proplists:split(Props, [module, line]),
-            erlang:error({assertEqual, [{module, Module}, {line, Line} | Rest]})
+            error({assertEqual, [{module, Module}, {line, Line} | Rest]})
     end.
 
 assert_each_prop(_Db, []) ->
@@ -309,7 +309,7 @@ gen_write(Db, {Action, {<<"_local/", _/binary>> = DocId, Body}}) ->
         end,
     {local, #doc{
         id = DocId,
-        revs = {0, [list_to_binary(integer_to_list(RevId))]},
+        revs = {0, [integer_to_binary(RevId)]},
         body = Body,
         deleted = Deleted
     }};
@@ -387,7 +387,7 @@ prep_atts(Db, [{FileName, Data} | Rest]) ->
             {'DOWN', Ref, _, _, Resp} ->
                 Resp
         after ?ATTACHMENT_WRITE_TIMEOUT ->
-            erlang:error(attachment_write_timeout)
+            error(attachment_write_timeout)
         end,
     [Att | prep_atts(Db, Rest)].
 
@@ -617,7 +617,7 @@ list_diff([T1 | R1], [T2 | R2]) ->
 
 compact(Db) ->
     {ok, Pid} = couch_db:start_compact(Db),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
 
     % Ideally I'd assert that Pid is linked to us
     % at this point but its technically possible
@@ -630,9 +630,9 @@ compact(Db) ->
         {'DOWN', Ref, _, _, noproc} ->
             ok;
         {'DOWN', Ref, _, _, Reason} ->
-            erlang:error({compactor_died, Reason})
+            error({compactor_died, Reason})
     after ?COMPACTOR_TIMEOUT ->
-        erlang:error(compactor_timed_out)
+        error(compactor_timed_out)
     end,
 
     test_util:wait(fun() ->

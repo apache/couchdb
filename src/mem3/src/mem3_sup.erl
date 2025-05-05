@@ -18,19 +18,40 @@ start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init(_Args) ->
+    % Some startup order constraints based on call dependencies:
+    %
+    % * mem3_events gen_event should be started before all the others
+    %
+    % * mem3_nodes gen_server is needed so everyone can call mem3:nodes()
+    %
+    % * mem3_sync_nodes needs to run before mem3_sync and
+    %   mem3_sync_event_listener, so they can both can call
+    %   mem3_sync_nodes:add/1
+    %
+    % * mem3_distribution force connects nodes from mem3:nodes(), so start it
+    %   before mem3_sync since mem3_sync:initial_sync/0 expects the connected
+    %   nodes to be there when calling mem3_sync_nodes:add(nodes())
+    %
+    % * mem3_sync_event_listener has to start after mem3_sync, so it can call
+    %   mem3_sync:push/2
+    %
+    % * mem3_seeds and mem3_reshard_sup can wait till the end, as they will
+    %   spawn background work that can go on for a while: seeding system dbs
+    %   from other nodes running resharding jobs
+    %
     Children = [
         child(mem3_events),
         child(mem3_nodes),
-        child(mem3_distribution),
-        child(mem3_seeds),
-        % Order important?
-        child(mem3_sync_nodes),
-        child(mem3_sync),
         child(mem3_shards),
+        child(mem3_sync_nodes),
+        child(mem3_distribution),
+        child(mem3_sync),
         child(mem3_sync_event_listener),
+        child(mem3_seeds),
+        child(mem3_db_doc_updater),
         child(mem3_reshard_sup)
     ],
-    {ok, {{one_for_one, 10, 1}, couch_epi:register_service(mem3_epi, Children)}}.
+    {ok, {{rest_for_one, 10, 1}, couch_epi:register_service(mem3_epi, Children)}}.
 
 child(mem3_events) ->
     MFA = {gen_event, start_link, [{local, mem3_events}]},

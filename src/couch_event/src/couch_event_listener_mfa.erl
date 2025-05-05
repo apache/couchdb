@@ -47,7 +47,7 @@ enter_loop(Mod, Func, State, Options) ->
     Parent =
         case proplists:get_value(parent, Options) of
             P when is_pid(P) ->
-                erlang:monitor(process, P),
+                monitor(process, P),
                 P;
             _ ->
                 undefined
@@ -64,7 +64,7 @@ stop(Pid) ->
     couch_event_listener:cast(Pid, shutdown).
 
 init({Parent, Mod, Func, State}) ->
-    erlang:monitor(process, Parent),
+    monitor(process, Parent),
     {ok, #st{
         mod = Mod,
         func = Func,
@@ -86,7 +86,7 @@ handle_event(DbName, Event, #st{mod = Mod, func = Func, state = State} = St) ->
                 couch_log:error("~p: else in handle_event for db ~p, event ~p, else ~p", [
                     ?MODULE, DbName, Event, Else
                 ]),
-                erlang:error(Else)
+                error(Else)
         end
     catch
         Class:Reason:Stack ->

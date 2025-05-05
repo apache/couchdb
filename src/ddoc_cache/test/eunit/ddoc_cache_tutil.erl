@@ -50,7 +50,7 @@ clear() ->
     application:start(ddoc_cache).
 
 get_rev(DbName, DDocId) ->
-    {_, Ref} = erlang:spawn_monitor(fun() ->
+    {_, Ref} = spawn_monitor(fun() ->
         {ok, #doc{revs = Revs}} = fabric:open_doc(DbName, DDocId, [?ADMIN_CTX]),
         {Depth, [RevId | _]} = Revs,
         exit({Depth, RevId})

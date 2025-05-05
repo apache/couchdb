@@ -491,7 +491,7 @@ encoded_lengths_from_json(Props) ->
             EncodedLen = Len;
         EncodingValue ->
             EncodedLen = couch_util:get_value(<<"encoded_length">>, Props, Len),
-            Encoding = list_to_existing_atom(binary_to_list(EncodingValue))
+            Encoding = binary_to_existing_atom(EncodingValue)
     end,
     {Len, EncodedLen, Encoding}.
 
@@ -585,7 +585,7 @@ flush_data(Db, Fun, Att) when is_function(Fun) ->
             end)
     end;
 flush_data(Db, {follows, Parser, Ref}, Att) ->
-    ParserRef = erlang:monitor(process, Parser),
+    ParserRef = monitor(process, Parser),
     Fun = fun() ->
         Parser ! {get_bytes, Ref, self()},
         receive
@@ -600,7 +600,7 @@ flush_data(Db, {follows, Parser, Ref}, Att) ->
     try
         flush_data(Db, Fun, store(data, Fun, Att))
     after
-        erlang:demonitor(ParserRef, [flush])
+        demonitor(ParserRef, [flush])
     end;
 flush_data(Db, {stream, StreamEngine}, Att) ->
     case couch_db:is_active_stream(Db, StreamEngine) of
@@ -645,7 +645,7 @@ foldl(DataFun, Att, Fun, Acc) when is_function(DataFun) ->
     Len = fetch(att_len, Att),
     fold_streamed_data(DataFun, Len, Fun, Acc);
 foldl({follows, Parser, Ref}, Att, Fun, Acc) ->
-    ParserRef = erlang:monitor(process, Parser),
+    ParserRef = monitor(process, Parser),
     DataFun = fun() ->
         Parser ! {get_bytes, Ref, self()},
         receive
@@ -660,7 +660,7 @@ foldl({follows, Parser, Ref}, Att, Fun, Acc) ->
     try
         foldl(DataFun, store(data, DataFun, Att), Fun, Acc)
     after
-        erlang:demonitor(ParserRef, [flush])
+        demonitor(ParserRef, [flush])
     end.
 
 range_foldl(Att, From, To, Fun, Acc) ->
@@ -781,7 +781,7 @@ open_stream(StreamSrc, Data) ->
                 true ->
                     StreamSrc(Data);
                 false ->
-                    erlang:error({invalid_stream_source, StreamSrc})
+                    error({invalid_stream_source, StreamSrc})
             end
     end.
 

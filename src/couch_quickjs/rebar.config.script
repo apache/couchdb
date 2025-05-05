@@ -15,8 +15,13 @@
 % Windows is "special" so we treat it "specially"
 Msys = "msys2_shell.cmd -defterm -no-start -ucrt64 -here -lc ".
 
+% Disabled CONFIG_LTO=y as of June 2025. It interfered with -j8 and microbench
+% on quickjs repo didn't show any measurable per benefit for it. It even looked
+% a bit slower on ubuntu-noble/x86_64 (lto:9032ns vs nolto:8746ns) and only a
+% tiny bit faster on MacOS x86_64 (lto:12646 vs nolto:12614)
+%
 PreHooks = [
-    {"(linux|darwin)", compile, "make CONFIG_LTO=y -C quickjs -j8 libquickjs.lto.a qjsc"},
+    {"(linux|darwin)", compile, "make -C quickjs -j8 libquickjs.a qjsc"},
     {"freebsd", compile, "gmake -C quickjs -j8 libquickjs.a qjsc"},
     {"win32", compile, Msys ++ "'make -C quickjs -j8 libquickjs.a qjsc.exe'"},
     {"(linux|darwin|freebsd|win32)", compile, "escript build_js.escript compile"}
@@ -38,14 +43,9 @@ ResetFlags = [
     {"EXE_LDFLAGS", ""}
 ].
 
-LinuxDarwinEnv = [
-    {"CFLAGS", "$CFLAGS -flto -g -Wall -DCONFIG_LTO=y -O2 -Iquickjs"},
-    {"LDFLAGS", "$LDFLAGS -flto -lm quickjs/libquickjs.lto.a"}
-] ++ ResetFlags.
-
-FreeBSDEnv  = [
+UnixEnv = [
     {"CFLAGS", "$CFLAGS -g -Wall -O2 -Iquickjs"},
-    {"LDFLAGS", "$LDFLAGS -lm -lpthread quickjs/libquickjs.a"}
+    {"LDFLAGS", "$LDFLAGS quickjs/libquickjs.a -lpthread -lm"}
 ] ++ ResetFlags.
 
 WindowsEnv = [
@@ -73,10 +73,8 @@ WindowsMainjsSrc = WindowsBaseSrc ++ UnixMainjsSrc.
 WindowsCoffeeSrc = WindowsBaseSrc ++ UnixCoffeeSrc.
 
 PortSpecs = [
-    {"(linux|darwin)", "priv/couchjs_mainjs", UnixMainjsSrc, [{env, LinuxDarwinEnv}]},
-    {"(linux|darwin)", "priv/couchjs_coffee", UnixCoffeeSrc, [{env, LinuxDarwinEnv}]},
-    {"freebsd", "priv/couchjs_mainjs", UnixMainjsSrc, [{env, FreeBSDEnv}]},
-    {"freebsd", "priv/couchjs_coffee", UnixCoffeeSrc, [{env, FreeBSDEnv}]},
+    {"(linux|darwin|freebsd)", "priv/couchjs_mainjs", UnixMainjsSrc, [{env, UnixEnv}]},
+    {"(linux|darwin|freebsd)", "priv/couchjs_coffee", UnixCoffeeSrc, [{env, UnixEnv}]},
     {"win32", "priv/couchjs_mainjs.exe", WindowsMainjsSrc, [{env, WindowsEnv}]},
     {"win32", "priv/couchjs_coffee.exe", WindowsCoffeeSrc, [{env, WindowsEnv}]}
 ].

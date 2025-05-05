@@ -75,7 +75,7 @@ local_command(Module, Function, Args, Timeout) ->
                 "Local function call: ~p:~p(~p)",
                 [Module, Function, Args]
             ),
-            erlang:apply(Module, Function, Args);
+            apply(Module, Function, Args);
         _ ->
             weatherreport_log:log(
                 node(),

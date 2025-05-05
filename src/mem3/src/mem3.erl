@@ -18,6 +18,7 @@
     restart/0,
     nodes/0,
     node_info/2,
+    props/1,
     shards/1, shards/2,
     choose_shards/2,
     n/1, n/2,
@@ -38,9 +39,10 @@
 -export([db_is_current/1]).
 -export([shard_creation_time/1]).
 -export([generate_shard_suffix/0]).
+-export([get_db_doc/1, update_db_doc/1]).
 
 %% For mem3 use only.
--export([name/1, node/1, range/1, engine/1]).
+-export([name/1, node/1, range/1]).
 
 -include_lib("mem3/include/mem3.hrl").
 
@@ -72,7 +74,7 @@ restart() ->
     ].
 compare_nodelists() ->
     Nodes = mem3:nodes(),
-    AllNodes = erlang:nodes([this, visible]),
+    AllNodes = nodes([this, visible]),
     {Replies, BadNodes} = gen_server:multi_call(Nodes, mem3_nodes, get_nodelist),
     Dict = lists:foldl(
         fun({Node, Nodelist}, D) ->
@@ -115,6 +117,11 @@ nodes() ->
 node_info(Node, Key) ->
     mem3_nodes:get_node_info(Node, Key).
 
+-spec props(DbName :: iodata()) -> [].
+props(DbName) ->
+    Opts = mem3_shards:opts_for_db(DbName),
+    couch_util:get_value(props, Opts, []).
+
 -spec shards(DbName :: iodata()) -> [#shard{}].
 shards(DbName) ->
     shards_int(DbName, []).
@@ -135,8 +142,7 @@ shards_int(DbName, Options) ->
                     name = ShardDbName,
                     dbname = ShardDbName,
                     range = [0, (2 bsl 31) - 1],
-                    order = undefined,
-                    opts = []
+                    order = undefined
                 }
             ];
         ShardDbName ->
@@ -147,8 +153,7 @@ shards_int(DbName, Options) ->
                     node = config:node_name(),
                     name = ShardDbName,
                     dbname = ShardDbName,
-                    range = [0, (2 bsl 31) - 1],
-                    opts = []
+                    range = [0, (2 bsl 31) - 1]
                 }
             ];
         _ ->
@@ -260,7 +265,7 @@ choose_shards(DbName, Nodes, Options) ->
     Suffix = couch_util:get_value(shard_suffix, Options, ""),
     N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
     if
-        N =:= 0 -> erlang:error(no_nodes_in_zone);
+        N =:= 0 -> error(no_nodes_in_zone);
         true -> ok
     end,
     Q = mem3_util:q_val(
@@ -310,7 +315,7 @@ dbname(DbName) when is_list(DbName) ->
 dbname(DbName) when is_binary(DbName) ->
     DbName;
 dbname(_) ->
-    erlang:error(badarg).
+    error(badarg).
 
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
 belongs(#shard{} = Shard, DocId) when is_binary(DocId) ->
@@ -416,25 +421,13 @@ name(#ordered_shard{name = Name}) ->
 owner(DbName, DocId, Nodes) ->
     hd(mem3_util:rotate_list({DbName, DocId}, lists:usort(Nodes))).
 
-engine(#shard{opts = Opts}) ->
-    engine(Opts);
-engine(#ordered_shard{opts = Opts}) ->
-    engine(Opts);
-engine(Opts) when is_list(Opts) ->
-    case couch_util:get_value(engine, Opts) of
-        Engine when is_binary(Engine) ->
-            [{engine, Engine}];
-        _ ->
-            []
-    end.
-
 %% Check whether a node is up or down
 %%  side effect: set up a connection to Node if there not yet is one.
 
 -spec ping(node()) -> pos_integer() | Error :: term().
 
 ping(Node) ->
-    [{Node, Res}] = ping_nodes([Node]),
+    [{Node, Res}] = ping_nodes([Node], ?PING_TIMEOUT_IN_MS),
     Res.
 
 -spec ping(node(), Timeout :: pos_integer()) -> pos_integer() | Error :: term().
@@ -480,7 +473,7 @@ gather_ping_results(Refs, Until, Results) ->
             end;
         false ->
             Fun = fun(Ref, true, Acc) ->
-                erlang:demonitor(Ref, [flush]),
+                demonitor(Ref, [flush]),
                 Acc#{Ref => timeout}
             end,
             maps:fold(Fun, Results, Refs)
@@ -507,7 +500,7 @@ do_ping(Node, Timeout) ->
             {Tag, Err}
     end.
 
--spec dead_nodes() -> [node() | Error :: term()].
+-spec dead_nodes() -> [{node(), [node()]}].
 
 %% @doc Returns a list of dead nodes from the cluster.
 %%
@@ -525,32 +518,21 @@ do_ping(Node, Timeout) ->
 dead_nodes() ->
     dead_nodes(?PING_TIMEOUT_IN_MS).
 
--spec dead_nodes(Timeout :: pos_integer()) -> [node() | Error :: term()].
+-spec dead_nodes(Timeout :: pos_integer()) -> [{node(), [node()]}].
 
 dead_nodes(Timeout) when is_integer(Timeout), Timeout > 0 ->
     % Here we are trying to detect overlapping partitions where not all the
     % nodes connect to each other. For example: n1 connects to n2 and n3, but
     % n2 and n3 are not connected.
-    DeadFun = fun() ->
-        Expected = ordsets:from_list(mem3:nodes()),
-        Live = ordsets:from_list(mem3_util:live_nodes()),
-        Dead = ordsets:subtract(Expected, Live),
-        ordsets:to_list(Dead)
+    Nodes = [node() | erlang:nodes()],
+    Expected = erpc:multicall(Nodes, mem3, nodes, [], Timeout),
+    Live = erpc:multicall(Nodes, mem3_util, live_nodes, [], Timeout),
+    ZipF = fun
+        (N, {ok, E}, {ok, L}) -> {N, E -- L};
+        (N, _, _) -> {N, Nodes}
     end,
-    {Responses, BadNodes} = multicall(DeadFun, Timeout),
-    AccF = lists:foldl(
-        fun
-            (Dead, Acc) when is_list(Dead) -> ordsets:union(Acc, Dead);
-            (Error, Acc) -> ordsets:union(Acc, [Error])
-        end,
-        ordsets:from_list(BadNodes),
-        Responses
-    ),
-    ordsets:to_list(AccF).
-
-multicall(Fun, Timeout) when is_integer(Timeout), Timeout > 0 ->
-    F = fun() -> catch Fun() end,
-    rpc:multicall(erlang, apply, [F, []], Timeout).
+    DeadPerNode = lists:zipwith3(ZipF, Nodes, Expected, Live),
+    lists:sort([{N, lists:sort(D)} || {N, D} <- DeadPerNode, D =/= []]).
 
 db_is_current(#shard{name = Name}) ->
     db_is_current(Name);
@@ -586,6 +568,12 @@ strip_shard_suffix(DbName) when is_binary(DbName) ->
         _ ->
             filename:rootname(DbName)
     end.
+
+get_db_doc(DocId) ->
+    mem3_db_doc_updater:get_db_doc(DocId).
+
+update_db_doc(Doc) ->
+    mem3_db_doc_updater:update_db_doc(Doc).
 
 -ifdef(TEST).
 

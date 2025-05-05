@@ -115,10 +115,10 @@ db_open(#httpdb{} = Db1, Create, CreateParams) ->
             throw(Error);
         error:Error ->
             db_close(Db),
-            erlang:error(Error);
+            error(Error);
         exit:Error ->
             db_close(Db),
-            erlang:exit(Error)
+            exit(Error)
     end.
 
 db_close(#httpdb{httpc_pool = Pool} = HttpDb) ->
@@ -300,7 +300,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
         % hammer approach to making sure it releases
         % that connection back to the pool.
         spawn(fun() ->
-            Ref = erlang:monitor(process, Self),
+            Ref = monitor(process, Self),
             receive
                 {'DOWN', Ref, process, Self, normal} ->
                     exit(Streamer, {streamer_parent_died, Self});
@@ -352,7 +352,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             NewRetries = Retries - 1,
             case NewRetries > 0 of
                 true ->
-                    Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
+                    Wait = 2 * min(Wait0 * 2, ?MAX_WAIT),
                     LogRetryMsg = "Retrying GET to ~s in ~p seconds due to error ~w",
                     couch_log:notice(LogRetryMsg, [Url, Wait / 1000, error_reason(Else)]),
                     ok = timer:sleep(Wait),
@@ -532,7 +532,7 @@ changes_since(
     UserFun,
     Options
 ) ->
-    Timeout = erlang:max(1000, InactiveTimeout div 3),
+    Timeout = max(1000, InactiveTimeout div 3),
     EncodedSeq = couch_replicator_utils:seq_encode(StartSeq),
     BaseQArgs =
         case get_value(continuous, Options, false) of
@@ -820,7 +820,7 @@ run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
     end),
     receive
         {started_open_doc_revs, NewRef} ->
-            erlang:demonitor(Ref, [flush]),
+            demonitor(Ref, [flush]),
             exit(Pid, kill),
             restart_remote_open_doc_revs(OldRef, NewRef);
         {'DOWN', Ref, process, Pid, {exit_ok, Ret}} ->
@@ -828,9 +828,9 @@ run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
         {'DOWN', Ref, process, Pid, {exit_throw, Reason}} ->
             throw(Reason);
         {'DOWN', Ref, process, Pid, {exit_error, Reason}} ->
-            erlang:error(Reason);
+            error(Reason);
         {'DOWN', Ref, process, Pid, {exit_exit, Reason}} ->
-            erlang:exit(Reason)
+            exit(Reason)
     end.
 
 restart_remote_open_doc_revs(Ref, NewRef) ->
@@ -844,7 +844,7 @@ restart_remote_open_doc_revs(Ref, NewRef) ->
         {headers, Ref, _} ->
             restart_remote_open_doc_revs(Ref, NewRef)
     after 0 ->
-        erlang:error({restart_open_doc_revs, NewRef})
+        error({restart_open_doc_revs, NewRef})
     end.
 
 remote_open_doc_revs_streamer_start(Parent) ->

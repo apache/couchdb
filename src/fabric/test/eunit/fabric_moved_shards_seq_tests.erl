@@ -39,7 +39,7 @@ t_shard_moves_avoid_sequence_rewinds(_) ->
     ok = fabric:create_db(DbName, [{q, 1}, {n, 1}]),
     lists:foreach(
         fun(I) ->
-            update_doc(DbName, #doc{id = erlang:integer_to_binary(I)})
+            update_doc(DbName, #doc{id = integer_to_binary(I)})
         end,
         lists:seq(1, DocCnt)
     ),

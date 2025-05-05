@@ -61,7 +61,7 @@ compact(Pid) ->
 compact(Pid, Options) ->
     {ok, CPid} = gen_server:call(Pid, compact),
     case lists:member(monitor, Options) of
-        true -> {ok, erlang:monitor(process, CPid)};
+        true -> {ok, monitor(process, CPid)};
         false -> ok
     end.
 
@@ -381,7 +381,7 @@ send_replies(Waiters, UpdateSeq, IdxState) ->
 assert_signature_match(Mod, OldIdxState, NewIdxState) ->
     case {Mod:get(signature, OldIdxState), Mod:get(signature, NewIdxState)} of
         {Sig, Sig} -> ok;
-        _ -> erlang:error(signature_mismatch)
+        _ -> error(signature_mismatch)
     end.
 
 commit_compacted(NewIdxState, State) ->
