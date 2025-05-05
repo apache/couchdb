@@ -56,10 +56,10 @@ format(FmtStr, Args, MaxLen, Opts) when is_list(FmtStr) ->
             ),
             build2(Cs2, Count, MaxLen2 - StrLen);
         false ->
-            erlang:error(badarg)
+            error(badarg)
     end;
 format(_FmtStr, _Args, _MaxLen, _Opts) ->
-    erlang:error(badarg).
+    error(badarg).
 
 collect([$~ | Fmt0], Args0) ->
     {C, Fmt1, Args1} = collect_cseq(Fmt0, Args0),
@@ -324,7 +324,7 @@ term(T, F, Adj, P0, Pad) ->
     L = lists:flatlength(T),
     P =
         case P0 of
-            none -> erlang:min(L, F);
+            none -> min(L, F);
             _ -> P0
         end,
     if
@@ -501,10 +501,10 @@ unprefixed_integer(Int, F, Adj, Base, Pad, Lowercase) when
 ->
     if
         Int < 0 ->
-            S = cond_lowercase(erlang:integer_to_list(-Int, Base), Lowercase),
+            S = cond_lowercase(integer_to_list(-Int, Base), Lowercase),
             term([$- | S], F, Adj, none, Pad);
         true ->
-            S = cond_lowercase(erlang:integer_to_list(Int, Base), Lowercase),
+            S = cond_lowercase(integer_to_list(Int, Base), Lowercase),
             term(S, F, Adj, none, Pad)
     end.
 
@@ -516,10 +516,10 @@ prefixed_integer(Int, F, Adj, Base, Pad, Prefix, Lowercase) when
 ->
     if
         Int < 0 ->
-            S = cond_lowercase(erlang:integer_to_list(-Int, Base), Lowercase),
+            S = cond_lowercase(integer_to_list(-Int, Base), Lowercase),
             term([$-, Prefix | S], F, Adj, none, Pad);
         true ->
-            S = cond_lowercase(erlang:integer_to_list(Int, Base), Lowercase),
+            S = cond_lowercase(integer_to_list(Int, Base), Lowercase),
             term([Prefix | S], F, Adj, none, Pad)
     end.
 

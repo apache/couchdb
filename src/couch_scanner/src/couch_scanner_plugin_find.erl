@@ -23,7 +23,6 @@
     complete/1,
     checkpoint/1,
     db/2,
-    ddoc/3,
     shards/2,
     db_opened/2,
     doc_id/3,
@@ -77,11 +76,6 @@ db(#st{} = St, DbName) ->
     report_match(DbName, Pats, Meta),
     {ok, St}.
 
-ddoc(#st{} = St, _DbName, #doc{} = _DDoc) ->
-    % We'll check doc bodies during the shard scan
-    % so no need to keep inspecting ddocs
-    {stop, St}.
-
 shards(#st{sid = SId} = St, Shards) ->
     case debug() of
         true -> ?DEBUG(" ~p shards", [length(Shards)], #{sid => SId});
@@ -94,7 +88,9 @@ db_opened(#st{sid = SId} = St, Db) ->
         true -> ?DEBUG("", [], #{sid => SId, db => Db});
         false -> ok
     end,
-    {ok, St}.
+    % Search backwards with the idea that we may be looking for some recent
+    % changes we just made to the database.
+    {couch_db:get_update_seq(Db), [{dir, rev}], St}.
 
 doc_id(#st{} = St, DocId, Db) ->
     #st{sid = SId, compiled_regexes = Pats} = St,

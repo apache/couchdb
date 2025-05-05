@@ -57,7 +57,7 @@ setup() ->
     Pid.
 
 teardown(Pid) ->
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     unlink(Pid),
     exit(Pid, kill),
     receive

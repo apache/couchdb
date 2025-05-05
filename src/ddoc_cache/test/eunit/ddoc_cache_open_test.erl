@@ -29,7 +29,7 @@ ddocid(_) ->
     no_ddocid.
 
 recover({deleted, _DbName}) ->
-    erlang:error(database_does_not_exist);
+    error(database_does_not_exist);
 recover(DbName) ->
     ddoc_cache_entry_validation_funs:recover(DbName).
 

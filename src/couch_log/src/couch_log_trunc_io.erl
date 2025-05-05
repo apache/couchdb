@@ -69,7 +69,7 @@ format(Fmt, Args, Max, Options) ->
         couch_log_trunc_io_fmt:format(Fmt, Args, Max, Options)
     catch
         _What:_Why ->
-            erlang:error(badarg, [Fmt, Args])
+            error(badarg, [Fmt, Args])
     end.
 
 %% @doc Returns an flattened list containing the ASCII representation of the given
@@ -114,7 +114,7 @@ print(Term, Max, Options) when is_list(Options) ->
 print(Term, _Max, #print_options{force_strings = true}) when
     not is_list(Term), not is_binary(Term), not is_atom(Term)
 ->
-    erlang:error(badarg);
+    error(badarg);
 print(_, Max, _Options) when Max < 0 -> {"...", 3};
 print(_, _, #print_options{depth = 0}) ->
     {"...", 3};
@@ -249,7 +249,7 @@ print(Fun, Max, _Options) when is_function(Fun) ->
     L = erlang:fun_to_list(Fun),
     case length(L) > Max of
         true ->
-            S = erlang:max(5, Max),
+            S = max(5, Max),
             Res = string:substr(L, 1, S) ++ "..>",
             {Res, length(Res)};
         _ ->
@@ -347,7 +347,7 @@ list_bodyc(X, Max, Options, _Tuple) ->
     {[$|, List], Len + 1}.
 
 map_body(Map, Max, #print_options{depth = Depth}) when Max < 4; Depth =:= 0 ->
-    case erlang:map_size(Map) of
+    case map_size(Map) of
         0 -> {[], 0};
         _ -> {"...", 3}
     end;
@@ -474,7 +474,7 @@ alist([H | T], Max, Options = #print_options{force_strings = true}) when is_bina
             {[List | Final], FLen + Len}
     end;
 alist(_, _, #print_options{force_strings = true}) ->
-    erlang:error(badarg);
+    error(badarg);
 alist([H | _L], _Max, _Options) ->
     throw({unprintable, H});
 alist(H, _Max, _Options) ->

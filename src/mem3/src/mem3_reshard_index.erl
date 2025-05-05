@@ -21,7 +21,6 @@
 
 -define(MRVIEW, mrview).
 -define(DREYFUS, dreyfus).
--define(HASTINGS, hastings).
 -define(NOUVEAU, nouveau).
 
 -include_lib("mem3/include/mem3.hrl").
@@ -63,8 +62,7 @@ fabric_design_docs(DbName) ->
 indices(DbName, Doc) ->
     mrview_indices(DbName, Doc) ++
         nouveau_indices(DbName, Doc) ++
-        [dreyfus_indices(DbName, Doc) || has_app(dreyfus)] ++
-        [hastings_indices(DbName, Doc) || has_app(hastings)].
+        [dreyfus_indices(DbName, Doc) || has_app(dreyfus)].
 
 mrview_indices(DbName, Doc) ->
     try
@@ -101,22 +99,11 @@ nouveau_indices(DbName, Doc) ->
 
 dreyfus_indices(DbName, Doc) ->
     try
-        Indices = dreyfus_index:design_doc_to_indexes(Doc),
+        Indices = dreyfus_index:design_doc_to_indexes(DbName, Doc),
         [{?DREYFUS, DbName, Index} || Index <- Indices]
     catch
         Tag:Err ->
             Msg = "~p couldn't get dreyfus indices ~p ~p ~p:~p",
-            couch_log:error(Msg, [?MODULE, DbName, Doc, Tag, Err]),
-            []
-    end.
-
-hastings_indices(DbName, Doc) ->
-    try
-        Indices = hastings_index:design_doc_to_indexes(Doc),
-        [{?HASTINGS, DbName, Index} || Index <- Indices]
-    catch
-        Tag:Err ->
-            Msg = "~p couldn't get hasting indices ~p ~p ~p:~p",
             couch_log:error(Msg, [?MODULE, DbName, Doc, Tag, Err]),
             []
     end.
@@ -136,13 +123,6 @@ build_index({?DREYFUS, DbName, DIndex} = Ctx, Try) ->
     await_retry(
         dreyfus_index_manager:get_index(DbName, DIndex),
         fun dreyfus_index:await/2,
-        Ctx,
-        Try
-    );
-build_index({?HASTINGS, DbName, HIndex} = Ctx, Try) ->
-    await_retry(
-        hastings_index_manager:get_index(DbName, HIndex),
-        fun hastings_index:await/2,
         Ctx,
         Try
     ).
@@ -196,8 +176,6 @@ index_info({?MRVIEW, DbName, MRSt}) ->
     GroupName = couch_mrview_index:get(idx_name, MRSt),
     {DbName, GroupName};
 index_info({?DREYFUS, DbName, Index}) ->
-    {DbName, Index};
-index_info({?HASTINGS, DbName, Index}) ->
     {DbName, Index}.
 
 has_app(App) ->

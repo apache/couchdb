@@ -187,7 +187,7 @@ user_pass() ->
     {User, Pass, B64Auth}.
 
 worker_internals(Pid) ->
-    Dict = io_lib:format("~p", [erlang:process_info(Pid, dictionary)]),
+    Dict = io_lib:format("~p", [process_info(Pid, dictionary)]),
     State = io_lib:format("~p", [sys:get_state(Pid)]),
     lists:flatten([Dict, State]).
 

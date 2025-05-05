@@ -139,7 +139,7 @@ class BasicFindTests(mango.UserDocsTests):
             '"location.city":{"$exists":true}}}'
         )
         r = self.db.sess.post(self.db.path("_find"), data=body)
-        r.raise_for_status()
+        mango.raise_for_status(r)
         docs = r.json()["docs"]
 
         # expectation is that only the second instance

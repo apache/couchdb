@@ -111,8 +111,8 @@ Centos 7 and RHEL 7
         python-pygments gnupg nodejs npm
 
 
-Mac OS X
-~~~~~~~~
+macOS
+~~~~~
 
 Install `Homebrew <https://brew.sh/>`_, if you do not have it already.
 
@@ -120,7 +120,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum node python
+    brew install help2man gnupg md5sha1sum node python elixir
 
 If you don't already have pip installed, install it::
 
@@ -311,9 +311,9 @@ follows::
 
     dev/run --with-clouseau
 
-When a specific Erlang cookie string is set in
-``rel/overlay/etc/vm.args``, the ``--erlang-cookie`` flag could be
-used to configure Clouseau to work with that::
+When a specific Erlang cookie string is needed, the
+``--erlang-cookie`` flag could be used to configure CouchDB and
+Clouseau to work with that::
 
     dev/run --with-clouseau --erlang-cookie=brumbrum
 

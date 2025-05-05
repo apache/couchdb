@@ -90,7 +90,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
 
         IndexesBefore = get_indexes_by_ddoc(couch_db:name(Db), DDocID, 1),
         ?assertEqual(1, length(IndexesBefore)),
-        AliveBefore = lists:filter(fun erlang:is_process_alive/1, IndexesBefore),
+        AliveBefore = lists:filter(fun is_process_alive/1, IndexesBefore),
         ?assertEqual(1, length(AliveBefore)),
 
         {ok, DDoc} = couch_db:open_doc(Db, DDocID, [ejson_body, ?ADMIN_CTX]),
@@ -117,7 +117,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
             {QPid, Msg} ->
                 ?assertEqual(Msg, ddoc_updated)
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -129,7 +129,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
         %% assert that previously running indexes are gone
         IndexesAfter = get_indexes_by_ddoc(couch_db:name(Db), DDocID, 0),
         ?assertEqual(0, length(IndexesAfter)),
-        AliveAfter = lists:filter(fun erlang:is_process_alive/1, IndexesBefore),
+        AliveAfter = lists:filter(fun is_process_alive/1, IndexesBefore),
         ?assertEqual(0, length(AliveAfter))
     end).
 

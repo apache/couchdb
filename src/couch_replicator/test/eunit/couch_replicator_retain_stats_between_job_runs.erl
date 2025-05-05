@@ -80,13 +80,13 @@ t_stats_retained_on_job_removal({_Ctx, {Source, Target}}) ->
     couch_replicator_scheduler:remove_job(RepId).
 
 stop_job(RepPid) ->
-    Ref = erlang:monitor(process, RepPid),
+    Ref = monitor(process, RepPid),
     gen_server:cast(couch_replicator_scheduler, {set_max_jobs, 0}),
     couch_replicator_scheduler:reschedule(),
     receive
         {'DOWN', Ref, _, _, _} -> ok
     after ?TIMEOUT ->
-        erlang:error(timeout)
+        error(timeout)
     end.
 
 start_job() ->
@@ -187,7 +187,7 @@ wait_target_in_sync(DocCount, Target) when is_integer(DocCount) ->
     wait_target_in_sync_loop(DocCount, Target, 300).
 
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
-    erlang:error(
+    error(
         {assertion_failed, [
             {module, ?MODULE},
             {line, ?LINE},

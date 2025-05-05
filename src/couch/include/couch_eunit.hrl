@@ -68,7 +68,7 @@
 	((fun (__X) ->
         case (Expr) of
         __V when __V == __X -> ok;
-        __Y -> erlang:error({assertEquiv_failed,
+        __Y -> error({assertEquiv_failed,
 				      [{module, ?MODULE},
 				       {line, ?LINE},
 				       {expression, (??Expr)},

@@ -55,7 +55,7 @@ should_swap(Db) ->
         receive
             {'DOWN', MonRef, process, _, _} -> ok
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -68,7 +68,7 @@ should_swap(Db) ->
             {QPid, Count} ->
                 ?assertEqual(1000, Count)
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -86,7 +86,7 @@ should_remove(Db) ->
         ok = couch_index:compact(IndexPid, []),
         {ok, CompactorPid} = couch_index:get_compactor_pid(IndexPid),
         {ok, CompactingPid} = couch_index_compactor:get_compacting_pid(CompactorPid),
-        MonRef = erlang:monitor(process, CompactingPid),
+        MonRef = monitor(process, CompactingPid),
         exit(CompactingPid, crash),
         receive
             {'DOWN', MonRef, process, _, crash} ->
@@ -100,7 +100,7 @@ should_remove(Db) ->
                 ?assert(is_process_alive(IndexPid)),
                 ?assert(is_process_alive(CompactorPid))
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},

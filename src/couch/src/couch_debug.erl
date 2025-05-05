@@ -48,7 +48,8 @@
     dead_nodes/1,
     ping/1,
     ping/2,
-    ping_nodes/0,
+    ping_live_cluster_nodes/0,
+    ping_live_cluster_nodes/1,
     ping_nodes/1,
     ping_nodes/2,
     node_events/0
@@ -57,8 +58,11 @@
 -export([
     print_table/2,
     print_report/1,
-    print_report_with_info_width/2
+    print_report_with_info_width/2,
+    print_tree/2
 ]).
+
+-define(PING_TIMEOUT_IN_MS, 60000).
 
 -type throw(_Reason) :: no_return().
 
@@ -83,18 +87,23 @@ help() ->
         process_name,
         get_pid,
         link_tree,
-        mapfold,
-        map,
-        fold,
+        mapfold_tree,
+        fold_tree,
+        map_tree,
         linked_processes_info,
         print_linked_processes,
         memory_info,
+        resource_hoggers,
+        resource_hoggers_snapshot,
+        analyze_resource_hoggers,
         print_table,
         print_report,
         print_report_with_info_width,
+        print_tree,
         restart,
         restart_busy,
         dead_nodes,
+        ping,
         ping_nodes,
         node_events
     ].
@@ -230,7 +239,7 @@ help(link_tree) ->
     The function doesn't recurse to pids older than initial one.
     The Pids which are lesser than initial Pid are still shown in the output.
     The info argument is a list of process_info_item() as documented in
-    erlang:process_info/2. We don't do any attempts to prevent dangerous items.
+    process_info/2. We don't do any attempts to prevent dangerous items.
     Be warn that passing some of them such as `messages` for example
     can be dangerous in a very busy system.
     ---
@@ -288,7 +297,7 @@ help(linked_processes_info) ->
         use of link_tree.
           - Pid: initial Pid to start from
           - Info: a list of process_info_item() as documented
-            in erlang:process_info/2.
+            in process_info/2.
 
         ---
     ", []);
@@ -469,16 +478,25 @@ help(ping) ->
 
         ---
     ", []);
+help(ping_live_cluster_nodes) ->
+    io:format("
+        ping_live_cluster_nodes()
+        ping_live_cluster_nodes(Timeout)
+        --------------------------------
+
+        Ping the currently connected cluster nodes. Returns a list of
+        {Node, Result} tuples or an empty list.
+
+        ---
+    ", []);
 help(ping_nodes) ->
     io:format("
-        ping_nodes()
-        ping_nodes(Timeout)
+        ping_nodes(Nodes)
         ping_nodes(Nodes, Timeout)
         --------------------------------
 
-        Ping the list of currently connected nodes. Return a list of {Node,
-        Result} tuples where Result is either a time in microseconds or an
-        error term.
+        Ping the list of nodes. Return a list of {Node, Result} tuples where
+        Result is either a time in microseconds or an error term.
 
         ---
     ", []);
@@ -768,6 +786,7 @@ info_size(InfoKV) ->
         {binary, BinInfos} -> lists:sum([S || {_, S, _} <- BinInfos]);
         {_, V} -> V
     end.
+
 resource_hoggers(MemoryInfo, InfoKey) ->
     KeyFun = fun
         ({_Pid, _Id, undefined}) -> undefined;
@@ -976,11 +995,14 @@ ping(Node) ->
 ping(Node, Timeout) ->
     mem3:ping(Node, Timeout).
 
-ping_nodes() ->
+ping_live_cluster_nodes() ->
     mem3:ping_nodes().
 
-ping_nodes(Timeout) ->
+ping_live_cluster_nodes(Timeout) ->
     mem3:ping_nodes(Timeout).
+
+ping_nodes(Nodes) ->
+    mem3:ping_nodes(Nodes, ?PING_TIMEOUT_IN_MS).
 
 ping_nodes(Nodes, Timeout) ->
     mem3:ping_nodes(Nodes, Timeout).
@@ -1007,6 +1029,7 @@ print_table(Rows, TableSpec) ->
         end,
         Rows
     ),
+    io:format("~n", []),
     ok.
 
 print_report(Report) ->
@@ -1124,8 +1147,8 @@ random_processes(Acc, Depth) ->
                 end);
             open_port ->
                 spawn_link(fun() ->
-                    Port = erlang:open_port({spawn, "sleep 10"}, [hide]),
-                    true = erlang:link(Port),
+                    Port = open_port({spawn, "sleep 10"}, [hide]),
+                    true = link(Port),
                     Caller ! {Ref, random_processes(Depth - 1)},
                     receive
                         looper -> ok

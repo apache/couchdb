@@ -120,7 +120,7 @@ get_client_worker({Pid, Ref}, ClientName) ->
         {worker, Ref, Worker} ->
             Worker
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},

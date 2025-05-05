@@ -29,14 +29,14 @@ check_restart_listener() ->
 
     Handler1 = get_handler(),
     ?assertNotEqual(not_found, Handler1),
-    Ref = erlang:monitor(process, Listener1),
+    Ref = monitor(process, Listener1),
     ok = gen_event:delete_handler(config_event, get_handler(), testing),
 
     receive
         {'DOWN', Ref, process, _, _} ->
             ?assertNot(is_process_alive(Listener1))
     after ?TIMEOUT ->
-        erlang:error({timeout, config_listener_mon_death})
+        error({timeout, config_listener_mon_death})
     end,
 
     NewHandler = test_util:wait(

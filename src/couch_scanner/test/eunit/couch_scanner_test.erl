@@ -29,6 +29,7 @@ couch_scanner_test_() ->
             ?TDEF_FE(t_conflict_finder_works, 30),
             ?TDEF_FE(t_config_skips, 10),
             ?TDEF_FE(t_resume_after_error, 10),
+            ?TDEF_FE(t_resume_after_skip, 10),
             ?TDEF_FE(t_reset, 10),
             ?TDEF_FE(t_schedule_repeat, 10),
             ?TDEF_FE(t_schedule_after, 15)
@@ -49,15 +50,23 @@ couch_scanner_test_() ->
 setup() ->
     {module, _} = code:ensure_loaded(?FIND_PLUGIN),
     meck:new(?FIND_PLUGIN, [passthrough]),
+    meck:new(fabric, [passthrough]),
     meck:new(couch_scanner_server, [passthrough]),
     meck:new(couch_scanner_util, [passthrough]),
     Ctx = test_util:start_couch([fabric, couch_scanner]),
+    % Run with the smallest batch size to exercise the batched
+    % ddoc iteration
+    config:set("couch_scanner", "ddoc_batch_size", "2", false),
     DbName1 = <<"dbname1", (?tempdb())/binary>>,
     DbName2 = <<"dbname2", (?tempdb())/binary>>,
     DbName3 = <<"dbname3", (?tempdb())/binary>>,
     ok = fabric:create_db(DbName1, [{q, "2"}, {n, "1"}]),
     ok = fabric:create_db(DbName2, [{q, "2"}, {n, "1"}]),
     ok = fabric:create_db(DbName3, [{q, "2"}, {n, "1"}]),
+    % Add a design doc the shards db. Scanner should ignore it.
+    {ok, _} = couch_util:with_db(mem3_sync:shards_db(), fun(Db) ->
+        couch_db:update_doc(Db, #doc{id = <<"_design/foo">>}, [])
+    end),
     ok = add_doc(DbName1, ?DOC1, #{foo1 => bar}),
     ok = add_doc(DbName1, ?DOC2, #{
         foo2 => baz,
@@ -84,8 +93,8 @@ setup() ->
     ok = add_doc(DbName2, ?DOC3, #{foo3 => bax}),
     ok = add_doc(DbName2, ?DOC4, #{foo4 => baw, <<>> => this_is_ok_apparently}),
     add_docs(DbName3, [
-        {doc, ?DOC5, {2, [<<"x">>, <<"z">>]}, {[]}, [], false, []},
-        {doc, ?DOC5, {2, [<<"y">>, <<"z">>]}, {[]}, [], false, []}
+        #doc{id = ?DOC5, revs = {2, [<<"x">>, <<"z">>]}, deleted = false},
+        #doc{id = ?DOC5, revs = {2, [<<"y">>, <<"z">>]}, deleted = false}
     ]),
     couch_scanner:reset_checkpoints(),
     {Ctx, {DbName1, DbName2, DbName3}}.
@@ -108,6 +117,7 @@ teardown({Ctx, {DbName1, DbName2, DbName3}}) ->
     fabric:delete_db(DbName1),
     fabric:delete_db(DbName2),
     fabric:delete_db(DbName3),
+    couch_server:delete(mem3_sync:shards_db(), [?ADMIN_CTX]),
     test_util:stop_couch(Ctx),
     meck:unload().
 
@@ -141,8 +151,6 @@ t_run_through_all_callbacks_basic({_, {DbName1, DbName2, _}}) ->
     ?assertEqual(2, num_calls(checkpoint, 1)),
     ?assertEqual(1, num_calls(db, ['_', DbName1])),
     ?assertEqual(1, num_calls(db, ['_', DbName2])),
-    ?assertEqual(1, num_calls(ddoc, ['_', DbName1, '_'])),
-    ?assertEqual(1, num_calls(ddoc, ['_', DbName2, '_'])),
     ?assert(num_calls(shards, 2) >= 2),
     DbOpenedCount = num_calls(db_opened, 2),
     ?assert(DbOpenedCount >= 4),
@@ -161,10 +169,14 @@ t_find_reporting_works(_) ->
     config:set(Plugin ++ ".regexes", "foo14", "foo(1|4)", false),
     config:set(Plugin ++ ".regexes", "baz", "baz", false),
     meck:reset(couch_scanner_server),
+    meck:reset(fabric),
     config:set("couch_scanner_plugins", Plugin, "true", false),
     wait_exit(10000),
     % doc2 should have a baz and doc1 and doc4 matches foo14
-    ?assertEqual(3, log_calls(warning)).
+    ?assertEqual(3, log_calls(warning)),
+    % check that we didn't call fabric:all_docs fetching design docs
+    % as we don't need to for this plugin
+    ?assertEqual(0, meck:num_calls(fabric, all_docs, 5)).
 
 t_ddoc_features_works({_, {_, DbName2, _}}) ->
     % Run the "ddoc_features" plugin
@@ -201,9 +213,18 @@ t_conflict_finder_works({_, {_, _, DbName3}}) ->
     % Add a deleted conflicting doc to the third database.
     % 3 reports are expected: 2 doc reports and 1 db report.
     add_docs(DbName3, [
-        {doc, ?DOC6, {2, [<<"x">>, <<"z">>]}, {[]}, [], false, []},
-        {doc, ?DOC6, {2, [<<"d">>, <<"z">>]}, {[]}, [], true, []}
+        #doc{id = ?DOC6, revs = {2, [<<"x">>, <<"z">>]}, deleted = false},
+        #doc{id = ?DOC6, revs = {2, [<<"d">>, <<"z">>]}, deleted = true}
     ]),
+    resume_couch_scanner(Plugin),
+    ?assertEqual(3, meck:num_calls(couch_scanner_util, log, LogArgs)),
+    % Should work even if all revs are deleted (the whole FDI is deleted)
+    add_docs(DbName3, [
+        #doc{id = ?DOC6, revs = {3, [<<"a">>, <<"x">>, <<"z">>]}, deleted = true}
+    ]),
+    % Confirm it's deleted (we did the revs paths manipulations correctly)
+    ?assertEqual({not_found, deleted}, fabric:open_doc(DbName3, ?DOC6, [])),
+    % But we can still find the conflicts
     resume_couch_scanner(Plugin),
     ?assertEqual(3, meck:num_calls(couch_scanner_util, log, LogArgs)),
     % Set doc_report to false to only have 1 db report.
@@ -256,6 +277,25 @@ t_resume_after_error(_) ->
     couch_scanner:resume(),
     config:set("couch_scanner_plugins", Plugin, "true", false),
     meck:wait(?FIND_PLUGIN, resume, 2, 10000).
+
+t_resume_after_skip(_) ->
+    meck:reset(?FIND_PLUGIN),
+    meck:expect(
+        ?FIND_PLUGIN,
+        start,
+        2,
+        meck:seq([
+            skip,
+            meck:passthrough()
+        ])
+    ),
+    Plugin = atom_to_list(?FIND_PLUGIN),
+    config:set("couch_scanner", "min_penalty_sec", "1", false),
+    config:set("couch_scanner", "interval_sec", "1", false),
+    config:set(Plugin, "repeat", "2_sec", false),
+    couch_scanner:resume(),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    meck:wait(?FIND_PLUGIN, complete, 1, 10000).
 
 t_reset(_) ->
     meck:reset(?FIND_PLUGIN),

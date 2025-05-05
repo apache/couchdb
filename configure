@@ -21,8 +21,8 @@ basename=`basename $0`
 
 PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
-REBAR3_BRANCH="3.23.0"
-ERLFMT_VERSION="v1.3.0"
+REBAR3_BRANCH="3.25.1"
+ERLFMT_VERSION="v1.7.0"
 
 # TEST=0
 WITH_PROPER="true"
@@ -43,9 +43,10 @@ JS_ENGINE=${JS_ENGINE:-"spidermonkey"}
 SM_VSN=${SM_VSN:-"91"}
 CLOUSEAU_MTH=${CLOUSEAU_MTH:-"dist"}
 CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases/download/%s/clouseau-%s-dist.zip"}
-CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.23.1"}
+CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.25.0"}
 CLOUSEAU_DIR="$(pwd)"/clouseau
 ARCH="$(uname -m)"
+MULTIARCH_NAME="$(command -v dpkg-architecture > /dev/null && dpkg-architecture -q DEB_HOST_MULTIARCH || true)"
 ERLANG_VER="$(run_erlang 'io:put_chars(erlang:system_info(otp_release)).')"
 ERLANG_OS="$(run_erlang 'case os:type() of {OS, _} -> io:format("~s~n", [OS]) end.')"
 
@@ -126,6 +127,7 @@ parse_opts() {
             --dev)
                 WITH_DOCS="false"
                 WITH_FAUXTON="false"
+                WITH_SPIDERMONKEY="false"
                 shift
                 continue
                 ;;
@@ -134,6 +136,7 @@ parse_opts() {
                 WITH_DOCS="false"
                 WITH_FAUXTON="false"
                 WITH_NOUVEAU="true"
+                WITH_SPIDERMONKEY="false"
                 shift
                 continue
                 ;;
@@ -327,6 +330,7 @@ if [ "${WITH_SPIDERMONKEY}" = "true" ] && [ "${ERLANG_OS}" = "unix" ]; then
 
     # This list is taken from src/couch/rebar.config.script, please keep them in sync.
     if [ ! -d "/usr/include/${SM_HEADERS}" ] && \
+        [ -n "${MULTIARCH_NAME}" -a ! -d "/usr/include/${MULTIARCH_NAME}/${SM_HEADERS}" ] && \
         [ ! -d "/usr/local/include/${SM_HEADERS}" ] && \
         [ ! -d "/opt/homebrew/include/${SM_HEADERS}" ]; then
         echo "ERROR: SpiderMonkey ${SM_VSN} is not found. Please specify with --spidermonkey-version."

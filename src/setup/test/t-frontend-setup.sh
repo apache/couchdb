@@ -64,8 +64,8 @@ curl a:b@127.0.0.1:25984/_node/node2@127.0.0.1/_config/cluster/n
 curl a:b@127.0.0.1:15984/_node/node1@127.0.0.1/_config/couchdb/uuid
 curl a:b@127.0.0.1:15984/_node/node2@127.0.0.1/_config/couchdb/uuid
 
-curl a:b@127.0.0.1:15984/_node/node1@127.0.0.1/_config/couch_httpd_auth/secret
-curl a:b@127.0.0.1:15984/_node/node2@127.0.0.1/_config/couch_httpd_auth/secret
+curl a:b@127.0.0.1:15984/_node/node1@127.0.0.1/_config/chttpd_auth/secret
+curl a:b@127.0.0.1:15984/_node/node2@127.0.0.1/_config/chttpd_auth/secret
 
 
 echo "YAY ALL GOOD"

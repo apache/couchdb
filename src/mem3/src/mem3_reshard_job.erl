@@ -180,7 +180,7 @@ set_start_state(#job{split_state = State} = Job) ->
         undefined ->
             Fmt1 = "~p recover : unknown state ~s",
             couch_log:error(Fmt1, [?MODULE, jobfmt(Job)]),
-            erlang:error({invalid_split_job_recover_state, Job});
+            error({invalid_split_job_recover_state, Job});
         StartState ->
             Job#job{split_state = StartState}
     end.
@@ -371,7 +371,7 @@ parent() ->
 handle_unknown_msg(Job, When, RMsg) ->
     LogMsg = "~p ~s received an unknown message ~p when in ~s",
     couch_log:error(LogMsg, [?MODULE, jobfmt(Job), RMsg, When]),
-    erlang:error({invalid_split_job_message, Job#job.id, When, RMsg}).
+    error({invalid_split_job_message, Job#job.id, When, RMsg}).
 
 initial_copy(#job{} = Job) ->
     Pid = spawn_link(?MODULE, initial_copy_impl, [Job]),
@@ -411,7 +411,7 @@ topoff_impl(#job{source = #shard{} = Source, target = Targets}) ->
     BatchSize = config:get_integer(
         "rexi", "shard_split_topoff_batch_size", ?INTERNAL_REP_BATCH_SIZE
     ),
-    TMap = maps:from_list([{R, T} || #shard{range = R} = T <- Targets]),
+    TMap = #{R => T || #shard{range = R} = T <- Targets},
     Opts = [
         {batch_size, BatchSize},
         {batch_count, all},
@@ -552,7 +552,7 @@ check_state(#job{split_state = State} = Job) ->
         true ->
             Job;
         false ->
-            erlang:error({invalid_shard_split_state, State, Job})
+            error({invalid_shard_split_state, State, Job})
     end.
 
 create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
@@ -665,7 +665,7 @@ reset_target(#job{source = Source, target = Targets} = Job) ->
                     % Should never get here but if we do crash and don't continue
                     LogMsg = "~p : ~p target unexpectedly found in shard map ~p",
                     couch_log:error(LogMsg, [?MODULE, jobfmt(Job), Name]),
-                    erlang:error({target_present_in_shard_map, Name});
+                    error({target_present_in_shard_map, Name});
                 {true, false} ->
                     LogMsg = "~p : ~p resetting ~p target",
                     couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), Name]),

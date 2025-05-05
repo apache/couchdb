@@ -108,8 +108,9 @@
         the filtering criteria.
     :query number timeout: Maximum period in *milliseconds* to wait for a change
         before the response is sent, even if there are no results.
-        Only applicable for :ref:`longpoll <changes/longpoll>` or
-        :ref:`continuous <changes/continuous>` feeds.
+        Only applicable for :ref:`longpoll <changes/longpoll>`,
+        :ref:`continuous <changes/continuous>` or
+        :ref:`eventsource <changes/eventsource>` feeds.
         Default value is specified by :config:option:`chttpd/changes_timeout`
         configuration option. Note that ``60000`` value is also the default
         maximum timeout to prevent undetected dead connections.

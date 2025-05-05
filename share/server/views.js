@@ -36,9 +36,9 @@ var Views = (function() {
     var reduce_line = JSON.stringify(reductions);
     var reduce_length = reduce_line.length;
     var input_length =  State.line_length - code_size
-    // TODO make reduce_limit config into a number
     if (State.query_config && State.query_config.reduce_limit &&
-          reduce_length > 4096 && ((reduce_length * 2) > input_length)) {
+        reduce_length > State.query_config.reduce_limit_threshold &&
+        ((reduce_length * State.query_config.reduce_limit_ratio) > input_length)) {
       var log_message = [
           "Reduce output must shrink more rapidly:",
           "input size:", input_length,

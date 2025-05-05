@@ -16,96 +16,110 @@
 -include_lib("couch/include/couch_eunit.hrl").
 
 setup() ->
-    meck:new([config, couch_log]).
+    meck:new(couch_log, [passthrough]),
+    Ctx = test_util:start_couch([ioq]),
+    config:set("query_server_config", "reduce_limit", "true", false),
+    config:set("log", "level", "info", false),
+    Ctx.
 
-teardown(_) ->
+teardown(Ctx) ->
+    config:delete("query_server_config", "reduce_limit", true),
+    config:delete("query_server_config", "reduce_limit_threshold", true),
+    config:delete("query_server_config", "reduce_limit_ratio", true),
+    config:delete("log", "level", false),
+    test_util:stop_couch(Ctx),
     meck:unload().
 
-setup_oom() ->
-    test_util:start_couch([ioq]).
-
-teardown_oom(Ctx) ->
-    meck:unload(),
-    test_util:stop_couch(Ctx).
-
-sum_overflow_test_() ->
+query_server_limits_test_() ->
     {
-        "Test overflow detection in the _sum reduce function",
+        "Test overflow detection and batch splitting in query server",
         {
-            setup,
+            foreach,
             fun setup/0,
             fun teardown/1,
             [
-                fun should_return_error_on_overflow/0,
-                fun should_return_object_on_log/0,
-                fun should_return_object_on_false/0
+                ?TDEF_FE(builtin_should_return_error_on_overflow),
+                ?TDEF_FE(builtin_should_not_return_error_with_generous_overflow_threshold),
+                ?TDEF_FE(builtin_should_not_return_error_with_generous_overflow_ratio),
+                ?TDEF_FE(builtin_should_return_object_on_log),
+                ?TDEF_FE(builtin_should_return_object_on_false),
+                ?TDEF_FE(js_reduce_should_return_error_on_overflow),
+                ?TDEF_FE(js_reduce_should_return_object_on_log),
+                ?TDEF_FE(js_reduce_should_return_object_on_false),
+                ?TDEF_FE(should_split_large_batches)
             ]
         }
     }.
 
-filter_oom_test_() ->
-    {
-        "Test recovery from oom in filters",
-        {
-            setup,
-            fun setup_oom/0,
-            fun teardown_oom/1,
-            [
-                fun should_split_large_batches/0
-            ]
-        }
-    }.
-
-should_return_error_on_overflow() ->
-    meck:reset([config, couch_log]),
-    meck:expect(
-        config,
-        get,
-        ["query_server_config", "reduce_limit", "true"],
-        "true"
-    ),
-    meck:expect(couch_log, error, ['_', '_'], ok),
+builtin_should_return_error_on_overflow(_) ->
+    config:set("query_server_config", "reduce_limit", "true", false),
+    meck:reset(couch_log),
     KVs = gen_sum_kvs(),
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
     ?assertMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result),
-    ?assert(meck:called(config, get, '_')),
     ?assert(meck:called(couch_log, error, '_')).
 
-should_return_object_on_log() ->
-    meck:reset([config, couch_log]),
-    meck:expect(
-        config,
-        get,
-        ["query_server_config", "reduce_limit", "true"],
-        "log"
-    ),
-    meck:expect(couch_log, error, ['_', '_'], ok),
+builtin_should_not_return_error_with_generous_overflow_threshold(_) ->
+    config:set("query_server_config", "reduce_limit", "true", false),
+    config:set_integer("query_server_config", "reduce_limit_threshold", 1000000, false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
+    ?assertNotMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result).
+
+builtin_should_not_return_error_with_generous_overflow_ratio(_) ->
+    config:set("query_server_config", "reduce_limit", "true", false),
+    config:set_float("query_server_config", "reduce_limit_ratio", 0.1, false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
+    ?assertNotMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result).
+
+builtin_should_return_object_on_log(_) ->
+    config:set("query_server_config", "reduce_limit", "log", false),
+    meck:reset(couch_log),
     KVs = gen_sum_kvs(),
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
     ?assertMatch({[_ | _]}, Result),
     Keys = [K || {K, _} <- element(1, Result)],
     ?assert(not lists:member(<<"error">>, Keys)),
-    ?assert(meck:called(config, get, '_')),
     ?assert(meck:called(couch_log, error, '_')).
 
-should_return_object_on_false() ->
-    meck:reset([config, couch_log]),
-    meck:expect(
-        config,
-        get,
-        ["query_server_config", "reduce_limit", "true"],
-        "false"
-    ),
-    meck:expect(couch_log, error, ['_', '_'], ok),
+builtin_should_return_object_on_false(_) ->
+    config:set("query_server_config", "reduce_limit", "false", false),
+    meck:reset(couch_log),
     KVs = gen_sum_kvs(),
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
     ?assertMatch({[_ | _]}, Result),
     Keys = [K || {K, _} <- element(1, Result)],
     ?assert(not lists:member(<<"error">>, Keys)),
-    ?assert(meck:called(config, get, '_')),
     ?assertNot(meck:called(couch_log, error, '_')).
 
-should_split_large_batches() ->
+js_reduce_should_return_error_on_overflow(_) ->
+    config:set("query_server_config", "reduce_limit", "true", false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"javascript">>, [sum_js()], KVs),
+    ?assertMatch({[{reduce_overflow_error, <<"Reduce output must shrink", _/binary>>}]}, Result),
+    ?assert(meck:called(couch_log, error, '_')).
+
+js_reduce_should_return_object_on_log(_) ->
+    config:set("query_server_config", "reduce_limit", "log", false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"javascript">>, [sum_js()], KVs),
+    ?assertMatch([<<"result">>, [_ | _]], Result),
+    ?assert(meck:called(couch_log, info, '_')).
+
+js_reduce_should_return_object_on_false(_) ->
+    config:set("query_server_config", "reduce_limit", "false", false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"javascript">>, [sum_js()], KVs),
+    ?assertMatch([<<"result">>, [_ | _]], Result),
+    ?assertNot(meck:called(couch_log, info, '_')).
+
+should_split_large_batches(_) ->
     Req = {json_req, {[]}},
     Db = <<"somedb">>,
     DDoc = #doc{
@@ -152,3 +166,13 @@ gen_sum_kvs() ->
         end,
         lists:seq(1, 10)
     ).
+
+sum_js() ->
+    % Don't do this in real views
+    <<
+        "\n"
+        "     function(keys, vals, rereduce) {\n"
+        "         return ['result', vals.concat(vals)]\n"
+        "     }\n"
+        "    "
+    >>.

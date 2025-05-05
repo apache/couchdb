@@ -25,7 +25,7 @@
     handle_call/3,
     handle_info/2,
     handle_cast/2,
-    format_status/2,
+    format_status/1,
     sum_stats/2,
     report_seq_done/3
 ]).
@@ -47,6 +47,7 @@
 -define(LOWEST_SEQ, 0).
 -define(DEFAULT_CHECKPOINT_INTERVAL, 30000).
 -define(STARTUP_JITTER_DEFAULT, 5000).
+-define(STOP_TIMEOUT_MSEC, 5000).
 
 -record(rep_state, {
     rep_details,
@@ -104,13 +105,14 @@ start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     end.
 
 stop(Pid) when is_pid(Pid) ->
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     unlink(Pid),
     % In the rare case the job is already stopping as we try to stop it, it
     % won't return ok but exit the calling process, usually the scheduler, so
     % we guard against that. See:
     %  www.erlang.org/doc/apps/stdlib/gen_server.html#stop/3
-    catch gen_server:stop(Pid, shutdown, infinity),
+    catch gen_server:stop(Pid, shutdown, ?STOP_TIMEOUT_MSEC),
+    exit(Pid, kill),
     receive
         {'DOWN', Ref, _, _, Reason} -> Reason
     end,
@@ -475,38 +477,46 @@ terminate_cleanup(#rep_state{rep_details = #rep{id = RepId}} = State) ->
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
 
-format_status(_Opt, [_PDict, State]) ->
-    #rep_state{
-        source = Source,
-        target = Target,
-        rep_details = RepDetails,
-        start_seq = StartSeq,
-        source_seq = SourceSeq,
-        committed_seq = CommitedSeq,
-        current_through_seq = ThroughSeq,
-        highest_seq_done = HighestSeqDone,
-        session_id = SessionId
-    } = state_strip_creds(State),
-    #rep{
-        id = RepId,
-        options = Options,
-        doc_id = DocId,
-        db_name = DbName
-    } = RepDetails,
-    [
-        {rep_id, RepId},
-        {source, couch_replicator_api_wrap:db_uri(Source)},
-        {target, couch_replicator_api_wrap:db_uri(Target)},
-        {db_name, DbName},
-        {doc_id, DocId},
-        {options, Options},
-        {session_id, SessionId},
-        {start_seq, StartSeq},
-        {source_seq, SourceSeq},
-        {committed_seq, CommitedSeq},
-        {current_through_seq, ThroughSeq},
-        {highest_seq_done, HighestSeqDone}
-    ].
+format_status(Status) ->
+    maps:map(
+        fun
+            (state, State) ->
+                #rep_state{
+                    source = Source,
+                    target = Target,
+                    rep_details = RepDetails,
+                    start_seq = StartSeq,
+                    source_seq = SourceSeq,
+                    committed_seq = CommitedSeq,
+                    current_through_seq = ThroughSeq,
+                    highest_seq_done = HighestSeqDone,
+                    session_id = SessionId
+                } = state_strip_creds(State),
+                #rep{
+                    id = RepId,
+                    options = Options,
+                    doc_id = DocId,
+                    db_name = DbName
+                } = RepDetails,
+                #{
+                    rep_id => RepId,
+                    source => couch_replicator_api_wrap:db_uri(Source),
+                    target => couch_replicator_api_wrap:db_uri(Target),
+                    db_name => DbName,
+                    doc_id => DocId,
+                    options => Options,
+                    session_id => SessionId,
+                    start_seq => StartSeq,
+                    source_seq => SourceSeq,
+                    committed_seq => CommitedSeq,
+                    current_through_seq => ThroughSeq,
+                    highest_seq_done => HighestSeqDone
+                };
+            (_, Value) ->
+                Value
+        end,
+        Status
+    ).
 
 sum_stats(Pid, Stats) when is_pid(Pid) ->
     gen_server:cast(Pid, {sum_stats, Stats}).
@@ -520,7 +530,7 @@ startup_jitter() ->
         "startup_jitter",
         ?STARTUP_JITTER_DEFAULT
     ),
-    rand:uniform(erlang:max(1, Jitter)).
+    rand:uniform(max(1, Jitter)).
 
 headers_strip_creds([], Acc) ->
     lists:reverse(Acc);
@@ -1228,29 +1238,31 @@ t_scheduler_job_format_status(_) ->
         doc_id = <<"mydoc">>,
         db_name = <<"mydb">>
     },
-    State = #rep_state{
-        rep_details = Rep,
-        source = Rep#rep.source,
-        target = Rep#rep.target,
-        session_id = <<"a">>,
-        start_seq = <<"1">>,
-        source_seq = <<"2">>,
-        committed_seq = <<"3">>,
-        current_through_seq = <<"4">>,
-        highest_seq_done = <<"5">>
+    Status = #{
+        state => #rep_state{
+            rep_details = Rep,
+            source = Rep#rep.source,
+            target = Rep#rep.target,
+            session_id = <<"a">>,
+            start_seq = <<"1">>,
+            source_seq = <<"2">>,
+            committed_seq = <<"3">>,
+            current_through_seq = <<"4">>,
+            highest_seq_done = <<"5">>
+        }
     },
-    Format = format_status(opts_ignored, [pdict, State]),
-    ?assertEqual("http://h1/d1/", proplists:get_value(source, Format)),
-    ?assertEqual("http://h2/d2/", proplists:get_value(target, Format)),
-    ?assertEqual({"base", "+ext"}, proplists:get_value(rep_id, Format)),
-    ?assertEqual([{create_target, true}], proplists:get_value(options, Format)),
-    ?assertEqual(<<"mydoc">>, proplists:get_value(doc_id, Format)),
-    ?assertEqual(<<"mydb">>, proplists:get_value(db_name, Format)),
-    ?assertEqual(<<"a">>, proplists:get_value(session_id, Format)),
-    ?assertEqual(<<"1">>, proplists:get_value(start_seq, Format)),
-    ?assertEqual(<<"2">>, proplists:get_value(source_seq, Format)),
-    ?assertEqual(<<"3">>, proplists:get_value(committed_seq, Format)),
-    ?assertEqual(<<"4">>, proplists:get_value(current_through_seq, Format)),
-    ?assertEqual(<<"5">>, proplists:get_value(highest_seq_done, Format)).
+    #{state := State} = format_status(Status),
+    ?assertEqual("http://h1/d1/", maps:get(source, State)),
+    ?assertEqual("http://h2/d2/", maps:get(target, State)),
+    ?assertEqual({"base", "+ext"}, maps:get(rep_id, State)),
+    ?assertEqual([{create_target, true}], maps:get(options, State)),
+    ?assertEqual(<<"mydoc">>, maps:get(doc_id, State)),
+    ?assertEqual(<<"mydb">>, maps:get(db_name, State)),
+    ?assertEqual(<<"a">>, maps:get(session_id, State)),
+    ?assertEqual(<<"1">>, maps:get(start_seq, State)),
+    ?assertEqual(<<"2">>, maps:get(source_seq, State)),
+    ?assertEqual(<<"3">>, maps:get(committed_seq, State)),
+    ?assertEqual(<<"4">>, maps:get(current_through_seq, State)),
+    ?assertEqual(<<"5">>, maps:get(highest_seq_done, State)).
 
 -endif.

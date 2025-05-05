@@ -64,7 +64,7 @@ base_url() ->
     "http://" ++ Addr ++ ":" ++ Port.
 
 make_auth_session_string(HashAlgorithm, User, Secret, TimeStamp) ->
-    SessionData = User ++ ":" ++ erlang:integer_to_list(TimeStamp, 16),
+    SessionData = User ++ ":" ++ integer_to_list(TimeStamp, 16),
     Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
     "AuthSession=" ++ couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)).
 

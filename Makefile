@@ -95,6 +95,10 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
 TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local' -c 'iterations=9'"
 
+ifneq ($(ERLANG_COOKIE),)
+TEST_OPTS+=" --erlang-cookie=$(ERLANG_COOKIE)"
+endif
+
 ################################################################################
 # Main commands
 ################################################################################
@@ -350,6 +354,12 @@ weatherreport-test: devclean escriptize
 	@dev/run "$(TEST_OPTS)" -n 1 -a adm:pass --no-eval \
 		'bin/weatherreport --etc dev/lib/node1/etc --level error'
 
+.PHONY: quickjs-test262
+# target: quickjs-javascript-tests - Run QuickJS JS conformance tests
+quickjs-test262: couch
+	make -C src/couch_quickjs/quickjs test2-bootstrap
+	make -C src/couch_quickjs/quickjs test2
+
 ################################################################################
 # Developing
 ################################################################################
@@ -474,7 +484,12 @@ clean:
 	@rm -rf .rebar/
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
-	@rm -rf src/*/ebin
+	@find src/*/ebin \
+	  -not -path 'src/cowlib/ebin/cowlib.app' \
+	  -not -path 'src/cowlib/ebin' \
+	  -not -path 'src/gun/ebin/gun.app' \
+	  -not -path 'src/gun/ebin' \
+	  -delete
 	@rm -rf src/*/.rebar
 	@rm -rf src/*/priv/*.so
 	@rm -rf share/server/main.js share/server/main-ast-bypass.js share/server/main-coffee.js
@@ -482,7 +497,7 @@ clean:
 	@rm -rf src/mango/.venv
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
-	@rm -f src/couch_dist/certs/out
+	@rm -rf src/couch_dist/certs/out
 	@rm -rf src/docs/build src/docs/.venv
 ifeq ($(with_nouveau), true)
 	@cd nouveau && $(GRADLE) clean

@@ -241,7 +241,7 @@ should_wait_for_shard_map(<<_/binary>>) ->
 
 -spec register_with_event_server(pid()) -> reference().
 register_with_event_server(Server) ->
-    Ref = erlang:monitor(process, couch_event_server),
+    Ref = monitor(process, couch_event_server),
     couch_event:register_all(Server),
     Ref.
 
@@ -475,7 +475,7 @@ setup_all() ->
     meck:expect(couch_db, close, 1, ok),
     mock_changes_reader(),
     % create process to stand in for couch_event_server
-    % mocking erlang:monitor doesn't work, so give it real process to monitor
+    % mocking monitor doesn't work, so give it real process to monitor
     EvtPid = spawn_link(fun() ->
         receive
             looper -> ok
@@ -709,7 +709,7 @@ t_handle_info_change_feed_exited_and_need_rescan(_) ->
 
 t_spawn_changes_reader(_) ->
     Pid = start_changes_reader(?DBNAME, 3),
-    ?assert(erlang:is_process_alive(Pid)),
+    ?assert(is_process_alive(Pid)),
     ChArgs = kill_mock_changes_reader_and_get_its_args(Pid),
     ?assertEqual({self(), ?DBNAME}, ChArgs),
     ?assert(meck:validate(couch_db)),
@@ -1135,7 +1135,7 @@ kill_mock_changes_reader_and_get_its_args(Pid) ->
         {'DOWN', Ref, _, Pid, {Server, DbName}} ->
             {Server, DbName}
     after 1000 ->
-        erlang:error(spawn_change_reader_timeout)
+        error(spawn_change_reader_timeout)
     end.
 
 mock_changes_reader() ->

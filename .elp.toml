@@ -1,0 +1,38 @@
+[build_info]
+apps = ["src/*"]
+# 3rd party dependencies (not type-checked), defaults to [] (see rebar.config.script)
+deps = [
+    "src/erlfmt",
+    "src/rebar",
+    "src/rebar3",
+    "src/meck",
+    "src/cowlib",
+    "src/gun",
+    "src/recon",
+    "src/proper",
+    "src/fauxton",
+    "src/docs",
+    "src/meck",
+    "src/jiffy",
+    "src/ibrowse",
+    "src/mochiweb",
+    "src/snappy"
+]
+# List of OTP application names to exclude from indexing. This can help improve performance by not loading rarely used OTP apps.
+[otp]
+exclude_apps = [
+    "megaco",
+    "common_test",
+    "edoc",
+    "eldap",
+    "erl_docgen",
+    "et",
+    "ftp",
+    "mnesia",
+    "odbc",
+    "observer",
+    "snmp",
+    "tftp",
+    "wx",
+    "xmerl"
+]

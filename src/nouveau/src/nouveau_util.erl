@@ -27,9 +27,9 @@
     maybe_create_local_purge_doc/2,
     get_local_purge_doc_id/1,
     get_local_purge_doc_body/3,
-    nouveau_url/0,
-    max_sessions/0,
-    max_pipeline_size/0
+    get_purge_checkpoints/1,
+    get_signatures_from_ddocs/2,
+    nouveau_url/0
 ]).
 
 index_name(Path) when is_binary(Path) ->
@@ -75,16 +75,15 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
                 undefined ->
                     {error, InvalidDDocError};
                 Def ->
-                    Sig = ?l2b(
-                        couch_util:to_hex(
+                    Sig =
+                        couch_util:to_hex_bin(
                             crypto:hash(
                                 sha256,
                                 ?term_to_bin(
                                     {DefaultAnalyzer, FieldAnalyzers, Def}
                                 )
                             )
-                        )
-                    ),
+                        ),
                     {ok, #index{
                         dbname = DbName,
                         default_analyzer = DefaultAnalyzer,
@@ -177,6 +176,9 @@ maybe_create_local_purge_doc(Db, Index) ->
 get_local_purge_doc_id(Sig) ->
     iolist_to_binary([?LOCAL_DOC_PREFIX, "purge-", "nouveau-", Sig]).
 
+get_purge_checkpoints(Db) ->
+    couch_index_util:get_purge_checkpoints(Db, <<"nouveau">>).
+
 get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
     #index{
         name = IdxName,
@@ -196,11 +198,13 @@ get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
         ]},
     couch_doc:from_json_obj(JsonList).
 
+get_signatures_from_ddocs(DbName, DesignDocs) ->
+    SigList = lists:flatmap(fun(Doc) -> active_sigs(DbName, Doc) end, DesignDocs),
+    #{Sig => true || Sig <- SigList}.
+
+active_sigs(DbName, #doc{} = Doc) ->
+    Indexes = nouveau_util:design_doc_to_indexes(DbName, Doc),
+    lists:map(fun(Index) -> Index#index.sig end, Indexes).
+
 nouveau_url() ->
     config:get("nouveau", "url", "http://127.0.0.1:5987").
-
-max_sessions() ->
-    config:get_integer("nouveau", "max_sessions", 100).
-
-max_pipeline_size() ->
-    config:get_integer("nouveau", "max_pipeline_size", 1000).

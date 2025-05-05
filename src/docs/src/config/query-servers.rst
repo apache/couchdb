@@ -139,7 +139,9 @@ Query Servers Configuration
     .. config:option:: reduce_limit :: Reduce limit control
 
         Controls `Reduce overflow` error that raises when output of
-        :ref:`reduce functions <reducefun>` is too big::
+        :ref:`reduce functions <reducefun>` is too big. The possible values are
+        ``true``, ``false`` or ``log``. The ``log`` value will log a warning
+        instead of crashing the view ::
 
             [query_server_config]
             reduce_limit = true
@@ -147,6 +149,16 @@ Query Servers Configuration
         Normally, you don't have to disable (by setting ``false`` value) this
         option since main propose of `reduce` functions is to *reduce* the
         input.
+
+    .. config:option:: reduce_limit_threshold :: Reduce limit threshold
+
+        The number of bytes a reduce result must exceed to trigger the ``reduce_limit``
+        control. Defaults to 5000.
+
+    .. config:option:: reduce_limit_ratio :: Reduce limit ratio
+
+        The ratio of input/output that must be exceeded to trigger the ``reduce_limit``
+        control. Defaults to 2.0.
 
 .. _config/native_query_servers:
 

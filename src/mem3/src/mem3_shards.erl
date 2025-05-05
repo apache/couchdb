@@ -39,6 +39,7 @@
 
 -define(DBS, mem3_dbs).
 -define(SHARDS, mem3_shards).
+-define(OPTS, mem3_opts).
 -define(ATIMES, mem3_atimes).
 -define(OPENERS, mem3_openers).
 -define(RELISTEN_DELAY, 5000).
@@ -46,14 +47,19 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-opts_for_db(DbName0) ->
+opts_for_db(DbName) when is_list(DbName) ->
+    opts_for_db(list_to_binary(DbName));
+opts_for_db(DbName0) when is_binary(DbName0) ->
     DbName = mem3:dbname(DbName0),
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
-    case couch_db:open_doc(Db, DbName, [ejson_body]) of
-        {ok, #doc{body = {Props}}} ->
-            mem3_util:get_shard_opts(Props);
-        {not_found, _} ->
-            erlang:error(database_does_not_exist, [DbName])
+    try ets:lookup(?OPTS, DbName) of
+        [] ->
+            load_opts_from_disk(DbName);
+        [{_, Opts}] ->
+            gen_server:cast(?MODULE, {cache_hit, DbName}),
+            Opts
+    catch
+        error:badarg ->
+            load_opts_from_disk(DbName)
     end.
 
 for_db(DbName) ->
@@ -80,7 +86,7 @@ for_docid(DbName, DocId) ->
     for_docid(DbName, DocId, []).
 
 for_docid(DbName, DocId, Options) ->
-    HashKey = mem3_hash:calculate(DbName, DocId),
+    HashKey = mem3_hash:calculate(mem3:props(DbName), DocId),
     ShardHead = #shard{
         dbname = DbName,
         range = ['$1', '$2'],
@@ -97,13 +103,13 @@ for_docid(DbName, DocId, Options) ->
     Shards =
         try ets:select(?SHARDS, [ShardSpec, OrderedShardSpec]) of
             [] ->
-                load_shards_from_disk(DbName, DocId);
+                load_shards_from_disk(DbName, HashKey);
             Else ->
                 gen_server:cast(?MODULE, {cache_hit, DbName}),
                 Else
         catch
             error:badarg ->
-                load_shards_from_disk(DbName, DocId)
+                load_shards_from_disk(DbName, HashKey)
         end,
     case lists:member(ordered, Options) of
         true -> Shards;
@@ -225,13 +231,9 @@ handle_config_terminate(_Server, _Reason, _State) ->
 
 init([]) ->
     couch_util:set_mqd_off_heap(?MODULE),
-    ets:new(?SHARDS, [
-        bag,
-        public,
-        named_table,
-        {keypos, #shard.dbname},
-        {read_concurrency, true}
-    ]),
+    CacheEtsOpts = [public, named_table, {read_concurrency, true}, {write_concurrency, auto}],
+    ets:new(?OPTS, CacheEtsOpts),
+    ets:new(?SHARDS, [bag, {keypos, #shard.dbname}] ++ CacheEtsOpts),
     ets:new(?DBS, [set, protected, named_table]),
     ets:new(?ATIMES, [ordered_set, protected, named_table]),
     ets:new(?OPENERS, [bag, public, named_table]),
@@ -239,6 +241,7 @@ init([]) ->
     SizeList = config:get("mem3", "shard_cache_size", "25000"),
     WriteTimeout = config:get_integer("mem3", "shard_write_timeout", 1000),
     DbName = mem3_sync:shards_db(),
+    cache_shards_db_props(),
     ioq:set_io_priority({system, DbName}),
     UpdateSeq = get_update_seq(),
     {ok, #st{
@@ -304,6 +307,7 @@ handle_info({'DOWN', _, _, Pid, Reason}, #st{changes_pid = Pid} = St) ->
                 couch_log:notice("~p changes listener died ~p", [?MODULE, Reason]),
                 {St, get_update_seq()}
         end,
+    cache_shards_db_props(),
     erlang:send_after(5000, self(), {start_listener, Seq}),
     {noreply, NewSt#st{changes_pid = undefined}};
 handle_info({start_listener, Seq}, St) ->
@@ -324,9 +328,9 @@ terminate(_Reason, #st{changes_pid = Pid}) ->
 
 start_changes_listener(SinceSeq) ->
     Self = self(),
-    {Pid, _} = erlang:spawn_monitor(fun() ->
-        erlang:spawn_link(fun() ->
-            Ref = erlang:monitor(process, Self),
+    {Pid, _} = spawn_monitor(fun() ->
+        spawn_link(fun() ->
+            Ref = monitor(process, Self),
             receive
                 {'DOWN', Ref, _, _, _} ->
                     ok
@@ -361,6 +365,7 @@ listen_for_changes(Since) ->
     DbName = mem3_sync:shards_db(),
     ioq:set_io_priority({system, DbName}),
     {ok, Db} = mem3_util:ensure_exists(DbName),
+
     Args = #changes_args{
         feed = "continuous",
         since = Since,
@@ -393,10 +398,11 @@ changes_callback({change, {Change}, _}, _) ->
                             );
                         {Doc} ->
                             Shards = mem3_util:build_ordered_shards(DbName, Doc),
+                            DbOpts = mem3_util:get_shard_opts(Doc),
                             IdleTimeout = config:get_integer(
                                 "mem3", "writer_idle_timeout", 30000
                             ),
-                            Writer = spawn_shard_writer(DbName, Shards, IdleTimeout),
+                            Writer = spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout),
                             ets:insert(?OPENERS, {DbName, Writer}),
                             Msg = {cache_insert_change, DbName, Writer, Seq},
                             gen_server:cast(?MODULE, Msg),
@@ -417,18 +423,30 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
     couch_stats:increment_counter([mem3, shard_cache, miss]),
     {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     try
-        load_shards_from_db(Db, DbName)
+        {Shards, _DbOpts} = load_from_db(Db, DbName),
+        Shards
     after
         couch_db:close(Db)
     end.
 
-load_shards_from_db(ShardDb, DbName) ->
+load_opts_from_disk(DbName) when is_binary(DbName) ->
+    couch_stats:increment_counter([mem3, shard_cache, miss]),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
+    try
+        {_Shards, DbOpts} = load_from_db(Db, DbName),
+        DbOpts
+    after
+        couch_db:close(Db)
+    end.
+
+load_from_db(ShardDb, DbName) ->
     case couch_db:open_doc(ShardDb, DbName, [ejson_body]) of
         {ok, #doc{body = {Props}}} ->
             Seq = couch_db:get_update_seq(ShardDb),
             Shards = mem3_util:build_ordered_shards(DbName, Props),
+            DbOpts = mem3_util:get_shard_opts(Props),
             IdleTimeout = config:get_integer("mem3", "writer_idle_timeout", 30000),
-            case maybe_spawn_shard_writer(DbName, Shards, IdleTimeout) of
+            case maybe_spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout) of
                 Writer when is_pid(Writer) ->
                     case ets:insert_new(?OPENERS, {DbName, Writer}) of
                         true ->
@@ -440,14 +458,13 @@ load_shards_from_db(ShardDb, DbName) ->
                 ignore ->
                     ok
             end,
-            Shards;
+            {Shards, DbOpts};
         {not_found, _} ->
-            erlang:error(database_does_not_exist, [DbName])
+            error(database_does_not_exist, [DbName])
     end.
 
-load_shards_from_disk(DbName, DocId) ->
+load_shards_from_disk(DbName, HashKey) ->
     Shards = load_shards_from_disk(DbName),
-    HashKey = mem3_hash:calculate(hd(Shards), DocId),
     [S || S <- Shards, in_range(S, HashKey)].
 
 in_range(Shard, HashKey) ->
@@ -474,6 +491,7 @@ create_if_missing(ShardName) ->
 cache_insert(#st{cur_size = Cur} = St, DbName, Writer, Timeout) ->
     NewATime = couch_util:unique_monotonic_integer(),
     true = ets:delete(?SHARDS, DbName),
+    true = ets:delete(?OPTS, DbName),
     flush_write(DbName, Writer, Timeout),
     case ets:lookup(?DBS, DbName) of
         [{DbName, ATime}] ->
@@ -489,6 +507,7 @@ cache_insert(#st{cur_size = Cur} = St, DbName, Writer, Timeout) ->
 
 cache_remove(#st{cur_size = Cur} = St, DbName) ->
     true = ets:delete(?SHARDS, DbName),
+    true = ets:delete(?OPTS, DbName),
     case ets:lookup(?DBS, DbName) of
         [{DbName, ATime}] ->
             true = ets:delete(?DBS, DbName),
@@ -515,6 +534,7 @@ cache_free(#st{max_size = Max, cur_size = Cur} = St) when Max =< Cur ->
     true = ets:delete(?ATIMES, ATime),
     true = ets:delete(?DBS, DbName),
     true = ets:delete(?SHARDS, DbName),
+    true = ets:delete(?OPTS, DbName),
     cache_free(St#st{cur_size = Cur - 1});
 cache_free(St) ->
     St.
@@ -522,24 +542,32 @@ cache_free(St) ->
 cache_clear(St) ->
     true = ets:delete_all_objects(?DBS),
     true = ets:delete_all_objects(?SHARDS),
+    true = ets:delete_all_objects(?OPTS),
     true = ets:delete_all_objects(?ATIMES),
     St#st{cur_size = 0}.
 
-maybe_spawn_shard_writer(DbName, Shards, IdleTimeout) ->
-    case ets:member(?OPENERS, DbName) of
+maybe_spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
+    try ets:member(?OPENERS, DbName) of
         true ->
             ignore;
         false ->
-            spawn_shard_writer(DbName, Shards, IdleTimeout)
+            spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout)
+    catch
+        error:badarg ->
+            % We might have been called before mem3 finished initializing
+            % from the error:badarg clause in for_db/2, for instance, so
+            % we shouldn't expect ?OPENERS to exist yet
+            ignore
     end.
 
-spawn_shard_writer(DbName, Shards, IdleTimeout) ->
-    erlang:spawn(fun() -> shard_writer(DbName, Shards, IdleTimeout) end).
+spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
+    spawn(fun() -> shard_writer(DbName, DbOpts, Shards, IdleTimeout) end).
 
-shard_writer(DbName, Shards, IdleTimeout) ->
+shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
     try
         receive
             write ->
+                true = ets:insert(?OPTS, {DbName, DbOpts}),
                 true = ets:insert(?SHARDS, Shards);
             cancel ->
                 ok
@@ -551,15 +579,15 @@ shard_writer(DbName, Shards, IdleTimeout) ->
     end.
 
 flush_write(DbName, Writer, WriteTimeout) ->
-    Ref = erlang:monitor(process, Writer),
+    Ref = monitor(process, Writer),
     Writer ! write,
     receive
         {'DOWN', Ref, _, _, normal} ->
             ok;
         {'DOWN', Ref, _, _, Error} ->
-            erlang:exit({mem3_shards_bad_write, Error})
+            exit({mem3_shards_bad_write, Error})
     after WriteTimeout ->
-        erlang:exit({mem3_shards_write_timeout, DbName})
+        exit({mem3_shards_write_timeout, DbName})
     end.
 
 filter_shards_by_range(Range, Shards) ->
@@ -571,9 +599,23 @@ filter_shards_by_range(Range, Shards) ->
         Shards
     ).
 
+cache_shards_db_props() ->
+    DbName = mem3_sync:shards_db(),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
+    try
+        DbProps = couch_db:get_props(Db),
+        DbOpts = [{props, DbProps}],
+        ets:insert(?OPTS, {DbName, DbOpts})
+    catch
+        error:badarg ->
+            ok
+    after
+        couch_db:close(Db)
+    end.
+
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 -define(DB, <<"eunit_db_name">>).
 -define(INFINITY, 99999999).
@@ -588,22 +630,23 @@ mem3_shards_test_() ->
             fun setup/0,
             fun teardown/1,
             [
-                t_maybe_spawn_shard_writer_already_exists(),
-                t_maybe_spawn_shard_writer_new(),
-                t_flush_writer_exists_normal(),
-                t_flush_writer_times_out(),
-                t_flush_writer_crashes(),
-                t_writer_deletes_itself_when_done(),
-                t_writer_does_not_delete_other_writers_for_same_shard(),
-                t_spawn_writer_in_load_shards_from_db(),
-                t_cache_insert_takes_new_update(),
-                t_cache_insert_ignores_stale_update_and_kills_worker()
+                ?TDEF_FE(t_maybe_spawn_shard_writer_already_exists),
+                ?TDEF_FE(t_maybe_spawn_shard_writer_new),
+                ?TDEF_FE(t_flush_writer_exists_normal),
+                ?TDEF_FE(t_flush_writer_times_out),
+                ?TDEF_FE(t_flush_writer_crashes),
+                ?TDEF_FE(t_writer_deletes_itself_when_done),
+                ?TDEF_FE(t_writer_does_not_delete_other_writers_for_same_shard),
+                ?TDEF_FE(t_spawn_writer_in_load_shards_from_db),
+                ?TDEF_FE(t_cache_insert_takes_new_update),
+                ?TDEF_FE(t_cache_insert_ignores_stale_update_and_kills_worker)
             ]
         }
     }.
 
 setup_all() ->
     ets:new(?SHARDS, [bag, public, named_table, {keypos, #shard.dbname}]),
+    ets:new(?OPTS, [set, public, named_table, {read_concurrency, true}, {write_concurrency, auto}]),
     ets:new(?OPENERS, [bag, public, named_table]),
     ets:new(?DBS, [set, public, named_table]),
     ets:new(?ATIMES, [ordered_set, public, named_table]),
@@ -615,142 +658,130 @@ teardown_all(_) ->
     ets:delete(?ATIMES),
     ets:delete(?DBS),
     ets:delete(?OPENERS),
-    ets:delete(?SHARDS).
+    ets:delete(?SHARDS),
+    ets:delete(?OPTS).
 
 setup() ->
     ets:delete_all_objects(?ATIMES),
     ets:delete_all_objects(?DBS),
     ets:delete_all_objects(?OPENERS),
-    ets:delete_all_objects(?SHARDS).
+    ets:delete_all_objects(?SHARDS),
+    ets:delete_all_objects(?OPTS).
 
 teardown(_) ->
     ok.
 
-t_maybe_spawn_shard_writer_already_exists() ->
-    ?_test(begin
-        ets:insert(?OPENERS, {?DB, self()}),
-        Shards = mock_shards(),
-        WRes = maybe_spawn_shard_writer(?DB, Shards, ?INFINITY),
-        ?assertEqual(ignore, WRes)
-    end).
+t_maybe_spawn_shard_writer_already_exists(_) ->
+    ets:insert(?OPENERS, {?DB, self()}),
+    Shards = mock_shards(),
+    WRes = maybe_spawn_shard_writer(?DB, [{x, y}], Shards, ?INFINITY),
+    ?assertEqual(ignore, WRes).
 
-t_maybe_spawn_shard_writer_new() ->
-    ?_test(begin
-        Shards = mock_shards(),
-        WPid = maybe_spawn_shard_writer(?DB, Shards, 1000),
-        WRef = erlang:monitor(process, WPid),
-        ?assert(is_pid(WPid)),
-        ?assert(is_process_alive(WPid)),
-        WPid ! write,
-        ?assertEqual(normal, wait_writer_result(WRef)),
-        ?assertEqual(Shards, ets:tab2list(?SHARDS))
-    end).
+t_maybe_spawn_shard_writer_new(_) ->
+    Shards = mock_shards(),
+    WPid = maybe_spawn_shard_writer(?DB, [{x, y}], Shards, 1000),
+    WRef = monitor(process, WPid),
+    ?assert(is_pid(WPid)),
+    ?assert(is_process_alive(WPid)),
+    WPid ! write,
+    ?assertEqual(normal, wait_writer_result(WRef)),
+    ?assertEqual(Shards, ets:tab2list(?SHARDS)),
+    ?assertEqual([{?DB, [{x, y}]}], ets:tab2list(?OPTS)).
 
-t_flush_writer_exists_normal() ->
-    ?_test(begin
-        Shards = mock_shards(),
-        WPid = spawn_link_mock_writer(?DB, Shards, ?INFINITY),
-        ?assertEqual(ok, flush_write(?DB, WPid, ?INFINITY)),
-        ?assertEqual(Shards, ets:tab2list(?SHARDS))
-    end).
+t_flush_writer_exists_normal(_) ->
+    Shards = mock_shards(),
+    WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
+    ?assertEqual(ok, flush_write(?DB, WPid, ?INFINITY)),
+    ?assertEqual(Shards, ets:tab2list(?SHARDS)),
+    ?assertEqual([{?DB, [{x, y}]}], ets:tab2list(?OPTS)).
 
-t_flush_writer_times_out() ->
-    ?_test(begin
-        WPid = spawn(fun() ->
-            receive
-                will_never_receive_this -> ok
-            end
-        end),
-        Error = {mem3_shards_write_timeout, ?DB},
-        ?assertExit(Error, flush_write(?DB, WPid, 100)),
-        exit(WPid, kill)
-    end).
+t_flush_writer_times_out(_) ->
+    WPid = spawn(fun() ->
+        receive
+            will_never_receive_this -> ok
+        end
+    end),
+    Error = {mem3_shards_write_timeout, ?DB},
+    ?assertExit(Error, flush_write(?DB, WPid, 100)),
+    exit(WPid, kill).
 
-t_flush_writer_crashes() ->
-    ?_test(begin
-        WPid = spawn(fun() ->
-            receive
-                write -> exit('kapow!')
-            end
-        end),
-        Error = {mem3_shards_bad_write, 'kapow!'},
-        ?assertExit(Error, flush_write(?DB, WPid, 1000))
-    end).
+t_flush_writer_crashes(_) ->
+    WPid = spawn(fun() ->
+        receive
+            write -> exit('kapow!')
+        end
+    end),
+    Error = {mem3_shards_bad_write, 'kapow!'},
+    ?assertExit(Error, flush_write(?DB, WPid, 1000)).
 
-t_writer_deletes_itself_when_done() ->
-    ?_test(begin
-        Shards = mock_shards(),
-        WPid = spawn_link_mock_writer(?DB, Shards, ?INFINITY),
-        WRef = erlang:monitor(process, WPid),
-        ets:insert(?OPENERS, {?DB, WPid}),
-        WPid ! write,
-        ?assertEqual(normal, wait_writer_result(WRef)),
-        ?assertEqual(Shards, ets:tab2list(?SHARDS)),
-        ?assertEqual([], ets:tab2list(?OPENERS))
-    end).
+t_writer_deletes_itself_when_done(_) ->
+    Shards = mock_shards(),
+    WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
+    WRef = monitor(process, WPid),
+    ets:insert(?OPENERS, {?DB, WPid}),
+    WPid ! write,
+    ?assertEqual(normal, wait_writer_result(WRef)),
+    ?assertEqual(Shards, ets:tab2list(?SHARDS)),
+    ?assertEqual([{?DB, [{x, y}]}], ets:tab2list(?OPTS)),
+    ?assertEqual([], ets:tab2list(?OPENERS)).
 
-t_writer_does_not_delete_other_writers_for_same_shard() ->
-    ?_test(begin
-        Shards = mock_shards(),
-        WPid = spawn_link_mock_writer(?DB, Shards, ?INFINITY),
-        WRef = erlang:monitor(process, WPid),
-        ets:insert(?OPENERS, {?DB, WPid}),
-        % should not be deleted
-        ets:insert(?OPENERS, {?DB, self()}),
-        WPid ! write,
-        ?assertEqual(normal, wait_writer_result(WRef)),
-        ?assertEqual(Shards, ets:tab2list(?SHARDS)),
-        ?assertEqual(1, ets:info(?OPENERS, size)),
-        ?assertEqual([{?DB, self()}], ets:tab2list(?OPENERS))
-    end).
+t_writer_does_not_delete_other_writers_for_same_shard(_) ->
+    Shards = mock_shards(),
+    WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
+    WRef = monitor(process, WPid),
+    ets:insert(?OPENERS, {?DB, WPid}),
+    % should not be deleted
+    ets:insert(?OPENERS, {?DB, self()}),
+    WPid ! write,
+    ?assertEqual(normal, wait_writer_result(WRef)),
+    ?assertEqual(Shards, ets:tab2list(?SHARDS)),
+    ?assertEqual([{?DB, [{x, y}]}], ets:tab2list(?OPTS)),
+    ?assertEqual(1, ets:info(?OPENERS, size)),
+    ?assertEqual([{?DB, self()}], ets:tab2list(?OPENERS)).
 
-t_spawn_writer_in_load_shards_from_db() ->
-    ?_test(begin
-        meck:expect(couch_db, open_doc, 3, {ok, #doc{body = {[]}}}),
-        meck:expect(couch_db, get_update_seq, 1, 1),
-        meck:expect(mem3_util, build_ordered_shards, 2, mock_shards()),
-        % register to get cache_insert cast
-        erlang:register(?MODULE, self()),
-        load_shards_from_db(test_util:fake_db([{name, <<"testdb">>}]), ?DB),
-        meck:validate(couch_db),
-        meck:validate(mem3_util),
-        Cast =
-            receive
-                {'$gen_cast', Msg} -> Msg
-            after 1000 ->
-                timeout
-            end,
-        ?assertMatch({cache_insert, ?DB, Pid, 1} when is_pid(Pid), Cast),
-        {cache_insert, _, WPid, _} = Cast,
-        exit(WPid, kill),
-        ?assertEqual([{?DB, WPid}], ets:tab2list(?OPENERS)),
-        meck:unload(couch_db),
-        meck:unload(mem3_util)
-    end).
+t_spawn_writer_in_load_shards_from_db(_) ->
+    meck:expect(couch_db, open_doc, 3, {ok, #doc{body = {[]}}}),
+    meck:expect(couch_db, get_update_seq, 1, 1),
+    meck:expect(mem3_util, build_ordered_shards, 2, mock_shards()),
+    % register to get cache_insert cast
+    erlang:register(?MODULE, self()),
+    load_from_db(test_util:fake_db([{name, <<"testdb">>}]), ?DB),
+    meck:validate(couch_db),
+    meck:validate(mem3_util),
+    Cast =
+        receive
+            {'$gen_cast', Msg} -> Msg
+        after 1000 ->
+            timeout
+        end,
+    ?assertMatch({cache_insert, ?DB, Pid, 1} when is_pid(Pid), Cast),
+    {cache_insert, _, WPid, _} = Cast,
+    exit(WPid, kill),
+    ?assertEqual([{?DB, WPid}], ets:tab2list(?OPENERS)),
+    meck:unload(couch_db),
+    meck:unload(mem3_util).
 
-t_cache_insert_takes_new_update() ->
-    ?_test(begin
-        Shards = mock_shards(),
-        WPid = spawn_link_mock_writer(?DB, Shards, ?INFINITY),
-        Msg = {cache_insert, ?DB, WPid, 2},
-        {noreply, NewState} = handle_cast(Msg, mock_state(1)),
-        ?assertMatch(#st{cur_size = 1}, NewState),
-        ?assertEqual(Shards, ets:tab2list(?SHARDS)),
-        ?assertEqual([], ets:tab2list(?OPENERS))
-    end).
+t_cache_insert_takes_new_update(_) ->
+    Shards = mock_shards(),
+    WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
+    Msg = {cache_insert, ?DB, WPid, 2},
+    {noreply, NewState} = handle_cast(Msg, mock_state(1)),
+    ?assertMatch(#st{cur_size = 1}, NewState),
+    ?assertEqual(Shards, ets:tab2list(?SHARDS)),
+    ?assertEqual([{?DB, [{x, y}]}], ets:tab2list(?OPTS)),
+    ?assertEqual([], ets:tab2list(?OPENERS)).
 
-t_cache_insert_ignores_stale_update_and_kills_worker() ->
-    ?_test(begin
-        Shards = mock_shards(),
-        WPid = spawn_link_mock_writer(?DB, Shards, ?INFINITY),
-        WRef = erlang:monitor(process, WPid),
-        Msg = {cache_insert, ?DB, WPid, 1},
-        {noreply, NewState} = handle_cast(Msg, mock_state(2)),
-        ?assertEqual(normal, wait_writer_result(WRef)),
-        ?assertMatch(#st{cur_size = 0}, NewState),
-        ?assertEqual([], ets:tab2list(?SHARDS)),
-        ?assertEqual([], ets:tab2list(?OPENERS))
-    end).
+t_cache_insert_ignores_stale_update_and_kills_worker(_) ->
+    Shards = mock_shards(),
+    WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
+    WRef = monitor(process, WPid),
+    Msg = {cache_insert, ?DB, WPid, 1},
+    {noreply, NewState} = handle_cast(Msg, mock_state(2)),
+    ?assertEqual(normal, wait_writer_result(WRef)),
+    ?assertMatch(#st{cur_size = 0}, NewState),
+    ?assertEqual([], ets:tab2list(?SHARDS)),
+    ?assertEqual([], ets:tab2list(?OPTS)),
+    ?assertEqual([], ets:tab2list(?OPENERS)).
 
 mock_state(UpdateSeq) ->
     #st{
@@ -778,8 +809,8 @@ wait_writer_result(WRef) ->
         timeout
     end.
 
-spawn_link_mock_writer(Db, Shards, Timeout) ->
-    erlang:spawn_link(fun() -> shard_writer(Db, Shards, Timeout) end).
+spawn_link_mock_writer(Db, DbOpts, Shards, Timeout) ->
+    spawn_link(fun() -> shard_writer(Db, DbOpts, Shards, Timeout) end).
 
 mem3_shards_changes_test_() ->
     {
@@ -798,7 +829,7 @@ should_kill_changes_listener_on_shutdown() ->
     {ok, Pid} = ?MODULE:start_link(),
     {ok, ChangesPid} = get_changes_pid(),
     ?assert(is_process_alive(ChangesPid)),
-    true = erlang:unlink(Pid),
+    true = unlink(Pid),
     true = test_util:stop_sync_throw(
         ChangesPid, fun() -> exit(Pid, shutdown) end, wait_timeout
     ),

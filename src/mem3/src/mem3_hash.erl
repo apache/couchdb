@@ -23,33 +23,35 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-calculate(#shard{opts = Opts}, DocId) ->
-    Props = couch_util:get_value(props, Opts, []),
-    MFA = get_hash_fun_int(Props),
+calculate(#shard{dbname = DbName}, DocId) ->
+    MFA = get_hash_fun(DbName),
     calculate(MFA, DocId);
-calculate(#ordered_shard{opts = Opts}, DocId) ->
-    Props = couch_util:get_value(props, Opts, []),
-    MFA = get_hash_fun_int(Props),
+calculate(#ordered_shard{dbname = DbName}, DocId) ->
+    MFA = get_hash_fun(DbName),
     calculate(MFA, DocId);
 calculate(DbName, DocId) when is_binary(DbName) ->
     MFA = get_hash_fun(DbName),
     calculate(MFA, DocId);
+calculate(Props, DocId) when is_list(Props) ->
+    MFA = get_hash_fun(Props),
+    calculate(MFA, DocId);
 calculate({Mod, Fun, Args}, DocId) ->
-    erlang:apply(Mod, Fun, [DocId | Args]).
+    apply(Mod, Fun, [DocId | Args]).
 
-get_hash_fun(#shard{opts = Opts}) ->
-    get_hash_fun_int(Opts);
-get_hash_fun(#ordered_shard{opts = Opts}) ->
-    get_hash_fun_int(Opts);
+get_hash_fun(#shard{dbname = DbName}) ->
+    get_hash_fun(DbName);
+get_hash_fun(#ordered_shard{dbname = DbName}) ->
+    get_hash_fun(DbName);
 get_hash_fun(DbName0) when is_binary(DbName0) ->
     DbName = mem3:dbname(DbName0),
     try
-        [#shard{opts = Opts} | _] = mem3_shards:for_db(DbName),
-        get_hash_fun_int(couch_util:get_value(props, Opts, []))
+        get_hash_fun_int(mem3:props(DbName))
     catch
         error:database_does_not_exist ->
             {?MODULE, crc32, []}
-    end.
+    end;
+get_hash_fun(Props) when is_list(Props) ->
+    get_hash_fun_int(Props).
 
 crc32(Item) when is_binary(Item) ->
     erlang:crc32(Item);
