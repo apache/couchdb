@@ -10,22 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name}.
-HaveHastings = code:lib_dir(hastings) /= {error, bad_name}.
-
-BaseApplications = [
+Applications = [
     kernel,
     stdlib,
     couch_log,
     couch_event,
     couch,
-    config
+    config,
+    dreyfus
 ].
-
-Applications =
-    if HaveDreyfus -> [dreyfus]; true -> [] end ++
-    if HaveHastings -> [hastings]; true -> [] end ++
-    BaseApplications.
 
 {application, ken, [
     {description, "Ken builds views and search indexes automatically"},

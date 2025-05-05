@@ -264,24 +264,58 @@ typedef struct DynBuf {
 
 void dbuf_init(DynBuf *s);
 void dbuf_init2(DynBuf *s, void *opaque, DynBufReallocFunc *realloc_func);
-int dbuf_realloc(DynBuf *s, size_t new_size);
-int dbuf_write(DynBuf *s, size_t offset, const uint8_t *data, size_t len);
+int dbuf_claim(DynBuf *s, size_t len);
 int dbuf_put(DynBuf *s, const uint8_t *data, size_t len);
 int dbuf_put_self(DynBuf *s, size_t offset, size_t len);
-int dbuf_putc(DynBuf *s, uint8_t c);
 int dbuf_putstr(DynBuf *s, const char *str);
+int __dbuf_putc(DynBuf *s, uint8_t c);
+int __dbuf_put_u16(DynBuf *s, uint16_t val);
+int __dbuf_put_u32(DynBuf *s, uint32_t val);
+int __dbuf_put_u64(DynBuf *s, uint64_t val);
+
+static inline int dbuf_putc(DynBuf *s, uint8_t val)
+{
+    if (unlikely((s->allocated_size - s->size) < 1)) {
+        return __dbuf_putc(s, val);
+    } else {
+        s->buf[s->size++] = val;
+        return 0;
+    }
+}
+
 static inline int dbuf_put_u16(DynBuf *s, uint16_t val)
 {
-    return dbuf_put(s, (uint8_t *)&val, 2);
+    if (unlikely((s->allocated_size - s->size) < 2)) {
+        return __dbuf_put_u16(s, val);
+    } else {
+        put_u16(s->buf + s->size, val);
+        s->size += 2;
+        return 0;
+    }
 }
+
 static inline int dbuf_put_u32(DynBuf *s, uint32_t val)
 {
-    return dbuf_put(s, (uint8_t *)&val, 4);
+    if (unlikely((s->allocated_size - s->size) < 4)) {
+        return __dbuf_put_u32(s, val);
+    } else {
+        put_u32(s->buf + s->size, val);
+        s->size += 4;
+        return 0;
+    }
 }
+
 static inline int dbuf_put_u64(DynBuf *s, uint64_t val)
 {
-    return dbuf_put(s, (uint8_t *)&val, 8);
+    if (unlikely((s->allocated_size - s->size) < 8)) {
+        return __dbuf_put_u64(s, val);
+    } else {
+        put_u64(s->buf + s->size, val);
+        s->size += 8;
+        return 0;
+    }
 }
+
 int __attribute__((format(printf, 2, 3))) dbuf_printf(DynBuf *s,
                                                       const char *fmt, ...);
 void dbuf_free(DynBuf *s);
@@ -362,6 +396,62 @@ static inline double uint64_as_float64(uint64_t u64)
     } u;
     u.u64 = u64;
     return u.d;
+}
+
+static inline double fromfp16(uint16_t v)
+{
+    double d;
+    uint32_t v1;
+    v1 = v & 0x7fff;
+    if (unlikely(v1 >= 0x7c00))
+        v1 += 0x1f8000; /* NaN or infinity */
+    d = uint64_as_float64(((uint64_t)(v >> 15) << 63) | ((uint64_t)v1 << (52 - 10)));
+    return d * 0x1p1008;
+}
+
+static inline uint16_t tofp16(double d)
+{
+    uint64_t a, addend;
+    uint32_t v, sgn;
+    int shift;
+    
+    a = float64_as_uint64(d);
+    sgn = a >> 63;
+    a = a & 0x7fffffffffffffff;
+    if (unlikely(a > 0x7ff0000000000000)) {
+        /* nan */
+        v = 0x7c01;
+    } else if (a < 0x3f10000000000000) { /* 0x1p-14 */
+        /* subnormal f16 number or zero */
+        if (a <= 0x3e60000000000000) { /* 0x1p-25 */
+            v = 0x0000; /* zero */
+        } else {
+            shift = 1051 - (a >> 52);
+            a = ((uint64_t)1 << 52) | (a & (((uint64_t)1 << 52) - 1));
+            addend = ((a >> shift) & 1) + (((uint64_t)1 << (shift - 1)) - 1);
+            v = (a + addend) >> shift;
+        }
+    } else {
+        /* normal number or infinity */
+        a -= 0x3f00000000000000; /* adjust the exponent */
+        /* round */
+        addend = ((a >> (52 - 10)) & 1) + (((uint64_t)1 << (52 - 11)) - 1);
+        v = (a + addend) >> (52 - 10);
+        /* overflow ? */
+        if (unlikely(v > 0x7c00))
+            v = 0x7c00;
+    }
+    return v | (sgn << 15);
+}
+
+static inline int isfp16nan(uint16_t v)
+{
+    return (v & 0x7FFF) > 0x7C00;
+}
+
+static inline int isfp16zero(uint16_t v)
+{
+    return (v & 0x7FFF) == 0;
 }
 
 #endif  /* CUTILS_H */

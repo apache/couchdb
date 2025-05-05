@@ -512,7 +512,7 @@ kill_job_int(#job{pid = undefined} = Job) ->
 kill_job_int(#job{pid = Pid, ref = Ref} = Job) ->
     couch_log:info("~p kill_job_int ~p", [?MODULE, jobfmt(Job)]),
     demonitor(Ref, [flush]),
-    case erlang:is_process_alive(Pid) of
+    case is_process_alive(Pid) of
         true ->
             ok = mem3_reshard_job_sup:terminate_child(Pid);
         false ->
@@ -799,7 +799,7 @@ db_exists(Name) ->
 -spec db_monitor(pid()) -> no_return().
 db_monitor(Server) ->
     couch_log:notice("~p db monitor ~p starting", [?MODULE, self()]),
-    EvtRef = erlang:monitor(process, couch_event_server),
+    EvtRef = monitor(process, couch_event_server),
     couch_event:register_all(self()),
     db_monitor_loop(Server, EvtRef).
 

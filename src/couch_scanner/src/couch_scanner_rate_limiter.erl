@@ -21,6 +21,24 @@
 %
 % [1] https://en.wikipedia.org/wiki/Additive_increase/multiplicative_decrease
 %
+% Example of usage:
+%
+%  initialize:
+%    Limiter = couch_scanner_rate_limiter:get(),
+%
+%  use:
+%    bulk_docs(#{docs => [doc1, doc2, doc3]}),
+%    {Wait, Limiter1} = couch_scanner_rate_limiter:update(Limiter, doc_write, 3),
+%    timer:sleep(Wait)
+%       or
+%    receive .... after Wait -> ... end
+%
+%  The Type can be:
+%     * db : rate of clustered db opens
+%     * shard: rate of shard files opened
+%     * doc : rate of document reads
+%     * doc_write : rate of document writes (or other per document updates, could be purges, too)
+%
 
 -module(couch_scanner_rate_limiter).
 
@@ -29,7 +47,8 @@
 -export([
     start_link/0,
     get/0,
-    update/2
+    update/2,
+    update/3
 ]).
 
 % gen_server callbacks
@@ -62,16 +81,17 @@
 -define(DB_RATE_DEFAULT, 25).
 -define(SHARD_RATE_DEFAULT, 50).
 -define(DOC_RATE_DEFAULT, 1000).
+-define(DOC_WRITE_RATE_DEFAULT, 500).
 
 % Atomic ref indices. They start at 1.
--define(INDICES, #{db => 1, shard => 2, doc => 3}).
+-define(INDICES, #{db => 1, shard => 2, doc => 3, doc_write => 4}).
 
 % Record maintained by the clients. Each client will have one of these handles.
 % With each update/2 call they will update their own backoff values.
 %
 -record(client_st, {
     ref,
-    % db|shard|doc => {Backoff, UpdateTStamp}
+    % db|shard|doc|doc_write => {Backoff, UpdateTStamp}
     backoffs = #{}
 }).
 
@@ -83,13 +103,17 @@
 get() ->
     Ref = gen_server:call(?MODULE, get, infinity),
     NowMSec = erlang:monotonic_time(millisecond),
-    Backoffs = maps:from_keys([db, shard, doc], {?INIT_BACKOFF, NowMSec}),
+    Backoffs = maps:from_keys([db, shard, doc, doc_write], {?INIT_BACKOFF, NowMSec}),
     #client_st{ref = Ref, backoffs = Backoffs}.
 
-update(#client_st{ref = Ref, backoffs = Backoffs} = St, Type) when
-    Type =:= db orelse Type =:= shard orelse Type =:= doc
+update(St, Type) ->
+    update(St, Type, 1).
+
+update(#client_st{ref = Ref, backoffs = Backoffs} = St, Type, Count) when
+    (is_integer(Count) andalso Count >= 0) andalso
+        (Type =:= db orelse Type =:= shard orelse Type =:= doc orelse Type =:= doc_write)
 ->
-    AtLimit = atomics:sub_get(Ref, map_get(Type, ?INDICES), 1) =< 0,
+    AtLimit = atomics:sub_get(Ref, map_get(Type, ?INDICES), Count) =< 0,
     {Backoff, TStamp} = map_get(Type, Backoffs),
     NowMSec = erlang:monotonic_time(millisecond),
     case NowMSec - TStamp > ?SENSITIVITY_MSEC of
@@ -142,6 +166,7 @@ refill(#st{ref = Ref} = St) ->
     ok = atomics:put(Ref, map_get(db, ?INDICES), db_limit()),
     ok = atomics:put(Ref, map_get(shard, ?INDICES), shard_limit()),
     ok = atomics:put(Ref, map_get(doc, ?INDICES), doc_limit()),
+    ok = atomics:put(Ref, map_get(doc_write, ?INDICES), doc_write_limit()),
     schedule_refill(St).
 
 update_backoff(true, 0) ->
@@ -160,6 +185,9 @@ shard_limit() ->
 doc_limit() ->
     cfg_int("doc_rate_limit", ?DOC_RATE_DEFAULT).
 
+doc_write_limit() ->
+    cfg_int("doc_write_rate_limit", ?DOC_WRITE_RATE_DEFAULT).
+
 cfg_int(Key, Default) when is_list(Key), is_integer(Default) ->
     config:get_integer("couch_scanner", Key, Default).
 
@@ -175,6 +203,7 @@ couch_scanner_rate_limiter_test_() ->
         [
             ?TDEF_FE(t_init),
             ?TDEF_FE(t_update),
+            ?TDEF_FE(t_update_multiple),
             ?TDEF_FE(t_refill)
         ]
     }.
@@ -184,7 +213,8 @@ t_init(_) ->
     ?assertEqual(ok, refill()),
     ?assertMatch({Val, #client_st{}} when is_number(Val), update(ClientSt, db)),
     ?assertMatch({Val, #client_st{}} when is_number(Val), update(ClientSt, shard)),
-    ?assertMatch({Val, #client_st{}} when is_number(Val), update(ClientSt, doc)).
+    ?assertMatch({Val, #client_st{}} when is_number(Val), update(ClientSt, doc)),
+    ?assertMatch({Val, #client_st{}} when is_number(Val), update(ClientSt, doc_write)).
 
 t_update(_) ->
     ClientSt = ?MODULE:get(),
@@ -194,6 +224,16 @@ t_update(_) ->
     end,
     ClientSt1 = lists:foldl(Fun, ClientSt, lists:seq(1, 500)),
     {Backoff, _} = update(ClientSt1, db),
+    ?assertEqual(?MAX_BACKOFF, Backoff).
+
+t_update_multiple(_) ->
+    ClientSt = ?MODULE:get(),
+    Fun = fun(_, Acc) ->
+        {_, Acc1} = update(Acc, doc_write, 100),
+        reset_time(Acc1, doc_write)
+    end,
+    ClientSt1 = lists:foldl(Fun, ClientSt, lists:seq(1, 50)),
+    {Backoff, _} = update(ClientSt1, doc_write, 100),
     ?assertEqual(?MAX_BACKOFF, Backoff).
 
 t_refill(_) ->

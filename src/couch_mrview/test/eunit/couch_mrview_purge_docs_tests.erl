@@ -299,7 +299,7 @@ test_purge_index_reset(Db) ->
 
         PurgeInfos = lists:map(
             fun(I) ->
-                DocId = list_to_binary(integer_to_list(I)),
+                DocId = integer_to_binary(I),
                 FDI = couch_db:get_full_doc_info(Db, DocId),
                 Rev = get_rev(FDI),
                 {couch_uuids:random(), DocId, [Rev]}
@@ -576,7 +576,7 @@ wait_compaction(DbName, Kind, Line) ->
     end,
     case test_util:wait(WaitFun, 10000) of
         timeout ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, Line},
@@ -600,7 +600,7 @@ fold_fun({_PSeq, _UUID, Id, Revs}, Acc) ->
     {ok, [{Id, Revs} | Acc]}.
 
 docid(I) ->
-    list_to_binary(integer_to_list(I)).
+    integer_to_binary(I).
 
 uuid(I) ->
     Str = io_lib:format("UUID~4..0b", [I]),

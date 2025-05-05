@@ -650,6 +650,9 @@ Do this for all of the nodes in your cluster. For example:
             "zone": "{zone-name}"
             }'
 
+Alternatively, you can set the ``COUCHDB_ZONE`` environment variable
+on each node and CouchDB will configure this document for you on startup.
+
 In the local config file (``local.ini``) of each node, define a
 consistent cluster-wide setting like:
 
@@ -669,7 +672,7 @@ when the database is created, using the same syntax as the ini file:
 
 .. code-block:: bash
 
-    curl -X PUT $COUCH_URL:5984/{db}?zone={zone}
+    curl -X PUT $COUCH_URL:5984/{db}?placement={zone}
 
 The ``placement`` argument may also be specified. Note that this *will*
 override the logic that determines the number of created replicas!

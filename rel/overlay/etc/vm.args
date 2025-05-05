@@ -57,6 +57,17 @@
 #
 -kernel prevent_overlapping_partitions false
 
+# Set Erlang process limit. If not set in Erlang 27 and greater versions it
+# defaults to 1048576. In Erlang versions less than 27 it defaulted to 262144.
+# When a cluster reaches this limit it will emit "Too many processes" error in
+# the log. That could be a time to bump it up. The actual value set will be a
+# larger power of 2 number. To check the actual limit call
+# `erlang:system_info(process_limit).` in remsh.
+#
+# For additional info see
+#   https://www.erlang.org/doc/apps/erts/erl_cmd.html#emulator-flags
++P 1048576
+
 # Increase the pool of dirty IO schedulers from 10 to 16
 # Dirty IO schedulers are used for file IO.
 +SDio 16

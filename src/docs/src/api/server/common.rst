@@ -200,6 +200,8 @@
     :query json endkey: Stop returning databases when the specified key is
       reached.
     :query json end_key: Alias for ``endkey`` param
+    :query boolean inclusive_end: Specifies whether the specified end key
+      should be included in the result. Default is ``true``.
     :query number limit: Limit the number of the returned databases to the
       specified number.
     :query number skip: Skip this number of databases before starting to return
@@ -716,11 +718,11 @@
       :ref:`selector objects <selectorobj>` in replication documents.
       ``doc_ids``, ``filter``, and ``selector`` are mutually exclusive.
     :<json string source_proxy: Address of a proxy server through which
-      replication from the source should occur (protocol can be "http" or
-      "socks5")
+      replication from the source should occur (protocol can be "http", "https",
+      or "socks5")
     :<json string target_proxy: Address of a proxy server through which
-      replication to the target should occur (protocol can be "http" or
-      "socks5")
+      replication to the target should occur (protocol can be "http", "https",
+      or "socks5")
     :<json string/object source: Fully qualified source database URL or an
       object which contains the full URL of the source database with additional
       parameters like headers. Eg: 'http://example.com/source_db_name' or
@@ -2318,7 +2320,15 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 
     Confirms that the server is up, running, and ready to respond to requests.
     If :config:option:`maintenance_mode <couchdb/maintenance_mode>` is
-    ``true`` or ``nolb``, the endpoint will return a 404 response.
+    ``true`` or ``nolb``, the endpoint will return a 404 response. The status field
+    in the response body also changes to reflect the current ``maintenance_mode``
+    defaulting to ``ok``.
+
+    If :config:option:`maintenance_mode <couchdb/maintenance_mode>` is ``true`` the status
+    field is set to ``maintenance_mode``.
+
+    If :config:option:`maintenance_mode <couchdb/maintenance_mode>` is set to ``nolb`` the
+    status field is set to ``nolb``.
 
     :>header Content-Type: :mimetype:`application/json`
     :code 200: Request completed successfully

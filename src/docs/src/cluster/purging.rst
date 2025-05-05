@@ -141,10 +141,8 @@ These settings can be updated in the default.ini or local.ini:
 +-----------------------+--------------------------------------------+----------+
 | Field                 | Description                                | Default  |
 +=======================+============================================+==========+
-| max_document_id_number| Allowed maximum number of documents in one | 100      |
-|                       | purge request                              |          |
 +-----------------------+--------------------------------------------+----------+
-| max_revisions_number  | Allowed maximum number of accumulated      | 1000     |
+| max_revisions_number  | Allowed maximum number of accumulated      | infinity |
 |                       | revisions in one purge request             |          |
 +-----------------------+--------------------------------------------+----------+
 | allowed_purge_seq_lag | Beside purged_infos_limit, allowed         | 100      |

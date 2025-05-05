@@ -232,7 +232,7 @@ continuous_feed_should_work_during_split(#{db1 := Db}) ->
                 {'DOWN', UpdaterRef, process, UpdaterPid, normal} ->
                     ok;
                 {'DOWN', UpdaterRef, process, UpdaterPid, Error} ->
-                    erlang:error(
+                    error(
                         {test_context_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},
@@ -295,11 +295,11 @@ changes_callback({stop, EndSeq, _Pending}, Acc) ->
 %% common helpers from here
 
 create_db(DbName, Opts) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(fun() -> fabric:create_db(DbName, Opts) end, GL).
 
 delete_db(DbName) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(fun() -> fabric:delete_db(DbName, [?ADMIN_CTX]) end, GL).
 
 with_proc(Fun) ->
@@ -312,7 +312,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         case GroupLeader of
             undefined -> ok;
-            _ -> erlang:group_leader(GroupLeader, self())
+            _ -> group_leader(GroupLeader, self())
         end,
         exit({with_proc_res, Fun()})
     end),
@@ -322,7 +322,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
         {'DOWN', Ref, process, Pid, Error} ->
             error(Error)
     after Timeout ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         exit(Pid, kill),
         error({with_proc_timeout, Fun, Timeout})
     end.

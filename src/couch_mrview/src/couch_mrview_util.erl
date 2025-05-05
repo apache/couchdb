@@ -16,6 +16,7 @@
 -export([get_local_purge_doc_id/1, get_value_from_options/2]).
 -export([verify_view_filename/1, get_signature_from_filename/1]).
 -export([get_signatures/1, get_purge_checkpoints/1, get_index_files/1]).
+-export([get_signatures_from_ddocs/2]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
 -export([make_header/1]).
 -export([index_file/2, compaction_file/2, open_file/1]).
@@ -94,40 +95,35 @@ get_signatures(DbName) when is_binary(DbName) ->
     couch_util:with_db(DbName, fun get_signatures/1);
 get_signatures(Db) ->
     DbName = couch_db:name(Db),
-    % get_design_docs/1 returns ejson for clustered shards, and
-    % #full_doc_info{}'s for other cases.
     {ok, DDocs} = couch_db:get_design_docs(Db),
+    % get_design_docs/1 returns ejson for clustered shards, and
+    % #full_doc_info{}'s for other cases. Both are transformed to #doc{} records
     FoldFun = fun
         ({[_ | _]} = EJsonDoc, Acc) ->
             Doc = couch_doc:from_json_obj(EJsonDoc),
-            {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
-            Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
-            Acc#{Sig => true};
+            [Doc | Acc];
         (#full_doc_info{} = FDI, Acc) ->
             {ok, Doc} = couch_db:open_doc_int(Db, FDI, [ejson_body]),
-            {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
-            Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
-            Acc#{Sig => true}
+            [Doc | Acc]
+    end,
+    DDocs1 = lists:foldl(FoldFun, [], DDocs),
+    get_signatures_from_ddocs(DbName, DDocs1).
+
+% From a list of design #doc{} records returns signatures map: #{Sig => true}
+%
+get_signatures_from_ddocs(DbName, DDocs) when is_list(DDocs) ->
+    FoldFun = fun(#doc{} = Doc, Acc) ->
+        {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
+        Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
+        Acc#{Sig => true}
     end,
     lists:foldl(FoldFun, #{}, DDocs).
 
 % Returns a map of `Sig => DocId` elements for all the purge view
 % checkpoint docs. Sig is a hex-encoded binary.
 %
-get_purge_checkpoints(DbName) when is_binary(DbName) ->
-    couch_util:with_db(DbName, fun get_purge_checkpoints/1);
 get_purge_checkpoints(Db) ->
-    FoldFun = fun(#doc{id = Id}, Acc) ->
-        case Id of
-            <<?LOCAL_DOC_PREFIX, "purge-mrview-", Sig/binary>> ->
-                {ok, Acc#{Sig => Id}};
-            _ ->
-                {stop, Acc}
-        end
-    end,
-    Opts = [{start_key, <<?LOCAL_DOC_PREFIX, "purge-mrview-">>}],
-    {ok, Signatures = #{}} = couch_db:fold_local_docs(Db, FoldFun, #{}, Opts),
-    Signatures.
+    couch_index_util:get_purge_checkpoints(Db, <<"mrview">>).
 
 % Returns a map of `Sig => [FilePath, ...]` elements. Sig is a hex-encoded
 % binary and FilePaths are lists as they intended to be passed to couch_file
@@ -152,7 +148,7 @@ get_index_files(Db) ->
 get_view(Db, DDoc, ViewName, Args0) ->
     case get_view_index_state(Db, DDoc, ViewName, Args0) of
         {ok, State, Args2} ->
-            Ref = erlang:monitor(process, State#mrst.fd),
+            Ref = monitor(process, State#mrst.fd),
             #mrst{language = Lang, views = Views} = State,
             {Type, View, Args3} = extract_view(Lang, Args2, ViewName, Views),
             check_range(Args3, view_cmp(View)),
@@ -382,7 +378,7 @@ init_state(Db, Fd, State, Header) ->
 
     {ShouldCommit, State#mrst{
         fd = Fd,
-        fd_monitor = erlang:monitor(process, Fd),
+        fd_monitor = monitor(process, Fd),
         update_seq = Seq,
         purge_seq = PurgeSeq,
         id_btree = IdBtree,
@@ -544,7 +540,13 @@ apply_limit(ViewPartitioned, Args) ->
             mrverror(io_lib:format(Fmt, [MaxLimit]))
     end.
 
-validate_all_docs_args(Db, Args0) ->
+validate_all_docs_args(Db, #mrargs{} = Args) ->
+    case get_extra(Args, validated, false) of
+        true -> Args;
+        false -> validate_all_docs_args_int(Db, Args)
+    end.
+
+validate_all_docs_args_int(Db, Args0) ->
     Args = validate_args(Args0#mrargs{view_type = map}),
 
     DbPartitioned = couch_db:is_partitioned(Db),
@@ -560,7 +562,13 @@ validate_all_docs_args(Db, Args0) ->
             apply_limit(false, Args)
     end.
 
-validate_args(Args) ->
+validate_args(#mrargs{} = Args) ->
+    case get_extra(Args, validated, false) of
+        true -> Args;
+        false -> validate_args_int(Args)
+    end.
+
+validate_args_int(#mrargs{} = Args) ->
     GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
     case Reduce == undefined orelse is_boolean(Reduce) of
@@ -696,11 +704,12 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `partition`.">>)
     end,
 
-    Args#mrargs{
+    Args1 = Args#mrargs{
         start_key_docid = SKDocId,
         end_key_docid = EKDocId,
         group_level = GroupLevel
-    }.
+    },
+    set_extra(Args1, validated, true).
 
 determine_group_level(#mrargs{group = undefined, group_level = undefined}) ->
     0;
@@ -1304,7 +1313,8 @@ make_user_reds_reduce_fun(Lang, ReduceFuns, NthRed) ->
 
 get_btree_state(nil) ->
     nil;
-get_btree_state(#btree{} = Btree) ->
+get_btree_state(Btree) ->
+    true = couch_btree:is_btree(Btree),
     couch_btree:get_state(Btree).
 
 extract_view_reduce({red, {N, _Lang, #mrview{reduce_funs = Reds}}, _Ref}) ->

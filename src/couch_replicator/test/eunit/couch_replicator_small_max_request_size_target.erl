@@ -63,7 +63,7 @@ binary_chunk(Size) when is_integer(Size), Size > 0 ->
 add_docs(DbName, DocCount, DocSize, AttSize) ->
     [
         begin
-            DocId = iolist_to_binary(["doc", integer_to_list(Id)]),
+            DocId = <<"doc", (integer_to_binary(Id))/binary>>,
             add_doc(DbName, DocId, DocSize, AttSize)
         end
      || Id <- lists:seq(1, DocCount)

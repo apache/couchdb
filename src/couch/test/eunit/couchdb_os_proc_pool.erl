@@ -562,7 +562,7 @@ get_client_proc({Pid, Ref}, ClientName) ->
     receive
         {proc, Ref, Proc} -> Proc
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -574,7 +574,7 @@ get_client_proc({Pid, Ref}, ClientName) ->
     end.
 
 stop_client({Pid, Ref}) ->
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     Pid ! stop,
     receive
         {stop, Ref} ->
@@ -583,12 +583,12 @@ stop_client({Pid, Ref}) ->
             end,
             ok
     after ?TIMEOUT ->
-        erlang:demonitor(MRef, [flush]),
+        demonitor(MRef, [flush]),
         timeout
     end.
 
 kill_client({Pid, Ref}) ->
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     Pid ! die,
     receive
         {die, Ref} ->
@@ -597,7 +597,7 @@ kill_client({Pid, Ref}) ->
             end,
             ok
     after ?TIMEOUT ->
-        erlang:demonitor(MRef, [flush]),
+        demonitor(MRef, [flush]),
         timeout
     end.
 

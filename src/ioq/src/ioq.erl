@@ -146,7 +146,7 @@ handle_cast(_Msg, State) ->
 handle_info({Ref, Reply}, State) ->
     case lists:keytake(Ref, #request.ref, State#state.running) of
         {value, Request, Remaining} ->
-            erlang:demonitor(Ref, [flush]),
+            demonitor(Ref, [flush]),
             gen_server:reply(Request#request.from, Reply),
             {noreply, State#state{running = Remaining}, 0};
         false ->
@@ -225,6 +225,6 @@ choose_next_request(Index, State) ->
     end.
 
 submit_request(#request{} = Request, #state{} = State) ->
-    Ref = erlang:monitor(process, Request#request.fd),
+    Ref = monitor(process, Request#request.fd),
     Request#request.fd ! {'$gen_call', {self(), Ref}, Request#request.msg},
     State#state{running = [Request#request{ref = Ref} | State#state.running]}.

@@ -264,7 +264,7 @@ run_successful_compaction(DbName) ->
     {ok, ContinueFun} = ?EV_MOD:set_wait(init),
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, CPid} = couch_db:start_compact(Db),
-    Ref = erlang:monitor(process, CPid),
+    Ref = monitor(process, CPid),
     ContinueFun(CPid),
     receive
         {'DOWN', Ref, _, _, normal} -> ok
@@ -278,7 +278,7 @@ wait_db_cleared(Db) ->
     wait_db_cleared(Db, 5).
 
 wait_db_cleared(Db, N) when N < 0 ->
-    erlang:error({db_clear_timeout, couch_db:name(Db)});
+    error({db_clear_timeout, couch_db:name(Db)});
 wait_db_cleared(Db, N) ->
     Tab = couch_server:couch_dbs(couch_db:name(Db)),
     case ets:lookup(Tab, couch_db:name(Db)) of
@@ -299,7 +299,7 @@ wait_db_cleared(Db, N) ->
 populate_db(_Db, NumDocs) when NumDocs =< 0 ->
     ok;
 populate_db(Db, NumDocs) ->
-    String = [$a || _ <- lists:seq(1, erlang:min(NumDocs, 500))],
+    String = [$a || _ <- lists:seq(1, min(NumDocs, 500))],
     Docs = lists:map(
         fun(_) ->
             couch_doc:from_json_obj(

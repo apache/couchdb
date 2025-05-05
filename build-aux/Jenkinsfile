@@ -13,12 +13,24 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// Erlang version embedded in binary packages
-ERLANG_VERSION = '26.2.5.11'
+// This is image used to build the tarball, check source formatting and build
+// the docs
+DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
+
+// Erlang version embedded in binary packages. Also the version most builds
+// will run.
+ERLANG_VERSION = '26.2.5.15'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '25.3.2.20'
+MINIMUM_ERLANG_VERSION = '26.2.5.15'
+
+// Highest support Erlang version.
+MAXIMUM_ERLANG_VERSION = '28.0.4'
+
+// Use these to detect if just documents changed
+docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
+other_changes = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q -v '^src/docs/'"
 
 // We create parallel build / test / package stages for each OS using the metadata
 // in this map. Adding a new OS should ideally only involve adding a new entry here.
@@ -28,6 +40,7 @@ meta = [
     spidermonkey_vsn: '60',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
@@ -36,15 +49,8 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
-  ],
-
-  'focal': [
-    name: 'Ubuntu 20.04',
-    spidermonkey_vsn: '68',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
   'jammy': [
@@ -52,6 +58,7 @@ meta = [
     spidermonkey_vsn: '91',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
@@ -60,24 +67,8 @@ meta = [
     spidermonkey_vsn: '115',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
-  ],
-
-  'bookworm-ppc64': [
-    name: 'Debian POWER',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
-    node_label: 'ppc64le'
-  ],
-
-  'bookworm-s390x': [
-    name: 'Debian s390x',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
-    node_label: 's390x'
   ],
 
   'bullseye': [
@@ -85,23 +76,97 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
-  'bookworm': [
+  // Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
+  // seems like a good thing, however, those workers allow running multiple
+  // agents at a time and often time out even with retries. The build times
+  // take close to an hour, which is at least x2 as long as it takes to run
+  // other arch CI jobs and they still time out often and fail. Disable for
+  // now. This is a low demand arch distro, maybe remove support altogether?
+  //
+  // 'base-ppc64': [
+  //   name: 'Debian POWER',
+  //   spidermonkey_vsn: '78',
+  //   with_nouveau: true,
+  //   with_clouseau: true,
+  //   quickjs_test262: true,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 'ppc64le'
+  // ],
+
+  // Just like in the ppc64le case we sometimes "pick up" built-in s390x workers added to
+  // our jenkins, but since those are managed by us, our .mix/.venv/.hex packaging
+  // cache hack in /home/jenkins doesn't work, and so elixir tests fail. Skip this arch build
+  // until we figure out caching (probably need to use a proper caching plugin).
+  //
+  // 'base-s390x': [
+  //   name: 'Debian s390x',
+  //   spidermonkey_vsn: '78',
+  //   with_nouveau: true,
+  //   // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
+  //   // Test262Error: 51539607552,42,0,4,5,6,7,8
+  //   quickjs_test262: false,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 's390x'
+  // ],
+
+  'base': [
     name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
+    // Test this in in the bookworm-quickjs variant
+    quickjs_test262: false,
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
   ],
 
-  'bookworm-quickjs': [
+  'base-max-erlang': [
+    name: 'Debian x86_64',
+    spidermonkey_vsn: '78',
+    with_nouveau: true,
+    with_clouseau: true,
+    quickjs_test262: false,
+    image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}"
+  ],
+
+  'base-quickjs': [
     name: 'Debian 12 with QuickJS',
     disable_spidermonkey: true,
     with_nouveau: true,
     with_clouseau: true,
-    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
+    quickjs_test262: true,
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
+  ],
+
+  // This runs on a docker ARM64 host. Normally we should be able to run all
+  // ubuntu and centos containers on top any docker host, however spidermonkey
+  // 60 from CentOS cannot build on ARM64 so we're forced to separate it as a
+  // separate build usable for ubuntu/debian only and isolated it from other
+  // builds. At some point when we remove CentOS 8 or switch to QuickJS only,
+  // remove the docker-arm64 label on ubuntu-nc-arm64-12 node in Jenkins and
+  // remove this flavor
+  //
+  'base-arm64': [
+    name: 'Debian ARM64',
+    spidermonkey_vsn: '78',
+    with_nouveau: true,
+    with_clouseau: true,
+    // Test this in in the bookworm-quickjs variant
+    quickjs_test262: false,
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+    node_label: 'docker-arm64'
+  ],
+
+  'trixie': [
+    name: 'Debian x86_64',
+    spidermonkey_vsn: '128',
+    with_nouveau: true,
+    with_clouseau: true,
+    quickjs_test262: true,
+    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}"
   ],
 
   'freebsd-x86_64': [
@@ -109,6 +174,7 @@ meta = [
       spidermonkey_vsn: '91',
       with_clouseau: true,
       clouseau_java_home: '/usr/local/openjdk8-jre',
+      quickjs_test262: false,
       gnu_make: 'gmake'
   ],
 
@@ -119,21 +185,27 @@ meta = [
      disable_spidermonkey: true,
      with_clouseau: true,
      clouseau_java_home: '/usr/local/openjdk8-jre',
+     quickjs_test262: false,
      gnu_make: 'gmake'
   ],
 
- 'macos': [
-    name: 'macOS',
-    spidermonkey_vsn: '128',
-    with_nouveau: false,
-    with_clouseau: true,
-    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
-    gnu_make: 'make'
-  ],
+ // Disable temporarily. Forks / shell execs seem to fail there currently
+ //
+ //
+ // 'macos': [
+ //    name: 'macOS',
+ //    spidermonkey_vsn: '128',
+ //    with_nouveau: false,
+ //    with_clouseau: true,
+ //    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
+ //    gnu_make: 'make'
+ //  ],
 
   'win2022': [
     name: 'Windows 2022',
     spidermonkey_vsn: '128',
+    with_clouseau: true,
+    quickjs_test262: false,
     node_label: 'win'
   ]
 ]
@@ -170,7 +242,7 @@ def generateNativeStage(platform) {
   return {
     stage(platform) {
       node(platform) {
-        timeout(time: 90, unit: "MINUTES") {
+        timeout(time: 180, unit: "MINUTES") {
           // Steps to configure and build CouchDB on *nix platforms
           if (isUnix()) {
             try {
@@ -190,12 +262,13 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
-                  sh '$MAKE eunit'
-                  sh '$MAKE elixir'
-                  sh '$MAKE elixir-search'
-                  sh '$MAKE mango-test'
-                  sh '$MAKE weatherreport-test'
-                  sh '$MAKE nouveau-test'
+                  retry (3) {sh '$MAKE eunit'}
+                  if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
+                  retry (3) {sh '$MAKE elixir'}
+                  retry (3) {sh '$MAKE elixir-search'}
+                  retry (3) {sh '$MAKE mango-test'}
+                  retry (3) {sh '$MAKE weatherreport-test'}
+                  retry (3) {sh '$MAKE nouveau-test'}
                 }
               }
             }
@@ -229,9 +302,11 @@ def generateNativeStage(platform) {
                 powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
                 powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
                 dir( "${platform}/build" ) {
+                  withClouseau = meta[platform].with_clouseau ? '-WithClouseau' : ''
+
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
-                    .\\configure.ps1 -SkipDeps -WithNouveau -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    .\\configure.ps1 -SkipDeps -WithNouveau ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     make -f Makefile.win release
                   """, label: 'Configure and Build')
@@ -239,13 +314,17 @@ def generateNativeStage(platform) {
                   //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit", label: 'EUnit tests')
                   //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir", label: 'Elixir tests')
 
-                  powershell( script: '& .\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win elixir-search"', label: 'N/A Clouseau tests')
-
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
-                    make -f Makefile.win mango-test
-                  """, label: 'Mango tests')
+                    make -f Makefile.win elixir-search ERLANG_COOKIE=crumbles
+                  """, label: 'Clouseau tests')
+
+                  powershell( script: """
+                      .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                      make -f Makefile.win mango-test ERLANG_COOKIE=crumbles
+                    """, label: 'Mango tests')
 
                   powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
 
@@ -295,17 +374,19 @@ def generateContainerStage(platform) {
       node(meta[platform].get('node_label', 'docker')) {
         docker.withRegistry('https://docker.io/', 'dockerhub_creds') {
           docker.image(meta[platform].image).inside("${DOCKER_ARGS}") {
-            timeout(time: 90, unit: "MINUTES") {
+            timeout(time: 180, unit: "MINUTES") {
               stage("${meta[platform].name} - build & test") {
                 try {
                   sh( script: "rm -rf ${platform} apache-couchdb-*", label: 'Clean workspace' )
                   unstash 'tarball'
                   sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                  quickjs_tests262 = meta[platform].quickjs_test262
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
                     retry(3) {sh 'make eunit'}
+                    if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
                     retry(3) {sh 'make elixir-search'}
                     retry(3) {sh 'make mango-test'}
@@ -383,23 +464,161 @@ pipeline {
   options {
     buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
     preserveStashes(buildCount: 10)
-    timeout(time: 3, unit: 'HOURS')
+    timeout(time: 4, unit: 'HOURS')
     timestamps()
   }
 
   stages {
+
+    stage('Setup Env') {
+      agent {
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
+      }
+      options {
+        timeout(time: 10, unit: 'MINUTES')
+      }
+      steps {
+        script {
+          env.DOCS_CHANGED = '0'
+          env.ONLY_DOCS_CHANGED = '0'
+          if ( sh(returnStatus: true, script: docs_changed) == 0 ) {
+            env.DOCS_CHANGED = '1'
+            if (sh(returnStatus: true, script: other_changes) == 1) {
+              env.ONLY_DOCS_CHANGED = '1'
+            }
+          }
+        }
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage 'Setup Environment'
+
+    stage('Docs Check') {
+      // Run docs `make check` stage if any docs changed
+      when {
+        beforeOptions true
+        expression { DOCS_CHANGED == '1' }
+      }
+      agent {
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
+      }
+      options {
+        timeout(time: 15, unit: 'MINUTES')
+      }
+      steps {
+        sh '''
+          make python-black
+        '''
+        sh '''
+          (cd src/docs && make check)
+        '''
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage Docs Check
+
+    stage('Build Docs') {
+      // Build docs separately if only docs changed. If there are other changes, docs are
+      // already built as part of `make dist`
+      when {
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '1' }
+      }
+      agent {
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
+      }
+      options {
+        timeout(time: 30, unit: 'MINUTES')
+      }
+      steps {
+        sh '''
+           (cd src/docs && ./setup.sh ; make html)
+         '''
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage Build Docs
+
+    stage('Source Format Checks') {
+      when {
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '0' }
+      }
+      agent {
+        docker {
+          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
+      }
+      options {
+        timeout(time: 15, unit: "MINUTES")
+      }
+      steps {
+        sh '''
+          rm -rf apache-couchdb-*
+          ./configure --skip-deps --spidermonkey-version 78
+          make erlfmt-check
+          make elixir-source-checks
+          make python-black
+        '''
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage Erlfmt
+
     stage('Build Release Tarball') {
+      when {
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '0' }
+      }
       agent {
         docker {
           label 'docker'
-          image "apache/couchdbci-debian:bookworm-erlang-${MINIMUM_ERLANG_VERSION}"
+          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
           registryCredentialsId 'dockerhub_creds'
         }
       }
       steps {
-        timeout(time: 15, unit: "MINUTES") {
+        timeout(time: 30, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
           sh "./configure --spidermonkey-version 78 --with-nouveau"
           sh 'make dist'
@@ -421,10 +640,14 @@ pipeline {
     } // stage Build Release Tarball
 
     stage('Test and Package') {
+      when {
+        beforeOptions true
+        expression { ONLY_DOCS_CHANGED == '0' }
+      }
       steps {
         script {
           // Including failFast: true in map fails the build immediately if any parallel step fails
-          parallelStagesMap = meta.collectEntries( [failFast: false] ) { key, values ->
+          parallelStagesMap = meta.collectEntries( [failFast: true] ) { key, values ->
             if (values.image) {
               ["${key}": generateContainerStage(key)]
             }
@@ -436,64 +659,6 @@ pipeline {
         }
       }
     }
-
-    stage('Publish') {
-
-      when {
-        expression { return env.BRANCH_NAME ==~ /main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
-      }
-
-      agent {
-        docker {
-          image "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      options {
-        skipDefaultCheckout()
-        timeout(time: 90, unit: "MINUTES")
-      }
-
-      steps {
-        sh 'rm -rf ${WORKSPACE}/*'
-        unstash 'tarball'
-        unarchive mapping: ['pkgs/' : '.']
-
-        sh( label: 'Setup repo dirs', script: '''
-            mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el8 $BRANCH_NAME/el9 $BRANCH_NAME/source
-            git clone https://github.com/apache/couchdb-pkg
-          ''' )
-
-        sh( label: 'Build Debian repo', script: '''
-            for plat in bullseye bookworm focal
-            do
-              reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
-            done
-          ''' )
-
-        sh( label: 'Build CentOS 8', script: '''
-            (cd pkgs/centos8 && createrepo_c --database .)
-          ''' )
-
-        sh( label: 'Build CentOS 9', script: '''
-            (cd pkgs/centos9 && createrepo_c --database .)
-          ''' )
-
-        sh( label: 'Build unified repo', script: '''
-            mv couchdb-pkg/repo/pool $BRANCH_NAME/debian
-            mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
-            mv pkgs/centos8/* $BRANCH_NAME/el8
-            mv pkgs/centos9/* $BRANCH_NAME/el9
-            mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
-            cd $BRANCH_NAME/source
-            ls -1tr | head -n -10 | xargs -d '\n' rm -f --
-            cd ../..
-          ''' )
-      } // steps
-    } // stage
   } // stages
 
   post {

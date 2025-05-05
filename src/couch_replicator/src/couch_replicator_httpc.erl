@@ -38,7 +38,7 @@
 % consuming the request. This threshold gives us confidence we'll
 % continue to properly close changes feeds while avoiding any case
 % where we may end up processing an unbounded number of messages.
--define(MAX_DISCARDED_MESSAGES, 16).
+-define(MAX_DISCARDED_MESSAGES, 100).
 
 setup(Db) ->
     #httpdb{
@@ -154,7 +154,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
 %% {error, req_timedout} error. While in reality is not really a timeout, just
 %% a race condition.
 stop_and_release_worker(Pool, Worker) ->
-    Ref = erlang:monitor(process, Worker),
+    Ref = monitor(process, Worker),
     ibrowse_http_client:stop(Worker),
     receive
         {'DOWN', Ref, _, _, _} ->
@@ -230,7 +230,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
                         Ok =:= 413 -> put(?STOP_HTTP_WORKER, stop);
                         true -> ok
                     end,
-                    ibrowse:stream_next(ReqId),
+                    ok = ibrowse:stream_next(ReqId),
                     try
                         Ret = Callback(Ok, Headers, StreamDataFun),
                         Ret
@@ -297,11 +297,15 @@ clean_mailbox({ibrowse_req_id, ReqId}, Count) when Count > 0 ->
                     discard_message(ReqId, Worker, Count);
                 false ->
                     put(?STREAM_STATUS, ended),
-                    ok
+                    % Worker is not alive but we may still messages
+                    % in the mailbox from it so recurse to clean them
+                    clean_mailbox({ibrowse_req_id, ReqId}, Count)
             end;
         Status when Status == init; Status == ended ->
             receive
                 {ibrowse_async_response, ReqId, _} ->
+                    clean_mailbox({ibrowse_req_id, ReqId}, Count - 1);
+                {ibrowse_async_response_timeout, ReqId} ->
                     clean_mailbox({ibrowse_req_id, ReqId}, Count - 1);
                 {ibrowse_async_response_end, ReqId} ->
                     put(?STREAM_STATUS, ended),
@@ -314,16 +318,26 @@ clean_mailbox(_, Count) when Count > 0 ->
     ok.
 
 discard_message(ReqId, Worker, Count) ->
-    ibrowse:stream_next(ReqId),
-    receive
-        {ibrowse_async_response, ReqId, _} ->
-            clean_mailbox({ibrowse_req_id, ReqId}, Count - 1);
-        {ibrowse_async_response_end, ReqId} ->
+    case ibrowse:stream_next(ReqId) of
+        ok ->
+            receive
+                {ibrowse_async_response, ReqId, _} ->
+                    clean_mailbox({ibrowse_req_id, ReqId}, Count - 1);
+                {ibrowse_async_response_timeout, ReqId} ->
+                    clean_mailbox({ibrowse_req_id, ReqId}, Count - 1);
+                {ibrowse_async_response_end, ReqId} ->
+                    put(?STREAM_STATUS, ended),
+                    ok
+            after 30000 ->
+                exit(Worker, {timeout, ibrowse_stream_cleanup}),
+                exit({timeout, ibrowse_stream_cleanup})
+            end;
+        {error, unknown_req_id} ->
+            % The stream is being torn down so expect to handle stream ids not
+            % being found. We don't want to sleep for 30 seconds and then exit.
+            % Just clean any left-over mailbox messages and move on.
             put(?STREAM_STATUS, ended),
-            ok
-    after 30000 ->
-        exit(Worker, {timeout, ibrowse_stream_cleanup}),
-        exit({timeout, ibrowse_stream_cleanup})
+            clean_mailbox({ibrowse_req_id, ReqId}, Count)
     end.
 
 -spec maybe_retry(any(), pid(), #httpdb{}, list()) -> no_return().
@@ -341,7 +355,7 @@ maybe_retry(
         false ->
             ok = timer:sleep(Wait),
             log_retry_error(Params, HttpDb, Wait, Error),
-            Wait2 = erlang:min(Wait * 2, ?MAX_WAIT),
+            Wait2 = min(Wait * 2, ?MAX_WAIT),
             HttpDb1 = HttpDb#httpdb{retries = Retries - 1, wait = Wait2},
             HttpDb2 = update_first_error_timestamp(HttpDb1),
             throw({retry, HttpDb2, Params})
@@ -403,7 +417,7 @@ error_cause(Cause) ->
 stream_data_self(#httpdb{timeout = T} = HttpDb, Params, Worker, ReqId, Cb) ->
     case accumulate_messages(ReqId, [], T + 500) of
         {Data, ibrowse_async_response} ->
-            ibrowse:stream_next(ReqId),
+            ok = ibrowse:stream_next(ReqId),
             {Data, fun() -> stream_data_self(HttpDb, Params, Worker, ReqId, Cb) end};
         {Data, ibrowse_async_response_end} ->
             put(?STREAM_STATUS, ended),
@@ -539,5 +553,126 @@ merge_headers_test() ->
     ),
     ?assertEqual([{"a", "y"}], merge_headers([{"A", "z"}, {"a", "y"}], [])),
     ?assertEqual([{"a", "y"}], merge_headers([], [{"A", "z"}, {"a", "y"}])).
+
+clean_mailbox_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_clean_noop),
+            ?TDEF_FE(t_clean_skip_other_messages),
+            ?TDEF_FE(t_clean_when_init),
+            ?TDEF_FE(t_clean_when_ended),
+            ?TDEF_FE(t_clean_when_streaming),
+            ?TDEF_FE(t_clean_when_streaming_dead_pid),
+            ?TDEF_FE(t_other_req_id_is_ignored)
+        ]
+    }.
+
+setup() ->
+    meck:new(ibrowse),
+    meck:expect(ibrowse, stream_next, 1, ok),
+    ok.
+
+teardown(_) ->
+    meck:unload().
+
+t_clean_noop(_) ->
+    ReqId = make_ref(),
+    ?assertEqual(ok, clean_mailbox(random_junk)),
+    meck:expect(ibrowse, stream_next, 1, {error, unknown_req_id}),
+    set_stream_status({streaming, self()}),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    set_stream_status(init),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    set_stream_status(ended),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})).
+
+t_clean_skip_other_messages(_) ->
+    set_stream_status(init),
+    self() ! other_message,
+    ReqId = make_ref(),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    ?assertEqual([other_message], flush()).
+
+t_clean_when_init(_) ->
+    set_stream_status(init),
+    ReqId = make_ref(),
+    add_all_message_types(ReqId),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    ?assertEqual([], flush()),
+    ?assertEqual(ended, stream_status()).
+
+t_clean_when_ended(_) ->
+    set_stream_status(init),
+    ReqId = make_ref(),
+    add_all_message_types(ReqId),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    ?assertEqual([], flush()),
+    ?assertEqual(ended, stream_status()).
+
+t_clean_when_streaming(_) ->
+    set_stream_status({streaming, self()}),
+    ReqId = make_ref(),
+    add_all_message_types(ReqId),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    ?assertEqual([], flush()),
+    ?assertEqual(ended, stream_status()).
+
+t_clean_when_streaming_dead_pid(_) ->
+    {Pid, Ref} = spawn_monitor(fun() -> ok end),
+    receive
+        {'DOWN', Ref, _, _, _} -> ok
+    end,
+    set_stream_status({streaming, Pid}),
+    ReqId = make_ref(),
+    add_all_message_types(ReqId),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId})),
+    ?assertEqual([], flush()),
+    ?assertEqual(ended, stream_status()).
+
+t_other_req_id_is_ignored(_) ->
+    set_stream_status({streaming, self()}),
+    ReqId1 = make_ref(),
+    add_all_message_types(ReqId1),
+    ReqId2 = make_ref(),
+    add_all_message_types(ReqId2),
+    ?assertEqual(ok, clean_mailbox({ibrowse_req_id, ReqId1})),
+    ?assertEqual(
+        [
+            {ibrowse_async_response, ReqId2, foo},
+            {ibrowse_async_response_timeout, ReqId2},
+            {ibrowse_async_response_end, ReqId2}
+        ],
+        flush()
+    ),
+    ?assertEqual(ended, stream_status()).
+
+stream_status() ->
+    get(?STREAM_STATUS).
+
+set_stream_status(Status) ->
+    put(?STREAM_STATUS, Status).
+
+add_all_message_types(ReqId) ->
+    Messages = [
+        {ibrowse_async_response, ReqId, foo},
+        {ibrowse_async_response_timeout, ReqId},
+        {ibrowse_async_response_end, ReqId}
+    ],
+    [self() ! M || M <- Messages],
+    ok.
+
+flush() ->
+    flush([]).
+
+flush(Acc) ->
+    receive
+        Msg ->
+            flush([Msg | Acc])
+    after 0 ->
+        lists:reverse(Acc)
+    end.
 
 -endif.

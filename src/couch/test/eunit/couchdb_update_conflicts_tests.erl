@@ -120,7 +120,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
                 ]}
             ),
             Pid = spawn_client(DbName, ClientDoc),
-            {Value, Pid, erlang:monitor(process, Pid)}
+            {Value, Pid, monitor(process, Pid)}
         end,
         lists:seq(1, NumClients)
     ),
@@ -135,7 +135,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
                 {'DOWN', MonRef, process, Pid, conflict} ->
                     {AccConflicts + 1, AccValue};
                 {'DOWN', MonRef, process, Pid, Error} ->
-                    erlang:error(
+                    error(
                         {assertion_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},
@@ -146,7 +146,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
                         ]}
                     )
             after ?TIMEOUT div 2 ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},

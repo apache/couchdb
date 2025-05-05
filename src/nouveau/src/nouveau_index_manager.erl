@@ -36,9 +36,6 @@
     handle_info/2
 ]).
 
-% config_listener api
--export([handle_config_change/5, handle_config_terminate/3]).
-
 -export([handle_db_event/3]).
 
 -define(BY_DBSIG, nouveau_by_dbsig).
@@ -60,8 +57,6 @@ init(_) ->
     ets:new(?BY_DBSIG, [set, named_table]),
     ets:new(?BY_REF, [set, named_table]),
     couch_event:link_listener(?MODULE, handle_db_event, nil, [all_dbs]),
-    configure_ibrowse(nouveau_util:nouveau_url()),
-    ok = config:listen_for_changes(?MODULE, nil),
     {ok, nil}.
 
 handle_call({update, #index{} = Index0}, From, State) ->
@@ -131,31 +126,3 @@ handle_db_event(DbName, deleted, State) ->
     {ok, State};
 handle_db_event(_DbName, _Event, State) ->
     {ok, State}.
-
-handle_config_change("nouveau", "url", URL, _Persist, State) ->
-    configure_ibrowse(URL),
-    {ok, State};
-handle_config_change(_Section, _Key, _Value, _Persist, State) ->
-    {ok, State}.
-
-handle_config_terminate(_Server, stop, _State) ->
-    ok;
-handle_config_terminate(_Server, _Reason, _State) ->
-    erlang:send_after(
-        5000,
-        whereis(?MODULE),
-        restart_config_listener
-    ).
-
-configure_ibrowse(URL) ->
-    #{host := Host, port := Port} = uri_string:parse(URL),
-    ibrowse:set_max_sessions(
-        Host,
-        Port,
-        nouveau_util:max_sessions()
-    ),
-    ibrowse:set_max_pipeline_size(
-        Host,
-        Port,
-        nouveau_util:max_pipeline_size()
-    ).

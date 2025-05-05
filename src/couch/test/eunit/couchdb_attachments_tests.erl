@@ -646,7 +646,7 @@ wait_compaction(DbName, Kind, Line) ->
     end,
     case test_util:wait(WaitFun, ?TIMEOUT) of
         timeout ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, Line},

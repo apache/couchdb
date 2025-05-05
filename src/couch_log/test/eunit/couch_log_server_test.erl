@@ -39,7 +39,7 @@ check_can_reconfigure() ->
 
 check_can_restart() ->
     Pid1 = whereis(couch_log_server),
-    Ref = erlang:monitor(process, Pid1),
+    Ref = monitor(process, Pid1),
     ?assert(is_process_alive(Pid1)),
 
     supervisor:terminate_child(couch_log_sup, couch_log_server),
@@ -48,7 +48,7 @@ check_can_restart() ->
     receive
         {'DOWN', Ref, _, _, _} -> ok
     after 1000 ->
-        erlang:error(timeout_restarting_couch_log_server)
+        error(timeout_restarting_couch_log_server)
     end,
 
     ?assert(not is_process_alive(Pid1)),

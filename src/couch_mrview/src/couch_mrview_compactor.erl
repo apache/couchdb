@@ -136,11 +136,11 @@ recompact(State) ->
     recompact(State, recompact_retry_count()).
 
 recompact(#mrst{db_name = DbName, idx_name = IdxName}, 0) ->
-    erlang:error({exceeded_recompact_retry_count, [{db_name, DbName}, {idx_name, IdxName}]});
+    error({exceeded_recompact_retry_count, [{db_name, DbName}, {idx_name, IdxName}]});
 recompact(State, RetryCount) ->
     Self = self(),
     link(State#mrst.fd),
-    {Pid, Ref} = erlang:spawn_monitor(fun() ->
+    {Pid, Ref} = spawn_monitor(fun() ->
         couch_index_updater:update(Self, couch_mrview_index, State)
     end),
     recompact_loop(Pid, Ref, State, RetryCount).
@@ -240,7 +240,7 @@ swap_compacted(OldState, NewState) ->
     } = NewState,
 
     link(NewState#mrst.fd),
-    Ref = erlang:monitor(process, NewState#mrst.fd),
+    Ref = monitor(process, NewState#mrst.fd),
 
     RootDir = couch_index_util:root_dir(),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
@@ -257,7 +257,7 @@ swap_compacted(OldState, NewState) ->
     ok = file:rename(CompactFName, IndexFName),
 
     unlink(OldState#mrst.fd),
-    erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
+    demonitor(OldState#mrst.fd_monitor, [flush]),
 
     {ok, NewState#mrst{fd_monitor = Ref}}.
 

@@ -30,7 +30,8 @@
     normalize_basic_auth/1,
     seq_encode/1,
     valid_endpoint_protocols_log/1,
-    verify_ssl_certificates_log/1
+    verify_ssl_certificates_log/1,
+    cacert_get/0
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
@@ -39,6 +40,10 @@
 -include("couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include_lib("public_key/include/public_key.hrl").
+
+-define(CACERT_KEY, {?MODULE, cacert_timestamp_key}).
+-define(CACERT_DEFAULT_TIMESTAMP, -(1 bsl 59)).
+-define(CACERT_DEFAULT_INTERVAL_HOURS, 24).
 
 -import(couch_util, [
     get_value/2,
@@ -76,7 +81,7 @@ get_json_value(Key, Props, Default) when is_atom(Key) ->
     Ref = make_ref(),
     case get_value(Key, Props, Ref) of
         Ref ->
-            get_value(?l2b(atom_to_list(Key)), Props, Default);
+            get_value(atom_to_binary(Key), Props, Default);
         Else ->
             Else
     end;
@@ -84,7 +89,7 @@ get_json_value(Key, Props, Default) when is_binary(Key) ->
     Ref = make_ref(),
     case get_value(Key, Props, Ref) of
         Ref ->
-            get_value(list_to_atom(?b2l(Key)), Props, Default);
+            get_value(binary_to_atom(Key), Props, Default);
         Else ->
             Else
     end.
@@ -401,6 +406,34 @@ rep_principal(#rep{user_ctx = #user_ctx{name = Name}}) when is_binary(Name) ->
     io_lib:format("by user ~s", [Name]);
 rep_principal(#rep{}) ->
     "by unknown principal".
+
+cacert_get() ->
+    Now = erlang:monotonic_time(second),
+    Max = cacert_reload_interval_sec(),
+    TStamp = persistent_term:get(?CACERT_KEY, ?CACERT_DEFAULT_TIMESTAMP),
+    cacert_load(TStamp, Now, Max),
+    public_key:cacerts_get().
+
+cacert_load(TStamp, Now, Max) when (Now - TStamp) > Max ->
+    public_key:cacerts_clear(),
+    case public_key:cacerts_load() of
+        ok ->
+            Count = length(public_key:cacerts_get()),
+            InfoMsg = "~p : loaded ~p os ca certificates",
+            couch_log:info(InfoMsg, [?MODULE, Count]);
+        {error, Reason} ->
+            ErrMsg = "~p : error loading os ca certificates: ~p",
+            couch_log:error(ErrMsg, [?MODULE, Reason])
+    end,
+    persistent_term:put(?CACERT_KEY, Now),
+    loaded;
+cacert_load(_TStamp, _Now, _Max) ->
+    not_loaded.
+
+cacert_reload_interval_sec() ->
+    Default = ?CACERT_DEFAULT_INTERVAL_HOURS,
+    Hrs = config:get_integer("replicator", "cacert_reload_interval_hours", Default),
+    Hrs * 3600.
 
 -ifdef(TEST).
 
@@ -777,5 +810,20 @@ t_allow_canceling_transient_jobs(_) ->
     % target endpoints defined. They are left undefined.
     ?assertEqual(ok, valid_endpoint_protocols_log(#rep{})),
     ?assertEqual(0, meck:num_calls(couch_log, warning, 2)).
+
+cacert_test() ->
+    Old = ?CACERT_DEFAULT_TIMESTAMP,
+    Now = erlang:monotonic_time(second),
+    Max = 0,
+    ?assertEqual(loaded, cacert_load(Old, Now, Max)),
+    ?assertEqual(not_loaded, cacert_load(Now, Now, Max)),
+    try cacert_get() of
+        CACerts ->
+            ?assert(is_list(CACerts))
+    catch
+        error:_Err ->
+            % This is ok, some environments may not have OS certs
+            ?assert(true)
+    end.
 
 -endif.

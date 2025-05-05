@@ -17,6 +17,8 @@
 -include("dreyfus.hrl").
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 
+-define(RETRY_DELAY, 2100).
+
 % public api.
 -export([search/4, group1/4, group2/4, info/3, disk_size/3]).
 
@@ -44,29 +46,32 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
         stale = Stale
     } = QueryArgs,
     {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
-            case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    case dreyfus_index:await(Pid, MinSeq) of
-                        {ok, IndexPid, _Seq} ->
-                            Result = dreyfus_index:Fun(IndexPid, QueryArgs),
-                            rexi:reply(Result);
-                        % obsolete clauses, remove after upgrade
-                        ok ->
-                            Result = dreyfus_index:Fun(Pid, QueryArgs),
-                            rexi:reply(Result);
-                        {ok, _Seq} ->
-                            Result = dreyfus_index:Fun(Pid, QueryArgs),
-                            rexi:reply(Result);
-                        Error ->
-                            rexi:reply(Error)
-                    end;
-                Error ->
-                    rexi:reply(Error)
+            try
+                rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
+            catch
+                exit:{noproc, _} ->
+                    timer:sleep(?RETRY_DELAY),
+                    %% try one more time to handle the case when Clouseau's LRU
+                    %% closed the index in the middle of our call
+                    rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
             end;
         Error ->
             rexi:reply(Error)
+    end.
+
+index_call(Fun, DbName, Index, QueryArgs, MinSeq) ->
+    case dreyfus_index_manager:get_index(DbName, Index) of
+        {ok, Pid} ->
+            case dreyfus_index:await(Pid, MinSeq) of
+                {ok, IndexPid, _Seq} ->
+                    dreyfus_index:Fun(IndexPid, QueryArgs);
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
     end.
 
 info(DbName, DDoc, IndexName) ->
@@ -76,7 +81,7 @@ info(DbName, DDoc, IndexName) ->
 info_int(DbName, DDoc, IndexName) ->
     erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
                 {ok, Pid} ->
@@ -97,7 +102,7 @@ info_int(DbName, DDoc, IndexName) ->
 disk_size(DbName, DDoc, IndexName) ->
     erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             Result = dreyfus_index_manager:get_disk_size(DbName, Index),
             rexi:reply(Result);

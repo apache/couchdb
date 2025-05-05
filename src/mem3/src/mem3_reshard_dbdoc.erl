@@ -12,128 +12,47 @@
 
 -module(mem3_reshard_dbdoc).
 
--behaviour(gen_server).
-
 -export([
-    update_shard_map/1,
-
-    start_link/0,
-
-    init/1,
-    handle_call/3,
-    handle_cast/2,
-    handle_info/2
+    update_shard_map/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mem3_reshard.hrl").
 
--spec update_shard_map(#job{}) -> no_return | ok.
 update_shard_map(#job{source = Source, target = Target} = Job) ->
-    Node = hd(mem3_util:live_nodes()),
+    DocId = mem3:dbname(Source#shard.name),
     JobStr = mem3_reshard_job:jobfmt(Job),
-    LogMsg1 = "~p : ~p calling update_shard_map node:~p",
-    couch_log:notice(LogMsg1, [?MODULE, JobStr, Node]),
-    ServerRef = {?MODULE, Node},
-    CallArg = {update_shard_map, Source, Target},
-    TimeoutMSec = shard_update_timeout_msec(),
+    LogMsg1 = "~p : ~p calling update_shard_map",
+    couch_log:notice(LogMsg1, [?MODULE, JobStr]),
     try
-        case gen_server:call(ServerRef, CallArg, TimeoutMSec) of
-            {ok, _} -> ok;
-            {error, CallError} -> throw({error, CallError})
+        case mem3:get_db_doc(DocId) of
+            {ok, #doc{} = Doc} ->
+                #doc{body = Body} = Doc,
+                NewBody = update_shard_props(Body, Source, Target),
+                NewDoc = Doc#doc{body = NewBody},
+                case mem3:update_db_doc(NewDoc) of
+                    {ok, _} ->
+                        ok;
+                    {error, UpdateError} ->
+                        exit(UpdateError)
+                end,
+                LogMsg2 = "~p : ~p update_shard_map returned",
+                couch_log:notice(LogMsg2, [?MODULE, JobStr]),
+                TimeoutMSec = shard_update_timeout_msec(),
+                UntilSec = mem3_reshard:now_sec() + (TimeoutMSec div 1000),
+                case wait_source_removed(Source, 5, UntilSec) of
+                    true ->
+                        ok;
+                    false ->
+                        exit(shard_update_did_not_propagate)
+                end;
+            Error ->
+                exit(Error)
         end
     catch
         _:Err ->
             exit(Err)
-    end,
-    LogMsg2 = "~p : ~p update_shard_map on node:~p returned",
-    couch_log:notice(LogMsg2, [?MODULE, JobStr, Node]),
-    UntilSec = mem3_reshard:now_sec() + (TimeoutMSec div 1000),
-    case wait_source_removed(Source, 5, UntilSec) of
-        true -> ok;
-        false -> exit(shard_update_did_not_propagate)
     end.
-
--spec start_link() -> {ok, pid()} | ignore | {error, term()}.
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-init(_) ->
-    couch_log:notice("~p start init()", [?MODULE]),
-    {ok, nil}.
-
-handle_call({update_shard_map, Source, Target}, _From, State) ->
-    Res =
-        try
-            update_shard_map(Source, Target)
-        catch
-            throw:{error, Error} ->
-                {error, Error}
-        end,
-    {reply, Res, State};
-handle_call(Call, From, State) ->
-    couch_log:error("~p unknown call ~p from: ~p", [?MODULE, Call, From]),
-    {noreply, State}.
-
-handle_cast(Cast, State) ->
-    couch_log:error("~p unexpected cast ~p", [?MODULE, Cast]),
-    {noreply, State}.
-
-handle_info(Info, State) ->
-    couch_log:error("~p unexpected info ~p", [?MODULE, Info]),
-    {noreply, State}.
-
-% Private
-
-update_shard_map(Source, Target) ->
-    ok = validate_coordinator(),
-    ok = replicate_from_all_nodes(shard_update_timeout_msec()),
-    DocId = mem3:dbname(Source#shard.name),
-    OldDoc =
-        case mem3_util:open_db_doc(DocId) of
-            {ok, #doc{deleted = true}} ->
-                throw({error, missing_source});
-            {ok, #doc{} = Doc} ->
-                Doc;
-            {not_found, deleted} ->
-                throw({error, missing_source});
-            OpenErr ->
-                throw({error, {shard_doc_open_error, OpenErr}})
-        end,
-    #doc{body = OldBody} = OldDoc,
-    NewBody = update_shard_props(OldBody, Source, Target),
-    {ok, _} = write_shard_doc(OldDoc, NewBody),
-    ok = replicate_to_all_nodes(shard_update_timeout_msec()),
-    {ok, NewBody}.
-
-validate_coordinator() ->
-    case hd(mem3_util:live_nodes()) =:= node() of
-        true -> ok;
-        false -> throw({error, coordinator_changed})
-    end.
-
-replicate_from_all_nodes(TimeoutMSec) ->
-    case mem3_util:replicate_dbs_from_all_nodes(TimeoutMSec) of
-        ok -> ok;
-        Error -> throw({error, Error})
-    end.
-
-replicate_to_all_nodes(TimeoutMSec) ->
-    case mem3_util:replicate_dbs_to_all_nodes(TimeoutMSec) of
-        ok -> ok;
-        Error -> throw({error, Error})
-    end.
-
-write_shard_doc(#doc{id = Id} = Doc, Body) ->
-    UpdatedDoc = Doc#doc{body = Body},
-    couch_util:with_db(mem3_sync:shards_db(), fun(Db) ->
-        try
-            {ok, _} = couch_db:update_doc(Db, UpdatedDoc, [])
-        catch
-            conflict ->
-                throw({error, {conflict, Id, Doc#doc.body, UpdatedDoc}})
-        end
-    end).
 
 update_shard_props({Props0}, #shard{} = Source, [#shard{} | _] = Targets) ->
     {ByNode0} = couch_util:get_value(<<"by_node">>, Props0, {[]}),
@@ -205,12 +124,10 @@ node_key(#shard{node = Node}) ->
     couch_util:to_binary(Node).
 
 range_key(#shard{range = [B, E]}) ->
-    BHex = couch_util:to_hex(<<B:32/integer>>),
-    EHex = couch_util:to_hex(<<E:32/integer>>),
-    list_to_binary([BHex, "-", EHex]).
+    mem3_util:range_to_hex([B, E]).
 
 shard_update_timeout_msec() ->
-    config:get_integer("reshard", "shard_upate_timeout_msec", 300000).
+    config:get_integer("reshard", "shard_update_timeout_msec", 300000).
 
 wait_source_removed(#shard{name = Name} = Source, SleepSec, UntilSec) ->
     case check_source_removed(Source) of

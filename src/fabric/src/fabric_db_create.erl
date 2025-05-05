@@ -158,11 +158,7 @@ make_document([#shard{dbname = DbName} | _] = Shards, Suffix, Options) ->
     {RawOut, ByNodeOut, ByRangeOut} =
         lists:foldl(
             fun(#shard{node = N, range = [B, E]}, {Raw, ByNode, ByRange}) ->
-                Range = ?l2b([
-                    couch_util:to_hex(<<B:32/integer>>),
-                    "-",
-                    couch_util:to_hex(<<E:32/integer>>)
-                ]),
+                Range = mem3_util:range_to_hex([B, E]),
                 Node = couch_util:to_binary(N),
                 {
                     [[<<"add">>, Range, Node] | Raw],
@@ -227,7 +223,7 @@ db_exists_for_existing_db() ->
 
 db_exists_for_missing_db() ->
     Mock = fun(DbName) ->
-        erlang:error(database_does_not_exist, [DbName])
+        error(database_does_not_exist, [DbName])
     end,
     meck:expect(mem3, shards, Mock),
     ?assertEqual(false, db_exists(<<"foobar">>)),

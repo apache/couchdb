@@ -33,6 +33,7 @@
     reset_validation_funs/1,
     set_security/3,
     set_revs_limit/3,
+    update_props/4,
     create_shard_db_doc/2,
     delete_shard_db_doc/2,
     get_partition_info/2
@@ -146,9 +147,13 @@ all_docs(DbName, Options, Args0) ->
     case fabric_util:upgrade_mrargs(Args0) of
         #mrargs{keys = undefined} = Args ->
             set_io_priority(DbName, Options),
-            {ok, Db} = get_or_create_db(DbName, Options),
-            CB = get_view_cb(Args),
-            couch_mrview:query_all_docs(Db, Args, CB, Args)
+            case get_or_create_db(DbName, Options) of
+                {ok, Db} ->
+                    CB = get_view_cb(Args),
+                    couch_mrview:query_all_docs(Db, Args, CB, Args);
+                Error ->
+                    rexi:reply(Error)
+            end
     end.
 
 update_mrview(DbName, {DDocId, Rev}, ViewName, Args0) ->
@@ -171,9 +176,13 @@ map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fabric_util:upgrade_mrargs(Args0),
-    {ok, Db} = get_or_create_db(DbName, DbOptions),
-    CB = get_view_cb(Args),
-    couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args).
+    case get_or_create_db(DbName, DbOptions) of
+        {ok, Db} ->
+            CB = get_view_cb(Args),
+            couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args);
+        Error ->
+            rexi:reply(Error)
+    end.
 
 %% @equiv reduce_view(DbName, DDoc, ViewName, Args0)
 reduce_view(DbName, DDocInfo, ViewName, Args0) ->
@@ -185,10 +194,14 @@ reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fabric_util:upgrade_mrargs(Args0),
-    {ok, Db} = get_or_create_db(DbName, DbOptions),
-    VAcc0 = #vacc{db = Db},
-    Callback = fun(Msg, Acc) -> reduce_cb(Msg, Acc, Args#mrargs.extra) end,
-    couch_mrview:query_view(Db, DDoc, ViewName, Args, Callback, VAcc0).
+    case get_or_create_db(DbName, DbOptions) of
+        {ok, Db} ->
+            VAcc0 = #vacc{db = Db},
+            Callback = fun(Msg, Acc) -> reduce_cb(Msg, Acc, Args#mrargs.extra) end,
+            couch_mrview:query_view(Db, DDoc, ViewName, Args, Callback, VAcc0);
+        Error ->
+            rexi:reply(Error)
+    end.
 
 create_db(DbName) ->
     create_db(DbName, []).
@@ -261,6 +274,9 @@ set_revs_limit(DbName, Limit, Options) ->
 
 set_purge_infos_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_purge_infos_limit, [Limit]}).
+
+update_props(DbName, K, V, Options) ->
+    with_db(DbName, Options, {couch_db, update_props, [K, V]}).
 
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
@@ -341,7 +357,7 @@ compact(ShardName, DesignName) ->
     {ok, Pid} = couch_index_server:get_index(
         couch_mrview_index, ShardName, <<"_design/", DesignName/binary>>
     ),
-    Ref = erlang:make_ref(),
+    Ref = make_ref(),
     Pid ! {'$gen_call', {self(), Ref}, compact}.
 
 get_uuid(DbName) ->
@@ -458,7 +474,7 @@ get_node_seqs(Db, Nodes) ->
                 PurgeSeq = couch_util:get_value(<<"purge_seq">>, Props),
                 case lists:keyfind(TgtNode, 1, Acc) of
                     {_, OldSeq} ->
-                        NewSeq = erlang:max(OldSeq, PurgeSeq),
+                        NewSeq = max(OldSeq, PurgeSeq),
                         NewEntry = {TgtNode, NewSeq},
                         NewAcc = lists:keyreplace(TgtNode, 1, Acc, NewEntry),
                         {ok, NewAcc};
@@ -470,13 +486,18 @@ get_node_seqs(Db, Nodes) ->
                 {stop, Acc}
         end
     end,
-    InitAcc = [{list_to_binary(atom_to_list(Node)), 0} || Node <- Nodes],
+    InitAcc = [{atom_to_binary(Node), 0} || Node <- Nodes],
     Opts = [{start_key, <<?LOCAL_DOC_PREFIX, "purge-mem3-">>}],
     {ok, NodeBinSeqs} = couch_db:fold_local_docs(Db, FoldFun, InitAcc, Opts),
-    [{list_to_existing_atom(binary_to_list(N)), S} || {N, S} <- NodeBinSeqs].
+    [{binary_to_existing_atom(N), S} || {N, S} <- NodeBinSeqs].
 
 get_or_create_db(DbName, Options) ->
-    mem3_util:get_or_create_db_int(DbName, Options).
+    try
+        mem3_util:get_or_create_db_int(DbName, Options)
+    catch
+        throw:{error, missing_target} ->
+            error(database_does_not_exist, [DbName])
+    end.
 
 get_view_cb(#mrargs{extra = Options}) ->
     case couch_util:get_value(callback, Options) of
@@ -621,7 +642,7 @@ make_att_reader({follows, Parser, Ref}) when is_pid(Parser) ->
                 % First time encountering a particular parser pid. Monitor it,
                 % in case it dies, and notify it about us, so it could monitor
                 % us in case we die.
-                PRef = erlang:monitor(process, Parser),
+                PRef = monitor(process, Parser),
                 put({mp_parser_ref, Parser}, PRef),
                 Parser ! {hello_from_writer, Ref, WriterPid},
                 PRef;

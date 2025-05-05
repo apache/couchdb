@@ -12,8 +12,6 @@
 
 -module(mango_cursor_text).
 
--ifdef(HAVE_DREYFUS).
-
 -export([
     create/4,
     explain/1,
@@ -55,7 +53,7 @@ create(Db, {Indexes, Trace}, Selector, Opts0) ->
     Stats = mango_execution_stats:stats_init(DbName),
 
     DreyfusLimit = get_dreyfus_limit(),
-    Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
+    Limit = min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 
@@ -327,7 +325,7 @@ update_query_args(CAcc) ->
     }.
 
 get_limit(CAcc) ->
-    erlang:min(get_dreyfus_limit(), CAcc#cacc.limit + CAcc#cacc.skip).
+    min(get_dreyfus_limit(), CAcc#cacc.limit + CAcc#cacc.skip).
 
 get_dreyfus_limit() ->
     config:get_integer("dreyfus", "max_limit", 200).
@@ -1224,7 +1222,5 @@ t_explain(_) ->
         ],
     meck:expect(mango_selector_text, convert, [selector], meck:val(converted_selector)),
     ?assertEqual(Response, explain(Cursor)).
-
--endif.
 
 -endif.

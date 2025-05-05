@@ -41,11 +41,11 @@ go(DbName, Id, Options) ->
     ),
     SuppressDeletedDoc = not lists:member(deleted, Options),
     N = mem3:n(DbName),
-    R = couch_util:get_value(r, Options, integer_to_list(mem3:quorum(DbName))),
+    R = fabric_util:r_from_opts(DbName, Options),
     Acc0 = #acc{
         dbname = DbName,
         workers = Workers,
-        r = erlang:min(N, list_to_integer(R)),
+        r = min(N, R),
         state = r_not_met,
         replies = []
     },
@@ -317,8 +317,8 @@ t_handle_message_down(_) ->
 
 t_handle_message_exit(_) ->
     Exit = {rexi_EXIT, nil},
-    Worker0 = #shard{ref = erlang:make_ref()},
-    Worker1 = #shard{ref = erlang:make_ref()},
+    Worker0 = #shard{ref = make_ref()},
+    Worker1 = #shard{ref = make_ref()},
 
     % Only removes the specified worker
     ?assertEqual(
@@ -338,9 +338,9 @@ t_handle_message_exit(_) ->
     ).
 
 t_handle_message_reply(_) ->
-    Worker0 = #shard{ref = erlang:make_ref()},
-    Worker1 = #shard{ref = erlang:make_ref()},
-    Worker2 = #shard{ref = erlang:make_ref()},
+    Worker0 = #shard{ref = make_ref()},
+    Worker1 = #shard{ref = make_ref()},
+    Worker2 = #shard{ref = make_ref()},
     Workers = [Worker0, Worker1, Worker2],
     Acc0 = #acc{workers = Workers, r = 2, replies = []},
 
@@ -426,9 +426,9 @@ t_handle_message_reply(_) ->
     ).
 
 t_store_node_revs(_) ->
-    W1 = #shard{node = w1, ref = erlang:make_ref()},
-    W2 = #shard{node = w2, ref = erlang:make_ref()},
-    W3 = #shard{node = w3, ref = erlang:make_ref()},
+    W1 = #shard{node = w1, ref = make_ref()},
+    W2 = #shard{node = w2, ref = make_ref()},
+    W3 = #shard{node = w3, ref = make_ref()},
     Foo1 = {ok, #doc{id = <<"bar">>, revs = {1, [<<"foo">>]}}},
     Foo2 = {ok, #doc{id = <<"bar">>, revs = {2, [<<"foo2">>, <<"foo">>]}}},
     NFM = {not_found, missing},

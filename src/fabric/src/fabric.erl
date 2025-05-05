@@ -25,6 +25,8 @@
     get_db_info/1,
     get_doc_count/1, get_doc_count/2,
     set_revs_limit/3,
+    update_props/3,
+    update_props/4,
     set_security/2, set_security/3,
     get_revs_limit/1,
     get_security/1, get_security/2,
@@ -62,9 +64,10 @@
 -export([
     design_docs/1,
     reset_validation_funs/1,
-    cleanup_index_files/0,
-    cleanup_index_files/1,
+    cleanup_index_files_all_nodes/0,
     cleanup_index_files_all_nodes/1,
+    cleanup_index_files_this_node/0,
+    cleanup_index_files_this_node/1,
     dbname/1,
     db_uuids/1
 ]).
@@ -174,6 +177,16 @@ get_revs_limit(DbName) ->
     after
         catch couch_db:close(Db)
     end.
+
+%% @doc update shard property. Some properties like `partitioned` or `hash` are
+%% static and cannot be updated. They will return an error.
+-spec update_props(dbname(), atom() | binary(), any()) -> ok.
+update_props(DbName, K, V) ->
+    update_props(DbName, K, V, [?ADMIN_CTX]).
+
+-spec update_props(dbname(), atom() | binary(), any(), [option()]) -> ok.
+update_props(DbName, K, V, Options) when is_atom(K) orelse is_binary(K) ->
+    fabric_db_meta:update_props(dbname(DbName), K, V, opts(Options)).
 
 %% @doc sets the readers/writers/admin permissions for a database
 -spec set_security(dbname(), SecObj :: json_obj()) -> ok.
@@ -570,54 +583,17 @@ reset_validation_funs(DbName) ->
      || #shard{node = Node, name = Name} <- mem3:shards(DbName)
     ].
 
-%% @doc clean up index files for all Dbs
--spec cleanup_index_files() -> [ok].
-cleanup_index_files() ->
-    {ok, Dbs} = fabric:all_dbs(),
-    [cleanup_index_files(Db) || Db <- Dbs].
+cleanup_index_files_this_node() ->
+    fabric_index_cleanup:cleanup_this_node().
 
-%% @doc clean up index files for a specific db
--spec cleanup_index_files(dbname()) -> ok.
-cleanup_index_files(DbName) ->
-    try
-        ShardNames = [mem3:name(S) || S <- mem3:local_shards(dbname(DbName))],
-        cleanup_local_indices_and_purge_checkpoints(ShardNames)
-    catch
-        error:database_does_not_exist ->
-            ok
-    end.
+cleanup_index_files_this_node(Db) ->
+    fabric_index_cleanup:cleanup_this_node(dbname(Db)).
 
-cleanup_local_indices_and_purge_checkpoints([]) ->
-    ok;
-cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
-    AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
-    AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
-    Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
-    ok = cleanup_purges(Sigs, AllPurges, Dbs),
-    ok = cleanup_indices(Sigs, AllIndices).
+cleanup_index_files_all_nodes() ->
+    fabric_index_cleanup:cleanup_all_nodes().
 
-cleanup_purges(Sigs, AllPurges, Dbs) ->
-    Fun = fun(DbPurges, Db) ->
-        couch_mrview_cleanup:cleanup_purges(Db, Sigs, DbPurges)
-    end,
-    lists:zipwith(Fun, AllPurges, Dbs),
-    ok.
-
-cleanup_indices(Sigs, AllIndices) ->
-    Fun = fun(DbIndices) ->
-        couch_mrview_cleanup:cleanup_indices(Sigs, DbIndices)
-    end,
-    lists:foreach(Fun, AllIndices).
-
-%% @doc clean up index files for a specific db on all nodes
--spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
-cleanup_index_files_all_nodes(DbName) ->
-    lists:foreach(
-        fun(Node) ->
-            rexi:cast(Node, {?MODULE, cleanup_index_files, [DbName]})
-        end,
-        mem3:nodes()
-    ).
+cleanup_index_files_all_nodes(Db) ->
+    fabric_index_cleanup:cleanup_all_nodes(dbname(Db)).
 
 %% some simple type validation and transcoding
 dbname(DbName) when is_list(DbName) ->
@@ -629,7 +605,7 @@ dbname(Db) ->
         couch_db:name(Db)
     catch
         error:badarg ->
-            erlang:error({illegal_database_name, Db})
+            error({illegal_database_name, Db})
     end.
 
 %% @doc get db shard uuids
@@ -648,7 +624,7 @@ docid(DocId) ->
 docs(Db, Docs) when is_list(Docs) ->
     [doc(Db, D) || D <- Docs];
 docs(_Db, Docs) ->
-    erlang:error({illegal_docs_list, Docs}).
+    error({illegal_docs_list, Docs}).
 
 doc(_Db, #doc{} = Doc) ->
     Doc;
@@ -658,14 +634,13 @@ doc(Db0, {_} = Doc) ->
             true ->
                 Db0;
             false ->
-                Shard = hd(mem3:shards(Db0)),
-                Props = couch_util:get_value(props, Shard#shard.opts, []),
+                Props = mem3:props(Db0),
                 {ok, Db1} = couch_db:clustered_db(Db0, [{props, Props}]),
                 Db1
         end,
     couch_db:doc_from_json_obj_validate(Db, Doc);
 doc(_Db, Doc) ->
-    erlang:error({illegal_doc_format, Doc}).
+    error({illegal_doc_format, Doc}).
 
 design_doc(#doc{} = DDoc) ->
     DDoc;

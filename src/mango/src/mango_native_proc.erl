@@ -98,7 +98,7 @@ handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
 handle_cast(garbage_collect, St) ->
-    erlang:garbage_collect(),
+    garbage_collect(),
     {noreply, St};
 handle_cast(stop, St) ->
     {stop, normal, St};

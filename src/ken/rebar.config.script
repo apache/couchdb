@@ -12,19 +12,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-HaveDreyfus = element(1, file:list_dir("../dreyfus")) == ok.
-
-HastingsHome = os:getenv("HASTINGS_HOME", "../hastings").
-HaveHastings = element(1, file:list_dir(HastingsHome)) == ok.
-
-CurrOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
+ErlOpts = [{i, "../"}] ++ case lists:keyfind(erl_opts, 1, CONFIG) of
     {erl_opts, Opts} -> Opts;
     false -> []
 end,
 
-NewOpts =
-    if HaveDreyfus -> [{d, 'HAVE_DREYFUS'}]; true -> [] end ++
-    if HaveHastings -> [{d, 'HAVE_HASTINGS'}]; true -> [] end ++
-    [{i, "../"}] ++ CurrOpts.
-
-lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts}).
+lists:keystore(erl_opts, 1, CONFIG, {erl_opts, ErlOpts}).

@@ -29,8 +29,7 @@
 ]).
 -export([get_or_create_db/2, get_or_create_db_int/2]).
 -export([is_deleted/1, rotate_list/2]).
--export([get_shard_opts/1, get_engine_opt/1, get_props_opt/1]).
--export([get_shard_props/1, find_dirty_shards/0]).
+-export([get_shard_opts/1]).
 -export([
     iso8601_timestamp/0,
     live_nodes/0,
@@ -44,7 +43,8 @@
     non_overlapping_shards/1,
     non_overlapping_shards/3,
     calculate_max_n/1,
-    calculate_max_n/3
+    calculate_max_n/3,
+    range_to_hex/1
 ]).
 
 %% do not use outside mem3.
@@ -71,15 +71,7 @@ name_shard(#ordered_shard{dbname = DbName, range = Range} = Shard, Suffix) ->
     Shard#ordered_shard{name = ?l2b(Name)}.
 
 make_name(DbName, [B, E], Suffix) ->
-    [
-        "shards/",
-        couch_util:to_hex(<<B:32/integer>>),
-        "-",
-        couch_util:to_hex(<<E:32/integer>>),
-        "/",
-        DbName,
-        Suffix
-    ].
+    ["shards/", ?b2l(range_to_hex([B, E])), "/", DbName, Suffix].
 
 create_partition_map(DbName, N, Q, Nodes) ->
     create_partition_map(DbName, N, Q, Nodes, "").
@@ -172,6 +164,12 @@ update_db_doc(DbName, #doc{id = Id, body = Body} = Doc, ShouldMutate) ->
         couch_db:close(Db)
     end.
 
+-spec range_to_hex([non_neg_integer()]) -> binary().
+range_to_hex([B, E]) when is_integer(B), is_integer(E) ->
+    HexB = couch_util:to_hex(<<B:32/integer>>),
+    HexE = couch_util:to_hex(<<E:32/integer>>),
+    ?l2b(HexB ++ "-" ++ HexE).
+
 delete_db_doc(DocId) ->
     gen_server:cast(mem3_shards, {cache_remove, DocId}),
     delete_db_doc(mem3_sync:shards_db(), DocId, true).
@@ -231,8 +229,7 @@ build_shards_by_node(DbName, DocProps) ->
                         #shard{
                             dbname = DbName,
                             node = to_atom(Node),
-                            range = [Beg, End],
-                            opts = get_shard_opts(DocProps)
+                            range = [Beg, End]
                         },
                         Suffix
                     )
@@ -258,8 +255,7 @@ build_shards_by_range(DbName, DocProps) ->
                             dbname = DbName,
                             node = to_atom(Node),
                             range = [Beg, End],
-                            order = Order,
-                            opts = get_shard_opts(DocProps)
+                            order = Order
                         },
                         Suffix
                     )
@@ -271,14 +267,14 @@ build_shards_by_range(DbName, DocProps) ->
     ).
 
 to_atom(Node) when is_binary(Node) ->
-    list_to_atom(binary_to_list(Node));
+    binary_to_atom(Node);
 to_atom(Node) when is_atom(Node) ->
     Node.
 
 to_integer(N) when is_integer(N) ->
     N;
 to_integer(N) when is_binary(N) ->
-    list_to_integer(binary_to_list(N));
+    binary_to_integer(N);
 to_integer(N) when is_list(N) ->
     list_to_integer(N).
 
@@ -469,13 +465,15 @@ range_overlap([A, B], [X, Y]) when
 ->
     A =< Y andalso X =< B.
 
-non_overlapping_shards(Shards) ->
+non_overlapping_shards([]) ->
+    [];
+non_overlapping_shards([_ | _] = Shards) ->
     {Start, End} = lists:foldl(
         fun(Shard, {Min, Max}) ->
             [B, E] = mem3:range(Shard),
             {min(B, Min), max(E, Max)}
         end,
-        {0, ?RING_END},
+        {?RING_END, 0},
         Shards
     ),
     non_overlapping_shards(Shards, Start, End).
@@ -642,50 +640,6 @@ merge_opts(New, Old) ->
         New
     ).
 
-get_shard_props(ShardName) ->
-    case couch_db:open_int(ShardName, []) of
-        {ok, Db} ->
-            Props =
-                case couch_db_engine:get_props(Db) of
-                    undefined -> [];
-                    Else -> Else
-                end,
-            %% We don't normally store the default engine name
-            EngineProps =
-                case couch_db_engine:get_engine(Db) of
-                    couch_bt_engine ->
-                        [];
-                    EngineName ->
-                        [{engine, EngineName}]
-                end,
-            [{props, Props} | EngineProps];
-        {not_found, _} ->
-            not_found;
-        Else ->
-            Else
-    end.
-
-find_dirty_shards() ->
-    mem3_shards:fold(
-        fun(#shard{node = Node, name = Name, opts = Opts} = Shard, Acc) ->
-            case Opts of
-                [] ->
-                    Acc;
-                [{props, []}] ->
-                    Acc;
-                _ ->
-                    Props = rpc:call(Node, ?MODULE, get_shard_props, [Name]),
-                    case Props =:= Opts of
-                        true ->
-                            Acc;
-                        false ->
-                            [{Shard, Props} | Acc]
-                    end
-            end
-        end,
-        []
-    ).
-
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -705,10 +659,11 @@ range_overlap_test_() ->
         ]
     ].
 
-non_overlapping_shards_test() ->
+non_overlapping_shards_test_() ->
     [
         ?_assertEqual(Res, non_overlapping_shards(Shards))
      || {Shards, Res} <- [
+            {[], []},
             {
                 [shard(0, ?RING_END)],
                 [shard(0, ?RING_END)]
@@ -719,7 +674,7 @@ non_overlapping_shards_test() ->
             },
             {
                 [shard(0, 1), shard(0, 1)],
-                [shard(0, 1)]
+                [shard(0, 1), shard(0, 1)]
             },
             {
                 [shard(0, 1), shard(3, 4)],
@@ -731,15 +686,15 @@ non_overlapping_shards_test() ->
             },
             {
                 [shard(1, 2), shard(0, 1)],
-                [shard(0, 1), shard(1, 2)]
+                []
             },
             {
                 [shard(0, 1), shard(0, 2), shard(2, 5), shard(3, 5)],
-                [shard(0, 2), shard(2, 5)]
+                [shard(0, 2), shard(3, 5)]
             },
             {
-                [shard(0, 2), shard(4, 5), shard(1, 3)],
-                []
+                [shard(1, 2), shard(3, 4), shard(1, 4), shard(5, 6)],
+                [shard(1, 4), shard(5, 6)]
             }
         ]
     ].
@@ -776,5 +731,9 @@ calculate_max_n_custom_range_test_() ->
 
 shard(Begin, End) ->
     #shard{range = [Begin, End]}.
+
+range_to_hex_test() ->
+    Range = [2147483648, 4294967295],
+    ?assertEqual(<<"80000000-ffffffff">>, range_to_hex(Range)).
 
 -endif.

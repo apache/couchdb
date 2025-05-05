@@ -454,8 +454,7 @@ delete_db_req(#httpd{} = Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts = [DbName | _], user_ctx = Ctx} = Req, Fun) ->
-    Shard = hd(mem3:shards(DbName)),
-    Props = couch_util:get_value(props, Shard#shard.opts, []),
+    Props = mem3:props(DbName),
     Opts =
         case Ctx of
             undefined ->
@@ -695,22 +694,17 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_purge">>]} = Req, Db) ->
     Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}],
     {IdsRevs} = chttpd:json_body_obj(Req),
     IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
-    MaxIds = config:get_integer("purge", "max_document_id_number", 100),
-    case length(IdsRevs2) =< MaxIds of
-        false -> throw({bad_request, "Exceeded maximum number of documents."});
-        true -> ok
-    end,
-    RevsLen = lists:foldl(
-        fun({_Id, Revs}, Acc) ->
-            length(Revs) + Acc
-        end,
-        0,
-        IdsRevs2
-    ),
-    MaxRevs = config:get_integer("purge", "max_revisions_number", 1000),
-    case RevsLen =< MaxRevs of
-        false -> throw({bad_request, "Exceeded maximum number of revisions."});
-        true -> ok
+    case config:get("purge", "max_revisions_number", "infinity") of
+        "infinity" ->
+            ok;
+        Val ->
+            MaxRevs = list_to_integer(Val),
+            SumFun = fun({_Id, Revs}, Acc) -> length(Revs) + Acc end,
+            RevsLen = lists:foldl(SumFun, 0, IdsRevs2),
+            case RevsLen =< MaxRevs of
+                false -> throw({bad_request, "Exceeded maximum number of revisions."});
+                true -> ok
+            end
     end,
     couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
     Results2 =
@@ -1419,7 +1413,7 @@ receive_request_data(Req, Len) when Len == chunked ->
         GetChunk
     };
 receive_request_data(Req, LenLeft) when LenLeft > 0 ->
-    Len = erlang:min(4096, LenLeft),
+    Len = min(4096, LenLeft),
     Data = chttpd:recv(Req, Len),
     {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
 receive_request_data(_Req, _) ->
@@ -1460,13 +1454,13 @@ purge_results_to_json([{DocId, _Revs} | RIn], [{accepted, PRevs} | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
     couch_stats:increment_counter([couchdb, document_purges, success]),
     NewResults = [{DocId, couch_doc:revs_to_strs(PRevs)} | Results],
-    {erlang:max(Code, 202), NewResults};
+    {max(Code, 202), NewResults};
 purge_results_to_json([{DocId, _Revs} | RIn], [Error | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
     {NewCode, ErrorStr, Reason} = chttpd:error_info(Error),
     couch_stats:increment_counter([couchdb, document_purges, failure]),
     NewResults = [{DocId, {[{error, ErrorStr}, {reason, Reason}]}} | Results],
-    {erlang:max(NewCode, Code), NewResults}.
+    {max(NewCode, Code), NewResults}.
 
 send_updated_doc(Req, Db, DocId, Json) ->
     send_updated_doc(Req, Db, DocId, Json, []).
@@ -1526,9 +1520,9 @@ update_doc(Db, DocId, #doc{deleted = Deleted, body = DocBody} = Doc, Options) ->
             {'DOWN', Ref, _, _, {exit_throw, Reason}} ->
                 throw(Reason);
             {'DOWN', Ref, _, _, {exit_error, Reason}} ->
-                erlang:error(Reason);
+                error(Reason);
             {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
-                erlang:exit(Reason)
+                exit(Reason)
         end,
 
     case Result of
