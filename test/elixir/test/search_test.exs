@@ -71,6 +71,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
@@ -84,6 +85,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode(["place", "kitchen"]), include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
@@ -97,6 +99,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode(["state", "new", "unknown"]), include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
@@ -110,6 +113,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode([["state", "old"], ["item", "apple"]]), include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == []
@@ -123,6 +127,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits?q=*:*&drilldown=[\"state\",\"old\"]&drilldown=[\"item\",\"apple\"]&include_docs=true"
     resp = Couch.get(url)
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == []
@@ -137,6 +142,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
@@ -150,6 +156,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: %{query: "*:*", drilldown: ["place", "kitchen"], include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
@@ -163,6 +170,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: %{query: "*:*", drilldown: ["state", "new", "unknown"], include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
@@ -176,6 +184,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: %{q: "*:*", drilldown: [["state", "old"], ["item", "apple"]], include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == []
@@ -189,6 +198,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: %{q: "*:*", drilldown: [["place", "kitchen"], ["state", "new"], ["item", "apple"]], include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == ["apple"]
@@ -202,6 +212,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: %{q: "*:*", drilldown: [["state", "old", "new"], ["item", "apple"]], include_docs: true})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == ["apple"]
@@ -215,6 +226,7 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     resp = Couch.post(url, body: "{\"include_docs\": true, \"q\": \"*:*\", \"drilldown\": [\"state\", \"old\"], \"drilldown\": [\"item\", \"apple\"]}")
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == ["apple"]
@@ -240,6 +252,7 @@ defmodule SearchTest do
     url = "/#{db_name}/_design/inventory/_search/fruits"
     counts = ["place"]
     resp = Couch.get(url, query: %{q: "*:*", limit: 0, counts: :jiffy.encode(counts)})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
 
     %{:body => %{"counts" => counts}} = resp
@@ -255,6 +268,7 @@ defmodule SearchTest do
     url = "/#{db_name}/_design/inventory/_search/fruits"
     counts = ["place"]
     resp = Couch.get(url, query: %{q: "item:tomato", limit: 0, counts: :jiffy.encode(counts)})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
 
     %{:body => %{"counts" => counts}} = resp
@@ -270,6 +284,7 @@ defmodule SearchTest do
     url = "/#{db_name}/_design/inventory/_search/fruits"
     ranges = %{"price" => %{"cheap" => "[0 TO 0.99]", "expensive" => "[1.00 TO Infinity]"}}
     resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
 
     %{:body => %{"ranges" => ranges}} = resp
@@ -285,6 +300,7 @@ defmodule SearchTest do
     url = "/#{db_name}/_design/inventory/_search/fruits"
     ranges = %{"price" => %{}}
     resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
+    retry_until(fn -> resp.status_code == 200 end)
     assert resp.status_code == 200
 
     %{:body => %{"ranges" => ranges}} = resp
