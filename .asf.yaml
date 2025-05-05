@@ -40,6 +40,9 @@ github:
         strict: true
         contexts:
           - continuous-integration/jenkins/pr-merge
+    3.5.x:
+      required_status_checks:
+        strict: true
     3.4.x:
       required_status_checks:
         strict: true
