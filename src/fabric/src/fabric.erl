@@ -590,24 +590,37 @@ cleanup_index_files(DbName) ->
 cleanup_local_indices_and_purge_checkpoints([]) ->
     ok;
 cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
-    AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
-    AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
-    Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
-    ok = cleanup_purges(Sigs, AllPurges, Dbs),
-    ok = cleanup_indices(Sigs, AllIndices).
+    MrViewIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
+    MrViewPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
+    MrViewSigs = couch_mrview_util:get_signatures(hd(Dbs)),
+    ok = cleanup_mrview_purges(MrViewSigs, MrViewPurges, Dbs),
+    ok = cleanup_mrview_indices(MrViewSigs, MrViewIndices),
 
-cleanup_purges(Sigs, AllPurges, Dbs) ->
+    ClouseauSigs = dreyfus_util:active_sigs(hd(Dbs)),
+    ok = cleanup_clouseau_indices(Dbs, ClouseauSigs),
+
+    NouveauSigs = nouveau_util:active_sigs(hd(Dbs)),
+    ok = cleanup_nouveau_indices(Dbs, NouveauSigs).
+
+cleanup_mrview_purges(Sigs, AllPurges, Dbs) ->
     Fun = fun(DbPurges, Db) ->
         couch_mrview_cleanup:cleanup_purges(Db, Sigs, DbPurges)
     end,
     lists:zipwith(Fun, AllPurges, Dbs),
     ok.
 
-cleanup_indices(Sigs, AllIndices) ->
+cleanup_mrview_indices(Sigs, AllIndices) ->
     Fun = fun(DbIndices) ->
         couch_mrview_cleanup:cleanup_indices(Sigs, DbIndices)
     end,
     lists:foreach(Fun, AllIndices).
+
+cleanup_clouseau_indices(Dbs, ActiveSigs) ->
+    Fun = fun(Db) -> clouseau_rpc:cleanup(Db, ActiveSigs) end,
+    lists:foreach(Fun, Dbs).
+cleanup_nouveau_indices(Dbs, ActiveSigs) ->
+    Fun = fun(Db) -> nouveau_api:delete_path(nouveau_util:index_name(Db), ActiveSigs) end,
+    lists:foreach(Fun, Dbs).
 
 %% @doc clean up index files for a specific db on all nodes
 -spec cleanup_index_files_all_nodes(dbname()) -> [reference()].

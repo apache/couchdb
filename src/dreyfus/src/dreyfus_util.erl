@@ -29,7 +29,8 @@
     maybe_create_local_purge_doc/2,
     maybe_create_local_purge_doc/3,
     get_signature_from_idxdir/1,
-    verify_index_exists/2
+    verify_index_exists/2,
+    active_sigs/1
 ]).
 
 get_shards(DbName, #index_query_args{partition = nil} = Args) ->
@@ -426,6 +427,33 @@ verify_index_exists(DbName, Props) ->
     catch
         _:_ ->
             false
+    end.
+
+active_sigs(DbName) when is_binary(DbName) ->
+    couch_util:with_db(DbName, fun active_sigs/1);
+active_sigs(Db) ->
+    {ok, DesignDocs} = couch_db:get_design_docs(Db),
+    lists:usort(
+        lists:flatmap(
+            fun sigs_from_ddoc/1,
+            [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
+        )
+    ).
+
+sigs_from_ddoc(#doc{body = {Fields}} = Doc) ->
+    try
+        {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
+        {IndexNames, _} = lists:unzip(RawIndexes),
+        [
+            begin
+                {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
+                Index#index.sig
+            end
+         || IndexName <- IndexNames
+        ]
+    catch
+        error:{badmatch, _Error} ->
+            []
     end.
 
 -ifdef(TEST).
