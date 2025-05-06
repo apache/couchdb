@@ -147,6 +147,7 @@ enum {
     JS_CLASS_UINT32_ARRAY,      /* u.array (typed_array) */
     JS_CLASS_BIG_INT64_ARRAY,   /* u.array (typed_array) */
     JS_CLASS_BIG_UINT64_ARRAY,  /* u.array (typed_array) */
+    JS_CLASS_FLOAT16_ARRAY,     /* u.array (typed_array) */
     JS_CLASS_FLOAT32_ARRAY,     /* u.array (typed_array) */
     JS_CLASS_FLOAT64_ARRAY,     /* u.array (typed_array) */
     JS_CLASS_DATAVIEW,          /* u.typed_array */
@@ -974,6 +975,7 @@ struct JSObject {
                 uint32_t *uint32_ptr;   /* JS_CLASS_UINT32_ARRAY */
                 int64_t *int64_ptr;     /* JS_CLASS_INT64_ARRAY */
                 uint64_t *uint64_ptr;   /* JS_CLASS_UINT64_ARRAY */
+                uint16_t *fp16_ptr;     /* JS_CLASS_FLOAT16_ARRAY */
                 float *float_ptr;       /* JS_CLASS_FLOAT32_ARRAY */
                 double *double_ptr;     /* JS_CLASS_FLOAT64_ARRAY */
             } u;
@@ -1078,7 +1080,6 @@ static __exception int JS_ToArrayLengthFree(JSContext *ctx, uint32_t *plen,
 static JSValue JS_EvalObject(JSContext *ctx, JSValueConst this_obj,
                              JSValueConst val, int flags, int scope_idx);
 JSValue __attribute__((format(printf, 2, 3))) JS_ThrowInternalError(JSContext *ctx, const char *fmt, ...);
-static void js_print_atom(JSRuntime *rt, FILE *fo, JSAtom atom);
 static __maybe_unused void JS_DumpAtoms(JSRuntime *rt);
 static __maybe_unused void JS_DumpString(JSRuntime *rt, const JSString *p);
 static __maybe_unused void JS_DumpObjectHeader(JSRuntime *rt);
@@ -1087,6 +1088,7 @@ static __maybe_unused void JS_DumpGCObject(JSRuntime *rt, JSGCObjectHeader *p);
 static __maybe_unused void JS_DumpValueRT(JSRuntime *rt, const char *str, JSValueConst val);
 static __maybe_unused void JS_DumpValue(JSContext *ctx, const char *str, JSValueConst val);
 static __maybe_unused void JS_DumpShapes(JSRuntime *rt);
+static void js_dump_value_write(void *opaque, const char *buf, size_t len);
 static JSValue js_function_apply(JSContext *ctx, JSValueConst this_val,
                                  int argc, JSValueConst *argv, int magic);
 static void js_array_finalizer(JSRuntime *rt, JSValue val);
@@ -1502,6 +1504,7 @@ static JSClassShortDef const js_std_class_def[] = {
     { JS_ATOM_Uint32Array, js_typed_array_finalizer, js_typed_array_mark },     /* JS_CLASS_UINT32_ARRAY */
     { JS_ATOM_BigInt64Array, js_typed_array_finalizer, js_typed_array_mark },   /* JS_CLASS_BIG_INT64_ARRAY */
     { JS_ATOM_BigUint64Array, js_typed_array_finalizer, js_typed_array_mark },  /* JS_CLASS_BIG_UINT64_ARRAY */
+    { JS_ATOM_Float16Array, js_typed_array_finalizer, js_typed_array_mark },    /* JS_CLASS_FLOAT16_ARRAY */
     { JS_ATOM_Float32Array, js_typed_array_finalizer, js_typed_array_mark },    /* JS_CLASS_FLOAT32_ARRAY */
     { JS_ATOM_Float64Array, js_typed_array_finalizer, js_typed_array_mark },    /* JS_CLASS_FLOAT64_ARRAY */
     { JS_ATOM_DataView, js_typed_array_finalizer, js_typed_array_mark },        /* JS_CLASS_DATAVIEW */
@@ -3199,11 +3202,6 @@ static BOOL JS_AtomSymbolHasDescription(JSContext *ctx, JSAtom v)
               p->hash != JS_ATOM_HASH_PRIVATE) ||
              p->atom_type == JS_ATOM_TYPE_GLOBAL_SYMBOL) &&
             !(p->len == 0 && p->is_wide_char != 0));
-}
-
-static __maybe_unused void print_atom(JSContext *ctx, JSAtom atom)
-{
-    js_print_atom(ctx->rt, stdout, atom);
 }
 
 /* free with JS_FreeCString() */
@@ -5096,6 +5094,7 @@ static JSValue JS_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID clas
     case JS_CLASS_UINT32_ARRAY:
     case JS_CLASS_BIG_INT64_ARRAY:
     case JS_CLASS_BIG_UINT64_ARRAY:
+    case JS_CLASS_FLOAT16_ARRAY:
     case JS_CLASS_FLOAT32_ARRAY:
     case JS_CLASS_FLOAT64_ARRAY:
         p->is_exotic = 1;
@@ -6487,6 +6486,7 @@ void JS_ComputeMemoryUsage(JSRuntime *rt, JSMemoryUsage *s)
         case JS_CLASS_UINT32_ARRAY:      /* u.typed_array / u.array */
         case JS_CLASS_BIG_INT64_ARRAY:   /* u.typed_array / u.array */
         case JS_CLASS_BIG_UINT64_ARRAY:  /* u.typed_array / u.array */
+        case JS_CLASS_FLOAT16_ARRAY:     /* u.typed_array / u.array */
         case JS_CLASS_FLOAT32_ARRAY:     /* u.typed_array / u.array */
         case JS_CLASS_FLOAT64_ARRAY:     /* u.typed_array / u.array */
         case JS_CLASS_DATAVIEW:          /* u.typed_array */
@@ -8349,6 +8349,9 @@ static JSValue JS_GetPropertyValue(JSContext *ctx, JSValueConst this_obj,
         case JS_CLASS_BIG_UINT64_ARRAY:
             if (unlikely(idx >= p->u.array.count)) goto slow_path;
             return JS_NewBigUint64(ctx, p->u.array.u.uint64_ptr[idx]);
+        case JS_CLASS_FLOAT16_ARRAY:
+            if (unlikely(idx >= p->u.array.count)) goto slow_path;
+            return __JS_NewFloat64(ctx, fromfp16(p->u.array.u.fp16_ptr[idx]));
         case JS_CLASS_FLOAT32_ARRAY:
             if (unlikely(idx >= p->u.array.count)) goto slow_path;
             return __JS_NewFloat64(ctx, p->u.array.u.float_ptr[idx]);
@@ -9182,6 +9185,13 @@ static int JS_SetPropertyValue(JSContext *ctx, JSValueConst this_obj,
                     goto ta_out_of_bound;
                 p->u.array.u.uint64_ptr[idx] = v;
             }
+            break;
+        case JS_CLASS_FLOAT16_ARRAY:
+            if (JS_ToFloat64Free(ctx, &d, val))
+                return -1;
+            if (unlikely(idx >= (uint32_t)p->u.array.count))
+                goto ta_out_of_bound;
+            p->u.array.u.fp16_ptr[idx] = tofp16(d);
             break;
         case JS_CLASS_FLOAT32_ARRAY:
             if (JS_ToFloat64Free(ctx, &d, val))
@@ -12962,12 +12972,34 @@ typedef struct {
     JSRuntime *rt;
     JSContext *ctx; /* may be NULL */
     JSPrintValueOptions options;
-    FILE *fo;
+    JSPrintValueWrite *write_func;
+    void *write_opaque;
     int level;
     JSObject *print_stack[JS_PRINT_MAX_DEPTH]; /* level values */
 } JSPrintValueState;
 
 static void js_print_value(JSPrintValueState *s, JSValueConst val);
+
+static void js_putc(JSPrintValueState *s, char c)
+{
+    s->write_func(s->write_opaque, &c, 1);
+}
+
+static void js_puts(JSPrintValueState *s, const char *str)
+{
+    s->write_func(s->write_opaque, str, strlen(str));
+}
+
+static void __attribute__((format(printf, 2, 3))) js_printf(JSPrintValueState *s, const char *fmt, ...)
+{
+    va_list ap;
+    char buf[256];
+    
+    va_start(ap, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
+    s->write_func(s->write_opaque, buf, strlen(buf));
+}
 
 static void js_print_float64(JSPrintValueState *s, double d)
 {
@@ -12975,7 +13007,7 @@ static void js_print_float64(JSPrintValueState *s, double d)
     char buf[32];
     int len;
     len = js_dtoa(buf, d, 10, 0, JS_DTOA_FORMAT_FREE | JS_DTOA_MINUS_ZERO, &dtoa_mem);
-    fwrite(buf, 1, len, s->fo);
+    s->write_func(s->write_opaque, buf, len);
 }
 
 static uint32_t js_string_get_length(JSValueConst val)
@@ -12991,8 +13023,23 @@ static uint32_t js_string_get_length(JSValueConst val)
     }
 }
 
+static void js_dump_char(JSPrintValueState *s, int c, int sep)
+{
+    if (c == sep || c == '\\') {
+        js_putc(s, '\\');
+        js_putc(s, c);
+    } else if (c >= ' ' && c <= 126) {
+        js_putc(s, c);
+    } else if (c == '\n') {
+        js_putc(s, '\\');
+        js_putc(s, 'n');
+    } else {
+        js_printf(s, "\\u%04x", c);
+    }
+}
+
 static void js_print_string_rec(JSPrintValueState *s, JSValueConst val,
-                                    int sep, uint32_t pos)
+                                int sep, uint32_t pos)
 {
     if (JS_VALUE_GET_TAG(val) == JS_TAG_STRING) {
         JSString *p = JS_VALUE_GET_STRING(val);
@@ -13000,7 +13047,7 @@ static void js_print_string_rec(JSPrintValueState *s, JSValueConst val,
         if (pos < s->options.max_string_length) {
             len = min_uint32(p->len, s->options.max_string_length - pos);
             for(i = 0; i < len; i++) {
-                JS_DumpChar(s->fo, string_get(p, i), sep);
+                js_dump_char(s, string_get(p, i), sep);
             }
         }
     } else if (JS_VALUE_GET_TAG(val) == JS_TAG_STRING_ROPE) {
@@ -13008,7 +13055,7 @@ static void js_print_string_rec(JSPrintValueState *s, JSValueConst val,
         js_print_string_rec(s, r->left, sep, pos);
         js_print_string_rec(s, r->right, sep, pos + js_string_get_length(r->left));
     } else {
-        fprintf(s->fo, "<invalid string tag %d>", (int)JS_VALUE_GET_TAG(val));
+        js_printf(s, "<invalid string tag %d>", (int)JS_VALUE_GET_TAG(val));
     }
 }
 
@@ -13017,17 +13064,17 @@ static void js_print_string(JSPrintValueState *s, JSValueConst val)
     int sep;
     if (s->options.raw_dump && JS_VALUE_GET_TAG(val) == JS_TAG_STRING) {
         JSString *p = JS_VALUE_GET_STRING(val);
-        fprintf(s->fo, "%d", p->header.ref_count);
+        js_printf(s, "%d", p->header.ref_count);
         sep = (p->header.ref_count == 1) ? '\"' : '\'';
     } else {
         sep = '\"';
     }
-    fputc(sep, s->fo);
+    js_putc(s, sep);
     js_print_string_rec(s, val, sep, 0);
-    fputc(sep, s->fo);
+    js_putc(s, sep);
     if (js_string_get_length(val) > s->options.max_string_length) {
         uint32_t n = js_string_get_length(val) - s->options.max_string_length;
-        fprintf(s->fo, "... %u more character%s", n, n > 1 ? "s" : "");
+        js_printf(s, "... %u more character%s", n, n > 1 ? "s" : "");
     }
 }
 
@@ -13039,7 +13086,7 @@ static void js_print_raw_string2(JSPrintValueState *s, JSValueConst val, BOOL re
     if (cstr) {
         if (remove_last_lf && len > 0 && cstr[len - 1] == '\n')
             len--;
-        fwrite(cstr, 1, len, s->fo);
+        s->write_func(s->write_opaque, cstr, len);
         JS_FreeCString(s->ctx, cstr);
     }
 }
@@ -13064,27 +13111,27 @@ static BOOL is_ascii_ident(const JSString *p)
     return TRUE;
 }
 
-static void js_print_atom(JSRuntime *rt, FILE *fo, JSAtom atom)
+static void js_print_atom(JSPrintValueState *s, JSAtom atom)
 {
     int i;
     if (__JS_AtomIsTaggedInt(atom)) {
-        fprintf(fo, "%u", __JS_AtomToUInt32(atom));
+        js_printf(s, "%u", __JS_AtomToUInt32(atom));
     } else if (atom == JS_ATOM_NULL) {
-        fprintf(fo, "<null>");
+        js_puts(s, "<null>");
     } else {
-        assert(atom < rt->atom_size);
+        assert(atom < s->rt->atom_size);
         JSString *p;
-        p = rt->atom_array[atom];
+        p = s->rt->atom_array[atom];
         if (is_ascii_ident(p)) {
             for(i = 0; i < p->len; i++) {
-                fputc(string_get(p, i), fo);
+                js_putc(s, string_get(p, i));
             }
         } else {
-            fputc('"', fo);
+            js_putc(s, '"');
             for(i = 0; i < p->len; i++) {
-                JS_DumpChar(fo, string_get(p, i), '\"');
+                js_dump_char(s, string_get(p, i), '\"');
             }
-            fputc('"', fo);
+            js_putc(s, '"');
         }
     }
 }
@@ -13118,10 +13165,10 @@ static void js_print_comma(JSPrintValueState *s, int *pcomma_state)
     case 0:
         break;
     case 1:
-        fprintf(s->fo, ", ");
+        js_printf(s, ", ");
         break;
     case 2:
-        fprintf(s->fo, " { ");
+        js_printf(s, " { ");
         break;
     }
     *pcomma_state = 1;
@@ -13131,7 +13178,7 @@ static void js_print_more_items(JSPrintValueState *s, int *pcomma_state,
                                 uint32_t n)
 {
     js_print_comma(s, pcomma_state);
-    fprintf(s->fo, "... %u more item%s", n, n > 1 ? "s" : "");
+    js_printf(s, "... %u more item%s", n, n > 1 ? "s" : "");
 }
 
 static void js_print_object(JSPrintValueState *s, JSObject *p)
@@ -13148,7 +13195,7 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
     is_array = FALSE;
     if (p->class_id == JS_CLASS_ARRAY) {
         is_array = TRUE;
-        fprintf(s->fo, "[ ");
+        js_printf(s, "[ ");
         /* XXX: print array like properties even if not fast array */
         if (p->fast_array) {
             uint32_t len, n, len1;
@@ -13164,7 +13211,7 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
             if (p->u.array.count < len) {
                 n = len - p->u.array.count;
                 js_print_comma(s, &comma_state);
-                fprintf(s->fo, "<%u empty item%s>", n, n > 1 ? "s" : "");
+                js_printf(s, "<%u empty item%s>", n, n > 1 ? "s" : "");
             }
         }
     } else if (p->class_id >= JS_CLASS_UINT8C_ARRAY && p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
@@ -13172,8 +13219,8 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
         uint32_t len1;
         int64_t v;
 
-        js_print_atom(s->rt, s->fo, rt->class_array[p->class_id].class_name);
-        fprintf(s->fo, "(%u) [ ", p->u.array.count);
+        js_print_atom(s, rt->class_array[p->class_id].class_name);
+        js_printf(s, "(%u) [ ", p->u.array.count);
         
         is_array = TRUE;
         len1 = min_uint32(p->u.array.count, s->options.max_item_count);
@@ -13203,10 +13250,13 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
             case JS_CLASS_BIG_INT64_ARRAY:
                 v = *(int64_t *)ptr;
             ta_int64:
-                fprintf(s->fo, "%" PRId64, v);
+                js_printf(s, "%" PRId64, v);
                 break;
             case JS_CLASS_BIG_UINT64_ARRAY:
-                fprintf(s->fo, "%" PRIu64, *(uint64_t *)ptr);
+                js_printf(s, "%" PRIu64, *(uint64_t *)ptr);
+                break;
+            case JS_CLASS_FLOAT16_ARRAY:
+                js_print_float64(s, fromfp16(*(uint16_t *)ptr));
                 break;
             case JS_CLASS_FLOAT32_ARRAY:
                 js_print_float64(s, *(float *)ptr);
@@ -13221,19 +13271,19 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
     } else if (p->class_id == JS_CLASS_BYTECODE_FUNCTION ||
                (rt->class_array[p->class_id].call != NULL &&
                 p->class_id != JS_CLASS_PROXY)) {
-        fprintf(s->fo, "[Function");
+        js_printf(s, "[Function");
         /* XXX: allow dump without ctx */
         if (!s->options.raw_dump && s->ctx) {
             const char *func_name_str;
-            fputc(' ', s->fo);
+            js_putc(s, ' ');
             func_name_str = get_func_name(s->ctx, JS_MKPTR(JS_TAG_OBJECT, p));
             if (!func_name_str || func_name_str[0] == '\0')
-                fputs("(anonymous)", s->fo);
+                js_puts(s, "(anonymous)");
             else
-                fputs(func_name_str, s->fo);
+                js_puts(s, func_name_str);
             JS_FreeCString(s->ctx, func_name_str);
         }
-        fprintf(s->fo, "]");
+        js_printf(s, "]");
         comma_state = 2;
     } else if (p->class_id == JS_CLASS_MAP || p->class_id == JS_CLASS_SET) {
         JSMapState *ms = p->u.opaque;
@@ -13241,8 +13291,8 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
         
         if (!ms)
             goto default_obj;
-        js_print_atom(s->rt, s->fo, rt->class_array[p->class_id].class_name);
-        fprintf(s->fo, "(%u) { ", ms->record_count);
+        js_print_atom(s, rt->class_array[p->class_id].class_name);
+        js_printf(s, "(%u) { ", ms->record_count);
         i = 0;
         list_for_each(el, &ms->records) {
             JSMapRecord *mr = list_entry(el, JSMapRecord, link);
@@ -13251,7 +13301,7 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
                 continue;
             js_print_value(s, mr->key);
             if (p->class_id == JS_CLASS_MAP) {
-                fprintf(s->fo, " => ");
+                js_printf(s, " => ");
                 js_print_value(s, mr->value);
             }
             i++;
@@ -13283,7 +13333,7 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
         /* dump the stack if present */
         str = JS_GetProperty(s->ctx, JS_MKPTR(JS_TAG_OBJECT, p), JS_ATOM_stack);
         if (JS_IsString(str)) {
-            fputc('\n', s->fo);
+            js_putc(s, '\n');
             /* XXX: should remove the last '\n' in stack as
                v8. SpiderMonkey does not do it */
             js_print_raw_string2(s, str, TRUE);
@@ -13293,10 +13343,10 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
     } else {
         default_obj:
         if (p->class_id != JS_CLASS_OBJECT) {
-            js_print_atom(s->rt, s->fo, rt->class_array[p->class_id].class_name);
-            fprintf(s->fo, " ");
+            js_print_atom(s, rt->class_array[p->class_id].class_name);
+            js_printf(s, " ");
         }
-        fprintf(s->fo, "{ ");
+        js_printf(s, "{ ");
     }
     
     sh = p->shape; /* the shape can be NULL while freeing an object */
@@ -13313,39 +13363,39 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
                 if (j < s->options.max_item_count) {
                     pr = &p->prop[i];
                     js_print_comma(s, &comma_state);
-                    js_print_atom(s->rt, s->fo, prs->atom);
-                    fprintf(s->fo, ": ");
+                    js_print_atom(s, prs->atom);
+                    js_printf(s, ": ");
                     
                     /* XXX: autoinit property */
                     if ((prs->flags & JS_PROP_TMASK) == JS_PROP_GETSET) {
                         if (s->options.raw_dump) {
-                            fprintf(s->fo, "[Getter %p Setter %p]",
+                            js_printf(s, "[Getter %p Setter %p]",
                                     pr->u.getset.getter, pr->u.getset.setter);
                         } else {
                             if (pr->u.getset.getter && pr->u.getset.setter) {
-                                fprintf(s->fo, "[Getter/Setter]");
+                                js_printf(s, "[Getter/Setter]");
                             } else if (pr->u.getset.setter) {
-                                fprintf(s->fo, "[Setter]");
+                                js_printf(s, "[Setter]");
                             } else {
-                                fprintf(s->fo, "[Getter]");
+                                js_printf(s, "[Getter]");
                             }
                         }
                     } else if ((prs->flags & JS_PROP_TMASK) == JS_PROP_VARREF) {
                         if (s->options.raw_dump) {
-                            fprintf(s->fo, "[varref %p]", (void *)pr->u.var_ref);
+                            js_printf(s, "[varref %p]", (void *)pr->u.var_ref);
                         } else {
                             js_print_value(s, *pr->u.var_ref->pvalue);
                         }
                     } else if ((prs->flags & JS_PROP_TMASK) == JS_PROP_AUTOINIT) {
                         if (s->options.raw_dump) {
-                            fprintf(s->fo, "[autoinit %p %d %p]",
+                            js_printf(s, "[autoinit %p %d %p]",
                                     (void *)js_autoinit_get_realm(pr),
                                     js_autoinit_get_id(pr),
                                     (void *)pr->u.init.opaque);
                         } else {
                             /* XXX: could autoinit but need to restart
                                the iteration */
-                            fprintf(s->fo, "[autoinit]");
+                            js_printf(s, "[autoinit]");
                         }
                     } else {
                         js_print_value(s, pr->u.value);
@@ -13357,34 +13407,34 @@ static void js_print_object(JSPrintValueState *s, JSObject *p)
         if (j > s->options.max_item_count)
             js_print_more_items(s, &comma_state, j - s->options.max_item_count);
     }
-    if (s->options.show_closure && js_class_has_bytecode(p->class_id)) {
+    if (s->options.raw_dump && js_class_has_bytecode(p->class_id)) {
         JSFunctionBytecode *b = p->u.func.function_bytecode;
         if (b->closure_var_count) {
             JSVarRef **var_refs;
             var_refs = p->u.func.var_refs;
             
             js_print_comma(s, &comma_state);
-            fprintf(s->fo, "[[Closure]]: [");
+            js_printf(s, "[[Closure]]: [");
             for(i = 0; i < b->closure_var_count; i++) {
                 if (i != 0)
-                    fprintf(s->fo, ", ");
+                    js_printf(s, ", ");
                 js_print_value(s, var_refs[i]->value);
             }
-            fprintf(s->fo, " ]");
+            js_printf(s, " ]");
         }
         if (p->u.func.home_object) {
             js_print_comma(s, &comma_state);
-            fprintf(s->fo, "[[HomeObject]]: ");
+            js_printf(s, "[[HomeObject]]: ");
             js_print_value(s, JS_MKPTR(JS_TAG_OBJECT, p->u.func.home_object));
         }
     }
 
     if (!is_array) {
         if (comma_state != 2) {
-            fprintf(s->fo, " }");
+            js_printf(s, " }");
         }
     } else {
-        fprintf(s->fo, " ]");
+        js_printf(s, " ]");
     }
 }
 
@@ -13404,7 +13454,7 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
 
     switch(tag) {
     case JS_TAG_INT:
-        fprintf(s->fo, "%d", JS_VALUE_GET_INT(val));
+        js_printf(s, "%d", JS_VALUE_GET_INT(val));
         break;
     case JS_TAG_BOOL:
         if (JS_VALUE_GET_BOOL(val))
@@ -13424,13 +13474,13 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
     case JS_TAG_UNDEFINED:
         str = "undefined";
     print_str:
-        fprintf(s->fo, "%s", str);
+        js_puts(s, str);
         break;
     case JS_TAG_FLOAT64:
         js_print_float64(s, JS_VALUE_GET_FLOAT64(val));
         break;
     case JS_TAG_SHORT_BIG_INT:
-        fprintf(s->fo, "%" PRId64 "n", (int64_t)JS_VALUE_GET_SHORT_BIG_INT(val));
+        js_printf(s, "%" PRId64 "n", (int64_t)JS_VALUE_GET_SHORT_BIG_INT(val));
         break;
     case JS_TAG_BIG_INT:
         if (!s->options.raw_dump && s->ctx) {
@@ -13438,7 +13488,7 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
             if (JS_IsException(str))
                 goto raw_bigint;
             js_print_raw_string(s, str);
-            fputc('n', s->fo);
+            js_putc(s, 'n');
             JS_FreeValueRT(s->rt, str);
         } else {
             JSBigInt *p;
@@ -13448,27 +13498,27 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
             /* In order to avoid allocations we just dump the limbs */
             sgn = js_bigint_sign(p);
             if (sgn)
-                fprintf(s->fo, "BigInt.asIntN(%d,", p->len * JS_LIMB_BITS);
-            fprintf(s->fo, "0x");
+                js_printf(s, "BigInt.asIntN(%d,", p->len * JS_LIMB_BITS);
+            js_printf(s, "0x");
             for(i = p->len - 1; i >= 0; i--) {
                 if (i != p->len - 1)
-                    fprintf(s->fo, "_");
+                    js_putc(s, '_');
 #if JS_LIMB_BITS == 32
-                fprintf(s->fo, "%08x", p->tab[i]);
+                js_printf(s, "%08x", p->tab[i]);
 #else
-                fprintf(s->fo, "%016" PRIx64, p->tab[i]);
+                js_printf(s, "%016" PRIx64, p->tab[i]);
 #endif
             }
-            fprintf(s->fo, "n");
+            js_putc(s, 'n');
             if (sgn)
-                fprintf(s->fo, ")");
+                js_putc(s, ')');
         }
         break;
     case JS_TAG_STRING:
     case JS_TAG_STRING_ROPE:
         if (s->options.raw_dump && tag == JS_TAG_STRING_ROPE) {
             JSStringRope *r = JS_VALUE_GET_STRING_ROPE(val);
-            fprintf(s->fo, "[rope len=%d depth=%d]", r->len, r->depth);
+            js_printf(s, "[rope len=%d depth=%d]", r->len, r->depth);
         } else {
             js_print_string(s, val);
         }
@@ -13476,9 +13526,9 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
     case JS_TAG_FUNCTION_BYTECODE:
         {
             JSFunctionBytecode *b = JS_VALUE_GET_PTR(val);
-            fprintf(s->fo, "[bytecode ");
-            js_print_atom(s->rt, s->fo, b->func_name);
-            fprintf(s->fo, "]");
+            js_puts(s, "[bytecode ");
+            js_print_atom(s, b->func_name);
+            js_putc(s, ']');
         }
         break;
     case JS_TAG_OBJECT:
@@ -13487,35 +13537,35 @@ static void js_print_value(JSPrintValueState *s, JSValueConst val)
             int idx;
             idx = js_print_stack_index(s, p);
             if (idx >= 0) {
-                fprintf(s->fo, "[circular %d]", idx);
+                js_printf(s, "[circular %d]", idx);
             } else if (s->level < s->options.max_depth) {
                 s->print_stack[s->level++] = p;
                 js_print_object(s, JS_VALUE_GET_OBJ(val));
                 s->level--;
             } else {
                 JSAtom atom = s->rt->class_array[p->class_id].class_name;
-                fprintf(s->fo, "[");
-                js_print_atom(s->rt, s->fo, atom);
+                js_putc(s, '[');
+                js_print_atom(s, atom);
                 if (s->options.raw_dump) {
-                    fprintf(s->fo, " %p", (void *)p);
+                    js_printf(s, " %p", (void *)p);
                 }
-                fprintf(s->fo, "]");
+                js_putc(s, ']');
             }
         }
         break;
     case JS_TAG_SYMBOL:
         {
             JSAtomStruct *p = JS_VALUE_GET_PTR(val);
-            fprintf(s->fo, "Symbol(");
-            js_print_atom(s->rt, s->fo, js_get_atom_index(s->rt, p));
-            fprintf(s->fo, ")");
+            js_puts(s, "Symbol(");
+            js_print_atom(s, js_get_atom_index(s->rt, p));
+            js_putc(s, ')');
         }
         break;
     case JS_TAG_MODULE:
-        fprintf(s->fo, "[module]");
+        js_puts(s, "[module]");
         break;
     default:
-        fprintf(s->fo, "[unknown tag %d]", tag);
+        js_printf(s, "[unknown tag %d]", tag);
         break;
     }
 }
@@ -13528,8 +13578,9 @@ void JS_PrintValueSetDefaultOptions(JSPrintValueOptions *options)
     options->max_item_count = 100;
 }
 
-static void JS_PrintValueInternal(JSRuntime *rt, JSContext *ctx,
-                                  FILE *fo, JSValueConst val, const JSPrintValueOptions *options)
+static void JS_PrintValueInternal(JSRuntime *rt, JSContext *ctx, 
+                                  JSPrintValueWrite *write_func, void *write_opaque,
+                                  JSValueConst val, const JSPrintValueOptions *options)
 {
     JSPrintValueState ss, *s = &ss;
     if (options)
@@ -13546,32 +13597,52 @@ static void JS_PrintValueInternal(JSRuntime *rt, JSContext *ctx,
         s->options.max_item_count = UINT32_MAX;
     s->rt = rt;
     s->ctx = ctx;
-    s->fo = fo;
+    s->write_func = write_func;
+    s->write_opaque = write_opaque;
     s->level = 0;
     js_print_value(s, val);
 }
 
-void JS_PrintValueRT(JSRuntime *rt, FILE *fo, JSValueConst val, const JSPrintValueOptions *options)
+void JS_PrintValueRT(JSRuntime *rt, JSPrintValueWrite *write_func, void *write_opaque,
+                     JSValueConst val, const JSPrintValueOptions *options)
 {
-    JS_PrintValueInternal(rt, NULL, fo, val, options);
+    JS_PrintValueInternal(rt, NULL, write_func, write_opaque, val, options);
 }
 
-void JS_PrintValue(JSContext *ctx, FILE *fo, JSValueConst val, const JSPrintValueOptions *options)
+void JS_PrintValue(JSContext *ctx, JSPrintValueWrite *write_func, void *write_opaque,
+                   JSValueConst val, const JSPrintValueOptions *options)
 {
-    JS_PrintValueInternal(ctx->rt, ctx, fo, val, options);
+    JS_PrintValueInternal(ctx->rt, ctx, write_func, write_opaque, val, options);
+}
+
+static void js_dump_value_write(void *opaque, const char *buf, size_t len)
+{
+    FILE *fo = opaque;
+    fwrite(buf, 1, len, fo);
+}
+
+static __maybe_unused void print_atom(JSContext *ctx, JSAtom atom)
+{
+    JSPrintValueState ss, *s = &ss;
+    memset(s, 0, sizeof(*s));
+    s->rt = ctx->rt;
+    s->ctx = ctx;
+    s->write_func = js_dump_value_write;
+    s->write_opaque = stdout;
+    js_print_atom(s, atom);
 }
 
 static __maybe_unused void JS_DumpValue(JSContext *ctx, const char *str, JSValueConst val)
 {
     printf("%s=", str);
-    JS_PrintValue(ctx, stdout, val, NULL);
+    JS_PrintValue(ctx, js_dump_value_write, stdout, val, NULL);
     printf("\n");
 }
 
 static __maybe_unused void JS_DumpValueRT(JSRuntime *rt, const char *str, JSValueConst val)
 {
     printf("%s=", str);
-    JS_PrintValueRT(rt, stdout, val, NULL);
+    JS_PrintValueRT(rt, js_dump_value_write, stdout, val, NULL);
     printf("\n");
 }
 
@@ -13605,7 +13676,7 @@ static __maybe_unused void JS_DumpObject(JSRuntime *rt, JSObject *p)
     options.max_depth = 1;
     options.show_hidden = TRUE;
     options.raw_dump = TRUE;
-    JS_PrintValueRT(rt, stdout, JS_MKPTR(JS_TAG_OBJECT, p), &options);
+    JS_PrintValueRT(rt, js_dump_value_write, stdout, JS_MKPTR(JS_TAG_OBJECT, p), &options);
 
     printf("\n");
 }
@@ -30522,7 +30593,7 @@ static void dump_byte_code(JSContext *ctx, int pass,
         has_pool_idx:
             printf(" %u: ", idx);
             if (idx < cpool_count) {
-                JS_PrintValue(ctx, stdout, cpool[idx], NULL);
+                JS_PrintValue(ctx, js_dump_value_write, stdout, cpool[idx], NULL);
             }
             break;
         case OP_FMT_atom:
@@ -43849,6 +43920,11 @@ static JSValue js_math_hypot(JSContext *ctx, JSValueConst this_val,
     return JS_NewFloat64(ctx, r);
 }
 
+static double js_math_f16round(double a)
+{
+    return fromfp16(tofp16(a));
+}
+
 static double js_math_fround(double a)
 {
     return (float)a;
@@ -43952,6 +44028,7 @@ static const JSCFunctionListEntry js_math_funcs[] = {
     JS_CFUNC_SPECIAL_DEF("cbrt", 1, f_f, cbrt ),
     JS_CFUNC_DEF("hypot", 2, js_math_hypot ),
     JS_CFUNC_DEF("random", 0, js_math_random ),
+    JS_CFUNC_SPECIAL_DEF("f16round", 1, f_f, js_math_f16round ),
     JS_CFUNC_SPECIAL_DEF("fround", 1, f_f, js_math_fround ),
     JS_CFUNC_DEF("imul", 2, js_math_imul ),
     JS_CFUNC_DEF("clz32", 1, js_math_clz32 ),
@@ -44529,6 +44606,58 @@ void *lre_realloc(void *opaque, void *ptr, size_t size)
     JSContext *ctx = opaque;
     /* No JS exception is raised here */
     return js_realloc_rt(ctx->rt, ptr, size);
+}
+
+static JSValue js_regexp_escape(JSContext *ctx, JSValueConst this_val,
+                                int argc, JSValueConst *argv)
+{
+    JSValue str;
+    StringBuffer b_s, *b = &b_s;
+    JSString *p;
+    uint32_t c, i;
+    char s[16];
+
+    if (!JS_IsString(argv[0]))
+        return JS_ThrowTypeError(ctx, "not a string");
+    str = JS_ToString(ctx, argv[0]); /* must call it to linearlize ropes */
+    if (JS_IsException(str))
+        return JS_EXCEPTION;
+    p = JS_VALUE_GET_STRING(str);
+    string_buffer_init2(ctx, b, 0, p->is_wide_char);
+    for (i = 0; i < p->len; i++) {
+        c = string_get(p, i);
+        if (c < 33) {
+            if (c >= 9 && c <= 13) {
+                string_buffer_putc8(b, '\\');
+                string_buffer_putc8(b, "tnvfr"[c - 9]);
+            } else {
+                goto hex2;
+            }
+        } else if (c < 128) {
+            if ((c >= '0' && c <= '9')
+             || (c >= 'A' && c <= 'Z')
+             || (c >= 'a' && c <= 'z')) {
+                if (i == 0)
+                    goto hex2;
+            } else if (strchr(",-=<>#&!%:;@~'`\"", c)) {
+                goto hex2;
+            } else if (c != '_') {
+                string_buffer_putc8(b, '\\');
+            }
+            string_buffer_putc8(b, c);
+        } else if (c < 256) {
+        hex2:
+            snprintf(s, sizeof(s), "\\x%02x", c);
+            string_buffer_puts8(b, s);
+        } else if (is_surrogate(c) || lre_is_space(c)) {
+            snprintf(s, sizeof(s), "\\u%04x", c);
+            string_buffer_puts8(b, s);
+        } else {
+            string_buffer_putc16(b, c);
+        }
+    }
+    JS_FreeValue(ctx, str);
+    return string_buffer_end(b);
 }
 
 static JSValue js_regexp_exec(JSContext *ctx, JSValueConst this_val,
@@ -45578,6 +45707,7 @@ done:
 }
 
 static const JSCFunctionListEntry js_regexp_funcs[] = {
+    JS_CFUNC_DEF("escape", 1, js_regexp_escape ),
     JS_CGETSET_DEF("[Symbol.species]", js_get_this, NULL ),
     //JS_CFUNC_DEF("__RegExpExec", 2, js_regexp___RegExpExec ),
     //JS_CFUNC_DEF("__RegExpDelete", 2, js_regexp___RegExpDelete ),
@@ -51866,8 +51996,8 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
 
 static uint8_t const typed_array_size_log2[JS_TYPED_ARRAY_COUNT] = {
     0, 0, 0, 1, 1, 2, 2,
-    3, 3, /* BigInt64Array, BigUint64Array */
-    2, 3
+    3, 3,                   // BigInt64Array, BigUint64Array
+    1, 2, 3                 // Float16Array, Float32Array, Float64Array
 };
 
 static JSValue js_array_buffer_constructor3(JSContext *ctx,
@@ -52800,7 +52930,9 @@ static JSValue js_typed_array_fill(JSContext *ctx, JSValueConst this_val,
         double d;
         if (JS_ToFloat64(ctx, &d, argv[0]))
             return JS_EXCEPTION;
-        if (p->class_id == JS_CLASS_FLOAT32_ARRAY) {
+        if (p->class_id == JS_CLASS_FLOAT16_ARRAY) {
+            v64 = tofp16(d);
+        } else if (p->class_id == JS_CLASS_FLOAT32_ARRAY) {
             union {
                 float f;
                 uint32_t u32;
@@ -52931,6 +53063,7 @@ static JSValue js_typed_array_indexOf(JSContext *ctx, JSValueConst this_val,
     int64_t v64;
     double d;
     float f;
+    uint16_t hf;
 
     len = js_typed_array_get_length_internal(ctx, this_val);
     if (len < 0)
@@ -53087,6 +53220,39 @@ static JSValue js_typed_array_indexOf(JSContext *ctx, JSValueConst this_val,
             v = v64;
             for (; k != stop; k += inc) {
                 if (pv[k] == v) {
+                    res = k;
+                    break;
+                }
+            }
+        }
+        break;
+    case JS_CLASS_FLOAT16_ARRAY:
+        if (is_bigint)
+            break;
+        if (isnan(d)) {
+            const uint16_t *pv = p->u.array.u.fp16_ptr;
+            /* special case: indexOf returns -1, includes finds NaN */
+            if (special != special_includes)
+                goto done;
+            for (; k != stop; k += inc) {
+                if (isfp16nan(pv[k])) {
+                    res = k;
+                    break;
+                }
+            }
+        } else if (d == 0) {
+            // special case: includes also finds negative zero
+            const uint16_t *pv = p->u.array.u.fp16_ptr;
+            for (; k != stop; k += inc) {
+                if (isfp16zero(pv[k])) {
+                    res = k;
+                    break;
+                }
+            }
+        } else if (hf = tofp16(d), d == fromfp16(hf)) {
+            const uint16_t *pv = p->u.array.u.fp16_ptr;
+            for (; k != stop; k += inc) {
+                if (pv[k] == hf) {
                     res = k;
                     break;
                 }
@@ -53483,6 +53649,11 @@ static int js_TA_cmp_uint64(const void *a, const void *b, void *opaque) {
     return (y < x) - (y > x);
 }
 
+static int js_TA_cmp_float16(const void *a, const void *b, void *opaque) {
+    return js_cmp_doubles(fromfp16(*(const uint16_t *)a),
+                          fromfp16(*(const uint16_t *)b));
+}
+
 static int js_TA_cmp_float32(const void *a, const void *b, void *opaque) {
     return js_cmp_doubles(*(const float *)a, *(const float *)b);
 }
@@ -53521,6 +53692,10 @@ static JSValue js_TA_get_int64(JSContext *ctx, const void *a) {
 
 static JSValue js_TA_get_uint64(JSContext *ctx, const void *a) {
     return JS_NewBigUint64(ctx, *(uint64_t *)a);
+}
+
+static JSValue js_TA_get_float16(JSContext *ctx, const void *a) {
+    return __JS_NewFloat64(ctx, fromfp16(*(const uint16_t *)a));
 }
 
 static JSValue js_TA_get_float32(JSContext *ctx, const void *a) {
@@ -53647,6 +53822,10 @@ static JSValue js_typed_array_sort(JSContext *ctx, JSValueConst this_val,
         case JS_CLASS_BIG_UINT64_ARRAY:
             tsc.getfun = js_TA_get_uint64;
             cmpfun = js_TA_cmp_uint64;
+            break;
+        case JS_CLASS_FLOAT16_ARRAY:
+            tsc.getfun = js_TA_get_float16;
+            cmpfun = js_TA_cmp_float16;
             break;
         case JS_CLASS_FLOAT32_ARRAY:
             tsc.getfun = js_TA_get_float32;
@@ -54203,6 +54382,14 @@ static JSValue js_dataview_getValue(JSContext *ctx,
             return JS_NewBigUint64(ctx, v);
         }
         break;
+    case JS_CLASS_FLOAT16_ARRAY:
+        {
+            uint16_t v;
+            v = get_u16(ptr);
+            if (is_swap)
+                v = bswap16(v);
+            return __JS_NewFloat64(ctx, fromfp16(v));
+        }
     case JS_CLASS_FLOAT32_ARRAY:
         {
             union {
@@ -54264,7 +54451,9 @@ static JSValue js_dataview_setValue(JSContext *ctx,
         double d;
         if (JS_ToFloat64(ctx, &d, val))
             return JS_EXCEPTION;
-        if (class_id == JS_CLASS_FLOAT32_ARRAY) {
+        if (class_id == JS_CLASS_FLOAT16_ARRAY) {
+            v = tofp16(d);
+        } else if (class_id == JS_CLASS_FLOAT32_ARRAY) {
             union {
                 float f;
                 uint32_t i;
@@ -54293,6 +54482,7 @@ static JSValue js_dataview_setValue(JSContext *ctx,
         break;
     case JS_CLASS_INT16_ARRAY:
     case JS_CLASS_UINT16_ARRAY:
+    case JS_CLASS_FLOAT16_ARRAY:
         if (is_swap)
             v = bswap16(v);
         put_u16(ptr, v);
@@ -54329,6 +54519,7 @@ static const JSCFunctionListEntry js_dataview_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("getUint32", 1, js_dataview_getValue, JS_CLASS_UINT32_ARRAY ),
     JS_CFUNC_MAGIC_DEF("getBigInt64", 1, js_dataview_getValue, JS_CLASS_BIG_INT64_ARRAY ),
     JS_CFUNC_MAGIC_DEF("getBigUint64", 1, js_dataview_getValue, JS_CLASS_BIG_UINT64_ARRAY ),
+    JS_CFUNC_MAGIC_DEF("getFloat16", 1, js_dataview_getValue, JS_CLASS_FLOAT16_ARRAY ),
     JS_CFUNC_MAGIC_DEF("getFloat32", 1, js_dataview_getValue, JS_CLASS_FLOAT32_ARRAY ),
     JS_CFUNC_MAGIC_DEF("getFloat64", 1, js_dataview_getValue, JS_CLASS_FLOAT64_ARRAY ),
     JS_CFUNC_MAGIC_DEF("setInt8", 2, js_dataview_setValue, JS_CLASS_INT8_ARRAY ),
@@ -54339,6 +54530,7 @@ static const JSCFunctionListEntry js_dataview_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("setUint32", 2, js_dataview_setValue, JS_CLASS_UINT32_ARRAY ),
     JS_CFUNC_MAGIC_DEF("setBigInt64", 2, js_dataview_setValue, JS_CLASS_BIG_INT64_ARRAY ),
     JS_CFUNC_MAGIC_DEF("setBigUint64", 2, js_dataview_setValue, JS_CLASS_BIG_UINT64_ARRAY ),
+    JS_CFUNC_MAGIC_DEF("setFloat16", 2, js_dataview_setValue, JS_CLASS_FLOAT16_ARRAY ),
     JS_CFUNC_MAGIC_DEF("setFloat32", 2, js_dataview_setValue, JS_CLASS_FLOAT32_ARRAY ),
     JS_CFUNC_MAGIC_DEF("setFloat64", 2, js_dataview_setValue, JS_CLASS_FLOAT64_ARRAY ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "DataView", JS_PROP_CONFIGURABLE ),
