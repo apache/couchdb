@@ -301,13 +301,27 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
         ShardSyncHistory
     ).
 
-create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq) when
+create_peer_checkpoint_doc_if_missing(
+    <<"shards/", _/binary>> = DbName, Subtype, Source, PeerId, UpdateSeq
+) when
     is_binary(DbName), is_binary(PeerId), is_integer(UpdateSeq)
 ->
     create_peer_checkpoint_doc_if_missing(
         DbName, Subtype, Source, PeerId, pack_seq(DbName, UpdateSeq)
     );
-create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq) when
+create_peer_checkpoint_doc_if_missing(
+    DbName, Subtype, Source, PeerId, UpdateSeq
+) when
+    is_binary(DbName),
+    is_binary(Subtype),
+    is_binary(Source),
+    is_binary(PeerId),
+    is_integer(UpdateSeq)
+->
+    ok;
+create_peer_checkpoint_doc_if_missing(
+    <<"shards/", _/binary>> = DbName, Subtype, Source, PeerId, UpdateSeq
+) when
     is_binary(DbName),
     is_binary(Subtype),
     is_binary(Source),
@@ -333,7 +347,9 @@ create_peer_checkpoint_doc_if_missing(DbName, Subtype, Source, PeerId, UpdateSeq
             Else
     end.
 
-update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
+update_peer_checkpoint_doc(
+    <<"shards/", _/binary>> = DbName, Subtype, Source, PeerId, UpdateSeq
+) when
     is_binary(DbName),
     is_binary(Subtype),
     is_binary(Source),
@@ -341,7 +357,19 @@ update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
     is_integer(UpdateSeq)
 ->
     update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, pack_seq(DbName, UpdateSeq));
-update_peer_checkpoint_doc(DbName, Subtype, Source, PeerId, UpdateSeq) when
+update_peer_checkpoint_doc(
+    DbName, Subtype, Source, PeerId, UpdateSeq
+) when
+    is_binary(DbName),
+    is_binary(Subtype),
+    is_binary(Source),
+    is_binary(PeerId),
+    is_integer(UpdateSeq)
+->
+    ok;
+update_peer_checkpoint_doc(
+    <<"shards/", _/binary>> = DbName, Subtype, Source, PeerId, UpdateSeq
+) when
     is_binary(DbName),
     is_binary(Subtype),
     is_binary(Source),
