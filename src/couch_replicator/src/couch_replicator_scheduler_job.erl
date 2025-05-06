@@ -887,7 +887,14 @@ do_checkpoint(State) ->
                 {TgtRevPos, TgtRevId} = update_checkpoint(
                     Target, TargetLog#doc{body = NewRepHistory}, target
                 ),
-                update_checkpoint(Source, peer_checkpoint_doc(Source, BaseId, NewSeq), source),
+                if
+                    is_binary(NewSeq) ->
+                        update_checkpoint(
+                            Source, peer_checkpoint_doc(Source, BaseId, NewSeq), source
+                        );
+                    true ->
+                        ok
+                end,
                 NewState = State#rep_state{
                     checkpoint_history = NewRepHistory,
                     committed_seq = NewTsSeq,
@@ -930,7 +937,12 @@ create_peer_checkpoint_doc_if_missing(#httpdb{} = Db, BaseId, SourceSeq) when
             end;
         {error, Reason} ->
             throw({checkpoint_commit_failure, Reason})
-    end.
+    end;
+create_peer_checkpoint_doc_if_missing(#httpdb{} = _Db, BaseId, SourceSeq) when
+    is_list(BaseId), is_integer(SourceSeq)
+->
+    %% ignored
+    ok.
 
 peer_checkpoint_doc(#httpdb{} = Db, BaseId, UpdateSeq) ->
     fabric_drop_seq:peer_checkpoint_doc(
