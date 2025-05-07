@@ -70,7 +70,7 @@ is_enabled_init_p() ->
 
 -spec should_track_init_p(Mod :: atom(), Func :: atom()) -> boolean().
 should_track_init_p(fabric_rpc, Func) ->
-    config:get_boolean(?CSRT_INIT_P, fabric_conf_key(Func), false);
+    is_enabled_init_p() andalso config:get_boolean(?CSRT_INIT_P, fabric_conf_key(Func), false);
 should_track_init_p(_Mod, _Func) ->
     false.
 
@@ -404,6 +404,7 @@ couch_stats_resource_tracker_test_() ->
         [
             ?TDEF_FE(t_should_track_init_p),
             ?TDEF_FE(t_should_not_track_init_p_empty),
+            ?TDEF_FE(t_should_not_track_init_p_empty_and_disabled),
             ?TDEF_FE(t_should_not_track_init_p_disabled),
             ?TDEF_FE(t_should_not_track_init_p)
         ]
@@ -420,11 +421,17 @@ t_should_track_init_p(_) ->
     [?assert(should_track_init_p(M, F), {M, F}) || [M, F] <- base_metrics()].
 
 t_should_not_track_init_p_empty(_) ->
-    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    disable_init_p_metrics(),
+    enable_init_p([]),
+    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
+
+t_should_not_track_init_p_empty_and_disabled(_) ->
+    disable_init_p(),
     [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
 
 t_should_not_track_init_p_disabled(_) ->
-    config:set(?CSRT_INIT_P, "enabled", "false", false),
+    enable_init_p_metrics(),
+    disable_init_p(),
     [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
 
 t_should_not_track_init_p(_) ->
@@ -442,7 +449,26 @@ enable_init_p() ->
 
 enable_init_p(Metrics) ->
     config:set(?CSRT_INIT_P, "enabled", "true", false),
+    enable_init_p_metrics(Metrics).
+
+enable_init_p_metrics() ->
+    enable_init_p(base_metrics()).
+
+enable_init_p_metrics(Metrics) ->
     [set_fabric_init_p(F, true, false) || [_, F] <- Metrics].
+
+disable_init_p() ->
+    disable_init_p(base_metrics()).
+
+disable_init_p(Metrics) ->
+    config:set(?CSRT_INIT_P, "enabled", "false", false),
+    disable_init_p_metrics(Metrics).
+
+disable_init_p_metrics() ->
+    disable_init_p_metrics(base_metrics()).
+
+disable_init_p_metrics(Metrics) ->
+    [set_fabric_init_p(F, false, false) || [_, F] <- Metrics].
 
 base_metrics() ->
     [
