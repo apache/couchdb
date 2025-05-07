@@ -469,13 +469,15 @@ range_overlap([A, B], [X, Y]) when
 ->
     A =< Y andalso X =< B.
 
-non_overlapping_shards(Shards) ->
+non_overlapping_shards([]) ->
+    [];
+non_overlapping_shards([_ | _] = Shards) ->
     {Start, End} = lists:foldl(
         fun(Shard, {Min, Max}) ->
             [B, E] = mem3:range(Shard),
             {min(B, Min), max(E, Max)}
         end,
-        {0, ?RING_END},
+        {?RING_END, 0},
         Shards
     ),
     non_overlapping_shards(Shards, Start, End).
@@ -705,10 +707,11 @@ range_overlap_test_() ->
         ]
     ].
 
-non_overlapping_shards_test() ->
+non_overlapping_shards_test_() ->
     [
         ?_assertEqual(Res, non_overlapping_shards(Shards))
      || {Shards, Res} <- [
+            {[], []},
             {
                 [shard(0, ?RING_END)],
                 [shard(0, ?RING_END)]
@@ -719,7 +722,7 @@ non_overlapping_shards_test() ->
             },
             {
                 [shard(0, 1), shard(0, 1)],
-                [shard(0, 1)]
+                [shard(0, 1), shard(0, 1)]
             },
             {
                 [shard(0, 1), shard(3, 4)],
@@ -731,15 +734,15 @@ non_overlapping_shards_test() ->
             },
             {
                 [shard(1, 2), shard(0, 1)],
-                [shard(0, 1), shard(1, 2)]
+                []
             },
             {
                 [shard(0, 1), shard(0, 2), shard(2, 5), shard(3, 5)],
-                [shard(0, 2), shard(2, 5)]
+                [shard(0, 2), shard(3, 5)]
             },
             {
-                [shard(0, 2), shard(4, 5), shard(1, 3)],
-                []
+                [shard(1, 2), shard(3, 4), shard(1, 4), shard(5, 6)],
+                [shard(1, 4), shard(5, 6)]
             }
         ]
     ].
