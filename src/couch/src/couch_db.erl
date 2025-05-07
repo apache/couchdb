@@ -1340,8 +1340,13 @@ update_docs(Db, Docs0, Options, ?REPLICATED_CHANGES) ->
     {ok, DocErrors};
 update_docs(Db, Docs0, Options, ?INTERACTIVE_EDIT) ->
     BlockInteractiveDatabaseWrites = couch_disk_monitor:block_interactive_database_writes(),
+    InternalReplication =
+        case get(io_priority) of
+            {internal_repl, _} -> true;
+            _Else -> false
+        end,
     if
-        BlockInteractiveDatabaseWrites ->
+        not InternalReplication andalso BlockInteractiveDatabaseWrites ->
             {ok, [{insufficient_storage, <<"database_dir is too full">>} || _ <- Docs0]};
         true ->
             update_docs_interactive(Db, Docs0, Options)
