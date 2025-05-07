@@ -15,13 +15,14 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include("../../src/couch_stats_resource_tracker.hrl").
 
 -define(RCTX_RANGE, 1000).
 -define(RCTX_COUNT, 10000).
 
 %% Dirty hack for hidden records as .hrl is only in src/
--define(RCTX_RPC, {rpc_worker, foo, bar, {self(), make_ref()}}).
--define(RCTX_COORDINATOR, {coordinator, foo, bar, 'GET', "/foo/_all_docs"}).
+-define(RCTX_RPC, #rpc_worker{from = {self(), make_ref()}}).
+-define(RCTX_COORDINATOR, #coordinator{method = 'GET', path = "/foo/_all_docs"}).
 
 -define(THRESHOLD_DBNAME, <<"foo">>).
 -define(THRESHOLD_DBNAME_IO, 91).
@@ -33,8 +34,8 @@
 csrt_logger_works_test_() ->
     {
         foreach,
-        fun setup/0,
-        fun teardown/1,
+        fun setup_reporting/0,
+        fun teardown_reporting/1,
         [
             ?TDEF_FE(t_do_report),
             ?TDEF_FE(t_do_lifetime_report),
@@ -115,6 +116,16 @@ teardown(#{ctx := Ctx, dbname := DbName}) ->
     ok = meck:unload(ioq),
     test_util:stop_couch(Ctx).
 
+setup_reporting() ->
+    Ctx = setup(),
+    ok = meck:new(couch_log),
+    ok = meck:expect(couch_log, report, fun(_, _) -> true end),
+    Ctx.
+
+teardown_reporting(Ctx) ->
+    ok = meck:unload(couch_log),
+    teardown(Ctx).
+
 rctx_gen() ->
     rctx_gen(#{}).
 
@@ -175,22 +186,17 @@ rctxs() ->
 t_do_report(#{rctx := Rctx}) ->
     JRctx = csrt_util:to_json(Rctx),
     ReportName = "foo",
-    ok = meck:new(couch_log),
-    ok = meck:expect(couch_log, report, fun(_, _) -> true end),
     ?assert(csrt_logger:do_report(ReportName, Rctx), "CSRT _logger:do_report " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT do_report"),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
     ?assert(
         meck:called(couch_log, report, [ReportName, JRctx]),
         "CSRT couch_log:report"
-    ),
-    ok = meck:unload(couch_log).
+    ).
 
 t_do_lifetime_report(#{rctx := Rctx}) ->
     JRctx = csrt_util:to_json(Rctx),
     ReportName = "csrt-pid-usage-lifetime",
-    ok = meck:new(couch_log),
-    ok = meck:expect(couch_log, report, fun(_, _) -> true end),
     ?assert(
         csrt_logger:do_lifetime_report(Rctx),
         "CSRT _logger:do_report " ++ ReportName
@@ -199,21 +205,17 @@ t_do_lifetime_report(#{rctx := Rctx}) ->
     ?assert(
         meck:called(couch_log, report, [ReportName, JRctx]),
         "CSRT couch_log:report"
-    ),
-    ok = meck:unload(couch_log).
+    ).
 
 t_do_status_report(#{rctx := Rctx}) ->
     JRctx = csrt_util:to_json(Rctx),
     ReportName = "csrt-pid-usage-status",
-    ok = meck:new(couch_log),
-    ok = meck:expect(couch_log, report, fun(_, _) -> true end),
     ?assert(csrt_logger:do_status_report(Rctx), "csrt_logger:do_ " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
     ?assert(
         meck:called(couch_log, report, [ReportName, JRctx]),
         "CSRT couch_log:report"
-    ),
-    ok = meck:unload(couch_log).
+    ).
 
 t_matcher_on_dbname(#{rctx := _Rctx, rctxs := Rctxs0}) ->
     %% Make sure we have at least one match
