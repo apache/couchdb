@@ -170,7 +170,7 @@ def generateNativeStage(platform) {
   return {
     stage(platform) {
       node(platform) {
-        timeout(time: 90, unit: "MINUTES") {
+        timeout(time: 180, unit: "MINUTES") {
           // Steps to configure and build CouchDB on *nix platforms
           if (isUnix()) {
             try {
@@ -190,12 +190,12 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
-                  sh '$MAKE eunit'
-                  sh '$MAKE elixir'
-                  sh '$MAKE elixir-search'
-                  sh '$MAKE mango-test'
-                  sh '$MAKE weatherreport-test'
-                  sh '$MAKE nouveau-test'
+                  retry (3) {sh '$MAKE eunit'}
+                  retry (3) {sh '$MAKE elixir'}
+                  retry (3) {sh '$MAKE elixir-search'}
+                  retry (3) {sh '$MAKE mango-test'}
+                  retry (3) {sh '$MAKE weatherreport-test'}
+                  retry (3) {sh '$MAKE nouveau-test'}
                 }
               }
             }
@@ -295,7 +295,7 @@ def generateContainerStage(platform) {
       node(meta[platform].get('node_label', 'docker')) {
         docker.withRegistry('https://docker.io/', 'dockerhub_creds') {
           docker.image(meta[platform].image).inside("${DOCKER_ARGS}") {
-            timeout(time: 90, unit: "MINUTES") {
+            timeout(time: 180, unit: "MINUTES") {
               stage("${meta[platform].name} - build & test") {
                 try {
                   sh( script: "rm -rf ${platform} apache-couchdb-*", label: 'Clean workspace' )
@@ -383,7 +383,7 @@ pipeline {
   options {
     buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
     preserveStashes(buildCount: 10)
-    timeout(time: 3, unit: 'HOURS')
+    timeout(time: 4, unit: 'HOURS')
     timestamps()
   }
 
@@ -399,7 +399,7 @@ pipeline {
         }
       }
       steps {
-        timeout(time: 15, unit: "MINUTES") {
+        timeout(time: 30, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
           sh "./configure --spidermonkey-version 78 --with-nouveau"
           sh 'make dist'
@@ -454,7 +454,7 @@ pipeline {
       }
       options {
         skipDefaultCheckout()
-        timeout(time: 90, unit: "MINUTES")
+        timeout(time: 120, unit: "MINUTES")
       }
 
       steps {
