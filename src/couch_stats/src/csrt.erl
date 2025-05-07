@@ -235,7 +235,7 @@ destroy_context() ->
 -spec destroy_context(PidRef :: maybe_pid_ref()) -> ok.
 destroy_context(undefined) ->
     ok;
-destroy_context({_, _} = PidRef) ->
+destroy_context(PidRef) ->
     csrt_logger:stop_tracker(),
     destroy_pid_ref(PidRef),
     ok.

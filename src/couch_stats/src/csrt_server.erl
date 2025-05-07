@@ -29,6 +29,7 @@
     get_context_type/1,
     inc/2,
     inc/3,
+    match_resource/1,
     new_context/2,
     set_context_dbname/2,
     set_context_username/2,
@@ -97,19 +98,19 @@ set_context_type(Type, PidRef) ->
 
 -spec create_resource(Rctx :: rctx()) -> boolean().
 create_resource(#rctx{} = Rctx) ->
-    (catch ets:insert(?MODULE, Rctx)) == true.
+    (catch ets:insert(?CSRT_ETS, Rctx)) == true.
 
 -spec destroy_resource(PidRef :: maybe_pid_ref()) -> boolean().
 destroy_resource(undefined) ->
     false;
 destroy_resource({_, _} = PidRef) ->
-    (catch ets:delete(?MODULE, PidRef)) == true.
+    (catch ets:delete(?CSRT_ETS, PidRef)) == true.
 
 -spec get_resource(PidRef :: maybe_pid_ref()) -> maybe_rctx().
 get_resource(undefined) ->
     undefined;
 get_resource(PidRef) ->
-    try ets:lookup(?MODULE, PidRef) of
+    try ets:lookup(?CSRT_ETS, PidRef) of
         [#rctx{} = Rctx] ->
             Rctx;
         [] ->
@@ -118,6 +119,12 @@ get_resource(PidRef) ->
         _:_ ->
             undefined
     end.
+
+-spec match_resource(Rctx :: maybe_rctx()) -> [] | [rctx()].
+match_resource(undefined) ->
+    [];
+match_resource(#rctx{} = Rctx) ->
+    ets:match_object(?CSRT_ETS, Rctx).
 
 -spec is_rctx_field(Field :: rctx_field() | atom()) -> boolean().
 is_rctx_field(Field) ->
@@ -140,7 +147,7 @@ update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
         true ->
             Update = {get_rctx_field(Field), Count},
             try
-                ets:update_counter(?MODULE, PidRef, Update, #rctx{pid_ref = PidRef})
+                ets:update_counter(?CSRT_ETS, PidRef, Update, #rctx{pid_ref = PidRef})
             catch
                 _:_ ->
                     0
@@ -177,7 +184,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    ets:new(?MODULE, [
+    ets:new(?CSRT_ETS, [
         named_table,
         public,
         {decentralized_counters, true},
@@ -202,4 +209,4 @@ update_element(undefined, _Update) ->
     false;
 update_element({_Pid, _Ref} = PidRef, Update) ->
     %% TODO: should we take any action when the update fails?
-    catch ets:update_element(?MODULE, PidRef, Update).
+    catch ets:update_element(?CSRT_ETS, PidRef, Update).

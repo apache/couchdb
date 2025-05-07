@@ -67,27 +67,23 @@ active_int(all) ->
     select_by_type(all).
 
 select_by_type(coordinators) ->
-    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = #coordinator{}} = R) -> R end));
+    ets:select(?CSRT_ETS, ets:fun2ms(fun(#rctx{type = #coordinator{}} = R) -> R end));
 select_by_type(workers) ->
-    ets:select(?MODULE, ets:fun2ms(fun(#rctx{type = #rpc_worker{}} = R) -> R end));
+    ets:select(?CSRT_ETS, ets:fun2ms(fun(#rctx{type = #rpc_worker{}} = R) -> R end));
 select_by_type(all) ->
-    ets:tab2list(?MODULE).
+    ets:tab2list(?CSRT_ETS).
 
 find_by_nonce(Nonce) ->
-    %%ets:match_object(?MODULE, ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end)).
-    [R || R <- ets:match_object(?MODULE, #rctx{nonce = Nonce})].
+    csrt_server:match_resource(#rctx{nonce = Nonce}).
 
 find_by_pid(Pid) ->
-    %%[R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{pid_ref={Pid, '_'}, _ = '_'})].
-    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref = {Pid, '_'}})].
+    csrt_server:match_resource(#rctx{pid_ref = {Pid, '_'}}).
 
 find_by_pidref(PidRef) ->
-    %%[R || R <- ets:match_object(?MODULE, #rctx{pid_ref=PidRef, _ = '_'})].
-    [R || R <- ets:match_object(?MODULE, #rctx{pid_ref = PidRef})].
+    csrt_server:match_resource(#rctx{pid_ref = PidRef}).
 
 find_workers_by_pidref(PidRef) ->
-    %%[R || #rctx{} = R <- ets:match_object(?MODULE, #rctx{type=#rpc_worker{from=PidRef}, _ = '_'})].
-    [R || R <- ets:match_object(?MODULE, #rctx{type = #rpc_worker{from = PidRef}})].
+    csrt_server:match_resource(#rctx{type = #rpc_worker{from = PidRef}}).
 
 field(#rctx{pid_ref = Val}, pid_ref) -> Val;
 %% NOTE: Pros and cons to doing these convert functions here
@@ -154,7 +150,7 @@ group_by(KeyFun, ValFun, AggFun) ->
                 Acc
         end
     end,
-    ets:foldl(FoldFun, #{}, ?MODULE).
+    ets:foldl(FoldFun, #{}, ?CSRT_ETS).
 
 %% Sorts largest first
 sorted(Map) when is_map(Map) ->
