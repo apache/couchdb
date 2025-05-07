@@ -130,7 +130,8 @@ match_resource(#rctx{} = Rctx) ->
 is_rctx_field(Field) ->
     maps:is_key(Field, ?KEYS_TO_FIELDS).
 
--spec get_rctx_field(Field :: rctx_field()) -> non_neg_integer()
+-spec get_rctx_field(Field :: rctx_field()) ->
+    non_neg_integer()
     | throw({badkey, Key :: any()}).
 get_rctx_field(Field) ->
     maps:get(Field, ?KEYS_TO_FIELDS).
