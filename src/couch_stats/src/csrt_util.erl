@@ -179,7 +179,7 @@ to_json(#rctx{} = Rctx) ->
         ioq_calls => Rctx#rctx.ioq_calls
     }.
 
-%% NOTE: this does not do the inverse of to_json, should it conver types?
+%% NOTE: this does not do the inverse of to_json, should it convert types?
 -spec map_to_rctx(Map :: map()) -> rctx().
 map_to_rctx(Map) ->
     maps:fold(fun map_to_rctx_field/3, #rctx{}, Map).
@@ -403,8 +403,8 @@ couch_stats_resource_tracker_test_() ->
         fun teardown/1,
         [
             ?TDEF_FE(t_should_track_init_p),
-            ?TDEF_FE(t_should_track_init_p_empty),
-            ?TDEF_FE(t_should_track_init_p_disabled),
+            ?TDEF_FE(t_should_not_track_init_p_empty),
+            ?TDEF_FE(t_should_not_track_init_p_disabled),
             ?TDEF_FE(t_should_not_track_init_p)
         ]
     }.
@@ -419,11 +419,11 @@ t_should_track_init_p(_) ->
     enable_init_p(),
     [?assert(should_track_init_p(M, F), {M, F}) || [M, F] <- base_metrics()].
 
-t_should_track_init_p_empty(_) ->
+t_should_not_track_init_p_empty(_) ->
     config:set(?CSRT_INIT_P, "enabled", "true", false),
     [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
 
-t_should_track_init_p_disabled(_) ->
+t_should_not_track_init_p_disabled(_) ->
     config:set(?CSRT_INIT_P, "enabled", "false", false),
     [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
 

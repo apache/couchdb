@@ -12,6 +12,7 @@
 
 -define(CSRT, "csrt").
 -define(CSRT_INIT_P, "csrt.init_p").
+-define(CSRT_ETS, csrt_server).
 
 %% CSRT pdict markers
 -define(DELTA_TA, csrt_delta_ta).
