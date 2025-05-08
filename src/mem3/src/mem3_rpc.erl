@@ -378,32 +378,25 @@ rexi_call(Node, MFA, Timeout) ->
     Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
-        wait_message(Node, Ref, Mon, Timeout)
+        receive
+            {Ref, Msg0} ->
+                {Msg, Delta} = csrt:extract_delta(Msg0),
+                csrt:accumulate_delta(Delta),
+                case Msg of
+                    {ok, Reply} ->
+                        Reply;
+                    Error ->
+                        erlang:error(Error)
+                end;
+            {rexi_DOWN, Mon, _, Reason0} ->
+                {Reason, Delta} = csrt:extract_delta(Reason0),
+                csrt:accumulate_delta(Delta),
+                erlang:error({rexi_DOWN, {Node, Reason}})
+        after Timeout ->
+            erlang:error(timeout)
+        end
     after
         rexi_monitor:stop(Mon)
-    end.
-
-wait_message(Node, Ref, Mon, Timeout) ->
-    receive
-        Msg ->
-            process_raw_message(Msg, Node, Ref, Mon, Timeout)
-    after Timeout ->
-        erlang:error(timeout)
-    end.
-
-process_raw_message(Msg0, Node, Ref, Mon, Timeout) ->
-    {Msg, Delta} = csrt:extract_delta(Msg0),
-    csrt:accumulate_delta(Delta),
-    case Msg of
-        {Ref, {ok, Reply}} ->
-            Reply;
-        {Ref, Error} ->
-            erlang:error(Error);
-        {rexi_DOWN, Mon, _, Reason} ->
-            erlang:error({rexi_DOWN, {Node, Reason}});
-        Other ->
-            ?LOG_UNEXPECTED_MSG(Other),
-            wait_message(Node, Ref, Mon, Timeout)
     end.
 
 get_or_create_db(DbName, Options) ->

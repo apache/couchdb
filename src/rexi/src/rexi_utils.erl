@@ -60,35 +60,39 @@ process_mailbox(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
 
 process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
-        Msg ->
-            process_raw_message(Msg, RefList, Keypos, Fun, Acc0, TimeoutRef)
-    after PerMsgTO ->
-        {timeout, Acc0}
-    end.
-
-process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
-    {Payload, Delta} = csrt:extract_delta(Payload0),
-    csrt:accumulate_delta(Delta),
-    case Payload of
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
-        {rexi, Ref, Msg} ->
+        {rexi, Ref, Msg0} ->
+            {Msg, Delta} = csrt:extract_delta(Msg0),
+            csrt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
                 Worker ->
                     Fun(Msg, Worker, Acc0)
             end;
-        {rexi, Ref, From, Msg} ->
+        {rexi, Ref, From, Msg0} ->
+            {Msg, Delta} = csrt:extract_delta(Msg0),
+            csrt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
                 Worker ->
                     Fun(Msg, {Worker, From}, Acc0)
             end;
+        %% Special case for csrt of `{rexi, '$rexi_ping'}` with Delta.
+        %% Including delta in rexi_ping is essential for getting live info
+        %% about long running filtered queries that aren't returning rows, as
+        %% otherwise we won't get the delta until the exhaustion of the find
+        %% query.
+        {{rexi, '$rexi_ping'}, {delta, Delta}} ->
+            csrt:accumulate_delta(Delta),
+            {ok, Acc0};
         {rexi, '$rexi_ping'} ->
             {ok, Acc0};
-        {Ref, Msg} ->
+        {Ref, Msg0} ->
+            {Msg, Delta} = csrt:extract_delta(Msg0),
+            csrt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     % this was some non-matching message which we will ignore
@@ -96,7 +100,9 @@ process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
                 Worker ->
                     Fun(Msg, Worker, Acc0)
             end;
-        {Ref, From, Msg} ->
+        {Ref, From, Msg0} ->
+            {Msg, Delta} = csrt:extract_delta(Msg0),
+            csrt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
@@ -105,4 +111,6 @@ process_raw_message(Payload0, RefList, Keypos, Fun, Acc0, TimeoutRef) ->
             end;
         {rexi_DOWN, _, _, _} = Msg ->
             Fun(Msg, nil, Acc0)
+    after PerMsgTO ->
+        {timeout, Acc0}
     end.

@@ -208,7 +208,8 @@ find_worker(Ref, Tab) ->
     end.
 
 notify_caller({Caller, Ref}, Reason, Delta) ->
-    Msg = csrt:maybe_add_delta({Ref, {rexi_EXIT, Reason}}, Delta),
+    Payload = csrt:maybe_add_delta({rexi_EXIT, Reason}, Delta),
+    Msg = {Ref, Payload},
     rexi_utils:send(Caller, Msg).
 
 kill_worker(FromRef, #st{clients = Clients} = St) ->
