@@ -262,9 +262,9 @@ rpc_update_doc(DbName, Doc, Opts) ->
     fabric_rpc:update_docs(DbName, [Doc], Opts),
     Reply = test_util:wait(fun() ->
         receive
-            {Ref, Reply} ->
+            {Ref, {Reply, {delta, _}}} ->
                 Reply;
-            {Ref, Reply, {delta, _}} ->
+            {Ref, Reply} ->
                 Reply
         after 0 ->
             wait
