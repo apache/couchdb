@@ -217,8 +217,7 @@ t_ping(_) ->
         receive
             {{rexi, Ping}, {delta, _}} -> Ping;
             {rexi, Ping} -> Ping;
-            Other ->
-                Other
+            Other -> Other
         end,
     ?assertEqual('$rexi_ping', Res).
 
