@@ -104,7 +104,8 @@ kill_all(NodeRefs) when is_list(NodeRefs) ->
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    erlang:send(Caller, csrt:maybe_add_delta({Ref, Reply})).
+    Payload = csrt:maybe_add_delta(Reply),
+    erlang:send(Caller, {Ref, Payload}).
 
 %% Private function used by stream2 to initialize the stream. Message is of the
 %% form {OriginalRef, {self(),reference()}, Reply}, which enables the
@@ -188,7 +189,8 @@ stream2(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            erlang:send(Caller, csrt:maybe_add_delta({Ref, self(), Msg})),
+            Payload = csrt:maybe_add_delta(Msg),
+            erlang:send(Caller, {Ref, self(), Payload}),
             ok
     catch
         throw:timeout ->

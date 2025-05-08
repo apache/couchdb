@@ -105,7 +105,7 @@ t_no_config_db_create_fails_for_shard_rpc(DbName) ->
         true ->
             %% allow for {Ref, {rexi_EXIT, error}, {delta, D}}
             ?assertMatch(
-                {Ref, {'rexi_EXIT', {{error, missing_target}, _}}, _},
+                {Ref, {{'rexi_EXIT', {{error, missing_target}, _}}, _}},
                 Resp
             );
         false ->

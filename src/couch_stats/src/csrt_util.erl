@@ -60,9 +60,22 @@
 
 -include_lib("couch_stats_resource_tracker.hrl").
 
+-ifdef(TEST).
 -spec is_enabled() -> boolean().
 is_enabled() ->
+    %% randomly enable CSRT during testing to handle unexpected failures
+    case config:get_boolean(?CSRT, "randomize_testing", true) of
+        true ->
+            rand:uniform(100) > 80;
+        false ->
+            config:get_boolean(?CSRT, "enabled", true)
+    end.
+-else.
+-spec is_enabled() -> boolean().
+is_enabled() ->
+    %% TODO: toggle back to false before merging
     config:get_boolean(?CSRT, "enabled", true).
+-endif.
 
 -spec is_enabled_init_p() -> boolean().
 is_enabled_init_p() ->
@@ -264,23 +277,17 @@ field(changes_processed, #rctx{changes_processed = Val}) ->
 field(ioq_calls, #rctx{ioq_calls = Val}) ->
     Val.
 
-add_delta({A}, Delta) -> {A, Delta};
-add_delta({A, B}, Delta) -> {A, B, Delta};
-add_delta({A, B, C}, Delta) -> {A, B, C, Delta};
-add_delta({A, B, C, D}, Delta) -> {A, B, C, D, Delta};
-add_delta({A, B, C, D, E}, Delta) -> {A, B, C, D, E, Delta};
-add_delta({A, B, C, D, E, F}, Delta) -> {A, B, C, D, E, F, Delta};
-add_delta({A, B, C, D, E, F, G}, Delta) -> {A, B, C, D, E, F, G, Delta};
-add_delta(T, _Delta) -> T.
+add_delta(T, {delta, undefined}) ->
+    T;
+add_delta(T, {delta, _} = Delta) ->
+    {T, Delta};
+add_delta(T, _Delta) ->
+    T.
 
-extract_delta({A, {delta, Delta}}) -> {{A}, Delta};
-extract_delta({A, B, {delta, Delta}}) -> {{A, B}, Delta};
-extract_delta({A, B, C, {delta, Delta}}) -> {{A, B, C}, Delta};
-extract_delta({A, B, C, D, {delta, Delta}}) -> {{A, B, C, D}, Delta};
-extract_delta({A, B, C, D, E, {delta, Delta}}) -> {{A, B, C, D, E}, Delta};
-extract_delta({A, B, C, D, E, F, {delta, Delta}}) -> {{A, B, C, D, E, F}, Delta};
-extract_delta({A, B, C, D, E, F, G, {delta, Delta}}) -> {{A, B, C, D, E, F, G}, Delta};
-extract_delta(T) -> {T, undefined}.
+extract_delta({Msg, {delta, Delta}}) ->
+    {Msg, Delta};
+extract_delta(Msg) ->
+    {Msg, undefined}.
 
 -spec get_delta(PidRef :: maybe_pid_ref()) -> tagged_delta().
 get_delta(PidRef) ->
@@ -305,6 +312,8 @@ maybe_add_delta(T, Delta) ->
     end.
 
 maybe_add_delta_int(T, undefined) ->
+    T;
+maybe_add_delta_int(T, {delta, undefined}) ->
     T;
 maybe_add_delta_int(T, Delta) when is_map(Delta) ->
     maybe_add_delta_int(T, {delta, Delta});
@@ -411,7 +420,9 @@ couch_stats_resource_tracker_test_() ->
     }.
 
 setup() ->
-    test_util:start_couch().
+    Ctx = test_util:start_couch(),
+    config:set_boolean(?CSRT, "randomize_testing", false, false),
+    Ctx.
 
 teardown(Ctx) ->
     test_util:stop_couch(Ctx).

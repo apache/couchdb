@@ -15,6 +15,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include("../../src/couch_stats_resource_tracker.hrl").
 
 -define(DOCS_COUNT, 100).
 -define(DDOCS_COUNT, 1).
@@ -85,6 +86,7 @@ make_docs(Count) ->
 
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats]),
+    config:set_boolean(?CSRT, "randomize_testing", false, false),
     ok = meck:new(ioq, [passthrough]),
     ok = meck:expect(ioq, bypass, fun(_, _) -> false end),
     DbName = ?tempdb(),

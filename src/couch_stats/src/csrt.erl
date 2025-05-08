@@ -448,7 +448,9 @@ couch_stats_resource_tracker_test_() ->
     }.
 
 setup() ->
-    test_util:start_couch().
+    Ctx = test_util:start_couch(),
+    config:set_boolean(?CSRT, "randomize_testing", false, false),
+    Ctx.
 
 teardown(Ctx) ->
     test_util:stop_couch(Ctx).
