@@ -32,9 +32,10 @@
 }.
 
 go(DbName) ->
-    Shards = mem3:shards(DbName),
+    Shards0 = mem3:shards(DbName),
     {ok, PeerCheckpoints0} = get_peer_checkpoint_docs(DbName),
-    {ok, ShardSyncHistory} = get_all_shard_sync_docs(Shards),
+    {ok, ShardSyncHistory} = get_all_shard_sync_docs(Shards0),
+    Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
     PeerCheckpoints1 = calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory),
     Workers = lists:filtermap(
         fun(Shard) ->
@@ -50,14 +51,14 @@ go(DbName) ->
                     false
             end
         end,
-        Shards
+        Shards1
     ),
     if
         Workers == [] ->
             %% nothing to do
             {ok, #{}};
         true ->
-            RexiMon = fabric_util:create_monitors(Shards),
+            RexiMon = fabric_util:create_monitors(Shards1),
             Acc0 = {#{}, length(Workers) - 1},
             try
                 case fabric_util:recv(Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0) of
@@ -216,6 +217,20 @@ parse_shard_sync_doc(#doc{id = <<"_local/shard-sync-", _/binary>>} = Doc, Acc) -
                 maps:groups_from_list(KeyFun, ValueFun, History), Acc
             )
     end.
+
+%% return only the shards that have synced with every other replica
+fully_replicated_shards_only(Shards, ShardSyncHistory) ->
+    lists:filter(
+        fun(#shard{range = Range, node = Node}) ->
+            ExpectedPeers = [
+                S#shard.node
+             || S <- Shards, S#shard.range == Range, S#shard.node /= Node
+            ],
+            ExpectedKeys = [{Range, Peer, Node} || Peer <- ExpectedPeers],
+            lists:all(fun(Key) -> maps:is_key(Key, ShardSyncHistory) end, ExpectedKeys)
+        end,
+        Shards
+    ).
 
 -spec get_peer_checkpoint_docs(DbName :: binary()) -> peer_checkpoints().
 get_peer_checkpoint_docs(DbName) ->
@@ -590,5 +605,51 @@ search_history_for_latest_safe_crossover_test() ->
         },
         calculate_drop_seqs(PeerCheckpoints, ShardSyncHistory)
     ).
+
+fully_replicated_shards_only_test_() ->
+    Range1 = [0, 1],
+    Range2 = [1, 2],
+    Shards = [
+        #shard{node = node1, range = Range1},
+        #shard{node = node2, range = Range1},
+        #shard{node = node3, range = Range1},
+        #shard{node = node1, range = Range2},
+        #shard{node = node2, range = Range2}
+    ],
+    [
+        %% empty history means no fully replicated shards
+        ?_assertEqual([], fully_replicated_shards_only(Shards, #{})),
+        %% some but not all peers
+        ?_assertEqual(
+            [],
+            fully_replicated_shards_only(Shards, #{
+                {Range1, node2, node1} => {0, <<>>}
+            })
+        ),
+        %% all peers of one replica
+        ?_assertEqual(
+            [#shard{node = node1, range = Range1}],
+            fully_replicated_shards_only(Shards, #{
+                {Range1, node2, node1} => {0, <<>>},
+                {Range1, node3, node1} => {0, <<>>}
+            })
+        ),
+        %% all peers of one range
+        ?_assertEqual(
+            [
+                #shard{node = node1, range = Range1},
+                #shard{node = node2, range = Range1},
+                #shard{node = node3, range = Range1}
+            ],
+            fully_replicated_shards_only(Shards, #{
+                {Range1, node2, node1} => {0, <<>>},
+                {Range1, node3, node1} => {0, <<>>},
+                {Range1, node1, node2} => {0, <<>>},
+                {Range1, node3, node2} => {0, <<>>},
+                {Range1, node1, node3} => {0, <<>>},
+                {Range1, node2, node3} => {0, <<>>}
+            })
+        )
+    ].
 
 -endif.
