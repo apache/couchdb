@@ -124,10 +124,6 @@ destroy_pid_ref(_PidRef) ->
 %% Context lifecycle API
 %%
 
-%% TODO: shouldn't need this?
-%% create_resource(#rctx{} = Rctx) ->
-%%     csrt_server:create_resource(Rctx).
-
 -spec create_worker_context(From, MFA, Nonce) -> pid_ref() | false when
     From :: pid_ref(), MFA :: mfa(), Nonce :: nonce().
 create_worker_context(From, {M, F, _A}, Nonce) ->
@@ -154,8 +150,6 @@ create_coordinator_context(#httpd{method = Verb, nonce = Nonce}, Path0) ->
 -spec create_context(Type :: rctx_type(), Nonce :: term()) -> pid_ref().
 create_context(Type, Nonce) ->
     Rctx = csrt_server:new_context(Type, Nonce),
-    %% TODO: which approach
-    %% PidRef = csrt_server:pid_ref(Rctx),
     PidRef = get_pid_ref(Rctx),
     set_pid_ref(PidRef),
     csrt_util:set_delta_zero(Rctx),
@@ -203,12 +197,20 @@ set_context_handler_fun(Mod, Func) when
 update_handler_fun(_, _, undefined) ->
     false;
 update_handler_fun(Mod, Func, PidRef) ->
-    Rctx = get_resource(PidRef),
-    %% TODO: #coordinator{} assumption needs to adapt for other types
-    #coordinator{} = Coordinator0 = csrt_server:get_context_type(Rctx),
-    Coordinator = Coordinator0#coordinator{mod = Mod, func = Func},
-    csrt_server:set_context_type(Coordinator, PidRef),
-    ok.
+    case get_resource(PidRef) of
+        undefined ->
+            ok;
+        #rctx{} = Rctx ->
+            %% TODO: #coordinator{} assumption needs to adapt for other types
+            case csrt_server:get_context_type(Rctx) of
+                #coordinator{} = Coordinator0 ->
+                    Coordinator = Coordinator0#coordinator{mod = Mod, func = Func},
+                    csrt_server:set_context_type(Coordinator, PidRef),
+                    ok;
+                _ ->
+                    ok
+            end
+    end.
 
 %% @equiv set_context_username(User, get_pid_ref())
 set_context_username(User) ->
@@ -335,14 +337,6 @@ make_delta() ->
 rctx_delta(TA, TB) ->
     csrt_util:rctx_delta(TA, TB).
 
-%% TODO: cleanup return type
-%%-spec update_counter(Field :: rctx_field(), Count :: non_neg_integer()) -> false | ok.
-%%-spec update_counter(Field :: non_neg_integer(), Count :: non_neg_integer()) -> false | ok.
-%%update_counter(_Field, Count) when Count < 0 ->
-%%    false;
-%%update_counter(Field, Count) when Count >= 0 ->
-%%    is_enabled() andalso csrt_server:update_counter(get_pid_ref(), Field, Count).
-
 %%
 %% aggregate query api
 %%
@@ -351,8 +345,6 @@ rctx_delta(TA, TB) ->
 active() ->
     csrt_query:active().
 
-%% TODO: ensure Type fields align with type specs
-%%-spec active(Type :: rctx_type()) -> [rctx()].
 -spec active(Type :: json) -> [rctx()].
 active(Type) ->
     csrt_query:active(Type).
@@ -428,7 +420,7 @@ maybe_add_delta(T, Delta) ->
     csrt_util:maybe_add_delta(T, Delta).
 
 %%
-%% Internal Operations assuming is_enabled() == true
+%% Tests
 %%
 
 -ifdef(TEST).
