@@ -71,7 +71,7 @@ public final class IndexInfo {
 
     @Override
     public String toString() {
-        return "IndexInfo [updateSeq=" + updateSeq + ", committedUpdateSeq=" + committedUpdateSeq + ", purgeSeq=" + purgeSeq + ", numDocs=" + numDocs + ", diskSize="
-                + diskSize + "]";
+        return "IndexInfo [updateSeq=" + updateSeq + ", committedUpdateSeq=" + committedUpdateSeq + ", purgeSeq="
+                + purgeSeq + ", numDocs=" + numDocs + ", diskSize=" + diskSize + "]";
     }
 }
