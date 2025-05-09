@@ -331,15 +331,24 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
 %% it last updated. Find these cases and split the peer checkpoints too.
 substitute_splits(Shards, PeerCheckpoints) ->
     maps:fold(
-        fun({[B1, E1], Node}, {_Uuid, Seq}, Acc) ->
+        fun({[B1, E1], Node}, {Uuid, Seq}, Acc) ->
             MatchingRanges = [
                 S#shard.range
              || #shard{range = [B2, E2]} = S <- Shards,
                 Node == S#shard.node,
                 B2 >= B1 andalso E2 =< E1
             ],
-            %% we don't know the uuids of the split shards
-            AsMap = maps:from_list([{{R, Node}, {undefined, Seq}} || R <- MatchingRanges]),
+            %% set uuid to undefined if ranges don't match as we don't know the uuids of the split shards
+            AsMap = maps:from_list([
+                {{R, Node}, {
+                    if
+                        [B1, E1] == R -> Uuid;
+                        true -> undefined
+                    end,
+                    Seq
+                }}
+             || R <- MatchingRanges
+            ]),
             maps:merge_with(fun merge_peers/3, AsMap, Acc)
         end,
         #{},
