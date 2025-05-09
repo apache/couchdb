@@ -814,16 +814,21 @@ set_update_seq(#st{header = Header} = St, UpdateSeq) ->
         needs_commit = true
     }}.
 
-set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
-    is_binary(ExpectedUuidPrefix), is_integer(NewDropSeq), NewDropSeq > 0
-->
-    CurrentDropSeq = get_drop_seq(St),
+set_drop_seq(#st{} = St, undefined, NewDropSeq) ->
+    set_drop_seq(St, NewDropSeq);
+set_drop_seq(#st{} = St, ExpectedUuidPrefix, NewDropSeq) when is_binary(ExpectedUuidPrefix) ->
     Uuid = get_uuid(St),
     ActualUuidPrefix = binary:part(Uuid, 0, byte_size(ExpectedUuidPrefix)),
-
     if
         ExpectedUuidPrefix /= ActualUuidPrefix ->
             {error, uuid_mismatch};
+        true ->
+            set_drop_seq(St, NewDropSeq)
+    end.
+
+set_drop_seq(#st{header = Header} = St, NewDropSeq) when is_integer(NewDropSeq), NewDropSeq > 0 ->
+    CurrentDropSeq = get_drop_seq(St),
+    if
         NewDropSeq < CurrentDropSeq ->
             {error, {drop_seq_cant_decrease, CurrentDropSeq, NewDropSeq}};
         true ->

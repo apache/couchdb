@@ -33,14 +33,13 @@
 
 go(DbName) ->
     Shards0 = mem3:shards(DbName),
-    {ok, PeerCheckpoints0} = get_peer_checkpoint_docs(DbName),
+    {ok, PeerCheckpoints} = get_peer_checkpoint_docs(DbName),
     {ok, ShardSyncHistory} = get_all_shard_sync_docs(Shards0),
-    Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
-    PeerCheckpoints1 = calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory),
+    {Shards1, DropSeqs} = go_int(Shards0, PeerCheckpoints, ShardSyncHistory),
     Workers = lists:filtermap(
         fun(Shard) ->
             #shard{range = Range, node = Node, name = ShardName} = Shard,
-            case maps:find({Range, Node}, PeerCheckpoints1) of
+            case maps:find({Range, Node}, DropSeqs) of
                 {ok, {UuidPrefix, DropSeq}} ->
                     Ref = rexi:cast(
                         Node,
@@ -81,6 +80,12 @@ go(DbName) ->
                 rexi_monitor:stop(RexiMon)
             end
     end.
+
+go_int(Shards, PeerCheckpoints, ShardSyncHistory) ->
+    {
+        fully_replicated_shards_only(Shards, ShardSyncHistory),
+        calculate_drop_seqs(substitute_splits(Shards, PeerCheckpoints), ShardSyncHistory)
+    }.
 
 -spec calculate_drop_seqs(peer_checkpoints(), shard_sync_history()) -> peer_checkpoints().
 calculate_drop_seqs(PeerCheckpoints0, ShardSyncHistory) ->
@@ -259,6 +264,10 @@ parse_peer_checkpoint_docs_cb({row, Row}, PeerCheckpoints0) ->
 parse_peer_checkpoint_docs_cb(_Else, Acc) ->
     {ok, Acc}.
 
+merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when
+    Uuid1 == undefined orelse Uuid2 == undefined, is_integer(Val1), is_integer(Val2)
+->
+    {undefined, min(Val1, Val2)};
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when is_integer(Val1), is_integer(Val2) ->
     PrefixLen = min(byte_size(Uuid1), byte_size(Uuid2)),
     true = binary:longest_common_prefix([Uuid1, Uuid2]) == PrefixLen,
@@ -316,6 +325,25 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
         end,
         #{},
         ShardSyncHistory
+    ).
+
+%% A peer checkpoint might refer to a range that has been split since
+%% it last updated. Find these cases and split the peer checkpoints too.
+substitute_splits(Shards, PeerCheckpoints) ->
+    maps:fold(
+        fun({[B1, E1], Node}, {_Uuid, Seq}, Acc) ->
+            MatchingRanges = [
+                S#shard.range
+             || #shard{range = [B2, E2]} = S <- Shards,
+                Node == S#shard.node,
+                B2 >= B1 andalso E2 =< E1
+            ],
+            %% we don't know the uuids of the split shards
+            AsMap = maps:from_list([{{R, Node}, {undefined, Seq}} || R <- MatchingRanges]),
+            maps:merge_with(fun merge_peers/3, AsMap, Acc)
+        end,
+        #{},
+        PeerCheckpoints
     ).
 
 create_peer_checkpoint_doc_if_missing(
@@ -651,5 +679,33 @@ fully_replicated_shards_only_test_() ->
             })
         )
     ].
+
+substitute_splits_test() ->
+    Range = [0, 10],
+    Subrange1 = [0, 5],
+    Subrange2 = [6, 10],
+    Node1 = 'node1@127.0.0.1',
+    Shards = [#shard{range = Subrange1, node = Node1}, #shard{range = Subrange2, node = Node1}],
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
+
+    ?assertEqual(
+        #{{Subrange1, Node1} => {undefined, 12}, {Subrange2, Node1} => {undefined, 12}},
+        substitute_splits(Shards, PeerCheckpoints)
+    ).
+
+go_int_test() ->
+    Range = [0, 10],
+    Subrange1 = [0, 5],
+    Subrange2 = [6, 10],
+    Node1 = 'node1@127.0.0.1',
+    Shards = [#shard{range = Subrange1, node = Node1}, #shard{range = Subrange2, node = Node1}],
+    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
+    ShardSyncHistory = #{},
+    ?assertEqual(
+        {Shards, #{
+            {Subrange1, Node1} => {undefined, 12}, {Subrange2, Node1} => {undefined, 12}
+        }},
+        go_int(Shards, PeerCheckpoints, ShardSyncHistory)
+    ).
 
 -endif.
