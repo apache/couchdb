@@ -71,10 +71,10 @@ SpiderMonkey version compatibility
 
 Depending on the CouchDB version and what's available on supported operating
 systems, the SpiderMonkey version may be any one of these: 1.8.5, 60, 68, 78,
-86 or 91. Sometimes there are differences in supported features between
-versions. Usually later versions only add features, so views will work on
-version upgrades. However, there are a few exceptions to this. These are a few
-known regression or discrepancies between versions:
+86, 91, 120, 115, or 128. Sometimes there are differences in supported features
+between versions. Usually later versions only add features, so views will work
+on version upgrades. However, there are a few exceptions to this. These are a
+few known regression or discrepancies between versions:
 
 1. ``for each (var x in ...)``
 

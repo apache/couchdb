@@ -210,7 +210,7 @@ Fedora 36
 
 On Fedora 36, you may need these packages in addition to the ones listed above:
 
-* `mozjs91-devel`
+* `mozjs128-devel`
 * `erlang-rebar`
 
 If the system contains dangling links to Erlang chunk files, the compiler will
@@ -230,7 +230,7 @@ Note that due to a problem with the Python package sphinx-build, it is not
 possible to compile the documentation on Fedora 36. You can skip compiling the
 documentation via::
 
-    ./configure --disable-docs --spidermonkey-version 91
+    ./configure --disable-docs --spidermonkey-version 128
 
 Mac OS X
 --------
