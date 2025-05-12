@@ -267,7 +267,13 @@ parse_peer_checkpoint_docs_cb(_Else, Acc) ->
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when
     Uuid1 == undefined orelse Uuid2 == undefined, is_integer(Val1), is_integer(Val2)
 ->
-    {undefined, min(Val1, Val2)};
+    {
+        if
+            is_binary(Uuid1) -> Uuid1;
+            true -> Uuid2
+        end,
+        min(Val1, Val2)
+    };
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when is_integer(Val1), is_integer(Val2) ->
     PrefixLen = min(byte_size(Uuid1), byte_size(Uuid2)),
     true = binary:longest_common_prefix([Uuid1, Uuid2]) == PrefixLen,
@@ -702,19 +708,29 @@ substitute_splits_test() ->
         substitute_splits(Shards, PeerCheckpoints)
     ).
 
-go_int_test() ->
+go_int_test_() ->
     Range = [0, 10],
     Subrange1 = [0, 5],
     Subrange2 = [6, 10],
     Node1 = 'node1@127.0.0.1',
     Shards = [#shard{range = Subrange1, node = Node1}, #shard{range = Subrange2, node = Node1}],
-    PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
-    ShardSyncHistory = #{},
-    ?assertEqual(
-        {Shards, #{
-            {Subrange1, Node1} => {undefined, 12}, {Subrange2, Node1} => {undefined, 12}
-        }},
-        go_int(Shards, PeerCheckpoints, ShardSyncHistory)
-    ).
+    [
+        ?_assertEqual(
+            {Shards, #{
+                {Subrange1, Node1} => {undefined, 12}, {Subrange2, Node1} => {undefined, 12}
+            }},
+            go_int(Shards, #{{Range, Node1} => {<<"uuid1">>, 12}}, #{})
+        ),
+        ?_assertEqual(
+            {Shards, #{
+                {Subrange1, Node1} => {<<"uuid2">>, 10}, {Subrange2, Node1} => {undefined, 12}
+            }},
+            go_int(
+                Shards,
+                #{{Range, Node1} => {<<"uuid1">>, 12}, {Subrange1, Node1} => {<<"uuid2">>, 10}},
+                #{}
+            )
+        )
+    ].
 
 -endif.
