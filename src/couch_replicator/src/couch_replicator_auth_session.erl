@@ -379,7 +379,7 @@ parse_cookie(Headers) ->
             {error, cookie_not_found};
         [_ | _] = Cookies ->
             case get_auth_session_cookies_and_age(Cookies) of
-                [] -> {error, cookie_format_invalid};
+                [] -> {error, cookie_not_found};
                 [{Cookie, MaxAge} | _] -> {ok, MaxAge, Cookie}
             end
     end.
@@ -799,5 +799,15 @@ get_auth_session_cookies_and_age_test() ->
             [{"AuthSession", "z"}, {"Foo", "Bar"}]
         ])
     ).
+
+parse_cookie_test() ->
+    NotFound = {error, cookie_not_found},
+    ?assertEqual(NotFound, parse_cookie([])),
+    ?assertEqual(NotFound, parse_cookie([{"abc", "def"}])),
+    ?assertEqual(NotFound, parse_cookie([{"set-cookiee", "c=v"}])),
+    ?assertEqual(NotFound, parse_cookie([{"set-cookie", ""}])),
+    ?assertEqual(NotFound, parse_cookie([{"Set-cOokie", "c=v"}])),
+    ?assertEqual({ok, undefined, "x"}, parse_cookie([{"set-cookie", "authsession=x"}])),
+    ?assertEqual({ok, 4, "x"}, parse_cookie([{"set-cookie", "authsession=x; max-age=4"}])).
 
 -endif.
