@@ -769,4 +769,69 @@ go_int_test_() ->
         )
     ].
 
+go_int2_test_() ->
+    Range = [0, 10],
+    Subrange1 = [0, 5],
+    Subrange2 = [6, 10],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    Shards = [
+        #shard{range = Subrange1, node = Node1},
+        #shard{range = Subrange2, node = Node1},
+        #shard{range = Subrange1, node = Node2},
+        #shard{range = Subrange2, node = Node2}
+    ],
+    UuidMap = #{
+        {Subrange1, Node1} => <<"s1n1">>,
+        {Subrange2, Node1} => <<"s2n1">>,
+        {Subrange1, Node2} => <<"s1n2">>,
+        {Subrange2, Node2} => <<"s2n2">>
+    },
+    ShardSyncHistory =
+        #{
+            {Subrange1, Node1, Node2} => [
+                {<<"s1n1">>, 100, <<"s1n2">>, 99},
+                {<<"s1n1">>, 75, <<"s1n2">>, 76},
+                {<<"s1n1">>, 50, <<"s1n2">>, 51},
+                {<<"s1n1">>, 12, <<"s1n2">>, 11}
+            ],
+            {Subrange2, Node1, Node2} => [
+                {<<"s2n1">>, 100, <<"s2n2">>, 99},
+                {<<"s2n1">>, 75, <<"s2n2">>, 76},
+                {<<"s2n1">>, 50, <<"s2n2">>, 51},
+                {<<"s2n1">>, 12, <<"s2n2">>, 11}
+            ],
+            {Subrange1, Node2, Node1} => [
+                {<<"s1n2">>, 100, <<"s1n1">>, 99},
+                {<<"s1n2">>, 75, <<"s1n1">>, 76},
+                {<<"s1n2">>, 50, <<"s1n1">>, 51},
+                {<<"s1n2">>, 12, <<"s1n1">>, 11}
+            ],
+            {Subrange2, Node2, Node1} => [
+                {<<"s2n2">>, 100, <<"s2n1">>, 99},
+                {<<"s2n2">>, 75, <<"s2n1">>, 76},
+                {<<"s2n2">>, 50, <<"s2n1">>, 51},
+                {<<"s2n2">>, 12, <<"s2n1">>, 11}
+            ]
+        },
+    [
+        ?_assertEqual(
+            #{
+                {Subrange1, Node1} => {<<"s1n1">>, 11},
+                {Subrange2, Node1} => {<<"s2n1">>, 11},
+                {Subrange1, Node1} => {<<"s2n1">>, 11},
+                {Subrange2, Node2} => {<<"s2n2">>, 11}
+            },
+            element(
+                2,
+                go_int(
+                    Shards,
+                    UuidMap,
+                    #{{Range, Node1} => {<<"ignored">>, 12}},
+                    ShardSyncHistory
+                )
+            )
+        )
+    ].
+
 -endif.
