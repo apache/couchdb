@@ -132,7 +132,9 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
                 fun({R, _S, T}, History, Acc2) ->
                     case
                         lists:search(
-                            fun({SU, SS, _TU, _TS}) -> Uuid == SU andalso SS =< Seq end,
+                            fun({SU, SS, _TU, _TS}) ->
+                                uuids_match([Uuid, SU]) andalso SS =< Seq
+                            end,
                             History
                         )
                     of
@@ -308,9 +310,12 @@ parse_peer_checkpoint_docs_cb(_Else, Acc) ->
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when
     is_binary(Uuid1), is_binary(Uuid2), is_integer(Val1), is_integer(Val2)
 ->
-    PrefixLen = min(byte_size(Uuid1), byte_size(Uuid2)),
-    true = binary:longest_common_prefix([Uuid1, Uuid2]) == PrefixLen,
+    true = uuids_match([Uuid1, Uuid2]),
     {Uuid1, min(Val1, Val2)}.
+
+uuids_match(Uuids) when is_list(Uuids) ->
+    PrefixLen = lists:min([byte_size(Uuid) || Uuid <- Uuids]),
+    binary:longest_common_prefix(Uuids) == PrefixLen.
 
 decode_seq(OpaqueSeq) ->
     Decoded = fabric_view_changes:decode_seq(OpaqueSeq),
@@ -817,9 +822,9 @@ go_int2_test_() ->
     [
         ?_assertEqual(
             #{
-                {Subrange1, Node1} => {<<"s1n1">>, 11},
-                {Subrange2, Node1} => {<<"s2n1">>, 11},
-                {Subrange1, Node1} => {<<"s2n1">>, 11},
+                {Subrange1, Node1} => {<<"s1n1">>, 12},
+                {Subrange2, Node1} => {<<"s2n1">>, 12},
+                {Subrange1, Node2} => {<<"s1n2">>, 11},
                 {Subrange2, Node2} => {<<"s2n2">>, 11}
             },
             element(
