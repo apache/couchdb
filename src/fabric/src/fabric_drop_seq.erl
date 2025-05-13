@@ -86,11 +86,12 @@ go(DbName) ->
             end
     end.
 
-go_int(Shards0, UuidMap, PeerCheckpoints, ShardSyncHistory) ->
+go_int(Shards0, UuidMap, PeerCheckpoints0, ShardSyncHistory) ->
     Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
+    PeerCheckpoints1 = substitute_splits(Shards1, UuidMap, PeerCheckpoints0),
     {
         Shards1,
-        calculate_drop_seqs(substitute_splits(Shards1, UuidMap, PeerCheckpoints), ShardSyncHistory)
+        calculate_drop_seqs(PeerCheckpoints1, ShardSyncHistory)
     }.
 
 -spec calculate_drop_seqs(peer_checkpoints(), shard_sync_history()) ->
@@ -371,8 +372,8 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
         ShardSyncHistory
     ).
 
-%% A peer checkpoint might refer to a range that has been split since
-%% it last updated. Find these cases and split the peer checkpoints too.
+%% A shard may have been split since a peer saw it.
+-spec substitute_splits([#shard{}], uuid_map(), peer_checkpoints()) -> peer_checkpoints().
 substitute_splits(Shards, UuidMap, PeerCheckpoints) ->
     maps:fold(
         fun({[B1, E1], Node}, {Uuid, Seq}, Acc) ->
