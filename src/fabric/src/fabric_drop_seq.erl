@@ -88,11 +88,11 @@ go(DbName) ->
 
 go_int(Shards0, UuidMap, PeerCheckpoints0, ShardSyncHistory) ->
     Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
-    PeerCheckpoints1 = substitute_splits(Shards1, UuidMap, PeerCheckpoints0),
-    {
-        Shards1,
-        calculate_drop_seqs(PeerCheckpoints1, ShardSyncHistory)
-    }.
+    PeerCheckpoints1 = crossref(PeerCheckpoints0, ShardSyncHistory),
+    PeerCheckpoints2 = substitute_splits(Shards1, UuidMap, PeerCheckpoints1),
+    DropSeqs = calculate_drop_seqs(PeerCheckpoints2, ShardSyncHistory),
+
+    {Shards1, DropSeqs}.
 
 -spec calculate_drop_seqs(peer_checkpoints(), shard_sync_history()) ->
     peer_checkpoints().
@@ -747,6 +747,59 @@ substitute_splits_test() ->
         #{{Subrange1, Node1} => {<<"uuid2">>, 12}, {Subrange2, Node1} => {<<"uuid3">>, 12}},
         substitute_splits(Shards, UuidMap, PeerCheckpoints)
     ).
+
+crossref_test_() ->
+    Range = [0, 10],
+    Node1 = 'node1@127.0.0.1',
+    Node2 = 'node2@127.0.0.1',
+    Node3 = 'node3@127.0.0.1',
+    [
+        ?_assertEqual(#{}, crossref(#{}, #{})),
+        ?_assertEqual(
+            #{
+                {Range, Node1} => {<<"n1">>, 5},
+                {Range, Node2} => {<<"n2">>, 4},
+                {Range, Node3} => {<<"n3">>, 3}
+            },
+            crossref(
+                #{{Range, Node1} => {<<"n1">>, 5}},
+                #{
+                    {Range, Node1, Node2} => [
+                        {<<"n1">>, 10, <<"n2">>, 9},
+                        {<<"n1">>, 5, <<"n2">>, 4},
+                        {<<"n1">>, 2, <<"n2">>, 1}
+                    ],
+                    {Range, Node1, Node3} => [
+                        {<<"n1">>, 9, <<"n3">>, 8},
+                        {<<"n1">>, 4, <<"n3">>, 3},
+                        {<<"n1">>, 3, <<"n3">>, 2}
+                    ]
+                }
+            )
+        ),
+        ?_assertEqual(
+            #{
+                {Range, Node1} => {<<"n1">>, 5},
+                {Range, Node2} => {<<"n2x">>, 4},
+                {Range, Node3} => {<<"n3x">>, 3}
+            },
+            crossref(
+                #{{Range, Node1} => {<<"n1">>, 5}},
+                #{
+                    {Range, Node1, Node2} => [
+                        {<<"n1x">>, 10, <<"n2x">>, 9},
+                        {<<"n1x">>, 5, <<"n2x">>, 4},
+                        {<<"n1x">>, 2, <<"n2x">>, 1}
+                    ],
+                    {Range, Node1, Node3} => [
+                        {<<"n1x">>, 9, <<"n3x">>, 8},
+                        {<<"n1x">>, 4, <<"n3x">>, 3},
+                        {<<"n1x">>, 3, <<"n3x">>, 2}
+                    ]
+                }
+            )
+        )
+    ].
 
 go_int_test_() ->
     Range = [0, 10],
