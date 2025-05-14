@@ -136,7 +136,7 @@ ping_nodes_test(_) ->
             {n1, {nodedown, n1}},
             {n2, {nodedown, n2}}
         ],
-        couch_debug:ping_nodes()
+        couch_debug:ping_live_cluster_nodes()
     ),
     ?assertEqual({nodedown, n3}, couch_debug:ping(n3, 100)).
 
