@@ -57,7 +57,6 @@ increment_counter(Name, Value) ->
     %% Should maybe_track_local happen before or after notify?
     %% If after, only currently tracked metrics declared in the app's
     %% stats_description.cfg will be trackable locally. Pros/cons.
-    %io:format("NOTIFY_EXISTING_METRIC: ~p || ~p || ~p~n", [Name, Op, Type]),
     ok = maybe_track_local_counter(Name, Value),
     case couch_stats_util:get_counter(Name, stats()) of
         {ok, Ctx} -> couch_stats_counter:increment(Ctx, Value);
@@ -113,7 +112,6 @@ now_sec() ->
 %% Only potentially track positive increments to counters
 -spec maybe_track_local_counter(any(), any()) -> ok.
 maybe_track_local_counter(Name, Val) when is_integer(Val) andalso Val > 0 ->
-    %%io:format("maybe_track_local[~p]: ~p~n", [Val, Name]),
     csrt:maybe_inc(Name, Val),
     ok;
 maybe_track_local_counter(_, _) ->
