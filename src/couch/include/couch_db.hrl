@@ -53,6 +53,8 @@
 -define(INTERACTIVE_EDIT, interactive_edit).
 -define(REPLICATED_CHANGES, replicated_changes).
 
+-define(LOG_UNEXPECTED_MSG(Msg), couch_log:warning("[~p:~p:~p/~p]{~p[~p]} Unexpected message: ~w", [?MODULE, ?LINE, ?FUNCTION_NAME, ?FUNCTION_ARITY, self(), element(2, process_info(self(), message_queue_len)), Msg])).
+
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
 -type update_type() :: replicated_changes | interactive_edit.
