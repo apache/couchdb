@@ -716,11 +716,11 @@
       :ref:`selector objects <selectorobj>` in replication documents.
       ``doc_ids``, ``filter``, and ``selector`` are mutually exclusive.
     :<json string source_proxy: Address of a proxy server through which
-      replication from the source should occur (protocol can be "http" or
-      "socks5")
+      replication from the source should occur (protocol can be "http", "https",
+      or "socks5")
     :<json string target_proxy: Address of a proxy server through which
-      replication to the target should occur (protocol can be "http" or
-      "socks5")
+      replication to the target should occur (protocol can be "http", "https",
+      or "socks5")
     :<json string/object source: Fully qualified source database URL or an
       object which contains the full URL of the source database with additional
       parameters like headers. Eg: 'http://example.com/source_db_name' or
