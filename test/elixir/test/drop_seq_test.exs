@@ -124,6 +124,11 @@ defmodule DropSeqTest do
       wait_for_reshard_jobs_to_complete()
     end
 
+    after_doc_deletion_fn = fn ->
+      split_all_shard_ranges(db_name)
+      wait_for_reshard_jobs_to_complete()
+    end
+
     update_checkpoint_fn = fn ->
       resp = Couch.get("/#{db_name}")
       assert resp.status_code == 200
@@ -135,10 +140,15 @@ defmodule DropSeqTest do
       assert resp.status_code == 201
     end
 
-    checkpoint_test_helper(context[:db_name], create_checkpoint_fn, update_checkpoint_fn)
+    checkpoint_test_helper(context[:db_name],
+      create_checkpoint_fn, update_checkpoint_fn, after_doc_deletion_fn)
   end
 
   defp checkpoint_test_helper(db_name, create_checkpoint_fn, update_checkpoint_fn) do
+    checkpoint_test_helper(db_name, create_checkpoint_fn, update_checkpoint_fn, fn() -> true end)
+  end
+
+  defp checkpoint_test_helper(db_name, create_checkpoint_fn, update_checkpoint_fn, after_doc_deletion_fn) do
     doc_id = "testdoc"
 
     drop_count = get_drop_count(db_name)
@@ -156,6 +166,8 @@ defmodule DropSeqTest do
     # delete it
     resp = Couch.delete("/#{db_name}/#{doc_id}?rev=#{rev}")
     assert resp.status_code == 200
+
+    after_doc_deletion_fn.()
 
     # wait for drop seq to change
     wait_for_drop_seq_change(db_name, drop_seq, update_checkpoint_fn)
@@ -186,6 +198,20 @@ defmodule DropSeqTest do
       200,
       10_000
     )
+  end
+
+  defp split_all_shard_ranges(db_name) do
+    resp = Couch.get("/#{db_name}/_shards")
+    assert resp.status_code == 200
+    ranges = Map.keys(resp.body["shards"])
+    Enum.each(ranges, fn r ->
+      resp = Couch.post("/_reshard/jobs", body: %{
+        type: "split",
+        db: db_name,
+        range: r
+      })
+      assert resp.status_code == 201
+    end)
   end
 
   defp wait_for_reshard_jobs_to_complete() do
