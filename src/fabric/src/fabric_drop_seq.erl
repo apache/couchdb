@@ -97,7 +97,6 @@ go_int(Shards0, UuidFetcher, PeerCheckpoints0, ShardSyncHistory) ->
     PeerCheckpoints1 = crossref(PeerCheckpoints0, ShardSyncHistory),
     PeerCheckpoints2 = substitute_splits(Shards1, UuidFetcher, PeerCheckpoints1),
     DropSeqs = calculate_drop_seqs(PeerCheckpoints2, ShardSyncHistory),
-
     {Shards1, DropSeqs}.
 
 -spec calculate_drop_seqs(peer_checkpoints(), shard_sync_history()) ->

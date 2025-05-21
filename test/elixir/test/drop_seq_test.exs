@@ -95,15 +95,58 @@ defmodule DropSeqTest do
     checkpoint_test_helper(context[:db_name], update_checkpoint_fn, update_checkpoint_fn)
   end
 
+  @tag :with_db
+  test "peer checkpoint - shard split", context do
+    db_name = context[:db_name]
+    peer_checkpoint_id = "_local/peer-checkpoint-foo"
+
+    create_checkpoint_fn = fn ->
+      resp = Couch.get("/#{db_name}")
+      assert resp.status_code == 200
+      update_seq = resp.body["update_seq"]
+
+      resp = Couch.put("/#{db_name}/#{peer_checkpoint_id}", body: %{
+        update_seq: update_seq
+      })
+      assert resp.status_code == 201
+
+      resp = Couch.get("/#{db_name}/_shards")
+      assert resp.status_code == 200
+      ranges = Map.keys(resp.body["shards"])
+      Enum.each(ranges, fn r ->
+        resp = Couch.post("/_reshard/jobs", body: %{
+          type: "split",
+          db: db_name,
+          range: r
+        })
+        assert resp.status_code == 201
+      end)
+      wait_for_reshard_jobs_to_complete()
+    end
+
+    update_checkpoint_fn = fn ->
+      resp = Couch.get("/#{db_name}")
+      assert resp.status_code == 200
+      update_seq = resp.body["update_seq"]
+
+      resp = Couch.put("/#{db_name}/#{peer_checkpoint_id}", body: %{
+        update_seq: update_seq
+      })
+      assert resp.status_code == 201
+    end
+
+    checkpoint_test_helper(context[:db_name], create_checkpoint_fn, update_checkpoint_fn)
+  end
+
   defp checkpoint_test_helper(db_name, create_checkpoint_fn, update_checkpoint_fn) do
     doc_id = "testdoc"
 
-    assert get_drop_count(db_name) == 0
+    drop_count = get_drop_count(db_name)
     drop_seq = update_drop_seq(db_name)
 
     # create something that will create a peer checkpoint
     create_checkpoint_fn.()
-    assert get_drop_count(db_name) == 0
+    assert get_drop_count(db_name) == drop_count
 
     # create a document
     resp = Couch.put("/#{db_name}/#{doc_id}", body: %{})
@@ -116,7 +159,7 @@ defmodule DropSeqTest do
 
     # wait for drop seq to change
     wait_for_drop_seq_change(db_name, drop_seq, update_checkpoint_fn)
-    assert get_drop_count(db_name) == 0
+    assert get_drop_count(db_name) == drop_count
 
     # confirm deleted doc is still in _changes response
     resp = Couch.get("/#{db_name}/_changes")
@@ -130,7 +173,7 @@ defmodule DropSeqTest do
     resp = Couch.get("/#{db_name}/_changes")
     assert resp.status_code == 200
     assert !Enum.member?(get_ids(resp), doc_id)
-    assert get_drop_count(db_name) == 1
+    assert get_drop_count(db_name) == drop_count + 1
   end
 
   defp wait_for_drop_seq_change(db_name, previous_drop_seq, update_checkpoint_fn) do
@@ -139,6 +182,20 @@ defmodule DropSeqTest do
         update_checkpoint_fn.()
         new_drop_seq = update_drop_seq(db_name)
         new_drop_seq != previous_drop_seq
+      end,
+      200,
+      10_000
+    )
+  end
+
+  defp wait_for_reshard_jobs_to_complete() do
+    retry_until(
+      fn ->
+        resp = Couch.get("/_reshard/jobs")
+        assert resp.status_code == 200
+        Enum.all?(resp.body["jobs"], fn job ->
+          job["job_state"] == "completed"
+        end)
       end,
       200,
       10_000
