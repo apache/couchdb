@@ -194,6 +194,11 @@
 -callback get_del_doc_count(DbHandle :: db_handle()) ->
     DelDocCount :: non_neg_integer().
 
+% The number of tombstones (deleted documents with no content) in the
+% database which have been completely dropped from the database.
+-callback get_drop_count(DbHandle :: db_handle()) ->
+    DropCount :: non_neg_integer().
+
 % This number is reported in the database info properties and
 % as such can be any JSON value.
 -callback get_disk_version(DbHandle :: db_handle()) -> Version :: json().
@@ -679,6 +684,7 @@
     get_engine/1,
     get_compacted_seq/1,
     get_del_doc_count/1,
+    get_drop_count/1,
     get_disk_version/1,
     get_doc_count/1,
     get_epochs/1,
@@ -805,6 +811,10 @@ get_compacted_seq(#db{} = Db) ->
 get_del_doc_count(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_del_doc_count(EngineState).
+
+get_drop_count(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_drop_count(EngineState).
 
 get_disk_version(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,

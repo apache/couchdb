@@ -98,10 +98,12 @@ defmodule DropSeqTest do
   defp checkpoint_test_helper(db_name, create_checkpoint_fn, update_checkpoint_fn) do
     doc_id = "testdoc"
 
+    assert get_drop_count(db_name) == 0
     drop_seq = update_drop_seq(db_name)
 
     # create something that will create a peer checkpoint
     create_checkpoint_fn.()
+    assert get_drop_count(db_name) == 0
 
     # create a document
     resp = Couch.put("/#{db_name}/#{doc_id}", body: %{})
@@ -114,6 +116,7 @@ defmodule DropSeqTest do
 
     # wait for drop seq to change
     wait_for_drop_seq_change(db_name, drop_seq, update_checkpoint_fn)
+    assert get_drop_count(db_name) == 0
 
     # confirm deleted doc is still in _changes response
     resp = Couch.get("/#{db_name}/_changes")
@@ -127,6 +130,7 @@ defmodule DropSeqTest do
     resp = Couch.get("/#{db_name}/_changes")
     assert resp.status_code == 200
     assert !Enum.member?(get_ids(resp), doc_id)
+    assert get_drop_count(db_name) == 1
   end
 
   defp wait_for_drop_seq_change(db_name, previous_drop_seq, update_checkpoint_fn) do
@@ -145,6 +149,12 @@ defmodule DropSeqTest do
     resp = Couch.post("/#{db_name}/_update_drop_seq")
     assert resp.status_code == 201
     resp.body["results"]
+  end
+
+  defp get_drop_count(db_name) do
+    resp = Couch.get("/#{db_name}")
+    assert resp.status_code == 200
+    resp.body["drop_count"]
   end
 
   defp get_ids(resp) do
