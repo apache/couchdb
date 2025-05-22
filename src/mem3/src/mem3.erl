@@ -434,7 +434,7 @@ engine(Opts) when is_list(Opts) ->
 -spec ping(node()) -> pos_integer() | Error :: term().
 
 ping(Node) ->
-    [{Node, Res}] = ping_nodes([Node]),
+    [{Node, Res}] = ping_nodes([Node], ?PING_TIMEOUT_IN_MS),
     Res.
 
 -spec ping(node(), Timeout :: pos_integer()) -> pos_integer() | Error :: term().
