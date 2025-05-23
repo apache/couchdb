@@ -22,7 +22,7 @@
 -export([delete/2, update/3, cleanup/1, cleanup/2, rename/1]).
 -export([analyze/2, version/0, disk_size/1]).
 -export([set_purge_seq/2, get_purge_seq/1, get_root_dir/0]).
--export([connected/0]).
+-export([connected/0, check_service/1, check_services/0]).
 
 %% string represented as binary
 -type string_as_binary(_Value) :: nonempty_binary().
@@ -31,6 +31,7 @@
 -type path() :: string_as_binary(_).
 
 -type error() :: any().
+-type throw(_Reason) :: no_return().
 
 -type analyzer_name() :: string_as_binary(_).
 
@@ -63,6 +64,8 @@
         | {string_as_binary(fields), {analyzer_fields()}}
         | {string_as_binary(stopwords), [field_name()]}
     ].
+
+-define(TIMEOUT, 200).
 
 -spec open_index(Peer :: pid(), Path :: shard(), Analyzer :: analyzer()) ->
     {ok, indexer_pid()} | error().
@@ -285,6 +288,21 @@ analyze(Analyzer, Text) ->
 version() ->
     rpc({main, clouseau()}, version).
 
+-spec clouseau_major_vsn() -> binary() | throw({atom(), binary()}).
+clouseau_major_vsn() ->
+    case version() of
+        {ok, <<Major, _/binary>>} ->
+            <<Major>>;
+        {'EXIT', noconnection} ->
+            throw({noconnection, <<"Clouseau node is not connected.">>});
+        {ok, null} ->
+            %% Backward compatibility:
+            %% If we run Clouseau from source code, remsh will return
+            %% `{ok, null}` for Clouseau <= 2.25.0.
+            %% See PR: https://github.com/cloudant-labs/clouseau/pull/106
+            <<$2>>
+    end.
+
 -spec connected() -> boolean().
 
 connected() ->
@@ -316,3 +334,46 @@ rpc(Ref, Msg) ->
 
 clouseau() ->
     list_to_atom(config:get("dreyfus", "name", "clouseau@127.0.0.1")).
+
+-type service() :: sup | main | analyzer | cleanup.
+-type liveness_status() :: alive | timeout.
+
+-spec clouseau_services(MajorVsn) -> [service()] when
+    MajorVsn :: binary().
+clouseau_services(_MajorVsn) ->
+    [sup, main, analyzer, cleanup].
+
+-spec is_valid(Service) -> boolean() when
+    Service :: atom().
+is_valid(Service) when is_atom(Service) ->
+    lists:member(Service, clouseau_services(clouseau_major_vsn())).
+
+-spec check_service(Service) -> {service(), liveness_status()} | throw({atom(), binary()}) when
+    Service :: service().
+check_service(Service) when is_list(Service) ->
+    check_service(list_to_atom(Service));
+check_service(Service) when is_atom(Service) ->
+    case is_valid(Service) of
+        true ->
+            Ref = make_ref(),
+            {Service, clouseau()} ! {ping, self(), Ref},
+            receive
+                {pong, Ref} ->
+                    {Service, alive}
+            after ?TIMEOUT ->
+                {Service, timeout}
+            end;
+        false ->
+            NoService = atom_to_binary(Service),
+            throw({not_found, <<"no such service: ", NoService/binary>>})
+    end.
+
+-spec check_services() -> [{service(), liveness_status()}] | throw({atom(), binary()}).
+check_services() ->
+    case connected() of
+        true ->
+            Services = clouseau_services(clouseau_major_vsn()),
+            [check_service(S) || S <- Services];
+        false ->
+            throw({noconnection, <<"Clouseau node is not connected.">>})
+    end.
