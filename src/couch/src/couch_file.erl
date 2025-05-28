@@ -410,9 +410,7 @@ delete_dir(RootDelDir, Dir) ->
 
 init_delete_dir(RootDir) ->
     Dir = filename:join(RootDir, ".delete"),
-    % note: ensure_dir requires an actual filename companent, which is the
-    % reason for "foo".
-    filelib:ensure_dir(filename:join(Dir, "foo")),
+    filelib:ensure_path(Dir),
     spawn(fun() ->
         filelib:fold_files(
             Dir,
