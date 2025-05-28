@@ -303,7 +303,12 @@ init([N]) ->
         "couchdb", "update_lru_on_read", false
     ),
     ok = config:listen_for_changes(?MODULE, N),
-    ok = couch_file:init_delete_dir(RootDir),
+    % Spawn async .deleted files recursive cleaner, but only
+    % for the first sharded couch_server instance
+    case N of
+        1 -> ok = couch_file:init_delete_dir(RootDir);
+        _ -> ok
+    end,
     ets:new(couch_dbs(N), [
         set,
         protected,
