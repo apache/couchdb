@@ -210,7 +210,7 @@ range_key(#shard{range = [B, E]}) ->
     list_to_binary([BHex, "-", EHex]).
 
 shard_update_timeout_msec() ->
-    config:get_integer("reshard", "shard_upate_timeout_msec", 300000).
+    config:get_integer("reshard", "shard_update_timeout_msec", 300000).
 
 wait_source_removed(#shard{name = Name} = Source, SleepSec, UntilSec) ->
     case check_source_removed(Source) of
