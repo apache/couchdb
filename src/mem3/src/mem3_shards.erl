@@ -526,11 +526,17 @@ cache_clear(St) ->
     St#st{cur_size = 0}.
 
 maybe_spawn_shard_writer(DbName, Shards, IdleTimeout) ->
-    case ets:member(?OPENERS, DbName) of
+    try ets:member(?OPENERS, DbName) of
         true ->
             ignore;
         false ->
             spawn_shard_writer(DbName, Shards, IdleTimeout)
+    catch
+        error:badarg ->
+            % We might have been called before mem3 finished initializing
+            % from the error:badarg clause in for_db/2, for instance, so
+            % we shouldn't expect ?OPENERS to exist yet
+            ignore
     end.
 
 spawn_shard_writer(DbName, Shards, IdleTimeout) ->
