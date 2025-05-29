@@ -53,10 +53,9 @@ defmodule DropSeqStateM do
     state()
   end
 
-  @max_doc_ids 10
-  @doc_ids 1..@max_doc_ids |> Enum.map(&"doc-#{&1}")
-
-  def doc_id, do: oneof(@doc_ids)
+  def doc_id do
+    "doc-#{Enum.random(1..20)}"
+  end
 
   def command(_state) do
     oneof([
