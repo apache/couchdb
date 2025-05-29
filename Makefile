@@ -257,7 +257,6 @@ elixir-cluster-with-quorum: elixir-init devclean
 .PHONY: elixir-cluster
 elixir-cluster: export MIX_ENV=integration
 elixir-cluster: elixir-init devclean
-#   @rm -f _build/propcheck.ctex
 	@dev/run -n 3 -q -a adm:pass \
 		--no-eval 'mix test --trace --only with_cluster $(EXUNIT_OPTS)'
 

@@ -64,7 +64,8 @@ defmodule DropSeqStateM do
       {:call, __MODULE__, :update_peer_checkpoint, [{:var, :dbname}]},
       {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]},
       {:call, __MODULE__, :compact_db, [{:var, :dbname}]},
-      {:call, __MODULE__, :changes, [{:var, :dbname}]}
+      {:call, __MODULE__, :changes, [{:var, :dbname}]},
+      {:call, __MODULE__, :split_shard, [{:var, :dbname}]}
     ])
   end
 
@@ -150,6 +151,36 @@ defmodule DropSeqStateM do
     end)
   end
 
+  def split_shard(db_name) do
+    resp = Couch.get("/#{db_name}/_shards")
+    assert resp.status_code == 200
+    range = Enum.random(Map.keys(resp.body["shards"]))
+
+    resp =
+      Couch.post("/_reshard/jobs",
+        body: %{
+          type: "split",
+          db: db_name,
+          range: range
+        }
+      )
+
+    assert resp.status_code == 201
+
+    retry_until(
+      fn ->
+        resp = Couch.get("/_reshard/jobs")
+        assert resp.status_code == 200
+
+        Enum.all?(resp.body["jobs"], fn job ->
+          job["job_state"] == "completed"
+        end)
+      end,
+      200,
+      10_000
+    )
+  end
+
   def sync_shards(db_name) do
     resp = Couch.post("/#{db_name}/_sync_shards")
     assert resp.status_code == 202
@@ -214,6 +245,10 @@ defmodule DropSeqStateM do
   end
 
   def next_state(s, _v, {:call, _, :changes, [_db_name]}) do
+    s
+  end
+
+  def next_state(s, _v, {:call, _, :split_shard, [_db_name]}) do
     s
   end
 
