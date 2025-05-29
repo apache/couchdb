@@ -294,6 +294,12 @@ design_docs(Name) ->
         case fabric:design_docs(mem3:dbname(Name)) of
             {error, {maintenance_mode, _, _Node}} ->
                 {ok, []};
+            {error, {nodedown, _Reason}} ->
+                {ok, []};
+            {ok, DDocs} when is_list(DDocs) ->
+                {ok, DDocs};
+            {ok, _Resp} ->
+                {ok, []};
             Else ->
                 Else
         end
