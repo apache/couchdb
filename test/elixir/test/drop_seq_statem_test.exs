@@ -13,11 +13,13 @@ defmodule DropSeqStateM do
   @moduletag :without_quorum_test
   @moduletag :with_quorum_test
 
-  property "drop_seq works fine", start_size: 5, max_size: 100, numtests: 2000 do
+  property "drop_seq works fine", start_size: 5, max_size: 200, numtests: 10000 do
     forall cmds <- more_commands(100, commands(__MODULE__)) do
       trap_exit do
         db_name = random_db_name()
-        {:ok, _} = create_db(db_name, query: %{n: 3, q: 4})
+        n = Enum.random(1..3)
+        q = Enum.random(1..10)
+        {:ok, _} = create_db(db_name, query: %{n: n, q: q})
         r = run_commands(__MODULE__, cmds, [{:dbname, db_name}])
         {history, state, result} = r
         delete_db(db_name)
@@ -25,6 +27,7 @@ defmodule DropSeqStateM do
         (result == :ok)
         |> when_fail(
           IO.puts("""
+          n: #{n}, q: #{q}
           Commands: #{inspect(cmds, pretty: true)}
           History: #{inspect(history, pretty: true)}
           State: #{inspect(state, pretty: true)}
