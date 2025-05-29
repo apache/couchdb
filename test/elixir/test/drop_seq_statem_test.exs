@@ -88,6 +88,7 @@ defmodule DropSeqStateM do
         resp = Couch.put("/#{db_name}/#{doc_id}", body: %{})
         assert resp.status_code == 201
     end
+
     sync_shards(db_name)
   end
 
@@ -101,6 +102,7 @@ defmodule DropSeqStateM do
       {:not_found, _} ->
         :ok
     end
+
     sync_shards(db_name)
   end
 
@@ -117,7 +119,7 @@ defmodule DropSeqStateM do
       )
 
     assert resp.status_code == 201
-    update_seq
+    seq_to_shards(update_seq)
   end
 
   def update_drop_seq(db_name) do
@@ -229,5 +231,19 @@ defmodule DropSeqStateM do
 
   def deleted_doc_ids(s) do
     Enum.map(state(s, :deleted_docs), fn {doc_id, _} -> doc_id end)
+  end
+
+  def seq_to_shards(seq) do
+    for {node, [b, e], {seq_num, _uuid, _epoch}} <- decode_seq(seq) do
+      b_hex = :couch_util.to_hex(<<b::32-integer>>)
+      e_hex = :couch_util.to_hex(<<e::32-integer>>)
+      range = "#{b_hex}-#{e_hex}"
+      {node, range, seq_num}
+    end
+  end
+
+  def decode_seq(seq) do
+    seq = String.replace(seq, ~r/\d+-/, "", global: false)
+    :erlang.binary_to_term(Base.url_decode64!(seq, padding: false))
   end
 end
