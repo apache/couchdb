@@ -820,7 +820,7 @@ set_update_seq(#st{header = Header} = St, UpdateSeq) ->
     }}.
 
 set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
-    is_binary(ExpectedUuidPrefix), is_integer(NewDropSeq), NewDropSeq > 0
+    is_binary(ExpectedUuidPrefix), is_integer(NewDropSeq), NewDropSeq >= 0
 ->
     CurrentDropSeq = get_drop_seq(St),
     Uuid = get_uuid(St),

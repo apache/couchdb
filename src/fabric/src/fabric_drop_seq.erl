@@ -163,7 +163,25 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
     %% crossreferences may be possible.
     if
         PeerCheckpoints0 == PeerCheckpoints1 ->
-            PeerCheckpoints1;
+            %% insert {<<>>, 0} for any missing crossref so that shard sync
+            %% history is subordinate.
+            maps:fold(
+                fun({Range, Node}, {_Uuid, _Seq}, Acc1) ->
+                    Others = maps:filter(
+                        fun({R, _S, T}, _History) -> R == Range andalso T /= Node end,
+                        ShardSyncHistory
+                    ),
+                    maps:fold(
+                        fun({R, _S, T}, _History, Acc3) ->
+                            maps:merge(#{{R, T} => {<<>>, 0}}, Acc3)
+                        end,
+                        Acc1,
+                        Others
+                    )
+                end,
+                PeerCheckpoints1,
+                PeerCheckpoints1
+            );
         true ->
             crossref(PeerCheckpoints1, ShardSyncHistory)
     end.
@@ -333,7 +351,7 @@ decode_seq(OpaqueSeq) ->
                 is_integer(Seq),
                 S >= 0,
                 E > S,
-                Seq > 0,
+                Seq >= 0,
                 is_binary(Uuid),
                 is_atom(Node)
             ->
