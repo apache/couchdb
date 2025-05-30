@@ -13,7 +13,7 @@ defmodule DropSeqStateM do
   @moduletag :without_quorum_test
   @moduletag :with_quorum_test
 
-  property "drop_seq works fine", start_size: 5, max_size: 200, numtests: 10000 do
+  property "drop_seq works fine", start_size: 5, max_size: 30, numtests: 10000 do
     forall cmds <- more_commands(100, commands(__MODULE__)) do
       trap_exit do
         db_name = random_db_name()
@@ -46,7 +46,8 @@ defmodule DropSeqStateM do
     current_seq: 0,
     peer_checkpoint_seq: nil,
     drop_seq: nil,
-    drop_count: 0
+    drop_count: 0,
+    changed: false
   )
 
   def initial_state() do
@@ -57,16 +58,20 @@ defmodule DropSeqStateM do
     "doc-#{Enum.random(1..20)}"
   end
 
-  def command(_state) do
-    oneof([
-      {:call, __MODULE__, :update_document, [{:var, :dbname}, doc_id()]},
-      {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id()]},
-      {:call, __MODULE__, :update_peer_checkpoint, [{:var, :dbname}]},
-      {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]},
-      {:call, __MODULE__, :compact_db, [{:var, :dbname}]},
-      {:call, __MODULE__, :changes, [{:var, :dbname}]},
-      {:call, __MODULE__, :split_shard, [{:var, :dbname}]}
-    ])
+  def command(s) do
+    if state(s, :changed) do
+      {:call, __MODULE__, :changes, [{:var, :dbname}]}
+    else
+      oneof([
+        {:call, __MODULE__, :update_document, [{:var, :dbname}, doc_id()]},
+        {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id()]},
+        {:call, __MODULE__, :update_peer_checkpoint, [{:var, :dbname}]},
+        {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]},
+        {:call, __MODULE__, :compact_db, [{:var, :dbname}]},
+        {:call, __MODULE__, :changes, [{:var, :dbname}]},
+        {:call, __MODULE__, :split_shard, [{:var, :dbname}]}
+      ])
+    end
   end
 
   def get_document(db_name, doc_id) do
@@ -203,7 +208,8 @@ defmodule DropSeqStateM do
     state(s,
       current_seq: state(s, :current_seq) + 1,
       docs: Enum.sort([doc_id | state(s, :docs)]),
-      deleted_docs: List.keydelete(state(s, :deleted_docs), doc_id, 0)
+      deleted_docs: List.keydelete(state(s, :deleted_docs), doc_id, 0),
+      changed: true
     )
   end
 
@@ -212,12 +218,13 @@ defmodule DropSeqStateM do
       current_seq: state(s, :current_seq) + 1,
       docs: List.delete(state(s, :docs), doc_id),
       deleted_docs:
-        Enum.sort([{doc_id, state(s, :current_seq) + 1} | state(s, :deleted_docs)])
+        Enum.sort([{doc_id, state(s, :current_seq) + 1} | state(s, :deleted_docs)]),
+      changed: true
     )
   end
 
   def next_state(s, _v, {:call, _, :update_peer_checkpoint, [_db_name]}) do
-    state(s, peer_checkpoint_seq: state(s, :current_seq))
+    state(s, peer_checkpoint_seq: state(s, :current_seq), changed: true)
   end
 
   def next_state(s, _v, {:call, _, :update_drop_seq, [_db_name]}) do
@@ -229,7 +236,7 @@ defmodule DropSeqStateM do
         do: state(s, :current_seq),
         else: state(s, :peer_checkpoint_seq)
 
-    state(s, drop_seq: drop_seq)
+    state(s, drop_seq: drop_seq, changed: true)
   end
 
   def next_state(s, _v, {:call, _, :compact_db, [_db_name]}) do
@@ -240,16 +247,17 @@ defmodule DropSeqStateM do
 
     state(s,
       deleted_docs: keep_docs,
-      drop_count: state(s, :drop_count) + length(drop_docs)
+      drop_count: state(s, :drop_count) + length(drop_docs),
+      changed: true
     )
   end
 
   def next_state(s, _v, {:call, _, :changes, [_db_name]}) do
-    s
+    state(s, changed: false)
   end
 
   def next_state(s, _v, {:call, _, :split_shard, [_db_name]}) do
-    s
+    state(s, changed: true)
   end
 
   def postcondition(s, {:call, _, :changes, [_db_name]}, {doc_ids, del_doc_ids}) do
