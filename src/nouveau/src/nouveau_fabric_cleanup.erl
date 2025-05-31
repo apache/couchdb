@@ -22,7 +22,14 @@
 -export([go/1]).
 
 go(DbName) ->
-    {ok, DesignDocs} = fabric:design_docs(DbName),
+    DesignDocs =
+        case fabric:design_docs(DbName) of
+            {ok, DDocs} when is_list(DDocs) ->
+                DDocs;
+            Else ->
+                couch_log:debug("Invalid design docs: ~p~n", [Else]),
+                []
+        end,
     ActiveSigs =
         lists:usort(
             lists:flatmap(

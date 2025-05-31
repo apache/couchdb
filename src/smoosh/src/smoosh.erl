@@ -64,7 +64,14 @@ fold_local_shards(Fun, Acc0) ->
 
 enqueue_views(ShardName) ->
     DbName = mem3:dbname(ShardName),
-    {ok, DDocs} = fabric:design_docs(DbName),
+    DDocs =
+        case fabric:design_docs(DbName) of
+            {ok, Resp} when is_list(Resp) ->
+                Resp;
+            Else ->
+                couch_log:debug("Invalid design docs: ~p~n", [Else]),
+                []
+        end,
     [sync_enqueue({ShardName, id(DDoc)}) || DDoc <- DDocs].
 
 id(#doc{id = Id}) ->
