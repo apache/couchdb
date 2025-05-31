@@ -27,16 +27,21 @@ ddocid(_) ->
 
 recover(DbName) ->
     {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
-    Funs = lists:flatmap(
-        fun(DDoc) ->
-            case couch_doc:get_validate_doc_fun(DbName, DDoc) of
-                nil -> [];
-                Fun -> [Fun]
-            end
-        end,
-        DDocs
-    ),
-    {ok, Funs}.
+    case is_list(DDocs) of
+        true ->
+            Funs = lists:flatmap(
+                fun(DDoc) ->
+                    case couch_doc:get_validate_doc_fun(DbName, DDoc) of
+                        nil -> [];
+                        Fun -> [Fun]
+                    end
+                end,
+                DDocs
+            ),
+            {ok, Funs};
+        false ->
+            throw({error, DDocs})
+    end.
 
 insert(_, _) ->
     ok.
