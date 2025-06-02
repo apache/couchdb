@@ -224,7 +224,7 @@ as ``http(s)://domain.com/couchdb/db1/doc1`` are proxied to
 To proxy the URL ``http(s)://domain.com/couchdb`` to
 ``http://localhost:5984`` so that requests appended to the subdirectory, such
 as ``http(s)://domain.com/couchdb/db1/doc1`` are proxied to
-``http://localhost:5984/db1/doc1``, you have to configure a route in Caddy:
+``http://localhost:5984/db1/doc1``, you have to configure a route in Caddy and strip the subdirectory from the target URI with ``uri strip_prefix``:
 
 .. code-block:: text
 
@@ -236,8 +236,6 @@ as ``http(s)://domain.com/couchdb/db1/doc1`` are proxied to
         }
 
     }
-
-
 
 Reverse proxying + load balancing for CouchDB clusters
 ------------------------------------------------------
