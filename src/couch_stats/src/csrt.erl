@@ -147,16 +147,24 @@ create_coordinator_context(#httpd{method = Verb, nonce = Nonce}, Path0) ->
             false
     end.
 
--spec create_context(Type :: rctx_type(), Nonce :: term()) -> pid_ref().
+-spec create_context(Type :: rctx_type(), Nonce :: term()) -> pid_ref() | false.
 create_context(Type, Nonce) ->
     Rctx = csrt_server:new_context(Type, Nonce),
     PidRef = get_pid_ref(Rctx),
     set_pid_ref(PidRef),
-    csrt_util:set_delta_zero(Rctx),
-    csrt_util:set_delta_a(Rctx),
-    csrt_server:create_resource(Rctx),
-    csrt_logger:track(Rctx),
-    PidRef.
+    try
+        csrt_util:set_delta_zero(Rctx),
+        csrt_util:set_delta_a(Rctx),
+        csrt_server:create_resource(Rctx),
+        csrt_logger:track(Rctx),
+        PidRef
+    catch
+        _:_ ->
+            csrt_server:destroy_resource(Rctx),
+            %% destroy_context(PidRef) clears the tracker too
+            destroy_context(PidRef),
+            false
+    end.
 
 -spec set_context_dbname(DbName :: binary()) -> boolean().
 set_context_dbname(DbName) ->

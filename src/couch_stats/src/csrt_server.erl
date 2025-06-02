@@ -124,7 +124,13 @@ get_resource(PidRef) ->
 match_resource(undefined) ->
     [];
 match_resource(#rctx{} = Rctx) ->
-    ets:match_object(?CSRT_ETS, Rctx).
+    try
+        ets:match_object(?CSRT_ETS, Rctx)
+    catch
+        _:_ ->
+            []
+    end.
+
 
 -spec is_rctx_field(Field :: rctx_field() | atom()) -> boolean().
 is_rctx_field(Field) ->
@@ -188,8 +194,7 @@ init([]) ->
     ets:new(?CSRT_ETS, [
         named_table,
         public,
-        {decentralized_counters, true},
-        {write_concurrency, true},
+        {write_concurrency, auto},
         {read_concurrency, true},
         {keypos, #rctx.pid_ref}
     ]),
@@ -209,5 +214,4 @@ handle_cast(_Msg, State) ->
 update_element(undefined, _Update) ->
     false;
 update_element({_Pid, _Ref} = PidRef, Update) ->
-    %% TODO: should we take any action when the update fails?
-    catch ets:update_element(?CSRT_ETS, PidRef, Update).
+    (catch ets:update_element(?CSRT_ETS, PidRef, Update)) == true.
