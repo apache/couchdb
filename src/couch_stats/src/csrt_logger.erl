@@ -28,9 +28,11 @@
     do_lifetime_report/1,
     do_status_report/1,
     do_report/2,
-    maybe_report/2
+    maybe_report/2,
+    should_truncate_reports/0
 ]).
 
+%% gen_server callbacks
 -export([
     start_link/0,
     init/1,
@@ -172,6 +174,10 @@ maybe_report(ReportName, PidRef) ->
             ok
     end.
 
+-spec should_truncate_reports() -> boolean().
+should_truncate_reports() ->
+    config:get_boolean(?CSRT, "should_truncate_reports", false).
+
 -spec do_lifetime_report(Rctx :: rctx()) -> boolean().
 do_lifetime_report(Rctx) ->
     do_report("csrt-pid-usage-lifetime", Rctx).
@@ -182,7 +188,13 @@ do_status_report(Rctx) ->
 
 -spec do_report(ReportName :: string(), Rctx :: rctx()) -> boolean().
 do_report(ReportName, #rctx{} = Rctx) ->
-    couch_log:report(ReportName, csrt_util:to_json(Rctx)).
+    JRctx = case {should_truncate_reports(), csrt_util:to_json(Rctx)} of
+        {true, JRctx0} ->
+            maps:filter(fun(_K, V) -> V > 0 end, JRctx0);
+        {false, JRctx0} ->
+            JRctx0
+    end,
+    couch_log:report(ReportName, JRctx).
 
 %%
 %% Process lifetime logging api
@@ -337,10 +349,10 @@ set_matchers_term(Matchers) when is_map(Matchers) ->
 -spec initialize_matchers() -> ok.
 initialize_matchers() ->
     DefaultMatchers = [
-        {docs_read, fun matcher_on_docs_read/1, 100},
-        {dbname, fun matcher_on_dbname/1, <<"foo">>},
-        {rows_read, fun matcher_on_rows_read/1, 100},
-        {docs_written, fun matcher_on_docs_written/1, 1},
+        {docs_read, fun matcher_on_docs_read/1, 1000},
+        %%{dbname, fun matcher_on_dbname/1, <<"foo">>},
+        {rows_read, fun matcher_on_rows_read/1, 1000},
+        {docs_written, fun matcher_on_docs_written/1, 500},
         %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
         %%{slow_reqs, fun matcher_on_slow_reqs/1, 10000},
         {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
