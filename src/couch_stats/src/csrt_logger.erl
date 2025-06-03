@@ -50,6 +50,7 @@
 
 %% Matchers
 -export([
+    deregister_matcher/1,
     get_matcher/1,
     get_matchers/0,
     is_match/1,
@@ -74,7 +75,7 @@
 -define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
 
 -record(st, {
-    matchers = #{}
+    registered_matchers = #{}
 }).
 
 -spec track(Rctx :: rctx()) -> pid().
@@ -116,6 +117,10 @@ tracker({Pid, _Ref} = PidRef) ->
     Name :: string(), MSpec :: ets:match_spec().
 register_matcher(Name, MSpec) ->
     gen_server:call(?MODULE, {register, Name, MSpec}).
+
+-spec deregister_matcher(Name :: string()) -> ok.
+deregister_matcher(Name) ->
+    gen_server:call(?MODULE, {deregister, Name}).
 
 -spec log_process_lifetime_report(PidRef :: pid_ref()) -> ok.
 log_process_lifetime_report(PidRef) ->
@@ -223,21 +228,22 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    ok = initialize_matchers(),
+    St = #st{},
+    ok = initialize_matchers(St#st.registered_matchers),
     ok = subscribe_changes(),
-    {ok, #st{}}.
+    {ok, St}.
 
-handle_call({register, Name, MSpec}, _From, #st{matchers = Matchers} = St) ->
-    case add_matcher(Name, MSpec, Matchers) of
-        {ok, Matchers1} ->
-            set_matchers_term(Matchers1),
-            {reply, ok, St#st{matchers = Matchers1}};
+handle_call({register, Name, MSpec}, _From, #st{registered_matchers = RMatchers} = St) ->
+    case add_matcher(Name, MSpec, RMatchers) of
+        {ok, RMatchers1} ->
+            ok = initialize_matchers(RMatchers1),
+            {reply, ok, St#st{registered_matchers = RMatchers1}};
         {error, badarg} = Error ->
             {reply, Error, St}
     end;
 handle_call(reload_matchers, _From, St) ->
     couch_log:warning("Reloading persistent term matchers", []),
-    ok = initialize_matchers(),
+    ok = initialize_matchers(St#st.registered_matchers),
     {reply, ok, St};
 handle_call(_, _From, State) ->
     {reply, ok, State}.
@@ -273,13 +279,12 @@ matcher_on_dbname_io_threshold(DbName, Threshold) when
             get_kv_node = KVN,
             get_kp_node = KPN,
             docs_read = Docs,
-            rows_read = Rows,
-            changes_processed = Chgs
+            rows_read = Rows
         } = R
     ) when
         DbName =:= DbName1 andalso
             ((IOQ > Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or
-                (Rows >= Threshold) or (Chgs >= Threshold))
+                (Rows >= Threshold))
     ->
         R
     end).
@@ -315,7 +320,7 @@ matcher_on_worker_changes_processed(Threshold) when
     ets:fun2ms(
         fun(
             #rctx{
-                changes_processed = Processed,
+                rows_read = Processed,
                 changes_returned = Returned
             } = R
         ) when (Processed - Returned) >= Threshold ->
@@ -344,10 +349,11 @@ add_matcher(Name, MSpec, Matchers) ->
 
 -spec set_matchers_term(Matchers :: matchers()) -> ok.
 set_matchers_term(Matchers) when is_map(Matchers) ->
-    persistent_term:put({?MODULE, all_csrt_matchers}, Matchers).
+    persistent_term:put(?MATCHERS_KEY, Matchers).
 
--spec initialize_matchers() -> ok.
-initialize_matchers() ->
+-spec initialize_matchers(RegisteredMatchers :: map()) -> ok.
+initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
+    %% Standard matchers to conditionally enable
     DefaultMatchers = [
         {docs_read, fun matcher_on_docs_read/1, 1000},
         %%{dbname, fun matcher_on_dbname/1, <<"foo">>},
@@ -358,6 +364,8 @@ initialize_matchers() ->
         {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
         {ioq_calls, fun matcher_on_ioq_calls/1, 10000}
     ],
+
+    %% Add enabled Matchers for standard matchers
     Matchers = lists:foldl(
         fun({Name0, MatchGenFunc, Threshold0}, Matchers0) when is_atom(Name0) ->
             Name = atom_to_list(Name0),
@@ -381,6 +389,8 @@ initialize_matchers() ->
         #{},
         DefaultMatchers
     ),
+
+    %% Add additional dbname_io matchers
     Matchers1 = lists:foldl(
         fun({Dbname, Value}, Matchers0) ->
             try list_to_integer(Value) of
@@ -410,8 +420,11 @@ initialize_matchers() ->
         config:get(?CONF_MATCHERS_DBNAMES)
     ),
 
-    couch_log:notice("Initialized ~p CSRT Logger matchers", [maps:size(Matchers1)]),
-    persistent_term:put(?MATCHERS_KEY, Matchers1),
+    %% Finally, merge in the dynamically registered matchers, with priority
+    Matchers2 = maps:merge(Matchers1, RegisteredMatchers),
+
+    couch_log:notice("Initialized ~p CSRT Logger matchers", [maps:size(Matchers2)]),
+    set_matchers_term(Matchers2),
     ok.
 
 -spec matcher_enabled(Name :: string()) -> boolean().

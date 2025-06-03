@@ -341,7 +341,7 @@ handle_request_int(MochiReq) ->
 
     %% This is probably better in before_request, but having Path is nice
     csrt:create_coordinator_context(HttpReq0, Path),
-    csrt:set_context_handler_fun(?MODULE, ?FUNCTION_NAME),
+    csrt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
 
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
@@ -373,7 +373,7 @@ handle_request_int(MochiReq) ->
 
 before_request(HttpReq) ->
     try
-        csrt:set_context_handler_fun(?MODULE, ?FUNCTION_NAME),
+        csrt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
     catch
@@ -407,7 +407,7 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     RawUri = MochiReq:get(raw_path),
 
     try
-        csrt:set_context_handler_fun(?MODULE, ?FUNCTION_NAME),
+        csrt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
         couch_httpd:validate_host(HttpReq),
         check_request_uri_length(RawUri),
         check_url_encoding(RawUri),

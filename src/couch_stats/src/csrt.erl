@@ -171,14 +171,22 @@ set_context_dbname(DbName) ->
     set_context_dbname(DbName, get_pid_ref()).
 
 -spec set_context_dbname(DbName, PidRef) -> boolean() when
-    DbName :: binary(), PidRef :: pid_ref() | undefined.
+    DbName :: binary(), PidRef :: maybe_pid_ref().
 set_context_dbname(_, undefined) ->
     false;
 set_context_dbname(DbName, PidRef) ->
     is_enabled() andalso csrt_server:set_context_dbname(DbName, PidRef).
 
--spec set_context_handler_fun(Fun :: function()) -> boolean().
-set_context_handler_fun(Fun) when is_function(Fun) ->
+-spec set_context_handler_fun(Handler) -> boolean() when
+    Handler :: function() | {atom(), atom()}.
+set_context_handler_fun(Handler) ->
+    set_context_handler_fun(Handler, get_pid_ref()).
+
+-spec set_context_handler_fun(Handler, PidRef) -> boolean() when
+    Handler :: function() | {atom(), atom()}, PidRef :: maybe_pid_ref().
+set_context_handler_fun(_, undefined) ->
+    false;
+set_context_handler_fun(Fun, PidRef) when is_function(Fun) ->
     case is_enabled() of
         false ->
             false;
@@ -186,38 +194,14 @@ set_context_handler_fun(Fun) when is_function(Fun) ->
             FProps = erlang:fun_info(Fun),
             Mod = proplists:get_value(module, FProps),
             Func = proplists:get_value(name, FProps),
-            update_handler_fun(Mod, Func, get_pid_ref())
-    end.
-
--spec set_context_handler_fun(Mod :: atom(), Func :: atom()) -> boolean().
-set_context_handler_fun(Mod, Func) when
-    is_atom(Mod) andalso is_atom(Func)
-->
+            set_context_handler_fun({Mod, Func}, PidRef)
+    end;
+set_context_handler_fun({Mod, Func}, PidRef) ->
     case is_enabled() of
         false ->
             false;
         true ->
-            update_handler_fun(Mod, Func, get_pid_ref())
-    end.
-
--spec update_handler_fun(Mod, Func, PidRef) -> boolean() when
-    Mod :: atom(), Func :: atom(), PidRef :: maybe_pid_ref().
-update_handler_fun(_, _, undefined) ->
-    false;
-update_handler_fun(Mod, Func, PidRef) ->
-    case get_resource(PidRef) of
-        undefined ->
-            ok;
-        #rctx{} = Rctx ->
-            %% TODO: #coordinator{} assumption needs to adapt for other types
-            case csrt_server:get_context_type(Rctx) of
-                #coordinator{} = Coordinator0 ->
-                    Coordinator = Coordinator0#coordinator{mod = Mod, func = Func},
-                    csrt_server:set_context_type(Coordinator, PidRef),
-                    ok;
-                _ ->
-                    ok
-            end
+            csrt_server:set_context_handler_fun({Mod, Func}, PidRef)
     end.
 
 %% @equiv set_context_username(User, get_pid_ref())
@@ -456,11 +440,26 @@ teardown(Ctx) ->
     test_util:stop_couch(Ctx).
 
 t_static_map_translations(_) ->
-    ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, maps:values(?STATS_TO_KEYS))),
+    %% Bit of a hack to delete duplicated rows_read between views and changes
+    SingularStats = lists:delete(rows_read, maps:values(?STATS_TO_KEYS)),
+    ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, SingularStats)),
     %% TODO: properly handle ioq_calls field
     ?assertEqual(
-        lists:sort(maps:values(?STATS_TO_KEYS)),
-        lists:delete(docs_written, lists:delete(ioq_calls, lists:sort(maps:keys(?KEYS_TO_FIELDS))))
+        lists:sort(SingularStats),
+        lists:sort(lists:foldl(
+            fun(E, A) ->
+                %% Ignore fields regarding external processes
+                Deletions = [docs_written, ioq_calls, js_filter, js_filtered_docs],
+                case lists:member(E, Deletions) of
+                    true ->
+                        A;
+                    false ->
+                        [E | A]
+                end
+            end,
+            [],
+            maps:keys(?KEYS_TO_FIELDS)
+         ))
     ).
 
 t_should_track_init_p(_) ->

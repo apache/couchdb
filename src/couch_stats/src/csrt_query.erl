@@ -102,15 +102,10 @@ field(#rctx{username = Val}, username) -> Val;
 field(#rctx{db_open = Val}, db_open) -> Val;
 field(#rctx{docs_read = Val}, docs_read) -> Val;
 field(#rctx{rows_read = Val}, rows_read) -> Val;
-field(#rctx{changes_processed = Val}, changes_processed) -> Val;
 field(#rctx{changes_returned = Val}, changes_returned) -> Val;
 field(#rctx{ioq_calls = Val}, ioq_calls) -> Val;
-field(#rctx{io_bytes_read = Val}, io_bytes_read) -> Val;
-field(#rctx{io_bytes_written = Val}, io_bytes_written) -> Val;
-field(#rctx{js_evals = Val}, js_evals) -> Val;
 field(#rctx{js_filter = Val}, js_filter) -> Val;
 field(#rctx{js_filtered_docs = Val}, js_filtered_docs) -> Val;
-field(#rctx{mango_eval_match = Val}, mango_eval_match) -> Val;
 field(#rctx{get_kv_node = Val}, get_kv_node) -> Val;
 field(#rctx{get_kp_node = Val}, get_kp_node) -> Val.
 
