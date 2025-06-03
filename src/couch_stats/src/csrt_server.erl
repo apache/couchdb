@@ -141,15 +141,17 @@ match_resource(#rctx{} = Rctx) ->
             []
     end.
 
--spec is_rctx_field(Field :: rctx_field() | atom()) -> boolean().
-is_rctx_field(Field) ->
-    maps:is_key(Field, ?KEYS_TO_FIELDS).
+%% Is this a valid #rctx{} field for inducing ets:update_counter upon?
+-spec is_rctx_stat_field(Field :: rctx_field() | atom()) -> boolean().
+is_rctx_stat_field(Field) ->
+    maps:is_key(Field, ?STAT_KEYS_TO_FIELDS).
 
--spec get_rctx_field(Field :: rctx_field()) ->
+%% Get the #rctx{} field record index of the corresponding stat counter field
+-spec get_rctx_stat_field(Field :: rctx_field()) ->
     non_neg_integer()
     | throw({badkey, Key :: any()}).
-get_rctx_field(Field) ->
-    maps:get(Field, ?KEYS_TO_FIELDS).
+get_rctx_stat_field(Field) ->
+    maps:get(Field, ?STAT_KEYS_TO_FIELDS).
 
 -spec update_counter(PidRef, Field, Count) -> non_neg_integer() when
     PidRef :: maybe_pid_ref(),
@@ -158,10 +160,9 @@ get_rctx_field(Field) ->
 update_counter(undefined, _Field, _Count) ->
     0;
 update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
-    %% TODO: mem3 crashes without catch, why do we lose the stats table?
-    case is_rctx_field(Field) of
+    case is_rctx_stat_field(Field) of
         true ->
-            Update = {get_rctx_field(Field), Count},
+            Update = {get_rctx_stat_field(Field), Count},
             try
                 ets:update_counter(?CSRT_ETS, PidRef, Update, #rctx{pid_ref = PidRef})
             catch
@@ -185,7 +186,7 @@ inc(undefined, _Field, _) ->
 inc(_PidRef, _Field, 0) ->
     0;
 inc({_Pid, _Ref} = PidRef, Field, N) when is_integer(N) andalso N > 0 ->
-    case is_rctx_field(Field) of
+    case is_rctx_stat_field(Field) of
         true ->
             update_counter(PidRef, Field, N);
         false ->
