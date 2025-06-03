@@ -494,11 +494,8 @@ view_cb({meta, Meta}, Acc) ->
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
 view_cb({row, Props}, #mrargs{extra = Options} = Acc) ->
-    %% TODO: distinguish between rows and docs
-    %% TODO: wire in csrt tracking
     %% TODO: distinguish between all_docs vs view call
     couch_stats:increment_counter([fabric_rpc, view, rows_read]),
-    %%csrt:inc(rows_read),
     % Adding another row
     ViewRow = fabric_view_row:from_props(Props, Options),
     ok = rexi:stream2(ViewRow),
@@ -518,6 +515,7 @@ reduce_cb({meta, Meta}, Acc, _Options) ->
     {ok, Acc};
 reduce_cb({row, Props}, Acc, Options) ->
     % Adding another row
+    couch_stats:increment_counter([fabric_rpc, view, rows_read]),
     ViewRow = fabric_view_row:from_props(Props, Options),
     ok = rexi:stream2(ViewRow),
     {ok, Acc};

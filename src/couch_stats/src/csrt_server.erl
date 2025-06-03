@@ -32,8 +32,9 @@
     match_resource/1,
     new_context/2,
     set_context_dbname/2,
-    set_context_username/2,
+    set_context_handler_fun/2,
     set_context_type/2,
+    set_context_username/2,
     update_counter/3
 ]).
 
@@ -70,20 +71,29 @@ set_context_dbname(_, undefined) ->
 set_context_dbname(DbName, PidRef) ->
     update_element(PidRef, [{#rctx.dbname, DbName}]).
 
-%%set_context_handler_fun(_, undefined) ->
-%%    ok;
-%%set_context_handler_fun(Fun, PidRef) when is_function(Fun) ->
-%%    FProps = erlang:fun_info(Fun),
-%%    Mod = proplists:get_value(module, FProps),
-%%    Func = proplists:get_value(name, FProps),
-%%    #rctx{type=#coordinator{}=Coordinator} = get_resource(PidRef),
-%%    Update = [{#rctx.type, Coordinator#coordinator{mod=Mod, func=Func}}],
-%%    update_element(PidRef, Update).
+-spec set_context_handler_fun({Mod, Func}, PidRef) -> boolean() when
+    Mod :: atom(), Func :: atom(), PidRef :: maybe_pid_ref().
+set_context_handler_fun(_, undefined) ->
+    false;
+set_context_handler_fun({Mod, Func}, PidRef) ->
+    case get_resource(PidRef) of
+        undefined ->
+            false;
+        #rctx{} = Rctx ->
+            %% TODO: #coordinator{} assumption needs to adapt for other types
+            case csrt_server:get_context_type(Rctx) of
+                #coordinator{} = Coordinator0 ->
+                    Coordinator = Coordinator0#coordinator{mod = Mod, func = Func},
+                    set_context_type(Coordinator, PidRef);
+                _ ->
+                    false
+            end
+    end.
 
 -spec set_context_username(UserName, PidRef) -> boolean() when
     UserName :: username(), PidRef :: maybe_pid_ref().
 set_context_username(_, undefined) ->
-    ok;
+    false;
 set_context_username(UserName, PidRef) ->
     update_element(PidRef, [{#rctx.username, UserName}]).
 
@@ -130,7 +140,6 @@ match_resource(#rctx{} = Rctx) ->
         _:_ ->
             []
     end.
-
 
 -spec is_rctx_field(Field :: rctx_field() | atom()) -> boolean().
 is_rctx_field(Field) ->
