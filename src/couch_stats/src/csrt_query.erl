@@ -93,21 +93,21 @@ field(#rctx{pid_ref = Val}, pid_ref) -> Val;
 %% structure provided by the caller of *_by aggregator functions below.
 %% For now, we just always return jiffy:encode'able data types.
 field(#rctx{nonce = Val}, nonce) -> Val;
-%%field(#rctx{from=Val}, from) -> Val;
-%% TODO: fix this, perhaps move it all to csrt_util?
 field(#rctx{type = Val}, type) -> csrt_util:convert_type(Val);
 field(#rctx{dbname = Val}, dbname) -> Val;
 field(#rctx{username = Val}, username) -> Val;
-%%field(#rctx{path=Val}, path) -> Val;
 field(#rctx{db_open = Val}, db_open) -> Val;
 field(#rctx{docs_read = Val}, docs_read) -> Val;
+field(#rctx{docs_written = Val}, docs_written) -> Val;
 field(#rctx{rows_read = Val}, rows_read) -> Val;
 field(#rctx{changes_returned = Val}, changes_returned) -> Val;
 field(#rctx{ioq_calls = Val}, ioq_calls) -> Val;
 field(#rctx{js_filter = Val}, js_filter) -> Val;
 field(#rctx{js_filtered_docs = Val}, js_filtered_docs) -> Val;
 field(#rctx{get_kv_node = Val}, get_kv_node) -> Val;
-field(#rctx{get_kp_node = Val}, get_kp_node) -> Val.
+field(#rctx{get_kp_node = Val}, get_kp_node) -> Val;
+field(#rctx{started_at = Val}, started_at) -> Val;
+field(#rctx{updated_at = Val}, updated_at) -> Val.
 
 curry_field(Field) ->
     fun(Ele) -> field(Ele, Field) end.
