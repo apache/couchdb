@@ -35,6 +35,8 @@
 -define(ROWS_READ, rows_read).
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
+%% Mapping of couch_stat metric names to #rctx{} field names.
+%% These are used for fields that we inc a counter on.
 -define(STATS_TO_KEYS, #{
     [couchdb, database_reads] => ?DB_OPEN_DOC,
     %% Double on ?ROWS_READ for changes_processed as we only need the one
@@ -54,7 +56,9 @@
     %% [couchdb, query_server, calls, ddoc_filter] => ?COUCH_JS_FILTER
 }).
 
--define(KEYS_TO_FIELDS, #{
+%% Mapping of stat field names to their corresponding record entries.
+%% This only includes integer fields valid for ets:update_counter
+-define(STAT_KEYS_TO_FIELDS, #{
     ?DB_OPEN => #rctx.?DB_OPEN,
     ?ROWS_READ => #rctx.?ROWS_READ,
     ?FRPC_CHANGES_RETURNED => #rctx.?FRPC_CHANGES_RETURNED,
