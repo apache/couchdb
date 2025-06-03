@@ -316,7 +316,7 @@ t_changes({_Ctx, DbName, View}) ->
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
-        changes_processed => docs_count(View),
+        rows_read => docs_count(View),
         changes_returned => docs_count(View),
         docs_read => 0,
         docs_written => 0,
@@ -338,7 +338,7 @@ t_changes_limit_zero({_Ctx, DbName, _View}) ->
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
-        changes_processed => assert_gte(?DB_Q),
+        rows_read => assert_gte(?DB_Q),
         changes_returned => assert_gte(?DB_Q),
         docs_read => 0,
         docs_written => 0,
@@ -370,7 +370,7 @@ t_changes_js_filtered({_Ctx, DbName, {DDocId, _ViewName} = View}) ->
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => assert_gte(?DB_Q),
-        changes_processed => assert_gte(docs_count(View)),
+        rows_read => assert_gte(docs_count(View)),
         changes_returned => round(?DOCS_COUNT / 2),
         docs_read => assert_gte(docs_count(View)),
         docs_written => 0,
@@ -468,8 +468,6 @@ rctx_assert(Rctx, Asserts0) ->
         changes_returned => 0,
         js_filter => 0,
         js_filtered_docs => 0,
-        write_kp_node => 0,
-        write_kv_node => 0,
         nonce => undefined,
         db_open => 0,
         rows_read => 0,

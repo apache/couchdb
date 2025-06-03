@@ -185,10 +185,10 @@ to_json(#rctx{} = Rctx) ->
         type => convert_type(Rctx#rctx.type),
         get_kp_node => Rctx#rctx.get_kp_node,
         get_kv_node => Rctx#rctx.get_kv_node,
-        write_kp_node => Rctx#rctx.write_kp_node,
-        write_kv_node => Rctx#rctx.write_kv_node,
+        %% "Example to extend CSRT"
+        %% write_kp_node => Rctx#rctx.write_kp_node,
+        %% write_kv_node => Rctx#rctx.write_kv_node,
         changes_returned => Rctx#rctx.changes_returned,
-        changes_processed => Rctx#rctx.changes_processed,
         ioq_calls => Rctx#rctx.ioq_calls
     }.
 
@@ -228,16 +228,18 @@ map_to_rctx_field(get_kp_node, Val, Rctx) ->
     Rctx#rctx{get_kp_node = Val};
 map_to_rctx_field(get_kv_node, Val, Rctx) ->
     Rctx#rctx{get_kv_node = Val};
-map_to_rctx_field(write_kp_node, Val, Rctx) ->
-    Rctx#rctx{write_kp_node = Val};
-map_to_rctx_field(write_kv_node, Val, Rctx) ->
-    Rctx#rctx{write_kv_node = Val};
+%% "Example to extend CSRT"
+%% map_to_rctx_field(write_kp_node, Val, Rctx) ->
+%%     Rctx#rctx{write_kp_node = Val};
+%% map_to_rctx_field(write_kv_node, Val, Rctx) ->
+%%     Rctx#rctx{write_kv_node = Val};
 map_to_rctx_field(changes_returned, Val, Rctx) ->
     Rctx#rctx{changes_returned = Val};
-map_to_rctx_field(changes_processed, Val, Rctx) ->
-    Rctx#rctx{changes_processed = Val};
 map_to_rctx_field(ioq_calls, Val, Rctx) ->
-    Rctx#rctx{ioq_calls = Val}.
+    Rctx#rctx{ioq_calls = Val};
+map_to_rctx_field(_, _, Rctx) ->
+    %% Unknown key, could throw but just move on
+    Rctx.
 
 -spec field(Field :: rctx_field(), Rctx :: rctx()) -> any().
 field(updated_at, #rctx{updated_at = Val}) ->
@@ -272,11 +274,10 @@ field(get_kv_node, #rctx{get_kv_node = Val}) ->
     Val;
 field(changes_returned, #rctx{changes_returned = Val}) ->
     Val;
-field(changes_processed, #rctx{changes_processed = Val}) ->
-    Val;
 field(ioq_calls, #rctx{ioq_calls = Val}) ->
     Val.
 
+-spec add_delta(T :: term(), Delta :: maybe_delta()) -> term().
 add_delta(T, {delta, undefined}) ->
     T;
 add_delta(T, {delta, _} = Delta) ->
@@ -284,6 +285,7 @@ add_delta(T, {delta, _} = Delta) ->
 add_delta(T, _Delta) ->
     T.
 
+-spec extract_delta(T :: term()) -> {term(), maybe_delta()}.
 extract_delta({Msg, {delta, Delta}}) ->
     {Msg, Delta};
 extract_delta(Msg) ->
@@ -293,6 +295,7 @@ extract_delta(Msg) ->
 get_delta(PidRef) ->
     {delta, make_delta(PidRef)}.
 
+-spec maybe_add_delta(T :: term()) -> term().
 maybe_add_delta(T) ->
     case is_enabled() of
         false ->
@@ -303,6 +306,7 @@ maybe_add_delta(T) ->
 
 %% Allow for externally provided Delta in error handling scenarios
 %% eg in cases like rexi_server:notify_caller/3
+-spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term().
 maybe_add_delta(T, Delta) ->
     case is_enabled() of
         false ->
@@ -311,6 +315,7 @@ maybe_add_delta(T, Delta) ->
             maybe_add_delta_int(T, Delta)
     end.
 
+-spec maybe_add_delta_int(T :: term(), Delta :: maybe_delta()) -> term().
 maybe_add_delta_int(T, undefined) ->
     T;
 maybe_add_delta_int(T, {delta, undefined}) ->
@@ -339,7 +344,6 @@ rctx_delta(#rctx{} = TA, #rctx{} = TB) ->
         js_filtered_docs => TB#rctx.js_filtered_docs - TA#rctx.js_filtered_docs,
         rows_read => TB#rctx.rows_read - TA#rctx.rows_read,
         changes_returned => TB#rctx.changes_returned - TA#rctx.changes_returned,
-        changes_processed => TB#rctx.changes_processed - TA#rctx.changes_processed,
         get_kp_node => TB#rctx.get_kp_node - TA#rctx.get_kp_node,
         get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
         db_open => TB#rctx.db_open - TA#rctx.db_open,
@@ -373,11 +377,11 @@ set_delta_zero(TZ) ->
 get_pid_ref() ->
     get(?PID_REF).
 
--spec get_pid_ref(Rctx :: rctx()) -> pid_ref().
+-spec get_pid_ref(Rctx :: rctx()) -> maybe_pid_ref().
 get_pid_ref(#rctx{pid_ref = PidRef}) ->
     PidRef;
-get_pid_ref(R) ->
-    throw({unexpected, R}).
+get_pid_ref(_) ->
+    undefined.
 
 -spec set_pid_ref(PidRef :: pid_ref()) -> pid_ref().
 set_pid_ref(PidRef) ->

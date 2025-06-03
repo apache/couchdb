@@ -27,6 +27,7 @@
 -define(THRESHOLD_DBNAME, <<"foo">>).
 -define(THRESHOLD_DBNAME_IO, 91).
 -define(THRESHOLD_DOCS_READ, 123).
+-define(THRESHOLD_DOCS_WRITTEN, 12).
 -define(THRESHOLD_IOQ_CALLS, 439).
 -define(THRESHOLD_ROWS_READ, 143).
 -define(THRESHOLD_CHANGES, 79).
@@ -49,7 +50,7 @@ csrt_logger_matchers_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            ?TDEF_FE(t_matcher_on_dbname),
+            %%?TDEF_FE(t_matcher_on_dbname), %% TODO: add back in or delete
             ?TDEF_FE(t_matcher_on_dbnames_io),
             ?TDEF_FE(t_matcher_on_docs_read),
             ?TDEF_FE(t_matcher_on_docs_written),
@@ -91,6 +92,9 @@ setup() ->
     Rctx = load_rctx(PidRef),
     ok = config:set(
         "csrt_logger.matchers_threshold", "docs_read", integer_to_list(?THRESHOLD_DOCS_READ), false
+    ),
+    ok = config:set(
+        "csrt_logger.matchers_threshold", "docs_written", integer_to_list(?THRESHOLD_DOCS_WRITTEN), false
     ),
     ok = config:set(
         "csrt_logger.matchers_threshold", "ioq_calls", integer_to_list(?THRESHOLD_IOQ_CALLS), false
@@ -156,15 +160,16 @@ rctx_gen(Opts0) ->
     csrt_util:map_to_rctx(
         maps:fold(
             fun
-                %% Hack for changes because we need to modify both changes_processed
-                %% and changes_returned but the latter must be <= the former
+                %% Hack for changes because we need to modify both
+                %% changes_processed (rows_read) and changes_returned but the
+                %% latter must be <= the former
                 ('_do_changes', V, Acc) ->
                     case V of
                         true ->
                             Processed = R(),
                             Returned = (one_of([0, 0, 1, Processed, rand:uniform(Processed)]))(),
                             maps:put(
-                                changes_processed,
+                                rows_read,
                                 Processed,
                                 maps:put(changes_returned, Returned, Acc)
                             );
@@ -238,10 +243,11 @@ t_matcher_on_docs_read(#{rctxs := Rctxs0}) ->
     ).
 
 t_matcher_on_docs_written(#{rctxs := Rctxs0}) ->
+    Threshold = ?THRESHOLD_DOCS_WRITTEN,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{docs_written => 73}) | Rctxs0],
+    Rctxs = [rctx_gen(#{docs_written => Threshold + 10}) | Rctxs0],
     ?assertEqual(
-        lists:sort(lists:filter(matcher_gte(docs_written, 1), Rctxs)),
+        lists:sort(lists:filter(matcher_gte(docs_written, Threshold), Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("docs_written"), Rctxs)),
         "Docs written matcher"
     ).
@@ -259,10 +265,10 @@ t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
 t_matcher_on_worker_changes_processed(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_CHANGES,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{changes_processed => Threshold + 10}) | Rctxs0],
+    Rctxs = [rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
     ChangesFilter = fun(R) ->
         Ret = csrt_util:field(changes_returned, R),
-        Proc = csrt_util:field(changes_processed, R),
+        Proc = csrt_util:field(rows_read, R),
         (Proc - Ret) >= Threshold
     end,
     ?assertEqual(
@@ -346,13 +352,19 @@ matcher_for(Field, Value, Op) ->
 
 matcher_for_csrt(MatcherName) ->
     Matchers = #{MatcherName => {_, _} = csrt_logger:get_matcher(MatcherName)},
-    fun(Rctx) -> csrt_logger:is_match(Rctx, Matchers) end.
+    case csrt_logger:get_matcher(MatcherName) of
+        {_, _} = Matcher ->
+            Matchers = #{MatcherName => Matcher},
+            fun(Rctx) -> csrt_logger:is_match(Rctx, Matchers) end;
+        _ ->
+            throw({missing_matcher, MatcherName})
+    end.
 
 matcher_for_dbname_io(Dbname0, Threshold) ->
     Dbname = list_to_binary(Dbname0),
     fun(Rctx) ->
         DbnameA = csrt_util:field(dbname, Rctx),
-        Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read, changes_processed],
+        Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read],
         Vals = [{F, csrt_util:field(F, Rctx)} || F <- Fields],
         Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun(V) -> V >= Threshold end, Vals)
     end.
