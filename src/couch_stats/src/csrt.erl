@@ -446,20 +446,22 @@ t_static_map_translations(_) ->
     %% TODO: properly handle ioq_calls field
     ?assertEqual(
         lists:sort(SingularStats),
-        lists:sort(lists:foldl(
-            fun(E, A) ->
-                %% Ignore fields regarding external processes
-                Deletions = [docs_written, ioq_calls, js_filter, js_filtered_docs],
-                case lists:member(E, Deletions) of
-                    true ->
-                        A;
-                    false ->
-                        [E | A]
-                end
-            end,
-            [],
-            maps:keys(?KEYS_TO_FIELDS)
-         ))
+        lists:sort(
+            lists:foldl(
+                fun(E, A) ->
+                    %% Ignore fields regarding external processes
+                    Deletions = [docs_written, ioq_calls, js_filter, js_filtered_docs],
+                    case lists:member(E, Deletions) of
+                        true ->
+                            A;
+                        false ->
+                            [E | A]
+                    end
+                end,
+                [],
+                maps:keys(?KEYS_TO_FIELDS)
+            )
+        )
     ).
 
 t_should_track_init_p(_) ->
