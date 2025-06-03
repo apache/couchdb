@@ -442,7 +442,7 @@ teardown(Ctx) ->
 t_static_map_translations(_) ->
     %% Bit of a hack to delete duplicated rows_read between views and changes
     SingularStats = lists:delete(rows_read, maps:values(?STATS_TO_KEYS)),
-    ?assert(lists:all(fun(E) -> maps:is_key(E, ?KEYS_TO_FIELDS) end, SingularStats)),
+    ?assert(lists:all(fun(E) -> maps:is_key(E, ?STAT_KEYS_TO_FIELDS) end, SingularStats)),
     %% TODO: properly handle ioq_calls field
     ?assertEqual(
         lists:sort(SingularStats),
@@ -459,7 +459,7 @@ t_static_map_translations(_) ->
                     end
                 end,
                 [],
-                maps:keys(?KEYS_TO_FIELDS)
+                maps:keys(?STAT_KEYS_TO_FIELDS)
             )
         )
     ).
