@@ -94,7 +94,10 @@ setup() ->
         "csrt_logger.matchers_threshold", "docs_read", integer_to_list(?THRESHOLD_DOCS_READ), false
     ),
     ok = config:set(
-        "csrt_logger.matchers_threshold", "docs_written", integer_to_list(?THRESHOLD_DOCS_WRITTEN), false
+        "csrt_logger.matchers_threshold",
+        "docs_written",
+        integer_to_list(?THRESHOLD_DOCS_WRITTEN),
+        false
     ),
     ok = config:set(
         "csrt_logger.matchers_threshold", "ioq_calls", integer_to_list(?THRESHOLD_IOQ_CALLS), false

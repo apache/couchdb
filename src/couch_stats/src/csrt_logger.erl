@@ -193,12 +193,13 @@ do_status_report(Rctx) ->
 
 -spec do_report(ReportName :: string(), Rctx :: rctx()) -> boolean().
 do_report(ReportName, #rctx{} = Rctx) ->
-    JRctx = case {should_truncate_reports(), csrt_util:to_json(Rctx)} of
-        {true, JRctx0} ->
-            maps:filter(fun(_K, V) -> V > 0 end, JRctx0);
-        {false, JRctx0} ->
-            JRctx0
-    end,
+    JRctx =
+        case {should_truncate_reports(), csrt_util:to_json(Rctx)} of
+            {true, JRctx0} ->
+                maps:filter(fun(_K, V) -> V > 0 end, JRctx0);
+            {false, JRctx0} ->
+                JRctx0
+        end,
     couch_log:report(ReportName, JRctx).
 
 %%
