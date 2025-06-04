@@ -272,11 +272,21 @@ do_report(ReportName, PidRef) ->
 
 -spec inc(Key :: rctx_field()) -> non_neg_integer().
 inc(Key) ->
-    is_enabled() andalso csrt_server:inc(get_pid_ref(), Key).
+    case is_enabled() of
+        true ->
+            csrt_server:inc(get_pid_ref(), Key);
+        false ->
+            0
+    end.
 
 -spec inc(Key :: rctx_field(), N :: non_neg_integer()) -> non_neg_integer().
 inc(Key, N) when is_integer(N) andalso N >= 0 ->
-    is_enabled() andalso csrt_server:inc(get_pid_ref(), Key, N).
+    case is_enabled() of
+        true ->
+            csrt_server:inc(get_pid_ref(), Key, N);
+        false ->
+            0
+    end.
 
 -spec maybe_inc(Stat :: atom(), Val :: non_neg_integer()) -> non_neg_integer().
 maybe_inc(Stat, Val) ->
