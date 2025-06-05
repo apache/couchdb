@@ -39,22 +39,18 @@ defmodule DropSeqStateM do
     print_report(r, cmds)
   end
 
-  require Record
-
-  Record.defrecord(:state,
-    docs: [],
-    deleted_docs: [],
-    current_seq: 0,
-    peer_checkpoint_seq: nil,
-    drop_seq: nil,
-    drop_count: 0,
-    changed: false,
-    stale: false
-  )
-
-  def initial_state() do
-    state()
+  defmodule State do
+    defstruct docs: [],
+              deleted_docs: [],
+              current_seq: 0,
+              peer_checkpoint_seq: nil,
+              drop_seq: nil,
+              drop_count: 0,
+              changed: false,
+              stale: false
   end
+
+  def initial_state, do: %State{}
 
   @max_docids 20
   @docids 1..@max_docids |> Enum.map(&"doc-#{&1}")
@@ -66,14 +62,14 @@ defmodule DropSeqStateM do
   end
 
   def command(s) do
-    cond do
-      state(s, :stale) ->
+    case s do
+      %State{stale: true} ->
         {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}
 
-      state(s, :changed) ->
+      %State{changed: true} ->
         {:call, __MODULE__, :changes, [{:var, :dbname}]}
 
-      true ->
+      %State{} ->
         frequency([
           {10, {:call, __MODULE__, :update_document, [{:var, :dbname}, doc_id()]}},
           {10, {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id()]}},
@@ -312,28 +308,29 @@ defmodule DropSeqStateM do
   end
 
   def next_state(s, _v, {:call, _, :update_document, [_db_name, doc_id]}) do
-    state(s,
-      current_seq: state(s, :current_seq) + 1,
-      docs: Enum.sort([doc_id | state(s, :docs)]),
-      deleted_docs: List.keydelete(state(s, :deleted_docs), doc_id, 0),
-      changed: true,
-      stale: true
-    )
+    %State{
+      s
+      | current_seq: s.current_seq + 1,
+        docs: Enum.sort([doc_id | s.docs]),
+        deleted_docs: List.keydelete(s.deleted_docs, doc_id, 0),
+        changed: true,
+        stale: true
+    }
   end
 
   def next_state(s, _v, {:call, _, :delete_document, [_db_name, doc_id]}) do
-    state(s,
-      current_seq: state(s, :current_seq) + 1,
-      docs: List.delete(state(s, :docs), doc_id),
-      deleted_docs:
-        Enum.sort([{doc_id, state(s, :current_seq) + 1} | state(s, :deleted_docs)]),
-      changed: true,
-      stale: true
-    )
+    %State{
+      s
+      | current_seq: s.current_seq + 1,
+        docs: List.delete(s.docs, doc_id),
+        deleted_docs: Enum.sort([{doc_id, s.current_seq + 1} | s.deleted_docs]),
+        changed: true,
+        stale: true
+    }
   end
 
   def next_state(s, _v, {:call, _, :update_peer_checkpoint, [_db_name]}) do
-    state(s, peer_checkpoint_seq: state(s, :current_seq), changed: true)
+    %State{s | peer_checkpoint_seq: s.current_seq, changed: true}
   end
 
   def next_state(s, _v, {:call, _, :update_drop_seq, [_db_name]}) do
@@ -343,45 +340,47 @@ defmodule DropSeqStateM do
     # n.b: indexes and their peer checkpoints will always be fresh as we
     # force update_indexes after every doc update.
     drop_seq =
-      if state(s, :peer_checkpoint_seq) == nil,
-        do: state(s, :current_seq),
-        else: state(s, :peer_checkpoint_seq)
+      if s.peer_checkpoint_seq == nil,
+        do: s.current_seq,
+        else: s.peer_checkpoint_seq
 
-    state(s, drop_seq: drop_seq, changed: true)
+    %State{s | drop_seq: drop_seq, changed: true}
   end
 
   def next_state(s, _v, {:call, _, :compact_db, [_db_name]}) do
     {keep_docs, drop_docs} =
-      Enum.split_with(state(s, :deleted_docs), fn {_, seq} ->
-        state(s, :drop_seq) == nil or seq > state(s, :drop_seq)
+      Enum.split_with(s.deleted_docs, fn {_, seq} ->
+        s.drop_seq == nil or seq > s.drop_seq
       end)
 
-    state(s,
-      deleted_docs: keep_docs,
-      drop_count: state(s, :drop_count) + length(drop_docs),
-      changed: true
-    )
+    %State{
+      s
+      | deleted_docs: keep_docs,
+        drop_count: s.drop_count + length(drop_docs),
+        changed: true
+    }
   end
 
   def next_state(s, _v, {:call, _, :changes, [_db_name]}) do
-    state(s, changed: false)
+    %State{s | changed: false}
   end
 
   def next_state(s, _v, {:call, _, :split_shard, [_db_name]}) do
-    state(s, changed: true)
+    %State{s | changed: true}
   end
 
   def next_state(s, v, {:call, _, :create_index, [_db_name, _index_type]}) do
-    state(s,
-      current_seq: state(s, :current_seq) + 1,
-      docs: Enum.sort([v | state(s, :docs)]),
-      changed: true,
-      stale: true
-    )
+    %State{
+      s
+      | current_seq: s.current_seq + 1,
+        docs: Enum.sort([v | s.docs]),
+        changed: true,
+        stale: true
+    }
   end
 
   def next_state(s, _v, {:call, _, :update_indexes, [_db_name]}) do
-    state(s, stale: false)
+    %State{s | stale: false}
   end
 
   def postcondition(s, {:call, _, :changes, [_db_name]}, {doc_ids, del_doc_ids}) do
@@ -390,16 +389,16 @@ defmodule DropSeqStateM do
 
   def postcondition(_, _, _), do: true
 
-  def doc_exists(s, doc_id), do: doc_id in state(s, :docs)
+  def doc_exists(s, doc_id), do: doc_id in s.docs
 
   def deleted_doc_exists(s, doc_id) do
-    List.keymember?(state(s, :deleted_docs), doc_id, 0)
+    List.keymember?(s.deleted_docs, doc_id, 0)
   end
 
-  def doc_ids(s), do: state(s, :docs)
+  def doc_ids(s), do: s.docs
 
   def deleted_doc_ids(s) do
-    Enum.map(state(s, :deleted_docs), fn {doc_id, _} -> doc_id end)
+    Enum.map(s.deleted_docs, fn {doc_id, _} -> doc_id end)
   end
 
   def seq_to_shards(seq) do
