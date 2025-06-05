@@ -25,6 +25,9 @@ public final class IndexInfo {
     private final long updateSeq;
 
     @PositiveOrZero
+    private final long committedUpdateSeq;
+
+    @PositiveOrZero
     private final long purgeSeq;
 
     @PositiveOrZero
@@ -35,10 +38,12 @@ public final class IndexInfo {
 
     public IndexInfo(
             @JsonProperty("update_seq") final long updateSeq,
+            @JsonProperty("committed_update_seq") final long committedUpdateSeq,
             @JsonProperty("purge_seq") final long purgeSeq,
             @JsonProperty("num_docs") final int numDocs,
             @JsonProperty("disk_size") final long diskSize) {
         this.updateSeq = updateSeq;
+        this.committedUpdateSeq = committedUpdateSeq;
         this.purgeSeq = purgeSeq;
         this.numDocs = numDocs;
         this.diskSize = diskSize;
@@ -56,13 +61,17 @@ public final class IndexInfo {
         return updateSeq;
     }
 
+    public long getCommittedUpdateSeq() {
+        return committedUpdateSeq;
+    }
+
     public long getPurgeSeq() {
         return purgeSeq;
     }
 
     @Override
     public String toString() {
-        return "IndexInfo [updateSeq=" + updateSeq + ", purgeSeq=" + purgeSeq + ", numDocs=" + numDocs + ", diskSize="
-                + diskSize + "]";
+        return "IndexInfo [updateSeq=" + updateSeq + ", committedUpdateSeq=" + committedUpdateSeq + ", purgeSeq="
+                + purgeSeq + ", numDocs=" + numDocs + ", diskSize=" + diskSize + "]";
     }
 }

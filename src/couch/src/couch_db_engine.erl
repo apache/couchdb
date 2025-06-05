@@ -194,6 +194,11 @@
 -callback get_del_doc_count(DbHandle :: db_handle()) ->
     DelDocCount :: non_neg_integer().
 
+% The number of tombstones (deleted documents with no content) in the
+% database which have been completely dropped from the database.
+-callback get_drop_count(DbHandle :: db_handle()) ->
+    DropCount :: non_neg_integer().
+
 % This number is reported in the database info properties and
 % as such can be any JSON value.
 -callback get_disk_version(DbHandle :: db_handle()) -> Version :: json().
@@ -263,6 +268,9 @@
 % the database.
 -callback get_update_seq(DbHandle :: db_handle()) -> UpdateSeq :: non_neg_integer().
 
+% The current drop sequence of the database.
+-callback get_drop_seq(DbHandle :: db_handle()) -> DropSeq :: non_neg_integer().
+
 % Whenever a database is created it should generate a
 % persistent UUID for identification in case the shard should
 % ever need to be moved between nodes in a cluster.
@@ -296,6 +304,14 @@
 -callback set_update_seq(
     DbHandle :: db_handle(),
     UpdateSeq :: non_neg_integer()
+) ->
+    {ok, NewDbHandle :: db_handle()}.
+
+% Set the drop sequence of the database.
+-callback set_drop_seq(
+    DbHandle :: db_handle(),
+    UuidPrefix :: binary,
+    DropSeq :: non_neg_integer()
 ) ->
     {ok, NewDbHandle :: db_handle()}.
 
@@ -668,6 +684,7 @@
     get_engine/1,
     get_compacted_seq/1,
     get_del_doc_count/1,
+    get_drop_count/1,
     get_disk_version/1,
     get_doc_count/1,
     get_epochs/1,
@@ -680,6 +697,7 @@
     get_size_info/1,
     get_partition_info/2,
     get_update_seq/1,
+    get_drop_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
@@ -688,6 +706,7 @@
     set_props/2,
 
     set_update_seq/2,
+    set_drop_seq/3,
 
     open_docs/2,
     open_local_docs/2,
@@ -793,6 +812,10 @@ get_del_doc_count(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_del_doc_count(EngineState).
 
+get_drop_count(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_drop_count(EngineState).
+
 get_disk_version(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_disk_version(EngineState).
@@ -841,6 +864,10 @@ get_update_seq(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_update_seq(EngineState).
 
+get_drop_seq(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_drop_seq(EngineState).
+
 get_uuid(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_uuid(EngineState).
@@ -869,6 +896,15 @@ set_update_seq(#db{} = Db, UpdateSeq) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_update_seq(EngineState, UpdateSeq),
     {ok, Db#db{engine = {Engine, NewSt}}}.
+
+set_drop_seq(#db{} = Db, UuidPrefix, UpdateSeq) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    case Engine:set_drop_seq(EngineState, UuidPrefix, UpdateSeq) of
+        {ok, NewSt} ->
+            {ok, Db#db{engine = {Engine, NewSt}}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 open_docs(#db{} = Db, DocIds) ->
     #db{engine = {Engine, EngineState}} = Db,
