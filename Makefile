@@ -262,6 +262,7 @@ elixir-cluster-with-quorum: elixir-init devclean
 elixir-cluster: export MIX_ENV=integration
 elixir-cluster: elixir-init devclean
 	@dev/run -n 3 -q -a adm:pass --with-nouveau --no-auto \
+		--locald-config test/elixir/test/config/cluster-config.ini \
 		--no-eval 'mix test --trace --only with_cluster $(EXUNIT_OPTS)'
 
 .PHONY: elixir
