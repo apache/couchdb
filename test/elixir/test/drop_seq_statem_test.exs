@@ -14,7 +14,7 @@ defmodule DropSeqStateM do
   @moduletag :with_quorum_test
 
   property "_update_drop_seq works correctly",
-    start_size: 5,
+    start_size: 10,
     max_size: 100,
     numtests: 2_000 do
     forall cmds <- commands(__MODULE__) do
