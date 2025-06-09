@@ -22,7 +22,6 @@ defmodule DropSeqStateM do
         db_name = random_db_name()
         n = Enum.random(1..3)
         q = Enum.random(1..10)
-
         {:ok, _} = create_db(db_name, query: %{n: n, q: q})
         r = run_commands(__MODULE__, cmds, [{:dbname, db_name}])
         {_history, _state, result} = r
@@ -163,7 +162,7 @@ defmodule DropSeqStateM do
     compact(db_name)
     # try to avoid seeing pre-compact state of shards immediately after
     # compactor pids exit
-    :timer.sleep(1000)
+    :timer.sleep(500)
   end
 
   def changes(db_name) do
@@ -292,7 +291,8 @@ defmodule DropSeqStateM do
     assert resp.status_code == 202,
            "sync_shards failed #{resp.status_code} #{inspect(resp.body)}"
 
-    :timer.sleep(1000)
+    # mem3_rep configured for 100ms frequency
+    :timer.sleep(200)
   end
 
   def precondition(s, {:call, _, :update_document, [_db_name, doc_id]}) do
