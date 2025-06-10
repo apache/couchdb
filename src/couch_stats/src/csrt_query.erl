@@ -118,32 +118,44 @@ count_by(KeyFun) ->
 group_by(KeyFun, ValFun) ->
     group_by(KeyFun, ValFun, fun erlang:'+'/2).
 
+group_by(KeyFun, ValFun, AggFun) ->
+    group_by(KeyFun, ValFun, AggFun, ?QUERY_CARDINALITY_LIMIT).
+
 %% eg: group_by(mfa, docs_read).
 %% eg: group_by(fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
 %% eg: ^^ or: group_by([mfa, docs_read], ioq_calls).
 %% eg: group_by([username, dbname, mfa], docs_read).
 %% eg: group_by([username, dbname, mfa], ioq_calls).
 %% eg: group_by([username, dbname, mfa], js_filters).
-group_by(KeyL, ValFun, AggFun) when is_list(KeyL) ->
+group_by(KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
     KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
-    group_by(KeyFun, ValFun, AggFun);
-group_by(Key, ValFun, AggFun) when is_atom(Key) ->
-    group_by(curry_field(Key), ValFun, AggFun);
-group_by(KeyFun, Val, AggFun) when is_atom(Val) ->
-    group_by(KeyFun, curry_field(Val), AggFun);
-group_by(KeyFun, ValFun, AggFun) ->
+    group_by(KeyFun, ValFun, AggFun, Limit);
+group_by(Key, ValFun, AggFun, Limit) when is_atom(Key) ->
+    group_by(curry_field(Key), ValFun, AggFun, Limit);
+group_by(KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
+    group_by(KeyFun, curry_field(Val), AggFun, Limit);
+group_by(KeyFun, ValFun, AggFun, Limit) ->
     FoldFun = fun(Ele, Acc) ->
-        Key = KeyFun(Ele),
-        Val = ValFun(Ele),
-        CurrVal = maps:get(Key, Acc, 0),
-        case AggFun(CurrVal, Val) of
-            0 ->
-                Acc;
-            NewVal ->
-                maps:put(Key, NewVal, Acc)
-        end
+        case maps:size(Acc) =< Limit of
+            true ->
+                Key = KeyFun(Ele),
+                Val = ValFun(Ele),
+                CurrVal = maps:get(Key, Acc, 0),
+                case AggFun(CurrVal, Val) of
+                    0 ->
+                        Acc;
+                    NewVal ->
+                        maps:put(Key, NewVal, Acc)
+                end;
+            false ->
+                throw({limit, Acc})
+            end
     end,
-    ets:foldl(FoldFun, #{}, ?CSRT_ETS).
+    try
+        {ok, ets:foldl(FoldFun, #{}, ?CSRT_ETS)}
+    catch throw:{limit, Acc} ->
+        {limit, Acc}
+    end.
 
 %% Sorts largest first
 sorted(Map) when is_map(Map) ->

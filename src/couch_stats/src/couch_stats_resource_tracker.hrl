@@ -35,6 +35,8 @@
 -define(ROWS_READ, rows_read).
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
+-define(QUERY_CARDINALITY_LIMIT, 10_000).
+
 %% Mapping of couch_stat metric names to #rctx{} field names.
 %% These are used for fields that we inc a counter on.
 -define(STATS_TO_KEYS, #{
