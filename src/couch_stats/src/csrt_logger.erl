@@ -179,9 +179,10 @@ maybe_report(ReportName, PidRef) ->
             ok
     end.
 
+%% Whether or not to remove zero value fields from reports
 -spec should_truncate_reports() -> boolean().
 should_truncate_reports() ->
-    config:get_boolean(?CSRT, "should_truncate_reports", false).
+    config:get_boolean(?CSRT, "should_truncate_reports", true).
 
 -spec do_lifetime_report(Rctx :: rctx()) -> boolean().
 do_lifetime_report(Rctx) ->
