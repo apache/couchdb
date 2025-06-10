@@ -43,9 +43,17 @@ def random_string(n_max):
     return "".join(random.choice(string.ascii_letters) for _ in range(n))
 
 
+def requests_session():
+    # use trust_env=False to disable possible .netrc usage
+    sess = requests.session()
+    sess.trust_env = False
+    return sess
+
+
 def has_text_service():
-    features = requests.get(COUCH_HOST).json()["features"]
-    return "search" in features
+    with requests_session() as sess:
+        features = sess.get(COUCH_HOST).json()["features"]
+        return "search" in features
 
 
 def clean_up_dbs():
@@ -82,7 +90,7 @@ class Concurrently(object):
 class Database(object):
     def __init__(self, dbname):
         self.dbname = dbname
-        self.sess = requests.session()
+        self.sess = requests_session()
         self.sess.auth = (COUCH_USER, COUCH_PASS)
         self.sess.headers["Content-Type"] = "application/json"
 
