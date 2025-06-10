@@ -55,7 +55,7 @@
 
     set_update_seq/2,
     set_drop_seq/3,
-    increment_drop_count/1,
+    increment_drop_count/2,
 
     open_docs/2,
     open_local_docs/2,
@@ -818,7 +818,7 @@ set_update_seq(#st{header = Header} = St, UpdateSeq) ->
     }}.
 
 set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
-    is_binary(ExpectedUuidPrefix), is_integer(NewDropSeq), NewDropSeq > 0
+    is_binary(ExpectedUuidPrefix), is_integer(NewDropSeq), NewDropSeq >= 0
 ->
     CurrentDropSeq = get_drop_seq(St),
     Uuid = get_uuid(St),
@@ -838,10 +838,10 @@ set_drop_seq(#st{header = Header} = St, ExpectedUuidPrefix, NewDropSeq) when
             {ok, increment_update_seq(NewSt)}
     end.
 
-increment_drop_count(#st{header = Header} = St) ->
+increment_drop_count(#st{header = Header} = St, Inc) when is_integer(Inc), Inc >= 0 ->
     CurrentDropCount = get_drop_count(St),
     NewSt = St#st{
-        header = couch_bt_engine_header:set(Header, [{drop_count, CurrentDropCount + 1}]),
+        header = couch_bt_engine_header:set(Header, [{drop_count, CurrentDropCount + Inc}]),
         needs_commit = true
     },
     {ok, NewSt}.
