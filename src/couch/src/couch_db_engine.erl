@@ -315,6 +315,13 @@
 ) ->
     {ok, NewDbHandle :: db_handle()}.
 
+% Increment the drop sequence of the database.
+-callback increment_drop_count(
+    DbHandle :: db_handle(),
+    Inc :: non_neg_integer()
+) ->
+    {ok, NewDbHandle :: db_handle()}.
+
 % This function will be called by many processes concurrently.
 % It should return a #full_doc_info{} record or not_found for
 % every provided DocId in the order those DocId's appear in
@@ -707,6 +714,7 @@
 
     set_update_seq/2,
     set_drop_seq/3,
+    increment_drop_count/2,
 
     open_docs/2,
     open_local_docs/2,
@@ -900,6 +908,15 @@ set_update_seq(#db{} = Db, UpdateSeq) ->
 set_drop_seq(#db{} = Db, UuidPrefix, UpdateSeq) ->
     #db{engine = {Engine, EngineState}} = Db,
     case Engine:set_drop_seq(EngineState, UuidPrefix, UpdateSeq) of
+        {ok, NewSt} ->
+            {ok, Db#db{engine = {Engine, NewSt}}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+increment_drop_count(#db{} = Db, Inc) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    case Engine:increment_drop_count(EngineState, Inc) of
         {ok, NewSt} ->
             {ok, Db#db{engine = {Engine, NewSt}}};
         {error, Reason} ->
