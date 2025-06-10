@@ -136,13 +136,11 @@ group_by(KeyFun, ValFun, AggFun) ->
         Key = KeyFun(Ele),
         Val = ValFun(Ele),
         CurrVal = maps:get(Key, Acc, 0),
-        NewVal = AggFun(CurrVal, Val),
-        %% TODO: should we skip here? how to make this optional?
-        case NewVal > 0 of
-            true ->
-                maps:put(Key, NewVal, Acc);
-            false ->
-                Acc
+        case AggFun(CurrVal, Val) of
+            0 ->
+                Acc;
+            NewVal ->
+                maps:put(Key, NewVal, Acc)
         end
     end,
     ets:foldl(FoldFun, #{}, ?CSRT_ETS).
