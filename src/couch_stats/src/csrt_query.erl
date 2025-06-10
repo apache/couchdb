@@ -23,17 +23,17 @@
     active_coordinators/1,
     active_workers/0,
     active_workers/1,
-    count_by/1,
+    all/0,
+    count_by/2,
     find_by_nonce/1,
     find_by_pid/1,
     find_by_pidref/1,
     find_workers_by_pidref/1,
-    group_by/2,
     group_by/3,
-    sorted/1,
-    sorted_by/1,
+    group_by/4,
     sorted_by/2,
-    sorted_by/3
+    sorted_by/3,
+    sorted_by/4
 ]).
 
 %%
@@ -112,45 +112,122 @@ field(#rctx{updated_at = Val}, updated_at) -> Val.
 curry_field(Field) ->
     fun(Ele) -> field(Ele, Field) end.
 
-count_by(KeyFun) ->
-    group_by(KeyFun, fun(_) -> 1 end).
+count_by(Matcher, KeyFun) ->
+    group_by(Matcher, KeyFun, fun(_) -> 1 end).
 
-group_by(KeyFun, ValFun) ->
-    group_by(KeyFun, ValFun, fun erlang:'+'/2).
+group_by(Matcher, KeyFun, ValFun) ->
+    group_by(Matcher, KeyFun, ValFun, fun erlang:'+'/2).
 
-group_by(KeyL, ValFun, AggFun) when is_list(KeyL) ->
+group_by(Matcher, KeyFun, ValFun, AggFun) ->
+    group_by(Matcher, KeyFun, ValFun, AggFun, ?QUERY_CARDINALITY_LIMIT).
+
+-spec all() -> matcher().
+
+all() ->
+    Spec = ets:fun2ms(fun(#rctx{} = R) -> R end),
+    {Spec, ets:match_spec_compile(Spec)}.
+
+%% eg: group_by(all(), mfa, docs_read).
+%% eg: group_by(all(), fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
+%% eg: ^^ or: group_by(all(), [mfa, docs_read], ioq_calls).
+%% eg: group_by(all(), [username, dbname, mfa], docs_read).
+%% eg: group_by(all(), [username, dbname, mfa], ioq_calls).
+%% eg: group_by(all(), [username, dbname, mfa], js_filters).
+group_by(Matcher, KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
     KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
-    group_by(KeyFun, ValFun, AggFun);
-group_by(Key, ValFun, AggFun) when is_atom(Key) ->
-    group_by(curry_field(Key), ValFun, AggFun);
-group_by(KeyFun, Val, AggFun) when is_atom(Val) ->
-    group_by(KeyFun, curry_field(Val), AggFun);
-group_by(KeyFun, ValFun, AggFun) ->
+    group_by(Matcher, KeyFun, ValFun, AggFun, Limit);
+group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
+    group_by(Matcher, curry_field(Key), ValFun, AggFun, Limit);
+group_by(Matcher, KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
+    group_by(Matcher, KeyFun, curry_field(Val), AggFun, Limit);
+group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
     FoldFun = fun(Ele, Acc) ->
-        Key = KeyFun(Ele),
-        Val = ValFun(Ele),
-        CurrVal = maps:get(Key, Acc, 0),
-        NewVal = AggFun(CurrVal, Val),
-        %% TODO: should we skip here? how to make this optional?
-        case NewVal > 0 of
+        case maps:size(Acc) =< Limit of
             true ->
-                maps:put(Key, NewVal, Acc);
+                case maybe_match(Ele, Matcher) of
+                    true ->
+                        Key = KeyFun(Ele),
+                        Val = ValFun(Ele),
+                        CurrVal = maps:get(Key, Acc, 0),
+                        case AggFun(CurrVal, Val) of
+                            0 ->
+                                Acc;
+                            NewVal ->
+                                maps:put(Key, NewVal, Acc)
+                        end;
+                    false ->
+                        Acc
+                end;
             false ->
-                Acc
-        end
+                throw({limit, Acc})
+            end
     end,
-    ets:foldl(FoldFun, #{}, ?CSRT_ETS).
+    try
+        {ok, ets:foldl(FoldFun, #{}, ?CSRT_ETS)}
+    catch throw:{limit, Acc} ->
+        {limit, Acc}
+    end.
 
-%% Sorts largest first
-sorted(Map) when is_map(Map) ->
-    lists:sort(fun({_K1, A}, {_K2, B}) -> B < A end, maps:to_list(Map)).
+maybe_match(_Ele, undefined) ->
+    true;
+maybe_match(Ele, {_, MS}) ->
+    ets:match_spec_run([Ele], MS) =/= [].
 
-shortened(L) ->
-    lists:sublist(L, 10).
+%%
+%% Auxiliary functions to calculate topK
+%%
 
-sorted_by(KeyFun) -> shortened(sorted(count_by(KeyFun))).
-sorted_by(KeyFun, ValFun) -> shortened(sorted(group_by(KeyFun, ValFun))).
-sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, AggFun))).
+-record(topK, {
+    % we store ordered elements in ascending order
+    seq = [] :: list(pos_integer()),
+    % we rely on erlang sorting order where `number < atom`
+    min = infinite  :: infinite | pos_integer(),
+    max = 0 :: pos_integer(),
+    size = 0 :: non_neg_integer(),
+    % capacity cannot be less than 1
+    capacity = 1 :: pos_integer()
+}).
+
+new_topK(K) when K >= 1 ->
+    #topK{capacity = K}.
+
+% when we are at capacity
+% don't bother adding the value since it is less than what we already saw
+update_topK(_Key, Value, #topK{size = S, capacity = S, min = Min} = Top) when Value < Min ->
+    Top#topK{min = Value};
+% when we are at capacity evict smallest value
+update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Seq} = Top) when Value > Max ->
+    % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
+    [_ | Truncated] = Seq,
+    Top#topK{max = Value, seq = lists:keysort(2, [{Key, Value} | Truncated])};
+% when we are at capacity and value is in between min and max evict smallest value
+update_topK(Key, Value, #topK{size = S, capacity = S, seq = Seq} = Top) ->
+    % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
+    [_ | Truncated] = Seq,
+    Top#topK{seq = lists:keysort(2, [{Key, Value} | Truncated])};
+update_topK(Key, Value, #topK{size = S, min = Min, seq = Seq} = Top) when Value < Min ->
+    Top#topK{size = S + 1, min = Value, seq = lists:keysort(2, [{Key, Value} | Seq])};
+update_topK(Key, Value, #topK{size = S, max = Max, seq = Seq} = Top) when Value > Max ->
+    Top#topK{size = S + 1, max = Value, seq = lists:keysort(2, [{Key, Value} | Seq])};
+update_topK(Key, Value, #topK{size = S, seq = Seq} = Top) ->
+    Top#topK{size = S + 1, seq = lists:keysort(2, [{Key, Value} | Seq])}.
+
+get_topK(#topK{seq = S}) ->
+    lists:reverse(S).
+
+topK(Results, K) ->
+    TopK = maps:fold(fun update_topK/3, new_topK(K), Results),
+    get_topK(TopK).
+
+%% eg: sorted_by([username, dbname, mfa], ioq_calls)
+%% eg: sorted_by([dbname, mfa], doc_reads)
+sorted_by(KeyFun) -> topK(count_by(KeyFun), 10).
+sorted_by(KeyFun, ValFun) ->
+    {Result, Acc} = group_by(KeyFun, ValFun),
+    {Result, topK(Acc, 10)}.
+sorted_by(KeyFun, ValFun, AggFun) ->
+    {Result, Acc} = group_by(KeyFun, ValFun, AggFun),
+    {Result, topK(Acc, 10)}.
 
 to_json_list(List) when is_list(List) ->
     lists:map(fun csrt_util:to_json/1, List).

@@ -41,6 +41,7 @@
 -define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
 -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
 -define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
+-define(QUERY_CARDINALITY_LIMIT, 10_000).
 
 %% Mapping of couch_stat metric names to #rctx{} field names.
 %% These are used for fields that we inc a counter on.
