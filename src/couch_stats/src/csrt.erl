@@ -71,6 +71,12 @@
     should_track_init_p/1
 ]).
 
+%% RPC api
+-export([
+    rpc/2,
+    call/1
+]).
+
 %% aggregate query api
 -export([
     active/0,
@@ -98,6 +104,50 @@
     pid_ref_matchspec/1,
     proc_window/3
 ]).
+
+%%
+%% RPC operations
+%%
+
+-spec rpc(FName :: atom(), Args :: [any()]) ->
+    {[{node(), Result :: any()}], Errors :: [{badrpc, Reason :: any()}], BadNodes :: [node()]}.
+rpc(FName, Args) when is_atom(FName) andalso is_list(Args) ->
+    {Resp, BadNodes} = rpc:multicall(?MODULE, call, [{FName, Args}]),
+    {Results, Errors} = split_response(Resp),
+    {Results, lists:usort(Errors), BadNodes}.
+
+split_response(Resp) ->
+    lists:foldl(fun(Message, {Results, Errors}) ->
+        case Message of
+            {badrpc, _} = E ->
+                {Results, [E | Errors]};
+            Result ->
+                {[Result | Results], Errors}
+        end
+    end, {[], []}, Resp).
+
+call({active, []}) -> {node(), active()};
+call({active, [json]}) -> {node(), active(json)};
+call({active_coordinators, []}) -> {node(), active_coordinators()};
+call({active_coordinators, [json]}) -> {node(), active_coordinators(json)};
+call({active_workers, []}) -> {node(), active_workers()};
+call({active_workers, [json]}) -> {node(), active_workers(json)};
+call({count_by, [Key]}) -> {node(), count_by(Key)};
+call({find_by_nonce, [Nonce]}) -> {node(), find_by_nonce(Nonce)};
+call({find_by_pid, [Pid]}) -> {node(), find_by_pid(Pid)};
+call({find_by_pidref, [PidRef]}) -> {node(), find_by_pidref(PidRef)};
+call({find_workers_by_pidref, [PidRef]}) -> {node(), find_workers_by_pidref(PidRef)};
+call({group_by, [Key, Val]}) -> {node(), group_by(Key, Val)};
+call({group_by, [Key, Val, Agg]}) -> {node(), group_by(Key, Val, Agg)};
+call({sorted, [Map]}) -> {node(), sorted(Map)};
+call({sorted_by, [Key]}) -> {node(), sorted_by(Key)};
+call({sorted_by, [Key, Val]}) -> {node(), sorted_by(Key, Val)};
+call({sorted_by, [Key, Val, Agg]}) -> {node(), sorted_by(Key, Val, Agg)};
+call({FunName, Args}) ->
+    FunNameBin = atom_to_binary(FunName),
+    ArityBin = integer_to_binary(length(Args)),
+    {error, <<"No such function '"/binary, FunNameBin/binary, "/"/binary, ArityBin/binary>>}.
+
 
 %%
 %% PidRef operations
