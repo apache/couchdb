@@ -192,8 +192,17 @@ rctx_gen(Opts0) ->
 rctxs() ->
     [rctx_gen() || _ <- lists:seq(1, ?RCTX_COUNT)].
 
-t_do_report(#{rctx := Rctx}) ->
+jrctx(Rctx) ->
     JRctx = csrt_util:to_json(Rctx),
+    case csrt_logger:should_truncate_reports() of
+        true ->
+            maps:filter(fun(_K, V) -> V > 0 end, JRctx);
+        false ->
+            JRctx
+    end.
+
+t_do_report(#{rctx := Rctx}) ->
+    JRctx = jrctx(Rctx),
     ReportName = "foo",
     ?assert(csrt_logger:do_report(ReportName, Rctx), "CSRT _logger:do_report " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT do_report"),
@@ -204,7 +213,7 @@ t_do_report(#{rctx := Rctx}) ->
     ).
 
 t_do_lifetime_report(#{rctx := Rctx}) ->
-    JRctx = csrt_util:to_json(Rctx),
+    JRctx = jrctx(Rctx),
     ReportName = "csrt-pid-usage-lifetime",
     ?assert(
         csrt_logger:do_lifetime_report(Rctx),
@@ -217,7 +226,7 @@ t_do_lifetime_report(#{rctx := Rctx}) ->
     ).
 
 t_do_status_report(#{rctx := Rctx}) ->
-    JRctx = csrt_util:to_json(Rctx),
+    JRctx = jrctx(Rctx),
     ReportName = "csrt-pid-usage-status",
     ?assert(csrt_logger:do_status_report(Rctx), "csrt_logger:do_ " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
