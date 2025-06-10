@@ -35,7 +35,8 @@
     set_context_handler_fun/2,
     set_context_type/2,
     set_context_username/2,
-    update_counter/3
+    update_counter/3,
+    update_counters/2
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -171,6 +172,42 @@ update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
             end;
         false ->
             0
+    end.
+
+-spec update_counters(PidRef, Delta) -> boolean() when
+    PidRef :: maybe_pid_ref(),
+    Delta :: delta().
+update_counters(undefined, _Delta) ->
+    false;
+update_counters({_Pid, _Ref} = PidRef, Delta) when is_map(Delta) ->
+    Updates = maps:fold(
+        fun(Field, Count, Acc) ->
+            case is_rctx_stat_field(Field) of
+                true ->
+                    [{get_rctx_stat_field(Field), Count} | Acc];
+                false ->
+                    %% This skips entries that are not is_rctx_stat_field's
+                    %% Another approach would be:
+                    %% lists:all(lists:map(fun is_rctx_stat_field/1, maps:keys(Delta)))
+                    %% But that's a lot of looping for not even acumulating the update.
+                    Acc
+            end
+        end,
+        [],
+        Delta
+    ),
+
+    case Updates of
+        [] ->
+            false;
+        _ ->
+            try
+                ets:update_counter(?CSRT_ETS, PidRef, Updates, #rctx{pid_ref = PidRef}),
+                true
+            catch
+                _:_ ->
+                    false
+            end
     end.
 
 -spec inc(PidRef :: maybe_pid_ref(), Field :: rctx_field()) -> non_neg_integer().
