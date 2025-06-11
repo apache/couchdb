@@ -394,6 +394,19 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
         csrt_logger:find_all_matches(Rctxs, Matchers),
         "find our CrazyDb ExtraRctx with our Matcher, and nothing else"
     ),
+    ?assertEqual(ok, csrt_logger:reload_matchers(), "we can reload matchers"),
+    ?assertEqual(
+        [MName],
+        maps:keys(csrt_logger:get_registered_matchers()),
+        "correct current registered matchers after a global reload"
+    ),
+    ?assert(
+        maps:is_key(
+            MName,
+            csrt_logger:find_matches(Rctxs, csrt_logger:get_matchers())
+        ),
+        "our matcher still behaves expectedly after a global matcher reload"
+    ),
     ?assertEqual(ok, csrt_logger:deregister_matcher(MName), "deregister_matcher returns ok"),
     Matcher2 = test_util:wait(
         fun() ->
