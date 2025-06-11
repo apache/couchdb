@@ -32,7 +32,7 @@
 -define(THRESHOLD_ROWS_READ, 143).
 -define(THRESHOLD_CHANGES, 79).
 
-csrt_logger_works_test_() ->
+csrt_logger_reporting_works_test_() ->
     {
         foreach,
         fun setup_reporting/0,
@@ -57,7 +57,8 @@ csrt_logger_matchers_test_() ->
             ?TDEF_FE(t_matcher_on_rows_read),
             ?TDEF_FE(t_matcher_on_worker_changes_processed),
             ?TDEF_FE(t_matcher_on_ioq_calls),
-            ?TDEF_FE(t_matcher_on_nonce)
+            ?TDEF_FE(t_matcher_on_nonce),
+            ?TDEF_FE(t_matcher_register_deregister)
         ]
     }.
 
@@ -342,6 +343,64 @@ t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
         lists:sort(lists:filter(MatcherFooBar, Rctxs)),
         "dbname_io foo/bar matcher"
     ).
+
+t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
+    CrazyDbName = <<"asdf123@?!&#fdsa">>,
+    MName = "Crazy-Matcher",
+    MSpec = csrt_logger:matcher_on_dbname(CrazyDbName),
+    %% Add an extra Rctx with CrazyDbName to create a specific match
+    ExtraRctx = rctx_gen(#{dbname => CrazyDbName}),
+    %% Make sure we have at least one match
+    Rctxs = [ExtraRctx | Rctxs0],
+
+    ?assertEqual(#{}, csrt_logger:get_registered_matchers(), "no current registered matchers"),
+    ?assertEqual(ok, csrt_logger:register_matcher(MName, MSpec), "register matcher"),
+    %% TODO: use test_wait thing until initialize_matchers rebuilds
+    CompMSpec = test_util:wait(
+        fun() ->
+            case csrt_logger:get_matcher(MName) of
+                undefined ->
+                    wait;
+                {MSpec, _Ref} = CompMSpec0 ->
+                    CompMSpec0
+            end
+        end
+    ),
+    Matchers = #{MName => CompMSpec},
+    ?assert(CompMSpec =/= timeout, "newly registered matcher was initialized"),
+    ?assertEqual([MName], maps:keys(csrt_logger:get_registered_matchers()), "correct current registered matchers"),
+    ?assert(csrt_logger:is_match(ExtraRctx, Matchers), "our registered matcher matches expectedly"),
+    ?assert(csrt_logger:is_match(ExtraRctx), "our registered matcher is picked up and matches expectedly"),
+    ?assertEqual(
+        Matchers,
+        csrt_logger:find_matches(Rctxs, Matchers),
+        "we find our matcher and no extra matchers"
+    ),
+    ?assert(
+        maps:is_key(
+            MName,
+            csrt_logger:find_matches(Rctxs, csrt_logger:get_matchers())
+        ),
+        "find our CrazyDbName matcher in matches against all registered matchers"
+    ),
+    ?assertEqual(
+       #{MName => [ExtraRctx]},
+        csrt_logger:find_all_matches(Rctxs, Matchers),
+        "find our CrazyDb ExtraRctx with our Matcher, and nothing else"
+    ),
+    ?assertEqual(ok, csrt_logger:deregister_matcher(MName), "deregister_matcher returns ok"),
+    Matcher2 = test_util:wait(
+        fun() ->
+            case csrt_logger:get_matcher(MName) of
+                undefined ->
+                    undefined;
+                _ ->
+                    wait
+            end
+        end
+    ),
+    ?assertEqual(undefined, Matcher2, "matcher was deregistered successfully"),
+    ?assertEqual(#{}, csrt_logger:get_registered_matchers(), "no leftover registered matchers").
 
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas

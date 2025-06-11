@@ -51,8 +51,11 @@
 %% Matchers
 -export([
     deregister_matcher/1,
+    find_all_matches/2,
+    find_matches/2,
     get_matcher/1,
     get_matchers/0,
+    get_registered_matchers/0,
     is_match/1,
     is_match/2,
     matcher_on_dbname/1,
@@ -131,12 +134,27 @@ log_process_lifetime_report(PidRef) ->
             ok
     end.
 
-%% TODO: add Matchers spec
+%% Return a subset of Matchers for each Matcher that matches on Rctxs
 -spec find_matches(Rctxs :: [rctx()], Matchers :: matchers()) -> matchers().
 find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
     maps:filter(
         fun(_Name, {_MSpec, CompMSpec}) ->
-            catch [] =/= ets:match_spec_run(Rctxs, CompMSpec)
+            (catch ets:match_spec_run(Rctxs, CompMSpec)) =/= []
+        end,
+        Matchers
+    ).
+
+%% Return a Map of #{MatcherName => SRctxs :: rctxs()} for all MatcherName => Matcher
+%% in Matchers where SRctxs is the subset of Rctxs matched by the given Matcher
+-spec find_all_matches(Rctxs :: rctxs(), Matchers :: matchers()) -> matcher_matches().
+find_all_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
+    maps:map(
+        fun(_Name, {_MSpec, CompMSpec}) ->
+            try
+                ets:match_spec_run(Rctxs, CompMSpec)
+            catch _:_ ->
+                []
+            end
         end,
         Matchers
     ).
@@ -153,13 +171,16 @@ get_matchers() ->
 get_matcher(Name) ->
     maps:get(Name, get_matchers(), undefined).
 
+-spec get_registered_matchers() -> matchers().
+get_registered_matchers() ->
+    gen_server:call(?MODULE, get_registered_matchers, infinity).
+
 -spec is_match(Rctx :: maybe_rctx()) -> boolean().
 is_match(undefined) ->
     false;
 is_match(#rctx{} = Rctx) ->
     is_match(Rctx, get_matchers()).
 
-%% TODO: add Matchers spec
 -spec is_match(Rctx :: maybe_rctx(), Matchers :: matchers()) -> boolean().
 is_match(undefined, _Matchers) ->
     false;
@@ -243,10 +264,21 @@ handle_call({register, Name, MSpec}, _From, #st{registered_matchers = RMatchers}
         {error, badarg} = Error ->
             {reply, Error, St}
     end;
+handle_call({deregister, Name}, _From, #st{registered_matchers = RMatchers} = St) ->
+    case maps:is_key(Name, RMatchers) of
+        false ->
+            {reply, {error, missing_matcher}, St};
+        true ->
+            RMatchers1 = maps:remove(Name, RMatchers),
+            ok = initialize_matchers(RMatchers1),
+            {reply, ok, St#st{registered_matchers = RMatchers1}}
+    end;
 handle_call(reload_matchers, _From, St) ->
     couch_log:warning("Reloading persistent term matchers", []),
     ok = initialize_matchers(St#st.registered_matchers),
     {reply, ok, St};
+handle_call(get_registered_matchers, _From, St) ->
+    {reply, St#st.registered_matchers, St};
 handle_call(_, _From, State) ->
     {reply, ok, State}.
 
