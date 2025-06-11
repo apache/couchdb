@@ -319,9 +319,6 @@ docs_written(N) ->
 
 -spec accumulate_delta(Delta :: map() | undefined) -> ok.
 accumulate_delta(Delta) when is_map(Delta) ->
-    %% TODO: switch to creating a batch of updates to invoke a single
-    %% update_counter rather than sequentially invoking it for each field
-    %%is_enabled() andalso maps:foreach(fun inc/2, Delta),
     is_enabled() andalso csrt_server:update_counters(get_pid_ref(), Delta),
     ok;
 accumulate_delta(undefined) ->

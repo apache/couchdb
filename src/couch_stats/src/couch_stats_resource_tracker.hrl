@@ -150,6 +150,7 @@
 -type coordinator_rctx() :: #rctx{type :: coordinator()}.
 -type rpc_worker_rctx() :: #rctx{type :: rpc_worker()}.
 -type rctx() :: #rctx{} | coordinator_rctx() | rpc_worker_rctx().
+-type rctxs() :: [#rctx{}] | [].
 -type maybe_rctx() :: rctx() | undefined.
 
 %% TODO: solidify nonce type and ideally move to couch_db.hrl
@@ -164,5 +165,6 @@
 -type matcher_name() :: string().
 -type matcher() :: {ets:match_spec(), ets:comp_match_spec()}.
 -type matchers() :: #{matcher_name() => matcher()} | #{}.
+-type matcher_matches() :: #{matcher_name() => rctxs()} | #{}.
 -type maybe_matcher() :: matcher() | undefined.
 -type maybe_matchers() :: matchers() | undefined.
