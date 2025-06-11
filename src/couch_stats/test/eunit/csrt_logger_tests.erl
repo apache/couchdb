@@ -355,7 +355,6 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
 
     ?assertEqual(#{}, csrt_logger:get_registered_matchers(), "no current registered matchers"),
     ?assertEqual(ok, csrt_logger:register_matcher(MName, MSpec), "register matcher"),
-    %% TODO: use test_wait thing until initialize_matchers rebuilds
     CompMSpec = test_util:wait(
         fun() ->
             case csrt_logger:get_matcher(MName) of
@@ -368,9 +367,16 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
     ),
     Matchers = #{MName => CompMSpec},
     ?assert(CompMSpec =/= timeout, "newly registered matcher was initialized"),
-    ?assertEqual([MName], maps:keys(csrt_logger:get_registered_matchers()), "correct current registered matchers"),
+    ?assertEqual(
+        [MName],
+        maps:keys(csrt_logger:get_registered_matchers()),
+        "correct current registered matchers"
+    ),
     ?assert(csrt_logger:is_match(ExtraRctx, Matchers), "our registered matcher matches expectedly"),
-    ?assert(csrt_logger:is_match(ExtraRctx), "our registered matcher is picked up and matches expectedly"),
+    ?assert(
+        csrt_logger:is_match(ExtraRctx),
+        "our registered matcher is picked up and matches expectedly"
+    ),
     ?assertEqual(
         Matchers,
         csrt_logger:find_matches(Rctxs, Matchers),
@@ -384,7 +390,7 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
         "find our CrazyDbName matcher in matches against all registered matchers"
     ),
     ?assertEqual(
-       #{MName => [ExtraRctx]},
+        #{MName => [ExtraRctx]},
         csrt_logger:find_all_matches(Rctxs, Matchers),
         "find our CrazyDb ExtraRctx with our Matcher, and nothing else"
     ),

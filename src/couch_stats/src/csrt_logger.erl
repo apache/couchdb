@@ -152,8 +152,9 @@ find_all_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) -
         fun(_Name, {_MSpec, CompMSpec}) ->
             try
                 ets:match_spec_run(Rctxs, CompMSpec)
-            catch _:_ ->
-                []
+            catch
+                _:_ ->
+                    []
             end
         end,
         Matchers
