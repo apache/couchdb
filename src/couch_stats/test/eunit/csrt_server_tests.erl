@@ -285,7 +285,7 @@ t_updated_at({_Ctx, DbName, _View}) ->
         "updated_at gets updated with an expected TimeDelay"
     ),
     ?assert(
-        csrt_util:make_dt(Started, Updated, millisecond) < 2*TimeDelay,
+        csrt_util:make_dt(Started, Updated, millisecond) < 2 * TimeDelay,
         "updated_at gets updated in a reasonable time frame"
     ),
     ok = nonzero_local_io_assert(Rctx, io_sum),
