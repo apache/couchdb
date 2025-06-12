@@ -45,6 +45,7 @@ test_funs() ->
         ?TDEF_FE(t_changes),
         ?TDEF_FE(t_changes_limit_zero),
         ?TDEF_FE(t_changes_filtered),
+        ?TDEF_FE(t_updated_at),
         ?TDEF_FE(t_view_query),
         ?TDEF_FE(t_view_query_include_docs)
     ].
@@ -248,6 +249,45 @@ t_get_doc({_Ctx, DbName, _View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
+    ok = nonzero_local_io_assert(Rctx, io_sum),
+    ok = assert_teardown(PidRef).
+
+t_updated_at({_Ctx, DbName, _View}) ->
+    %% Same test as t_get_doc but with a timer sleep and updated_at assertion
+    TimeDelay = 1234,
+    pdebug(dbname, DbName),
+    DocId = "foo_17",
+    Context = #{
+        method => 'GET',
+        path => "/" ++ ?b2l(DbName) ++ "/" ++ DocId
+    },
+    {PidRef, Nonce} = coordinator_context(Context),
+    Rctx0 = load_rctx(PidRef),
+    ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
+    timer:sleep(TimeDelay),
+    _Res = fabric:open_doc(DbName, DocId, [?ADMIN_CTX]),
+    Rctx = load_rctx(PidRef),
+    %% Get RawRctx to have pre-json-converted timestamps
+    RawRctx = csrt:get_resource(PidRef),
+    pdebug(rctx, Rctx),
+    ok = rctx_assert(Rctx, #{
+        nonce => Nonce,
+        db_open => 1,
+        rows_read => 0,
+        docs_read => 1,
+        docs_written => 0,
+        pid_ref => PidRef
+    }),
+    Started = csrt_util:field(started_at, RawRctx),
+    Updated = csrt_util:field(updated_at, RawRctx),
+    ?assert(
+        csrt_util:make_dt(Started, Updated, millisecond) > TimeDelay,
+        "updated_at gets updated with an expected TimeDelay"
+    ),
+    ?assert(
+        csrt_util:make_dt(Started, Updated, millisecond) < 2*TimeDelay,
+        "updated_at gets updated in a reasonable time frame"
+    ),
     ok = nonzero_local_io_assert(Rctx, io_sum),
     ok = assert_teardown(PidRef).
 

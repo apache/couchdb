@@ -36,7 +36,9 @@
     set_context_type/2,
     set_context_username/2,
     update_counter/3,
-    update_counters/2
+    update_counter/4,
+    update_counters/2,
+    update_counters/3
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -154,18 +156,60 @@ is_rctx_stat_field(Field) ->
 get_rctx_stat_field(Field) ->
     maps:get(Field, ?STAT_KEYS_TO_FIELDS).
 
+%% This provides a base set of updates to include along with any other #rctx{}
+%% updates. Specifically, this provides a way to automatically track and
+%% increment the #rctx.updated_at field without having to do ets:lookup to find
+%% the last updated_at time, or having to do ets:update_element to set a
+%% specific updated_at. We trade a pdict marker to keep inc operations as only
+%% a singular ets call while sneaking in updated_at.
+%% Calling csrt_util:put_updated_at/1 within this function is not the cleanest,
+%% but it allows us to encapsulate the automatic updated_at inclusion into the
+%% ?MODULE:update_counter(s)/3-4 arity call-through while still allowing the
+%% 4-arity version to be exposed to pass an empty base updates list. Isolating
+%% this logic means the final arity functions operate independently of any
+%% local pdict values.
+-spec make_base_counter_updates() -> [] | [{rctx_field(), integer()}].
+make_base_counter_updates() ->
+    case csrt_util:get_updated_at() of
+        undefined ->
+            [];
+        LastUpdated ->
+            Now = csrt_util:tnow(),
+            csrt_util:put_updated_at(Now),
+            UpdatedInc = csrt_util:make_dt(LastUpdated, Now, native),
+            [{#rctx.updated_at, UpdatedInc}]
+    end.
+
 -spec update_counter(PidRef, Field, Count) -> non_neg_integer() when
     PidRef :: maybe_pid_ref(),
     Field :: rctx_field(),
     Count :: non_neg_integer().
 update_counter(undefined, _Field, _Count) ->
     0;
-update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
+update_counter(_PidRef, _Field, 0) ->
+    0;
+update_counter(PidRef, Field, Count) ->
+    %% Only call make_base_counter_updates() if PidRef, Field, Count all valid
     case is_rctx_stat_field(Field) of
         true ->
-            Update = {get_rctx_stat_field(Field), Count},
+            update_counter(PidRef, Field, Count, make_base_counter_updates());
+        false ->
+            0
+    end.
+
+-spec update_counter(PidRef, Field, Count, BaseUpdates) -> non_neg_integer() when
+    PidRef :: maybe_pid_ref(),
+    Field :: rctx_field(),
+    Count :: non_neg_integer(),
+    BaseUpdates :: [] | [{rctx_field(), integer()}].
+update_counter(undefined, _Field, _Count, _BaseUpdates) ->
+    0;
+update_counter({_Pid, _Ref} = PidRef, Field, Count, BaseUpdates) when Count >= 0 ->
+    case is_rctx_stat_field(Field) of
+        true ->
+            Updates = [{get_rctx_stat_field(Field), Count} | BaseUpdates],
             try
-                ets:update_counter(?CSRT_ETS, PidRef, Update, #rctx{pid_ref = PidRef})
+                ets:update_counter(?CSRT_ETS, PidRef, Updates, #rctx{pid_ref = PidRef})
             catch
                 _:_ ->
                     0
@@ -179,7 +223,16 @@ update_counter({_Pid, _Ref} = PidRef, Field, Count) when Count >= 0 ->
     Delta :: delta().
 update_counters(undefined, _Delta) ->
     false;
-update_counters({_Pid, _Ref} = PidRef, Delta) when is_map(Delta) ->
+update_counters(PidRef, Delta) when is_map(Delta) ->
+    update_counters(PidRef, Delta, make_base_counter_updates()).
+
+-spec update_counters(PidRef, Delta, BaseUpdates) -> boolean() when
+    PidRef :: maybe_pid_ref(),
+    Delta :: delta(),
+    BaseUpdates :: [] | [{rctx_field(), integer()}].
+update_counters(undefined, _Delta, _BaseUpdates) ->
+    false;
+update_counters({_Pid, _Ref} = PidRef, Delta, BaseUpdates) when is_map(Delta) ->
     Updates = maps:fold(
         fun(Field, Count, Acc) ->
             case is_rctx_stat_field(Field) of
@@ -190,10 +243,11 @@ update_counters({_Pid, _Ref} = PidRef, Delta) when is_map(Delta) ->
                     %% Another approach would be:
                     %% lists:all(lists:map(fun is_rctx_stat_field/1, maps:keys(Delta)))
                     %% But that's a lot of looping for not even acumulating the update.
+                    %% Need to drop Delta.dt either way as it's not an rctx_field
                     Acc
             end
         end,
-        [],
+        BaseUpdates,
         Delta
     ),
 
