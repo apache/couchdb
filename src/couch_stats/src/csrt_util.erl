@@ -40,15 +40,15 @@
     extract_delta/1,
     get_delta/1,
     get_delta_a/0,
-    get_delta_zero/0,
+    get_updated_at/0,
     maybe_add_delta/1,
     maybe_add_delta/2,
     make_delta/1,
     make_dt/2,
     make_dt/3,
     rctx_delta/2,
-    set_delta_a/1,
-    set_delta_zero/1
+    put_delta_a/1,
+    put_updated_at/1
 ]).
 
 %% Extra niceties and testing facilities
@@ -135,7 +135,13 @@ make_dt(A, A, _Unit) when is_integer(A) ->
 make_dt(A, B, Unit) when is_integer(A) andalso is_integer(B) andalso B > A ->
     A1 = erlang:convert_time_unit(A, native, Unit),
     B1 = erlang:convert_time_unit(B, native, Unit),
-    B1 - A1.
+    case B1 - A1 of
+        Delta when Delta > 0 ->
+            Delta;
+        _ ->
+            1
+    end.
+
 
 %%
 %% Conversion API for outputting JSON
@@ -340,7 +346,7 @@ make_delta(PidRef) ->
     TA = get_delta_a(),
     TB = csrt_server:get_resource(PidRef),
     Delta = rctx_delta(TA, TB),
-    set_delta_a(TB),
+    put_delta_a(TB),
     Delta.
 
 -spec rctx_delta(TA :: Rctx, TB :: Rctx) -> map().
@@ -369,17 +375,19 @@ rctx_delta(_, _) ->
 get_delta_a() ->
     erlang:get(?DELTA_TA).
 
--spec get_delta_zero() -> maybe_rctx().
-get_delta_zero() ->
-    erlang:get(?DELTA_TZ).
-
--spec set_delta_a(TA :: rctx()) -> maybe_rctx().
-set_delta_a(TA) ->
+-spec put_delta_a(TA :: rctx()) -> maybe_rctx().
+put_delta_a(TA) ->
     erlang:put(?DELTA_TA, TA).
 
--spec set_delta_zero(TZ :: rctx()) -> maybe_rctx().
-set_delta_zero(TZ) ->
-    erlang:put(?DELTA_TZ, TZ).
+-spec get_updated_at() -> maybe_rctx().
+get_updated_at() ->
+    erlang:get(?LAST_UPDATED).
+
+-spec put_updated_at(_Rctx :: rctx()) -> maybe_rctx().
+put_updated_at(#rctx{updated_at=Updated}) ->
+    put_updated_at(Updated);
+put_updated_at(Updated) when is_integer(Updated) ->
+    erlang:put(?LAST_UPDATED, Updated).
 
 -spec get_pid_ref() -> maybe_pid_ref().
 get_pid_ref() ->
