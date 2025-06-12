@@ -65,6 +65,7 @@
     matcher_on_worker_changes_processed/1,
     matcher_on_ioq_calls/1,
     matcher_on_nonce/1,
+    matcher_on_long_reqs/1,
     register_matcher/2,
     reload_matchers/0
 ]).
@@ -364,6 +365,42 @@ matcher_on_worker_changes_processed(Threshold) when
         end
     ).
 
+%% Matcher on requests taking longer than Threshold milliseconds
+-spec matcher_on_long_reqs(Threshold :: pos_integer()) -> ets:match_spec().
+matcher_on_long_reqs(Threshold) when
+    is_integer(Threshold) andalso Threshold > 0
+->
+    %% Threshold is in milliseconds, but we track erlang:monotonic_time/0
+    %% which is in native format, a machine dependent internal representation
+    %% but with the guarantee of monotonically increasing. Note that this number
+    %% is integer(), _not_ positive_integer(), so we must use abs/2 to get a
+    %% positive time delta; notably, abs/2 is valid match_spec guard.
+    %%
+    %% Time warps and is relative and is complicated, so here's an example of
+    %% converting 10000 milliseconds into a native time format and back, then
+    %% using csrt_util:tnow/0 to accurately measure sleeping for 10000 ms.
+    %%
+    %% (node1@127.0.0.1)5> erlang:convert_time_unit(10000, millisecond, native).
+    %% 10000000000
+    %% (node1@127.0.0.1)6> erlang:convert_time_unit(10000000000, native, millisecond).
+    %% 10000
+    %% (node1@127.0.0.1)7> T0 = csrt_util:tnow(), timer:sleep(10000), T1 = csrt_util:tnow(),
+    %%     erlang:convert_time_unit(abs(T1 - T0), native, millisecond).
+    %% 10000
+
+    Unit = millisecond,
+    NativeThreshold = erlang:convert_time_unit(Threshold, Unit, native),
+    ets:fun2ms(
+        fun(
+            #rctx{
+                started_at = Started,
+                updated_at = Updated
+            } = R
+        ) when abs(Updated - Started) >= NativeThreshold ->
+            R
+        end
+    ).
+
 -spec matcher_on_ioq_calls(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_ioq_calls(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
@@ -396,7 +433,7 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
         {rows_read, fun matcher_on_rows_read/1, 1000},
         {docs_written, fun matcher_on_docs_written/1, 500},
         %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
-        %%{slow_reqs, fun matcher_on_slow_reqs/1, 10000},
+        {long_reqs, fun matcher_on_long_reqs/1, 60000}, %% in milliseconds
         {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
         {ioq_calls, fun matcher_on_ioq_calls/1, 10000}
     ],

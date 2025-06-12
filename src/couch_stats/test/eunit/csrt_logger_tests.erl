@@ -24,6 +24,7 @@
 -define(RCTX_RPC, #rpc_worker{from = {self(), make_ref()}}).
 -define(RCTX_COORDINATOR, #coordinator{method = 'GET', path = "/foo/_all_docs"}).
 
+%% Use different values than default configs to ensure they're picked up
 -define(THRESHOLD_DBNAME, <<"foo">>).
 -define(THRESHOLD_DBNAME_IO, 91).
 -define(THRESHOLD_DOCS_READ, 123).
@@ -31,6 +32,7 @@
 -define(THRESHOLD_IOQ_CALLS, 439).
 -define(THRESHOLD_ROWS_READ, 143).
 -define(THRESHOLD_CHANGES, 79).
+-define(THRESHOLD_LONG_REQS, 432).
 
 csrt_logger_reporting_works_test_() ->
     {
@@ -56,6 +58,7 @@ csrt_logger_matchers_test_() ->
             ?TDEF_FE(t_matcher_on_docs_written),
             ?TDEF_FE(t_matcher_on_rows_read),
             ?TDEF_FE(t_matcher_on_worker_changes_processed),
+            ?TDEF_FE(t_matcher_on_long_reqs),
             ?TDEF_FE(t_matcher_on_ioq_calls),
             ?TDEF_FE(t_matcher_on_nonce),
             ?TDEF_FE(t_matcher_register_deregister)
@@ -111,6 +114,9 @@ setup() ->
         "worker_changes_processed",
         integer_to_list(?THRESHOLD_CHANGES),
         false
+    ),
+    ok = config:set(
+        "csrt_logger.matchers_threshold", "long_reqs", integer_to_list(?THRESHOLD_LONG_REQS), false
     ),
     ok = config:set("csrt_logger.dbnames_io", "foo", integer_to_list(?THRESHOLD_DBNAME_IO), false),
     ok = config:set("csrt_logger.dbnames_io", "bar", integer_to_list(?THRESHOLD_DBNAME_IO), false),
@@ -288,6 +294,27 @@ t_matcher_on_worker_changes_processed(#{rctxs := Rctxs0}) ->
         lists:sort(lists:filter(ChangesFilter, Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("worker_changes_processed"), Rctxs)),
         "Changes processed matcher"
+    ).
+
+t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
+    %% Threshold is in milliseconds, convert to native time format
+    Threshold = ?THRESHOLD_LONG_REQS,
+    NativeThreshold = erlang:convert_time_unit(Threshold, millisecond, native),
+    %% Native is a small timescale, make sure we have enough for a millisecond
+    %% measureable time delta
+    %% Make sure we have at least one match
+    Now = csrt_util:tnow(),
+    UpdatedAt = Now - round(NativeThreshold * 1.23),
+    Rctxs = [rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0],
+    DurationFilter = fun(R) ->
+        Started = csrt_util:field(started_at, R),
+        Updated = csrt_util:field(updated_at, R),
+        abs(Updated - Started) >= NativeThreshold
+    end,
+    ?assertEqual(
+        lists:sort(lists:filter(DurationFilter, Rctxs)),
+        lists:sort(lists:filter(matcher_for_csrt("long_reqs"), Rctxs)),
+        "Long requests matcher"
     ).
 
 t_matcher_on_ioq_calls(#{rctxs := Rctxs0}) ->
