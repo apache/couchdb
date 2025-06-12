@@ -803,11 +803,11 @@ remove_sensitive_data(KVList) ->
     lists:keyreplace(password, 1, KVList1, {password, <<"****">>}).
 
 ejson_to_map(#{} = Val) ->
-    maps:map(fun(_, V) -> ejson_to_map(V) end, Val);
+    #{K => ejson_to_map(V) || K := V <- Val};
 ejson_to_map(Val) when is_list(Val) ->
-    lists:map(fun(V) -> ejson_to_map(V) end, Val);
+    [ejson_to_map(V) || V <- Val];
 ejson_to_map({Val}) when is_list(Val) ->
-    maps:from_list(lists:map(fun({K, V}) -> {K, ejson_to_map(V)} end, Val));
+    #{K => ejson_to_map(V) || {K, V} <- Val};
 ejson_to_map(Val) ->
     Val.
 
