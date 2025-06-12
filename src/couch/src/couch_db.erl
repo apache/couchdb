@@ -420,7 +420,7 @@ purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
     % Gather any existing purges with the same UUIDs
     UUIDs = element(1, lists:unzip3(UUIDsIdsRevs1)),
     Old1 = get_purge_infos(Db, UUIDs),
-    Old2 = maps:from_list([{UUID, {Id, Revs}} || {_, UUID, Id, Revs} <- Old1]),
+    Old2 = #{UUID => {Id, Revs} || {_, UUID, Id, Revs} <- Old1},
     % Filter out all the purges which have already been processed
     FilterCheckFun = fun({UUID, Id, Revs}) ->
         case maps:is_key(UUID, Old2) of
