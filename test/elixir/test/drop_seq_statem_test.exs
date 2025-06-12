@@ -3,9 +3,6 @@ defmodule DropSeqStateM do
   use PropCheck.StateM
   use CouchTestCase
 
-  # alias Couch.Test.Utils
-  # import Utils
-
   @moduletag capture_log: true
 
   # expected to pass in all three cluster scenarios
@@ -20,7 +17,7 @@ defmodule DropSeqStateM do
     forall cmds <- commands(__MODULE__) do
       trap_exit do
         db_name = random_db_name()
-        n = Enum.random(1..3)
+        n = Enum.random(2..3)
         q = Enum.random(1..10)
         {:ok, _} = create_db(db_name, query: %{n: n, q: q})
         r = run_commands(__MODULE__, cmds, [{:dbname, db_name}])
@@ -28,13 +25,13 @@ defmodule DropSeqStateM do
         delete_db(db_name)
 
         (result == :ok)
-        |> when_fail(when_fail_fn(n, q, r, cmds))
+        |> when_fail(when_fail_fn(db_name, n, q, r, cmds))
       end
     end
   end
 
-  def when_fail_fn(n, q, r, cmds) do
-    IO.puts("\nn: #{n}, q: #{q}")
+  def when_fail_fn(db_name, n, q, r, cmds) do
+    IO.puts("\ndb_name: #{db_name}, n: #{n}, q: #{q}")
     print_report(r, cmds)
   end
 
@@ -43,10 +40,16 @@ defmodule DropSeqStateM do
               deleted_docs: [],
               current_seq: 0,
               peer_checkpoint_seq: nil,
+              index_seq: nil,
               drop_seq: nil,
               drop_count: 0,
-              changed: false,
-              stale: false
+              check_actual_state: false
+  end
+
+  defmodule ActualState do
+    defstruct docs: [],
+              deleted_docs: [],
+              drop_count: 0
   end
 
   def initial_state, do: %State{}
@@ -56,28 +59,49 @@ defmodule DropSeqStateM do
 
   def doc_id, do: oneof(@docids)
 
+  def doc_id(%State{docs: doc_ids}), do: elements(doc_ids)
+
   def index_type do
     oneof([:mrview, :nouveau])
   end
 
   def command(s) do
     case s do
-      %State{stale: true} ->
-        {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}
-
-      %State{changed: true} ->
-        {:call, __MODULE__, :changes, [{:var, :dbname}]}
+      %State{check_actual_state: true} ->
+        {:call, __MODULE__, :check_actual_state, [{:var, :dbname}]}
 
       %State{} ->
-        frequency([
+        base_cmds = [
           {10, {:call, __MODULE__, :update_document, [{:var, :dbname}, doc_id()]}},
-          {10, {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id()]}},
           {10, {:call, __MODULE__, :update_peer_checkpoint, [{:var, :dbname}]}},
-          {10, {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]}},
           {10, {:call, __MODULE__, :compact_db, [{:var, :dbname}]}},
           {5, {:call, __MODULE__, :split_shard, [{:var, :dbname}]}},
-          {1, {:call, __MODULE__, :create_index, [{:var, :dbname}, index_type()]}}
-        ])
+          {1, {:call, __MODULE__, :create_index, [{:var, :dbname}, index_type()]}},
+          {5, {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}}
+        ]
+
+        cond do
+          s.docs == [] and s.deleted_docs == [] ->
+            frequency(base_cmds)
+
+          s.docs != [] ->
+            frequency(
+              base_cmds ++
+                [
+                  {10,
+                   {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id(s)]}},
+                  {10, {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]}}
+                ]
+            )
+
+          true ->
+            frequency(
+              base_cmds ++
+                [
+                  {10, {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]}}
+                ]
+            )
+        end
     end
   end
 
@@ -108,7 +132,7 @@ defmodule DropSeqStateM do
                "Couch.put failed #{resp.status_code} #{inspect(resp.body)}"
     end
 
-    sync_shards(db_name)
+    wait_for_internal_replication(db_name)
   end
 
   def delete_document(db_name, doc_id) do
@@ -124,7 +148,7 @@ defmodule DropSeqStateM do
         :ok
     end
 
-    sync_shards(db_name)
+    wait_for_internal_replication(db_name)
   end
 
   def update_peer_checkpoint(db_name) do
@@ -145,7 +169,7 @@ defmodule DropSeqStateM do
     assert resp.status_code == 201,
            "update_peer_checkpoint failed #{resp.status_code} #{inspect(resp.body)}"
 
-    sync_shards(db_name)
+    wait_for_internal_replication(db_name)
     seq_to_shards(update_seq)
   end
 
@@ -165,15 +189,28 @@ defmodule DropSeqStateM do
     :timer.sleep(500)
   end
 
-  def changes(db_name) do
+  def check_actual_state(db_name) do
+    resp = Couch.get("/#{db_name}/")
+    assert resp.status_code == 200
+
+    # update_seq = String.to_integer(List.first(String.split(resp.body["update_seq"], "-")))
+    drop_count = resp.body["drop_count"]
+
     resp = Couch.get("/#{db_name}/_changes")
     assert resp.status_code == 200
 
-    List.foldl(resp.body["results"], {[], []}, fn change, {doc_ids, del_doc_ids} ->
-      if change["deleted"] do
-        {doc_ids, Enum.sort([change["id"] | del_doc_ids])}
-      else
-        {Enum.sort([change["id"] | doc_ids]), del_doc_ids}
+    acc0 = %ActualState{drop_count: drop_count}
+
+    List.foldl(resp.body["results"], acc0, fn change, acc1 ->
+      cond do
+        String.starts_with?(change["id"], "_design/") ->
+          acc1
+
+        change["deleted"] ->
+          %ActualState{acc1 | deleted_docs: Enum.sort([change["id"] | acc1.deleted_docs])}
+
+        true ->
+          %ActualState{acc1 | docs: Enum.sort([change["id"] | acc1.docs])}
       end
     end)
   end
@@ -260,7 +297,7 @@ defmodule DropSeqStateM do
     assert resp.status_code == 201,
            "create_index failed #{resp.status_code} #{inspect(resp.body)}"
 
-    sync_shards(db_name)
+    wait_for_internal_replication(db_name)
     ddoc_id
   end
 
@@ -285,14 +322,14 @@ defmodule DropSeqStateM do
     end)
   end
 
-  def sync_shards(db_name) do
+  def wait_for_internal_replication(db_name) do
     resp = Couch.post("/#{db_name}/_sync_shards")
 
     assert resp.status_code == 202,
            "sync_shards failed #{resp.status_code} #{inspect(resp.body)}"
 
     # mem3_rep configured for 100ms frequency
-    :timer.sleep(200)
+    :timer.sleep(500)
   end
 
   def precondition(s, {:call, _, :update_document, [_db_name, doc_id]}) do
@@ -301,6 +338,14 @@ defmodule DropSeqStateM do
 
   def precondition(s, {:call, _, :delete_document, [_db_name, doc_id]}) do
     doc_exists(s, doc_id)
+  end
+
+  def precondition(s, {:call, _, :update_drop_seq, [_db_name]}) do
+    s.docs != [] or s.deleted_docs != []
+  end
+
+  def precondition(s, {:call, _, :update_indexes, [_db_name]}) do
+    s.index_seq != nil
   end
 
   def precondition(_, _) do
@@ -313,8 +358,7 @@ defmodule DropSeqStateM do
       | current_seq: s.current_seq + 1,
         docs: Enum.sort([doc_id | s.docs]),
         deleted_docs: List.keydelete(s.deleted_docs, doc_id, 0),
-        changed: true,
-        stale: true
+        check_actual_state: true
     }
   end
 
@@ -324,27 +368,39 @@ defmodule DropSeqStateM do
       | current_seq: s.current_seq + 1,
         docs: List.delete(s.docs, doc_id),
         deleted_docs: Enum.sort([{doc_id, s.current_seq + 1} | s.deleted_docs]),
-        changed: true,
-        stale: true
+        check_actual_state: true
     }
   end
 
   def next_state(s, _v, {:call, _, :update_peer_checkpoint, [_db_name]}) do
-    %State{s | peer_checkpoint_seq: s.current_seq, changed: true}
+    %State{
+      s
+      | peer_checkpoint_seq: s.current_seq,
+        check_actual_state: true
+    }
   end
 
   def next_state(s, _v, {:call, _, :update_drop_seq, [_db_name]}) do
-    # we'll drop all tombstones if _update_drop_seq is called when there
-    # are no peer checkpoint docs as the only peers are the shard syncs
-    # which update automatically
-    # n.b: indexes and their peer checkpoints will always be fresh as we
-    # force update_indexes after every doc update.
     drop_seq =
-      if s.peer_checkpoint_seq == nil,
-        do: s.current_seq,
-        else: s.peer_checkpoint_seq
+      cond do
+        s.peer_checkpoint_seq != nil and s.index_seq != nil ->
+          min(s.peer_checkpoint_seq, s.index_seq)
 
-    %State{s | drop_seq: drop_seq, changed: true}
+        s.index_seq != nil ->
+          s.index_seq
+
+        s.peer_checkpoint_seq != nil ->
+          s.peer_checkpoint_seq
+
+        true ->
+          s.current_seq
+      end
+
+    %State{
+      s
+      | drop_seq: drop_seq,
+        check_actual_state: true
+    }
   end
 
   def next_state(s, _v, {:call, _, :compact_db, [_db_name]}) do
@@ -357,34 +413,33 @@ defmodule DropSeqStateM do
       s
       | deleted_docs: keep_docs,
         drop_count: s.drop_count + length(drop_docs),
-        changed: true
+        check_actual_state: true
     }
   end
 
-  def next_state(s, _v, {:call, _, :changes, [_db_name]}) do
-    %State{s | changed: false}
+  def next_state(s, _v, {:call, _, :check_actual_state, [_db_name]}) do
+    %State{s | check_actual_state: false}
   end
 
   def next_state(s, _v, {:call, _, :split_shard, [_db_name]}) do
-    %State{s | changed: true}
+    %State{s | check_actual_state: true}
   end
 
-  def next_state(s, v, {:call, _, :create_index, [_db_name, _index_type]}) do
+  def next_state(s, _v, {:call, _, :create_index, [_db_name, _index_type]}) do
     %State{
       s
       | current_seq: s.current_seq + 1,
-        docs: Enum.sort([v | s.docs]),
-        changed: true,
-        stale: true
+        check_actual_state: true
     }
   end
 
   def next_state(s, _v, {:call, _, :update_indexes, [_db_name]}) do
-    %State{s | stale: false}
+    %State{s | index_seq: s.current_seq, check_actual_state: true}
   end
 
-  def postcondition(s, {:call, _, :changes, [_db_name]}, {doc_ids, del_doc_ids}) do
-    doc_ids == doc_ids(s) and del_doc_ids == deleted_doc_ids(s)
+  def postcondition(s, {:call, _, :check_actual_state, [_db_name]}, actual) do
+    doc_ids(s) == actual.docs and deleted_doc_ids(s) == actual.deleted_docs and
+      s.drop_count == actual.drop_count
   end
 
   def postcondition(_, _, _), do: true

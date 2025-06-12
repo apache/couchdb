@@ -121,7 +121,7 @@ get_partition_info(DbName, Partition) ->
     fabric_db_partition_info:go(dbname(DbName), Partition).
 
 -spec update_drop_seq(dbname()) ->
-    {ok, [{node(), binary(), non_neg_integer()}]}.
+    {ok, [{node(), binary(), non_neg_integer()}]} | {error, term()}.
 update_drop_seq(DbName) ->
     fabric_drop_seq:go(dbname(DbName)).
 

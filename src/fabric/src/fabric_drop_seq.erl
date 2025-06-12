@@ -37,67 +37,77 @@
 
 go(DbName) ->
     Shards0 = mem3:shards(DbName),
-    #{
-        uuid_map := UuidMap,
-        peer_checkpoints := PeerCheckpoints,
-        shard_sync_history := ShardSyncHistory
-    } = gather_drop_seq_info(
-        Shards0
-    ),
-    {Shards1, DropSeqs} = go_int(
-        Shards0, UuidMap, PeerCheckpoints, ShardSyncHistory
-    ),
-    Workers = lists:filtermap(
-        fun(Shard) ->
-            #shard{range = Range, node = Node, name = ShardName} = Shard,
-            case maps:find({Range, Node}, DropSeqs) of
-                {ok, {_UuidPrefix, 0}} ->
-                    false;
-                {ok, {UuidPrefix, DropSeq}} ->
-                    Ref = rexi:cast(
-                        Node,
-                        {fabric_rpc, set_drop_seq, [ShardName, UuidPrefix, DropSeq, [?ADMIN_CTX]]}
-                    ),
-                    {true, Shard#shard{ref = Ref, opts = [{drop_seq, DropSeq}]}};
-                error ->
-                    false
-            end
-        end,
-        Shards1
-    ),
-    if
-        Workers == [] ->
-            %% nothing to do
-            {ok, #{}};
-        true ->
-            RexiMon = fabric_util:create_monitors(Shards1),
-            Acc0 = {#{}, length(Workers) - 1},
-            try
-                case fabric_util:recv(Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0) of
-                    {ok, Results} ->
-                        {ok, Results};
-                    {timeout, {WorkersDict, _}} ->
-                        DefunctWorkers = fabric_util:remove_done_workers(
-                            WorkersDict,
-                            nil
-                        ),
-                        fabric_util:log_timeout(
-                            DefunctWorkers,
-                            "set_drop_seq"
-                        ),
-                        {error, timeout};
-                    {error, Reason} ->
-                        {error, Reason}
-                end
-            after
-                rexi_monitor:stop(RexiMon)
+    case gather_drop_seq_info(Shards0) of
+        {error, Reason} ->
+            {error, Reason};
+        {ok, #{
+            uuid_map := UuidMap,
+            peer_checkpoints := PeerCheckpoints,
+            shard_sync_history := ShardSyncHistory
+        }} ->
+            {Shards1, DropSeqs} = go_int(
+                Shards0, UuidMap, PeerCheckpoints, ShardSyncHistory
+            ),
+            Workers = lists:filtermap(
+                fun(Shard) ->
+                    #shard{range = Range, node = Node, name = ShardName} = Shard,
+                    case maps:find({Range, Node}, DropSeqs) of
+                        {ok, {_UuidPrefix, 0}} ->
+                            false;
+                        {ok, {UuidPrefix, DropSeq}} ->
+                            Ref = rexi:cast(
+                                Node,
+                                {fabric_rpc, set_drop_seq, [
+                                    ShardName, UuidPrefix, DropSeq, [?ADMIN_CTX]
+                                ]}
+                            ),
+                            {true, Shard#shard{ref = Ref, opts = [{drop_seq, DropSeq}]}};
+                        error ->
+                            false
+                    end
+                end,
+                Shards1
+            ),
+            if
+                Workers == [] ->
+                    %% nothing to do
+                    {ok, #{}};
+                true ->
+                    RexiMon = fabric_util:create_monitors(Shards1),
+                    Acc0 = {#{}, length(Workers) - 1},
+                    try
+                        case
+                            fabric_util:recv(
+                                Workers, #shard.ref, fun handle_set_drop_seq_reply/3, Acc0
+                            )
+                        of
+                            {ok, Results} ->
+                                {ok, Results};
+                            {timeout, {WorkersDict, _}} ->
+                                DefunctWorkers = fabric_util:remove_done_workers(
+                                    WorkersDict,
+                                    nil
+                                ),
+                                fabric_util:log_timeout(
+                                    DefunctWorkers,
+                                    "set_drop_seq"
+                                ),
+                                {error, timeout};
+                            {error, Reason} ->
+                                {error, Reason}
+                        end
+                    after
+                        rexi_monitor:stop(RexiMon)
+                    end
             end
     end.
 
-go_int(Shards0, UuidFetcher, PeerCheckpoints0, ShardSyncHistory) ->
+go_int(
+    Shards0, UuidMap, PeerCheckpoints0, ShardSyncHistory
+) ->
     Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
     PeerCheckpoints1 = crossref(PeerCheckpoints0, ShardSyncHistory),
-    PeerCheckpoints2 = substitute_splits(Shards1, UuidFetcher, PeerCheckpoints1),
+    PeerCheckpoints2 = substitute_splits(Shards1, UuidMap, PeerCheckpoints1),
     DropSeqs = calculate_drop_seqs(PeerCheckpoints2, ShardSyncHistory),
     {Shards1, DropSeqs}.
 
@@ -136,25 +146,38 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
             Others = maps:filter(
                 fun({R, _S, T}, _History) -> R == Range andalso T /= Node end, ShardSyncHistory
             ),
-            maps:fold(
-                fun({R, _S, T}, History, Acc2) ->
-                    case
-                        lists:search(
-                            fun({SU, SS, _TU, _TS}) ->
-                                uuids_match([Uuid, SU]) andalso SS =< Seq
-                            end,
-                            History
-                        )
-                    of
-                        {value, {_SU, _SS, TU, TS}} ->
-                            maps:merge_with(fun merge_peers/3, #{{R, T} => {TU, TS}}, Acc2);
-                        false ->
-                            Acc2
-                    end
-                end,
-                Acc1,
-                Others
-            )
+            if
+                Seq == 0 ->
+                    %% propogate any 0 checkpoint as they would not be
+                    %% matched in shard sync history.
+                    maps:fold(
+                        fun({R, _S, T}, _History, Acc2) ->
+                            maps:merge_with(fun merge_peers/3, #{{R, T} => {<<>>, 0}}, Acc2)
+                        end,
+                        Acc1,
+                        Others
+                    );
+                true ->
+                    maps:fold(
+                        fun({R, _S, T}, History, Acc2) ->
+                            case
+                                lists:search(
+                                    fun({SU, SS, _TU, _TS}) ->
+                                        uuids_match([Uuid, SU]) andalso SS =< Seq
+                                    end,
+                                    History
+                                )
+                            of
+                                {value, {_SU, _SS, TU, TS}} ->
+                                    maps:merge_with(fun merge_peers/3, #{{R, T} => {TU, TS}}, Acc2);
+                                false ->
+                                    Acc2
+                            end
+                        end,
+                        Acc1,
+                        Others
+                    )
+            end
         end,
         PeerCheckpoints0,
         PeerCheckpoints0
@@ -165,25 +188,7 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
     %% crossreferences may be possible.
     if
         PeerCheckpoints0 == PeerCheckpoints1 ->
-            %% insert {<<>>, 0} for any missing crossref so that shard sync
-            %% history is subordinate.
-            maps:fold(
-                fun({Range, Node}, {_Uuid, _Seq}, Acc1) ->
-                    Others = maps:filter(
-                        fun({R, _S, T}, _History) -> R == Range andalso T /= Node end,
-                        ShardSyncHistory
-                    ),
-                    maps:fold(
-                        fun({R, _S, T}, _History, Acc3) ->
-                            maps:merge(#{{R, T} => {<<>>, 0}}, Acc3)
-                        end,
-                        Acc1,
-                        Others
-                    )
-                end,
-                PeerCheckpoints1,
-                PeerCheckpoints1
-            );
+            PeerCheckpoints1;
         true ->
             crossref(PeerCheckpoints1, ShardSyncHistory)
     end.
@@ -202,7 +207,8 @@ fully_replicated_shards_only(Shards, ShardSyncHistory) ->
         Shards
     ).
 
--spec gather_drop_seq_info(Shards :: [#shard{}]) -> {peer_checkpoints(), shard_sync_history()}.
+-spec gather_drop_seq_info(Shards :: [#shard{}]) ->
+    {ok, peer_checkpoints(), shard_sync_history()} | {error, term()}.
 gather_drop_seq_info([#shard{} | _] = Shards) ->
     Workers = fabric_util:submit_jobs(
         Shards, ?MODULE, gather_drop_seq_info_rpc, []
@@ -221,7 +227,7 @@ gather_drop_seq_info([#shard{} | _] = Shards) ->
             )
         of
             {ok, Result} ->
-                Result;
+                {ok, Result};
             {timeout, _State} ->
                 {error, timeout};
             {error, Reason} ->
@@ -237,13 +243,16 @@ gather_drop_seq_info_rpc(DbName) ->
         {ok, Db} ->
             try
                 Uuid = couch_db:get_uuid(Db),
-                Acc0 = {#{}, #{}},
+                Seq = couch_db:get_committed_update_seq(Db),
+                Range = mem3:range(DbName),
+                Acc0 = {#{{Range, node()} => {Uuid, Seq}}, #{}},
                 {ok, {PeerCheckpoints, ShardSyncHistory}} = couch_db:fold_local_docs(
                     Db, fun gather_drop_seq_info_fun/2, Acc0, []
                 ),
                 rexi:reply(
                     {ok, #{
                         uuid => Uuid,
+                        seq => Seq,
                         peer_checkpoints => PeerCheckpoints,
                         shard_sync_history => ShardSyncHistory
                     }}
@@ -353,7 +362,7 @@ decode_seq(OpaqueSeq) ->
                 is_integer(Seq),
                 S >= 0,
                 E > S,
-                Seq > 0,
+                Seq >= 0,
                 is_binary(Uuid),
                 is_atom(Node)
             ->
@@ -379,12 +388,12 @@ latest_shard_sync_checkpoints(ShardSyncHistory) ->
 -spec substitute_splits([#shard{}], uuid_map(), peer_checkpoints()) -> peer_checkpoints().
 substitute_splits(Shards, UuidMap, PeerCheckpoints) ->
     maps:fold(
-        fun({[B1, E1], Node}, {Uuid, Seq}, Acc) ->
+        fun({[PS, PE], Node}, {Uuid, Seq}, Acc) ->
             ShardsInRange = [
                 S
-             || #shard{range = [B2, E2]} = S <- Shards,
+             || #shard{range = [SS, SE]} = S <- Shards,
                 Node == S#shard.node,
-                B2 >= B1 andalso E2 =< E1
+                SS >= PS andalso SE =< PE
             ],
             %% lookup uuid from map if substituted
             AsMap = maps:from_list(
@@ -392,7 +401,7 @@ substitute_splits(Shards, UuidMap, PeerCheckpoints) ->
                     fun(#shard{} = Shard) ->
                         Key = {Shard#shard.range, Shard#shard.node},
                         if
-                            [B1, E1] == Shard#shard.range ->
+                            [PS, PE] == Shard#shard.range ->
                                 {true, {Key, {Uuid, Seq}}};
                             true ->
                                 case maps:find(Key, UuidMap) of
@@ -711,6 +720,12 @@ fully_replicated_shards_only_test_() ->
         #shard{node = node2, range = Range2}
     ],
     [
+        %% n=1 edge case
+        ?_assertEqual(
+            [hd(Shards)],
+            fully_replicated_shards_only([hd(Shards)], #{})
+        ),
+
         %% empty history means no fully replicated shards
         ?_assertEqual([], fully_replicated_shards_only(Shards, #{})),
         %% some but not all peers
