@@ -157,18 +157,61 @@ group_by(KeyFun, ValFun, AggFun, Limit) ->
         {limit, Acc}
     end.
 
-%% Sorts largest first
-sorted(Map) when is_map(Map) ->
-    lists:sort(fun({_K1, A}, {_K2, B}) -> B < A end, maps:to_list(Map)).
+%%
+%% Auxiliary functions to calculate topK
+%%
 
-shortened(L) ->
-    lists:sublist(L, 10).
+-record(topK, {
+    % we store ordered elements in ascending order
+    seq = [] :: list(pos_integer()),
+    % we rely on erlang sorting order where `number < atom`
+    min = infinite  :: infinite | pos_integer(),
+    max = 0 :: pos_integer(),
+    size = 0 :: non_neg_integer(),
+    % capacity cannot be less than 1
+    capacity = 1 :: pos_integer()
+}).
+
+new_topK(K) when K >= 1 ->
+    #topK{capacity = K}.
+
+% when we are at capacity
+% don't bother adding the value since it is less than what we already saw
+update_topK(_Key, Value, #topK{size = S, capacity = S, min = Min} = Top) when Value < Min ->
+    Top#topK{min = Value};
+% when we are at capacity evict smallest value
+update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Seq} = Top) when Value > Max ->
+    % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
+    [_ | Truncated] = Seq,
+    Top#topK{max = Value, seq = lists:keysort(2, [{Key, Value} | Truncated])};
+% when we are at capacity and value is in between min and max evict smallest value
+update_topK(Key, Value, #topK{size = S, capacity = S, seq = Seq} = Top) ->
+    % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
+    [_ | Truncated] = Seq,
+    Top#topK{seq = lists:keysort(2, [{Key, Value} | Truncated])};
+update_topK(Key, Value, #topK{size = S, min = Min, seq = Seq} = Top) when Value < Min ->
+    Top#topK{size = S + 1, min = Value, seq = lists:keysort(2, [{Key, Value} | Seq])};
+update_topK(Key, Value, #topK{size = S, max = Max, seq = Seq} = Top) when Value > Max ->
+    Top#topK{size = S + 1, max = Value, seq = lists:keysort(2, [{Key, Value} | Seq])};
+update_topK(Key, Value, #topK{size = S, seq = Seq} = Top) ->
+    Top#topK{size = S + 1, seq = lists:keysort(2, [{Key, Value} | Seq])}.
+
+get_topK(#topK{seq = S}) ->
+    lists:reverse(S).
+
+topK(Results, K) ->
+    TopK = maps:fold(fun update_topK/3, new_topK(K), Results),
+    get_topK(TopK).
 
 %% eg: sorted_by([username, dbname, mfa], ioq_calls)
 %% eg: sorted_by([dbname, mfa], doc_reads)
-sorted_by(KeyFun) -> shortened(sorted(count_by(KeyFun))).
-sorted_by(KeyFun, ValFun) -> shortened(sorted(group_by(KeyFun, ValFun))).
-sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, AggFun))).
+sorted_by(KeyFun) -> topK(count_by(KeyFun), 10).
+sorted_by(KeyFun, ValFun) ->
+    {Result, Acc} = group_by(KeyFun, ValFun),
+    {Result, topK(Acc, 10)}.
+sorted_by(KeyFun, ValFun, AggFun) ->
+    {Result, Acc} = group_by(KeyFun, ValFun, AggFun),
+    {Result, topK(Acc, 10)}.
 
 to_json_list(List) when is_list(List) ->
     lists:map(fun csrt_util:to_json/1, List).
