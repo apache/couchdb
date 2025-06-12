@@ -129,12 +129,14 @@ open(Db, State0) ->
                     NewSt = init_and_upgrade_state(Db, Fd, State, Header),
                     ok = commit(NewSt),
                     ensure_local_purge_doc(Db, NewSt),
+                    ensure_peer_checkpoint_doc(NewSt),
                     {ok, NewSt};
                 % end of upgrade code for <= 2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
                     NewSt = init_and_upgrade_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
+                    ensure_peer_checkpoint_doc(NewSt),
                     check_collator_versions(DbName, NewSt),
                     {ok, NewSt};
                 {ok, {WrongSig, _}} ->
@@ -144,6 +146,7 @@ open(Db, State0) ->
                     ),
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
+                    ensure_peer_checkpoint_doc(NewSt),
                     {ok, NewSt};
                 {ok, Else} ->
                     couch_log:error(
@@ -152,10 +155,12 @@ open(Db, State0) ->
                     ),
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
+                    ensure_peer_checkpoint_doc(NewSt),
                     {ok, NewSt};
                 no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
+                    ensure_peer_checkpoint_doc(NewSt),
                     {ok, NewSt}
             end;
         {error, Reason} = Error ->
@@ -210,7 +215,17 @@ finish_update(State) ->
 
 commit(State) ->
     Header = {State#mrst.sig, couch_mrview_util:make_header(State)},
-    couch_file:write_header(State#mrst.fd, Header).
+    ok = couch_file:sync(State#mrst.fd),
+    ok = couch_file:write_header(State#mrst.fd, Header),
+    ok = couch_file:sync(State#mrst.fd),
+    fabric_drop_seq:update_peer_checkpoint_doc(
+        State#mrst.db_name,
+        <<"mrview">>,
+        State#mrst.idx_name,
+        fabric_drop_seq:peer_id_from_sig(State#mrst.db_name, couch_util:to_hex_bin(State#mrst.sig)),
+        State#mrst.update_seq
+    ),
+    ok.
 
 compact(Db, State, Opts) ->
     couch_mrview_compactor:compact(Db, State, Opts).
@@ -294,6 +309,15 @@ ensure_local_purge_doc(Db, #mrst{} = State) ->
         {ok, _} ->
             ok
     end.
+
+ensure_peer_checkpoint_doc(#mrst{} = State) ->
+    fabric_drop_seq:create_peer_checkpoint_doc_if_missing(
+        State#mrst.db_name,
+        <<"mrview">>,
+        State#mrst.idx_name,
+        fabric_drop_seq:peer_id_from_sig(State#mrst.db_name, couch_util:to_hex_bin(State#mrst.sig)),
+        State#mrst.update_seq
+    ).
 
 create_local_purge_doc(Db, State) ->
     PurgeSeq = couch_db:get_purge_seq(Db),

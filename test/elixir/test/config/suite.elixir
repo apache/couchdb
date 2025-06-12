@@ -211,6 +211,11 @@
     "design doc path",
     "design doc path with slash in db name"
   ],
+  "DropSeqTest": [
+    "peer checkpoint - mrview",
+    "peer checkpoint - custom",
+    "peer checkpoint - shard split"
+  ],
   "ErlangViewsTest": [
     "Erlang map function",
     "Erlang reduce function",

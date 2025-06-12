@@ -87,6 +87,13 @@ update(#index{} = Index) ->
                 {ok, PurgeAcc1} = purge_index(ConnPid, Db, Index, PurgeAcc0),
 
                 NewCurSeq = couch_db:get_update_seq(Db),
+                fabric_drop_seq:create_peer_checkpoint_doc_if_missing(
+                    Index#index.dbname,
+                    <<"nouveau">>,
+                    <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
+                    fabric_drop_seq:peer_id_from_sig(Index#index.dbname, Index#index.sig),
+                    NewCurSeq
+                ),
                 Proc = get_os_process(Index#index.def_lang),
                 try
                     true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
@@ -107,6 +114,16 @@ update(#index{} = Index) ->
                         Db, Acc0#acc.update_seq, fun load_docs/2, Acc0, []
                     ),
                     nouveau_api:drain_async_responses(Acc1#acc.reqids, 0),
+                    {ok, #{<<"committed_update_seq">> := CommittedUpdateSeq}} = nouveau_api:index_info(
+                        Index
+                    ),
+                    fabric_drop_seq:update_peer_checkpoint_doc(
+                        Index#index.dbname,
+                        <<"nouveau">>,
+                        <<(Index#index.ddoc_id)/binary, "/", (Index#index.name)/binary>>,
+                        fabric_drop_seq:peer_id_from_sig(Index#index.dbname, Index#index.sig),
+                        CommittedUpdateSeq
+                    ),
                     exit(nouveau_api:set_update_seq(ConnPid, Index, Acc1#acc.update_seq, NewCurSeq))
                 after
                     ibrowse:stop_worker_process(ConnPid),

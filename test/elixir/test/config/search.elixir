@@ -1,4 +1,7 @@
 %{
+  "DropSeqTest": [
+    "peer checkpoint - search"
+  ],
   "PartitionSearchTest": [
     "Cannot do global query with partition view",
     "Cannot do partition query with global search ddoc",

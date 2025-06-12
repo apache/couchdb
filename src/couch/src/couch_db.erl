@@ -42,6 +42,7 @@
     get_db_info/1,
     get_partition_info/2,
     get_del_doc_count/1,
+    get_drop_count/1,
     get_doc_count/1,
     get_epochs/1,
     get_filepath/1,
@@ -50,6 +51,7 @@
     get_revs_limit/1,
     get_security/1,
     get_update_seq/1,
+    get_drop_seq/1,
     get_user_ctx/1,
     get_uuid/1,
     get_purge_seq/1,
@@ -66,6 +68,7 @@
     set_purge_infos_limit/2,
     set_security/2,
     set_user_ctx/2,
+    set_drop_seq/3,
 
     load_validation_funs/1,
     reload_validation_funs/1,
@@ -554,6 +557,9 @@ get_committed_update_seq(#db{committed_update_seq = Seq}) ->
 get_update_seq(#db{} = Db) ->
     couch_db_engine:get_update_seq(Db).
 
+get_drop_seq(#db{} = Db) ->
+    couch_db_engine:get_drop_seq(Db).
+
 get_user_ctx(#db{user_ctx = UserCtx}) ->
     UserCtx;
 get_user_ctx(?OLD_DB_REC = Db) ->
@@ -573,6 +579,9 @@ get_pid(#db{main_pid = Pid}) ->
 
 get_del_doc_count(Db) ->
     {ok, couch_db_engine:get_del_doc_count(Db)}.
+
+get_drop_count(Db) ->
+    {ok, couch_db_engine:get_drop_count(Db)}.
 
 get_doc_count(Db) ->
     {ok, couch_db_engine:get_doc_count(Db)}.
@@ -614,6 +623,7 @@ get_db_info(Db) ->
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
+    {ok, DropCount} = get_drop_count(Db),
     SizeInfo = couch_db_engine:get_size_info(Db),
     DiskVersion = couch_db_engine:get_disk_version(Db),
     Uuid =
@@ -636,6 +646,7 @@ get_db_info(Db) ->
         {engine, couch_db_engine:get_engine(Db)},
         {doc_count, DocCount},
         {doc_del_count, DelDocCount},
+        {drop_count, DropCount},
         {update_seq, get_update_seq(Db)},
         {purge_seq, couch_db_engine:get_purge_seq(Db)},
         {compact_running, Compactor /= nil},
@@ -795,6 +806,10 @@ set_security(_, _) ->
 
 set_user_ctx(#db{} = Db, UserCtx) ->
     {ok, Db#db{user_ctx = UserCtx}}.
+
+set_drop_seq(#db{main_pid = Pid} = Db, UuidPrefix, DropSeq) ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {set_drop_seq, UuidPrefix, DropSeq}).
 
 validate_security_object(SecProps) ->
     Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),

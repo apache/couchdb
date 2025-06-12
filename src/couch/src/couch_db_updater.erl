@@ -92,6 +92,15 @@ handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
     ok = couch_server:db_updated(Db2),
     {reply, ok, Db2};
+handle_call({set_drop_seq, UuidPrefix, DropSeq}, _From, Db) ->
+    case couch_db_engine:set_drop_seq(Db, UuidPrefix, DropSeq) of
+        {ok, Db2} ->
+            Db3 = commit_data(Db2),
+            ok = couch_server:db_updated(Db3),
+            {reply, ok, Db3};
+        {error, Reason} ->
+            {reply, {error, Reason}, Db}
+    end;
 handle_call({purge_docs, [], _}, _From, Db) ->
     {reply, {ok, []}, Db};
 handle_call({purge_docs, PurgeReqs0, Options}, _From, Db) ->
