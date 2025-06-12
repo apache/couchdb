@@ -267,6 +267,13 @@ def get_args_parser():
         default=None,
         help="Use TCP for specified node when TLS distribution is enabled",
     )
+    parser.add_option(
+        "--no-auto",
+        dest="no_auto",
+        default=False,
+        action="store_true",
+        help="Disable auto-indexing and auto-compaction",
+    )
     return parser
 
 
@@ -304,6 +311,7 @@ def setup_context(opts, args):
         "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
         "no_tls": opts.no_tls,
+        "no_auto": opts.no_auto,
     }
 
 
@@ -856,6 +864,10 @@ def hack_vm_args(ctx, node, contents):
     if ctx["erlang_cookie"]:
         contents += f"""
 -setcookie {ctx["erlang_cookie"]}
+"""
+    if ctx["no_auto"]:
+        contents += """
+-kernel permissions '[{smoosh,false},{ken,false}]'
 """
     return contents
 

@@ -261,7 +261,7 @@ elixir-cluster-with-quorum: elixir-init devclean
 .PHONY: elixir-cluster
 elixir-cluster: export MIX_ENV=integration
 elixir-cluster: elixir-init devclean
-	@dev/run -n 3 -q -a adm:pass --with-nouveau \
+	@dev/run -n 3 -q -a adm:pass --with-nouveau --no-auto \
 		--no-eval 'mix test --trace --only with_cluster $(EXUNIT_OPTS)'
 
 .PHONY: elixir
