@@ -160,7 +160,7 @@ create_context(Type, Nonce) ->
         PidRef
     catch
         _:_ ->
-            csrt_server:destroy_resource(Rctx),
+            csrt_server:destroy_resource(PidRef),
             %% destroy_context(PidRef) clears the tracker too
             destroy_context(PidRef),
             false
