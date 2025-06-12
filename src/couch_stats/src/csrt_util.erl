@@ -291,7 +291,7 @@ field(changes_returned, #rctx{changes_returned = Val}) ->
 field(ioq_calls, #rctx{ioq_calls = Val}) ->
     Val.
 
--spec add_delta(T :: term(), Delta :: maybe_delta()) -> term().
+-spec add_delta(T :: term(), Delta :: tagged_delta()) -> term_delta().
 add_delta(T, {delta, undefined}) ->
     T;
 add_delta(T, {delta, _} = Delta) ->
@@ -299,7 +299,7 @@ add_delta(T, {delta, _} = Delta) ->
 add_delta(T, _Delta) ->
     T.
 
--spec extract_delta(T :: term()) -> {term(), maybe_delta()}.
+-spec extract_delta(T :: term_delta()) -> {term(), maybe_delta()}.
 extract_delta({Msg, {delta, Delta}}) ->
     {Msg, Delta};
 extract_delta(Msg) ->
@@ -309,7 +309,7 @@ extract_delta(Msg) ->
 get_delta(PidRef) ->
     {delta, make_delta(PidRef)}.
 
--spec maybe_add_delta(T :: term()) -> term().
+-spec maybe_add_delta(T :: term()) -> term_delta().
 maybe_add_delta(T) ->
     case is_enabled() of
         false ->
@@ -320,7 +320,7 @@ maybe_add_delta(T) ->
 
 %% Allow for externally provided Delta in error handling scenarios
 %% eg in cases like rexi_server:notify_caller/3
--spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term().
+-spec maybe_add_delta(T :: term(), Delta :: tagged_delta()) -> term_delta().
 maybe_add_delta(T, Delta) ->
     case is_enabled() of
         false ->
@@ -329,13 +329,9 @@ maybe_add_delta(T, Delta) ->
             maybe_add_delta_int(T, Delta)
     end.
 
--spec maybe_add_delta_int(T :: term(), Delta :: maybe_delta()) -> term().
-maybe_add_delta_int(T, undefined) ->
-    T;
+-spec maybe_add_delta_int(T :: term(), Delta :: tagged_delta()) -> term_delta().
 maybe_add_delta_int(T, {delta, undefined}) ->
     T;
-maybe_add_delta_int(T, Delta) when is_map(Delta) ->
-    maybe_add_delta_int(T, {delta, Delta});
 maybe_add_delta_int(T, {delta, _} = Delta) ->
     add_delta(T, Delta).
 
@@ -379,11 +375,11 @@ get_delta_a() ->
 put_delta_a(TA) ->
     erlang:put(?DELTA_TA, TA).
 
--spec get_updated_at() -> maybe_rctx().
+-spec get_updated_at() -> maybe_integer().
 get_updated_at() ->
     erlang:get(?LAST_UPDATED).
 
--spec put_updated_at(_Rctx :: rctx()) -> maybe_rctx().
+-spec put_updated_at(Updated :: rctx() | integer()) -> maybe_integer().
 put_updated_at(#rctx{updated_at=Updated}) ->
     put_updated_at(Updated);
 put_updated_at(Updated) when is_integer(Updated) ->

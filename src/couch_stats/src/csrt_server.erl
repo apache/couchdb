@@ -168,7 +168,7 @@ get_rctx_stat_field(Field) ->
 %% 4-arity version to be exposed to pass an empty base updates list. Isolating
 %% this logic means the final arity functions operate independently of any
 %% local pdict values.
--spec make_base_counter_updates() -> [] | [{rctx_field(), integer()}].
+-spec make_base_counter_updates() -> counter_updates_list().
 make_base_counter_updates() ->
     case csrt_util:get_updated_at() of
         undefined ->

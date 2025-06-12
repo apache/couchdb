@@ -163,6 +163,7 @@
 -type delta() :: map().
 -type maybe_delta() :: delta() | undefined.
 -type tagged_delta() :: {delta, maybe_delta()}.
+-type term_delta() :: term() | {term(), tagged_delta()}.
 
 -type matcher_name() :: string().
 -type matcher() :: {ets:match_spec(), ets:comp_match_spec()}.
@@ -170,3 +171,12 @@
 -type matcher_matches() :: #{matcher_name() => rctxs()} | #{}.
 -type maybe_matcher() :: matcher() | undefined.
 -type maybe_matchers() :: matchers() | undefined.
+
+-type maybe_integer() :: integer() | undefined.
+%% This is a little awkward to type, it's a list of ets:update_counter UpdateOp's
+%% where ets types the updates as `UpdateOp = {Pos, Incr}`. We can do better than
+%% that because we know `Pos` is the #rctx record field index, a non_neg_integer(),
+%% and similarly, we know Incr is from `csrt_util:make_dt`, which is returns at
+%% least one. Ideally, we'd specify the `Pos` type sufficiently to be one of the
+%% valid #rctx record field names, however, a clean solution is not obvious.
+-type counter_updates_list() :: [{non_neg_integer(), pos_integer()}] | [].
