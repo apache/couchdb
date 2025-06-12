@@ -127,7 +127,7 @@ deregister_matcher(Name) ->
 
 -spec log_process_lifetime_report(PidRef :: pid_ref()) -> ok.
 log_process_lifetime_report(PidRef) ->
-    case csrt_util:is_enabled() of
+    case csrt_util:is_enabled() andalso csrt_util:is_enabled_reporting() of
         true ->
             maybe_report("csrt-pid-usage-lifetime", PidRef);
         false ->
@@ -190,6 +190,7 @@ is_match(_Rctx, undefined) ->
 is_match(#rctx{} = Rctx, Matchers) when is_map(Matchers) ->
     maps:size(find_matches([Rctx], Matchers)) > 0.
 
+%% Generate a report for the Rctx if it triggers an active Matcher
 -spec maybe_report(ReportName :: string(), PidRef :: maybe_pid_ref()) -> ok.
 maybe_report(ReportName, PidRef) ->
     Rctx = csrt_server:get_resource(PidRef),
@@ -201,7 +202,7 @@ maybe_report(ReportName, PidRef) ->
             ok
     end.
 
-%% Whether or not to remove zero value fields from reports
+%% Whether or not to remove zero value fields from reports to save on volume
 -spec should_truncate_reports() -> boolean().
 should_truncate_reports() ->
     config:get_boolean(?CSRT, "should_truncate_reports", true).

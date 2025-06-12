@@ -14,6 +14,7 @@
 
 -export([
     is_enabled/0,
+    is_enabled_reporting/0,
     is_enabled_init_p/0,
     get_pid_ref/0,
     get_pid_ref/1,
@@ -68,24 +69,31 @@ is_enabled() ->
         true ->
             rand:uniform(100) > 80;
         false ->
-            config:get_boolean(?CSRT, "enabled", true)
+            config:get_boolean(?CSRT, "enable", true)
     end.
 -else.
 -spec is_enabled() -> boolean().
 is_enabled() ->
     %% TODO: toggle back to false before merging
-    config:get_boolean(?CSRT, "enabled", true).
+    config:get_boolean(?CSRT, "enable", true).
 -endif.
 
 -spec is_enabled_init_p() -> boolean().
 is_enabled_init_p() ->
-    config:get_boolean(?CSRT_INIT_P, "enabled", true).
+    %% TODO: toggle back to false before merging
+    config:get_boolean(?CSRT, "enable_init_p", true).
 
 -spec should_track_init_p(Mod :: atom(), Func :: atom()) -> boolean().
 should_track_init_p(fabric_rpc, Func) ->
     is_enabled_init_p() andalso config:get_boolean(?CSRT_INIT_P, fabric_conf_key(Func), false);
 should_track_init_p(_Mod, _Func) ->
     false.
+
+%% Toggle to disable all reporting
+-spec is_enabled_reporting() -> boolean().
+is_enabled_reporting() ->
+    %% TODO: toggle back to false before merging
+    config:get_boolean(?CSRT, "enable_reporting", true).
 
 %% Monotnonic time now in native format using time forward only event tracking
 -spec tnow() -> integer().
@@ -463,7 +471,7 @@ enable_init_p() ->
     enable_init_p(base_metrics()).
 
 enable_init_p(Metrics) ->
-    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    config:set(?CSRT, "enable_init_p", "true", false),
     enable_init_p_metrics(Metrics).
 
 enable_init_p_metrics() ->
@@ -476,7 +484,7 @@ disable_init_p() ->
     disable_init_p(base_metrics()).
 
 disable_init_p(Metrics) ->
-    config:set(?CSRT_INIT_P, "enabled", "false", false),
+    config:set(?CSRT, "enable_init_p", "false", false),
     disable_init_p_metrics(Metrics).
 
 disable_init_p_metrics() ->
