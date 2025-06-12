@@ -433,7 +433,8 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
         {rows_read, fun matcher_on_rows_read/1, 1000},
         {docs_written, fun matcher_on_docs_written/1, 500},
         %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
-        {long_reqs, fun matcher_on_long_reqs/1, 60000}, %% in milliseconds
+        %% long_reqs Threshold in milliseconds
+        {long_reqs, fun matcher_on_long_reqs/1, 60000},
         {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
         {ioq_calls, fun matcher_on_ioq_calls/1, 10000}
     ],

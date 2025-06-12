@@ -142,7 +142,6 @@ make_dt(A, B, Unit) when is_integer(A) andalso is_integer(B) andalso B > A ->
             1
     end.
 
-
 %%
 %% Conversion API for outputting JSON
 %%
@@ -380,7 +379,7 @@ get_updated_at() ->
     erlang:get(?LAST_UPDATED).
 
 -spec put_updated_at(Updated :: rctx() | integer()) -> maybe_integer().
-put_updated_at(#rctx{updated_at=Updated}) ->
+put_updated_at(#rctx{updated_at = Updated}) ->
     put_updated_at(Updated);
 put_updated_at(Updated) when is_integer(Updated) ->
     erlang:put(?LAST_UPDATED, Updated).
