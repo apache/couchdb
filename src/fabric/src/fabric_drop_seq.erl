@@ -746,22 +746,43 @@ fully_replicated_shards_only_test_() ->
         )
     ].
 
-substitute_splits_test() ->
+substitute_splits_test_() ->
     Range = [0, 10],
-    Subrange1 = [0, 5],
-    Subrange2 = [6, 10],
     Node1 = 'node1@127.0.0.1',
-    Shards = [#shard{range = Subrange1, node = Node1}, #shard{range = Subrange2, node = Node1}],
     UuidMap = #{
-        {Subrange1, Node1} => <<"uuid2">>,
-        {Subrange2, Node1} => <<"uuid3">>
+        {[0, 5], Node1} => <<"uuid2">>,
+        {[6, 10], Node1} => <<"uuid3">>,
+        {[0, 3], Node1} => <<"uuid4">>,
+        {[4, 5], Node1} => <<"uuid5">>
     },
     PeerCheckpoints = #{{Range, Node1} => {<<"uuid1">>, 12}},
 
-    ?assertEqual(
-        #{{Subrange1, Node1} => {<<"uuid2">>, 12}, {Subrange2, Node1} => {<<"uuid3">>, 12}},
-        substitute_splits(Shards, UuidMap, PeerCheckpoints)
-    ).
+    [
+        ?_assertEqual(
+            #{{[0, 5], Node1} => {<<"uuid2">>, 12}, {[6, 10], Node1} => {<<"uuid3">>, 12}},
+            substitute_splits(
+                [#shard{range = [0, 5], node = Node1}, #shard{range = [6, 10], node = Node1}],
+                UuidMap,
+                PeerCheckpoints
+            )
+        ),
+        ?_assertEqual(
+            #{
+                {[0, 3], Node1} => {<<"uuid4">>, 12},
+                {[4, 5], Node1} => {<<"uuid5">>, 12},
+                {[6, 10], Node1} => {<<"uuid3">>, 12}
+            },
+            substitute_splits(
+                [
+                    #shard{range = [0, 3], node = Node1},
+                    #shard{range = [4, 5], node = Node1},
+                    #shard{range = [6, 10], node = Node1}
+                ],
+                UuidMap,
+                PeerCheckpoints
+            )
+        )
+    ].
 
 crossref_test_() ->
     Range = [0, 10],
