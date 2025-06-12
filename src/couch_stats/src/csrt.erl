@@ -153,8 +153,8 @@ create_context(Type, Nonce) ->
     PidRef = get_pid_ref(Rctx),
     set_pid_ref(PidRef),
     try
-        csrt_util:set_delta_zero(Rctx),
-        csrt_util:set_delta_a(Rctx),
+        csrt_util:put_delta_a(Rctx),
+        csrt_util:put_updated_at(Rctx),
         csrt_server:create_resource(Rctx),
         csrt_logger:track(Rctx),
         PidRef

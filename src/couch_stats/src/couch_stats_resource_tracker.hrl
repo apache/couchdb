@@ -16,7 +16,7 @@
 
 %% CSRT pdict markers
 -define(DELTA_TA, csrt_delta_ta).
--define(DELTA_TZ, csrt_delta_tz). %% T Zed instead of T0
+-define(LAST_UPDATED, csrt_last_updated).
 -define(PID_REF, csrt_pid_ref). %% track local ID
 -define(TRACKER_PID, csrt_tracker). %% tracker pid
 
@@ -100,6 +100,7 @@
 -record(rctx, {
     %% Metadata
     started_at = csrt_util:tnow(),
+    %% NOTE: updated_at must be after started_at to preserve time congruity
     updated_at = csrt_util:tnow(),
     pid_ref :: maybe_pid_ref() | {'_', '_'},
     nonce,
