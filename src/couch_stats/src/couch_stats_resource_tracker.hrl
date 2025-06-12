@@ -120,7 +120,7 @@
     %% ?COUCH_BT_GET_KP_NODE = 0 :: non_neg_integer(),
     get_kv_node = 0 :: non_neg_integer(),
     get_kp_node = 0 :: non_neg_integer()
-    %% Add these later
+    %% "Example to extend CSRT"
     %%write_kv_node = 0 :: non_neg_integer(),
     %%write_kp_node = 0 :: non_neg_integer()
 }).
@@ -143,6 +143,7 @@
         | js_filtered_docs
         | get_kv_node
         | get_kp_node.
+        %% "Example to extend CSRT"
         %%| write_kv_node
         %%| write_kp_node.
 

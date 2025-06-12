@@ -473,7 +473,7 @@ t_static_map_translations(_) ->
     ).
 
 t_should_track_init_p(_) ->
-    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    config:set(?CSRT, "enable_init_p", "true", false),
     Metrics = [
         [fabric_rpc, all_docs, spawned],
         [fabric_rpc, changes, spawned],
@@ -488,7 +488,7 @@ t_should_track_init_p(_) ->
     [?assert(should_track_init_p(M), M) || M <- Metrics].
 
 t_should_not_track_init_p(_) ->
-    config:set(?CSRT_INIT_P, "enabled", "true", false),
+    config:set(?CSRT, "enable_init_p", "true", false),
     Metrics = [
         [couch_db, name, spawned],
         [couch_db, get_db_info, spawned],
