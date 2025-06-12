@@ -157,7 +157,7 @@ Dependencies
 
 You should have the following installed:
 
-* `Erlang OTP (25, 26, 27)      <http://erlang.org/>`_
+* `Erlang OTP (26, 27, 28)      <http://erlang.org/>`_
 * `ICU                          <http://icu-project.org/>`_
 * `OpenSSL                      <http://www.openssl.org/>`_
 * `Mozilla SpiderMonkey (1.8.5, 60, 68, 78, 91, 102, 115, 128) <https://spidermonkey.dev/>`_
