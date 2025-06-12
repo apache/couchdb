@@ -51,7 +51,7 @@ unpack(DbName, PackedBookmark) when is_list(PackedBookmark) ->
     unpack(DbName, list_to_binary(PackedBookmark));
 unpack(DbName, PackedBookmark) when is_binary(PackedBookmark) ->
     Bookmark = jiffy:decode(b64url:decode(PackedBookmark), [return_maps]),
-    maps:from_list([{range_of(DbName, V), V} || V <- Bookmark]).
+    #{range_of(DbName, V) => V || V <- Bookmark}.
 
 pack(nil) ->
     null;

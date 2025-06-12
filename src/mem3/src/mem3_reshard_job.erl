@@ -411,7 +411,7 @@ topoff_impl(#job{source = #shard{} = Source, target = Targets}) ->
     BatchSize = config:get_integer(
         "rexi", "shard_split_topoff_batch_size", ?INTERNAL_REP_BATCH_SIZE
     ),
-    TMap = maps:from_list([{R, T} || #shard{range = R} = T <- Targets]),
+    TMap = #{R => T || #shard{range = R} = T <- Targets},
     Opts = [
         {batch_size, BatchSize},
         {batch_count, all},
