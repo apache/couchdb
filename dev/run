@@ -267,6 +267,13 @@ def get_args_parser():
         default=None,
         help="Use TCP for specified node when TLS distribution is enabled",
     )
+    parser.add_option(
+        "--no-auto",
+        dest="no_auto",
+        default=False,
+        action="store_true",
+        help="Disable auto-indexing and auto-compaction",
+    )
     return parser
 
 
@@ -304,6 +311,7 @@ def setup_context(opts, args):
         "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
         "no_tls": opts.no_tls,
+        "no_auto": opts.no_auto,
     }
 
 
@@ -516,8 +524,11 @@ def write_config(ctx, node, env):
             content = apply_config_overrides(ctx, content)
         elif base == "local.ini":
             content = hack_local_ini(ctx, content)
-        elif ctx["enable_tls"] and base == "vm.args":
-            content = hack_vm_args(ctx, node, content)
+        elif base == "vm.args":
+            if ctx["enable_tls"]:
+                content = hack_vm_args(ctx, node, content)
+            if ctx["no_auto"]:
+                content += '\n-kernel permissions \"[{smoosh,false},{ken,false}]\"'
 
         with open(tgt, "w") as handle:
             handle.write(content)
@@ -837,7 +848,6 @@ def hack_local_ini(ctx, contents):
     )
 
     return contents + "\n\n[chttpd_auth]\nsecret = %s\n" % COMMON_SALT
-
 
 def hack_vm_args(ctx, node, contents):
     contents += f"""
