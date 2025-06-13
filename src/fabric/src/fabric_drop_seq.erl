@@ -376,9 +376,9 @@ decode_seq(OpaqueSeq) ->
 
 latest_shard_sync_checkpoints(ShardSyncHistory) ->
     maps:fold(
-        fun({R, SN, _TN}, History, Acc) ->
-            {SU, SS, _TU, _TS} = hd(History),
-            maps:merge_with(fun merge_peers/3, #{{R, SN} => {SU, SS}}, Acc)
+        fun({R, _SN, TN}, History, Acc) ->
+            {_SU, _SS, TU, TS} = hd(History),
+            maps:merge_with(fun merge_peers/3, #{{R, TN} => {TU, TS}}, Acc)
         end,
         #{},
         ShardSyncHistory
