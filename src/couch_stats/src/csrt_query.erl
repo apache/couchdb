@@ -23,17 +23,17 @@
     active_coordinators/1,
     active_workers/0,
     active_workers/1,
-    count_by/1,
+    all/0,
+    count_by/2,
     find_by_nonce/1,
     find_by_pid/1,
     find_by_pidref/1,
     find_workers_by_pidref/1,
-    group_by/2,
     group_by/3,
-    sorted/1,
-    sorted_by/1,
+    group_by/4,
     sorted_by/2,
-    sorted_by/3
+    sorted_by/3,
+    sorted_by/4
 ]).
 
 %%
@@ -112,40 +112,51 @@ field(#rctx{updated_at = Val}, updated_at) -> Val.
 curry_field(Field) ->
     fun(Ele) -> field(Ele, Field) end.
 
-count_by(KeyFun) ->
-    group_by(KeyFun, fun(_) -> 1 end).
+count_by(Matcher, KeyFun) ->
+    group_by(Matcher, KeyFun, fun(_) -> 1 end).
 
-group_by(KeyFun, ValFun) ->
-    group_by(KeyFun, ValFun, fun erlang:'+'/2).
+group_by(Matcher, KeyFun, ValFun) ->
+    group_by(Matcher, KeyFun, ValFun, fun erlang:'+'/2).
 
-group_by(KeyFun, ValFun, AggFun) ->
-    group_by(KeyFun, ValFun, AggFun, ?QUERY_CARDINALITY_LIMIT).
+group_by(Matcher, KeyFun, ValFun, AggFun) ->
+    group_by(Matcher, KeyFun, ValFun, AggFun, ?QUERY_CARDINALITY_LIMIT).
 
-%% eg: group_by(mfa, docs_read).
-%% eg: group_by(fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
-%% eg: ^^ or: group_by([mfa, docs_read], ioq_calls).
-%% eg: group_by([username, dbname, mfa], docs_read).
-%% eg: group_by([username, dbname, mfa], ioq_calls).
-%% eg: group_by([username, dbname, mfa], js_filters).
-group_by(KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
+-spec all() -> matcher().
+
+all() ->
+    Spec = ets:fun2ms(fun(#rctx{} = R) -> R end),
+    {Spec, ets:match_spec_compile(Spec)}.
+
+%% eg: group_by(all(), mfa, docs_read).
+%% eg: group_by(all(), fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
+%% eg: ^^ or: group_by(all(), [mfa, docs_read], ioq_calls).
+%% eg: group_by(all(), [username, dbname, mfa], docs_read).
+%% eg: group_by(all(), [username, dbname, mfa], ioq_calls).
+%% eg: group_by(all(), [username, dbname, mfa], js_filters).
+group_by(Matcher, KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
     KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
-    group_by(KeyFun, ValFun, AggFun, Limit);
-group_by(Key, ValFun, AggFun, Limit) when is_atom(Key) ->
-    group_by(curry_field(Key), ValFun, AggFun, Limit);
-group_by(KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
-    group_by(KeyFun, curry_field(Val), AggFun, Limit);
-group_by(KeyFun, ValFun, AggFun, Limit) ->
+    group_by(Matcher, KeyFun, ValFun, AggFun, Limit);
+group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
+    group_by(Matcher, curry_field(Key), ValFun, AggFun, Limit);
+group_by(Matcher, KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
+    group_by(Matcher, KeyFun, curry_field(Val), AggFun, Limit);
+group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
     FoldFun = fun(Ele, Acc) ->
         case maps:size(Acc) =< Limit of
             true ->
-                Key = KeyFun(Ele),
-                Val = ValFun(Ele),
-                CurrVal = maps:get(Key, Acc, 0),
-                case AggFun(CurrVal, Val) of
-                    0 ->
-                        Acc;
-                    NewVal ->
-                        maps:put(Key, NewVal, Acc)
+                case maybe_match(Ele, Matcher) of
+                    true ->
+                        Key = KeyFun(Ele),
+                        Val = ValFun(Ele),
+                        CurrVal = maps:get(Key, Acc, 0),
+                        case AggFun(CurrVal, Val) of
+                            0 ->
+                                Acc;
+                            NewVal ->
+                                maps:put(Key, NewVal, Acc)
+                        end;
+                    false ->
+                        Acc
                 end;
             false ->
                 throw({limit, Acc})
@@ -156,6 +167,11 @@ group_by(KeyFun, ValFun, AggFun, Limit) ->
     catch throw:{limit, Acc} ->
         {limit, Acc}
     end.
+
+maybe_match(_Ele, undefined) ->
+    true;
+maybe_match(Ele, {_, MS}) ->
+    ets:match_spec_run([Ele], MS) =/= [].
 
 %%
 %% Auxiliary functions to calculate topK
