@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_stats_sup).
+-module(couch_stats_csrt_sup).
 
 -behaviour(supervisor).
 
@@ -20,25 +20,15 @@
 ]).
 
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
--define(CSRT_SUP, couch_stats_csrt_sup).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-    %% Use a dedicated CSRT supervisor with restart strategy set to transient
-    %% so that if a CSRT failure arrises that triggers the sup rate limiter
-    %% thresholds, that shutdown signal will bubble up here and be ignored,
-    %% as the use of transient specifies that `normal` and `shutdown` signals
-    %% are ignored.
-    %% Switch this to `permanent` once CSRT is out of experimental stage.
-    CSRTSup =
-        {?CSRT_SUP, {?CSRT_SUP, start_link, []}, transient, infinity, supervisor, [?CSRT_SUP]},
     {ok,
         {
             {one_for_one, 5, 10}, [
-                ?CHILD(couch_stats_server, worker),
-                ?CHILD(couch_stats_process_tracker, worker),
-                CSRTSup
+                ?CHILD(csrt_server, worker),
+                ?CHILD(csrt_logger, worker)
             ]
         }}.
