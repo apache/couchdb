@@ -56,7 +56,8 @@
     set_fabric_init_p/2,
     set_fabric_init_p/3,
     map_to_rctx/1,
-    field/2
+    field/2,
+    rctx_record_info/0
 ]).
 
 -include_lib("couch_stats_resource_tracker.hrl").
@@ -416,6 +417,13 @@ fabric_conf_key(Key) ->
     %% Double underscore to separate Mod and Func
     "fabric_rpc__" ++ atom_to_list(Key).
 
+-spec rctx_record_info() -> #{fields => [rctx_field()], size => pos_integer()}.
+rctx_record_info() ->
+    #{
+        fields => record_info(fields, rctx),
+        size => record_info(size, rctx)
+    }.
+
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -430,7 +438,8 @@ couch_stats_resource_tracker_test_() ->
             ?TDEF_FE(t_should_not_track_init_p_empty),
             ?TDEF_FE(t_should_not_track_init_p_empty_and_disabled),
             ?TDEF_FE(t_should_not_track_init_p_disabled),
-            ?TDEF_FE(t_should_not_track_init_p)
+            ?TDEF_FE(t_should_not_track_init_p),
+            ?TDEF_FE(t_should_extract_fields_properly)
         ]
     }.
 
@@ -469,6 +478,20 @@ t_should_not_track_init_p(_) ->
         [fabric_rpc, get_purge_seq]
     ],
     [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- Metrics].
+
+t_should_extract_fields_properly(_) ->
+    Rctx = #rctx{},
+    #{fields := Fields} = rctx_record_info(),
+    %% field/2 throws on invalid fields, assert that the function succeeded
+    TestField = fun(Field) ->
+        try
+            field(Field, Rctx),
+            true
+        catch
+            _:_ -> false
+        end
+    end,
+    [?assert(TestField(Field)) || Field <- Fields].
 
 enable_init_p() ->
     enable_init_p(base_metrics()).
