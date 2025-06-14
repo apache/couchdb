@@ -16,6 +16,8 @@
 /quickjs/qjscalc.c
 /quickjs/repl.c
 /quickjs/run-test262
+/quickjs/test262_report.txt
+/quickjs/test262/
 /quickjs/test_fib.c
 /quickjs/.github
 compile_commands.json

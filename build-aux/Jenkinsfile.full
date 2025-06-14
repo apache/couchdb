@@ -312,6 +312,7 @@ def generateContainerStage(platform) {
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
+                    retry(1) {sh 'make quickjs-javascript-test'}
                     retry(3) {sh 'make eunit'}
                     retry(3) {sh 'make elixir'}
                     retry(3) {sh 'make elixir-search'}
