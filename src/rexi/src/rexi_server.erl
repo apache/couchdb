@@ -147,6 +147,7 @@ init_p(From, {M, F, A}, Nonce) ->
             csrt:destroy_context(),
             ok;
         Class:Reason:Stack0 ->
+            %% Make a CSRT delta manually to funnel back to the caller
             Delta = csrt:make_delta(),
             csrt:destroy_context(),
             Stack = clean_stack(Stack0),
