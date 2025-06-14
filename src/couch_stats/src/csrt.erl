@@ -230,6 +230,7 @@ destroy_context() ->
 destroy_context(undefined) ->
     ok;
 destroy_context(PidRef) ->
+    %% Stopping the tracker clears the ets entry for PidRef on its way out
     csrt_logger:stop_tracker(),
     destroy_pid_ref(PidRef),
     ok.
@@ -404,18 +405,23 @@ sorted_by(Key, Val, Agg) ->
 %% Delta API
 %%
 
+-spec add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 add_delta(T, Delta) ->
     csrt_util:add_delta(T, Delta).
 
+-spec extract_delta(T :: term_delta()) -> {term(), maybe_delta()}.
 extract_delta(T) ->
     csrt_util:extract_delta(T).
 
+-spec get_delta() -> tagged_delta().
 get_delta() ->
     csrt_util:get_delta(get_pid_ref()).
 
+-spec maybe_add_delta(T :: term()) -> term_delta().
 maybe_add_delta(T) ->
     csrt_util:maybe_add_delta(T).
 
+-spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 maybe_add_delta(T, Delta) ->
     csrt_util:maybe_add_delta(T, Delta).
 

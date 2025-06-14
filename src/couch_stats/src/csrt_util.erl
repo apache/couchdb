@@ -291,13 +291,17 @@ field(changes_returned, #rctx{changes_returned = Val}) ->
 field(ioq_calls, #rctx{ioq_calls = Val}) ->
     Val.
 
--spec add_delta(T :: term(), Delta :: tagged_delta()) -> term_delta().
-add_delta(T, {delta, undefined}) ->
+-spec add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
+add_delta(T, undefined) ->
     T;
-add_delta(T, {delta, _} = Delta) ->
-    {T, Delta};
-add_delta(T, _Delta) ->
-    T.
+add_delta(T, Delta) when is_map(Delta) ->
+    add_delta_int(T, {delta, Delta}).
+
+-spec add_delta_int(T :: term(), Delta :: tagged_delta()) -> term_delta().
+add_delta_int(T, {delta, undefined}) ->
+    T;
+add_delta_int(T, {delta, _} = Delta) ->
+    {T, Delta}.
 
 -spec extract_delta(T :: term_delta()) -> {term(), maybe_delta()}.
 extract_delta({Msg, {delta, Delta}}) ->
@@ -320,7 +324,9 @@ maybe_add_delta(T) ->
 
 %% Allow for externally provided Delta in error handling scenarios
 %% eg in cases like rexi_server:notify_caller/3
--spec maybe_add_delta(T :: term(), Delta :: tagged_delta()) -> term_delta().
+-spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
+maybe_add_delta(T, undefined) ->
+    T;
 maybe_add_delta(T, Delta) ->
     case is_enabled() of
         false ->
@@ -333,7 +339,7 @@ maybe_add_delta(T, Delta) ->
 maybe_add_delta_int(T, {delta, undefined}) ->
     T;
 maybe_add_delta_int(T, {delta, _} = Delta) ->
-    add_delta(T, Delta).
+    add_delta_int(T, Delta).
 
 -spec make_delta(PidRef :: maybe_pid_ref()) -> maybe_delta().
 make_delta(undefined) ->
