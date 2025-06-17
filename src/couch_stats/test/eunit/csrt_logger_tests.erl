@@ -79,6 +79,8 @@ make_docs(Count) ->
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats]),
     config:set_boolean(?CSRT, "randomize_testing", false, false),
+    config:set_boolean(?CSRT, "enable_reporting", true, false),
+    config:set_boolean(?CSRT, "enable_rpc_reporting", true, false),
     ok = meck:new(ioq, [passthrough]),
     ok = meck:expect(ioq, bypass, fun(_, _) -> false end),
     DbName = ?tempdb(),
