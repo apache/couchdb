@@ -429,8 +429,8 @@ matcher_on_ioq_calls(Threshold) when
 %%    Size = Size - 1,
 
 pid_ref_matchspec(AttrName) ->
-    #{size := Size, field_idx := FieldIdx} = csrt_util:rctx_record_info(),
-    RctxMatch0 = list_to_tuple([rctx | lists:duplicate(Size - 1, '_')]),
+    #{field_idx := FieldIdx} = csrt_util:rctx_record_info(),
+    RctxMatch0 = #rctx{_ = '_'},
     RctxMatch1 = setelement(maps:get(pid_ref, FieldIdx) + 1, RctxMatch0, '$1'),
     RctxMatch = setelement(maps:get(AttrName, FieldIdx) + 1, RctxMatch1, '$2'),
     MatchSpec = [{RctxMatch, [], [{{'$1', '$2'}}]}],
