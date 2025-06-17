@@ -70,6 +70,13 @@
     reload_matchers/0
 ]).
 
+%% Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
+-export([
+    pid_ref_attrs/1,
+    pid_ref_matchspec/1,
+    proc_window/3
+]).
+
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
 
@@ -406,6 +413,40 @@ matcher_on_ioq_calls(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
     ets:fun2ms(fun(#rctx{ioq_calls = IOQCalls} = R) when IOQCalls >= Threshold -> R end).
+
+%%-spec matcher_for_rctx_field(Field :: rctx_field()) -> ets:match_spec().
+%%matcher_for_rctx_field() ->
+%%    #{size := Size0, fields := Fields} = csrt_util:rctx_record_info(),
+%%    %% Subtract 1 as record_info size includes tuple record name
+%%    %% erlang:list_to_tuple([rctx | lists:duplicate(maps:get(size, csrt_util:rctx_record_info()), '_')])
+%%    Size = Size - 1,
+
+pid_ref_matchspec(AttrName) ->
+    #{size := Size, field_idx := FieldIdx} = csrt_util:rctx_record_info(),
+    RctxMatch0 = list_to_tuple([rctx | lists:duplicate(Size - 1, '_')]),
+    RctxMatch1 = setelement(maps:get(pid_ref, FieldIdx) + 1 , RctxMatch0, '$1'),
+    RctxMatch = setelement(maps:get(AttrName, FieldIdx) + 1, RctxMatch1, '$2'),
+    MatchSpec = [{RctxMatch, [], [{{'$1', '$2'}}]}],
+    {MatchSpec, ets:match_spec_compile(MatchSpec)}.
+
+pid_ref_attrs(AttrName) ->
+    {MatchSpec, _CompMatch} = pid_ref_matchspec(AttrName),
+    %% Base fields at least an empty list, but we could add more info here.
+    %% The recon typespec is an improper list of the form:
+    %%Base = [Name | [{current_function, mfa()} | {initial_call, mfa()}]],
+    Base = [],
+    [{PidRef, Val, Base} || {PidRef, Val} <- ets:select(?CSRT_ETS, MatchSpec)].
+
+%% This is a recon:proc_window/3 [1] port with the same core logic but
+%% recon_lib:proc_attrs/1 replaced with pid_ref_attrs/1, and returning on
+%% pid_ref() rather than pid().
+%% [1] https://github.com/ferd/recon/blob/c2a76855be3a226a3148c0dfc21ce000b6186ef8/src/recon.erl#L268-L300
+-spec proc_window(AttrName, Num, Time) -> term() | throw(any()) when
+      AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
+proc_window(AttrName, Num, Time) ->
+    Sample = fun() -> pid_ref_attrs(AttrName) end,
+    {First,Last} = recon_lib:sample(Time, Sample),
+    recon_lib:sublist_top_n_attrs(recon_lib:sliding_window(First, Last), Num).
 
 -spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, badarg} when
     Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
