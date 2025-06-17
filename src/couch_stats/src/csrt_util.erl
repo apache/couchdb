@@ -327,11 +327,12 @@ maybe_add_delta(T) ->
 -spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 maybe_add_delta(T, undefined) ->
     T;
-maybe_add_delta(T, Delta) ->
+maybe_add_delta(T, Delta0) when is_map(Delta0) ->
     case is_enabled() of
         false ->
             T;
         true ->
+            Delta = {delta, Delta0},
             maybe_add_delta_int(T, Delta)
     end.
 
