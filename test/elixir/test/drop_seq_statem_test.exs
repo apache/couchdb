@@ -33,6 +33,118 @@ defmodule DropSeqStateM do
   def when_fail_fn(db_name, n, q, r, cmds) do
     IO.puts("\ndb_name: #{db_name}, n: #{n}, q: #{q}")
     print_report(r, cmds)
+    print_script(n, q, cmds)
+  end
+
+  def print_script(n, q, cmds) do
+    url = "http://foo:bar@localhost:15984"
+    db_name = "propcheck-repro"
+    db_url = "#{url}/#{db_name}"
+
+    IO.puts("""
+    #!/bin/sh
+    set -e
+    COUNT=0
+    curl -X DELETE #{db_url} || true
+    curl --fail -X PUT "#{db_url}?q=#{q}&n=#{n}"
+    """)
+
+    Enum.each(cmds, fn cmd ->
+      case cmd do
+        {:set, _var, {:call, __MODULE__, :update_document, [_dbname, doc_id]}} ->
+          IO.puts("""
+          curl --fail -X PUT "#{db_url}/#{doc_id}" -d "{}"
+          """)
+
+        {:set, _var, {:call, __MODULE__, :delete_document, [_dbname, doc_id]}} ->
+          IO.puts("""
+          REV=$(curl --fail -X GET "#{db_url}/#{doc_id}" | jq -r ._rev)
+          curl --fail -X DELETE "#{db_url}/#{doc_id}?rev=$REV"
+          """)
+
+        {:set, _var, {:call, __MODULE__, :check_actual_state, [_dbname]}} ->
+          IO.puts("""
+          curl --fail -X GET "#{db_url}/_changes"
+          """)
+
+        {:set, _var, {:call, __MODULE__, :compact_db, [_dbname]}} ->
+          IO.puts("""
+          curl --fail -X POST "#{db_url}/_compact" -Hcontent-type:application/json
+          sleep 10
+          """)
+
+        {:set, _var, {:call, __MODULE__, :update_drop_seq, [_dbname]}} ->
+          IO.puts("""
+          curl --fail -X POST "#{db_url}/_update_drop_seq" -Hcontent-type:application/json
+          """)
+
+        {:set, _var, {:call, __MODULE__, :update_peer_checkpoint, [_dbname]}} ->
+          IO.puts("""
+          SEQ=$(curl --fail -X GET "#{db_url}" | jq -r .update_seq)
+          curl --fail -X PUT "#{db_url}/_local/peer-checkpoint-foo" --data-binary @- << EOF
+          {
+            "update_seq": "$SEQ"
+          }
+          EOF
+          """)
+
+        {:set, _var, {:call, __MODULE__, :split_shard, [_dbname]}} ->
+          IO.puts("""
+          RANGE=$(curl --fail -X GET "#{db_url}/_shards" | jq -r '.shards | keys[]' | shuf -n 1)
+          curl --fail -X POST "#{url}/_reshard/jobs" -Hcontent-type:application/json --data-binary @- << EOF
+          {
+            "type":"split",
+            "db":"#{db_name}",
+            "range":"$RANGE"
+          }
+          EOF
+          sleep 10
+          """)
+
+        {:set, _var, {:call, __MODULE__, :create_index, [_dbname, :mrview]}} ->
+          IO.puts("""
+          COUNT=$((COUNT+1))
+          curl --fail -X PUT "#{db_url}/_design/ddoc-mrview-${COUNT}" --data-binary @- << EOF
+          {
+            "views": {
+              "foo": {
+                "map": "function(doc) { emit(#{:rand.uniform_real()}); }"
+              }
+            }
+          }
+          EOF
+          """)
+
+        {:set, _var, {:call, __MODULE__, :create_index, [_dbname, :nouveau]}} ->
+          IO.puts("""
+          COUNT=$((COUNT+1))
+          curl --fail -X PUT "#{db_url}/_design/ddoc-nouveau-${COUNT}" --data-binary @- << EOF
+          {
+            "nouveau": {
+              "foo": {
+                "index": "function(doc) { index('double', 'foo', #{:rand.uniform_real()}); }"
+              }
+            }
+          }
+          EOF
+          """)
+
+        {:set, _var, {:call, __MODULE__, :update_indexes, [_dbname]}} ->
+          IO.puts("""
+          for DDOC_ID in $(curl --fail "#{db_url}/_design_docs" | jq -r .rows[].id)
+          do
+            if echo $DDOC_ID | grep -q nouveau
+            then
+              curl --fail -X GET "#{db_url}/$DDOC_ID/_nouveau/foo?q=*:*"
+            fi
+            if echo $DDOC_ID | grep -q mrview
+            then
+              curl --fail -X GET "#{db_url}/$DDOC_ID/_view/foo?limit=1"
+            fi
+          done
+          """)
+      end
+    end)
   end
 
   defmodule State do
@@ -249,6 +361,8 @@ defmodule DropSeqStateM do
       200,
       10_000
     )
+
+    range
   end
 
   def create_index(db_name, index_type) do
@@ -329,7 +443,7 @@ defmodule DropSeqStateM do
            "sync_shards failed #{resp.status_code} #{inspect(resp.body)}"
 
     # mem3_rep configured for 100ms frequency
-    :timer.sleep(500)
+    :timer.sleep(1000)
   end
 
   def precondition(s, {:call, _, :update_document, [_db_name, doc_id]}) do
