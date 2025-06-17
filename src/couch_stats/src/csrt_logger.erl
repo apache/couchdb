@@ -145,9 +145,15 @@ log_process_lifetime_report(PidRef) ->
 %% Return a subset of Matchers for each Matcher that matches on Rctxs
 -spec find_matches(Rctxs :: [rctx()], Matchers :: matchers()) -> matchers().
 find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
+    Rctxs1 = case csrt_util:is_enabled_rpc_reporting() of
+        true ->
+            Rctxs;
+        false ->
+            [Rctx || #rctx{type=#coordinator{}}=Rctx <- Rctxs]
+    end,
     maps:filter(
         fun(_Name, {_MSpec, CompMSpec}) ->
-            (catch ets:match_spec_run(Rctxs, CompMSpec)) =/= []
+            (catch ets:match_spec_run(Rctxs1, CompMSpec)) =/= []
         end,
         Matchers
     ).
