@@ -307,8 +307,6 @@ add_delta(T, Delta) when is_map(Delta) ->
     add_delta_int(T, {delta, Delta}).
 
 -spec add_delta_int(T :: term(), Delta :: tagged_delta()) -> term_delta().
-add_delta_int(T, {delta, undefined}) ->
-    T;
 add_delta_int(T, {delta, _} = Delta) ->
     {T, Delta}.
 
