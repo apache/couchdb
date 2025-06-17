@@ -443,7 +443,7 @@ defmodule DropSeqStateM do
            "sync_shards failed #{resp.status_code} #{inspect(resp.body)}"
 
     # mem3_rep configured for 100ms frequency
-    :timer.sleep(1000)
+    :timer.sleep(3000)
   end
 
   def precondition(s, {:call, _, :update_document, [_db_name, doc_id]}) do
