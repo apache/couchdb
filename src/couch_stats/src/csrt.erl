@@ -44,10 +44,12 @@
 
 %% Public API
 -export([
+    clear_pdict_markers/0,
+    do_report/2,
     is_enabled/0,
     is_enabled_init_p/0,
-    do_report/2,
-    maybe_report/2
+    maybe_report/2,
+    to_json/1
 ]).
 
 %% stats collection api
@@ -88,6 +90,13 @@
     sorted_by/1,
     sorted_by/2,
     sorted_by/3
+]).
+
+%% Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
+-export([
+    pid_ref_attrs/1,
+    pid_ref_matchspec/1,
+    proc_window/3
 ]).
 
 %%
@@ -233,7 +242,20 @@ destroy_context(PidRef) ->
     %% Stopping the tracker clears the ets entry for PidRef on its way out
     csrt_logger:stop_tracker(),
     destroy_pid_ref(PidRef),
+    clear_pdict_markers(),
     ok.
+
+-spec clear_pdict_markers() -> ok.
+clear_pdict_markers() ->
+    ok = lists:foreach(
+        fun
+            ({{csrt,_} = K , _V}) ->
+                erlang:erase(K);
+            (_) ->
+                ok
+        end,
+        erlang:get()
+    ).
 
 %%
 %% Public API
@@ -266,6 +288,10 @@ maybe_report(ReportName, PidRef) ->
 -spec do_report(ReportName :: string(), PidRef :: pid_ref()) -> boolean().
 do_report(ReportName, PidRef) ->
     csrt_logger:do_report(ReportName, get_resource(PidRef)).
+
+-spec to_json(Rctx :: rctx()) -> map().
+to_json(Rctx) ->
+    csrt_util:to_json(Rctx).
 
 %%
 %% Stat collection API
@@ -388,6 +414,23 @@ group_by(Key, Val) ->
 
 group_by(Key, Val, Agg) ->
     csrt_query:group_by(Key, Val, Agg).
+
+-spec pid_ref_matchspec(AttrName :: rctx_field()) -> term() | throw(any()).
+pid_ref_matchspec(AttrName) ->
+    csrt_logger:pid_ref_matchspec(AttrName).
+
+-spec pid_ref_attrs(AttrName :: rctx_field()) -> term() | throw(any()).
+pid_ref_attrs(AttrName) ->
+    csrt_logger:pid_ref_attrs(AttrName).
+
+%% This is a recon:proc_window/3 [1] port with the same core logic but
+%% recon_lib:proc_attrs/1 replaced with csrt_logger:pid_ref_attrs/1, and
+%% returning on pid_ref() rather than pid().
+%% [1] https://github.com/ferd/recon/blob/c2a76855be3a226a3148c0dfc21ce000b6186ef8/src/recon.erl#L268-L300
+-spec proc_window(AttrName, Num, Time) -> term() | throw(any()) when
+      AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
+proc_window(AttrName, Num, Time) ->
+    csrt_logger:proc_window(AttrName, Num, Time).
 
 sorted(Map) ->
     csrt_query:sorted(Map).

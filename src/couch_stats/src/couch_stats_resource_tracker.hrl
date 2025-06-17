@@ -15,11 +15,12 @@
 -define(CSRT_ETS, csrt_server).
 
 %% CSRT pdict markers
--define(DELTA_TA, csrt_delta_ta).
--define(LAST_UPDATED, csrt_last_updated).
--define(PID_REF, csrt_pid_ref). %% track local ID
--define(TRACKER_PID, csrt_tracker). %% tracker pid
+-define(DELTA_TA, {csrt, delta_ta}).
+-define(LAST_UPDATED, {csrt, last_updated}).
+-define(PID_REF, {csrt, pid_ref}). %% track local ID
+-define(TRACKER_PID, {csrt, tracker}). %% tracker pid
 
+%% Stats fields
 -define(DB_OPEN_DOC, docs_read).
 -define(DB_OPEN, db_open).
 -define(COUCH_SERVER_OPEN, db_open).
