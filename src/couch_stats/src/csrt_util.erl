@@ -433,7 +433,12 @@ fabric_conf_key(Key) ->
     %% Double underscore to separate Mod and Func
     "fabric_rpc__" ++ atom_to_list(Key).
 
--spec rctx_record_info() -> #{fields => [rctx_field()], size => pos_integer(), field_idx => #{rctx_field() => pos_integer()}}.
+-spec rctx_record_info() ->
+    #{
+        fields => [rctx_field()],
+        size => pos_integer(),
+        field_idx => #{rctx_field() => pos_integer()}
+    }.
 rctx_record_info() ->
     Fields = record_info(fields, rctx),
     Size = record_info(size, rctx),

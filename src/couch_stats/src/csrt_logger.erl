@@ -145,12 +145,13 @@ log_process_lifetime_report(PidRef) ->
 %% Return a subset of Matchers for each Matcher that matches on Rctxs
 -spec find_matches(Rctxs :: [rctx()], Matchers :: matchers()) -> matchers().
 find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
-    Rctxs1 = case csrt_util:is_enabled_rpc_reporting() of
-        true ->
-            Rctxs;
-        false ->
-            [Rctx || #rctx{type=#coordinator{}}=Rctx <- Rctxs]
-    end,
+    Rctxs1 =
+        case csrt_util:is_enabled_rpc_reporting() of
+            true ->
+                Rctxs;
+            false ->
+                [Rctx || #rctx{type = #coordinator{}} = Rctx <- Rctxs]
+        end,
     maps:filter(
         fun(_Name, {_MSpec, CompMSpec}) ->
             (catch ets:match_spec_run(Rctxs1, CompMSpec)) =/= []
@@ -430,7 +431,7 @@ matcher_on_ioq_calls(Threshold) when
 pid_ref_matchspec(AttrName) ->
     #{size := Size, field_idx := FieldIdx} = csrt_util:rctx_record_info(),
     RctxMatch0 = list_to_tuple([rctx | lists:duplicate(Size - 1, '_')]),
-    RctxMatch1 = setelement(maps:get(pid_ref, FieldIdx) + 1 , RctxMatch0, '$1'),
+    RctxMatch1 = setelement(maps:get(pid_ref, FieldIdx) + 1, RctxMatch0, '$1'),
     RctxMatch = setelement(maps:get(AttrName, FieldIdx) + 1, RctxMatch1, '$2'),
     MatchSpec = [{RctxMatch, [], [{{'$1', '$2'}}]}],
     {MatchSpec, ets:match_spec_compile(MatchSpec)}.
@@ -448,10 +449,10 @@ pid_ref_attrs(AttrName) ->
 %% pid_ref() rather than pid().
 %% [1] https://github.com/ferd/recon/blob/c2a76855be3a226a3148c0dfc21ce000b6186ef8/src/recon.erl#L268-L300
 -spec proc_window(AttrName, Num, Time) -> term() | throw(any()) when
-      AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
+    AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
 proc_window(AttrName, Num, Time) ->
     Sample = fun() -> pid_ref_attrs(AttrName) end,
-    {First,Last} = recon_lib:sample(Time, Sample),
+    {First, Last} = recon_lib:sample(Time, Sample),
     recon_lib:sublist_top_n_attrs(recon_lib:sliding_window(First, Last), Num).
 
 -spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, badarg} when

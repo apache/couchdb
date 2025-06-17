@@ -249,7 +249,7 @@ destroy_context(PidRef) ->
 clear_pdict_markers() ->
     ok = lists:foreach(
         fun
-            ({{csrt,_} = K , _V}) ->
+            ({{csrt, _} = K, _V}) ->
                 erlang:erase(K);
             (_) ->
                 ok
@@ -428,7 +428,7 @@ pid_ref_attrs(AttrName) ->
 %% returning on pid_ref() rather than pid().
 %% [1] https://github.com/ferd/recon/blob/c2a76855be3a226a3148c0dfc21ce000b6186ef8/src/recon.erl#L268-L300
 -spec proc_window(AttrName, Num, Time) -> term() | throw(any()) when
-      AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
+    AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
 proc_window(AttrName, Num, Time) ->
     csrt_logger:proc_window(AttrName, Num, Time).
 
