@@ -15,6 +15,7 @@
 -export([
     is_enabled/0,
     is_enabled_reporting/0,
+    is_enabled_rpc_reporting/0,
     is_enabled_init_p/0,
     get_pid_ref/0,
     get_pid_ref/1,
@@ -95,6 +96,14 @@ should_track_init_p(_Mod, _Func) ->
 is_enabled_reporting() ->
     %% TODO: toggle back to false before merging
     config:get_boolean(?CSRT, "enable_reporting", true).
+
+%% Toggle to disable all reporting from #rpc_worker{} types, eg only log
+%% #coordinator{} types. This is a bit of a kludge that would be better served
+%% by a dynamic match spec generator, but this provides a know for disabling
+%% any rpc worker logs, even if they hit the normal logging Threshold's.
+-spec is_enabled_rpc_reporting() -> boolean().
+is_enabled_rpc_reporting() ->
+    config:get_boolean(?CSRT, "enable_rpc_reporting", false).
 
 %% Monotnonic time now in native format using time forward only event tracking
 -spec tnow() -> integer().
