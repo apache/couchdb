@@ -334,7 +334,7 @@ matcher_on_dbname_io_threshold(DbName, Threshold) when
         } = R
     ) when
         DbName =:= DbName1 andalso
-            ((IOQ > Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or
+            ((IOQ >= Threshold) or (KVN >= Threshold) or (KPN >= Threshold) or (Docs >= Threshold) or
                 (Rows >= Threshold))
     ->
         R

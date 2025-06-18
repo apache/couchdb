@@ -40,6 +40,7 @@ csrt_logger_reporting_works_test_() ->
         fun setup_reporting/0,
         fun teardown_reporting/1,
         [
+            ?TDEF_FE(t_enablement),
             ?TDEF_FE(t_do_report),
             ?TDEF_FE(t_do_lifetime_report),
             ?TDEF_FE(t_do_status_report)
@@ -53,6 +54,7 @@ csrt_logger_matchers_test_() ->
         fun teardown/1,
         [
             %%?TDEF_FE(t_matcher_on_dbname), %% TODO: add back in or delete
+            ?TDEF_FE(t_enablement),
             ?TDEF_FE(t_matcher_on_dbnames_io),
             ?TDEF_FE(t_matcher_on_docs_read),
             ?TDEF_FE(t_matcher_on_docs_written),
@@ -152,7 +154,7 @@ rctx_gen(Opts0) ->
     R = fun() -> rand:uniform(?RCTX_RANGE) end,
     R10 = fun() -> 3 + rand:uniform(round(?RCTX_RANGE / 10)) end,
     Occasional = one_of([0, 0, 0, 0, 0, R]),
-    Nonce = one_of(["9c54fa9283", "foobar7799", lists:duplicate(10, fun nonce/0)]),
+    Nonce = one_of(["9c54fa9283", "foobar7799" | lists:duplicate(10, fun nonce/0)]),
     Base = #{
         dbname => DbnameGen,
         db_open => R10,
@@ -209,6 +211,11 @@ jrctx(Rctx) ->
         false ->
             JRctx
     end.
+
+t_enablement(#{}) ->
+    ?assert(csrt_util:is_enabled(), "CSRT is enabled"),
+    ?assert(csrt_util:is_enabled_reporting(), "CSRT reporting is enabled"),
+    ?assert(csrt_util:is_enabled_rpc_reporting(), "CSRT RPC reporting is enabled").
 
 t_do_report(#{rctx := Rctx}) ->
     JRctx = jrctx(Rctx),
@@ -485,7 +492,7 @@ matcher_for_dbname_io(Dbname0, Threshold) ->
         DbnameA = csrt_util:field(dbname, Rctx),
         Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read],
         Vals = [{F, csrt_util:field(F, Rctx)} || F <- Fields],
-        Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun(V) -> V >= Threshold end, Vals)
+        Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun({_K,V}) -> V >= Threshold end, Vals)
     end.
 
 nonce() ->
