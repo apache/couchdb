@@ -143,12 +143,14 @@ make_dt(A, A, _Unit) when is_integer(A) ->
     %% possible positive integer value delta.
     1;
 make_dt(A, B, Unit) when is_integer(A) andalso is_integer(B) andalso B > A ->
-    A1 = erlang:convert_time_unit(A, native, Unit),
-    B1 = erlang:convert_time_unit(B, native, Unit),
-    case B1 - A1 of
+    case erlang:convert_time_unit(abs(B - A), native, Unit) of
         Delta when Delta > 0 ->
             Delta;
         _ ->
+            %% Handle case where Delta is smaller than a whole Unit, eg:
+            %% Unit = millisecond,
+            %% (node1@127.0.0.1)2> erlang:convert_time_unit(423, native, Unit).
+            %% 0
             1
     end.
 
