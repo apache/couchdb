@@ -80,11 +80,6 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
 
--define(MATCHERS_KEY, {?MODULE, all_csrt_matchers}).
--define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
--define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
--define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
-
 -record(st, {
     registered_matchers = #{}
 }).
@@ -278,7 +273,7 @@ handle_call({register, Name, MSpec}, _From, #st{registered_matchers = RMatchers}
         {ok, RMatchers1} ->
             ok = initialize_matchers(RMatchers1),
             {reply, ok, St#st{registered_matchers = RMatchers1}};
-        {error, badarg} = Error ->
+        {error, {invalid_ms, _, _}} = Error ->
             {reply, Error, St}
     end;
 handle_call({deregister, Name}, _From, #st{registered_matchers = RMatchers} = St) ->
@@ -455,7 +450,7 @@ proc_window(AttrName, Num, Time) ->
     {First, Last} = recon_lib:sample(Time, Sample),
     recon_lib:sublist_top_n_attrs(recon_lib:sliding_window(First, Last), Num).
 
--spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, badarg} when
+-spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, {invalid_ms, string(), ets:match_spec()}} when
     Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
 add_matcher(Name, MSpec, Matchers) ->
     try ets:match_spec_compile(MSpec) of
@@ -465,7 +460,7 @@ add_matcher(Name, MSpec, Matchers) ->
             {ok, Matchers1}
     catch
         error:badarg ->
-            {error, badarg}
+            {error, {invalid_ms, Name, MSpec}}
     end.
 
 -spec set_matchers_term(Matchers :: matchers()) -> ok.
@@ -496,9 +491,9 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                     case add_matcher(Name, MatchGenFunc(Threshold), Matchers0) of
                         {ok, Matchers1} ->
                             Matchers1;
-                        {error, badarg} ->
-                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [
-                                ?MODULE, Name
+                        {error, {invalid_ms, NameE, MSpecE}} ->
+                            couch_log:warning("[~p] Failed to initialize matcher[~p]: ~p", [
+                                ?MODULE, NameE, MSpecE
                             ]),
                             Matchers0
                     end;
@@ -521,9 +516,9 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                     case add_matcher(Name, MSpec, Matchers0) of
                         {ok, Matchers1} ->
                             Matchers1;
-                        {error, badarg} ->
-                            couch_log:warning("[~p] Failed to initialize matcher: ~p", [
-                                ?MODULE, Name
+                        {error, {invalid_ms, NameE, MSpecE}} ->
+                            couch_log:warning("[~p] Failed to initialize matcher[~p]: ~p", [
+                                ?MODULE, NameE, MSpecE
                             ]),
                             Matchers0
                     end;
@@ -531,9 +526,10 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                     Matchers0
             catch
                 error:badarg ->
-                    couch_log:warning("[~p] Failed to initialize dbname io matcher on: ~p", [
-                        ?MODULE, Dbname
-                    ])
+                    couch_log:warning("[~p] Failed to initialize dbname io matcher on[~p]: ~p", [
+                        ?MODULE, Dbname, Value
+                    ]),
+                    Matchers0
             end
         end,
         Matchers,
