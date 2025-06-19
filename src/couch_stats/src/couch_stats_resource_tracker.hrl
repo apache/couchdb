@@ -124,8 +124,6 @@
     ioq_calls = 0 :: non_neg_integer() | '_',
     js_filter = 0 :: non_neg_integer() | '_',
     js_filtered_docs = 0 :: non_neg_integer() | '_',
-    %% TODO: switch record definitions to be macro based, eg:
-    %% ?COUCH_BT_GET_KP_NODE = 0 :: non_neg_integer() | '_',
     get_kv_node = 0 :: non_neg_integer() | '_',
     get_kp_node = 0 :: non_neg_integer() | '_'
     %% "Example to extend CSRT"
