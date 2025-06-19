@@ -106,31 +106,31 @@
 
 -record(rctx, {
     %% Metadata
-    started_at = csrt_util:tnow(),
+    started_at = csrt_util:tnow() :: integer() | '_',
     %% NOTE: updated_at must be after started_at to preserve time congruity
-    updated_at = csrt_util:tnow(),
-    pid_ref :: maybe_pid_ref() | {'_', '_'},
-    nonce,
+    updated_at = csrt_util:tnow() :: integer() | '_',
+    pid_ref :: maybe_pid_ref() | {'_', '_'} | '_',
+    nonce :: nonce() | undefined | '_',
     type :: rctx_type() | undefined | '_',
-    dbname,
-    username,
+    dbname :: dbname() | undefined | '_',
+    username :: username() | undefined | '_',
 
     %% Stats counters
-    db_open = 0,
-    docs_read = 0 :: non_neg_integer(),
-    docs_written = 0 :: non_neg_integer(),
-    rows_read = 0 :: non_neg_integer(),
-    changes_returned = 0 :: non_neg_integer(),
-    ioq_calls = 0 :: non_neg_integer(),
-    js_filter = 0 :: non_neg_integer(),
-    js_filtered_docs = 0 :: non_neg_integer(),
+    db_open = 0 :: non_neg_integer() | '_',
+    docs_read = 0 :: non_neg_integer() | '_',
+    docs_written = 0 :: non_neg_integer() | '_',
+    rows_read = 0 :: non_neg_integer() | '_',
+    changes_returned = 0 :: non_neg_integer() | '_',
+    ioq_calls = 0 :: non_neg_integer() | '_',
+    js_filter = 0 :: non_neg_integer() | '_',
+    js_filtered_docs = 0 :: non_neg_integer() | '_',
     %% TODO: switch record definitions to be macro based, eg:
-    %% ?COUCH_BT_GET_KP_NODE = 0 :: non_neg_integer(),
-    get_kv_node = 0 :: non_neg_integer(),
-    get_kp_node = 0 :: non_neg_integer()
+    %% ?COUCH_BT_GET_KP_NODE = 0 :: non_neg_integer() | '_',
+    get_kv_node = 0 :: non_neg_integer() | '_',
+    get_kp_node = 0 :: non_neg_integer() | '_'
     %% "Example to extend CSRT"
-    %%write_kv_node = 0 :: non_neg_integer(),
-    %%write_kp_node = 0 :: non_neg_integer()
+    %%write_kv_node = 0 :: non_neg_integer() | '_',
+    %%write_kp_node = 0 :: non_neg_integer() | '_'
 }).
 
 -type rctx_field() ::
