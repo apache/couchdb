@@ -374,6 +374,9 @@ rctx_delta(#rctx{} = TA, #rctx{} = TB) ->
         get_kv_node => TB#rctx.get_kv_node - TA#rctx.get_kv_node,
         db_open => TB#rctx.db_open - TA#rctx.db_open,
         ioq_calls => TB#rctx.ioq_calls - TA#rctx.ioq_calls,
+        %% "Example to extend CSRT"
+        %% write_kp_node => TB#rctx.write_kp_node - TA#rctx.write_kp_node,
+        %% write_kv_node => TB#rctx.write_kv_node - TA#rctx.write_kv_node,
         dt => make_dt(TA#rctx.updated_at, TB#rctx.updated_at)
     },
     %% TODO: reevaluate this decision
