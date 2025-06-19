@@ -451,7 +451,9 @@ proc_window(AttrName, Num, Time) ->
     {First, Last} = recon_lib:sample(Time, Sample),
     recon_lib:sublist_top_n_attrs(recon_lib:sliding_window(First, Last), Num).
 
--spec add_matcher(Name, MSpec, Matchers) -> {ok, matchers()} | {error, {invalid_ms, string(), ets:match_spec()}} when
+-spec add_matcher(Name, MSpec, Matchers) ->
+    {ok, matchers()} | {error, {invalid_ms, string(), ets:match_spec()}}
+when
     Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
 add_matcher(Name, MSpec, Matchers) ->
     try ets:match_spec_compile(MSpec) of
@@ -499,8 +501,9 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                                 ]),
                                 Matchers0
                         end
-                    catch _:_ ->
-                        Matchers0
+                    catch
+                        _:_ ->
+                            Matchers0
                     end;
                 false ->
                     couch_log:warning("[~p] Failed to initialize matcher: ~p", [
