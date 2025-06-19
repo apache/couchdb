@@ -13,7 +13,6 @@
 -module(config_listener_mon).
 -behaviour(gen_server).
 
-
 -export([
     subscribe/2,
     start_link/2
