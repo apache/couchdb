@@ -118,12 +118,6 @@ count_by(KeyFun) ->
 group_by(KeyFun, ValFun) ->
     group_by(KeyFun, ValFun, fun erlang:'+'/2).
 
-%% eg: group_by(mfa, docs_read).
-%% eg: group_by(fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
-%% eg: ^^ or: group_by([mfa, docs_read], ioq_calls).
-%% eg: group_by([username, dbname, mfa], docs_read).
-%% eg: group_by([username, dbname, mfa], ioq_calls).
-%% eg: group_by([username, dbname, mfa], js_filters).
 group_by(KeyL, ValFun, AggFun) when is_list(KeyL) ->
     KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
     group_by(KeyFun, ValFun, AggFun);
@@ -154,8 +148,6 @@ sorted(Map) when is_map(Map) ->
 shortened(L) ->
     lists:sublist(L, 10).
 
-%% eg: sorted_by([username, dbname, mfa], ioq_calls)
-%% eg: sorted_by([dbname, mfa], doc_reads)
 sorted_by(KeyFun) -> shortened(sorted(count_by(KeyFun))).
 sorted_by(KeyFun, ValFun) -> shortened(sorted(group_by(KeyFun, ValFun))).
 sorted_by(KeyFun, ValFun, AggFun) -> shortened(sorted(group_by(KeyFun, ValFun, AggFun))).

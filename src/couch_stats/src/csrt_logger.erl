@@ -423,6 +423,7 @@ matcher_on_ioq_calls(Threshold) when
 %%    %% erlang:list_to_tuple([rctx | lists:duplicate(maps:get(size, csrt_util:rctx_record_info()), '_')])
 %%    Size = Size - 1,
 
+-spec pid_ref_matchspec(AttrName :: rctx_field()) -> matcher() | throw(any()).
 pid_ref_matchspec(AttrName) ->
     #{field_idx := FieldIdx} = csrt_util:rctx_record_info(),
     RctxMatch0 = #rctx{_ = '_'},
@@ -431,6 +432,7 @@ pid_ref_matchspec(AttrName) ->
     MatchSpec = [{RctxMatch, [], [{{'$1', '$2'}}]}],
     {MatchSpec, ets:match_spec_compile(MatchSpec)}.
 
+-spec pid_ref_attrs(AttrName :: rctx_field()) -> list() | throw(any()).
 pid_ref_attrs(AttrName) ->
     {MatchSpec, _CompMatch} = pid_ref_matchspec(AttrName),
     %% Base fields at least an empty list, but we could add more info here.
@@ -568,6 +570,9 @@ handle_config_change(?CONF_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
 handle_config_change(?CONF_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
+    ok = gen_server:call(?MODULE, reload_matchers, infinity),
+    {ok, St};
+handle_config_change(?CONF_MATCHERS_DBNAMES, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
 handle_config_change(_Sec, _Key, _Val, _Persist, St) ->
