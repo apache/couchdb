@@ -53,13 +53,12 @@ csrt_logger_matchers_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            %%?TDEF_FE(t_matcher_on_dbname), %% TODO: add back in or delete
             ?TDEF_FE(t_enablement),
             ?TDEF_FE(t_matcher_on_dbnames_io),
             ?TDEF_FE(t_matcher_on_docs_read),
             ?TDEF_FE(t_matcher_on_docs_written),
             ?TDEF_FE(t_matcher_on_rows_read),
-            ?TDEF_FE(t_matcher_on_worker_changes_processed),
+            ?TDEF_FE(t_matcher_on_changes_processed),
             ?TDEF_FE(t_matcher_on_long_reqs),
             ?TDEF_FE(t_matcher_on_ioq_calls),
             ?TDEF_FE(t_matcher_on_nonce),
@@ -115,7 +114,7 @@ setup() ->
     ),
     ok = config:set(
         "csrt_logger.matchers_threshold",
-        "worker_changes_processed",
+        "changes_processed",
         integer_to_list(?THRESHOLD_CHANGES),
         false
     ),
@@ -251,15 +250,6 @@ t_do_status_report(#{rctx := Rctx}) ->
         "CSRT couch_log:report"
     ).
 
-t_matcher_on_dbname(#{rctx := _Rctx, rctxs := Rctxs0}) ->
-    %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{dbname => <<"foo">>}) | Rctxs0],
-    ?assertEqual(
-        lists:sort(lists:filter(matcher_on(dbname, <<"foo">>), Rctxs)),
-        lists:sort(lists:filter(matcher_for_csrt("dbname"), Rctxs)),
-        "Dbname matcher on <<\"foo\">>"
-    ).
-
 t_matcher_on_docs_read(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_DOCS_READ,
     %% Make sure we have at least one match
@@ -290,7 +280,7 @@ t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
         "Rows read matcher"
     ).
 
-t_matcher_on_worker_changes_processed(#{rctxs := Rctxs0}) ->
+t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_CHANGES,
     %% Make sure we have at least one match
     Rctxs = [rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
@@ -301,7 +291,7 @@ t_matcher_on_worker_changes_processed(#{rctxs := Rctxs0}) ->
     end,
     ?assertEqual(
         lists:sort(lists:filter(ChangesFilter, Rctxs)),
-        lists:sort(lists:filter(matcher_for_csrt("worker_changes_processed"), Rctxs)),
+        lists:sort(lists:filter(matcher_for_csrt("changes_processed"), Rctxs)),
         "Changes processed matcher"
     ).
 

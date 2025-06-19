@@ -62,7 +62,7 @@
     matcher_on_docs_read/1,
     matcher_on_docs_written/1,
     matcher_on_rows_read/1,
-    matcher_on_worker_changes_processed/1,
+    matcher_on_changes_processed/1,
     matcher_on_ioq_calls/1,
     matcher_on_nonce/1,
     matcher_on_long_reqs/1,
@@ -364,8 +364,8 @@ matcher_on_rows_read(Threshold) when
 matcher_on_nonce(Nonce) ->
     ets:fun2ms(fun(#rctx{nonce = Nonce1} = R) when Nonce =:= Nonce1 -> R end).
 
--spec matcher_on_worker_changes_processed(Threshold :: pos_integer()) -> ets:match_spec().
-matcher_on_worker_changes_processed(Threshold) when
+-spec matcher_on_changes_processed(Threshold :: pos_integer()) -> ets:match_spec().
+matcher_on_changes_processed(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
     ets:fun2ms(
@@ -477,13 +477,11 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
     %% Standard matchers to conditionally enable
     DefaultMatchers = [
         {docs_read, fun matcher_on_docs_read/1, 1000},
-        %%{dbname, fun matcher_on_dbname/1, <<"foo">>},
         {rows_read, fun matcher_on_rows_read/1, 1000},
         {docs_written, fun matcher_on_docs_written/1, 500},
-        %%{view_rows_read, fun matcher_on_rows_read/1, 1000},
         %% long_reqs Threshold in milliseconds
         {long_reqs, fun matcher_on_long_reqs/1, 60000},
-        {worker_changes_processed, fun matcher_on_worker_changes_processed/1, 1000},
+        {changes_processed, fun matcher_on_changes_processed/1, 1000},
         {ioq_calls, fun matcher_on_ioq_calls/1, 10000}
     ],
 
