@@ -35,6 +35,9 @@
     {Range :: range(), SourceNode :: node(), TargetNode :: node()} => [history_item()]
 }.
 
+-define(START_KEY(SubType), <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, "-">>).
+-define(END_KEY(SubType), <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, ".">>).
+
 go(DbName) ->
     Shards0 = mem3:shards(DbName),
     case gather_drop_seq_info(Shards0) of
@@ -573,8 +576,8 @@ cleanup_peer_checkpoint_docs(DbName, SubType, KeepSigs) when
     MrArgs = #mrargs{
         view_type = map,
         include_docs = true,
-        start_key = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, "-">>,
-        end_key = <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, ".">>,
+        start_key = ?START_KEY(SubType),
+        end_key = ?END_KEY(SubType),
         inclusive_end = false,
         extra = [
             {include_system, true},
