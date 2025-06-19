@@ -39,14 +39,6 @@ meta = [
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
   ],
 
-  'focal': [
-    name: 'Ubuntu 20.04',
-    spidermonkey_vsn: '68',
-    with_nouveau: true,
-    with_clouseau: true,
-    image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
-  ],
-
   'jammy': [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
@@ -122,14 +114,17 @@ meta = [
      gnu_make: 'gmake'
   ],
 
- 'macos': [
-    name: 'macOS',
-    spidermonkey_vsn: '128',
-    with_nouveau: false,
-    with_clouseau: true,
-    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
-    gnu_make: 'make'
-  ],
+ // Disable temporarily. Forks / shell execs seem to fail there currently
+ //
+ //
+ // 'macos': [
+ //    name: 'macOS',
+ //    spidermonkey_vsn: '128',
+ //    with_nouveau: false,
+ //    with_clouseau: true,
+ //    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
+ //    gnu_make: 'make'
+ //  ],
 
   'win2022': [
     name: 'Windows 2022',
