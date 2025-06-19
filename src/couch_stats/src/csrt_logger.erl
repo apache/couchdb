@@ -100,7 +100,6 @@ tracker({Pid, _Ref} = PidRef) ->
     MonRef = erlang:monitor(process, Pid),
     receive
         stop ->
-            %% TODO: do we need cleanup here?
             log_process_lifetime_report(PidRef),
             csrt_server:destroy_resource(PidRef),
             ok;
@@ -488,18 +487,25 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
             Name = atom_to_list(Name0),
             case matcher_enabled(Name) of
                 true ->
-                    Threshold = matcher_threshold(Name, Threshold0),
-                    %% TODO: handle errors from Func
-                    case add_matcher(Name, MatchGenFunc(Threshold), Matchers0) of
-                        {ok, Matchers1} ->
-                            Matchers1;
-                        {error, {invalid_ms, NameE, MSpecE}} ->
-                            couch_log:warning("[~p] Failed to initialize matcher[~p]: ~p", [
-                                ?MODULE, NameE, MSpecE
-                            ]),
-                            Matchers0
+                    %% Wrap in a try-catch to handle MatcherGen errors
+                    try
+                        Threshold = matcher_threshold(Name, Threshold0),
+                        case add_matcher(Name, MatchGenFunc(Threshold), Matchers0) of
+                            {ok, Matchers1} ->
+                                Matchers1;
+                            {error, {invalid_ms, NameE, MSpecE}} ->
+                                couch_log:warning("[~p] Failed to initialize matcher[~p]: ~p", [
+                                    ?MODULE, NameE, MSpecE
+                                ]),
+                                Matchers0
+                        end
+                    catch _:_ ->
+                        Matchers0
                     end;
                 false ->
+                    couch_log:warning("[~p] Failed to initialize matcher: ~p", [
+                        ?MODULE, Name
+                    ]),
                     Matchers0
             end
         end,
