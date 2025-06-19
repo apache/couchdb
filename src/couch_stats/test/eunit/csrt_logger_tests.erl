@@ -136,7 +136,7 @@ teardown(#{ctx := Ctx, dbname := DbName}) ->
 
 setup_reporting() ->
     Ctx = setup(),
-    ok = meck:new(couch_log),
+    ok = meck:new(couch_log, [passthrough]),
     ok = meck:expect(couch_log, report, fun(_, _) -> true end),
     Ctx.
 
@@ -212,6 +212,9 @@ jrctx(Rctx) ->
     end.
 
 t_enablement(#{}) ->
+    %% Set an invalid match spec to ensure csrt_logger is resilient
+    config:set(?CONF_MATCHERS_DBNAMES, "foobar", "lkajsdfkjkkadfjkajkf", false),
+    ?assertEqual(ok, csrt_logger:reload_matchers(), "reloads even with bad matcher specs set"),
     ?assert(csrt_util:is_enabled(), "CSRT is enabled"),
     ?assert(csrt_util:is_enabled_reporting(), "CSRT reporting is enabled"),
     ?assert(csrt_util:is_enabled_rpc_reporting(), "CSRT RPC reporting is enabled").
@@ -380,6 +383,11 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
     Rctxs = [ExtraRctx | Rctxs0],
 
     ?assertEqual(#{}, csrt_logger:get_registered_matchers(), "no current registered matchers"),
+    ?assertEqual(
+        {error, {invalid_ms, "bad_spec", "fdsa"}},
+        csrt_logger:register_matcher("bad_spec", "fdsa"),
+        "register bad matcher fails"
+    ),
     ?assertEqual(ok, csrt_logger:register_matcher(MName, MSpec), "register matcher"),
     CompMSpec = test_util:wait(
         fun() ->
