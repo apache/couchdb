@@ -492,7 +492,7 @@ matcher_for_dbname_io(Dbname0, Threshold) ->
         DbnameA = csrt_util:field(dbname, Rctx),
         Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read],
         Vals = [{F, csrt_util:field(F, Rctx)} || F <- Fields],
-        Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun({_K,V}) -> V >= Threshold end, Vals)
+        Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun({_K, V}) -> V >= Threshold end, Vals)
     end.
 
 nonce() ->
