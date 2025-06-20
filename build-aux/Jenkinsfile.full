@@ -28,6 +28,7 @@ meta = [
     spidermonkey_vsn: '60',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
@@ -36,6 +37,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
   ],
 
@@ -44,6 +46,7 @@ meta = [
     spidermonkey_vsn: '91',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
 
@@ -52,6 +55,7 @@ meta = [
     spidermonkey_vsn: '115',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
   ],
 
@@ -60,6 +64,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
     node_label: 'ppc64le'
   ],
@@ -68,6 +73,9 @@ meta = [
     name: 'Debian s390x',
     spidermonkey_vsn: '78',
     with_nouveau: true,
+    // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
+    // Test262Error: 51539607552,42,0,4,5,6,7,8
+    quickjs_test262: false,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
     node_label: 's390x'
   ],
@@ -77,6 +85,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
@@ -85,6 +94,8 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    // Test this in in the bookworm-quickjs variant
+    quickjs_test262: false,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
@@ -93,6 +104,7 @@ meta = [
     disable_spidermonkey: true,
     with_nouveau: true,
     with_clouseau: true,
+    quickjs_test262: true,
     image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}"
   ],
 
@@ -101,6 +113,7 @@ meta = [
       spidermonkey_vsn: '91',
       with_clouseau: true,
       clouseau_java_home: '/usr/local/openjdk8-jre',
+      quickjs_test262: false,
       gnu_make: 'gmake'
   ],
 
@@ -111,6 +124,7 @@ meta = [
      disable_spidermonkey: true,
      with_clouseau: true,
      clouseau_java_home: '/usr/local/openjdk8-jre',
+     quickjs_test262: false,
      gnu_make: 'gmake'
   ],
 
@@ -130,6 +144,7 @@ meta = [
     name: 'Windows 2022',
     spidermonkey_vsn: '128',
     with_clouseau: true,
+    quickjs_test262: false,
     node_label: 'win'
   ]
 ]
@@ -187,6 +202,7 @@ def generateNativeStage(platform) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
                   retry (3) {sh '$MAKE eunit'}
+                  if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
                   retry (3) {sh '$MAKE elixir-search'}
                   retry (3) {sh '$MAKE mango-test'}
@@ -304,10 +320,12 @@ def generateContainerStage(platform) {
                   unstash 'tarball'
                   sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                  quickjs_tests262 = meta[platform].quickjs_test262
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
                     retry(3) {sh 'make eunit'}
+                    if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
                     retry(3) {sh 'make elixir-search'}
                     retry(3) {sh 'make mango-test'}
