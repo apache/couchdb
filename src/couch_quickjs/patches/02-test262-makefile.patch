@@ -1,0 +1,29 @@
+--- quickjs-master/Makefile	2025-06-14 05:51:48
++++ quickjs/Makefile	2025-06-20 18:03:41
+@@ -53,6 +53,10 @@
+ #CONFIG_MSAN=y
+ # use UB sanitizer
+ #CONFIG_UBSAN=y
++
++# TEST262 bootstrap config: commit id and shallow "since" parameter
++TEST262_COMMIT?=3316c0aaf676d657f5a6b33364fa7e579c78ac7f
++TEST262_SINCE?=2025-05-21
+ 
+ OBJDIR=.obj
+ 
+@@ -464,6 +468,15 @@
+ microbench: qjs$(EXE)
+ 	$(WINE) ./qjs$(EXE) --std tests/microbench.js
+ 
++ifeq ($(wildcard test262/features.txt),)
++test2-bootstrap:
++	git clone --single-branch --shallow-since=$(TEST262_SINCE) https://github.com/tc39/test262.git
++	(cd test262 && git checkout -q $(TEST262_COMMIT) && patch -p1 < ../tests/test262.patch && cd ..)
++else
++test2-bootstrap:
++	(cd test262 && git fetch && git reset --hard $(TEST262_COMMIT) && patch -p1 < ../tests/test262.patch && cd ..)
++endif
++
+ ifeq ($(wildcard test262o/tests.txt),)
+ test2o test2o-update:
+ 	@echo test262o tests not installed

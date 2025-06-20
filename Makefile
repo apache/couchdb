@@ -354,6 +354,12 @@ weatherreport-test: devclean escriptize
 	@dev/run "$(TEST_OPTS)" -n 1 -a adm:pass --no-eval \
 		'bin/weatherreport --etc dev/lib/node1/etc --level error'
 
+.PHONY: quickjs-test262
+# target: quickjs-javascript-tests - Run QuickJS JS conformance tests
+quickjs-test262: couch
+	make -C src/couch_quickjs/quickjs test2-bootstrap
+	make -C src/couch_quickjs/quickjs test2
+
 ################################################################################
 # Developing
 ################################################################################
