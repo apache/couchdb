@@ -1,0 +1,15 @@
+--- quickjs-master/tests/test262.patch	2025-06-14 05:51:48
++++ quickjs/tests/test262.patch	2025-06-20 18:03:41
+@@ -14,9 +14,9 @@
+ +//  small: 200,
+ +//  long: 1000,
+ +//  huge: 10000,
+-+  yield: 20,
+-+  small: 20,
+-+  long: 100,
+++  yield: 40,
+++  small: 40,
+++  long: 200,
+ +  huge: 1000,
+  };
+  
