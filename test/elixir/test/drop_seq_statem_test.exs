@@ -535,8 +535,12 @@ defmodule DropSeqStateM do
     %State{s | check_actual_state: false}
   end
 
-  # _reshard/jobs forcibly updates all indexes
+  def next_state(s = %State{index_seq: nil}, _v, {:call, _, :split_shard, [_db_name]}) do
+    %State{s | check_actual_state: true}
+  end
+
   def next_state(s, _v, {:call, _, :split_shard, [_db_name]}) do
+    # _reshard/jobs forcibly updates all indexes
     %State{s | index_seq: s.current_seq, check_actual_state: true}
   end
 
