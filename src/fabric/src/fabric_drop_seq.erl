@@ -3,6 +3,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -export([go/1]).
 
@@ -117,9 +118,9 @@ calculate_drop_seqs(Shards, UuidMap, PeerCheckpoints0, ShardSyncHistory) ->
 handle_set_drop_seq_reply(ok, Worker, {Results0, Waiting}) ->
     DropSeq = proplists:get_value(drop_seq, Worker#shard.opts),
     [B, E] = Worker#shard.range,
-    BHex = couch_util:to_hex(<<B:32/integer>>),
-    EHex = couch_util:to_hex(<<E:32/integer>>),
-    Range = list_to_binary([BHex, "-", EHex]),
+    BHex = couch_util:to_hex_bin(<<B:32/integer>>),
+    EHex = couch_util:to_hex_bin(<<E:32/integer>>),
+    Range = <<BHex/binary, "-", EHex/binary>>,
     Results1 = maps:merge_with(
         fun(_Key, Val1, Val2) ->
             maps:merge(Val1, Val2)
@@ -341,7 +342,7 @@ merge_info(#shard{} = Shard, Info, Acc) ->
 merge_peers(_Key, {Uuid1, Val1}, {Uuid2, Val2}) when
     is_binary(Uuid1), is_binary(Uuid2), is_integer(Val1), is_integer(Val2)
 ->
-    true = uuids_match([Uuid1, Uuid2]),
+    ?assert(uuids_match([Uuid1, Uuid2]), "UUIDs belong to different shard files"),
     {Uuid1, min(Val1, Val2)}.
 
 uuids_match(Uuids) when is_list(Uuids) ->
@@ -497,15 +498,15 @@ update_peer_checkpoint_doc(
             fabric:open_doc(mem3:dbname(DbName), peer_checkpoint_id(Subtype, PeerId), [?ADMIN_CTX])
         of
             {ok, ExistingDoc} ->
-                exit(ExistingDoc#doc.revs);
+                exit({rev, ExistingDoc#doc.revs});
             {not_found, _Reason} ->
-                exit({0, []});
+                exit({rev, {0, []}});
             {error, Reason} ->
                 throw({checkpoint_fetch_failure, Reason})
         end
     end),
     receive
-        {'DOWN', OpenRef, _, _, Revs} ->
+        {'DOWN', OpenRef, _, _, {rev, Revs}} ->
             NewDoc0 = peer_checkpoint_doc(PeerId, Subtype, Source, UpdateSeq),
             NewDoc1 = NewDoc0#doc{revs = Revs},
             {_, UpdateRef} = spawn_monitor(fun() ->
