@@ -470,7 +470,7 @@ pipeline {
           ''' )
 
         sh( label: 'Build Debian repo', script: '''
-            for plat in bullseye bookworm focal
+            for plat in bullseye bookworm
             do
               reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
             done
