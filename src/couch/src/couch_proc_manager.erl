@@ -141,6 +141,7 @@ init([]) ->
     ets:new(?COUNTERS, [named_table]),
 
     ok = configure_language_servers(),
+    ets:insert(?SERVERS, [{"SELECTOR", {mango_simple_proc, start_link, []}}]),
 
     {ok, #state{
         config = get_proc_config(),
