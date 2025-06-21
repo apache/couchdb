@@ -24,7 +24,7 @@ public class NouveauApplicationConfiguration extends Configuration {
     @Min(10)
     private int maxIndexesOpen = 10;
 
-    @Min(10)
+    @Min(5)
     private int commitIntervalSeconds = 10;
 
     @Min(30)

@@ -36,6 +36,7 @@ go(DbName) ->
         )
     ),
     cleanup_local_purge_doc(DbName, ActiveSigs),
+    fabric_drop_seq:cleanup_peer_checkpoint_docs(DbName, <<"search">>, ActiveSigs),
     clouseau_rpc:cleanup(DbName, ActiveSigs),
     ok.
 

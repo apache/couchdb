@@ -319,16 +319,27 @@ copy_meta(#state{source_db = SourceDb, targets = Targets} = State) ->
     RevsLimit = couch_db:get_revs_limit(SourceDb),
     {SecProps} = couch_db:get_security(SourceDb),
     PurgeLimit = couch_db:get_purge_infos_limit(SourceDb),
-    Targets1 = maps:map(
-        fun(_, #target{db = Db} = T) ->
+    DropSeq = couch_db:get_drop_seq(SourceDb),
+    {ok, DropCount} = couch_db:get_drop_count(SourceDb),
+    {Targets1, _} = maps:fold(
+        fun(K, #target{db = Db} = T, {Acc, [DC|DCRest]}) ->
+            Uuid = couch_db_engine:get_uuid(Db),
             {ok, Db1} = couch_db_engine:set_revs_limit(Db, RevsLimit),
             {ok, Db2} = couch_db_engine:set_security(Db1, SecProps),
             {ok, Db3} = couch_db_engine:set_purge_infos_limit(Db2, PurgeLimit),
-            T#target{db = Db3}
+            {ok, Db4} = couch_db_engine:set_drop_seq(Db3, Uuid, DropSeq),
+            {ok, Db5} = couch_db_engine:increment_drop_count(Db4, DC),
+            {Acc#{K => T#target{db = Db5}}, DCRest}
         end,
+        {#{}, spread(DropCount, map_size(Targets))},
         Targets
     ),
     State#state{targets = Targets1}.
+
+spread(Amount, N) when is_integer(Amount), Amount >= 0, is_integer(N),  N > 0 ->
+    Div = Amount div N,
+    Rem = Amount rem N,
+    [if I > Rem -> Div; true -> Div + 1 end || I <- lists:seq(1, N)].
 
 copy_purge_info(#state{source_db = Db} = State) ->
     {ok, NewState} = couch_db:fold_purge_infos(Db, fun purge_cb/2, State),
