@@ -228,6 +228,16 @@ unlimited. A detailed discussion can be found on the erlang-questions list,
 but the short answer is that you should decrease ``ulimit -n`` or lower the
 ``vm.args`` parameter ``+Q`` to something reasonable like 1024.
 
+The same issue can be manifested in some docker configurations which default
+ulimit max files to ``unlimited``. In those cases it's also recommended to set
+a lower ``nofile`` ulimit, something like 65536. In docker compose files that
+can be done as:
+
+.. code-block:: yaml
+
+    ulimits:
+      nofiles: 65535
+
 Function raised exception (Cannot encode 'undefined' value as JSON)
 -------------------------------------------------------------------
 If you see this in the CouchDB error logs, the JavaScript code you are using
