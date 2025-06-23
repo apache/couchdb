@@ -580,21 +580,9 @@ handle_call({append_bins, Bins}, _From, #file{} = File) ->
         {{ok, Resps}, File1} -> {reply, {ok, Resps}, File1};
         {Error, File1} -> {reply, Error, File1}
     end;
-handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
-    BinSize = byte_size(Bin),
-    case Pos rem ?SIZE_BLOCK of
-        0 ->
-            Padding = <<>>;
-        BlockOffset ->
-            Padding = <<0:(8 * (?SIZE_BLOCK - BlockOffset))>>
-    end,
-    FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
-    case file:write(Fd, FinalBin) of
-        ok ->
-            {reply, ok, File#file{eof = Pos + iolist_size(FinalBin)}};
-        Error ->
-            {reply, Error, reset_eof(File)}
-    end;
+handle_call({write_header, Bin}, _From, #file{} = File) ->
+    {Res, State} = do_write_header(Bin, File),
+    {reply, Res, State};
 handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
 
@@ -755,6 +743,24 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
             {ok, Location, HeaderBin};
         _Error ->
             find_newest_header(Fd, LocationSizes)
+    end.
+
+-spec do_write_header(_, _) ->
+    {ok, #file{}} | {{error, Reason :: any()},  #file{}}.
+do_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
+    BinSize = byte_size(Bin),
+    case Pos rem ?SIZE_BLOCK of
+        0 ->
+            Padding = <<>>;
+        BlockOffset ->
+            Padding = <<0:(8 * (?SIZE_BLOCK - BlockOffset))>>
+    end,
+    FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
+    case file:write(Fd, FinalBin) of
+        ok ->
+            {ok, File#file{eof = Pos + iolist_size(FinalBin)}};
+        Error ->
+            {Error, reset_eof(File)}
     end.
 
 read_multi_raw_iolists_int(#file{fd = Fd, eof = Eof} = File, PosLens) ->
