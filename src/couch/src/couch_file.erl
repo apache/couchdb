@@ -598,19 +598,19 @@ handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File};
 handle_call({commit_header, Bin}, _From, #file{fd = Fd} = File) ->
     maybe
-      ok ?= fsync(Fd),
-      {ok, NewFile} ?= do_write_header(Bin, File),
-      ok ?= fsync(Fd),
-      {reply, ok, NewFile}
+        ok ?= fsync(Fd),
+        {ok, NewFile} ?= do_write_header(Bin, File),
+        ok ?= fsync(Fd),
+        {reply, ok, NewFile}
     else
-      {{error, _} = Error, State} ->
-        {reply, Error, State};
-      {error, _} = Error ->
-        % We're intentionally dropping all knowledge
-        % of this Fd so that we don't accidentally
-        % recover in some whacky edge case that I
-        % can't fathom.
-        {stop, Error, Error, #file{fd = nil}}
+        {{error, _} = Error, State} ->
+            {reply, Error, State};
+        {error, _} = Error ->
+            % We're intentionally dropping all knowledge
+            % of this Fd so that we don't accidentally
+            % recover in some whacky edge case that I
+            % can't fathom.
+            {stop, Error, Error, #file{fd = nil}}
     end.
 
 handle_cast(Msg, #file{} = File) ->
