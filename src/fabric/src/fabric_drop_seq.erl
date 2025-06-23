@@ -160,7 +160,7 @@ crossref(PeerCheckpoints0, ShardSyncHistory) ->
                             case
                                 lists:search(
                                     fun({SU, SS, _TU, _TS}) ->
-                                        uuids_match([Uuid, SU]) andalso SS =< Seq
+                                        SS =< Seq andalso uuids_match([Uuid, SU])
                                     end,
                                     History
                                 )
