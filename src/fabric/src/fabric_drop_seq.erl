@@ -242,7 +242,7 @@ gather_drop_seq_info_rpc(DbName) ->
                 Uuid = couch_db:get_uuid(Db),
                 Seq = couch_db:get_committed_update_seq(Db),
                 Range = mem3:range(DbName),
-                Acc0 = {#{{Range, node()} => {Uuid, Seq}}, #{}},
+                Acc0 = {#{{Range, config:node_name()} => {Uuid, Seq}}, #{}},
                 {ok, {PeerCheckpoints, ShardSyncHistory}} = couch_db:fold_local_docs(
                     Db, fun gather_drop_seq_info_fun/2, Acc0, []
                 ),
@@ -555,7 +555,7 @@ peer_checkpoint_id(Subtype, PeerId) ->
 
 peer_id_from_sig(DbName, Sig) when is_binary(DbName), is_binary(Sig) ->
     Hash = couch_util:encodeBase64Url(
-        crypto:hash(sha256, [atom_to_binary(node()), $0, DbName])
+        crypto:hash(sha256, [atom_to_binary(config:node_name(), utf8), $0, DbName])
     ),
     <<Sig/binary, "$", Hash/binary>>.
 
@@ -565,8 +565,8 @@ pack_seq(DbName, UpdateSeq) ->
     fabric_view_changes:pack_seqs(
         [
             {
-                #shard{node = node(), range = mem3:range(DbName)},
-                {UpdateSeq, binary:part(DbUuid, {0, PrefixLen}), node()}
+                #shard{node = config:node_name(), range = mem3:range(DbName)},
+                {UpdateSeq, binary:part(DbUuid, {0, PrefixLen}), config:node_name()}
             }
         ]
     ).
