@@ -773,7 +773,7 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
     end.
 
 -spec do_write_header(_, _) ->
-    {ok, #file{}} | {{error, Reason :: any()},  #file{}}.
+    {ok, #file{}} | {{error, Reason :: any()}, #file{}}.
 do_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
     BinSize = byte_size(Bin),
     case Pos rem ?SIZE_BLOCK of
