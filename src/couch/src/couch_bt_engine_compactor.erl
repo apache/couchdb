@@ -660,7 +660,8 @@ commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
         db_header = Header,
         meta_st = MetaState
     },
-    ok = couch_file:commit_header(Fd, CompHeader),
+    ok = couch_file:sync(Fd),
+    ok = couch_file:write_header(Fd, CompHeader),
     St2 = St1#st{
         header = Header
     },

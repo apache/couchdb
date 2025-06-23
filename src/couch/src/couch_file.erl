@@ -47,7 +47,7 @@
 -export([append_term/2, append_term/3]).
 -export([pread_terms/2]).
 -export([append_terms/2, append_terms/3]).
--export([write_header/2, read_header/1, commit_header/2]).
+-export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
 
 % gen_server callbacks
@@ -439,14 +439,6 @@ write_header(Fd, Data) ->
     FinalBin = <<Checksum/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
 
-% Same as write_header/2, but ensure durable write.
-commit_header(Fd, Data) ->
-    Bin = ?term_to_bin(Data),
-    Checksum = generate_checksum(Bin),
-    % now we assemble the final header binary and write to disk
-    FinalBin = <<Checksum/binary, Bin/binary>>,
-    ioq:call(Fd, {commit_header, FinalBin}, erlang:get(io_priority)).
-
 init_status_error(ReturnPid, Ref, Error) ->
     ReturnPid ! {Ref, self(), Error},
     ignore.
@@ -604,28 +596,7 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
             {reply, Error, reset_eof(File)}
     end;
 handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
-    {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File};
-handle_call({commit_header, Bin}, From, #file{fd = Fd} = File) ->
-    case fsync(Fd) of
-        ok ->
-            Result = handle_call({write_header, Bin}, From, File),
-            case fsync(Fd) of
-                ok ->
-                    Result;
-                {error, _} = Error ->
-                    % We're intentionally dropping all knowledge
-                    % of this Fd so that we don't accidentally
-                    % recover in some whacky edge case that I
-                    % can't fathom.
-                    {stop, Error, Error, #file{fd = nil}}
-            end;
-        {error, _} = Error ->
-            % We're intentionally dropping all knowledge
-            % of this Fd so that we don't accidentally
-            % recover in some whacky edge case that I
-            % can't fathom.
-            {stop, Error, Error, #file{fd = nil}}
-    end.
+    {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
 
 handle_cast(Msg, #file{} = File) ->
     {stop, {invalid_cast, Msg}, File}.
