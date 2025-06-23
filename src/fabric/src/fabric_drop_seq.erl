@@ -280,12 +280,11 @@ gather_drop_seq_info_fun(
     {PeerCheckpoints, ShardSyncHistory0} = Acc
 ) ->
     {Props} = Doc#doc.body,
-    case couch_util:get_value(<<"dbname">>, Props) of
+    case couch_util:get_value(<<"range">>, Props) of
         undefined ->
             %% not yet upgraded with new property
             {ok, Acc};
-        DbName ->
-            Range = mem3:range(DbName),
+        Range ->
             {[{_SrcNode, History}]} = couch_util:get_value(<<"history">>, Props),
             KeyFun = fun({Item}) ->
                 {Range, binary_to_existing_atom(couch_util:get_value(<<"source_node">>, Item)),
