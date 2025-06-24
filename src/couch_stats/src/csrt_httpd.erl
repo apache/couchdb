@@ -110,7 +110,7 @@ key_to_string(Key) when is_atom(Key) ->
 matching(MatcherName) ->
     case csrt_logger:get_matcher(binary_to_list(MatcherName)) of
         undefined ->
-            throw({bad_request, <<"unknown matcher '"/binary, MatcherName/binary, "'"/binary>>});
+            throw({bad_request, <<"unknown matcher '", MatcherName/binary, "'">>});
         Matcher ->
             Matcher
     end.
@@ -124,7 +124,7 @@ matching(MatcherName) ->
 query_matcher(MatcherName, AggregationKey, CounterKey) ->
     case csrt_logger:get_matcher(binary_to_list(MatcherName)) of
         undefined ->
-            {error, <<"unknown matcher '"/binary, MatcherName/binary, "'"/binary>>};
+            {error, <<"unknown matcher '", MatcherName/binary, "'">>};
         Matcher ->
             csrt_query:query_matcher(Matcher, AggregationKey, CounterKey)
     end.
@@ -146,7 +146,7 @@ to_key(<<"js_filter">>) -> js_filter;
 to_key(<<"js_filtered_docs">>) -> js_filtered_docs;
 to_key(<<"get_kv_node">>) -> get_kv_node;
 to_key(<<"get_kp_node">>) -> get_kp_node;
-to_key(Other) when is_binary(Other) -> throw({bad_request, <<"Invalid key '"/binary, Other/binary, "'"/binary>>}).
+to_key(Other) when is_binary(Other) -> throw({bad_request, <<"Invalid key '", Other/binary, "'">>}).
 
 -spec parse_key(Keys :: binary() | [binary()]) -> [rctx_field()]
     | throw({bad_request, Reason :: binary()}).

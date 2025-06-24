@@ -24,6 +24,7 @@
     active_workers/0,
     active_workers/1,
     all/0,
+    count_by/1,
     count_by/2,
     find_by_nonce/1,
     find_by_pid/1,
@@ -31,9 +32,15 @@
     find_workers_by_pidref/1,
     group_by/3,
     group_by/4,
-    sorted_by/2,
-    sorted_by/3,
-    sorted_by/4
+    query/1,
+    query/2,
+    query_matcher/1,
+    query_matcher/2,
+    query_matcher_rows/1,
+    query_matcher_rows/2,
+    sort_by/1,
+    sort_by/2,
+    sort_by/3
 ]).
 
 %%
@@ -112,8 +119,14 @@ field(#rctx{updated_at = Val}, updated_at) -> Val.
 curry_field(Field) ->
     fun(Ele) -> field(Ele, Field) end.
 
+count_by(KeyFun) ->
+    csrt_query:count_by(all(), KeyFun).
+
 count_by(Matcher, KeyFun) ->
     group_by(Matcher, KeyFun, fun(_) -> 1 end).
+
+group_by(KeyFun, ValFun) ->
+    csrt_query:group_by(all(), KeyFun, ValFun).
 
 group_by(Matcher, KeyFun, ValFun) ->
     group_by(Matcher, KeyFun, ValFun, fun erlang:'+'/2).
@@ -219,15 +232,71 @@ topK(Results, K) ->
     TopK = maps:fold(fun update_topK/3, new_topK(K), Results),
     get_topK(TopK).
 
-%% eg: sorted_by([username, dbname, mfa], ioq_calls)
-%% eg: sorted_by([dbname, mfa], doc_reads)
-sorted_by(KeyFun) -> topK(count_by(KeyFun), 10).
-sorted_by(KeyFun, ValFun) ->
+%% eg: sort_by([username, dbname, type], ioq_calls)
+%% eg: sort_by([dbname, type], doc_reads)
+sort_by(KeyFun) ->
+    topK(count_by(KeyFun), 10).
+sort_by(KeyFun, ValFun) ->
     {Result, Acc} = group_by(KeyFun, ValFun),
     {Result, topK(Acc, 10)}.
-sorted_by(KeyFun, ValFun, AggFun) ->
+sort_by(KeyFun, ValFun, AggFun) ->
     {Result, Acc} = group_by(KeyFun, ValFun, AggFun),
     {Result, topK(Acc, 10)}.
 
 to_json_list(List) when is_list(List) ->
     lists:map(fun csrt_util:to_json/1, List).
+
+-spec query_matcher(MatcherName :: string()) -> {ok, query_result()}
+    | {error, any()}.
+query_matcher(MatcherName) when is_list(MatcherName)  ->
+    query_matcher(MatcherName, query_limit()).
+
+-spec query_matcher(MatcherName :: matcher_name(), Limit :: pos_integer()) -> {ok, query_result()}
+    | {error, any()}.
+query_matcher(MatcherName, Limit) when is_list(MatcherName) andalso is_integer(Limit) ->
+    case csrt_logger:get_matcher(MatcherName) of
+        undefined ->
+            {error, {unknown_matcher, MatcherName}};
+        Matcher ->
+            query_matcher_rows(Matcher, Limit)
+    end.
+
+-spec query_matcher_rows(Matcher :: matcher()) -> {ok, query_result()}
+    | {error, any()}.
+query_matcher_rows(Matcher) ->
+    query_matcher_rows(Matcher, query_limit()).
+
+-spec query_matcher_rows(Matcher :: matcher(), Limit :: pos_integer()) -> {ok, query_result()}
+    | {error, any()}.
+query_matcher_rows({MSpec, _CompMSpec}, Limit) when is_list(MSpec) andalso is_integer(Limit) andalso Limit >= 1 ->
+    try
+        %% ets:select/* takes match_spec(), not  comp_match_spec()
+        %% use ets:select/3 to constrain to Limit rows, but we need to handle
+        %% the continuation() style return type compared with ets:select/2.
+        Rctxs = case ets:select(?CSRT_ETS, MSpec, Limit) of
+            {Rctxs0, _Continuation} ->
+                Rctxs0;
+            %% Handle '$end_of_table'
+            _ ->
+                []
+        end,
+        {ok, to_json_list(Rctxs)}
+    catch
+        _:_ = Error ->
+            {error, Error}
+    end.
+
+-spec query(Keys :: string() | [string()]) -> {ok, query_result()}
+    | {error, any()}.
+%% #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}
+query(Keys) ->
+    query(Keys, []).
+
+-spec query(Keys :: string() | [string()], Options :: query_options()) -> {ok, query_result()}
+    | {error, any()}.
+%% #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}
+query(_Keys, _Options) ->
+    {error, todo}.
+
+query_limit() ->
+    config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT).

@@ -42,6 +42,7 @@
 -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
 -define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
 -define(QUERY_CARDINALITY_LIMIT, 10_000).
+-define(QUERY_LIMIT, 100).
 
 %% Mapping of couch_stat metric names to #rctx{} field names.
 %% These are used for fields that we inc a counter on.
@@ -186,3 +187,7 @@
 %% least one. Ideally, we'd specify the `Pos` type sufficiently to be one of the
 %% valid #rctx record field names, however, a clean solution is not obvious.
 -type counter_updates_list() :: [{non_neg_integer(), pos_integer()}] | [].
+
+-type query_options() :: #{aggregation => group_by | sort_by | count_by, limit => pos_integer()}.
+-type aggregation_key() :: tuple().
+-type query_result() :: #{aggregation_key() => non_neg_integer()}.

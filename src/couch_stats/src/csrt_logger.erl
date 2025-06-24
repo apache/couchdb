@@ -562,11 +562,6 @@ matcher_enabled(Name) when is_list(Name) ->
 
 -spec matcher_threshold(Name, Threshold) -> string() | integer() when
     Name :: string(), Threshold :: pos_integer() | string().
-matcher_threshold("dbname", DbName) when is_binary(DbName) ->
-    %% TODO: toggle Default to undefined to disallow for particular dbname
-    %% TODO: sort out list vs binary
-    %%config:get_integer(?CONF_MATCHERS_THRESHOLD, binary_to_list(DbName), Default);
-    DbName;
 matcher_threshold(Name, Default) when
     is_list(Name) andalso is_integer(Default) andalso Default > 0
 ->

@@ -92,6 +92,10 @@
     find_workers_by_pidref/1,
     group_by/2,
     group_by/3,
+    query/1,
+    query/2,
+    query_matcher/1,
+    query_matcher/2,
     sorted/1,
     sorted_by/1,
     sorted_by/2,
@@ -146,8 +150,7 @@ call({sorted_by, [Key, Val, Agg]}) -> {node(), sorted_by(Key, Val, Agg)};
 call({FunName, Args}) ->
     FunNameBin = atom_to_binary(FunName),
     ArityBin = integer_to_binary(length(Args)),
-    {error, <<"No such function '"/binary, FunNameBin/binary, "/"/binary, ArityBin/binary>>}.
-
+    {error, <<"No such function '", FunNameBin/binary, "/", ArityBin/binary>>}.
 
 %%
 %% PidRef operations
@@ -481,6 +484,25 @@ pid_ref_attrs(AttrName) ->
     AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
 proc_window(AttrName, Num, Time) ->
     csrt_logger:proc_window(AttrName, Num, Time).
+
+-spec query_matcher(MatcherName :: matcher_name()) -> {ok, query_result()}
+    | {error, any()}.
+query_matcher(MatcherName) ->
+    csrt_query:query_matcher(MatcherName).
+
+-spec query_matcher(MatcherName :: matcher_name(), Limit :: pos_integer()) -> {ok, query_result()}
+    | {error, any()}.
+query_matcher(MatcherName, Limit) ->
+    csrt_query:query_matcher(MatcherName, Limit).
+
+-spec query(Keys :: string() | [string()], Options :: query_options()) -> {ok, query_result()}
+    | {error, any()}.
+query(Keys) ->
+    csrt_query:query(Keys).
+
+%% #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}
+query(Keys, Options) ->
+    csrt_query:query(Keys, Options).
 
 sorted(Map) ->
     csrt_query:sorted(Map).
