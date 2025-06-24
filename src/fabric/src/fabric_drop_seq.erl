@@ -5,7 +5,10 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
--export([go/1]).
+-export([
+    go/1,
+    calculate_drop_seq/1
+]).
 
 -export([
     create_peer_checkpoint_doc_if_missing/5,
@@ -40,19 +43,10 @@
 -define(END_KEY(SubType), <<?LOCAL_DOC_PREFIX, "peer-checkpoint-", SubType/binary, ".">>).
 
 go(DbName) ->
-    Shards0 = mem3:shards(DbName),
-    case gather_drop_seq_info(Shards0) of
+    case calculate_drop_seq(DbName) of
         {error, Reason} ->
             {error, Reason};
-        {ok, #{
-            uuid_map := UuidMap,
-            peer_checkpoints := PeerCheckpoints,
-            shard_sync_history := ShardSyncHistory
-        }} ->
-            Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
-            DropSeqs = calculate_drop_seqs(
-                Shards0, UuidMap, PeerCheckpoints, ShardSyncHistory
-            ),
+        {ok, Shards1, DropSeqs} ->
             Workers = lists:filtermap(
                 fun(Shard) ->
                     #shard{range = Range, node = Node, name = ShardName} = Shard,
@@ -105,6 +99,23 @@ go(DbName) ->
                         rexi_monitor:stop(RexiMon)
                     end
             end
+    end.
+
+calculate_drop_seq(DbName) ->
+    Shards0 = mem3:shards(DbName),
+    case gather_drop_seq_info(Shards0) of
+        {error, Reason} ->
+            {error, Reason};
+        {ok, #{
+            uuid_map := UuidMap,
+            peer_checkpoints := PeerCheckpoints,
+            shard_sync_history := ShardSyncHistory
+        }} ->
+            Shards1 = fully_replicated_shards_only(Shards0, ShardSyncHistory),
+            DropSeqs = calculate_drop_seqs(
+                Shards0, UuidMap, PeerCheckpoints, ShardSyncHistory
+            ),
+            {ok, Shards1, DropSeqs}
     end.
 
 -spec calculate_drop_seqs([#shard{}], uuid_map(), peer_checkpoints(), shard_sync_history()) ->
