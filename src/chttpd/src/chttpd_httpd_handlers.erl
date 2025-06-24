@@ -36,6 +36,7 @@ db_handler(<<"_partition">>) -> fun chttpd_db:handle_partition_req/2;
 db_handler(<<"_temp_view">>) -> fun chttpd_view:handle_temp_view_req/2;
 db_handler(<<"_changes">>) -> fun chttpd_db:handle_changes_req/2;
 db_handler(<<"_update_drop_seq">>) -> fun chttpd_db:handle_update_drop_seq_req/2;
+db_handler(<<"_calculate_drop_seq">>) -> fun chttpd_db:handle_calculate_drop_seq_req/2;
 db_handler(_) -> no_match.
 
 design_handler(<<"_view">>) -> fun chttpd_view:handle_view_req/3;

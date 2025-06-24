@@ -31,7 +31,8 @@
     update_doc/4,
     http_code_from_status/1,
     handle_partition_req/2,
-    handle_update_drop_seq_req/2
+    handle_update_drop_seq_req/2,
+    handle_calculate_drop_seq_req/2
 ]).
 
 -import(
@@ -403,6 +404,19 @@ handle_update_drop_seq_req(
     end;
 handle_update_drop_seq_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
+
+handle_calculate_drop_seq_req(
+    #httpd{method = 'GET', path_parts = [_DbName, <<"_calculate_drop_seq">>]} = Req, Db
+) ->
+    case fabric:calculate_drop_seq(Db) of
+        {ok, _Shards, DropSeq} ->
+            Opaque = couch_util:encodeBase64Url(?term_to_bin(DropSeq, [compressed])),
+            send_json(Req, 201, {[{ok, true}, {drop_seq, Opaque}]});
+        {error, Reason} ->
+            chttpd:send_error(Req, Reason)
+    end;
+handle_calculate_drop_seq_req(Req, _Db) ->
+    send_method_not_allowed(Req, "GET").
 
 handle_design_req(
     #httpd{
