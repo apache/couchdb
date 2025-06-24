@@ -336,10 +336,16 @@ copy_meta(#state{source_db = SourceDb, targets = Targets} = State) ->
     ),
     State#state{targets = Targets1}.
 
-spread(Amount, N) when is_integer(Amount), Amount >= 0, is_integer(N),  N > 0 ->
+spread(Amount, N) when is_integer(Amount), Amount >= 0, is_integer(N), N > 0 ->
     Div = Amount div N,
     Rem = Amount rem N,
-    [if I > Rem -> Div; true -> Div + 1 end || I <- lists:seq(1, N)].
+    [
+        if
+            I > Rem -> Div;
+            true -> Div + 1
+        end
+     || I <- lists:seq(1, N)
+    ].
 
 copy_purge_info(#state{source_db = Db} = State) ->
     {ok, NewState} = couch_db:fold_purge_infos(Db, fun purge_cb/2, State),
