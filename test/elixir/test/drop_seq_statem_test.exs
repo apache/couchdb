@@ -88,6 +88,11 @@ defmodule DropSeqStateM do
           EOF
           """)
 
+        {:set, _var, {:call, __MODULE__, :delete_peer_checkpoint, [_dbname]}} ->
+          IO.puts("""
+          curl --fail -X DELETE "#{db_url}/_local/peer-checkpoint-foo"
+          """)
+
         {:set, _var, {:call, __MODULE__, :split_shard, [_dbname]}} ->
           IO.puts("""
           RANGE=$(curl --fail -X GET "#{db_url}/_shards" | jq -r '.shards | keys[]' | shuf -n 1)
@@ -183,37 +188,39 @@ defmodule DropSeqStateM do
         {:call, __MODULE__, :check_actual_state, [{:var, :dbname}]}
 
       %State{} ->
-        base_cmds = [
-          {10, {:call, __MODULE__, :update_document, [{:var, :dbname}, doc_id()]}},
-          {10, {:call, __MODULE__, :update_peer_checkpoint, [{:var, :dbname}]}},
-          {10, {:call, __MODULE__, :compact_db, [{:var, :dbname}]}},
-          {5, {:call, __MODULE__, :split_shard, [{:var, :dbname}]}},
-          {1, {:call, __MODULE__, :create_index, [{:var, :dbname}, index_type()]}},
-          {5, {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}}
-        ]
-
-        cond do
-          s.docs == [] and s.deleted_docs == [] ->
-            frequency(base_cmds)
-
-          s.docs != [] ->
-            frequency(
-              base_cmds ++
-                [
+        # repro's restrictions in precondition function as runs fail with
+        # "Precondition failed" if propcheck chooses a command that fails the
+        # precondition instead of generating a new one like the docs say it should
+        # clearly I'm doing something wrong to make this crap necessary. fix me.
+        frequency(
+          [
+            {10, {:call, __MODULE__, :update_document, [{:var, :dbname}, doc_id()]}},
+            {10, {:call, __MODULE__, :update_peer_checkpoint, [{:var, :dbname}]}},
+            {10, {:call, __MODULE__, :compact_db, [{:var, :dbname}]}},
+            {5, {:call, __MODULE__, :split_shard, [{:var, :dbname}]}},
+            {1, {:call, __MODULE__, :create_index, [{:var, :dbname}, index_type()]}},
+            {5, {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}}
+          ] ++
+            for cmd <- [
                   {10,
-                   {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id(s)]}},
+                   {:call, __MODULE__, :delete_document, [{:var, :dbname}, doc_id(s)]}}
+                ],
+                s.docs != [] do
+              cmd
+            end ++
+            for cmd <- [
                   {10, {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]}}
-                ]
-            )
-
-          true ->
-            frequency(
-              base_cmds ++
-                [
-                  {10, {:call, __MODULE__, :update_drop_seq, [{:var, :dbname}]}}
-                ]
-            )
-        end
+                ],
+                s.docs != [] or s.deleted_docs != [] do
+              cmd
+            end ++
+            for cmd <- [
+                  {10, {:call, __MODULE__, :delete_peer_checkpoint, [{:var, :dbname}]}}
+                ],
+                s.peer_checkpoint_seq != nil do
+              cmd
+            end
+        )
     end
   end
 
@@ -283,6 +290,12 @@ defmodule DropSeqStateM do
 
     wait_for_internal_replication(db_name)
     seq_to_shards(update_seq)
+  end
+
+  def delete_peer_checkpoint(db_name) do
+    resp = Couch.delete("/#{db_name}/_local/peer-checkpoint-foo")
+    assert resp.status_code == 200
+    wait_for_internal_replication(db_name)
   end
 
   def update_drop_seq(db_name) do
@@ -462,6 +475,10 @@ defmodule DropSeqStateM do
     s.index_seq != nil
   end
 
+  def precondition(s, {:call, _, :delete_peer_checkpoint, [_db_name]}) do
+    s.peer_checkpoint_seq != nil
+  end
+
   def precondition(_, _) do
     true
   end
@@ -490,6 +507,14 @@ defmodule DropSeqStateM do
     %State{
       s
       | peer_checkpoint_seq: s.current_seq,
+        check_actual_state: true
+    }
+  end
+
+  def next_state(s, _v, {:call, _, :delete_peer_checkpoint, [_db_name]}) do
+    %State{
+      s
+      | peer_checkpoint_seq: nil,
         check_actual_state: true
     }
   end
