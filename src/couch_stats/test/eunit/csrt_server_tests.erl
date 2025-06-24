@@ -508,16 +508,20 @@ rctx_assert(Rctx, Asserts0) ->
         changes_returned => 0,
         js_filter => 0,
         js_filtered_docs => 0,
-        nonce => undefined,
+        nonce => null,
         db_open => 0,
         rows_read => 0,
         docs_read => 0,
         docs_written => 0,
-        pid_ref => undefined
+        pid_ref => null
+    },
+    Updates = #{
+        pid_ref => fun convert_pidref/1,
+        nonce => fun csrt_util:convert_string/1
     },
     Asserts = maps:merge(
         DefaultAsserts,
-        maps:update_with(pid_ref, fun convert_pidref/1, Asserts0)
+        maps:fold(fun maps:update_with/3, Asserts0, Updates)
     ),
     ok = maps:foreach(
         fun

@@ -32,6 +32,7 @@
     convert_pidref/1,
     convert_pid/1,
     convert_ref/1,
+    convert_string/1,
     to_json/1
 ]).
 
@@ -168,6 +169,7 @@ convert_type(#coordinator{method = Verb0, path = Path, mod = M0, func = F0}) ->
 convert_type(#rpc_worker{mod = M0, func = F0, from = From0}) ->
     M = atom_to_binary(M0),
     F = atom_to_binary(F0),
+    %% Technically From is a PidRef data type from Pid, but different Ref for fabric
     From = convert_pidref(From0),
     <<"rpc_worker-{", From/binary, "}:", M/binary, ":", F/binary>>;
 convert_type(undefined) ->
@@ -192,15 +194,23 @@ convert_pid(Pid) when is_pid(Pid) ->
 convert_ref(Ref) when is_reference(Ref) ->
     list_to_binary(ref_to_list(Ref)).
 
+-spec convert_string(Str :: string() | binary() | undefined) -> binary() | null.
+convert_string(undefined) ->
+    null;
+convert_string(Str) when is_list(Str) ->
+    list_to_binary(Str);
+convert_string(Bin) when is_binary(Bin) ->
+    Bin.
+
 -spec to_json(Rctx :: rctx()) -> map().
 to_json(#rctx{} = Rctx) ->
     #{
-        updated_at => tutc(Rctx#rctx.updated_at),
-        started_at => tutc(Rctx#rctx.started_at),
+        updated_at => convert_string(tutc(Rctx#rctx.updated_at)),
+        started_at => convert_string(tutc(Rctx#rctx.started_at)),
         pid_ref => convert_pidref(Rctx#rctx.pid_ref),
-        nonce => Rctx#rctx.nonce,
-        dbname => Rctx#rctx.dbname,
-        username => Rctx#rctx.username,
+        nonce => convert_string(Rctx#rctx.nonce),
+        dbname => convert_string(Rctx#rctx.dbname),
+        username => convert_string(Rctx#rctx.username),
         db_open => Rctx#rctx.db_open,
         docs_read => Rctx#rctx.docs_read,
         docs_written => Rctx#rctx.docs_written,
