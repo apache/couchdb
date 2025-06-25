@@ -171,12 +171,13 @@ group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
                 end;
             false ->
                 throw({limit, Acc})
-            end
+        end
     end,
     try
         {ok, ets:foldl(FoldFun, #{}, ?CSRT_ETS)}
-    catch throw:{limit, Acc} ->
-        {limit, Acc}
+    catch
+        throw:{limit, Acc} ->
+            {limit, Acc}
     end.
 
 maybe_match(_Ele, undefined) ->
@@ -192,7 +193,7 @@ maybe_match(Ele, {_, MS}) ->
     % we store ordered elements in ascending order
     seq = [] :: list(pos_integer()),
     % we rely on erlang sorting order where `number < atom`
-    min = infinite  :: infinite | pos_integer(),
+    min = infinite :: infinite | pos_integer(),
     max = 0 :: pos_integer(),
     size = 0 :: non_neg_integer(),
     % capacity cannot be less than 1
@@ -207,7 +208,9 @@ new_topK(K) when K >= 1 ->
 update_topK(_Key, Value, #topK{size = S, capacity = S, min = Min} = Top) when Value < Min ->
     Top#topK{min = Value};
 % when we are at capacity evict smallest value
-update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Seq} = Top) when Value > Max ->
+update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Seq} = Top) when
+    Value > Max
+->
     % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
     [_ | Truncated] = Seq,
     Top#topK{max = Value, seq = lists:keysort(2, [{Key, Value} | Truncated])};
@@ -264,12 +267,14 @@ sort_by(KeyFun, ValFun, AggFun) ->
 to_json_list(List) when is_list(List) ->
     lists:map(fun csrt_entry:to_json/1, List).
 
--spec query_matcher(MatcherName :: string()) -> {ok, query_result()}
+-spec query_matcher(MatcherName :: string()) ->
+    {ok, query_result()}
     | {error, any()}.
-query_matcher(MatcherName) when is_list(MatcherName)  ->
+query_matcher(MatcherName) when is_list(MatcherName) ->
     query_matcher(MatcherName, query_limit()).
 
--spec query_matcher(MatcherName :: matcher_name(), Limit :: pos_integer()) -> {ok, query_result()}
+-spec query_matcher(MatcherName :: matcher_name(), Limit :: pos_integer()) ->
+    {ok, query_result()}
     | {error, any()}.
 query_matcher(MatcherName, Limit) when is_list(MatcherName) andalso is_integer(Limit) ->
     case get_matcher(MatcherName) of
@@ -279,25 +284,30 @@ query_matcher(MatcherName, Limit) when is_list(MatcherName) andalso is_integer(L
             Error
     end.
 
--spec query_matcher_rows(Matcher :: matcher()) -> {ok, query_result()}
+-spec query_matcher_rows(Matcher :: matcher()) ->
+    {ok, query_result()}
     | {error, any()}.
 query_matcher_rows(Matcher) ->
     query_matcher_rows(Matcher, query_limit()).
 
--spec query_matcher_rows(Matcher :: matcher(), Limit :: pos_integer()) -> {ok, query_result()}
+-spec query_matcher_rows(Matcher :: matcher(), Limit :: pos_integer()) ->
+    {ok, query_result()}
     | {error, any()}.
-query_matcher_rows({MSpec, _CompMSpec}, Limit) when is_list(MSpec) andalso is_integer(Limit) andalso Limit >= 1 ->
+query_matcher_rows({MSpec, _CompMSpec}, Limit) when
+    is_list(MSpec) andalso is_integer(Limit) andalso Limit >= 1
+->
     try
         %% ets:select/* takes match_spec(), not  comp_match_spec()
         %% use ets:select/3 to constrain to Limit rows, but we need to handle
         %% the continuation() style return type compared with ets:select/2.
-        Rctxs = case ets:select(?CSRT_ETS, MSpec, Limit) of
-            {Rctxs0, _Continuation} ->
-                Rctxs0;
-            %% Handle '$end_of_table'
-            _ ->
-                []
-        end,
+        Rctxs =
+            case ets:select(?CSRT_ETS, MSpec, Limit) of
+                {Rctxs0, _Continuation} ->
+                    Rctxs0;
+                %% Handle '$end_of_table'
+                _ ->
+                    []
+            end,
         {ok, to_json_list(Rctxs)}
     catch
         _:_ = Error ->
