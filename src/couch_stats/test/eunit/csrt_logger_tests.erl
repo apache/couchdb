@@ -170,7 +170,7 @@ rctx_gen(Opts0) ->
         '_do_changes' => true
     },
     Opts = maps:merge(Base, Opts0),
-    csrt_util:map_to_rctx(
+    csrt_entry:from_map(
         maps:fold(
             fun
                 %% Hack for changes because we need to modify both
