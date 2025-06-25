@@ -122,15 +122,35 @@ curry_field(Field) ->
 count_by(KeyFun) ->
     csrt_query:count_by(all(), KeyFun).
 
+-spec count_by(Matcher :: matcher(), KeyFun) ->
+    query_result()
+when
+    KeyFun :: fun((Ele :: #rctx{}) -> aggregation_key()).
 count_by(Matcher, KeyFun) ->
     group_by(Matcher, KeyFun, fun(_) -> 1 end).
 
+-spec group_by(KeyFun, ValFun) ->
+    query_result()
+when
+    KeyFun :: fun((Ele :: #rctx{}) -> aggregation_key()),
+    ValFun :: fun((Ele :: #rctx{}) -> aggregation_values()).
 group_by(KeyFun, ValFun) ->
     csrt_query:group_by(all(), KeyFun, ValFun).
 
+-spec group_by(Matcher :: matcher(), KeyFun, ValFun) ->
+    query_result()
+when
+    KeyFun :: fun((Ele :: #rctx{}) -> aggregation_key()),
+    ValFun :: fun((Ele :: #rctx{}) -> aggregation_values()).
 group_by(Matcher, KeyFun, ValFun) ->
     group_by(Matcher, KeyFun, ValFun, fun erlang:'+'/2).
 
+-spec group_by(Matcher :: matcher(), KeyFun, ValFun, AggFun) ->
+    query_result()
+when
+    KeyFun :: fun((Ele :: #rctx{}) -> aggregation_key()),
+    ValFun :: fun((Ele :: #rctx{}) -> aggregation_values()),
+    AggFun :: fun((FieldValue :: pos_integer()) -> pos_integer()).
 group_by(Matcher, KeyFun, ValFun, AggFun) ->
     group_by(Matcher, KeyFun, ValFun, AggFun, ?QUERY_CARDINALITY_LIMIT).
 
@@ -232,13 +252,33 @@ topK(Results, K) ->
     TopK = maps:fold(fun update_topK/3, new_topK(K), Results),
     get_topK(TopK).
 
+-spec sort_by(KeyFun) ->
+    query_result()
+when
+    KeyFun :: fun((Ele :: #rctx{}) -> aggregation_key()).
+
 %% eg: sort_by([username, dbname, type], ioq_calls)
 %% eg: sort_by([dbname, type], doc_reads)
 sort_by(KeyFun) ->
     topK(count_by(KeyFun), 10).
+
+-spec sort_by(ValFun, AggFun) ->
+    query_result()
+when
+    ValFun :: fun((Ele :: #rctx{}) -> aggregation_values()),
+    AggFun :: fun((FieldValue :: pos_integer()) -> pos_integer()).
+
 sort_by(KeyFun, ValFun) ->
     {Result, Acc} = group_by(KeyFun, ValFun),
     {Result, topK(Acc, 10)}.
+
+-spec sort_by(KeyFun, ValFun, AggFun) ->
+    query_result()
+when
+    KeyFun :: fun((Ele :: #rctx{}) -> aggregation_key()),
+    ValFun :: fun((Ele :: #rctx{}) -> aggregation_values()),
+    AggFun :: fun((FieldValue :: pos_integer()) -> pos_integer()).
+
 sort_by(KeyFun, ValFun, AggFun) ->
     {Result, Acc} = group_by(KeyFun, ValFun, AggFun),
     {Result, topK(Acc, 10)}.
