@@ -92,32 +92,8 @@ find_by_pidref(PidRef) ->
 find_workers_by_pidref(PidRef) ->
     csrt_server:match_resource(#rctx{type = #rpc_worker{from = PidRef}}).
 
-field(#rctx{pid_ref = Val}, pid_ref) -> Val;
-%% NOTE: Pros and cons to doing these convert functions here
-%% Ideally, this would be done later so as to prefer the core data structures
-%% as long as possible, but we currently need the output of this function to
-%% be jiffy:encode'able. The tricky bit is dynamically encoding the group_by
-%% structure provided by the caller of *_by aggregator functions below.
-%% For now, we just always return jiffy:encode'able data types.
-field(#rctx{nonce = Val}, nonce) -> Val;
-field(#rctx{type = Val}, type) -> csrt_util:convert_type(Val);
-field(#rctx{dbname = Val}, dbname) -> Val;
-field(#rctx{username = Val}, username) -> Val;
-field(#rctx{db_open = Val}, db_open) -> Val;
-field(#rctx{docs_read = Val}, docs_read) -> Val;
-field(#rctx{docs_written = Val}, docs_written) -> Val;
-field(#rctx{rows_read = Val}, rows_read) -> Val;
-field(#rctx{changes_returned = Val}, changes_returned) -> Val;
-field(#rctx{ioq_calls = Val}, ioq_calls) -> Val;
-field(#rctx{js_filter = Val}, js_filter) -> Val;
-field(#rctx{js_filtered_docs = Val}, js_filtered_docs) -> Val;
-field(#rctx{get_kv_node = Val}, get_kv_node) -> Val;
-field(#rctx{get_kp_node = Val}, get_kp_node) -> Val;
-field(#rctx{started_at = Val}, started_at) -> Val;
-field(#rctx{updated_at = Val}, updated_at) -> Val.
-
 curry_field(Field) ->
-    fun(Ele) -> field(Ele, Field) end.
+    fun(Ele) -> csrt_entry:value(Ele, Field) end.
 
 count_by(KeyFun) ->
     csrt_query:count_by(all(), KeyFun).
@@ -167,7 +143,7 @@ all() ->
 %% eg: group_by(all(), [username, dbname, mfa], ioq_calls).
 %% eg: group_by(all(), [username, dbname, mfa], js_filters).
 group_by(Matcher, KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
-    KeyFun = fun(Ele) -> list_to_tuple([field(Ele, Key) || Key <- KeyL]) end,
+    KeyFun = fun(Ele) -> list_to_tuple([csrt_entry:value(Ele, Key) || Key <- KeyL]) end,
     group_by(Matcher, KeyFun, ValFun, AggFun, Limit);
 group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
     group_by(Matcher, curry_field(Key), ValFun, AggFun, Limit);

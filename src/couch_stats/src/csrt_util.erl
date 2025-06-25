@@ -58,7 +58,6 @@
     set_fabric_init_p/2,
     set_fabric_init_p/3,
     map_to_rctx/1,
-    field/2,
     rctx_record_info/0
 ]).
 
@@ -276,42 +275,6 @@ map_to_rctx_field(_, _, Rctx) ->
     %% Unknown key, could throw but just move on
     Rctx.
 
--spec field(Field :: rctx_field(), Rctx :: rctx()) -> any().
-field(updated_at, #rctx{updated_at = Val}) ->
-    Val;
-field(started_at, #rctx{started_at = Val}) ->
-    Val;
-field(pid_ref, #rctx{pid_ref = Val}) ->
-    Val;
-field(nonce, #rctx{nonce = Val}) ->
-    Val;
-field(dbname, #rctx{dbname = Val}) ->
-    Val;
-field(username, #rctx{username = Val}) ->
-    Val;
-field(db_open, #rctx{db_open = Val}) ->
-    Val;
-field(docs_read, #rctx{docs_read = Val}) ->
-    Val;
-field(docs_written, #rctx{docs_written = Val}) ->
-    Val;
-field(js_filter, #rctx{js_filter = Val}) ->
-    Val;
-field(js_filtered_docs, #rctx{js_filtered_docs = Val}) ->
-    Val;
-field(rows_read, #rctx{rows_read = Val}) ->
-    Val;
-field(type, #rctx{type = Val}) ->
-    Val;
-field(get_kp_node, #rctx{get_kp_node = Val}) ->
-    Val;
-field(get_kv_node, #rctx{get_kv_node = Val}) ->
-    Val;
-field(changes_returned, #rctx{changes_returned = Val}) ->
-    Val;
-field(ioq_calls, #rctx{ioq_calls = Val}) ->
-    Val.
-
 -spec add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 add_delta(T, undefined) ->
     T;
@@ -520,10 +483,10 @@ t_should_not_track_init_p(_) ->
 t_should_extract_fields_properly(_) ->
     Rctx = #rctx{},
     #{fields := Fields} = rctx_record_info(),
-    %% field/2 throws on invalid fields, assert that the function succeeded
+    %% csrt_entry:value/2 throws on invalid fields, assert that the function succeeded
     TestField = fun(Field) ->
         try
-            field(Field, Rctx),
+            csrt_entry:value(Rctx, Field),
             true
         catch
             _:_ -> false
