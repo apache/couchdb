@@ -344,7 +344,7 @@ do_report(ReportName, PidRef) ->
 
 -spec to_json(Rctx :: rctx()) -> map().
 to_json(Rctx) ->
-    csrt_util:to_json(Rctx).
+    csrt_entry:to_json(Rctx).
 
 %%
 %% Stat collection API

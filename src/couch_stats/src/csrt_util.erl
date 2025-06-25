@@ -26,16 +26,6 @@
     tutc/1
 ]).
 
-%% JSON Conversion API
--export([
-    convert_type/1,
-    convert_pidref/1,
-    convert_pid/1,
-    convert_ref/1,
-    convert_string/1,
-    to_json/1
-]).
-
 %% Delta API
 -export([
     add_delta/2,
@@ -56,8 +46,7 @@
 %% Extra niceties and testing facilities
 -export([
     set_fabric_init_p/2,
-    set_fabric_init_p/3,
-    rctx_record_info/0
+    set_fabric_init_p/3
 ]).
 
 -include_lib("couch_stats_resource_tracker.hrl").
@@ -152,78 +141,6 @@ make_dt(A, B, Unit) when is_integer(A) andalso is_integer(B) andalso B > A ->
             %% 0
             1
     end.
-
-%%
-%% Conversion API for outputting JSON
-%%
-
--spec convert_type(T) -> binary() | null when
-    T :: #coordinator{} | #rpc_worker{} | undefined.
-convert_type(#coordinator{method = Verb0, path = Path, mod = M0, func = F0}) ->
-    M = atom_to_binary(M0),
-    F = atom_to_binary(F0),
-    Verb = atom_to_binary(Verb0),
-    <<"coordinator-{", M/binary, ":", F/binary, "}:", Verb/binary, ":", Path/binary>>;
-convert_type(#rpc_worker{mod = M0, func = F0, from = From0}) ->
-    M = atom_to_binary(M0),
-    F = atom_to_binary(F0),
-    %% Technically From is a PidRef data type from Pid, but different Ref for fabric
-    From = convert_pidref(From0),
-    <<"rpc_worker-{", From/binary, "}:", M/binary, ":", F/binary>>;
-convert_type(undefined) ->
-    null.
-
--spec convert_pidref(PidRef) -> binary() | null when
-    PidRef :: {A :: pid(), B :: reference()} | undefined.
-convert_pidref({Parent0, ParentRef0}) ->
-    Parent = convert_pid(Parent0),
-    ParentRef = convert_ref(ParentRef0),
-    <<Parent/binary, ":", ParentRef/binary>>;
-%%convert_pidref(null) ->
-%%    null;
-convert_pidref(undefined) ->
-    null.
-
--spec convert_pid(Pid :: pid()) -> binary().
-convert_pid(Pid) when is_pid(Pid) ->
-    list_to_binary(pid_to_list(Pid)).
-
--spec convert_ref(Ref :: reference()) -> binary().
-convert_ref(Ref) when is_reference(Ref) ->
-    list_to_binary(ref_to_list(Ref)).
-
--spec convert_string(Str :: string() | binary() | undefined) -> binary() | null.
-convert_string(undefined) ->
-    null;
-convert_string(Str) when is_list(Str) ->
-    list_to_binary(Str);
-convert_string(Bin) when is_binary(Bin) ->
-    Bin.
-
--spec to_json(Rctx :: rctx()) -> map().
-to_json(#rctx{} = Rctx) ->
-    #{
-        updated_at => convert_string(tutc(Rctx#rctx.updated_at)),
-        started_at => convert_string(tutc(Rctx#rctx.started_at)),
-        pid_ref => convert_pidref(Rctx#rctx.pid_ref),
-        nonce => convert_string(Rctx#rctx.nonce),
-        dbname => convert_string(Rctx#rctx.dbname),
-        username => convert_string(Rctx#rctx.username),
-        db_open => Rctx#rctx.db_open,
-        docs_read => Rctx#rctx.docs_read,
-        docs_written => Rctx#rctx.docs_written,
-        js_filter => Rctx#rctx.js_filter,
-        js_filtered_docs => Rctx#rctx.js_filtered_docs,
-        rows_read => Rctx#rctx.rows_read,
-        type => convert_type(Rctx#rctx.type),
-        get_kp_node => Rctx#rctx.get_kp_node,
-        get_kv_node => Rctx#rctx.get_kv_node,
-        %% "Example to extend CSRT"
-        %% write_kp_node => Rctx#rctx.write_kp_node,
-        %% write_kv_node => Rctx#rctx.write_kv_node,
-        changes_returned => Rctx#rctx.changes_returned,
-        ioq_calls => Rctx#rctx.ioq_calls
-    }.
 
 -spec add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 add_delta(T, undefined) ->
