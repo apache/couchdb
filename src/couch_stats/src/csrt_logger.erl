@@ -417,14 +417,14 @@ matcher_on_ioq_calls(Threshold) when
 
 %%-spec matcher_for_rctx_field(Field :: rctx_field()) -> ets:match_spec().
 %%matcher_for_rctx_field() ->
-%%    #{size := Size0, fields := Fields} = csrt_util:rctx_record_info(),
+%%    #{size := Size0, fields := Fields} = csrt_entry:record_info(),
 %%    %% Subtract 1 as record_info size includes tuple record name
-%%    %% erlang:list_to_tuple([rctx | lists:duplicate(maps:get(size, csrt_util:rctx_record_info()), '_')])
+%%    %% erlang:list_to_tuple([rctx | lists:duplicate(maps:get(size, csrt_entry:record_info()), '_')])
 %%    Size = Size - 1,
 
 -spec pid_ref_matchspec(AttrName :: rctx_field()) -> matcher() | throw(any()).
 pid_ref_matchspec(AttrName) ->
-    #{field_idx := FieldIdx} = csrt_util:rctx_record_info(),
+    #{field_idx := FieldIdx} = csrt_entry:record_info(),
     RctxMatch0 = #rctx{_ = '_'},
     RctxMatch1 = setelement(maps:get(pid_ref, FieldIdx) + 1, RctxMatch0, '$1'),
     RctxMatch = setelement(maps:get(AttrName, FieldIdx) + 1, RctxMatch1, '$2'),
