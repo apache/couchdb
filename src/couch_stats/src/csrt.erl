@@ -92,8 +92,8 @@
     find_workers_by_pidref/1,
     group_by/2,
     group_by/3,
-    query/1,
     query/2,
+    query/4,
     query_matcher/1,
     query_matcher/2,
     sorted/1,
@@ -495,14 +495,21 @@ query_matcher(MatcherName) ->
 query_matcher(MatcherName, Limit) ->
     csrt_query:query_matcher(MatcherName, Limit).
 
--spec query(Keys :: string() | [string()], Options :: query_options()) -> {ok, query_result()}
+-spec query(MatcherName :: string(), Keys :: binary() | rctx_field() | [binary()] | [rctx_field()]) ->
+    {ok, query_result()}
     | {error, any()}.
-query(Keys) ->
-    csrt_query:query(Keys).
+query(MatcherName, AggregationKeys) ->
+    csrt_query:query(MatcherName, AggregationKeys).
 
-%% #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}
-query(Keys, Options) ->
-    csrt_query:query(Keys, Options).
+-spec query(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
+    ValueKey :: binary() | rctx_field().
+query(MatcherName, AggregationKeys, ValueKey, Options) ->
+    csrt_query:query(MatcherName, AggregationKeys, ValueKey, Options).
 
 sorted(Map) ->
     csrt_query:sorted(Map).

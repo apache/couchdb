@@ -12,6 +12,8 @@
 
 -module(csrt_query).
 
+-feature(maybe_expr, enable).
+
 -include_lib("stdlib/include/ms_transform.hrl").
 -include_lib("couch_stats_resource_tracker.hrl").
 
@@ -32,8 +34,8 @@
     find_workers_by_pidref/1,
     group_by/3,
     group_by/4,
-    query/1,
     query/2,
+    query/4,
     query_matcher/1,
     query_matcher/2,
     query_matcher_rows/1,
@@ -270,11 +272,11 @@ query_matcher(MatcherName) when is_list(MatcherName)  ->
 -spec query_matcher(MatcherName :: matcher_name(), Limit :: pos_integer()) -> {ok, query_result()}
     | {error, any()}.
 query_matcher(MatcherName, Limit) when is_list(MatcherName) andalso is_integer(Limit) ->
-    case csrt_logger:get_matcher(MatcherName) of
-        undefined ->
-            {error, {unknown_matcher, MatcherName}};
-        Matcher ->
-            query_matcher_rows(Matcher, Limit)
+    case get_matcher(MatcherName) of
+        {ok, Matcher} ->
+            query_matcher_rows(Matcher, Limit);
+        Error ->
+            Error
     end.
 
 -spec query_matcher_rows(Matcher :: matcher()) -> {ok, query_result()}
@@ -302,17 +304,90 @@ query_matcher_rows({MSpec, _CompMSpec}, Limit) when is_list(MSpec) andalso is_in
             {error, Error}
     end.
 
--spec query(Keys :: string() | [string()]) -> {ok, query_result()}
-    | {error, any()}.
-%% #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}
-query(Keys) ->
-    query(Keys, []).
+get_matcher(MatcherName) ->
+    case csrt_logger:get_matcher(MatcherName) of
+        undefined ->
+            {error, {unknown_matcher, MatcherName}};
+        Matcher ->
+            {ok, Matcher}
+    end.
 
--spec query(Keys :: string() | [string()], Options :: query_options()) -> {ok, query_result()}
+-spec query(MatcherName :: string(), Keys :: binary() | rctx_field() | [binary()] | [rctx_field()]) ->
+    {ok, query_result()}
     | {error, any()}.
-%% #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}
-query(_Keys, _Options) ->
-    {error, todo}.
+%% {ok, #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}}
+query(MatcherName, AggregationKeys) ->
+    query(MatcherName, AggregationKeys, undefined, #{}).
+
+-spec query(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
+    ValueKey :: binary() | rctx_field().
+%% {ok, #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}}
+query(MatcherName, AggregationKeys, ValueKey, Options) ->
+    AggregationKey = parse_key(AggregationKeys),
+    VKey = parse_key(ValueKey),
+    Limit = maps:get(Options, aggregation, query_limit()),
+    Aggregation = maps:get(Options, aggregation, none),
+    maybe
+        ok ?= validate_limit(Limit),
+        ok ?= validate_aggregation(Aggregation),
+        {ok, Matcher} ?= get_matcher(MatcherName),
+        case Aggregation of
+            group_by ->
+                group_by(Matcher, AggregationKey, VKey);
+            sort_by ->
+                sort_by(Matcher, AggregationKey, VKey);
+            count_by when VKey == undefined ->
+                count_by(Matcher, AggregationKey);
+            count_by ->
+                {error, {extra_argument, value_key}};
+            none ->
+                query_matcher_rows(Matcher, Limit)
+        end
+    end.
 
 query_limit() ->
     config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT).
+
+validate_limit(Limit) when is_integer(Limit) ->
+    case Limit =< query_limit() of
+        true ->
+            ok;
+        false ->
+            {error, {beyond_limit, query_limit()}}
+    end;
+validate_limit(Limit) ->
+    {error, {invalid_limit, Limit}}.
+
+validate_aggregation(none) ->
+    ok;
+validate_aggregation(group_by) ->
+    ok;
+validate_aggregation(sort_by) ->
+    ok;
+validate_aggregation(count_by) ->
+    ok;
+validate_aggregation(Other) ->
+    {error, {invalid_aggregation, Other}}.
+
+-spec parse_key(Keys :: binary() | atom() | [binary()] | [atom()]) ->
+    [rctx_field()]
+    | throw({bad_request, Reason :: binary()}).
+
+parse_key(Keys) when is_list(Keys) ->
+    parse_key(Keys, []);
+parse_key(BinKey) when is_binary(BinKey) ->
+    csrt_entry:key(BinKey);
+parse_key(undefined) ->
+    undefined;
+parse_key(Key) when is_atom(Key) ->
+    csrt_entry:key(Key).
+
+parse_key([BinKey | Rest], Keys) ->
+    parse_key(Rest, [csrt_entry:key(BinKey) | Keys]);
+parse_key([], Keys) ->
+    lists:reverse(Keys).
