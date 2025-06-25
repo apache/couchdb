@@ -93,7 +93,7 @@ find_workers_by_pidref(PidRef) ->
     csrt_server:match_resource(#rctx{type = #rpc_worker{from = PidRef}}).
 
 curry_field(Field) ->
-    fun(Ele) -> csrt_entry:value(Ele, Field) end.
+    fun(Ele) -> csrt_entry:value(Field, Ele) end.
 
 count_by(KeyFun) ->
     csrt_query:count_by(all(), KeyFun).
@@ -143,7 +143,7 @@ all() ->
 %% eg: group_by(all(), [username, dbname, mfa], ioq_calls).
 %% eg: group_by(all(), [username, dbname, mfa], js_filters).
 group_by(Matcher, KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
-    KeyFun = fun(Ele) -> list_to_tuple([csrt_entry:value(Ele, Key) || Key <- KeyL]) end,
+    KeyFun = fun(Ele) -> list_to_tuple([csrt_entry:value(Key, Ele) || Key <- KeyL]) end,
     group_by(Matcher, KeyFun, ValFun, AggFun, Limit);
 group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
     group_by(Matcher, curry_field(Key), ValFun, AggFun, Limit);
