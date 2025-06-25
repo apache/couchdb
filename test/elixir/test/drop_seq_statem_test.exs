@@ -158,6 +158,7 @@ defmodule DropSeqStateM do
               current_seq: 0,
               peer_checkpoint_seq: nil,
               index_seq: nil,
+              indexes_exist: false,
               drop_seq: nil,
               drop_count: 0,
               check_actual_state: false
@@ -568,7 +569,7 @@ defmodule DropSeqStateM do
     %State{s | check_actual_state: false}
   end
 
-  def next_state(s = %State{index_seq: nil}, _v, {:call, _, :split_shard, [_db_name]}) do
+  def next_state(s = %State{indexes_exist: false}, _v, {:call, _, :split_shard, [_db_name]}) do
     %State{s | check_actual_state: true}
   end
 
@@ -581,6 +582,7 @@ defmodule DropSeqStateM do
     %State{
       s
       | current_seq: s.current_seq + 1,
+        indexes_exist: true,
         check_actual_state: true
     }
   end
