@@ -37,7 +37,9 @@ resp_to_json([], Acc) ->
 %     %% TODO: incorporate Bad responses
 %     Resp = rpc_to_json(csrt:rpc(active, [json])),
 %     send_json(Req, Resp);
-handle_resource_status_req(#httpd{method = 'POST', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherName]} = Req) ->
+handle_resource_status_req(
+    #httpd{method = 'POST', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherName]} = Req
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     GroupBy = couch_util:get_value(<<"group_by">>, JsonProps),
@@ -57,7 +59,6 @@ handle_resource_status_req(#httpd{method = 'POST', path_parts = [<<"_active_reso
 handle_resource_status_req(#httpd{path_parts = [<<"_active_resources">>]} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_method_not_allowed(Req, "GET,HEAD");
-
 handle_resource_status_req(Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_method_not_allowed(Req, "GET,HEAD,POST").
@@ -129,8 +130,10 @@ query_matcher(MatcherName, AggregationKey, CounterKey) ->
             csrt_query:query_matcher(Matcher, AggregationKey, CounterKey)
     end.
 
--spec to_key(BinKey :: binary() | string()) -> Key :: rctx_field()
-    | throw({bad_request, Reason :: binary()}).
+-spec to_key(BinKey :: binary() | string()) ->
+    Key ::
+        rctx_field()
+        | throw({bad_request, Reason :: binary()}).
 
 to_key(<<"pid_ref">>) -> pid_ref;
 to_key(<<"nonce">>) -> nonce;
@@ -148,7 +151,8 @@ to_key(<<"get_kv_node">>) -> get_kv_node;
 to_key(<<"get_kp_node">>) -> get_kp_node;
 to_key(Other) when is_binary(Other) -> throw({bad_request, <<"Invalid key '", Other/binary, "'">>}).
 
--spec parse_key(Keys :: binary() | [binary()]) -> [rctx_field()]
+-spec parse_key(Keys :: binary() | [binary()]) ->
+    [rctx_field()]
     | throw({bad_request, Reason :: binary()}).
 
 parse_key(Keys) when is_list(Keys) ->
@@ -162,4 +166,3 @@ parse_key([BinKey | Rest], Keys) ->
     parse_key(Rest, [to_key(BinKey) | Keys]);
 parse_key([], Keys) ->
     lists:reverse(Keys).
-
