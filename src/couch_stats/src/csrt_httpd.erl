@@ -129,37 +129,18 @@ query_matcher(MatcherName, AggregationKey, CounterKey) ->
             csrt_query:query_matcher(Matcher, AggregationKey, CounterKey)
     end.
 
--spec to_key(BinKey :: binary() | string()) -> Key :: rctx_field()
-    | throw({bad_request, Reason :: binary()}).
-
-to_key(<<"pid_ref">>) -> pid_ref;
-to_key(<<"nonce">>) -> nonce;
-to_key(<<"type">>) -> type;
-to_key(<<"dbname">>) -> dbname;
-to_key(<<"username">>) -> username;
-to_key(<<"db_open">>) -> db_open;
-to_key(<<"docs_read">>) -> docs_read;
-to_key(<<"rows_read">>) -> rows_read;
-to_key(<<"changes_returned">>) -> changes_returned;
-to_key(<<"ioq_calls">>) -> ioq_calls;
-to_key(<<"js_filter">>) -> js_filter;
-to_key(<<"js_filtered_docs">>) -> js_filtered_docs;
-to_key(<<"get_kv_node">>) -> get_kv_node;
-to_key(<<"get_kp_node">>) -> get_kp_node;
-to_key(Other) when is_binary(Other) -> throw({bad_request, <<"Invalid key '", Other/binary, "'">>}).
-
 -spec parse_key(Keys :: binary() | [binary()]) -> [rctx_field()]
     | throw({bad_request, Reason :: binary()}).
 
 parse_key(Keys) when is_list(Keys) ->
     parse_key(Keys, []);
 parse_key(BinKey) when is_binary(BinKey) ->
-    to_key(BinKey);
+    csrt_entry:key(BinKey);
 parse_key(undefined) ->
     undefined.
 
 parse_key([BinKey | Rest], Keys) ->
-    parse_key(Rest, [to_key(BinKey) | Keys]);
+    parse_key(Rest, [csrt_entry:key(BinKey) | Keys]);
 parse_key([], Keys) ->
     lists:reverse(Keys).
 
