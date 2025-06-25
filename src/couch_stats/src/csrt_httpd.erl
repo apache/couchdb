@@ -59,7 +59,6 @@ handle_resource_status_req(
 handle_resource_status_req(#httpd{path_parts = [<<"_active_resources">>]} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_method_not_allowed(Req, "GET,HEAD");
-
 handle_resource_status_req(Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_method_not_allowed(Req, "GET,HEAD,POST").
