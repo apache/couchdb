@@ -497,7 +497,7 @@ pdbg(Str, Args) ->
     ?DEBUG_ENABLED andalso ?debugFmt(Str, Args).
 
 convert_pidref({_, _} = PidRef) ->
-    csrt_util:convert_pidref(PidRef);
+    csrt_entry:convert_pidref(PidRef);
 convert_pidref(PidRef) when is_binary(PidRef) ->
     PidRef;
 convert_pidref(false) ->
@@ -517,7 +517,7 @@ rctx_assert(Rctx, Asserts0) ->
     },
     Updates = #{
         pid_ref => fun convert_pidref/1,
-        nonce => fun csrt_util:convert_string/1
+        nonce => fun csrt_entry:convert_string/1
     },
     Asserts = maps:merge(
         DefaultAsserts,
@@ -616,4 +616,4 @@ configure_filter(DbName, DDocId, Req, FName) ->
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas
     timer:sleep(50),
-    csrt_util:to_json(csrt:get_resource(PidRef)).
+    csrt_entry:to_json(csrt:get_resource(PidRef)).

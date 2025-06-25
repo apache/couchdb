@@ -203,7 +203,7 @@ rctxs() ->
     [rctx_gen() || _ <- lists:seq(1, ?RCTX_COUNT)].
 
 jrctx(Rctx) ->
-    JRctx = csrt_util:to_json(Rctx),
+    JRctx = csrt_entry:to_json(Rctx),
     case csrt_logger:should_truncate_reports() of
         true ->
             maps:filter(fun(_K, V) -> V > 0 end, JRctx);
