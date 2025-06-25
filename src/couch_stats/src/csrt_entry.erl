@@ -21,25 +21,25 @@
     from_map/1
 ]).
 
--spec value(#rctx{}, rctx_field()) -> any().
+-spec value(rctx_field(), #rctx{}) -> any().
 
-value(#rctx{pid_ref = Val}, pid_ref) -> Val;
-value(#rctx{nonce = Val}, nonce) -> Val;
-value(#rctx{type = Val}, type) -> csrt_util:convert_type(Val);
-value(#rctx{dbname = Val}, dbname) -> Val;
-value(#rctx{username = Val}, username) -> Val;
-value(#rctx{db_open = Val}, db_open) -> Val;
-value(#rctx{docs_read = Val}, docs_read) -> Val;
-value(#rctx{docs_written = Val}, docs_written) -> Val;
-value(#rctx{rows_read = Val}, rows_read) -> Val;
-value(#rctx{changes_returned = Val}, changes_returned) -> Val;
-value(#rctx{ioq_calls = Val}, ioq_calls) -> Val;
-value(#rctx{js_filter = Val}, js_filter) -> Val;
-value(#rctx{js_filtered_docs = Val}, js_filtered_docs) -> Val;
-value(#rctx{get_kv_node = Val}, get_kv_node) -> Val;
-value(#rctx{get_kp_node = Val}, get_kp_node) -> Val;
-value(#rctx{started_at = Val}, started_at) -> Val;
-value(#rctx{updated_at = Val}, updated_at) -> Val.
+value(pid_ref, #rctx{pid_ref = Val}) -> Val;
+value(nonce, #rctx{nonce = Val}) -> Val;
+value(type, #rctx{type = Val}) -> csrt_util:convert_type(Val);
+value(dbname, #rctx{dbname = Val}) -> Val;
+value(username, #rctx{username = Val}) -> Val;
+value(db_open, #rctx{db_open = Val}) -> Val;
+value(docs_read, #rctx{docs_read = Val}) -> Val;
+value(docs_written, #rctx{docs_written = Val}) -> Val;
+value(rows_read, #rctx{rows_read = Val}) -> Val;
+value(changes_returned, #rctx{changes_returned = Val}) -> Val;
+value(ioq_calls, #rctx{ioq_calls = Val}) -> Val;
+value(js_filter, #rctx{js_filter = Val}) -> Val;
+value(js_filtered_docs, #rctx{js_filtered_docs = Val}) -> Val;
+value(get_kv_node, #rctx{get_kv_node = Val}) -> Val;
+value(get_kp_node, #rctx{get_kp_node = Val}) -> Val;
+value(started_at, #rctx{started_at = Val}) -> Val;
+value(updated_at, #rctx{updated_at = Val}) -> Val.
 
 -spec key(BinKey :: binary() | string() | atom()) -> Key :: rctx_field()
     | throw({bad_request, Reason :: binary()}).

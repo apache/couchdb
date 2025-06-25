@@ -278,8 +278,8 @@ t_updated_at({_Ctx, DbName, _View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    Started = csrt_entry:value(RawRctx, started_at),
-    Updated = csrt_entry:value(RawRctx, updated_at),
+    Started = csrt_entry:value(started_at, RawRctx),
+    Updated = csrt_entry:value(updated_at, RawRctx),
     ?assert(
         csrt_util:make_dt(Started, Updated, millisecond) > TimeDelay,
         "updated_at gets updated with an expected TimeDelay"

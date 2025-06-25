@@ -436,7 +436,7 @@ t_should_extract_fields_properly(_) ->
     %% csrt_entry:value/2 throws on invalid fields, assert that the function succeeded
     TestField = fun(Field) ->
         try
-            csrt_entry:value(Rctx, Field),
+            csrt_entry:value(Field, Rctx),
             true
         catch
             _:_ -> false
