@@ -359,22 +359,6 @@ fabric_conf_key(Key) ->
     %% Double underscore to separate Mod and Func
     "fabric_rpc__" ++ atom_to_list(Key).
 
--spec rctx_record_info() ->
-    #{
-        fields => [rctx_field()],
-        size => pos_integer(),
-        field_idx => #{rctx_field() => pos_integer()}
-    }.
-rctx_record_info() ->
-    Fields = record_info(fields, rctx),
-    Size = record_info(size, rctx),
-    Idx = maps:from_list(lists:zip(Fields, lists:seq(1, length(Fields)))),
-    #{
-        fields => Fields,
-        field_idx => Idx,
-        size => Size
-    }.
-
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -432,7 +416,7 @@ t_should_not_track_init_p(_) ->
 
 t_should_extract_fields_properly(_) ->
     Rctx = #rctx{},
-    #{fields := Fields} = rctx_record_info(),
+    #{fields := Fields} = csrt_entry:record_info(),
     %% csrt_entry:value/2 throws on invalid fields, assert that the function succeeded
     TestField = fun(Field) ->
         try
