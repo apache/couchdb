@@ -288,8 +288,8 @@ t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
     %% Make sure we have at least one match
     Rctxs = [rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
     ChangesFilter = fun(R) ->
-        Ret = csrt_entry:value(R, changes_returned),
-        Proc = csrt_entry:value(R, rows_read),
+        Ret = csrt_entry:value(changes_returned, R),
+        Proc = csrt_entry:value(rows_read, R),
         (Proc - Ret) >= Threshold
     end,
     ?assertEqual(
@@ -309,8 +309,8 @@ t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
     UpdatedAt = Now - round(NativeThreshold * 1.23),
     Rctxs = [rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0],
     DurationFilter = fun(R) ->
-        Started = csrt_entry:value(R, started_at),
-        Updated = csrt_entry:value(R, updated_at),
+        Started = csrt_entry:value(started_at, R),
+        Updated = csrt_entry:value(updated_at, R),
         abs(Updated - Started) >= NativeThreshold
     end,
     ?assertEqual(
@@ -472,7 +472,7 @@ matcher_on(Field, Value) ->
     matcher_for(Field, Value, fun erlang:'=:='/2).
 
 matcher_for(Field, Value, Op) ->
-    fun(Rctx) -> Op(csrt_entry:value(Rctx, Field), Value) end.
+    fun(Rctx) -> Op(csrt_entry:value(Field, Rctx), Value) end.
 
 matcher_for_csrt(MatcherName) ->
     Matchers = #{MatcherName => {_, _} = csrt_logger:get_matcher(MatcherName)},
@@ -487,9 +487,9 @@ matcher_for_csrt(MatcherName) ->
 matcher_for_dbname_io(Dbname0, Threshold) ->
     Dbname = list_to_binary(Dbname0),
     fun(Rctx) ->
-        DbnameA = csrt_entry:value(Rctx, dbname),
+        DbnameA = csrt_entry:value(dbname, Rctx),
         Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read],
-        Vals = [{F, csrt_entry:value(Rctx, F)} || F <- Fields],
+        Vals = [{F, csrt_entry:value(F, Rctx)} || F <- Fields],
         Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun({_K, V}) -> V >= Threshold end, Vals)
     end.
 
