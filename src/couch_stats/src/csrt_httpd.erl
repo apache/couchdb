@@ -64,8 +64,7 @@ handle_resource_status_req(Req) ->
 
 handle_count_by(Req, MatcherName, CountBy) ->
     AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, CountBy),
-    AggregationKey = parse_key(AggregationKeys),
-    case csrt_query:count_by(matching(MatcherName), AggregationKey) of
+    case csrt:query(MatcherName, AggregationKeys, undefined, #{aggregation => count_by}) of
         {ok, Map} ->
             send_json(Req, {aggregation_result_to_json(Map)});
         Else ->
@@ -76,9 +75,7 @@ handle_count_by(Req, MatcherName, CountBy) ->
 handle_sort_by(Req, MatcherName, SortBy) ->
     AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, SortBy),
     CounterKey = couch_util:get_value(<<"counter_key">>, SortBy),
-    AggregationKey = parse_key(AggregationKeys),
-    ValueKey = parse_key(CounterKey),
-    case csrt_query:sort_by(matching(MatcherName), AggregationKey, ValueKey) of
+    case csrt:query(MatcherName, AggregationKeys, CounterKey, #{aggregation => sort_by}) of
         {ok, Map} ->
             send_json(Req, {aggregation_result_to_json(Map)});
         Else ->
@@ -89,9 +86,7 @@ handle_sort_by(Req, MatcherName, SortBy) ->
 handle_group_by(Req, MatcherName, GroupBy) ->
     AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, GroupBy),
     CounterKey = couch_util:get_value(<<"counter_key">>, GroupBy),
-    AggregationKey = parse_key(AggregationKeys),
-    ValueKey = parse_key(CounterKey),
-    case csrt_query:group_by(matching(MatcherName), AggregationKey, ValueKey) of
+    case csrt:query(MatcherName, AggregationKeys, CounterKey, #{aggregation => group_by}) of
         {ok, Map} ->
             send_json(Req, {aggregation_result_to_json(Map)});
         Else ->
@@ -106,41 +101,3 @@ key_to_string(Key) when is_tuple(Key) ->
     list_to_binary(string:join([atom_to_list(K) || K <- tuple_to_list(Key)], ","));
 key_to_string(Key) when is_atom(Key) ->
     atom_to_binary(Key).
-
-matching(MatcherName) ->
-    case csrt_logger:get_matcher(binary_to_list(MatcherName)) of
-        undefined ->
-            throw({bad_request, <<"unknown matcher '", MatcherName/binary, "'">>});
-        Matcher ->
-            Matcher
-    end.
-
-% extract one of the predefined matchers
-%   - docs_read
-%   - rows_read
-%   - docs_written
-%   - worker_changes_processed
-%   - ioq_calls
-query_matcher(MatcherName, AggregationKey, CounterKey) ->
-    case csrt_logger:get_matcher(binary_to_list(MatcherName)) of
-        undefined ->
-            {error, <<"unknown matcher '", MatcherName/binary, "'">>};
-        Matcher ->
-            csrt_query:query_matcher(Matcher, AggregationKey, CounterKey)
-    end.
-
--spec parse_key(Keys :: binary() | [binary()]) -> [rctx_field()]
-    | throw({bad_request, Reason :: binary()}).
-
-parse_key(Keys) when is_list(Keys) ->
-    parse_key(Keys, []);
-parse_key(BinKey) when is_binary(BinKey) ->
-    csrt_entry:key(BinKey);
-parse_key(undefined) ->
-    undefined.
-
-parse_key([BinKey | Rest], Keys) ->
-    parse_key(Rest, [csrt_entry:key(BinKey) | Keys]);
-parse_key([], Keys) ->
-    lists:reverse(Keys).
-
