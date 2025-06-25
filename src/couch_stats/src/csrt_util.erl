@@ -57,7 +57,6 @@
 -export([
     set_fabric_init_p/2,
     set_fabric_init_p/3,
-    map_to_rctx/1,
     rctx_record_info/0
 ]).
 
@@ -225,55 +224,6 @@ to_json(#rctx{} = Rctx) ->
         changes_returned => Rctx#rctx.changes_returned,
         ioq_calls => Rctx#rctx.ioq_calls
     }.
-
-%% NOTE: this does not do the inverse of to_json, should it convert types?
--spec map_to_rctx(Map :: map()) -> rctx().
-map_to_rctx(Map) ->
-    maps:fold(fun map_to_rctx_field/3, #rctx{}, Map).
-
--spec map_to_rctx_field(Field :: rctx_field(), Val :: any(), Rctx :: rctx()) -> rctx().
-map_to_rctx_field(updated_at, Val, Rctx) ->
-    Rctx#rctx{updated_at = Val};
-map_to_rctx_field(started_at, Val, Rctx) ->
-    Rctx#rctx{started_at = Val};
-map_to_rctx_field(pid_ref, Val, Rctx) ->
-    Rctx#rctx{pid_ref = Val};
-map_to_rctx_field(nonce, Val, Rctx) ->
-    Rctx#rctx{nonce = Val};
-map_to_rctx_field(dbname, Val, Rctx) ->
-    Rctx#rctx{dbname = Val};
-map_to_rctx_field(username, Val, Rctx) ->
-    Rctx#rctx{username = Val};
-map_to_rctx_field(db_open, Val, Rctx) ->
-    Rctx#rctx{db_open = Val};
-map_to_rctx_field(docs_read, Val, Rctx) ->
-    Rctx#rctx{docs_read = Val};
-map_to_rctx_field(docs_written, Val, Rctx) ->
-    Rctx#rctx{docs_written = Val};
-map_to_rctx_field(js_filter, Val, Rctx) ->
-    Rctx#rctx{js_filter = Val};
-map_to_rctx_field(js_filtered_docs, Val, Rctx) ->
-    Rctx#rctx{js_filtered_docs = Val};
-map_to_rctx_field(rows_read, Val, Rctx) ->
-    Rctx#rctx{rows_read = Val};
-map_to_rctx_field(type, Val, Rctx) ->
-    Rctx#rctx{type = Val};
-map_to_rctx_field(get_kp_node, Val, Rctx) ->
-    Rctx#rctx{get_kp_node = Val};
-map_to_rctx_field(get_kv_node, Val, Rctx) ->
-    Rctx#rctx{get_kv_node = Val};
-%% "Example to extend CSRT"
-%% map_to_rctx_field(write_kp_node, Val, Rctx) ->
-%%     Rctx#rctx{write_kp_node = Val};
-%% map_to_rctx_field(write_kv_node, Val, Rctx) ->
-%%     Rctx#rctx{write_kv_node = Val};
-map_to_rctx_field(changes_returned, Val, Rctx) ->
-    Rctx#rctx{changes_returned = Val};
-map_to_rctx_field(ioq_calls, Val, Rctx) ->
-    Rctx#rctx{ioq_calls = Val};
-map_to_rctx_field(_, _, Rctx) ->
-    %% Unknown key, could throw but just move on
-    Rctx.
 
 -spec add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 add_delta(T, undefined) ->
