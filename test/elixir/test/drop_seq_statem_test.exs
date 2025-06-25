@@ -252,6 +252,7 @@ defmodule DropSeqStateM do
     end
 
     wait_for_internal_replication(db_name)
+    get_range(db_name, doc_id)
   end
 
   def delete_document(db_name, doc_id) do
@@ -268,6 +269,7 @@ defmodule DropSeqStateM do
     end
 
     wait_for_internal_replication(db_name)
+    get_range(db_name, doc_id)
   end
 
   def update_peer_checkpoint(db_name) do
@@ -457,6 +459,12 @@ defmodule DropSeqStateM do
 
     # mem3_rep configured for 100ms frequency
     :timer.sleep(3000)
+  end
+
+  def get_range(db_name, doc_id) do
+    resp = Couch.get("/#{db_name}/_shards/#{doc_id}")
+    assert resp.status_code == 200
+    resp.body["range"]
   end
 
   def precondition(s, {:call, _, :update_document, [_db_name, doc_id]}) do
