@@ -260,7 +260,7 @@ sort_by(KeyFun, ValFun, AggFun) ->
     {Result, topK(Acc, 10)}.
 
 to_json_list(List) when is_list(List) ->
-    lists:map(fun csrt_util:to_json/1, List).
+    lists:map(fun csrt_entry:to_json/1, List).
 
 -spec query_matcher(MatcherName :: string()) -> {ok, query_result()}
     | {error, any()}.
