@@ -18,7 +18,8 @@
 -export([
     value/2,
     key/1,
-    from_map/1
+    from_map/1,
+    record_info/0
 ]).
 
 -spec value(rctx_field(), #rctx{}) -> any().
@@ -137,3 +138,19 @@ set_field(ioq_calls, Val, Rctx) ->
 set_field(_, _, Rctx) ->
     %% Unknown key, could throw but just move on
     Rctx.
+
+-spec record_info() ->
+    #{
+        fields => [rctx_field()],
+        size => pos_integer(),
+        field_idx => #{rctx_field() => pos_integer()}
+    }.
+record_info() ->
+    Fields = record_info(fields, rctx),
+    Size = record_info(size, rctx),
+    Idx = maps:from_list(lists:zip(Fields, lists:seq(1, length(Fields)))),
+    #{
+        fields => Fields,
+        field_idx => Idx,
+        size => Size
+    }.
