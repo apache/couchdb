@@ -562,9 +562,7 @@ commit_data(St) ->
 
     case NewHeader /= OldHeader orelse NeedsCommit of
         true ->
-            couch_file:sync(Fd),
-            ok = couch_file:write_header(Fd, NewHeader),
-            couch_file:sync(Fd),
+            ok = couch_file:write_header(Fd, NewHeader, [sync]),
             couch_stats:increment_counter([couchdb, commits]),
             {ok, St#st{
                 header = NewHeader,
