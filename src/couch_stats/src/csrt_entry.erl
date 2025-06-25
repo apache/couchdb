@@ -17,7 +17,8 @@
 
 -export([
     value/2,
-    key/1
+    key/1,
+    from_map/1
 ]).
 
 -spec value(#rctx{}, rctx_field()) -> any().
@@ -92,3 +93,51 @@ key_from_binary(Other) -> key_error(Other).
 key_error(Key) ->
     {error, {invalid_key, Key}}.
 
+-spec from_map(Map :: map()) -> rctx().
+
+from_map(Map) ->
+    maps:fold(fun set_field/3, #rctx{}, Map).
+
+-spec set_field(Field :: rctx_field(), Val :: any(), Rctx :: rctx()) -> rctx().
+set_field(updated_at, Val, Rctx) ->
+    Rctx#rctx{updated_at = Val};
+set_field(started_at, Val, Rctx) ->
+    Rctx#rctx{started_at = Val};
+set_field(pid_ref, Val, Rctx) ->
+    Rctx#rctx{pid_ref = Val};
+set_field(nonce, Val, Rctx) ->
+    Rctx#rctx{nonce = Val};
+set_field(dbname, Val, Rctx) ->
+    Rctx#rctx{dbname = Val};
+set_field(username, Val, Rctx) ->
+    Rctx#rctx{username = Val};
+set_field(db_open, Val, Rctx) ->
+    Rctx#rctx{db_open = Val};
+set_field(docs_read, Val, Rctx) ->
+    Rctx#rctx{docs_read = Val};
+set_field(docs_written, Val, Rctx) ->
+    Rctx#rctx{docs_written = Val};
+set_field(js_filter, Val, Rctx) ->
+    Rctx#rctx{js_filter = Val};
+set_field(js_filtered_docs, Val, Rctx) ->
+    Rctx#rctx{js_filtered_docs = Val};
+set_field(rows_read, Val, Rctx) ->
+    Rctx#rctx{rows_read = Val};
+set_field(type, Val, Rctx) ->
+    Rctx#rctx{type = Val};
+set_field(get_kp_node, Val, Rctx) ->
+    Rctx#rctx{get_kp_node = Val};
+set_field(get_kv_node, Val, Rctx) ->
+    Rctx#rctx{get_kv_node = Val};
+%% "Example to extend CSRT"
+%% set_field(write_kp_node, Val, Rctx) ->
+%%     Rctx#rctx{write_kp_node = Val};
+%% set_field(write_kv_node, Val, Rctx) ->
+%%     Rctx#rctx{write_kv_node = Val};
+set_field(changes_returned, Val, Rctx) ->
+    Rctx#rctx{changes_returned = Val};
+set_field(ioq_calls, Val, Rctx) ->
+    Rctx#rctx{ioq_calls = Val};
+set_field(_, _, Rctx) ->
+    %% Unknown key, could throw but just move on
+    Rctx.
