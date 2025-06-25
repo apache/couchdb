@@ -105,6 +105,8 @@ merge_results(Info) ->
                 [{doc_count, lists:sum(X)} | Acc];
             (doc_del_count, X, Acc) ->
                 [{doc_del_count, lists:sum(X)} | Acc];
+            (drop_count, X, Acc) ->
+                [{drop_count, lists:sum(X)} | Acc];
             (compact_running, X, Acc) ->
                 [{compact_running, lists:member(true, X)} | Acc];
             (sizes, X, Acc) ->
