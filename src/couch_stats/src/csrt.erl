@@ -25,7 +25,7 @@
     set_pid_ref/1
 ]).
 
-%% Context API
+%% Context Lifecycle API
 -export([
     create_context/2,
     create_coordinator_context/2,
@@ -52,7 +52,7 @@
     to_json/1
 ]).
 
-%% stats collection api
+%% Stats Collection API
 -export([
     accumulate_delta/1,
     add_delta/2,
@@ -71,13 +71,13 @@
     should_track_init_p/1
 ]).
 
-%% RPC api
+%% RPC API
 -export([
     rpc/2,
     call/1
 ]).
 
-%% aggregate query api
+%% Aggregate Query API
 -export([
     active/0,
     active/1,
@@ -114,7 +114,7 @@
 ]).
 
 %%
-%% RPC operations
+%% RPC Operations
 %%
 
 -spec rpc(FName :: atom(), Args :: [any()]) ->
@@ -178,7 +178,7 @@ call({FunName, Args}) ->
     {error, <<"No such function '", FunNameBin/binary, "/", ArityBin/binary>>}.
 
 %%
-%% PidRef operations
+%% PidRef Operations
 %%
 
 -spec get_pid_ref() -> maybe_pid_ref().
@@ -208,7 +208,7 @@ destroy_pid_ref(_PidRef) ->
     erase(?PID_REF).
 
 %%
-%% Context lifecycle API
+%% Context Lifecycle API
 %%
 
 -spec create_worker_context(From, MFA, Nonce) -> pid_ref() | false when
@@ -248,7 +248,7 @@ create_context(Type, Nonce) ->
     catch
         _:_ ->
             csrt_server:destroy_resource(PidRef),
-            %% destroy_context(PidRef) clears the tracker too
+            %% calling destroy_context(PidRef) clears the tracker too
             destroy_context(PidRef),
             false
     end.
@@ -372,7 +372,7 @@ to_json(Rctx) ->
     csrt_entry:to_json(Rctx).
 
 %%
-%% Stat collection API
+%% Stat Collection API
 %%
 
 -spec inc(Key :: rctx_field()) -> non_neg_integer().
@@ -443,7 +443,7 @@ rctx_delta(TA, TB) ->
     csrt_util:rctx_delta(TA, TB).
 
 %%
-%% aggregate query api
+%% Aggregate Query API
 %%
 
 -spec active() -> [rctx()].

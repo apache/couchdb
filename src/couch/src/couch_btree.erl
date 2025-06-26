@@ -472,7 +472,6 @@ reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
 
 get_node(#btree{fd = Fd}, NodePos) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
-    %% TODO: wire in csrt tracking
     couch_stats:increment_counter([couchdb, btree, get_node, NodeType]),
     {NodeType, NodeList}.
 
