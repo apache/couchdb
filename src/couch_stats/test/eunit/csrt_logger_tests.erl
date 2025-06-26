@@ -20,7 +20,6 @@
 -define(RCTX_RANGE, 1000).
 -define(RCTX_COUNT, 10000).
 
-%% Dirty hack for hidden records as .hrl is only in src/
 -define(RCTX_RPC, #rpc_worker{from = {self(), make_ref()}}).
 -define(RCTX_COORDINATOR, #coordinator{method = 'GET', path = "/foo/_all_docs"}).
 

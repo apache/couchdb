@@ -542,8 +542,6 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
         {ok, filter_docs_int(Db, DDoc, FName, JsonReq, JsonDocs)}
     catch
         throw:{os_process_error, {exit_status, 1}} ->
-            %% TODO: wire in csrt tracking
-            couch_stats:increment_counter([couchdb, query_server, js_filter_error]),
             %% batch used too much memory, retry sequentially.
             Fun = fun(JsonDoc) ->
                 filter_docs_int(Db, DDoc, FName, JsonReq, [JsonDoc])
