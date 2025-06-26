@@ -28,8 +28,7 @@
     get_local_purge_doc_id/1,
     get_local_purge_doc_body/3,
     nouveau_url/0,
-    max_sessions/0,
-    max_pipeline_size/0
+    max_sessions/0
 ]).
 
 index_name(Path) when is_binary(Path) ->
@@ -201,6 +200,3 @@ nouveau_url() ->
 
 max_sessions() ->
     config:get_integer("nouveau", "max_sessions", 100).
-
-max_pipeline_size() ->
-    config:get_integer("nouveau", "max_pipeline_size", 1000).

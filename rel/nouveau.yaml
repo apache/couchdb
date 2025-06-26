@@ -8,15 +8,19 @@ logging:
 
 server:
   applicationConnectors:
-    - type: http
+    - type: h2
       bindHost: 127.0.0.1
       port: {{nouveau_port}}
       useDateHeader: false
+      keyStorePath: {{keystore_path}}
+      keyStorePassword: {{keystore_password}}
   adminConnectors:
-    - type: http
+    - type: h2
       bindHost: 127.0.0.1
       port: {{nouveau_admin_port}}
       useDateHeader: false
+      keyStorePath: {{keystore_path}}
+      keyStorePassword: {{keystore_password}}
   gzip:
     includedMethods:
       - GET
