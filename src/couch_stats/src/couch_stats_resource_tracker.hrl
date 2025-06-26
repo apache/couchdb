@@ -37,7 +37,7 @@
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
 %% csrt_logger matcher keys
--define(MATCHERS_KEY, {?MODULE, all_csrt_matchers}).
+-define(MATCHERS_KEY, {csrt_logger, all_csrt_matchers}).
 -define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
 -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
 -define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
