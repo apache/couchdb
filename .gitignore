@@ -53,10 +53,12 @@ src/couch/priv/couchspawnkillable
 src/couch/priv/couch_ejson_compare/couch_ejson_compare.d
 src/couch/priv/couch_js/**/*.d
 src/couch/priv/icu_driver/couch_icu_driver.d
+src/cowlib/
 src/mango/src/mango_cursor_text.nocompile
 src/excoveralls/
 src/fauxton/
 src/folsom/
+src/gun/
 src/hackney/
 src/hqueue/
 src/ibrowse/
