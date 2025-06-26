@@ -248,6 +248,10 @@ with_docs = $BuildDocs
 with_nouveau = $($WithNouveau.ToString().ToLower())
 with_clouseau = $($WithClouseau.ToString().ToLower())
 
+$Env:GIT_CONFIG_COUNT = 1
+$Env:GIT_CONFIG_KEY_0 = "url.https://github.com/apache/couchdb-.insteadOf"
+$Env:GIT_CONFIG_VALUE_0 = "https://github.com/ninenines/"
+
 user = $CouchDBUser
 
 js_engine = $JSEngine
