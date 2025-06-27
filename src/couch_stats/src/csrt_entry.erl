@@ -60,7 +60,12 @@ key(Key) when is_atom(Key) ->
 key(Key) when is_binary(Key) ->
     key_from_binary(Key);
 key(Key) when is_list(Key) ->
-    key_from_binary(list_to_binary(Key));
+    case key_from_binary(list_to_binary(Key)) of
+        {error, {invalid_key, _Key}} ->
+            {error, {invalid_key, Key}};
+        Res ->
+            Res
+    end;
 key(Other) ->
     key_error(Other).
 
@@ -97,8 +102,7 @@ key_from_binary(<<"get_kp_node">>) -> get_kp_node;
 key_from_binary(Other) -> key_error(Other).
 
 key_error(Key) ->
-    Other = iolist_to_binary(io_lib:format("~s", Key)),
-    throw({bad_request, <<"Invalid key '", Other/binary, "'">>}).
+    {error, {invalid_key, Key}}.
 
 -spec from_map(Map :: map()) -> rctx().
 
