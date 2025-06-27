@@ -13,7 +13,7 @@
 -record(st, {
     filepath,
     fd,
-    fd_monitor,
+    gen_fds = [],
     % deprecated but keeping it here to avoid altering the record size
     fsync_options_deprecated,
     header,

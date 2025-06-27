@@ -851,7 +851,7 @@ attachment_disk_term_test_() ->
     Headers = [{<<"X-Foo">>, <<"bar">>}],
     ExtendedAttachment = store(headers, Headers, BaseAttachment),
     ExtendedDiskTerm = {BaseDiskTerm, [{headers, Headers}]},
-    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd = fake_fd}}}]),
+    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd = {fake_fd, fake_ref}}}}]),
     {"Disk term tests", [
         ?_assertEqual(BaseDiskTerm, to_disk_term(BaseAttachment)),
         ?_assertEqual(BaseAttachment, from_disk_term(FakeDb, BaseDiskTerm)),
