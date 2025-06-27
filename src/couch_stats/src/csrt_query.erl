@@ -414,6 +414,11 @@ parse_key(Key) when is_atom(Key) ->
     csrt_entry:key(Key).
 
 parse_key([BinKey | Rest], Keys) ->
-    parse_key(Rest, [csrt_entry:key(BinKey) | Keys]);
+    case csrt_entry:key(BinKey) of
+        {error, _} = Error ->
+            Error;
+        Key ->
+            parse_key(Rest, [Key | Keys])
+    end;
 parse_key([], Keys) ->
     lists:reverse(Keys).
