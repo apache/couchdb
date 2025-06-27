@@ -1413,13 +1413,15 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1, SrcGen) ->
     % they continue to be used by the new state.
     decref(OldSt#st{gen_fds = []}),
 
+    {_, DstGen} = increment_generation(NewSt2, SrcGen),
+
     % And return our finished new state
     {ok,
         NewSt2#st{
             filepath = FilePath,
             gen_fds = NewGenFds
         },
-        undefined}.
+        DstGen}.
 
 increment_generation(#st{header = Header}, Gen) ->
     MaxGen = couch_bt_engine_header:max_generation(Header),

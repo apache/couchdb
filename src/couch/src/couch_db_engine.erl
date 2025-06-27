@@ -975,8 +975,9 @@ finish_compaction(Db, CompactInfo) ->
     } = Db,
     NewDb =
         case Engine:finish_compaction(St, DbName, Options, CompactInfo) of
-            {ok, NewState, undefined} ->
+            {ok, NewState, DstGen} when is_integer(DstGen) ->
                 couch_event:notify(DbName, compacted),
+                couch_event:notify(DbName, {compacted_into_generation, DstGen}),
                 Db#db{
                     engine = {Engine, NewState},
                     compactor_pid = nil
