@@ -119,10 +119,13 @@ sync_enqueue(Object0) ->
     end.
 
 handle_db_event(DbName, local_updated, St) ->
-    enqueue(DbName),
+    enqueue({DbName, 0}),
     {ok, St};
 handle_db_event(DbName, updated, St) ->
-    enqueue(DbName),
+    enqueue({DbName, 0}),
+    {ok, St};
+handle_db_event(DbName, {compacted_into_generation, DstGen}, St) ->
+    enqueue({DbName, DstGen}),
     {ok, St};
 handle_db_event(DbName, {index_commit, IdxName}, St) ->
     enqueue({DbName, IdxName}),
@@ -313,12 +316,12 @@ enqueue_request(State, Object) ->
             ok
     end.
 
+find_channel(#state{} = State, {DbName, SrcGen}) when is_integer(SrcGen) ->
+    find_channel(State, State#state.db_channels, {DbName, SrcGen});
 find_channel(#state{} = State, {?INDEX_CLEANUP, DbName}) ->
     find_channel(State, State#state.cleanup_channels, {?INDEX_CLEANUP, DbName});
 find_channel(#state{} = State, {Shard, GroupId}) when is_binary(Shard) ->
-    find_channel(State, State#state.view_channels, {Shard, GroupId});
-find_channel(#state{} = State, DbName) ->
-    find_channel(State, State#state.db_channels, DbName).
+    find_channel(State, State#state.view_channels, {Shard, GroupId}).
 
 find_channel(#state{} = _State, [], _Object) ->
     false;
@@ -381,7 +384,7 @@ get_priority(_Channel, {?INDEX_CLEANUP, DbName}) ->
         error:database_does_not_exist ->
             0
     end;
-get_priority(Channel, {Shard, GroupId}) ->
+get_priority(Channel, {Shard, GroupId}) when is_binary(GroupId) ->
     try couch_index_server:get_index(couch_mrview_index, Shard, GroupId) of
         {ok, Pid} ->
             try
@@ -409,11 +412,11 @@ get_priority(Channel, {Shard, GroupId}) ->
         throw:{not_found, _} ->
             0
     end;
-get_priority(Channel, DbName) when is_binary(DbName) ->
+get_priority(Channel, {DbName, SrcGen}) when is_binary(DbName), is_integer(SrcGen) ->
     case couch_db:open_int(DbName, []) of
         {ok, Db} ->
             try
-                get_priority(Channel, Db)
+                get_priority(Channel, {Db, SrcGen})
             after
                 couch_db:close(Db)
             end;
@@ -421,9 +424,9 @@ get_priority(Channel, DbName) when is_binary(DbName) ->
             % It's expected that a db might be deleted while waiting in queue
             0
     end;
-get_priority(Channel, Db) ->
+get_priority(Channel, {Db, SrcGen}) when is_integer(SrcGen) ->
     {ok, DocInfo} = couch_db:get_db_info(Db),
-    [{SizeInfo} | _] = couch_util:get_value(sizes, DocInfo),
+    {SizeInfo} = lists:nth(SrcGen + 1, couch_util:get_value(sizes, DocInfo)),
     DiskSize = couch_util:get_value(file, SizeInfo),
     ActiveSize = couch_util:get_value(active, SizeInfo),
     NeedsUpgrade = needs_upgrade(DocInfo),
