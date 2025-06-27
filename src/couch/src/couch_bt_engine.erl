@@ -732,6 +732,31 @@ finish_compaction(OldState, DbName, Options, {CompactFilePath, SrcGen}) ->
                 [OldSeq, NewSeq]
             ),
             ok = decref(NewState1),
+
+            % TODO: What should we do here when generation > 0? The gen-0 file
+            % has gained new doc data, which the .compact file does not have,
+            % so we cannot swap over to the compacted file without data loss.
+            % However, if gen > 0, then further compaction will not move the
+            % new bodies out of the gen-0 file. Does this command "resume" to
+            % just cover the most recent writes, or does it re-scan the whole
+            % file?
+            %
+            %       all new data goes too foo.couch
+            %       when compacting, foo.couch structure -> foo.couch.compact
+            %
+            %       data cases:
+            %
+            %       gen=0
+            %           foo.couch -> foo.1.couch
+            %
+            %       gen=N
+            %           foo.couch -> foo.couch.compact
+            %           foo.N.couch -> foo.N+1.couch
+            %
+            %       gen=M
+            %           foo.couch -> foo.couch.compact
+            %           foo.M.couch -> foo.M.couch.compact.maxgen
+
             start_compaction(OldState, DbName, SrcGen, Options, self())
     end.
 
