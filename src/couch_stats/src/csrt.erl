@@ -92,8 +92,12 @@
     find_workers_by_pidref/1,
     group_by/2,
     group_by/3,
-    query/2,
-    query/4,
+    query_group_by/3,
+    query_group_by/4,
+    query_sort_by/3,
+    query_sort_by/4,
+    query_count_by/2,
+    query_count_by/3,
     query_matcher/1,
     query_matcher/2,
     sorted/1,
@@ -495,21 +499,63 @@ query_matcher(MatcherName) ->
 query_matcher(MatcherName, Limit) ->
     csrt_query:query_matcher(MatcherName, Limit).
 
--spec query(MatcherName :: string(), Keys :: binary() | rctx_field() | [binary()] | [rctx_field()]) ->
-    {ok, query_result()}
-    | {error, any()}.
-query(MatcherName, AggregationKeys) ->
-    csrt_query:query(MatcherName, AggregationKeys).
-
--spec query(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+-spec query_group_by(MatcherName, AggregationKeys, ValueKey) ->
     {ok, query_result()}
     | {error, any()}
 when
     MatcherName :: string(),
     AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
     ValueKey :: binary() | rctx_field().
-query(MatcherName, AggregationKeys, ValueKey, Options) ->
-    csrt_query:query(MatcherName, AggregationKeys, ValueKey, Options).
+query_group_by(MatcherName, AggregationKeys, ValueKey) ->
+    csrt_query:query_group_by(MatcherName, AggregationKeys, ValueKey, #{}).
+
+-spec query_group_by(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
+    ValueKey :: binary() | rctx_field().
+query_group_by(MatcherName, AggregationKeys, ValueKey, Options) ->
+    csrt_query:query_group_by(MatcherName, AggregationKeys, ValueKey, Options).
+
+-spec query_sort_by(MatcherName, AggregationKeys, ValueKey) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
+    ValueKey :: binary() | rctx_field().
+query_sort_by(MatcherName, AggregationKeys, ValueKey) ->
+    csrt_query:query_sort_by(MatcherName, AggregationKeys, ValueKey, #{}).
+
+-spec query_sort_by(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
+    ValueKey :: binary() | rctx_field().
+query_sort_by(MatcherName, AggregationKeys, ValueKey, Options) ->
+    csrt_query:query_sort_by(MatcherName, AggregationKeys, ValueKey, Options).
+
+-spec query_count_by(MatcherName, AggregationKeys) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()].
+query_count_by(MatcherName, AggregationKeys) ->
+    csrt_query:query_count_by(MatcherName, AggregationKeys, #{}).
+
+-spec query_count_by(MatcherName, AggregationKeys, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()].
+query_count_by(MatcherName, AggregationKeys, Options) ->
+    csrt_query:query_count_by(MatcherName, AggregationKeys, Options).
 
 sorted(Map) ->
     csrt_query:sorted(Map).

@@ -34,8 +34,9 @@
     find_workers_by_pidref/1,
     group_by/3,
     group_by/4,
-    query/2,
-    query/4,
+    query_group_by/4,
+    query_sort_by/4,
+    query_count_by/3,
     query_matcher/1,
     query_matcher/2,
     query_matcher_rows/1,
@@ -322,14 +323,7 @@ get_matcher(MatcherName) ->
             {ok, Matcher}
     end.
 
--spec query(MatcherName :: string(), Keys :: binary() | rctx_field() | [binary()] | [rctx_field()]) ->
-    {ok, query_result()}
-    | {error, any()}.
-%% {ok, #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}}
-query(MatcherName, AggregationKeys) ->
-    query(MatcherName, AggregationKeys, undefined, #{}).
-
--spec query(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+-spec query_group_by(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
     {ok, query_result()}
     | {error, any()}
 when
@@ -337,29 +331,53 @@ when
     AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
     ValueKey :: binary() | rctx_field().
 %% {ok, #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}}
-query(MatcherName, AggregationKeys, ValueKey, Options) ->
+query_group_by(MatcherName, AggregationKeys, ValueKey, Options) ->
     AggregationKey = parse_key(AggregationKeys),
     VKey = parse_key(ValueKey),
     Limit = maps:get(limit, Options, query_limit()),
-    Aggregation = maps:get(aggregation, Options, none),
     maybe
         ok ?= validate_not_error(AggregationKey),
         ok ?= validate_not_error(VKey),
         ok ?= validate_limit(Limit),
-        ok ?= validate_aggregation(Aggregation),
         {ok, Matcher} ?= get_matcher(MatcherName),
-        case Aggregation of
-            group_by ->
-                group_by(Matcher, AggregationKey, VKey);
-            sort_by ->
-                sort_by(Matcher, AggregationKey, VKey);
-            count_by when VKey == undefined ->
-                count_by(Matcher, AggregationKey);
-            count_by ->
-                {error, {extra_argument, value_key}};
-            none ->
-                query_matcher_rows(Matcher, Limit)
-        end
+        group_by(Matcher, AggregationKey, VKey)
+    end.
+
+-spec query_sort_by(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
+    ValueKey :: binary() | rctx_field().
+%% {ok, #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}}
+query_sort_by(MatcherName, AggregationKeys, ValueKey, Options) ->
+    AggregationKey = parse_key(AggregationKeys),
+    VKey = parse_key(ValueKey),
+    Limit = maps:get(limit, Options, query_limit()),
+    maybe
+        ok ?= validate_not_error(AggregationKey),
+        ok ?= validate_not_error(VKey),
+        ok ?= validate_limit(Limit),
+        {ok, Matcher} ?= get_matcher(MatcherName),
+        sort_by(Matcher, AggregationKey, VKey)
+    end.
+
+-spec query_count_by(MatcherName, AggregationKeys, Options :: query_options()) ->
+    {ok, query_result()}
+    | {error, any()}
+when
+    MatcherName :: string(),
+    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()].
+%% {ok, #{{<<"adm">>,<<"bench-yktbb3as46rzffea">>} => 2}}
+query_count_by(MatcherName, AggregationKeys, Options) ->
+    AggregationKey = parse_key(AggregationKeys),
+    Limit = maps:get(limit, Options, query_limit()),
+    maybe
+        ok ?= validate_not_error(AggregationKey),
+        ok ?= validate_limit(Limit),
+        {ok, Matcher} ?= get_matcher(MatcherName),
+        count_by(Matcher, AggregationKey)
     end.
 
 validate_not_error({error, _} = Error) ->
@@ -379,17 +397,6 @@ validate_limit(Limit) when is_integer(Limit) ->
     end;
 validate_limit(Limit) ->
     {error, {invalid_limit, Limit}}.
-
-validate_aggregation(none) ->
-    ok;
-validate_aggregation(group_by) ->
-    ok;
-validate_aggregation(sort_by) ->
-    ok;
-validate_aggregation(count_by) ->
-    ok;
-validate_aggregation(Other) ->
-    {error, {invalid_aggregation, Other}}.
 
 -spec parse_key(Keys :: binary() | atom() | [binary()] | [atom()]) ->
     [rctx_field()]

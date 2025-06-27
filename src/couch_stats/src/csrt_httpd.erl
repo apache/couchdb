@@ -64,7 +64,7 @@ handle_resource_status_req(Req) ->
 
 handle_count_by(Req, MatcherName, CountBy) ->
     AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, CountBy),
-    case csrt:query(MatcherName, AggregationKeys, undefined, #{aggregation => count_by}) of
+    case csrt:query_count_by(MatcherName, AggregationKeys) of
         {ok, Map} ->
             send_json(Req, {aggregation_result_to_json(Map)});
         Else ->
@@ -75,7 +75,7 @@ handle_count_by(Req, MatcherName, CountBy) ->
 handle_sort_by(Req, MatcherName, SortBy) ->
     AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, SortBy),
     CounterKey = couch_util:get_value(<<"counter_key">>, SortBy),
-    case csrt:query(MatcherName, AggregationKeys, CounterKey, #{aggregation => sort_by}) of
+    case csrt:query_sort_by(MatcherName, AggregationKeys, CounterKey) of
         {ok, Map} ->
             send_json(Req, {aggregation_result_to_json(Map)});
         Else ->
@@ -86,7 +86,7 @@ handle_sort_by(Req, MatcherName, SortBy) ->
 handle_group_by(Req, MatcherName, GroupBy) ->
     AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, GroupBy),
     CounterKey = couch_util:get_value(<<"counter_key">>, GroupBy),
-    case csrt:query(MatcherName, AggregationKeys, CounterKey, #{aggregation => group_by}) of
+    case csrt:query_group_by(MatcherName, AggregationKeys, CounterKey) of
         {ok, Map} ->
             send_json(Req, {aggregation_result_to_json(Map)});
         Else ->
