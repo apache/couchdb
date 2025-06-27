@@ -120,6 +120,7 @@
     owner_of/2,
 
     start_compact/1,
+    start_compact/2,
     cancel_compact/1,
     wait_for_compaction/1,
     wait_for_compaction/2,
@@ -257,7 +258,10 @@ monitor(#db{main_pid = MainPid}) ->
     erlang:monitor(process, MainPid).
 
 start_compact(#db{} = Db) ->
-    gen_server:call(Db#db.main_pid, start_compact).
+    start_compact(Db, 0).
+
+start_compact(#db{} = Db, Generation) ->
+    gen_server:call(Db#db.main_pid, {start_compact, Generation}).
 
 cancel_compact(#db{main_pid = Pid}) ->
     gen_server:call(Pid, cancel_compact).

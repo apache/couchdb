@@ -371,7 +371,7 @@ start_compact(#state{} = State, Db) ->
                 nil ->
                     DbPid = couch_db:get_pid(Db),
                     Ref = erlang:monitor(process, DbPid),
-                    DbPid ! {'$gen_call', {self(), Ref}, start_compact},
+                    DbPid ! {'$gen_call', {self(), Ref}, {start_compact, 0}},
                     State#state{starting = Starting#{Ref => Key}};
                 % Compaction is already running, so monitor existing compaction pid.
                 CPid when is_pid(CPid) ->
