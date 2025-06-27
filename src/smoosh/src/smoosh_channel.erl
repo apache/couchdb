@@ -329,21 +329,23 @@ start_compact(#state{} = State, {?INDEX_CLEANUP, DbName} = Key) ->
         _ ->
             false
     end;
-start_compact(#state{name = Name} = State, DbName) when is_binary(DbName) ->
+start_compact(#state{name = Name} = State, {DbName, SrcGen} = Key) when
+    is_binary(DbName), is_integer(SrcGen)
+->
     case couch_db:open_int(DbName, []) of
         {ok, Db} ->
             try
-                start_compact(State, Db)
+                start_compact(State, {Db, SrcGen})
             after
                 couch_db:close(Db)
             end;
         Error = {not_found, no_db_file} ->
             LogMsg = "~s : Error starting compaction for ~p: ~p",
-            LogArgs = [Name, smoosh_utils:stringify(DbName), Error],
+            LogArgs = [Name, smoosh_utils:stringify(Key), Error],
             couch_log:warning(LogMsg, LogArgs),
             false
     end;
-start_compact(#state{} = State, {Shard, GroupId} = Key) ->
+start_compact(#state{} = State, {Shard, GroupId} = Key) when is_binary(Shard), is_binary(GroupId) ->
     #state{name = Name, starting = Starting} = State,
     case smoosh_utils:ignore_db({Shard, GroupId}) of
         false ->
@@ -362,16 +364,17 @@ start_compact(#state{} = State, {Shard, GroupId} = Key) ->
         _ ->
             false
     end;
-start_compact(#state{} = State, Db) ->
+start_compact(#state{} = State, {Db, SrcGen}) when is_integer(SrcGen) ->
     #state{name = Name, starting = Starting, active = Active} = State,
-    Key = couch_db:name(Db),
-    case smoosh_utils:ignore_db(Key) of
+    DbName = couch_db:name(Db),
+    Key = {DbName, SrcGen},
+    case smoosh_utils:ignore_db(DbName) of
         false ->
             case couch_db:get_compactor_pid(Db) of
                 nil ->
                     DbPid = couch_db:get_pid(Db),
                     Ref = erlang:monitor(process, DbPid),
-                    DbPid ! {'$gen_call', {self(), Ref}, {start_compact, 0}},
+                    DbPid ! {'$gen_call', {self(), Ref}, {start_compact, SrcGen}},
                     State#state{starting = Starting#{Ref => Key}};
                 % Compaction is already running, so monitor existing compaction pid.
                 CPid when is_pid(CPid) ->
@@ -532,7 +535,7 @@ teardown_purge_seq({Ctx, DbName}) ->
 t_start_db_with_missing_db({_, _}) ->
     State = #state{name = "ratio_dbs"},
     meck:reset(couch_log),
-    try_compact(State, <<"missing_db">>),
+    try_compact(State, {<<"missing_db">>, 0}),
     ?assertEqual(1, meck:num_calls(couch_log, warning, 2)).
 
 t_start_view_with_missing_db({_, _}) ->
