@@ -423,7 +423,7 @@ get_priority(Channel, DbName) when is_binary(DbName) ->
     end;
 get_priority(Channel, Db) ->
     {ok, DocInfo} = couch_db:get_db_info(Db),
-    {SizeInfo} = couch_util:get_value(sizes, DocInfo),
+    [{SizeInfo} | _] = couch_util:get_value(sizes, DocInfo),
     DiskSize = couch_util:get_value(file, SizeInfo),
     ActiveSize = couch_util:get_value(active, SizeInfo),
     NeedsUpgrade = needs_upgrade(DocInfo),

@@ -108,7 +108,7 @@ merge_results(Info) ->
             (compact_running, X, Acc) ->
                 [{compact_running, lists:member(true, X)} | Acc];
             (sizes, X, Acc) ->
-                [{sizes, {merge_object(X)}} | Acc];
+                [{sizes, merge_sizes(X)} | Acc];
             (disk_format_version, X, Acc) ->
                 [{disk_format_version, lists:max(X)} | Acc];
             (cluster, [X], Acc) ->
@@ -120,6 +120,53 @@ merge_results(Info) ->
         end,
         [],
         Dict
+    ).
+
+merge_sizes(ByShard) ->
+    ByGen = fill_transpose({[]}, ByShard),
+    Merged = [{merge_object(S)} || S <- ByGen],
+    case Merged of
+        [S] -> S;
+        S -> S
+    end.
+
+fill_transpose(Filler, Lists) ->
+    fill_transpose(Filler, Lists, []).
+
+fill_transpose(_Filler, [], Acc) ->
+    lists:reverse(Acc);
+fill_transpose(Filler, Lists, Acc) ->
+    {Heads, Tails} = lists:unzip(
+        lists:map(
+            fun(List) ->
+                case List of
+                    [] -> {undefined, []};
+                    [H | T] -> {H, T}
+                end
+            end,
+            Lists
+        )
+    ),
+    case lists:all(fun all_undefined/1, Heads) of
+        true ->
+            fill_transpose(Filler, [], Acc);
+        _ ->
+            Filled = fill_list(Filler, Heads),
+            fill_transpose(Filler, Tails, [Filled | Acc])
+    end.
+
+all_undefined(undefined) -> true;
+all_undefined(_) -> false.
+
+fill_list(Filler, List) ->
+    lists:map(
+        fun(Item) ->
+            case Item of
+                undefined -> Filler;
+                X -> X
+            end
+        end,
+        List
     ).
 
 merge_object(Objects) ->
