@@ -618,7 +618,7 @@ get_db_info(Db) ->
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
-    SizeInfo = couch_db_engine:get_size_info(Db),
+    SizeInfos = couch_db_engine:get_size_info(Db),
     DiskVersion = couch_db_engine:get_disk_version(Db),
     Uuid =
         case get_uuid(Db) of
@@ -643,7 +643,7 @@ get_db_info(Db) ->
         {update_seq, get_update_seq(Db)},
         {purge_seq, couch_db_engine:get_purge_seq(Db)},
         {compact_running, Compactor /= nil},
-        {sizes, {SizeInfo}},
+        {sizes, lists:map(fun(SI) -> {SI} end, SizeInfos)},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
