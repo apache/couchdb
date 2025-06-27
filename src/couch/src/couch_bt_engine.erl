@@ -35,6 +35,8 @@
     get_disk_version/1,
     get_doc_count/1,
     get_epochs/1,
+    get_fd/1,
+    get_fd/2,
     get_purge_seq/1,
     get_oldest_purge_seq/1,
     get_purge_infos_limit/1,
@@ -77,11 +79,12 @@
     count_changes_since/2,
 
     start_compaction/4,
+    open_additional_generation_file/3,
     finish_compaction/4
 ]).
 
 -export([
-    init_state/4
+    init_state/5
 ]).
 
 -export([
@@ -141,8 +144,19 @@ delete(RootDir, FilePath, Async) ->
     %% as a recovery.
     delete_compaction_files(RootDir, FilePath, [{context, compaction}]),
 
-    % Delete the actual database file
-    couch_file:delete(RootDir, FilePath, Async).
+    % Delete the actual database files
+    delete_generational_files(RootDir, FilePath, 0, Async).
+
+delete_generational_files(RootDir, FilePath, Gen, Async) ->
+    GenPath = generation_file_path(FilePath, Gen),
+    case couch_file:delete(RootDir, GenPath, Async) of
+        ok ->
+            delete_generational_files(RootDir, FilePath, Gen + 1, Async);
+        {error, enoent} ->
+            ok;
+        Error ->
+            Error
+    end.
 
 delete_compaction_files(RootDir, FilePath, DelOpts) ->
     lists:foreach(
@@ -168,8 +182,10 @@ init(FilePath, Options) ->
                 delete_compaction_files(FilePath),
                 Header0 = couch_bt_engine_header:new(),
                 Header1 = init_set_props(Fd, Header0, Options),
-                ok = couch_file:write_header(Fd, Header1),
-                Header1;
+                MaxGen = proplists:get_value(max_generation, Options, 0),
+                Header2 = couch_bt_engine_header:set(Header1, [{max_generation, MaxGen}]),
+                ok = couch_file:write_header(Fd, Header2),
+                Header2;
             false ->
                 case couch_file:read_header(Fd) of
                     {ok, Header0} ->
@@ -181,47 +197,75 @@ init(FilePath, Options) ->
                         Header0
                 end
         end,
-    {ok, init_state(FilePath, Fd, Header, Options)}.
+    OpenGen = couch_bt_engine_header:max_generation(Header),
+    GenFds = maybe_open_generation_files(FilePath, OpenGen, Options),
+    {ok, init_state(FilePath, Fd, GenFds, Header, Options)}.
 
 terminate(_Reason, St) ->
     % If the reason we died is because our fd disappeared
     % then we don't need to try closing it again.
-    Ref = St#st.fd_monitor,
-    if
-        Ref == closed ->
-            ok;
-        true ->
-            ok = couch_file:close(St#st.fd),
-            receive
-                {'DOWN', Ref, _, _, _} ->
-                    ok
-            after 500 ->
-                ok
-            end
-    end,
-    couch_util:shutdown_sync(St#st.fd),
+    lists:foreach(
+        fun({Fd, Ref}) ->
+            if
+                Ref == closed ->
+                    ok;
+                true ->
+                    ok = couch_file:close(Fd),
+                    receive
+                        {'DOWN', Ref, _, _, _} ->
+                            ok
+                    after 500 ->
+                        ok
+                    end
+            end,
+            couch_util:shutdown_sync(Fd)
+        end,
+        [St#st.fd | St#st.gen_fds]
+    ),
     ok.
 
 handle_db_updater_call(Msg, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
-handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{fd_monitor = Ref} = St) ->
-    {stop, normal, St#st{fd = undefined, fd_monitor = closed}}.
+handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{} = St) ->
+    {Fd, GenFds} = update_fd_monitors(St#st.fd, St#st.gen_fds, Ref),
+    St1 = St#st{fd = Fd, gen_fds = GenFds},
+    {stop, normal, St1}.
 
-incref(St) ->
-    {ok, St#st{fd_monitor = monitor(process, St#st.fd)}}.
+update_fd_monitors({_Fd, Ref}, GenFds, Ref) ->
+    {{undefined, closed}, GenFds};
+update_fd_monitors(Fd, [{_Fd, Ref} | Rest], Ref) ->
+    {Fd, [{undefined, closed} | Rest]};
+update_fd_monitors(Fd0, [First | Rest], Ref) ->
+    {Fd, GenFds} = update_fd_monitors(Fd0, Rest, Ref),
+    {Fd, [First | GenFds]}.
 
-decref(St) ->
-    true = demonitor(St#st.fd_monitor, [flush]),
+incref(#st{fd = {Fd, _}, gen_fds = GenFds0} = St) ->
+    Ref = monitor(process, Fd),
+    GenFds = [{GenFd, monitor(process, GenFd)} || {GenFd, _} <- GenFds0],
+    {ok, St#st{fd = {Fd, Ref}, gen_fds = GenFds}}.
+
+decref(#st{} = St) ->
+    lists:foreach(
+        fun({_, Ref}) ->
+            true = demonitor(Ref, [flush])
+        end,
+        [St#st.fd | St#st.gen_fds]
+    ),
     ok.
 
-monitored_by(St) ->
-    case process_info(St#st.fd, monitored_by) of
-        {monitored_by, Pids} ->
-            lists:filter(fun is_pid/1, Pids);
-        _ ->
-            []
-    end.
+monitored_by(#st{fd = Fd, gen_fds = GenFds}) ->
+    lists:flatmap(
+        fun(GenFd) ->
+            case process_info(GenFd, monitored_by) of
+                {monitored_by, Pids} ->
+                    lists:filter(fun is_pid/1, Pids);
+                _ ->
+                    []
+            end
+        end,
+        [GenFd || {GenFd, _} <- [Fd | GenFds]]
+    ).
 
 get_compacted_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, ?COMPACTED_SEQ).
@@ -261,7 +305,8 @@ get_revs_limit(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, ?REVS_LIMIT).
 
 get_size_info(#st{} = St) ->
-    {ok, FileSize} = couch_file:bytes(St#st.fd),
+    Fd = get_fd(St),
+    {ok, FileSize} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(St#st.id_tree),
     SizeInfo0 = element(3, DbReduction),
     SizeInfo =
@@ -375,7 +420,8 @@ open_local_docs(#st{} = St, DocIds) ->
     ).
 
 read_doc_body(#st{} = St, #doc{} = Doc) ->
-    {ok, {Body, Atts}} = couch_file:pread_term(St#st.fd, Doc#doc.body),
+    Fd = get_fd(St),
+    {ok, {Body, Atts}} = couch_file:pread_term(Fd, Doc#doc.body),
     Doc#doc{
         body = Body,
         atts = Atts
@@ -412,10 +458,17 @@ serialize_doc(#st{} = St, #doc{} = Doc) ->
         meta = [{comp_body, Body} | Doc#doc.meta]
     }.
 
+get_fd(#st{fd = {Fd, _}}) ->
+    Fd.
+
+get_fd(#st{fd = {Fd, _}}, 0) ->
+    Fd;
+get_fd(#st{gen_fds = GenFds}, Gen) ->
+    {Fd, _} = lists:nth(Gen, GenFds),
+    Fd.
+
 write_doc_body(St, #doc{} = Doc) ->
-    #st{
-        fd = Fd
-    } = St,
+    Fd = get_fd(St),
     {ok, Ptr, Written} = couch_file:append_raw_chunk(Fd, Doc#doc.body),
     {ok, Doc#doc{body = Ptr}, Written}.
 
@@ -538,10 +591,10 @@ copy_purge_infos(#st{} = St, PurgeInfos) ->
 
 commit_data(St) ->
     #st{
-        fd = Fd,
         header = OldHeader,
         needs_commit = NeedsCommit
     } = St,
+    Fd = get_fd(St),
 
     NewHeader = update_header(St, OldHeader),
 
@@ -558,13 +611,15 @@ commit_data(St) ->
     end.
 
 open_write_stream(#st{} = St, Options) ->
-    couch_stream:open({couch_bt_engine_stream, {St#st.fd, []}}, Options).
+    Fd = get_fd(St),
+    couch_stream:open({couch_bt_engine_stream, {Fd, []}}, Options).
 
 open_read_stream(#st{} = St, StreamSt) ->
-    {ok, {couch_bt_engine_stream, {St#st.fd, StreamSt}}}.
+    Fd = get_fd(St),
+    {ok, {couch_bt_engine_stream, {Fd, StreamSt}}}.
 
 is_active_stream(#st{} = St, {couch_bt_engine_stream, {Fd, _}}) ->
-    St#st.fd == Fd;
+    get_fd(St) == Fd;
 is_active_stream(_, _) ->
     false.
 
@@ -819,7 +874,70 @@ open_db_file(FilePath, Options) ->
             throw(Error)
     end.
 
-init_state(FilePath, Fd, Header0, Options) ->
+generation_file_path(FilePath, 0) ->
+    FilePath;
+generation_file_path(FilePath, Gen) ->
+    G = integer_to_list(Gen),
+    string:replace(FilePath, ".couch", "." ++ G ++ ".couch", trailing).
+
+open_generation_file(FilePath, Gen, Options) ->
+    open_generation_file(FilePath, Gen, "", Options).
+
+open_generation_file(FilePath, Gen, Suffix, Options) ->
+    GenFilePath = generation_file_path(FilePath, Gen) ++ Suffix,
+    Fd =
+        case couch_file:open(GenFilePath, [nologifmissing | Options]) of
+            {ok, Db} ->
+                Db;
+            {error, enoent} ->
+                {ok, Db} = couch_file:open(GenFilePath, [create]),
+                Db
+        end,
+    {Fd, monitor(process, Fd)}.
+
+open_generation_files(_FilePath, 0, _Options) ->
+    [];
+open_generation_files(FilePath, Generations, Options) ->
+    lists:map(
+        fun(Gen) ->
+            open_generation_file(FilePath, Gen, Options)
+        end,
+        lists:seq(1, Generations)
+    ).
+
+maybe_open_generation_files(FilePath, Generations, Options) ->
+    case lists:member(compacting, Options) of
+        true -> [];
+        false -> open_generation_files(FilePath, Generations, Options)
+    end.
+
+open_additional_generation_file(#st{} = St, Gen, Options) ->
+    #st{
+        filepath = FilePath,
+        header = Header,
+        gen_fds = GenFds
+    } = St,
+    MaxGen = couch_bt_engine_header:max_generation(Header),
+    case {MaxGen, Gen} of
+        {0, _} ->
+            GenFds;
+        {M, M} ->
+            Fd = open_generation_file(FilePath, M, ".compact.maxgen", Options),
+            GenFds ++ [Fd];
+        _ ->
+            GenFds
+    end.
+
+reopen_generation_file(FilePath, Fds, Gen) ->
+    reopen_generation_file(FilePath, Gen, Fds, Gen).
+
+reopen_generation_file(FilePath, Gen, [_ | Fds], 1) ->
+    Fd = open_generation_file(FilePath, Gen, []),
+    [Fd | Fds];
+reopen_generation_file(FilePath, Gen, [Fd | Fds], G) ->
+    [Fd | reopen_generation_file(FilePath, Gen, Fds, G - 1)].
+
+init_state(FilePath, Fd, GenFds, Header0, Options) ->
     ok = couch_file:sync(Fd),
 
     Compression = couch_compress:get_compression_method(),
@@ -874,8 +992,8 @@ init_state(FilePath, Fd, Header0, Options) ->
 
     St = #st{
         filepath = FilePath,
-        fd = Fd,
-        fd_monitor = monitor(process, Fd),
+        fd = {Fd, monitor(process, Fd)},
+        gen_fds = GenFds,
         header = Header,
         needs_commit = false,
         id_tree = IdTree,
@@ -1205,10 +1323,11 @@ get_header_term(#st{header = Header} = St, Key, Default) when is_atom(Key) ->
         undefined ->
             Default;
         Pointer when is_integer(Pointer) ->
-            case couch_bt_engine_cache:lookup({St#st.fd, Pointer}) of
+            Fd = get_fd(St),
+            case couch_bt_engine_cache:lookup({Fd, Pointer}) of
                 undefined ->
-                    {ok, Term} = couch_file:pread_term(St#st.fd, Pointer),
-                    couch_bt_engine_cache:insert({St#st.fd, Pointer}, Term, ?HEADER_CACHE_PRIORITY),
+                    {ok, Term} = couch_file:pread_term(Fd, Pointer),
+                    couch_bt_engine_cache:insert({Fd, Pointer}, Term, ?HEADER_CACHE_PRIORITY),
                     Term;
                 Term ->
                     Term
@@ -1216,7 +1335,8 @@ get_header_term(#st{header = Header} = St, Key, Default) when is_atom(Key) ->
     end.
 
 set_header_term(#st{} = St, Key, Term) when is_atom(Key) ->
-    #st{fd = Fd, header = Header, compression = Compression} = St,
+    #st{header = Header, compression = Compression} = St,
+    Fd = get_fd(St),
     St#st{
         header = set_header_term(Fd, Header, Key, Term, Compression),
         needs_commit = true
