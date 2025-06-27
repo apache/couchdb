@@ -295,26 +295,27 @@ get_revs_limit(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, revs_limit).
 
 get_size_info(#st{} = St) ->
-    Fd = get_fd(St),
-    {ok, FileSize} = couch_file:bytes(Fd),
     {ok, DbReduction} = couch_btree:full_reduce(St#st.id_tree),
-    SizeInfo0 = element(3, DbReduction),
-    SizeInfo =
-        case SizeInfo0 of
-            SI when is_record(SI, size_info) ->
-                SI;
-            {AS, ES} ->
-                #size_info{active = AS, external = ES};
-            AS ->
-                #size_info{active = AS}
+    SizeInfos = upgrade_sizes_to_list(element(3, DbReduction)),
+    lists:zipwith(
+        fun(Gen, SI) ->
+            Fd = get_fd(St, Gen),
+            {ok, FileSize} = couch_file:bytes(Fd),
+            ActiveSize =
+                case Gen of
+                    0 -> active_size(St, SI);
+                    _ -> SI#size_info.active
+                end,
+            ExternalSize = SI#size_info.external,
+            [
+                {active, ActiveSize},
+                {external, ExternalSize},
+                {file, FileSize}
+            ]
         end,
-    ActiveSize = active_size(St, SizeInfo),
-    ExternalSize = SizeInfo#size_info.external,
-    [
-        {active, ActiveSize},
-        {external, ExternalSize},
-        {file, FileSize}
-    ].
+        lists:seq(0, length(SizeInfos) - 1),
+        SizeInfos
+    ).
 
 partition_size_cb(traverse, Key, {DC, DDC, Sizes}, {Partition, DCAcc, DDCAcc, SizesAcc}) ->
     case couch_partition:is_member(Key, Partition) of
@@ -342,7 +343,8 @@ get_partition_info(#st{} = St, Partition) ->
     InitAcc = {Partition, 0, 0, #size_info{}},
     Options = [{start_key, StartKey}, {end_key, EndKey}],
     {ok, _, OutAcc} = couch_btree:fold(St#st.id_tree, Fun, InitAcc, Options),
-    {Partition, DocCount, DocDelCount, SizeInfo} = OutAcc,
+    {Partition, DocCount, DocDelCount, SizeInfo0} = OutAcc,
+    SizeInfo = couch_db_updater:sum_sizes(SizeInfo0),
     [
         {partition, Partition},
         {doc_count, DocCount},
@@ -1210,11 +1212,21 @@ disk_tree(RevTree) ->
         RevTree
     ).
 
-split_sizes(#size_info{} = SI) ->
-    {SI#size_info.active, SI#size_info.external}.
+split_sizes(Sizes) ->
+    couch_db_updater:map_sizes(
+        fun(#size_info{active = Active, external = External}) ->
+            {Active, External}
+        end,
+        Sizes
+    ).
 
-join_sizes({Active, External}) when is_integer(Active), is_integer(External) ->
-    #size_info{active = Active, external = External}.
+join_sizes(Sizes) ->
+    couch_db_updater:map_sizes(
+        fun({Active, External}) when is_integer(Active), is_integer(External) ->
+            #size_info{active = Active, external = External}
+        end,
+        Sizes
+    ).
 
 reduce_sizes(nil, _) ->
     nil;
@@ -1225,10 +1237,22 @@ reduce_sizes(#size_info{} = S1, #size_info{} = S2) ->
         active = S1#size_info.active + S2#size_info.active,
         external = S1#size_info.external + S2#size_info.external
     };
+reduce_sizes([], S) ->
+    S;
+reduce_sizes(S, []) ->
+    S;
+reduce_sizes([S1 | R1], [S2 | R2]) ->
+    [reduce_sizes(S1, S2) | reduce_sizes(R1, R2)];
 reduce_sizes(S1, S2) ->
-    US1 = couch_db_updater:upgrade_sizes(S1),
-    US2 = couch_db_updater:upgrade_sizes(S2),
+    US1 = upgrade_sizes_to_list(S1),
+    US2 = upgrade_sizes_to_list(S2),
     reduce_sizes(US1, US2).
+
+upgrade_sizes_to_list(Sizes) ->
+    case couch_db_updater:upgrade_sizes(Sizes) of
+        S when is_list(S) -> S;
+        S -> [S]
+    end.
 
 active_size(#st{} = St, #size_info{} = SI) ->
     Trees = [

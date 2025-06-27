@@ -13,7 +13,7 @@
 -module(couch_db_updater).
 -behaviour(gen_server).
 
--export([add_sizes/3, upgrade_sizes/1]).
+-export([add_sizes/3, map_sizes/2, map_fold_sizes/1, sum_sizes/1, upgrade_sizes/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
 -export([generation_pointer/1, canonical_pointer/1]).
 
@@ -379,14 +379,10 @@ flush_trees(
         {0, 0, []},
         Unflushed
     ),
-    {FinalAS, FinalES, FinalAtts} = FinalAcc,
-    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
+    GenSizes = map_fold_sizes(FinalAcc),
     NewInfo = InfoUnflushed#full_doc_info{
         rev_tree = Flushed,
-        sizes = #size_info{
-            active = FinalAS + TotalAttSize,
-            external = FinalES + TotalAttSize
-        }
+        sizes = GenSizes
     },
     flush_trees(Db, RestUnflushed, [NewInfo | AccFlushed]).
 
@@ -431,7 +427,26 @@ generation_pointer(undefined) ->
 generation_pointer({Gen, Ptr}) ->
     {Gen, Ptr}.
 
-add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
+add_sizes(leaf, #leaf{ptr = Ptr} = Leaf, Acc) ->
+    {Gen, _} = generation_pointer(Ptr),
+    case add_sizes_int(Leaf, Gen, Acc) of
+        [A] -> A;
+        A -> A
+    end;
+add_sizes(_, #leaf{}, Acc) ->
+    % For intermediate nodes external and active contribution is 0
+    Acc.
+
+add_sizes_int(Leaf, Gen, []) ->
+    add_sizes_int(Leaf, Gen, [{0, 0, []}]);
+add_sizes_int(Leaf, 0, [Acc | Rest]) ->
+    [add_sizes_leaf(Leaf, Acc) | Rest];
+add_sizes_int(Leaf, Gen, [Acc | Rest]) ->
+    [Acc | add_sizes_int(Leaf, Gen - 1, Rest)];
+add_sizes_int(Leaf, Gen, Acc) ->
+    add_sizes_int(Leaf, Gen, [Acc]).
+
+add_sizes_leaf(#leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     % Maybe upgrade from disk_size only
     #size_info{
         active = ActiveSize,
@@ -441,11 +456,41 @@ add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     NewASAcc = ActiveSize + ASAcc,
     NewESAcc = ExternalSize + ESAcc,
     NewAttsAcc = lists:umerge(AttSizes, AttsAcc),
-    {NewASAcc, NewESAcc, NewAttsAcc};
-add_sizes(_, #leaf{}, Acc) ->
-    % For intermediate nodes external and active contribution is 0
-    Acc.
+    {NewASAcc, NewESAcc, NewAttsAcc}.
 
+map_fold_sizes(FinalSizesAcc) ->
+    map_sizes(fun fold_sizes/1, FinalSizesAcc).
+
+map_sizes(Fun, Sizes) when is_list(Sizes) ->
+    lists:map(Fun, Sizes);
+map_sizes(Fun, Sizes) ->
+    Fun(Sizes).
+
+fold_sizes({ActiveSize, ExternalSize, AttSizes}) ->
+    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, AttSizes),
+    #size_info{
+        active = ActiveSize + TotalAttSize,
+        external = ExternalSize + TotalAttSize
+    }.
+
+sum_sizes(SI) when is_list(SI) ->
+    lists:foldl(
+        fun(A, B) ->
+            #size_info{
+                active = A#size_info.active + B#size_info.active,
+                external = A#size_info.external + B#size_info.external
+            }
+        end,
+        #size_info{active = 0, external = 0},
+        SI
+    );
+sum_sizes(#size_info{} = SI) ->
+    SI.
+
+upgrade_sizes([S]) ->
+    upgrade_sizes(S);
+upgrade_sizes(S) when is_list(S) ->
+    lists:map(fun upgrade_sizes/1, S);
 upgrade_sizes(#size_info{} = SI) ->
     SI;
 upgrade_sizes({D, E}) ->
@@ -799,9 +844,9 @@ estimate_size(#full_doc_info{} = FDI) ->
         (_Rev, _Value, branch, SizesAcc) ->
             SizesAcc
     end,
-    {_, FinalES, FinalAtts} = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
-    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
-    FinalES + TotalAttSize.
+    Sizes = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
+    #size_info{external = ES} = sum_sizes(map_fold_sizes(Sizes)),
+    ES.
 
 purge_docs(Db, []) ->
     {ok, Db, []};

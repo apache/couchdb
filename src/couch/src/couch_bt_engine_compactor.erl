@@ -472,17 +472,11 @@ copy_docs(St, SrcGen, #st{} = NewSt, MixedInfos, Retry) ->
                 {0, 0, []},
                 Info#full_doc_info.rev_tree
             ),
-            {FinalAS, FinalES, FinalAtts} = FinalAcc,
-            TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
-            NewActiveSize = FinalAS + TotalAttSize,
-            NewExternalSize = FinalES + TotalAttSize,
+            GenSizes = couch_db_updater:map_fold_sizes(FinalAcc),
             ?COMP_EVENT(seq_copy),
             Info#full_doc_info{
                 rev_tree = NewRevTree,
-                sizes = #size_info{
-                    active = NewActiveSize,
-                    external = NewExternalSize
-                }
+                sizes = GenSizes
             }
         end,
         NewInfos0

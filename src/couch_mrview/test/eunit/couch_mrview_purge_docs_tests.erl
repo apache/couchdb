@@ -565,7 +565,12 @@ db_disk_size(DbName) ->
     active_size(Info).
 
 active_size(Info) ->
-    couch_util:get_nested_json_value({Info}, [sizes, active]).
+    Size =
+        case couch_util:get_value(sizes, Info) of
+            [{Size} | _] -> Size;
+            {Size} -> Size
+        end,
+    couch_util:get_value(active, Size).
 
 wait_compaction(DbName, Kind, Line) ->
     WaitFun = fun() ->

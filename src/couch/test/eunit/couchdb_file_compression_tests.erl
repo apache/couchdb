@@ -208,10 +208,20 @@ view_external_size(DbName) ->
     external_size(Info).
 
 active_size(Info) ->
-    couch_util:get_nested_json_value({Info}, [sizes, active]).
+    Size =
+        case couch_util:get_value(sizes, Info) of
+            [{Size} | _] -> Size;
+            {Size} -> Size
+        end,
+    couch_util:get_value(active, Size).
 
 external_size(Info) ->
-    couch_util:get_nested_json_value({Info}, [sizes, external]).
+    Size =
+        case couch_util:get_value(sizes, Info) of
+            [{Size} | _] -> Size;
+            {Size} -> Size
+        end,
+    couch_util:get_value(external, Size).
 
 wait_compaction(DbName, Kind, Line) ->
     WaitFun = fun() ->
