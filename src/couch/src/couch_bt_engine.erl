@@ -62,6 +62,7 @@
 
     serialize_doc/2,
     write_doc_body/2,
+    write_doc_body/3,
     write_doc_infos/3,
     purge_docs/3,
     copy_purge_infos/2,
@@ -69,6 +70,7 @@
     commit_data/1,
 
     open_write_stream/2,
+    open_write_stream/3,
     open_read_stream/2,
     is_active_stream/2,
 
@@ -435,8 +437,9 @@ open_local_docs(#st{} = St, DocIds) ->
     ).
 
 read_doc_body(#st{} = St, #doc{} = Doc) ->
-    Fd = get_fd(St),
-    {ok, {Body, Atts}} = couch_file:pread_term(Fd, Doc#doc.body),
+    {Gen, Ptr} = couch_db_updater:generation_pointer(Doc#doc.body),
+    Fd = get_fd(St, Gen),
+    {ok, {Body, Atts}} = couch_file:pread_term(Fd, Ptr),
     Doc#doc{
         body = Body,
         atts = Atts
@@ -483,9 +486,18 @@ get_fd(#st{gen_fds = GenFds}, Gen) ->
     Fd.
 
 write_doc_body(St, #doc{} = Doc) ->
-    Fd = get_fd(St),
+    % New doc bodies start with generation 0
+    write_doc_body(St, Doc, {0, 0}).
+
+write_doc_body(St, #doc{} = Doc, {FdGen, PtrGen}) ->
+    Fd = get_fd(St, FdGen),
     {ok, Ptr, Written} = couch_file:append_raw_chunk(Fd, Doc#doc.body),
-    {ok, Doc#doc{body = Ptr}, Written}.
+    GenPtr =
+        case PtrGen of
+            0 -> Ptr;
+            G -> {G, Ptr}
+        end,
+    {ok, Doc#doc{body = GenPtr}, Written}.
 
 write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
     #st{
@@ -628,15 +640,20 @@ commit_data(St) ->
     end.
 
 open_write_stream(#st{} = St, Options) ->
-    Fd = get_fd(St),
-    couch_stream:open({couch_bt_engine_stream, {Fd, []}}, Options).
+    open_write_stream(St, {0, 0}, Options).
 
-open_read_stream(#st{} = St, StreamSt) ->
-    Fd = get_fd(St),
-    {ok, {couch_bt_engine_stream, {Fd, StreamSt}}}.
+open_write_stream(#st{} = St, {FdGen, PtrGen}, Options) ->
+    Fd = get_fd(St, FdGen),
+    couch_stream:open({couch_bt_engine_stream, {Fd, PtrGen, []}}, Options).
 
-is_active_stream(#st{} = St, {couch_bt_engine_stream, {Fd, _}}) ->
-    get_fd(St) == Fd;
+open_read_stream(#st{} = St, StreamSt0) ->
+    {Gen, StreamSt} = couch_db_updater:generation_pointer(StreamSt0),
+    Fd = get_fd(St, Gen),
+    {ok, {couch_bt_engine_stream, {Fd, Gen, StreamSt}}}.
+
+is_active_stream(#st{} = St, {couch_bt_engine_stream, {Fd, _, _}}) ->
+    Fds = [GenFd || {GenFd, _} <- [St#st.fd | St#st.gen_fds]],
+    lists:member(Fd, Fds);
 is_active_stream(_, _) ->
     false.
 
@@ -1186,7 +1203,7 @@ disk_tree(RevTree) ->
                     sizes = Sizes,
                     atts = Atts
                 } = Leaf,
-                {?b2i(Del), Ptr, Seq, split_sizes(Sizes), Atts}
+                {?b2i(Del), couch_db_updater:canonical_pointer(Ptr), Seq, split_sizes(Sizes), Atts}
         end,
         RevTree
     ).

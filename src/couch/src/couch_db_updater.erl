@@ -15,6 +15,7 @@
 
 -export([add_sizes/3, upgrade_sizes/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
+-export([generation_pointer/1, canonical_pointer/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_db_int.hrl").
@@ -415,6 +416,20 @@ check_doc_atts(Db, Doc) ->
                     throw(retry)
             end
     end.
+
+canonical_pointer({0, Ptr}) ->
+    Ptr;
+canonical_pointer(Ptr) ->
+    Ptr.
+
+generation_pointer(Ptr) when is_integer(Ptr) ->
+    {0, Ptr};
+generation_pointer(Ptr) when is_list(Ptr) ->
+    {0, Ptr};
+generation_pointer(undefined) ->
+    {0, undefined};
+generation_pointer({Gen, Ptr}) ->
+    {Gen, Ptr}.
 
 add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     % Maybe upgrade from disk_size only
