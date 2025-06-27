@@ -334,8 +334,8 @@ open_shard(Name, Opts) ->
             couch_stats:increment_counter([fabric, open_shard, timeouts])
     end.
 
-compact(DbName) ->
-    with_db(DbName, [], {couch_db, start_compact, []}).
+compact({DbName, SrcGen}) ->
+    with_db(DbName, [], {couch_db, start_compact, [SrcGen]}).
 
 compact(ShardName, DesignName) ->
     {ok, Pid} = couch_index_server:get_index(

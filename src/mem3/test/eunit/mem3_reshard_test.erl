@@ -752,7 +752,7 @@ purge_docs(DbName, DocIdRevs) ->
 
 compact(DbName) ->
     InitFileSize = get_db_file_size(DbName),
-    ok = with_proc(fun() -> fabric:compact(DbName) end),
+    ok = with_proc(fun() -> fabric:compact({DbName, 0}) end),
     test_util:wait(
         fun() ->
             case {compact_running(DbName), get_db_file_size(DbName)} of
