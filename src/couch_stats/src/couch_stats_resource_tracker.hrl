@@ -194,4 +194,7 @@
 -type query_options() :: #{limit => pos_integer()}.
 -type aggregation_key() :: tuple_of_field_names().
 -type aggregation_values() :: tuple_of_field_values().
--type query_result() :: #{aggregation_key() => non_neg_integer()}.
+-type aggregation_result() :: #{aggregation_key() => non_neg_integer()}.
+-type ordered_result() :: [{aggregation_key(), non_neg_integer()}].
+-type query_result() :: aggregation_result() | ordered_result().
+-type json_spec(_Spec) :: term().
