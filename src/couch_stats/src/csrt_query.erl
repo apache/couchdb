@@ -388,6 +388,8 @@ validate_aggregation(Other) ->
     [rctx_field()]
     | throw({bad_request, Reason :: binary()}).
 
+parse_key([C | _] = Key) when is_integer(C)->
+    csrt_entry:key(Key);
 parse_key(Keys) when is_list(Keys) ->
     parse_key(Keys, []);
 parse_key(BinKey) when is_binary(BinKey) ->
