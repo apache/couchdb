@@ -340,9 +340,11 @@ when
 query(MatcherName, AggregationKeys, ValueKey, Options) ->
     AggregationKey = parse_key(AggregationKeys),
     VKey = parse_key(ValueKey),
-    Limit = maps:get(Options, aggregation, query_limit()),
-    Aggregation = maps:get(Options, aggregation, none),
+    Limit = maps:get(limit, Options, query_limit()),
+    Aggregation = maps:get(aggregation, Options, none),
     maybe
+        ok ?= validate_not_error(AggregationKey),
+        ok ?= validate_not_error(VKey),
         ok ?= validate_limit(Limit),
         ok ?= validate_aggregation(Aggregation),
         {ok, Matcher} ?= get_matcher(MatcherName),
@@ -359,6 +361,11 @@ query(MatcherName, AggregationKeys, ValueKey, Options) ->
                 query_matcher_rows(Matcher, Limit)
         end
     end.
+
+validate_not_error({error, _} = Error) ->
+    Error;
+validate_not_error(_) ->
+    ok.
 
 query_limit() ->
     config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT).
