@@ -63,8 +63,8 @@ terminate(Reason, Db) ->
 
 handle_call(get_db, _From, Db) ->
     {reply, {ok, Db}, Db};
-handle_call(start_compact, _From, Db) ->
-    {noreply, NewDb} = handle_cast(start_compact, Db),
+handle_call({start_compact, Generation}, _From, Db) ->
+    {noreply, NewDb} = handle_cast({start_compact, Generation}, Db),
     {reply, {ok, NewDb#db.compactor_pid}, NewDb};
 handle_call(compactor_pid, _From, #db{compactor_pid = Pid} = Db) ->
     {reply, Pid, Db};
@@ -128,7 +128,7 @@ handle_cast({load_validation_funs, ValidationFuns}, Db) ->
     Db2 = Db#db{validate_doc_funs = ValidationFuns},
     ok = couch_server:db_updated(Db2),
     {noreply, Db2};
-handle_cast(start_compact, Db) ->
+handle_cast({start_compact, Generation}, Db) ->
     case Db#db.compactor_pid of
         nil ->
             % For now we only support compacting to the same
@@ -143,7 +143,7 @@ handle_cast(start_compact, Db) ->
                 )
             ),
             couch_log:Level("Starting compaction for db \"~s\" at ~p", Args),
-            {ok, Db2} = couch_db_engine:start_compaction(Db),
+            {ok, Db2} = couch_db_engine:start_compaction(Db, Generation),
             ok = couch_server:db_updated(Db2),
             {noreply, Db2};
         _ ->
