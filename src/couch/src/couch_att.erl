@@ -828,6 +828,8 @@ attachment_field_api_test_() ->
     ]}.
 
 attachment_disk_term_test_() ->
+    FakeGen = 0,
+    FakeSp = 1337,
     BaseAttachment = new([
         {name, <<"empty">>},
         {type, <<"application/octet-stream">>},
@@ -835,13 +837,13 @@ attachment_disk_term_test_() ->
         {disk_len, 0},
         {md5, <<212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126>>},
         {revpos, 4},
-        {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
+        {data, {stream, {couch_bt_engine_stream, {fake_fd, FakeGen, FakeSp}}}},
         {encoding, identity}
     ]),
     BaseDiskTerm = {
         <<"empty">>,
         <<"application/octet-stream">>,
-        fake_sp,
+        FakeSp,
         0,
         0,
         4,

@@ -14,7 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(ENGINE(FdVar), {couch_bt_engine_stream, {FdVar, []}}).
+-define(ENGINE(FdVar), {couch_bt_engine_stream, {FdVar, 0, []}}).
 
 setup() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
