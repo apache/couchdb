@@ -97,6 +97,7 @@ open_compaction_files(DbName, OldSt, Options) ->
     {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
     {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
+    GenFds = couch_bt_engine:open_additional_generation_file(OldSt, 0, Options),
     CompSt =
         case {DataHdr, MetaHdr} of
             {#comp_header{} = A, #comp_header{} = A} ->
@@ -104,7 +105,7 @@ open_compaction_files(DbName, OldSt, Options) ->
                 % before trying to swap out with the original db
                 DbHeader = A#comp_header.db_header,
                 St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DbHeader, Options
+                    DataFile, DataFd, GenFds, DbHeader, Options
                 ),
                 St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
                 #comp_st{
@@ -121,7 +122,7 @@ open_compaction_files(DbName, OldSt, Options) ->
                 Header = couch_bt_engine_header:from(SrcHdr),
                 ok = reset_compaction_file(MetaFd, Header),
                 St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DataHdr, Options
+                    DataFile, DataFd, GenFds, DataHdr, Options
                 ),
                 St1 = bind_emsort(St0, MetaFd, nil),
                 #comp_st{
@@ -136,7 +137,7 @@ open_compaction_files(DbName, OldSt, Options) ->
                 Header = couch_bt_engine_header:from(SrcHdr),
                 ok = reset_compaction_file(DataFd, Header),
                 ok = reset_compaction_file(MetaFd, Header),
-                St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
+                St0 = couch_bt_engine:init_state(DataFile, DataFd, GenFds, Header, Options),
                 St1 = bind_emsort(St0, MetaFd, nil),
                 #comp_st{
                     db_name = DbName,
@@ -211,7 +212,7 @@ copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
     NewIdTreeState = couch_bt_engine_header:id_tree_state(NewSt0#st.header),
     MetaFd = couch_emsort:get_fd(NewSt0#st.id_tree),
     MetaState = couch_emsort:get_state(NewSt0#st.id_tree),
-    NewSt1 = bind_id_tree(NewSt0, NewSt0#st.fd, NewIdTreeState),
+    NewSt1 = bind_id_tree(NewSt0, couch_bt_engine:get_fd(NewSt0), NewIdTreeState),
 
     #st{
         id_tree = NewIdTree0,
@@ -505,7 +506,8 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
     NewSt#st{id_tree = IdEms, seq_tree = SeqTree}.
 
 copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
-    {ok, {BodyData, BinInfos0}} = couch_file:pread_term(SrcSt#st.fd, SrcSp),
+    Fd = couch_bt_engine:get_fd(SrcSt),
+    {ok, {BodyData, BinInfos0}} = couch_file:pread_term(Fd, SrcSp),
     BinInfos =
         case BinInfos0 of
             _ when is_binary(BinInfos0) ->
@@ -573,10 +575,10 @@ sort_meta_data(#comp_st{new_st = St0} = CompSt) ->
 
 copy_meta_data(#comp_st{new_st = St} = CompSt) ->
     #st{
-        fd = Fd,
         header = Header,
         id_tree = Src
     } = St,
+    Fd = couch_bt_engine:get_fd(St),
     SrcFd = couch_emsort:get_fd(Src),
     DstState = couch_bt_engine_header:id_tree_state(Header),
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
@@ -648,13 +650,13 @@ commit_compaction_data(#comp_st{new_st = St} = CompSt) ->
     };
 commit_compaction_data(#st{} = St) ->
     commit_compaction_data(St, couch_emsort:get_fd(St#st.id_tree)),
-    commit_compaction_data(St, St#st.fd).
+    commit_compaction_data(St, couch_bt_engine:get_fd(St)).
 
 commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     DataState = couch_bt_engine_header:id_tree_state(OldHeader),
     MetaFd = couch_emsort:get_fd(St0#st.id_tree),
     MetaState = couch_emsort:get_state(St0#st.id_tree),
-    St1 = bind_id_tree(St0, St0#st.fd, DataState),
+    St1 = bind_id_tree(St0, couch_bt_engine:get_fd(St0), DataState),
     Header = couch_bt_engine:update_header(St1, St1#st.header),
     CompHeader = #comp_header{
         db_header = Header,
