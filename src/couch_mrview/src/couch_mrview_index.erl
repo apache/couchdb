@@ -215,9 +215,7 @@ finish_update(State) ->
 
 commit(State) ->
     Header = {State#mrst.sig, couch_mrview_util:make_header(State)},
-    ok = couch_file:sync(State#mrst.fd),
-    ok = couch_file:write_header(State#mrst.fd, Header),
-    ok = couch_file:sync(State#mrst.fd),
+    ok = couch_file:write_header(State#mrst.fd, Header, [sync]),
     fabric_drop_seq:update_peer_checkpoint_doc(
         State#mrst.db_name,
         <<"mrview">>,
