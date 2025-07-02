@@ -78,7 +78,6 @@ handle_sort_by(Req, MatcherName, SortBy) ->
     CounterKey = couch_util:get_value(<<"counter_key">>, SortBy),
     case csrt:query_sort_by(MatcherName, AggregationKeys, CounterKey) of
         {ok, Map} ->
-            io:format(user, "Map ~p~n", [Map]),
             send_json(Req, aggregation_result_to_json(AggregationKeys, Map));
         {error, Reason} ->
             send_error(Req, Reason)
