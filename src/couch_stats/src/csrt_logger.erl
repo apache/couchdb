@@ -121,7 +121,7 @@ tracker({Pid, _Ref} = PidRef) ->
 -spec register_matcher(Name, MSpec) -> ok | {error, badarg} when
     Name :: string(), MSpec :: ets:match_spec().
 register_matcher(Name, MSpec) ->
-    gen_server:call(?MODULE, {register, Name, MSpec}).
+    gen_server:call(?MODULE, {register, Name, MSpec}, infinity).
 
 -spec deregister_matcher(Name :: string()) -> ok.
 deregister_matcher(Name) ->
@@ -362,9 +362,13 @@ matcher_on_nonce(Nonce) ->
 matcher_on_changes_processed(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
+    %% HACK: because we overload the use of #rctx.rows_read for
+    %% changes_processed, we must specify a direct match against a changes
+    %% context. Fow now, just match on #coordinator's
     ets:fun2ms(
         fun(
             #rctx{
+                type = #coordinator{mod = chttpd_db, func = handle_changes_req},
                 rows_read = Processed,
                 changes_returned = Returned
             } = R

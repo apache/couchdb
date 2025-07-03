@@ -119,7 +119,7 @@
     dbname :: dbname() | undefined | '_',
     username :: username() | undefined | '_',
 
-    %% Stats counters
+    %% Stats Counters
     db_open = 0 :: non_neg_integer() | '_',
     docs_read = 0 :: non_neg_integer() | '_',
     docs_written = 0 :: non_neg_integer() | '_',
