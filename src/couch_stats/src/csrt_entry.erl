@@ -52,8 +52,10 @@ value(get_kp_node, #rctx{get_kp_node = Val}) -> Val;
 value(started_at, #rctx{started_at = Val}) -> Val;
 value(updated_at, #rctx{updated_at = Val}) -> Val.
 
--spec key(BinKey :: binary() | string() | atom()) -> Key :: rctx_field()
-    | throw({bad_request, Reason :: binary()}).
+-spec key(BinKey :: binary() | string() | atom()) ->
+    Key ::
+        rctx_field()
+        | throw({bad_request, Reason :: binary()}).
 
 key(Key) when is_atom(Key) ->
     key_from_atom(Key);

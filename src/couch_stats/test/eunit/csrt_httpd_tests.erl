@@ -92,13 +92,19 @@ t_query_group_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_group_by(Url, [<<"username">>, <<"dbname">>], <<"ioq_calls">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     OrderedByKey = order_by_key([username, dbname], Result),
     V1 = maps:get({<<"user_bar">>, <<"db1">>}, Grouped),
     V2 = maps:get({<<"user_bar">>, <<"db2">>}, Grouped),
@@ -106,10 +112,22 @@ t_query_group_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     V4 = maps:get({<<"user_foo">>, <<"db2">>}, Grouped),
     ?assertMatch(
         [
-            #{<<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db1">>}, <<"value">> := V1},
-            #{<<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db2">>}, <<"value">> := V2},
-            #{<<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db1">>}, <<"value">> := V3},
-            #{<<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db2">>}, <<"value">> := V4}
+            #{
+                <<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db1">>},
+                <<"value">> := V1
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db2">>},
+                <<"value">> := V2
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db1">>},
+                <<"value">> := V3
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db2">>},
+                <<"value">> := V4
+            }
         ],
         OrderedByKey
     ),
@@ -121,11 +139,17 @@ t_query_group_by_single_key(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_group_by(Url, [<<"username">>], <<"ioq_calls">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     OrderedByKey = order_by_key([username], Result),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -144,11 +168,17 @@ t_query_group_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_group_by(Url, <<"username">>, <<"ioq_calls">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
-    ], Result, format("Unexpected shape of the result~n  ~p~n", [Result])),
+    ?assertEqual(
+        2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
+        ],
+        Result,
+        format("Unexpected shape of the result~n  ~p~n", [Result])
+    ),
     OrderedByKey = order_by_key([username], Result),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -163,30 +193,34 @@ t_query_group_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
 
 t_query_group_by_bad_request(#{url := Url}) ->
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>
+        }},
         active_resources_group_by("unknown_matcher", Url, <<"username">>, <<"ioq_calls">>),
         "Should return error if 'matcher' is unknown"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_group_by(Url, [<<"unknown_field">>], <<"ioq_calls">>),
         "Should return error if 'AggregationKeys' contain unknown field"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_group_by(Url, <<"unknown_field">>, <<"ioq_calls">>),
         "Should return error if 'AggregationKeys' is unknown field"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_group_by(Url, <<"username">>, <<"unknown_field">>),
         "Should return error if 'ValueKey' contain unknown field"
     ),
@@ -209,13 +243,19 @@ t_query_count_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_count_by(Url, [<<"username">>, <<"dbname">>]),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     OrderedByKey = order_by_key([username, dbname], Result),
     V1 = maps:get({<<"user_bar">>, <<"db1">>}, Grouped),
     V2 = maps:get({<<"user_bar">>, <<"db2">>}, Grouped),
@@ -223,10 +263,22 @@ t_query_count_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     V4 = maps:get({<<"user_foo">>, <<"db2">>}, Grouped),
     ?assertMatch(
         [
-            #{<<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db1">>}, <<"value">> := V1},
-            #{<<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db2">>}, <<"value">> := V2},
-            #{<<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db1">>}, <<"value">> := V3},
-            #{<<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db2">>}, <<"value">> := V4}
+            #{
+                <<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db1">>},
+                <<"value">> := V1
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db2">>},
+                <<"value">> := V2
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db1">>},
+                <<"value">> := V3
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db2">>},
+                <<"value">> := V4
+            }
         ],
         OrderedByKey
     ),
@@ -238,11 +290,17 @@ t_query_count_by_single_key(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_count_by(Url, [<<"username">>]),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     OrderedByKey = order_by_key([username], Result),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -261,11 +319,17 @@ t_query_count_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_count_by(Url, <<"username">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     OrderedByKey = order_by_key([username], Result),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -280,23 +344,26 @@ t_query_count_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
 
 t_query_count_by_bad_request(#{url := Url}) ->
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>
+        }},
         active_resources_count_by("unknown_matcher", Url, <<"username">>),
         "Should return error if 'matcher' is unknown"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_count_by(Url, [<<"unknown_field">>]),
         "Should return error if 'AggregationKeys' contain unknown field"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_count_by(Url, <<"unknown_field">>),
         "Should return error if 'AggregationKeys' is unknown field"
     ),
@@ -321,13 +388,19 @@ t_query_sort_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_sort_by(Url, [<<"username">>, <<"dbname">>], <<"ioq_calls">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _, <<"dbname">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     [
         {{<<"user_foo">>, <<"db2">>}, V1},
         {{<<"user_bar">>, <<"db2">>}, V2},
@@ -336,10 +409,22 @@ t_query_sort_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     ] = Ordered,
     ?assertMatch(
         [
-            #{<<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db2">>}, <<"value">> := V1},
-            #{<<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db2">>}, <<"value">> := V2},
-            #{<<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db1">>}, <<"value">> := V3},
-            #{<<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db1">>}, <<"value">> := V4}
+            #{
+                <<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db2">>},
+                <<"value">> := V1
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db2">>},
+                <<"value">> := V2
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_bar">>, <<"dbname">> := <<"db1">>},
+                <<"value">> := V3
+            },
+            #{
+                <<"key">> := #{<<"username">> := <<"user_foo">>, <<"dbname">> := <<"db1">>},
+                <<"value">> := V4
+            }
         ],
         Result
     ),
@@ -352,11 +437,17 @@ t_query_sort_by_single_key(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_sort_by(Url, [<<"username">>], <<"ioq_calls">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     [
         {{<<"user_bar">>}, V1},
         {{<<"user_foo">>}, V2}
@@ -377,11 +468,17 @@ t_query_sort_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     {RC, Result} = active_resources_sort_by(Url, <<"username">>, <<"ioq_calls">>),
     ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
-    ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
-    ?assertMatch([
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
-        #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
-    ], Result, "Unexpected shape of the result"),
+    ?assertEqual(
+        2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])
+    ),
+    ?assertMatch(
+        [
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _},
+            #{<<"key">> := #{<<"username">> := _}, <<"value">> := _}
+        ],
+        Result,
+        "Unexpected shape of the result"
+    ),
     [
         {{<<"user_bar">>}, V1},
         {{<<"user_foo">>}, V2}
@@ -397,30 +494,34 @@ t_query_sort_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
 
 t_query_sort_by_bad_request(#{url := Url}) ->
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>
+        }},
         active_resources_sort_by("unknown_matcher", Url, <<"username">>, <<"ioq_calls">>),
         "Should return error if 'matcher' is unknown"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_sort_by(Url, [<<"unknown_field">>], <<"ioq_calls">>),
         "Should return error if 'AggregationKeys' contain unknown field"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_sort_by(Url, <<"unknown_field">>, <<"ioq_calls">>),
         "Should return error if 'AggregationKeys' is unknown field"
     ),
     ?assertMatch(
-        {400,
-            #{<<"error">> := <<"bad_request">>,
-            <<"reason">> := <<"Unknown field name 'unknown_field'">>}},
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Unknown field name 'unknown_field'">>
+        }},
         active_resources_sort_by(Url, <<"username">>, <<"unknown_field">>),
         "Should return error if 'ValueKey' contain unknown field"
     ),
@@ -430,21 +531,33 @@ format(Fmt, Args) ->
     lists:flatten(io_lib:format(Fmt, Args)).
 
 aggregate(AggregationKeys, ValField, Records) ->
-    lists:foldl(fun(Rctx, Acc) ->
-        Key = list_to_tuple([csrt_entry:value(Field, Rctx) || Field <- AggregationKeys]),
-        CurrVal = maps:get(Key, Acc, []),
-        maps:put(Key, [csrt_entry:value(ValField, Rctx) | CurrVal], Acc)
-    end, #{}, Records).
+    lists:foldl(
+        fun(Rctx, Acc) ->
+            Key = list_to_tuple([csrt_entry:value(Field, Rctx) || Field <- AggregationKeys]),
+            CurrVal = maps:get(Key, Acc, []),
+            maps:put(Key, [csrt_entry:value(ValField, Rctx) | CurrVal], Acc)
+        end,
+        #{},
+        Records
+    ).
 
 group(Aggregated) ->
-    maps:fold(fun(Key, Val, Acc) ->
-        maps:put(Key, lists:foldl(fun erlang:'+'/2, 0, Val), Acc)
-    end, #{}, Aggregated).
+    maps:fold(
+        fun(Key, Val, Acc) ->
+            maps:put(Key, lists:foldl(fun erlang:'+'/2, 0, Val), Acc)
+        end,
+        #{},
+        Aggregated
+    ).
 
 count(Aggregated) ->
-    maps:fold(fun(Key, Val, Acc) ->
-        maps:put(Key, lists:foldl(fun(_, A) -> A + 1 end, 0, Val), Acc)
-    end, #{}, Aggregated).
+    maps:fold(
+        fun(Key, Val, Acc) ->
+            maps:put(Key, lists:foldl(fun(_, A) -> A + 1 end, 0, Val), Acc)
+        end,
+        #{},
+        Aggregated
+    ).
 
 order_by_value(Grouped) ->
     lists:reverse(lists:keysort(2, maps:to_list(Grouped))).
@@ -454,9 +567,12 @@ order_by_value(Grouped) ->
 % and
 % {{<<"db2">>, <<"user_foo">>}, 1}
 order_by_key(AggregationKeys, Entries) when is_list(AggregationKeys) andalso is_list(Entries) ->
-    lists:sort(fun(A, B) ->
-        get_key(AggregationKeys, A) =< get_key(AggregationKeys, B)
-    end, Entries).
+    lists:sort(
+        fun(A, B) ->
+            get_key(AggregationKeys, A) =< get_key(AggregationKeys, B)
+        end,
+        Entries
+    ).
 
 % This function handles both representations of entries of the result
 % #{<<"key">> => #{<<"dbname">> => <<"db2">>, <<"username">> => <<"user_foo">>}, <<"value">> => 1}

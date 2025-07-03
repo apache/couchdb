@@ -13,10 +13,10 @@
 -module(csrt_test_helper).
 
 -export([
-        rctx_gen/0,
-        rctx_gen/1,
-        rctxs/0,
-        jrctx/1
+    rctx_gen/0,
+    rctx_gen/1,
+    rctxs/0,
+    jrctx/1
 ]).
 
 -include_lib("couch/include/couch_eunit.hrl").

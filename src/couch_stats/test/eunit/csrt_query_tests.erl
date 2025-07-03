@@ -174,16 +174,18 @@ t_query_group_by(#{rctx := Rctx, dbname := DbName}) ->
     ),
     ?assertMatch(
         {ok, #{{<<"user_foo">>, DbName} := IoqCalls}},
-        csrt_query:query_group_by("rows_read", [username, dbname], ioq_calls, #{limit => ?TEST_QUERY_LIMIT - 1}),
+        csrt_query:query_group_by("rows_read", [username, dbname], ioq_calls, #{
+            limit => ?TEST_QUERY_LIMIT - 1
+        }),
         "Should handle 'limit' option"
     ),
     ?assertMatch(
-        {error,{unknown_matcher,"unknown_matcher"}},
+        {error, {unknown_matcher, "unknown_matcher"}},
         csrt_query:query_group_by("unknown_matcher", [username, dbname], ioq_calls, #{}),
         "Should return error if 'matcher' is unknown"
     ),
     ?assertMatch(
-        {error,{unknown_matcher, rows_read}},
+        {error, {unknown_matcher, rows_read}},
         csrt_query:query_group_by(rows_read, [username, dbname], ioq_calls, #{}),
         "Should return error if 'matcher' is not a string()"
     ),
@@ -199,7 +201,9 @@ t_query_group_by(#{rctx := Rctx, dbname := DbName}) ->
     ),
     ?assertMatch(
         {error, {beyond_limit, ?TEST_QUERY_LIMIT}},
-        csrt_query:query_group_by("rows_read", [username, dbname], ioq_calls, #{limit => ?TEST_QUERY_LIMIT + 1}),
+        csrt_query:query_group_by("rows_read", [username, dbname], ioq_calls, #{
+            limit => ?TEST_QUERY_LIMIT + 1
+        }),
         "Should return error when 'limit' is greater than configured"
     ),
     ok.
@@ -237,12 +241,12 @@ t_query_count_by(#{dbname := DbName}) ->
         "Should handle 'limit' option"
     ),
     ?assertMatch(
-        {error,{unknown_matcher,"unknown_matcher"}},
+        {error, {unknown_matcher, "unknown_matcher"}},
         csrt_query:query_count_by("unknown_matcher", [username, dbname], #{}),
         "Should return error if 'matcher' is unknown"
     ),
     ?assertMatch(
-        {error,{unknown_matcher, rows_read}},
+        {error, {unknown_matcher, rows_read}},
         csrt_query:query_count_by(rows_read, [username, dbname], #{}),
         "Should return error if 'matcher' is not a string()"
     ),
@@ -297,16 +301,18 @@ t_query_sort_by(#{rctx := Rctx, dbname := DbName}) ->
     ),
     ?assertMatch(
         {ok, [{{<<"user_foo">>, DbName}, IoqCalls}]},
-        csrt_query:query_sort_by("rows_read", [username, dbname], ioq_calls, #{limit => ?TEST_QUERY_LIMIT - 1}),
+        csrt_query:query_sort_by("rows_read", [username, dbname], ioq_calls, #{
+            limit => ?TEST_QUERY_LIMIT - 1
+        }),
         "Should handle 'limit' option"
     ),
     ?assertMatch(
-        {error,{unknown_matcher,"unknown_matcher"}},
+        {error, {unknown_matcher, "unknown_matcher"}},
         csrt_query:query_sort_by("unknown_matcher", [username, dbname], ioq_calls, #{}),
         "Should return error if 'matcher' is unknown"
     ),
     ?assertMatch(
-        {error,{unknown_matcher, rows_read}},
+        {error, {unknown_matcher, rows_read}},
         csrt_query:query_sort_by(rows_read, [username, dbname], ioq_calls, #{}),
         "Should return error if 'matcher' is not a string()"
     ),
@@ -322,7 +328,9 @@ t_query_sort_by(#{rctx := Rctx, dbname := DbName}) ->
     ),
     ?assertMatch(
         {error, {beyond_limit, ?TEST_QUERY_LIMIT}},
-        csrt_query:query_sort_by("rows_read", [username, dbname], ioq_calls, #{limit => ?TEST_QUERY_LIMIT + 1}),
+        csrt_query:query_sort_by("rows_read", [username, dbname], ioq_calls, #{
+            limit => ?TEST_QUERY_LIMIT + 1
+        }),
         "Should return error when 'limit' is greater than configured"
     ),
     ok.
