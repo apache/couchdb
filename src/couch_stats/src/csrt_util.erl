@@ -197,6 +197,8 @@ convert_ref(Ref) when is_reference(Ref) ->
 -spec convert_string(Str :: string() | binary() | undefined) -> binary() | null.
 convert_string(undefined) ->
     null;
+convert_string(<<"undefined">>) ->
+    null;
 convert_string(Str) when is_list(Str) ->
     list_to_binary(Str);
 convert_string(Bin) when is_binary(Bin) ->
