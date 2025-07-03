@@ -47,6 +47,7 @@
 -define(LOWEST_SEQ, 0).
 -define(DEFAULT_CHECKPOINT_INTERVAL, 30000).
 -define(STARTUP_JITTER_DEFAULT, 5000).
+-define(STOP_TIMEOUT_MSEC, 5000).
 
 -record(rep_state, {
     rep_details,
@@ -110,7 +111,8 @@ stop(Pid) when is_pid(Pid) ->
     % won't return ok but exit the calling process, usually the scheduler, so
     % we guard against that. See:
     %  www.erlang.org/doc/apps/stdlib/gen_server.html#stop/3
-    catch gen_server:stop(Pid, shutdown, infinity),
+    catch gen_server:stop(Pid, shutdown, ?STOP_TIMEOUT_MSEC),
+    exit(Pid, kill),
     receive
         {'DOWN', Ref, _, _, Reason} -> Reason
     end,
