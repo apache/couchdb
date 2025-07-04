@@ -66,7 +66,7 @@ handle_call({get_node_info, Node, Key}, _From, State) ->
     {reply, Resp, State};
 handle_call({add_node, Node, NodeInfo}, _From, State) ->
     gen_event:notify(mem3_events, {add_node, Node}),
-    ets:insert(?MODULE, {Node, NodeInfo}),
+    update_ets(Node, NodeInfo),
     {reply, ok, State};
 handle_call({remove_node, Node}, _From, State) ->
     gen_event:notify(mem3_events, {remove_node, Node}),
@@ -95,12 +95,26 @@ handle_info(_Info, State) ->
     {noreply, State}.
 
 %% internal functions
-
 initialize_nodelist() ->
     DbName = mem3_sync:nodes_db(),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
+
     insert_if_missing(Db, [config:node_name() | mem3_seeds:get_seeds()]),
+
+    % when creating the document for the local node, populate
+    % the placement zone as defined by the COUCHDB_ZONE environment
+    % variable. This is an additional update on top of the first,
+    % empty document so that we don't create conflicting revisions
+    % between different nodes in the cluster when using a seedlist.
+    case os:getenv("COUCHDB_ZONE") of
+        false ->
+            % do not support unsetting a zone.
+            ok;
+        Zone ->
+            set_zone(DbName, config:node_name(), ?l2b(Zone))
+    end,
+
     Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
     Seq.
@@ -111,7 +125,7 @@ first_fold(#full_doc_info{deleted = true}, Acc) ->
     {ok, Acc};
 first_fold(#full_doc_info{id = Id} = DocInfo, Db) ->
     {ok, #doc{body = {Props}}} = couch_db:open_doc(Db, DocInfo, [ejson_body]),
-    ets:insert(?MODULE, {mem3_util:to_atom(Id), Props}),
+    update_ets(mem3_util:to_atom(Id), Props),
     {ok, Db}.
 
 listen_for_changes(Since) ->
@@ -156,7 +170,7 @@ insert_if_missing(Db, Nodes) ->
                 [_] ->
                     Acc;
                 [] ->
-                    ets:insert(?MODULE, {Node, []}),
+                    update_ets(Node, []),
                     [#doc{id = couch_util:to_binary(Node)} | Acc]
             end
         end,
@@ -169,3 +183,42 @@ insert_if_missing(Db, Nodes) ->
         true ->
             {ok, []}
     end.
+
+-spec update_ets(Node :: term(), NodeInfo :: [tuple()]) -> true.
+update_ets(Node, NodeInfo) ->
+    ets:insert(?MODULE, {Node, NodeInfo}).
+
+% sets the placement zone for the given node document.
+-spec set_zone(DbName :: binary(), Node :: string() | binary(), Zone :: binary()) -> ok.
+set_zone(DbName, Node, Zone) ->
+    {ok, Db} = couch_db:open(DbName, [sys_db, ?ADMIN_CTX]),
+    Props = get_from_db(Db, Node),
+    CurrentZone = couch_util:get_value(<<"zone">>, Props),
+    case CurrentZone of
+        Zone ->
+            ok;
+        _ ->
+            couch_log:info("Setting node zone attribute to ~s~n", [Zone]),
+            Props1 = couch_util:set_value(<<"zone">>, Props, Zone),
+            save_to_db(Db, Node, Props1)
+    end,
+    couch_db:close(Db),
+    ok.
+
+% get a node document from the system nodes db as a property list
+-spec get_from_db(Db :: any(), Node :: string() | binary()) -> [tuple()].
+get_from_db(Db, Node) ->
+    Id = couch_util:to_binary(Node),
+    {ok, Doc} = couch_db:open_doc(Db, Id, [ejson_body]),
+    {Props} = couch_doc:to_json_obj(Doc, []),
+    Props.
+
+% save a node document (represented as a property list)
+% to the system nodes db and update the ETS cache.
+-spec save_to_db(Db :: any(), Node :: string() | binary(), Props :: [tuple()]) -> ok.
+save_to_db(Db, Node, Props) ->
+    Doc = couch_doc:from_json_obj({Props}),
+    #doc{body = {NodeInfo}} = Doc,
+    {ok, _} = couch_db:update_doc(Db, Doc, []),
+    update_ets(Node, NodeInfo),
+    ok.
