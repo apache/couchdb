@@ -40,6 +40,7 @@ defmodule DropSeqStateM do
     url = "http://foo:bar@localhost:15984"
     db_name = "propcheck-repro"
     db_url = "#{url}/#{db_name}"
+    shard_map_url = "#{url}/_node/_local/_dbs/#{db_name}"
 
     IO.puts("""
     #!/bin/sh
@@ -148,6 +149,16 @@ defmodule DropSeqStateM do
             fi
           done
           """)
+        {:set, _var, {:call, __MODULE__, :move_shard, [_dbname]}} ->
+          # get new shard map from existing elixir-side code so we don’t
+          # have to reimplement the find algo in bash
+          new_map = _get_new_shard_map(db_name)
+          if new_map != nil do
+            json_map = :jiffy.encode(new_map)
+            IO.puts("""
+              curl --fail -X POST "#{shard_map_url} -Hcontent-type:application/json --data-binary '#{json_map}'
+            """)
+          end
       end
     end)
   end
@@ -200,7 +211,8 @@ defmodule DropSeqStateM do
             {10, {:call, __MODULE__, :compact_db, [{:var, :dbname}]}},
             {5, {:call, __MODULE__, :split_shard, [{:var, :dbname}]}},
             {1, {:call, __MODULE__, :create_index, [{:var, :dbname}, index_type()]}},
-            {5, {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}}
+            {5, {:call, __MODULE__, :update_indexes, [{:var, :dbname}]}},
+            {5, {:call, __MODULE__, :move_shard, [{:var, :dbname}]}}
           ] ++
             for cmd <- [
                   {10,
@@ -357,7 +369,7 @@ defmodule DropSeqStateM do
         }
       )
 
-    assert resp.status_code == 201,
+    assert resp.status_code == 201
            "split_shard failed #{resp.status_code} #{inspect(resp.body)}"
 
     retry_until(
@@ -379,6 +391,85 @@ defmodule DropSeqStateM do
     )
 
     range
+  end
+
+  # return source and target nodes and range or nil if no shard can be moved
+  # O(n^2) algorithm, but no bother for shard maps
+  def _find_movable_range(by_node) do
+    List.foldl(Map.keys(by_node), nil, fn from_node, _acc ->
+      node_ranges = by_node[from_node]
+      # for each range in node_range, see if if the range is missing in the other node_ranges, if yes, return source and target node and the range
+      List.foldl(node_ranges, nil, fn range, _acc2 ->
+        List.foldl(Map.keys(by_node), nil, fn to_node, acc3 ->
+          if from_node == to_node do
+            acc3
+          else
+            case Enum.find(by_node[to_node], fn elm -> elm == range end) do
+              nil ->
+                {from_node, to_node, range}
+              _ ->
+                acc3
+            end
+          end
+        end)
+      end)
+    end)
+  end
+
+  def _get_new_shard_map(db_name) do
+    resp = Couch.get("/_node/_local/_dbs/#{db_name}")
+    assert resp.status_code == 200
+    shard_map = resp.body
+    by_node = shard_map["by_node"]
+    by_range = shard_map["by_range"]
+
+    # find a range and two nodes in by_node so that the range exists in
+    # one and not the other node
+    found = _find_movable_range(by_node)
+    if found != nil do # n = N, skip
+      {from_node, to_node, to_move_range} = found
+
+      # move entry to new node
+      new_to_node = Enum.sort([to_move_range | by_node[to_node]])
+      new_from_node = List.delete(by_node[from_node], to_move_range)
+      new_by_node = Map.put(by_node, to_node, new_to_node)
+      new_by_node1 = Map.put(new_by_node, from_node, new_from_node)
+
+      # do the same move in by_range
+      new_range = by_range[to_move_range]
+      new_range1 = List.delete(new_range, from_node)
+      new_range2 = Enum.sort([to_node | new_range1])
+      new_by_range = Map.put(by_range, to_move_range, new_range2)
+
+      changelog_entry = ["move", to_move_range, from_node, to_node]
+
+      %{
+        _id: shard_map["_id"],
+        _rev: shard_map["_rev"],
+        shard_suffix: shard_map["shard_suffix"],
+        changelog: shard_map["changelog"] ++ [changelog_entry],
+        props: shard_map["props"],
+        by_node: new_by_node1,
+        by_range: new_by_range
+      }
+    end
+  end
+
+  def move_shard(db_name) do
+    resp = Couch.get("/#{db_name}")
+    assert resp.status_code == 200
+    # skip dbs with n=3
+    if resp.body["cluster"]["n"] == 2 do
+      new_map = _get_new_shard_map(db_name)
+      if new_map != nil do
+        resp = Couch.put("/_node/_local/_dbs/#{db_name}", body: new_map)
+
+        assert resp.status_code == 201,
+          "update shard map failed #{resp.status_code} #{inspect(resp.body)}"
+
+        wait_for_internal_replication(db_name)
+      end
+    end
   end
 
   def create_index(db_name, index_type) do
@@ -589,6 +680,10 @@ defmodule DropSeqStateM do
 
   def next_state(s, _v, {:call, _, :update_indexes, [_db_name]}) do
     %State{s | index_seq: s.current_seq, check_actual_state: true}
+  end
+
+  def next_state(s, _v, {:call, _, :move_shard, [_db_name]}) do
+    %State{s | check_actual_state: true}
   end
 
   def postcondition(s, {:call, _, :check_actual_state, [_db_name]}, actual) do
