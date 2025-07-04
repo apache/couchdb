@@ -130,7 +130,13 @@ build_index({?MRVIEW, DbName, MRSt} = Ctx, Try) ->
         Try
     );
 build_index({?NOUVEAU, _DbName, DIndex} = Ctx, Try) ->
-    UpdateFun = fun() -> nouveau_index_updater:update(DIndex) end,
+    UpdateFun = fun() ->
+        {IndexerPid, IndexerRef} = spawn_monitor(nouveau_index_updater, update, [DIndex]),
+        receive
+            {'DOWN', IndexerRef, process, IndexerPid, Reason} ->
+                Reason
+        end
+    end,
     retry_loop(Ctx, UpdateFun, Try);
 build_index({?DREYFUS, DbName, DIndex} = Ctx, Try) ->
     await_retry(
@@ -196,6 +202,8 @@ index_info({?MRVIEW, DbName, MRSt}) ->
     GroupName = couch_mrview_index:get(idx_name, MRSt),
     {DbName, GroupName};
 index_info({?DREYFUS, DbName, Index}) ->
+    {DbName, Index};
+index_info({?NOUVEAU, DbName, Index}) ->
     {DbName, Index};
 index_info({?HASTINGS, DbName, Index}) ->
     {DbName, Index}.
