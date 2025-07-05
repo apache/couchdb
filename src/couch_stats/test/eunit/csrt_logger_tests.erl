@@ -18,6 +18,7 @@
         rctx_gen/0,
         rctx_gen/1,
         rctxs/0,
+        rctxs/1,
         jrctx/1
     ]
 ).
@@ -221,12 +222,19 @@ t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
 t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_CHANGES,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
-    ChangesFilter = fun(R) ->
-        Ret = csrt_entry:value(changes_returned, R),
-        Proc = csrt_entry:value(rows_read, R),
-        (Proc - Ret) >= Threshold
-    end,
+    Rctx0 = rctx_gen(#{mod => chttpd_db, func => handle_changes_req, rows_read => Threshold + 10}),
+    Rctxs = [Rctx0 | Rctxs0],
+    ChangesFilter =
+        fun
+            %% Matcher on changes only works for coordinators at the moment due
+            %% to overloading over rows_read for all aggregate operations
+            (#rctx{type = #coordinator{mod = chttpd_db, func = handle_changes_req}} = R) ->
+                Ret = csrt_entry:value(changes_returned, R),
+                Proc = csrt_entry:value(rows_read, R),
+                (Proc - Ret) >= Threshold;
+            (_) ->
+                false
+        end,
     ?assertEqual(
         lists:sort(lists:filter(ChangesFilter, Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("changes_processed"), Rctxs)),

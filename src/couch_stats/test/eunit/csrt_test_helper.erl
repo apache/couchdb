@@ -16,6 +16,7 @@
     rctx_gen/0,
     rctx_gen/1,
     rctxs/0,
+    rctxs/1,
     jrctx/1
 ]).
 
@@ -25,16 +26,20 @@
 -define(RCTX_RANGE, 1000).
 -define(RCTX_COUNT, 10000).
 
-%% Dirty hack for hidden records as .hrl is only in src/
 -define(RCTX_RPC, #rpc_worker{from = {self(), make_ref()}}).
--define(RCTX_COORDINATOR, #coordinator{method = 'GET', path = "/foo/_all_docs"}).
+-define(RCTX_COORDINATOR, #coordinator{
+    method = 'GET', path = <<"/foo/_all_docs">>, mod = chttp_db, func = db_req
+}).
+-define(RCTX_CHANGES_COORDINATOR, #coordinator{
+    method = 'GET', path = <<"/foo/_changes">>, mod = chttp_db, func = handle_changes_req
+}).
 
 rctx_gen() ->
     rctx_gen(#{}).
 
 rctx_gen(Opts0) ->
     DbnameGen = one_of([<<"foo">>, <<"bar">>, ?tempdb]),
-    TypeGen = one_of([?RCTX_RPC, ?RCTX_COORDINATOR]),
+    TypeGen = one_of([?RCTX_RPC, ?RCTX_COORDINATOR, ?RCTX_CHANGES_COORDINATOR]),
     R = fun() -> rand:uniform(?RCTX_RANGE) end,
     R10 = fun() -> 3 + rand:uniform(round(?RCTX_RANGE / 10)) end,
     Occasional = one_of([0, 0, 0, 0, 0, R]),
@@ -85,7 +90,10 @@ rctx_gen(Opts0) ->
     ).
 
 rctxs() ->
-    [rctx_gen() || _ <- lists:seq(1, ?RCTX_COUNT)].
+    rctxs(?RCTX_COUNT).
+
+rctxs(Count) when is_integer(Count) andalso Count >= 1 ->
+    [rctx_gen() || _ <- lists:seq(1, Count)].
 
 jrctx(Rctx) ->
     JRctx = csrt_entry:to_json(Rctx),
