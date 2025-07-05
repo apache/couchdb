@@ -38,6 +38,17 @@ resp_to_json([], Acc) ->
 %     Resp = rpc_to_json(csrt:rpc(active, [json])),
 %     send_json(Req, Resp);
 handle_resource_status_req(
+    #httpd{method = 'GET', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherName]} = Req
+) ->
+    case csrt:query_matcher(binary_to_list(MatcherName)) of
+        {ok, Rctxs} ->
+            send_json(Req, 200, Rctxs);
+        {error, {unknown_matcher, _}} ->
+            throw({bad_request, <<"unknown matcher '", MatcherName/binary, "'">>});
+        {error, Reason} ->
+            throw({bad_request, Reason})
+    end;
+handle_resource_status_req(
     #httpd{method = 'POST', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherName]} = Req
 ) ->
     chttpd:validate_ctype(Req, "application/json"),
