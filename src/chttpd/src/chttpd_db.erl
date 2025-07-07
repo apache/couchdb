@@ -855,6 +855,19 @@ db_req(#httpd{method = 'GET', path_parts = [_, <<"_revs_limit">>]} = Req, Db) ->
     send_json(Req, fabric:get_revs_limit(Db));
 db_req(#httpd{path_parts = [_, <<"_revs_limit">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
+db_req(#httpd{method = 'PUT', path_parts = [_, <<"_max_generation">>]} = Req, Db) ->
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    case chttpd:json_body(Req) of
+        MaxGen when is_integer(MaxGen), MaxGen > 0 ->
+            case fabric:set_max_generation(Db, MaxGen, Options) of
+                ok ->
+                    send_json(Req, {[{<<"ok">>, true}]});
+                Error ->
+                    throw(Error)
+            end;
+        _ ->
+            throw({bad_request, "`max_generation` must be positive integer"})
+    end;
 db_req(#httpd{method = 'PUT', path_parts = [_, <<"_purged_infos_limit">>]} = Req, Db) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
     case chttpd:json_body(Req) of

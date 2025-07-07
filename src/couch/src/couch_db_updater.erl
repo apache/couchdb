@@ -89,6 +89,14 @@ handle_call({set_revs_limit, Limit}, _From, Db) ->
     Db3 = commit_data(Db2),
     ok = couch_server:db_updated(Db3),
     {reply, ok, Db3};
+handle_call({set_max_generation, MaxGen}, _From, Db) ->
+    case couch_db_engine:set_max_generation(Db, MaxGen) of
+        {ok, Db2} ->
+            ok = couch_server:db_updated(Db2),
+            {reply, ok, Db2};
+        {error, Error} ->
+            {reply, Error, Db}
+    end;
 handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
     ok = couch_server:db_updated(Db2),
