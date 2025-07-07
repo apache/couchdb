@@ -63,6 +63,7 @@
     is_partitioned/1,
 
     set_revs_limit/2,
+    set_max_generation/2,
     set_purge_infos_limit/2,
     set_security/2,
     set_user_ctx/2,
@@ -539,6 +540,12 @@ purge_client_exists(DbName, DocId, Props) ->
             couch_log:error(Log, [?MODULE, DbName, DocId, Tag, Error]),
             true
     end.
+
+set_max_generation(#db{main_pid = Pid} = Db, MaxGen) when MaxGen > 0 ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {set_max_generation, MaxGen}, infinity);
+set_max_generation(_Db, _MaxGen) ->
+    throw(invalid_purge_infos_limit).
 
 set_purge_infos_limit(#db{main_pid = Pid} = Db, Limit) when Limit > 0 ->
     check_is_admin(Db),

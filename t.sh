@@ -20,6 +20,23 @@ test_doc_with_att_compact () {
   check-files 'OBVIOUS ATTACHMENT'  0 1
 }
 
+test_max_gen_upgrade () {
+  create-db 0
+
+  create-doc 'the-doc' '{ "basic": "DOC BODY" }'
+  add-att 'the-doc' 'the-att' 'VERY OBVIOUS ATTACHMENT DATA'
+  compact 0
+
+  check-files 'DOC BODY'            1
+  check-files 'OBVIOUS ATTACHMENT'  1
+
+  cdb '/asd/_max_generation' -X PUT -d '2'
+  compact 0
+
+  check-files 'DOC BODY'            0 1
+  check-files 'OBVIOUS ATTACHMENT'  0 1
+}
+
 test_doc_compact_add_att () {
   create-doc 'the-doc' '{ "basic": "DOC BODY" }'
   compact 0

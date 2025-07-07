@@ -39,7 +39,9 @@
 ]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
--export([get_purge_seq/2, get_purged_infos/1, purge_docs/3, set_purge_infos_limit/3]).
+-export([
+    get_purge_seq/2, get_purged_infos/1, purge_docs/3, set_max_generation/3, set_purge_infos_limit/3
+]).
 
 -export([
     get_db_info/2,
@@ -258,6 +260,9 @@ get_all_security(DbName, Options) ->
 
 set_revs_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_revs_limit, [Limit]}).
+
+set_max_generation(DbName, MaxGen, Options) ->
+    with_db(DbName, Options, {couch_db, set_max_generation, [MaxGen]}).
 
 set_purge_infos_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_purge_infos_limit, [Limit]}).
