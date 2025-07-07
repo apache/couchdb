@@ -228,8 +228,14 @@ get_value(Key, List, Default) ->
             Default
     end.
 
-set_value(Key, List, Value) ->
-    lists:keyreplace(Key, 1, List, {Key, Value}).
+% insert or update a {Key, Value} tuple in a list of tuples
+-spec set_value(Key, TupleList1, Value) -> TupleList2 when
+    Key :: term(),
+    TupleList1 :: [tuple()],
+    Value :: term(),
+    TupleList2 :: [tuple()].
+set_value(Key, TupleList1, Value) ->
+    lists:keystore(Key, 1, TupleList1, {Key, Value}).
 
 get_nested_json_value({Props}, [Key | Keys]) ->
     case couch_util:get_value(Key, Props, nil) of
