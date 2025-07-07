@@ -575,14 +575,31 @@ changes_enumerator(DocInfo, Acc) ->
 changes_row(Changes, Docs, DocInfo, Acc) ->
     #fabric_changes_acc{db = Db, pending = Pending, epochs = Epochs} = Acc,
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DocInfo,
-    {change, [
-        {pending, Pending - 1},
-        {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}},
-        {id, Id},
-        {changes, Changes},
-        {deleted, Del}
-        | Docs
-    ]}.
+    {change,
+        maybe_add_drop(Db, Acc#fabric_changes_acc.args, DocInfo, [
+            {pending, Pending - 1},
+            {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}},
+            {id, Id},
+            {changes, Changes},
+            {deleted, Del}
+            | Docs
+        ])}.
+
+maybe_add_drop(
+    Db,
+    #changes_args{simulate_drop_seq = DropSeq},
+    #doc_info{revs = [#rev_info{deleted = true} | _]} = DocInfo,
+    Acc0
+) when DropSeq /= undefined ->
+    Key = {mem3:range(couch_db:name(Db)), config:node_name()},
+    case maps:find(Key, DropSeq) of
+        {ok, {_Uuid, Seq}} when DocInfo#doc_info.high_seq =< Seq ->
+            [{drop, true} | Acc0];
+        _Else ->
+            Acc0
+    end;
+maybe_add_drop(_Db, #changes_args{} = _Args, #doc_info{} = _DocInfo, Acc0) ->
+    Acc0.
 
 doc_member(Shard, DocInfo, Opts, Filter) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of

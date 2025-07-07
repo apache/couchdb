@@ -2169,6 +2169,17 @@ parse_changes_query(Req) ->
                         error:badarg ->
                             throw({bad_request, invalid_seq_interval})
                     end;
+                {"simulate_drop_seq", DropSeq} ->
+                    Args#changes_args{
+                        simulate_drop_seq =
+                        try
+                            binary_to_term(couch_util:decodeBase64Url(DropSeq), [safe])
+                            catch
+                        error:badarg ->
+                            throw(
+                                {bad_request, <<"Invalid simulate_drop_seq value.">>})
+                            end
+                    };
                 % unknown key value pair, ignore.
                 _Else ->
                     Args
