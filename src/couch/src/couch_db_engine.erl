@@ -276,6 +276,9 @@
 -callback set_revs_limit(DbHandle :: db_handle(), RevsLimit :: pos_integer()) ->
     {ok, NewDbHandle :: db_handle()}.
 
+-callback set_max_generation(DbHandle :: db_handle(), MaxGen :: pos_integer()) ->
+    {ok, NewDbHandle :: db_handle()}.
+
 -callback set_purge_infos_limit(DbHandle :: db_handle(), Limit :: pos_integer()) ->
     {ok, NewDbHandle :: db_handle()}.
 
@@ -685,6 +688,7 @@
 
     set_revs_limit/2,
     set_security/2,
+    set_max_generation/2,
     set_purge_infos_limit/2,
     set_props/2,
 
@@ -849,6 +853,11 @@ get_uuid(#db{} = Db) ->
 set_revs_limit(#db{} = Db, RevsLimit) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_revs_limit(EngineState, RevsLimit),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+set_max_generation(#db{} = Db, MaxGen) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_max_generation(EngineState, MaxGen),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 set_purge_infos_limit(#db{} = Db, PurgedDocsLimit) ->

@@ -29,6 +29,7 @@
     get_revs_limit/1,
     get_security/1, get_security/2,
     get_all_security/1, get_all_security/2,
+    set_max_generation/3,
     get_purge_infos_limit/1,
     set_purge_infos_limit/3,
     get_purged_infos/1,
@@ -184,6 +185,13 @@ set_security(DbName, SecObj) ->
 -spec set_security(dbname(), SecObj :: json_obj(), [option()]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
+
+%% @doc sets the upper bound for the number of storage generations
+-spec set_max_generation(dbname(), pos_integer(), [option()]) -> ok.
+set_max_generation(DbName, MaxGen, Options) when
+    is_integer(MaxGen), MaxGen > 0
+->
+    fabric_db_meta:set_max_generation(dbname(DbName), MaxGen, opts(Options)).
 
 %% @doc sets the upper bound for the number of stored purge requests
 -spec set_purge_infos_limit(dbname(), pos_integer(), [option()]) -> ok.

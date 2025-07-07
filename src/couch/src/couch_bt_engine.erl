@@ -49,6 +49,7 @@
     get_uuid/1,
 
     set_revs_limit/2,
+    set_max_generation/2,
     set_purge_infos_limit/2,
     set_security/2,
     set_props/2,
@@ -387,6 +388,17 @@ set_revs_limit(#st{header = Header} = St, RevsLimit) ->
         needs_commit = true
     },
     {ok, increment_update_seq(NewSt)}.
+
+set_max_generation(#st{filepath = FilePath, gen_fds = GenFds, header = Header} = St, MaxGen) ->
+    NewSt = St#st{
+        header = couch_bt_engine_header:set(Header, [
+            {max_generation, MaxGen}
+        ]),
+        needs_commit = true
+    },
+    GenFds1 = open_missing_generation_files(FilePath, GenFds, MaxGen),
+    NewSt1 = NewSt#st{gen_fds = GenFds1},
+    {ok, increment_update_seq(NewSt1)}.
 
 set_purge_infos_limit(#st{header = Header} = St, PurgeInfosLimit) ->
     NewSt = St#st{
@@ -956,6 +968,18 @@ open_generation_files(FilePath, Generations, Options) ->
         end,
         lists:seq(1, Generations)
     ).
+
+open_missing_generation_files(FilePath, GenFds, MaxGen) ->
+    open_missing_generation_files(FilePath, GenFds, MaxGen, 1).
+
+open_missing_generation_files(_FilePath, GenFds, MaxGen, Gen) when Gen > MaxGen ->
+    GenFds;
+open_missing_generation_files(FilePath, [], MaxGen, Gen) ->
+    Rest = open_missing_generation_files(FilePath, [], MaxGen, Gen + 1),
+    Fd = open_generation_file(FilePath, Gen, []),
+    [Fd | Rest];
+open_missing_generation_files(FilePath, [Fd | Rest], MaxGen, Gen) ->
+    [Fd | open_missing_generation_files(FilePath, Rest, MaxGen, Gen + 1)].
 
 maybe_open_generation_files(FilePath, Generations, Options) ->
     case lists:member(compacting, Options) of
