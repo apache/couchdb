@@ -14,6 +14,8 @@
 
 -behaviour(gen_event).
 
+-define(NAME, couch_replication).
+
 % public API
 -export([start_link/1, stop/1, notify/1]).
 
@@ -21,17 +23,20 @@
 -export([init/1]).
 -export([handle_event/2, handle_call/2, handle_info/2]).
 
--include_lib("couch/include/couch_db.hrl").
-
 start_link(FunAcc) ->
-    couch_event_sup:start_link(
-        couch_replication,
-        {couch_replicator_notifier, make_ref()},
-        FunAcc
-    ).
+    couch_event_sup:start_link(?NAME, {?MODULE, make_ref()}, FunAcc).
 
 notify(Event) ->
-    gen_event:notify(couch_replication, Event).
+    try
+        gen_event:notify(?NAME, Event)
+    catch
+        _:_ ->
+            % It's possible some jobs may remain around after the notification
+            % service had shut down or crashed. Avoid making a mess in the logs
+            % and just ignore that. At that point nobody will notice the
+            % notification anyway.
+            ok
+    end.
 
 stop(Pid) ->
     couch_event_sup:stop(Pid).
@@ -51,3 +56,12 @@ handle_call(_Msg, State) ->
 
 handle_info(_Msg, State) ->
     {ok, State}.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+couch_replicator_notify_when_stopped_test() ->
+    ?assertEqual(ok, notify({stopped, foo})).
+
+-endif.
