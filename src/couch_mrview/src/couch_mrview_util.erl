@@ -544,7 +544,13 @@ apply_limit(ViewPartitioned, Args) ->
             mrverror(io_lib:format(Fmt, [MaxLimit]))
     end.
 
-validate_all_docs_args(Db, Args0) ->
+validate_all_docs_args(Db, #mrargs{} = Args) ->
+    case get_extra(Args, validated, false) of
+        true -> Args;
+        false -> validate_all_docs_args_int(Db, Args)
+    end.
+
+validate_all_docs_args_int(Db, Args0) ->
     Args = validate_args(Args0#mrargs{view_type = map}),
 
     DbPartitioned = couch_db:is_partitioned(Db),
@@ -560,7 +566,13 @@ validate_all_docs_args(Db, Args0) ->
             apply_limit(false, Args)
     end.
 
-validate_args(Args) ->
+validate_args(#mrargs{} = Args) ->
+    case get_extra(Args, validated, false) of
+        true -> Args;
+        false -> validate_args_int(Args)
+    end.
+
+validate_args_int(#mrargs{} = Args) ->
     GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
     case Reduce == undefined orelse is_boolean(Reduce) of
@@ -696,11 +708,12 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `partition`.">>)
     end,
 
-    Args#mrargs{
+    Args1 = Args#mrargs{
         start_key_docid = SKDocId,
         end_key_docid = EKDocId,
         group_level = GroupLevel
-    }.
+    },
+    set_extra(Args1, validated, true).
 
 determine_group_level(#mrargs{group = undefined, group_level = undefined}) ->
     0;

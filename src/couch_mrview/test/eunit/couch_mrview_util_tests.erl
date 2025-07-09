@@ -174,3 +174,31 @@ t_get_index_files_clustered({DbName, _Db}) ->
     ?assertMatch({ok, _}, file:read_file_info(File)),
     {ok, Info} = couch_mrview:get_info(ShardName1, ?DDOC_ID),
     ?assertEqual(proplists:get_value(signature, Info), Sig).
+
+do_not_validate_args_if_already_validated_test() ->
+    Args = #mrargs{
+        view_type = red,
+        group = true,
+        group_level = undefined,
+        extra = [{foo, bar}]
+    },
+
+    % Initially if we haven't validated, it's not flagged as such
+    ?assertNot(couch_mrview_util:get_extra(Args, validated, false)),
+
+    % Do the validation
+    Args1 = couch_mrview_util:validate_args(Args),
+
+    % Validation worked
+    ?assertEqual(exact, Args1#mrargs.group_level),
+
+    % Validation flag is set to true
+    ?assert(couch_mrview_util:get_extra(Args1, validated, false)),
+
+    Args2 = couch_mrview_util:validate_args(Args1),
+    % No change, as already validated
+    ?assertEqual(Args1, Args2),
+
+    Args3 = couch_mrview_util:validate_all_docs_args(some_db, Args2),
+    % No change for all docs validation as already validated
+    ?assertEqual(Args1, Args3).

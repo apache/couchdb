@@ -298,7 +298,7 @@ t_query_view_configuration({_Ctx, DbName}) ->
             view_type = map,
             start_key_docid = <<>>,
             end_key_docid = <<255>>,
-            extra = [{view_row_map, true}]
+            extra = [{validated, true}, {view_row_map, true}]
         },
     Options = [],
     Accumulator = [],
