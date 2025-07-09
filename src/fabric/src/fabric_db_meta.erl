@@ -16,6 +16,7 @@
     set_revs_limit/3,
     set_security/3,
     get_all_security/2,
+    set_max_generation/3,
     set_purge_infos_limit/3
 ]).
 
@@ -50,6 +51,21 @@ handle_revs_message(ok, Worker, {Workers, Waiting}) ->
     {ok, {lists:delete(Worker, Workers), Waiting - 1}};
 handle_revs_message(Error, _, _Acc) ->
     {error, Error}.
+
+set_max_generation(DbName, MaxGen, Options) ->
+    Shards = mem3:shards(DbName),
+    Workers = fabric_util:submit_jobs(Shards, set_max_generation, [MaxGen, Options]),
+    Handler = fun handle_purge_message/3,
+    Acc0 = {Workers, length(Workers) - 1},
+    case fabric_util:recv(Workers, #shard.ref, Handler, Acc0) of
+        {ok, ok} ->
+            ok;
+        {timeout, {DefunctWorkers, _}} ->
+            fabric_util:log_timeout(DefunctWorkers, "set_purged_docs_limit"),
+            {error, timeout};
+        Error ->
+            Error
+    end.
 
 set_purge_infos_limit(DbName, Limit, Options) ->
     Shards = mem3:shards(DbName),

@@ -276,6 +276,9 @@
 -callback set_revs_limit(DbHandle :: db_handle(), RevsLimit :: pos_integer()) ->
     {ok, NewDbHandle :: db_handle()}.
 
+-callback set_max_generation(DbHandle :: db_handle(), MaxGen :: pos_integer()) ->
+    {ok, NewDbHandle :: db_handle()}.
+
 -callback set_purge_infos_limit(DbHandle :: db_handle(), Limit :: pos_integer()) ->
     {ok, NewDbHandle :: db_handle()}.
 
@@ -628,6 +631,7 @@
 -callback start_compaction(
     DbHandle :: db_handle(),
     DbName :: binary(),
+    Generation :: non_neg_integer(),
     Options :: db_open_options(),
     Parent :: pid()
 ) ->
@@ -684,6 +688,7 @@
 
     set_revs_limit/2,
     set_security/2,
+    set_max_generation/2,
     set_purge_infos_limit/2,
     set_props/2,
 
@@ -711,7 +716,7 @@
     fold_purge_infos/5,
     count_changes_since/2,
 
-    start_compaction/1,
+    start_compaction/2,
     finish_compaction/2,
     trigger_on_compact/1
 ]).
@@ -850,6 +855,11 @@ set_revs_limit(#db{} = Db, RevsLimit) ->
     {ok, NewSt} = Engine:set_revs_limit(EngineState, RevsLimit),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
+set_max_generation(#db{} = Db, MaxGen) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_max_generation(EngineState, MaxGen),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
 set_purge_infos_limit(#db{} = Db, PurgedDocsLimit) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_purge_infos_limit(EngineState, PurgedDocsLimit),
@@ -952,14 +962,14 @@ count_changes_since(#db{} = Db, StartSeq) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:count_changes_since(EngineState, StartSeq).
 
-start_compaction(#db{} = Db) ->
+start_compaction(#db{} = Db, Generation) ->
     #db{
         engine = {Engine, EngineState},
         name = DbName,
         options = Options
     } = Db,
     {ok, NewEngineState, Pid} = Engine:start_compaction(
-        EngineState, DbName, Options, self()
+        EngineState, DbName, Generation, Options, self()
     ),
     {ok, Db#db{
         engine = {Engine, NewEngineState},
@@ -974,8 +984,9 @@ finish_compaction(Db, CompactInfo) ->
     } = Db,
     NewDb =
         case Engine:finish_compaction(St, DbName, Options, CompactInfo) of
-            {ok, NewState, undefined} ->
+            {ok, NewState, DstGen} when is_integer(DstGen) ->
                 couch_event:notify(DbName, compacted),
+                couch_event:notify(DbName, {compacted_into_generation, DstGen}),
                 Db#db{
                     engine = {Engine, NewState},
                     compactor_pid = nil

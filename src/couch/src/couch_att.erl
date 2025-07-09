@@ -828,6 +828,8 @@ attachment_field_api_test_() ->
     ]}.
 
 attachment_disk_term_test_() ->
+    FakeGen = 0,
+    FakeSp = 1337,
     BaseAttachment = new([
         {name, <<"empty">>},
         {type, <<"application/octet-stream">>},
@@ -835,13 +837,13 @@ attachment_disk_term_test_() ->
         {disk_len, 0},
         {md5, <<212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126>>},
         {revpos, 4},
-        {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
+        {data, {stream, {couch_bt_engine_stream, {fake_fd, FakeGen, FakeSp}}}},
         {encoding, identity}
     ]),
     BaseDiskTerm = {
         <<"empty">>,
         <<"application/octet-stream">>,
-        fake_sp,
+        FakeSp,
         0,
         0,
         4,
@@ -851,7 +853,7 @@ attachment_disk_term_test_() ->
     Headers = [{<<"X-Foo">>, <<"bar">>}],
     ExtendedAttachment = store(headers, Headers, BaseAttachment),
     ExtendedDiskTerm = {BaseDiskTerm, [{headers, Headers}]},
-    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd = fake_fd}}}]),
+    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd = {fake_fd, fake_ref}}}}]),
     {"Disk term tests", [
         ?_assertEqual(BaseDiskTerm, to_disk_term(BaseAttachment)),
         ?_assertEqual(BaseAttachment, from_disk_term(FakeDb, BaseDiskTerm)),
