@@ -194,4 +194,11 @@
 -type query_options() :: #{aggregation => group_by | sort_by | count_by, limit => pos_integer()}.
 -type aggregation_key() :: tuple_of_field_names().
 -type aggregation_values() :: tuple_of_field_values().
--type query_result() :: #{aggregation_key() => non_neg_integer()}.
+
+-type field_value() :: any().
+-type aggregation_value() :: field_value().
+-type aggregation_result() :: #{aggregation_key() => non_neg_integer()}.
+-type ordered_result() :: [{aggregation_key(), non_neg_integer()}].
+-type query_result() :: aggregation_result() | ordered_result().
+
+-type json_spec(_Spec) :: term().
