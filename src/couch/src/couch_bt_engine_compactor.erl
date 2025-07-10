@@ -319,16 +319,11 @@ copy_compact(#comp_st{} = CompSt) ->
                     #full_doc_info{} -> DocInfo#full_doc_info.update_seq;
                     #doc_info{} -> DocInfo#doc_info.high_seq
                 end,
-            Deleted =
-                case DocInfo of
-                    #full_doc_info{} -> DocInfo#full_doc_info.deleted;
-                    % Older versions stored #doc_info records in the seq_tree.
-                    #doc_info{} -> false
-                end,
+            WouldDrop = fabric_drop_seq:would_drop(DocInfo, DropSeq),
 
             AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
             if
-                Deleted andalso Seq =< DropSeq ->
+                WouldDrop ->
                     %% drop this document completely
                     {ok, NewSt2} = couch_bt_engine:increment_drop_count(AccNewSt, 1),
                     {ok, {NewSt2, AccUncopied, AccUncopiedSize, AccCopiedSize}};

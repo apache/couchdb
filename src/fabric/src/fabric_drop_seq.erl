@@ -15,7 +15,8 @@
     update_peer_checkpoint_doc/5,
     cleanup_peer_checkpoint_docs/3,
     peer_checkpoint_doc/4,
-    peer_id_from_sig/2
+    peer_id_from_sig/2,
+    would_drop/2
 ]).
 
 %% rpc
@@ -568,6 +569,17 @@ peer_id_from_sig(DbName, Sig) when is_binary(DbName), is_binary(Sig) ->
         crypto:hash(sha256, [atom_to_binary(config:node_name(), utf8), $0, DbName])
     ),
     <<Sig/binary, "$", Hash/binary>>.
+
+would_drop(#full_doc_info{deleted = true} = DocInfo, DropSeq) ->
+    would_drop(DocInfo#full_doc_info.update_seq, DropSeq);
+would_drop(#full_doc_info{}, _DropSeq) ->
+    false;
+would_drop(#doc_info{revs = [#rev_info{deleted = true} | _]} = DocInfo, DropSeq) ->
+    would_drop(DocInfo#doc_info.high_seq, DropSeq);
+would_drop(#doc_info{}, _DropSeq) ->
+    false;
+would_drop(UpdateSeq, DropSeq) when is_integer(UpdateSeq), is_integer(DropSeq) ->
+       UpdateSeq =< DropSeq.
 
 pack_seq(DbName, UpdateSeq) ->
     PrefixLen = fabric_util:get_uuid_prefix_len(),

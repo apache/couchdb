@@ -588,13 +588,19 @@ changes_row(Changes, Docs, DocInfo, Acc) ->
 maybe_add_drop(
     Db,
     #changes_args{simulate_drop_seq = DropSeq},
-    #doc_info{revs = [#rev_info{deleted = true} | _]} = DocInfo,
+    #doc_info{} = DocInfo,
     Acc0
 ) when DropSeq /= undefined ->
     Key = {mem3:range(couch_db:name(Db)), config:node_name()},
     case maps:find(Key, DropSeq) of
-        {ok, {_Uuid, Seq}} when DocInfo#doc_info.high_seq =< Seq ->
-            [{drop, true} | Acc0];
+        {ok, {_Uuid, Seq}} ->
+            WouldDrop = fabric_drop_seq:would_drop(DocInfo, Seq),
+            if
+                WouldDrop ->
+                    [{drop, true} | Acc0];
+                true ->
+                    Acc0
+            end;
         _Else ->
             Acc0
     end;
