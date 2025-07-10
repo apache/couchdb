@@ -73,8 +73,8 @@
 
 %% RPC api
 -export([
-    rpc/2,
-    call/1
+    rpc_run/1,
+    rpc_unsafe_run/1
 ]).
 
 %% aggregate query api
@@ -85,25 +85,12 @@
     active_coordinators/1,
     active_workers/0,
     active_workers/1,
-    count_by/1,
     find_by_nonce/1,
     find_by_pid/1,
     find_by_pidref/1,
     find_workers_by_pidref/1,
-    group_by/2,
-    group_by/3,
-    query_group_by/3,
-    query_group_by/4,
-    query_sort_by/3,
-    query_sort_by/4,
-    query_count_by/2,
-    query_count_by/3,
     query_matcher/1,
-    query_matcher/2,
-    sorted/1,
-    sorted_by/1,
-    sorted_by/2,
-    sorted_by/3
+    query_matcher/2
 ]).
 
 %% Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
@@ -113,48 +100,92 @@
     proc_window/3
 ]).
 
+-export([
+    query/1,
+    from/1,
+    group_by/1,
+    group_by/2,
+    sort_by/1,
+    sort_by/2,
+    count_by/1,
+    options/1,
+    unlimited/0,
+    with_limit/1,
+
+    run/1,
+    unsafe_run/1
+]).
+
+-export_type([
+    query/0,
+    query_expression/0,
+    query_option/0
+]).
+
+-opaque query() :: csrt_query:query().
+-opaque query_expression() :: csrt_query:query_expression().
+-opaque query_option() :: csrt_query:query_option().
+
 %%
 %% RPC operations
 %%
 
--spec rpc(FName :: atom(), Args :: [any()]) ->
-    {[{node(), Result :: any()}], Errors :: [{badrpc, Reason :: any()}], BadNodes :: [node()]}.
-rpc(FName, Args) when is_atom(FName) andalso is_list(Args) ->
-    {Resp, BadNodes} = rpc:multicall(?MODULE, call, [{FName, Args}]),
-    {Results, Errors} = split_response(Resp),
-    {Results, lists:usort(Errors), BadNodes}.
+-spec rpc_run(Query :: query()) ->
+    [#{
+        node => node(),
+        result => [{aggregation_key(), pos_integer()}],
+        errors => [atom()]
+    }].
+rpc_run(Query) ->
+    Nodes = mem3:nodes(),
+    merge_results(Nodes, erpc:multicall(Nodes, ?MODULE, run, [Query])).
 
-split_response(Resp) ->
-    lists:foldl(fun(Message, {Results, Errors}) ->
-        case Message of
-            {badrpc, _} = E ->
-                {Results, [E | Errors]};
-            Result ->
-                {[Result | Results], Errors}
-        end
-    end, {[], []}, Resp).
+-spec rpc_unsafe_run(Query :: query()) ->
+    [#{
+        node => node(),
+        result => [{aggregation_key(), pos_integer()}],
+        errors => [atom()]
+    }].
+rpc_unsafe_run(Query) ->
+    Nodes = mem3:nodes(),
+    merge_results(Nodes, erpc:multicall(Nodes, ?MODULE, unsafe_run, [Query])).
 
-call({active, []}) -> {node(), active()};
-call({active, [json]}) -> {node(), active(json)};
-call({active_coordinators, []}) -> {node(), active_coordinators()};
-call({active_coordinators, [json]}) -> {node(), active_coordinators(json)};
-call({active_workers, []}) -> {node(), active_workers()};
-call({active_workers, [json]}) -> {node(), active_workers(json)};
-call({count_by, [Key]}) -> {node(), count_by(Key)};
-call({find_by_nonce, [Nonce]}) -> {node(), find_by_nonce(Nonce)};
-call({find_by_pid, [Pid]}) -> {node(), find_by_pid(Pid)};
-call({find_by_pidref, [PidRef]}) -> {node(), find_by_pidref(PidRef)};
-call({find_workers_by_pidref, [PidRef]}) -> {node(), find_workers_by_pidref(PidRef)};
-call({group_by, [Key, Val]}) -> {node(), group_by(Key, Val)};
-call({group_by, [Key, Val, Agg]}) -> {node(), group_by(Key, Val, Agg)};
-call({sorted, [Map]}) -> {node(), sorted(Map)};
-call({sorted_by, [Key]}) -> {node(), sorted_by(Key)};
-call({sorted_by, [Key, Val]}) -> {node(), sorted_by(Key, Val)};
-call({sorted_by, [Key, Val, Agg]}) -> {node(), sorted_by(Key, Val, Agg)};
-call({FunName, Args}) ->
-    FunNameBin = atom_to_binary(FunName),
-    ArityBin = integer_to_binary(length(Args)),
-    {error, <<"No such function '", FunNameBin/binary, "/", ArityBin/binary>>}.
+merge_results(Nodes, Resp) ->
+    %% The result of erpc:multicall is returned as a list where the result from each
+    %% node is placed at the same position as the node name is placed in Nodes.
+    %% That is why we can use `lists:zip/2` here.
+    lists:map(fun format_response/1, lists:zip(Nodes, Resp)).
+
+format_response({Node, {ok, {ok, Result}}}) ->
+    #{
+        node => Node,
+        result => Result,
+        errors => []
+    };
+format_response({Node, {ok, {error, Reason}}}) ->
+    #{
+        node => Node,
+        result => none,
+        errors => [Reason]
+    };
+format_response({Node, {ok, Result}}) ->
+    #{
+        node => Node,
+        result => Result,
+        errors => []
+    };
+format_response({Node, {error, {erpc, Reason}}}) ->
+    #{
+        node => Node,
+        result => none,
+        errors => [Reason]
+    };
+format_response({Node, {Tag, _}}) ->
+    #{
+        node => Node,
+        result => none,
+        errors => [Tag]
+    }.
 
 %%
 %% PidRef operations
@@ -450,10 +481,6 @@ active_workers() ->
 active_workers(Type) ->
     csrt_query:active_workers(Type).
 
--spec count_by(Key :: string()) -> map().
-count_by(Key) ->
-    csrt_query:count_by(Key).
-
 find_by_nonce(Nonce) ->
     csrt_query:find_by_nonce(Nonce).
 
@@ -465,12 +492,6 @@ find_by_pidref(PidRef) ->
 
 find_workers_by_pidref(PidRef) ->
     csrt_query:find_workers_by_pidref(PidRef).
-
-group_by(Key, Val) ->
-    csrt_query:group_by(Key, Val).
-
-group_by(Key, Val, Agg) ->
-    csrt_query:group_by(Key, Val, Agg).
 
 -spec pid_ref_matchspec(AttrName :: rctx_field()) -> term() | throw(any()).
 pid_ref_matchspec(AttrName) ->
@@ -499,76 +520,6 @@ query_matcher(MatcherName) ->
 query_matcher(MatcherName, Limit) ->
     csrt_query:query_matcher(MatcherName, Limit).
 
--spec query_group_by(MatcherName, AggregationKeys, ValueKey) ->
-    {ok, query_result()}
-    | {error, any()}
-when
-    MatcherName :: string(),
-    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
-    ValueKey :: binary() | rctx_field().
-query_group_by(MatcherName, AggregationKeys, ValueKey) ->
-    csrt_query:query_group_by(MatcherName, AggregationKeys, ValueKey, #{}).
-
--spec query_group_by(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
-    {ok, query_result()}
-    | {error, any()}
-when
-    MatcherName :: string(),
-    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
-    ValueKey :: binary() | rctx_field().
-query_group_by(MatcherName, AggregationKeys, ValueKey, Options) ->
-    csrt_query:query_group_by(MatcherName, AggregationKeys, ValueKey, Options).
-
--spec query_sort_by(MatcherName, AggregationKeys, ValueKey) ->
-    {ok, query_result()}
-    | {error, any()}
-when
-    MatcherName :: string(),
-    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
-    ValueKey :: binary() | rctx_field().
-query_sort_by(MatcherName, AggregationKeys, ValueKey) ->
-    csrt_query:query_sort_by(MatcherName, AggregationKeys, ValueKey, #{}).
-
--spec query_sort_by(MatcherName, AggregationKeys, ValueKey, Options :: query_options()) ->
-    {ok, query_result()}
-    | {error, any()}
-when
-    MatcherName :: string(),
-    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()],
-    ValueKey :: binary() | rctx_field().
-query_sort_by(MatcherName, AggregationKeys, ValueKey, Options) ->
-    csrt_query:query_sort_by(MatcherName, AggregationKeys, ValueKey, Options).
-
--spec query_count_by(MatcherName, AggregationKeys) ->
-    {ok, query_result()}
-    | {error, any()}
-when
-    MatcherName :: string(),
-    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()].
-query_count_by(MatcherName, AggregationKeys) ->
-    csrt_query:query_count_by(MatcherName, AggregationKeys, #{}).
-
--spec query_count_by(MatcherName, AggregationKeys, Options :: query_options()) ->
-    {ok, query_result()}
-    | {error, any()}
-when
-    MatcherName :: string(),
-    AggregationKeys :: binary() | rctx_field() | [binary()] | [rctx_field()].
-query_count_by(MatcherName, AggregationKeys, Options) ->
-    csrt_query:query_count_by(MatcherName, AggregationKeys, Options).
-
-sorted(Map) ->
-    csrt_query:sorted(Map).
-
-sorted_by(Key) ->
-    csrt_query:sorted_by(Key).
-
-sorted_by(Key, Val) ->
-    csrt_query:sorted_by(Key, Val).
-
-sorted_by(Key, Val, Agg) ->
-    csrt_query:sorted_by(Key, Val, Agg).
-
 %%
 %% Delta API
 %%
@@ -592,6 +543,249 @@ maybe_add_delta(T) ->
 -spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 maybe_add_delta(T, Delta) ->
     csrt_util:maybe_add_delta(T, Delta).
+
+%%
+%% Query API functions
+%%
+%%
+
+%% @doc Construct query from the expressions.
+%% There are following types of expressions allowed in the query.
+%%   <li>group_by/1 @see group_by/1</li>
+%%   <li>group_by/2 @see group_by/1</li>
+%%   <li>sort_by/1 @see sort_by/1</li>
+%%   <li>count_by/1 @see count_by/1</li>
+%%   <li>options/1 @see options/1</li>
+%%   <li>from/1 @see from/1</li>
+%% The order of expressions doesn't matter.
+%% <code>
+%% Q = query([
+%%    from("docs_read"),
+%%    group_by(username, dbname, ioq_calls),
+%%    options([
+%%       with_limit(10)
+%%    ])
+%% ]),
+%% </code>
+%% @end
+-spec query(QueryExpression :: [query_expression()]) ->
+    query() | {error, any()}.
+query(QueryExpression) ->
+    csrt_query:query(QueryExpression).
+
+%% @doc Specify the matcher to use for the query.
+%% If atom 'all' is used then all entries would be in the scope of the query.
+%% Also the use of 'all' makes the query 'unsafe'. Because it scans through all entries
+%% and can return many matching rows.
+%% Unsafe queries can only be run using 'unsafe_run/1'.
+%% <code>
+%% Q = query([
+%%    ...
+%%    from("docs_read")
+%% ]),
+%% </code>
+%% @end
+-spec from(MatcherNameOrAll :: string() | all) ->
+    query_expression() | {error, any()}.
+from(MatcherNameOrAll) ->
+    csrt_query:from(MatcherNameOrAll).
+
+%% @doc Request 'group_by' aggregation of results.
+%% <code>
+%% Q = query([
+%%    ...
+%%    group_by([username, dbname])
+%% ]),
+%% </code>
+%% @end
+-spec group_by(AggregationKeys) ->
+    query_expression() | {error, any()}
+when
+    AggregationKeys ::
+        binary()
+        | rctx_field()
+        | [binary()]
+        | [rctx_field()].
+group_by(AggregationKeys) ->
+    csrt_query:group_by(AggregationKeys).
+
+%% @doc Request 'group_by' aggregation of results.
+%% <code>
+%% Q = query([
+%%    ...
+%%    group_by([username, dbname], ioq_calls)
+%% ]),
+%% </code>
+%% @end
+-spec group_by(AggregationKeys, ValueKey) ->
+    query_expression() | {error, any()}
+when
+    AggregationKeys ::
+        binary()
+        | rctx_field()
+        | [binary()]
+        | [rctx_field()],
+    ValueKey ::
+        binary()
+        | rctx_field().
+group_by(AggregationKeys, ValueKey) ->
+    csrt_query:group_by(AggregationKeys, ValueKey).
+
+%% @doc Request 'sort_by' aggregation of results.
+%% <code>
+%% Q = query([
+%%    ...
+%%    sort_by([username, dbname])
+%% ]),
+%% </code>
+%% @end
+-spec sort_by(AggregationKeys) ->
+    query_expression() | {error, any()}
+when
+    AggregationKeys ::
+        binary()
+        | rctx_field()
+        | [binary()]
+        | [rctx_field()].
+sort_by(AggregationKeys) ->
+    csrt_query:sort_by(AggregationKeys).
+
+%% @doc Request 'sort_by' aggregation of results.
+%% <code>
+%% Q = query([
+%%    ...
+%%    sort_by([username, dbname], ioq_calls)
+%% ]),
+%% </code>
+%% @end
+-spec sort_by(AggregationKeys, ValueKey) ->
+    query_expression() | {error, any()}
+when
+    AggregationKeys ::
+        binary()
+        | rctx_field()
+        | [binary()]
+        | [rctx_field()],
+    ValueKey ::
+        binary()
+        | rctx_field().
+sort_by(AggregationKeys, ValueKey) ->
+    csrt_query:sort_by(AggregationKeys, ValueKey).
+
+%% @doc Request 'count_by' aggregation of results.
+%% <code>
+%% Q = query([
+%%    ...
+%%    count_by(username)
+%% ]),
+%% </code>
+%% @end
+-spec count_by(AggregationKeys) ->
+    query_expression() | {error, any()}
+when
+    AggregationKeys ::
+        binary()
+        | rctx_field()
+        | [binary()]
+        | [rctx_field()].
+count_by(AggregationKeys) ->
+    csrt_query:count_by(AggregationKeys).
+
+%% @doc Construct 'options' query expression.
+%% There are following types of expressions allowed in the query.
+%%   <li>unlimited/0 @see unlimited/0 (cannot be used with 'with_limit/1')</li>
+%%   <li>with_limit/1 @see with_limit/1 (cannot be used with 'unlimited/0')</li>
+%% The order of expressions doesn't matter.
+%% <code>
+%% Q = query([
+%%    ...
+%%    options([
+%%      ...
+%%    ])
+%% ]),
+%% </code>
+%% @end
+-spec options([query_option()]) ->
+    query_expression() | {error, any()}.
+options(OptionsExpression) ->
+    csrt_query:options(OptionsExpression).
+
+
+%% @doc Enable unlimited number of results from the query.
+%% The use of 'unlimited' makes the query 'unsafe'. Because it can return many matching rows.
+%% Unsafe queries can only be run using 'unsafe_run/1'.
+%% <code>
+%% Q = query([
+%%    ...
+%%    options([
+%%      unlimited()
+%%    ])
+%% ]),
+%% </code>
+%% @end
+-spec unlimited() ->
+    query_expression().
+unlimited() ->
+    csrt_query:unlimited().
+
+%% @doc Set limit on number of results returned from the query.
+%% <code>
+%% Q = query([
+%%    ...
+%%    options([
+%%      with_limit(100)
+%%    ])
+%% ]),
+%% </code>
+%% @end
+-spec with_limit(Limit :: pos_integer()) ->
+    query_expression() | {error, any()}.
+with_limit(Limit) ->
+    csrt_query:with_limit(Limit).
+
+%% @doc Executes provided query. Only 'safe' queries can be executed using 'run'.
+%% The query considered 'unsafe' if any of the conditions bellow are met:
+%%   <li>Query uses 'unlimited/0'</li>
+%%   <li>Query uses 'from(all)'</li>
+%% <code>
+%% Q = query([
+%%    from("docs_read"),
+%%    group_by(username, dbname, ioq_calls),
+%%    options([
+%%       with_limit(10)
+%%    ])
+%% ]),
+%% run(Q)
+%% </code>
+%% @end
+-spec run(query()) ->
+    {ok, [{aggregation_key(), pos_integer()}]}
+    | {limit, [{aggregation_key(), pos_integer()}]}.
+run(Query) ->
+    csrt_query:run(Query).
+
+%% @doc Executes provided query. This function is similar to 'run/1',
+%% however it supports 'unsafe' queries. Be very careful using it.
+%% Pay attention to cardinality of the result.
+%% The query considered 'unsafe' if any of the conditions bellow are met:
+%%   <li>Query uses 'unlimited/0'</li>
+%%   <li>Query uses 'from(all)'</li>
+%% <code>
+%% Q = query([
+%%    from("docs_read"),
+%%    group_by(username, dbname, ioq_calls),
+%%    options([
+%%       with_limit(10)
+%%    ])
+%% ]),
+%% unsafe_run(Q)
+%% </code>
+%% @end
+-spec unsafe_run(query()) ->
+    {ok, [{aggregation_key(), pos_integer()}]}
+    | {limit, [{aggregation_key(), pos_integer()}]}.
+unsafe_run(Query) ->
+    csrt_query:unsafe_run(Query).
 
 %%
 %% Tests

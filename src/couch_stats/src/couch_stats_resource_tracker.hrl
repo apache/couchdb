@@ -191,8 +191,10 @@
 -type tuple_of_field_values() :: tuple().
 -type tuple_of_field_names() :: tuple().
 
+-type field_value() :: any().
 -type query_options() :: #{limit => pos_integer()}.
 -type aggregation_key() :: tuple_of_field_names().
+-type aggregation_value() :: field_value().
 -type aggregation_values() :: tuple_of_field_values().
 -type aggregation_result() :: #{aggregation_key() => non_neg_integer()}.
 -type ordered_result() :: [{aggregation_key(), non_neg_integer()}].

@@ -24,37 +24,54 @@
     ]
 ).
 
-rpc_to_json({Resp, _Errors, _Nodes}) ->
-    #{<<"results">> => resp_to_json(Resp, #{}), <<"errors">> => [], <<"bad_nodes">> => []}.
+-import(
+    csrt,
+    [
+        query/1,
+        from/1,
+        group_by/1,
+        group_by/2,
+        sort_by/1,
+        sort_by/2,
+        count_by/1,
+        options/1,
+        unlimited/0,
+        with_limit/1,
 
-resp_to_json([{N, R} | Rest], Acc) ->
-    resp_to_json(Rest, maps:put(atom_to_binary(N), R, Acc));
-resp_to_json([], Acc) ->
-    Acc.
+        run/1
+    ]
+).
 
-% handle_resource_status_req(#httpd{method = 'GET', path_parts = [<<"_active_resources">>]} = Req) ->
-%     ok = chttpd:verify_is_server_admin(Req),
-%     %% TODO: incorporate Bad responses
-%     Resp = rpc_to_json(csrt:rpc(active, [json])),
-%     send_json(Req, Resp);
 handle_resource_status_req(
-    #httpd{method = 'POST', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherName]} = Req
+    #httpd{method = 'POST', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherNameBin]} = Req
 ) ->
     chttpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
     GroupBy = couch_util:get_value(<<"group_by">>, JsonProps),
     SortBy = couch_util:get_value(<<"sort_by">>, JsonProps),
     CountBy = couch_util:get_value(<<"count_by">>, JsonProps),
-
-    case {GroupBy, SortBy, CountBy} of
-        {undefined, undefined, {Query}} ->
-            handle_count_by(Req, binary_to_list(MatcherName), Query);
-        {undefined, {Query}, undefined} ->
-            handle_sort_by(Req, binary_to_list(MatcherName), Query);
-        {{Query}, undefined, undefined} ->
-            handle_group_by(Req, binary_to_list(MatcherName), Query);
+    MatcherName = binary_to_list(MatcherNameBin),
+    {AggregationKeys, Query} = case {GroupBy, SortBy, CountBy} of
+        {undefined, undefined, {Props}} ->
+            Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
+            {Keys, csrt:query([from(MatcherName), count_by(Keys)])};
+        {undefined, {Props}, undefined} ->
+            Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
+            CounterKey = couch_util:get_value(<<"counter_key">>, Props),
+            {Keys, query([from(MatcherName), sort_by(Keys, CounterKey)])};
+        {{Props}, undefined, undefined} ->
+            Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
+            CounterKey = couch_util:get_value(<<"counter_key">>, Props),
+            {Keys, query([from(MatcherName), group_by(Keys, CounterKey)])};
         {_, _, _} ->
             throw({bad_request, <<"Multiple aggregations are not supported">>})
+    end,
+    case Query of
+        {error, Reason} ->
+            send_error(Req, Reason);
+        Q ->
+            JSON = to_json(AggregationKeys, csrt:rpc_run(Q)),
+            send_json(Req, JSON)
     end;
 handle_resource_status_req(#httpd{path_parts = [<<"_active_resources">>]} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
@@ -64,39 +81,21 @@ handle_resource_status_req(Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_method_not_allowed(Req, "GET,HEAD,POST").
 
-handle_count_by(Req, MatcherName, CountBy) ->
-    AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, CountBy),
-    case csrt:query_count_by(MatcherName, AggregationKeys) of
-        {ok, Map} ->
-            send_json(Req, aggregation_result_to_json(AggregationKeys, Map));
-        {error, Reason} ->
-            send_error(Req, Reason)
-    end.
+to_json(AggregationKeys, Results) ->
+    lists:map(fun(E) -> node_reply_to_json(AggregationKeys, E) end, Results).
 
-handle_sort_by(Req, MatcherName, SortBy) ->
-    AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, SortBy),
-    CounterKey = couch_util:get_value(<<"counter_key">>, SortBy),
-    case csrt:query_sort_by(MatcherName, AggregationKeys, CounterKey) of
-        {ok, Map} ->
-            send_json(Req, aggregation_result_to_json(AggregationKeys, Map));
-        {error, Reason} ->
-            send_error(Req, Reason)
-    end.
-
-handle_group_by(Req, MatcherName, GroupBy) ->
-    AggregationKeys = couch_util:get_value(<<"aggregate_keys">>, GroupBy),
-    CounterKey = couch_util:get_value(<<"counter_key">>, GroupBy),
-    case csrt:query_group_by(MatcherName, AggregationKeys, CounterKey) of
-        {ok, Map} ->
-            send_json(Req, aggregation_result_to_json(AggregationKeys, Map));
-        {error, Reason} ->
-            send_error(Req, Reason)
-    end.
-
-%% [{{<<"user_foo">>,<<"eunit-test-db-3950c6fc68955a4b629cebbece5bdfac">>}, 10}]
-% -type aggregation_result() :: #{aggregation_key() => non_neg_integer()}.
-% -type ordered_result() :: [{aggregation_key(), non_neg_integer()}].
-% -type query_result() :: aggregation_result() | ordered_result().
+node_reply_to_json(_AggregationKeys, #{node := Node, result := none, errors := Errors}) ->
+    #{
+        node => atom_to_binary(Node),
+        result => none,
+        errors => lists:map(fun erlang:atom_to_list/1, Errors)
+    };
+node_reply_to_json(AggregationKeys, #{node := Node, result := Result, errors := Errors}) ->
+    #{
+        node => atom_to_binary(Node),
+        result => aggregation_result_to_json(AggregationKeys, Result),
+        errors => lists:map(fun erlang:atom_to_list/1, Errors)
+    }.
 
 encode_key(AggregationKeys, Key) ->
     maps:from_list(lists:zip(AggregationKeys, tuple_to_list(Key))).
@@ -160,10 +159,10 @@ aggregation_result_to_json(AggregationKey, Ordered) when
         Ordered
     ).
 
-send_error(Req, {unknown_matcher, Matcher}) ->
+send_error(Req, [{unknown_matcher, Matcher} | _]) ->
     MatcherBin = list_to_binary(Matcher),
     chttpd:send_error(Req, {bad_request, <<"Unknown matcher '", MatcherBin/binary, "'">>});
-send_error(Req, {invalid_key, FieldName}) ->
+send_error(Req, [{invalid_key, FieldName} | _]) ->
     chttpd:send_error(Req, {bad_request, <<"Unknown field name '", FieldName/binary, "'">>});
-send_error(Req, Reason) ->
+send_error(Req, [Reason | _]) ->
     chttpd:send_error(Req, {error, Reason}).
