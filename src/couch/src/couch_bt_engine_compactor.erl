@@ -295,6 +295,7 @@ copy_compact(#comp_st{} = CompSt) ->
     Compression = couch_compress:get_compression_method(),
     NewSt = NewSt0#st{compression = Compression},
     NewUpdateSeq = couch_bt_engine:get_update_seq(NewSt0),
+    DropSeq = couch_bt_engine:get_drop_seq(NewSt0),
     TotalChanges = couch_bt_engine:count_changes_since(St, NewUpdateSeq),
     BufferSize = list_to_integer(
         config:get("database_compaction", "doc_buffer_size", "524288")
@@ -318,9 +319,14 @@ copy_compact(#comp_st{} = CompSt) ->
                     #full_doc_info{} -> DocInfo#full_doc_info.update_seq;
                     #doc_info{} -> DocInfo#doc_info.high_seq
                 end,
+            WouldDrop = fabric_drop_seq:would_drop(DocInfo, DropSeq),
 
             AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
             if
+                WouldDrop ->
+                    %% drop this document completely
+                    {ok, NewSt2} = couch_bt_engine:increment_drop_count(AccNewSt, 1),
+                    {ok, {NewSt2, AccUncopied, AccUncopiedSize, AccCopiedSize}};
                 AccUncopiedSize2 >= BufferSize ->
                     NewSt2 = copy_docs(
                         St, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry

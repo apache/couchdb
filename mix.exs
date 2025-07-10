@@ -71,7 +71,7 @@ defmodule CouchDBTest.Mixfile do
   end
 
   # Run "mix help compile.app" to learn about applications.
-  def application, do: [applications: [:logger, :httpotion]]
+  def application, do: [applications: [:logger, :httpotion, :propcheck]]
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["test/elixir/lib", "test/elixir/test/support"]
@@ -85,7 +85,8 @@ defmodule CouchDBTest.Mixfile do
       {:httpotion, ">= 3.2.0", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.18.3", only: :test},
       {:ibrowse, path: path("ibrowse"), override: true},
-      {:credo, "~> 1.7.11", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "~> 1.7.11", only: [:dev, :test, :integration], runtime: false},
+      {:propcheck, ">= 1.5.0", only: [:dev, :test, :integration]},
     ]
 
     extra_deps = [:b64url, :jiffy, :jwtf, :meck, :mochiweb]
