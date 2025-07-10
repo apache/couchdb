@@ -89,8 +89,13 @@ active_resources_group_by(MatcherName, Url, AggregationKeys, CounterKey) ->
 t_query_group_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username, dbname], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
-    {RC, Result} = active_resources_group_by(Url, [<<"username">>, <<"dbname">>], <<"ioq_calls">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_group_by(Url, [<<"username">>, <<"dbname">>], <<"ioq_calls">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -118,8 +123,13 @@ t_query_group_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
 t_query_group_by_single_key(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
-    {RC, Result} = active_resources_group_by(Url, [<<"username">>], <<"ioq_calls">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_group_by(Url, [<<"username">>], <<"ioq_calls">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -141,8 +151,13 @@ t_query_group_by_single_key(#{rctxs := Rctxs, url := Url}) ->
 t_query_group_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
-    {RC, Result} = active_resources_group_by(Url, <<"username">>, <<"ioq_calls">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_group_by(Url, <<"username">>, <<"ioq_calls">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -206,8 +221,13 @@ active_resources_count_by(MatcherName, Url, AggregationKeys) ->
 t_query_count_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username, dbname], ioq_calls, Rctxs),
     Grouped = count(Aggregated),
-    {RC, Result} = active_resources_count_by(Url, [<<"username">>, <<"dbname">>]),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_count_by(Url, [<<"username">>, <<"dbname">>]),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -235,8 +255,13 @@ t_query_count_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
 t_query_count_by_single_key(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username], ioq_calls, Rctxs),
     Grouped = count(Aggregated),
-    {RC, Result} = active_resources_count_by(Url, [<<"username">>]),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_count_by(Url, [<<"username">>]),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -258,8 +283,13 @@ t_query_count_by_single_key(#{rctxs := Rctxs, url := Url}) ->
 t_query_count_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username], ioq_calls, Rctxs),
     Grouped = count(Aggregated),
-    {RC, Result} = active_resources_count_by(Url, <<"username">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_count_by(Url, <<"username">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -318,8 +348,13 @@ t_query_sort_by_multiple_keys(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username, dbname], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     Ordered = order_by_value(Grouped),
-    {RC, Result} = active_resources_sort_by(Url, [<<"username">>, <<"dbname">>], <<"ioq_calls">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_sort_by(Url, [<<"username">>, <<"dbname">>], <<"ioq_calls">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(4, length(Result), format("Expected four entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -349,8 +384,13 @@ t_query_sort_by_single_key(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     Ordered = order_by_value(Grouped),
-    {RC, Result} = active_resources_sort_by(Url, [<<"username">>], <<"ioq_calls">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_sort_by(Url, [<<"username">>], <<"ioq_calls">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
@@ -374,8 +414,13 @@ t_query_sort_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     Aggregated = aggregate([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     Ordered = order_by_value(Grouped),
-    {RC, Result} = active_resources_sort_by(Url, <<"username">>, <<"ioq_calls">>),
-    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Result])),
+    {RC, Results} = active_resources_sort_by(Url, <<"username">>, <<"ioq_calls">>),
+    ?assertEqual(200, RC, format("Should have '200' return code, got ~p~n  ~p~n", [RC, Results])),
+    [#{
+        <<"errors">> := [],
+        <<"node">> := _,
+        <<"result">> := Result
+    }] = Results,
     ?assert(is_list(Result), format("Expected list of entries, got ~p~n", [Result])),
     ?assertEqual(2, length(Result), format("Expected two entries, got ~p~n  ~p~n", [length(Result), Result])),
     ?assertMatch([
