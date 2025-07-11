@@ -72,7 +72,7 @@ create_index(#index{} = Index, IndexDefinition) ->
         index_path(Index), [?JSON_CONTENT_TYPE], <<"PUT">>, jiffy:encode(IndexDefinition)
     ),
     case Resp of
-        {ok, 204, _, _} ->
+        {ok, 200, _, _} ->
             ok;
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
@@ -90,7 +90,7 @@ delete_path(Path, Exclusions) when
         index_path(Path), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(Exclusions)
     ),
     case Resp of
-        {ok, 204, _, _} ->
+        {ok, 200, _, _} ->
             ok;
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
@@ -125,7 +125,7 @@ purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
         doc_path(Index, DocId), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(ReqBody)
     ),
     case Resp of
-        {ok, 204, _, _} ->
+        {ok, 200, _, _} ->
             ok;
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
@@ -190,7 +190,7 @@ set_seq(#index{} = Index, ReqBody) ->
         index_path(Index), [?JSON_CONTENT_TYPE], <<"POST">>, jiffy:encode(ReqBody)
     ),
     case Resp of
-        {ok, 204, _, _} ->
+        {ok, 200, _, _} ->
             ok;
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};

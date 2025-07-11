@@ -35,6 +35,7 @@ import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.IndexInfoRequest;
+import org.apache.couchdb.nouveau.api.Ok;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexManager;
@@ -54,27 +55,29 @@ public final class IndexResource {
     }
 
     @PUT
-    public void createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
+    public Ok createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
             throws IOException {
         indexManager.create(name, indexDefinition);
+        return Ok.INSTANCE;
     }
 
     @DELETE
     @Path("/doc/{docId}")
-    public void deleteDoc(
+    public Ok deleteDoc(
             @PathParam("name") String name,
             @PathParam("docId") String docId,
             @NotNull @Valid DocumentDeleteRequest request)
             throws Exception {
-        indexManager.with(name, (index) -> {
+        return indexManager.with(name, (index) -> {
             index.delete(docId, request);
-            return null;
+            return Ok.INSTANCE;
         });
     }
 
     @DELETE
-    public void deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
+    public Ok deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
         indexManager.deleteAll(path, exclusions);
+        return Ok.INSTANCE;
     }
 
     @GET
@@ -85,9 +88,8 @@ public final class IndexResource {
     }
 
     @POST
-    public void setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request)
-            throws Exception {
-        indexManager.with(name, (index) -> {
+    public Ok setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
+        return indexManager.with(name, (index) -> {
             if (request.getMatchUpdateSeq().isPresent()
                     && request.getUpdateSeq().isPresent()) {
                 index.setUpdateSeq(
@@ -99,7 +101,7 @@ public final class IndexResource {
                         request.getMatchPurgeSeq().getAsLong(),
                         request.getPurgeSeq().getAsLong());
             }
-            return null;
+            return Ok.INSTANCE;
         });
     }
 
@@ -114,14 +116,14 @@ public final class IndexResource {
 
     @PUT
     @Path("/doc/{docId}")
-    public void updateDoc(
+    public Ok updateDoc(
             @PathParam("name") String name,
             @PathParam("docId") String docId,
             @NotNull @Valid DocumentUpdateRequest request)
             throws Exception {
-        indexManager.with(name, (index) -> {
+        return indexManager.with(name, (index) -> {
             index.update(docId, request);
-            return null;
+            return Ok.INSTANCE;
         });
     }
 }
