@@ -975,7 +975,7 @@ def check_node_alive(url, user, pswd):
 
     for _ in range(10):
         try:
-            with contextlib.closing(urlopen(url)):
+            with contextlib.closing(urlopen(url, timeout=1)):
                 pass
         except Exception as exc:
             error = exc
