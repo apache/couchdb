@@ -1,6 +1,63 @@
 # Couch Stats Resource Tracker (CSRT)
 
-TODO: add list of stat fields
+CSRT (Couch Stats Resource Tracker) is a real time stats tracking system that
+tracks the quantity of resources induced at the process level in a live
+queryable manner that also generates process lifetime reports containing
+statistics on the total resource load of a request, as a function of things like
+dbs/docs opened, view and changes rows read, changes returned vs processed,
+Javascript filter usage, duration, and more. This system is a paradigm shift in
+CouchDB visibility and introspection, allowing for expressive real time querying
+capabilities to introspect, understand, and aggregate CouchDB internal resource
+usage, as well as powerful filtering facilities for conditionally generating
+reports on "heavy usage" requests or "long/slow" requests. CSRT also extends
+`recon:proc_window` with `csrt:proc_window` allowing for the same style of
+battle hardened introspection with Recon's excellent `proc_window`, but with the
+sample window over any of the CSRT tracked CouchDB stats!
+
+CSRT does this by piggy-backing off of the existing metrics tracked by way of
+`couch_stats:increment_counter` at the time when the local process induces those
+metrics inc calls, and then CSRT updates an ets entry containing the context
+information for the local process, such that global aggregate queries can be
+performed against the ets table as well as the generation of the process
+resource usage reports at the conclusions of the process's lifecyle.The ability
+to do aggregate querying in realtime in addition to the process lifecycle
+reports for post facto analysis over time, is a cornerstone of CSRT that is the
+result of a series of iterations until a robust and scalable aproach was built.
+
+The real time querying is achieved by way of a global ets table with
+`read_concurrency`, `write_concurrency`, and `decentralized_counters` enabled.
+Great care was taken to ensure that _zero_ concurrent writes to the same key
+occure in this model, and this entire system is predicated on the fact that
+incremental updates to `ets:update_counters` provides *really* fast and
+efficient updates in an atomic and isolated fashion when coupled with
+decentralized counters and write concurrency. Each process that calls
+`couch_stats:increment_counter` tracks their local context in CSRT as well, with
+zero concurrent writes from any other processes. Outside of the context setup
+and teardown logic, _only_ operations to `ets:update_counter` are performed, one
+per process invocation of `couch_stats:increment_counter`, and one for
+coordinators to update worker deltas in a single batch, resulting in a 1:1 ratio
+of ets calls to real time stats updates for the primary workloads.
+
+The primary achievement of CSRT is the core framework iself for concurrent
+process local stats tracking and real time RPC delta accumulation in a scalable
+manner that allows for real time aggregate querying and process lifecycle
+reports. This took several versions to find a scalable and robust approach that
+induced minimal impact on maximum system throughput. Now that the framework is
+in place, it can be extended to track any further desired process local uses of
+`couch_stats:increment_counter`. That said, the currently selected set of stats
+to track was heavily influenced by the challenges in reotractively understanding
+the quantity of resources induced by a query like `/db/_changes?since=$SEQ`, or
+similarly, `/db/_find`.
+
+CSRT started as an extension of the Mango execution stats logic to `_changes`
+feeds to get proper visibility into quantity of docs read and filtered per
+changes request, but then the focus inverted with the realization that we should
+instead use the existing stats tracking mechanisms that have already been deemed
+critical information to track, which then also allows for the real time tracking
+and aggregate query capabilities. The Mango execution stats can be ported into
+CSRT itself and just become one subset of the stats tracked as a whole, and
+similarly, any additional desired stats tracking can be easily added and will
+be picked up in the RPC deltas and process lifetime reports.
 
 # CSRT Config Keys
 
@@ -24,21 +81,21 @@ metrics to track, the feature is enabled by way of the config toggle
 `config:get(?CSRT, "enable_init_p")`, and these configs can left alone for the
 most part until new operations are tracked.
 
-## -define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
+## -define(CSRT_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
 
 > config:get("csrt_logger.matchers_enabled").
 
 Config toggles for enabling specific builtin logger matchers, see the dedicated
 section below on `# CSRT Default Matchers`.
 
-## -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
+## -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
 
 > config:get("csrt_logger.matchers_threshold").
 
 Config settings for defining the primary `Threshold` value of the builtin logger
 matchers, see the dedicated section below on `# CSRT Default Matchers`.
 
-## -define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
+## -define(CSRT_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
 
 > config:get("csrt_logger.matchers_enabled").
 
@@ -103,7 +160,7 @@ corresponding to `$pid_ref` is the _only_ process doing updates so we know the
 last `updated_at` value will be the last time this process updated the data. So
 we track that value in the pdict and then take a delta between `tnow()` and
 `updated_at`, and then `updated_at` becomes a value we can sneak into the other
-integer ounter updates we're already performing!
+integer counter updates we're already performing!
 
 ## -define(PID_REF, {csrt, pid_ref}).
 
@@ -136,10 +193,6 @@ reprots at the end of the process lifecycle. We store a reference to the tracker
 pid so that for explicit context destruction, like in `chttpd` workers after a
 request has been serviced, we can update stop the tracker and perform the
 expected cleanup directly.
-
-# #rctx{} fields
-
-# rexi_server:init_p -- rename/clarify this
 
 # Primary Config Toggles
 
@@ -298,18 +351,16 @@ The current default matchers are:
   * ioq_calls: match all requests inducing more than N ioq_calls
 
 Each of the default matchers has an enablement setting in
-`config:get(?CONF_MATCHERS_ENABLED, Name)` for toggling enablement of it, and a
-corresponding threshold value setting in `config:get(?CONF_MATCHERS_THRESHOLD,
+`config:get(?CSRT_MATCHERS_ENABLED, Name)` for toggling enablement of it, and a
+corresponding threshold value setting in `config:get(?CSRT_MATCHERS_THRESHOLD,
 Name)` that is an integer value corresponding to the specific nature of that
 matcher.
 
+## CSRT Logger Matcher Enablement (?CSRT_MATCHERS_ENABLED)
 
-## CSRT Logger Matcher Enablement (?CONF_MATCHERS_ENABLED)
+> -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_enabled").
 
-> -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_enabled").
-
-
-### config:get_boolean(?CONF_MATCHERS_ENABLED, "docs_read", false)
+### config:get_boolean(?CSRT_MATCHERS_ENABLED, "docs_read", false)
 
 Enable the `docs_read` builtin matcher, with a default `Threshold=1000`, such
 that any request that reads more than `Threshold` docs will generate a CSRT
@@ -319,7 +370,7 @@ This is different from the `rows_read` filter in that a view with `?limit=1000`
 will read 1000 rows, but the same request with `?include_docs=true` will also
 induce an additional 1000 docs read.
 
-### config:get_boolean(?CONF_MATCHERS_ENABLED, "rows_read", false)
+### config:get_boolean(?CSRT_MATCHERS_ENABLED, "rows_read", false)
 
 Enable the `rows_read` builtin matcher, with a default `Threshold=1000`, such
 that any request that reads more than `Threshold` rows will generate a CSRT
@@ -328,50 +379,48 @@ process lifetime report with a summary of its resouce consumption.
 This is different from the `docs_read` filter so that we can distinguish between
 heavy view requests with lots of rows or heavy requests with lots of docs.
 
-### config:get_boolean(?CONF_MATCHERS_ENABLED, "docs_written", false)
+### config:get_boolean(?CSRT_MATCHERS_ENABLED, "docs_written", false)
 
 Enable the `docs_written` builtin matcher, with a default `Threshold=500`, such
 that any request that writtens more than `Threshold` docs will generate a CSRT
 process lifetime report with a summary of its resouce consumption.
 
-### config:get_boolean(?CONF_MATCHERS_ENABLED, "ioq_calls", false)
+### config:get_boolean(?CSRT_MATCHERS_ENABLED, "ioq_calls", false)
 
 Enable the `ioq_calls` builtin matcher, with a default `Threshold=10000`, such
 that any request that induces more than `Threshold` IOQ calls will generate a
 CSRT process lifetime report with a summary of its resouce consumption.
 
-### config:get_boolean(?CONF_MATCHERS_ENABLED, "long_reqs", false)
+### config:get_boolean(?CSRT_MATCHERS_ENABLED, "long_reqs", false)
 
 Enable the `long_reqs` builtin matcher, with a default `Threshold=60000`, such
 that any request where the the last CSRT rctx `updated_at` timestamp is at least
 `Threshold` milliseconds grather than the `started_at timestamp` will generate a
 CSRT process lifetime report with a summary of its resource consumption.
 
+## CSRT Logger Matcher Threshold (?CSRT_MATCHERS_THRESHOLD)
 
-## CSRT Logger Matcher Threshold (?CONF_MATCHERS_THRESHOLD)
+> -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
 
-> -define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
-
-
-### config:get_integer(?CONF_MATCHERS_THRESHOLD, "docs_read", 1000)
+### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "docs_read", 1000)
 
 Threshold for `docs_read` logger matcher, defaults to `1000` docs read.
 
-### config:get_integer(?CONF_MATCHERS_THRESHOLD, "rows_read", false)
+### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "rows_read", 1000)
 
 Threshold for `rows_read` logger matcher, defaults to `1000` rows read.
 
-### config:get_integer(?CONF_MATCHERS_THRESHOLD, "docs_written", false)
+### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "docs_written", 500)
 
 Threshold for `docs_written` logger matcher, defaults to `500` docs written.
 
-### config:get_integer(?CONF_MATCHERS_THRESHOLD, "ioq_calls", false)
+### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "ioq_calls", 10000)
 
-Threshold for `ioq_calls` logger matcher, defaults to `10_000` IOQ calls made.
+Threshold for `ioq_calls` logger matcher, defaults to `10000` IOQ calls made.
 
-### config:get_integer(?CONF_MATCHERS_THRESHOLD, "long_reqs", false)
+### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "long_reqs", 60000)
 
-Threshold for `long_reqs` logger matcher, defaults to `60_000` milliseconds.
+Threshold for `long_reqs` logger matcher, defaults to `60000` milliseconds.
 
 
 # Core CSRT API
@@ -661,6 +710,7 @@ existing `#rctx{}` record to search with.
     %%write_kv_node = 0 :: non_neg_integer() | '_',
     %%write_kp_node = 0 :: non_neg_integer() | '_'
 }).
+```
 
 ## Metadata
 

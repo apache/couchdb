@@ -548,7 +548,7 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
             end
         end,
         Matchers,
-        config:get(?CONF_MATCHERS_DBNAMES)
+        config:get(?CSRT_MATCHERS_DBNAMES)
     ),
 
     %% Finally, merge in the dynamically registered matchers, with priority
@@ -561,26 +561,26 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
 -spec matcher_enabled(Name :: string()) -> boolean().
 matcher_enabled(Name) when is_list(Name) ->
     %% TODO: fix
-    %% config:get_boolean(?CONF_MATCHERS_ENABLED, Name, false).
-    config:get_boolean(?CONF_MATCHERS_ENABLED, Name, true).
+    %% config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, false).
+    config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, true).
 
 -spec matcher_threshold(Name, Threshold) -> string() | integer() when
     Name :: string(), Threshold :: pos_integer() | string().
 matcher_threshold(Name, Default) when
     is_list(Name) andalso is_integer(Default) andalso Default > 0
 ->
-    config:get_integer(?CONF_MATCHERS_THRESHOLD, Name, Default).
+    config:get_integer(?CSRT_MATCHERS_THRESHOLD, Name, Default).
 
 subscribe_changes() ->
     config:listen_for_changes(?MODULE, nil).
 
-handle_config_change(?CONF_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
+handle_config_change(?CSRT_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
-handle_config_change(?CONF_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
+handle_config_change(?CSRT_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
-handle_config_change(?CONF_MATCHERS_DBNAMES, _Key, _Val, _Persist, St) ->
+handle_config_change(?CSRT_MATCHERS_DBNAMES, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
 handle_config_change(_Sec, _Key, _Val, _Persist, St) ->

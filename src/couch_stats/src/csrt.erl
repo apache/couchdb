@@ -48,6 +48,8 @@
     do_report/2,
     is_enabled/0,
     is_enabled_init_p/0,
+    is_enabled_reporting/0,
+    is_enabled_rpc_reporting/0,
     maybe_report/2,
     to_json/1
 ]).
@@ -343,6 +345,16 @@ clear_pdict_markers() ->
 -spec is_enabled() -> boolean().
 is_enabled() ->
     csrt_util:is_enabled().
+
+%% @equiv csrt_util:is_enabled_reporting().
+-spec is_enabled_reporting() -> boolean().
+is_enabled_reporting() ->
+    csrt_util:is_enabled_reporting().
+
+%% @equiv csrt_util:is_enabled_rpc_reporting().
+-spec is_enabled_rpc_reporting() -> boolean().
+is_enabled_rpc_reporting() ->
+    csrt_util:is_enabled_rpc_reporting().
 
 %% @equiv csrt_util:is_enabled_init_p().
 -spec is_enabled_init_p() -> boolean().

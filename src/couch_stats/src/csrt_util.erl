@@ -14,9 +14,9 @@
 
 -export([
     is_enabled/0,
+    is_enabled_init_p/0,
     is_enabled_reporting/0,
     is_enabled_rpc_reporting/0,
-    is_enabled_init_p/0,
     get_pid_ref/0,
     get_pid_ref/1,
     set_pid_ref/1,

@@ -149,7 +149,7 @@ teardown_reporting(Ctx) ->
 
 t_enablement(#{}) ->
     %% Set an invalid match spec to ensure csrt_logger is resilient
-    config:set(?CONF_MATCHERS_DBNAMES, "foobar", "lkajsdfkjkkadfjkajkf", false),
+    config:set(?CSRT_MATCHERS_DBNAMES, "foobar", "lkajsdfkjkkadfjkajkf", false),
     ?assertEqual(ok, csrt_logger:reload_matchers(), "reloads even with bad matcher specs set"),
     ?assert(csrt_util:is_enabled(), "CSRT is enabled"),
     ?assert(csrt_util:is_enabled_reporting(), "CSRT reporting is enabled"),
