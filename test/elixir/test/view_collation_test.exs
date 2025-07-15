@@ -69,6 +69,7 @@ defmodule ViewCollationTest do
     {:ok, [db_name: db_name]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "ascending collation order", context do
     retry_until(fn ->
       resp = Couch.get(url(context))
@@ -80,6 +81,7 @@ defmodule ViewCollationTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "descending collation order", context do
     retry_until(fn ->
       resp = Couch.get(url(context), query: %{"descending" => "true"})
@@ -111,6 +113,7 @@ defmodule ViewCollationTest do
     assert Enum.at(resp.body["rows"], -1)["key"] == "b"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "inclusive_end=false", context do
     query = %{:endkey => :jiffy.encode("b"), :inclusive_end => false}
     resp = Couch.get(url(context), query: query)

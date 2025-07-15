@@ -44,6 +44,7 @@ defmodule AttachmentNamesTest do
   This is a port of the attachment_names.js suite
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "saves attachment names successfully", context do
     db_name = context[:db_name]

@@ -257,6 +257,7 @@ defmodule UsersDbSecurityTest do
            "apple"
          }
        ]
+  @tag skip_for_pouchdb_server: true
   test "user db security" do
     # _users db
     # a doc with a field 'password' should be hashed to 'derived_key'

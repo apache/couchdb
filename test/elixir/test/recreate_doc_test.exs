@@ -75,6 +75,7 @@ defmodule RecreateDocTest do
     assert resp.status_code == 409
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Recreate a deleted document with non-exsistant rev", context do
     db_name = context[:db_name]

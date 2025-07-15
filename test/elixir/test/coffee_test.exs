@@ -8,6 +8,7 @@ defmodule CoffeeTest do
   This is a port of the coffee.js test suite.
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "CoffeeScript basic functionality", context do
     db_name = context[:db_name]

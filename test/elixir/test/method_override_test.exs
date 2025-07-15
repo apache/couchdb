@@ -8,6 +8,7 @@ defmodule MethodOverrideTest do
    X-HTTP-METHOD-OVERRIDE header
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "method override PUT", context do
     db_name = context[:db_name]
@@ -24,6 +25,7 @@ defmodule MethodOverrideTest do
     assert resp.body["bob"] == "connie"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "method override DELETE", context do
     db_name = context[:db_name]

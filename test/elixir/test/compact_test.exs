@@ -14,6 +14,7 @@ defmodule CompactTest do
   @att_plaintext String.duplicate("This is plain text", 100)
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "compaction reduces size of deleted docs", context do
     db = context[:db_name]
     docs = populate(db)

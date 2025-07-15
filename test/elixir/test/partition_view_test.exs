@@ -74,6 +74,7 @@ defmodule ViewPartitionTest do
     rows
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query with partitioned:true returns partitioned fields", context do
     db_name = context[:db_name]
 
@@ -90,6 +91,7 @@ defmodule ViewPartitionTest do
     assert Enum.dedup(partitions) == ["bar"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "default view query returns partitioned fields", context do
     db_name = context[:db_name]
 
@@ -106,6 +108,7 @@ defmodule ViewPartitionTest do
     assert Enum.dedup(partitions) == ["bar"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "conflicting partitions in path and query string rejected", context do
     db_name = context[:db_name]
 
@@ -116,6 +119,7 @@ defmodule ViewPartitionTest do
     assert Regex.match?(~r/Conflicting value/, reason)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query will return zero results for wrong inputs", context do
     db_name = context[:db_name]
 
@@ -125,6 +129,7 @@ defmodule ViewPartitionTest do
     assert Map.get(resp, :body)["rows"] == []
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partitioned ddoc cannot be used in global query", context do
     db_name = context[:db_name]
 
@@ -135,6 +140,7 @@ defmodule ViewPartitionTest do
     assert Regex.match?(~r/mandatory for queries to this view./, reason)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partitioned query cannot be used with global ddoc", context do
     db_name = context[:db_name]
 
@@ -155,6 +161,7 @@ defmodule ViewPartitionTest do
     assert length(ids) == 100
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query errors with incorrect partition supplied", context do
     db_name = context[:db_name]
 
@@ -167,6 +174,7 @@ defmodule ViewPartitionTest do
     assert resp.status_code == 400
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partitioned query works with startkey, endkey range", context do
     db_name = context[:db_name]
 
@@ -178,6 +186,7 @@ defmodule ViewPartitionTest do
     assert Enum.dedup(partitions) == ["foo"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partitioned query works with keys", context do
     db_name = context[:db_name]
 
@@ -200,6 +209,7 @@ defmodule ViewPartitionTest do
     assert ids == ["foo:2", "foo:4", "foo:6"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query works with limit", context do
     db_name = context[:db_name]
 
@@ -211,6 +221,7 @@ defmodule ViewPartitionTest do
     assert Enum.dedup(partitions) == ["foo"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query with descending", context do
     db_name = context[:db_name]
 
@@ -228,6 +239,7 @@ defmodule ViewPartitionTest do
     assert ids == ["foo:2", "foo:4", "foo:6", "foo:8", "foo:10"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query with skip", context do
     db_name = context[:db_name]
 
@@ -239,6 +251,7 @@ defmodule ViewPartitionTest do
     assert ids == ["foo:12", "foo:14", "foo:16", "foo:18", "foo:20"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query with key", context do
     db_name = context[:db_name]
 
@@ -250,6 +263,7 @@ defmodule ViewPartitionTest do
     assert ids == ["foo:22"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query with startkey_docid and endkey_docid", context do
     db_name = context[:db_name]
 
@@ -271,6 +285,7 @@ defmodule ViewPartitionTest do
     assert ids == ["foo:12", "foo:18", "foo:24", "foo:30"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query with reduce works", context do
     db_name = context[:db_name]
 
@@ -297,6 +312,7 @@ defmodule ViewPartitionTest do
            ]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition query can set query limits", context do
     set_config({"query_server_config", "partition_query_limit", "2000"})
 
@@ -361,6 +377,7 @@ defmodule ViewPartitionTest do
     assert length(ids) == 25
   end
 
+  @tag skip_for_pouchdb_server: true
   test "include_design works correctly", context do
     db_name = context[:db_name]
 

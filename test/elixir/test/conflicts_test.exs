@@ -16,6 +16,7 @@ defmodule RevisionTest do
     %{doc: doc}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "multiple updates with same _rev raise conflict errors", context do
     db = context[:db_name]
@@ -36,6 +37,7 @@ defmodule RevisionTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "mismatched rev in body and query string returns error", context do
     db = context[:db_name]
@@ -48,6 +50,7 @@ defmodule RevisionTest do
     assert_bad_request(resp, expected_reason)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "mismatched rev in body and etag returns error", context do
     opts = [body: context[:doc], headers: [{:"If-Match", "1-foobar"}]]
@@ -56,6 +59,7 @@ defmodule RevisionTest do
     assert_bad_request(resp, expected_reason)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "`new_edits: false` prevents bulk updates (COUCHDB-1178)", context do
     db = context[:db_name]

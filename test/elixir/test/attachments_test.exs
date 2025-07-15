@@ -30,6 +30,7 @@ defmodule AttachmentsTest do
     assert resp.body["ok"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "errors for bad attachment", context do
     db_name = context[:db_name]
@@ -97,6 +98,7 @@ defmodule AttachmentsTest do
     assert Regex.match?(~r/bin_doc2\/foo2.txt/, resp.headers["location"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "delete attachment", context do
     db_name = context[:db_name]
@@ -124,6 +126,7 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "delete attachment request with a payload should not block following requests", context do
     db_name = context[:db_name]
 
@@ -370,6 +373,7 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "COUCHDB-809 - stubs should only require the 'stub' field", context do
     db_name = context[:db_name]
 
@@ -431,6 +435,7 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "attachment via multipart/form-data", context do
     db_name = context[:db_name]
 

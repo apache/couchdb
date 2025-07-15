@@ -13,6 +13,7 @@ defmodule ReduceTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Basic reduce functions", context do
     db_name = context[:db_name]
     view_url = "/#{db_name}/_design/foo/_view/bar"
@@ -67,6 +68,7 @@ defmodule ReduceTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "More complex array key view row testing", context do
     db_name = context[:db_name]
     view_url = "/#{db_name}/_design/foo/_view/bar"
@@ -146,6 +148,7 @@ defmodule ReduceTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "More complex reductions that need to use the combine option", context do
     db_name = context[:db_name]
     view_url = "/#{db_name}/_design/foo/_view/bar"
@@ -202,6 +205,7 @@ defmodule ReduceTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Reduce pagination", context do
     db_name = context[:db_name]
     view_url = "/#{db_name}/_design/foo/_view/bar"

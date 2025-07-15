@@ -48,6 +48,7 @@ defmodule PartitionSearchTest do
     Enum.map(rows, fn row -> row["id"] end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "Simple query returns partitioned search results", context do
     db_name = context[:db_name]
@@ -67,6 +68,7 @@ defmodule PartitionSearchTest do
     assert ids == ["bar:1", "bar:3", "bar:5", "bar:7", "bar:9"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "Only returns docs in partition not those in shard", context do
     db_name = context[:db_name]
@@ -80,6 +82,7 @@ defmodule PartitionSearchTest do
     assert ids == ["foo:10", "foo:2", "foo:4", "foo:6", "foo:8"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "Works with bookmarks and limit", context do
     db_name = context[:db_name]
@@ -108,6 +111,7 @@ defmodule PartitionSearchTest do
     assert resp.status_code == 400
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Works with limit using POST for on non-partitioned db", context do
     db_name = context[:db_name]
@@ -119,6 +123,7 @@ defmodule PartitionSearchTest do
     assert resp.status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "Works with limit using POST for partitioned db", context do
     db_name = context[:db_name]
@@ -131,6 +136,7 @@ defmodule PartitionSearchTest do
   end
 
   @tag :with_partitioned_db
+  @tag skip_for_pouchdb_server: true
   test "Cannot do global query with partition view", context do
     db_name = context[:db_name]
     create_search_docs(db_name)
@@ -143,6 +149,7 @@ defmodule PartitionSearchTest do
     assert Regex.match?(~r/mandatory for queries to this index./, reason)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "Cannot do partition query with global search ddoc", context do
     db_name = context[:db_name]
@@ -156,6 +163,7 @@ defmodule PartitionSearchTest do
     assert reason == "`partition` not supported on this index"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "normal search on non-partitioned dbs still work", context do
     db_name = context[:db_name]
@@ -169,6 +177,7 @@ defmodule PartitionSearchTest do
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "normal search on non-partitioned dbs without limit", context do
     db_name = context[:db_name]
@@ -182,6 +191,7 @@ defmodule PartitionSearchTest do
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "normal search on non-partitioned dbs with limit", context do
     db_name = context[:db_name]
@@ -195,6 +205,7 @@ defmodule PartitionSearchTest do
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "normal search on non-partitioned dbs with over limit", context do
     db_name = context[:db_name]
@@ -217,6 +228,7 @@ defmodule PartitionSearchTest do
     assert resp.status_code == 400
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "restricted parameters are not allowed in query or body", context do
     db_name = context[:db_name]

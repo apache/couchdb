@@ -14,6 +14,7 @@ defmodule BasicsTest do
     assert user_ctx["roles"] == ["_admin"], "Should have _admin role"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Welcome endpoint" do
     assert Couch.get("/").body["couchdb"] == "Welcome", "Should say welcome"
   end
@@ -35,6 +36,7 @@ defmodule BasicsTest do
     {:ok, _} = delete_db(db_name)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db_name
   test "Creating a new DB with slashes should return Location header (COUCHDB-411)",
        context do
@@ -59,6 +61,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Limit and skip should work in _all_dbs", context do
     db = context[:db_name]
     db_count = length(Couch.get("/_all_dbs").body)
@@ -69,6 +72,7 @@ defmodule BasicsTest do
     assert [db] == Couch.get("/_all_dbs?start_key=\"#{db}\"&limit=1").body
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Database name with '+' should encode to '+'", _context do
     set_config({"chttpd", "decode_plus_to_space", "false"})
 
@@ -85,6 +89,7 @@ defmodule BasicsTest do
     assert resp.body["db_name"] == db_name
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Database name with '%2B' should encode to '+'", _context do
     set_config({"chttpd", "decode_plus_to_space", "true"})
 
@@ -114,6 +119,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "'+' in document name should encode to space", context do
     set_config({"chttpd", "decode_plus_to_space", "true"})
 
@@ -144,6 +150,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Revs info status is good", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, sample_doc_foo())
@@ -152,6 +159,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "A document read with etag works", context do
     db_name = context[:db_name]
     {:ok, resp} = create_doc(db_name, sample_doc_foo())
@@ -162,6 +170,7 @@ defmodule BasicsTest do
     assert resp.body == "", "Should have an empty body"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Make sure you can do a seq=true option", context do
     db_name = context[:db_name]
@@ -300,6 +309,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Check for invalid document members", context do
     db_name = context[:db_name]
 
@@ -340,6 +350,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "_all_docs POST error when multi-get is not a {'key': [...]} structure", context do
     db_name = context[:db_name]
     resp = Couch.post("/#{db_name}/_all_docs", body: "[]")
@@ -353,6 +364,7 @@ defmodule BasicsTest do
     assert resp.body["reason"] == "`keys` body member must be an array."
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "oops, the doc id got lost in code nirwana", context do
     db_name = context[:db_name]
@@ -373,6 +385,7 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Default headers are returned for doc with open_revs=all", context do
     db_name = context[:db_name]
     post_response = Couch.post("/#{db_name}", body: %{:foo => :bar})
@@ -382,6 +395,7 @@ defmodule BasicsTest do
     assert head_response.headers["X-CouchDB-Body-Time"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "request ID can be specified at the client", _context do
     uuid = "E7498DE1-B661-42FA-943D-17F890143068"

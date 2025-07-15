@@ -7,6 +7,7 @@ defmodule LocalDocsTest do
   Test CouchDB _local_docs
   """
 
+  @tag skip_for_pouchdb_server: true
   setup_all do
     db_name = random_db_name()
     {:ok, _} = create_db(db_name)
@@ -33,6 +34,7 @@ defmodule LocalDocsTest do
     {:ok, [db_name: db_name]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "GET with no parameters", context do
     resp = Couch.get(
       "/#{context[:db_name]}/_local_docs"
@@ -42,6 +44,7 @@ defmodule LocalDocsTest do
     assert length(Map.get(resp, :body)["rows"]) == 2
   end
 
+  @tag skip_for_pouchdb_server: true
   test "GET with multiple keys", context do
     resp = Couch.get(
       "/#{context[:db_name]}/_local_docs",
@@ -54,6 +57,7 @@ defmodule LocalDocsTest do
     assert length(Map.get(resp, :body)["rows"]) == 2
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST with empty body", context do
     resp = Couch.post(
       "/#{context[:db_name]}/_local_docs",
@@ -64,6 +68,7 @@ defmodule LocalDocsTest do
     assert length(Map.get(resp, :body)["rows"]) == 2
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST with keys and limit", context do
     resp = Couch.post(
       "/#{context[:db_name]}/_local_docs",
@@ -77,6 +82,7 @@ defmodule LocalDocsTest do
     assert length(Map.get(resp, :body)["rows"]) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST with query parameter and JSON body", context do
     resp = Couch.post(
       "/#{context[:db_name]}/_local_docs",
@@ -92,6 +98,7 @@ defmodule LocalDocsTest do
     assert length(Map.get(resp, :body)["rows"]) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST edge case with colliding parameters - query takes precedence", context do
     resp = Couch.post(
       "/#{context[:db_name]}/_local_docs",
