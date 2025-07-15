@@ -269,6 +269,10 @@ elixir: elixir-init devclean
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
+elixir-pouchdb: export MIX_ENV=integration
+elixir-pouchdb: elixir-init devclean
+	mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)
+
 ifneq ($(CLOUSEAU_DIR),)
 _WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
 else ifeq ($(with_clouseau), true)

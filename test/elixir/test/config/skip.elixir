@@ -22,5 +22,6 @@
     "Copy doc should return 202-Acepted",
     "Creating/Deleting DB should return 202-Acepted",
     "Creating/Updating/Deleting doc should return 202-Acepted"
-  ]
+  ],
+  skip_for_pouchdb_server: [true]
 }
