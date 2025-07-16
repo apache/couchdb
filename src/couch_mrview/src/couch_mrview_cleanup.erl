@@ -15,7 +15,8 @@
 -export([
     run/1,
     cleanup_purges/3,
-    cleanup_indices/2
+    cleanup_indices/2,
+    cleanup_peer_checkpoints/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -42,6 +43,9 @@ cleanup_indices(#{} = Sigs, #{} = IndexMap) ->
     Fun = fun(_, Files) -> lists:foreach(fun delete_file/1, Files) end,
     maps:map(Fun, maps:without(maps:keys(Sigs), IndexMap)),
     ok.
+
+cleanup_peer_checkpoints(DbName, Sigs) when is_binary(DbName), is_map(Sigs) ->
+    fabric_drop_seq:cleanup_peer_checkpoint_docs(DbName, <<"mrview">>, maps:keys(Sigs)).
 
 delete_file(File) ->
     RootDir = couch_index_util:root_dir(),

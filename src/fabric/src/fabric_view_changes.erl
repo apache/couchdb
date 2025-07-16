@@ -597,7 +597,7 @@ changes_row(Props0) ->
             _ ->
                 lists:keydelete(deleted, 1, Props0)
         end,
-    Allowed = [seq, id, changes, deleted, doc, error],
+    Allowed = [seq, id, changes, deleted, doc, error, drop],
     Props2 = lists:filter(fun({K, _V}) -> lists:member(K, Allowed) end, Props1),
     {change, {Props2}}.
 

@@ -179,7 +179,8 @@
     include_docs = false,
     doc_options = [],
     conflicts = false,
-    db_open_options = []
+    db_open_options = [],
+    simulate_drop_seq
 }).
 
 -record(btree, {

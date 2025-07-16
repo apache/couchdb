@@ -51,7 +51,8 @@
     reduce_view/5,
     group_info/3,
     update_mrview/4,
-    get_uuid/1
+    get_uuid/1,
+    set_drop_seq/4
 ]).
 
 -include_lib("fabric/include/fabric.hrl").
@@ -347,6 +348,9 @@ compact(ShardName, DesignName) ->
 get_uuid(DbName) ->
     with_db(DbName, [], {couch_db, get_uuid, []}).
 
+set_drop_seq(DbName, UuidPrefix, DropSeq, Options) ->
+    with_db(DbName, Options, {couch_db, set_drop_seq, [UuidPrefix, DropSeq]}).
+
 %%
 %% internal
 %%
@@ -571,14 +575,37 @@ changes_enumerator(DocInfo, Acc) ->
 changes_row(Changes, Docs, DocInfo, Acc) ->
     #fabric_changes_acc{db = Db, pending = Pending, epochs = Epochs} = Acc,
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DocInfo,
-    {change, [
-        {pending, Pending - 1},
-        {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}},
-        {id, Id},
-        {changes, Changes},
-        {deleted, Del}
-        | Docs
-    ]}.
+    {change,
+        maybe_add_drop(Db, Acc#fabric_changes_acc.args, DocInfo, [
+            {pending, Pending - 1},
+            {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}},
+            {id, Id},
+            {changes, Changes},
+            {deleted, Del}
+            | Docs
+        ])}.
+
+maybe_add_drop(
+    Db,
+    #changes_args{simulate_drop_seq = DropSeq},
+    #doc_info{} = DocInfo,
+    Acc0
+) when DropSeq /= undefined ->
+    Key = {mem3:range(couch_db:name(Db)), config:node_name()},
+    case maps:find(Key, DropSeq) of
+        {ok, {_Uuid, Seq}} ->
+            WouldDrop = fabric_drop_seq:would_drop(DocInfo, Seq),
+            if
+                WouldDrop ->
+                    [{drop, true} | Acc0];
+                true ->
+                    Acc0
+            end;
+        _Else ->
+            Acc0
+    end;
+maybe_add_drop(_Db, #changes_args{} = _Args, #doc_info{} = _DocInfo, Acc0) ->
+    Acc0.
 
 doc_member(Shard, DocInfo, Opts, Filter) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
