@@ -37,10 +37,12 @@
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
 %% csrt_logger matcher keys
--define(MATCHERS_KEY, {?MODULE, all_csrt_matchers}).
--define(CONF_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
--define(CONF_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
--define(CONF_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
+-define(MATCHERS_KEY, {csrt_logger, all_csrt_matchers}).
+-define(CSRT_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
+-define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
+-define(CSRT_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
+
+%% matcher query magnitude default limitations
 -define(QUERY_CARDINALITY_LIMIT, 10_000).
 -define(QUERY_LIMIT, 100).
 
@@ -117,7 +119,7 @@
     dbname :: dbname() | undefined | '_',
     username :: username() | undefined | '_',
 
-    %% Stats counters
+    %% Stats Counters
     db_open = 0 :: non_neg_integer() | '_',
     docs_read = 0 :: non_neg_integer() | '_',
     docs_written = 0 :: non_neg_integer() | '_',

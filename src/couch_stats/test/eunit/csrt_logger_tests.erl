@@ -18,6 +18,7 @@
         rctx_gen/0,
         rctx_gen/1,
         rctxs/0,
+        rctxs/1,
         jrctx/1
     ]
 ).
@@ -25,7 +26,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
--include("../../src/couch_stats_resource_tracker.hrl").
+-include("../../src/csrt.hrl").
 
 %% Use different values than default configs to ensure they're picked up
 -define(THRESHOLD_DBNAME_IO, 91).
@@ -148,7 +149,7 @@ teardown_reporting(Ctx) ->
 
 t_enablement(#{}) ->
     %% Set an invalid match spec to ensure csrt_logger is resilient
-    config:set(?CONF_MATCHERS_DBNAMES, "foobar", "lkajsdfkjkkadfjkajkf", false),
+    config:set(?CSRT_MATCHERS_DBNAMES, "foobar", "lkajsdfkjkkadfjkajkf", false),
     ?assertEqual(ok, csrt_logger:reload_matchers(), "reloads even with bad matcher specs set"),
     ?assert(csrt_util:is_enabled(), "CSRT is enabled"),
     ?assert(csrt_util:is_enabled_reporting(), "CSRT reporting is enabled"),
@@ -221,12 +222,19 @@ t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
 t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_CHANGES,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
-    ChangesFilter = fun(R) ->
-        Ret = csrt_entry:value(changes_returned, R),
-        Proc = csrt_entry:value(rows_read, R),
-        (Proc - Ret) >= Threshold
-    end,
+    Rctx0 = rctx_gen(#{mod => chttpd_db, func => handle_changes_req, rows_read => Threshold + 10}),
+    Rctxs = [Rctx0 | Rctxs0],
+    ChangesFilter =
+        fun
+            %% Matcher on changes only works for coordinators at the moment due
+            %% to overloading over rows_read for all aggregate operations
+            (#rctx{type = #coordinator{mod = chttpd_db, func = handle_changes_req}} = R) ->
+                Ret = csrt_entry:value(changes_returned, R),
+                Proc = csrt_entry:value(rows_read, R),
+                (Proc - Ret) >= Threshold;
+            (_) ->
+                false
+        end,
     ?assertEqual(
         lists:sort(lists:filter(ChangesFilter, Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("changes_processed"), Rctxs)),

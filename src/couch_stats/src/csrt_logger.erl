@@ -78,7 +78,7 @@
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("couch_stats_resource_tracker.hrl").
+-include_lib("csrt.hrl").
 
 -record(st, {
     registered_matchers = #{}
@@ -121,7 +121,7 @@ tracker({Pid, _Ref} = PidRef) ->
 -spec register_matcher(Name, MSpec) -> ok | {error, badarg} when
     Name :: string(), MSpec :: ets:match_spec().
 register_matcher(Name, MSpec) ->
-    gen_server:call(?MODULE, {register, Name, MSpec}).
+    gen_server:call(?MODULE, {register, Name, MSpec}, infinity).
 
 -spec deregister_matcher(Name :: string()) -> ok.
 deregister_matcher(Name) ->
@@ -362,9 +362,13 @@ matcher_on_nonce(Nonce) ->
 matcher_on_changes_processed(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
+    %% HACK: because we overload the use of #rctx.rows_read for
+    %% changes_processed, we must specify a direct match against a changes
+    %% context. Fow now, just match on #coordinator's
     ets:fun2ms(
         fun(
             #rctx{
+                type = #coordinator{mod = chttpd_db, func = handle_changes_req},
                 rows_read = Processed,
                 changes_returned = Returned
             } = R
@@ -544,7 +548,7 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
             end
         end,
         Matchers,
-        config:get(?CONF_MATCHERS_DBNAMES)
+        config:get(?CSRT_MATCHERS_DBNAMES)
     ),
 
     %% Finally, merge in the dynamically registered matchers, with priority
@@ -557,26 +561,26 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
 -spec matcher_enabled(Name :: string()) -> boolean().
 matcher_enabled(Name) when is_list(Name) ->
     %% TODO: fix
-    %% config:get_boolean(?CONF_MATCHERS_ENABLED, Name, false).
-    config:get_boolean(?CONF_MATCHERS_ENABLED, Name, true).
+    %% config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, false).
+    config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, true).
 
 -spec matcher_threshold(Name, Threshold) -> string() | integer() when
     Name :: string(), Threshold :: pos_integer() | string().
 matcher_threshold(Name, Default) when
     is_list(Name) andalso is_integer(Default) andalso Default > 0
 ->
-    config:get_integer(?CONF_MATCHERS_THRESHOLD, Name, Default).
+    config:get_integer(?CSRT_MATCHERS_THRESHOLD, Name, Default).
 
 subscribe_changes() ->
     config:listen_for_changes(?MODULE, nil).
 
-handle_config_change(?CONF_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
+handle_config_change(?CSRT_MATCHERS_ENABLED, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
-handle_config_change(?CONF_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
+handle_config_change(?CSRT_MATCHERS_THRESHOLD, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
-handle_config_change(?CONF_MATCHERS_DBNAMES, _Key, _Val, _Persist, St) ->
+handle_config_change(?CSRT_MATCHERS_DBNAMES, _Key, _Val, _Persist, St) ->
     ok = gen_server:call(?MODULE, reload_matchers, infinity),
     {ok, St};
 handle_config_change(_Sec, _Key, _Val, _Persist, St) ->

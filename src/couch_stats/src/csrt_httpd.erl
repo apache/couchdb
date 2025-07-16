@@ -12,7 +12,7 @@
 
 -module(csrt_httpd).
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_stats_resource_tracker.hrl").
+-include_lib("csrt.hrl").
 
 -export([handle_resource_status_req/1]).
 

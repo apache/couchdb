@@ -15,7 +15,7 @@
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("../../src/couch_stats_resource_tracker.hrl").
+-include("../../src/csrt.hrl").
 
 -define(USER, ?MODULE_STRING ++ "_admin").
 -define(PASS, "pass").

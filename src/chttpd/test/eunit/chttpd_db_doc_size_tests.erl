@@ -24,9 +24,8 @@
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), false),
-    ok = config:set("couchdb", "max_document_size", "50", false),
-
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
+    ok = config:set("couchdb", "max_document_size", "50"),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -36,7 +35,7 @@ setup() ->
 
 teardown(Url) ->
     delete_db(Url),
-    ok = config:delete("admins", ?USER, false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     ok = config:delete("couchdb", "max_document_size").
 
 create_db(Url) ->

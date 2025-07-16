@@ -13,7 +13,7 @@
 -module(csrt).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_stats_resource_tracker.hrl").
+-include_lib("csrt.hrl").
 
 %% PidRef API
 -export([
@@ -25,7 +25,7 @@
     set_pid_ref/1
 ]).
 
-%% Context API
+%% Context Lifecycle API
 -export([
     create_context/2,
     create_coordinator_context/2,
@@ -48,11 +48,13 @@
     do_report/2,
     is_enabled/0,
     is_enabled_init_p/0,
+    is_enabled_reporting/0,
+    is_enabled_rpc_reporting/0,
     maybe_report/2,
     to_json/1
 ]).
 
-%% stats collection api
+%% Stats Collection API
 -export([
     accumulate_delta/1,
     add_delta/2,
@@ -71,13 +73,13 @@
     should_track_init_p/1
 ]).
 
-%% RPC api
+%% RPC API
 -export([
     rpc_run/1,
     rpc_unsafe_run/1
 ]).
 
-%% aggregate query api
+%% Aggregate Query API
 -export([
     active/0,
     active/1,
@@ -127,7 +129,7 @@
 -opaque query_option() :: csrt_query:query_option().
 
 %%
-%% RPC operations
+%% RPC Operations
 %%
 
 -spec rpc_run(Query :: query()) ->
@@ -192,7 +194,7 @@ format_response({Node, {Tag, _}}) ->
     }.
 
 %%
-%% PidRef operations
+%% PidRef Operations
 %%
 
 -spec get_pid_ref() -> maybe_pid_ref().
@@ -222,7 +224,7 @@ destroy_pid_ref(_PidRef) ->
     erase(?PID_REF).
 
 %%
-%% Context lifecycle API
+%% Context Lifecycle API
 %%
 
 -spec create_worker_context(From, MFA, Nonce) -> pid_ref() | false when
@@ -262,7 +264,7 @@ create_context(Type, Nonce) ->
     catch
         _:_ ->
             csrt_server:destroy_resource(PidRef),
-            %% destroy_context(PidRef) clears the tracker too
+            %% calling destroy_context(PidRef) clears the tracker too
             destroy_context(PidRef),
             false
     end.
@@ -358,6 +360,16 @@ clear_pdict_markers() ->
 is_enabled() ->
     csrt_util:is_enabled().
 
+%% @equiv csrt_util:is_enabled_reporting().
+-spec is_enabled_reporting() -> boolean().
+is_enabled_reporting() ->
+    csrt_util:is_enabled_reporting().
+
+%% @equiv csrt_util:is_enabled_rpc_reporting().
+-spec is_enabled_rpc_reporting() -> boolean().
+is_enabled_rpc_reporting() ->
+    csrt_util:is_enabled_rpc_reporting().
+
 %% @equiv csrt_util:is_enabled_init_p().
 -spec is_enabled_init_p() -> boolean().
 is_enabled_init_p() ->
@@ -386,7 +398,7 @@ to_json(Rctx) ->
     csrt_entry:to_json(Rctx).
 
 %%
-%% Stat collection API
+%% Stat Collection API
 %%
 
 -spec inc(Key :: rctx_field()) -> non_neg_integer().
@@ -457,7 +469,7 @@ rctx_delta(TA, TB) ->
     csrt_util:rctx_delta(TA, TB).
 
 %%
-%% aggregate query api
+%% Aggregate Query API
 %%
 
 -spec active() -> [rctx()].

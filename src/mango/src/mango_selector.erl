@@ -50,7 +50,6 @@ normalize(Selector) ->
 % This assumes that the Selector has been normalized.
 % Returns true or false.
 match(Selector, D) ->
-    %% TODO: wire in csrt tracking
     couch_stats:increment_counter([mango, evaluate_selector]),
     match_int(Selector, D).
 

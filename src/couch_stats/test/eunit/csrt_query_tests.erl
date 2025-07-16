@@ -34,7 +34,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include("../../src/couch_stats_resource_tracker.hrl").
+-include("../../src/csrt.hrl").
 
 -define(MATCHERS_THRESHOLD, 1000).
 csrt_query_test_() ->

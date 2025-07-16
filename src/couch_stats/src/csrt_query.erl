@@ -15,7 +15,7 @@
 -feature(maybe_expr, enable).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("couch_stats_resource_tracker.hrl").
+-include_lib("csrt.hrl").
 
 %% aggregate query api
 -export([

@@ -178,7 +178,11 @@ handle_node_req(#httpd{method = 'POST', path_parts = [_, Node, <<"_restart">>]} 
     send_json(Req, 200, {[{ok, true}]});
 handle_node_req(#httpd{path_parts = [_, _Node, <<"_restart">>]} = Req) ->
     send_method_not_allowed(Req, "POST");
-handle_node_req(#httpd{method = 'GET', path_parts = [_, Node, <<"_active_resources">>, <<"_match">>, MatcherName]} = Req) ->
+handle_node_req(
+    #httpd{
+        method = 'GET', path_parts = [_, Node, <<"_active_resources">>, <<"_match">>, MatcherName]
+    } = Req
+) ->
     case call_node(Node, csrt, query_matcher, [binary_to_list(MatcherName)]) of
         {ok, Rctxs} ->
             send_json(Req, 200, Rctxs);
@@ -187,7 +191,9 @@ handle_node_req(#httpd{method = 'GET', path_parts = [_, Node, <<"_active_resourc
         {error, Reason} ->
             throw({bad_request, Reason})
     end;
-handle_node_req(#httpd{method = _, path_parts = [_, _Node, <<"_active_resources">>, <<"_match">> | _]} = Req) ->
+handle_node_req(
+    #httpd{method = _, path_parts = [_, _Node, <<"_active_resources">>, <<"_match">> | _]} = Req
+) ->
     send_method_not_allowed(Req, "GET");
 handle_node_req(#httpd{
     path_parts = [_, Node | PathParts],

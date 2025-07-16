@@ -13,7 +13,7 @@
 -module(csrt_entry).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("couch_stats_resource_tracker.hrl").
+-include_lib("csrt.hrl").
 
 -export([
     value/2,

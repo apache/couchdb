@@ -14,9 +14,9 @@
 
 -export([
     is_enabled/0,
+    is_enabled_init_p/0,
     is_enabled_reporting/0,
     is_enabled_rpc_reporting/0,
-    is_enabled_init_p/0,
     get_pid_ref/0,
     get_pid_ref/1,
     set_pid_ref/1,
@@ -49,7 +49,7 @@
     set_fabric_init_p/3
 ]).
 
--include_lib("couch_stats_resource_tracker.hrl").
+-include_lib("csrt.hrl").
 
 -ifdef(TEST).
 -spec is_enabled() -> boolean().
