@@ -20,41 +20,43 @@
     to_disk_term/1
 ]).
 
-foldl({_Fd, []}, _Fun, Acc) ->
+foldl({_Fd, _Gen, []}, _Fun, Acc) ->
     Acc;
-foldl({Fd, [{Pos, _} | Rest]}, Fun, Acc) ->
-    foldl({Fd, [Pos | Rest]}, Fun, Acc);
-foldl({Fd, [Bin | Rest]}, Fun, Acc) when is_binary(Bin) ->
+foldl({Fd, Gen, [{Pos, _} | Rest]}, Fun, Acc) ->
+    foldl({Fd, Gen, [Pos | Rest]}, Fun, Acc);
+foldl({Fd, Gen, [Bin | Rest]}, Fun, Acc) when is_binary(Bin) ->
     % We're processing the first bit of data
     % after we did a seek for a range fold.
-    foldl({Fd, Rest}, Fun, Fun(Bin, Acc));
-foldl({Fd, [Pos | Rest]}, Fun, Acc) when is_integer(Pos) ->
+    foldl({Fd, Gen, Rest}, Fun, Fun(Bin, Acc));
+foldl({Fd, Gen, [Pos | Rest]}, Fun, Acc) when is_integer(Pos) ->
     {ok, Bin} = couch_file:pread_binary(Fd, Pos),
-    foldl({Fd, Rest}, Fun, Fun(Bin, Acc)).
+    foldl({Fd, Gen, Rest}, Fun, Fun(Bin, Acc)).
 
-seek({Fd, [{Pos, Length} | Rest]}, Offset) ->
+seek({Fd, Gen, [{Pos, Length} | Rest]}, Offset) ->
     case Length =< Offset of
         true ->
-            seek({Fd, Rest}, Offset - Length);
+            seek({Fd, Gen, Rest}, Offset - Length);
         false ->
-            seek({Fd, [Pos | Rest]}, Offset)
+            seek({Fd, Gen, [Pos | Rest]}, Offset)
     end;
-seek({Fd, [Pos | Rest]}, Offset) when is_integer(Pos) ->
+seek({Fd, Gen, [Pos | Rest]}, Offset) when is_integer(Pos) ->
     {ok, Bin} = couch_file:pread_binary(Fd, Pos),
     case iolist_size(Bin) =< Offset of
         true ->
-            seek({Fd, Rest}, Offset - size(Bin));
+            seek({Fd, Gen, Rest}, Offset - size(Bin));
         false ->
             <<_:Offset/binary, Tail/binary>> = Bin,
-            {ok, {Fd, [Tail | Rest]}}
+            {ok, {Fd, Gen, [Tail | Rest]}}
     end.
 
-write({Fd, Written}, Data) when is_pid(Fd) ->
+write({Fd, Gen, Written}, Data) when is_pid(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, Data),
-    {ok, {Fd, [{Pos, iolist_size(Data)} | Written]}}.
+    {ok, {Fd, Gen, [{Pos, iolist_size(Data)} | Written]}}.
 
-finalize({Fd, Written}) ->
-    {ok, {Fd, lists:reverse(Written)}}.
+finalize({Fd, Gen, Written}) ->
+    {ok, {Fd, Gen, lists:reverse(Written)}}.
 
-to_disk_term({_Fd, Written}) ->
-    {ok, Written}.
+to_disk_term({_Fd, 0, Written}) ->
+    {ok, Written};
+to_disk_term({_Fd, Gen, Written}) ->
+    {ok, {Gen, Written}}.

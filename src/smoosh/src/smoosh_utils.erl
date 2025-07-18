@@ -44,6 +44,8 @@ split(CSV) ->
 
 stringify({?INDEX_CLEANUP, DbName}) ->
     io_lib:format("~s index_cleanup", [DbName]);
+stringify({DbName, Gen}) when is_integer(Gen) ->
+    io_lib:format("~s (gen=~p)", [DbName, Gen]);
 stringify({DbName, GroupId}) ->
     io_lib:format("~s ~s", [DbName, GroupId]);
 stringify(DbName) ->
@@ -125,14 +127,14 @@ capacity(ChannelName) ->
 %
 validate_arg({?INDEX_CLEANUP, DbName}) when is_list(DbName) ->
     validate_arg({?INDEX_CLEANUP, ?l2b(DbName)});
-validate_arg(DbName) when is_list(DbName) ->
-    validate_arg(?l2b(DbName));
+validate_arg({DbName, Gen}) when is_list(DbName), is_integer(Gen) ->
+    validate_arg({?l2b(DbName), Gen});
 validate_arg({DbName, GroupId}) when is_list(DbName) ->
     validate_arg({?l2b(DbName), GroupId});
 validate_arg({DbName, GroupId}) when is_list(GroupId) ->
     validate_arg({DbName, ?l2b(GroupId)});
-validate_arg(DbName) when is_binary(DbName) ->
-    DbName;
+validate_arg({DbName, Gen}) when is_binary(DbName), is_integer(Gen) ->
+    {DbName, Gen};
 validate_arg({DbName, GroupId}) when is_binary(DbName), is_binary(GroupId) ->
     {DbName, GroupId};
 validate_arg({?INDEX_CLEANUP, DbName}) when is_binary(DbName) ->
@@ -145,8 +147,8 @@ validate_arg(_) ->
 -include_lib("couch/include/couch_eunit.hrl").
 
 smoosh_util_validate_test() ->
-    ?assertEqual(<<"x">>, validate_arg(<<"x">>)),
-    ?assertEqual(<<"x">>, validate_arg("x")),
+    ?assertEqual({<<"x">>, 0}, validate_arg({<<"x">>, 0})),
+    ?assertEqual({<<"x">>, 0}, validate_arg({"x", 0})),
     ?assertEqual({<<"x">>, <<"y">>}, validate_arg({"x", "y"})),
     ?assertEqual({<<"x">>, <<"y">>}, validate_arg({<<"x">>, "y"})),
     ?assertEqual({<<"x">>, <<"y">>}, validate_arg({"x", <<"y">>})),

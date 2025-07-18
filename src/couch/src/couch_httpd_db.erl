@@ -203,7 +203,8 @@ handle_compact_req(#httpd{method = 'POST'} = Req, Db) ->
             ok = couch_db:check_is_admin(Db),
             couch_httpd:validate_ctype(Req, "application/json"),
             _ = couch_httpd:body(Req),
-            {ok, _} = couch_db:start_compact(Db),
+            SrcGen = list_to_integer(couch_httpd:qs_value(Req, "gen", "0")),
+            {ok, _} = couch_db:start_compact(Db, SrcGen),
             send_json(Req, 202, {[{ok, true}]});
         [_DbName, <<"_compact">>, DesignName | _] ->
             DesignId = <<"_design/", DesignName/binary>>,

@@ -327,15 +327,15 @@ t_manual_enqueue_api_works(DbName) ->
     config:set("smoosh.ratio_dbs", "min_priority", "1", false),
     config:set("smoosh.ratio_views", "min_priority", "1", false),
 
-    ?assertEqual(ok, smoosh_server:sync_enqueue(<<"invalid">>)),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({<<"invalid">>, 0})),
     ?assertEqual(ok, smoosh_server:sync_enqueue({index_cleanup, <<"invalid">>})),
     ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, <<"_design/invalid">>})),
 
-    ?assertEqual(ok, smoosh_server:sync_enqueue(Shard)),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, 0})),
     ?assertEqual(ok, smoosh_server:sync_enqueue({index_cleanup, Shard})),
     ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, <<"_design/foo">>})),
 
-    ?assertEqual(ok, smoosh:enqueue(Shard)),
+    ?assertEqual(ok, smoosh:enqueue({Shard, 0})),
     ?assertEqual(ok, smoosh:enqueue({index_cleanup, Shard})),
     ?assertEqual(ok, smoosh:enqueue({Shard, <<"_design/foo">>})),
 
@@ -345,14 +345,14 @@ t_manual_enqueue_api_works(DbName) ->
     % Enqueuing the same items in a loop should work
     lists:foreach(
         fun(_) ->
-            ?assertEqual(ok, smoosh:enqueue(Shard)),
+            ?assertEqual(ok, smoosh:enqueue({Shard, 0})),
             ?assertEqual(ok, smoosh:enqueue({index_cleanup, Shard})),
             ?assertEqual(ok, smoosh:enqueue({Shard, <<"_design/foo">>}))
         end,
         lists:seq(1, 1000)
     ),
 
-    ?assertEqual(ok, smoosh_server:sync_enqueue(Shard)),
+    ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, 0})),
     ?assertEqual(ok, smoosh_server:sync_enqueue({index_cleanup, Shard})),
     ?assertEqual(ok, smoosh_server:sync_enqueue({Shard, <<"_design/foo">>})),
 
@@ -454,7 +454,7 @@ wait_for_channels(N) when is_integer(N), N >= 0 ->
     test_util:wait(WaitFun).
 
 wait_to_enqueue(DbName) when is_binary(DbName) ->
-    wait_enqueue(shard_name(DbName));
+    wait_enqueue({shard_name(DbName), 0});
 wait_to_enqueue({DbName, View}) when is_binary(DbName) ->
     wait_enqueue({shard_name(DbName), View});
 wait_to_enqueue({index_cleanup, DbName}) when is_binary(DbName) ->
