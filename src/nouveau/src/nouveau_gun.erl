@@ -36,6 +36,11 @@
 
 -define(NOUVEAU_HOST_HEADER, nouveau_host_header).
 
+-record(state, {
+    enabled,
+    url
+}).
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -43,13 +48,20 @@ host_header() ->
     persistent_term:get(?NOUVEAU_HOST_HEADER).
 
 init(_) ->
+    Enabled = nouveau:enabled(),
     URL = nouveau_util:nouveau_url(),
-    case start_gun(URL) of
-        {ok, _PoolPid} ->
-            ok = config:listen_for_changes(?MODULE, URL),
-            {ok, nil};
-        {error, Reason} ->
-            {error, Reason}
+    State = #state{enabled = Enabled, url = URL},
+    ok = config:listen_for_changes(?MODULE, State),
+    if
+        Enabled ->
+            case start_gun(URL) of
+                {ok, _PoolPid} ->
+                    {ok, nil};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        true ->
+            {ok, nil}
     end.
 
 handle_call(_Msg, _From, State) ->
@@ -58,32 +70,43 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(restart_config_listener, State) ->
-    ok = config:listen_for_changes(?MODULE, nil),
+handle_info({restart_config_listener, ConfigState}, State) ->
+    ok = config:listen_for_changes(?MODULE, ConfigState),
     {noreply, State};
 handle_info(Msg, State) ->
     couch_log:warning("~p received unexpected message: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-handle_config_change("nouveau", "url", URL, _Persist, OldURL) ->
-    case start_gun(URL) of
+handle_config_change("nouveau", "enable", "true", _Persist, #state{enabled = false} = State) ->
+    case start_gun(State#state.url) of
         {ok, _PoolPid} ->
-            #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(OldURL),
-            gun_pool:stop_pool(Host, Port, #{transport => scheme_to_transport(Scheme)}),
-            {ok, URL};
+            {ok, State#state{enabled = true}};
         {error, Reason} ->
             {stop, Reason}
     end;
+handle_config_change("nouveau", "enable", "false", _Persist, #state{enabled = true} = State) ->
+    stop_gun(State#state.url),
+    {ok, State#state{enabled = false}};
+handle_config_change("nouveau", "url", URL, _Persist, #state{enabled = true} = State) ->
+    case start_gun(URL) of
+        {ok, _PoolPid} ->
+            stop_gun(State#state.url),
+            {ok, State#state{url = URL}};
+        {error, Reason} ->
+            {stop, Reason}
+    end;
+handle_config_change("nouveau", "url", URL, _Persist, #state{enabled = false} = State) ->
+    {ok, State#state{url = URL}};
 handle_config_change(_Section, _Key, _Value, _Persist, State) ->
     {ok, State}.
 
 handle_config_terminate(_Server, stop, _State) ->
     ok;
-handle_config_terminate(_Server, _Reason, _State) ->
+handle_config_terminate(_Server, _Reason, State) ->
     erlang:send_after(
         500,
         whereis(?MODULE),
-        restart_config_listener
+        {restart_config_listener, State}
     ).
 
 %% private functions
@@ -115,6 +138,10 @@ start_gun(URL) ->
                 BaseConnOptions
         end,
     gun_pool:start_pool(Host, Port, #{size => PoolSize, conn_opts => ConnOptions}).
+
+stop_gun(URL) ->
+    #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
+    gun_pool:stop_pool(Host, Port, #{transport => scheme_to_transport(Scheme)}).
 
 remove_undefined(_Key, Value) ->
     Value /= undefined.
