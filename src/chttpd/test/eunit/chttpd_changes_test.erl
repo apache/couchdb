@@ -83,7 +83,8 @@ changes_test_() ->
             ?TDEF(t_selector_filter),
             ?TDEF(t_design_filter),
             ?TDEF(t_docs_id_filter),
-            ?TDEF(t_docs_id_filter_over_limit)
+            ?TDEF(t_docs_id_filter_over_limit),
+            ?TDEF(t_time_since)
         ])
     }.
 
@@ -109,7 +110,8 @@ changes_q8_test_() ->
             ?TDEF(t_reverse_limit_one_q8),
             ?TDEF(t_selector_filter),
             ?TDEF(t_design_filter),
-            ?TDEF(t_docs_id_filter_q8)
+            ?TDEF(t_docs_id_filter_q8),
+            ?TDEF(t_time_since_q8)
         ])
     }.
 
@@ -492,6 +494,97 @@ t_docs_id_filter_over_limit({_, DbUrl}) ->
         ],
         Rows
     ).
+
+t_time_since({_, DbUrl}) ->
+    Params1 = "?since=3000-02-03T04:05:00Z",
+    {Seq1, Pending1, Rows1} = changes(DbUrl, Params1),
+    ?assertEqual(8, Seq1),
+    ?assertEqual(0, Pending1),
+    ?assertEqual([], Rows1, "Far into the future, we should get nothing"),
+
+    Params2 = "?since=2025-07-01T04:05:00Z",
+    Res2 = {Seq2, Pending2, Rows2} = changes(DbUrl, Params2),
+    ?assertEqual(8, Seq2),
+    ?assertEqual(0, Pending2),
+    ?assertEqual(
+        [
+            {6, {?DOC1, <<"2-c">>}, ?LEAFREV},
+            {7, {?DOC3, <<"2-b">>}, ?DELETED},
+            {8, {?DDOC2, <<"2-c">>}, ?LEAFREV}
+        ],
+        Rows2,
+        "Before the feature is released, should same as since=0"
+    ),
+
+    ?assertEqual(
+        Res2,
+        changes(DbUrl, "?since=0"),
+        "Expected the same result as from '?since=0'"
+    ),
+
+    Params3 = "?since=2025-01-01Txx:yy:00Z",
+    {InvalCode, InvalRes} = reqraw(get, DbUrl ++ "/_changes" ++ Params3),
+    ?assertEqual(400, InvalCode),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"invalid_time_format">>
+        },
+        json(InvalRes),
+        "Invalid time"
+    ),
+
+    {TSeqCode, TSeqRes} = reqraw(get, DbUrl ++ "/_time_seq"),
+    ?assertEqual(200, TSeqCode),
+    Year = integer_to_binary(element(1, date())),
+    Node = atom_to_binary(config:node_name()),
+    ?assertMatch(
+        #{
+            <<"time_seq">> := #{
+                <<"00000000-ffffffff">> := #{
+                    Node := [[<<Year:4/binary, _/binary>>, 8]]
+                }
+            }
+        },
+        json(TSeqRes),
+        "Check we can get _time_seq via http API"
+    ),
+
+    {TSeqResetCode, TSeqResetRes} = reqraw(delete, DbUrl ++ "/_time_seq"),
+    ?assertEqual(200, TSeqResetCode),
+    ?assertMatch(#{<<"ok">> := true}, json(TSeqResetRes), "Reset the time seq info"),
+
+    {TSeqCodeVerify, TSeqResVerify} = reqraw(get, DbUrl ++ "/_time_seq"),
+    ?assertEqual(200, TSeqCodeVerify),
+    ?assertMatch(
+        #{<<"time_seq">> := #{<<"00000000-ffffffff">> := #{Node := []}}},
+        json(TSeqResVerify)
+    ),
+
+    ?assertEqual(Res2, changes(DbUrl, Params2), "Changes feeds still work after a reset").
+
+t_time_since_q8({_, DbUrl}) ->
+    Params1 = "?since=3000-02-03T04:05:00Z",
+    {Seq1, Pending1, Rows1} = changes(DbUrl, Params1),
+    ?assertEqual(8, Seq1),
+    ?assertEqual(0, Pending1),
+    ?assertEqual([], Rows1, "Far into the future, we should get nothing"),
+
+    Params2 = "?since=2025-01-01T04:05:00Z",
+    {Seq2, Pending2, Rows2} = changes(DbUrl, Params2),
+    {Seqs, Revs, _Deleted} = lists:unzip3(Rows2),
+    ?assertEqual(8, Seq2),
+    ?assertEqual(0, Pending2),
+    ?assertEqual(
+        [
+            {?DDOC2, <<"2-c">>},
+            {?DOC1, <<"2-c">>},
+            {?DOC3, <<"2-b">>}
+        ],
+        lists:sort(Revs),
+        "Before the feature is released, should get everything"
+    ),
+    ?assertEqual(Seqs, lists:sort(Seqs)).
 
 t_js_filter({_, DbUrl}) ->
     DDocId = "_design/filters",
