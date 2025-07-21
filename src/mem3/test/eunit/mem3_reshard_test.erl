@@ -103,6 +103,14 @@ split_one_shard(#{db1 := Db}) ->
             SecObj = {[{<<"foo">>, <<"bar">>}]},
             set_security(Db, SecObj),
 
+            {ok, TSeqs} = get_time_seq(Db),
+            Node = config:node_name(),
+            #{
+                [16#00000000, 16#ffffffff] := #{
+                    Node := #{bins := [{Time1, TSeq1} | _]}
+                }
+            } = TSeqs,
+
             % DbInfo is saved after setting metadata bits
             % as those could bump the update sequence
             DbInfo0 = get_db_info(Db),
@@ -153,7 +161,23 @@ split_one_shard(#{db1 := Db}) ->
 
             % Don't forget about the local but don't include internal checkpoints
             % as some of those are munged and transformed during the split
-            ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
+            ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1)),
+
+            % Verify the time seq structure. There should be one per range. With the
+            % same time and sequence as the source
+            {ok, TSeqs1} = get_time_seq(Db),
+            #{
+                [16#00000000, 16#7fffffff] := #{
+                    Node := #{bins := [{Time2, TSeq2} | _]}
+                },
+                [16#80000000, 16#ffffffff] := #{
+                    Node := #{bins := [{Time3, TSeq3} | _]}
+                }
+            } = TSeqs1,
+            ?assertEqual(TSeq1, TSeq2),
+            ?assertEqual(TSeq1, TSeq3),
+            ?assertEqual(Time1, Time2),
+            ?assertEqual(Time1, Time3)
         end)}.
 
 % Test to check that shard with high number of purges can be split
@@ -780,6 +804,9 @@ set_security(DbName, SecObj) ->
 
 get_security(DbName) ->
     with_proc(fun() -> fabric:get_security(DbName, [?ADMIN_CTX]) end).
+
+get_time_seq(DbName) ->
+    with_proc(fun() -> fabric:get_time_seq(DbName, [?ADMIN_CTX]) end).
 
 get_db_info(DbName) ->
     with_proc(fun() ->

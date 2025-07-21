@@ -54,6 +54,13 @@
     get_uuid/1
 ]).
 
+-export([
+    time_seq_since/2,
+    time_seq_histogram/2,
+    get_time_seq/2,
+    set_time_seq/3
+]).
+
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -346,6 +353,18 @@ compact(ShardName, DesignName) ->
 
 get_uuid(DbName) ->
     with_db(DbName, [], {couch_db, get_uuid, []}).
+
+time_seq_since(DbName, Time) ->
+    with_db(DbName, [], {couch_db, time_seq_since, [Time]}).
+
+time_seq_histogram(DbName, Options) ->
+    with_db(DbName, Options, {couch_db, time_seq_histogram, []}).
+
+get_time_seq(DbName, Options) ->
+    with_db(DbName, Options, {couch_db, get_time_seq, []}).
+
+set_time_seq(DbName, TSeq, Options) ->
+    with_db(DbName, Options, {couch_db, set_time_seq, [TSeq]}).
 
 %%
 %% internal

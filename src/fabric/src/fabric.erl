@@ -69,6 +69,17 @@
     db_uuids/1
 ]).
 
+% time_seq stuff
+-export([
+    time_seq_since/2,
+    time_seq_histogram/1,
+    time_seq_histogram/2,
+    get_time_seq/1,
+    get_time_seq/2,
+    set_time_seq/2,
+    set_time_seq/3
+]).
+
 -type dbname() :: (iodata() | tuple()).
 -type docid() :: iodata().
 -type revision() :: {integer(), binary()}.
@@ -184,6 +195,39 @@ set_security(DbName, SecObj) ->
 -spec set_security(dbname(), SecObj :: json_obj(), [option()]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
+
+%% @doc get the time seq histograms
+-spec time_seq_histogram(dbname()) ->
+    {ok, #{#shard{} => [[binary() | non_neg_integer()]]}} | {error, any()} | no_return().
+time_seq_histogram(DbName) ->
+    time_seq_histogram(DbName, [?ADMIN_CTX]).
+
+%% @doc get the time seq histograms
+-spec time_seq_histogram(dbname(), [option()]) ->
+    {ok, #{#shard{} => [[binary() | non_neg_integer()]]}} | {error, any()} | no_return().
+time_seq_histogram(DbName, Options) ->
+    fabric_time_seq:histogram(dbname(DbName), opts(Options)).
+
+%% @doc reset the time seq data structure
+-spec set_time_seq(dbname(), couch_time_seq:time_seq()) -> ok | {error, any()}.
+set_time_seq(DbName, TSeq) ->
+    set_time_seq(DbName, TSeq, [?ADMIN_CTX]).
+
+-spec set_time_seq(dbname(), couch_time_seq:time_seq(), [option()]) -> ok | {error, any()}.
+set_time_seq(DbName, TSeq, Options) ->
+    fabric_time_seq:set_time_seq(dbname(DbName), TSeq, opts(Options)).
+
+%% @doc get the time seq data structure summary
+-spec get_time_seq(dbname()) ->
+    {ok, #{#shard{} => couch_time_seq:time_seq()}} | {error, any()} | no_return().
+get_time_seq(DbName) ->
+    get_time_seq(DbName, [?ADMIN_CTX]).
+
+%% @doc get the time seq data structure summary
+-spec get_time_seq(dbname(), [option()]) ->
+    {ok, #{#shard{} => couch_time_seq:time_seq()}} | {error, any()} | no_return().
+get_time_seq(DbName, Options) ->
+    fabric_time_seq:get_time_seq(dbname(DbName), opts(Options)).
 
 %% @doc sets the upper bound for the number of stored purge requests
 -spec set_purge_infos_limit(dbname(), pos_integer(), [option()]) -> ok.
@@ -636,6 +680,22 @@ dbname(Db) ->
 -spec db_uuids(dbname()) -> map().
 db_uuids(DbName) ->
     fabric_db_uuids:go(dbname(DbName)).
+
+%% @doc get db update sequence before a timestamp
+-spec time_seq_since(dbname(), list() | binary() | pos_integer()) ->
+    {ok, binary()} | {error, any()}.
+time_seq_since(DbName, Time) when is_binary(Time) ->
+    time_seq_since(DbName, binary_to_list(Time));
+time_seq_since(DbName, Time) when is_list(Time) ->
+    try calendar:rfc3339_to_system_time(Time) of
+        TimeUnix ->
+            time_seq_since(DbName, TimeUnix)
+    catch
+        _:_ ->
+            {error, invalid_time_format}
+    end;
+time_seq_since(DbName, Time) when is_integer(Time), Time >= 0 ->
+    fabric_time_seq:since(dbname(DbName), Time).
 
 name(Thing) ->
     couch_util:to_binary(Thing).
