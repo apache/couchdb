@@ -29,12 +29,18 @@
 -export([handle_call/3]).
 -export([handle_cast/2]).
 -export([handle_info/2]).
+-export([handle_continue/2]).
 
 % config_listener callbacks
 -export([handle_config_change/5]).
 -export([handle_config_terminate/3]).
 
 -define(NOUVEAU_HOST_HEADER, nouveau_host_header).
+
+-record(state, {
+    enabled,
+    url
+}).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -43,14 +49,9 @@ host_header() ->
     persistent_term:get(?NOUVEAU_HOST_HEADER).
 
 init(_) ->
-    URL = nouveau_util:nouveau_url(),
-    case start_gun(URL) of
-        {ok, _PoolPid} ->
-            ok = config:listen_for_changes(?MODULE, URL),
-            {ok, nil};
-        {error, Reason} ->
-            {error, Reason}
-    end.
+    ok = config:listen_for_changes(?MODULE, nil),
+    State = #state{enabled = false, url = nouveau_util:nouveau_url()},
+    {ok, State, {continue, reconfigure}}.
 
 handle_call(_Msg, _From, State) ->
     {reply, unexpected_msg, State}.
@@ -61,25 +62,27 @@ handle_cast(_Msg, State) ->
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State};
+handle_info(reconfigure, State) ->
+    reconfigure(new_state(), State);
 handle_info(Msg, State) ->
     couch_log:warning("~p received unexpected message: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-handle_config_change("nouveau", "url", URL, _Persist, OldURL) ->
-    case start_gun(URL) of
-        {ok, _PoolPid} ->
-            #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(OldURL),
-            gun_pool:stop_pool(Host, Port, #{transport => scheme_to_transport(Scheme)}),
-            {ok, URL};
-        {error, Reason} ->
-            {stop, Reason}
-    end;
-handle_config_change(_Section, _Key, _Value, _Persist, State) ->
-    {ok, State}.
+handle_continue(reconfigure, State) ->
+    reconfigure(new_state(), State).
 
-handle_config_terminate(_Server, stop, _State) ->
+handle_config_change("nouveau", "enable", _Value, _Persist, nil) ->
+    whereis(?MODULE) ! reconfigure,
+    {ok, nil};
+handle_config_change("nouveau", "url", _Value, _Persist, nil) ->
+    whereis(?MODULE) ! reconfigure,
+    {ok, nil};
+handle_config_change(_Section, _Key, _Value, _Persist, nil) ->
+    {ok, nil}.
+
+handle_config_terminate(_Server, stop, nil) ->
     ok;
-handle_config_terminate(_Server, _Reason, _State) ->
+handle_config_terminate(_Server, _Reason, nil) ->
     erlang:send_after(
         500,
         whereis(?MODULE),
@@ -87,6 +90,36 @@ handle_config_terminate(_Server, _Reason, _State) ->
     ).
 
 %% private functions
+
+new_state() ->
+    #state{enabled = nouveau:enabled(), url = nouveau_util:nouveau_url()}.
+
+reconfigure(#state{} = State, #state{} = State) ->
+    %% no change
+    {noreply, State};
+reconfigure(#state{enabled = false} = NewState, #state{enabled = true} = CurrState) ->
+    %% turning off
+    stop_gun(CurrState#state.url),
+    {noreply, NewState};
+reconfigure(#state{enabled = true} = NewState, #state{enabled = false}) ->
+    %% turning on
+    case start_gun(NewState#state.url) of
+        {ok, _PoolPid} ->
+            {noreply, NewState};
+        {error, Reason} ->
+            {stop, Reason}
+    end;
+reconfigure(#state{enabled = true} = NewState, #state{enabled = true} = CurrState) when
+    NewState#state.url /= CurrState#state.url
+->
+    %% changing url while on
+    stop_gun(CurrState#state.url),
+    reconfigure(NewState, CurrState#state{enabled = false});
+reconfigure(#state{enabled = false} = NewState, #state{enabled = false} = CurrState) when
+    NewState#state.url /= CurrState#state.url
+->
+    %% changing url while off
+    {noreply, NewState}.
 
 start_gun(URL) ->
     #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
@@ -115,6 +148,10 @@ start_gun(URL) ->
                 BaseConnOptions
         end,
     gun_pool:start_pool(Host, Port, #{size => PoolSize, conn_opts => ConnOptions}).
+
+stop_gun(URL) ->
+    #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
+    gun_pool:stop_pool(Host, Port, #{transport => scheme_to_transport(Scheme)}).
 
 remove_undefined(_Key, Value) ->
     Value /= undefined.
