@@ -383,11 +383,15 @@ copy_compact(#comp_st{} = CompSt) ->
     Props = couch_bt_engine:get_props(St),
     {ok, NewSt5} = couch_bt_engine:copy_props(NewSt4, Props),
 
+    % Copy time-seq structure over
+    TSeq = couch_bt_engine:get_time_seq(St),
+    {ok, NewSt6} = couch_bt_engine:set_time_seq(NewSt5, TSeq),
+
     FinalUpdateSeq = couch_bt_engine:get_update_seq(St),
-    {ok, NewSt6} = couch_bt_engine:set_update_seq(NewSt5, FinalUpdateSeq),
+    {ok, NewSt7} = couch_bt_engine:set_update_seq(NewSt6, FinalUpdateSeq),
 
     CompSt#comp_st{
-        new_st = NewSt6
+        new_st = NewSt7
     }.
 
 copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->

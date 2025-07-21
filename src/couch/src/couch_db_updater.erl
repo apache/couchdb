@@ -92,6 +92,11 @@ handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
     ok = couch_server:db_updated(Db2),
     {reply, ok, Db2};
+handle_call({set_time_seq, TSeq}, _From, Db) ->
+    {ok, Db1} = couch_db_engine:set_time_seq(Db, TSeq),
+    {ok, Db2} = couch_db_engine:commit_data(Db1#db{time_seq = TSeq}),
+    ok = couch_server:db_updated(Db2),
+    {reply, ok, Db2};
 handle_call({purge_docs, [], _}, _From, Db) ->
     {reply, {ok, []}, Db};
 handle_call({purge_docs, PurgeReqs0, Options}, _From, Db) ->
@@ -313,6 +318,7 @@ init_db(DbName, FilePath, EngineState, Options) ->
     InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
         security = couch_db_engine:get_security(InitDb),
+        time_seq = couch_db_engine:get_time_seq(InitDb),
         options = lists:keystore(props, 1, NonCreateOpts, {props, DbProps})
     }.
 
@@ -876,11 +882,24 @@ apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
     NewReplies = [{ok, RemovedRevs} | Replies],
     apply_purge_reqs(RestReqs, NewIdFDIs, NewUSeq, NewReplies).
 
+update_time_seq(#db{time_seq = TSeq} = Db, Seq) when is_integer(Seq) ->
+    Timestamp = couch_time_seq:timestamp(),
+    TSeq1 = couch_time_seq:update(TSeq, Timestamp, Seq),
+    % Do not expect this structure to update very often, so only
+    % update the engine if its value changed
+    case TSeq =:= TSeq1 of
+        true ->
+            {ok, Db};
+        false ->
+            Db1 = Db#db{time_seq = TSeq1},
+            couch_db_engine:set_time_seq(Db1, TSeq1)
+    end.
+
 commit_data(Db) ->
-    {ok, Db1} = couch_db_engine:commit_data(Db),
-    Db1#db{
-        committed_update_seq = couch_db_engine:get_update_seq(Db)
-    }.
+    UpdateSeq = couch_db_engine:get_update_seq(Db),
+    {ok, Db1} = update_time_seq(Db, Db#db.committed_update_seq),
+    {ok, Db2} = couch_db_engine:commit_data(Db1),
+    Db2#db{committed_update_seq = UpdateSeq}.
 
 pair_write_info(Old, New) ->
     lists:map(
