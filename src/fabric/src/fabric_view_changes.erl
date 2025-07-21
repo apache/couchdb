@@ -27,13 +27,15 @@
 
 -import(fabric_db_update_listener, [wait_db_updated/1]).
 
+-define(RFC3339_TIME, [_, _, _, _, $-, _, _, $-, _, _, $T, _, _, $:, _, _, $:, _, _, $Z]).
+
 go(DbName, Feed, Options, Callback, Acc0) when
     Feed == "continuous" orelse
         Feed == "longpoll" orelse Feed == "eventsource"
 ->
     Args = make_changes_args(Options),
     Since = get_start_seq(DbName, Args),
-    case validate_start_seq(DbName, Since) of
+    case validate_start_seq(Since) of
         ok ->
             {ok, Acc} = Callback(start, Acc0),
             {Timeout, _} = couch_changes:get_changes_timeout(Args, Callback),
@@ -69,7 +71,7 @@ go(DbName, Feed, Options, Callback, Acc0) when
 go(DbName, "normal", Options, Callback, Acc0) ->
     Args = make_changes_args(Options),
     Since = get_start_seq(DbName, Args),
-    case validate_start_seq(DbName, Since) of
+    case validate_start_seq(Since) of
         ok ->
             {ok, Acc} = Callback(start, Acc0),
             {ok, Collector} = send_changes(
@@ -369,6 +371,11 @@ get_start_seq(DbName, #changes_args{dir = Dir, since = Since}) when
 ->
     {ok, Info} = fabric:get_db_info(DbName),
     couch_util:get_value(update_seq, Info);
+get_start_seq(DbName, #changes_args{dir = fwd, since = ?RFC3339_TIME = Since}) ->
+    case fabric:time_seq_since(DbName, Since) of
+        {ok, SinceSeq} -> SinceSeq;
+        {error, Error} -> {error, Error}
+    end;
 get_start_seq(_DbName, #changes_args{dir = fwd, since = Since}) ->
     Since.
 
@@ -728,11 +735,11 @@ make_split_seq({Num, Uuid, Node}, RepCount) when RepCount > 1 ->
 make_split_seq(Seq, _) ->
     Seq.
 
-validate_start_seq(_DbName, 0) ->
+validate_start_seq(0) ->
     ok;
-validate_start_seq(_DbName, "0") ->
+validate_start_seq("0") ->
     ok;
-validate_start_seq(_DbName, Seq) when is_list(Seq) orelse is_binary(Seq) ->
+validate_start_seq(Seq) when is_list(Seq) orelse is_binary(Seq) ->
     try
         Opaque = unpack_seq_regex_match(Seq),
         unpack_seq_decode_term(Opaque),
@@ -741,7 +748,9 @@ validate_start_seq(_DbName, Seq) when is_list(Seq) orelse is_binary(Seq) ->
         _:_ ->
             Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
             {error, {bad_request, Reason}}
-    end.
+    end;
+validate_start_seq({error, Error}) ->
+    {error, {bad_request, Error}}.
 
 get_changes_epoch() ->
     case application:get_env(fabric, changes_epoch) of

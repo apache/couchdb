@@ -872,18 +872,17 @@ db_req(#httpd{path_parts = [_, <<"_purged_infos_limit">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "GET,PUT");
 db_req(#httpd{method = 'GET', path_parts = [_, <<"_time_seq">>]} = Req, Db) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
-    case fabric:get_time_seq(Db, Options) of
-        {ok, #{} = RangeNodeToTSeq} ->
+    case fabric:time_seq_histogram(Db, Options) of
+        {ok, #{} = RangeNodeToHist} ->
             Props = maps:fold(
                 fun([B, E], #{} = ByNode, Acc) ->
                     Range = mem3_util:range_to_hex([B, E]),
-                    MapF = fun(_, TSeq) -> couch_time_seq:histogram(TSeq) end,
-                    [{Range, maps:map(MapF, ByNode)} | Acc]
+                    [{Range, ByNode} | Acc]
                 end,
                 [],
-                RangeNodeToTSeq
+                RangeNodeToHist
             ),
-            send_json(Req, {lists:sort(Props)});
+            send_json(Req, {[{<<"time_seq">>, {lists:sort(Props)}}]});
         Error ->
             throw(Error)
     end;
