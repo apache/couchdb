@@ -883,7 +883,7 @@ db_req(#httpd{method = 'GET', path_parts = [_, <<"_time_seq">>]} = Req, Db) ->
                 [],
                 RangeNodeToTSeq
             ),
-            send_json(Req, {lists:sort(Props)});
+            send_json(Req, {[{<<"time_seq">>, {lists:sort(Props)}}]});
         Error ->
             throw(Error)
     end;
