@@ -29,6 +29,7 @@
 -export([handle_call/3]).
 -export([handle_cast/2]).
 -export([handle_info/2]).
+-export([handle_continue/2]).
 
 % config_listener callbacks
 -export([handle_config_change/5]).
@@ -48,21 +49,9 @@ host_header() ->
     persistent_term:get(?NOUVEAU_HOST_HEADER).
 
 init(_) ->
-    Enabled = nouveau:enabled(),
-    URL = nouveau_util:nouveau_url(),
-    State = #state{enabled = Enabled, url = URL},
-    ok = config:listen_for_changes(?MODULE, State),
-    if
-        Enabled ->
-            case start_gun(URL) of
-                {ok, _PoolPid} ->
-                    {ok, nil};
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        true ->
-            {ok, nil}
-    end.
+    ok = config:listen_for_changes(?MODULE, nil),
+    State = #state{enabled = false, url = nouveau_util:nouveau_url()},
+    {ok, State, {continue, reconfigure}}.
 
 handle_call(_Msg, _From, State) ->
     {reply, unexpected_msg, State}.
@@ -70,46 +59,67 @@ handle_call(_Msg, _From, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({restart_config_listener, ConfigState}, State) ->
-    ok = config:listen_for_changes(?MODULE, ConfigState),
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State};
+handle_info(reconfigure, State) ->
+    reconfigure(new_state(), State);
 handle_info(Msg, State) ->
     couch_log:warning("~p received unexpected message: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-handle_config_change("nouveau", "enable", "true", _Persist, #state{enabled = false} = State) ->
-    case start_gun(State#state.url) of
-        {ok, _PoolPid} ->
-            {ok, State#state{enabled = true}};
-        {error, Reason} ->
-            {stop, Reason}
-    end;
-handle_config_change("nouveau", "enable", "false", _Persist, #state{enabled = true} = State) ->
-    stop_gun(State#state.url),
-    {ok, State#state{enabled = false}};
-handle_config_change("nouveau", "url", URL, _Persist, #state{enabled = true} = State) ->
-    case start_gun(URL) of
-        {ok, _PoolPid} ->
-            stop_gun(State#state.url),
-            {ok, State#state{url = URL}};
-        {error, Reason} ->
-            {stop, Reason}
-    end;
-handle_config_change("nouveau", "url", URL, _Persist, #state{enabled = false} = State) ->
-    {ok, State#state{url = URL}};
-handle_config_change(_Section, _Key, _Value, _Persist, State) ->
-    {ok, State}.
+handle_continue(reconfigure, State) ->
+    reconfigure(new_state(), State).
 
-handle_config_terminate(_Server, stop, _State) ->
+handle_config_change("nouveau", "enable", _Value, _Persist, nil) ->
+    whereis(?MODULE) ! reconfigure,
+    {ok, nil};
+handle_config_change("nouveau", "url", _Value, _Persist, nil) ->
+    whereis(?MODULE) ! reconfigure,
+    {ok, nil};
+handle_config_change(_Section, _Key, _Value, _Persist, nil) ->
+    {ok, nil}.
+
+handle_config_terminate(_Server, stop, nil) ->
     ok;
-handle_config_terminate(_Server, _Reason, State) ->
+handle_config_terminate(_Server, _Reason, nil) ->
     erlang:send_after(
         500,
         whereis(?MODULE),
-        {restart_config_listener, State}
+        restart_config_listener
     ).
 
 %% private functions
+
+new_state() ->
+    #state{enabled = nouveau:enabled(), url = nouveau_util:nouveau_url()}.
+
+reconfigure(#state{} = State, #state{} = State) ->
+    %% no change
+    {noreply, State};
+reconfigure(#state{enabled = false} = NewState, #state{enabled = true} = CurrState) ->
+    %% turning off
+    stop_gun(CurrState#state.url),
+    {noreply, NewState};
+reconfigure(#state{enabled = true} = NewState, #state{enabled = false}) ->
+    %% turning on
+    case start_gun(NewState#state.url) of
+        {ok, _PoolPid} ->
+            {noreply, NewState};
+        {error, Reason} ->
+            {stop, Reason}
+    end;
+reconfigure(#state{enabled = true} = NewState, #state{enabled = true} = CurrState) when
+    NewState#state.url /= CurrState#state.url
+->
+    %% changing url while on
+    stop_gun(CurrState#state.url),
+    reconfigure(NewState, CurrState#state{enabled = false});
+reconfigure(#state{enabled = false} = NewState, #state{enabled = false} = CurrState) when
+    NewState#state.url /= CurrState#state.url
+->
+    %% changing url while off
+    {noreply, NewState}.
 
 start_gun(URL) ->
     #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
