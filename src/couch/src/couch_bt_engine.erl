@@ -64,6 +64,9 @@
     purge_docs/3,
     copy_purge_infos/2,
 
+    get_time_seq/1,
+    set_time_seq/2,
+
     commit_data/1,
 
     open_write_stream/2,
@@ -550,6 +553,13 @@ copy_purge_infos(#st{} = St, PurgeInfos) ->
         purge_seq_tree = PurgeSeqTree2,
         needs_commit = true
     }}.
+
+get_time_seq(#st{header = Header}) ->
+    couch_bt_engine_header:time_seq(Header).
+
+set_time_seq(#st{header = Header} = St, TimeSeq) ->
+    NewHeader = couch_bt_engine_header:set(Header, time_seq, TimeSeq),
+    {ok, St#st{header = NewHeader}}.
 
 commit_data(St) ->
     #st{
@@ -1190,7 +1200,8 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
         header = couch_bt_engine_header:set(Header, [
             {compacted_seq, get_update_seq(OldSt)},
             {revs_limit, get_revs_limit(OldSt)},
-            {purge_infos_limit, get_purge_infos_limit(OldSt)}
+            {purge_infos_limit, get_purge_infos_limit(OldSt)},
+            {time_seq, get_time_seq(OldSt)}
         ]),
         local_tree = NewLocal2
     }),

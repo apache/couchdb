@@ -38,7 +38,8 @@
     revs_limit/1,
     uuid/1,
     epochs/1,
-    compacted_seq/1
+    compacted_seq/1,
+    time_seq/1
 ]).
 
 -include_lib("stdlib/include/assert.hrl").
@@ -58,7 +59,7 @@
 -record(db_header, {
     disk_version = ?LATEST_DISK_VERSION,
     update_seq = 0,
-    unused = 0,
+    time_seq,
     id_tree_state = nil,
     seq_tree_state = nil,
     local_tree_state = nil,
@@ -79,7 +80,8 @@
 new() ->
     #db_header{
         uuid = couch_uuids:random(),
-        epochs = [{config:node_name(), 0}]
+        epochs = [{config:node_name(), 0}],
+        time_seq = couch_time_seq:new()
     }.
 
 from(Header0) ->
@@ -87,7 +89,8 @@ from(Header0) ->
     #db_header{
         uuid = Header#db_header.uuid,
         epochs = Header#db_header.epochs,
-        compacted_seq = Header#db_header.compacted_seq
+        compacted_seq = Header#db_header.compacted_seq,
+        time_seq = Header#db_header.time_seq
     }.
 
 is_header(Header) ->
@@ -105,7 +108,8 @@ upgrade(Header) ->
         fun upgrade_disk_version/1,
         fun upgrade_uuid/1,
         fun upgrade_epochs/1,
-        fun upgrade_compacted_seq/1
+        fun upgrade_compacted_seq/1,
+        fun upgrade_time_seq/1
     ],
     lists:foldl(
         fun(F, HdrAcc) ->
@@ -175,6 +179,9 @@ epochs(Header) ->
 
 compacted_seq(Header) ->
     get_field(Header, compacted_seq).
+
+time_seq(Header) ->
+    get_field(Header, time_seq).
 
 purge_infos_limit(Header) ->
     get_field(Header, purge_infos_limit).
@@ -330,6 +337,19 @@ upgrade_compacted_seq(#db_header{} = Header) ->
             Header
     end.
 
+upgrade_time_seq(#db_header{} = Header) ->
+    MaybeTSeq = Header#db_header.time_seq,
+    case couch_time_seq:check(MaybeTSeq) of
+        true ->
+            TSeq = couch_time_seq:new(MaybeTSeq),
+            Header#db_header{time_seq = TSeq};
+        false ->
+            TSeq = couch_time_seq:new(),
+            UpdateSeq = update_seq(Header),
+            TSeq1 = couch_time_seq:update(TSeq, UpdateSeq),
+            Header#db_header{time_seq = TSeq1}
+    end.
+
 latest(?LATEST_DISK_VERSION) ->
     true;
 latest(N) when is_integer(N), N < ?LATEST_DISK_VERSION ->
@@ -338,7 +358,8 @@ latest(_Else) ->
     undefined.
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("couch/include/couch_eunit.hrl").
 
 mk_header(Vsn) ->
     {
@@ -348,8 +369,8 @@ mk_header(Vsn) ->
         Vsn,
         % update_seq
         100,
-        % unused
-        0,
+        % time_seq
+        couch_time_seq:new(),
         % id_tree_state
         foo,
         % seq_tree_state
@@ -477,5 +498,14 @@ get_uuid_from_old_header_test() ->
 get_epochs_from_old_header_test() ->
     Vsn5Header = mk_header(5),
     ?assertEqual(undefined, epochs(Vsn5Header)).
+
+upgrade_time_seq_test() ->
+    Header = mk_header(8),
+    ?assert(couch_time_seq:check(time_seq(Header))),
+    % time_seq's field was reused from an old field which was set to 0 so check
+    % that we can upgrade from 0
+    HeaderWith0Unused = setelement(4, Header, 0),
+    Upgrade = upgrade(HeaderWith0Unused),
+    ?assert(couch_time_seq:check(time_seq(Upgrade))).
 
 -endif.
