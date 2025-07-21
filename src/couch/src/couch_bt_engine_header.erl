@@ -38,7 +38,8 @@
     revs_limit/1,
     uuid/1,
     epochs/1,
-    compacted_seq/1
+    compacted_seq/1,
+    time_seq_ptr/1
 ]).
 
 -include_lib("stdlib/include/assert.hrl").
@@ -58,7 +59,7 @@
 -record(db_header, {
     disk_version = ?LATEST_DISK_VERSION,
     update_seq = 0,
-    unused = 0,
+    time_seq_ptr = undefined,
     id_tree_state = nil,
     seq_tree_state = nil,
     local_tree_state = nil,
@@ -105,7 +106,8 @@ upgrade(Header) ->
         fun upgrade_disk_version/1,
         fun upgrade_uuid/1,
         fun upgrade_epochs/1,
-        fun upgrade_compacted_seq/1
+        fun upgrade_compacted_seq/1,
+        fun upgrade_time_seq/1
     ],
     lists:foldl(
         fun(F, HdrAcc) ->
@@ -175,6 +177,9 @@ epochs(Header) ->
 
 compacted_seq(Header) ->
     get_field(Header, compacted_seq).
+
+time_seq_ptr(Header) ->
+    get_field(Header, time_seq_ptr).
 
 purge_infos_limit(Header) ->
     get_field(Header, purge_infos_limit).
@@ -329,6 +334,17 @@ upgrade_compacted_seq(#db_header{} = Header) ->
             Header
     end.
 
+upgrade_time_seq(#db_header{} = Header) ->
+    case Header#db_header.time_seq_ptr of
+        0 ->
+            % This used to be an unused, always set to 0 field before,
+            % on upgrade upgrade it to the default unset time_seq_ptr
+            % value: undefined
+            Header#db_header{time_seq_ptr = undefined};
+        _ ->
+            Header
+    end.
+
 latest(?LATEST_DISK_VERSION) ->
     true;
 latest(N) when is_integer(N), N < ?LATEST_DISK_VERSION ->
@@ -337,6 +353,7 @@ latest(_Else) ->
     undefined.
 
 -ifdef(TEST).
+
 -include_lib("couch/include/couch_eunit.hrl").
 
 mk_header(Vsn) ->
@@ -347,8 +364,8 @@ mk_header(Vsn) ->
         Vsn,
         % update_seq
         100,
-        % unused
-        0,
+        % time_seq_ptr
+        boom,
         % id_tree_state
         foo,
         % seq_tree_state
@@ -476,6 +493,14 @@ get_uuid_from_old_header_test() ->
 get_epochs_from_old_header_test() ->
     Vsn5Header = mk_header(5),
     ?assertEqual(undefined, epochs(Vsn5Header)).
+
+upgrade_time_seq_test() ->
+    Header = mk_header(8),
+    % time_seq's field was reused from an old field which was set to 0 so check
+    % that we can upgrade from 0
+    HeaderWith0Unused = setelement(4, Header, 0),
+    Upgrade = upgrade(HeaderWith0Unused),
+    ?assertEqual(undefined, time_seq_ptr(Upgrade)).
 
 tuple_uprade_test_() ->
     {

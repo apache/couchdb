@@ -32,9 +32,12 @@
     before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
     after_doc_read = nil,    % nil | fun(Doc, Db) -> NewDoc
 
-    % feature removed in 3.x, but field kept to avoid changing db record size
-    % and breaking rolling cluster upgrade
-    waiting_delayed_commit_deprecated,
+    % In 2.x versions this field was called waiting_delayed_commit.
+    % In 3.0->3.5 versions it was deprecated and named waiting_delayed_commit_deprecated.
+    % In 3.6+ it was repurposed to keep the time_seq structure.
+    % This repurposing and deprecating is done in order to avoid changing db
+    % record sizes and breaking cross-cluster online upgrades.
+    time_seq,
 
     options = [],
     compression

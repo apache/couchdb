@@ -56,6 +56,11 @@
     get_oldest_purge_seq/1,
     get_purge_infos_limit/1,
 
+    time_seq_since/2,
+    time_seq_histogram/1,
+    get_time_seq/1,
+    set_time_seq/2,
+
     is_db/1,
     is_system_db/1,
     is_clustered/1,
@@ -567,6 +572,25 @@ get_oldest_purge_seq(#db{} = Db) ->
 
 get_purge_infos_limit(#db{} = Db) ->
     couch_db_engine:get_purge_infos_limit(Db).
+
+time_seq_since(#db{time_seq = TSeq} = Db, Time) when is_integer(Time), Time >= 0 ->
+    case couch_time_seq:since(TSeq, Time) of
+        Seq when is_integer(Seq) -> Seq;
+        now -> couch_db:get_update_seq(Db)
+    end.
+
+time_seq_histogram(#db{time_seq = TSeq} = Db) ->
+    UpdateSeq = couch_db:get_update_seq(Db),
+    couch_time_seq:histogram(TSeq, UpdateSeq).
+
+get_time_seq(#db{time_seq = TSeq}) ->
+    TSeq.
+
+set_time_seq(#db{main_pid = Pid} = Db, #{} = TSeq) ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {set_time_seq, TSeq}, infinity);
+set_time_seq(_Db, _TSeq) ->
+    throw(invalid_time_seq).
 
 get_pid(#db{main_pid = Pid}) ->
     Pid.
