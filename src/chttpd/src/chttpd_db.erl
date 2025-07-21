@@ -870,6 +870,31 @@ db_req(#httpd{method = 'GET', path_parts = [_, <<"_purged_infos_limit">>]} = Req
     send_json(Req, fabric:get_purge_infos_limit(Db));
 db_req(#httpd{path_parts = [_, <<"_purged_infos_limit">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "GET,PUT");
+db_req(#httpd{method = 'GET', path_parts = [_, <<"_time_seq">>]} = Req, Db) ->
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    case fabric:get_time_seq(Db, Options) of
+        {ok, #{} = RangeNodeToTSeq} ->
+            Props = maps:fold(
+                fun([B, E], #{} = ByNode, Acc) ->
+                    Range = mem3_util:range_to_hex([B, E]),
+                    MapF = fun(_, TSeq) -> couch_time_seq:histogram(TSeq) end,
+                    [{Range, maps:map(MapF, ByNode)} | Acc]
+                end,
+                [],
+                RangeNodeToTSeq
+            ),
+            send_json(Req, {lists:sort(Props)});
+        Error ->
+            throw(Error)
+    end;
+db_req(#httpd{method = 'DELETE', path_parts = [_, <<"_time_seq">>]} = Req, Db) ->
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    case fabric:set_time_seq(Db, couch_time_seq:new(), Options) of
+        ok -> send_json(Req, {[{<<"ok">>, true}]});
+        Error -> throw(Error)
+    end;
+db_req(#httpd{path_parts = [_, <<"_time_seq">>]} = Req, _Db) ->
+    send_method_not_allowed(Req, "GET,DELETE");
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
 db_req(
