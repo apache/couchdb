@@ -20,7 +20,6 @@
     get_pid_ref/0,
     get_pid_ref/1,
     set_pid_ref/1,
-    should_track_init_p/2,
     tnow/0,
     tutc/0,
     tutc/1
@@ -41,12 +40,6 @@
     rctx_delta/2,
     put_delta_a/1,
     put_updated_at/1
-]).
-
-%% Extra niceties and testing facilities
--export([
-    set_fabric_init_p/2,
-    set_fabric_init_p/3
 ]).
 
 -include_lib("csrt.hrl").
@@ -72,12 +65,6 @@ is_enabled() ->
 is_enabled_init_p() ->
     %% TODO: toggle back to false before merging
     config:get_boolean(?CSRT, "enable_init_p", true).
-
--spec should_track_init_p(Mod :: atom(), Func :: atom()) -> boolean().
-should_track_init_p(fabric_rpc, Func) ->
-    is_enabled_init_p() andalso config:get_boolean(?CSRT_INIT_P, fabric_conf_key(Func), false);
-should_track_init_p(_Mod, _Func) ->
-    false.
 
 %% Toggle to disable all reporting
 -spec is_enabled_reporting() -> boolean().
@@ -258,129 +245,3 @@ get_pid_ref(_) ->
 set_pid_ref(PidRef) ->
     erlang:put(?PID_REF, PidRef),
     PidRef.
-
-%% @equiv set_fabric_init_p(Func, Enabled, true).
--spec set_fabric_init_p(Func :: atom(), Enabled :: boolean()) -> ok.
-set_fabric_init_p(Func, Enabled) ->
-    set_fabric_init_p(Func, Enabled, true).
-
-%% Expose Persist for use in test cases outside this module
--spec set_fabric_init_p(Func, Enabled, Persist) -> ok when
-    Func :: atom(), Enabled :: boolean(), Persist :: boolean().
-set_fabric_init_p(Func, Enabled, Persist) ->
-    Key = fabric_conf_key(Func),
-    ok = config:set_boolean(?CSRT_INIT_P, Key, Enabled, Persist).
-
--spec fabric_conf_key(Key :: atom()) -> string().
-fabric_conf_key(Key) ->
-    %% Double underscore to separate Mod and Func
-    "fabric_rpc__" ++ atom_to_list(Key).
-
--ifdef(TEST).
-
--include_lib("couch/include/couch_eunit.hrl").
-
-couch_stats_resource_tracker_test_() ->
-    {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            ?TDEF_FE(t_should_track_init_p),
-            ?TDEF_FE(t_should_not_track_init_p_empty),
-            ?TDEF_FE(t_should_not_track_init_p_empty_and_disabled),
-            ?TDEF_FE(t_should_not_track_init_p_disabled),
-            ?TDEF_FE(t_should_not_track_init_p),
-            ?TDEF_FE(t_should_extract_fields_properly)
-        ]
-    }.
-
-setup() ->
-    Ctx = test_util:start_couch(),
-    config:set_boolean(?CSRT, "randomize_testing", false, false),
-    Ctx.
-
-teardown(Ctx) ->
-    test_util:stop_couch(Ctx).
-
-t_should_track_init_p(_) ->
-    enable_init_p(),
-    [?assert(should_track_init_p(M, F), {M, F}) || [M, F] <- base_metrics()].
-
-t_should_not_track_init_p_empty(_) ->
-    disable_init_p_metrics(),
-    enable_init_p([]),
-    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
-
-t_should_not_track_init_p_empty_and_disabled(_) ->
-    disable_init_p(),
-    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
-
-t_should_not_track_init_p_disabled(_) ->
-    enable_init_p_metrics(),
-    disable_init_p(),
-    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- base_metrics()].
-
-t_should_not_track_init_p(_) ->
-    enable_init_p(),
-    Metrics = [
-        [couch_db, name],
-        [couch_db, get_after_doc_read_fun],
-        [couch_db, open],
-        [fabric_rpc, get_purge_seq]
-    ],
-    [?assert(should_track_init_p(M, F) =:= false, {M, F}) || [M, F] <- Metrics].
-
-t_should_extract_fields_properly(_) ->
-    Rctx = #rctx{},
-    #{fields := Fields} = csrt_entry:record_info(),
-    %% csrt_entry:value/2 throws on invalid fields, assert that the function succeeded
-    TestField = fun(Field) ->
-        try
-            csrt_entry:value(Field, Rctx),
-            true
-        catch
-            _:_ -> false
-        end
-    end,
-    [?assert(TestField(Field)) || Field <- Fields].
-
-enable_init_p() ->
-    enable_init_p(base_metrics()).
-
-enable_init_p(Metrics) ->
-    config:set(?CSRT, "enable_init_p", "true", false),
-    enable_init_p_metrics(Metrics).
-
-enable_init_p_metrics() ->
-    enable_init_p(base_metrics()).
-
-enable_init_p_metrics(Metrics) ->
-    [set_fabric_init_p(F, true, false) || [_, F] <- Metrics].
-
-disable_init_p() ->
-    disable_init_p(base_metrics()).
-
-disable_init_p(Metrics) ->
-    config:set(?CSRT, "enable_init_p", "false", false),
-    disable_init_p_metrics(Metrics).
-
-disable_init_p_metrics() ->
-    disable_init_p_metrics(base_metrics()).
-
-disable_init_p_metrics(Metrics) ->
-    [set_fabric_init_p(F, false, false) || [_, F] <- Metrics].
-
-base_metrics() ->
-    [
-        [fabric_rpc, all_docs],
-        [fabric_rpc, changes],
-        [fabric_rpc, map_view],
-        [fabric_rpc, reduce_view],
-        [fabric_rpc, get_all_security],
-        [fabric_rpc, open_doc],
-        [fabric_rpc, update_docs],
-        [fabric_rpc, open_shard]
-    ].
-
--endif.

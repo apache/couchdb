@@ -431,8 +431,25 @@ maybe_inc(Stat, Val) ->
     end.
 
 -spec should_track_init_p(Stat :: [atom()]) -> boolean().
-should_track_init_p([Mod, Func, spawned]) ->
-    is_enabled_init_p() andalso csrt_util:should_track_init_p(Mod, Func);
+%% "Example to extend CSRT"
+%% should_track_init_p([fabric_rpc, foo, spawned]) ->
+%%    is_enabled_init_p();
+should_track_init_p([fabric_rpc, all_docs, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, changes, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, get_all_security, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, map_view, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, open_doc, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, open_shard, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, reduce_view, spawned]) ->
+    is_enabled_init_p();
+should_track_init_p([fabric_rpc, update_docs, spawned]) ->
+    is_enabled_init_p();
 should_track_init_p(_Metric) ->
     false.
 
@@ -822,9 +839,11 @@ couch_stats_resource_tracker_test_() ->
         fun setup/0,
         fun teardown/1,
         [
+            ?TDEF_FE(t_should_track_init_p_enabled),
+            ?TDEF_FE(t_should_not_track_init_p_enabled),
+            ?TDEF_FE(t_should_not_track_init_p_disabled),
             ?TDEF_FE(t_static_map_translations),
-            ?TDEF_FE(t_should_track_init_p),
-            ?TDEF_FE(t_should_not_track_init_p)
+            ?TDEF_FE(t_should_extract_fields_properly)
         ]
     }.
 
@@ -861,9 +880,46 @@ t_static_map_translations(_) ->
         )
     ).
 
-t_should_track_init_p(_) ->
-    config:set(?CSRT, "enable_init_p", "true", false),
+t_should_not_track_init_p_enabled(_) ->
+    enable_init_p(),
     Metrics = [
+        [couch_db, name, spawned],
+        [couch_db, get_db_info, spawned],
+        [couch_db, open, spawned],
+        [fabric_rpc, get_purge_seq, spawned]
+    ],
+    [?assert(should_track_init_p(M) =:= false, M) || M <- Metrics].
+
+t_should_track_init_p_enabled(_) ->
+    enable_init_p(),
+    [?assert(should_track_init_p(M), M) || M <- base_metrics()].
+
+t_should_not_track_init_p_disabled(_) ->
+    disable_init_p(),
+    [?assert(should_track_init_p(M) =:= false, M) || M <- base_metrics()].
+
+t_should_extract_fields_properly(_) ->
+    Rctx = #rctx{},
+    #{fields := Fields} = csrt_entry:record_info(),
+    %% csrt_entry:value/2 throws on invalid fields, assert that the function succeeded
+    TestField = fun(Field) ->
+        try
+            csrt_entry:value(Field, Rctx),
+            true
+        catch
+            _:_ -> false
+        end
+    end,
+    [?assert(TestField(Field)) || Field <- Fields].
+
+enable_init_p() ->
+    config:set(?CSRT, "enable_init_p", "true", false).
+
+disable_init_p() ->
+    config:set(?CSRT, "enable_init_p", "false", false).
+
+base_metrics() ->
+    [
         [fabric_rpc, all_docs, spawned],
         [fabric_rpc, changes, spawned],
         [fabric_rpc, map_view, spawned],
@@ -872,18 +928,6 @@ t_should_track_init_p(_) ->
         [fabric_rpc, open_doc, spawned],
         [fabric_rpc, update_docs, spawned],
         [fabric_rpc, open_shard, spawned]
-    ],
-    [csrt_util:set_fabric_init_p(F, true, false) || [_, F, _] <- Metrics],
-    [?assert(should_track_init_p(M), M) || M <- Metrics].
-
-t_should_not_track_init_p(_) ->
-    config:set(?CSRT, "enable_init_p", "true", false),
-    Metrics = [
-        [couch_db, name, spawned],
-        [couch_db, get_db_info, spawned],
-        [couch_db, open, spawned],
-        [fabric_rpc, get_purge_seq, spawned]
-    ],
-    [?assert(should_track_init_p(M) =:= false, M) || M <- Metrics].
+    ].
 
 -endif.

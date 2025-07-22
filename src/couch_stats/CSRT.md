@@ -262,18 +262,6 @@ not easy to sequentially generate matchspecs by way `ets:fun2ms/1`, and so an
 alternative mechanism for either dynamically assembling an `#rctx{}` to match
 against or generating the raw matchspecs themselves is warranted.
 
-## -define(CSRT_INIT_P, "csrt.init_p").
-
-> config:get("csrt.init_p").
-
-Config toggles for tracking counters on spawning of RPC `fabric_rpc` workers by
-way of `rexi_server:init_p`. This allows us to conditionally enable new metrics
-for the desired RPC operations in an expandable manner, without having to add
-new stats for every single potential RPC operation. These are for the individual
-metrics to track, the feature is enabled by way of the config toggle
-`config:get(?CSRT, "enable_init_p")`, and these configs can left alone for the
-most part until new operations are tracked.
-
 # CSRT Code Markers
 
 ## -define(CSRT_ETS, csrt_server).
@@ -375,15 +363,13 @@ how to handle the new RPC formats including an embedded Delta payload.
 ## config:get(?CSRT, "enable_init_p", false).
 
 Enablement of tracking new metric counters for different `fabric_rpc` operations
-types to track spawn rates of RPC work induced across the cluster. There is
-corresponding config lookups into the `?CSRT_INIT_P` namespace for keys of the
-form: `atom_to_list(Mod) ++ "__" atom_to_list(Fun)`, eg `"fabric_rpc__open_doc"`
-for enabling the specific RPC endpoints.
-
-However, those individual settings can be ignored and this top level config
-toggle is what should be used in general, as the function specific config
-toggles predominantly exist to enable tracking a subet of total RPC operations
-in the cluster, and new endpoints can be added here.
+spawned by way of `rexi_server:init_p/3`. This is the primary mechanism for
+inducing database RPC operations within CouchDB, and these init_p metrics aim to
+provide node lever understandings of the workloads being induced by other
+coordinator proceses. This is especially relevant for databases on subsets of a
+cluster resulting in non-uniform workloads, these metrics are tailored to
+provide insight into what work is being spawned on each node in the cluster as a
+function of time.
 
 ## config:get(?CSRT, "enable_reporting", false).
 
@@ -459,34 +445,6 @@ intended to be used directly.
 ## config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT)
 
 Limit the quantity of rows that can be loaded in an http query.
-
-# CSRT_INIT_P (?CSRT_INIT_P="csrt.init_p") Config Settings
-
-## config:get(?CSRT_INIT_P, ModFunName, false).
-
-These config toggles exist to conditionaly enable additional tracking of RPC
-endpoints of interest, but rather it's a way to selectively enable tracking for
-a subset of RPC operations, in a way we can extend later to add more. The
-`ModFunName` is of the form `atom_to_list(Mod) ++ "__" atom_to_list(Fun)`, eg
-`"fabric_rpc__open_doc"`, and right now, only exists for `fabric_rpc` modules.
-
-NOTE: this is a bit awkward and isn't meant to be used directly, instead,
-utilize `config:set(?CSRT, "enable_init_p", "true").` to enable or disable these
-as a whole.
-
-The current set of operations, as copied in from `default.ini`
-
-```
-[csrt.init_p]
-fabric_rpc__all_docs = true
-fabric_rpc__changes = true
-fabric_rpc__get_all_security = true
-fabric_rpc__map_view = true
-fabric_rpc__open_doc = true
-fabric_rpc__open_shard = true
-fabric_rpc__reduce_view = true
-fabric_rpc__update_docs = true
-```
 
 # CSRT Logger Matcher Enablement and Thresholds
 
