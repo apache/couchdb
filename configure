@@ -34,10 +34,6 @@ ERLANG_MD5="false"
 SKIP_DEPS="false"
 WITH_SPIDERMONKEY="true"
 
-export GIT_CONFIG_COUNT=1
-export GIT_CONFIG_KEY_0="url.https://github.com/apache/couchdb-.insteadOf"
-export GIT_CONFIG_VALUE_0="https://github.com/ninenines/"
-
 run_erlang() {
     erl -noshell -eval "$1" -eval "halt()."
 }
