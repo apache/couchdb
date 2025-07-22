@@ -158,7 +158,7 @@ DepDescs = [
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.3.4"}, [raw]},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-6"}},
-{gun,              "gun",              {tag, "2.2.0"}},
+{gun,              "gun",              {tag, "2.2.0-couchdb"}},
 {jiffy,            "jiffy",            {tag, "1.1.2"}},
 {mochiweb,         "mochiweb",         {tag, "v3.2.2"}},
 {meck,             "meck",             {tag, "1.0.0"}},

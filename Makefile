@@ -484,7 +484,7 @@ clean:
 	@rm -rf .rebar/
 	@rm -f bin/couchjs
 	@rm -f bin/weatherreport
-	@rm -rf src/*/ebin
+	@find src/*/ebin -not -path 'src/cowlib/ebin/cowlib.app' -not -path 'src/gun/ebin/gun.app' -delete
 	@rm -rf src/*/.rebar
 	@rm -rf src/*/priv/*.so
 	@rm -rf share/server/main.js share/server/main-ast-bypass.js share/server/main-coffee.js
