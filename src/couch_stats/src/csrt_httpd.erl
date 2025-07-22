@@ -24,24 +24,6 @@
     ]
 ).
 
--import(
-    csrt,
-    [
-        query/1,
-        from/1,
-        group_by/1,
-        group_by/2,
-        sort_by/1,
-        sort_by/2,
-        count_by/1,
-        options/1,
-        unlimited/0,
-        with_limit/1,
-
-        run/1
-    ]
-).
-
 handle_resource_status_req(
     #httpd{method = 'POST', path_parts = [<<"_active_resources">>, <<"_match">>, MatcherNameBin]} =
         Req
@@ -56,15 +38,15 @@ handle_resource_status_req(
         case {GroupBy, SortBy, CountBy} of
             {undefined, undefined, {Props}} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
-                {Keys, csrt:query([from(MatcherName), count_by(Keys)])};
+                {Keys, csrt:query([csrt:from(MatcherName), csrt:count_by(Keys)])};
             {undefined, {Props}, undefined} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
                 CounterKey = couch_util:get_value(<<"counter_key">>, Props),
-                {Keys, query([from(MatcherName), sort_by(Keys, CounterKey)])};
+                {Keys, csrt:query([csrt:from(MatcherName), csrt:sort_by(Keys, CounterKey)])};
             {{Props}, undefined, undefined} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
                 CounterKey = couch_util:get_value(<<"counter_key">>, Props),
-                {Keys, query([from(MatcherName), group_by(Keys, CounterKey)])};
+                {Keys, csrt:query([csrt:from(MatcherName), csrt:group_by(Keys, CounterKey)])};
             {_, _, _} ->
                 throw({bad_request, <<"Multiple aggregations are not supported">>})
         end,
