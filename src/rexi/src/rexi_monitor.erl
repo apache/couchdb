@@ -35,7 +35,6 @@ start(Procs) ->
 %% messages from our mailbox.
 -spec stop(pid()) -> ok.
 stop(MonitoringPid) ->
-    unlink(MonitoringPid),
     MonitoringPid ! {self(), shutdown},
     flush_down_messages().
 

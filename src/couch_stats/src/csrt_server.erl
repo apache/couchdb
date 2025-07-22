@@ -301,11 +301,11 @@ init([]) ->
     ]),
     {ok, #st{}}.
 
-handle_call(_, _From, State) ->
-    {reply, ok, State}.
+handle_call(Msg, From, State) ->
+    {stop, {unknown_call, Msg, From}, State}.
 
-handle_cast(_Msg, State) ->
-    {noreply, State}.
+handle_cast(Msg, State) ->
+    {stop, {unknown_cast, Msg}, State}.
 
 %%
 %% private functions

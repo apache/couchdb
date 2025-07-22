@@ -250,7 +250,7 @@ matchers, see the dedicated section below on `# CSRT Default Matchers`.
 > config:get("csrt_logger.matchers_enabled").
 
 Config section for setting `$db_name = $threshold` resulting in instantiating a
-"dbname_io" logger matcher for each `$db_name` that will generate a CSRT
+"dbnames_io" logger matcher for each `$db_name` that will generate a CSRT
 lifecycle report for any contexts that that induced more operations on _any_ one
 field of `ioq_calls|get_kv_node|get_kp_node|docs_read|rows_read` that is greater
 than `$threshold` and is on database `$db_name`.

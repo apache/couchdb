@@ -115,7 +115,7 @@ make_dt(A, A, _Unit) when is_integer(A) ->
     %% possible positive integer value delta.
     1;
 make_dt(A, B, Unit) when is_integer(A) andalso is_integer(B) andalso B > A ->
-    case erlang:convert_time_unit(abs(B - A), native, Unit) of
+    case erlang:convert_time_unit(B - A, native, Unit) of
         Delta when Delta > 0 ->
             Delta;
         _ ->

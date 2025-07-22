@@ -12,6 +12,8 @@
 
 -module(csrt_logger).
 
+-behaviour(gen_server).
+
 %% Process lifetime logging api
 -export([
     get_tracker/0,
@@ -290,17 +292,17 @@ handle_call(reload_matchers, _From, St) ->
     {reply, ok, St};
 handle_call(get_registered_matchers, _From, St) ->
     {reply, St#st.registered_matchers, St};
-handle_call(_, _From, State) ->
-    {reply, ok, State}.
+handle_call(Msg, From, St) ->
+    {stop, {unknown_call, Msg, From}, St}.
 
-handle_cast(_Msg, State) ->
-    {noreply, State, 0}.
+handle_cast(Msg, St) ->
+    {stop, {unknown_cast, Msg}, St}.
 
-handle_info(restart_config_listener, State) ->
+handle_info(restart_config_listener, St) ->
     ok = subscribe_changes(),
-    {noreply, State};
-handle_info(_Msg, St) ->
-    {noreply, St}.
+    {noreply, St};
+handle_info(Msg, St) ->
+    {stop, {unknown_info, Msg}, St}.
 
 %%
 %% Matchers
@@ -312,9 +314,9 @@ matcher_on_dbname(DbName) when
 ->
     ets:fun2ms(fun(#rctx{dbname = DbName1} = R) when DbName =:= DbName1 -> R end).
 
--spec matcher_on_dbname_io_threshold(DbName, Threshold) -> ets:match_spec() when
+-spec matcher_on_dbnames_io_threshold(DbName, Threshold) -> ets:match_spec() when
     DbName :: dbname(), Threshold :: pos_integer().
-matcher_on_dbname_io_threshold(DbName, Threshold) when
+matcher_on_dbnames_io_threshold(DbName, Threshold) when
     is_binary(DbName)
 ->
     ets:fun2ms(fun(
@@ -382,9 +384,10 @@ matcher_on_long_reqs(Threshold) when
 ->
     %% Threshold is in milliseconds, but we track erlang:monotonic_time/0
     %% which is in native format, a machine dependent internal representation
-    %% but with the guarantee of monotonically increasing. Note that this number
-    %% is integer(), _not_ positive_integer(), so we must use abs/2 to get a
-    %% positive time delta; notably, abs/2 is valid match_spec guard.
+    %% so we must convert the provided Threshold from milliseconds to native
+    %% representation which then allows us to match against entries where the
+    %% time delta between the started_at and updated_at is greater than the
+    %% native converted threshold.
     %%
     %% Time warps and is relative and is complicated, so here's an example of
     %% converting 10000 milliseconds into a native time format and back, then
@@ -395,7 +398,7 @@ matcher_on_long_reqs(Threshold) when
     %% (node1@127.0.0.1)6> erlang:convert_time_unit(10000000000, native, millisecond).
     %% 10000
     %% (node1@127.0.0.1)7> T0 = csrt_util:tnow(), timer:sleep(10000), T1 = csrt_util:tnow(),
-    %%     erlang:convert_time_unit(abs(T1 - T0), native, millisecond).
+    %%     erlang:convert_time_unit(T1 - T0, native, millisecond).
     %% 10000
 
     Unit = millisecond,
@@ -406,7 +409,7 @@ matcher_on_long_reqs(Threshold) when
                 started_at = Started,
                 updated_at = Updated
             } = R
-        ) when abs(Updated - Started) >= NativeThreshold ->
+        ) when Updated - Started >= NativeThreshold ->
             R
         end
     ).
@@ -511,14 +514,14 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
         DefaultMatchers
     ),
 
-    %% Add additional dbname_io matchers
+    %% Add additional dbnames_io matchers
     Matchers1 = lists:foldl(
         fun({Dbname, Value}, Matchers0) ->
             try list_to_integer(Value) of
                 Threshold when Threshold > 0 ->
-                    Name = "dbname_io__" ++ Dbname ++ "__" ++ Value,
+                    Name = "dbnames_io__" ++ Dbname ++ "__" ++ Value,
                     DbnameB = list_to_binary(Dbname),
-                    MSpec = matcher_on_dbname_io_threshold(DbnameB, Threshold),
+                    MSpec = matcher_on_dbnames_io_threshold(DbnameB, Threshold),
                     case add_matcher(Name, MSpec, Matchers0) of
                         {ok, Matchers1} ->
                             Matchers1;

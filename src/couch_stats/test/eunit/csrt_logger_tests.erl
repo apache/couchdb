@@ -254,7 +254,7 @@ t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
     DurationFilter = fun(R) ->
         Started = csrt_entry:value(started_at, R),
         Updated = csrt_entry:value(updated_at, R),
-        abs(Updated - Started) >= NativeThreshold
+        Updated - Started >= NativeThreshold
     end,
     ?assertEqual(
         lists:sort(lists:filter(DurationFilter, Rctxs)),
@@ -293,27 +293,27 @@ t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
     SThreshold = integer_to_list(Threshold),
     DbFoo = "foo",
     DbBar = "bar",
-    MatcherFoo = matcher_for_csrt("dbname_io__" ++ DbFoo ++ "__" ++ SThreshold),
-    MatcherBar = matcher_for_csrt("dbname_io__" ++ DbBar ++ "__" ++ SThreshold),
-    MatcherFooBar = matcher_for_csrt("dbname_io__foo/bar__" ++ SThreshold),
+    MatcherFoo = matcher_for_csrt("dbnames_io__" ++ DbFoo ++ "__" ++ SThreshold),
+    MatcherBar = matcher_for_csrt("dbnames_io__" ++ DbBar ++ "__" ++ SThreshold),
+    MatcherFooBar = matcher_for_csrt("dbnames_io__foo/bar__" ++ SThreshold),
     %% Add an extra Rctx with dbname foo/bar to ensure correct naming matches
     ExtraRctx = rctx_gen(#{dbname => <<"foo/bar">>, get_kp_node => Threshold + 10}),
     %% Make sure we have at least one match
     Rctxs = [ExtraRctx, rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
     ?assertEqual(
-        lists:sort(lists:filter(matcher_for_dbname_io(DbFoo, Threshold), Rctxs)),
+        lists:sort(lists:filter(matcher_for_dbnames_io(DbFoo, Threshold), Rctxs)),
         lists:sort(lists:filter(MatcherFoo, Rctxs)),
-        "dbname_io foo matcher"
+        "dbnames_io foo matcher"
     ),
     ?assertEqual(
-        lists:sort(lists:filter(matcher_for_dbname_io(DbBar, Threshold), Rctxs)),
+        lists:sort(lists:filter(matcher_for_dbnames_io(DbBar, Threshold), Rctxs)),
         lists:sort(lists:filter(MatcherBar, Rctxs)),
-        "dbname_io bar matcher"
+        "dbnames_io bar matcher"
     ),
     ?assertEqual(
         [ExtraRctx],
         lists:sort(lists:filter(MatcherFooBar, Rctxs)),
-        "dbname_io foo/bar matcher"
+        "dbnames_io foo/bar matcher"
     ).
 
 t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
@@ -427,7 +427,7 @@ matcher_for_csrt(MatcherName) ->
             throw({missing_matcher, MatcherName})
     end.
 
-matcher_for_dbname_io(Dbname0, Threshold) ->
+matcher_for_dbnames_io(Dbname0, Threshold) ->
     Dbname = list_to_binary(Dbname0),
     fun(Rctx) ->
         DbnameA = csrt_entry:value(dbname, Rctx),
