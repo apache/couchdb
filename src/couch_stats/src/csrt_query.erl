@@ -206,12 +206,11 @@ all() ->
     Spec = ets:fun2ms(fun(#rctx{} = R) -> R end),
     {Spec, ets:match_spec_compile(Spec)}.
 
-%% eg: group_by(all(), mfa, docs_read).
-%% eg: group_by(all(), fun(#rctx{mfa=MFA,docs_read=DR}) -> {MFA, DR} end, ioq_calls).
-%% eg: ^^ or: group_by(all(), [mfa, docs_read], ioq_calls).
-%% eg: group_by(all(), [username, dbname, mfa], docs_read).
-%% eg: group_by(all(), [username, dbname, mfa], ioq_calls).
-%% eg: group_by(all(), [username, dbname, mfa], js_filters).
+%% eg: group_by(all(), username, docs_read).
+%% eg: ^^ or: group_by(all(), [username, docs_read], ioq_calls).
+%% eg: group_by(all(), [username, dbname, js_filter], docs_read).
+%% eg: group_by(all(), [username, dbname, js_filter], ioq_calls).
+%% eg: group_by(all(), [username, dbname, js_filter], get_kv_node).
 -spec group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
     {ok, aggregation_result()} | {limit, aggregation_result()}
 when

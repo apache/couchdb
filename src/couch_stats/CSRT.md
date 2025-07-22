@@ -59,6 +59,168 @@ CSRT itself and just become one subset of the stats tracked as a whole, and
 similarly, any additional desired stats tracking can be easily added and will
 be picked up in the RPC deltas and process lifetime reports.
 
+## A Simple Example
+
+Given a databse `foo` with 11k documents containg a `doc.value` field that is an
+integer value which can be filtered in a design doc by way of even and odd. If
+we instantiate a series of while loops in parallel making requests of the form:
+
+> GET /foo/_changes?filter=bar/even&include_docs=true
+
+We can generate a good chunk of load on a local laptop dev setup, resulting in
+requests that take a few seconds to load through the changes feed, fetch all 11k
+docs, and then funnel them through the Javascript engine to filter for even
+valued docs; this allows us time to query these heavier requests live and see
+them in progress with the real time stats tracking and querying capabilities of
+CSRT.
+
+For example, let's use `csrt:proc_window/3` as one would do with
+`recon:proc_window/3` to get an idea of the heavy active processes on the
+system:
+
+```
+(node1@127.0.0.1)2> rp([{PR, csrt:to_json(csrt:get_resource(PR))} || {PR, _, _} <- csrt:proc_window(ioq_calls, 3, 1000)]).
+[{{<0.5090.0>,#Ref<0.2277656623.605290499.37969>},
+  #{changes_returned => 3962,db_open => 10,dbname => <<"foo">>,
+    docs_read => 7917,docs_written => 0,get_kp_node => 54,
+    get_kv_node => 1241,ioq_calls => 15834,js_filter => 7917,
+    js_filtered_docs => 7917,nonce => <<"cc5a814ceb">>,
+    pid_ref =>
+        <<"<0.5090.0>:#Ref<0.2277656623.605290499.37969>">>,
+    rows_read => 7917,
+    started_at => <<"2025-07-21T17:25:08.784z">>,
+    type =>
+        <<"coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes">>,
+    updated_at => <<"2025-07-21T17:25:13.051z">>,
+    username => <<"adm">>}},
+ {{<0.5087.0>,#Ref<0.2277656623.606601217.92191>},
+  #{changes_returned => 4310,db_open => 10,dbname => <<"foo">>,
+    docs_read => 8624,docs_written => 0,get_kp_node => 58,
+    get_kv_node => 1358,ioq_calls => 17248,js_filter => 8624,
+    js_filtered_docs => 8624,nonce => <<"0e625c723a">>,
+    pid_ref =>
+        <<"<0.5087.0>:#Ref<0.2277656623.606601217.92191>">>,
+    rows_read => 8624,
+    started_at => <<"2025-07-21T17:25:08.424z">>,
+    type =>
+        <<"coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes">>,
+    updated_at => <<"2025-07-21T17:25:13.051z">>,
+    username => <<"adm">>}},
+ {{<0.5086.0>,#Ref<0.2277656623.605290499.27728>},
+  #{changes_returned => 4285,db_open => 10,dbname => <<"foo">>,
+    docs_read => 8569,docs_written => 0,get_kp_node => 57,
+    get_kv_node => 1349,ioq_calls => 17138,js_filter => 8569,
+    js_filtered_docs => 8569,nonce => <<"962cda1645">>,
+    pid_ref =>
+        <<"<0.5086.0>:#Ref<0.2277656623.605290499.27728>">>,
+    rows_read => 8569,
+    started_at => <<"2025-07-21T17:25:08.406z">>,
+    type =>
+        <<"coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes">>,
+    updated_at => <<"2025-07-21T17:25:13.051z">>,
+    username => <<"adm">>}}]
+ok
+```
+
+This shows us the top 3 most active processes (being tracked in CSRT) over the
+next 1000 milliseconds, sorted by number of `ioq_calls` induced! All of three
+of these processes are incurring heavy usage, reading many thousands of docs
+with 15k+ IOQ calls and heavy JS filter usage, exactly the types of requests
+you want to be alerted to. CSRT's proc window logic is built on top of Recon's,
+which doesn't return the process info itself, so you'll need to fetch the
+process status with `csrt:get_resource/1` and then pretty print it with
+`csrt:to_json/1`.
+
+The output above is a real time snapshot of the live running system and shows
+processes actively inducing additional resource usage, so these CSRT context
+values are just a time snapshot of where that process was at, as of the
+`updated_at` timestamp. We can reference the nonce value to search through the
+report logs for a final report, assuming the given context ended up using
+sufficient resources to trigger a logger matcher lifetime report. The above
+changes requests were induced specifically to induce reports as well, so
+unsurprisingly we have reprots for all three.
+
+However, I want to first show the existing visibility into these changes
+requests exposed by the raw HTTP logs to highlight the impact of the CSRT
+reports and new visibility into request workloads exposed.
+
+First, let's look at the existing HTTP logs for those 3 requests:
+
+```
+(chewbranca)-(jobs:1)-(~/src/couchdb_csrt_v3)
+(! 9872)-> grep 'cc5a814ceb\|0e625c723a\|962cda1645' ./dev/logs/node1.log | grep -v '^\[report]'
+[notice] 2025-07-21T17:25:14.520641Z node1@127.0.0.1 <0.5087.0> 0e625c723a localhost:15984 127.0.0.1 adm GET /foo/_changes?filter=bar/even&asdf=fdsa&include_docs=true 200 ok 6096
+[notice] 2025-07-21T17:25:14.521417Z node1@127.0.0.1 <0.5086.0> 962cda1645 localhost:15984 127.0.0.1 adm GET /foo/_changes?filter=bar/even&asdf=fdsa&include_docs=true 200 ok 6115
+[notice] 2025-07-21T17:25:14.844317Z node1@127.0.0.1 <0.5090.0> cc5a814ceb localhost:15984 127.0.0.1 adm GET /foo/_changes?filter=bar/even&asdf=fdsa&include_docs=true 200 ok 6059
+```
+
+So we see the requests were made, and we can see it's doing `include_docs=true`
+as well as using a customer filter, both obvious indications that this is a
+potentially heavier request, however, we don't know if database foo had a
+thousand docs or a billion docs, whether those docs were small or large, nor any
+indication of the computational complexity of the reference filter function.
+This makes it challenging to retroactively correlate heavy resource usage at a
+hardware level with the underlying requests that induced those workloads,
+especially if the heavy requests are an inconspicuous subset of the full
+database workload.
+
+CSRT resolves this by providing a real time querying system to find the active
+heavy proceses, live, as well as a process lifecyle reporting engine providing
+detailed analysis of the workloads induced by the request.
+
+Let's assume we had the default IOQ logger matcher enabled, with the default
+configuration of logging any requests inducing more than 10k IOQ calls, which
+would catch all three of our requests above, even though they're all still
+going. As a result, we generate process lifecylce reports for all three of those
+requests, as we can see:
+
+```
+(chewbranca)-(jobs:1)-(~/src/couchdb_csrt_v3)
+(! 9873)-> grep 'cc5a814ceb\|0e625c723a\|962cda1645' ./dev/logs/node1.log | grep '^\[report]'
+[report] 2025-07-21T17:25:14.520787Z node1@127.0.0.1 <0.5174.0> -------- [csrt-pid-usage-lifetime changes_returned=5500 db_open=10 dbname="foo" docs_read=11001 get_kp_node=72 get_kv_node=1754 ioq_calls=22002 js_filter=11001 js_filtered_docs=11001 nonce="0e625c723a" pid_ref="<0.5087.0>:#Ref<0.2277656623.606601217.92191>" rows_read=11001 started_at="2025-07-21T17:25:08.424z" type="coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes" updated_at="2025-07-21T17:25:14.520z" username="adm"]
+[report] 2025-07-21T17:25:14.521578Z node1@127.0.0.1 <0.5155.0> -------- [csrt-pid-usage-lifetime changes_returned=5500 db_open=10 dbname="foo" docs_read=11001 get_kp_node=72 get_kv_node=1754 ioq_calls=22002 js_filter=11001 js_filtered_docs=11001 nonce="962cda1645" pid_ref="<0.5086.0>:#Ref<0.2277656623.605290499.27728>" rows_read=11001 started_at="2025-07-21T17:25:08.406z" type="coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes" updated_at="2025-07-21T17:25:14.521z" username="adm"]
+[report] 2025-07-21T17:25:14.844436Z node1@127.0.0.1 <0.5213.0> -------- [csrt-pid-usage-lifetime changes_returned=5500 db_open=10 dbname="foo" docs_read=11001 get_kp_node=72 get_kv_node=1754 ioq_calls=22002 js_filter=11001 js_filtered_docs=11001 nonce="cc5a814ceb" pid_ref="<0.5090.0>:#Ref<0.2277656623.605290499.37969>" rows_read=11001 started_at="2025-07-21T17:25:08.784z" type="coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes" updated_at="2025-07-21T17:25:14.844z" username="adm"]
+```
+
+We find the process lifecycle reports for the requests with the three grep'ed on
+nonces, and we can see they all read the 11k core documents, plus the one design
+document, JS filtered all 11,001 docs, and then only returned the 5500 doc's
+containing an even `doc.value` field.
+
+This also shows the discrepancy between the quantity of induced resource usage
+to actually generate a request, relative to the magnitude of the data returned.
+All of our `doc.value` fields were positive integers, if we had a filter
+function searching for negative `doc.value` results, we would have found none,
+resulting in `changes_returned=0`, but we would have still induced the 11,001
+doc loads and Javascript filter calls.
+
+CSRT is specifically built to automatically find and report these types of
+workload discrepancies and in general to help highlight where individual HTTP
+requests use drastically more resources than the median workloads.
+
+See the dedicated proc window documentation section further down for more info.
+
+## Additional Overview and Examples
+
+The query and HTTP API's are well documented and tested (h/t @iilyak) and
+provide an excellent overview of the interaction patterns and query capabilities
+of CSRT. Those can be found at:
+
+* `csrt_query.erl` "Query API functions"
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/src/csrt_query.erl#L319-L674
+  - the above highlighted functions are well tested, typespec'ed, and have
+    auxilary documentation and examples, an excellent resource
+* the `csrt_query_tests.erl` Eunit tests are an excellent overview of utilizing
+  the `csrt_query:` API from Erlang to find, filter, and aggregate CSRT real
+  time contexts
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/csrt_query_tests.erl
+* similarly, the `csrt_httpd_tests.erl` Eunit tests are an excellent overview of
+  performing the same style `csrt_query:` queries, but through the HTTP API
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/csrt_httpd_tests.erl
+* Additionally there's the `csrt_logger_tests.erl` Eunit tests which demonstrate
+  the different default logger matchers in action
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/csrt_logger_tests.erl
+
 # CSRT Config Keys
 
 ## -define(CSRT, "csrt").
@@ -524,16 +686,12 @@ generate an actual delta by way of `csrt_util:rctx_delta/2`.
 ]).
 ```
 
-## TODO: RPC/QUERY DOCS
+## Query API
+
+See the `Additional Overview and Examples` section above for more details.
 
 ```
-%% RPC API
--export([
-    rpc/2,
-    call/1
-]).
-
-%% Aggregate Query API
+% Aggregate Query API
 -export([
     active/0,
     active/1,
@@ -541,25 +699,32 @@ generate an actual delta by way of `csrt_util:rctx_delta/2`.
     active_coordinators/1,
     active_workers/0,
     active_workers/1,
-    count_by/1,
     find_by_nonce/1,
     find_by_pid/1,
     find_by_pidref/1,
     find_workers_by_pidref/1,
-    group_by/2,
-    group_by/3,
-    query/1,
-    query/2,
     query_matcher/1,
-    query_matcher/2,
-    sorted/1,
-    sorted_by/1,
-    sorted_by/2,
-    sorted_by/3
+    query_matcher/2
+]).
+
+-export([
+    query/1,
+    from/1,
+    group_by/1,
+    group_by/2,
+    sort_by/1,
+    sort_by/2,
+    count_by/1,
+    options/1,
+    unlimited/0,
+    with_limit/1,
+
+    run/1,
+    unsafe_run/1
 ]).
 ```
 
-## Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
+## csrt:proc_window/3 -- Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
 
 This is a "port" of `recon:proc_window` to `csrt:proc_window`, allowing for
 `proc_window` style aggregations/sorting/filtering but with the stats fields
@@ -888,6 +1053,14 @@ size as those values become larger in the logarithmic complexity btree
 algorithms.  size on the logarithmic complexity btree algorithms as the database
 btrees grow.
 
-%% "Example to extend CSRT"
-%%write_kv_node = 0 :: non_neg_integer() | '_',
-%%write_kp_node = 0 :: non_neg_integer() | '_'
+# Extending CSRT
+
+There are documentation markers in the code highlighting where and how to extend
+CSRT with additional stats to track. The currently selected stats are targeted
+as a working demonstration of CSRT being able to highlight heavy usage changes
+requests. CSRT has been designed to support extending out to all stats
+collection and all resource usage inducing processes within CouchDB.
+
+Grep for `'Example to extend CSRT'` to find the code points, eg:
+
+> grep -ri 'Example to extend CSRT' src/
