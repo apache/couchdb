@@ -393,7 +393,9 @@ maybe_report(ReportName, PidRef) ->
 do_report(ReportName, PidRef) ->
     csrt_logger:do_report(ReportName, get_resource(PidRef)).
 
--spec to_json(Rctx :: rctx()) -> map().
+-spec to_json(Rctx :: maybe_rctx()) -> map() | null.
+to_json(undefined) ->
+    null;
 to_json(Rctx) ->
     csrt_entry:to_json(Rctx).
 
