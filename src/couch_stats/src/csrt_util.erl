@@ -57,20 +57,17 @@ is_enabled() ->
 -else.
 -spec is_enabled() -> boolean().
 is_enabled() ->
-    %% TODO: toggle back to false before merging
-    config:get_boolean(?CSRT, "enable", true).
+    config:get_boolean(?CSRT, "enable", false).
 -endif.
 
 -spec is_enabled_init_p() -> boolean().
 is_enabled_init_p() ->
-    %% TODO: toggle back to false before merging
-    config:get_boolean(?CSRT, "enable_init_p", true).
+    config:get_boolean(?CSRT, "enable_init_p", false).
 
 %% Toggle to disable all reporting
 -spec is_enabled_reporting() -> boolean().
 is_enabled_reporting() ->
-    %% TODO: toggle back to false before merging
-    config:get_boolean(?CSRT, "enable_reporting", true).
+    config:get_boolean(?CSRT, "enable_reporting", false).
 
 %% Toggle to disable all reporting from #rpc_worker{} types, eg only log
 %% #coordinator{} types. This is a bit of a kludge that would be better served

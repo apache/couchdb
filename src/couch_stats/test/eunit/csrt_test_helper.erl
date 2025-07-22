@@ -13,6 +13,7 @@
 -module(csrt_test_helper).
 
 -export([
+    enable_default_logger_matchers/0,
     rctx_gen/0,
     rctx_gen/1,
     rctxs/0,
@@ -116,3 +117,19 @@ one_of(L) ->
                 N
         end
     end.
+
+enable_default_logger_matchers() ->
+    DefaultMatchers = [
+        docs_read,
+        rows_read,
+        docs_written,
+        long_reqs,
+        changes_processed,
+        ioq_calls
+    ],
+    lists:foreach(
+        fun(Name) ->
+            config:set(?CSRT_MATCHERS_ENABLED, atom_to_list(Name), "true", false)
+        end,
+        DefaultMatchers
+    ).

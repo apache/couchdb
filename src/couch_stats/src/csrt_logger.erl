@@ -551,9 +551,7 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
 
 -spec matcher_enabled(Name :: string()) -> boolean().
 matcher_enabled(Name) when is_list(Name) ->
-    %% TODO: fix
-    %% config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, false).
-    config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, true).
+    config:get_boolean(?CSRT_MATCHERS_ENABLED, Name, false).
 
 -spec matcher_threshold(Name, Threshold) -> string() | integer() when
     Name :: string(), Threshold :: pos_integer() | string().

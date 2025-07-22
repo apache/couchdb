@@ -15,10 +15,9 @@
 -import(
     csrt_test_helper,
     [
-        rctx_gen/0,
+        enable_default_logger_matchers/0,
         rctx_gen/1,
         rctxs/0,
-        rctxs/1,
         jrctx/1
     ]
 ).
@@ -82,6 +81,7 @@ make_docs(Count) ->
 
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats]),
+    enable_default_logger_matchers(),
     config:set_boolean(?CSRT, "randomize_testing", false, false),
     config:set_boolean(?CSRT, "enable_reporting", true, false),
     config:set_boolean(?CSRT, "enable_rpc_reporting", true, false),

@@ -58,6 +58,7 @@ setup_ctx() ->
 
 setup() ->
     {Ctx, Url} = setup_ctx(),
+    csrt_test_helper:enable_default_logger_matchers(),
     Rctxs = [
         rctx(#{dbname => <<"db1">>, ioq_calls => 123, username => <<"user_foo">>}),
         rctx(#{dbname => <<"db1">>, ioq_calls => 321, username => <<"user_foo">>}),
