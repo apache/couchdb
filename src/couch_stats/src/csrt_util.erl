@@ -103,13 +103,13 @@ tnow() ->
 tutc() ->
     tutc(tnow()).
 
-%% Convert a integer system time in milliseconds into UTC RFC 3339 format
+%% Convert an Erlang native monotonic_time() into UTC RFC 3339 format
 -spec tutc(Time :: integer()) -> calendar:rfc3339_string().
 tutc(Time0) when is_integer(Time0) ->
-    Unit = millisecond,
-    Time1 = Time0 + erlang:time_offset(),
-    Time = erlang:convert_time_unit(Time1, native, Unit),
-    calendar:system_time_to_rfc3339(Time, [{unit, Unit}, {offset, "z"}]).
+    calendar:system_time_to_rfc3339(
+        Time0 + erlang:time_offset(),
+        [{unit, native}, {offset, "z"}]
+    ).
 
 %% Returns dt (delta time) in microseconds
 %% @equiv make_dt(A, B, microsecond)

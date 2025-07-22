@@ -305,7 +305,7 @@ handle_call(_, _From, State) ->
     {reply, ok, State}.
 
 handle_cast(_Msg, State) ->
-    {noreply, State, 0}.
+    {noreply, State}.
 
 %%
 %% private functions

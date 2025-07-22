@@ -125,7 +125,7 @@ register_matcher(Name, MSpec) ->
 
 -spec deregister_matcher(Name :: string()) -> ok.
 deregister_matcher(Name) ->
-    gen_server:call(?MODULE, {deregister, Name}).
+    gen_server:call(?MODULE, {deregister, Name}, infinity).
 
 -spec log_process_lifetime_report(PidRef :: pid_ref()) -> ok.
 log_process_lifetime_report(PidRef) ->
@@ -338,14 +338,12 @@ matcher_on_dbname_io_threshold(DbName, Threshold) when
 matcher_on_docs_read(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
-    %%ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_read=DocsRead} = R) when DocsRead >= Threshold -> R end).
     ets:fun2ms(fun(#rctx{docs_read = DocsRead} = R) when DocsRead >= Threshold -> R end).
 
 -spec matcher_on_docs_written(Threshold :: pos_integer()) -> ets:match_spec().
 matcher_on_docs_written(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
-    %%ets:fun2ms(fun(#rctx{type=#coordinator{}, docs_written=DocsRead} = R) when DocsRead >= Threshold -> R end).
     ets:fun2ms(fun(#rctx{docs_written = DocsWritten} = R) when DocsWritten >= Threshold -> R end).
 
 -spec matcher_on_rows_read(Threshold :: pos_integer()) -> ets:match_spec().
@@ -418,13 +416,6 @@ matcher_on_ioq_calls(Threshold) when
     is_integer(Threshold) andalso Threshold > 0
 ->
     ets:fun2ms(fun(#rctx{ioq_calls = IOQCalls} = R) when IOQCalls >= Threshold -> R end).
-
-%%-spec matcher_for_rctx_field(Field :: rctx_field()) -> ets:match_spec().
-%%matcher_for_rctx_field() ->
-%%    #{size := Size0, fields := Fields} = csrt_entry:record_info(),
-%%    %% Subtract 1 as record_info size includes tuple record name
-%%    %% erlang:list_to_tuple([rctx | lists:duplicate(maps:get(size, csrt_entry:record_info()), '_')])
-%%    Size = Size - 1,
 
 -spec pid_ref_matchspec(AttrName :: rctx_field()) -> matcher() | throw(any()).
 pid_ref_matchspec(AttrName) ->

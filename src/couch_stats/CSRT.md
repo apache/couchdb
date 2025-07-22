@@ -138,7 +138,7 @@ values are just a time snapshot of where that process was at, as of the
 report logs for a final report, assuming the given context ended up using
 sufficient resources to trigger a logger matcher lifetime report. The above
 changes requests were induced specifically to induce reports as well, so
-unsurprisingly we have reprots for all three.
+unsurprisingly we have reports for all three.
 
 However, I want to first show the existing visibility into these changes
 requests exposed by the raw HTTP logs to highlight the impact of the CSRT
@@ -316,7 +316,7 @@ entries even if the Pid crashes.
 ## -define(TRACKER_PID, {csrt, tracker}).
 
 A handle to the spawned tracker process that does cleanup and logger matching
-reprots at the end of the process lifecycle. We store a reference to the tracker
+reports at the end of the process lifecycle. We store a reference to the tracker
 pid so that for explicit context destruction, like in `chttpd` workers after a
 request has been serviced, we can update stop the tracker and perform the
 expected cleanup directly.
