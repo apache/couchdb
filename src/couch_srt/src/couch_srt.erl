@@ -358,7 +358,7 @@ clear_pdict_markers() ->
 %%
 
 -spec maybe_track_rexi_init_p({M, F, A}) -> couch_stats:response() when
-      M :: atom(), F :: atom(), A :: non_neg_integer().
+    M :: atom(), F :: atom(), A :: non_neg_integer().
 maybe_track_rexi_init_p({M, F, _A}) ->
     Metric = [M, F, spawned],
     case couch_srt:should_track_init_p(Metric) of

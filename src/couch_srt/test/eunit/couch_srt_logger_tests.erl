@@ -349,7 +349,9 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
         maps:keys(couch_srt_logger:get_registered_matchers()),
         "correct current registered matchers"
     ),
-    ?assert(couch_srt_logger:is_match(ExtraRctx, Matchers), "our registered matcher matches expectedly"),
+    ?assert(
+        couch_srt_logger:is_match(ExtraRctx, Matchers), "our registered matcher matches expectedly"
+    ),
     ?assert(
         couch_srt_logger:is_match(ExtraRctx),
         "our registered matcher is picked up and matches expectedly"
@@ -396,7 +398,9 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
         end
     ),
     ?assertEqual(undefined, Matcher2, "matcher was deregistered successfully"),
-    ?assertEqual(#{}, couch_srt_logger:get_registered_matchers(), "no leftover registered matchers").
+    ?assertEqual(
+        #{}, couch_srt_logger:get_registered_matchers(), "no leftover registered matchers"
+    ).
 
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas

@@ -42,11 +42,17 @@ handle_resource_status_req(
             {undefined, {Props}, undefined} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
                 CounterKey = couch_util:get_value(<<"counter_key">>, Props),
-                {Keys, couch_srt:query([couch_srt:from(MatcherName), couch_srt:sort_by(Keys, CounterKey)])};
+                {Keys,
+                    couch_srt:query([
+                        couch_srt:from(MatcherName), couch_srt:sort_by(Keys, CounterKey)
+                    ])};
             {{Props}, undefined, undefined} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
                 CounterKey = couch_util:get_value(<<"counter_key">>, Props),
-                {Keys, couch_srt:query([couch_srt:from(MatcherName), couch_srt:group_by(Keys, CounterKey)])};
+                {Keys,
+                    couch_srt:query([
+                        couch_srt:from(MatcherName), couch_srt:group_by(Keys, CounterKey)
+                    ])};
             {_, _, _} ->
                 throw({bad_request, <<"Multiple aggregations are not supported">>})
         end,
