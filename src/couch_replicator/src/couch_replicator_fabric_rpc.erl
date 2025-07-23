@@ -106,7 +106,7 @@ docs_test_() ->
         fun() -> ok end,
         fun(_) -> ok end,
         [
-            ?TDEF_FE(t_docs)
+            ?TDEF_FE(t_docs, 15)
         ]
     }.
 
@@ -140,10 +140,10 @@ docs_cb_test_() ->
         end,
         fun(_) -> meck:unload() end,
         [
-            ?TDEF_FE(t_docs_cb_meta),
-            ?TDEF_FE(t_docs_cb_row_skip),
-            ?TDEF_FE(t_docs_cb_row),
-            ?TDEF_FE(t_docs_cb_complete)
+            ?TDEF_FE(t_docs_cb_meta, 15),
+            ?TDEF_FE(t_docs_cb_row_skip, 15),
+            ?TDEF_FE(t_docs_cb_row, 15),
+            ?TDEF_FE(t_docs_cb_complete, 15)
         ]
     }.
 
