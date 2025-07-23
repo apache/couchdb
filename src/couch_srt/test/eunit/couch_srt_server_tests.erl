@@ -10,12 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_server_tests).
+-module(couch_srt_server_tests).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
--include("../../src/csrt.hrl").
+-include("../../src/couch_srt.hrl").
 
 -define(DOCS_COUNT, 100).
 -define(DDOCS_COUNT, 1).
@@ -86,7 +86,7 @@ make_docs(Count) ->
     ).
 
 setup() ->
-    Ctx = test_util:start_couch([fabric, couch_stats]),
+    Ctx = test_util:start_couch([fabric, couch_stats, couch_srt]),
     config:set_boolean(?CSRT, "randomize_testing", false, false),
     ok = meck:new(ioq, [passthrough]),
     ok = meck:expect(ioq, bypass, fun(_, _) -> false end),
@@ -268,7 +268,7 @@ t_updated_at({_Ctx, DbName, _View}) ->
     _Res = fabric:open_doc(DbName, DocId, [?ADMIN_CTX]),
     Rctx = load_rctx(PidRef),
     %% Get RawRctx to have pre-json-converted timestamps
-    RawRctx = csrt:get_resource(PidRef),
+    RawRctx = couch_srt:get_resource(PidRef),
     pdebug(rctx, Rctx),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
@@ -278,14 +278,14 @@ t_updated_at({_Ctx, DbName, _View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    Started = csrt_entry:value(started_at, RawRctx),
-    Updated = csrt_entry:value(updated_at, RawRctx),
+    Started = couch_srt_entry:value(started_at, RawRctx),
+    Updated = couch_srt_entry:value(updated_at, RawRctx),
     ?assert(
-        csrt_util:make_dt(Started, Updated, millisecond) > TimeDelay,
+        couch_srt_util:make_dt(Started, Updated, millisecond) > TimeDelay,
         "updated_at gets updated with an expected TimeDelay"
     ),
     ?assert(
-        csrt_util:make_dt(Started, Updated, millisecond) < 2 * TimeDelay,
+        couch_srt_util:make_dt(Started, Updated, millisecond) < 2 * TimeDelay,
         "updated_at gets updated in a reasonable time frame"
     ),
     ok = nonzero_local_io_assert(Rctx, io_sum),
@@ -466,11 +466,11 @@ t_view_query_include_docs({_Ctx, DbName, View}) ->
     ok = assert_teardown(PidRef).
 
 assert_teardown(PidRef) ->
-    ?assertEqual(ok, csrt:destroy_context(PidRef)),
-    ?assertEqual(undefined, csrt:get_resource()),
+    ?assertEqual(ok, couch_srt:destroy_context(PidRef)),
+    ?assertEqual(undefined, couch_srt:get_resource()),
     %% Normally the tracker is responsible for destroying the resource
-    ?assertEqual(true, csrt_server:destroy_resource(PidRef)),
-    ?assertEqual(undefined, csrt:get_resource(PidRef)),
+    ?assertEqual(true, couch_srt_server:destroy_resource(PidRef)),
+    ?assertEqual(undefined, couch_srt:get_resource(PidRef)),
     ok.
 
 view_cb({row, Row}, Acc) ->
@@ -497,7 +497,7 @@ pdbg(Str, Args) ->
     ?DEBUG_ENABLED andalso ?debugFmt(Str, Args).
 
 convert_pidref({_, _} = PidRef) ->
-    csrt_entry:convert_pidref(PidRef);
+    couch_srt_entry:convert_pidref(PidRef);
 convert_pidref(PidRef) when is_binary(PidRef) ->
     PidRef;
 convert_pidref(false) ->
@@ -517,7 +517,7 @@ rctx_assert(Rctx, Asserts0) ->
     },
     Updates = #{
         pid_ref => fun convert_pidref/1,
-        nonce => fun csrt_entry:convert_string/1
+        nonce => fun couch_srt_entry:convert_string/1
     },
     Asserts = maps:merge(
         DefaultAsserts,
@@ -575,7 +575,7 @@ ddoc_dependent_local_io_assert(Rctx, {_DDoc, _ViewName}) ->
 coordinator_context(#{method := Method, path := Path}) ->
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
     Req = #httpd{method = Method, nonce = Nonce},
-    {_, _} = PidRef = csrt:create_coordinator_context(Req, Path),
+    {_, _} = PidRef = couch_srt:create_coordinator_context(Req, Path),
     {PidRef, Nonce}.
 
 fresh_rctx_assert(Rctx, PidRef, Nonce) ->
@@ -616,4 +616,4 @@ configure_filter(DbName, DDocId, Req, FName) ->
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas
     timer:sleep(50),
-    csrt_entry:to_json(csrt:get_resource(PidRef)).
+    couch_srt_entry:to_json(couch_srt:get_resource(PidRef)).

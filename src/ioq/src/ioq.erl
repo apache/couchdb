@@ -60,7 +60,7 @@ call_search(Fd, Msg, Metadata) ->
     call(Fd, Msg, Metadata).
 
 call(Fd, Msg, Metadata) ->
-    csrt:ioq_called(),
+    couch_srt:ioq_called(),
     case bypass(Msg, Metadata) of
         true ->
             gen_server:call(Fd, Msg, infinity);

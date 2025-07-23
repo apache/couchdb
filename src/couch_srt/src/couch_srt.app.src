@@ -10,25 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_stats_sup).
-
--behaviour(supervisor).
-
--export([
-    start_link/0,
-    init/1
-]).
-
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
-
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-
-init([]) ->
-    {ok,
-        {
-            {one_for_one, 5, 10}, [
-                ?CHILD(couch_stats_server, worker),
-                ?CHILD(couch_stats_process_tracker, worker)
-            ]
-        }}.
+{application, couch_srt, [
+    {description,
+        "Couch Stats Resource Tracker (CSRT) - realtime process local stats"},
+    {vsn, git},
+    {registered, [
+        couch_srt_server,
+        couch_srt_logger
+    ]},
+    {applications, [kernel, stdlib, couch_log, couch_stats]},
+    {mod, {couch_srt_app, []}},
+    {env, []}
+]}.

@@ -10,10 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_logger_tests).
+-module(couch_srt_logger_tests).
 
 -import(
-    csrt_test_helper,
+    couch_srt_test_helper,
     [
         enable_default_logger_matchers/0,
         rctx_gen/1,
@@ -25,7 +25,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
--include("../../src/csrt.hrl").
+-include("../../src/couch_srt.hrl").
 
 %% Use different values than default configs to ensure they're picked up
 -define(THRESHOLD_DBNAME_IO, 91).
@@ -80,7 +80,7 @@ make_docs(Count) ->
     ).
 
 setup() ->
-    Ctx = test_util:start_couch([fabric, couch_stats]),
+    Ctx = test_util:start_couch([fabric, couch_stats, couch_srt]),
     enable_default_logger_matchers(),
     config:set_boolean(?CSRT, "randomize_testing", false, false),
     config:set_boolean(?CSRT, "enable_reporting", true, false),
@@ -96,7 +96,7 @@ setup() ->
     Path = "/" ++ ?b2l(DbName) ++ "/_all_docs",
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
     Req = #httpd{method = Method, nonce = Nonce},
-    {_, _} = PidRef = csrt:create_coordinator_context(Req, Path),
+    {_, _} = PidRef = couch_srt:create_coordinator_context(Req, Path),
     MArgs = #mrargs{include_docs = false},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
     Rctx = load_rctx(PidRef),
@@ -129,7 +129,7 @@ setup() ->
     ok = config:set(
         "csrt_logger.dbnames_io", "foo/bar", integer_to_list(?THRESHOLD_DBNAME_IO), false
     ),
-    csrt_logger:reload_matchers(),
+    couch_srt_logger:reload_matchers(),
     #{ctx => Ctx, dbname => DbName, rctx => Rctx, rctxs => rctxs()}.
 
 teardown(#{ctx := Ctx, dbname := DbName}) ->
@@ -148,17 +148,17 @@ teardown_reporting(Ctx) ->
     teardown(Ctx).
 
 t_enablement(#{}) ->
-    %% Set an invalid match spec to ensure csrt_logger is resilient
+    %% Set an invalid match spec to ensure couch_srt_logger is resilient
     config:set(?CSRT_MATCHERS_DBNAMES, "foobar", "lkajsdfkjkkadfjkajkf", false),
-    ?assertEqual(ok, csrt_logger:reload_matchers(), "reloads even with bad matcher specs set"),
-    ?assert(csrt_util:is_enabled(), "CSRT is enabled"),
-    ?assert(csrt_util:is_enabled_reporting(), "CSRT reporting is enabled"),
-    ?assert(csrt_util:is_enabled_rpc_reporting(), "CSRT RPC reporting is enabled").
+    ?assertEqual(ok, couch_srt_logger:reload_matchers(), "reloads even with bad matcher specs set"),
+    ?assert(couch_srt_util:is_enabled(), "CSRT is enabled"),
+    ?assert(couch_srt_util:is_enabled_reporting(), "CSRT reporting is enabled"),
+    ?assert(couch_srt_util:is_enabled_rpc_reporting(), "CSRT RPC reporting is enabled").
 
 t_do_report(#{rctx := Rctx}) ->
     JRctx = jrctx(Rctx),
     ReportName = "foo",
-    ?assert(csrt_logger:do_report(ReportName, Rctx), "CSRT _logger:do_report " ++ ReportName),
+    ?assert(couch_srt_logger:do_report(ReportName, Rctx), "CSRT _logger:do_report " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT do_report"),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
     ?assert(
@@ -170,7 +170,7 @@ t_do_lifetime_report(#{rctx := Rctx}) ->
     JRctx = jrctx(Rctx),
     ReportName = "csrt-pid-usage-lifetime",
     ?assert(
-        csrt_logger:do_lifetime_report(Rctx),
+        couch_srt_logger:do_lifetime_report(Rctx),
         "CSRT _logger:do_report " ++ ReportName
     ),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
@@ -182,7 +182,7 @@ t_do_lifetime_report(#{rctx := Rctx}) ->
 t_do_status_report(#{rctx := Rctx}) ->
     JRctx = jrctx(Rctx),
     ReportName = "csrt-pid-usage-status",
-    ?assert(csrt_logger:do_status_report(Rctx), "csrt_logger:do_ " ++ ReportName),
+    ?assert(couch_srt_logger:do_status_report(Rctx), "couch_srt_logger:do_ " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
     ?assert(
         meck:called(couch_log, report, [ReportName, JRctx]),
@@ -229,8 +229,8 @@ t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
             %% Matcher on changes only works for coordinators at the moment due
             %% to overloading over rows_read for all aggregate operations
             (#rctx{type = #coordinator{mod = chttpd_db, func = handle_changes_req}} = R) ->
-                Ret = csrt_entry:value(changes_returned, R),
-                Proc = csrt_entry:value(rows_read, R),
+                Ret = couch_srt_entry:value(changes_returned, R),
+                Proc = couch_srt_entry:value(rows_read, R),
                 (Proc - Ret) >= Threshold;
             (_) ->
                 false
@@ -248,12 +248,12 @@ t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
     %% Native is a small timescale, make sure we have enough for a millisecond
     %% measureable time delta
     %% Make sure we have at least one match
-    Now = csrt_util:tnow(),
+    Now = couch_srt_util:tnow(),
     UpdatedAt = Now - round(NativeThreshold * 1.23),
     Rctxs = [rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0],
     DurationFilter = fun(R) ->
-        Started = csrt_entry:value(started_at, R),
-        Updated = csrt_entry:value(updated_at, R),
+        Started = couch_srt_entry:value(started_at, R),
+        Updated = couch_srt_entry:value(updated_at, R),
         Updated - Started >= NativeThreshold
     end,
     ?assertEqual(
@@ -278,10 +278,10 @@ t_matcher_on_nonce(#{rctxs := Rctxs0}) ->
     Rctxs = [rctx_gen(#{nonce => Nonce}) | Rctxs0],
     %% Nonce requires dynamic matcher as it's a static match
     %% TODO: add pattern based nonce matching
-    MSpec = csrt_logger:matcher_on_nonce(Nonce),
+    MSpec = couch_srt_logger:matcher_on_nonce(Nonce),
     CompMSpec = ets:match_spec_compile(MSpec),
     Matchers = #{"nonce" => {MSpec, CompMSpec}},
-    IsMatch = fun(ARctx) -> csrt_logger:is_match(ARctx, Matchers) end,
+    IsMatch = fun(ARctx) -> couch_srt_logger:is_match(ARctx, Matchers) end,
     ?assertEqual(
         lists:sort(lists:filter(matcher_on(nonce, Nonce), Rctxs)),
         lists:sort(lists:filter(IsMatch, Rctxs)),
@@ -319,22 +319,22 @@ t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
 t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
     CrazyDbName = <<"asdf123@?!&#fdsa">>,
     MName = "Crazy-Matcher",
-    MSpec = csrt_logger:matcher_on_dbname(CrazyDbName),
+    MSpec = couch_srt_logger:matcher_on_dbname(CrazyDbName),
     %% Add an extra Rctx with CrazyDbName to create a specific match
     ExtraRctx = rctx_gen(#{dbname => CrazyDbName}),
     %% Make sure we have at least one match
     Rctxs = [ExtraRctx | Rctxs0],
 
-    ?assertEqual(#{}, csrt_logger:get_registered_matchers(), "no current registered matchers"),
+    ?assertEqual(#{}, couch_srt_logger:get_registered_matchers(), "no current registered matchers"),
     ?assertEqual(
         {error, {invalid_ms, "bad_spec", "fdsa"}},
-        csrt_logger:register_matcher("bad_spec", "fdsa"),
+        couch_srt_logger:register_matcher("bad_spec", "fdsa"),
         "register bad matcher fails"
     ),
-    ?assertEqual(ok, csrt_logger:register_matcher(MName, MSpec), "register matcher"),
+    ?assertEqual(ok, couch_srt_logger:register_matcher(MName, MSpec), "register matcher"),
     CompMSpec = test_util:wait(
         fun() ->
-            case csrt_logger:get_matcher(MName) of
+            case couch_srt_logger:get_matcher(MName) of
                 undefined ->
                     wait;
                 {MSpec, _Ref} = CompMSpec0 ->
@@ -346,48 +346,48 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
     ?assert(CompMSpec =/= timeout, "newly registered matcher was initialized"),
     ?assertEqual(
         [MName],
-        maps:keys(csrt_logger:get_registered_matchers()),
+        maps:keys(couch_srt_logger:get_registered_matchers()),
         "correct current registered matchers"
     ),
-    ?assert(csrt_logger:is_match(ExtraRctx, Matchers), "our registered matcher matches expectedly"),
+    ?assert(couch_srt_logger:is_match(ExtraRctx, Matchers), "our registered matcher matches expectedly"),
     ?assert(
-        csrt_logger:is_match(ExtraRctx),
+        couch_srt_logger:is_match(ExtraRctx),
         "our registered matcher is picked up and matches expectedly"
     ),
     ?assertEqual(
         Matchers,
-        csrt_logger:find_matches(Rctxs, Matchers),
+        couch_srt_logger:find_matches(Rctxs, Matchers),
         "we find our matcher and no extra matchers"
     ),
     ?assert(
         maps:is_key(
             MName,
-            csrt_logger:find_matches(Rctxs, csrt_logger:get_matchers())
+            couch_srt_logger:find_matches(Rctxs, couch_srt_logger:get_matchers())
         ),
         "find our CrazyDbName matcher in matches against all registered matchers"
     ),
     ?assertEqual(
         #{MName => [ExtraRctx]},
-        csrt_logger:find_all_matches(Rctxs, Matchers),
+        couch_srt_logger:find_all_matches(Rctxs, Matchers),
         "find our CrazyDb ExtraRctx with our Matcher, and nothing else"
     ),
-    ?assertEqual(ok, csrt_logger:reload_matchers(), "we can reload matchers"),
+    ?assertEqual(ok, couch_srt_logger:reload_matchers(), "we can reload matchers"),
     ?assertEqual(
         [MName],
-        maps:keys(csrt_logger:get_registered_matchers()),
+        maps:keys(couch_srt_logger:get_registered_matchers()),
         "correct current registered matchers after a global reload"
     ),
     ?assert(
         maps:is_key(
             MName,
-            csrt_logger:find_matches(Rctxs, csrt_logger:get_matchers())
+            couch_srt_logger:find_matches(Rctxs, couch_srt_logger:get_matchers())
         ),
         "our matcher still behaves expectedly after a global matcher reload"
     ),
-    ?assertEqual(ok, csrt_logger:deregister_matcher(MName), "deregister_matcher returns ok"),
+    ?assertEqual(ok, couch_srt_logger:deregister_matcher(MName), "deregister_matcher returns ok"),
     Matcher2 = test_util:wait(
         fun() ->
-            case csrt_logger:get_matcher(MName) of
+            case couch_srt_logger:get_matcher(MName) of
                 undefined ->
                     undefined;
                 _ ->
@@ -396,12 +396,12 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
         end
     ),
     ?assertEqual(undefined, Matcher2, "matcher was deregistered successfully"),
-    ?assertEqual(#{}, csrt_logger:get_registered_matchers(), "no leftover registered matchers").
+    ?assertEqual(#{}, couch_srt_logger:get_registered_matchers(), "no leftover registered matchers").
 
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas
     timer:sleep(50),
-    csrt:get_resource(PidRef).
+    couch_srt:get_resource(PidRef).
 
 view_cb({row, Row}, Acc) ->
     {ok, [Row | Acc]};
@@ -415,14 +415,14 @@ matcher_on(Field, Value) ->
     matcher_for(Field, Value, fun erlang:'=:='/2).
 
 matcher_for(Field, Value, Op) ->
-    fun(Rctx) -> Op(csrt_entry:value(Field, Rctx), Value) end.
+    fun(Rctx) -> Op(couch_srt_entry:value(Field, Rctx), Value) end.
 
 matcher_for_csrt(MatcherName) ->
-    Matchers = #{MatcherName => {_, _} = csrt_logger:get_matcher(MatcherName)},
-    case csrt_logger:get_matcher(MatcherName) of
+    Matchers = #{MatcherName => {_, _} = couch_srt_logger:get_matcher(MatcherName)},
+    case couch_srt_logger:get_matcher(MatcherName) of
         {_, _} = Matcher ->
             Matchers = #{MatcherName => Matcher},
-            fun(Rctx) -> csrt_logger:is_match(Rctx, Matchers) end;
+            fun(Rctx) -> couch_srt_logger:is_match(Rctx, Matchers) end;
         _ ->
             throw({missing_matcher, MatcherName})
     end.
@@ -430,8 +430,8 @@ matcher_for_csrt(MatcherName) ->
 matcher_for_dbnames_io(Dbname0, Threshold) ->
     Dbname = list_to_binary(Dbname0),
     fun(Rctx) ->
-        DbnameA = csrt_entry:value(dbname, Rctx),
+        DbnameA = couch_srt_entry:value(dbname, Rctx),
         Fields = [ioq_calls, get_kv_node, get_kp_node, docs_read, rows_read],
-        Vals = [{F, csrt_entry:value(F, Rctx)} || F <- Fields],
+        Vals = [{F, couch_srt_entry:value(F, Rctx)} || F <- Fields],
         Dbname =:= mem3:dbname(DbnameA) andalso lists:any(fun({_K, V}) -> V >= Threshold end, Vals)
     end.

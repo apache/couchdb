@@ -15,9 +15,7 @@
     {vsn, git},
     {registered, [
         couch_stats_aggregator,
-        couch_stats_process_tracker,
-        csrt_server,
-        csrt_logger
+        couch_stats_process_tracker
     ]},
     {applications, [kernel, stdlib, couch_log]},
     {mod, {couch_stats_app, []}},

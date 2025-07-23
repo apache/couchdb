@@ -10,10 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_entry).
+-module(couch_srt_entry).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 -export([
     value/2,
@@ -174,8 +174,8 @@ record_info() ->
 -spec to_json(Rctx :: rctx()) -> map().
 to_json(#rctx{} = Rctx) ->
     #{
-        updated_at => convert_string(csrt_util:tutc(Rctx#rctx.updated_at)),
-        started_at => convert_string(csrt_util:tutc(Rctx#rctx.started_at)),
+        updated_at => convert_string(couch_srt_util:tutc(Rctx#rctx.updated_at)),
+        started_at => convert_string(couch_srt_util:tutc(Rctx#rctx.started_at)),
         pid_ref => convert_pidref(Rctx#rctx.pid_ref),
         nonce => convert_string(Rctx#rctx.nonce),
         dbname => convert_string(Rctx#rctx.dbname),

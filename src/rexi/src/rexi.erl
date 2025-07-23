@@ -104,7 +104,7 @@ kill_all(NodeRefs) when is_list(NodeRefs) ->
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    Payload = csrt:maybe_add_delta(Reply),
+    Payload = couch_srt:maybe_add_delta(Reply),
     erlang:send(Caller, {Ref, Payload}).
 
 %% Private function used by stream2 to initialize the stream. Message is of the
@@ -189,7 +189,7 @@ stream2(Msg, Limit, Timeout) ->
         {ok, Count} ->
             put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
-            Payload = csrt:maybe_add_delta(Msg),
+            Payload = couch_srt:maybe_add_delta(Msg),
             erlang:send(Caller, {Ref, self(), Payload}),
             ok
     catch
@@ -228,7 +228,7 @@ ping() ->
     %% filtered queries will be silent on usage until they finally return
     %% a row or no results. This delay is proportional to the database size,
     %% so instead we make sure ping/0 keeps live stats flowing.
-    erlang:send(Caller, csrt:maybe_add_delta({rexi, '$rexi_ping'})).
+    erlang:send(Caller, couch_srt:maybe_add_delta({rexi, '$rexi_ping'})).
 
 aggregate_server_queue_len() ->
     rexi_server_mon:aggregate_queue_len(rexi_server).

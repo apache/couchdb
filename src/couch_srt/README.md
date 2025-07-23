@@ -1,16 +1,17 @@
-# Couch Stats Resource Tracker (CSRT)
+# couch_srt: Couch Stats Resource Tracker aka CSRT
 
-CSRT (Couch Stats Resource Tracker) is a real time stats tracking system that
-tracks the quantity of resources induced at the process level in a live
-queryable manner that also generates process lifetime reports containing
-statistics on the total resource load of a request, as a function of things like
-dbs/docs opened, view and changes rows read, changes returned vs processed,
-Javascript filter usage, duration, and more. This system is a paradigm shift in
-CouchDB visibility and introspection, allowing for expressive real time querying
+The `couch_srt` app introduces the Couch Stats Resource Tracker, aka CSRT for
+short. CSRT is a real time stats tracking system that tracks the quantity of
+resources induced at the process level in a live queryable manner, while also
+generating process lifetime reports containing statistics on the total resource
+load of a request, as a function of CouchDB operations like dbs/docs opened,
+view and changes rows read, changes returned vs processed, Javascript filter
+usage, request duration, and more. This system is a paradigm shift in CouchDB
+visibility and introspection, allowing for expressive real time querying
 capabilities to introspect, understand, and aggregate CouchDB internal resource
 usage, as well as powerful filtering facilities for conditionally generating
 reports on "heavy usage" requests or "long/slow" requests. CSRT also extends
-`recon:proc_window` with `csrt:proc_window` allowing for the same style of
+`recon:proc_window` with `couch_srt:proc_window` allowing for the same style of
 battle hardened introspection with Recon's excellent `proc_window`, but with the
 sample window over any of the CSRT tracked CouchDB stats!
 
@@ -74,12 +75,12 @@ valued docs; this allows us time to query these heavier requests live and see
 them in progress with the real time stats tracking and querying capabilities of
 CSRT.
 
-For example, let's use `csrt:proc_window/3` as one would do with
+For example, let's use `couch_srt:proc_window/3` as one would do with
 `recon:proc_window/3` to get an idea of the heavy active processes on the
 system:
 
 ```
-(node1@127.0.0.1)2> rp([{PR, csrt:to_json(csrt:get_resource(PR))} || {PR, _, _} <- csrt:proc_window(ioq_calls, 3, 1000)]).
+(node1@127.0.0.1)2> rp([{PR, couch_srt:to_json(couch_srt:get_resource(PR))} || {PR, _, _} <- couch_srt:proc_window(ioq_calls, 3, 1000)]).
 [{{<0.5090.0>,#Ref<0.2277656623.605290499.37969>},
   #{changes_returned => 3962,db_open => 10,dbname => <<"foo">>,
     docs_read => 7917,docs_written => 0,get_kp_node => 54,
@@ -128,8 +129,8 @@ of these processes are incurring heavy usage, reading many thousands of docs
 with 15k+ IOQ calls and heavy JS filter usage, exactly the types of requests
 you want to be alerted to. CSRT's proc window logic is built on top of Recon's,
 which doesn't return the process info itself, so you'll need to fetch the
-process status with `csrt:get_resource/1` and then pretty print it with
-`csrt:to_json/1`.
+process status with `couch_srt:get_resource/1` and then pretty print it with
+`couch_srt:to_json/1`.
 
 The output above is a real time snapshot of the live running system and shows
 processes actively inducing additional resource usage, so these CSRT context
@@ -206,20 +207,20 @@ The query and HTTP API's are well documented and tested (h/t @iilyak) and
 provide an excellent overview of the interaction patterns and query capabilities
 of CSRT. Those can be found at:
 
-* `csrt_query.erl` "Query API functions"
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/src/csrt_query.erl#L319-L674
+* `couch_srt_query.erl` "Query API functions"
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/src/couch_srt_query.erl#L319-L674
   - the above highlighted functions are well tested, typespec'ed, and have
     auxilary documentation and examples, an excellent resource
-* the `csrt_query_tests.erl` Eunit tests are an excellent overview of utilizing
-  the `csrt_query:` API from Erlang to find, filter, and aggregate CSRT real
+* the `couch_srt_query_tests.erl` Eunit tests are an excellent overview of utilizing
+  the `couch_srt_query:` API from Erlang to find, filter, and aggregate CSRT real
   time contexts
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/csrt_query_tests.erl
-* similarly, the `csrt_httpd_tests.erl` Eunit tests are an excellent overview of
-  performing the same style `csrt_query:` queries, but through the HTTP API
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/csrt_httpd_tests.erl
-* Additionally there's the `csrt_logger_tests.erl` Eunit tests which demonstrate
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_query_tests.erl
+* similarly, the `couch_srt_httpd_tests.erl` Eunit tests are an excellent overview of
+  performing the same style `couch_srt_query:` queries, but through the HTTP API
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_httpd_tests.erl
+* Additionally there's the `couch_srt_logger_tests.erl` Eunit tests which demonstrate
   the different default logger matchers in action
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/csrt_logger_tests.erl
+  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_logger_tests.erl
 
 # CSRT Config Keys
 
@@ -332,7 +333,7 @@ system works effeciently at scale. This means that we can increment counters on
 all of the stats counter fields in a batch, very quickly, but for tracking
 `updated_at` timestamps we'd need to either do an extra ets call to get the last
 `updated_at` value, or do an extra ets call to `ets:update_element` to set the
-`updated_at` value to `csrt_util:tnow()`. The core problem with this is that the
+`updated_at` value to `couch_srt_util:tnow()`. The core problem with this is that the
 batch inc operation is essentially the only write operation performed after the
 initial context setting of dbname/handler/etc; this means that we'd literally
 double the number of ets calls induced to track CSRT updates, just for tracking
@@ -428,7 +429,7 @@ reporting by default, as its a simple way to reduce overall volume
 ## config:get(?CSRT, "randomize_testing", true).
 
 This is a `make eunit` only feature toggle that will induce randomness into the
-cluster's `csrt:is_enabled()` state, specifically to utilize the test suite to
+cluster's `couch_srt:is_enabled()` state, specifically to utilize the test suite to
 exercise edge case scenarios and failures when CSRT is only conditionally
 enabled, ensuring that it gracefuly and robustly handles errors without fallout
 to the underlying http clients.
@@ -574,8 +575,8 @@ These are functions are CRUD operations around creating and storing the CSRT
 
 These are the CRUD functions for handling a CSRT context lifecycle, where a
 lifecycle context is created in a `chttpd` coordinator process by way of
-`csrt:create_coordinator_context/2`, or in `rexi_server:init_p` by way of
-`csrt:create_worker_context/3`. Additional functions are exposed for setting
+`couch_srt:create_coordinator_context/2`, or in `rexi_server:init_p` by way of
+`couch_srt:create_worker_context/3`. Additional functions are exposed for setting
 context specific info like username/dbname/handler. `get_resource` fetches the
 context being tracked corresponding to the given `PidRef`.
 
@@ -622,7 +623,7 @@ to adding and extracting delta contexts and then accumulating those values.
 NOTE: `make_delta/0` is a "destructive" operation that will induce a new delta
 by way of the last local pdict's rctx delta snapshot, and then update to the
 most recent version. Two individual rctx snapshots for a PidRef can safely
-generate an actual delta by way of `csrt_util:rctx_delta/2`.
+generate an actual delta by way of `couch_srt_util:rctx_delta/2`.
 
 ```
 -export([
@@ -682,9 +683,9 @@ See the `Additional Overview and Examples` section above for more details.
 ]).
 ```
 
-## csrt:proc_window/3 -- Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
+## couch_srt:proc_window/3 -- Recon API Ports of https://github.com/ferd/recon/releases/tag/2.5.6
 
-This is a "port" of `recon:proc_window` to `csrt:proc_window`, allowing for
+This is a "port" of `recon:proc_window` to `couch_srt:proc_window`, allowing for
 `proc_window` style aggregations/sorting/filtering but with the stats fields
 collected by CSRT! This is also a direct port of `recon:proc_window` in that it
 utilizes the same underlying logic and effecient internal data structures as
@@ -708,7 +709,7 @@ and in fact, if recon upstream parameterized the option of `AttrName` or
 `SampleFunction`, this could be reimplemented as:
 
 ```erlang
-%% csrt:proc_window
+%% couch_srt:proc_window
 proc_window(AttrName, Num, Time) ->
     Sample = fun() -> pid_ref_attrs(AttrName) end,
     recon:proc_window(Sample, Num, Time).
@@ -769,7 +770,7 @@ while hacking on CSRT:
 Above we have the core `pid_ref()` data type, which is just a tuple with a
 `pid()` and a `reference()`, and naturally, `maybe_pid_ref()` handles the
 optional presence of a `pid_ref()`, allowing for our APIs like
-`csrt:get_resource(maybe_pidref())` to handle ambiguity of the presence of a
+`couch_srt:get_resource(maybe_pidref())` to handle ambiguity of the presence of a
 `pid_ref()`.
 
 We define our core `rctx()` data type as an empty `#rctx{}`, or the more
@@ -807,9 +808,9 @@ existing `#rctx{}` record to search with.
 ```erlang
 -record(rctx, {
     %% Metadata
-    started_at = csrt_util:tnow() :: integer() | '_',
+    started_at = couch_srt_util:tnow() :: integer() | '_',
     %% NOTE: updated_at must be after started_at to preserve time congruity
-    updated_at = csrt_util:tnow() :: integer() | '_',
+    updated_at = couch_srt_util:tnow() :: integer() | '_',
     pid_ref :: maybe_pid_ref() | {'_', '_'} | '_',
     nonce :: nonce() | undefined | '_',
     type :: rctx_type() | undefined | '_',
@@ -835,7 +836,7 @@ existing `#rctx{}` record to search with.
 
 ## Metadata
 
-We use `csrt_util:tnow()` for time tracking, which is a `native` format
+We use `couch_srt_util:tnow()` for time tracking, which is a `native` format
 `erlang:monotonic_time()` integer, which, noteably, _can_ be and is often a
 negative value. You must either take a delta or convert the time to get into a
 useable format, as one might suspect by the use of `native`.
@@ -853,7 +854,7 @@ An easier way to do this is to use erlang:monotonic_time/1 with the desired time
 unit. However, you can then lose accuracy and precision.
 ```
 
-So our `csrt_util:tnow/0` is implemented as the following, and we store
+So our `couch_srt_util:tnow/0` is implemented as the following, and we store
 timestamps in `native` format as long as possible to avoid precision loss at
 higher units of time, eg 300 microseconds is zero milliseconds.
 
@@ -871,16 +872,16 @@ native time representation to its corresponding time format when we generate the
 process life cycle reports or send an http response.
 
 NOTE: because we do an inline definition and assignment of the
-`#rctx.started_at` and `#rctx.updated_at` fields to `csrt_util:tnow()`, we
+`#rctx.started_at` and `#rctx.updated_at` fields to `couch_srt_util:tnow()`, we
 _must_ declare `#rctx.updated_at` *after* `#rctx.started_at` to avoid
 fundamental time incongruenties.
 
-### #rctx.started_at = csrt_util:tnow() :: integer() | '_',
+### #rctx.started_at = couch_srt_util:tnow() :: integer() | '_',
 
 A static value corresponding to the local node's Erlang monotonic_time at which
 this context was created.
 
-### #rctx.updated_at = csrt_util:tnow() :: integer() | '_',
+### #rctx.updated_at = couch_srt_util:tnow() :: integer() | '_',
 
 A dynamic value corresponding to the local node's Erlang monotonic_time at which
 this context was updated. Note: unlike `#rctx.started_at`, this value will
@@ -911,12 +912,12 @@ additional context types like `#view_indexer{}`, `#search_indexer{}`,
 ### #rctx.dbname :: dbname() | undefined | '_',
 
 The database name, filled in at some point after the initial context creation by
-way of `csrt:set_context_dbname/{1,2}`.
+way of `couch_srt:set_context_dbname/{1,2}`.
 
 ### #rctx.username :: username() | undefined | '_',
 
 The requester's username, filled in at some point after the initial context
-creation by way of `csrt:set_context_username/{1,2}`.
+creation by way of `couch_srt:set_context_username/{1,2}`.
 
 ## Stats Counters
 
@@ -943,7 +944,7 @@ The number of `couch_db:open_doc/3` invocations induced by this context.
 ### #rctx.docs_written = 0 :: non_neg_integer() | '_',
 
 A phony metric counting docs written by the context, induced by
-`csrt:docs_written(length(Docs0)),` in `fabric_rpc:update_docs/3` as a way to
+`couch_srt:docs_written(length(Docs0)),` in `fabric_rpc:update_docs/3` as a way to
 count the magnitude of docs written, as the actual document writes happen in the
 `#db.main_pid` `couch_db_updater` pid and subprocess tracking is not yet
 supported in CSRT.
@@ -976,7 +977,7 @@ its own delta back to the worker pid.
 
 A phony metric counting the number of `couch_query_servers:filter_docs_int/5`
 (eg ddoc_prompt) invocations induced by this context. This is called by way of
-`csrt:js_filtered(length(JsonDocs))` which both increments `js_filter` by 1, and
+`couch_srt:js_filtered(length(JsonDocs))` which both increments `js_filter` by 1, and
 `js_filtered_docs` by the length of the docs so we can track magnitude of docs
 and doc revs being filtered.
 
@@ -984,7 +985,7 @@ and doc revs being filtered.
 
 A phony metric counting the quantity of documents filtered by way of
 `couch_query_servers:filter_docs_int/5` (eg ddoc_prompt) invocations induced by
-this context. This is called by way of `csrt:js_filtered(length(JsonDocs))`
+this context. This is called by way of `couch_srt:js_filtered(length(JsonDocs))`
 which both increments `#rctx.js_filter` by 1, and `#rctx.js_filtered_docs` by
 the length of the docs so we can track magnitude of docs and doc revs being
 filtered.

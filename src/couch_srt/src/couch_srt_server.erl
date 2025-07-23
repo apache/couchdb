@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_server).
+-module(couch_srt_server).
 
 -behaviour(gen_server).
 
@@ -42,7 +42,7 @@
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 -record(st, {}).
 
@@ -84,7 +84,7 @@ set_context_handler_fun({Mod, Func}, PidRef) ->
             false;
         #rctx{} = Rctx ->
             %% TODO: #coordinator{} assumption needs to adapt for other types
-            case csrt_server:get_context_type(Rctx) of
+            case couch_srt_server:get_context_type(Rctx) of
                 #coordinator{} = Coordinator0 ->
                     Coordinator = Coordinator0#coordinator{mod = Mod, func = Func},
                     set_context_type(Coordinator, PidRef);
@@ -162,7 +162,7 @@ get_rctx_stat_field(Field) ->
 %% the last updated_at time, or having to do ets:update_element to set a
 %% specific updated_at. We trade a pdict marker to keep inc operations as only
 %% a singular ets call while sneaking in updated_at.
-%% Calling csrt_util:put_updated_at/1 within this function is not the cleanest,
+%% Calling couch_srt_util:put_updated_at/1 within this function is not the cleanest,
 %% but it allows us to encapsulate the automatic updated_at inclusion into the
 %% ?MODULE:update_counter(s)/3-4 arity call-through while still allowing the
 %% 4-arity version to be exposed to pass an empty base updates list. Isolating
@@ -170,13 +170,13 @@ get_rctx_stat_field(Field) ->
 %% local pdict values.
 -spec make_base_counter_updates() -> counter_updates_list().
 make_base_counter_updates() ->
-    case csrt_util:get_updated_at() of
+    case couch_srt_util:get_updated_at() of
         undefined ->
             [];
         LastUpdated ->
-            Now = csrt_util:tnow(),
-            csrt_util:put_updated_at(Now),
-            UpdatedInc = csrt_util:make_dt(LastUpdated, Now, native),
+            Now = couch_srt_util:tnow(),
+            couch_srt_util:put_updated_at(Now),
+            UpdatedInc = couch_srt_util:make_dt(LastUpdated, Now, native),
             [{#rctx.updated_at, UpdatedInc}]
     end.
 

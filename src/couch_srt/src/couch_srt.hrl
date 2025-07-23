@@ -12,7 +12,7 @@
 
 -define(CSRT, "csrt").
 -define(CSRT_INIT_P, "csrt.init_p").
--define(CSRT_ETS, csrt_server).
+-define(CSRT_ETS, csrt_ets).
 
 %% CSRT pdict markers
 -define(DELTA_TA, {csrt, delta_ta}).
@@ -36,7 +36,7 @@
 -define(ROWS_READ, rows_read).
 -define(FRPC_CHANGES_RETURNED, changes_returned).
 
-%% csrt_logger matcher keys
+%% couch_srt_logger matcher keys
 -define(MATCHERS_KEY, {csrt_logger, all_csrt_matchers}).
 -define(CSRT_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
 -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
@@ -110,9 +110,9 @@
 
 -record(rctx, {
     %% Metadata
-    started_at = csrt_util:tnow() :: integer() | '_',
+    started_at = couch_srt_util:tnow() :: integer() | '_',
     %% NOTE: updated_at must be after started_at to preserve time congruity
-    updated_at = csrt_util:tnow() :: integer() | '_',
+    updated_at = couch_srt_util:tnow() :: integer() | '_',
     pid_ref :: maybe_pid_ref() | {'_', '_'} | '_',
     nonce :: nonce() | undefined | '_',
     type :: rctx_type() | undefined | '_',
@@ -185,7 +185,7 @@
 %% This is a little awkward to type, it's a list of ets:update_counter UpdateOp's
 %% where ets types the updates as `UpdateOp = {Pos, Incr}`. We can do better than
 %% that because we know `Pos` is the #rctx record field index, a non_neg_integer(),
-%% and similarly, we know Incr is from `csrt_util:make_dt`, which is returns at
+%% and similarly, we know Incr is from `couch_srt_util:make_dt`, which is returns at
 %% least one. Ideally, we'd specify the `Pos` type sufficiently to be one of the
 %% valid #rctx record field names, however, a clean solution is not obvious.
 -type counter_updates_list() :: [{non_neg_integer(), pos_integer()}] | [].

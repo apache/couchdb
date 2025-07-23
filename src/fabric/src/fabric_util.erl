@@ -138,8 +138,8 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     try
         receive
             {Ref, Msg0} ->
-                {Msg, Delta} = csrt:extract_delta(Msg0),
-                csrt:accumulate_delta(Delta),
+                {Msg, Delta} = couch_srt:extract_delta(Msg0),
+                couch_srt:accumulate_delta(Delta),
                 case Msg of
                     {ok, Db} ->
                         {ok, Db};

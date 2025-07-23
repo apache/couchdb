@@ -284,7 +284,7 @@ get_missing_revs(DbName, IdRevsList, Options) ->
     with_db(DbName, Options, {couch_db, get_missing_revs, [IdRevsList]}).
 
 update_docs(DbName, Docs0, Options) ->
-    csrt:docs_written(length(Docs0)),
+    couch_srt:docs_written(length(Docs0)),
     {Docs1, Type} =
         case couch_util:get_value(read_repair, Options) of
             NodeRevs when is_list(NodeRevs) ->
@@ -673,13 +673,13 @@ clean_stack(S) ->
     ).
 
 set_io_priority(DbName, Options) ->
-    csrt:set_context_dbname(DbName),
+    couch_srt:set_context_dbname(DbName),
     %% TODO: better approach here than using proplists?
     case proplists:get_value(user_ctx, Options) of
         undefined ->
             ok;
         #user_ctx{name = UserName} ->
-            csrt:set_context_username(UserName)
+            couch_srt:set_context_username(UserName)
     end,
     case lists:keyfind(io_priority, 1, Options) of
         {io_priority, Pri} ->

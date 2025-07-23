@@ -101,7 +101,7 @@ t_no_config_db_create_fails_for_shard_rpc(DbName) ->
         receive
             Resp0 -> Resp0
         end,
-    case csrt:is_enabled() of
+    case couch_srt:is_enabled() of
         true ->
             %% allow for {Ref, {rexi_EXIT, error}, {delta, D}}
             ?assertMatch(

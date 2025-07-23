@@ -10,12 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_httpd_tests).
+-module(couch_srt_httpd_tests).
 
 -include_lib("stdlib/include/ms_transform.hrl").
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("../../src/csrt.hrl").
+-include("../../src/couch_srt.hrl").
 
 -define(USER, ?MODULE_STRING ++ "_admin").
 -define(PASS, "pass").
@@ -47,7 +47,7 @@ csrt_httpd_test_() ->
     }.
 
 setup_ctx() ->
-    Ctx = test_util:start_couch([chttpd, fabric, couch_stats]),
+    Ctx = test_util:start_couch([chttpd, fabric, couch_stats, couch_srt]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
     HashedList = binary_to_list(Hashed),
     ok = config:set("admins", ?USER, HashedList, false),
@@ -58,7 +58,7 @@ setup_ctx() ->
 
 setup() ->
     {Ctx, Url} = setup_ctx(),
-    csrt_test_helper:enable_default_logger_matchers(),
+    couch_srt_test_helper:enable_default_logger_matchers(),
     Rctxs = [
         rctx(#{dbname => <<"db1">>, ioq_calls => 123, username => <<"user_foo">>}),
         rctx(#{dbname => <<"db1">>, ioq_calls => 321, username => <<"user_foo">>}),
@@ -597,9 +597,9 @@ format(Fmt, Args) ->
 aggregate(AggregationKeys, ValField, Records) ->
     lists:foldl(
         fun(Rctx, Acc) ->
-            Key = list_to_tuple([csrt_entry:value(Field, Rctx) || Field <- AggregationKeys]),
+            Key = list_to_tuple([couch_srt_entry:value(Field, Rctx) || Field <- AggregationKeys]),
             CurrVal = maps:get(Key, Acc, []),
-            maps:put(Key, [csrt_entry:value(ValField, Rctx) | CurrVal], Acc)
+            maps:put(Key, [couch_srt_entry:value(ValField, Rctx) | CurrVal], Acc)
         end,
         #{},
         Records
@@ -658,4 +658,4 @@ rctx(Opts) ->
     % matcher match.
     Threshold = config:get("csrt_logger.matchers_threshold", "rows_read", 1000),
     BaseOpts = #{docs_read => Threshold + 1, username => <<"user_foo">>},
-    csrt_test_helper:rctx_gen(maps:merge(BaseOpts, Opts)).
+    couch_srt_test_helper:rctx_gen(maps:merge(BaseOpts, Opts)).

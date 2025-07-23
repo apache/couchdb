@@ -10,9 +10,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_httpd).
+-module(couch_srt_httpd).
 -include_lib("couch/include/couch_db.hrl").
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 -export([handle_resource_status_req/1]).
 
@@ -38,15 +38,15 @@ handle_resource_status_req(
         case {GroupBy, SortBy, CountBy} of
             {undefined, undefined, {Props}} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
-                {Keys, csrt:query([csrt:from(MatcherName), csrt:count_by(Keys)])};
+                {Keys, couch_srt:query([couch_srt:from(MatcherName), couch_srt:count_by(Keys)])};
             {undefined, {Props}, undefined} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
                 CounterKey = couch_util:get_value(<<"counter_key">>, Props),
-                {Keys, csrt:query([csrt:from(MatcherName), csrt:sort_by(Keys, CounterKey)])};
+                {Keys, couch_srt:query([couch_srt:from(MatcherName), couch_srt:sort_by(Keys, CounterKey)])};
             {{Props}, undefined, undefined} ->
                 Keys = couch_util:get_value(<<"aggregate_keys">>, Props),
                 CounterKey = couch_util:get_value(<<"counter_key">>, Props),
-                {Keys, csrt:query([csrt:from(MatcherName), csrt:group_by(Keys, CounterKey)])};
+                {Keys, couch_srt:query([couch_srt:from(MatcherName), couch_srt:group_by(Keys, CounterKey)])};
             {_, _, _} ->
                 throw({bad_request, <<"Multiple aggregations are not supported">>})
         end,
@@ -54,7 +54,7 @@ handle_resource_status_req(
         {error, Reason} ->
             send_error(Req, Reason);
         Q ->
-            JSON = to_json(AggregationKeys, csrt:rpc_run(Q)),
+            JSON = to_json(AggregationKeys, couch_srt:rpc_run(Q)),
             send_json(Req, JSON)
     end;
 handle_resource_status_req(#httpd{path_parts = [<<"_active_resources">>]} = Req) ->

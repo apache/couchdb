@@ -63,8 +63,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
         {rexi, Ref, Msg0} ->
-            {Msg, Delta} = csrt:extract_delta(Msg0),
-            csrt:accumulate_delta(Delta),
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
@@ -72,8 +72,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                     Fun(Msg, Worker, Acc0)
             end;
         {rexi, Ref, From, Msg0} ->
-            {Msg, Delta} = csrt:extract_delta(Msg0),
-            csrt:accumulate_delta(Delta),
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
@@ -86,13 +86,13 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         %% otherwise we won't get the delta until the exhaustion of the find
         %% query.
         {{rexi, '$rexi_ping'}, {delta, Delta}} ->
-            csrt:accumulate_delta(Delta),
+            couch_srt:accumulate_delta(Delta),
             {ok, Acc0};
         {rexi, '$rexi_ping'} ->
             {ok, Acc0};
         {Ref, Msg0} ->
-            {Msg, Delta} = csrt:extract_delta(Msg0),
-            csrt:accumulate_delta(Delta),
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     % this was some non-matching message which we will ignore
@@ -101,8 +101,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                     Fun(Msg, Worker, Acc0)
             end;
         {Ref, From, Msg0} ->
-            {Msg, Delta} = csrt:extract_delta(Msg0),
-            csrt:accumulate_delta(Delta),
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};

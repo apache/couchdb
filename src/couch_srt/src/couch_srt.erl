@@ -10,10 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt).
+-module(couch_srt).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 %% PidRef API
 -export([
@@ -44,6 +44,8 @@
 
 %% Public API
 -export([
+    maybe_track_rexi_init_p/1,
+    maybe_track_local_counter/2,
     clear_pdict_markers/0,
     do_report/2,
     is_enabled/0,
@@ -124,9 +126,9 @@
     query_option/0
 ]).
 
--opaque query() :: csrt_query:query().
--opaque query_expression() :: csrt_query:query_expression().
--opaque query_option() :: csrt_query:query_option().
+-opaque query() :: couch_srt_query:query().
+-opaque query_expression() :: couch_srt_query:query_expression().
+-opaque query_option() :: couch_srt_query:query_option().
 
 %%
 %% RPC Operations
@@ -199,19 +201,19 @@ format_response({Node, {Tag, _}}) ->
 
 -spec get_pid_ref() -> maybe_pid_ref().
 get_pid_ref() ->
-    csrt_util:get_pid_ref().
+    couch_srt_util:get_pid_ref().
 
 -spec get_pid_ref(Rctx :: rctx()) -> pid_ref().
 get_pid_ref(Rctx) ->
-    csrt_util:get_pid_ref(Rctx).
+    couch_srt_util:get_pid_ref(Rctx).
 
 -spec set_pid_ref(PidRef :: pid_ref()) -> pid_ref().
 set_pid_ref(PidRef) ->
-    csrt_util:set_pid_ref(PidRef).
+    couch_srt_util:set_pid_ref(PidRef).
 
 -spec create_pid_ref() -> pid_ref().
 create_pid_ref() ->
-    csrt_server:create_pid_ref().
+    couch_srt_server:create_pid_ref().
 
 -spec destroy_pid_ref() -> maybe_pid_ref().
 destroy_pid_ref() ->
@@ -252,18 +254,18 @@ create_coordinator_context(#httpd{method = Verb, nonce = Nonce}, Path0) ->
 
 -spec create_context(Type :: rctx_type(), Nonce :: term()) -> pid_ref() | false.
 create_context(Type, Nonce) ->
-    Rctx = csrt_server:new_context(Type, Nonce),
+    Rctx = couch_srt_server:new_context(Type, Nonce),
     PidRef = get_pid_ref(Rctx),
     set_pid_ref(PidRef),
     try
-        csrt_util:put_delta_a(Rctx),
-        csrt_util:put_updated_at(Rctx),
-        csrt_server:create_resource(Rctx),
-        csrt_logger:track(Rctx),
+        couch_srt_util:put_delta_a(Rctx),
+        couch_srt_util:put_updated_at(Rctx),
+        couch_srt_server:create_resource(Rctx),
+        couch_srt_logger:track(Rctx),
         PidRef
     catch
         _:_ ->
-            csrt_server:destroy_resource(PidRef),
+            couch_srt_server:destroy_resource(PidRef),
             %% calling destroy_context(PidRef) clears the tracker too
             destroy_context(PidRef),
             false
@@ -278,7 +280,7 @@ set_context_dbname(DbName) ->
 set_context_dbname(_, undefined) ->
     false;
 set_context_dbname(DbName, PidRef) ->
-    is_enabled() andalso csrt_server:set_context_dbname(DbName, PidRef).
+    is_enabled() andalso couch_srt_server:set_context_dbname(DbName, PidRef).
 
 -spec set_context_handler_fun(Handler) -> boolean() when
     Handler :: function() | {atom(), atom()}.
@@ -304,7 +306,7 @@ set_context_handler_fun({Mod, Func}, PidRef) ->
         false ->
             false;
         true ->
-            csrt_server:set_context_handler_fun({Mod, Func}, PidRef)
+            couch_srt_server:set_context_handler_fun({Mod, Func}, PidRef)
     end.
 
 %% @equiv set_context_username(User, get_pid_ref())
@@ -323,7 +325,7 @@ set_context_username(#httpd{user_ctx = Ctx}, PidRef) ->
 set_context_username(#user_ctx{name = Name}, PidRef) ->
     set_context_username(Name, PidRef);
 set_context_username(UserName, PidRef) ->
-    is_enabled() andalso csrt_server:set_context_username(UserName, PidRef).
+    is_enabled() andalso couch_srt_server:set_context_username(UserName, PidRef).
 
 -spec destroy_context() -> ok.
 destroy_context() ->
@@ -334,7 +336,7 @@ destroy_context(undefined) ->
     ok;
 destroy_context(PidRef) ->
     %% Stopping the tracker clears the ets entry for PidRef on its way out
-    csrt_logger:stop_tracker(),
+    couch_srt_logger:stop_tracker(),
     destroy_pid_ref(PidRef),
     clear_pdict_markers(),
     ok.
@@ -355,25 +357,42 @@ clear_pdict_markers() ->
 %% Public API
 %%
 
-%% @equiv csrt_util:is_enabled().
+-spec maybe_track_rexi_init_p({M, F, A}) -> couch_stats:response() when
+      M :: atom(), F :: atom(), A :: non_neg_integer().
+maybe_track_rexi_init_p({M, F, _A}) ->
+    Metric = [M, F, spawned],
+    case couch_srt:should_track_init_p(Metric) of
+        true -> couch_stats:increment_counter(Metric);
+        false -> ok
+    end.
+
+%% Only potentially track positive increments to counters
+-spec maybe_track_local_counter(any(), any()) -> ok.
+maybe_track_local_counter(Name, Val) when is_integer(Val) andalso Val > 0 ->
+    couch_srt:maybe_inc(Name, Val),
+    ok;
+maybe_track_local_counter(_, _) ->
+    ok.
+
+%% @equiv couch_srt_util:is_enabled().
 -spec is_enabled() -> boolean().
 is_enabled() ->
-    csrt_util:is_enabled().
+    couch_srt_util:is_enabled().
 
-%% @equiv csrt_util:is_enabled_reporting().
+%% @equiv couch_srt_util:is_enabled_reporting().
 -spec is_enabled_reporting() -> boolean().
 is_enabled_reporting() ->
-    csrt_util:is_enabled_reporting().
+    couch_srt_util:is_enabled_reporting().
 
-%% @equiv csrt_util:is_enabled_rpc_reporting().
+%% @equiv couch_srt_util:is_enabled_rpc_reporting().
 -spec is_enabled_rpc_reporting() -> boolean().
 is_enabled_rpc_reporting() ->
-    csrt_util:is_enabled_rpc_reporting().
+    couch_srt_util:is_enabled_rpc_reporting().
 
-%% @equiv csrt_util:is_enabled_init_p().
+%% @equiv couch_srt_util:is_enabled_init_p().
 -spec is_enabled_init_p() -> boolean().
 is_enabled_init_p() ->
-    csrt_util:is_enabled_init_p().
+    couch_srt_util:is_enabled_init_p().
 
 -spec get_resource() -> maybe_rctx().
 get_resource() ->
@@ -381,23 +400,23 @@ get_resource() ->
 
 -spec get_resource(PidRef :: maybe_pid_ref()) -> maybe_rctx().
 get_resource(PidRef) ->
-    csrt_server:get_resource(PidRef).
+    couch_srt_server:get_resource(PidRef).
 
 %% Log a CSRT report if any filters match
 -spec maybe_report(ReportName :: string(), PidRef :: pid_ref()) -> ok.
 maybe_report(ReportName, PidRef) ->
-    csrt_logger:maybe_report(ReportName, PidRef).
+    couch_srt_logger:maybe_report(ReportName, PidRef).
 
 %% Direct report logic skipping should log filters
 -spec do_report(ReportName :: string(), PidRef :: pid_ref()) -> boolean().
 do_report(ReportName, PidRef) ->
-    csrt_logger:do_report(ReportName, get_resource(PidRef)).
+    couch_srt_logger:do_report(ReportName, get_resource(PidRef)).
 
 -spec to_json(Rctx :: maybe_rctx()) -> map() | null.
 to_json(undefined) ->
     null;
 to_json(Rctx) ->
-    csrt_entry:to_json(Rctx).
+    couch_srt_entry:to_json(Rctx).
 
 %%
 %% Stat Collection API
@@ -407,7 +426,7 @@ to_json(Rctx) ->
 inc(Key) ->
     case is_enabled() of
         true ->
-            csrt_server:inc(get_pid_ref(), Key);
+            couch_srt_server:inc(get_pid_ref(), Key);
         false ->
             0
     end.
@@ -416,7 +435,7 @@ inc(Key) ->
 inc(Key, N) when is_integer(N) andalso N >= 0 ->
     case is_enabled() of
         true ->
-            csrt_server:inc(get_pid_ref(), Key, N);
+            couch_srt_server:inc(get_pid_ref(), Key, N);
         false ->
             0
     end.
@@ -469,7 +488,7 @@ docs_written(N) ->
 
 -spec accumulate_delta(Delta :: map() | undefined) -> ok.
 accumulate_delta(Delta) when is_map(Delta) ->
-    is_enabled() andalso csrt_server:update_counters(get_pid_ref(), Delta),
+    is_enabled() andalso couch_srt_server:update_counters(get_pid_ref(), Delta),
     ok;
 accumulate_delta(undefined) ->
     ok.
@@ -480,12 +499,12 @@ make_delta() ->
         false ->
             undefined;
         true ->
-            csrt_util:make_delta(get_pid_ref())
+            couch_srt_util:make_delta(get_pid_ref())
     end.
 
 -spec rctx_delta(TA :: maybe_rctx(), TB :: maybe_rctx()) -> maybe_delta().
 rctx_delta(TA, TB) ->
-    csrt_util:rctx_delta(TA, TB).
+    couch_srt_util:rctx_delta(TA, TB).
 
 %%
 %% Aggregate Query API
@@ -493,69 +512,69 @@ rctx_delta(TA, TB) ->
 
 -spec active() -> [rctx()].
 active() ->
-    csrt_query:active().
+    couch_srt_query:active().
 
 -spec active(Type :: json) -> [rctx()].
 active(Type) ->
-    csrt_query:active(Type).
+    couch_srt_query:active(Type).
 
 -spec active_coordinators() -> [coordinator_rctx()].
 active_coordinators() ->
-    csrt_query:active_coordinators().
+    couch_srt_query:active_coordinators().
 
 %% TODO: cleanup json logic here
 -spec active_coordinators(Type :: json) -> [coordinator_rctx()].
 active_coordinators(Type) ->
-    csrt_query:active_coordinators(Type).
+    couch_srt_query:active_coordinators(Type).
 
 -spec active_workers() -> [rpc_worker_rctx()].
 active_workers() ->
-    csrt_query:active_workers().
+    couch_srt_query:active_workers().
 
 -spec active_workers(Type :: json) -> [rpc_worker_rctx()].
 active_workers(Type) ->
-    csrt_query:active_workers(Type).
+    couch_srt_query:active_workers(Type).
 
 find_by_nonce(Nonce) ->
-    csrt_query:find_by_nonce(Nonce).
+    couch_srt_query:find_by_nonce(Nonce).
 
 find_by_pid(Pid) ->
-    csrt_query:find_by_pid(Pid).
+    couch_srt_query:find_by_pid(Pid).
 
 find_by_pidref(PidRef) ->
-    csrt_query:find_by_pidref(PidRef).
+    couch_srt_query:find_by_pidref(PidRef).
 
 find_workers_by_pidref(PidRef) ->
-    csrt_query:find_workers_by_pidref(PidRef).
+    couch_srt_query:find_workers_by_pidref(PidRef).
 
 -spec pid_ref_matchspec(AttrName :: rctx_field()) -> term() | throw(any()).
 pid_ref_matchspec(AttrName) ->
-    csrt_logger:pid_ref_matchspec(AttrName).
+    couch_srt_logger:pid_ref_matchspec(AttrName).
 
 -spec pid_ref_attrs(AttrName :: rctx_field()) -> term() | throw(any()).
 pid_ref_attrs(AttrName) ->
-    csrt_logger:pid_ref_attrs(AttrName).
+    couch_srt_logger:pid_ref_attrs(AttrName).
 
 %% This is a recon:proc_window/3 [1] port with the same core logic but
-%% recon_lib:proc_attrs/1 replaced with csrt_logger:pid_ref_attrs/1, and
+%% recon_lib:proc_attrs/1 replaced with couch_srt_logger:pid_ref_attrs/1, and
 %% returning on pid_ref() rather than pid().
 %% [1] https://github.com/ferd/recon/blob/c2a76855be3a226a3148c0dfc21ce000b6186ef8/src/recon.erl#L268-L300
 -spec proc_window(AttrName, Num, Time) -> term() | throw(any()) when
     AttrName :: rctx_field(), Num :: non_neg_integer(), Time :: pos_integer().
 proc_window(AttrName, Num, Time) ->
-    csrt_logger:proc_window(AttrName, Num, Time).
+    couch_srt_logger:proc_window(AttrName, Num, Time).
 
 -spec query_matcher(MatcherName :: matcher_name()) ->
     {ok, query_result()}
     | {error, any()}.
 query_matcher(MatcherName) ->
-    csrt_query:query_matcher(MatcherName).
+    couch_srt_query:query_matcher(MatcherName).
 
 -spec query_matcher(MatcherName :: matcher_name(), Limit :: pos_integer()) ->
     {ok, query_result()}
     | {error, any()}.
 query_matcher(MatcherName, Limit) ->
-    csrt_query:query_matcher(MatcherName, Limit).
+    couch_srt_query:query_matcher(MatcherName, Limit).
 
 %%
 %% Delta API
@@ -563,23 +582,23 @@ query_matcher(MatcherName, Limit) ->
 
 -spec add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 add_delta(T, Delta) ->
-    csrt_util:add_delta(T, Delta).
+    couch_srt_util:add_delta(T, Delta).
 
 -spec extract_delta(T :: term_delta()) -> {term(), maybe_delta()}.
 extract_delta(T) ->
-    csrt_util:extract_delta(T).
+    couch_srt_util:extract_delta(T).
 
 -spec get_delta() -> tagged_delta().
 get_delta() ->
-    csrt_util:get_delta(get_pid_ref()).
+    couch_srt_util:get_delta(get_pid_ref()).
 
 -spec maybe_add_delta(T :: term()) -> term_delta().
 maybe_add_delta(T) ->
-    csrt_util:maybe_add_delta(T).
+    couch_srt_util:maybe_add_delta(T).
 
 -spec maybe_add_delta(T :: term(), Delta :: maybe_delta()) -> term_delta().
 maybe_add_delta(T, Delta) ->
-    csrt_util:maybe_add_delta(T, Delta).
+    couch_srt_util:maybe_add_delta(T, Delta).
 
 %%
 %% Query API functions
@@ -608,7 +627,7 @@ maybe_add_delta(T, Delta) ->
 -spec query(QueryExpression :: [query_expression()]) ->
     query() | {error, any()}.
 query(QueryExpression) ->
-    csrt_query:query(QueryExpression).
+    couch_srt_query:query(QueryExpression).
 
 %% @doc Specify the matcher to use for the query.
 %% If atom 'all' is used then all entries would be in the scope of the query.
@@ -625,7 +644,7 @@ query(QueryExpression) ->
 -spec from(MatcherNameOrAll :: string() | all) ->
     query_expression() | {error, any()}.
 from(MatcherNameOrAll) ->
-    csrt_query:from(MatcherNameOrAll).
+    couch_srt_query:from(MatcherNameOrAll).
 
 %% @doc Request 'group_by' aggregation of results.
 %% <code>
@@ -644,7 +663,7 @@ when
         | [binary()]
         | [rctx_field()].
 group_by(AggregationKeys) ->
-    csrt_query:group_by(AggregationKeys).
+    couch_srt_query:group_by(AggregationKeys).
 
 %% @doc Request 'group_by' aggregation of results.
 %% <code>
@@ -666,7 +685,7 @@ when
         binary()
         | rctx_field().
 group_by(AggregationKeys, ValueKey) ->
-    csrt_query:group_by(AggregationKeys, ValueKey).
+    couch_srt_query:group_by(AggregationKeys, ValueKey).
 
 %% @doc Request 'sort_by' aggregation of results.
 %% <code>
@@ -685,7 +704,7 @@ when
         | [binary()]
         | [rctx_field()].
 sort_by(AggregationKeys) ->
-    csrt_query:sort_by(AggregationKeys).
+    couch_srt_query:sort_by(AggregationKeys).
 
 %% @doc Request 'sort_by' aggregation of results.
 %% <code>
@@ -707,7 +726,7 @@ when
         binary()
         | rctx_field().
 sort_by(AggregationKeys, ValueKey) ->
-    csrt_query:sort_by(AggregationKeys, ValueKey).
+    couch_srt_query:sort_by(AggregationKeys, ValueKey).
 
 %% @doc Request 'count_by' aggregation of results.
 %% <code>
@@ -726,7 +745,7 @@ when
         | [binary()]
         | [rctx_field()].
 count_by(AggregationKeys) ->
-    csrt_query:count_by(AggregationKeys).
+    couch_srt_query:count_by(AggregationKeys).
 
 %% @doc Construct 'options' query expression.
 %% There are following types of expressions allowed in the query.
@@ -745,7 +764,7 @@ count_by(AggregationKeys) ->
 -spec options([query_option()]) ->
     query_expression() | {error, any()}.
 options(OptionsExpression) ->
-    csrt_query:options(OptionsExpression).
+    couch_srt_query:options(OptionsExpression).
 
 %% @doc Enable unlimited number of results from the query.
 %% The use of 'unlimited' makes the query 'unsafe'. Because it can return many matching rows.
@@ -762,7 +781,7 @@ options(OptionsExpression) ->
 -spec unlimited() ->
     query_expression().
 unlimited() ->
-    csrt_query:unlimited().
+    couch_srt_query:unlimited().
 
 %% @doc Set limit on number of results returned from the query.
 %% The construction of the query fail if the 'limit' is greater than
@@ -779,7 +798,7 @@ unlimited() ->
 -spec with_limit(Limit :: pos_integer()) ->
     query_expression() | {error, any()}.
 with_limit(Limit) ->
-    csrt_query:with_limit(Limit).
+    couch_srt_query:with_limit(Limit).
 
 %% @doc Executes provided query. Only 'safe' queries can be executed using 'run'.
 %% The query considered 'unsafe' if any of the conditions bellow are met:
@@ -800,7 +819,7 @@ with_limit(Limit) ->
     {ok, [{aggregation_key(), pos_integer()}]}
     | {limit, [{aggregation_key(), pos_integer()}]}.
 run(Query) ->
-    csrt_query:run(Query).
+    couch_srt_query:run(Query).
 
 %% @doc Executes provided query. This function is similar to 'run/1',
 %% however it supports 'unsafe' queries. Be very careful using it.
@@ -823,7 +842,7 @@ run(Query) ->
     {ok, [{aggregation_key(), pos_integer()}]}
     | {limit, [{aggregation_key(), pos_integer()}]}.
 unsafe_run(Query) ->
-    csrt_query:unsafe_run(Query).
+    couch_srt_query:unsafe_run(Query).
 
 %%
 %% Tests
@@ -900,11 +919,11 @@ t_should_not_track_init_p_disabled(_) ->
 
 t_should_extract_fields_properly(_) ->
     Rctx = #rctx{},
-    #{fields := Fields} = csrt_entry:record_info(),
-    %% csrt_entry:value/2 throws on invalid fields, assert that the function succeeded
+    #{fields := Fields} = couch_srt_entry:record_info(),
+    %% couch_srt_entry:value/2 throws on invalid fields, assert that the function succeeded
     TestField = fun(Field) ->
         try
-            csrt_entry:value(Field, Rctx),
+            couch_srt_entry:value(Field, Rctx),
             true
         catch
             _:_ -> false

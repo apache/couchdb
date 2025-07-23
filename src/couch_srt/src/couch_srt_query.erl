@@ -10,12 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_query).
+-module(couch_srt_query).
 
 -feature(maybe_expr, enable).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 %% aggregate query api
 -export([
@@ -154,19 +154,19 @@ select_by_type(all) ->
     ets:tab2list(?CSRT_ETS).
 
 find_by_nonce(Nonce) ->
-    csrt_server:match_resource(#rctx{nonce = Nonce}).
+    couch_srt_server:match_resource(#rctx{nonce = Nonce}).
 
 find_by_pid(Pid) ->
-    csrt_server:match_resource(#rctx{pid_ref = {Pid, '_'}}).
+    couch_srt_server:match_resource(#rctx{pid_ref = {Pid, '_'}}).
 
 find_by_pidref(PidRef) ->
-    csrt_server:match_resource(#rctx{pid_ref = PidRef}).
+    couch_srt_server:match_resource(#rctx{pid_ref = PidRef}).
 
 find_workers_by_pidref(PidRef) ->
-    csrt_server:match_resource(#rctx{type = #rpc_worker{from = PidRef}}).
+    couch_srt_server:match_resource(#rctx{type = #rpc_worker{from = PidRef}}).
 
 curry_field(Field) ->
-    fun(Ele) -> csrt_entry:value(Field, Ele) end.
+    fun(Ele) -> couch_srt_entry:value(Field, Ele) end.
 
 -spec group_by(Matcher, KeyFun, ValFun) ->
     {ok, aggregation_result()} | {limit, aggregation_result()}
@@ -227,7 +227,7 @@ when
     Limit :: pos_integer().
 
 group_by(Matcher, KeyL, ValFun, AggFun, Limit) when is_list(KeyL) ->
-    KeyFun = fun(Ele) -> list_to_tuple([csrt_entry:value(Key, Ele) || Key <- KeyL]) end,
+    KeyFun = fun(Ele) -> list_to_tuple([couch_srt_entry:value(Key, Ele) || Key <- KeyL]) end,
     group_by(Matcher, KeyFun, ValFun, AggFun, Limit);
 group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
     group_by(Matcher, curry_field(Key), ValFun, AggFun, Limit);
@@ -336,7 +336,7 @@ topK(Results, K) ->
 from(all) ->
     #from{matcher = all, is_safe = false};
 from(MatcherName) ->
-    case csrt_logger:get_matcher(MatcherName) of
+    case couch_srt_logger:get_matcher(MatcherName) of
         undefined ->
             {error, {unknown_matcher, MatcherName}};
         _ ->
@@ -800,18 +800,18 @@ to_map({Result, Results}) when is_map(Results) ->
     | {error, Reason :: any()}.
 
 parse_key([C | _] = Key) when is_integer(C) ->
-    csrt_entry:key(Key);
+    couch_srt_entry:key(Key);
 parse_key(Keys) when is_list(Keys) ->
     parse_key(Keys, []);
 parse_key(BinKey) when is_binary(BinKey) ->
-    csrt_entry:key(BinKey);
+    couch_srt_entry:key(BinKey);
 parse_key(undefined) ->
     undefined;
 parse_key(Key) when is_atom(Key) ->
-    csrt_entry:key(Key).
+    couch_srt_entry:key(Key).
 
 parse_key([BinKey | Rest], Keys) ->
-    case csrt_entry:key(BinKey) of
+    case couch_srt_entry:key(BinKey) of
         {error, _} = Error ->
             Error;
         Key ->
@@ -871,7 +871,7 @@ query_matcher_rows({MSpec, _CompMSpec}, Limit) when
     end.
 
 get_matcher(MatcherName) ->
-    case csrt_logger:get_matcher(MatcherName) of
+    case couch_srt_logger:get_matcher(MatcherName) of
         undefined ->
             {error, {unknown_matcher, MatcherName}};
         Matcher ->
@@ -885,4 +885,4 @@ query_limit() ->
     config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT).
 
 to_json_list(List) when is_list(List) ->
-    lists:map(fun csrt_entry:to_json/1, List).
+    lists:map(fun couch_srt_entry:to_json/1, List).

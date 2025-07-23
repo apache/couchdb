@@ -139,17 +139,17 @@ init_p(From, {M, F, A}, Nonce) ->
     put('$initial_call', MFA),
     put(nonce, Nonce),
     try
-        csrt:create_worker_context(From, MFA, Nonce),
-        couch_stats:maybe_track_rexi_init_p(MFA),
+        couch_srt:create_worker_context(From, MFA, Nonce),
+        couch_srt:maybe_track_rexi_init_p(MFA),
         apply(M, F, A)
     catch
         exit:normal ->
-            csrt:destroy_context(),
+            couch_srt:destroy_context(),
             ok;
         Class:Reason:Stack0 ->
             %% Make a CSRT delta manually to funnel back to the caller
-            Delta = csrt:make_delta(),
-            csrt:destroy_context(),
+            Delta = couch_srt:make_delta(),
+            couch_srt:destroy_context(),
             Stack = clean_stack(Stack0),
             {ClientPid, _ClientRef} = From,
             couch_log:error(
@@ -209,7 +209,7 @@ find_worker(Ref, Tab) ->
     end.
 
 notify_caller({Caller, Ref}, Reason, Delta) ->
-    Payload = csrt:maybe_add_delta({rexi_EXIT, Reason}, Delta),
+    Payload = couch_srt:maybe_add_delta({rexi_EXIT, Reason}, Delta),
     Msg = {Ref, Payload},
     rexi_utils:send(Caller, Msg).
 

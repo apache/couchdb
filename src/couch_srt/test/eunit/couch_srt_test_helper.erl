@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_test_helper).
+-module(couch_srt_test_helper).
 
 -export([
     enable_default_logger_matchers/0,
@@ -23,7 +23,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--include("../../src/csrt.hrl").
+-include("../../src/couch_srt.hrl").
 -define(RCTX_RANGE, 1000).
 -define(RCTX_COUNT, 10000).
 
@@ -61,7 +61,7 @@ rctx_gen(Opts0) ->
         '_do_changes' => true
     },
     Opts = maps:merge(Base, Opts0),
-    csrt_entry:from_map(
+    couch_srt_entry:from_map(
         maps:fold(
             fun
                 %% Hack for changes because we need to modify both
@@ -97,8 +97,8 @@ rctxs(Count) when is_integer(Count) andalso Count >= 1 ->
     [rctx_gen() || _ <- lists:seq(1, Count)].
 
 jrctx(Rctx) ->
-    JRctx = csrt_entry:to_json(Rctx),
-    case csrt_logger:should_truncate_reports() of
+    JRctx = couch_srt_entry:to_json(Rctx),
+    case couch_srt_logger:should_truncate_reports() of
         true ->
             maps:filter(fun(_K, V) -> V > 0 end, JRctx);
         false ->

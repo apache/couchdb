@@ -340,8 +340,8 @@ handle_request_int(MochiReq) ->
     chttpd_util:mochiweb_client_req_set(MochiReq),
 
     %% This is probably better in before_request, but having Path is nice
-    csrt:create_coordinator_context(HttpReq0, Path),
-    csrt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
+    couch_srt:create_coordinator_context(HttpReq0, Path),
+    couch_srt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
 
     {HttpReq2, Response} =
         case before_request(HttpReq0) of
@@ -373,7 +373,7 @@ handle_request_int(MochiReq) ->
 
 before_request(HttpReq) ->
     try
-        csrt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
+        couch_srt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
     catch
@@ -394,7 +394,7 @@ after_request(HttpReq, HttpResp0) ->
     chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
     %% NOTE: do not set_context_handler_fun to preserve the Handler
-    csrt:destroy_context(),
+    couch_srt:destroy_context(),
     HttpResp2.
 
 process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
@@ -407,7 +407,7 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     RawUri = MochiReq:get(raw_path),
 
     try
-        csrt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
+        couch_srt:set_context_handler_fun({?MODULE, ?FUNCTION_NAME}),
         couch_httpd:validate_host(HttpReq),
         check_request_uri_length(RawUri),
         check_url_encoding(RawUri),
@@ -433,12 +433,12 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
             HandlerKey,
             fun chttpd_db:handle_request/1
         ),
-        csrt:set_context_handler_fun(HandlerFun),
+        couch_srt:set_context_handler_fun(HandlerFun),
         AuthorizedReq = chttpd_auth:authorize(
             possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1
         ),
-        csrt:set_context_username(AuthorizedReq),
+        couch_srt:set_context_username(AuthorizedReq),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
     catch
         ErrorType:Error:Stack ->

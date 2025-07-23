@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_util).
+-module(couch_srt_util).
 
 -export([
     is_enabled/0,
@@ -42,7 +42,7 @@
     put_updated_at/1
 ]).
 
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 -ifdef(TEST).
 -spec is_enabled() -> boolean().
@@ -180,7 +180,7 @@ make_delta(undefined) ->
     undefined;
 make_delta(PidRef) ->
     TA = get_delta_a(),
-    TB = csrt_server:get_resource(PidRef),
+    TB = couch_srt_server:get_resource(PidRef),
     Delta = rctx_delta(TA, TB),
     put_delta_a(TB),
     Delta.

@@ -10,25 +10,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_stats_sup).
+-module(couch_srt_app).
 
--behaviour(supervisor).
+-behaviour(application).
 
--export([
-    start_link/0,
-    init/1
-]).
+-export([start/2, stop/1]).
 
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
+start(_StartType, _StartArgs) ->
+    couch_srt_sup:start_link().
 
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
-
-init([]) ->
-    {ok,
-        {
-            {one_for_one, 5, 10}, [
-                ?CHILD(couch_stats_server, worker),
-                ?CHILD(couch_stats_process_tracker, worker)
-            ]
-        }}.
+stop(_State) ->
+    ok.

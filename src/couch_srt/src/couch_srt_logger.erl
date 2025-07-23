@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(csrt_logger).
+-module(couch_srt_logger).
 
 -behaviour(gen_server).
 
@@ -80,7 +80,7 @@
 ]).
 
 -include_lib("stdlib/include/ms_transform.hrl").
--include_lib("csrt.hrl").
+-include_lib("couch_srt.hrl").
 
 -record(st, {
     registered_matchers = #{}
@@ -103,7 +103,7 @@ tracker({Pid, _Ref} = PidRef) ->
     receive
         stop ->
             log_process_lifetime_report(PidRef),
-            csrt_server:destroy_resource(PidRef),
+            couch_srt_server:destroy_resource(PidRef),
             ok;
         {'DOWN', MonRef, _Type, _0DPid, _Reason0} ->
             %% TODO: should we pass reason to log_process_lifetime_report?
@@ -116,7 +116,7 @@ tracker({Pid, _Ref} = PidRef) ->
             %% end,
             %% TODO: should we send the induced work delta to the coordinator?
             log_process_lifetime_report(PidRef),
-            csrt_server:destroy_resource(PidRef),
+            couch_srt_server:destroy_resource(PidRef),
             ok
     end.
 
@@ -131,7 +131,7 @@ deregister_matcher(Name) ->
 
 -spec log_process_lifetime_report(PidRef :: pid_ref()) -> ok.
 log_process_lifetime_report(PidRef) ->
-    case csrt_util:is_enabled() andalso csrt_util:is_enabled_reporting() of
+    case couch_srt_util:is_enabled() andalso couch_srt_util:is_enabled_reporting() of
         true ->
             maybe_report("csrt-pid-usage-lifetime", PidRef);
         false ->
@@ -142,7 +142,7 @@ log_process_lifetime_report(PidRef) ->
 -spec find_matches(Rctxs :: [rctx()], Matchers :: matchers()) -> matchers().
 find_matches(Rctxs, Matchers) when is_list(Rctxs) andalso is_map(Matchers) ->
     Rctxs1 =
-        case csrt_util:is_enabled_rpc_reporting() of
+        case couch_srt_util:is_enabled_rpc_reporting() of
             true ->
                 Rctxs;
             false ->
@@ -204,7 +204,7 @@ is_match(#rctx{} = Rctx, Matchers) when is_map(Matchers) ->
 %% Generate a report for the Rctx if it triggers an active Matcher
 -spec maybe_report(ReportName :: string(), PidRef :: maybe_pid_ref()) -> ok.
 maybe_report(ReportName, PidRef) ->
-    Rctx = csrt_server:get_resource(PidRef),
+    Rctx = couch_srt_server:get_resource(PidRef),
     case is_match(Rctx) of
         true ->
             do_report(ReportName, Rctx),
@@ -229,7 +229,7 @@ do_status_report(Rctx) ->
 -spec do_report(ReportName :: string(), Rctx :: rctx()) -> boolean().
 do_report(ReportName, #rctx{} = Rctx) ->
     JRctx =
-        case {should_truncate_reports(), csrt_entry:to_json(Rctx)} of
+        case {should_truncate_reports(), couch_srt_entry:to_json(Rctx)} of
             {true, JRctx0} ->
                 maps:filter(fun(_K, V) -> V > 0 end, JRctx0);
             {false, JRctx0} ->
@@ -391,13 +391,13 @@ matcher_on_long_reqs(Threshold) when
     %%
     %% Time warps and is relative and is complicated, so here's an example of
     %% converting 10000 milliseconds into a native time format and back, then
-    %% using csrt_util:tnow/0 to accurately measure sleeping for 10000 ms.
+    %% using couch_srt_util:tnow/0 to accurately measure sleeping for 10000 ms.
     %%
     %% (node1@127.0.0.1)5> erlang:convert_time_unit(10000, millisecond, native).
     %% 10000000000
     %% (node1@127.0.0.1)6> erlang:convert_time_unit(10000000000, native, millisecond).
     %% 10000
-    %% (node1@127.0.0.1)7> T0 = csrt_util:tnow(), timer:sleep(10000), T1 = csrt_util:tnow(),
+    %% (node1@127.0.0.1)7> T0 = couch_srt_util:tnow(), timer:sleep(10000), T1 = couch_srt_util:tnow(),
     %%     erlang:convert_time_unit(T1 - T0, native, millisecond).
     %% 10000
 
@@ -422,7 +422,7 @@ matcher_on_ioq_calls(Threshold) when
 
 -spec pid_ref_matchspec(AttrName :: rctx_field()) -> matcher() | throw(any()).
 pid_ref_matchspec(AttrName) ->
-    #{field_idx := FieldIdx} = csrt_entry:record_info(),
+    #{field_idx := FieldIdx} = couch_srt_entry:record_info(),
     RctxMatch0 = #rctx{_ = '_'},
     RctxMatch1 = setelement(maps:get(pid_ref, FieldIdx) + 1, RctxMatch0, '$1'),
     RctxMatch = setelement(maps:get(AttrName, FieldIdx) + 1, RctxMatch1, '$2'),
