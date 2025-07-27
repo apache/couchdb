@@ -44,7 +44,8 @@
     non_overlapping_shards/1,
     non_overlapping_shards/3,
     calculate_max_n/1,
-    calculate_max_n/3
+    calculate_max_n/3,
+    range_to_hex/1
 ]).
 
 %% do not use outside mem3.
@@ -71,15 +72,7 @@ name_shard(#ordered_shard{dbname = DbName, range = Range} = Shard, Suffix) ->
     Shard#ordered_shard{name = ?l2b(Name)}.
 
 make_name(DbName, [B, E], Suffix) ->
-    [
-        "shards/",
-        couch_util:to_hex(<<B:32/integer>>),
-        "-",
-        couch_util:to_hex(<<E:32/integer>>),
-        "/",
-        DbName,
-        Suffix
-    ].
+    ["shards/", ?b2l(range_to_hex([B, E])), "/", DbName, Suffix].
 
 create_partition_map(DbName, N, Q, Nodes) ->
     create_partition_map(DbName, N, Q, Nodes, "").
@@ -171,6 +164,12 @@ update_db_doc(DbName, #doc{id = Id, body = Body} = Doc, ShouldMutate) ->
     after
         couch_db:close(Db)
     end.
+
+-spec range_to_hex([non_neg_integer()]) -> binary().
+range_to_hex([B, E]) when is_integer(B), is_integer(E) ->
+    HexB = couch_util:to_hex(<<B:32/integer>>),
+    HexE = couch_util:to_hex(<<E:32/integer>>),
+    ?l2b(HexB ++ "-" ++ HexE).
 
 delete_db_doc(DocId) ->
     gen_server:cast(mem3_shards, {cache_remove, DocId}),
@@ -779,5 +778,9 @@ calculate_max_n_custom_range_test_() ->
 
 shard(Begin, End) ->
     #shard{range = [Begin, End]}.
+
+range_to_hex_test() ->
+    Range = [2147483648, 4294967295],
+    ?assertEqual(<<"80000000-ffffffff">>, range_to_hex(Range)).
 
 -endif.
