@@ -205,9 +205,7 @@ node_key(#shard{node = Node}) ->
     couch_util:to_binary(Node).
 
 range_key(#shard{range = [B, E]}) ->
-    BHex = couch_util:to_hex(<<B:32/integer>>),
-    EHex = couch_util:to_hex(<<E:32/integer>>),
-    list_to_binary([BHex, "-", EHex]).
+    mem3_util:range_to_hex([B, E]).
 
 shard_update_timeout_msec() ->
     config:get_integer("reshard", "shard_update_timeout_msec", 300000).
