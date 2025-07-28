@@ -547,7 +547,7 @@ coordinator or rpc_worker process, represented by the `#rctx{}` record, and
 stored in the `?CSRT_ETS` table keyed on `{keypos, #rctx.pid_ref}`.
 
 The Metadata fields store labeling data for the given process being tracked,
-such as started_at and updated_at timings, the primary `pid_ref` id key, the
+such as `started_at` and `updated_at` timings, the primary `pid_ref` id key, the
 type of the process context, and some additional information like username,
 dbname, and the nonce of the coordinator request.
 

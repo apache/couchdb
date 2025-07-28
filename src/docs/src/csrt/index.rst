@@ -539,4 +539,3 @@ Demonstration of expressiveness constraints in Logger Matchers and ini settings
         `ets:fun2ms(fun(#rctx{dbname=<<"shards/", Range/17, "/foo", Timestamp/binary">>}) -> {Range, R} end).`
         allowing for matching on all `foo` db workers, and demoing extracting
         out the Range for run.
-

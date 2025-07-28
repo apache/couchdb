@@ -190,11 +190,11 @@ The current default matchers are:
 
   * `all_coordinators`: match all Coordinators handling HTTP requests
 
-    * :config:option:`Enable <csrt_logger.matchers_enabled/all_coordinators>` | no Threshold
+    * :config:option:`Enable <csrt_logger.matchers_enabled/all_coordinators>` | none
 
   * `all_rpc_workers`: match all RPC Worker handling internal requests
 
-    * :config:option:`Enable <csrt_logger.matchers_enabled/all_rpc_workers>` | no Threshold
+    * :config:option:`Enable <csrt_logger.matchers_enabled/all_rpc_workers>` | none
 
   * `docs_read`: match all requests reading more than N docs
 
@@ -221,7 +221,6 @@ The current default matchers are:
     filtered changes requests reading many rows but returning few).
 
     * :config:option:`Enable <csrt_logger.matchers_enabled/changes_processed>` | :config:option:`Threshold <csrt_logger.matchers_threshold/changes_processed>`
-
 
 Each of the default matchers has an enablement setting in
 ref:`csrt-logger-matcher-configuration-enablement` for toggling enablement of
@@ -254,7 +253,7 @@ CSRT Logger Matcher Enablement Configuration
 
 .. config:section:: csrt_logger.matchers_enabled :: CSRT Logger Matcher Enablement
 
-    .. config:option:: all_coordinators :: Enable all_coordinators default CSRT Logger Matcher
+    .. config:option:: all_coordinators :: Enable all_coordinators CSRT Logger Matcher
 
         Enable the `all_coordinators` default matcher to match against all
         coordinators handling HTTP requests.
@@ -397,7 +396,7 @@ CSRT Logger Matcher Threshold Configuration
 
 .. config:section:: csrt_logger.matchers_threshold :: CSRT Logger Matcher Threshold
 
-    .. config:option:: docs_read :: Set Threshold for docs_read default CSRT Logger Matcher
+    .. config:option:: docs_read :: Set Threshold for docs_read CSRT Logger Matcher
 
         Threshold for `docs_read` logger matcher, defaults to `1000` docs read.
 
@@ -506,7 +505,6 @@ watermarks to automatically generate logged reports for further analysis.
 Here's a recommended Sample configuration to enable the threshold based default
 matchers, and utilize their default config values::
 
-
     [csrt]
     enable = true
     enable_init_p = true
@@ -587,4 +585,3 @@ coordinators or RPC workers::
    probably extend the Logger Matchers logic to allow for specific Logger
    Matchers to only be utilized for the querying APIs, and allow for more
    stringent filters when decided to generate a lifecyle report.
-

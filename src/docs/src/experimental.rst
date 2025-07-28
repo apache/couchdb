@@ -60,7 +60,6 @@ tracking system designed to augment the existing the existing
 collection, querying, RPC deltas, and powerful filtered logging of resources
 induced by HTTP and RPC worker requests.
 
-
 .. toctree::
     :caption: Couch Stats Resource Tracker Links
 
