@@ -34,11 +34,13 @@ format_report_etoolong_test() ->
 
 format_report_test() ->
     {ok, Entry} = couch_log_formatter:format_report(self(), report123, #{
+        empty => null,
         foo => 123,
         bar => "barStr",
         baz => baz
     }),
     % Rely on `couch_log_formatter:format_meta/1` to sort keys
+    % `empty` is missing as `null` values are skipped
     Formatted = "[bar=\"barStr\" baz=\"baz\" foo=123]",
     ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
 

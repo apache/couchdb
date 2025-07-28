@@ -470,7 +470,12 @@ format_meta(Meta) ->
         lists:sort(
             maps:fold(
                 fun(K, V, Acc) ->
-                    [to_str(K, V) | Acc]
+                    case to_str(K, V) of
+                        "" ->
+                            Acc;
+                        Str ->
+                            [Str | Acc]
+                    end
                 end,
                 [],
                 Meta
@@ -487,6 +492,9 @@ format_meta(Meta) ->
 %% - maps
 %% However we are not going to try to distinguish lists from string
 %% Atoms would be printed as strings
+%% `null` JSON values are skipped
+to_str(_K, null) ->
+    "";
 to_str(K, _) when not (is_list(K) or is_atom(K)) ->
     "";
 to_str(K, Term) when is_list(Term) ->
