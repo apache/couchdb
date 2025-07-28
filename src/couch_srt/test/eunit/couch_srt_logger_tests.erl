@@ -213,7 +213,9 @@ t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
 t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_CHANGES,
     %% Make sure we have at least one match
-    Rctx0 = couch_srt_test_helper:rctx_gen(#{mod => chttpd_db, func => handle_changes_req, rows_read => Threshold + 10}),
+    Rctx0 = couch_srt_test_helper:rctx_gen(#{
+        mod => chttpd_db, func => handle_changes_req, rows_read => Threshold + 10
+    }),
     Rctxs = [Rctx0 | Rctxs0],
     ChangesFilter =
         fun
@@ -241,7 +243,9 @@ t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
     %% Make sure we have at least one match
     Now = couch_srt_util:tnow(),
     UpdatedAt = Now - round(NativeThreshold * 1.23),
-    Rctxs = [couch_srt_test_helper:rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0],
+    Rctxs = [
+        couch_srt_test_helper:rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0
+    ],
     DurationFilter = fun(R) ->
         Started = couch_srt_entry:value(started_at, R),
         Updated = couch_srt_entry:value(updated_at, R),
@@ -288,7 +292,9 @@ t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
     MatcherBar = matcher_for_csrt("dbnames_io__" ++ DbBar ++ "__" ++ SThreshold),
     MatcherFooBar = matcher_for_csrt("dbnames_io__foo/bar__" ++ SThreshold),
     %% Add an extra Rctx with dbname foo/bar to ensure correct naming matches
-    ExtraRctx = couch_srt_test_helper:rctx_gen(#{dbname => <<"foo/bar">>, get_kp_node => Threshold + 10}),
+    ExtraRctx = couch_srt_test_helper:rctx_gen(#{
+        dbname => <<"foo/bar">>, get_kp_node => Threshold + 10
+    }),
     %% Make sure we have at least one match
     Rctxs = [ExtraRctx, couch_srt_test_helper:rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
     ?assertEqual(
@@ -432,13 +438,13 @@ matcher_for(Field, Value, Op) ->
 
 matcher_on_coordinators() ->
     fun
-        (#rctx{type=#coordinator{}}) -> true;
+        (#rctx{type = #coordinator{}}) -> true;
         (_) -> false
     end.
 
 matcher_on_rpc_workers() ->
     fun
-        (#rctx{type=#rpc_worker{}}) -> true;
+        (#rctx{type = #rpc_worker{}}) -> true;
         (_) -> false
     end.
 

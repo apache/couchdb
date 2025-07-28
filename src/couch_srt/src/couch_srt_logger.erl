@@ -463,7 +463,7 @@ proc_window(AttrName, Num, Time) ->
     {ok, matchers()} | {error, {invalid_ms, string(), ets:match_spec()}}
 when
     Name :: string(), MSpec :: ets:match_spec() | undefined, Matchers :: matchers().
-add_matcher(Name, undefined=MSpec, _Matchers) ->
+add_matcher(Name, undefined = MSpec, _Matchers) ->
     {error, {invalid_ms, Name, MSpec}};
 add_matcher(Name, MSpec, Matchers) ->
     try ets:match_spec_compile(MSpec) of
@@ -503,15 +503,16 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                 true ->
                     %% Wrap in a try-catch to handle MatcherGen errors
                     try
-                        MSpec = case erlang:fun_info(MatchGenFunc, arity) of
-                            {arity, 1} ->
-                                Threshold = matcher_threshold(Name, Threshold0),
-                                MatchGenFunc(Threshold);
-                            {arity, 0} ->
-                                MatchGenFunc();
-                            _ ->
-                                undefined
-                        end,
+                        MSpec =
+                            case erlang:fun_info(MatchGenFunc, arity) of
+                                {arity, 1} ->
+                                    Threshold = matcher_threshold(Name, Threshold0),
+                                    MatchGenFunc(Threshold);
+                                {arity, 0} ->
+                                    MatchGenFunc();
+                                _ ->
+                                    undefined
+                            end,
                         case add_matcher(Name, MSpec, Matchers0) of
                             {ok, Matchers1} ->
                                 Matchers1;

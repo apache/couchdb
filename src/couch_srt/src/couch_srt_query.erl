@@ -298,17 +298,21 @@ ets_match(Ele, {_, CMS}) ->
 group_by_select(Matcher, KeyFun, ValFun, AggFun, Limit) ->
     {Status, Rctxs} = group_by_select_rows(Matcher, Limit),
     %% If we hit `Status=limit` rows, still aggregate over what we found
-    Aggregated = lists:foldl(fun(Rctx, Acc) ->
-        Key = KeyFun(Rctx),
-        Val = ValFun(Rctx),
-        CurrVal = maps:get(Key, Acc, 0),
-        case AggFun(CurrVal, Val) of
-            0 ->
-                Acc;
-            NewVal ->
-                maps:put(Key, NewVal, Acc)
-        end
-    end, #{}, Rctxs),
+    Aggregated = lists:foldl(
+        fun(Rctx, Acc) ->
+            Key = KeyFun(Rctx),
+            Val = ValFun(Rctx),
+            CurrVal = maps:get(Key, Acc, 0),
+            case AggFun(CurrVal, Val) of
+                0 ->
+                    Acc;
+                NewVal ->
+                    maps:put(Key, NewVal, Acc)
+            end
+        end,
+        #{},
+        Rctxs
+    ),
     {Status, Aggregated}.
 
 group_by_select_rows(Matcher, Limit) ->
