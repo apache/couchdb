@@ -411,8 +411,7 @@ matcher_on_long_reqs(Threshold) when
     %%     erlang:convert_time_unit(T1 - T0, native, millisecond).
     %% 10000
 
-    Unit = millisecond,
-    NativeThreshold = erlang:convert_time_unit(Threshold, Unit, native),
+    NativeThreshold = erlang:convert_time_unit(Threshold, millisecond, native),
     ets:fun2ms(
         fun(
             #rctx{

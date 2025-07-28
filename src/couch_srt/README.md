@@ -835,3 +835,6 @@ key to enable this, making it trivial to chain constraints.
 workers. This can reduce a lot of complexity by supplying proper lifecycles
 around closing all the remote RPC workers successfully as well as tracking CSRT
 data, and both can be done independently of the HTTP request.
+* More direct Prometheus integration, there's likely things that Prometheus can
+  handle extended granularity on, like labels, that older tools like Graphite
+are unable to handle.
