@@ -43,7 +43,7 @@
 -define(CSRT_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
 
 %% matcher query magnitude default limitations
--define(QUERY_CARDINALITY_LIMIT, 10_000).
+-define(QUERY_CARDINALITY_LIMIT, 10000).
 -define(QUERY_LIMIT, 100).
 
 %% Mapping of couch_stat metric names to #rctx{} field names.

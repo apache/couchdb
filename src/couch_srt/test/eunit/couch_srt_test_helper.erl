@@ -40,6 +40,7 @@ rctx_gen() ->
 
 rctx_gen(Opts0) ->
     DbnameGen = one_of([<<"foo">>, <<"bar">>, ?tempdb]),
+    UsernameGen = one_of([<<"user_foo">>, <<"user_bar">>, <<"adm">>]),
     TypeGen = one_of([?RCTX_RPC, ?RCTX_COORDINATOR, ?RCTX_CHANGES_COORDINATOR]),
     R = fun() -> rand:uniform(?RCTX_RANGE) end,
     R10 = fun() -> 3 + rand:uniform(round(?RCTX_RANGE / 10)) end,
@@ -57,6 +58,7 @@ rctx_gen(Opts0) ->
         ioq_calls => R,
         rows_read => R,
         type => TypeGen,
+        username => UsernameGen,
         %% Hack because we need to modify both fields
         '_do_changes' => true
     },

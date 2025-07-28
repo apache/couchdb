@@ -36,9 +36,20 @@ csrt_query_test_() ->
             ?TDEF_FE(t_count_by_binary_key),
             ?TDEF_FE(t_count_by_bad_request),
             ?TDEF_FE(t_sort_by_multiple_keys),
+            ?TDEF_FE(t_sort_by_multiple_keys),
             ?TDEF_FE(t_sort_by_single_key),
             ?TDEF_FE(t_sort_by_binary_key),
             ?TDEF_FE(t_sort_by_bad_request)
+        ]
+    }.
+
+csrt_query_cardinality_limit_test_() ->
+    {
+        foreach,
+        fun setup_query_limit/0,
+        fun teardown_query_limit/1,
+        [
+            ?TDEF_FE(t_run_hits_query_cardinality_limit)
         ]
     }.
 
@@ -62,6 +73,17 @@ setup() ->
 
 teardown(_) ->
     ets:delete(?CSRT_ETS).
+
+setup_query_limit() ->
+    Ctx = test_util:start_couch([couch_srt]),
+    config:set("csrt", "enable", "true", false),
+    config:set("csrt", "query_cardinality_limit", "5", false),
+    config:set("csrt_logger.matchers_enabled", "docs_read", "true", false),
+    ets:insert(?CSRT_ETS, couch_srt_test_helper:rctxs()),
+    #{ctx => Ctx}.
+
+teardown_query_limit(#{ctx := Ctx}) ->
+    test_util:stop_couch(Ctx).
 
 rctx(Opts) ->
     % Update `docs_read` to make standard `{docs_read, fun matcher_on_docs_read/1, 1000}`
@@ -579,6 +601,23 @@ t_sort_by_bad_request(_) ->
             ])
         ]),
         "Should return error when 'limit' is greater than configured"
+    ),
+    ok.
+
+t_run_hits_query_cardinality_limit(_) ->
+    %% Use a sort_by query to easily pattern match on a non empty list
+    ?assertMatch(
+        {limit, [_ | _]},
+        couch_srt:run(
+            couch_srt:query([
+                couch_srt:from("docs_read"),
+                couch_srt:sort_by([<<"dbname">>, <<"username">>], <<"ioq_calls">>),
+                couch_srt:options([
+                    couch_srt:with_limit(1)
+                ])
+            ])
+        ),
+        "Should hit limit but still return results when configured query_cardinality_limit is smaller than the working set"
     ),
     ok.
 

@@ -197,7 +197,7 @@ when
     AggFun ::
         count_key_fun().
 group_by(Matcher, KeyFun, ValFun, AggFun) ->
-    group_by(Matcher, KeyFun, ValFun, AggFun, ?QUERY_CARDINALITY_LIMIT).
+    group_by(Matcher, KeyFun, ValFun, AggFun, query_cardinality_limit()).
 
 -spec all() ->
     matcher().
@@ -234,6 +234,36 @@ group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
 group_by(Matcher, KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
     group_by(Matcher, KeyFun, curry_field(Val), AggFun, Limit);
 group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
+    %% This is a space versus speed tradeoff. Both query modes only filter
+    %% through the table until `Limit` rows have been returned and both will
+    %% utilize the compiled match_specs to do the testing, but
+    %% `group_by_fold/5` will sequentially copy in every row and test it
+    %% locally against the compiled match_spec using `ets:foldl/3`, whereas
+    %% `group_by_select/5` does the filtering internally in the ETS NIF, by way
+    %% of passing the uncompiled match_spec to `ets:select/3` to
+    %% `ets:select/3`. The tradeoff here is that `ets:select` will copy `Limit`
+    %% full `#rctx{}` records into this caller process, which we then aggregate
+    %% over, as opposed to `ets:foldl` only sequentially loading a singular
+    %% `#rctx{}` and extracting the relevant field value to aggregate on.
+    %%
+    %% The use of `query_by_fold` should only be needed if `Limit` is
+    %% drastically increased, and even then, the efficiencies gained here with
+    %% `query_by_fold` are shortlived until we can encode the values needed by
+    %% `ValFun` into the match_spec return fields, at which point it becomes
+    %% strictly worse.
+    %%
+    %% NOTE: This discrepancy of `ets:match_spec_run` taking a `match_spec()`
+    %% vs `ets:select` taking a `comp_match_spec()` is why our CSRT `matcher()`
+    %% type_spec funnels around both versions instead of just reference to the
+    %% compiled spec stored by ETS internally.
+    case config:get_boolean(?CSRT, "use_query_fold", false) of
+        true ->
+            group_by_fold(Matcher, KeyFun, ValFun, AggFun, Limit);
+        false ->
+            group_by_select(Matcher, KeyFun, ValFun, AggFun, Limit)
+    end.
+
+group_by_fold(Matcher, KeyFun, ValFun, AggFun, Limit) ->
     FoldFun = fun(Ele, Acc) ->
         case maps:size(Acc) =< Limit of
             true ->
@@ -262,8 +292,68 @@ group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
             {limit, Acc}
     end.
 
-ets_match(Ele, {_, MS}) ->
-    ets:match_spec_run([Ele], MS) =/= [].
+ets_match(Ele, {_, CMS}) ->
+    ets:match_spec_run([Ele], CMS) =/= [].
+
+group_by_select(Matcher, KeyFun, ValFun, AggFun, Limit) ->
+    {Status, Rctxs} = group_by_select_rows(Matcher, Limit),
+    %% If we hit `Status=limit` rows, still aggregate over what we found
+    Aggregated = lists:foldl(fun(Rctx, Acc) ->
+        Key = KeyFun(Rctx),
+        Val = ValFun(Rctx),
+        CurrVal = maps:get(Key, Acc, 0),
+        case AggFun(CurrVal, Val) of
+            0 ->
+                Acc;
+            NewVal ->
+                maps:put(Key, NewVal, Acc)
+        end
+    end, #{}, Rctxs),
+    {Status, Aggregated}.
+
+group_by_select_rows(Matcher, Limit) ->
+    try
+        %% Use `ets:select/3` as this does the ets fold internally in a space
+        %% efficient way that is still faster than the sequential traversal
+        %% through the table. See the `ets:select/3` documentation for more
+        %% info. We also use `ets:select/3` to pass the limit along, which
+        %% results in ets effeciently traversing rows until `Limit` rows have
+        %% been accumulated and returned.
+        %% ets:select/* takes match_spec(), not  comp_match_spec()
+        {MSpec, _CMSpec} = Matcher,
+        case ets:select(?CSRT_ETS, MSpec, Limit) of
+            %% Technically the {Rctxs, `continuation()`} here is an `opaque()`
+            %% type, but we assume `'$end_of_table'` is a reasonable indication
+            %% of no more rows. However, we fallback to checking the quantity
+            %% returned in case this is ever no longer true.
+            {Rctxs, '$end_of_table'} ->
+                {ok, Rctxs};
+            {Rctxs, _Continuation} ->
+                %% Continuation is opaque, and there's no `is_more_rows` API to
+                %% check to see if we actually limit the table Limit or we hit
+                %% the edge case where exactly `Limit` rows were found.  The
+                %% continuation can be passed back to `ets:select/1` to see if
+                %% explicity returns `'$end_of_table'`, but if it did hit the
+                %% `Limit`, we now wastefully fetch the next chunk of rows, so
+                %% instead for now we assume that when the length of rows
+                %% equals `Limit` that we hit the cap.  Note that this is only
+                %% relevant because the API returning `'$end_of_table'` is not
+                %% formally specified, but in theory this clause should not be
+                %% hit.
+                case length(Rctxs) >= Limit of
+                    true ->
+                        {limit, Rctxs};
+                    false ->
+                        {ok, Rctxs}
+                end;
+            %% Handle '$end_of_table'
+            _ ->
+                {ok, []}
+        end
+    catch
+        _:_ ->
+            {ok, []}
+    end.
 
 %%
 %% Auxiliary functions to calculate topK
@@ -366,7 +456,7 @@ options(Options) ->
                 Error;
             ({limit, unlimited}, Acc) ->
                 Acc#query_options{limit = unlimited, is_safe = false};
-            ({limit, Limit}, {[], Acc}) when is_integer(Limit) ->
+            ({limit, Limit}, Acc) when is_integer(Limit) ->
                 Acc#query_options{limit = Limit};
             ({error, _} = Error, _Acc) ->
                 Error
@@ -883,6 +973,9 @@ get_matcher(MatcherName) ->
 %%
 query_limit() ->
     config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT).
+
+query_cardinality_limit() ->
+    config:get_integer(?CSRT, "query_cardinality_limit", ?QUERY_CARDINALITY_LIMIT).
 
 to_json_list(List) when is_list(List) ->
     lists:map(fun couch_srt_entry:to_json/1, List).
