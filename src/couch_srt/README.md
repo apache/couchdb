@@ -222,47 +222,6 @@ of CSRT. Those can be found at:
   the different default logger matchers in action
   - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_logger_tests.erl
 
-# CSRT Config Keys
-
-## -define(CSRT, "csrt").
-
-> config:get("csrt").
-
-Primary CSRT config namespace: contains core settings for enabling different
-layers of functionality in CSRT, along with global config settings for limiting
-data volume generation.
-
-## -define(CSRT_MATCHERS_ENABLED, "csrt_logger.matchers_enabled").
-
-> config:get("csrt_logger.matchers_enabled").
-
-Config toggles for enabling specific builtin logger matchers, see the dedicated
-section below on `# CSRT Default Matchers`.
-
-## -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
-
-> config:get("csrt_logger.matchers_threshold").
-
-Config settings for defining the primary `Threshold` value of the builtin logger
-matchers, see the dedicated section below on `# CSRT Default Matchers`.
-
-## -define(CSRT_MATCHERS_DBNAMES, "csrt_logger.dbnames_io").
-
-> config:get("csrt_logger.matchers_enabled").
-
-Config section for setting `$db_name = $threshold` resulting in instantiating a
-"dbnames_io" logger matcher for each `$db_name` that will generate a CSRT
-lifecycle report for any contexts that that induced more operations on _any_ one
-field of `ioq_calls|get_kv_node|get_kp_node|docs_read|rows_read` that is greater
-than `$threshold` and is on database `$db_name`.
-
-This is basically a simple matcher for finding heavy IO requests on a particular
-database, in a manner amenable to key/value pair specifications in this .ini
-file until a more sophisticated declarative model exists. In particular, it's
-not easy to sequentially generate matchspecs by way `ets:fun2ms/1`, and so an
-alternative mechanism for either dynamically assembling an `#rctx{}` to match
-against or generating the raw matchspecs themselves is warranted.
-
 # CSRT Code Markers
 
 ## -define(CSRT_ETS, csrt_server).
@@ -344,203 +303,6 @@ we track that value in the pdict and then take a delta between `tnow()` and
 `updated_at`, and then `updated_at` becomes a value we can sneak into the other
 integer counter updates we're already performing!
 
-# Primary Config Toggles
-
-# CSRT (?CSRT="csrt") Config Settings
-
-## config:get(?CSRT, "enable", false).
-
-Core enablement toggle for CSRT, defaults to false. Enabling this setting
-intiates local CSRT stats collection as well as shipping deltas in RPC
-responses to accumulate in the coordinator.
-
-This does _not_ trigger the new RPC spawn metrics, and it does not enable
-reporting for any of the rctx types.
-
-*NOTE*: you *MUST* have all nodes in the cluster running a CSRT aware CouchDB
-_before_ you enable it on any node, otherwise the old version nodes won't know
-how to handle the new RPC formats including an embedded Delta payload.
-
-## config:get(?CSRT, "enable_init_p", false).
-
-Enablement of tracking new metric counters for different `fabric_rpc` operations
-spawned by way of `rexi_server:init_p/3`. This is the primary mechanism for
-inducing database RPC operations within CouchDB, and these init_p metrics aim to
-provide node lever understandings of the workloads being induced by other
-coordinator proceses. This is especially relevant for databases on subsets of a
-cluster resulting in non-uniform workloads, these metrics are tailored to
-provide insight into what work is being spawned on each node in the cluster as a
-function of time.
-
-## config:get(?CSRT, "enable_reporting", false).
-
-This is the primary toggle for enabling CSRT process lifetime reports containing
-detailed information about the quantity of work induced by the given
-request/worker/etc. This is the top level toggle for enabling _any_ reporting,
-and there also exists `config:get(?CSRT, "enable_rpc_reporting", false).` to
-disable the reporting of any individual RPC workers, leaving the coordinator
-responsible of generating a report with the accumulated deltas.
-
-## config:get(?CSRT, "enable_rpc_reporting", false).
-
-This enables the possibility of RPC workers generating reports. They still need
-to hit the configured thresholds to induce a report, but this will generate CSRT
-process lifetime reports for individual RPC workers that trigger the configured
-logger thresholds. This allows for quantifying per node resource usage when
-desired, as otherwise the reports are at the http request level and don't
-provide per node stats.
-
-The key idea here is that having RPC level CSRT process lifetime reporting is
-incredibly useful, but can also generate large quantities of data. For example,
-a view query on a Q=64 database will stream results from 64 shard replicas,
-resulting in at least 64 RPC reports, plus any that might have been generated
-from RPC workers that "lost" the race for shard replica. This is very useful,
-but a lot of data given the verbose nature of funneling it through the RSyslog
-reports, however, the ability to write directly to something like ClickHouse or
-another columnar store would be great.
-
-Until there's an efficient storage mechanism to stream the results to, the
-rsyslog entries work great and are very practical, but care must be taken to
-not generate too much data for aggregate queries as they generate at least `Qx`
-more report than an individual report per http request from the coordinator.
-This setting exists as a way to either a) utilize the logger matcher configured
-thresholds to allow for _any_ rctx's to be recorded when they induce heavy
-operations, either Coordinator or RPC worker; or b) to _only_ log workloads at
-the coordinator level.
-
-NOTE: this setting exists because we lack an expressive enough config
-declaration to easily chain the matchspec constructions as `ets:fun2ms/1` is a
-special compile time parse transform macro that requires the fully definition to
-be specified directly, it cannot be iteractively constructed. That said, you
-_can_ register matchers through remsh with more specific and fine grained
-pattern matching, and a more expressive system for defining matchers are being
-explored.
-
-## config:get_boolean(?CSRT, "should_truncate_reports", true)
-
-Enables truncation of the CSRT process lifetime reports to not include any
-fields that are zero at the end of process lifetime, eg don't include
-`js_filter=0` in the report if the request did not induce Javascript filtering.
-
-This can be disabled if you really care about consistent fields in the report
-logs, but this is a log space saving mechanism, similar to disabling RPC
-reporting by default, as its a simple way to reduce overall volume
-
-## config:get(?CSRT, "randomize_testing", true).
-
-This is a `make eunit` only feature toggle that will induce randomness into the
-cluster's `couch_srt:is_enabled()` state, specifically to utilize the test suite to
-exercise edge case scenarios and failures when CSRT is only conditionally
-enabled, ensuring that it gracefuly and robustly handles errors without fallout
-to the underlying http clients.
-
-The idea here is to introduce randomness into whether CSRT is enabled across all
-the nodes to simulate clusters with heterogeneous CSRT enablement and also to
-ensure that CSRT works properly when toggled on/off wihout causing any
-unexpected fallout to the client requests.
-
-This is a config toggle specifically so that the actual CSRT tests can disable
-it for making accurate assertions about resource usage traacking, and is not
-intended to be used directly.
-
-## config:get_integer(?CSRT, "query_limit", ?QUERY_LIMIT)
-
-Limit the quantity of rows that can be loaded in an http query.
-
-# CSRT Logger Matcher Enablement and Thresholds
-
-There are currently six builtin default loggers designed to make it easy to do
-filtering on heavy resource usage inducing and long running requests. These are
-designed as a simple baseline of useful matchers, declared in a manner amenable
-to `default.ini` based constructs. More expressive matcher declarations are
-being explored, and matchers of arbitrary complexity can be registered directly
-through remsh. The default matchers are all designed around an integer config
-Threshold that triggers on a specific field, eg docs read, or on a delta of
-fields for long requests and changes requests that process many rows but return
-few.
-
-The current default matchers are:
-
-  * docs_read: match all requests reading more than N docs
-  * rows_read: match all requests reading more than N rows
-  * docs_written: match all requests writing more than N docs
-  * long_reqs: match all requests lasting more than N milliseconds
-  * changes_processed: match all changes requests that returned at least N rows
-    less than was necessarily loaded to complete the request (eg find heavy
-    filtered changes requests reading many rows but returning few).
-  * ioq_calls: match all requests inducing more than N ioq_calls
-
-Each of the default matchers has an enablement setting in
-`config:get(?CSRT_MATCHERS_ENABLED, Name)` for toggling enablement of it, and a
-corresponding threshold value setting in `config:get(?CSRT_MATCHERS_THRESHOLD,
-Name)` that is an integer value corresponding to the specific nature of that
-matcher.
-
-## CSRT Logger Matcher Enablement (?CSRT_MATCHERS_ENABLED)
-
-> -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_enabled").
-
-### config:get_boolean(?CSRT_MATCHERS_ENABLED, "docs_read", false)
-
-Enable the `docs_read` builtin matcher, with a default `Threshold=1000`, such
-that any request that reads more than `Threshold` docs will generate a CSRT
-process lifetime report with a summary of its resouce consumption.
-
-This is different from the `rows_read` filter in that a view with `?limit=1000`
-will read 1000 rows, but the same request with `?include_docs=true` will also
-induce an additional 1000 docs read.
-
-### config:get_boolean(?CSRT_MATCHERS_ENABLED, "rows_read", false)
-
-Enable the `rows_read` builtin matcher, with a default `Threshold=1000`, such
-that any request that reads more than `Threshold` rows will generate a CSRT
-process lifetime report with a summary of its resouce consumption.
-
-This is different from the `docs_read` filter so that we can distinguish between
-heavy view requests with lots of rows or heavy requests with lots of docs.
-
-### config:get_boolean(?CSRT_MATCHERS_ENABLED, "docs_written", false)
-
-Enable the `docs_written` builtin matcher, with a default `Threshold=500`, such
-that any request that writtens more than `Threshold` docs will generate a CSRT
-process lifetime report with a summary of its resouce consumption.
-
-### config:get_boolean(?CSRT_MATCHERS_ENABLED, "ioq_calls", false)
-
-Enable the `ioq_calls` builtin matcher, with a default `Threshold=10000`, such
-that any request that induces more than `Threshold` IOQ calls will generate a
-CSRT process lifetime report with a summary of its resouce consumption.
-
-### config:get_boolean(?CSRT_MATCHERS_ENABLED, "long_reqs", false)
-
-Enable the `long_reqs` builtin matcher, with a default `Threshold=60000`, such
-that any request where the the last CSRT rctx `updated_at` timestamp is at least
-`Threshold` milliseconds grather than the `started_at timestamp` will generate a
-CSRT process lifetime report with a summary of its resource consumption.
-
-## CSRT Logger Matcher Threshold (?CSRT_MATCHERS_THRESHOLD)
-
-> -define(CSRT_MATCHERS_THRESHOLD, "csrt_logger.matchers_threshold").
-
-### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "docs_read", 1000)
-
-Threshold for `docs_read` logger matcher, defaults to `1000` docs read.
-
-### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "rows_read", 1000)
-
-Threshold for `rows_read` logger matcher, defaults to `1000` rows read.
-
-### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "docs_written", 500)
-
-Threshold for `docs_written` logger matcher, defaults to `500` docs written.
-
-### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "ioq_calls", 10000)
-
-Threshold for `ioq_calls` logger matcher, defaults to `10000` IOQ calls made.
-
-### config:get_integer(?CSRT_MATCHERS_THRESHOLD, "long_reqs", 60000)
-
-Threshold for `long_reqs` logger matcher, defaults to `60000` milliseconds.
 
 # Core CSRT API
 
@@ -554,22 +316,6 @@ edge cases. The aggregate query API has some callers that will actually throw,
 but aside from this core CSRT operations will not bubble up exceptions, and will
 either return the error value, or catch the error and move on rather than
 chaining further errors.
-
-## PidRef API
-
-These are functions are CRUD operations around creating and storing the CSRT
-`PidRef` handle.
-
-```
--export([
-    destroy_pid_ref/0,
-    destroy_pid_ref/1,
-    create_pid_ref/0,
-    get_pid_ref/0,
-    get_pid_ref/1,
-    set_pid_ref/1
-]).
-```
 
 ## Context Lifecycle API
 
@@ -605,14 +351,30 @@ functions exposed for wider use and/or testing purposes.
 
 ```
 -export([
-    clear_pdict_markers/0,
     do_report/2,
     is_enabled/0,
     is_enabled_init_p/0,
+    is_enabled_reporting/0,
+    is_enabled_rpc_reporting/0,
     maybe_report/2,
     to_json/1
 ]).
 ```
+
+These tools provide a direct and conditional mechanism to generate a report,
+with `do_report/2`, and `maybe_report`, respectively, with the latter testing
+the provided `rctx()` against the actively registered Logger Matchers.
+
+The `is_enabled*` checks perform the various enablement checks, as described in
+the corresponding Config documentation sections for the fields.
+
+And lastly, is the `couch_srt:to_json/1` function which takes a `maybe_rctx()` as
+opposed to `couch_srt_entry:to_json/1` which only takes an actual `rctx()`,
+specifically to make it easier to map `couch_srt:to_json/1` to output from
+`couch_srt:proc_window/3` and easily handle the case when
+`couch_srt:get_resource/1` returns undefined in the event the context has
+already exited before we could look at it.
+
 
 ## Stats Collection API
 
@@ -931,13 +693,13 @@ process life cycle report.
 
 ### #rctx.db_open = 0 :: non_neg_integer() | '_',
 
-> Tracking `couch_stats:increment_counter([couchdb, couch_server, open])
+> Tracking `couch_stats:increment_counter([couchdb, couch_server, open])`
 
 The number of `couch_server:open/2` invocations induced by this context.
 
 ### #rctx.docs_read = 0 :: non_neg_integer() | '_',
 
-> Tracking `couch_stats:increment_counter([couchdb, database_reads])
+> Tracking `couch_stats:increment_counter([couchdb, database_reads])`
 
 The number of `couch_db:open_doc/3` invocations induced by this context.
 
@@ -949,12 +711,12 @@ count the magnitude of docs written, as the actual document writes happen in the
 `#db.main_pid` `couch_db_updater` pid and subprocess tracking is not yet
 supported in CSRT.
 
-This can be replaced with direct counting  once passthrough contexts work.
+This can be replaced with direct counting once passthrough contexts work.
 
 ### #rctx.rows_read = 0 :: non_neg_integer() | '_',
 
-> Tracking `couch_stats:increment_counter([fabric_rpc, changes, processed])
-> also Tracking `couch_stats:increment_counter([fabric_rpc, view, rows_read])
+> Tracking `couch_stats:increment_counter([fabric_rpc, changes, processed])`
+> also Tracking `couch_stats:increment_counter([fabric_rpc, view, rows_read])`
 
 A value tracking multiple possible metrics corresponding to rows streamed in
 aggregate operations. This is used for view_rows/changes_rows/all_docs/etc.
@@ -1023,3 +785,53 @@ collection and all resource usage inducing processes within CouchDB.
 Grep for `'Example to extend CSRT'` to find the code points, eg:
 
 > grep -ri 'Example to extend CSRT' src/
+
+## Next Steps
+
+Next steps to continue CSRT improvements:
+
+* Create an expressive syntax that can map something like Mango queries,
+  expressable in ini files for persistent storage and easy configuration, and
+  turn those into `ets:match_spec()`. The current logic is getting progressively
+  closer to that, but we're not fully generating dynamic matchspecs. When we can,
+  the default matchers can be rewritten directly, and also create a `POST`
+  /_active_resources` API that will take a declarative query and translate it into
+  the matchspec and funnel it along efficiently to `ets:select/3`
+* chain CSRT contexts through the various callers, for example, funneling the
+  context through IOQ and onto `couch_file` should allow for the induced
+  workload of the `couch_file` process to be tracked _specifically_ in the context
+  of the RPC worker who made the request. This would let us bubble up any stats
+  from any process in the chain, but will need some type of delta hook mechanism,
+  we utilize RPC workers sending of data through `rexi` as a trigger for sending
+  deltas, we'd need a similar hook for forwarding the context from the caller to
+  IOQ to couch_file and then back to IOQ and back to the caller. Similarly, funnel
+  doc and rev counts back from `couch_db_update`, could also potentially track
+  some stats around merging of doc updates.
+* extend CSRT to the rest of core API operations, especially things like search
+  and replication
+* Port Mango stats into CSRT stats and remove the old stats RPC mechanisms
+  - Magno tracked _extra_ stats, CSRT says if a stat is worth tracking, making
+    it a formal `couch_stats` metric and then CSRT can pick it up directly
+  - this removes the need for phony metrics. Similarly, this removes the need
+    for `js_filtered()` and `ioq_called()`
+  - for now these are simple ways to get some data into CSRT without needing to
+    chain the deltas from nested processes
+* Chain RPC work induced from index processes back to caller
+* Port `csrt:proc_window` to have an HTTP API, should be fairly simple
+* add report snapshots, time regular summaries of node usage levels
+* Add additional query functions, like `longest() -> topK_on_time_delta()`
+* Add background job tracking for things like `#view_index{}`,
+  `#db_compactor{}`, etc.
+* Handle double/multi-counting. Right now a coordinator includes the stats
+  induced by the RPC workers, so taking the full sum of a field across all
+coordinators and RPC workers double counts that data. You can find out exactly
+what the coordinator did if you generate RPC reports and subtract the values,
+but as more processes chain results, more duplicate of resource counting will be
+done, so query mechanisms around aggregating the total workloads on the cluster
+need to take in the duplication hierarchies. A more expressive config syntax is
+key to enable this, making it trivial to chain constraints.
+* Introduce a fabric request context that manages the lifecycle of _all_ worker
+  responses, and doesn't just ignore any data from losing shards or orphaned
+workers. This can reduce a lot of complexity by supplying proper lifecycles
+around closing all the remote RPC workers successfully as well as tracking CSRT
+data, and both can be done independently of the HTTP request.

@@ -50,3 +50,22 @@ Enable nouveau in config and run the Java service.
         enable = true
 
 Have fun!
+
+Couch Stats Resource Tracker (CSRT)
+===================================
+
+Couch Stats Resource Tracker, aka CSRT, is an experimental real time stats
+tracking system designed to augment the existing the existing
+`couch_stats:increment_counter` invocations with real time process local stats
+collection, querying, RPC deltas, and powerful filtered logging of resources
+induced by HTTP and RPC worker requests.
+
+
+.. toctree::
+    :caption: Couch Stats Resource Tracker Links
+
+    csrt/index
+
+.. seealso::
+
+    :doc:`/config/csrt`
