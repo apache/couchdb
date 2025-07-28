@@ -257,3 +257,22 @@ Base CouchDB Options
 
             [couchdb]
             js_engine = spidermonkey
+
+    .. config:option:: time_seq_min_time :: Minimum time-seq threshold
+
+        .. versionchanged:: 3.6
+
+        Time-seq is the data structure in the database files which keeps track
+        of the mapping between rough time intervals and database sequence
+        numbers. This setting is minimum time threshold below which updates to
+        the time-seq data structure will be ignored. This may be useful, for
+        example, in embedded systems which do not keep their own time when
+        turned off, and instead only rely on NTP synchronization. Such systems
+        after boot may briefly default to some time like 1970-01-01 until they
+        synchronize. The default setting value is some recent time before the
+        latest CouchDB release or before feature was developed. The value may
+        be bumped on future release. The value is expected to be in Unix
+        seconds (see ``wikipedia.org/wiki/unix_time`` for more details) ::
+
+           [couchdb]
+           time_seq_min_time = 1754006400
