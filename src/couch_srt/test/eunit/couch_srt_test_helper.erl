@@ -120,6 +120,8 @@ one_of(L) ->
 
 enable_default_logger_matchers() ->
     DefaultMatchers = [
+        all_coordinators,
+        all_rpc_workers,
         docs_read,
         rows_read,
         docs_written,

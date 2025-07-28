@@ -12,16 +12,6 @@
 
 -module(couch_srt_logger_tests).
 
--import(
-    couch_srt_test_helper,
-    [
-        enable_default_logger_matchers/0,
-        rctx_gen/1,
-        rctxs/0,
-        jrctx/1
-    ]
-).
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -81,9 +71,17 @@ make_docs(Count) ->
         lists:seq(1, Count)
     ).
 
+set_matcher_threshold(_Key, undefined) ->
+    ok;
+set_matcher_threshold(Key, Val) when is_integer(Val) ->
+    config:set(?CSRT_MATCHERS_THRESHOLD, Key, integer_to_list(Val), false).
+
+set_dbnames_io_threshold(Key, Val) when is_integer(Val) ->
+    config:set(?CSRT_MATCHERS_DBNAMES, Key, integer_to_list(Val), false).
+
 setup() ->
     Ctx = test_util:start_couch([fabric, couch_stats, couch_srt]),
-    enable_default_logger_matchers(),
+    couch_srt_test_helper:enable_default_logger_matchers(),
     config:set_boolean(?CSRT, "randomize_testing", false, false),
     config:set_boolean(?CSRT, "enable_reporting", true, false),
     config:set_boolean(?CSRT, "enable_rpc_reporting", true, false),
@@ -102,37 +100,28 @@ setup() ->
     MArgs = #mrargs{include_docs = false},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
     Rctx = load_rctx(PidRef),
-    ok = config:set(
-        "csrt_logger.matchers_threshold", "docs_read", integer_to_list(?THRESHOLD_DOCS_READ), false
-    ),
-    ok = config:set(
-        "csrt_logger.matchers_threshold",
-        "docs_written",
-        integer_to_list(?THRESHOLD_DOCS_WRITTEN),
-        false
-    ),
-    ok = config:set(
-        "csrt_logger.matchers_threshold", "ioq_calls", integer_to_list(?THRESHOLD_IOQ_CALLS), false
-    ),
-    ok = config:set(
-        "csrt_logger.matchers_threshold", "rows_read", integer_to_list(?THRESHOLD_ROWS_READ), false
-    ),
-    ok = config:set(
-        "csrt_logger.matchers_threshold",
-        "changes_processed",
-        integer_to_list(?THRESHOLD_CHANGES),
-        false
-    ),
-    ok = config:set(
-        "csrt_logger.matchers_threshold", "long_reqs", integer_to_list(?THRESHOLD_LONG_REQS), false
-    ),
-    ok = config:set("csrt_logger.dbnames_io", "foo", integer_to_list(?THRESHOLD_DBNAME_IO), false),
-    ok = config:set("csrt_logger.dbnames_io", "bar", integer_to_list(?THRESHOLD_DBNAME_IO), false),
-    ok = config:set(
-        "csrt_logger.dbnames_io", "foo/bar", integer_to_list(?THRESHOLD_DBNAME_IO), false
-    ),
+
+    DefaultMatcherThresholds = [
+        {"all_coordinators", undefined},
+        {"all_rpc_workers", undefined},
+        {"docs_read", ?THRESHOLD_DOCS_READ},
+        {"docs_written", ?THRESHOLD_DOCS_WRITTEN},
+        {"ioq_calls", ?THRESHOLD_IOQ_CALLS},
+        {"rows_read", ?THRESHOLD_ROWS_READ},
+        {"changes_processed", ?THRESHOLD_CHANGES},
+        {"long_reqs", ?THRESHOLD_LONG_REQS}
+    ],
+    [set_matcher_threshold(Key, Val) || {Key, Val} <- DefaultMatcherThresholds],
+
+    DbnameIOMatcherThresholds = [
+        {"foo", ?THRESHOLD_DBNAME_IO},
+        {"bar", ?THRESHOLD_DBNAME_IO},
+        {"foo/bar", ?THRESHOLD_DBNAME_IO}
+    ],
+    [set_dbnames_io_threshold(Key, Val) || {Key, Val} <- DbnameIOMatcherThresholds],
+
     couch_srt_logger:reload_matchers(),
-    #{ctx => Ctx, dbname => DbName, rctx => Rctx, rctxs => rctxs()}.
+    #{ctx => Ctx, dbname => DbName, rctx => Rctx, rctxs => couch_srt_test_helper:rctxs()}.
 
 teardown(#{ctx := Ctx, dbname := DbName}) ->
     ok = fabric:delete_db(DbName, [?ADMIN_CTX]),
@@ -158,7 +147,7 @@ t_enablement(#{}) ->
     ?assert(couch_srt_util:is_enabled_rpc_reporting(), "CSRT RPC reporting is enabled").
 
 t_do_report(#{rctx := Rctx}) ->
-    JRctx = jrctx(Rctx),
+    JRctx = couch_srt_test_helper:jrctx(Rctx),
     ReportName = "foo",
     ?assert(couch_srt_logger:do_report(ReportName, Rctx), "CSRT _logger:do_report " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT do_report"),
@@ -169,7 +158,7 @@ t_do_report(#{rctx := Rctx}) ->
     ).
 
 t_do_lifetime_report(#{rctx := Rctx}) ->
-    JRctx = jrctx(Rctx),
+    JRctx = couch_srt_test_helper:jrctx(Rctx),
     ReportName = "csrt-pid-usage-lifetime",
     ?assert(
         couch_srt_logger:do_lifetime_report(Rctx),
@@ -182,7 +171,7 @@ t_do_lifetime_report(#{rctx := Rctx}) ->
     ).
 
 t_do_status_report(#{rctx := Rctx}) ->
-    JRctx = jrctx(Rctx),
+    JRctx = couch_srt_test_helper:jrctx(Rctx),
     ReportName = "csrt-pid-usage-status",
     ?assert(couch_srt_logger:do_status_report(Rctx), "couch_srt_logger:do_ " ++ ReportName),
     ?assert(meck:validate(couch_log), "CSRT validate couch_log"),
@@ -194,7 +183,7 @@ t_do_status_report(#{rctx := Rctx}) ->
 t_matcher_on_docs_read(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_DOCS_READ,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{docs_read => Threshold + 10}) | Rctxs0],
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{docs_read => Threshold + 10}) | Rctxs0],
     ?assertEqual(
         lists:sort(lists:filter(matcher_gte(docs_read, Threshold), Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("docs_read"), Rctxs)),
@@ -204,7 +193,7 @@ t_matcher_on_docs_read(#{rctxs := Rctxs0}) ->
 t_matcher_on_docs_written(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_DOCS_WRITTEN,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{docs_written => Threshold + 10}) | Rctxs0],
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{docs_written => Threshold + 10}) | Rctxs0],
     ?assertEqual(
         lists:sort(lists:filter(matcher_gte(docs_written, Threshold), Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("docs_written"), Rctxs)),
@@ -214,7 +203,7 @@ t_matcher_on_docs_written(#{rctxs := Rctxs0}) ->
 t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_ROWS_READ,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{rows_read => Threshold + 10}) | Rctxs0],
     ?assertEqual(
         lists:sort(lists:filter(matcher_gte(rows_read, Threshold), Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("rows_read"), Rctxs)),
@@ -224,7 +213,7 @@ t_matcher_on_rows_read(#{rctxs := Rctxs0}) ->
 t_matcher_on_changes_processed(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_CHANGES,
     %% Make sure we have at least one match
-    Rctx0 = rctx_gen(#{mod => chttpd_db, func => handle_changes_req, rows_read => Threshold + 10}),
+    Rctx0 = couch_srt_test_helper:rctx_gen(#{mod => chttpd_db, func => handle_changes_req, rows_read => Threshold + 10}),
     Rctxs = [Rctx0 | Rctxs0],
     ChangesFilter =
         fun
@@ -252,7 +241,7 @@ t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
     %% Make sure we have at least one match
     Now = couch_srt_util:tnow(),
     UpdatedAt = Now - round(NativeThreshold * 1.23),
-    Rctxs = [rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0],
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{started_at => Now, updated_at => UpdatedAt}) | Rctxs0],
     DurationFilter = fun(R) ->
         Started = couch_srt_entry:value(started_at, R),
         Updated = couch_srt_entry:value(updated_at, R),
@@ -267,7 +256,7 @@ t_matcher_on_long_reqs(#{rctxs := Rctxs0}) ->
 t_matcher_on_ioq_calls(#{rctxs := Rctxs0}) ->
     Threshold = ?THRESHOLD_IOQ_CALLS,
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
     ?assertEqual(
         lists:sort(lists:filter(matcher_gte(ioq_calls, Threshold), Rctxs)),
         lists:sort(lists:filter(matcher_for_csrt("ioq_calls"), Rctxs)),
@@ -277,7 +266,7 @@ t_matcher_on_ioq_calls(#{rctxs := Rctxs0}) ->
 t_matcher_on_nonce(#{rctxs := Rctxs0}) ->
     Nonce = "foobar7799",
     %% Make sure we have at least one match
-    Rctxs = [rctx_gen(#{nonce => Nonce}) | Rctxs0],
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{nonce => Nonce}) | Rctxs0],
     %% Nonce requires dynamic matcher as it's a static match
     %% TODO: add pattern based nonce matching
     MSpec = couch_srt_logger:matcher_on_nonce(Nonce),
@@ -299,9 +288,9 @@ t_matcher_on_dbnames_io(#{rctxs := Rctxs0}) ->
     MatcherBar = matcher_for_csrt("dbnames_io__" ++ DbBar ++ "__" ++ SThreshold),
     MatcherFooBar = matcher_for_csrt("dbnames_io__foo/bar__" ++ SThreshold),
     %% Add an extra Rctx with dbname foo/bar to ensure correct naming matches
-    ExtraRctx = rctx_gen(#{dbname => <<"foo/bar">>, get_kp_node => Threshold + 10}),
+    ExtraRctx = couch_srt_test_helper:rctx_gen(#{dbname => <<"foo/bar">>, get_kp_node => Threshold + 10}),
     %% Make sure we have at least one match
-    Rctxs = [ExtraRctx, rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
+    Rctxs = [ExtraRctx, couch_srt_test_helper:rctx_gen(#{ioq_calls => Threshold + 10}) | Rctxs0],
     ?assertEqual(
         lists:sort(lists:filter(matcher_for_dbnames_io(DbFoo, Threshold), Rctxs)),
         lists:sort(lists:filter(MatcherFoo, Rctxs)),
@@ -323,7 +312,7 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
     MName = "Crazy-Matcher",
     MSpec = couch_srt_logger:matcher_on_dbname(CrazyDbName),
     %% Add an extra Rctx with CrazyDbName to create a specific match
-    ExtraRctx = rctx_gen(#{dbname => CrazyDbName}),
+    ExtraRctx = couch_srt_test_helper:rctx_gen(#{dbname => CrazyDbName}),
     %% Make sure we have at least one match
     Rctxs = [ExtraRctx | Rctxs0],
 
