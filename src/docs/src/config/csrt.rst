@@ -58,7 +58,7 @@ This section contains the top level enablement and configuration options for CSR
         Enablement of tracking new metric counters for different `fabric_rpc` operations
         spawned by way of `rexi_server:init_p/3`. This is the primary mechanism for
         inducing database RPC operations within CouchDB, and these init_p metrics aim to
-        provide node lever understandings of the workloads being induced by other
+        provide node level understandings of the workloads being induced by other
         coordinator proceses. This is especially relevant for databases on subsets of a
         cluster resulting in non-uniform workloads, these metrics are tailored to
         provide insight into what work is being spawned on each node in the cluster as a
@@ -125,7 +125,7 @@ This section contains the top level enablement and configuration options for CSR
             This setting exists because we lack an expressive enough config
             declaration to easily chain the matchspec constructions as
             `ets:fun2ms/1` is a special compile time parse transform macro that
-            requires the fully definition to be specified directly, it cannot
+            requires the full definition to be specified directly, it cannot
             be iteractively constructed. That said, you _can_ register matchers
             through remsh with more specific and fine grained pattern matching,
             and a more expressive system for defining matchers are being
@@ -176,7 +176,7 @@ This section contains the top level enablement and configuration options for CSR
 CSRT Logger Matcher Configuration
 =================================
 
-There are currently eight builtin default logger matcherss designed to make it
+There are currently eight builtin default logger matchers designed to make it
 easy to do filtering on heavy resource usage inducing and long running
 requests. These are designed as a simple baseline of useful matchers, declared
 in a manner amenable to `default.ini` based constructs. More expressive matcher
@@ -269,7 +269,7 @@ CSRT Logger Matcher Enablement Configuration
         RPC Workers handling internal CouchDB requests. This is predominantly
         induced by HTTP requests, but any internall systems flowing through
         `fabric_rpc` will be picked up as well, such as internal/external
-        replication and anythingg that needs to load a document through the
+        replication and anything that needs to load a document through the
         quorum system.
 
         Enable the matcher::
@@ -282,7 +282,7 @@ CSRT Logger Matcher Enablement Configuration
         Enable the `docs_read` builtin matcher, with a default
         `Threshold=1000`, such that any request that reads more than
         `Threshold` docs will generate a CSRT process lifetime report with a
-        summary of its resouce consumption.
+        summary of its resource consumption.
 
         This is different from the `rows_read` filter in that a view with
         `?limit=1000` will read 1000 rows, but the same request with
@@ -301,7 +301,7 @@ CSRT Logger Matcher Enablement Configuration
         Enable the `rows_read` builtin matcher, with a default
         `Threshold=1000`, such that any request that reads more than
         `Threshold` rows will generate a CSRT process lifetime report with a
-        summary of its resouce consumption.
+        summary of its resource consumption.
 
         This is different from the `docs_read` filter so that we can
         distinguish between heavy view requests with lots of rows or heavy
@@ -320,7 +320,7 @@ CSRT Logger Matcher Enablement Configuration
         Enable the `docs_written` builtin matcher, with a default
         `Threshold=500`, such that any request that writtens more than
         `Threshold` docs will generate a CSRT process lifetime report with a
-        summary of its resouce consumption.
+        summary of its resource consumption.
 
         Enable the matcher::
 
@@ -335,7 +335,7 @@ CSRT Logger Matcher Enablement Configuration
         Enable the `ioq_calls` builtin matcher, with a default
         `Threshold=10000`, such that any request that induces more than
         `Threshold` IOQ calls will generate a CSRT process lifetime report with
-        a summary of its resouce consumption.
+        a summary of its resource consumption.
 
         Enable the matcher::
 

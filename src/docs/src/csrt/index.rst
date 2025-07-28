@@ -62,7 +62,7 @@ reports. This took several versions to find a scalable and robust approach that
 induced minimal impact on maximum system throughput. Now that the framework is
 in place, it can be extended to track any further desired process local uses of
 `couch_stats:increment_counter`. That said, the currently selected set of stats
-to track was heavily influenced by the challenges in reotractively
+to track was heavily influenced by the challenges in retroactively
 understanding the quantity of resources induced by a query like
 `/db/_changes?since=$SEQ`, or similarly, `/db/_find`.
 
@@ -114,7 +114,7 @@ CSRT Overview
     of work induced, at the cluster level, that can then be analyzed with
     various tools to visualize and understand what the cluster was doing and
     why. At a simpler level, these reports can be summed together over a time
-    period on the relevant fields, and then can we can utilize calculus to take
+    period on the relevant fields, and then we can utilize calculus to take
     the the derivative and understand the largest spikes in workload over time,
     or the integral to understand the total quantities of resources induced
     over time, eg docs read per second or how many total docs were read in a
@@ -285,7 +285,7 @@ An example of the hidden data CSRT exposes
     and advanced query aggregations become available. In our heavy example cyclic
     workload above, the benchmark was a rampup view query run on a Q=64 database
     with `?group=false&include_docs=true` and no limit, specifically to do a full
-    index database scane loading every single doc in the process, and then we spawn
+    index database scan loading every single doc in the process, and then we spawn
     another HTTP worker performing those view requests every second, progressively
     overloading the system as you can see in the Erlang process count metrics. In
     the above workload case, it was fairly uniform in that the workload wasn't
