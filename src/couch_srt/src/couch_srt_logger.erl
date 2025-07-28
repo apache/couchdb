@@ -60,6 +60,8 @@
     get_registered_matchers/0,
     is_match/1,
     is_match/2,
+    matcher_on_all_coordinators/0,
+    matcher_on_all_rpc_workers/0,
     matcher_on_dbname/1,
     matcher_on_docs_read/1,
     matcher_on_docs_written/1,
@@ -308,6 +310,14 @@ handle_info(Msg, St) ->
 %% Matchers
 %%
 
+-spec matcher_on_all_coordinators() -> ets:match_spec().
+matcher_on_all_coordinators() ->
+    ets:fun2ms(fun(#rctx{type = #coordinator{}} = R) -> R end).
+
+-spec matcher_on_all_rpc_workers() -> ets:match_spec().
+matcher_on_all_rpc_workers() ->
+    ets:fun2ms(fun(#rctx{type = #rpc_worker{}} = R) -> R end).
+
 -spec matcher_on_dbname(DbName :: dbname()) -> ets:match_spec().
 matcher_on_dbname(DbName) when
     is_binary(DbName)
@@ -452,7 +462,9 @@ proc_window(AttrName, Num, Time) ->
 -spec add_matcher(Name, MSpec, Matchers) ->
     {ok, matchers()} | {error, {invalid_ms, string(), ets:match_spec()}}
 when
-    Name :: string(), MSpec :: ets:match_spec(), Matchers :: matchers().
+    Name :: string(), MSpec :: ets:match_spec() | undefined, Matchers :: matchers().
+add_matcher(Name, undefined=MSpec, _Matchers) ->
+    {error, {invalid_ms, Name, MSpec}};
 add_matcher(Name, MSpec, Matchers) ->
     try ets:match_spec_compile(MSpec) of
         CompMSpec ->
@@ -472,6 +484,8 @@ set_matchers_term(Matchers) when is_map(Matchers) ->
 initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
     %% Standard matchers to conditionally enable
     DefaultMatchers = [
+        {all_coordinators, fun matcher_on_all_coordinators/0, undefined},
+        {all_rpc_workers, fun matcher_on_all_rpc_workers/0, undefined},
         {docs_read, fun matcher_on_docs_read/1, 1000},
         {rows_read, fun matcher_on_rows_read/1, 1000},
         {docs_written, fun matcher_on_docs_written/1, 500},
@@ -489,8 +503,16 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                 true ->
                     %% Wrap in a try-catch to handle MatcherGen errors
                     try
-                        Threshold = matcher_threshold(Name, Threshold0),
-                        case add_matcher(Name, MatchGenFunc(Threshold), Matchers0) of
+                        MSpec = case erlang:fun_info(MatchGenFunc, arity) of
+                            {arity, 1} ->
+                                Threshold = matcher_threshold(Name, Threshold0),
+                                MatchGenFunc(Threshold);
+                            {arity, 0} ->
+                                MatchGenFunc();
+                            _ ->
+                                undefined
+                        end,
+                        case add_matcher(Name, MSpec, Matchers0) of
                             {ok, Matchers1} ->
                                 Matchers1;
                             {error, {invalid_ms, NameE, MSpecE}} ->
@@ -504,9 +526,6 @@ initialize_matchers(RegisteredMatchers) when is_map(RegisteredMatchers) ->
                             Matchers0
                     end;
                 false ->
-                    couch_log:warning("[~p] Failed to initialize matcher: ~p", [
-                        ?MODULE, Name
-                    ]),
                     Matchers0
             end
         end,

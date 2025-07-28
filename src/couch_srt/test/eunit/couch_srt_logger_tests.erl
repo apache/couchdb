@@ -64,6 +64,8 @@ csrt_logger_matchers_test_() ->
             ?TDEF_FE(t_matcher_on_long_reqs),
             ?TDEF_FE(t_matcher_on_ioq_calls),
             ?TDEF_FE(t_matcher_on_nonce),
+            ?TDEF_FE(t_matcher_on_all_coordinators),
+            ?TDEF_FE(t_matcher_on_all_rpc_workers),
             ?TDEF_FE(t_matcher_register_deregister)
         ]
     }.
@@ -402,6 +404,24 @@ t_matcher_register_deregister(#{rctxs := Rctxs0}) ->
         #{}, couch_srt_logger:get_registered_matchers(), "no leftover registered matchers"
     ).
 
+t_matcher_on_all_coordinators(#{rctxs := Rctxs0}) ->
+    %% Make sure we have at least one match
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{type => #coordinator{}}) | Rctxs0],
+    ?assertEqual(
+        lists:sort(lists:filter(matcher_on_coordinators(), Rctxs)),
+        lists:sort(lists:filter(matcher_for_csrt("all_coordinators"), Rctxs)),
+        "All Coordinators matcher"
+    ).
+
+t_matcher_on_all_rpc_workers(#{rctxs := Rctxs0}) ->
+    %% Make sure we have at least one match
+    Rctxs = [couch_srt_test_helper:rctx_gen(#{type => #rpc_worker{}}) | Rctxs0],
+    ?assertEqual(
+        lists:sort(lists:filter(matcher_on_rpc_workers(), Rctxs)),
+        lists:sort(lists:filter(matcher_for_csrt("all_rpc_workers"), Rctxs)),
+        "All RPC Workers matcher"
+    ).
+
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas
     timer:sleep(50),
@@ -420,6 +440,18 @@ matcher_on(Field, Value) ->
 
 matcher_for(Field, Value, Op) ->
     fun(Rctx) -> Op(couch_srt_entry:value(Field, Rctx), Value) end.
+
+matcher_on_coordinators() ->
+    fun
+        (#rctx{type=#coordinator{}}) -> true;
+        (_) -> false
+    end.
+
+matcher_on_rpc_workers() ->
+    fun
+        (#rctx{type=#rpc_worker{}}) -> true;
+        (_) -> false
+    end.
 
 matcher_for_csrt(MatcherName) ->
     Matchers = #{MatcherName => {_, _} = couch_srt_logger:get_matcher(MatcherName)},
