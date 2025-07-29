@@ -19,8 +19,11 @@
 -define(WAIT_DELAY_COUNT, 50).
 
 setup() ->
+    setup(0).
+
+setup(MaxGen) ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX, {max_generation, MaxGen}]),
     ok = couch_db:close(Db),
     create_docs(DbName),
     DbName.
@@ -40,25 +43,57 @@ basic_compaction_test_() ->
             fun setup/0,
             fun teardown/1,
             [
-                fun compaction_resume/1,
+                fun compaction_resume_0/1,
                 fun is_compacting_works/1
             ]
         }
     }.
 
-compaction_resume(DbName) ->
+generational_compaction_test_() ->
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        {
+            foreach,
+            fun() -> setup(2) end,
+            fun teardown/1,
+            [
+                fun compaction_resume_0/1,
+                fun compaction_resume_1/1,
+                fun compaction_resume_2/1,
+                fun is_compacting_works/1
+            ]
+        }
+    }.
+
+compaction_resume_0(DbName) ->
+    compaction_resume(DbName, 0).
+
+compaction_resume_1(DbName) ->
+    compaction_resume(DbName, 1).
+
+compaction_resume_2(DbName) ->
+    compaction_resume(DbName, 2).
+
+compaction_resume(DbName, Gen) ->
+    lists:foreach(
+        fun(G) -> compact_db(DbName, G) end,
+        lists:seq(0, Gen - 1)
+    ),
+
     ?_test(begin
         check_db_validity(DbName),
-        compact_db(DbName),
+        compact_db(DbName, Gen),
         check_db_validity(DbName),
 
         % Force an error when copying document ids
         with_mecked_emsort(fun() ->
-            compact_db(DbName)
+            compact_db(DbName, Gen)
         end),
 
         check_db_validity(DbName),
-        compact_db(DbName),
+        compact_db(DbName, Gen),
         check_db_validity(DbName)
     end).
 
@@ -120,8 +155,12 @@ create_docs(DbName) ->
     end).
 
 compact_db(DbName) ->
+    compact_db(DbName, 0).
+
+compact_db(DbName, Gen) ->
+    couch_log:error("compact_db(Gen = ~p)", [Gen]),
     couch_util:with_db(DbName, fun(Db) ->
-        {ok, _} = couch_db:start_compact(Db)
+        {ok, _} = couch_db:start_compact(Db, Gen)
     end),
     wait_db_compact_done(DbName, ?WAIT_DELAY_COUNT).
 
