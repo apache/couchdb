@@ -300,8 +300,8 @@ defmodule Couch.DBTest do
     resp.body
   end
 
-  def compact(db_name) do
-    resp = Couch.post("/#{db_name}/_compact")
+  def compact(db_name, gen \\ 0) do
+    resp = Couch.post("/#{db_name}/_compact?gen=#{gen}")
     assert resp.status_code == 202
 
     retry_until(

@@ -139,6 +139,27 @@
   "CompactTest": [
     "compaction reduces size of deleted docs"
   ],
+  "CompactGenerationTest": [
+    "increase the max generation",
+    "promote docs and atts into gen-1",
+    "read doc and attachment after compaction",
+    "read doc after open file timeout",
+    "add an attachment to a compacted doc",
+    "compact an attachment added to a compacted doc",
+    "compact a doc and att an additional generation",
+    "update a compacted doc",
+    "compact an updated doc",
+    "compact, update and compact a doc",
+    "compact, update then compact twice",
+    "compact through multiple generations",
+    "compact max generation (0)",
+    "compact max generation (1)",
+    "retention in gen 0",
+    "compact final generation",
+    "copy compacted doc on moving attachment",
+    "compact with partition limit",
+    "transfer space used from gen 0 to gen 1"
+  ],
   "ConfigTest": [
     "Atoms, binaries, and strings suffice as whitelist sections and keys.",
     "Blacklist is functional",
