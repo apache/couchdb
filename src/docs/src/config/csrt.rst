@@ -35,7 +35,7 @@ This section contains the top level enablement and configuration options for CSR
     .. config:option:: enable :: Enable CSRT data collection and RPC deltas
 
         Core enablement toggle for CSRT, defaults to false. Enabling this
-        setting intiates local CSRT stats collection as well as shipping deltas
+        setting initiates local CSRT stats collection as well as shipping deltas
         in RPC responses to accumulate in the coordinator.
 
         This does *not* trigger the new RPC spawn metrics, and it does not
@@ -59,7 +59,7 @@ This section contains the top level enablement and configuration options for CSR
         spawned by way of `rexi_server:init_p/3`. This is the primary mechanism for
         inducing database RPC operations within CouchDB, and these init_p metrics aim to
         provide node level understandings of the workloads being induced by other
-        coordinator proceses. This is especially relevant for databases on subsets of a
+        coordinator processes. This is especially relevant for databases on subsets of a
         cluster resulting in non-uniform workloads, these metrics are tailored to
         provide insight into what work is being spawned on each node in the cluster as a
         function of time.
@@ -126,8 +126,8 @@ This section contains the top level enablement and configuration options for CSR
             declaration to easily chain the matchspec constructions as
             `ets:fun2ms/1` is a special compile time parse transform macro that
             requires the full definition to be specified directly, it cannot
-            be iteractively constructed. That said, you _can_ register matchers
-            through remsh with more specific and fine grained pattern matching,
+            be interactively constructed. That said, you _can_ register matchers
+            through `remsh` with more specific and fine grained pattern matching,
             and a more expressive system for defining matchers are being
             explored.
 
@@ -152,7 +152,7 @@ This section contains the top level enablement and configuration options for CSR
         disabling rpc reporting by default, as its a simple way to reduce
         overall volume
 
-        Truncate zero values from process lifecyle reports, enabled by default:
+        Truncate zero values from process lifecycle reports, enabled by default:
 
             [csrt]
             should_truncate_reports = true
@@ -181,7 +181,7 @@ easy to do filtering on heavy resource usage inducing and long running
 requests. These are designed as a simple baseline of useful matchers, declared
 in a manner amenable to `default.ini` based constructs. More expressive matcher
 declarations are being explored, and matchers of arbitrary complexity can be
-registered directly through remsh. The default matchers are all designed around
+registered directly through `remsh`. The default matchers are all designed around
 an integer config Threshold that triggers on a specific field, eg docs read, or
 on a delta of fields for long requests and changes requests that process many
 rows but return few.
@@ -267,7 +267,7 @@ CSRT Logger Matcher Enablement Configuration
 
         Enable the `all_rpc_workers` default matcher to match against all
         RPC Workers handling internal CouchDB requests. This is predominantly
-        induced by HTTP requests, but any internall systems flowing through
+        induced by HTTP requests, but any internal systems flowing through
         `fabric_rpc` will be picked up as well, such as internal/external
         replication and anything that needs to load a document through the
         quorum system.
@@ -318,7 +318,7 @@ CSRT Logger Matcher Enablement Configuration
     .. config:option:: docs_written :: Enable docs_written default CSRT Logger Matcher
 
         Enable the `docs_written` builtin matcher, with a default
-        `Threshold=500`, such that any request that writtens more than
+        `Threshold=500`, such that any request that written more than
         `Threshold` docs will generate a CSRT process lifetime report with a
         summary of its resource consumption.
 
@@ -497,7 +497,7 @@ to find significant requests that induce heavy resource usage, without
 drastically increasing the data log volume. For example, logging only when
 requests take more than a minute or induce more than 10000 IOQ calls are
 examples of scenarios where you most likely want to be informed about those
-significant requests as they're well outside of normal effecient database
+significant requests as they're well outside of normal efficient database
 queries, while constraining total log volume for non-significant requests. The
 default logger matcher Thresholds provide a simple way to set high level
 watermarks to automatically generate logged reports for further analysis.
@@ -563,7 +563,7 @@ for every CSRT tracked process lifecycle. This would be much better suited for
 writing directly to a Vector store for post processing without any of the
 verbose string labels. This also has the advantage of exposing both
 `all_coordinators` and `all_rpc_workers` through the `/_active_resources`
-interface, allowing for effecient querying and aggregating on either all
+interface, allowing for efficient querying and aggregating on either all
 coordinators or RPC workers::
 
     [csrt]
@@ -584,4 +584,4 @@ coordinators or RPC workers::
    `all_rpc_workers` logger matcher being enabled for querying. We should
    probably extend the Logger Matchers logic to allow for specific Logger
    Matchers to only be utilized for the querying APIs, and allow for more
-   stringent filters when decided to generate a lifecyle report.
+   stringent filters when decided to generate a lifecycle report.

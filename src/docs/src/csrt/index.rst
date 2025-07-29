@@ -36,15 +36,15 @@ CSRT does this by piggy-backing off of the existing metrics tracked by way of
 those metrics inc calls, and then CSRT updates an ets entry containing the
 context information for the local process, such that global aggregate queries
 can be performed against the ets table as well as the generation of the process
-resource usage reports at the conclusions of the process's lifecyle.The ability
+resource usage reports at the conclusions of the process's lifecycle.The ability
 to do aggregate querying in realtime in addition to the process lifecycle
 reports for post facto analysis over time, is a cornerstone of CSRT that is the
-result of a series of iterations until a robust and scalable aproach was built.
+result of a series of iterations until a robust and scalable approach was built.
 
 The real time querying is achieved by way of a global ets table with
 `read_concurrency`, `write_concurrency`, and `decentralized_counters` enabled.
 Great care was taken to ensure that _zero_ concurrent writes to the same key
-occure in this model, and this entire system is predicated on the fact that
+occur in this model, and this entire system is predicated on the fact that
 incremental updates to `ets:update_counters` provides *really* fast and
 efficient updates in an atomic and isolated fashion when coupled with
 decentralized counters and write concurrency. Each process that calls
@@ -55,7 +55,7 @@ performed, one per process invocation of `couch_stats:increment_counter`, and
 one for coordinators to update worker deltas in a single batch, resulting in a
 1:1 ratio of ets calls to real time stats updates for the primary workloads.
 
-The primary achievement of CSRT is the core framework iself for concurrent
+The primary achievement of CSRT is the core framework itself for concurrent
 process local stats tracking and real time RPC delta accumulation in a scalable
 manner that allows for real time aggregate querying and process lifecycle
 reports. This took several versions to find a scalable and robust approach that
@@ -156,7 +156,7 @@ CSRT Overview
     database, that will create a `coordinator` rctx, as well as `Q * N = 64 * 3
     = 196` total `rpc_worker` rctxs, although 2/3rds of those workers will die
     out after losing the race for the shard range, but if we logged all rctx
-    reports for all proceses tracked, the singular HTTP view query against a
+    reports for all processes tracked, the singular HTTP view query against a
     Q=64 database would generate 196 RPC worker reports and 1 coordinator
     report!
 
@@ -175,7 +175,7 @@ CSRT Overview
     minimal impact and at high throughput, but the act of logging and querying
     in real time is what becomes expensive.
 
-    The balance in CSRT is how do we query and save the usage data effeciently
+    The balance in CSRT is how do we query and save the usage data efficiently
     with minimal impact on throughput and performance of CouchDB while still
     allowing for meaningful insights.
 
@@ -263,8 +263,8 @@ An example of the hidden data CSRT exposes
     enabled CSRT and reporting on the default Logger Matchers, there'd be a
     logged report for each of the heavy requests using more than 10000 IOQ
     calls or 1000 docs read.  Perhaps only a few requests are hitting the 10000
-    IOQ calls metric, so you'd like to lower the Treshold to 5000 IOQ calls, or
-    maybe that wasn't sufficent so you dropped it down further to 1000. These
+    IOQ calls metric, so you'd like to lower the Threshold to 5000 IOQ calls, or
+    maybe that wasn't sufficient so you dropped it down further to 1000. These
     Logger Matchers can be enabled dynamically as well as their Thresholds
     configured dynamically, and the CSRT logger will pickup on those changes
     and reload the matchers immediately, live, such that those new Thresholds
@@ -296,8 +296,8 @@ Another example with csrt proc window
 -------------------------------------
 
     Now let us continue with another example, this time demonstrating the use of
-    the `csrt:proc_window/3` in a remsh, as one would do with `recon:proc_window/3`
-    to get an idea of heavy active procesess in the system. Normally one would
+    the `csrt:proc_window/3` in a `remsh`, as one would do with `recon:proc_window/3`
+    to get an idea of heavy active processes in the system. Normally one would
     run something like `recon:proc_window(reductions, 5, 5000).` to list the
     top 5 most active processes over the next five seconds, sorted by delta on
     the reductions count of that process. Essentially `recon:proc_window` takes
@@ -305,7 +305,7 @@ Another example with csrt proc window
     milliseconds, fetches a snapshot of the system at `T1`, then it performs a
     delta on T1 and T0, sorting and returning the top 5 results. Recon does
     this by way of a heavily optimized data structure allowing for minimal
-    memory consumption of high Erlang process systems and effecient deltas.
+    memory consumption of high Erlang process systems and efficient deltas.
 
     The `csrt:proc_window/3` functionality piggy backs off of
     `recon:proc_window`, and utilizes the same core data structures and delta
@@ -315,12 +315,12 @@ Another example with csrt proc window
 
     .. note::
 
-       The `csrt:proc_window/3` functionality is demonstrated in a remsh as it's
+       The `csrt:proc_window/3` functionality is demonstrated in a `remsh` as it's
        not currently exposed by way of the HTTP API, but can now easily be built on
        the field extraction logic in `couch_srt_query` powering the HTTP API. This
        can be added readily, as it should map over well enough to the HTTP API.
 
-    Now, given a databse `foo` with 11k documents containg a `doc.value` field
+    Now, given a database `foo` with 11k documents containing a `doc.value` field
     that is an integer value which can be filtered in a design doc by way of
     even and odd. If we instantiate a series of while loops in parallel making
     requests of the form::
@@ -413,7 +413,7 @@ Another example with csrt proc window
     So we see the requests were made, and we can see it's doing
     `include_docs=true` as well as using a customer filter, both obvious
     indications that this is a potentially heavier request, however, we don't
-    know if database foo had a thousand docs or a billion docs, whether those
+    know if database `foo` had a thousand docs or a billion docs, whether those
     docs were small or large, nor any indication of the computational
     complexity of the reference filter function.  This makes it challenging to
     retroactively correlate heavy resource usage at a hardware level with the
@@ -421,13 +421,13 @@ Another example with csrt proc window
     requests are an inconspicuous subset of the full database workload.
 
     CSRT resolves this by providing a real time querying system to find the
-    active heavy proceses, live, as well as a process lifecyle reporting engine
+    active heavy processes, live, as well as a process lifecycle reporting engine
     providing detailed analysis of the workloads induced by the request.
 
     Let's assume we had the default IOQ logger matcher enabled, with the
     default configuration of logging any requests inducing more than 10k IOQ
     calls, which would catch all three of our requests above, even though
-    they're all still going. As a result, we generate process lifecylce reports
+    they're all still going. As a result, we generate process lifecycle reports
     for all three of those requests, as we can see::
 
         (chewbranca)-(jobs:1)-(~/src/couchdb_csrt_v3)
