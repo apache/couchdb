@@ -217,6 +217,14 @@ t_query_group_by_bad_request(#{url := Url}) ->
     ?assertMatch(
         {400, #{
             <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Multiple keys in 'counter_key'">>
+        }},
+        active_resources_group_by(Url, <<"username">>, [<<"ioq_calls">>, <<"docs_read">>]),
+        "Should return error if multiple keys provided in 'counter_key'"
+    ),
+    ?assertMatch(
+        {400, #{
+            <<"error">> := <<"bad_request">>,
             <<"reason">> := <<"Unknown matcher 'unknown_matcher'">>
         }},
         active_resources_group_by("unknown_matcher", Url, <<"username">>, <<"ioq_calls">>),
@@ -557,6 +565,14 @@ t_query_sort_by_binary_key(#{rctxs := Rctxs, url := Url}) ->
     ok.
 
 t_query_sort_by_bad_request(#{url := Url}) ->
+    ?assertMatch(
+        {400, #{
+            <<"error">> := <<"bad_request">>,
+            <<"reason">> := <<"Multiple keys in 'counter_key'">>
+        }},
+        active_resources_sort_by(Url, <<"username">>, [<<"ioq_calls">>, <<"docs_read">>]),
+        "Should return error if multiple keys provided in 'counter_key'"
+    ),
     ?assertMatch(
         {400, #{
             <<"error">> := <<"bad_request">>,

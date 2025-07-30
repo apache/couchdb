@@ -153,5 +153,7 @@ send_error(Req, [{unknown_matcher, Matcher} | _]) ->
     chttpd:send_error(Req, {bad_request, <<"Unknown matcher '", MatcherBin/binary, "'">>});
 send_error(Req, [{invalid_key, FieldName} | _]) ->
     chttpd:send_error(Req, {bad_request, <<"Unknown field name '", FieldName/binary, "'">>});
+send_error(Req, [multiple_value_keys | _]) ->
+    chttpd:send_error(Req, {bad_request, <<"Multiple keys in 'counter_key'">>});
 send_error(Req, [Reason | _]) ->
     chttpd:send_error(Req, {error, Reason}).
