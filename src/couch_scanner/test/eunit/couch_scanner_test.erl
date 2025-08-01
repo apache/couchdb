@@ -49,6 +49,7 @@ couch_scanner_test_() ->
 setup() ->
     {module, _} = code:ensure_loaded(?FIND_PLUGIN),
     meck:new(?FIND_PLUGIN, [passthrough]),
+    meck:new(fabric, [passthrough]),
     meck:new(couch_scanner_server, [passthrough]),
     meck:new(couch_scanner_util, [passthrough]),
     Ctx = test_util:start_couch([fabric, couch_scanner]),
@@ -141,8 +142,6 @@ t_run_through_all_callbacks_basic({_, {DbName1, DbName2, _}}) ->
     ?assertEqual(2, num_calls(checkpoint, 1)),
     ?assertEqual(1, num_calls(db, ['_', DbName1])),
     ?assertEqual(1, num_calls(db, ['_', DbName2])),
-    ?assertEqual(1, num_calls(ddoc, ['_', DbName1, '_'])),
-    ?assertEqual(1, num_calls(ddoc, ['_', DbName2, '_'])),
     ?assert(num_calls(shards, 2) >= 2),
     DbOpenedCount = num_calls(db_opened, 2),
     ?assert(DbOpenedCount >= 4),
@@ -161,10 +160,14 @@ t_find_reporting_works(_) ->
     config:set(Plugin ++ ".regexes", "foo14", "foo(1|4)", false),
     config:set(Plugin ++ ".regexes", "baz", "baz", false),
     meck:reset(couch_scanner_server),
+    meck:reset(fabric),
     config:set("couch_scanner_plugins", Plugin, "true", false),
     wait_exit(10000),
     % doc2 should have a baz and doc1 and doc4 matches foo14
-    ?assertEqual(3, log_calls(warning)).
+    ?assertEqual(3, log_calls(warning)),
+    % check that we didn't call fabric:all_docs fetching design docs
+    % as we don't need to for this plugin
+    ?assertEqual(0, meck:num_calls(fabric, all_docs, 5)).
 
 t_ddoc_features_works({_, {_, DbName2, _}}) ->
     % Run the "ddoc_features" plugin
