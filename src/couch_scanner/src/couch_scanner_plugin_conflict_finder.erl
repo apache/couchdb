@@ -19,7 +19,7 @@
     complete/1,
     checkpoint/1,
     db/2,
-    doc_id/3
+    doc_fdi/3
 ]).
 
 -include_lib("couch_scanner/include/couch_scanner_plugin.hrl").
@@ -76,12 +76,10 @@ checkpoint(#st{sid = SId, opts = Opts}) ->
 db(#st{} = St, _DbName) ->
     {ok, St}.
 
-doc_id(#st{} = St, <<?DESIGN_DOC_PREFIX, _/binary>>, _Db) ->
-    {skip, St};
-doc_id(#st{} = St, DocId, Db) ->
-    {ok, #doc_info{revs = Revs}} = couch_db:get_doc_info(Db, DocId),
+doc_fdi(#st{} = St, #full_doc_info{} = FDI, Db) ->
+    #doc_info{revs = Revs} = couch_doc:to_doc_info(FDI),
     DbName = mem3:dbname(couch_db:name(Db)),
-    {ok, check(St, DbName, DocId, Revs)}.
+    {ok, check(St, DbName, FDI#full_doc_info.id, Revs)}.
 
 % Private
 
