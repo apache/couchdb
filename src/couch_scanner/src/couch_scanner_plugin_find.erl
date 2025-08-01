@@ -23,7 +23,6 @@
     complete/1,
     checkpoint/1,
     db/2,
-    ddoc/3,
     shards/2,
     db_opened/2,
     doc_id/3,
@@ -76,11 +75,6 @@ db(#st{} = St, DbName) ->
     Meta = #{sid => SId, db => DbName},
     report_match(DbName, Pats, Meta),
     {ok, St}.
-
-ddoc(#st{} = St, _DbName, #doc{} = _DDoc) ->
-    % We'll check doc bodies during the shard scan
-    % so no need to keep inspecting ddocs
-    {stop, St}.
 
 shards(#st{sid = SId} = St, Shards) ->
     case debug() of
