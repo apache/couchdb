@@ -119,10 +119,15 @@
 -callback db_opened(St :: term(), Db :: term()) ->
     {ok, St :: term()}.
 
-% Optional. If doc is not defined, then ddoc_id default action is {skip, St}.
-% If it is defined, the default action is {ok, St}.
+% Optional. If doc and doc_fdi are not defined, then doc_id default
+% action is {skip, St}. If it is defined, the default action is {ok, St}.
 -callback doc_id(St :: term(), DocId :: binary(), Db :: term()) ->
     {ok | skip | stop, St1 :: term()}.
+
+% Optional. If doc is not defined, then doc_fdi default action is {stop, St}.
+% If it is defined, the default action is {ok, St}.
+-callback doc_fdi(St :: term(), FDI :: #full_doc_info{}, Db :: term()) ->
+    {ok | stop, St1 :: term()}.
 
 % Optional.
 -callback doc(St :: term(), Db :: term(), #doc{}) ->
@@ -139,6 +144,7 @@
     shards/2,
     db_opened/2,
     doc_id/3,
+    doc_fdi/3,
     doc/3,
     db_closing/2
 ]).
@@ -153,6 +159,7 @@
     {shards, 2, fun default_shards/3},
     {db_opened, 2, fun default_db_opened/3},
     {doc_id, 3, fun default_doc_id/3},
+    {doc_fdi, 3, fun default_doc_fdi/3},
     {doc, 3, fun default_doc/3},
     {db_closing, 2, fun default_db_closing/3}
 ]).
@@ -382,12 +389,22 @@ scan_docs_fold(#full_doc_info{id = Id} = FDI, #st{} = St) ->
             {Go, PSt1} = DocIdCbk(PSt, Id, Db),
             St1 = St#st{pst = PSt1},
             case Go of
-                ok -> scan_doc(FDI, St1);
+                ok -> scan_fdi(FDI, St1);
                 skip -> {ok, St1};
                 stop -> {stop, St1}
             end;
         true ->
             {ok, St}
+    end.
+
+scan_fdi(#full_doc_info{} = FDI, #st{} = St) ->
+    #st{db = Db, callbacks = Cbks, pst = PSt} = St,
+    #{doc_fdi := FDICbk} = Cbks,
+    {Go, PSt1} = FDICbk(PSt, FDI, Db),
+    St1 = St#st{pst = PSt1},
+    case Go of
+        ok -> scan_doc(FDI, St1);
+        stop -> {stop, St1}
     end.
 
 scan_doc(#full_doc_info{} = FDI, #st{} = St) ->
@@ -575,6 +592,7 @@ default_shards(Mod, _F, _A) when is_atom(Mod) ->
     case
         is_exported(Mod, db_opened, 2) orelse
             is_exported(Mod, doc_id, 3) orelse
+            is_exported(Mod, doc_fdi, 3) orelse
             is_exported(Mod, doc, 3) orelse
             is_exported(Mod, db_closing, 2)
     of
@@ -586,9 +604,15 @@ default_db_opened(Mod, _F, _A) when is_atom(Mod) ->
     fun(St, _Db) -> {ok, St} end.
 
 default_doc_id(Mod, _F, _A) when is_atom(Mod) ->
-    case is_exported(Mod, doc, 3) of
+    case is_exported(Mod, doc, 3) orelse is_exported(Mod, doc_fdi, 3) of
         true -> fun(St, _DocId, _Db) -> {ok, St} end;
         false -> fun(St, _DocId, _Db) -> {skip, St} end
+    end.
+
+default_doc_fdi(Mod, _F, _A) when is_atom(Mod) ->
+    case is_exported(Mod, doc, 3) of
+        true -> fun(St, _FDI, _Db) -> {ok, St} end;
+        false -> fun(St, _FDI, _Db) -> {stop, St} end
     end.
 
 default_doc(Mod, _F, _A) when is_atom(Mod) ->
@@ -624,16 +648,23 @@ shards_by_range(Shards) ->
 
 % Design doc fetching helper
 
-fold_ddocs(Fun, #st{dbname = DbName} = Acc) ->
-    QArgs = #mrargs{
-        include_docs = true,
-        extra = [{namespace, <<"_design">>}]
-    },
-    try
-        {ok, Acc1} = fabric:all_docs(DbName, [?ADMIN_CTX], Fun, Acc, QArgs),
-        Acc1
-    catch
-        error:database_does_not_exist ->
+fold_ddocs(Fun, #st{dbname = DbName, mod = Mod} = Acc) ->
+    case is_exported(Mod, ddoc, 3) of
+        true ->
+            QArgs = #mrargs{
+                include_docs = true,
+                extra = [{namespace, <<"_design">>}]
+            },
+            try
+                {ok, Acc1} = fabric:all_docs(DbName, [?ADMIN_CTX], Fun, Acc, QArgs),
+                Acc1
+            catch
+                error:database_does_not_exist ->
+                    Acc
+            end;
+        false ->
+            % If the plugin doesn't export the ddoc callback, don't bother calling
+            % fabric:all_docs, as it's expensive
             Acc
     end.
 
