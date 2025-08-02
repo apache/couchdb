@@ -88,7 +88,9 @@ db_opened(#st{sid = SId} = St, Db) ->
         true -> ?DEBUG("", [], #{sid => SId, db => Db});
         false -> ok
     end,
-    {ok, St}.
+    % Search backwards with the idea that we may be looking for some recent
+    % changes we just made to the database.
+    {couch_db:get_update_seq(Db), [{dir, rev}], St}.
 
 doc_id(#st{} = St, DocId, Db) ->
     #st{sid = SId, compiled_regexes = Pats} = St,
