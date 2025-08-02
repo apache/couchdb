@@ -115,9 +115,14 @@
 -callback shards(St :: term(), [#shard{}]) ->
     {[#shard{}], St1 :: term()}.
 
-% Optional
+% Optional. Called right after a shard file is opened so it gets a Db handle.
+% Should return the change feed start sequence and a list of options along with any changes
+% in a private context. The change feed start sequence should normally be 0 and the list
+% of option can be []. The list of options will be passed directly to couch_db:fold_changes,
+% so any {dir, Dir}, {end_key, EndSeq} could work there.
+%
 -callback db_opened(St :: term(), Db :: term()) ->
-    {ok, St :: term()}.
+    {ChangesSeq :: non_neg_integer(), ChangesOpts :: [term()], St1 :: term()}.
 
 % Optional. If doc and doc_fdi are not defined, then doc_id default
 % action is {skip, St}. If it is defined, the default action is {ok, St}.
@@ -178,6 +183,8 @@
     cursor,
     shards_db,
     db,
+    changes_seq = 0,
+    changes_opts = [],
     checkpoint_sec = 0,
     start_sec = 0,
     skip_dbs,
@@ -370,7 +377,8 @@ scan_docs(#st{} = St, #shard{name = ShardDbName}) ->
             try
                 St2 = St1#st{db = Db},
                 St3 = db_opened_callback(St2),
-                {ok, St4} = couch_db:fold_docs(Db, fun scan_docs_fold/2, St3, []),
+                #st{changes_seq = Seq, changes_opts = Opts} = St3,
+                {ok, St4} = couch_db:fold_changes(Db, Seq, fun scan_docs_fold/2, St3, Opts),
                 St5 = db_closing_callback(St4),
                 erlang:garbage_collect(),
                 St5#st{db = undefined}
@@ -521,13 +529,13 @@ resume_callback(#{} = Cbks, SId, #{} = EJsonPSt) when is_binary(SId) ->
 
 db_opened_callback(#st{pst = PSt, callbacks = Cbks, db = Db} = St) ->
     #{db_opened := DbOpenedCbk} = Cbks,
-    {ok, PSt1} = DbOpenedCbk(PSt, Db),
-    St#st{pst = PSt1}.
+    {Seq, Opts, PSt1} = DbOpenedCbk(PSt, Db),
+    St#st{pst = PSt1, changes_seq = Seq, changes_opts = Opts}.
 
 db_closing_callback(#st{pst = PSt, callbacks = Cbks, db = Db} = St) ->
     #{db_closing := DbClosingCbk} = Cbks,
     {ok, PSt1} = DbClosingCbk(PSt, Db),
-    St#st{pst = PSt1}.
+    St#st{pst = PSt1, changes_seq = 0, changes_opts = []}.
 
 shards_callback(#st{pst = PSt, callbacks = Cbks} = St, Shards) ->
     #{shards := ShardsCbk} = Cbks,
@@ -601,7 +609,7 @@ default_shards(Mod, _F, _A) when is_atom(Mod) ->
     end.
 
 default_db_opened(Mod, _F, _A) when is_atom(Mod) ->
-    fun(St, _Db) -> {ok, St} end.
+    fun(St, _Db) -> {0, [], St} end.
 
 default_doc_id(Mod, _F, _A) when is_atom(Mod) ->
     case is_exported(Mod, doc, 3) orelse is_exported(Mod, doc_fdi, 3) of

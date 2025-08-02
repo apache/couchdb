@@ -85,8 +85,8 @@ setup() ->
     ok = add_doc(DbName2, ?DOC3, #{foo3 => bax}),
     ok = add_doc(DbName2, ?DOC4, #{foo4 => baw, <<>> => this_is_ok_apparently}),
     add_docs(DbName3, [
-        {doc, ?DOC5, {2, [<<"x">>, <<"z">>]}, {[]}, [], false, []},
-        {doc, ?DOC5, {2, [<<"y">>, <<"z">>]}, {[]}, [], false, []}
+        #doc{id = ?DOC5, revs = {2, [<<"x">>, <<"z">>]}, deleted = false},
+        #doc{id = ?DOC5, revs = {2, [<<"y">>, <<"z">>]}, deleted = false}
     ]),
     couch_scanner:reset_checkpoints(),
     {Ctx, {DbName1, DbName2, DbName3}}.
@@ -204,9 +204,18 @@ t_conflict_finder_works({_, {_, _, DbName3}}) ->
     % Add a deleted conflicting doc to the third database.
     % 3 reports are expected: 2 doc reports and 1 db report.
     add_docs(DbName3, [
-        {doc, ?DOC6, {2, [<<"x">>, <<"z">>]}, {[]}, [], false, []},
-        {doc, ?DOC6, {2, [<<"d">>, <<"z">>]}, {[]}, [], true, []}
+        #doc{id = ?DOC6, revs = {2, [<<"x">>, <<"z">>]}, deleted = false},
+        #doc{id = ?DOC6, revs = {2, [<<"d">>, <<"z">>]}, deleted = true}
     ]),
+    resume_couch_scanner(Plugin),
+    ?assertEqual(3, meck:num_calls(couch_scanner_util, log, LogArgs)),
+    % Should work even if all revs are deleted (the whole FDI is deleted)
+    add_docs(DbName3, [
+        #doc{id = ?DOC6, revs = {3, [<<"a">>, <<"x">>, <<"z">>]}, deleted = true}
+    ]),
+    % Confirm it's deleted (we did the revs paths manipulations correctly)
+    ?assertEqual({not_found, deleted}, fabric:open_doc(DbName3, ?DOC6, [])),
+    % But we can still find the conflicts
     resume_couch_scanner(Plugin),
     ?assertEqual(3, meck:num_calls(couch_scanner_util, log, LogArgs)),
     % Set doc_report to false to only have 1 db report.
