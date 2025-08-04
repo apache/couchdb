@@ -94,8 +94,15 @@
     :query number limit: Limit number of result rows to the specified value
         (note that using ``0`` here has the same effect as ``1``).
     :query since: Start the results from the change immediately after the given
-        update sequence. Can be valid update sequence or ``now`` value.
-        Default is ``0``.
+        update sequence. Default is ``0``. Other values can be:
+
+        - A valid update sequence, for example, from a ``_changes`` feed response.
+        - ``now``
+        - ``0``
+        - A timestmap string matching the ``YYYY-MM-DDTHH:MM:SSZ``
+          format. The results returned will depend on the time-sequence
+          intervals recorded by the time-seq data structure. To inspect or reset
+          it use the :ref:`_time_seq <api/db/time_seq>` endpoint.
     :query string style: Specifies how many revisions are returned in the
         changes array. The default, ``main_only``, will only return the current
         "winning" revision; ``all_docs`` will return all leaf revisions
