@@ -36,7 +36,7 @@ status() ->
 enqueue_all_dbs() ->
     fold_local_shards(
         fun(#shard{name = Name}, _Acc) ->
-            sync_enqueue(Name)
+            sync_enqueue({Name, 0})
         end,
         ok
     ).

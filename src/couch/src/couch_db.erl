@@ -63,6 +63,7 @@
     is_partitioned/1,
 
     set_revs_limit/2,
+    set_max_generation/2,
     set_purge_infos_limit/2,
     set_security/2,
     set_user_ctx/2,
@@ -120,6 +121,7 @@
     owner_of/2,
 
     start_compact/1,
+    start_compact/2,
     cancel_compact/1,
     wait_for_compaction/1,
     wait_for_compaction/2,
@@ -257,7 +259,10 @@ monitor(#db{main_pid = MainPid}) ->
     erlang:monitor(process, MainPid).
 
 start_compact(#db{} = Db) ->
-    gen_server:call(Db#db.main_pid, start_compact).
+    start_compact(Db, 0).
+
+start_compact(#db{} = Db, Generation) ->
+    gen_server:call(Db#db.main_pid, {start_compact, Generation}).
 
 cancel_compact(#db{main_pid = Pid}) ->
     gen_server:call(Pid, cancel_compact).
@@ -536,6 +541,12 @@ purge_client_exists(DbName, DocId, Props) ->
             true
     end.
 
+set_max_generation(#db{main_pid = Pid} = Db, MaxGen) when MaxGen > 0 ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {set_max_generation, MaxGen}, infinity);
+set_max_generation(_Db, _MaxGen) ->
+    throw(invalid_max_generation).
+
 set_purge_infos_limit(#db{main_pid = Pid} = Db, Limit) when Limit > 0 ->
     check_is_admin(Db),
     gen_server:call(Pid, {set_purge_infos_limit, Limit}, infinity);
@@ -614,7 +625,7 @@ get_db_info(Db) ->
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
-    SizeInfo = couch_db_engine:get_size_info(Db),
+    SizeInfos = couch_db_engine:get_size_info(Db),
     DiskVersion = couch_db_engine:get_disk_version(Db),
     Uuid =
         case get_uuid(Db) of
@@ -639,7 +650,7 @@ get_db_info(Db) ->
         {update_seq, get_update_seq(Db)},
         {purge_seq, couch_db_engine:get_purge_seq(Db)},
         {compact_running, Compactor /= nil},
-        {sizes, {SizeInfo}},
+        {sizes, lists:map(fun(SI) -> {SI} end, SizeInfos)},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},

@@ -13,7 +13,7 @@
 -module(couch_bt_engine_compactor).
 
 -export([
-    start/4
+    start/5
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -21,6 +21,7 @@
 
 -record(comp_st, {
     db_name,
+    src_generation,
     old_st,
     new_st,
     meta_fd,
@@ -47,14 +48,17 @@
 -define(COMP_EVENT(Name), ignore).
 -endif.
 
-start(#st{} = St, DbName, Options, Parent) ->
+start(#st{header = Header} = St, DbName, SrcGen0, Options, Parent) ->
     erlang:put(io_priority, {db_compact, DbName}),
     couch_log:debug("Compaction process spawned for db \"~s\"", [DbName]),
+
+    MaxGen = couch_bt_engine_header:max_generation(Header),
+    SrcGen = erlang:min(SrcGen0, MaxGen),
 
     couch_db_engine:trigger_on_compact(DbName),
 
     ?COMP_EVENT(init),
-    {ok, InitCompSt} = open_compaction_files(DbName, St, Options),
+    {ok, InitCompSt} = open_compaction_files(DbName, SrcGen, St, Options),
     ?COMP_EVENT(files_opened),
 
     Stages = [
@@ -84,10 +88,10 @@ start(#st{} = St, DbName, Options, Parent) ->
     ok = couch_file:close(MetaFd),
 
     ?COMP_EVENT(before_notify),
-    Msg = {compact_done, couch_bt_engine, FinalNewSt#st.filepath},
+    Msg = {compact_done, couch_bt_engine, {FinalNewSt#st.filepath, SrcGen}},
     gen_server:cast(Parent, Msg).
 
-open_compaction_files(DbName, OldSt, Options) ->
+open_compaction_files(DbName, SrcGen, OldSt, Options) ->
     #st{
         filepath = DbFilePath,
         header = SrcHdr
@@ -97,6 +101,7 @@ open_compaction_files(DbName, OldSt, Options) ->
     {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
     {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
+    GenFds = couch_bt_engine:open_additional_generation_file(OldSt, SrcGen, Options),
     CompSt =
         case {DataHdr, MetaHdr} of
             {#comp_header{} = A, #comp_header{} = A} ->
@@ -104,11 +109,12 @@ open_compaction_files(DbName, OldSt, Options) ->
                 % before trying to swap out with the original db
                 DbHeader = A#comp_header.db_header,
                 St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DbHeader, Options
+                    DataFile, DataFd, GenFds, DbHeader, Options
                 ),
                 St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
                 #comp_st{
                     db_name = DbName,
+                    src_generation = SrcGen,
                     old_st = OldSt,
                     new_st = St1,
                     meta_fd = MetaFd,
@@ -121,11 +127,12 @@ open_compaction_files(DbName, OldSt, Options) ->
                 Header = couch_bt_engine_header:from(SrcHdr),
                 ok = reset_compaction_file(MetaFd, Header),
                 St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DataHdr, Options
+                    DataFile, DataFd, GenFds, DataHdr, Options
                 ),
                 St1 = bind_emsort(St0, MetaFd, nil),
                 #comp_st{
                     db_name = DbName,
+                    src_generation = SrcGen,
                     old_st = OldSt,
                     new_st = St1,
                     meta_fd = MetaFd,
@@ -136,10 +143,11 @@ open_compaction_files(DbName, OldSt, Options) ->
                 Header = couch_bt_engine_header:from(SrcHdr),
                 ok = reset_compaction_file(DataFd, Header),
                 ok = reset_compaction_file(MetaFd, Header),
-                St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
+                St0 = couch_bt_engine:init_state(DataFile, DataFd, GenFds, Header, Options),
                 St1 = bind_emsort(St0, MetaFd, nil),
                 #comp_st{
                     db_name = DbName,
+                    src_generation = SrcGen,
                     old_st = OldSt,
                     new_st = St1,
                     meta_fd = MetaFd,
@@ -211,7 +219,7 @@ copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
     NewIdTreeState = couch_bt_engine_header:id_tree_state(NewSt0#st.header),
     MetaFd = couch_emsort:get_fd(NewSt0#st.id_tree),
     MetaState = couch_emsort:get_state(NewSt0#st.id_tree),
-    NewSt1 = bind_id_tree(NewSt0, NewSt0#st.fd, NewIdTreeState),
+    NewSt1 = bind_id_tree(NewSt0, couch_bt_engine:get_fd(NewSt0), NewIdTreeState),
 
     #st{
         id_tree = NewIdTree0,
@@ -287,6 +295,7 @@ copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
 copy_compact(#comp_st{} = CompSt) ->
     #comp_st{
         db_name = DbName,
+        src_generation = SrcGen,
         old_st = St,
         new_st = NewSt0,
         retry = Retry
@@ -323,7 +332,7 @@ copy_compact(#comp_st{} = CompSt) ->
             if
                 AccUncopiedSize2 >= BufferSize ->
                     NewSt2 = copy_docs(
-                        St, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry
+                        St, SrcGen, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry
                     ),
                     AccCopiedSize2 = AccCopiedSize + AccUncopiedSize2,
                     if
@@ -371,7 +380,7 @@ copy_compact(#comp_st{} = CompSt) ->
             [{start_key, NewUpdateSeq + 1}]
         ),
 
-    NewSt3 = copy_docs(St, NewSt2, lists:reverse(Uncopied), Retry),
+    NewSt3 = copy_docs(St, SrcGen, NewSt2, lists:reverse(Uncopied), Retry),
 
     ?COMP_EVENT(seq_done),
 
@@ -390,7 +399,13 @@ copy_compact(#comp_st{} = CompSt) ->
         new_st = NewSt6
     }.
 
-copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
+pick_target_generation(SrcGen, DstGen, DataGen) ->
+    case DataGen of
+        SrcGen -> DstGen;
+        _ -> {DataGen, DataGen}
+    end.
+
+copy_docs(St, SrcGen, #st{} = NewSt, MixedInfos, Retry) ->
     DocInfoIds = [Id || #doc_info{id = Id} <- MixedInfos],
     LookupResults = couch_btree:lookup(St#st.id_tree, DocInfoIds),
     % COUCHDB-968, make sure we prune duplicates during compaction
@@ -405,9 +420,14 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
         fun(Info) ->
             {NewRevTree, FinalAcc} = couch_key_tree:mapfold(
                 fun
-                    ({RevPos, RevId}, #leaf{ptr = Sp} = Leaf, leaf, SizesAcc) ->
-                        {Body, AttInfos} = copy_doc_attachments(St, Sp, NewSt),
-                        #size_info{external = OldExternalSize} = Leaf#leaf.sizes,
+                    ({RevPos, RevId}, #leaf{ptr = LeafPtr} = Leaf, leaf, SizesAcc) ->
+                        {DocGen, _} = couch_db_updater:generation_pointer(LeafPtr),
+                        DstGen = couch_bt_engine:increment_generation(St, SrcGen),
+                        {Body, AttsChanged, AttInfos} = copy_doc_attachments(
+                            St, NewSt, LeafPtr, SrcGen, DstGen
+                        ),
+                        #size_info{active = OldActiveSize, external = OldExternalSize} =
+                            Leaf#leaf.sizes,
                         ExternalSize =
                             case OldExternalSize of
                                 0 when is_binary(Body) ->
@@ -417,19 +437,28 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
                                 N ->
                                     N
                             end,
-                        Doc0 = #doc{
-                            id = Info#full_doc_info.id,
-                            revs = {RevPos, [RevId]},
-                            deleted = Leaf#leaf.deleted,
-                            body = Body,
-                            atts = AttInfos
-                        },
-                        Doc1 = couch_bt_engine:serialize_doc(NewSt, Doc0),
-                        {ok, Doc2, ActiveSize} =
-                            couch_bt_engine:write_doc_body(NewSt, Doc1),
+                        {NewPtr, ActiveSize} =
+                            case {AttsChanged, DocGen} of
+                                {false, Gen} when Gen > 0, Gen =/= SrcGen ->
+                                    {LeafPtr, OldActiveSize};
+                                _Else ->
+                                    Doc0 = #doc{
+                                        id = Info#full_doc_info.id,
+                                        revs = {RevPos, [RevId]},
+                                        deleted = Leaf#leaf.deleted,
+                                        body = Body,
+                                        atts = AttInfos
+                                    },
+                                    Doc1 = couch_bt_engine:serialize_doc(NewSt, Doc0),
+                                    NewGen = pick_target_generation(SrcGen, DstGen, DocGen),
+                                    {ok, Doc2, NewActiveSize} = couch_bt_engine:write_doc_body(
+                                        NewSt, Doc1, NewGen
+                                    ),
+                                    {Doc2#doc.body, NewActiveSize}
+                            end,
                         AttSizes = [{element(3, A), element(4, A)} || A <- AttInfos],
                         NewLeaf = Leaf#leaf{
-                            ptr = Doc2#doc.body,
+                            ptr = NewPtr,
                             sizes = #size_info{
                                 active = ActiveSize,
                                 external = ExternalSize
@@ -443,17 +472,11 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
                 {0, 0, []},
                 Info#full_doc_info.rev_tree
             ),
-            {FinalAS, FinalES, FinalAtts} = FinalAcc,
-            TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
-            NewActiveSize = FinalAS + TotalAttSize,
-            NewExternalSize = FinalES + TotalAttSize,
+            GenSizes = couch_db_updater:map_fold_sizes(FinalAcc),
             ?COMP_EVENT(seq_copy),
             Info#full_doc_info{
                 rev_tree = NewRevTree,
-                sizes = #size_info{
-                    active = NewActiveSize,
-                    external = NewExternalSize
-                }
+                sizes = GenSizes
             }
         end,
         NewInfos0
@@ -504,8 +527,10 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
     update_compact_task(length(NewInfos)),
     NewSt#st{id_tree = IdEms, seq_tree = SeqTree}.
 
-copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
-    {ok, {BodyData, BinInfos0}} = couch_file:pread_term(SrcSt#st.fd, SrcSp),
+copy_doc_attachments(#st{} = SrcSt, DstSt, LeafPtr, SrcGen, DstGen) ->
+    {DocGen, SrcSp} = couch_db_updater:generation_pointer(LeafPtr),
+    Fd = couch_bt_engine:get_fd(SrcSt, DocGen),
+    {ok, {BodyData, BinInfos0}} = couch_file:pread_term(Fd, SrcSp),
     BinInfos =
         case BinInfos0 of
             _ when is_binary(BinInfos0) ->
@@ -515,7 +540,7 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
                 BinInfos0
         end,
     % copy the bin values
-    NewBinInfos = lists:map(
+    NewBinInfos0 = lists:map(
         fun
             ({Name, Type, BinSp, AttLen, RevPos, ExpectedMd5}) ->
                 % 010 UPGRADE CODE
@@ -526,10 +551,17 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
                     couch_stream:close(DstStream),
                 {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
                 couch_util:check_md5(ExpectedMd5, ActualMd5),
-                {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
+                {true, {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity}};
+            (
+                {_Name, _Type, {AttGen, _BinSp}, _AttLen, _DiskLen, _RevPos, _ExpectedMd5, _Enc1} =
+                    BinInfo
+            ) when AttGen =/= SrcGen ->
+                {false, BinInfo};
             ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
+                {AttGen, _} = couch_db_updater:generation_pointer(BinSp),
+                NewGen = pick_target_generation(SrcGen, DstGen, AttGen),
                 {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
-                {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
+                {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, NewGen, []),
                 ok = couch_stream:copy(SrcStream, DstStream),
                 {NewStream, AttLen, _, ActualMd5, _IdentityMd5} =
                     couch_stream:close(DstStream),
@@ -546,11 +578,13 @@ copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
                         _ ->
                             Enc1
                     end,
-                {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
+                {true, {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}}
         end,
         BinInfos
     ),
-    {BodyData, NewBinInfos}.
+    {Statuses, NewBinInfos} = lists:unzip(NewBinInfos0),
+    Changed = lists:foldl(fun(A, B) -> A orelse B end, false, Statuses),
+    {BodyData, Changed, NewBinInfos}.
 
 sort_meta_data(#comp_st{new_st = St0} = CompSt) ->
     ?COMP_EVENT(md_sort_init),
@@ -573,10 +607,10 @@ sort_meta_data(#comp_st{new_st = St0} = CompSt) ->
 
 copy_meta_data(#comp_st{new_st = St} = CompSt) ->
     #st{
-        fd = Fd,
         header = Header,
         id_tree = Src
     } = St,
+    Fd = couch_bt_engine:get_fd(St),
     SrcFd = couch_emsort:get_fd(Src),
     DstState = couch_bt_engine_header:id_tree_state(Header),
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
@@ -648,13 +682,13 @@ commit_compaction_data(#comp_st{new_st = St} = CompSt) ->
     };
 commit_compaction_data(#st{} = St) ->
     commit_compaction_data(St, couch_emsort:get_fd(St#st.id_tree)),
-    commit_compaction_data(St, St#st.fd).
+    commit_compaction_data(St, couch_bt_engine:get_fd(St)).
 
 commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     DataState = couch_bt_engine_header:id_tree_state(OldHeader),
     MetaFd = couch_emsort:get_fd(St0#st.id_tree),
     MetaState = couch_emsort:get_state(St0#st.id_tree),
-    St1 = bind_id_tree(St0, St0#st.fd, DataState),
+    St1 = bind_id_tree(St0, couch_bt_engine:get_fd(St0), DataState),
     Header = couch_bt_engine:update_header(St1, St1#st.header),
     CompHeader = #comp_header{
         db_header = Header,

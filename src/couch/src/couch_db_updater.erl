@@ -13,8 +13,9 @@
 -module(couch_db_updater).
 -behaviour(gen_server).
 
--export([add_sizes/3, upgrade_sizes/1]).
+-export([add_sizes/3, map_sizes/2, map_fold_sizes/1, sum_sizes/1, upgrade_sizes/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2]).
+-export([generation_pointer/1, canonical_pointer/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_db_int.hrl").
@@ -62,8 +63,8 @@ terminate(Reason, Db) ->
 
 handle_call(get_db, _From, Db) ->
     {reply, {ok, Db}, Db};
-handle_call(start_compact, _From, Db) ->
-    {noreply, NewDb} = handle_cast(start_compact, Db),
+handle_call({start_compact, Generation}, _From, Db) ->
+    {noreply, NewDb} = handle_cast({start_compact, Generation}, Db),
     {reply, {ok, NewDb#db.compactor_pid}, NewDb};
 handle_call(compactor_pid, _From, #db{compactor_pid = Pid} = Db) ->
     {reply, Pid, Db};
@@ -88,6 +89,10 @@ handle_call({set_revs_limit, Limit}, _From, Db) ->
     Db3 = commit_data(Db2),
     ok = couch_server:db_updated(Db3),
     {reply, ok, Db3};
+handle_call({set_max_generation, MaxGen}, _From, Db) ->
+    {ok, Db2} = couch_db_engine:set_max_generation(Db, MaxGen),
+    ok = couch_server:db_updated(Db2),
+    {reply, ok, Db2};
 handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
     ok = couch_server:db_updated(Db2),
@@ -127,7 +132,7 @@ handle_cast({load_validation_funs, ValidationFuns}, Db) ->
     Db2 = Db#db{validate_doc_funs = ValidationFuns},
     ok = couch_server:db_updated(Db2),
     {noreply, Db2};
-handle_cast(start_compact, Db) ->
+handle_cast({start_compact, Generation}, Db) ->
     case Db#db.compactor_pid of
         nil ->
             % For now we only support compacting to the same
@@ -142,7 +147,7 @@ handle_cast(start_compact, Db) ->
                 )
             ),
             couch_log:Level("Starting compaction for db \"~s\" at ~p", Args),
-            {ok, Db2} = couch_db_engine:start_compaction(Db),
+            {ok, Db2} = couch_db_engine:start_compaction(Db, Generation),
             ok = couch_server:db_updated(Db2),
             {noreply, Db2};
         _ ->
@@ -378,14 +383,10 @@ flush_trees(
         {0, 0, []},
         Unflushed
     ),
-    {FinalAS, FinalES, FinalAtts} = FinalAcc,
-    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
+    GenSizes = map_fold_sizes(FinalAcc),
     NewInfo = InfoUnflushed#full_doc_info{
         rev_tree = Flushed,
-        sizes = #size_info{
-            active = FinalAS + TotalAttSize,
-            external = FinalES + TotalAttSize
-        }
+        sizes = GenSizes
     },
     flush_trees(Db, RestUnflushed, [NewInfo | AccFlushed]).
 
@@ -416,7 +417,40 @@ check_doc_atts(Db, Doc) ->
             end
     end.
 
-add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
+canonical_pointer({0, Ptr}) ->
+    Ptr;
+canonical_pointer(Ptr) ->
+    Ptr.
+
+generation_pointer(Ptr) when is_integer(Ptr) ->
+    {0, Ptr};
+generation_pointer(Ptr) when is_list(Ptr) ->
+    {0, Ptr};
+generation_pointer(undefined) ->
+    {0, undefined};
+generation_pointer({Gen, Ptr}) ->
+    {Gen, Ptr}.
+
+add_sizes(leaf, #leaf{ptr = Ptr} = Leaf, Acc) ->
+    {Gen, _} = generation_pointer(Ptr),
+    case add_sizes_int(Leaf, Gen, Acc) of
+        [A] -> A;
+        A -> A
+    end;
+add_sizes(_, #leaf{}, Acc) ->
+    % For intermediate nodes external and active contribution is 0
+    Acc.
+
+add_sizes_int(Leaf, Gen, []) ->
+    add_sizes_int(Leaf, Gen, [{0, 0, []}]);
+add_sizes_int(Leaf, 0, [Acc | Rest]) ->
+    [add_sizes_leaf(Leaf, Acc) | Rest];
+add_sizes_int(Leaf, Gen, [Acc | Rest]) ->
+    [Acc | add_sizes_int(Leaf, Gen - 1, Rest)];
+add_sizes_int(Leaf, Gen, Acc) ->
+    add_sizes_int(Leaf, Gen, [Acc]).
+
+add_sizes_leaf(#leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     % Maybe upgrade from disk_size only
     #size_info{
         active = ActiveSize,
@@ -426,11 +460,41 @@ add_sizes(leaf, #leaf{sizes = Sizes, atts = AttSizes}, Acc) ->
     NewASAcc = ActiveSize + ASAcc,
     NewESAcc = ExternalSize + ESAcc,
     NewAttsAcc = lists:umerge(AttSizes, AttsAcc),
-    {NewASAcc, NewESAcc, NewAttsAcc};
-add_sizes(_, #leaf{}, Acc) ->
-    % For intermediate nodes external and active contribution is 0
-    Acc.
+    {NewASAcc, NewESAcc, NewAttsAcc}.
 
+map_fold_sizes(FinalSizesAcc) ->
+    map_sizes(fun fold_sizes/1, FinalSizesAcc).
+
+map_sizes(Fun, Sizes) when is_list(Sizes) ->
+    lists:map(Fun, Sizes);
+map_sizes(Fun, Sizes) ->
+    Fun(Sizes).
+
+fold_sizes({ActiveSize, ExternalSize, AttSizes}) ->
+    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, AttSizes),
+    #size_info{
+        active = ActiveSize + TotalAttSize,
+        external = ExternalSize + TotalAttSize
+    }.
+
+sum_sizes(SI) when is_list(SI) ->
+    lists:foldl(
+        fun(A, B) ->
+            #size_info{
+                active = A#size_info.active + B#size_info.active,
+                external = A#size_info.external + B#size_info.external
+            }
+        end,
+        #size_info{active = 0, external = 0},
+        SI
+    );
+sum_sizes(#size_info{} = SI) ->
+    SI.
+
+upgrade_sizes([S]) ->
+    upgrade_sizes(S);
+upgrade_sizes(S) when is_list(S) ->
+    lists:map(fun upgrade_sizes/1, S);
 upgrade_sizes(#size_info{} = SI) ->
     SI;
 upgrade_sizes({D, E}) ->
@@ -784,9 +848,9 @@ estimate_size(#full_doc_info{} = FDI) ->
         (_Rev, _Value, branch, SizesAcc) ->
             SizesAcc
     end,
-    {_, FinalES, FinalAtts} = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
-    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
-    FinalES + TotalAttSize.
+    Sizes = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
+    #size_info{external = ES} = sum_sizes(map_fold_sizes(Sizes)),
+    ES.
 
 purge_docs(Db, []) ->
     {ok, Db, []};

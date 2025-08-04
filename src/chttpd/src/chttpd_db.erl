@@ -294,7 +294,8 @@ handle_compact_req(#httpd{method = 'POST'} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     case Req#httpd.path_parts of
         [_DbName, <<"_compact">>] ->
-            ok = fabric:compact(Db),
+            SrcGen = list_to_integer(chttpd:qs_value(Req, "gen", "0")),
+            ok = fabric:compact({Db, SrcGen}),
             send_json(Req, 202, {[{ok, true}]});
         [DbName, <<"_compact">>, DesignName | _] ->
             case ddoc_cache:open(DbName, <<"_design/", DesignName/binary>>) of
@@ -427,9 +428,10 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 create_db_req(#httpd{} = Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
     ShardsOpt = parse_shards_opt(Req),
+    MaxGenOpt = parse_generations_opt(Req),
     EngineOpt = parse_engine_opt(Req),
     DbProps = parse_partitioned_opt(Req),
-    Options = lists:append([ShardsOpt, [{props, DbProps}], EngineOpt]),
+    Options = lists:append([ShardsOpt, MaxGenOpt, [{props, DbProps}], EngineOpt]),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
         ok ->
@@ -853,6 +855,19 @@ db_req(#httpd{method = 'GET', path_parts = [_, <<"_revs_limit">>]} = Req, Db) ->
     send_json(Req, fabric:get_revs_limit(Db));
 db_req(#httpd{path_parts = [_, <<"_revs_limit">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
+db_req(#httpd{method = 'PUT', path_parts = [_, <<"_max_generation">>]} = Req, Db) ->
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    case chttpd:json_body(Req) of
+        MaxGen when is_integer(MaxGen), MaxGen > 0 ->
+            case fabric:set_max_generation(Db, MaxGen, Options) of
+                ok ->
+                    send_json(Req, {[{<<"ok">>, true}]});
+                Error ->
+                    throw(Error)
+            end;
+        _ ->
+            throw({bad_request, "`max_generation` must be positive integer"})
+    end;
 db_req(#httpd{method = 'PUT', path_parts = [_, <<"_purged_infos_limit">>]} = Req, Db) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
     case chttpd:json_body(Req) of
@@ -1982,6 +1997,10 @@ parse_shards_opt(Param, Req, Default) ->
         true -> Val;
         false -> throw({bad_request, Err})
     end.
+
+parse_generations_opt(Req) ->
+    Val = chttpd:qs_value(Req, "gen", "0"),
+    [{max_generation, list_to_integer(Val)}].
 
 parse_engine_opt(Req) ->
     case chttpd:qs_value(Req, "engine") of
