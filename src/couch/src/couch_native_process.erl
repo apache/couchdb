@@ -329,6 +329,47 @@ bindings(State, Sig, DDoc) ->
         erlang:put(Sig, [[Id, Value] | Curr])
     end,
 
+    Index = fun(FieldName, FieldValue, Options) ->
+        Curr = erlang:get(Sig),
+        erlang:put(Sig, [[FieldName, FieldValue, Options] | Curr])
+    end,
+
+    NouveauIndex = fun(FieldType, FieldName, FieldValue, Options) ->
+        Curr = erlang:get(Sig),
+        case FieldType of
+            _ when FieldType == <<"double">>; FieldType == <<"string">> ->
+                erlang:put(Sig, [
+                    #{
+                        <<"@type">> => FieldType,
+                        <<"name">> => FieldName,
+                        <<"value">> => FieldValue,
+                        <<"store">> => maps:get(store, Options, false),
+                        <<"facet">> => maps:get(facet, Options, false)
+                    }
+                    | Curr
+                ]);
+            <<"text">> ->
+                erlang:put(Sig, [
+                    #{
+                        <<"@type">> => FieldType,
+                        <<"name">> => FieldName,
+                        <<"value">> => FieldValue,
+                        <<"store">> => maps:get(store, Options, false)
+                    }
+                    | Curr
+                ]);
+            <<"stored">> ->
+                erlang:put(Sig, [
+                    #{
+                        <<"@type">> => FieldType,
+                        <<"name">> => FieldName,
+                        <<"value">> => FieldValue
+                    }
+                    | Curr
+                ])
+        end
+    end,
+
     Start = fun(Headers) ->
         erlang:put(list_headers, Headers)
     end,
@@ -368,6 +409,8 @@ bindings(State, Sig, DDoc) ->
     Bindings = [
         {'Log', Log},
         {'Emit', Emit},
+        {'Index', Index},
+        {'NouveauIndex', NouveauIndex},
         {'Start', Start},
         {'Send', Send},
         {'GetRow', GetRow},
