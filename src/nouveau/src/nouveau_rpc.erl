@@ -28,15 +28,24 @@ search(DbName, #index{} = Index0, QueryArgs0) ->
     %% Incorporate the shard name into the record.
     Index1 = Index0#index{dbname = DbName},
 
-    %% get minimum seqs for search
-    {MinUpdateSeq, MinPurgeSeq} = nouveau_index_updater:get_db_info(Index1),
+    Update = maps:get(update, QueryArgs0, true),
 
     %% Incorporate min seqs into the query args.
-    QueryArgs1 = QueryArgs0#{
-        min_update_seq => MinUpdateSeq,
-        min_purge_seq => MinPurgeSeq
-    },
-    Update = maps:get(update, QueryArgs1, true),
+    QueryArgs1 =
+        case Update of
+            true ->
+                %% get minimum seqs for search
+                {MinUpdateSeq, MinPurgeSeq} = nouveau_index_updater:get_db_info(Index1),
+                QueryArgs0#{
+                    min_update_seq => MinUpdateSeq,
+                    min_purge_seq => MinPurgeSeq
+                };
+            false ->
+                QueryArgs0#{
+                    min_update_seq => 0,
+                    min_purge_seq => 0
+                }
+        end,
 
     %% check if index is up to date
     T0 = erlang:monotonic_time(),
