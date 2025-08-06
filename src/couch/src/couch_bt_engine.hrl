@@ -14,8 +14,7 @@
     filepath,
     fd,
     fd_monitor,
-    % deprecated but keeping it here to avoid altering the record size
-    fsync_options_deprecated,
+    cache = #{},
     header,
     needs_commit,
     id_tree,

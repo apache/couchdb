@@ -122,6 +122,14 @@
 -define(PURGE_INFOS_LIMIT, purge_infos_limit).
 -define(COMPACTED_SEQ, compacted_seq).
 
+% Some frequently accessed keys we store in a cache. Technically security_ptr
+% could go here as well, however that one is currently is also cached in the
+% #db{}.
+%
+-define(CACHED_KEYS, #{
+    ?PROPS_PTR => true
+}).
+
 exists(FilePath) ->
     case is_file(FilePath) of
         true ->
@@ -544,10 +552,8 @@ commit_data(St) ->
         true ->
             ok = couch_file:write_header(Fd, NewHeader, [sync]),
             couch_stats:increment_counter([couchdb, commits]),
-            {ok, St#st{
-                header = NewHeader,
-                needs_commit = false
-            }};
+            St1 = St#st{header = NewHeader, needs_commit = false},
+            {ok, update_cache(St1)};
         false ->
             {ok, St}
     end.
@@ -884,7 +890,7 @@ init_state(FilePath, Fd, Header0, Options) ->
             {ok, NewSt} = commit_data(St#st{needs_commit = true}),
             NewSt;
         false ->
-            St
+            update_cache(St)
     end.
 
 update_header(St, Header) ->
@@ -1190,23 +1196,57 @@ is_file(Path) ->
         _ -> false
     end.
 
-get_header_term(#st{header = Header} = St, Key, Default) when is_atom(Key) ->
-    case couch_bt_engine_header:get(Header, Key) of
-        undefined ->
+get_header_term(#st{} = St, Key, Default) when is_atom(Key) ->
+    #st{header = Header, cache = Cache} = St,
+    case {couch_bt_engine_header:get(Header, Key), Cache} of
+        {undefined, _} ->
             Default;
-        Pointer when is_integer(Pointer) ->
+        {Pointer, #{Key := {Pointer, Term}}} when is_integer(Pointer) ->
+            % Explicitly match on both the key and the pointer to make sure
+            % we never return stale data. If we don't match somehow we'd
+            % still fall through to the next clause and just read from disk
+            Term;
+        {Pointer, _} when is_integer(Pointer) ->
             {ok, Term} = couch_file:pread_term(St#st.fd, Pointer),
             Term
     end.
 
 set_header_term(#st{} = St, Key, Term) when is_atom(Key) ->
-    #st{fd = Fd, header = Header, compression = Compression} = St,
-    St#st{
-        header = set_header_term(Fd, Header, Key, Term, Compression),
-        needs_commit = true
-    }.
+    #st{fd = Fd, header = Header, compression = Compression, cache = Cache} = St,
+    Header1 = set_header_term(Fd, Header, Key, Term, Compression),
+    Pointer = couch_bt_engine_header:get(Header1, Key),
+    Cache1 = Cache#{Key => {Pointer, Term}},
+    St#st{header = Header1, cache = Cache1, needs_commit = true}.
 
 set_header_term(Fd, Header, Key, Term, Compression) when is_atom(Key) ->
     TermOpts = [{compression, Compression}],
     {ok, Ptr, _} = couch_file:append_term(Fd, Term, TermOpts),
     couch_bt_engine_header:set(Header, Key, Ptr).
+
+% This is a cache for header terms referenced by file pointers. If they are not
+% cached, and are used for interactive requests, then on each request we'd have
+% to do these extra calls: file read, decompression and binary_to_term.
+%
+% This cache lives in the engine state, which lives in the #db{} record, so it
+% will be shared and available to all the client requests.
+
+update_cache(#st{} = St) ->
+    update_cache(#st{} = St, maps:keys(?CACHED_KEYS)).
+
+update_cache(#st{} = St, []) ->
+    St;
+update_cache(#st{} = St, [Key | Keys]) ->
+    #st{header = Header, cache = Cache} = St,
+    case couch_bt_engine_header:get(Header, Key) of
+        Pointer when is_integer(Pointer) ->
+            case Cache of
+                #{Key := {Pointer, _}} ->
+                    update_cache(St, Keys);
+                #{} ->
+                    {ok, Term} = couch_file:pread_term(St#st.fd, Pointer),
+                    Cache1 = Cache#{Key => {Pointer, Term}},
+                    update_cache(St#st{cache = Cache1}, Keys)
+            end;
+        _ ->
+            update_cache(St#st{cache = maps:remove(Key, Cache)}, Keys)
+    end.
