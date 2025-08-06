@@ -28,7 +28,7 @@ result of a series of iterations until a robust and scalable aproach was built.
 The real time querying is achieved by way of a global ets table with
 `read_concurrency`, `write_concurrency`, and `decentralized_counters` enabled.
 Great care was taken to ensure that _zero_ concurrent writes to the same key
-occure in this model, and this entire system is predicated on the fact that
+occur in this model, and this entire system is predicated on the fact that
 incremental updates to `ets:update_counters` provides *really* fast and
 efficient updates in an atomic and isolated fashion when coupled with
 decentralized counters and write concurrency. Each process that calls
@@ -46,7 +46,7 @@ reports. This took several versions to find a scalable and robust approach that
 induced minimal impact on maximum system throughput. Now that the framework is
 in place, it can be extended to track any further desired process local uses of
 `couch_stats:increment_counter`. That said, the currently selected set of stats
-to track was heavily influenced by the challenges in reotractively understanding
+to track was heavily influenced by the challenges in retroactively understanding
 the quantity of resources induced by a query like `/db/_changes?since=$SEQ`, or
 similarly, `/db/_find`.
 
@@ -62,7 +62,7 @@ be picked up in the RPC deltas and process lifetime reports.
 
 ## A Simple Example
 
-Given a databse `foo` with 11k documents containg a `doc.value` field that is an
+Given a database `foo` with 11k documents containing a `doc.value` field that is an
 integer value which can be filtered in a design doc by way of even and odd. If
 we instantiate a series of while loops in parallel making requests of the form:
 
@@ -166,13 +166,13 @@ especially if the heavy requests are an inconspicuous subset of the full
 database workload.
 
 CSRT resolves this by providing a real time querying system to find the active
-heavy proceses, live, as well as a process lifecyle reporting engine providing
+heavy processes, live, as well as a process lifecycle reporting engine providing
 detailed analysis of the workloads induced by the request.
 
 Let's assume we had the default IOQ logger matcher enabled, with the default
 configuration of logging any requests inducing more than 10k IOQ calls, which
 would catch all three of our requests above, even though they're all still
-going. As a result, we generate process lifecylce reports for all three of those
+going. As a result, we generate process lifecycle reports for all three of those
 requests, as we can see:
 
 ```
@@ -210,7 +210,7 @@ of CSRT. Those can be found at:
 * `couch_srt_query.erl` "Query API functions"
   - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/src/couch_srt_query.erl#L319-L674
   - the above highlighted functions are well tested, typespec'ed, and have
-    auxilary documentation and examples, an excellent resource
+    auxiliary documentation and examples, an excellent resource
 * the `couch_srt_query_tests.erl` Eunit tests are an excellent overview of utilizing
   the `couch_srt_query:` API from Erlang to find, filter, and aggregate CSRT real
   time contexts
@@ -231,7 +231,7 @@ that's where the name originates from.
 
 ## -define(MATCHERS_KEY, {csrt_logger, all_csrt_matchers}).
 
-This marker is where the active matchers are written to in `persisten_term` for
+This marker is where the active matchers are written to in `persistent_term` for
 concurrently and parallelly and accessing the logger matchers in the CSRT
 tracker processes for lifecycle reporting.
 
@@ -288,7 +288,7 @@ can be chained in the existing atomic `ets:update_counter` and
 The issue being that our updates are of the form `+2 to ioq_calls for $pid_ref`,
 which ets does atomically in a guaranteed `atomic` and `isolated` manner. The
 strict use of the atomic operations for tracking these values is why this
-system works effeciently at scale. This means that we can increment counters on
+system works efficiently at scale. This means that we can increment counters on
 all of the stats counter fields in a batch, very quickly, but for tracking
 `updated_at` timestamps we'd need to either do an extra ets call to get the last
 `updated_at` value, or do an extra ets call to `ets:update_element` to set the
@@ -450,7 +450,7 @@ See the `Additional Overview and Examples` section above for more details.
 This is a "port" of `recon:proc_window` to `couch_srt:proc_window`, allowing for
 `proc_window` style aggregations/sorting/filtering but with the stats fields
 collected by CSRT! This is also a direct port of `recon:proc_window` in that it
-utilizes the same underlying logic and effecient internal data structures as
+utilizes the same underlying logic and efficient internal data structures as
 `recon:proc_window`, but rather only changes the Sample function:
 
 ```erlang
@@ -478,12 +478,12 @@ proc_window(AttrName, Num, Time) ->
 ```
 
 This implementation is being highlighted here because `recon:proc_window/3` is
-battle hardened and `recon_lib:sliding_window` uses an effecient internal data
+battle hardened and `recon_lib:sliding_window` uses an efficient internal data
 structure for storing the two samples that has been proven to work in production
 systems with millions of active processes, so swapping the `Sample` function
 with a CSRT version allows us to utilize the production grade recon
 functionality, but extended out to the particular CouchDB statistics we're
-esepecially interested in.
+especially interested in.
 
 And on a fun note: any further stats tracking fields added to CSRT tracking will
 automatically work with this too.
@@ -599,7 +599,7 @@ existing `#rctx{}` record to search with.
 ## Metadata
 
 We use `couch_srt_util:tnow()` for time tracking, which is a `native` format
-`erlang:monotonic_time()` integer, which, noteably, _can_ be and is often a
+`erlang:monotonic_time()` integer, which, notably, _can_ be and is often a
 negative value. You must either take a delta or convert the time to get into a
 useable format, as one might suspect by the use of `native`.
 
@@ -627,7 +627,7 @@ tnow() ->
 ```
 
 We store timestamps in the node's local erlang representation of time,
-specifically to be able to effeciently do time deltas, and then we track time
+specifically to be able to efficiently do time deltas, and then we track time
 deltas from the local node's perspective to not send timestamps across the wire.
 We then utilize `calendar:system_time_to_rfc3339` to convert the local node's
 native time representation to its corresponding time format when we generate the
@@ -636,7 +636,7 @@ process life cycle reports or send an http response.
 NOTE: because we do an inline definition and assignment of the
 `#rctx.started_at` and `#rctx.updated_at` fields to `couch_srt_util:tnow()`, we
 _must_ declare `#rctx.updated_at` *after* `#rctx.started_at` to avoid
-fundamental time incongruenties.
+fundamental time incongruities.
 
 ### #rctx.started_at = couch_srt_util:tnow() :: integer() | '_',
 
@@ -667,7 +667,7 @@ used as the primary grouping identifier of workers across the cluster, as the
 ### #rctx.type :: rctx_type() | undefined | '_',
 
 A subtype classifier for the `#rctx{}` contexts, right now only supporting
-`#rpc_worker{}` and `#coordinator{}`, but CSRT was designed to accomodate
+`#rpc_worker{}` and `#coordinator{}`, but CSRT was designed to accommodate
 additional context types like `#view_indexer{}`, `#search_indexer{}`,
 `#replicator{}`, `#compactor{}`, `#etc{}`.
 
@@ -683,7 +683,7 @@ creation by way of `couch_srt:set_context_username/{1,2}`.
 
 ## Stats Counters
 
-All of these stats counters are stricly `non_neg_integer()` counter values that
+All of these stats counters are strictly `non_neg_integer()` counter values that
 are monotonically increasing, as we only induce positive counter increment calls
 in CSRT. Not all of these values will be nonzero, eg if the context doesn't
 induce Javascript filtering of documents, it won't inc the `#rctx.js_filter`
@@ -731,7 +731,7 @@ fulfill a request versus the number actually returned in the http response.
 ### #rctx.ioq_calls = 0 :: non_neg_integer() | '_',
 
 A phony metric counting invocations of `ioq:call/3` induced by this context. As
-with `#rctx.docs_written`, we need a proxy metric to reperesent these calls
+with `#rctx.docs_written`, we need a proxy metric to represent these calls
 until CSRT context passing is supported so that the `ioq_server` pid and return
 its own delta back to the worker pid.
 
@@ -791,7 +791,7 @@ Grep for `'Example to extend CSRT'` to find the code points, eg:
 Next steps to continue CSRT improvements:
 
 * Create an expressive syntax that can map something like Mango queries,
-  expressable in ini files for persistent storage and easy configuration, and
+  expressible in ini files for persistent storage and easy configuration, and
   turn those into `ets:match_spec()`. The current logic is getting progressively
   closer to that, but we're not fully generating dynamic matchspecs. When we can,
   the default matchers can be rewritten directly, and also create a `POST`
