@@ -208,19 +208,19 @@ provide an excellent overview of the interaction patterns and query capabilities
 of CSRT. Those can be found at:
 
 * `couch_srt_query.erl` "Query API functions"
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/src/couch_srt_query.erl#L319-L674
+  - https://github.com/apache/couchdb/blob/da87fc3fd7beb79f1ba63cf430dd92818fb02a62/src/couch_srt/src/couch_srt_query.erl#L412-L740
   - the above highlighted functions are well tested, typespec'ed, and have
     auxiliary documentation and examples, an excellent resource
 * the `couch_srt_query_tests.erl` Eunit tests are an excellent overview of utilizing
   the `couch_srt_query:` API from Erlang to find, filter, and aggregate CSRT real
   time contexts
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_query_tests.erl
+  - https://github.com/apache/couchdb/blob/da87fc3fd7beb79f1ba63cf430dd92818fb02a62/src/couch_stats/test/eunit/couch_srt_query_tests.erl
 * similarly, the `couch_srt_httpd_tests.erl` Eunit tests are an excellent overview of
   performing the same style `couch_srt_query:` queries, but through the HTTP API
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_httpd_tests.erl
+  - https://github.com/apache/couchdb/blob/da87fc3fd7beb79f1ba63cf430dd92818fb02a62/src/couch_stats/test/eunit/couch_srt_httpd_tests.erl
 * Additionally there's the `couch_srt_logger_tests.erl` Eunit tests which demonstrate
   the different default logger matchers in action
-  - https://github.com/apache/couchdb/blob/93bc894380056ccca1f77415454e991c4d914249/src/couch_stats/test/eunit/couch_srt_logger_tests.erl
+  - https://github.com/apache/couchdb/blob/da87fc3fd7beb79f1ba63cf430dd92818fb02a62/src/couch_stats/test/eunit/couch_srt_logger_tests.erl
 
 # CSRT Code Markers
 
