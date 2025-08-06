@@ -204,3 +204,4 @@
 -type query_result() :: aggregation_result() | ordered_result().
 
 -type json_spec(_Spec) :: term().
+-type json_string() :: binary().

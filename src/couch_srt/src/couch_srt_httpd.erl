@@ -93,8 +93,8 @@ encode_key(AggregationKeys, Key) ->
     json_spec(#{
         value => non_neg_integer(),
         key => #{
-            username => string(),
-            dbname => string()
+            username => json_string(),
+            dbname => json_string()
         }
     }).
 
