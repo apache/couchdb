@@ -40,11 +40,13 @@ import org.apache.couchdb.nouveau.lucene.LuceneIndex;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -380,7 +382,9 @@ public final class IndexManager implements Managed {
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
-        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("10")));
+        final int version = getIndexVersion(path);
+        final Path indexPath = path.resolve(Integer.toString(version));
+        final Directory dir = new DirectIODirectory(FSDirectory.open(indexPath));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
@@ -388,6 +392,19 @@ public final class IndexManager implements Managed {
         final long purgeSeq = getSeq(writer, "purge_seq");
         final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
         return new LuceneIndex(analyzer, writer, updateSeq, purgeSeq, searcherManager);
+    }
+
+    /**
+     * Find highest version index on disk, or latest version if none.
+     */
+    private int getIndexVersion(final Path path) throws IOException {
+        if (Files.exists(path.resolve("10"))) {
+            return 10;
+        }
+        if (Files.exists(path.resolve("9"))) {
+            return 9;
+        }
+        return 10;
     }
 
     private long getSeq(final IndexWriter writer, final String key) throws IOException {
