@@ -381,7 +381,7 @@ copy_compact(#comp_st{} = CompSt) ->
 
     % Copy general properties over
     Props = couch_bt_engine:get_props(St),
-    {ok, NewSt5} = couch_bt_engine:set_props(NewSt4, Props),
+    {ok, NewSt5} = couch_bt_engine:copy_props(NewSt4, Props),
 
     FinalUpdateSeq = couch_bt_engine:get_update_seq(St),
     {ok, NewSt6} = couch_bt_engine:set_update_seq(NewSt5, FinalUpdateSeq),
