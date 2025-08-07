@@ -377,3 +377,60 @@ exist anymore) you can trigger a :ref:`view cleanup <api/db/view_cleanup>`::
 .. code-block:: javascript
 
     {"ok":true}
+
+Generational Compaction
+=======================
+
+Normally, compaction works by copying all live data (the document bodies and
+attachments for the latest versions of all documents) into a new file with the
+``.compact`` extension, and then replacing the normal database file with this
+new one. That is, if the database resides in a file named ``mydb.couch``, then
+compaction copies its live data into ``mydb.couch.compact``, and then renames
+``mydb.couch.compact`` to ``mydb.couch``.
+
+If you have a lot of documents that do not change for long periods of time, then
+compaction will have to copy a lot of the same data every time it runs. For
+large data sets, especially those where individual documents or attachments are
+very large, this can be wasteful and it leads to compaction taking a long time
+to run.
+
+To improve compaction times for such data sets, CouchDB offers a mode called
+`generational compaction`. When this is enabled, the database is stored in
+multiple files known as `generations`, named ``mydb.1.couch``, ``mydb.2.couch``
+and so on, rather than in a single file. Rather than building a whole new copy
+of the ``mydb.couch`` file, generational compaction `promotes` live data from
+its current generation to the next one up.
+
+All new document and attachment data is originally stored in `generation 0`, and
+when it is compacted, its live data is promoted to `generation 1`. The next time
+generation 0 is compacted, CouchDB will not have to re-copy all the data that
+was already promoted to generation 1.
+
+Generational storage and compaction can be enabled either by setting the ``gen``
+parameter when the database is first created:
+
+.. code-block:: bash
+
+    curl -X PUT http://admin:pass@localhost:5984/dbname?gen=G
+
+Or, by setting the ``max_generation`` property on an existing database:
+
+.. codeb-block:: bash
+
+    curl -X PUT http://admin:pass@localhost:5984/dbname/_max_generation -d G
+
+The value ``G`` sets the database's ``max_generation`` number; a value of ``0``
+selects the normal single-file storage model. A value of ``1`` produces a single
+extra generational file, ``2`` produces two extra files, and so on.
+
+When compacting a generational database, you may specify a generation to compact
+via the ``gen`` parameter:
+
+.. code-block:: bash
+
+    curl -X POST http://admin:pass@localhost:5984/mydb/_compact?gen=1
+
+Compaction targets generation 0 by default. CouchDB will only ever compact a
+single generation of a database at the time, and Smoosh monitors the extra
+generation files for when they exceed a configured slack/ratio threshold, just
+like it does when using single-file storage.
