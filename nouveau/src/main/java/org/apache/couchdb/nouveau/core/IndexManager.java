@@ -383,6 +383,7 @@ public final class IndexManager implements Managed {
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         final int version = getIndexVersion(path);
+        final boolean upgradeRequired = version < Version.LATEST.major;
         final Path indexPath = path.resolve(Integer.toString(version));
         final Directory dir = new DirectIODirectory(FSDirectory.open(indexPath));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
@@ -391,7 +392,7 @@ public final class IndexManager implements Managed {
         final long updateSeq = getSeq(writer, "update_seq");
         final long purgeSeq = getSeq(writer, "purge_seq");
         final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-        return new LuceneIndex(analyzer, writer, updateSeq, purgeSeq, searcherManager);
+        return new LuceneIndex(analyzer, writer, updateSeq, purgeSeq, upgradeRequired, searcherManager);
     }
 
     /**

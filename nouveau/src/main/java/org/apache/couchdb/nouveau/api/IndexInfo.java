@@ -33,15 +33,23 @@ public final class IndexInfo {
     @PositiveOrZero
     private final long diskSize;
 
+    private final boolean upgradeRequired;
+
     public IndexInfo(
             @JsonProperty("update_seq") final long updateSeq,
             @JsonProperty("purge_seq") final long purgeSeq,
             @JsonProperty("num_docs") final int numDocs,
-            @JsonProperty("disk_size") final long diskSize) {
+            @JsonProperty("disk_size") final long diskSize,
+            @JsonProperty("upgrade_required") final boolean upgradeRequired) {
         this.updateSeq = updateSeq;
         this.purgeSeq = purgeSeq;
         this.numDocs = numDocs;
         this.diskSize = diskSize;
+        this.upgradeRequired = upgradeRequired;
+    }
+
+    public boolean getUpgradeRequired() {
+        return upgradeRequired;
     }
 
     public int getNumDocs() {
@@ -63,6 +71,6 @@ public final class IndexInfo {
     @Override
     public String toString() {
         return "IndexInfo [updateSeq=" + updateSeq + ", purgeSeq=" + purgeSeq + ", numDocs=" + numDocs + ", diskSize="
-                + diskSize + "]";
+                + diskSize + ", upgradeRequired=" + upgradeRequired + "]";
     }
 }

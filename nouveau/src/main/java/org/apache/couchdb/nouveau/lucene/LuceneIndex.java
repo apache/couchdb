@@ -113,8 +113,9 @@ public class LuceneIndex extends Index {
             final IndexWriter writer,
             final long updateSeq,
             final long purgeSeq,
+            final boolean upgradeRequired,
             final SearcherManager searcherManager) {
-        super(updateSeq, purgeSeq);
+        super(updateSeq, purgeSeq, upgradeRequired);
         this.analyzer = Objects.requireNonNull(analyzer);
         this.writer = Objects.requireNonNull(writer);
         this.searcherManager = Objects.requireNonNull(searcherManager);

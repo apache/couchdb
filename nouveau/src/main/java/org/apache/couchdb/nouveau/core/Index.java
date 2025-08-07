@@ -37,17 +37,19 @@ public abstract class Index implements Closeable {
 
     private long updateSeq;
     private long purgeSeq;
+    private boolean upgradeRequired;
     private boolean deleteOnClose = false;
 
-    protected Index(final long updateSeq, final long purgeSeq) {
+    protected Index(final long updateSeq, final long purgeSeq, final boolean upgradeRequired) {
         this.updateSeq = updateSeq;
         this.purgeSeq = purgeSeq;
+        this.upgradeRequired = upgradeRequired;
     }
 
     public final IndexInfo info() throws IOException {
         final int numDocs = doNumDocs();
         final long diskSize = doDiskSize();
-        return new IndexInfo(updateSeq, purgeSeq, numDocs, diskSize);
+        return new IndexInfo(updateSeq, purgeSeq, numDocs, diskSize, upgradeRequired);
     }
 
     protected abstract int doNumDocs() throws IOException;

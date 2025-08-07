@@ -104,5 +104,7 @@ handle_message({'EXIT', _}, Worker, {Counters, Acc}) ->
 
 merge_info(signature, Val, Val) ->
     Val;
+merge_info(<<"upgrade_required">>, Val1, Val2) when is_boolean(Val1), is_boolean(Val2) ->
+    Val1 orelse Val2;
 merge_info(_Key, Val1, Val2) ->
     Val1 + Val2.
