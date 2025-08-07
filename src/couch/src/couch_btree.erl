@@ -14,10 +14,21 @@
 
 -export([open/2, open/3, query_modify/4, add/2, add_remove/3]).
 -export([fold/4, full_reduce/1, final_reduce/2, size/1, foldl/3, foldl/4]).
--export([fold_reduce/4, lookup/2, get_state/1, set_options/2]).
+-export([fold_reduce/4, lookup/2, set_options/2]).
+-export([is_btree/1, get_state/1, get_fd/1, get_reduce_fun/1]).
 -export([extract/2, assemble/3, less/3]).
 
 -include_lib("couch/include/couch_db.hrl").
+
+-record(btree, {
+    fd,
+    root,
+    extract_kv,
+    assemble_kv,
+    less,
+    reduce = nil,
+    compression = ?DEFAULT_COMPRESSION
+}).
 
 -define(FILL_RATIO, 0.5).
 
@@ -56,8 +67,19 @@ set_options(Bt, [{compression, Comp} | Rest]) ->
 open(State, Fd, Options) ->
     {ok, set_options(#btree{root = State, fd = Fd}, Options)}.
 
+is_btree(#btree{}) ->
+    true;
+is_btree(_) ->
+    false.
+
 get_state(#btree{root = Root}) ->
     Root.
+
+get_fd(#btree{fd = Fd}) ->
+    Fd.
+
+get_reduce_fun(#btree{reduce = Reduce}) ->
+    Reduce.
 
 final_reduce(#btree{reduce = Reduce}, Val) ->
     final_reduce(Reduce, Val);

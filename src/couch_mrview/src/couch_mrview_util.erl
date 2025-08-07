@@ -1317,7 +1317,8 @@ make_user_reds_reduce_fun(Lang, ReduceFuns, NthRed) ->
 
 get_btree_state(nil) ->
     nil;
-get_btree_state(#btree{} = Btree) ->
+get_btree_state(Btree) ->
+    true = couch_btree:is_btree(Btree),
     couch_btree:get_state(Btree).
 
 extract_view_reduce({red, {N, _Lang, #mrview{reduce_funs = Reds}}, _Ref}) ->
