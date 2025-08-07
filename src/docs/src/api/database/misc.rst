@@ -330,6 +330,65 @@ following behavior:
             "ok": true
         }
 
+
+.. _api/db/_max_generation:
+
+==============================
+``/{db}/_max_generation``
+==============================
+
+.. http:put:: /{db}/_max_generation
+    :synopsis: Sets the maximum generation in the database.
+
+    Sets the maximum number of generation files that the database's content will
+    be stored in. This is 0 by default, which means that the database will be
+    stored in a single file. Increasing this limit means that the compactor can
+    "promote" live data into the next generation file, moving it out of the base
+    database file so that it does not need to be re-copied on subsequent
+    compactions.
+
+    This number can only be increased, not decreased, so exercise caution when
+    changing it.
+
+    :param db: Database name
+    :<header Accept: - :mimetype:`application/json`
+                     - :mimetype:`text/plain`
+    :<header Content-Type: :mimetype:`application/json`
+    :>header Content-Type: - :mimetype:`application/json`
+                           - :mimetype:`text/plain; charset=utf-8`
+    :>json boolean ok: Operation status
+    :code 200: Request completed successfully
+    :code 400: Invalid JSON data
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
+
+    **Request**:
+
+    .. code-block:: http
+
+        PUT /db/_max_generation HTTP/1.1
+        Accept: application/json
+        Content-Length: 1
+        Content-Type: application/json
+        Host: localhost:5984
+
+        2
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Length: 12
+        Content-Type: application/json
+        Date: Wed, 14 Jun 2017 14:45:34 GMT
+        Server: CouchDB (Erlang/OTP)
+
+        {
+            "ok": true
+        }
+
 .. _api/db/missing_revs:
 
 =======================

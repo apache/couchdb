@@ -45,6 +45,7 @@
     compaction is currently running. See :ref:`api/server/active_tasks`.
 
     :param db: Database name
+    :query integer gen: Generation - which generation to compact. Default is 0.
     :<header Accept: - :mimetype:`application/json`
                      - :mimetype:`text/plain`
     :<header Content-Type: :mimetype:`application/json`

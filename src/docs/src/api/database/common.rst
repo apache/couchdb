@@ -156,6 +156,9 @@
     :query integer n: Replicas. The number of copies of the database in the
       cluster. The default is 3, unless overridden in the
       :config:option:`cluster config <cluster/n>` .
+    :query integer gen: Maximum generation. The number of generation files in
+      which to store database content. The default is 0, which means the
+      database will not use generational storage.
     :query boolean partitioned: Whether to create a partitioned database.
       Default is false.
     :<header Accept: - :mimetype:`application/json`
