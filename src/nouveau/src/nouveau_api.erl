@@ -281,6 +281,9 @@ send_if_enabled(Path, ReqHeaders, Method) ->
     send_if_enabled(Path, ReqHeaders, Method, <<>>).
 
 send_if_enabled(Path, ReqHeaders, Method, ReqBody) ->
+    send_if_enabled(Path, ReqHeaders, Method, ReqBody, 5).
+
+send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries) ->
     case nouveau:enabled() of
         true ->
             case
@@ -306,6 +309,9 @@ send_if_enabled(Path, ReqHeaders, Method, ReqBody) ->
                         {error, Reason} ->
                             {error, Reason}
                     end;
+                {error, no_connection_available, _Reason} when RemainingTries > 0 ->
+                    timer:sleep(1000),
+                    send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries - 1);
                 {error, _Type, Reason} ->
                     {error, Reason}
             end;
