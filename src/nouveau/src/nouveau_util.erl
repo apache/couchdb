@@ -73,16 +73,15 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
                 undefined ->
                     {error, InvalidDDocError};
                 Def ->
-                    Sig = ?l2b(
-                        couch_util:to_hex(
+                    Sig =
+                        couch_util:to_hex_bin(
                             crypto:hash(
                                 sha256,
                                 ?term_to_bin(
                                     {DefaultAnalyzer, FieldAnalyzers, Def}
                                 )
                             )
-                        )
-                    ),
+                        ),
                     {ok, #index{
                         dbname = DbName,
                         default_analyzer = DefaultAnalyzer,
