@@ -10,12 +10,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(error, {
-    delta,
-    timestamp,
-    reason,
-    mfa,
-    nonce,
-    stack
-}).
+-module(couch_srt_app).
 
+-behaviour(application).
+
+-export([start/2, stop/1]).
+
+start(_StartType, _StartArgs) ->
+    couch_srt_sup:start_link().
+
+stop(_State) ->
+    ok.
