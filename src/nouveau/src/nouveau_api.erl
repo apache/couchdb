@@ -217,37 +217,20 @@ set_seq(#index{} = Index, ReqBody) ->
 %% private functions
 
 index_path(Path) when is_binary(Path) ->
-    lists:flatten(
-        io_lib:format(
-            "/index/~s",
-            [
-                couch_util:url_encode(Path)
-            ]
-        )
-    );
+    [<<"/index/">>, couch_util:url_encode(Path)];
 index_path(#index{} = Index) ->
-    lists:flatten(
-        io_lib:format(
-            "/index/~s",
-            [
-                couch_util:url_encode(nouveau_util:index_name(Index))
-            ]
-        )
-    ).
+    [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
 
 doc_path(#index{} = Index, DocId) ->
-    lists:flatten(
-        io_lib:format(
-            "/index/~s/doc/~s",
-            [
-                couch_util:url_encode(nouveau_util:index_name(Index)),
-                couch_util:url_encode(DocId)
-            ]
-        )
-    ).
+    [
+        <<"/index/">>,
+        couch_util:url_encode(nouveau_util:index_name(Index)),
+        <<"/doc/">>,
+        couch_util:url_encode(DocId)
+    ].
 
-search_path(IndexName) ->
-    index_path(IndexName) ++ "/search".
+search_path(#index{} = Index) ->
+    [index_path(Index), <<"/search">>].
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};
