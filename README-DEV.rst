@@ -120,15 +120,18 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum node python
+    brew install \
+      erlang \
+      elixir \
+      help2man \
+      node \
+      python \
+      spidermonkey
 
-If you don't already have pip installed, install it::
-
-    sudo easy_install pip
 
 Now, install the required Python packages::
 
-    sudo pip install sphinx docutils pygments sphinx_rtd_theme
+    pip3 install sphinx docutils pygments sphinx_rtd_theme
 
 FreeBSD
 ~~~~~~~
