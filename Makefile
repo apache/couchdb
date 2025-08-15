@@ -271,7 +271,7 @@ elixir: elixir-init devclean
 
 elixir-pouchdb: export MIX_ENV=integration
 elixir-pouchdb: elixir-init devclean
-	mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)
+	@mix test --trace test/elixir/test/* --exclude skip_for_pouchdb_server :true --max-failures 1 --seed 0 $(EXUNIT_OPTS)
 
 ifneq ($(CLOUSEAU_DIR),)
 _WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
