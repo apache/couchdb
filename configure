@@ -40,7 +40,7 @@ run_erlang() {
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
 JS_ENGINE=${JS_ENGINE:-"spidermonkey"}
-SM_VSN=${SM_VSN:-"91"}
+SM_VSN=${SM_VSN:-"128"}
 CLOUSEAU_MTH=${CLOUSEAU_MTH:-"dist"}
 CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases/download/%s/clouseau-%s-dist.zip"}
 CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.25.0"}
