@@ -98,12 +98,12 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
     {_, "128"} ->
         "128";
     undefined ->
-        "91";
+        "128";
     {_, Unsupported} ->
         io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
         erlang:halt(1);
     false ->
-        "91"
+        "128"
 end.
 
 ConfigH = [
