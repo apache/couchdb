@@ -286,6 +286,7 @@ get_stats() ->
         {run_queue, SQ},
         {run_queue_dirty_cpu, DCQ},
         {ets_table_count, length(ets:all())},
+        {bt_engine_cache, couch_bt_engine_cache:info()},
         {context_switches, element(1, statistics(context_switches))},
         {reductions, element(1, statistics(reductions))},
         {garbage_collection_count, NumberOfGCs},
