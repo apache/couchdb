@@ -20,6 +20,11 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+% For the btree cache, the priority of the root node will be
+% this value. The priority is roughly how many cleanup interval
+% (second) they'll survive without any updates in the cache
+-define(ROOT_NODE_CACHE_PRIORITY, 8).
+
 -record(btree, {
     fd,
     root,
@@ -27,7 +32,8 @@
     assemble_kv,
     less,
     reduce = nil,
-    compression = ?DEFAULT_COMPRESSION
+    compression = ?DEFAULT_COMPRESSION,
+    cache_depth = 0
 }).
 
 -define(FILL_RATIO, 0.5).
@@ -62,7 +68,9 @@ set_options(Bt, [{less, Less} | Rest]) ->
 set_options(Bt, [{reduce, Reduce} | Rest]) ->
     set_options(Bt#btree{reduce = Reduce}, Rest);
 set_options(Bt, [{compression, Comp} | Rest]) ->
-    set_options(Bt#btree{compression = Comp}, Rest).
+    set_options(Bt#btree{compression = Comp}, Rest);
+set_options(Bt, [{cache_depth, Depth} | Rest]) when is_integer(Depth) ->
+    set_options(Bt#btree{cache_depth = Depth}, Rest).
 
 open(State, Fd, Options) ->
     {ok, set_options(#btree{root = State, fd = Fd}, Options)}.
@@ -111,7 +119,8 @@ fold_reduce(#btree{root = Root} = Bt, Fun, Acc, Options) ->
                 [],
                 KeyGroupFun,
                 Fun,
-                Acc
+                Acc,
+                0
             ),
         if
             GroupedKey2 == undefined ->
@@ -258,7 +267,8 @@ fold(#btree{root = Root} = Bt, Fun, Acc, Options) ->
                     InRange,
                     Dir,
                     convert_fun_arity(Fun),
-                    Acc
+                    Acc,
+                    0
                 );
             StartKey ->
                 stream_node(
@@ -269,7 +279,8 @@ fold(#btree{root = Root} = Bt, Fun, Acc, Options) ->
                     InRange,
                     Dir,
                     convert_fun_arity(Fun),
-                    Acc
+                    Acc,
+                    0
                 )
         end,
     case Result of
@@ -307,7 +318,7 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
             end
         end,
     Actions = lists:sort(SortFun, lists:append([InsertActions, RemoveActions, FetchActions])),
-    {ok, KeyPointers, QueryResults} = modify_node(Bt, Root, Actions, []),
+    {ok, KeyPointers, QueryResults} = modify_node(Bt, Root, Actions, [], 0),
     {ok, NewRoot} = complete_root(Bt, KeyPointers),
     {ok, QueryResults, Bt#btree{root = NewRoot}}.
 
@@ -323,64 +334,87 @@ lookup(#btree{root = Root, less = Less} = Bt, Keys) ->
             undefined -> lists:sort(Keys);
             _ -> lists:sort(Less, Keys)
         end,
-    {ok, SortedResults} = lookup(Bt, Root, SortedKeys),
+    {ok, SortedResults} = lookup(Bt, Root, SortedKeys, 0),
     % We want to return the results in the same order as the keys were input
     % but we may have changed the order when we sorted. So we need to put the
     % order back into the results.
     couch_util:reorder_results(Keys, SortedResults).
 
-lookup(_Bt, nil, Keys) ->
+lookup(_Bt, nil, Keys, _Depth) ->
     {ok, [{Key, not_found} || Key <- Keys]};
-lookup(Bt, Node, Keys) ->
+lookup(Bt, Node, Keys, Depth0) ->
+    Depth = Depth0 + 1,
     Pointer = element(1, Node),
-    {NodeType, NodeList} = get_node(Bt, Pointer),
+    {NodeType, NodeList} = get_node(Bt, Pointer, Depth),
     case NodeType of
         kp_node ->
-            lookup_kpnode(Bt, list_to_tuple(NodeList), 1, Keys, []);
+            lookup_kpnode(Bt, list_to_tuple(NodeList), 1, Keys, [], Depth);
         kv_node ->
-            lookup_kvnode(Bt, list_to_tuple(NodeList), 1, Keys, [])
+            lookup_kvnode(Bt, list_to_tuple(NodeList), 1, Keys, [], Depth)
     end.
 
-lookup_kpnode(_Bt, _NodeTuple, _LowerBound, [], Output) ->
+lookup_kpnode(_Bt, _NodeTuple, _LowerBound, [], Output, _Depth) ->
     {ok, lists:reverse(Output)};
-lookup_kpnode(_Bt, NodeTuple, LowerBound, Keys, Output) when tuple_size(NodeTuple) < LowerBound ->
+lookup_kpnode(_Bt, NodeTuple, LowerBound, Keys, Output, _Depth) when
+    tuple_size(NodeTuple) < LowerBound
+->
     {ok, lists:reverse(Output, [{Key, not_found} || Key <- Keys])};
-lookup_kpnode(Bt, NodeTuple, LowerBound, [FirstLookupKey | _] = LookupKeys, Output) ->
+lookup_kpnode(Bt, NodeTuple, LowerBound, [FirstLookupKey | _] = LookupKeys, Output, Depth) ->
     N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), FirstLookupKey),
     {Key, PointerInfo} = element(N, NodeTuple),
     SplitFun = fun(LookupKey) -> not less(Bt, Key, LookupKey) end,
     case lists:splitwith(SplitFun, LookupKeys) of
         {[], GreaterQueries} ->
-            lookup_kpnode(Bt, NodeTuple, N + 1, GreaterQueries, Output);
+            lookup_kpnode(Bt, NodeTuple, N + 1, GreaterQueries, Output, Depth);
         {LessEqQueries, GreaterQueries} ->
-            {ok, Results} = lookup(Bt, PointerInfo, LessEqQueries),
-            lookup_kpnode(Bt, NodeTuple, N + 1, GreaterQueries, lists:reverse(Results, Output))
+            {ok, Results} = lookup(Bt, PointerInfo, LessEqQueries, Depth),
+            lookup_kpnode(
+                Bt, NodeTuple, N + 1, GreaterQueries, lists:reverse(Results, Output), Depth
+            )
     end.
 
-lookup_kvnode(_Bt, _NodeTuple, _LowerBound, [], Output) ->
+lookup_kvnode(_Bt, _NodeTuple, _LowerBound, [], Output, _Depth) ->
     {ok, lists:reverse(Output)};
-lookup_kvnode(_Bt, NodeTuple, LowerBound, Keys, Output) when tuple_size(NodeTuple) < LowerBound ->
+lookup_kvnode(_Bt, NodeTuple, LowerBound, Keys, Output, _Depth) when
+    tuple_size(NodeTuple) < LowerBound
+->
     % keys not found
     {ok, lists:reverse(Output, [{Key, not_found} || Key <- Keys])};
-lookup_kvnode(Bt, NodeTuple, LowerBound, [LookupKey | RestLookupKeys], Output) ->
+lookup_kvnode(Bt, NodeTuple, LowerBound, [LookupKey | RestLookupKeys], Output, Depth) ->
     N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), LookupKey),
     {Key, Value} = element(N, NodeTuple),
     case less(Bt, LookupKey, Key) of
         true ->
             % LookupKey is less than Key
-            lookup_kvnode(Bt, NodeTuple, N, RestLookupKeys, [{LookupKey, not_found} | Output]);
+            lookup_kvnode(
+                Bt, NodeTuple, N, RestLookupKeys, [{LookupKey, not_found} | Output], Depth
+            );
         false ->
             case less(Bt, Key, LookupKey) of
                 true ->
                     % LookupKey is greater than Key
-                    lookup_kvnode(Bt, NodeTuple, N + 1, RestLookupKeys, [
-                        {LookupKey, not_found} | Output
-                    ]);
+                    lookup_kvnode(
+                        Bt,
+                        NodeTuple,
+                        N + 1,
+                        RestLookupKeys,
+                        [
+                            {LookupKey, not_found} | Output
+                        ],
+                        Depth
+                    );
                 false ->
                     % LookupKey is equal to Key
-                    lookup_kvnode(Bt, NodeTuple, N, RestLookupKeys, [
-                        {LookupKey, {ok, assemble(Bt, LookupKey, Value)}} | Output
-                    ])
+                    lookup_kvnode(
+                        Bt,
+                        NodeTuple,
+                        N,
+                        RestLookupKeys,
+                        [
+                            {LookupKey, {ok, assemble(Bt, LookupKey, Value)}} | Output
+                        ],
+                        Depth
+                    )
             end
     end.
 
@@ -436,25 +470,27 @@ get_chunk_size() ->
             1279
     end.
 
-modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
+modify_node(Bt, RootPointerInfo, Actions, QueryOutput, Depth0) ->
+    Depth = Depth0 + 1,
     {NodeType, NodeList} =
         case RootPointerInfo of
             nil ->
                 {kv_node, []};
             _Tuple ->
                 Pointer = element(1, RootPointerInfo),
-                get_node(Bt, Pointer)
+                get_node(Bt, Pointer, Depth)
         end,
     NodeTuple = list_to_tuple(NodeList),
 
     {ok, NewNodeList, QueryOutput2} =
         case NodeType of
-            kp_node -> modify_kpnode(Bt, NodeTuple, 1, Actions, [], QueryOutput);
-            kv_node -> modify_kvnode(Bt, NodeTuple, 1, Actions, [], QueryOutput)
+            kp_node -> modify_kpnode(Bt, NodeTuple, 1, Actions, [], QueryOutput, Depth);
+            kv_node -> modify_kvnode(Bt, NodeTuple, 1, Actions, [], QueryOutput, Depth)
         end,
     case NewNodeList of
         % no nodes remain
         [] ->
+            reset_cache_usage(Bt, RootPointerInfo, Depth),
             {ok, [], QueryOutput2};
         % nothing changed
         NodeList ->
@@ -466,6 +502,7 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
                     nil ->
                         write_node(Bt, NodeType, NewNodeList);
                     _ ->
+                        reset_cache_usage(Bt, RootPointerInfo, Depth),
                         {LastKey, _LastValue} = element(tuple_size(NodeTuple), NodeTuple),
                         OldNode = {LastKey, RootPointerInfo},
                         write_node(Bt, OldNode, NodeType, NodeList, NewNodeList)
@@ -492,7 +529,30 @@ reduce_tree_size(kp_node, _NodeSize, [{_K, {_P, _Red, nil}} | _]) ->
 reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
     reduce_tree_size(kp_node, NodeSize + Sz, NodeList).
 
-get_node(#btree{fd = Fd}, NodePos) ->
+reset_cache_usage(_, nil, _Depth) ->
+    ok;
+reset_cache_usage(#btree{cache_depth = Max}, _, Depth) when Depth > Max ->
+    ok;
+reset_cache_usage(#btree{fd = Fd}, RootPointerInfo, _Depth) ->
+    Pointer = element(1, RootPointerInfo),
+    couch_bt_engine_cache:reset({Fd, Pointer}).
+
+get_node(#btree{fd = Fd, cache_depth = Max}, NodePos, Depth) when Depth =< Max ->
+    case couch_bt_engine_cache:lookup({Fd, NodePos}) of
+        undefined ->
+            {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
+            case NodeType of
+                kp_node ->
+                    Priority = max(1, ?ROOT_NODE_CACHE_PRIORITY - Depth),
+                    couch_bt_engine_cache:insert({Fd, NodePos}, NodeList, Priority);
+                kv_node ->
+                    ok
+            end,
+            {NodeType, NodeList};
+        NodeList ->
+            {kp_node, NodeList}
+    end;
+get_node(#btree{fd = Fd}, NodePos, _Depth) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
     {NodeType, NodeList}.
 
@@ -568,9 +628,9 @@ old_list_is_prefix([KV | Rest1], [KV | Rest2], Acc) ->
 old_list_is_prefix(_OldList, _NewList, _Acc) ->
     false.
 
-modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput) ->
-    modify_node(Bt, nil, Actions, QueryOutput);
-modify_kpnode(_Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
+modify_kpnode(Bt, {}, _LowerBound, Actions, [], QueryOutput, Depth) ->
+    modify_node(Bt, nil, Actions, QueryOutput, Depth);
+modify_kpnode(_Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput, _Depth) ->
     {ok,
         lists:reverse(
             ResultNode,
@@ -588,7 +648,8 @@ modify_kpnode(
     LowerBound,
     [{_, FirstActionKey, _} | _] = Actions,
     ResultNode,
-    QueryOutput
+    QueryOutput,
+    Depth
 ) ->
     Sz = tuple_size(NodeTuple),
     N = find_first_gteq(Bt, NodeTuple, LowerBound, Sz, FirstActionKey),
@@ -597,7 +658,7 @@ modify_kpnode(
             % perform remaining actions on last node
             {_, PointerInfo} = element(Sz, NodeTuple),
             {ok, ChildKPs, QueryOutput2} =
-                modify_node(Bt, PointerInfo, Actions, QueryOutput),
+                modify_node(Bt, PointerInfo, Actions, QueryOutput, Depth),
             NodeList = lists:reverse(
                 ResultNode,
                 bounded_tuple_to_list(
@@ -615,7 +676,7 @@ modify_kpnode(
             end,
             {LessEqQueries, GreaterQueries} = lists:splitwith(SplitFun, Actions),
             {ok, ChildKPs, QueryOutput2} =
-                modify_node(Bt, PointerInfo, LessEqQueries, QueryOutput),
+                modify_node(Bt, PointerInfo, LessEqQueries, QueryOutput, Depth),
             ResultNode2 = lists:reverse(
                 ChildKPs,
                 bounded_tuple_to_revlist(
@@ -625,7 +686,7 @@ modify_kpnode(
                     ResultNode
                 )
             ),
-            modify_kpnode(Bt, NodeTuple, N + 1, GreaterQueries, ResultNode2, QueryOutput2)
+            modify_kpnode(Bt, NodeTuple, N + 1, GreaterQueries, ResultNode2, QueryOutput2, Depth)
     end.
 
 bounded_tuple_to_revlist(_Tuple, Start, End, Tail) when Start > End ->
@@ -653,7 +714,7 @@ find_first_gteq(Bt, Tuple, Start, End, Key) ->
             find_first_gteq(Bt, Tuple, Start, Mid, Key)
     end.
 
-modify_kvnode(_Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput) ->
+modify_kvnode(_Bt, NodeTuple, LowerBound, [], ResultNode, QueryOutput, _Depth) ->
     {ok,
         lists:reverse(
             ResultNode, bounded_tuple_to_list(NodeTuple, LowerBound, tuple_size(NodeTuple), [])
@@ -665,7 +726,8 @@ modify_kvnode(
     LowerBound,
     [{ActionType, ActionKey, ActionValue} | RestActions],
     ResultNode,
-    QueryOutput
+    QueryOutput,
+    Depth
 ) when LowerBound > tuple_size(NodeTuple) ->
     case ActionType of
         insert ->
@@ -675,16 +737,25 @@ modify_kvnode(
                 LowerBound,
                 RestActions,
                 [{ActionKey, ActionValue} | ResultNode],
-                QueryOutput
+                QueryOutput,
+                Depth
             );
         remove ->
             % just drop the action
-            modify_kvnode(Bt, NodeTuple, LowerBound, RestActions, ResultNode, QueryOutput);
+            modify_kvnode(Bt, NodeTuple, LowerBound, RestActions, ResultNode, QueryOutput, Depth);
         fetch ->
             % the key/value must not exist in the tree
-            modify_kvnode(Bt, NodeTuple, LowerBound, RestActions, ResultNode, [
-                {not_found, {ActionKey, nil}} | QueryOutput
-            ])
+            modify_kvnode(
+                Bt,
+                NodeTuple,
+                LowerBound,
+                RestActions,
+                ResultNode,
+                [
+                    {not_found, {ActionKey, nil}} | QueryOutput
+                ],
+                Depth
+            )
     end;
 modify_kvnode(
     Bt,
@@ -692,7 +763,8 @@ modify_kvnode(
     LowerBound,
     [{ActionType, ActionKey, ActionValue} | RestActions],
     AccNode,
-    QueryOutput
+    QueryOutput,
+    Depth
 ) ->
     N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), ActionKey),
     {Key, Value} = element(N, NodeTuple),
@@ -708,16 +780,25 @@ modify_kvnode(
                         N,
                         RestActions,
                         [{ActionKey, ActionValue} | ResultNode],
-                        QueryOutput
+                        QueryOutput,
+                        Depth
                     );
                 remove ->
                     % ActionKey is less than the Key, just drop the action
-                    modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, QueryOutput);
+                    modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, QueryOutput, Depth);
                 fetch ->
                     % ActionKey is less than the Key, the key/value must not exist in the tree
-                    modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, [
-                        {not_found, {ActionKey, nil}} | QueryOutput
-                    ])
+                    modify_kvnode(
+                        Bt,
+                        NodeTuple,
+                        N,
+                        RestActions,
+                        ResultNode,
+                        [
+                            {not_found, {ActionKey, nil}} | QueryOutput
+                        ],
+                        Depth
+                    )
             end;
         false ->
             % ActionKey and Key are maybe equal.
@@ -731,18 +812,27 @@ modify_kvnode(
                                 N + 1,
                                 RestActions,
                                 [{ActionKey, ActionValue} | ResultNode],
-                                QueryOutput
+                                QueryOutput,
+                                Depth
                             );
                         remove ->
                             modify_kvnode(
-                                Bt, NodeTuple, N + 1, RestActions, ResultNode, QueryOutput
+                                Bt, NodeTuple, N + 1, RestActions, ResultNode, QueryOutput, Depth
                             );
                         fetch ->
                             % ActionKey is equal to the Key, insert into the QueryOuput, but re-process the node
                             % since an identical action key can follow it.
-                            modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, [
-                                {ok, assemble(Bt, Key, Value)} | QueryOutput
-                            ])
+                            modify_kvnode(
+                                Bt,
+                                NodeTuple,
+                                N,
+                                RestActions,
+                                ResultNode,
+                                [
+                                    {ok, assemble(Bt, Key, Value)} | QueryOutput
+                                ],
+                                Depth
+                            )
                     end;
                 true ->
                     modify_kvnode(
@@ -751,7 +841,8 @@ modify_kvnode(
                         N + 1,
                         [{ActionType, ActionKey, ActionValue} | RestActions],
                         [{Key, Value} | ResultNode],
-                        QueryOutput
+                        QueryOutput,
+                        Depth
                     )
             end
     end.
@@ -767,7 +858,8 @@ reduce_stream_node(
     GroupedRedsAcc,
     _KeyGroupFun,
     _Fun,
-    Acc
+    Acc,
+    _Depth
 ) ->
     {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey};
 reduce_stream_node(
@@ -781,10 +873,12 @@ reduce_stream_node(
     GroupedRedsAcc,
     KeyGroupFun,
     Fun,
-    Acc
+    Acc,
+    Depth0
 ) ->
+    Depth = Depth0 + 1,
     P = element(1, Node),
-    case get_node(Bt, P) of
+    case get_node(Bt, P, Depth) of
         {kp_node, NodeList} ->
             NodeList2 = adjust_dir(Dir, NodeList),
             reduce_stream_kp_node(
@@ -798,7 +892,8 @@ reduce_stream_node(
                 GroupedRedsAcc,
                 KeyGroupFun,
                 Fun,
-                Acc
+                Acc,
+                Depth
             );
         {kv_node, KVs} ->
             KVs2 = adjust_dir(Dir, KVs),
@@ -813,7 +908,8 @@ reduce_stream_node(
                 GroupedRedsAcc,
                 KeyGroupFun,
                 Fun,
-                Acc
+                Acc,
+                Depth
             )
     end.
 
@@ -828,7 +924,8 @@ reduce_stream_kv_node(
     GroupedRedsAcc,
     KeyGroupFun,
     Fun,
-    Acc
+    Acc,
+    Depth
 ) ->
     GTEKeyStartKVs =
         case KeyStart of
@@ -855,7 +952,8 @@ reduce_stream_kv_node(
         GroupedRedsAcc,
         KeyGroupFun,
         Fun,
-        Acc
+        Acc,
+        Depth
     ).
 
 reduce_stream_kv_node2(
@@ -866,7 +964,8 @@ reduce_stream_kv_node2(
     GroupedRedsAcc,
     _KeyGroupFun,
     _Fun,
-    Acc
+    Acc,
+    _Depth
 ) ->
     {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey};
 reduce_stream_kv_node2(
@@ -877,7 +976,8 @@ reduce_stream_kv_node2(
     GroupedRedsAcc,
     KeyGroupFun,
     Fun,
-    Acc
+    Acc,
+    Depth
 ) ->
     case GroupedKey of
         undefined ->
@@ -889,7 +989,8 @@ reduce_stream_kv_node2(
                 [],
                 KeyGroupFun,
                 Fun,
-                Acc
+                Acc,
+                Depth
             );
         _ ->
             case KeyGroupFun(GroupedKey, Key) of
@@ -902,7 +1003,8 @@ reduce_stream_kv_node2(
                         GroupedRedsAcc,
                         KeyGroupFun,
                         Fun,
-                        Acc
+                        Acc,
+                        Depth
                     );
                 false ->
                     case Fun(GroupedKey, {GroupedKVsAcc, GroupedRedsAcc}, Acc) of
@@ -915,7 +1017,8 @@ reduce_stream_kv_node2(
                                 [],
                                 KeyGroupFun,
                                 Fun,
-                                Acc2
+                                Acc2,
+                                Depth
                             );
                         {stop, Acc2} ->
                             throw({stop, Acc2})
@@ -934,7 +1037,8 @@ reduce_stream_kp_node(
     GroupedRedsAcc,
     KeyGroupFun,
     Fun,
-    Acc
+    Acc,
+    Depth
 ) ->
     Nodes =
         case KeyStart of
@@ -977,7 +1081,8 @@ reduce_stream_kp_node(
         GroupedRedsAcc,
         KeyGroupFun,
         Fun,
-        Acc
+        Acc,
+        Depth
     ).
 
 reduce_stream_kp_node2(
@@ -991,7 +1096,8 @@ reduce_stream_kp_node2(
     [],
     KeyGroupFun,
     Fun,
-    Acc
+    Acc,
+    Depth
 ) ->
     {ok, Acc2, GroupedRedsAcc2, GroupedKVsAcc2, GroupedKey2} =
         reduce_stream_node(
@@ -1005,7 +1111,8 @@ reduce_stream_kp_node2(
             [],
             KeyGroupFun,
             Fun,
-            Acc
+            Acc,
+            Depth
         ),
     reduce_stream_kp_node2(
         Bt,
@@ -1018,7 +1125,8 @@ reduce_stream_kp_node2(
         GroupedRedsAcc2,
         KeyGroupFun,
         Fun,
-        Acc2
+        Acc2,
+        Depth
     );
 reduce_stream_kp_node2(
     Bt,
@@ -1031,7 +1139,8 @@ reduce_stream_kp_node2(
     GroupedRedsAcc,
     KeyGroupFun,
     Fun,
-    Acc
+    Acc,
+    Depth
 ) ->
     {Grouped0, Ungrouped0} = lists:splitwith(
         fun({Key, _}) ->
@@ -1062,7 +1171,8 @@ reduce_stream_kp_node2(
                     GroupedReds ++ GroupedRedsAcc,
                     KeyGroupFun,
                     Fun,
-                    Acc
+                    Acc,
+                    Depth
                 ),
             reduce_stream_kp_node2(
                 Bt,
@@ -1075,7 +1185,8 @@ reduce_stream_kp_node2(
                 GroupedRedsAcc2,
                 KeyGroupFun,
                 Fun,
-                Acc2
+                Acc2,
+                Depth
             );
         [] ->
             {ok, Acc, GroupedReds ++ GroupedRedsAcc, GroupedKVsAcc, GroupedKey}
@@ -1086,40 +1197,46 @@ adjust_dir(fwd, List) ->
 adjust_dir(rev, List) ->
     lists:reverse(List).
 
-stream_node(Bt, Reds, Node, StartKey, InRange, Dir, Fun, Acc) ->
+stream_node(Bt, Reds, Node, StartKey, InRange, Dir, Fun, Acc, Depth0) ->
+    Depth = Depth0 + 1,
     Pointer = element(1, Node),
-    {NodeType, NodeList} = get_node(Bt, Pointer),
+    {NodeType, NodeList} = get_node(Bt, Pointer, Depth),
     case NodeType of
         kp_node ->
-            stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc);
+            stream_kp_node(
+                Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc, Depth
+            );
         kv_node ->
-            stream_kv_node(Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc)
+            stream_kv_node(
+                Bt, Reds, adjust_dir(Dir, NodeList), StartKey, InRange, Dir, Fun, Acc, Depth
+            )
     end.
 
-stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc) ->
+stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc, Depth0) ->
+    Depth = Depth0 + 1,
     Pointer = element(1, Node),
-    {NodeType, NodeList} = get_node(Bt, Pointer),
+    {NodeType, NodeList} = get_node(Bt, Pointer, Depth),
     case NodeType of
         kp_node ->
-            stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc);
+            stream_kp_node(Bt, Reds, adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc, Depth);
         kv_node ->
-            stream_kv_node2(Bt, Reds, [], adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc)
+            stream_kv_node2(Bt, Reds, [], adjust_dir(Dir, NodeList), InRange, Dir, Fun, Acc, Depth)
     end.
 
-stream_kp_node(_Bt, _Reds, [], _InRange, _Dir, _Fun, Acc) ->
+stream_kp_node(_Bt, _Reds, [], _InRange, _Dir, _Fun, Acc, _Depth) ->
     {ok, Acc};
-stream_kp_node(Bt, Reds, [{Key, Node} | Rest], InRange, Dir, Fun, Acc) ->
+stream_kp_node(Bt, Reds, [{Key, Node} | Rest], InRange, Dir, Fun, Acc, Depth) ->
     Red = element(2, Node),
     case Fun(traverse, Key, Red, Acc) of
         {ok, Acc2} ->
-            case stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc2) of
+            case stream_node(Bt, Reds, Node, InRange, Dir, Fun, Acc2, Depth) of
                 {ok, Acc3} ->
-                    stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc3);
+                    stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc3, Depth);
                 {stop, LastReds, Acc3} ->
                     {stop, LastReds, Acc3}
             end;
         {skip, Acc2} ->
-            stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc2);
+            stream_kp_node(Bt, [Red | Reds], Rest, InRange, Dir, Fun, Acc2, Depth);
         {stop, Acc2} ->
             {stop, Reds, Acc2}
     end.
@@ -1134,7 +1251,7 @@ drop_nodes(Bt, Reds, StartKey, [{NodeKey, Node} | RestKPs]) ->
             {Reds, [{NodeKey, Node} | RestKPs]}
     end.
 
-stream_kp_node(Bt, Reds, KPs, StartKey, InRange, Dir, Fun, Acc) ->
+stream_kp_node(Bt, Reds, KPs, StartKey, InRange, Dir, Fun, Acc, Depth) ->
     {NewReds, NodesToStream} =
         case Dir of
             fwd ->
@@ -1157,16 +1274,16 @@ stream_kp_node(Bt, Reds, KPs, StartKey, InRange, Dir, Fun, Acc) ->
         [] ->
             {ok, Acc};
         [{_Key, Node} | Rest] ->
-            case stream_node(Bt, NewReds, Node, StartKey, InRange, Dir, Fun, Acc) of
+            case stream_node(Bt, NewReds, Node, StartKey, InRange, Dir, Fun, Acc, Depth) of
                 {ok, Acc2} ->
                     Red = element(2, Node),
-                    stream_kp_node(Bt, [Red | NewReds], Rest, InRange, Dir, Fun, Acc2);
+                    stream_kp_node(Bt, [Red | NewReds], Rest, InRange, Dir, Fun, Acc2, Depth);
                 {stop, LastReds, Acc2} ->
                     {stop, LastReds, Acc2}
             end
     end.
 
-stream_kv_node(Bt, Reds, KVs, StartKey, InRange, Dir, Fun, Acc) ->
+stream_kv_node(Bt, Reds, KVs, StartKey, InRange, Dir, Fun, Acc, Depth) ->
     DropFun =
         case Dir of
             fwd ->
@@ -1176,11 +1293,11 @@ stream_kv_node(Bt, Reds, KVs, StartKey, InRange, Dir, Fun, Acc) ->
         end,
     {LTKVs, GTEKVs} = lists:splitwith(DropFun, KVs),
     AssembleLTKVs = [assemble(Bt, K, V) || {K, V} <- LTKVs],
-    stream_kv_node2(Bt, Reds, AssembleLTKVs, GTEKVs, InRange, Dir, Fun, Acc).
+    stream_kv_node2(Bt, Reds, AssembleLTKVs, GTEKVs, InRange, Dir, Fun, Acc, Depth).
 
-stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _InRange, _Dir, _Fun, Acc) ->
+stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _InRange, _Dir, _Fun, Acc, _Depth) ->
     {ok, Acc};
-stream_kv_node2(Bt, Reds, PrevKVs, [{K, V} | RestKVs], InRange, Dir, Fun, Acc) ->
+stream_kv_node2(Bt, Reds, PrevKVs, [{K, V} | RestKVs], InRange, Dir, Fun, Acc, Depth) ->
     case InRange(K) of
         false ->
             {stop, {PrevKVs, Reds}, Acc};
@@ -1189,7 +1306,7 @@ stream_kv_node2(Bt, Reds, PrevKVs, [{K, V} | RestKVs], InRange, Dir, Fun, Acc) -
             case Fun(visit, AssembledKV, {PrevKVs, Reds}, Acc) of
                 {ok, Acc2} ->
                     stream_kv_node2(
-                        Bt, Reds, [AssembledKV | PrevKVs], RestKVs, InRange, Dir, Fun, Acc2
+                        Bt, Reds, [AssembledKV | PrevKVs], RestKVs, InRange, Dir, Fun, Acc2, Depth
                     );
                 {stop, Acc2} ->
                     {stop, {PrevKVs, Reds}, Acc2}

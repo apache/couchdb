@@ -122,6 +122,11 @@
 -define(PURGE_INFOS_LIMIT, purge_infos_limit).
 -define(COMPACTED_SEQ, compacted_seq).
 
+-define(DEFAULT_BTREE_CACHE_DEPTH, 3).
+% Priority is about how long the entry will survive in the cache initially. A
+% period is about 2 seconds and each period the value is halved.
+-define(HEADER_CACHE_PRIORITY, 16).
+
 exists(FilePath) ->
     case is_file(FilePath) of
         true ->
@@ -828,7 +833,8 @@ init_state(FilePath, Fd, Header0, Options) ->
         {split, fun ?MODULE:id_tree_split/1},
         {join, fun ?MODULE:id_tree_join/2},
         {reduce, fun ?MODULE:id_tree_reduce/2},
-        {compression, Compression}
+        {compression, Compression},
+        {cache_depth, btree_cache_depth()}
     ]),
 
     SeqTreeState = couch_bt_engine_header:seq_tree_state(Header),
@@ -836,28 +842,32 @@ init_state(FilePath, Fd, Header0, Options) ->
         {split, fun ?MODULE:seq_tree_split/1},
         {join, fun ?MODULE:seq_tree_join/2},
         {reduce, fun ?MODULE:seq_tree_reduce/2},
-        {compression, Compression}
+        {compression, Compression},
+        {cache_depth, btree_cache_depth()}
     ]),
 
     LocalTreeState = couch_bt_engine_header:local_tree_state(Header),
     {ok, LocalTree} = couch_btree:open(LocalTreeState, Fd, [
         {split, fun ?MODULE:local_tree_split/1},
         {join, fun ?MODULE:local_tree_join/2},
-        {compression, Compression}
+        {compression, Compression},
+        {cache_depth, btree_cache_depth()}
     ]),
 
     PurgeTreeState = couch_bt_engine_header:purge_tree_state(Header),
     {ok, PurgeTree} = couch_btree:open(PurgeTreeState, Fd, [
         {split, fun ?MODULE:purge_tree_split/1},
         {join, fun ?MODULE:purge_tree_join/2},
-        {reduce, fun ?MODULE:purge_tree_reduce/2}
+        {reduce, fun ?MODULE:purge_tree_reduce/2},
+        {cache_depth, btree_cache_depth()}
     ]),
 
     PurgeSeqTreeState = couch_bt_engine_header:purge_seq_tree_state(Header),
     {ok, PurgeSeqTree} = couch_btree:open(PurgeSeqTreeState, Fd, [
         {split, fun ?MODULE:purge_seq_tree_split/1},
         {join, fun ?MODULE:purge_seq_tree_join/2},
-        {reduce, fun ?MODULE:purge_tree_reduce/2}
+        {reduce, fun ?MODULE:purge_tree_reduce/2},
+        {cache_depth, btree_cache_depth()}
     ]),
 
     ok = couch_file:set_db_pid(Fd, self()),
@@ -1195,8 +1205,14 @@ get_header_term(#st{header = Header} = St, Key, Default) when is_atom(Key) ->
         undefined ->
             Default;
         Pointer when is_integer(Pointer) ->
-            {ok, Term} = couch_file:pread_term(St#st.fd, Pointer),
-            Term
+            case couch_bt_engine_cache:lookup({St#st.fd, Pointer}) of
+                undefined ->
+                    {ok, Term} = couch_file:pread_term(St#st.fd, Pointer),
+                    couch_bt_engine_cache:insert({St#st.fd, Pointer}, Term, ?HEADER_CACHE_PRIORITY),
+                    Term;
+                Term ->
+                    Term
+            end
     end.
 
 set_header_term(#st{} = St, Key, Term) when is_atom(Key) ->
@@ -1207,6 +1223,20 @@ set_header_term(#st{} = St, Key, Term) when is_atom(Key) ->
     }.
 
 set_header_term(Fd, Header, Key, Term, Compression) when is_atom(Key) ->
+    case couch_bt_engine_header:get(Header, Key) of
+        Pointer when is_integer(Pointer) ->
+            % Reset old one to 0 usage. Some old snapshot may still
+            % see it and use. But it will only survive only one more
+            % interval at most otherwise
+            couch_bt_engine_cache:reset({Fd, Pointer});
+        _ ->
+            ok
+    end,
     TermOpts = [{compression, Compression}],
     {ok, Ptr, _} = couch_file:append_term(Fd, Term, TermOpts),
-    couch_bt_engine_header:set(Header, Key, Ptr).
+    Result = couch_bt_engine_header:set(Header, Key, Ptr),
+    couch_bt_engine_cache:insert({Fd, Ptr}, Term, ?HEADER_CACHE_PRIORITY),
+    Result.
+
+btree_cache_depth() ->
+    config:get_integer("bt_engine_cache", "db_btree_cache_depth", ?DEFAULT_BTREE_CACHE_DEPTH).
