@@ -68,7 +68,8 @@ get_system_stats() ->
         get_internal_replication_jobs_stat(),
         get_membership_stat(),
         get_membership_nodes(),
-        get_distribution_stats()
+        get_distribution_stats(),
+        get_bt_engine_cache_stats()
     ]).
 
 get_uptime_stat() ->
@@ -374,3 +375,12 @@ get_distribution_stats() ->
 get_ets_stats() ->
     NumTabs = length(ets:all()),
     to_prom(erlang_ets_table, gauge, "number of ETS tables", NumTabs).
+
+get_bt_engine_cache_stats() ->
+    Stats = couch_bt_engine_cache:info(),
+    Size = maps:get(size, Stats, 0),
+    Mem = maps:get(memory, Stats, 0),
+    [
+        to_prom(couchdb_bt_engine_cache_memory, gauge, "memory used by the btree cache", Mem),
+        to_prom(couchdb_bt_engine_cache_size, gauge, "number of entries in the btree cache", Size)
+    ].
