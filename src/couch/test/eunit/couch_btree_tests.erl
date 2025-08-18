@@ -29,6 +29,15 @@ setup() ->
 setup_kvs(_) ->
     setup().
 
+setup_kvs_with_cache(_) ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2},
+        {cache_depth, 2}
+    ]),
+    {Fd, Btree}.
+
 setup_red() ->
     {_, EvenOddKVs} = lists:foldl(
         fun(Idx, {Key, Acc}) ->
@@ -47,6 +56,7 @@ setup_red(_) ->
     setup_red().
 
 teardown(Fd) when is_pid(Fd) ->
+    config:delete("couchdb", "btree_chunk_size", false),
     ok = couch_file:close(Fd);
 teardown({Fd, _}) ->
     teardown(Fd).
@@ -135,6 +145,24 @@ shuffled_kvs_test_() ->
                 fun setup_kvs/1,
                 fun teardown/2,
                 [{Shuffled, Fun} || Fun <- Funs]
+            }
+        }
+    }.
+
+sorted_kvs_with_cache_test_() ->
+    Funs = kvs_test_funs(),
+    Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    {
+        "BTree with a cache and sorted keys",
+        {
+            setup,
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs_with_cache/1,
+                fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
             }
         }
     }.
