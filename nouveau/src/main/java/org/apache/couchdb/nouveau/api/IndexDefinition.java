@@ -22,7 +22,9 @@ import java.util.Map;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class IndexDefinition {
 
-    private int luceneVersion = 9; // Legacy version if not set.
+    public static final int LEGACY_LUCENE_VERSION = 9;
+
+    private int luceneVersion = LEGACY_LUCENE_VERSION; // Legacy version if not set.
 
     @NotEmpty
     private String defaultAnalyzer;
