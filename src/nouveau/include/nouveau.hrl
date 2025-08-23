@@ -12,6 +12,7 @@
 %% limitations under the License.
 
 -define(LEGACY_LUCENE_VERSION, 9).
+-define(TARGET_LUCENE_VERSION, 10).
 
 -record(index, {
     dbname,
