@@ -37,13 +37,16 @@ import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.lucene.LuceneAnalyzerFactory;
 import org.apache.couchdb.nouveau.lucene.LuceneIndex;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.backward_codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -218,7 +221,6 @@ public final class IndexManager implements Managed {
             assertSame(indexDefinition, loadIndexDefinition(name));
             return;
         }
-
         final Lock lock = this.createLock.writeLock(name);
         lock.lock();
         try {
@@ -393,9 +395,15 @@ public final class IndexManager implements Managed {
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
-        final Directory dir = new DirectIODirectory(
-                FSDirectory.open(path.resolve(Integer.toString(indexDefinition.getLuceneVersion()))));
+        final int luceneVersion = indexDefinition.getLuceneVersion();
+        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve(Integer.toString(luceneVersion))));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        if (luceneVersion != Version.LATEST.major) {
+            config.setOpenMode(OpenMode.APPEND);
+        }
+        if (luceneVersion == IndexDefinition.LEGACY_LUCENE_VERSION) {
+            config.setCodec(new Lucene912Codec());
+        }
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
         final long updateSeq = getSeq(writer, "update_seq");
