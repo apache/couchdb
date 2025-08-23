@@ -11,9 +11,12 @@
 %% See the License for the specific language governing permissions and
 %% limitations under the License.
 
+-define(LEGACY_LUCENE_VERSION, 9).
+
 -record(index, {
     dbname,
     ddoc_id,
+    lucene_version,
     default_analyzer,
     field_analyzers,
     def,

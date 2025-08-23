@@ -67,23 +67,33 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
         false ->
             {error, {not_found, <<IndexName/binary, " not found.">>}};
         {IndexName, {Index}} ->
+            LuceneVersion = couch_util:get_value(
+                <<"lucene_version">>, Index, ?LEGACY_LUCENE_VERSION
+            ),
             DefaultAnalyzer = couch_util:get_value(<<"default_analyzer">>, Index, <<"standard">>),
             FieldAnalyzers = couch_util:get_value(<<"field_analyzers">>, Index, #{}),
             case couch_util:get_value(<<"index">>, Index) of
                 undefined ->
                     {error, InvalidDDocError};
                 Def ->
-                    Sig =
-                        couch_util:to_hex_bin(
+                    SigTerm =
+                        case LuceneVersion of
+                            ?LEGACY_LUCENE_VERSION ->
+                                {DefaultAnalyzer, FieldAnalyzers, Def};
+                            _ ->
+                                {LuceneVersion, DefaultAnalyzer, FieldAnalyzers, Def}
+                        end,
+                    Sig = couch_util:to_hex_bin(
                             crypto:hash(
                                 sha256,
                                 ?term_to_bin(
-                                    {DefaultAnalyzer, FieldAnalyzers, Def}
+                                    SigTerm
                                 )
                             )
                         ),
                     {ok, #index{
                         dbname = DbName,
+                        lucene_version = LuceneVersion,
                         default_analyzer = DefaultAnalyzer,
                         field_analyzers = FieldAnalyzers,
                         ddoc_id = Id,
