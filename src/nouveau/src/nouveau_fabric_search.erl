@@ -15,7 +15,7 @@
 
 -module(nouveau_fabric_search).
 
--export([go/4]).
+-export([go/3, go/4]).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -38,12 +38,12 @@ go(DbName, GroupId, IndexName, QueryArgs0) when is_binary(GroupId) ->
 go(DbName, #doc{} = DDoc, IndexName, QueryArgs0) ->
     case nouveau_util:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
-            go(DbName, DDoc, IndexName, QueryArgs0, Index);
+            go(DbName, QueryArgs0, Index);
         {error, Reason} ->
             {error, Reason}
     end.
 
-go(DbName, #doc{} = _DDoc, _IndexName, QueryArgs0, Index) ->
+go(DbName, QueryArgs0, Index) ->
     Shards = get_shards(DbName, QueryArgs0),
     {PackedBookmark, #{limit := Limit, sort := Sort} = QueryArgs1} =
         maps:take(bookmark, QueryArgs0),
