@@ -204,6 +204,7 @@ get_db_info(#index{} = Index) ->
 
 index_definition(#index{} = Index) ->
     #{
+        <<"lucene_version">> => Index#index.lucene_version,
         <<"default_analyzer">> => Index#index.default_analyzer,
         <<"field_analyzers">> => Index#index.field_analyzers
     }.

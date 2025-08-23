@@ -22,6 +22,8 @@ import java.util.Map;
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class IndexDefinition {
 
+    private int luceneVersion = 9; // Legacy version if not set.
+
     @NotEmpty
     private String defaultAnalyzer;
 
@@ -31,9 +33,20 @@ public class IndexDefinition {
         // Jackson deserialization
     }
 
-    public IndexDefinition(final String defaultAnalyzer, final Map<String, String> fieldAnalyzers) {
+    public IndexDefinition(
+            final int luceneVersion, final String defaultAnalyzer, final Map<String, String> fieldAnalyzers) {
+        this.luceneVersion = luceneVersion;
         this.defaultAnalyzer = defaultAnalyzer;
         this.fieldAnalyzers = fieldAnalyzers;
+    }
+
+    @JsonProperty
+    public int getLuceneVersion() {
+        return luceneVersion;
+    }
+
+    public void setLuceneVersion(int luceneVersion) {
+        this.luceneVersion = luceneVersion;
     }
 
     @JsonProperty
@@ -62,6 +75,7 @@ public class IndexDefinition {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
+        result = prime * result + luceneVersion;
         result = prime * result + ((defaultAnalyzer == null) ? 0 : defaultAnalyzer.hashCode());
         result = prime * result + ((fieldAnalyzers == null) ? 0 : fieldAnalyzers.hashCode());
         return result;
@@ -73,6 +87,7 @@ public class IndexDefinition {
         if (obj == null) return false;
         if (getClass() != obj.getClass()) return false;
         IndexDefinition other = (IndexDefinition) obj;
+        if (luceneVersion != other.luceneVersion) return false;
         if (defaultAnalyzer == null) {
             if (other.defaultAnalyzer != null) return false;
         } else if (!defaultAnalyzer.equals(other.defaultAnalyzer)) return false;
@@ -84,6 +99,7 @@ public class IndexDefinition {
 
     @Override
     public String toString() {
-        return "IndexDefinition [defaultAnalyzer=" + defaultAnalyzer + ", fieldAnalyzers=" + fieldAnalyzers + "]";
+        return "IndexDefinition [luceneVersion=" + luceneVersion + ", defaultAnalyzer=" + defaultAnalyzer
+                + ", fieldAnalyzers=" + fieldAnalyzers + "]";
     }
 }

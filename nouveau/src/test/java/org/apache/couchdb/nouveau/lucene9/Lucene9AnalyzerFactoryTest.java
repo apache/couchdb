@@ -60,6 +60,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.sv.SwedishAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tr.TurkishAnalyzer;
+import org.apache.lucene.util.Version;
 import org.junit.jupiter.api.Test;
 
 public class Lucene9AnalyzerFactoryTest {
@@ -256,8 +257,8 @@ public class Lucene9AnalyzerFactoryTest {
 
     @Test
     public void testFieldAnalyzers() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition("standard", Map.of("english", "english", "thai", "thai", "email", "email"));
+        final IndexDefinition indexDefinition = new IndexDefinition(
+                Version.LATEST.major, "standard", Map.of("english", "english", "thai", "thai", "email", "email"));
         final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
         assertThat(analyzer).isInstanceOf(PerFieldAnalyzerWrapper.class);
         final Method m = PerFieldAnalyzerWrapper.class.getDeclaredMethod("getWrappedAnalyzer", String.class);
@@ -275,7 +276,7 @@ public class Lucene9AnalyzerFactoryTest {
 
     private void assertAnalyzer(final String name, final Class<? extends Analyzer> clazz) throws Exception {
         assertThat(Lucene9AnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
-        assertThat(Lucene9AnalyzerFactory.fromDefinition(new IndexDefinition(name, null)))
+        assertThat(Lucene9AnalyzerFactory.fromDefinition(new IndexDefinition(Version.LATEST.major, name, null)))
                 .isInstanceOf(clazz);
     }
 }
