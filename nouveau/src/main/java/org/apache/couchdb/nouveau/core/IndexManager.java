@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
-import org.apache.couchdb.nouveau.lucene9.Lucene9Index;
+import org.apache.couchdb.nouveau.lucene.LuceneAnalyzerFactory;
+import org.apache.couchdb.nouveau.lucene.LuceneIndex;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -392,15 +392,16 @@ public final class IndexManager implements Managed {
         LOGGER.info("opening {}", name);
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
-        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
-        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
+        final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
+        final Directory dir = new DirectIODirectory(
+                FSDirectory.open(path.resolve(Integer.toString(indexDefinition.getLuceneVersion()))));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
         final long updateSeq = getSeq(writer, "update_seq");
         final long purgeSeq = getSeq(writer, "purge_seq");
         final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-        return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
+        return new LuceneIndex(analyzer, writer, updateSeq, purgeSeq, searcherManager);
     }
 
     private long getSeq(final IndexWriter writer, final String key) throws IOException {
