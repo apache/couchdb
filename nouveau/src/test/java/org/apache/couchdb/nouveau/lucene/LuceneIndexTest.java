@@ -42,13 +42,14 @@ import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 public class LuceneIndexTest {
 
     protected final Index setup(final Path path) throws IOException {
-        final IndexDefinition indexDefinition = new IndexDefinition();
+        final IndexDefinition indexDefinition = new IndexDefinition(Version.LATEST.major, "standard", null);
         indexDefinition.setDefaultAnalyzer("standard");
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         final Directory dir = new DirectIODirectory(FSDirectory.open(path));
