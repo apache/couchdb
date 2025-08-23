@@ -24,8 +24,8 @@ import org.apache.couchdb.nouveau.core.IndexManager;
 import org.apache.couchdb.nouveau.core.UserAgentFilter;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexHealthCheck;
-import org.apache.couchdb.nouveau.lucene9.Lucene9Module;
-import org.apache.couchdb.nouveau.lucene9.ParallelSearcherFactory;
+import org.apache.couchdb.nouveau.lucene.LuceneModule;
+import org.apache.couchdb.nouveau.lucene.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
@@ -65,7 +65,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         environment.lifecycle().manage(indexManager);
 
         // Serialization classes
-        environment.getObjectMapper().registerModule(new Lucene9Module());
+        environment.getObjectMapper().registerModule(new LuceneModule());
 
         // AnalyzeResource
         final AnalyzeResource analyzeResource = new AnalyzeResource();

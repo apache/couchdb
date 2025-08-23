@@ -30,7 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.couchdb.nouveau.api.AnalyzeRequest;
 import org.apache.couchdb.nouveau.api.AnalyzeResponse;
-import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
+import org.apache.couchdb.nouveau.lucene.LuceneAnalyzerFactory;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
@@ -47,7 +47,7 @@ public final class AnalyzeResource {
     public AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest request) throws IOException {
         try {
             final List<String> tokens =
-                    tokenize(Lucene9AnalyzerFactory.newAnalyzer(request.getAnalyzer()), request.getText());
+                    tokenize(LuceneAnalyzerFactory.newAnalyzer(request.getAnalyzer()), request.getText());
             return new AnalyzeResponse(tokens);
         } catch (IllegalArgumentException e) {
             throw new WebApplicationException(request.getAnalyzer() + " not a valid analyzer", Status.BAD_REQUEST);

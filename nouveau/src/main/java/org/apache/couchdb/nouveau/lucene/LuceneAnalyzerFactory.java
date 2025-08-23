@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
@@ -60,9 +60,9 @@ import org.apache.lucene.analysis.sv.SwedishAnalyzer;
 import org.apache.lucene.analysis.th.ThaiAnalyzer;
 import org.apache.lucene.analysis.tr.TurkishAnalyzer;
 
-public final class Lucene9AnalyzerFactory {
+public final class LuceneAnalyzerFactory {
 
-    private Lucene9AnalyzerFactory() {}
+    private LuceneAnalyzerFactory() {}
 
     public static Analyzer fromDefinition(final IndexDefinition indexDefinition) {
         final Analyzer defaultAnalyzer = newAnalyzer(indexDefinition.getDefaultAnalyzer());

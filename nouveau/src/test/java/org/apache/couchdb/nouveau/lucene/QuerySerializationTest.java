@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,7 +39,7 @@ public class QuerySerializationTest {
     @BeforeAll
     public static void setup() {
         mapper = new ObjectMapper();
-        mapper.registerModule(new Lucene9Module());
+        mapper.registerModule(new LuceneModule());
     }
 
     @Test

@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
@@ -97,7 +97,7 @@ import org.apache.lucene.search.TopFieldCollectorManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 
-public class Lucene9Index extends Index {
+public class LuceneIndex extends Index {
 
     private static final Sort DEFAULT_SORT =
             new Sort(SortField.FIELD_SCORE, new SortField("_id", SortField.Type.STRING));
@@ -106,9 +106,9 @@ public class Lucene9Index extends Index {
     private final Analyzer analyzer;
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
-    private final Lucene9IndexSchema schema;
+    private final LuceneIndexSchema schema;
 
-    public Lucene9Index(
+    public LuceneIndex(
             final Analyzer analyzer,
             final IndexWriter writer,
             final long updateSeq,
@@ -537,22 +537,22 @@ public class Lucene9Index extends Index {
         return result;
     }
 
-    private Lucene9IndexSchema initSchema(IndexWriter writer) {
+    private LuceneIndexSchema initSchema(IndexWriter writer) {
         var commitData = writer.getLiveCommitData();
         if (commitData == null) {
-            return Lucene9IndexSchema.emptySchema();
+            return LuceneIndexSchema.emptySchema();
         }
         for (var entry : commitData) {
             if (entry.getKey().equals("_schema")) {
-                return Lucene9IndexSchema.fromString(entry.getValue());
+                return LuceneIndexSchema.fromString(entry.getValue());
             }
         }
-        return Lucene9IndexSchema.emptySchema();
+        return LuceneIndexSchema.emptySchema();
     }
 
     @Override
     public String toString() {
-        return "Lucene9Index [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager
+        return "LuceneIndex [analyzer=" + analyzer + ", writer=" + writer + ", searcherManager=" + searcherManager
                 + "]";
     }
 
