@@ -1,5 +1,5 @@
---- quickjs-master/tests/test262.patch	2025-06-14 05:51:48
-+++ quickjs/tests/test262.patch	2025-06-20 18:03:41
+--- quickjs-master/tests/test262.patch	2025-08-25 12:20:58
++++ quickjs/tests/test262.patch	2025-08-25 15:10:50
 @@ -14,9 +14,9 @@
  +//  small: 200,
  +//  long: 1000,
