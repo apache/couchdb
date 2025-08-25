@@ -4230,17 +4230,15 @@ static void js_std_promise_rejection_check(JSContext *ctx)
 /* main loop which calls the user JS callbacks */
 void js_std_loop(JSContext *ctx)
 {
-    JSContext *ctx1;
     int err;
 
     for(;;) {
         /* execute the pending jobs */
         for(;;) {
-            err = JS_ExecutePendingJob(JS_GetRuntime(ctx), &ctx1);
+            err = JS_ExecutePendingJob(JS_GetRuntime(ctx), NULL);
             if (err <= 0) {
-                if (err < 0) {
-                    js_std_dump_error(ctx1);
-                }
+                if (err < 0)
+                    js_std_dump_error(ctx);
                 break;
             }
         }
@@ -4271,11 +4269,10 @@ JSValue js_std_await(JSContext *ctx, JSValue obj)
             JS_FreeValue(ctx, obj);
             break;
         } else if (state == JS_PROMISE_PENDING) {
-            JSContext *ctx1;
             int err;
-            err = JS_ExecutePendingJob(JS_GetRuntime(ctx), &ctx1);
+            err = JS_ExecutePendingJob(JS_GetRuntime(ctx), NULL);
             if (err < 0) {
-                js_std_dump_error(ctx1);
+                js_std_dump_error(ctx);
             }
             if (err == 0) {
                 js_std_promise_rejection_check(ctx);
@@ -4303,6 +4300,7 @@ void js_std_eval_binary(JSContext *ctx, const uint8_t *buf, size_t buf_len,
         if (JS_VALUE_GET_TAG(obj) == JS_TAG_MODULE) {
             js_module_set_import_meta(ctx, obj, FALSE, FALSE);
         }
+        JS_FreeValue(ctx, obj);
     } else {
         if (JS_VALUE_GET_TAG(obj) == JS_TAG_MODULE) {
             if (JS_ResolveModule(ctx, obj) < 0) {
