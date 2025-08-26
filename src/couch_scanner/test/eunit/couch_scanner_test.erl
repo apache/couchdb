@@ -53,6 +53,9 @@ setup() ->
     meck:new(couch_scanner_server, [passthrough]),
     meck:new(couch_scanner_util, [passthrough]),
     Ctx = test_util:start_couch([fabric, couch_scanner]),
+    % Run with the smallest batch size to exercise the batched
+    % ddoc iteration
+    config:set("couch_scanner", "ddoc_batch_size", "2", false),
     DbName1 = <<"dbname1", (?tempdb())/binary>>,
     DbName2 = <<"dbname2", (?tempdb())/binary>>,
     DbName3 = <<"dbname3", (?tempdb())/binary>>,
