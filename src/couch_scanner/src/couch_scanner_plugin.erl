@@ -171,6 +171,7 @@
 
 -define(CHECKPOINT_INTERVAL_SEC, 10).
 -define(STOP_TIMEOUT_SEC, 5).
+-define(DDOC_BATCH_SIZE, 100).
 
 -record(st, {
     id,
@@ -326,7 +327,7 @@ scan_db([_ | _] = Shards, #st{} = St) ->
             case Go of
                 ok ->
                     St2 = rate_limit(St1, db),
-                    St3 = fold_ddocs(fun scan_ddocs_fold/2, St2),
+                    St3 = scan_ddocs(St2),
                     {Shards1, St4} = shards_callback(St3, Shards),
                     St5 = scan_shards(Shards1, St4),
                     {ok, St5};
@@ -338,16 +339,6 @@ scan_db([_ | _] = Shards, #st{} = St) ->
         true ->
             {ok, St}
     end.
-
-scan_ddocs_fold({meta, _}, #st{} = Acc) ->
-    {ok, Acc};
-scan_ddocs_fold({row, RowProps}, #st{} = Acc) ->
-    DDoc = couch_util:get_value(doc, RowProps),
-    scan_ddoc(ejson_to_doc(DDoc), Acc);
-scan_ddocs_fold(complete, #st{} = Acc) ->
-    {ok, Acc};
-scan_ddocs_fold({error, Error}, _Acc) ->
-    exit({shutdown, {scan_ddocs_fold, Error}}).
 
 scan_shards([], #st{} = St) ->
     St;
@@ -654,27 +645,77 @@ shards_by_range(Shards) ->
     Dict = lists:foldl(Fun, orddict:new(), Shards),
     orddict:to_list(Dict).
 
-% Design doc fetching helper
-
-fold_ddocs(Fun, #st{dbname = DbName, mod = Mod} = Acc) ->
+scan_ddocs(#st{mod = Mod} = St) ->
     case is_exported(Mod, ddoc, 3) of
         true ->
-            QArgs = #mrargs{
-                include_docs = true,
-                extra = [{namespace, <<"_design">>}]
-            },
             try
-                {ok, Acc1} = fabric:all_docs(DbName, [?ADMIN_CTX], Fun, Acc, QArgs),
-                Acc1
+                fold_ddocs_batched(St, <<?DESIGN_DOC_PREFIX>>)
             catch
                 error:database_does_not_exist ->
-                    Acc
+                    St
             end;
         false ->
             % If the plugin doesn't export the ddoc callback, don't bother calling
             % fabric:all_docs, as it's expensive
-            Acc
+            St
     end.
+
+fold_ddocs_batched(#st{dbname = DbName} = St, <<_/binary>> = StartKey) ->
+    QArgs = #mrargs{
+        include_docs = true,
+        start_key = StartKey,
+        extra = [{namespace, <<?DESIGN_DOC_PREFIX0>>}],
+        % Need limit > 1 for the algorithm below to work
+        limit = max(2, cfg_ddoc_batch_size())
+    },
+    Cbk =
+        fun
+            ({meta, _}, {Cnt, Id, DDocs}) ->
+                {ok, {Cnt, Id, DDocs}};
+            ({row, Props}, {Cnt, _Id, DDocs}) ->
+                EJson = couch_util:get_value(doc, Props),
+                DDoc = #doc{id = Id} = ejson_to_doc(EJson),
+                case Id =:= StartKey of
+                    true ->
+                        % We get there if we're continuing batched iteration so
+                        % we skip this ddoc as we already processed it. In the
+                        % first batch StartKey will be <<"_design/">> and
+                        % that's an invalid document ID so will never match.
+                        {ok, {Cnt + 1, Id, DDocs}};
+                    false ->
+                        {ok, {Cnt + 1, Id, [DDoc | DDocs]}}
+                end;
+            (complete, {Cnt, Id, DDocs}) ->
+                {ok, {Cnt, Id, lists:reverse(DDocs)}};
+            ({error, Error}, {_Cnt, _Id, _DDocs}) ->
+                exit({shutdown, {scan_ddocs_fold, Error}})
+        end,
+    Acc0 = {0, StartKey, []},
+    {ok, {Cnt, LastId, DDocs}} = fabric:all_docs(DbName, [?ADMIN_CTX], Cbk, Acc0, QArgs),
+    case scan_ddoc_batch(DDocs, {ok, St}) of
+        {ok, #st{} = St1} ->
+            if
+                is_integer(Cnt), Cnt < QArgs#mrargs.limit ->
+                    % We got less than we asked for so we're done
+                    St1;
+                Cnt == QArgs#mrargs.limit ->
+                    % We got all the docs we asked for, there are probably more docs
+                    % so we recurse and fetch the next batch.
+                    fold_ddocs_batched(St1, LastId)
+            end;
+        {stop, #st{} = St1} ->
+            % Plugin wanted to stop scanning ddocs, so we stop
+            St1
+    end.
+
+% Call plugin ddocs callback. These may take an arbitrarily long time to
+% process.
+scan_ddoc_batch(_, {stop, #st{} = St}) ->
+    {stop, St};
+scan_ddoc_batch([], {ok, #st{} = St}) ->
+    {ok, St};
+scan_ddoc_batch([#doc{} = DDoc | Rest], {ok, #st{} = St}) ->
+    scan_ddoc_batch(Rest, scan_ddoc(DDoc, St)).
 
 % Simple ejson to #doc{} function to avoid all the extra validation in from_json_obj/1.
 % We just got these docs from the cluster, they are already saved on disk.
@@ -707,6 +748,9 @@ match_skip_pat(<<_/binary>> = Bin, #{} = Pats) ->
 cfg(Mod, Key, Default) when is_list(Key) ->
     Section = atom_to_list(Mod),
     config:get(Section, Key, Default).
+
+cfg_ddoc_batch_size() ->
+    config:get_integer("couch_scanner", "ddoc_batch_size", ?DDOC_BATCH_SIZE).
 
 schedule_time(Mod, LastSec, NowSec) ->
     After = cfg(Mod, "after", "restart"),
