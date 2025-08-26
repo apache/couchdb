@@ -84,13 +84,13 @@ design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
                                 {LuceneVersion, DefaultAnalyzer, FieldAnalyzers, Def}
                         end,
                     Sig = couch_util:to_hex_bin(
-                            crypto:hash(
-                                sha256,
-                                ?term_to_bin(
-                                    SigTerm
-                                )
+                        crypto:hash(
+                            sha256,
+                            ?term_to_bin(
+                                SigTerm
                             )
-                        ),
+                        )
+                    ),
                     {ok, #index{
                         dbname = DbName,
                         lucene_version = LuceneVersion,
