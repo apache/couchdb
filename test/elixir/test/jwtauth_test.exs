@@ -3,6 +3,7 @@ defmodule JwtAuthTest do
 
   @moduletag :authentication
 
+  @tag skip_for_pouchdb_server: true
   test "jwt auth with HMAC secret", _context do
 
     secret = "zxczxc12zxczxc12"
@@ -33,6 +34,7 @@ defmodule JwtAuthTest do
       Record.extract(:RSAPrivateKey, from_lib: "public_key/include/public_key.hrl")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "jwt auth with RSA secret", _context do
     require JwtAuthTest.RSA
 
@@ -72,6 +74,7 @@ defmodule JwtAuthTest do
       Record.extract(:ECPrivateKey, from_lib: "public_key/include/public_key.hrl")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "jwt auth with EC secret", _context do
     require JwtAuthTest.EC
 
@@ -138,6 +141,7 @@ defmodule JwtAuthTest do
     assert resp.body["info"]["authenticated"] == "default"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "jwt auth with required iss claim", _context do
 
     secret = "zxczxc12zxczxc12"

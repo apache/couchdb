@@ -8,6 +8,7 @@ defmodule AttachmentRangesTest do
   This is a port of the attachment_ranges.js suite
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "manages attachment range requests successfully", context do
     db_name = context[:db_name]

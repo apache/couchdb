@@ -18,6 +18,7 @@ defmodule ReshardChangesFeedTest do
     {:ok, [db: db]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "all_docs after splitting all shards on node1", context do
     db = context[:db]
     add_docs(1..3, db)

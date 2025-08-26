@@ -8,6 +8,7 @@ defmodule FormSubmitTest do
   This is a port of form_submit.js
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "form submission gives back invalid content-type", context do
     headers = [

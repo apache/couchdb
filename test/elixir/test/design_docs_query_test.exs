@@ -32,6 +32,7 @@ defmodule DesignDocsQueryTest do
     create_doc(db_name, ddoc)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs (GET with no parameters)", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs")
@@ -40,6 +41,7 @@ defmodule DesignDocsQueryTest do
     assert length(resp.body["rows"]) == 5, "amount of rows mismatch"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs with single key", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?key=\"_design/ddoc03\"")
@@ -49,6 +51,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 0)["key"] == "_design/ddoc03"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs with multiple key", context do
     resp =
       Couch.get(
@@ -62,6 +65,7 @@ defmodule DesignDocsQueryTest do
     assert length(Map.get(resp, :body)["rows"]) == 2
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST with empty body", context do
     resp =
       Couch.post(
@@ -73,6 +77,7 @@ defmodule DesignDocsQueryTest do
     assert length(Map.get(resp, :body)["rows"]) == 5
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST with keys and limit", context do
     resp =
       Couch.post(
@@ -87,6 +92,7 @@ defmodule DesignDocsQueryTest do
     assert length(Map.get(resp, :body)["rows"]) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST with query parameter and JSON body", context do
     resp =
       Couch.post(
@@ -103,6 +109,7 @@ defmodule DesignDocsQueryTest do
     assert length(Map.get(resp, :body)["rows"]) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST edge case with colliding parameters - query takes precedence", context do
     resp =
       Couch.post(
@@ -120,6 +127,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.empty?(Map.get(resp, :body)["rows"])
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs descending=true", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?descending=true")
@@ -129,6 +137,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 0)["key"] == "_design/ddoc05"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs descending=false", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?descending=false")
@@ -138,6 +147,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 0)["key"] == "_design/ddoc01"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs end_key", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?end_key=\"_design/ddoc03\"")
@@ -147,6 +157,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 2)["key"] == "_design/ddoc03"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs endkey", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?endkey=\"_design/ddoc03\"")
@@ -156,6 +167,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 2)["key"] == "_design/ddoc03"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs start_key", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?start_key=\"_design/ddoc03\"")
@@ -165,6 +177,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 0)["key"] == "_design/ddoc03"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs startkey", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design_docs?startkey=\"_design/ddoc03\"")
@@ -174,6 +187,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 0)["key"] == "_design/ddoc03"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs end_key inclusive_end=true", context do
     db_name = context[:db_name]
 
@@ -187,6 +201,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 2)["key"] == "_design/ddoc03"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs end_key inclusive_end=false", context do
     db_name = context[:db_name]
 
@@ -200,6 +215,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 1)["key"] == "_design/ddoc02"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs end_key inclusive_end=false descending", context do
     db_name = context[:db_name]
 
@@ -213,6 +229,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 1)["key"] == "_design/ddoc04"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs end_key limit", context do
     db_name = context[:db_name]
 
@@ -226,6 +243,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 1)["key"] == "_design/ddoc02"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs end_key skip", context do
     db_name = context[:db_name]
 
@@ -240,6 +258,7 @@ defmodule DesignDocsQueryTest do
     assert Enum.at(resp.body["rows"], 2)["key"] == "_design/ddoc05"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs update_seq", context do
     db_name = context[:db_name]
 
@@ -252,6 +271,7 @@ defmodule DesignDocsQueryTest do
     assert Map.has_key?(resp.body, "update_seq")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "query _design_docs post with keys", context do
     db_name = context[:db_name]
 

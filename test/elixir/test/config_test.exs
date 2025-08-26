@@ -74,11 +74,13 @@ defmodule ConfigTest do
   @tag :pending
   test "CouchDB respects configured protocols"
 
+  @tag skip_for_pouchdb_server: true
   test "Standard config options are present", context do
     assert context[:config]["couchdb"]["database_dir"]
     assert context[:config]["chttpd"]["port"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Settings can be altered with undefined whitelist allowing any change", context do
     refute context["config"]["chttpd"]["config_whitelist"], "Default whitelist is empty"
     set_config(context, "test", "foo", "bar")
@@ -86,6 +88,7 @@ defmodule ConfigTest do
     assert get_config(context, "test", "foo") == "bar"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Server-side password hashing, and raw updates disabling that", context do
     plain_pass = "s3cret"
     set_config(context, "admins", "administrator", plain_pass)
@@ -102,6 +105,7 @@ defmodule ConfigTest do
   @tag :pending
   test "PORT `BUGGED` ?raw tests from config.js"
 
+  @tag skip_for_pouchdb_server: true
   test "Non-term whitelist values allow further modification of the whitelist", context do
     val = "!This is an invalid Erlang term!"
     set_config(context, "chttpd", "config_whitelist", val)
@@ -109,6 +113,7 @@ defmodule ConfigTest do
     delete_config(context, "chttpd", "config_whitelist")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Non-list whitelist values allow further modification of the whitelist", context do
     val = "{[yes, a_valid_erlang_term, but_unfortunately, not_a_list]}"
     set_config(context, "chttpd", "config_whitelist", val)
@@ -116,6 +121,7 @@ defmodule ConfigTest do
     delete_config(context, "chttpd", "config_whitelist")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Keys not in the whitelist may not be modified", context do
     val = "[{chttpd,config_whitelist}, {test,foo}]"
     set_config(context, "chttpd", "config_whitelist", val)
@@ -124,6 +130,7 @@ defmodule ConfigTest do
     delete_config(context, "test", "foo")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Non-2-tuples in the whitelist are ignored", context do
     val =
       "[{chttpd,config_whitelist}, these, {are}, {nOt, 2, tuples}, [so], [they, will], [all, become, noops], {test,foo}]"
@@ -134,6 +141,7 @@ defmodule ConfigTest do
     delete_config(context, "test", "foo")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Atoms, binaries, and strings suffice as whitelist sections and keys.", context do
     vals = ["{test,foo}", "{\"test\",\"foo\"}", "{<<\"test\">>,<<\"foo\">>}"]
 
@@ -159,6 +167,7 @@ defmodule ConfigTest do
     delete_config(context, "chttpd", "config_whitelist")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Blacklist is functional", context do
     sections = [
       "daemons",
@@ -175,6 +184,7 @@ defmodule ConfigTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Reload config", context do
     url = "#{context[:config_url]}/_reload"
     resp = Couch.post(url)
@@ -183,6 +193,7 @@ defmodule ConfigTest do
   end
 
   # Those are negative test cases.  The positive cases are implicitly
+  @tag skip_for_pouchdb_server: true
   # tested by other ones.
   test "Only JSON strings are accepted", context do
     url = "#{context[:config_url]}/a/b"
