@@ -85,6 +85,16 @@ Scanner Options
             [couch_scanner]
             doc_rate_limit = 1000
 
+    .. config:option:: ddoc_batch_size
+
+        Batch size to use when fetching design documents. For lots of small
+        design documents this value could be increased to 500 or 1000. If
+        design documents are large (100KB+) it could make sense to decrease it
+        a bit to 25 or 10. ::
+
+            [couch_scanner]
+            ddoc_batch_size = 100
+
 .. config:section:: couch_scanner_plugins :: Enable Scanner Plugins
 
     .. config:option:: {plugin}
