@@ -89,6 +89,6 @@ info(DbName, #index{} = Index0) ->
             rexi:reply({error, Reason})
     end.
 
-cleanup(DbName, Exclusions) ->
-    nouveau_api:delete_path(nouveau_util:index_name(DbName), Exclusions),
+cleanup(Path, Exclusions) ->
+    nouveau_api:delete_path(nouveau_util:index_name(Path), Exclusions),
     rexi:reply(ok).
