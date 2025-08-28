@@ -36,6 +36,8 @@ public class NouveauApplicationConfiguration extends Configuration {
     @Min(2)
     private int schedulerThreadCount = 5;
 
+    private String searchResultCacheSpec = "maximumSize = 10000";
+
     @JsonProperty
     public void setMaxIndexesOpen(int maxIndexesOpen) {
         this.maxIndexesOpen = maxIndexesOpen;
@@ -78,5 +80,13 @@ public class NouveauApplicationConfiguration extends Configuration {
 
     public void setSchedulerThreadCount(int schedulerThreadCount) {
         this.schedulerThreadCount = schedulerThreadCount;
+    }
+
+    public String getSearchResultCacheSpec() {
+        return searchResultCacheSpec;
+    }
+
+    public void setSearchResultCacheSpec(String searchResultCacheSpec) {
+        this.searchResultCacheSpec = searchResultCacheSpec;
     }
 }

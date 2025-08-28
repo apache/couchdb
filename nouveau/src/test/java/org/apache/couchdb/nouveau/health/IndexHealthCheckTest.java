@@ -39,7 +39,7 @@ public class IndexHealthCheckTest {
         manager.start();
 
         try {
-            var resource = new IndexResource(manager);
+            var resource = new IndexResource(manager, null);
             var check = new IndexHealthCheck(resource);
             var result = check.check();
             assertTrue(result.isHealthy(), result.toString());

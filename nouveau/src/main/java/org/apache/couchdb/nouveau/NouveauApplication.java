@@ -21,6 +21,7 @@ import java.util.EnumSet;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.couchdb.nouveau.core.IndexManager;
+import org.apache.couchdb.nouveau.core.SearchResultsCache;
 import org.apache.couchdb.nouveau.core.UserAgentFilter;
 import org.apache.couchdb.nouveau.health.AnalyzeHealthCheck;
 import org.apache.couchdb.nouveau.health.IndexHealthCheck;
@@ -64,6 +65,9 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         indexManager.setRootDir(configuration.getRootDir());
         environment.lifecycle().manage(indexManager);
 
+        // configure cache
+        var cache = new SearchResultsCache(configuration.getSearchResultCacheSpec());
+
         // Serialization classes
         environment.getObjectMapper().registerModule(new Lucene9Module());
 
@@ -72,7 +76,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         environment.jersey().register(analyzeResource);
 
         // IndexResource
-        final IndexResource indexResource = new IndexResource(indexManager);
+        final IndexResource indexResource = new IndexResource(indexManager, cache);
         environment.jersey().register(indexResource);
 
         // Health checks

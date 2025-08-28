@@ -39,6 +39,7 @@ import org.apache.couchdb.nouveau.api.Ok;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.core.IndexManager;
+import org.apache.couchdb.nouveau.core.SearchResultsCache;
 
 @Path("/index/{name}")
 @Metered
@@ -50,8 +51,11 @@ public final class IndexResource {
 
     private final IndexManager indexManager;
 
-    public IndexResource(final IndexManager indexManager) {
+    private final SearchResultsCache cache;
+
+    public IndexResource(final IndexManager indexManager, final SearchResultsCache cache) {
         this.indexManager = Objects.requireNonNull(indexManager);
+        this.cache = cache;
     }
 
     @PUT
@@ -110,7 +114,18 @@ public final class IndexResource {
     public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest request)
             throws Exception {
         return indexManager.with(name, (index) -> {
-            return index.search(request);
+            if (cache == null) {
+                return index.search(request);
+            }
+            final long updateSeq = index.getUpdateSeq();
+            final long purgeSeq = index.getPurgeSeq();
+            SearchResults result = cache.get(name, request, updateSeq, purgeSeq);
+            if (result != null) {
+                return result;
+            }
+            result = index.search(request);
+            cache.put(name, request, updateSeq, purgeSeq, result);
+            return result;
         });
     }
 

@@ -44,6 +44,14 @@ public abstract class Index implements Closeable {
         this.purgeSeq = purgeSeq;
     }
 
+    public final synchronized long getUpdateSeq() {
+        return updateSeq;
+    }
+
+    public final synchronized long getPurgeSeq() {
+        return purgeSeq;
+    }
+
     public final IndexInfo info() throws IOException {
         final int numDocs = doNumDocs();
         final long diskSize = doDiskSize();

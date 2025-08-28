@@ -22,6 +22,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -175,6 +176,56 @@ public class SearchRequest {
     @JsonProperty
     public PrimitiveWrapper<?>[] getAfter() {
         return after;
+    }
+
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((query == null) ? 0 : query.hashCode());
+        result = prime * result + (int) (minUpdateSeq ^ (minUpdateSeq >>> 32));
+        result = prime * result + (int) (minPurgeSeq ^ (minPurgeSeq >>> 32));
+        result = prime * result + ((locale == null) ? 0 : locale.hashCode());
+        result = prime * result + ((partition == null) ? 0 : partition.hashCode());
+        result = prime * result + limit;
+        result = prime * result + ((sort == null) ? 0 : sort.hashCode());
+        result = prime * result + ((counts == null) ? 0 : counts.hashCode());
+        result = prime * result + ((ranges == null) ? 0 : ranges.hashCode());
+        result = prime * result + Arrays.hashCode(after);
+        result = prime * result + topN;
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null) return false;
+        if (getClass() != obj.getClass()) return false;
+        SearchRequest other = (SearchRequest) obj;
+        if (query == null) {
+            if (other.query != null) return false;
+        } else if (!query.equals(other.query)) return false;
+        if (minUpdateSeq != other.minUpdateSeq) return false;
+        if (minPurgeSeq != other.minPurgeSeq) return false;
+        if (locale == null) {
+            if (other.locale != null) return false;
+        } else if (!locale.equals(other.locale)) return false;
+        if (partition == null) {
+            if (other.partition != null) return false;
+        } else if (!partition.equals(other.partition)) return false;
+        if (limit != other.limit) return false;
+        if (sort == null) {
+            if (other.sort != null) return false;
+        } else if (!sort.equals(other.sort)) return false;
+        if (counts == null) {
+            if (other.counts != null) return false;
+        } else if (!counts.equals(other.counts)) return false;
+        if (ranges == null) {
+            if (other.ranges != null) return false;
+        } else if (!ranges.equals(other.ranges)) return false;
+        if (!Arrays.equals(after, other.after)) return false;
+        if (topN != other.topN) return false;
+        return true;
     }
 
     @Override
