@@ -38,6 +38,26 @@ setup_kvs_with_cache(_) ->
     ]),
     {Fd, Btree}.
 
+setup_kvs_with_small_chunk_size(_) ->
+    % Less than a 1/4 than current default 1279
+    config:set("couchdb", "btree_chunk_size", "300", false),
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2}
+    ]),
+    {Fd, Btree}.
+
+setup_kvs_with_large_chunk_size(_) ->
+    % About 4x than current default 1279
+    config:set("couchdb", "btree_chunk_size", "5000", false),
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2}
+    ]),
+    {Fd, Btree}.
+
 setup_red() ->
     {_, EvenOddKVs} = lists:foldl(
         fun(Idx, {Key, Acc}) ->
@@ -114,7 +134,7 @@ sorted_kvs_test_() ->
 rsorted_kvs_test_() ->
     Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
     Funs = kvs_test_funs(),
-    Reversed = Sorted,
+    Reversed = lists:reverse(Sorted),
     {
         "BTree with backward sorted keys",
         {
@@ -161,6 +181,42 @@ sorted_kvs_with_cache_test_() ->
             {
                 foreachx,
                 fun setup_kvs_with_cache/1,
+                fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
+            }
+        }
+    }.
+
+sorted_kvs_small_chunk_size_test_() ->
+    Funs = kvs_test_funs(),
+    Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    {
+        "BTree with a small chunk size and sorted keys",
+        {
+            setup,
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs_with_small_chunk_size/1,
+                fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
+            }
+        }
+    }.
+
+sorted_kvs_large_chunk_size_test_() ->
+    Funs = kvs_test_funs(),
+    Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    {
+        "BTree with a large chunk size and sorted keys",
+        {
+            setup,
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs_with_large_chunk_size/1,
                 fun teardown/2,
                 [{Sorted, Fun} || Fun <- Funs]
             }
@@ -642,18 +698,15 @@ test_key_access(Btree, List) ->
     FoldFun = fun(Element, {[HAcc | TAcc], Count}) ->
         case Element == HAcc of
             true -> {ok, {TAcc, Count + 1}};
-            _ -> {ok, {TAcc, Count + 1}}
+            _ -> {ok, {TAcc, Count}}
         end
     end,
     Length = length(List),
     Sorted = lists:sort(List),
     {ok, _, {[], Length}} = couch_btree:foldl(Btree, FoldFun, {Sorted, 0}),
-    {ok, _, {[], Length}} = couch_btree:fold(
-        Btree,
-        FoldFun,
-        {Sorted, 0},
-        [{dir, rev}]
-    ),
+    Reversed = lists:reverse(Sorted),
+    RevOpts = [{dir, rev}],
+    {ok, _, {[], Length}} = couch_btree:fold(Btree, FoldFun, {Reversed, 0}, RevOpts),
     ok.
 
 test_lookup_access(Btree, KeyValues) ->
