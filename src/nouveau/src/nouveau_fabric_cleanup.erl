@@ -40,7 +40,10 @@ go(DbName) ->
     Shards = mem3:shards(DbName),
     lists:foreach(
         fun(Shard) ->
-            rexi:cast(Shard#shard.node, {nouveau_rpc, cleanup, [Shard#shard.name, ActiveSigs]})
+            Path =
+                <<"shards/", (mem3_util:range_to_hex(Shard#shard.range))/binary, "/", DbName/binary,
+                    ".*/*">>,
+            rexi:cast(Shard#shard.node, {nouveau_rpc, cleanup, [Path, ActiveSigs]})
         end,
         Shards
     ).
