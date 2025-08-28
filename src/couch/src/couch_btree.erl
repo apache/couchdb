@@ -20,6 +20,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+-define(DEFAULT_CHUNK_SIZE, 1279).
+
 % For the btree cache, the priority of the root node will be
 % this value. The priority is roughly how many cleanup interval
 % (second) they'll survive without any updates in the cache
@@ -463,12 +465,7 @@ chunkify([InElement | RestInList], ChunkThreshold, OutList, OutListSize, OutputC
 
 -compile({inline, [get_chunk_size/0]}).
 get_chunk_size() ->
-    try
-        list_to_integer(config:get("couchdb", "btree_chunk_size", "1279"))
-    catch
-        error:badarg ->
-            1279
-    end.
+    config:get_integer("couchdb", "btree_chunk_size", ?DEFAULT_CHUNK_SIZE).
 
 modify_node(Bt, RootPointerInfo, Actions, QueryOutput, Depth0) ->
     Depth = Depth0 + 1,
