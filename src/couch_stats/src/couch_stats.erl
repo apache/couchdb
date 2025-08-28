@@ -49,6 +49,7 @@ increment_counter(Name) ->
 
 -spec increment_counter(any(), pos_integer()) -> response().
 increment_counter(Name, Value) ->
+    couch_srt:maybe_track_local_counter(Name, Value),
     case couch_stats_util:get_counter(Name, stats()) of
         {ok, Ctx} -> couch_stats_counter:increment(Ctx, Value);
         {error, Error} -> {error, Error}
