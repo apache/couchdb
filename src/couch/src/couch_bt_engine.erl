@@ -64,6 +64,9 @@
     purge_docs/3,
     copy_purge_infos/2,
 
+    get_time_seq/1,
+    set_time_seq/2,
+
     commit_data/1,
 
     open_write_stream/2,
@@ -121,6 +124,7 @@
 -define(REVS_LIMIT, revs_limit).
 -define(PURGE_INFOS_LIMIT, purge_infos_limit).
 -define(COMPACTED_SEQ, compacted_seq).
+-define(TIME_SEQ_PTR, time_seq_ptr).
 
 -define(DEFAULT_BTREE_CACHE_DEPTH, 3).
 % Priority is about how long the entry will survive in the cache initially. A
@@ -324,6 +328,11 @@ get_security(#st{} = St) ->
 get_props(#st{} = St) ->
     get_header_term(St, ?PROPS_PTR, []).
 
+get_time_seq(#st{} = St) ->
+    TSeq = get_header_term(St, ?TIME_SEQ_PTR, couch_time_seq:new()),
+    % This may upgrade the data structure to a new version
+    couch_time_seq:new(TSeq).
+
 get_update_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, ?UPDATE_SEQ).
 
@@ -353,6 +362,15 @@ set_security(#st{} = St, NewSecurity) ->
 
 set_props(#st{} = St, Props) ->
     {ok, increment_update_seq(set_header_term(St, ?PROPS_PTR, Props))}.
+
+set_time_seq(#st{} = St, TSeq) ->
+    % Expect this to not change very often to make sure to
+    % only update it if it's actual value changed
+    OldTSeq = get_time_seq(St),
+    case TSeq =:= OldTSeq of
+        true -> {ok, St};
+        false -> {ok, set_header_term(St, ?TIME_SEQ_PTR, TSeq)}
+    end.
 
 open_docs(#st{} = St, DocIds) ->
     Results = couch_btree:lookup(St#st.id_tree, DocIds),
@@ -1147,7 +1165,6 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     } = OldSt,
     #st{
         filepath = CompactDataPath,
-        header = Header,
         local_tree = NewLocal1
     } = NewSt1,
 
@@ -1158,8 +1175,11 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, _, LocalDocs} = couch_btree:foldl(OldLocal, LoadFun, []),
     {ok, NewLocal2} = couch_btree:add(NewLocal1, LocalDocs),
 
-    {ok, NewSt2} = commit_data(NewSt1#st{
-        header = couch_bt_engine_header:set(Header, [
+    % copy time_seq structure to get the most recent version of it
+    {ok, NewSt2} = set_time_seq(NewSt1, get_time_seq(OldSt)),
+
+    {ok, NewSt3} = commit_data(NewSt2#st{
+        header = couch_bt_engine_header:set(NewSt2#st.header, [
             {?COMPACTED_SEQ, get_update_seq(OldSt)},
             {?REVS_LIMIT, get_revs_limit(OldSt)},
             {?PURGE_INFOS_LIMIT, get_purge_infos_limit(OldSt)}
@@ -1188,7 +1208,7 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
 
     % And return our finished new state
     {ok,
-        NewSt2#st{
+        NewSt3#st{
             filepath = FilePath
         },
         undefined}.
