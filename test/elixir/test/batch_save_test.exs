@@ -10,18 +10,21 @@ defmodule BatchSaveTest do
 
   @doc_count 100
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "batch put", context do
     path_fun = &"/#{&1}/#{&2}"
     run(&Couch.put/2, path_fun, context[:db_name], @doc_count)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "batch post", context do
     path_fun = fn db_name, _ -> "/#{db_name}" end
     run(&Couch.post/2, path_fun, context[:db_name], @doc_count)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "batch put with identical doc ids", context do
     path_fun = fn db_name, _ -> "/#{db_name}/foo" end

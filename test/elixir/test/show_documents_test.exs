@@ -198,6 +198,7 @@ defmodule ShowDocumentsTest do
     {:ok, [db_name: db_name]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show error", context do
     db_name = context[:db_name]
 
@@ -206,6 +207,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["reason"] == "Invalid path."
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show with existing doc", context do
     db_name = context[:db_name]
 
@@ -217,6 +219,7 @@ defmodule ShowDocumentsTest do
     assert String.match?(resp.headers["Server"], ~r/^CouchDB/)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show without docid", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/template/_show/hello")
@@ -233,12 +236,14 @@ defmodule ShowDocumentsTest do
     assert resp.body["error"] == "not_found"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show with doc", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/template/_show/just-name/test-doc-id")
     assert resp.body == "Just Rusty"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show with missing doc", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/template/_show/just-name/missingdoc")
@@ -253,6 +258,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["error"] == "not_found"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show query parameters", context do
     db_name = context[:db_name]
 
@@ -268,6 +274,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["info"]["db_name"] == db_name
   end
 
+  @tag skip_for_pouchdb_server: true
   test "accept header switching - different mime has different etag", context do
     db_name = context[:db_name]
 
@@ -294,6 +301,7 @@ defmodule ShowDocumentsTest do
     assert etag != etag2
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show with doc - etags", context do
     db_name = context[:db_name]
 
@@ -329,6 +337,7 @@ defmodule ShowDocumentsTest do
     assert resp.headers["etag"] != "skipped"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "the provides mime matcher", context do
     db_name = context[:db_name]
 
@@ -342,6 +351,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "Ha ha, you said \"plankton\"."
   end
 
+  @tag skip_for_pouchdb_server: true
   test "registering types works", context do
     db_name = context[:db_name]
 
@@ -354,6 +364,7 @@ defmodule ShowDocumentsTest do
     assert String.match?(resp.body, ~r/foofoo/)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "the provides mime matcher without a match", context do
     db_name = context[:db_name]
 
@@ -365,6 +376,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["error"] == "not_acceptable"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "id with slash", context do
     db_name = context[:db_name]
 
@@ -374,6 +386,7 @@ defmodule ShowDocumentsTest do
     assert resp.status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   test "show with non-existing docid", context do
     db_name = context[:db_name]
 
@@ -381,6 +394,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "New World"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "list() compatible API", context do
     db_name = context[:db_name]
 
@@ -389,6 +403,7 @@ defmodule ShowDocumentsTest do
     assert resp.headers["X-Couch-Test-Header"] == "Yeah"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "list() compatible API with provides function", context do
     db_name = context[:db_name]
 
@@ -398,6 +413,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "foo, bar, baz!"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "should keep next result order: chunks + return value + provided chunks + provided return value",
        context do
     db_name = context[:db_name]
@@ -419,6 +435,7 @@ defmodule ShowDocumentsTest do
     assert resp.headers["X-Couch-Test-Header-Awesome"] == "Oh Yeah!"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "deleted docs", context do
     db_name = context[:db_name]
 
@@ -432,6 +449,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "No doc testdoc"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "security object", context do
     db_name = context[:db_name]

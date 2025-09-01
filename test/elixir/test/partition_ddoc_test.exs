@@ -157,6 +157,7 @@ defmodule PartitionDDocTest do
   end
 
   @tag :skip_on_jenkins
+  @tag skip_for_pouchdb_server: true
   test "GET /dbname/_design_docs", context do
     db_name = context[:db_name]
 

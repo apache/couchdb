@@ -17,6 +17,7 @@ defmodule RewriteTest do
               "{couch_httpd_auth, special_test_authentication_handler}"},
              {"chttpd", "WWW-Authenticate", "X-Couch-Test-Auth"}
            ]
+      @tag skip_for_pouchdb_server: true
       test "Test basic rewrites on #{db_name}", context do
         db_name = context[:db_name]
 
@@ -448,6 +449,7 @@ defmodule RewriteTest do
       end
 
       @tag with_random_db: db_name
+      @tag skip_for_pouchdb_server: true
       @tag config: [
              {"chttpd", "secure_rewrites", "false"}
            ]
@@ -475,6 +477,7 @@ defmodule RewriteTest do
       @tag config: [
              {"chttpd", "rewrite_limit", "2"}
            ]
+      @tag skip_for_pouchdb_server: true
       test "loop detection on #{db_name}", context do
         db_name = context[:db_name]
 
@@ -494,6 +497,7 @@ defmodule RewriteTest do
              {"chttpd", "rewrite_limit", "2"},
              {"chttpd", "secure_rewrites", "false"}
            ]
+      @tag skip_for_pouchdb_server: true
       test "serial execution is not spuriously counted as loop on #{db_name}", context do
         db_name = context[:db_name]
 

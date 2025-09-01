@@ -8,11 +8,13 @@ defmodule ChangesAsyncTest do
   """
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "live changes", context do
     db_name = context[:db_name]
     test_changes(db_name, "live")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "continuous changes", context do
     db_name = context[:db_name]
@@ -20,6 +22,7 @@ defmodule ChangesAsyncTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "longpoll changes", context do
     db_name = context[:db_name]
 
@@ -75,6 +78,7 @@ defmodule ChangesAsyncTest do
     assert last_seq_prefix == "3-", "seq must start with 3-"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "eventsource changes", context do
     db_name = context[:db_name]
@@ -104,6 +108,7 @@ defmodule ChangesAsyncTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "eventsource changes with limit under", context do
     db_name = context[:db_name]
 
@@ -129,6 +134,7 @@ defmodule ChangesAsyncTest do
     HTTPotion.stop_worker_process(worker_pid)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "eventsource changes with limit exact", context do
     db_name = context[:db_name]
@@ -156,6 +162,7 @@ defmodule ChangesAsyncTest do
     HTTPotion.stop_worker_process(worker_pid)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "eventsource changes with limit over", context do
     db_name = context[:db_name]
@@ -185,6 +192,7 @@ defmodule ChangesAsyncTest do
     HTTPotion.stop_worker_process(worker_pid)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "eventsource no junk in response", context do
     db_name = context[:db_name]
@@ -209,6 +217,7 @@ defmodule ChangesAsyncTest do
 
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "eventsource heartbeat", context do
     db_name = context[:db_name]
@@ -227,6 +236,7 @@ defmodule ChangesAsyncTest do
     HTTPotion.stop_worker_process(worker_pid)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "longpoll filtered changes", context do
     db_name = context[:db_name]
@@ -271,6 +281,7 @@ defmodule ChangesAsyncTest do
     assert Enum.at(changes["results"], 0)["id"] == "bingo"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "continuous filtered changes", context do
     db_name = context[:db_name]
@@ -305,6 +316,7 @@ defmodule ChangesAsyncTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "continuous filtered changes with doc ids", context do
     db_name = context[:db_name]
@@ -339,6 +351,7 @@ defmodule ChangesAsyncTest do
     assert length(changes_ids) == 2
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "COUCHDB-1852", context do
     db_name = context[:db_name]
