@@ -249,3 +249,9 @@ settings in their ``[{plugin}]`` section.
 
             [couch_scanner_plugin_ddoc_features]
             ddoc_report = false
+
+.. config:section:: couch_tombstone_remover :: Configure the "Tombstone Remover" plugin
+
+    .. config:option:: {tag}
+
+        TODO
