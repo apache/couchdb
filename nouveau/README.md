@@ -3,8 +3,8 @@
 Nouveau is a modern replacement for dreyfus/clouseau and is built on;
 
 1) the Dropwizard framework (https://dropwizard.io)
-2) Java 11+
-3) Lucene 9
+2) Java 21+
+3) Lucene 10
 
 Nouveau transforms Apache CouchDB databases into Apache Lucene indexes at the shard level and then merges the results together.
 
@@ -23,7 +23,7 @@ This work is currently EXPERIMENTAL and may change in ways that invalidate any e
 * integration with resharding
 * update=false
 * `_nouveau_info`
-* `_search_cleanup`
+* `_nouveau_cleanup`
 * /openapi.{json.yaml}
 
 ## What doesn't work yet?
