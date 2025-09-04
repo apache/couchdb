@@ -50,10 +50,17 @@ assemble(#btree{assemble_kv = undefined}, Key, Value) ->
 assemble(#btree{assemble_kv = Assemble}, Key, Value) ->
     Assemble(Key, Value).
 
+-compile({inline, [less/3]}).
 less(#btree{less = undefined}, A, B) ->
     A < B;
 less(#btree{less = Less}, A, B) ->
     Less(A, B).
+
+-compile({inline, [less_eq/3]}).
+less_eq(#btree{less = undefined}, A, B) ->
+    A =< B;
+less_eq(#btree{less = Less}, A, B) ->
+    Less(A, B) orelse not Less(B, A).
 
 % pass in 'nil' for State if a new Btree.
 open(State, Fd) ->
@@ -311,6 +318,11 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
     ),
     RemoveActions = [{remove, Key, nil} || Key <- RemoveKeys],
     FetchActions = [{fetch, Key, nil} || Key <- LookupKeys],
+
+    UniqueFun = fun({Op, A, _}, {Op, B, _}) -> less_eq(Bt, A, B) end,
+    InsertActions1 = lists:usort(UniqueFun, InsertActions),
+    RemoveActions1 = lists:usort(UniqueFun, RemoveActions),
+
     SortFun =
         fun({OpA, A, _}, {OpB, B, _}) ->
             case A == B of
@@ -319,7 +331,7 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
                 false -> less(Bt, A, B)
             end
         end,
-    Actions = lists:sort(SortFun, lists:append([InsertActions, RemoveActions, FetchActions])),
+    Actions = lists:sort(SortFun, lists:append([InsertActions1, RemoveActions1, FetchActions])),
     {ok, KeyPointers, QueryResults} = modify_node(Bt, Root, Actions, [], 0),
     {ok, NewRoot} = complete_root(Bt, KeyPointers),
     {ok, QueryResults, Bt#btree{root = NewRoot}}.
