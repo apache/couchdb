@@ -37,7 +37,20 @@ init(_Args) ->
         worker(couch_replicator_doc_processor)
     ],
     SupFlags = #{strategy => rest_for_one, intensity => 10, period => 1},
+    ok = load_os_ca_certs(),
     {ok, {SupFlags, Children}}.
 
 worker(Mod) ->
     #{id => Mod, start => {Mod, start_link, []}}.
+
+load_os_ca_certs() ->
+    case public_key:cacerts_load() of
+        ok ->
+            CertCount = length(public_key:cacerts_get()),
+            InfoMsg = "~p : successfully loaded ~p os ca certificates",
+            couch_log:info(InfoMsg, [?MODULE, CertCount]);
+        {error, Reason} ->
+            ErrMsg = "~p : error loading os ca certificates: ~p",
+            couch_log:error(ErrMsg, [?MODULE, Reason])
+    end,
+    ok.
