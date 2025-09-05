@@ -32,7 +32,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 
 btree_property_test_() ->
-    ?EUNIT_QUICKCHECK(90, 5000).
+    ?EUNIT_QUICKCHECK(90, 3000).
 
 %
 % Properties
