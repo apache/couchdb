@@ -234,6 +234,8 @@ search_path(#index{} = Index) ->
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};
+jaxrs_error(403, Body) ->
+    {forbidden, message(Body)};
 jaxrs_error(404, Body) ->
     {not_found, message(Body)};
 jaxrs_error(405, Body) ->

@@ -34,16 +34,19 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.lucene9.Lucene9AnalyzerFactory;
-import org.apache.couchdb.nouveau.lucene9.Lucene9Index;
+import org.apache.couchdb.nouveau.lucene.LuceneAnalyzerFactory;
+import org.apache.couchdb.nouveau.lucene.LuceneIndex;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.backward_codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -217,6 +220,12 @@ public final class IndexManager implements Managed {
         if (exists(name)) {
             assertSame(indexDefinition, loadIndexDefinition(name));
             return;
+        }
+        if (indexDefinition.getLuceneVersion() != Version.LATEST.major) {
+            var msg = String.format(
+                    "cannot create index of version %d, only %d supported",
+                    indexDefinition.getLuceneVersion(), Version.LATEST.major);
+            throw new WebApplicationException(msg, Status.FORBIDDEN);
         }
 
         final Lock lock = this.createLock.writeLock(name);
@@ -392,15 +401,22 @@ public final class IndexManager implements Managed {
         LOGGER.info("opening {}", name);
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
-        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
-        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve("9")));
+        final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
+        final int luceneVersion = indexDefinition.getLuceneVersion();
+        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve(Integer.toString(luceneVersion))));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        if (luceneVersion != Version.LATEST.major) {
+            config.setOpenMode(OpenMode.APPEND);
+        }
+        if (luceneVersion == IndexDefinition.LEGACY_LUCENE_VERSION) {
+            config.setCodec(new Lucene912Codec());
+        }
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
         final long updateSeq = getSeq(writer, "update_seq");
         final long purgeSeq = getSeq(writer, "purge_seq");
         final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
-        return new Lucene9Index(analyzer, writer, updateSeq, purgeSeq, searcherManager);
+        return new LuceneIndex(analyzer, writer, updateSeq, purgeSeq, searcherManager);
     }
 
     private long getSeq(final IndexWriter writer, final String key) throws IOException {

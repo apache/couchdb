@@ -21,6 +21,7 @@ import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.resources.IndexResource;
+import org.apache.lucene.util.Version;
 
 public final class IndexHealthCheck extends HealthCheck {
 
@@ -32,14 +33,14 @@ public final class IndexHealthCheck extends HealthCheck {
 
     @Override
     protected Result check() throws Exception {
-        final String name = "___test9";
+        final String name = "___test" + Version.LATEST.major;
         try {
             indexResource.deletePath(name, null);
         } catch (IOException e) {
             // Ignored, index might not exist yet.
         }
 
-        indexResource.createIndex(name, new IndexDefinition("standard", null));
+        indexResource.createIndex(name, new IndexDefinition(Version.LATEST.major, "standard", null));
         try {
             final DocumentUpdateRequest documentUpdateRequest =
                     new DocumentUpdateRequest(0, 1, null, Collections.emptyList());
