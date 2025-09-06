@@ -303,7 +303,9 @@ Replicator Database Configuration
 
     .. config:option:: verify_ssl_certificates :: Check peer certificates
 
-        Set to true to validate peer certificates::
+        Set to true to validate peer certificates. If
+        ``ssl_trusted_certificates_file`` is set it will be used, otherwise the
+        operating system CA files will be used::
 
             [replicator]
             verify_ssl_certificates = false
