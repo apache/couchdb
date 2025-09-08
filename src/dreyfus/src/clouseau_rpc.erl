@@ -22,7 +22,8 @@
 -export([delete/2, update/3, cleanup/1, cleanup/2, rename/1]).
 -export([analyze/2, version/0, disk_size/1]).
 -export([set_purge_seq/2, get_purge_seq/1, get_root_dir/0]).
--export([connected/0, check_service/1, check_services/0]).
+-export([connected/0]).
+-export([check_service/1, check_service/2, check_services/0, check_services/1]).
 
 %% string represented as binary
 -type string_as_binary(_Value) :: nonempty_binary().
@@ -65,7 +66,7 @@
         | {string_as_binary(stopwords), [field_name()]}
     ].
 
--define(TIMEOUT, 200).
+-define(SEARCH_SERVICE_TIMEOUT, 2000).
 
 -spec open_index(Peer :: pid(), Path :: shard(), Analyzer :: analyzer()) ->
     {ok, indexer_pid()} | error().
@@ -348,11 +349,19 @@ clouseau_services(_MajorVsn) ->
 is_valid(Service) when is_atom(Service) ->
     lists:member(Service, clouseau_services(clouseau_major_vsn())).
 
--spec check_service(Service) -> {service(), liveness_status()} | throw({atom(), binary()}) when
-    Service :: service().
-check_service(Service) when is_list(Service) ->
-    check_service(list_to_atom(Service));
-check_service(Service) when is_atom(Service) ->
+-spec check_service(Service) -> Result when
+    Service :: service(),
+    Result :: {service(), liveness_status()} | throw({atom(), binary()}).
+check_service(Service) ->
+    check_service(Service, ?SEARCH_SERVICE_TIMEOUT).
+
+-spec check_service(Service, Timeout) -> Result when
+    Service :: service(),
+    Timeout :: timeout(),
+    Result :: {service(), liveness_status()} | throw({atom(), binary()}).
+check_service(Service, Timeout) when is_list(Service) ->
+    check_service(list_to_atom(Service), Timeout);
+check_service(Service, Timeout) when is_atom(Service) ->
     case is_valid(Service) of
         true ->
             Ref = make_ref(),
@@ -360,7 +369,7 @@ check_service(Service) when is_atom(Service) ->
             receive
                 {pong, Ref} ->
                     {Service, alive}
-            after ?TIMEOUT ->
+            after Timeout ->
                 {Service, timeout}
             end;
         false ->
@@ -368,12 +377,19 @@ check_service(Service) when is_atom(Service) ->
             throw({not_found, <<"no such service: ", NoService/binary>>})
     end.
 
--spec check_services() -> [{service(), liveness_status()}] | throw({atom(), binary()}).
+-spec check_services() -> Result when
+    Result :: [{service(), liveness_status()}] | throw({atom(), binary()}).
 check_services() ->
+    check_services(?SEARCH_SERVICE_TIMEOUT).
+
+-spec check_services(Timeout) -> Result when
+    Timeout :: timeout(),
+    Result :: [{service(), liveness_status()}] | throw({atom(), binary()}).
+check_services(Timeout) ->
     case connected() of
         true ->
             Services = clouseau_services(clouseau_major_vsn()),
-            [check_service(S) || S <- Services];
+            [check_service(S, Timeout) || S <- Services];
         false ->
             throw({noconnection, <<"Clouseau node is not connected.">>})
     end.
