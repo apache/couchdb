@@ -152,6 +152,9 @@ that the main task of reduce functions is to *reduce* the mapped result, not to
 make it bigger. Generally, your reduce function should converge rapidly to a
 single value - which could be an array or similar object.
 
+Set ``reduce_limit`` to ``log`` so views which would crash if the setting were
+``true`` would instead return the result and log an ``info`` level warning.
+
 .. _reducefun/builtin:
 
 Built-in Reduce Functions
