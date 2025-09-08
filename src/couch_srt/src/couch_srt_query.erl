@@ -321,7 +321,7 @@ group_by_select_rows(Matcher, Limit) ->
         %% efficient way that is still faster than the sequential traversal
         %% through the table. See the `ets:select/3` documentation for more
         %% info. We also use `ets:select/3` to pass the limit along, which
-        %% results in ets effeciently traversing rows until `Limit` rows have
+        %% results in ets efficiently traversing rows until `Limit` rows have
         %% been accumulated and returned.
         %% ets:select/* takes match_spec(), not  comp_match_spec()
         {MSpec, _CMSpec} = Matcher,
@@ -337,7 +337,7 @@ group_by_select_rows(Matcher, Limit) ->
                 %% check to see if we actually limit the table Limit or we hit
                 %% the edge case where exactly `Limit` rows were found.  The
                 %% continuation can be passed back to `ets:select/1` to see if
-                %% explicity returns `'$end_of_table'`, but if it did hit the
+                %% explicitly returns `'$end_of_table'`, but if it did hit the
                 %% `Limit`, we now wastefully fetch the next chunk of rows, so
                 %% instead for now we assume that when the length of rows
                 %% equals `Limit` that we hit the cap.  Note that this is only

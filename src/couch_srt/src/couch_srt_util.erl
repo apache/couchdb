@@ -77,7 +77,7 @@ is_enabled_reporting() ->
 is_enabled_rpc_reporting() ->
     config:get_boolean(?CSRT, "enable_rpc_reporting", false).
 
-%% Monotnonic time now in native format using time forward only event tracking
+%% Monotonic time now in native format using time forward only event tracking
 -spec tnow() -> integer().
 tnow() ->
     erlang:monotonic_time().

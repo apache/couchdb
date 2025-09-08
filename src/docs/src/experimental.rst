@@ -56,7 +56,7 @@ Couch Stats Resource Tracker (CSRT)
 
 Couch Stats Resource Tracker, aka CSRT, is an experimental real time stats
 tracking system designed to augment the existing the existing
-`couch_stats:increment_counter` invocations with real time process local stats
+``couch_stats:increment_counter/{1,2}`` invocations with real time process local stats
 collection, querying, RPC deltas, and powerful filtered logging of resources
 induced by HTTP and RPC worker requests.
 

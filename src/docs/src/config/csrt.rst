@@ -55,8 +55,8 @@ This section contains the top level enablement and configuration options for CSR
 
     .. config:option:: enable_init_p :: Enable RPC spawn metric tracking
 
-        Enablement of tracking new metric counters for different `fabric_rpc` operations
-        spawned by way of `rexi_server:init_p/3`. This is the primary mechanism for
+        Enablement of tracking new metric counters for different ``fabric_rpc`` operations
+        spawned by way of ``rexi_server:init_p/3``. This is the primary mechanism for
         inducing database RPC operations within CouchDB, and these init_p metrics aim to
         provide node level understandings of the workloads being induced by other
         coordinator processes. This is especially relevant for databases on subsets of a
@@ -113,7 +113,7 @@ This section contains the top level enablement and configuration options for CSR
         Until there's an efficient storage mechanism to stream the results to,
         the rsyslog entries work great and are very practical, but care must be
         taken to not generate too much data for aggregate queries as they
-        generate at least `Qx` more report than an individual report per http
+        generate at least ``Qx`` more report than an individual report per http
         request from the coordinator.  This setting exists as a way to either
         a) utilize the logger matcher configured thresholds to allow for _any_
         rctx's to be recorded when they induce heavy operations, either
@@ -124,10 +124,10 @@ This section contains the top level enablement and configuration options for CSR
 
             This setting exists because we lack an expressive enough config
             declaration to easily chain the matchspec constructions as
-            `ets:fun2ms/1` is a special compile time parse transform macro that
+            ``ets:fun2ms/1`` is a special compile time parse transform macro that
             requires the full definition to be specified directly, it cannot
             be interactively constructed. That said, you _can_ register matchers
-            through `remsh` with more specific and fine grained pattern matching,
+            through ``remsh`` with more specific and fine grained pattern matching,
             and a more expressive system for defining matchers are being
             explored.
 
@@ -144,7 +144,7 @@ This section contains the top level enablement and configuration options for CSR
 
         enables truncation of the csrt process lifetime reports to not include
         any fields that are zero at the end of process lifetime, eg don't
-        include `js_filter=0` in the report if the request did not induce
+        include ``js_filter=0`` in the report if the request did not induce
         javascript filtering.
 
         this can be disabled if you really care about consistent fields in the
@@ -152,7 +152,7 @@ This section contains the top level enablement and configuration options for CSR
         disabling rpc reporting by default, as its a simple way to reduce
         overall volume
 
-        Truncate zero values from process lifecycle reports, enabled by default:
+        Truncate zero values from process lifecycle reports, enabled by default::
 
             [csrt]
             should_truncate_reports = true
@@ -179,10 +179,10 @@ CSRT Logger Matcher Configuration
 There are currently eight builtin default logger matchers designed to make it
 easy to do filtering on heavy resource usage inducing and long running
 requests. These are designed as a simple baseline of useful matchers, declared
-in a manner amenable to `default.ini` based constructs. More expressive matcher
+in a manner amenable to ``default.ini`` based constructs. More expressive matcher
 declarations are being explored, and matchers of arbitrary complexity can be
-registered directly through `remsh`. The default matchers are all designed around
-an integer config Threshold that triggers on a specific field, eg docs read, or
+registered directly through ``remsh``. The default matchers are all designed around
+an integer config threshold that triggers on a specific field, eg docs read, or
 on a delta of fields for long requests and changes requests that process many
 rows but return few.
 
@@ -223,8 +223,8 @@ The current default matchers are:
     * :config:option:`Enable <csrt_logger.matchers_enabled/changes_processed>` | :config:option:`Threshold <csrt_logger.matchers_threshold/changes_processed>`
 
 Each of the default matchers has an enablement setting in
-ref:`csrt-logger-matcher-configuration-enablement` for toggling enablement of
-it, and all but the `all_coordinators` and `all_rpc_workers` matchers have a
+:ref:`csrt-logger-matcher-configuration-enablement` for toggling enablement of
+it, and all but the ``all_coordinators`` and ``all_rpc_workers`` matchers have a
 corresponding threshold value setting in
 :ref:`csrt-logger-matcher-configuration-threshold` that is an integer value
 corresponding to the specific nature of that matcher.
@@ -255,7 +255,7 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: all_coordinators :: Enable all_coordinators CSRT Logger Matcher
 
-        Enable the `all_coordinators` default matcher to match against all
+        Enable the ``all_coordinators`` default matcher to match against all
         coordinators handling HTTP requests.
 
         Enable the matcher::
@@ -265,10 +265,10 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: all_rpc_workers :: Enable all_rpc_workers default CSRT Logger Matcher
 
-        Enable the `all_rpc_workers` default matcher to match against all
+        Enable the ``all_rpc_workers`` default matcher to match against all
         RPC Workers handling internal CouchDB requests. This is predominantly
         induced by HTTP requests, but any internal systems flowing through
-        `fabric_rpc` will be picked up as well, such as internal/external
+        ``fabric_rpc`` will be picked up as well, such as internal/external
         replication and anything that needs to load a document through the
         quorum system.
 
@@ -279,14 +279,14 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: docs_read :: Enable docs_read default CSRT Logger Matcher
 
-        Enable the `docs_read` builtin matcher, with a default
-        `Threshold=1000`, such that any request that reads more than
-        `Threshold` docs will generate a CSRT process lifetime report with a
+        Enable the ``docs_read`` builtin matcher, with a default
+        ``Threshold=1000``, such that any request that reads more than
+        ``Threshold`` docs will generate a CSRT process lifetime report with a
         summary of its resource consumption.
 
-        This is different from the `rows_read` filter in that a view with
-        `?limit=1000` will read 1000 rows, but the same request with
-        `?include_docs=true` will also induce an additional 1000 docs read.
+        This is different from the ``rows_read`` filter in that a view with
+        ``?limit=1000`` will read 1000 rows, but the same request with
+        ``?include_docs=true`` will also induce an additional 1000 docs read.
 
         Enable the matcher::
 
@@ -298,12 +298,12 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: rows_read :: Enable rows_read default CSRT Logger Matcher
 
-        Enable the `rows_read` builtin matcher, with a default
-        `Threshold=1000`, such that any request that reads more than
-        `Threshold` rows will generate a CSRT process lifetime report with a
+        Enable the ``rows_read`` builtin matcher, with a default
+        ``Threshold=1000``, such that any request that reads more than
+        ``Threshold`` rows will generate a CSRT process lifetime report with a
         summary of its resource consumption.
 
-        This is different from the `docs_read` filter so that we can
+        This is different from the ``docs_read`` filter so that we can
         distinguish between heavy view requests with lots of rows or heavy
         requests with lots of docs.
 
@@ -317,9 +317,9 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: docs_written :: Enable docs_written default CSRT Logger Matcher
 
-        Enable the `docs_written` builtin matcher, with a default
-        `Threshold=500`, such that any request that written more than
-        `Threshold` docs will generate a CSRT process lifetime report with a
+        Enable the ``docs_written`` builtin matcher, with a default
+        ``Threshold=500``, such that any request that written more than
+        ``Threshold`` docs will generate a CSRT process lifetime report with a
         summary of its resource consumption.
 
         Enable the matcher::
@@ -332,9 +332,9 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: ioq_calls :: Enable ioq_calls default CSRT Logger Matcher
 
-        Enable the `ioq_calls` builtin matcher, with a default
-        `Threshold=10000`, such that any request that induces more than
-        `Threshold` IOQ calls will generate a CSRT process lifetime report with
+        Enable the ``ioq_calls`` builtin matcher, with a default
+        ``Threshold=10000``, such that any request that induces more than
+        ``Threshold`` IOQ calls will generate a CSRT process lifetime report with
         a summary of its resource consumption.
 
         Enable the matcher::
@@ -347,10 +347,10 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: long_reqs :: Enable long_reqs default CSRT Logger Matcher
 
-        Enable the `long_reqs` builtin matcher, with a default
-        `Threshold=60000`, such that any request where the the last CSRT rctx
-        `updated_at` timestamp is at least `Threshold` milliseconds greater
-        than the `started_at timestamp` will generate a CSRT process lifetime
+        Enable the ``long_reqs`` builtin matcher, with a default
+        ``Threshold=60000``, such that any request where the the last CSRT rctx
+        ``updated_at`` timestamp is at least ``Threshold`` milliseconds greater
+        than the ``started_at timestamp`` will generate a CSRT process lifetime
         report with a summary of its resource consumption.
 
         Enable the matcher::
@@ -363,9 +363,9 @@ CSRT Logger Matcher Enablement Configuration
 
     .. config:option:: changes_processed :: Enable changes_processed default CSRT Logger Matcher
 
-        Enable the `changes_processed` builtin matcher, with a default
-        `Threshold=1000`, such that any request where the CSRT rctx `rows_read`
-        field as at least `Threshold` greater than the rctx `changes_returned`
+        Enable the ``changes_processed`` builtin matcher, with a default
+        ``Threshold=1000``, such that any request where the CSRT rctx ``rows_read``
+        field as at least ``Threshold`` greater than the rctx ``changes_returned``
         field will generate a CSRT process lifetime report with a summary of
         its resource consumption.
 
@@ -384,7 +384,7 @@ CSRT Logger Matcher Threshold Configuration
 
    These settings control the Threshold configurations for the default
    matchers. These are scalar integer values that are used by all default
-   matchers aside from `all_coordinators` and `all_rpc_workers`. See the top
+   matchers aside from ``all_coordinators`` and ``all_rpc_workers``. See the top
    level config for more information and the enablement config for how to
    enable these matchers.
 
@@ -398,7 +398,7 @@ CSRT Logger Matcher Threshold Configuration
 
     .. config:option:: docs_read :: Set Threshold for docs_read CSRT Logger Matcher
 
-        Threshold for `docs_read` logger matcher, defaults to `1000` docs read.
+        Threshold for ``docs_read`` logger matcher, defaults to ``1000`` docs read.
 
         Set the Threshold::
 
@@ -410,7 +410,7 @@ CSRT Logger Matcher Threshold Configuration
 
     .. config:option:: rows_read :: Set Threshold for rows_read default CSRT Logger Matcher
 
-        Threshold for `rows_read` logger matcher, defaults to `1000` rows read.
+        Threshold for ``rows_read`` logger matcher, defaults to ``1000`` rows read.
 
         Set the Threshold::
 
@@ -422,7 +422,7 @@ CSRT Logger Matcher Threshold Configuration
 
     .. config:option:: docs_written :: Set Threshold for docs_written default CSRT Logger Matcher
 
-        Threshold for `docs_written` logger matcher, defaults to `500` docs written.
+        Threshold for ``docs_written`` logger matcher, defaults to ``500`` docs written.
 
         Set the Threshold::
 
@@ -434,7 +434,7 @@ CSRT Logger Matcher Threshold Configuration
 
     .. config:option:: ioq_calls :: Set Threshold for ioq_calls default CSRT Logger Matcher
 
-        Threshold for `ioq_calls` logger matcher, defaults to `10000` IOQ calls.
+        Threshold for ``ioq_calls`` logger matcher, defaults to ``10000`` IOQ calls.
 
         Set the Threshold::
 
@@ -446,7 +446,7 @@ CSRT Logger Matcher Threshold Configuration
 
     .. config:option:: long_reqs :: Set Threshold for long_reqs default CSRT Logger Matcher
 
-        Threshold for `long_reqs` logger matcher, defaults to `60000` milliseconds (1 minute).
+        Threshold for ``long_reqs`` logger matcher, defaults to ``60000`` milliseconds (1 minute).
 
         Set the Threshold::
 
@@ -458,7 +458,7 @@ CSRT Logger Matcher Threshold Configuration
 
     .. config:option:: changes_processed :: Set Threshold for changes_processed default CSRT Logger Matcher
 
-        Threshold for `changes_processed` logger matcher, defaults to `1000` changes processed.
+        Threshold for ``changes_processed`` logger matcher, defaults to ``1000`` changes processed.
 
         Set the Threshold::
 
@@ -532,9 +532,9 @@ Change these values and enablements at your discretion. And if you really want
 to enable RPC reporting, you can do so by way of
 :config:option:`csrt/enable_rpc_reporting`, which will then use the same
 configured Thresholds to match against those RPC workers, which, using the
-default `ioq_calls` Threshold of 10000 would result in generating an
-`rpc_worker` rctx report for any workers that generated more than 10000
-ioq_calls, and similarly for the coordinator, which is a little awkward but it
+default ``ioq_calls`` Threshold of 10000 would result in generating an
+``rpc_worker`` rctx report for any workers that generated more than 10000
+``ioq_calls``, and similarly for the coordinator, which is a little awkward but it
 provides a way to at least get node level reports generating when you really
 need to see RPC worker resource usage at the node level. This is certainly
 useful, but with Threshold configured low enough this will generate large
@@ -562,7 +562,7 @@ logging for *ALL* coordinators and RPC workers, resulting in a report generated
 for every CSRT tracked process lifecycle. This would be much better suited for
 writing directly to a Vector store for post processing without any of the
 verbose string labels. This also has the advantage of exposing both
-`all_coordinators` and `all_rpc_workers` through the `/_active_resources`
+``all_coordinators`` and ``all_rpc_workers`` through the ``/_active_resources``
 interface, allowing for efficient querying and aggregating on either all
 coordinators or RPC workers::
 
@@ -581,7 +581,7 @@ coordinators or RPC workers::
    Enabling :config:option:`csrt_logger.matchers_enabled/all_rpc_workers` while
    leaving :config:option:`csrt/enable_rpc_reporting` disabled will result in a
    pragmatic middle ground with no RPC reports being generated, yet the
-   `all_rpc_workers` logger matcher being enabled for querying. We should
+   ``all_rpc_workers`` logger matcher being enabled for querying. We should
    probably extend the Logger Matchers logic to allow for specific Logger
    Matchers to only be utilized for the querying APIs, and allow for more
    stringent filters when decided to generate a lifecycle report.

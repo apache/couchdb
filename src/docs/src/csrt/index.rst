@@ -16,7 +16,7 @@
 Couch Stats Resource Tracker (CSRT)
 ===================================
 
-The `couch_srt` app introduces the Couch Stats Resource Tracker, aka CSRT for
+The ``couch_srt`` app introduces the Couch Stats Resource Tracker, aka CSRT for
 short. CSRT is a real time stats tracking system that tracks the quantity of
 resources induced at the process level in a live queryable manner, while also
 generating process lifetime reports containing statistics on the total resource
@@ -27,12 +27,12 @@ visibility and introspection, allowing for expressive real time querying
 capabilities to introspect, understand, and aggregate CouchDB internal resource
 usage, as well as powerful filtering facilities for conditionally generating
 reports on "heavy usage" requests or "long/slow" requests. CSRT also extends
-`recon:proc_window` with `couch_srt:proc_window` allowing for the same style of
-battle hardened introspection with Recon's excellent `proc_window`, but with
+``recon:proc_window/3`` with ``couch_srt:proc_window/3`` allowing for the same style of
+battle hardened introspection with Recon's excellent ``proc_window``, but with
 the sample window over any of the CSRT tracked CouchDB stats!
 
 CSRT does this by piggy-backing off of the existing metrics tracked by way of
-`couch_stats:increment_counter` at the time when the local process induces
+``couch_stats:increment_counter/{1,2}`` at the time when the local process induces
 those metrics inc calls, and then CSRT updates an ets entry containing the
 context information for the local process, such that global aggregate queries
 can be performed against the ets table as well as the generation of the process
@@ -42,16 +42,16 @@ reports for post facto analysis over time, is a cornerstone of CSRT that is the
 result of a series of iterations until a robust and scalable approach was built.
 
 The real time querying is achieved by way of a global ets table with
-`read_concurrency`, `write_concurrency`, and `decentralized_counters` enabled.
+``read_concurrency``, ``write_concurrency``, and ``decentralized_counters`` enabled.
 Great care was taken to ensure that _zero_ concurrent writes to the same key
 occur in this model, and this entire system is predicated on the fact that
-incremental updates to `ets:update_counters` provides *really* fast and
+incremental updates to ``ets:update_counter/{3,4}`` provides *really* fast and
 efficient updates in an atomic and isolated fashion when coupled with
 decentralized counters and write concurrency. Each process that calls
-`couch_stats:increment_counter` tracks their local context in CSRT as well,
+``couch_stats:increment_counter/{1,2}`` tracks their local context in CSRT as well,
 with zero concurrent writes from any other processes. Outside of the context
-setup and teardown logic, _only_ operations to `ets:update_counter` are
-performed, one per process invocation of `couch_stats:increment_counter`, and
+setup and teardown logic, _only_ operations to ``ets:update_counter/{3,4}`` are
+performed, one per process invocation of ``couch_stats:increment_counter/{1,2}``, and
 one for coordinators to update worker deltas in a single batch, resulting in a
 1:1 ratio of ets calls to real time stats updates for the primary workloads.
 
@@ -61,12 +61,12 @@ manner that allows for real time aggregate querying and process lifecycle
 reports. This took several versions to find a scalable and robust approach that
 induced minimal impact on maximum system throughput. Now that the framework is
 in place, it can be extended to track any further desired process local uses of
-`couch_stats:increment_counter`. That said, the currently selected set of stats
+``couch_stats:increment_counter/{1,2}``. That said, the currently selected set of stats
 to track was heavily influenced by the challenges in retroactively
 understanding the quantity of resources induced by a query like
-`/db/_changes?since=$SEQ`, or similarly, `/db/_find`.
+``/db/_changes?since=$SEQ``, or similarly, ``/db/_find``.
 
-CSRT started as an extension of the Mango execution stats logic to `_changes`
+CSRT started as an extension of the Mango execution stats logic to ``_changes``
 feeds to get proper visibility into quantity of docs read and filtered per
 changes request, but then the focus inverted with the realization that we
 should instead use the existing stats tracking mechanisms that have already
@@ -83,18 +83,18 @@ and will be picked up in the RPC deltas and process lifetime reports.
 CSRT Overview
 -------------
 
-    When an incoming HTTP request is is handled by the CouchDB `chttpd` worker
-    pool, that worker process instantiates a CSRT `coordinator` context to
+    When an incoming HTTP request is handled by the CouchDB ``chttpd`` worker
+    pool, that worker process instantiates a CSRT ``coordinator`` context to
     track both the resources induced by local coordinator process, as well as
     to aggregate the resources induced by the remote RPC worker processes
     needed to fulfill the given request; each of those workers instantiates its
-    own `rpc_worker` context to do local tracking and forward the deltas back
+    own ``rpc_worker`` context to do local tracking and forward the deltas back
     to the coordinator.
 
-    These contexts are represented internally by the `#rctx{}` record and are
+    These contexts are represented internally by the ``#rctx{}`` record and are
     often referred to as "rctx"'s for short.
 
-    For a singular doc open request, eg `GET /foo/bar`, the coordinator process
+    For a singular doc open request, eg ``GET /foo/bar``, the coordinator process
     will query from the normal N=3 shard replicas containing that doc. The
     coordinator process spawns 3 RPC workers on the relevant nodes in the
     cluster containing those shard replicas, each of which creates a local
@@ -103,7 +103,7 @@ CSRT Overview
     lifecycle report to provide detailed node level information of RPC workers.
 
     We must decide what to log. A simple approach is by way of enabling the
-    `all_coordinators` matcher, this will create a process lifecycle report for
+    ``all_coordinators`` matcher, this will create a process lifecycle report for
     every HTTP request made against the CouchDB cluster, providing detailed
     statistics about the total quantities of CouchDB resources induced to
     fulfill the request. This creates a 1:1 mapping of additional CouchDB CSRT
@@ -145,16 +145,16 @@ CSRT Overview
     queryable in real time, but also because they need to funnel the statistics
     back to the coordinator request so that we can generate a report for the
     HTTP request as a whole. This brings us back to the question of what to
-    log, for our `GET /foo/bar` example above, that spawned four processes to
+    log, for our ``GET /foo/bar`` example above, that spawned four processes to
     fulfill the request, each of which instantiates a local CSRT context to
     track its usage. We could log reports for all three workers, and the
     coordinator, which would give us four total reports generated, which is
     maybe alright, but it's 4x more log lines compared to the singular HTTP
     entry.
 
-    Taking that a step further, if we perform a view query against a `Q=64`
-    database, that will create a `coordinator` rctx, as well as `Q * N = 64 * 3
-    = 196` total `rpc_worker` rctxs, although 2/3rds of those workers will die
+    Taking that a step further, if we perform a view query against a ``Q=64``
+    database, that will create a ``coordinator`` rctx, as well as ``Q * N = 64 * 3
+    = 196`` total ``rpc_worker`` rctxs, although 2/3rds of those workers will die
     out after losing the race for the shard range, but if we logged all rctx
     reports for all processes tracked, the singular HTTP view query against a
     Q=64 database would generate 196 RPC worker reports and 1 coordinator
@@ -162,7 +162,7 @@ CSRT Overview
 
     To generate 197 rsyslog report log entries for a singular HTTP request is a
     significant increase over the singular HTTP log entry normally generated,
-    *however*, a Javascript filtered changes request from `since=0` on a `Q=64`
+    *however*, a Javascript filtered changes request from ``since=0`` on a ``Q=64``
     billion+ doc database will takes many billions of rows read, docs read, and
     IOQ calls to fulfill, at which point, the 197 induced reports, even with
     2/3rds as noops, are suddenly inconsequential compared to the raw CPU and
@@ -184,8 +184,8 @@ CSRT Overview
         The core stats collection of CSRT is highly performant after having
         gone through a number of iterations and performance testing to find a
         viable approach. One of the key *experimental* aspects of CSRT is our
-        ability to map Logger Matcher configurations from `default.ini` into
-        CSRT itself and generate a corresponding `ets:match_spec()`.  If we had
+        ability to map Logger Matcher configurations from ``default.ini`` into
+        CSRT itself and generate a corresponding ``ets:match_spec()``.  If we had
         a way of declaring a Logger Matcher in the ini file by way of Mango
         specs that is then able to be translated into a compiled match_spec,
         then we eliminate the need for the default matchers and toggles for RPC
@@ -194,12 +194,12 @@ CSRT Overview
     The CSRT Logger Matchers are a first pass pragmatic approach for being able
     to easily map useful filtering declarations into logs and HTTP query API
     for constraining the volume of data returned. For example, enabling the
-    default `ioq_calls` matcher with a threshold of 10000 IOQ calls with non
+    default ``ioq_calls`` matcher with a threshold of 10000 IOQ calls with non
     RPC reporting enabled will result in generating a CSRT lifecycle report for
     that HTTP request, but all of the enabled matchers are are exposed in the
-    HTTP API as well, so you can query against the `ioq_calls` matcher and
+    HTTP API as well, so you can query against the ``ioq_calls`` matcher and
     perform aggregations on top of those results, grouping by database name for
-    instance, but the aggregations happen *on top* of the `ets:match_spec()`
+    instance, but the aggregations happen *on top* of the ``ets:match_spec()``
     filtered rows, so the initial query filtering is performed as close to the
     internal ETS data storage as possible, and we can focus on workloads that
     are already established as significant, and *only* aggregate on top of
@@ -221,7 +221,7 @@ An example of the hidden data CSRT exposes
     cluster, but let's say this view is roughly keyed into a real workload's
     daily cyclic run, and we're trying to understand what CouchDB is doing and
     why, for the given workload. So here we have some time series graphs built
-    from querying `GET /_node/_local/_system` and aggregated across the
+    from querying ``GET /_node/_local/_system`` and aggregated across the
     cluster, showing HTTP throughput, CouchDB operations, IOQ throughput,
     Erlang memory, and Erlang process count:
 
@@ -257,8 +257,8 @@ An example of the hidden data CSRT exposes
     operations, further clouding the connection of these metrics to the HTTP
     requests that induced them.
 
-    This is where you would enable CSRT with the `ioq_calls` matcher, and maybe
-    the `docs_read` matcher, allowing you to query live and track down what
+    This is where you would enable CSRT with the ``ioq_calls`` matcher, and maybe
+    the ``docs_read`` matcher, allowing you to query live and track down what
     requests are generating all of that load. Or better yet, if you'd already
     enabled CSRT and reporting on the default Logger Matchers, there'd be a
     logged report for each of the heavy requests using more than 10000 IOQ
@@ -269,7 +269,7 @@ An example of the hidden data CSRT exposes
     configured dynamically, and the CSRT logger will pickup on those changes
     and reload the matchers immediately, live, such that those new Thresholds
     apply to the process lifecycle logging reports as well as querying the
-    `_active_resources` against the `ioq_calls` matcher.
+    ``_active_resources`` against the ``ioq_calls`` matcher.
 
     .. seealso::
 
@@ -284,7 +284,7 @@ An example of the hidden data CSRT exposes
     Once the Logger Matchers are enabled, reports can be generated automatically,
     and advanced query aggregations become available. In our heavy example cyclic
     workload above, the benchmark was a rampup view query run on a Q=64 database
-    with `?group=false&include_docs=true` and no limit, specifically to do a full
+    with ``?group=false&include_docs=true`` and no limit, specifically to do a full
     index database scan loading every single doc in the process, and then we spawn
     another HTTP worker performing those view requests every second, progressively
     overloading the system as you can see in the Erlang process count metrics. In
@@ -296,31 +296,31 @@ Another example with csrt proc window
 -------------------------------------
 
     Now let us continue with another example, this time demonstrating the use of
-    the `csrt:proc_window/3` in a `remsh`, as one would do with `recon:proc_window/3`
+    the ``csrt:proc_window/3`` in a ``remsh``, as one would do with ``recon:proc_window/3``
     to get an idea of heavy active processes in the system. Normally one would
-    run something like `recon:proc_window(reductions, 5, 5000).` to list the
+    run something like ``recon:proc_window(reductions, 5, 5000).`` to list the
     top 5 most active processes over the next five seconds, sorted by delta on
-    the reductions count of that process. Essentially `recon:proc_window` takes
-    a snapshot of the system at `T0` for the data you requested, waits 5000
-    milliseconds, fetches a snapshot of the system at `T1`, then it performs a
-    delta on T1 and T0, sorting and returning the top 5 results. Recon does
+    the reductions count of that process. Essentially ``recon:proc_window/3`` takes
+    a snapshot of the system at ``T0`` for the data you requested, waits 5000
+    milliseconds, fetches a snapshot of the system at ``T1``, then it performs a
+    delta on ``T1`` and ``T0``, sorting and returning the top 5 results. Recon does
     this by way of a heavily optimized data structure allowing for minimal
     memory consumption of high Erlang process systems and efficient deltas.
 
-    The `csrt:proc_window/3` functionality piggy backs off of
-    `recon:proc_window`, and utilizes the same core data structures and delta
-    sorting logic, but instead exposing sampling on `erlang:process_info/2`
-    statistics, `csrt:proc_window` exposes the same logic on the CouchDB
-    internal CSRT metrics, like `docs_read`, `ioq_calls`, `js_filter`, etc.
+    The ``csrt:proc_window/3`` functionality piggy backs off of
+    ``recon:proc_window/3``, and utilizes the same core data structures and delta
+    sorting logic, but instead exposing sampling on ``erlang:process_info/2``
+    statistics, ``csrt:proc_window/3`` exposes the same logic on the CouchDB
+    internal CSRT metrics, like ``docs_read``, ``ioq_calls``, ``js_filter``, etc.
 
     .. note::
 
-       The `csrt:proc_window/3` functionality is demonstrated in a `remsh` as it's
+       The ``csrt:proc_window/3`` functionality is demonstrated in a ``remsh`` as it's
        not currently exposed by way of the HTTP API, but can now easily be built on
-       the field extraction logic in `couch_srt_query` powering the HTTP API. This
+       the field extraction logic in ``couch_srt_query`` powering the HTTP API. This
        can be added readily, as it should map over well enough to the HTTP API.
 
-    Now, given a database `foo` with 11k documents containing a `doc.value` field
+    Now, given a database ``foo`` with 11k documents containing a ``doc.value`` field
     that is an integer value which can be filtered in a design doc by way of
     even and odd. If we instantiate a series of while loops in parallel making
     requests of the form::
@@ -334,8 +334,8 @@ Another example with csrt proc window
     live and see them in progress with the real time stats tracking and
     querying capabilities of CSRT.
 
-    For example, let's use `couch_srt:proc_window/3` as one would do with
-    `recon:proc_window/3` to get an idea of the heavy active processes on the
+    For example, let's use ``couch_srt:proc_window/3`` as one would do with
+    ``recon:proc_window/3`` to get an idea of the heavy active processes on the
     system::
 
         (node1@127.0.0.1)2> rp([{PR, couch_srt:to_json(couch_srt:get_resource(PR))} || {PR, _, _} <- couch_srt:proc_window(ioq_calls, 3, 1000)]).
@@ -381,18 +381,18 @@ Another example with csrt proc window
         ok
 
     This shows us the top 3 most active processes (being tracked in CSRT) over
-    the next 1000 milliseconds, sorted by number of `ioq_calls` induced! All of
+    the next 1000 milliseconds, sorted by number of ``ioq_calls`` induced! All of
     three of these processes are incurring heavy usage, reading many thousands
     of docs with 15k+ IOQ calls and heavy JS filter usage, exactly the types of
     requests you want to be alerted to. CSRT's proc window logic is built on
     top of Recon's, which doesn't return the process info itself, so you'll
-    need to fetch the process status with `couch_srt:get_resource/1` and then
-    pretty print it with `couch_srt:to_json/1`.
+    need to fetch the process status with ``couch_srt:get_resource/1`` and then
+    pretty print it with ``couch_srt:to_json/1``.
 
     The output above is a real time snapshot of the live running system and
     shows processes actively inducing additional resource usage, so these CSRT
     context values are just a time snapshot of where that process was at, as of
-    the `updated_at` timestamp. We can reference the nonce value to search
+    the ``updated_at`` timestamp. We can reference the nonce value to search
     through the report logs for a final report, assuming the given context
     ended up using sufficient resources to trigger a logger matcher lifetime
     report. The above changes requests were induced specifically to induce
@@ -411,9 +411,9 @@ Another example with csrt proc window
         [notice] 2025-07-21T17:25:14.844317Z node1@127.0.0.1 <0.5090.0> cc5a814ceb localhost:15984 127.0.0.1 adm GET /foo/_changes?filter=bar/even&asdf=fdsa&include_docs=true 200 ok 6059
 
     So we see the requests were made, and we can see it's doing
-    `include_docs=true` as well as using a customer filter, both obvious
+    ``include_docs=true`` as well as using a customer filter, both obvious
     indications that this is a potentially heavier request, however, we don't
-    know if database `foo` had a thousand docs or a billion docs, whether those
+    know if database ``foo`` had a thousand docs or a billion docs, whether those
     docs were small or large, nor any indication of the computational
     complexity of the reference filter function.  This makes it challenging to
     retroactively correlate heavy resource usage at a hardware level with the
@@ -439,13 +439,13 @@ Another example with csrt proc window
     We find the process lifecycle reports for the requests with the three
     grep'ed on nonces, and we can see they all read the 11k core documents,
     plus the one design document, JS filtered all 11,001 docs, and then only
-    returned the 5500 doc's containing an even `doc.value` field.
+    returned the 5500 doc's containing an even ``doc.value`` field.
 
     This also shows the discrepancy between the quantity of induced resource
     usage to actually generate a request, relative to the magnitude of the data
-    returned.  All of our `doc.value` fields were positive integers, if we had
-    a filter function searching for negative `doc.value` results, we would have
-    found none, resulting in `changes_returned=0`, but we would have still
+    returned.  All of our ``doc.value`` fields were positive integers, if we had
+    a filter function searching for negative ``doc.value`` results, we would have
+    found none, resulting in ``changes_returned=0``, but we would have still
     induced the 11,001 doc loads and Javascript filter calls.
 
     CSRT is specifically built to automatically find and report these types of
@@ -467,16 +467,16 @@ Demonstration of expressiveness constraints in Logger Matchers and ini settings
         debug_foo_db_shard_changes = ets:fun2ms(fun(#rctx{type=#rpc_worker{func=changes}, dbname=(<<"shards/00000000-7fffffff/foo.1753691445">>)}=R) -> R end)).
 
     Once we can express and persist Logger Matchers directly like that in the
-    `ini` files, we'll no longer need the default matchers, as we'll be able to
+    ``ini`` files, we'll no longer need the default matchers, as we'll be able to
     express any filter functions directly, on coordinators or RPC workers or a
     combination of both. Furthermore, once we can transform the static
     default.ini definitions of that form, we'll be able to do the same with the
-    query interface, and we can `POST` those complex queries in and have a
+    query interface, and we can ``POST`` those complex queries in and have a
     match spec dynamically generated and run directly against the ETS table.
 
     Now to highlight that this is _specifically_ an expressiveness problem,
     let's demonstrate how to actually register those matchers above dynamically
-    by way of a `remsh`, and then see the report generation changes directly::
+    by way of a ``remsh``, and then see the report generation changes directly::
 
         (node1@127.0.0.1)35> rr(couch_srt_logger).
         [coordinator,rctx,rpc_worker,st]
@@ -487,21 +487,21 @@ Demonstration of expressiveness constraints in Logger Matchers and ini settings
 
         [notice] 2025-07-28T08:35:41.576259Z node1@127.0.0.1 <0.251.0> -------- Initialized 3 CSRT Logger matchers
 
-    And now, if we make an HTTP request to database `foo`, we'll automatically
+    And now, if we make an HTTP request to database ``foo``, we'll automatically
     generate a CSRT process lifecycle report log for that request, without
     inducing additional report logging for requests to databases other than
-    `foo`, for example, given `GET /foo`, we now get the following HTTP related
+    ``foo``, for example, given ``GET /foo``, we now get the following HTTP related
     logs::
 
         [notice] 2025-07-28T08:38:15.638529Z node1@127.0.0.1 <0.2114371.0> 203629c3b4 localhost:15984 127.0.0.1 adm GET /foo 200 ok 3
         [report] 2025-07-28T08:38:15.638659Z node1@127.0.0.1 <0.2114423.0> -------- [csrt-pid-usage-lifetime db_open=6 dbname="foo" nonce="203629c3b4" pid_ref="<0.2114371.0>:#Ref<0.3800414810.3105882114.258360>" started_at="2025-07-28T08:38:15.636z" type="coordinator-{chttpd_db:handle_request}:GET:/foo" updated_at="2025-07-28T08:38:15.638z" username="adm"]
 
-    We can also create our `debug_foo_db_shard_changes` Logger Matcher declared
+    We can also create our ``debug_foo_db_shard_changes`` Logger Matcher declared
     above, but note that the RPC workers operate on local database shard names,
     not the higher level clustered database names from the coordinator's
     perspective. To match against specific database names in RPC workers, we'll
     need to match against the full shard name (eg
-    `<<"shards/00000000-7fffffff/foo.1753691445">>` instead of `<<"foo">>`), as
+    ``<<"shards/00000000-7fffffff/foo.1753691445">>`` instead of ``<<"foo">>``), as
     in our example above, like so::
 
         (node1@127.0.0.1)44> rr(couch_srt_logger).
@@ -517,11 +517,11 @@ Demonstration of expressiveness constraints in Logger Matchers and ini settings
         [notice] 2025-07-28T08:45:08.106879Z node1@127.0.0.1 <0.2124751.0> eff915deb7 localhost:15984 127.0.0.1 adm GET /foo/_changes 200 ok 110
         [report] 2025-07-28T08:45:08.106957Z node1@127.0.0.1 <0.2124806.0> -------- [csrt-pid-usage-lifetime changes_returned=6228 db_open=8 dbname="foo" get_kp_node=42 get_kv_node=1003 nonce="eff915deb7" pid_ref="<0.2124751.0>:#Ref<0.3800414810.3105882116.229072>" rows_read=6228 started_at="2025-07-28T08:45:07.997z" type="coordinator-{chttpd_db:handle_changes_req}:GET:/foo/_changes" updated_at="2025-07-28T08:45:08.106z" username="adm"]
 
-    What happened is that Logger Matchers on `rpc_worker` rctxs are queryable
+    What happened is that Logger Matchers on ``rpc_worker`` rctxs are queryable
     but will not generate a report log unless the specific
     :config:option:`csrt/enable_rpc_reporting` setting is enabled! After doing
     so, we see the config set notice, followed by a report for the rpc worker
-    on shard range OO-7F for db `foo`, as expected. Note that we get the RPC
+    on shard range OO-7F for db ``foo``, as expected. Note that we get the RPC
     report before the HTTP log, as the worker completed before the coordinator
     that needed that worker to complete, completed, and similarly, the
     coordinator worker process logs the HTTP line prior to the CSRT coordinator
@@ -536,6 +536,6 @@ Demonstration of expressiveness constraints in Logger Matchers and ini settings
 
         It seems like that some creative pattern matches nestable within match
         specs are possible, perhaps something like
-        `ets:fun2ms(fun(#rctx{dbname=<<"shards/", Range/17, "/foo", Timestamp/binary">>}) -> {Range, R} end).`
-        allowing for matching on all `foo` db workers, and demoing extracting
+        ``ets:fun2ms(fun(#rctx{dbname=<<"shards/", Range/17, "/foo", Timestamp/binary">>}) -> {Range, R} end).``
+        allowing for matching on all ``foo`` db workers, and demoing extracting
         out the Range for run.
