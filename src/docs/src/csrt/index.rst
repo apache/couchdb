@@ -296,11 +296,11 @@ Another example with csrt proc window
 -------------------------------------
 
     Now let us continue with another example, this time demonstrating the use of
-    the ``csrt:proc_window/3`` in a ``remsh``, as one would do with ``recon:proc_window/3``
-    to get an idea of heavy active processes in the system. Normally one would
-    run something like ``recon:proc_window(reductions, 5, 5000).`` to list the
-    top 5 most active processes over the next five seconds, sorted by delta on
-    the reductions count of that process. Essentially ``recon:proc_window/3`` takes
+    the ``csrt:proc_window/3`` in a ``remsh``, as one would do with
+    ``recon:proc_window/3`` to get an idea of heavy active processes in the system.
+    Normally one would run something like ``recon:proc_window(reductions, 5, 5000).``
+    to list the top 5 most active processes over the next five seconds, sorted by delta
+    on the reductions count of that process. Essentially ``recon:proc_window/3`` takes
     a snapshot of the system at ``T0`` for the data you requested, waits 5000
     milliseconds, fetches a snapshot of the system at ``T1``, then it performs a
     delta on ``T1`` and ``T0``, sorting and returning the top 5 results. Recon does
