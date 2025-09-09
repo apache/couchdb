@@ -183,7 +183,7 @@ map_function_type({Props}) ->
     end.
 
 format_type(Type) when is_atom(Type) ->
-    ?l2b(atom_to_list(Type));
+    atom_to_binary(Type);
 format_type(Types) when is_list(Types) ->
     iolist_to_binary(join(lists:map(fun atom_to_list/1, Types), <<" or ">>)).
 

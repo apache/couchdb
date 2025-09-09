@@ -369,9 +369,9 @@ value_str(Value) when is_binary(Value) ->
             <<"\"", Escaped/binary, "\"">>
     end;
 value_str(Value) when is_integer(Value) ->
-    list_to_binary(integer_to_list(Value));
+    integer_to_binary(Value);
 value_str(Value) when is_float(Value) ->
-    list_to_binary(float_to_list(Value));
+    float_to_binary(Value);
 value_str(true) ->
     <<"true">>;
 value_str(false) ->
@@ -427,7 +427,7 @@ replace_array_indexes([], NewPartsAcc, HasIntAcc) ->
 replace_array_indexes([Part | Rest], NewPartsAcc, HasIntAcc) ->
     {NewPart, HasInt} =
         try
-            _ = list_to_integer(binary_to_list(Part)),
+            _ = binary_to_integer(Part),
             {<<"[]">>, true}
         catch
             _:_ ->

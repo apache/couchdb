@@ -162,7 +162,7 @@ check_capped_size(_) ->
     meck:reset(ddoc_cache_ev),
     lists:foreach(
         fun(I) ->
-            DbName = list_to_binary("big_" ++ integer_to_list(I)),
+            DbName = <<"bin_", (integer_to_binary(I))/binary>>,
             ddoc_cache:open_custom(DbName, ?MODULE),
             meck:wait(I, ddoc_cache_ev, event, [started, '_'], ?EVENT_TIMEOUT),
             ?assert(cache_size() < MaxSize * 2)
@@ -171,7 +171,7 @@ check_capped_size(_) ->
     ),
     lists:foreach(
         fun(I) ->
-            DbName = list_to_binary("big_" ++ integer_to_list(I)),
+            DbName = <<"bin_", (integer_to_binary(I))/binary>>,
             ddoc_cache:open_custom(DbName, ?MODULE),
             meck:wait(I, ddoc_cache_ev, event, [started, '_'], ?EVENT_TIMEOUT),
             ?assert(cache_size() < MaxSize * 2)
@@ -184,7 +184,7 @@ check_cache_refill({DbName, _}) ->
     meck:reset(ddoc_cache_ev),
 
     InitDDoc = fun(I) ->
-        NumBin = list_to_binary(integer_to_list(I)),
+        NumBin = integer_to_binary(I),
         DDocId = <<"_design/", NumBin/binary>>,
         Doc = #doc{id = DDocId, body = {[]}},
         {ok, _} = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]),
