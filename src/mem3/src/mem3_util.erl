@@ -270,14 +270,14 @@ build_shards_by_range(DbName, DocProps) ->
     ).
 
 to_atom(Node) when is_binary(Node) ->
-    list_to_atom(binary_to_list(Node));
+    binary_to_atom(Node);
 to_atom(Node) when is_atom(Node) ->
     Node.
 
 to_integer(N) when is_integer(N) ->
     N;
 to_integer(N) when is_binary(N) ->
-    list_to_integer(binary_to_list(N));
+    binary_to_integer(N);
 to_integer(N) when is_list(N) ->
     list_to_integer(N).
 

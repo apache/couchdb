@@ -309,7 +309,7 @@ gen_write(Db, {Action, {<<"_local/", _/binary>> = DocId, Body}}) ->
         end,
     {local, #doc{
         id = DocId,
-        revs = {0, [list_to_binary(integer_to_list(RevId))]},
+        revs = {0, [integer_to_binary(RevId)]},
         body = Body,
         deleted = Deleted
     }};

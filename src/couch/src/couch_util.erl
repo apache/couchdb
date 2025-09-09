@@ -137,7 +137,7 @@ to_existing_atom(V) when is_list(V) ->
     end;
 to_existing_atom(V) when is_binary(V) ->
     try
-        list_to_existing_atom(?b2l(V))
+        binary_to_existing_atom(V)
     catch
         _:_ -> V
     end;
@@ -429,16 +429,16 @@ to_binary(V) when is_list(V) ->
             list_to_binary(io_lib:format("~p", [V]))
     end;
 to_binary(V) when is_atom(V) ->
-    list_to_binary(atom_to_list(V));
+    atom_to_binary(V);
 to_binary(V) ->
     list_to_binary(io_lib:format("~p", [V])).
 
 to_integer(V) when is_integer(V) ->
     V;
 to_integer(V) when is_list(V) ->
-    erlang:list_to_integer(V);
+    list_to_integer(V);
 to_integer(V) when is_binary(V) ->
-    erlang:list_to_integer(binary_to_list(V)).
+    binary_to_integer(V).
 
 to_list(V) when is_list(V) ->
     V;

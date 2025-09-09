@@ -139,7 +139,7 @@ to_json_terms(Data) ->
 to_json_terms([], Acc) ->
     {lists:reverse(Acc)};
 to_json_terms([{Key, Value} | Rest], Acc) when is_atom(Key) ->
-    to_json_terms(Rest, [{list_to_binary(atom_to_list(Key)), list_to_binary(Value)} | Acc]);
+    to_json_terms(Rest, [{atom_to_binary(Key), list_to_binary(Value)} | Acc]);
 to_json_terms([{Key, Value} | Rest], Acc) ->
     to_json_terms(Rest, [{list_to_binary(Key), list_to_binary(Value)} | Acc]).
 
