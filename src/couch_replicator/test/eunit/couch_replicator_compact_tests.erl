@@ -409,7 +409,7 @@ writer_loop(Db0, Parent, Counter) ->
         fun(I) ->
             couch_doc:from_json_obj(
                 {[
-                    {<<"_id">>, ?l2b(integer_to_list(Counter + I))},
+                    {<<"_id">>, integer_to_binary(Counter + I)},
                     {<<"value">>, Counter + I},
                     {<<"_attachments">>,
                         {[

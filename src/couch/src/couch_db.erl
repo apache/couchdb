@@ -1279,7 +1279,7 @@ new_revid(#doc{body = Body, revs = {OldStart, OldRevs}, atts = Atts, deleted = D
     case DigestedAtts of
         Atts2 when length(Atts) =/= length(Atts2) ->
             % We must have old style non-md5 attachments
-            ?l2b(integer_to_list(couch_util:rand32()));
+            integer_to_binary(couch_util:rand32());
         Atts2 ->
             OldRev =
                 case OldRevs of
