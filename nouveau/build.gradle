@@ -46,7 +46,7 @@ group = 'org.apache.couchdb'
 version = '1.0-SNAPSHOT'
 
 java {
-    sourceCompatibility = "11"
+    sourceCompatibility = "21"
 }
 
 jar {
