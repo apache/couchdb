@@ -111,13 +111,23 @@ set_context_type(Type, PidRef) ->
 
 -spec create_resource(Rctx :: rctx()) -> boolean().
 create_resource(#rctx{} = Rctx) ->
-    (catch ets:insert(?CSRT_ETS, Rctx)) == true.
+    try ets:insert(?CSRT_ETS, Rctx) of
+        Result -> Result
+    catch
+        error:badarg ->
+            false
+    end.
 
 -spec destroy_resource(PidRef :: maybe_pid_ref()) -> boolean().
 destroy_resource(undefined) ->
     false;
 destroy_resource({_, _} = PidRef) ->
-    (catch ets:delete(?CSRT_ETS, PidRef)) == true.
+    try ets:delete(?CSRT_ETS, PidRef) of
+        Result -> Result
+    catch
+        error:badarg ->
+            false
+    end.
 
 -spec get_resource(PidRef :: maybe_pid_ref()) -> maybe_rctx().
 get_resource(undefined) ->
@@ -129,7 +139,7 @@ get_resource(PidRef) ->
         [] ->
             undefined
     catch
-        _:_ ->
+        error:badarg ->
             undefined
     end.
 
@@ -140,7 +150,7 @@ match_resource(#rctx{} = Rctx) ->
     try
         ets:match_object(?CSRT_ETS, Rctx)
     catch
-        _:_ ->
+        error:badarg ->
             []
     end.
 
@@ -211,7 +221,7 @@ update_counter({_Pid, _Ref} = PidRef, Field, Count, BaseUpdates) when Count >= 0
             try
                 ets:update_counter(?CSRT_ETS, PidRef, Updates, #rctx{pid_ref = PidRef})
             catch
-                _:_ ->
+                error:badarg ->
                     0
             end;
         false ->
@@ -259,7 +269,7 @@ update_counters({_Pid, _Ref} = PidRef, Delta, BaseUpdates) when is_map(Delta) ->
                 ets:update_counter(?CSRT_ETS, PidRef, Updates, #rctx{pid_ref = PidRef}),
                 true
             catch
-                _:_ ->
+                error:badarg ->
                     false
             end
     end.
