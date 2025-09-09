@@ -399,7 +399,7 @@ get_field({Props}, [Name | Rest], Validator) ->
 get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
     % Name might be an integer index into an array
     try
-        Pos = list_to_integer(binary_to_list(Name)),
+        Pos = binary_to_integer(Name),
         case Pos >= 0 andalso Pos < length(Values) of
             true ->
                 % +1 because Erlang uses 1 based list indices
@@ -441,7 +441,7 @@ rem_field({Props}, [Name | Rest]) ->
 rem_field(Values, [Name]) when is_list(Values) ->
     % Name might be an integer index into an array
     try
-        Pos = list_to_integer(binary_to_list(Name)),
+        Pos = binary_to_integer(Name),
         case Pos >= 0 andalso Pos < length(Values) of
             true ->
                 % +1 because Erlang uses 1 based list indices
@@ -456,7 +456,7 @@ rem_field(Values, [Name]) when is_list(Values) ->
 rem_field(Values, [Name | Rest]) when is_list(Values) ->
     % Name might be an integer index into an array
     try
-        Pos = list_to_integer(binary_to_list(Name)),
+        Pos = binary_to_integer(Name),
         case Pos >= 0 andalso Pos < length(Values) of
             true ->
                 % +1 because Erlang uses 1 based list indices
@@ -494,7 +494,7 @@ set_field({Props}, [Name | Rest], Value) ->
 set_field(Values, [Name], Value) when is_list(Values) ->
     % Name might be an integer index into an array
     try
-        Pos = list_to_integer(binary_to_list(Name)),
+        Pos = binary_to_integer(Name),
         case Pos >= 0 andalso Pos < length(Values) of
             true ->
                 % +1 because Erlang uses 1 based list indices
@@ -509,7 +509,7 @@ set_field(Values, [Name], Value) when is_list(Values) ->
 set_field(Values, [Name | Rest], Value) when is_list(Values) ->
     % Name might be an integer index into an array
     try
-        Pos = list_to_integer(binary_to_list(Name)),
+        Pos = binary_to_integer(Name),
         case Pos >= 0 andalso Pos < length(Values) of
             true ->
                 % +1 because Erlang uses 1 based list indices

@@ -139,7 +139,7 @@ ddoc(Id) ->
 doc(Id) ->
     couch_doc:from_json_obj(
         {[
-            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"_id">>, integer_to_binary(Id)},
             {<<"val">>, Id}
         ]}
     ).

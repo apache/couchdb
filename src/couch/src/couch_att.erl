@@ -491,7 +491,7 @@ encoded_lengths_from_json(Props) ->
             EncodedLen = Len;
         EncodingValue ->
             EncodedLen = couch_util:get_value(<<"encoded_length">>, Props, Len),
-            Encoding = list_to_existing_atom(binary_to_list(EncodingValue))
+            Encoding = binary_to_existing_atom(EncodingValue)
     end,
     {Len, EncodedLen, Encoding}.
 

@@ -152,7 +152,7 @@ t_no_filter_different_node({DbName, DocId, OldDoc, PSeq}) ->
     create_purge_checkpoint(DbName, PSeq),
 
     % Create a valid purge for a different node
-    TgtNode = list_to_binary(atom_to_list('notfoo@127.0.0.1')),
+    TgtNode = atom_to_binary('notfoo@127.0.0.1'),
     create_purge_checkpoint(DbName, 0, TgtNode),
 
     rpc_update_doc(DbName, OldDoc),
@@ -164,7 +164,7 @@ t_filter_local_node({DbName, DocId, OldDoc, PSeq}) ->
     create_purge_checkpoint(DbName, PSeq),
 
     % Create a valid purge for a different node
-    TgtNode = list_to_binary(atom_to_list('notfoo@127.0.0.1')),
+    TgtNode = atom_to_binary('notfoo@127.0.0.1'),
     create_purge_checkpoint(DbName, 0, TgtNode),
 
     % Add a local node rev to the list of node revs. It should
@@ -274,4 +274,4 @@ tgt_node() ->
     'foo@127.0.0.1'.
 
 tgt_node_bin() ->
-    iolist_to_binary(atom_to_list(tgt_node())).
+    atom_to_binary(tgt_node()).
