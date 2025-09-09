@@ -274,7 +274,7 @@ atts_to_mp(
     WriteFun,
     AttFun
 ) ->
-    LengthBin = list_to_binary(integer_to_list(Len)),
+    LengthBin = integer_to_binary(Len),
     % write headers
     WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),
     WriteFun(<<"\r\nContent-Type: ", Type/binary>>),

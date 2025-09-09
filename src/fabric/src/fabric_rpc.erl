@@ -470,10 +470,10 @@ get_node_seqs(Db, Nodes) ->
                 {stop, Acc}
         end
     end,
-    InitAcc = [{list_to_binary(atom_to_list(Node)), 0} || Node <- Nodes],
+    InitAcc = [{atom_to_binary(Node), 0} || Node <- Nodes],
     Opts = [{start_key, <<?LOCAL_DOC_PREFIX, "purge-mem3-">>}],
     {ok, NodeBinSeqs} = couch_db:fold_local_docs(Db, FoldFun, InitAcc, Opts),
-    [{list_to_existing_atom(binary_to_list(N)), S} || {N, S} <- NodeBinSeqs].
+    [{binary_to_existing_atom(N), S} || {N, S} <- NodeBinSeqs].
 
 get_or_create_db(DbName, Options) ->
     mem3_util:get_or_create_db_int(DbName, Options).

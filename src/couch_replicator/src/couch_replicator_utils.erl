@@ -81,7 +81,7 @@ get_json_value(Key, Props, Default) when is_atom(Key) ->
     Ref = make_ref(),
     case get_value(Key, Props, Ref) of
         Ref ->
-            get_value(?l2b(atom_to_list(Key)), Props, Default);
+            get_value(atom_to_binary(Key), Props, Default);
         Else ->
             Else
     end;
@@ -89,7 +89,7 @@ get_json_value(Key, Props, Default) when is_binary(Key) ->
     Ref = make_ref(),
     case get_value(Key, Props, Ref) of
         Ref ->
-            get_value(list_to_atom(?b2l(Key)), Props, Default);
+            get_value(binary_to_atom(Key), Props, Default);
         Else ->
             Else
     end.

@@ -388,7 +388,7 @@ pack_seqs(Workers) ->
     SeqList = [{N, R, S} || {#shard{node = N, range = R}, S} <- Workers],
     SeqSum = lists:sum([fake_packed_seq(S) || {_, _, S} <- SeqList]),
     Opaque = couch_util:encodeBase64Url(?term_to_bin(SeqList, [compressed])),
-    ?l2b([integer_to_list(SeqSum), $-, Opaque]).
+    <<(integer_to_binary(SeqSum))/binary, $-, Opaque/binary>>.
 
 % Generate the sequence number used to build the emitted N-... prefix.
 %

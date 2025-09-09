@@ -105,7 +105,7 @@ to_binary(true) ->
 to_binary(false) ->
     false;
 to_binary(Data) when is_atom(Data) ->
-    list_to_binary(atom_to_list(Data));
+    atom_to_binary(Data);
 to_binary(Data) when is_number(Data) ->
     Data;
 to_binary(Data) when is_binary(Data) ->

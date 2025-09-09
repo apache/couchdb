@@ -316,7 +316,7 @@ create_docs(Url, Docs) ->
 docs(Counter) ->
     lists:foldl(
         fun(I, Acc) ->
-            Id = ?l2b(integer_to_list(I)),
+            Id = integer_to_binary(I),
             Doc = #{<<"_id">> => Id, <<"val">> => I},
             [Doc | Acc]
         end,
