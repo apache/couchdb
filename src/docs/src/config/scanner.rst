@@ -85,6 +85,15 @@ Scanner Options
             [couch_scanner]
             doc_rate_limit = 1000
 
+    .. config:option:: doc_write_rate_limit
+
+        Limit the rate at which plugins update documents. This rate limit
+        applies to plugins which explicitly use the
+        ``couch_scanner_rate_limiter`` module for rate limiting ::
+
+            [couch_scanner]
+            doc_write_rate_limit = 500
+
     .. config:option:: ddoc_batch_size
 
         Batch size to use when fetching design documents. For lots of small
