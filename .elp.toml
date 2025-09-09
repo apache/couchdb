@@ -1,0 +1,3 @@
+[build_info]
+apps = ["src/*"]
+include_dirs = ["src", "src/*/include"]
