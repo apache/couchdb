@@ -46,27 +46,34 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
     {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
     case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
         {ok, Index} ->
-            case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    case dreyfus_index:await(Pid, MinSeq) of
-                        {ok, IndexPid, _Seq} ->
-                            Result = dreyfus_index:Fun(IndexPid, QueryArgs),
-                            rexi:reply(Result);
-                        % obsolete clauses, remove after upgrade
-                        ok ->
-                            Result = dreyfus_index:Fun(Pid, QueryArgs),
-                            rexi:reply(Result);
-                        {ok, _Seq} ->
-                            Result = dreyfus_index:Fun(Pid, QueryArgs),
-                            rexi:reply(Result);
-                        Error ->
-                            rexi:reply(Error)
-                    end;
-                Error ->
-                    rexi:reply(Error)
+            try
+                rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
+            catch exit:{noproc, _} ->
+                couch_log:error("Got NOPROC, re-trying", []),
+                %% try one more time to handle the case when Clouseau's LRU
+                %% closed the index in the middle of our call
+                rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
             end;
         Error ->
             rexi:reply(Error)
+    end.
+
+index_call(Fun, DbName, Index, QueryArgs, MinSeq) ->
+    case dreyfus_index_manager:get_index(DbName, Index) of
+        {ok, Pid} ->
+            case dreyfus_index:await(Pid, MinSeq) of
+                {ok, IndexPid, _Seq} ->
+                    dreyfus_index:Fun(IndexPid, QueryArgs);
+                % obsolete clauses, remove after upgrade
+                ok ->
+                    dreyfus_index:Fun(Pid, QueryArgs);
+                {ok, _Seq} ->
+                    dreyfus_index:Fun(Pid, QueryArgs);
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
     end.
 
 info(DbName, DDoc, IndexName) ->
