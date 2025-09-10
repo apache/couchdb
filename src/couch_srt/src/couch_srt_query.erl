@@ -234,72 +234,7 @@ group_by(Matcher, Key, ValFun, AggFun, Limit) when is_atom(Key) ->
 group_by(Matcher, KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
     group_by(Matcher, KeyFun, curry_field(Val), AggFun, Limit);
 group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
-    %% This is a space versus speed tradeoff. Both query modes only filter
-    %% through the table until `Limit` rows have been returned and both will
-    %% utilize the compiled match_specs to do the testing, but
-    %% `group_by_fold/5` will sequentially copy in every row and test it
-    %% locally against the compiled match_spec using `ets:foldl/3`, whereas
-    %% `group_by_select/5` does the filtering internally in the ETS NIF, by way
-    %% of passing the uncompiled match_spec to `ets:select/3` to
-    %% `ets:select/3`. The tradeoff here is that `ets:select` will copy `Limit`
-    %% full `#rctx{}` records into this caller process, which we then aggregate
-    %% over, as opposed to `ets:foldl` only sequentially loading a singular
-    %% `#rctx{}` and extracting the relevant field value to aggregate on.
-    %%
-    %% The use of `query_by_fold` should only be needed if `Limit` is
-    %% drastically increased, and even then, the efficiencies gained here with
-    %% `query_by_fold` are shortlived until we can encode the values needed by
-    %% `ValFun` into the match_spec return fields, at which point it becomes
-    %% strictly worse.
-    %%
-    %% NOTE: This discrepancy of `ets:match_spec_run` taking a `match_spec()`
-    %% vs `ets:select` taking a `comp_match_spec()` is why our CSRT `matcher()`
-    %% type_spec funnels around both versions instead of just reference to the
-    %% compiled spec stored by ETS internally.
-    case config:get_boolean(?CSRT, "use_query_fold", false) of
-        true ->
-            group_by_fold(Matcher, KeyFun, ValFun, AggFun, Limit);
-        false ->
-            group_by_select(Matcher, KeyFun, ValFun, AggFun, Limit)
-    end.
-
-group_by_fold(Matcher, KeyFun, ValFun, AggFun, Limit) ->
-    FoldFun = fun(Ele, Acc) ->
-        case maps:size(Acc) =< Limit of
-            true ->
-                case ets_match(Ele, Matcher) of
-                    true ->
-                        Key = KeyFun(Ele),
-                        Val = ValFun(Ele),
-                        CurrVal = maps:get(Key, Acc, 0),
-                        case AggFun(CurrVal, Val) of
-                            0 ->
-                                Acc;
-                            NewVal ->
-                                maps:put(Key, NewVal, Acc)
-                        end;
-                    false ->
-                        Acc
-                end;
-            false ->
-                throw({limit, Acc})
-        end
-    end,
-    try
-        {ok, ets:foldl(FoldFun, #{}, ?CSRT_ETS)}
-    catch
-        throw:{limit, Acc} ->
-            {limit, Acc}
-    end.
-
-ets_match(Ele, {_, CMS}) ->
-    ets:match_spec_run([Ele], CMS) =/= [].
-
-group_by_select(Matcher, KeyFun, ValFun, AggFun, Limit) ->
-    {Status, Rctxs} = group_by_select_rows(Matcher, Limit),
-    %% If we hit `Status=limit` rows, still aggregate over what we found
-    Aggregated = lists:foldl(
-        fun(Rctx, Acc) ->
+    AggregateFun = fun(Rctx, Acc) ->
             Key = KeyFun(Rctx),
             Val = ValFun(Rctx),
             CurrVal = maps:get(Key, Acc, 0),
@@ -310,12 +245,30 @@ group_by_select(Matcher, KeyFun, ValFun, AggFun, Limit) ->
                     maps:put(Key, NewVal, Acc)
             end
         end,
-        #{},
-        Rctxs
-    ),
-    {Status, Aggregated}.
+    fold_ets(Matcher, AggregateFun, Limit, ?CSRT_ETS).
 
-group_by_select_rows(Matcher, Limit) ->
+fold_ets(Matcher, Aggregate, TotalLimit, Table) ->
+    %% fold by batches of size 5000 rows max
+    fold_ets(Matcher, Aggregate, 5000, TotalLimit, #{}, ok, Table).
+
+fold_ets(Matcher, Aggregate, BatchSize, LeftToGo, Acc, ok, Table) when LeftToGo > 0 ->
+    RequestSize = min(BatchSize, LeftToGo),
+    {Status, Rctxs} = select_rows(Matcher, RequestSize),
+    {Size, Aggregated} = lists:foldl(fun(E, {Idx, A}) ->
+        {Idx + 1, Aggregate(E, A)}
+    end, {0, Acc}, Rctxs),
+    case Size < RequestSize  of
+        true ->
+            {Status, Aggregated};
+        false ->
+            fold_ets(Matcher, Aggregate, BatchSize, LeftToGo - Size, Aggregated, Status, Table)
+    end;
+fold_ets(_Matcher, _Aggregate, _BatchSize, _LeftToGo, Acc, limit, _Table) ->
+    {limit, Acc};
+fold_ets(_Matcher, _Aggregate, _BatchSize, _LeftToGo, Acc, Result, _Table) ->
+    {Result, Acc}.
+
+select_rows(Matcher, Limit) ->
     try
         %% Use `ets:select/3` as this does the ets fold internally in a space
         %% efficient way that is still faster than the sequential traversal
