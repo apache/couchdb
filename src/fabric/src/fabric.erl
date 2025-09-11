@@ -25,6 +25,8 @@
     get_db_info/1,
     get_doc_count/1, get_doc_count/2,
     set_revs_limit/3,
+    update_props/3,
+    update_props/4,
     set_security/2, set_security/3,
     get_revs_limit/1,
     get_security/1, get_security/2,
@@ -174,6 +176,16 @@ get_revs_limit(DbName) ->
     after
         catch couch_db:close(Db)
     end.
+
+%% @doc update shard property. Some properties like `partitioned` or `hash` are
+%% static and cannot be updated. They will return an error.
+-spec update_props(dbname(), atom() | binary(), any()) -> ok.
+update_props(DbName, K, V) ->
+    update_props(DbName, K, V, [?ADMIN_CTX]).
+
+-spec update_props(dbname(), atom() | binary(), any(), [option()]) -> ok.
+update_props(DbName, K, V, Options) when is_atom(K) orelse is_binary(K) ->
+    fabric_db_meta:update_props(dbname(DbName), K, V, opts(Options)).
 
 %% @doc sets the readers/writers/admin permissions for a database
 -spec set_security(dbname(), SecObj :: json_obj()) -> ok.
