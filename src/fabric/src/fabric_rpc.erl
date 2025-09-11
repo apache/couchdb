@@ -33,6 +33,7 @@
     reset_validation_funs/1,
     set_security/3,
     set_revs_limit/3,
+    update_props/4,
     create_shard_db_doc/2,
     delete_shard_db_doc/2,
     get_partition_info/2
@@ -268,6 +269,9 @@ set_revs_limit(DbName, Limit, Options) ->
 
 set_purge_infos_limit(DbName, Limit, Options) ->
     with_db(DbName, Options, {couch_db, set_purge_infos_limit, [Limit]}).
+
+update_props(DbName, K, V, Options) ->
+    with_db(DbName, Options, {couch_db, update_props, [K, V]}).
 
 open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).

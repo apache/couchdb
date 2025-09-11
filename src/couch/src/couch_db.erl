@@ -72,6 +72,9 @@
     set_security/2,
     set_user_ctx/2,
 
+    get_props/1,
+    update_props/3,
+
     load_validation_funs/1,
     reload_validation_funs/1,
 
@@ -157,6 +160,11 @@
 % Purge client max lag window in seconds (defaulting to 24 hours)
 -define(PURGE_LAG_SEC, 86400).
 
+% DB props which cannot be dynamically updated after db creation
+-define(PROP_PARTITIONED, partitioned).
+-define(PROP_HASH, hash).
+-define(STATIC_PROPS, [?PROP_PARTITIONED, ?PROP_HASH]).
+
 start_link(Engine, DbName, Filepath, Options) ->
     Arg = {Engine, DbName, Filepath, Options},
     proc_lib:start_link(couch_db_updater, init, [Arg]).
@@ -232,9 +240,9 @@ is_clustered(#db{}) ->
 is_clustered(?OLD_DB_REC = Db) ->
     ?OLD_DB_MAIN_PID(Db) == undefined.
 
-is_partitioned(#db{options = Options}) ->
-    Props = couch_util:get_value(props, Options, []),
-    couch_util:get_value(partitioned, Props, false).
+is_partitioned(#db{} = Db) ->
+    Props = get_props(Db),
+    couch_util:get_value(?PROP_PARTITIONED, Props, false).
 
 close(#db{} = Db) ->
     ok = couch_db_engine:decref(Db);
@@ -650,11 +658,7 @@ get_db_info(Db) ->
             undefined -> null;
             Else1 -> Else1
         end,
-    Props =
-        case couch_db_engine:get_props(Db) of
-            undefined -> null;
-            Else2 -> {Else2}
-        end,
+    Props = get_props(Db),
     InfoList = [
         {db_name, Name},
         {engine, couch_db_engine:get_engine(Db)},
@@ -668,7 +672,7 @@ get_db_info(Db) ->
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
-        {props, Props},
+        {props, {Props}},
         {uuid, Uuid}
     ],
     {ok, InfoList}.
@@ -860,6 +864,24 @@ set_revs_limit(#db{main_pid = Pid} = Db, Limit) when Limit > 0 ->
     gen_server:call(Pid, {set_revs_limit, Limit}, infinity);
 set_revs_limit(_Db, _Limit) ->
     throw(invalid_revs_limit).
+
+get_props(#db{options = Options}) ->
+    couch_util:get_value(props, Options, []).
+
+update_props(#db{main_pid = Pid} = Db, K, V) ->
+    check_is_admin(Db),
+    case lists:member(K, ?STATIC_PROPS) of
+        true ->
+            throw({bad_request, <<"cannot update static property">>});
+        false ->
+            Props = get_props(Db),
+            Props1 =
+                case V of
+                    undefined -> lists:keydelete(K, 1, Props);
+                    _ -> lists:keystore(K, 1, Props, {K, V})
+                end,
+            gen_server:call(Pid, {set_props, Props1}, infinity)
+    end.
 
 name(#db{name = Name}) ->
     Name;

@@ -97,6 +97,12 @@ handle_call({set_time_seq, TSeq}, _From, Db) ->
     {ok, Db2} = couch_db_engine:commit_data(Db1#db{time_seq = TSeq}),
     ok = couch_server:db_updated(Db2),
     {reply, ok, Db2};
+handle_call({set_props, Props}, _From, Db) ->
+    {ok, Db1} = couch_db_engine:set_props(Db, Props),
+    Db2 = options_set_props(Db1, Props),
+    {ok, Db3} = couch_db_engine:commit_data(Db2),
+    ok = couch_server:db_updated(Db3),
+    {reply, ok, Db3};
 handle_call({purge_docs, [], _}, _From, Db) ->
     {reply, {ok, []}, Db};
 handle_call({purge_docs, PurgeReqs0, Options}, _From, Db) ->
@@ -313,14 +319,18 @@ init_db(DbName, FilePath, EngineState, Options) ->
         after_doc_read = ADR
     },
 
-    DbProps = couch_db_engine:get_props(InitDb),
-
-    InitDb#db{
+    Db = InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
         security = couch_db_engine:get_security(InitDb),
         time_seq = couch_db_engine:get_time_seq(InitDb),
-        options = lists:keystore(props, 1, NonCreateOpts, {props, DbProps})
-    }.
+        options = NonCreateOpts
+    },
+    DbProps = couch_db_engine:get_props(Db),
+    options_set_props(Db, DbProps).
+
+options_set_props(#db{options = Options} = Db, Props) ->
+    Options1 = lists:keystore(props, 1, Options, {props, Props}),
+    Db#db{options = Options1}.
 
 refresh_validate_doc_funs(#db{name = <<"shards/", _/binary>> = Name} = Db) ->
     spawn(fabric, reset_validation_funs, [mem3:dbname(Name)]),
