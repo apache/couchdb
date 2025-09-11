@@ -13,6 +13,9 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(dreyfus_rpc).
+
+-feature(maybe_expr, enable).
+
 -include_lib("couch/include/couch_db.hrl").
 -include("dreyfus.hrl").
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
@@ -44,14 +47,11 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
         stale = Stale
     } = QueryArgs,
     {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
-        {ok, Index} ->
-            case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    rexi:reply(index_call(Fun, Pid, MinSeq, QueryArgs));
-                Error ->
-                    rexi:reply(Error)
-            end;
+    maybe
+        {ok, Index} ?= dreyfus_index:design_doc_to_index(DDoc, IndexName),
+        {ok, Pid} ?= dreyfus_index_manager:get_index(DbName, Index),
+        rexi:reply(index_call(Fun, Pid, MinSeq, QueryArgs))
+    else
         Error ->
             rexi:reply(Error)
     end.
