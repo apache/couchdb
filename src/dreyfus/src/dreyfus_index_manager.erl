@@ -20,7 +20,7 @@
 -define(BY_PID, dreyfus_by_pid).
 
 % public api.
--export([start_link/0, get_index/2, get_disk_size/2]).
+-export([start_link/0, get_index/2, reopen_index/2, get_disk_size/2]).
 
 % gen_server api.
 -export([
@@ -38,6 +38,9 @@ start_link() ->
 
 get_index(DbName, Index) ->
     gen_server:call(?MODULE, {get_index, DbName, Index}, infinity).
+
+reopen_index(DbName, Index) ->
+    gen_server:call(?MODULE, {reopen, DbName, Index}, infinity).
 
 get_disk_size(DbName, #index{sig = Sig}) ->
     Path = <<DbName/binary, "/", Sig/binary>>,
@@ -66,6 +69,14 @@ handle_call({get_index, DbName, #index{sig = Sig} = Index}, From, State) ->
         [{_, ExistingPid}] ->
             {reply, {ok, ExistingPid}, State}
     end;
+handle_call({reopen, DbName, #index{sig = Sig} = Index}, From, State) ->
+    case ets:lookup(?BY_SIG, {DbName, Sig}) of
+        [{_, ExistingPid}] when is_pid(ExistingPid) ->
+            true = ets:delete(?BY_SIG, {DbName, Sig});
+        _ ->
+            ok
+    end,
+    handle_call({get_index, DbName, Index}, From, State);
 handle_call({open_ok, DbName, Sig, NewPid}, {OpenerPid, _}, State) ->
     link(NewPid),
     [{_, WaitList}] = ets:lookup(?BY_SIG, {DbName, Sig}),

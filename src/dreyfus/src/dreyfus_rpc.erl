@@ -50,7 +50,20 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
     maybe
         {ok, Index} ?= dreyfus_index:design_doc_to_index(DDoc, IndexName),
         {ok, Pid} ?= dreyfus_index_manager:get_index(DbName, Index),
-        rexi:reply(index_call(Fun, Pid, MinSeq, QueryArgs))
+        try
+            rexi:reply(index_call(Fun, Pid, MinSeq, QueryArgs))
+        catch
+            exit:{noproc, _} ->
+                couch_log:error("Got NOPROC, re-trying", []),
+                %% try one more time to handle the case when Clouseau's LRU
+                %% closed the index in the middle of our call
+                case dreyfus_index_manager:reopen_index(DbName, Index) of
+                    {ok, Pid} ->
+                        rexi:reply(index_call(Fun, Pid, MinSeq, QueryArgs));
+                    ReopenError ->
+                        rexi:reply(ReopenError)
+                end
+        end
     else
         Error ->
             rexi:reply(Error)
