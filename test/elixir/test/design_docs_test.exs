@@ -210,6 +210,7 @@ defmodule DesignDocsTest do
     assert first_db_rev == resp2.body["rev"]
   end
 
+@tag skip_for_pouchdb_server: true
   test "commonjs require", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design/test/_show/requirey")
@@ -227,6 +228,7 @@ defmodule DesignDocsTest do
     assert result["language"] == "javascript"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "circular commonjs dependencies", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design/test/_show/circular_require")
@@ -234,6 +236,7 @@ defmodule DesignDocsTest do
     assert resp.body == "One"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "module id values are as expected", context do
     db_name = context[:db_name]
 
@@ -250,6 +253,7 @@ defmodule DesignDocsTest do
     assert resp.body == expected
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "that we get correct design doc info back", context do
     db_name = context[:db_name]
@@ -282,6 +286,7 @@ defmodule DesignDocsTest do
     end
   end
 
+  @tag skip_for_pouchdb_server: true
   test "commonjs in map functions", context do
     db_name = context[:db_name]
 

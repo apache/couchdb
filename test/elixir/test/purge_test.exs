@@ -3,6 +3,7 @@ defmodule PurgeTest do
 
   @moduletag :purge
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "purge documents", context do
     db_name = context[:db_name]
@@ -81,6 +82,7 @@ defmodule PurgeTest do
     test_all_docs_twice(db_name, num_docs, 0, 4)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "COUCHDB-1065", context do
     db_name_a = context[:db_name]

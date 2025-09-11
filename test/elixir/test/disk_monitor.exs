@@ -26,6 +26,7 @@ defmodule DiskMonitorTest do
     assert resp.body["total_rows"] == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "block interactive view indexing", context do
     set_config({"disk_monitor", "background_view_indexing_threshold", "100"})
@@ -43,6 +44,7 @@ defmodule DiskMonitorTest do
     assert resp.status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "block interactive database writes", context do
     set_config({"disk_monitor", "interactive_database_writes_threshold", "0"})

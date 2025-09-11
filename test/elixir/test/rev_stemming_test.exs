@@ -9,6 +9,7 @@ defmodule RevStemmingTest do
 
   @new_limit 5
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "revs limit update", context do
     db_name = context[:db_name]
@@ -33,6 +34,7 @@ defmodule RevStemmingTest do
     assert length(resp.body["_revisions"]["ids"]) == @new_limit
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "revs limit produces replication conflict ", context do
     db_name = context[:db_name]
@@ -83,6 +85,7 @@ defmodule RevStemmingTest do
     assert conflicted_rev == prev_conflicted_rev
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "revs limit is kept after compaction", context do
     db_name = context[:db_name]

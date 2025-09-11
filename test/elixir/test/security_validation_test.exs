@@ -51,6 +51,7 @@ defmodule SecurityValidationTest do
     """
   }
 
+  @tag skip_for_pouchdb_server: true
   setup_all do
     auth_db_name = random_db_name()
     {:ok, _} = create_db(auth_db_name)
@@ -96,6 +97,7 @@ defmodule SecurityValidationTest do
   end
 
   @tag :with_db_name
+  @tag skip_for_pouchdb_server: true
   test "Saving document using the wrong credentials", context do
     # spike:cat - which is wrong
     headers = @auth_headers[:spike_cat]
@@ -104,6 +106,7 @@ defmodule SecurityValidationTest do
     assert resp.status_code == 401
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Force basic login" do
     # spike:cat - which is wrong
     headers = @auth_headers[:spike_cat]
@@ -113,6 +116,7 @@ defmodule SecurityValidationTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Jerry can save a document normally", context do
     headers = @auth_headers[:jerry]
     assert Couch.get("/_session", headers: headers).body["userCtx"]["name"] == "jerry"
@@ -122,6 +126,7 @@ defmodule SecurityValidationTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Non-admin user cannot save a ddoc", context do
     headers = @auth_headers[:jerry]
     resp = Couch.post("/#{context[:db_name]}", body: @ddoc, headers: headers)
@@ -130,6 +135,7 @@ defmodule SecurityValidationTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Ddoc writes with admin and replication contexts", context do
     db_name = context[:db_name]
     sec_obj = %{admins: %{names: ["jerry"]}}
@@ -153,6 +159,7 @@ defmodule SecurityValidationTest do
     assert resp.body["error"] == "forbidden"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "_session API" do
     headers = @auth_headers[:jerry]
     resp = Couch.get("/_session", headers: headers)
@@ -161,6 +168,7 @@ defmodule SecurityValidationTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "try to set a wrong value for _security", context do
     db_name = context[:db_name]
     # try to do something lame
@@ -170,6 +178,7 @@ defmodule SecurityValidationTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Author presence and user security", context do
     db_name = context[:db_name]
     sec_obj = %{admin_override: false, admins: %{names: ["jerry"]}}
@@ -264,6 +273,7 @@ defmodule SecurityValidationTest do
     assert resp.status_code == 404
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Author presence and user security when replicated", _context do
     db_name = random_db_name()
     db_name_a = "#{db_name}_a"

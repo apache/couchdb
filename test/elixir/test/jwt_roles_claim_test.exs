@@ -29,6 +29,7 @@ defmodule JwtRolesClaimTest do
     }
   ]
 
+  @tag skip_for_pouchdb_server: true
   test "case: roles_claim_name (undefined) / roles_claim_path (undefined)" do
     server_config = @global_server_config
 
@@ -38,6 +39,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "case: roles_claim_name (defined) / roles_claim_path (undefined)" do
     server_config =
       [
@@ -54,6 +56,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "case: roles_claim_name (undefined) / roles_claim_path (defined)" do
     server_config =
       [
@@ -70,6 +73,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "case: roles_claim_name (defined) / roles_claim_path (defined)" do
     server_config =
       [
@@ -91,6 +95,7 @@ defmodule JwtRolesClaimTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "case: roles_claim_path with bad input" do
     server_config =
       [

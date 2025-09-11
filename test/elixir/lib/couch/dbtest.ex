@@ -179,9 +179,12 @@ defmodule Couch.DBTest do
     {:ok, resp}
   end
 
-  def reset_db(db_name, opts \\ []) do
+  def reset_db(db_name, _opts \\ []) do
     delete_db(db_name)
-    create_db(db_name, opts)
+    retry_until(fn ->
+      resp = Couch.get("/#{db_name}")
+      assert resp.status_code == 200
+    end)
   end
 
   # Use this function when testing authentication after resetting (re-creating)

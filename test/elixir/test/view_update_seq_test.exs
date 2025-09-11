@@ -33,6 +33,7 @@ defmodule ViewUpdateSeqTest do
     int
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "db info update seq", context do
     db_name = context[:db_name]
@@ -46,6 +47,7 @@ defmodule ViewUpdateSeqTest do
     assert seq_int(info["update_seq"]) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "_all_docs update seq", context do
     db_name = context[:db_name]
@@ -71,6 +73,7 @@ defmodule ViewUpdateSeqTest do
     assert seq_int(resp.body["update_seq"]) == 101
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "view update seq", context do
     db_name = context[:db_name]

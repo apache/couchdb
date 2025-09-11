@@ -64,6 +64,7 @@ defmodule PartitionSizeTest do
     body["rev"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "get empty partition", context do
     db_name = context[:db_name]
     partition = "non_existent_partition"
@@ -77,6 +78,7 @@ defmodule PartitionSizeTest do
     assert info["sizes"]["active"] == 0
   end
 
+  @tag skip_for_pouchdb_server: true
   test "unknown partition return's zero", context do
     db_name = context[:db_name]
     mk_docs(db_name)
@@ -88,6 +90,7 @@ defmodule PartitionSizeTest do
     assert info["sizes"]["active"] == 0
   end
 
+  @tag skip_for_pouchdb_server: true
   test "simple partition size", context do
     db_name = context[:db_name]
     save_doc(db_name, %{_id: "foo:bar", val: 42})
@@ -99,6 +102,7 @@ defmodule PartitionSizeTest do
     assert info["sizes"]["active"] > 0
   end
 
+  @tag skip_for_pouchdb_server: true
   test "adding docs increases partition sizes", context do
     db_name = context[:db_name]
     save_doc(db_name, %{_id: "foo:bar", val: 42})
@@ -113,6 +117,7 @@ defmodule PartitionSizeTest do
     assert post_info["sizes"]["active"] > pre_info["sizes"]["active"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "updating docs affects partition sizes", context do
     db_name = context[:db_name]
     rev1 = save_doc(db_name, %{_id: "foo:bar", val: ""})
@@ -142,6 +147,7 @@ defmodule PartitionSizeTest do
     assert info2["sizes"]["external"] > info3["sizes"]["external"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "deleting a doc affects partition sizes", context do
     db_name = context[:db_name]
     rev1 = save_doc(db_name, %{_id: "foo:bar", val: "some stuff here"})
@@ -159,6 +165,7 @@ defmodule PartitionSizeTest do
     assert info2["sizes"]["external"] < info1["sizes"]["external"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "design docs do not affect partition sizes", context do
     db_name = context[:db_name]
     mk_docs(db_name)
@@ -185,6 +192,7 @@ defmodule PartitionSizeTest do
     assert post_infos == pre_infos
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :skip_on_jenkins
   test "get all partition sizes", context do
     db_name = context[:db_name]
@@ -207,6 +215,7 @@ defmodule PartitionSizeTest do
     assert db_info["sizes"]["active"] >= asum
   end
 
+  @tag skip_for_pouchdb_server: true
   test "get partition size with attachment", context do
     db_name = context[:db_name]
 
@@ -234,6 +243,7 @@ defmodule PartitionSizeTest do
     assert foo_info["sizes"]["external"] <= db_info["sizes"]["external"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "attachments don't affect other partitions", context do
     db_name = context[:db_name]
     mk_docs(db_name)
@@ -278,6 +288,7 @@ defmodule PartitionSizeTest do
     assert esize == db_info["sizes"]["external"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition activity not affect other partition sizes", context do
     db_name = context[:db_name]
     mk_docs(db_name)
@@ -325,6 +336,7 @@ defmodule PartitionSizeTest do
     assert info2_delete == info2
   end
 
+  @tag skip_for_pouchdb_server: true
   test "purging docs decreases partition size", context do
     db_name = context[:db_name]
     mk_docs(db_name)

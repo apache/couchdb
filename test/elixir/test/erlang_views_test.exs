@@ -41,6 +41,7 @@ defmodule ErlangViewsTest do
 
   @word_list ["foo", "bar", "abc", "def", "baz", "xxyz"]
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Erlang map function", context do
     db_name = context[:db_name]
@@ -61,6 +62,7 @@ defmodule ErlangViewsTest do
     assert List.first(results["rows"])["value"] == "str1"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Erlang reduce function", context do
     db_name = context[:db_name]
@@ -81,6 +83,7 @@ defmodule ErlangViewsTest do
     assert List.first(results["rows"])["value"] == 2
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Erlang reduce function larger dataset", context do
     db_name = context[:db_name]

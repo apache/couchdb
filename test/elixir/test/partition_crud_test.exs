@@ -1,6 +1,7 @@
 defmodule PartitionCrudTest do
   use CouchTestCase
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "Sets partition in db info", context do
     db_name = context[:db_name]
@@ -27,6 +28,7 @@ defmodule PartitionCrudTest do
     assert doc["_id"] == id
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "PUT fails if a partition key is not supplied", context do
     db_name = context[:db_name]
@@ -44,6 +46,7 @@ defmodule PartitionCrudTest do
     assert Map.get(resp, :body) == error
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "PUT fails for partitions with _", context do
     db_name = context[:db_name]
@@ -61,6 +64,7 @@ defmodule PartitionCrudTest do
     assert Map.get(resp, :body) == error
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "PUT fails for bad partitions", context do
     db_name = context[:db_name]
@@ -94,6 +98,7 @@ defmodule PartitionCrudTest do
     assert doc["_id"] == id
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "GET to partition returns 400", context do
     db_name = context[:db_name]
@@ -103,6 +108,7 @@ defmodule PartitionCrudTest do
     assert resp.status_code == 400
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "POST and _bulk_get document", context do
     db_name = context[:db_name]
@@ -135,6 +141,7 @@ defmodule PartitionCrudTest do
            } == body
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "_bulk_get bad partitioned document", context do
     db_name = context[:db_name]
@@ -164,6 +171,7 @@ defmodule PartitionCrudTest do
            } == body
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "POST fails if a partition key is not supplied", context do
     db_name = context[:db_name]
@@ -194,6 +202,7 @@ defmodule PartitionCrudTest do
     assert resp.status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "_bulk_docs errors with missing partition key", context do
     db_name = context[:db_name]
@@ -213,6 +222,7 @@ defmodule PartitionCrudTest do
     assert Map.get(resp, :body) == error
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "_bulk_docs errors with bad partition key", context do
     db_name = context[:db_name]
@@ -232,6 +242,7 @@ defmodule PartitionCrudTest do
     assert Map.get(resp, :body) == error
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "_bulk_docs errors with bad doc key", context do
     db_name = context[:db_name]
@@ -279,7 +290,7 @@ defmodule PartitionCrudTest do
              "foo.txt" => %{
                "content_type" => "text/plain",
                #  "digest" => "md5-OW2BoZAtMqs1E+fAnLpNBw==",
-               # Temp remove the digest part since the digest value 
+               # Temp remove the digest part since the digest value
                # seems to be different on travis
                "digest" => body["_attachments"]["foo.txt"]["digest"],
                "length" => 31,
@@ -305,6 +316,7 @@ defmodule PartitionCrudTest do
   end
 
   @tag :with_partitioned_db
+  @tag skip_for_pouchdb_server: true
   test "can purge partitioned db docs", context do
     db_name = context[:db_name]
 
@@ -330,6 +342,7 @@ defmodule PartitionCrudTest do
     assert resp.body == %{"error" => "not_found", "reason" => "missing"}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "purge rejects unpartitioned docid", context do
     db_name = context[:db_name]
@@ -340,6 +353,7 @@ defmodule PartitionCrudTest do
     assert body["error"] == "illegal_docid"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "create database with bad `partitioned` value", _context do
     resp = Couch.put("/bad-db?partitioned=tru")
     assert resp.status_code == 400
@@ -350,6 +364,7 @@ defmodule PartitionCrudTest do
            }
   end
 
+  @tag skip_for_pouchdb_server: true
   test "can create unpartitioned system db", _context do
     Couch.delete("/_replicator")
     resp = Couch.put("/_replicator")
@@ -357,6 +372,7 @@ defmodule PartitionCrudTest do
     assert resp.body == %{"ok" => true}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "cannot create partitioned system db", _context do
     Couch.delete("/_replicator")
 
