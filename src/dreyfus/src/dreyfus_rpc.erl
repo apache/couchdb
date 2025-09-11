@@ -65,11 +65,6 @@ index_call(Fun, DbName, Index, QueryArgs, MinSeq) ->
             case dreyfus_index:await(Pid, MinSeq) of
                 {ok, IndexPid, _Seq} ->
                     dreyfus_index:Fun(IndexPid, QueryArgs);
-                % obsolete clauses, remove after upgrade
-                ok ->
-                    dreyfus_index:Fun(Pid, QueryArgs);
-                {ok, _Seq} ->
-                    dreyfus_index:Fun(Pid, QueryArgs);
                 Error ->
                     Error
             end;
