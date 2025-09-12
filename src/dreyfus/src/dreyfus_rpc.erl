@@ -17,6 +17,8 @@
 -include("dreyfus.hrl").
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 
+-define(RETRY_DELAY, 2100).
+
 % public api.
 -export([search/4, group1/4, group2/4, info/3, disk_size/3]).
 
@@ -50,6 +52,7 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
                 rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
             catch
                 exit:{noproc, _} ->
+                    timer:sleep(?RETRY_DELAY),
                     %% try one more time to handle the case when Clouseau's LRU
                     %% closed the index in the middle of our call
                     rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
