@@ -50,7 +50,6 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
                 rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
             catch
                 exit:{noproc, _} ->
-                    couch_log:error("Got NOPROC, re-trying", []),
                     %% try one more time to handle the case when Clouseau's LRU
                     %% closed the index in the middle of our call
                     rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
