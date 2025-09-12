@@ -29,8 +29,8 @@ application. Just follow the below instructions:
 #. Double click on the Zip file
 #. Drag and drop the Apache CouchDB.app into Applications folder
 
-.. _Download Apache CouchDB for macOS: http://couchdb.apache.org/#download
-.. _archive: http://archive.apache.org/dist/couchdb/binary/mac/
+.. _Download Apache CouchDB for macOS: https://couchdb.apache.org/#download
+.. _archive: https://archive.apache.org/dist/couchdb/binary/mac/
 
 That's all, now CouchDB is installed on your Mac:
 
@@ -56,7 +56,7 @@ and all formulae and install CouchDB with the following commands:
    brew update
    brew install couchdb
 
-.. _Homebrew: http://brew.sh/
+.. _Homebrew: https://brew.sh/
 
 Installation from source
 ========================
@@ -64,14 +64,14 @@ Installation from source
 Installation on macOS is possible from source. Download the `source tarball`_,
 extract it, and follow the instructions in the ``INSTALL.Unix.md`` file.
 
-.. _source tarball: http://couchdb.apache.org/#download
+.. _source tarball: https://couchdb.apache.org/#download
 
 Running as a Daemon
 -------------------
 
 CouchDB itself no longer ships with any daemonization scripts.
 
-The CouchDB team recommends `runit <http://smarden.org/runit/>`_ to
+The CouchDB team recommends `runit <https://smarden.org/runit/>`_ to
 run CouchDB persistently and reliably. Configuration of runit is
 straightforward; if you have questions, reach out to the CouchDB
 user mailing list.

@@ -14,9 +14,7 @@
 
 -export([
     % Load metrics from apps
-    create_metrics/1,
-    load_metrics_for_applications/0,
-    metrics_changed/2,
+    load/0,
 
     % Get various metric types
     get_counter/2,
@@ -26,10 +24,8 @@
     % Get histogram interval config settings
     histogram_interval_sec/0,
     histogram_safety_buffer_size_sec/0,
-    reset_histogram_interval_sec/0,
 
-    % Manage the main stats (metrics) persistent term map
-    replace_stats/1,
+    % Get the stats persistent term map
     stats/0,
     histograms/1,
 
@@ -37,6 +33,8 @@
     fetch/3,
     sample/4
 ]).
+
+-include_lib("stdlib/include/assert.hrl").
 
 -define(DEFAULT_INTERVAL_SEC, 10).
 
@@ -51,40 +49,76 @@
 
 % Persistent term keys
 -define(STATS_KEY, {?MODULE, stats}).
--define(HIST_TIME_INTERVAL_KEY, {?MODULE, hist_time_interval}).
+
+% Don't waste time looking for stats definition in some built-in and dependency
+% apps. This doesn't have to be an exhaustive list, it's just to avoid doing
+% extra work.
+%
+-define(SKIP_APPS, [
+    asn1,
+    b64url,
+    compiler,
+    cowlib,
+    crypto,
+    gun,
+    ibrowse,
+    inets,
+    jiffy,
+    kernel,
+    meck,
+    mochiweb,
+    os_mon,
+    public_key,
+    rebar,
+    rebar3,
+    recon,
+    runtime_tools,
+    sasl,
+    snappy,
+    ssl,
+    stdlib,
+    syntax_tools,
+    xmerl
+]).
+
+load() ->
+    Definitions = load_metrics_for_applications(),
+    Stats = create_metrics(Definitions),
+    persistent_term:put(?STATS_KEY, Stats),
+    Stats.
 
 load_metrics_for_applications() ->
     Apps = [element(1, A) || A <- application:loaded_applications()],
-    lists:foldl(fun load_metrics_for_application_fold/2, #{}, Apps).
+    Apps1 = [A || A <- Apps, not lists:member(A, ?SKIP_APPS)],
+    lists:foldl(fun load_metrics_for_application_fold/2, #{}, Apps1).
 
 load_metrics_for_application_fold(AppName, #{} = Acc) ->
-    case code:priv_dir(AppName) of
-        {error, _Error} ->
+    % For an existing application we should always be able to compute its
+    % priv_dir path, even though the directory itself may not exist or may not
+    % be accessible.
+    Dir = code:priv_dir(AppName),
+    ?assert(is_list(Dir), "Could not get application priv_dir " ++ atom_to_list(AppName)),
+    Path = filename:join(Dir, "stats_descriptions.cfg"),
+    % Expect some apps not to have stats descriptions and priv_dir paths to not even exist
+    case file:consult(Path) of
+        {ok, Descriptions} ->
+            DescMap = maps:map(
+                fun(_, TypeDesc) ->
+                    Type = proplists:get_value(type, TypeDesc, counter),
+                    Desc = proplists:get_value(desc, TypeDesc, <<>>),
+                    {Type, Desc}
+                end,
+                maps:from_list(Descriptions)
+            ),
+            maps:merge(Acc, DescMap);
+        {error, enoent} ->
             Acc;
-        Dir ->
-            case file:consult(Dir ++ "/stats_descriptions.cfg") of
-                {ok, Descriptions} ->
-                    DescMap = maps:map(
-                        fun(_, TypeDesc) ->
-                            Type = proplists:get_value(type, TypeDesc, counter),
-                            Desc = proplists:get_value(desc, TypeDesc, <<>>),
-                            {Type, Desc}
-                        end,
-                        maps:from_list(Descriptions)
-                    ),
-                    maps:merge(Acc, DescMap);
-                {error, _Error} ->
-                    Acc
-            end
+        {error, enotdir} ->
+            Acc;
+        {error, Error} ->
+            % Bail if we can't load stats for any other reason
+            error({couch_stats_load_error, Path, Error})
     end.
-
-metrics_changed(#{} = Map1, #{} = Map2) when map_size(Map1) =/= map_size(Map2) ->
-    % If their sizes are differently they are obvioulsy not the same
-    true;
-metrics_changed(#{} = Map1, #{} = Map2) when map_size(Map1) =:= map_size(Map2) ->
-    % If their intersection size is not the same as their individual size
-    % they are also not the same
-    map_size(maps:intersect(Map1, Map2)) =/= map_size(Map1).
 
 get_counter(Name, #{} = Stats) ->
     get_metric(Name, ?CNTR, Stats).
@@ -108,17 +142,7 @@ get_metric(Name, Type, Stats) when is_atom(Type), is_map(Stats) ->
     end.
 
 histogram_interval_sec() ->
-    case persistent_term:get(?HIST_TIME_INTERVAL_KEY, not_cached) of
-        not_cached ->
-            Time = config:get_integer("stats", "interval", ?DEFAULT_INTERVAL_SEC),
-            persistent_term:put(?HIST_TIME_INTERVAL_KEY, Time),
-            Time;
-        Val when is_integer(Val) ->
-            Val
-    end.
-
-reset_histogram_interval_sec() ->
-    persistent_term:erase(?HIST_TIME_INTERVAL_KEY).
+    config:get_integer("stats", "interval", ?DEFAULT_INTERVAL_SEC).
 
 histogram_safety_buffer_size_sec() ->
     ?HIST_WRAP_BUFFER_SIZE_SEC.
@@ -127,9 +151,6 @@ histogram_total_size_sec() ->
     % Add a safety buffer before and after the window couch_stats_server will
     % periodically clear.
     histogram_interval_sec() * 2 + ?HIST_WRAP_BUFFER_SIZE_SEC * 2.
-
-replace_stats(#{} = Stats) ->
-    persistent_term:put(?STATS_KEY, Stats).
 
 stats() ->
     persistent_term:get(?STATS_KEY, #{}).

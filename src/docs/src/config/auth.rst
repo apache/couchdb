@@ -329,6 +329,18 @@ Authentication Configuration
             [chttpd_auth]
             secret = 92de07df7e7a3fe14808cef90a7cc0d91
 
+        .. note::
+           You can change the secret value at any time. New cookies will be
+           signed with the new value and the previous value will be cached
+           for the duration of the auth ``timeout`` parameter.
+
+           The secret value should be set on all nodes at the same time. CouchDB
+           will tolerate a discrepancy, however, as each node sends its secret
+           to the other nodes of the cluster.
+
+           The easiest rotation method is to enable the config auto-reload
+           feature then update the secret in the ``.ini`` file of each node.
+
     .. config:option:: timeout :: Session timeout
 
         .. versionchanged:: 3.2 moved from [couch_httpd_auth] to [chttpd_auth] section

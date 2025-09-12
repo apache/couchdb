@@ -14,24 +14,45 @@ decoding Base64 URL values:
 
 ## Performance
 
-This implementation is significantly faster than the Erlang version it replaced
-in CouchDB. The `benchmark.escript` file contains the original implementation
-(using regular expressions to replace unsafe characters in the output of the
-`base64` module) and can be used to compare the two for strings of various
-lengths. For example:
+This implementation is faster than the Erlang version in OTP 26-28,
+especially for larger binaries (1000+ bytes). To benchmark clone
+erlperf repo and run `./benchmark.sh` script. In the future, it's
+plausible Erlang OTP's base64 module may become faster than the NIF,
+due to improvements in the JIT capabilities but it's not there yet.
 
 ```
-ERL_LIBS=_build/default/lib/b64url/ ./test/benchmark.escript 4 10 100 30
-erl :       75491270 bytes /  30 seconds =     2516375.67 bps
-nif :      672299342 bytes /  30 seconds =    22409978.07 bps
-```
+./benchmark.sh
 
-This test invocation spawns four workers that generate random strings between 10
-and 100 bytes in length and then perform an encode/decode on them in a tight
-loop for 30 seconds, and then reports the aggregate encoded data volume. Note
-that the generator overhead (`crypto:strong_rand_bytes/1`) is included in these
-results, so the relative difference in encoder throughput is rather larger than
-what's reported here.
+[...]
+
+--- bytes: 100 -----
+Code                   ||        QPS       Time   Rel
+encode_otp_100          1    1613 Ki     620 ns  100%
+encode_nif_100          1    1391 Ki     719 ns   86%
+Code                   ||        QPS       Time   Rel
+decode_nif_100          1    1453 Ki     688 ns  100%
+decode_otp_100          1    1395 Ki     716 ns   96%
+
+[...]
+
+--- bytes: 1000 -----
+Code                    ||        QPS       Time   Rel
+encode_nif_1000          1     369 Ki    2711 ns  100%
+encode_otp_1000          1     204 Ki    4904 ns   55%
+Code                    ||        QPS       Time   Rel
+decode_nif_1000          1     455 Ki    2196 ns  100%
+decode_otp_1000          1     178 Ki    5612 ns   39%
+
+[...]
+
+--- bytes: 10000000 -----
+Code                        ||        QPS       Time   Rel
+encode_nif_10000000          1         45   22388 us  100%
+encode_otp_10000000          1         19   51724 us   43%
+Code                        ||        QPS       Time   Rel
+decode_nif_10000000          1         55   18078 us  100%
+decode_otp_10000000          1         17   60020 us   30%
+```
 
 ## Timeslice Consumption
 

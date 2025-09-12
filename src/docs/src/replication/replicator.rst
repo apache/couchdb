@@ -490,13 +490,13 @@ Server restart
 
 When CouchDB is restarted, it checks its ``_replicator`` databases and
 restarts replications described by documents if they are not already in
-in a ``completed`` or ``failed`` state. If they are, they are ignored.
+a ``completed`` or ``failed`` state. If they are, they are ignored.
 
 Clustering
 ==========
 
 In a cluster, replication jobs are balanced evenly among all the nodes
-nodes such that a replication job runs on only one node at a time.
+such that a replication job runs on only one node at a time.
 
 Every time there is a cluster membership change, that is when nodes are
 added or removed, as it happens in a rolling reboot, replicator
@@ -760,12 +760,12 @@ There are multiple ways to specify usernames and passwords for replication endpo
             ...
         }
 
-   This is the prefererred format as it allows including characters like ``@``, ``:``
-   and others in the username and password fields.
+   This is the preferred format as it allows including characters like ``@``,
+   ``:`` and others in the username and password fields.
 
  - In the userinfo part of the endpoint URL. This allows for a more compact
-   endpoint represention however, it prevents using characters like ``@`` and ``:``
-   in usernames or passwords:
+   endpoint representation however, it prevents using characters like ``@``
+   and ``:`` in usernames or passwords:
 
     .. code-block:: javascript
 
@@ -795,14 +795,14 @@ There are multiple ways to specify usernames and passwords for replication endpo
 
     This method has the downside of the going through the extra step of base64
     encoding. In addition, it could give the impression that it encrypts or
-    hides the credentials so it could encourage invadvertent sharing and
+    hides the credentials so it could encourage inadvertent sharing and
     leaking credentials.
 
 When credentials are provided in multiple forms, they are selected in the following order:
 
   - ``"auth": {"basic": {...}}`` object
   - URL userinfo
-  - ``"Authorization: Basic ..."`` header.
+  - ``"Authorization: Basic ..."`` header
 
 First, the ``auth`` object is checked, and if credentials are defined there,
 they are used. If they are not, then URL userinfo is checked. If credentials

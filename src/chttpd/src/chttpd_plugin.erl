@@ -22,8 +22,6 @@
 
 -define(SERVICE_ID, chttpd).
 
--include_lib("couch/include/couch_db.hrl").
-
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------

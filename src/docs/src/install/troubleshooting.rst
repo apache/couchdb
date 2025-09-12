@@ -54,7 +54,7 @@ things:
 .. code-block:: text
 
     %% test SSL support. If this fails, ensure you have the OTP erlang-crypto library installed
-    crypto:md5_init().
+    crypto:hash_init(sha).
 
     %% test Snappy compression. If this fails, check your CouchDB configure script output or alternatively
     %% if your distro comes with erlang-snappy make sure you're using only the CouchDB supplied version
@@ -74,9 +74,8 @@ things:
     Erlang/OTP 17 [erts-6.2] [source] [64-bit] [smp:2:2] [async-threads:10] [kernel-poll:false]
 
     Eshell V6.2  (abort with ^G)
-    1> crypto:md5_init().
-    <<1,35,69,103,137,171,205,239,254,220,186,152,118,84,50,
-      16,0,0,0,0,0,0,0,0,0,0,0,0,0,...>>
+    1> crypto:hash_init(sha).
+    #Ref<0.3087268666.1613103106.180459>
     2> snappy:compress("gogogogogogogogogogogogogogo").
     {ok,<<28,4,103,111,102,2,0>>}
     3> jiffy:decode(jiffy:encode(<<"[1,2,3,4,5]">>)).

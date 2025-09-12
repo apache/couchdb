@@ -16,31 +16,33 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
+-define(TIMEOUT, 15).
+
 error_reporting_test_() ->
     {
         foreach,
         fun couch_replicator_test_helper:test_setup/0,
         fun couch_replicator_test_helper:test_teardown/1,
         [
-            ?TDEF_FE(t_fail_bulk_docs),
-            ?TDEF_FE(t_fail_changes_reader),
-            ?TDEF_FE(t_fail_doc_put_4xx_well_formed_json_error),
-            ?TDEF_FE(t_fail_doc_put_4xx_unexpected_json_error),
-            ?TDEF_FE(t_fail_doc_put_4xx_invalid_json_error),
-            ?TDEF_FE(t_skip_doc_put_401_errors),
-            ?TDEF_FE(t_skip_doc_put_403_errors),
-            ?TDEF_FE(t_skip_doc_put_413_errors),
-            ?TDEF_FE(t_skip_doc_put_415_errors),
-            ?TDEF_FE(t_skip_doc_put_invalid_attachment_name),
-            ?TDEF_FE(t_fail_revs_diff),
-            ?TDEF_FE(t_fail_bulk_get, 15),
-            ?TDEF_FE(t_fail_open_docs_get, 15),
-            ?TDEF_FE(t_fail_changes_queue),
-            ?TDEF_FE(t_fail_changes_manager),
-            ?TDEF_FE(t_fail_changes_reader_proc),
-            ?TDEF_FE(t_dont_start_duplicate_job),
-            ?TDEF_FE(t_can_start_multiple_jobs),
-            ?TDEF_FE(t_stop_duplicate_job)
+            ?TDEF_FE(t_fail_bulk_docs, ?TIMEOUT),
+            ?TDEF_FE(t_fail_changes_reader, ?TIMEOUT),
+            ?TDEF_FE(t_fail_doc_put_4xx_well_formed_json_error, ?TIMEOUT),
+            ?TDEF_FE(t_fail_doc_put_4xx_unexpected_json_error, ?TIMEOUT),
+            ?TDEF_FE(t_fail_doc_put_4xx_invalid_json_error, ?TIMEOUT),
+            ?TDEF_FE(t_skip_doc_put_401_errors, ?TIMEOUT),
+            ?TDEF_FE(t_skip_doc_put_403_errors, ?TIMEOUT),
+            ?TDEF_FE(t_skip_doc_put_413_errors, ?TIMEOUT),
+            ?TDEF_FE(t_skip_doc_put_415_errors, ?TIMEOUT),
+            ?TDEF_FE(t_skip_doc_put_invalid_attachment_name, ?TIMEOUT),
+            ?TDEF_FE(t_fail_revs_diff, ?TIMEOUT),
+            ?TDEF_FE(t_fail_bulk_get, ?TIMEOUT),
+            ?TDEF_FE(t_fail_open_docs_get, ?TIMEOUT),
+            ?TDEF_FE(t_fail_changes_queue, ?TIMEOUT),
+            ?TDEF_FE(t_fail_changes_manager, ?TIMEOUT),
+            ?TDEF_FE(t_fail_changes_reader_proc, ?TIMEOUT),
+            ?TDEF_FE(t_dont_start_duplicate_job, ?TIMEOUT),
+            ?TDEF_FE(t_can_start_multiple_jobs, ?TIMEOUT),
+            ?TDEF_FE(t_stop_duplicate_job, ?TIMEOUT)
         ]
     }.
 

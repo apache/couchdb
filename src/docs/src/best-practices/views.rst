@@ -41,9 +41,12 @@ Here is a worked example, assuming your ``/db/_design/ddoc`` needs to be updated
    You can track the indexing progress via the ``/_active_tasks`` endpoint, or
    through the :ref:`fauxton` web interface.
 
-4. When the index is done being built, re-upload the updated design document to
-   ``/db/_design/ddoc`` (or copy the document). The ``ddoc`` document will now
-   reference the same view indexes already built for ``_design/ddoc-new``.
+4. Confirm the index is built by querying it (without ``stale=ok`` or ``update=false``)
+   and confirming you get results.
+
+5. re-upload the updated design document to ``/db/_design/ddoc`` (or copy the
+   document). The ``ddoc`` document will now reference the same view indexes
+   already built for ``_design/ddoc-new``.
 
 5. Delete ``/db/_design/ddoc-new`` and/or ``/db/_design/ddoc-old`` at your
    discretion. Don't forget to trigger :ref:`compact/views/cleanup` to reclaim

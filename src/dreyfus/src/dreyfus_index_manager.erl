@@ -46,7 +46,7 @@ get_disk_size(DbName, #index{sig = Sig}) ->
 % gen_server functions.
 
 init([]) ->
-    couch_util:set_mqd_off_heap(?MODULE),
+    erlang:process_flag(message_queue_data, off_heap),
     ets:new(?BY_SIG, [set, private, named_table]),
     ets:new(?BY_PID, [set, private, named_table]),
     couch_event:link_listener(?MODULE, handle_db_event, nil, [all_dbs]),

@@ -57,9 +57,9 @@ This is the simplest way to go.
     database/index files.
 
 .. _Open up Fauxton: http://localhost:5984/_utils
-.. _CouchDB web site: http://couchdb.apache.org/
-.. _archive: http://archive.apache.org/dist/couchdb/binary/win/
-.. _the latest Windows binaries: http://couchdb.apache.org/#download
+.. _CouchDB web site: https://couchdb.apache.org/
+.. _archive: https://archive.apache.org/dist/couchdb/binary/win/
+.. _the latest Windows binaries: https://couchdb.apache.org/#download
 .. _.NET Framework v3.5: https://docs.microsoft.com/en-us/dotnet/framework/install/dotnet-35-windows-10
 
 .. _install/windows/silent:

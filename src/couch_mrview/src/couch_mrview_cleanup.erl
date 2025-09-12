@@ -14,7 +14,8 @@
 
 -export([
     run/1,
-    cleanup/2
+    cleanup/2,
+    cleanup_processes/2
 ]).
 
 run(Db) ->
@@ -23,7 +24,8 @@ run(Db) ->
     {ok, Db1} = couch_db:reopen(Db),
     Sigs = couch_mrview_util:get_signatures(Db1),
     ok = cleanup_purges(Db1, Sigs, Checkpoints),
-    ok = cleanup_indices(Sigs, Indices).
+    ok = cleanup_indices(Sigs, Indices),
+    ok = cleanup_processes(Db1, Sigs).
 
 % erpc endpoint for fabric_index_cleanup:cleanup_indexes/2
 %
@@ -34,7 +36,8 @@ cleanup(Dbs, #{} = Sigs) ->
                 Indices = couch_mrview_util:get_index_files(Db),
                 Checkpoints = couch_mrview_util:get_purge_checkpoints(Db),
                 ok = cleanup_purges(Db, Sigs, Checkpoints),
-                ok = cleanup_indices(Sigs, Indices)
+                ok = cleanup_indices(Sigs, Indices),
+                ok = cleanup_processes(Db, Sigs)
             end,
             Dbs
         )
@@ -42,6 +45,37 @@ cleanup(Dbs, #{} = Sigs) ->
         error:database_does_not_exist ->
             ok
     end.
+
+% Clean up indexer processes whose signature is no longer in the valid set.
+%
+cleanup_processes(ShardName, #{} = Sigs) when is_binary(ShardName) ->
+    Entries = couch_index_server:shard_entries(ShardName),
+    lists:foreach(
+        fun({DDocId, Sig}) ->
+            HexSig = couch_util:to_hex_bin(Sig),
+            case maps:find(HexSig, Sigs) of
+                {ok, ValidDDocs} ->
+                    % Sig in use. If DDocId doesn't reference it any
+                    % longer drop the stale by_db row
+                    case maps:is_key(DDocId, ValidDDocs) of
+                        true ->
+                            ok;
+                        false ->
+                            couch_index_server:forget_ddoc_binding(ShardName, DDocId, Sig)
+                    end;
+                error ->
+                    case couch_index_server:shard_index_pid(ShardName, Sig) of
+                        {ok, IndexPid} ->
+                            (catch gen_server:cast(IndexPid, {ddoc_updated, {not_found, deleted}}));
+                        not_found ->
+                            ok
+                    end
+            end
+        end,
+        Entries
+    );
+cleanup_processes(Db, #{} = Sigs) ->
+    cleanup_processes(couch_db:name(Db), Sigs).
 
 cleanup_purges(Db, Sigs, Checkpoints) ->
     couch_index_util:cleanup_purges(Db, Sigs, Checkpoints).

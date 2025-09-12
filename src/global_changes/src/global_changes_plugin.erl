@@ -14,8 +14,6 @@
 
 -export([transform_change/3]).
 
--include_lib("couch/include/couch_db.hrl").
-
 -define(SERVICE_ID, global_changes).
 
 %% ------------------------------------------------------------------

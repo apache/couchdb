@@ -98,12 +98,12 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
     {_, "128"} ->
         "128";
     undefined ->
-        "91";
+        "128";
     {_, Unsupported} ->
         io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
         erlang:halt(1);
     false ->
-        "91"
+        "128"
 end.
 
 ConfigH = [
@@ -256,7 +256,7 @@ CouchJSEnv = case SMVsn of
         ]
 end.
 
-BrewIcuPrefixCmd = "brew --prefix icu4c".
+BrewIcuPrefixCmd = "brew --prefix icu4c 2> /dev/null".
 GenericIcuIncludePaths = "-I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include".
 GenericIcuLibPaths = "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib".
 
@@ -275,7 +275,7 @@ IcuLibPath = case WithBrew of
     true -> "-L" ++ string:trim(os:cmd(BrewIcuPrefixCmd)) ++ "/lib"
 end.
 
-IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
+IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common -fvisibility=hidden"},
           {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"},
           {"LDFLAGS", "$LDFLAGS"},
           {"CFLAGS", "$CFLAGS"}].
@@ -289,7 +289,7 @@ IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
-CouchCFileEnv = [{"CFLAGS", "$CFLAGS -Wall -Werror -DNDEBUG -O3"}].
+CouchCFileEnv = [{"CFLAGS", "$CFLAGS -Wall -Werror -DNDEBUG -O3 -fvisibility=hidden"}].
 CouchCFilePath = "priv/couch_cfile.so".
 CouchCFileSrc = ["priv/couch_cfile/*.c"].
 

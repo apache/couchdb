@@ -30,7 +30,8 @@
     doc_queue,
     write_queue,
     qserver=nil,
-    view_info=#{}
+    view_info=#{},
+    start_time
 }).
 
 

@@ -65,7 +65,6 @@
     format_status/1
 ]).
 
--include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 
 -type headers() :: [{string(), string()}].

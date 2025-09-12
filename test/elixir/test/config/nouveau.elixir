@@ -6,6 +6,7 @@
     "search returns all items for GET",
     "search returns all items for POST",
     "search returns all items (paginated)",
+    "search returns all matches for hello by relevance",
     "search for foo:bar",
     "search for numeric ranges with locales",
     "multiple values for stored field",
@@ -30,6 +31,7 @@
     "purge with conflicts",
     "index same field with different field types",
     "index not found",
+    "index function throws",
     "meta",
     "stale search"
   ]

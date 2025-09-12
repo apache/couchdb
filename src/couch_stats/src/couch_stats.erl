@@ -14,7 +14,6 @@
 
 -export([
     fetch/0,
-    reload/0,
     sample/1,
     increment_counter/1,
     increment_counter/2,
@@ -32,9 +31,6 @@ fetch() ->
     StartSec = now_sec() - (Seconds - 1),
     % Last -1 is because the interval ends are inclusive
     couch_stats_util:fetch(stats(), StartSec, Seconds).
-
-reload() ->
-    couch_stats_server:reload().
 
 -spec sample(any()) -> stat().
 sample(Name) ->
@@ -112,7 +108,6 @@ couch_stats_test_() ->
         [
             ?TDEF_FE(t_fetch_metrics),
             ?TDEF_FE(t_sample_metrics),
-            ?TDEF_FE(t_reload),
             ?TDEF_FE(t_increment_counter),
             ?TDEF_FE(t_decrement_counter),
             ?TDEF_FE(t_update_gauge),
@@ -143,10 +138,6 @@ t_sample_metrics(_) ->
     ?assert(Count >= 0),
 
     ?assertEqual(0, sample([couch_replicator, jobs, total])).
-
-t_reload(_) ->
-    % This is tested in detail in couch_stats_server.
-    ?assertEqual(ok, reload()).
 
 t_increment_counter(_) ->
     [increment_counter([fsync, count]) || _ <- lists:seq(1, 1000)],
@@ -190,8 +181,6 @@ t_access_invalid_metrics(_) ->
     ?assertEqual({error, invalid_metric}, decrement_counter([fsync, time], 100)),
     ?assertEqual({error, invalid_metric}, update_gauge([fsync, count], 100)),
     ?assertEqual({error, invalid_metric}, update_histogram([fsync, count], 100)),
-    ?assertThrow({invalid_metric, _}, update_histogram([fsync, count], Fun)),
-    InvalidMetrics = #{[bad] => {invalid, <<"desc">>}},
-    ?assertThrow({unknown_metric, _}, couch_stats_util:create_metrics(InvalidMetrics)).
+    ?assertThrow({invalid_metric, _}, update_histogram([fsync, count], Fun)).
 
 -endif.

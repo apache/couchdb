@@ -22,8 +22,6 @@
     init/1
 ]).
 
--include("mem3_reshard.hrl").
-
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 

@@ -17,6 +17,7 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
@@ -47,10 +48,12 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, insufficient_storage} ->
-                Callback({error, insufficient_storage}, Acc);
+                Callback(
+                    {error, {insufficient_storage, <<"not enough room to update index">>}}, Acc
+                );
             {ok, Workers} ->
                 try
-                    go2(DbName, Workers, VInfo, CoordArgs, Callback, Acc)
+                    go2(DbName, DDoc#doc.id, VName, Workers, VInfo, CoordArgs, Callback, Acc)
                 after
                     fabric_streams:cleanup(Workers)
                 end;
@@ -64,7 +67,7 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-go2(DbName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
+go2(DbName, DDocId, VName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
     #mrargs{limit = Limit, skip = Skip, keys = Keys, update_seq = UpdateSeq} = Args,
     RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
     OsProc =
@@ -74,6 +77,8 @@ go2(DbName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
         end,
     State = #collector{
         db_name = DbName,
+        ddoc_name = DDocId,
+        view_name = VName,
         query_args = Args,
         callback = Callback,
         counters = fabric_dict:init(Workers, 0),

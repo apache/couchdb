@@ -32,7 +32,8 @@
     nodes_db/0,
     shards_db/0,
     users_db/0,
-    find_next_node/0
+    find_next_node/0,
+    find_previous_node/0
 ]).
 -export([
     local_dbs/0
@@ -307,10 +308,19 @@ find_next_node() ->
     Self = node(),
     LiveNodes = [Self | nodes()],
     Mem3Nodes = mem3:nodes(),
-    find_next_node(Self, LiveNodes, Mem3Nodes).
+    find_next_node(Self, LiveNodes, lists:sort(Mem3Nodes)).
 
-find_next_node(Self, LiveNodes, Mem3Nodes) ->
-    SortedMem3Nodes = lists:sort(Mem3Nodes),
+find_previous_node() ->
+    Self = node(),
+    LiveNodes = [Self | nodes()],
+    Mem3Nodes = mem3:nodes(),
+    % Previous node is the "next" node in the reverse sorted list
+    find_previous_node(Self, LiveNodes, lists:sort(Mem3Nodes)).
+
+find_previous_node(Self, LiveNodes, SortedMem3Nodes) ->
+    find_next_node(Self, LiveNodes, lists:reverse(SortedMem3Nodes)).
+
+find_next_node(Self, LiveNodes, SortedMem3Nodes) ->
     LiveMem3Nodes = [N || N <- SortedMem3Nodes, lists:member(N, LiveNodes)],
     case LiveMem3Nodes of
         [] ->
@@ -404,13 +414,34 @@ is_job_current(#job{name = Name, node = Node}, ConnectedNodes, Mem3Nodes) ->
 
 find_next_node_test() ->
     ?assertEqual(n, find_next_node(n, [n], [])),
+    ?assertEqual(n, find_previous_node(n, [], [])),
+
     ?assertEqual(n, find_next_node(n, [n], [n])),
+    ?assertEqual(n, find_previous_node(n, [n], [n])),
+
+    % We're in the middle
     ?assertEqual(x, find_next_node(n, [a, n, x], [a, n, x])),
+    ?assertEqual(a, find_previous_node(n, [a, n, x], [a, n, x])),
+
+    % Two nodes, we're at the end (start, for previous)
     ?assertEqual(a, find_next_node(n, [a, n], [a, n])),
+    ?assertEqual(a, find_previous_node(n, [a, n], [a, n])),
+
+    % We're on a node that's not in mem3:nodes() so next/prev is ourselves.
     ?assertEqual(n, find_next_node(n, [a, n], [a])),
-    ?assertEqual(x, find_next_node(n, [n, x], [x, n])),
+    ?assertEqual(n, find_previous_node(n, [a, n], [a])),
+
+    % Two nodes, we're at the start (end, for previous). Live nodes unsorted
+    ?assertEqual(x, find_next_node(n, [x, n], [n, x])),
+    ?assertEqual(x, find_previous_node(n, [x, n], [n, x])),
+
+    % Two nodes, we're at the start (end, for previous). Live nodes are sorted
     ?assertEqual(x, find_next_node(n, [n, x], [n, x])),
-    ?assertEqual(a, find_next_node(n, [a, n, x], [a, n, y])).
+    ?assertEqual(x, find_previous_node(n, [n, x], [n, x])),
+
+    % node x is not in mem3:nodes() and node and y is not live
+    ?assertEqual(a, find_next_node(n, [a, n, x], [a, n, y])),
+    ?assertEqual(a, find_previous_node(n, [a, n, x], [a, n, y])).
 
 is_job_current_test_() ->
     {

@@ -30,7 +30,8 @@
     r,
     args,
     reqs,
-    workers
+    workers,
+    errors = []
 }).
 
 go(_DbName, [], _Options) ->
@@ -72,6 +73,9 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Worker, #st{} = St) ->
     Reqs1 = maps:fold(FoldFun, Reqs, DeadWorkers),
     Error = {error, {nodedown, <<"progress not possible">>}},
     handle_error(Error, St#st{workers = Workers1, reqs = Reqs1});
+handle_message({rexi_EXIT, {maintenance_mode, _Node}}, Worker, #st{} = St) ->
+    % Remove the node to make it easier to de-duplicate later
+    handle_message(maintenance_mode, Worker, St);
 handle_message({rexi_EXIT, Reason}, Worker, #st{} = St) ->
     handle_message(Reason, Worker, St);
 handle_message({error, Reason}, Worker, #st{} = St) ->
@@ -112,7 +116,7 @@ responses_fold({ArgRef, NewResp}, #{} = Reqs) ->
         }
     }.
 
-handle_error(Error, #st{workers = Workers, reqs = Reqs} = St) ->
+handle_error(Error, #st{workers = Workers, errors = Errors, reqs = Reqs} = St) ->
     case success_possible(Reqs) of
         true ->
             case have_viable_workers(Workers) of
@@ -124,7 +128,8 @@ handle_error(Error, #st{workers = Workers, reqs = Reqs} = St) ->
             end;
         false ->
             stop_workers(Workers),
-            {error, Error}
+            % We may have multiple errors but need to pick one, so pick the first
+            {error, hd(merge_errors(Errors, Error))}
     end.
 
 % De-duplicate identical responses as we go along
@@ -141,6 +146,17 @@ sort_key({ok, #doc{id = Id, revs = Revs, deleted = Deleted}}) ->
     {Revs, Deleted, Id};
 sort_key(NotFound) ->
     NotFound.
+
+% We're trying to hide maintenance mode if possible. So if there are
+% non-maintenance mode errors, such as timeouts, etc, we remove the maintenance
+% mode from the list, otherwise, we keep it.
+%
+merge_errors(Errors, Error) ->
+    Errors1 = lists:uniq([Error | Errors]),
+    case Errors1 of
+        [maintenance_mode] -> [maintenance_mode];
+        [_ | _] -> lists:delete(maintenance_mode, Errors1)
+    end.
 
 % Build a #{ArgRef => #req{}} map. ArgRef references the initial {{Id, Revs},
 % Opts} tuples and the #req{} is a record keeping track of response for just
@@ -206,11 +222,17 @@ have_viable_workers(#{} = Workers) ->
     map_size(Workers) > 0.
 
 % We can still return success if we either have some waiting workers, or at
-% least one response already for each {Id, Revs} pair.
+% least one response already for each {Id, Revs} pair. We don't simply check
+% for W + R > 0 but check that responses have any entries, as not_found entries
+% won't bump the R values.
 %
 success_possible(#{} = Reqs) ->
-    Fun = fun(_, #req{wcnt = W, rcnt = R}, Acc) -> Acc andalso W + R > 0 end,
-    maps:fold(Fun, true, Reqs).
+    maps:fold(fun success_possible_fold/3, true, Reqs).
+
+success_possible_fold(_Key, #req{}, _Acc = false) ->
+    false;
+success_possible_fold(_Key, #req{wcnt = W, responses = Resps}, _Acc) ->
+    W > 0 orelse Resps =/= [].
 
 r_met(#{} = Reqs, ExpectedR) ->
     Fun = fun(_, #req{rcnt = R}, Acc) -> min(R, Acc) end,
@@ -316,6 +338,8 @@ open_revs_quorum_test_() ->
                 ?TDEF_FE(t_finish_quorum),
                 ?TDEF_FE(t_no_quorum_on_different_responses),
                 ?TDEF_FE(t_no_quorum_on_not_found),
+                ?TDEF_FE(t_not_found_and_maintenance_mode),
+                ?TDEF_FE(t_all_maintenance_mode),
                 ?TDEF_FE(t_done_on_third),
                 ?TDEF_FE(t_all_different_responses),
                 ?TDEF_FE(t_ancestors_merge_correctly),
@@ -399,6 +423,22 @@ t_no_quorum_on_not_found(_) ->
     {ok, S2} = handle_message([[]], W2, S1),
     Res2 = handle_message([[foo2(), bar1()]], W3, S2),
     ?assertEqual({stop, [[foo2(), bar1()]]}, Res2).
+
+t_not_found_and_maintenance_mode(_) ->
+    S0 = #st{workers = Workers0} = st0(),
+    [W1, W2, W3] = lists:sort(maps:keys(Workers0)),
+    {ok, S1} = handle_message([[bazNF()]], W1, S0),
+    {ok, S2} = handle_message({error, timeout}, W2, S1),
+    Res = handle_message({rexi_EXIT, {maintenance_mode, foo}}, W3, S2),
+    ?assertEqual({stop, [[bazNF()]]}, Res).
+
+t_all_maintenance_mode(_) ->
+    S0 = #st{workers = Workers0} = st0(),
+    [W1, W2, W3] = lists:sort(maps:keys(Workers0)),
+    {ok, S1} = handle_message({rexi_EXIT, {maintenance_mode, foo}}, W1, S0),
+    {ok, S2} = handle_message({rexi_EXIT, {maintenance_mode, foo}}, W2, S1),
+    Res = handle_message({rexi_EXIT, {maintenance_mode, foo}}, W3, S2),
+    ?assertEqual({error, maintenance_mode}, Res).
 
 t_done_on_third(_) ->
     S0 = #st{workers = Workers0} = st0(),

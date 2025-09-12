@@ -12,6 +12,8 @@
 
 -record(collector, {
     db_name=nil,
+    ddoc_name=nil,
+    view_name=nil,
     query_args,
     callback,
     counters,

@@ -119,11 +119,11 @@ init({DbName, Index}) ->
             case couch_db:open_int(DbName, []) of
                 {ok, Db} ->
                     try
-                        couch_db:monitor(Db)
+                        couch_db:monitor(Db),
+                        dreyfus_util:maybe_create_local_purge_doc(Db, Pid, Index)
                     after
                         couch_db:close(Db)
                     end,
-                    dreyfus_util:maybe_create_local_purge_doc(Db, Pid, Index),
                     proc_lib:init_ack({ok, self()}),
                     gen_server:enter_loop(?MODULE, [], State);
                 Error ->

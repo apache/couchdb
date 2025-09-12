@@ -68,7 +68,7 @@ teardown(Ctx) ->
     catch application:stop(mem3),
     os:unsetenv("COUCHDB_ZONE"),
     Filename = config:get("mem3", "nodes_db", "_nodes") ++ ".couch",
-    file:delete(filename:join([?BUILDDIR(), "tmp", "data", Filename])),
+    file:delete(filename:join([?BUILDDIR(), "data", Filename])),
     case config:get("couch_httpd_auth", "authentication_db") of
         undefined -> ok;
         DbName -> couch_server:delete(list_to_binary(DbName), [])

@@ -63,6 +63,39 @@ results from deeper in the result set.
 A nouveau index will inherit the partitioning type from the ``options.partitioned`` field
 of the design document that contains it.
 
+.. _ddoc/nouveau/lucene_upgrade:
+
+Lucene Version Upgrade
+======================
+
+Nouveau has been upgraded to use Lucene 10, earlier releases used Lucene 9.
+
+Nouveau can query and update indexes created by Lucene 9 but will not create new
+ones. The index definition can optionally define a ``lucene_version`` field
+(which must be either 9 or 10 expressed as an integer). If not specified
+when defining a new index the current version (10) will be automatically
+added to the definition.
+
+As Lucene only supports indexes up to one major release behind the current, it
+is important to rebuild all indexes to the current release. As Lucene major
+releases are infrequent, and Nouveau supports 9 and 10 versions simultaneously
+it is only necessary to rebuild version 9 indexes before Nouveau upgrades to
+Lucene 11 (when it exists). A ``couch_scanner`` plugin is available to
+automate this process, and can be enabled as follows;
+
+.. code-block:: ini
+
+    [couch_scanner_plugins]
+    nouveau_index_upgrader = true
+
+The plugin will scan all design documents for index definitions either with no
+``lucene_version`` field or one equal to a previous version (lower than
+10). The new index will be built by the plugin and, on successful
+completion, will update the ``lucene_version`` field in the index
+definition. Search requests against that index will seamlessly switch from the
+old index to the new one. Invoking the :ref:`_nouveau_cleanup <api/db/nouveau_cleanup>`
+will delete the old indexes.
+
 .. _ddoc/nouveau/field_types:
 
 Field Types

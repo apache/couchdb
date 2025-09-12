@@ -350,7 +350,7 @@ maybe_create_local_purge_doc(Db, IndexPid, Index) ->
     case couch_db:open_doc(Db, DocId) of
         {not_found, _} ->
             DbPurgeSeq = couch_db:get_purge_seq(Db),
-            clouseau_rpc:set_purge_seq(IndexPid, DbPurgeSeq),
+            ok = clouseau_rpc:set_purge_seq(IndexPid, DbPurgeSeq),
             DocContent = dreyfus_util:get_local_purge_doc_body(
                 Db, DocId, DbPurgeSeq, Index
             ),

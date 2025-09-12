@@ -53,7 +53,7 @@ update_index(#index{} = Index) ->
     end.
 
 init(_) ->
-    couch_util:set_mqd_off_heap(?MODULE),
+    erlang:process_flag(message_queue_data, off_heap),
     ets:new(?BY_DBSIG, [set, named_table]),
     ets:new(?BY_REF, [set, named_table]),
     couch_event:link_listener(?MODULE, handle_db_event, nil, [all_dbs]),

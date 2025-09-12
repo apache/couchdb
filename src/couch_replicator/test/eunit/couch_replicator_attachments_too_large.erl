@@ -32,13 +32,13 @@ attachment_too_large_replication_test_() ->
 should_succeed({_Ctx, {Source, Target}}) ->
     create_doc_with_attachment(Source, <<"doc">>, 1000),
     config:set("couchdb", "max_attachment_size", "1000", _Persist = false),
-    ok = replicate(Source, Target),
+    {ok, _} = replicate(Source, Target),
     ?assertEqual(ok, compare(Source, Target)).
 
 should_fail({_Ctx, {Source, Target}}) ->
     create_doc_with_attachment(Source, <<"doc">>, 1000),
     config:set("couchdb", "max_attachment_size", "999", _Persist = false),
-    ok = replicate(Source, Target),
+    {ok, _} = replicate(Source, Target),
     ?assertError({not_found, <<"doc">>}, compare(Source, Target)).
 
 create_doc_with_attachment(DbName, DocId, AttSize) ->

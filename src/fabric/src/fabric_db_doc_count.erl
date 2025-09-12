@@ -14,9 +14,7 @@
 
 -export([go/1]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 go(DbName) ->
     Shards = mem3:shards(DbName),

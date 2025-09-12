@@ -20,7 +20,6 @@
     update_props/4
 ]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -31,48 +30,13 @@
 }).
 
 set_revs_limit(DbName, Limit, Options) ->
-    Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, set_revs_limit, [Limit, Options]),
-    Handler = fun handle_revs_message/3,
-    Acc0 = {Workers, length(Workers) - 1},
-    case fabric_util:recv(Workers, #shard.ref, Handler, Acc0) of
-        {ok, ok} ->
-            ok;
-        {timeout, {DefunctWorkers, _}} ->
-            fabric_util:log_timeout(DefunctWorkers, "set_revs_limit"),
-            {error, timeout};
-        Error ->
-            Error
-    end.
-
-handle_revs_message(ok, _, {_Workers, 0}) ->
-    {stop, ok};
-handle_revs_message(ok, Worker, {Workers, Waiting}) ->
-    {ok, {lists:delete(Worker, Workers), Waiting - 1}};
-handle_revs_message(Error, _, _Acc) ->
-    {error, Error}.
+    set_meta(DbName, set_revs_limit, [Limit, Options]).
 
 set_purge_infos_limit(DbName, Limit, Options) ->
-    Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, set_purge_infos_limit, [Limit, Options]),
-    Handler = fun handle_purge_message/3,
-    Acc0 = {Workers, length(Workers) - 1},
-    case fabric_util:recv(Workers, #shard.ref, Handler, Acc0) of
-        {ok, ok} ->
-            ok;
-        {timeout, {DefunctWorkers, _}} ->
-            fabric_util:log_timeout(DefunctWorkers, "set_purged_docs_limit"),
-            {error, timeout};
-        Error ->
-            Error
-    end.
+    set_meta(DbName, set_purge_infos_limit, [Limit, Options]).
 
-handle_purge_message(ok, _, {_Workers, 0}) ->
-    {stop, ok};
-handle_purge_message(ok, Worker, {Workers, Waiting}) ->
-    {ok, {lists:delete(Worker, Workers), Waiting - 1}};
-handle_purge_message(Error, _, _Acc) ->
-    {error, Error}.
+update_props(DbName, K, V, Options) ->
+    set_meta(DbName, update_props, [K, V, Options]).
 
 set_security(DbName, SecObj, Options) ->
     Shards = mem3:shards(DbName),
@@ -200,24 +164,44 @@ maybe_finish_get(#acc{workers = []} = Acc) ->
 maybe_finish_get(Acc) ->
     {ok, Acc}.
 
-update_props(DbName, K, V, Options) ->
+set_meta(DbName, Fun, Args) when is_atom(Fun), is_list(Args) ->
     Shards = mem3:shards(DbName),
-    Workers = fabric_util:submit_jobs(Shards, update_props, [K, V, Options]),
-    Handler = fun handle_update_props_message/3,
-    Acc0 = {Workers, length(Workers) - 1},
-    case fabric_util:recv(Workers, #shard.ref, Handler, Acc0) of
+    Workers = fabric_util:submit_jobs(Shards, Fun, Args),
+    RexiMon = fabric_util:create_monitors(Shards),
+    Acc0 = {fabric_dict:init(Workers, nil), []},
+    try fabric_util:recv(Workers, #shard.ref, fun handle_set_meta_message/3, Acc0) of
         {ok, ok} ->
             ok;
-        {timeout, {DefunctWorkers, _}} ->
-            fabric_util:log_timeout(DefunctWorkers, "update_props"),
+        {timeout, {WorkersDict, _}} ->
+            DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
+            fabric_util:log_timeout(DefunctWorkers, atom_to_list(Fun)),
             {error, timeout};
         Error ->
             Error
+    after
+        rexi_monitor:stop(RexiMon)
     end.
 
-handle_update_props_message(ok, _, {_Workers, 0}) ->
-    {stop, ok};
-handle_update_props_message(ok, Worker, {Workers, Waiting}) ->
-    {ok, {lists:delete(Worker, Workers), Waiting - 1}};
-handle_update_props_message(Error, _, _Acc) ->
-    {error, Error}.
+handle_set_meta_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, {Cntrs, Res}) ->
+    case fabric_ring:node_down(NodeRef, Cntrs, Res, [all]) of
+        {ok, Cntrs1} -> {ok, {Cntrs1, Res}};
+        error -> {error, {nodedown, <<"progress not possible">>}}
+    end;
+handle_set_meta_message({rexi_EXIT, Reason}, Shard, {Cntrs, Res}) ->
+    case fabric_ring:handle_error(Shard, Cntrs, Res, [all]) of
+        {ok, Cntrs1} -> {ok, {Cntrs1, Res}};
+        error -> {error, Reason}
+    end;
+handle_set_meta_message(ok, Worker, {Cntrs, Res}) ->
+    case fabric_ring:handle_response(Worker, ok, Cntrs, Res, [all]) of
+        {ok, {Cntrs1, Res1}} ->
+            {ok, {Cntrs1, Res1}};
+        {stop, _Res1} ->
+            % We only stored ok results so we just return ok
+            {stop, ok}
+    end;
+handle_set_meta_message(Reason, Shard, {Cntrs, Res}) ->
+    case fabric_ring:handle_error(Shard, Cntrs, Res, [all]) of
+        {ok, Cntrs1} -> {ok, {Cntrs1, Res}};
+        error -> {error, Reason}
+    end.
