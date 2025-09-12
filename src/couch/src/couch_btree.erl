@@ -563,6 +563,7 @@ get_node(#btree{fd = Fd, cache_depth = Max}, NodePos, Depth) when Depth =< Max -
     end;
 get_node(#btree{fd = Fd}, NodePos, _Depth) ->
     {ok, {NodeType, NodeList}} = couch_file:pread_term(Fd, NodePos),
+    couch_stats:increment_counter([couchdb, btree, get_node, NodeType]),
     {NodeType, NodeList}.
 
 write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
@@ -571,6 +572,7 @@ write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     % now write out each chunk and return the KeyPointer pairs for those nodes
     ToWrite = [{NodeType, Chunk} || Chunk <- Chunks],
     WriteOpts = [{compression, Comp}],
+    couch_stats:increment_counter([couchdb, btree, write_node, NodeType]),
     {ok, PtrSizes} = couch_file:append_terms(Fd, ToWrite, WriteOpts),
     {ok, group_kps(Bt, NodeType, Chunks, PtrSizes)}.
 
