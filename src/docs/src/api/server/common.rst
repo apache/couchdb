@@ -200,6 +200,8 @@
     :query json endkey: Stop returning databases when the specified key is
       reached.
     :query json end_key: Alias for ``endkey`` param
+    :query boolean inclusive_end: Specifies whether the specified end key
+      should be included in the result. Default is ``true``.
     :query number limit: Limit the number of the returned databases to the
       specified number.
     :query number skip: Skip this number of databases before starting to return
