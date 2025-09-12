@@ -73,7 +73,7 @@
 
 % Worker children get a default 5 second shutdown timeout, so pick a value just
 % a bit less than that: 4.5 seconds. In couch_replicator_sup our scheduler
-% worker doesn't specify the timeout, so it up picks ups the OTP default of 5
+% worker doesn't specify the timeout, so it picks up the OTP default of 5
 % seconds https://www.erlang.org/doc/system/sup_princ.html#child-specification
 %
 -define(TERMINATE_SHUTDOWN_TIME, 4500).
@@ -173,9 +173,9 @@ job_proxy_url(_Endpoint) ->
     null.
 
 % Health threshold is the minimum amount of time an unhealthy job should run
-% crashing before it is considered to be healthy again. HealtThreashold should
+% crashing before it is considered to be healthy again. Health threshold should
 % not be 0 as jobs could start and immediately crash, and it shouldn't be
-% infinity, since then  consecutive crashes would accumulate forever even if
+% infinity, since then consecutive crashes would accumulate forever even if
 % job is back to normal.
 -spec health_threshold() -> non_neg_integer().
 health_threshold() ->
@@ -258,8 +258,7 @@ handle_call({add_job, Job}, _From, State) ->
     true = add_job_int(Job),
     ok = maybe_start_newly_added_job(Job, State),
     couch_stats:increment_counter([couch_replicator, jobs, adds]),
-    TotalJobs = ets:info(?MODULE, size),
-    couch_stats:update_gauge([couch_replicator, jobs, total], TotalJobs),
+    update_total_jobs_stats(),
     {reply, ok, State};
 handle_call({remove_job, Id}, _From, State) ->
     ok = maybe_remove_job_int(Id, State),
@@ -464,6 +463,7 @@ handle_crashed_job(Job, Reason, State) ->
             update_running_jobs_stats(State#state.stats_pid),
             ok;
         false ->
+            update_total_jobs_stats(),
             ok
     end.
 
@@ -480,6 +480,7 @@ maybe_start_newly_added_job(Job, State) ->
             update_running_jobs_stats(State#state.stats_pid),
             ok;
         false ->
+            update_total_jobs_stats(),
             ok
     end.
 
@@ -521,7 +522,7 @@ pending_fold(Job, {Set, Now, Count, HealthThreshold}) ->
 
 % Replace Job in the accumulator if it has a higher priority (lower priority
 % value) than the lowest priority there. Job priority is indexed by
-% {FairSharePiority, LastStarted} tuples. If the FairSharePriority is the same
+% {FairSharePriority, LastStarted} tuples. If the FairSharePriority is the same
 % then last started timestamp is used to pick. The goal is to keep up to Count
 % oldest jobs during the iteration. For example, if there are jobs with these
 % priorities accumulated so far [5, 7, 11], and the priority of current job is
@@ -593,14 +594,13 @@ not_recently_crashed(#job{history = History}, Now, HealthThreshold) ->
 % and running successfully without crashing for a period of time. That period
 % of time is the HealthThreshold.
 %
-
 -spec consecutive_crashes(history(), non_neg_integer()) -> non_neg_integer().
 consecutive_crashes(History, HealthThreshold) when is_list(History) ->
     consecutive_crashes(History, HealthThreshold, 0).
 
 -spec consecutive_crashes(history(), non_neg_integer(), non_neg_integer()) ->
     non_neg_integer().
-consecutive_crashes([], _HealthThreashold, Count) ->
+consecutive_crashes([], _HealthThreshold, Count) ->
     Count;
 consecutive_crashes(
     [{{crashed, _}, CrashT}, {_, PrevT} = PrevEvent | Rest],
@@ -655,16 +655,13 @@ maybe_remove_job_int(JobId, State) ->
             ok = stop_job_int(Job, State),
             true = remove_job_int(Job),
             couch_stats:increment_counter([couch_replicator, jobs, removes]),
-            TotalJobs = ets:info(?MODULE, size),
-            couch_stats:update_gauge(
-                [couch_replicator, jobs, total],
-                TotalJobs
-            ),
             update_running_jobs_stats(State#state.stats_pid),
             ok;
         {error, not_found} ->
             ok
-    end.
+    end,
+    update_total_jobs_stats(),
+    ok.
 
 start_job_int(#job{pid = Pid}, _State) when Pid /= undefined ->
     ok;
@@ -797,7 +794,7 @@ rotate_jobs(State, ChurnSoFar) ->
     if
         SlotsAvailable >= 0 ->
             % If there is are enough SlotsAvailable reduce StopCount to avoid
-            % unnesessarily stopping jobs. `stop_jobs/3` ignores 0 or negative
+            % unnecessarily stopping jobs. `stop_jobs/3` ignores 0 or negative
             % values so we don't worry about that here.
             StopCount = lists:min([Pending - SlotsAvailable, Running, Churn]),
             stop_jobs(StopCount, true, State),
@@ -932,7 +929,7 @@ optimize_int_option({Key, Val}, #rep{options = Options} = Rep) ->
 % Updater is a separate process. It receives `update_stats` messages and
 % updates scheduler stats from the scheduler jobs table. Updates are
 % performed no more frequently than once per ?STATS_UPDATE_WAIT milliseconds.
-
+%
 update_running_jobs_stats(StatsPid) when is_pid(StatsPid) ->
     StatsPid ! update_stats,
     ok.
@@ -964,6 +961,7 @@ stats_updater_refresh() ->
     couch_stats:update_gauge([couch_replicator, jobs, pending], PendingN),
     couch_stats:update_gauge([couch_replicator, jobs, running], RunningN),
     couch_stats:update_gauge([couch_replicator, jobs, crashed], CrashedN),
+    update_total_jobs_stats(),
     ok.
 
 -spec stats_fold(#job{}, #stats_acc{}) -> #stats_acc{}.
@@ -975,6 +973,10 @@ stats_fold(#job{pid = undefined, history = [{{crashed, _}, _} | _]}, Acc) ->
     Acc#stats_acc{crashed_n = Acc#stats_acc.crashed_n + 1};
 stats_fold(#job{pid = P, history = [{started, _} | _]}, Acc) when is_pid(P) ->
     Acc#stats_acc{running_n = Acc#stats_acc.running_n + 1}.
+
+update_total_jobs_stats() ->
+    TotalJobs = ets:info(?MODULE, size),
+    couch_stats:update_gauge([couch_replicator, jobs, total], TotalJobs).
 
 -spec existing_replication(#rep{}) -> boolean().
 existing_replication(#rep{} = NewRep) ->

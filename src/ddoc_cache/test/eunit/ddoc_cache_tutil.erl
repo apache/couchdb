@@ -32,7 +32,7 @@ start_couch() ->
 start_couch(Options) ->
     WriteDDocs = couch_util:get_value(write_ddocs, Options, true),
     purge_modules(),
-    Ctx = test_util:start_couch(?CONFIG_CHAIN, [chttpd, ddoc_cache]),
+    Ctx = test_util:start_couch([chttpd, ddoc_cache]),
     TmpDb = ?tempdb(),
     ok = fabric:create_db(TmpDb, [{q, "1"}, {n, "1"}]),
     if

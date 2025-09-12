@@ -29,10 +29,25 @@
     search/2,
     set_purge_seq/3,
     set_update_seq/3,
+    supported_lucene_versions/0,
     jaxrs_error/2
 ]).
 
+%% batch api functions
+-export([
+    update/2,
+    make_update/5,
+    make_delete/3,
+    make_purge/3
+]).
+
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
+
+-deprecated([
+    {purge_doc, 4, "replaced by updates/2"},
+    {update_doc, 6, "replaced by updates/2"},
+    {delete_doc, 4, "replaced by updates/2"}
+]).
 
 analyze(Text, Analyzer) when
     is_binary(Text), is_binary(Analyzer)
@@ -171,6 +186,78 @@ update_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
             send_error(Reason)
     end.
 
+update(#index{} = Index, Updates) when is_list(Updates) ->
+    Resp = send_if_enabled(
+        update_path(Index),
+        [?JSON_CONTENT_TYPE],
+        <<"POST">>,
+        jiffy:encode(#{updates => Updates})
+    ),
+    case Resp of
+        {ok, 200, _, _} ->
+            ok;
+        {ok, StatusCode, _, RespBody} ->
+            {error, jaxrs_error(StatusCode, RespBody)};
+        {error, Reason} ->
+            send_error(Reason)
+    end.
+
+make_delete(DocId, MatchSeq, UpdateSeq) when
+    is_binary(DocId),
+    is_integer(MatchSeq),
+    MatchSeq >= 0,
+    is_integer(UpdateSeq),
+    UpdateSeq > 0
+->
+    #{
+        doc_id => DocId,
+        update => #{
+            '@type' => delete,
+            doc_id => DocId,
+            match_seq => MatchSeq,
+            seq => UpdateSeq,
+            delete => true
+        }
+    }.
+
+make_purge(DocId, MatchSeq, PurgeSeq) when
+    is_binary(DocId),
+    is_integer(MatchSeq),
+    MatchSeq >= 0,
+    is_integer(PurgeSeq),
+    PurgeSeq > 0
+->
+    #{
+        doc_id => DocId,
+        update => #{
+            '@type' => delete,
+            doc_id => DocId,
+            match_seq => MatchSeq,
+            seq => PurgeSeq,
+            purge => true
+        }
+    }.
+
+make_update(DocId, MatchSeq, UpdateSeq, Partition, Fields) when
+    is_binary(DocId),
+    is_integer(MatchSeq),
+    MatchSeq >= 0,
+    is_integer(UpdateSeq),
+    UpdateSeq > 0,
+    (is_binary(Partition) orelse Partition == null),
+    is_list(Fields)
+->
+    #{
+        doc_id => DocId,
+        update => #{
+            '@type' => update,
+            match_seq => MatchSeq,
+            seq => UpdateSeq,
+            partition => Partition,
+            fields => Fields
+        }
+    }.
+
 search(#index{} = Index, QueryArgs) ->
     Resp = send_if_enabled(
         search_path(Index), [?JSON_CONTENT_TYPE], <<"POST">>, jiffy:encode(QueryArgs)
@@ -197,7 +284,8 @@ set_update_seq(#index{} = Index, MatchSeq, UpdateSeq) ->
 set_purge_seq(#index{} = Index, MatchSeq, PurgeSeq) ->
     ReqBody = #{
         match_purge_seq => MatchSeq,
-        purge_seq => PurgeSeq
+        purge_seq => PurgeSeq,
+        commit => true
     },
     set_seq(Index, ReqBody).
 
@@ -208,6 +296,18 @@ set_seq(#index{} = Index, ReqBody) ->
     case Resp of
         {ok, 200, _, _} ->
             ok;
+        {ok, StatusCode, _, RespBody} ->
+            {error, jaxrs_error(StatusCode, RespBody)};
+        {error, Reason} ->
+            send_error(Reason)
+    end.
+
+supported_lucene_versions() ->
+    Resp = send_if_enabled(<<"/">>, [], <<"GET">>),
+    case Resp of
+        {ok, 200, _, RespBody} ->
+            Json = jiffy:decode(RespBody, [return_maps]),
+            {ok, maps:get(<<"supported_lucene_versions">>, Json, [])};
         {ok, StatusCode, _, RespBody} ->
             {error, jaxrs_error(StatusCode, RespBody)};
         {error, Reason} ->
@@ -231,6 +331,9 @@ doc_path(#index{} = Index, DocId) ->
 
 search_path(#index{} = Index) ->
     [index_path(Index), <<"/search">>].
+
+update_path(#index{} = Index) ->
+    [index_path(Index), <<"/update">>].
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};

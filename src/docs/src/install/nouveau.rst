@@ -25,7 +25,7 @@ service that embeds `Apache Lucene <https://lucene.apache.org>`_. Typically, thi
 service is installed on the same host as CouchDB and communicates with it over
 the loopback network.
 
-Nouveau server is runtime-compatible with Java 11 or higher.
+Nouveau server is runtime-compatible with Java 21 or higher.
 
 Enable Nouveau
 ==============

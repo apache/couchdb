@@ -33,23 +33,33 @@
     changes_done,
     total_changes,
     exclude_idrevs,
-    update_seq
+    update_seq,
+    batch_size,
+    batch
 }).
 
 -record(purge_acc, {
+    index,
     exclude_list = [],
     index_update_seq,
-    index_purge_seq
+    index_purge_seq,
+    batch_size,
+    batch
 }).
 
 outdated(#index{} = Index) ->
-    case open_or_create_index(Index) of
-        {ok, #{} = Info} ->
-            #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
-            {DbUpdateSeq, DbPurgeSeq} = get_db_info(Index),
-            DbUpdateSeq > IndexUpdateSeq orelse DbPurgeSeq > IndexPurgeSeq;
-        {error, Reason} ->
-            {error, Reason}
+    {ok, Db} = couch_db:open_int(Index#index.dbname, []),
+    try
+        case open_or_create_index(Db, Index) of
+            {ok, #{} = Info} ->
+                #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
+                {DbUpdateSeq, DbPurgeSeq} = get_db_info(Db),
+                DbUpdateSeq > IndexUpdateSeq orelse DbPurgeSeq > IndexPurgeSeq;
+            {error, Reason} ->
+                {error, Reason}
+        end
+    after
+        couch_db:close(Db)
     end.
 
 update(#index{} = Index) ->
@@ -59,6 +69,7 @@ update(#index{} = Index) ->
             {error, Reason} ->
                 exit({error, Reason});
             {ok, #{} = Info} ->
+                nouveau_util:maybe_create_local_purge_doc(Db, Index),
                 #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
                 ChangesSince = couch_db:count_changes_since(Db, IndexUpdateSeq),
                 PurgesSince = couch_db:get_purge_seq(Db) - IndexPurgeSeq,
@@ -77,8 +88,11 @@ update(#index{} = Index) ->
                 couch_task_status:set_update_frequency(500),
 
                 PurgeAcc0 = #purge_acc{
+                    index = Index,
                     index_update_seq = IndexUpdateSeq,
-                    index_purge_seq = IndexPurgeSeq
+                    index_purge_seq = IndexPurgeSeq,
+                    batch_size = config:get_integer("nouveau", "batch_size", 20),
+                    batch = []
                 },
                 {ok, PurgeAcc1} = purge_index(Db, Index, PurgeAcc0),
 
@@ -94,12 +108,19 @@ update(#index{} = Index) ->
                         changes_done = 0,
                         total_changes = TotalChanges,
                         exclude_idrevs = PurgeAcc1#purge_acc.exclude_list,
-                        update_seq = PurgeAcc1#purge_acc.index_update_seq
+                        update_seq = PurgeAcc1#purge_acc.index_update_seq,
+                        batch_size = config:get_integer("nouveau", "batch_size", 20),
+                        batch = []
                     },
                     {ok, Acc1} = couch_db:fold_changes(
                         Db, Acc0#acc.update_seq, fun load_docs/2, Acc0, []
                     ),
-                    exit(nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq))
+                    case flush_batch(Acc1) of
+                        {ok, Acc2} ->
+                            exit(nouveau_api:set_update_seq(Index, Acc2#acc.update_seq, NewCurSeq));
+                        {error, Reason} ->
+                            exit({error, Reason})
+                    end
                 after
                     ret_os_process(Proc)
                 end
@@ -123,30 +144,26 @@ load_docs(FDI, #acc{} = Acc1) ->
             true ->
                 Acc1;
             false ->
-                case
-                    update_or_delete_index(
-                        Acc1#acc.db,
-                        Acc1#acc.index,
-                        Acc1#acc.update_seq,
-                        DI,
-                        Acc1#acc.proc
-                    )
-                of
-                    ok ->
-                        Acc1#acc{
-                            update_seq = DI#doc_info.high_seq
-                        };
-                    {error, Reason} ->
-                        exit({error, Reason})
-                end
+                Item = update_or_delete_index(
+                    Acc1#acc.db, Acc1#acc.update_seq, DI, Acc1#acc.proc
+                ),
+                Acc1#acc{
+                    batch = [Item | Acc1#acc.batch],
+                    update_seq = DI#doc_info.high_seq
+                }
         end,
-    {ok, Acc2#acc{changes_done = Acc2#acc.changes_done + 1}}.
+    case maybe_flush_batch(Acc2) of
+        {ok, Acc3} ->
+            {ok, Acc3};
+        {error, Reason} ->
+            exit({error, Reason})
+    end.
 
-update_or_delete_index(Db, #index{} = Index, MatchSeq, #doc_info{} = DI, Proc) ->
+update_or_delete_index(Db, MatchSeq, #doc_info{} = DI, Proc) ->
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DI,
     case Del of
         true ->
-            nouveau_api:delete_doc(Index, Id, MatchSeq, Seq);
+            nouveau_api:make_delete(Id, MatchSeq, Seq);
         false ->
             {ok, Doc} = couch_db:open_doc(Db, DI, []),
             Json = couch_doc:to_json_obj(Doc, []),
@@ -160,20 +177,51 @@ update_or_delete_index(Db, #index{} = Index, MatchSeq, #doc_info{} = DI, Proc) -
                 end,
             case Fields of
                 [] ->
-                    nouveau_api:delete_doc(Index, Id, MatchSeq, Seq);
+                    nouveau_api:make_delete(Id, MatchSeq, Seq);
                 _ ->
-                    nouveau_api:update_doc(
-                        Index, Id, MatchSeq, Seq, Partition, Fields
-                    )
+                    nouveau_api:make_update(Id, MatchSeq, Seq, Partition, Fields)
             end
     end.
 
-open_or_create_index(#index{} = Index) ->
+maybe_flush_batch(#acc{} = Acc) when length(Acc#acc.batch) >= Acc#acc.batch_size ->
+    flush_batch(Acc);
+maybe_flush_batch(#purge_acc{} = Acc) when
+    length(Acc#purge_acc.batch) >= Acc#purge_acc.batch_size
+->
+    flush_batch(Acc);
+maybe_flush_batch(#acc{} = Acc) ->
+    {ok, Acc};
+maybe_flush_batch(#purge_acc{} = Acc) ->
+    {ok, Acc}.
+
+flush_batch(#acc{batch = []} = Acc) ->
+    {ok, Acc};
+flush_batch(#purge_acc{batch = []} = Acc) ->
+    {ok, Acc};
+flush_batch(#acc{} = Acc) ->
+    #acc{batch = Batch} = Acc,
+    case nouveau_api:update(Acc#acc.index, lists:reverse(Batch)) of
+        ok ->
+            {ok, Acc#acc{batch = [], changes_done = Acc#acc.changes_done + length(Batch)}};
+        {error, Reason} ->
+            {error, Reason}
+    end;
+flush_batch(#purge_acc{} = Acc) ->
+    #purge_acc{batch = Batch} = Acc,
+    case nouveau_api:update(Acc#purge_acc.index, lists:reverse(Batch)) of
+        ok ->
+            {ok, Acc#purge_acc{batch = []}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+open_or_create_index(Db, #index{} = Index) ->
     case nouveau_api:index_info(Index) of
         {ok, #{} = Info} ->
             {ok, Info};
         {error, {not_found, _}} ->
-            case nouveau_api:create_index(Index, index_definition(Index)) of
+            InitialPurgeSeq = couch_db:get_purge_seq(Db),
+            case nouveau_api:create_index(Index, index_definition(Index, InitialPurgeSeq)) of
                 ok ->
                     nouveau_api:index_info(Index);
                 {error, Reason} ->
@@ -183,29 +231,24 @@ open_or_create_index(#index{} = Index) ->
             {error, Reason}
     end.
 
-open_or_create_index(Db, #index{} = Index) ->
-    case open_or_create_index(Index) of
-        {ok, #{} = Info} ->
-            nouveau_util:maybe_create_local_purge_doc(Db, Index),
-            {ok, Info};
-        Else ->
-            Else
-    end.
-
 get_db_info(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
     try
-        UpdateSeq = couch_db:get_update_seq(Db),
-        PurgeSeq = couch_db:get_purge_seq(Db),
-        {UpdateSeq, PurgeSeq}
+        get_db_info(Db)
     after
         couch_db:close(Db)
-    end.
+    end;
+get_db_info(Db) ->
+    UpdateSeq = couch_db:get_update_seq(Db),
+    PurgeSeq = couch_db:get_purge_seq(Db),
+    {UpdateSeq, PurgeSeq}.
 
-index_definition(#index{} = Index) ->
+index_definition(#index{} = Index, InitialPurgeSeq) ->
     #{
+        <<"lucene_version">> => Index#index.lucene_version,
         <<"default_analyzer">> => Index#index.default_analyzer,
-        <<"field_analyzers">> => Index#index.field_analyzers
+        <<"field_analyzers">> => Index#index.field_analyzers,
+        <<"initial_purge_seq">> => InitialPurgeSeq
     }.
 
 purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
@@ -213,13 +256,14 @@ purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
     try
         true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
         FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, #purge_acc{} = PurgeAcc1) ->
-            PurgeAcc2 =
+            PurgeAcc3 =
                 case couch_db:get_full_doc_info(Db, Id) of
                     not_found ->
-                        ok = nouveau_api:purge_doc(
-                            Index, Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
+                        Item = nouveau_api:make_purge(
+                            Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
                         ),
-                        PurgeAcc1#purge_acc{index_purge_seq = PurgeSeq};
+                        PurgeAcc2 = PurgeAcc1#purge_acc{batch = [Item | PurgeAcc1#purge_acc.batch]},
+                        PurgeAcc2#purge_acc{index_purge_seq = PurgeSeq};
                     FDI ->
                         DI = couch_doc:to_doc_info(FDI),
                         #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{rev = Rev} | _]} = DI,
@@ -227,32 +271,30 @@ purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
                             true ->
                                 PurgeAcc1;
                             false ->
-                                update_or_delete_index(
-                                    Db,
-                                    Index,
-                                    PurgeAcc1#purge_acc.index_update_seq,
-                                    DI,
-                                    Proc
+                                Item = update_or_delete_index(
+                                    Db, PurgeAcc1#purge_acc.index_update_seq, DI, Proc
                                 ),
                                 PurgeAcc1#purge_acc{
+                                    batch = [Item | PurgeAcc1#purge_acc.batch],
                                     exclude_list = [{Id, Rev} | PurgeAcc1#purge_acc.exclude_list],
                                     index_update_seq = Seq
                                 }
                         end
                 end,
             update_task(1),
-            {ok, PurgeAcc2}
+            maybe_flush_batch(PurgeAcc3)
         end,
 
         {ok, #purge_acc{} = PurgeAcc3} = couch_db:fold_purge_infos(
             Db, PurgeAcc0#purge_acc.index_purge_seq, FoldFun, PurgeAcc0, []
         ),
+        {ok, PurgeAcc4} = flush_batch(PurgeAcc3),
         DbPurgeSeq = couch_db:get_purge_seq(Db),
         ok = nouveau_api:set_purge_seq(
-            Index, PurgeAcc3#purge_acc.index_purge_seq, DbPurgeSeq
+            Index, PurgeAcc4#purge_acc.index_purge_seq, DbPurgeSeq
         ),
         update_local_doc(Db, Index, DbPurgeSeq),
-        {ok, PurgeAcc3}
+        {ok, PurgeAcc4}
     after
         ret_os_process(Proc)
     end.

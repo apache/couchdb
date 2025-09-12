@@ -27,8 +27,6 @@
     handle_info/2
 ]).
 
--include("couch_log.hrl").
-
 -record(st, {
     writer
 }).
@@ -49,7 +47,7 @@ log(Entry) ->
     ?SEND(Entry).
 
 init(_) ->
-    couch_util:set_mqd_off_heap(?MODULE),
+    erlang:process_flag(message_queue_data, off_heap),
     process_flag(trap_exit, true),
     {ok, #st{
         writer = couch_log_writer:init()

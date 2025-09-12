@@ -1255,7 +1255,7 @@ Documents-Attachments and may handle it as stream with lesser memory footprint.
         Content-Length: 87
 
         1. Cook spaghetti
-        2. Cook meetballs
+        2. Cook meatballs
         3. Mix them
         4. Add tomato sauce
         5. ...
@@ -1480,7 +1480,7 @@ one by one without any serialization overhead.
         Content-Length: 87
 
         1. Cook spaghetti
-        2. Cook meetballs
+        2. Cook meatballs
         3. Mix them
         4. Add tomato sauce
         5. ...

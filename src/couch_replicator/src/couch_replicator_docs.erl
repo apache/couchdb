@@ -137,7 +137,7 @@ delete_old_rep_ddoc(RepDb, DDocId) ->
     ok.
 
 % Update a #rep{} record with a replication_id. Calculating the id might involve
-% fetching a filter from the source db, and so it could fail intermetently.
+% fetching a filter from the source db, and so it could fail intermittently.
 % In case of a failure to fetch the filter this function will throw a
 %  `{filter_fetch_error, Reason} exception.
 update_rep_id(Rep) ->

@@ -23,6 +23,8 @@ github:
     rebase: true
     merge: true
   del_branch_on_merge: true
+  copilot_code_review:
+    enabled: false
   protected_branches:
     main:
       required_status_checks:

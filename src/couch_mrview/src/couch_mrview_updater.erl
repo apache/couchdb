@@ -20,7 +20,7 @@
 -define(REM_VAL, removed).
 
 start_update(Partial, State, NumChanges, NumChangesDone) ->
-    MaxSize = config:get_integer("view_updater", "queue_memory_cap", 100000),
+    MaxSize = config:get_integer("view_updater", "queue_memory_cap", 10485760),
     MaxItems = config:get_integer("view_updater", "queue_item_cap", 500),
     QueueOpts = [{max_size, MaxSize}, {max_items, MaxItems}],
     {ok, DocQueue} = couch_work_queue:new(QueueOpts),
@@ -229,11 +229,10 @@ accumulate_writes(State, W, Acc0) ->
 
 accumulate_more(NumDocIds, Acc) ->
     % check if we have enough items now
-    MinItems = config:get("view_updater", "min_writer_items", "100"),
-    MinSize = config:get("view_updater", "min_writer_size", "16777216"),
+    MinItems = config:get_integer("view_updater", "min_writer_items", 100),
+    MinSize = config:get_integer("view_updater", "min_writer_size", 16777216),
     CurrMem = ?term_size(Acc),
-    NumDocIds < list_to_integer(MinItems) andalso
-        CurrMem < list_to_integer(MinSize).
+    NumDocIds < MinItems andalso CurrMem < MinSize.
 
 merge_results([], SeqAcc, ViewKVs, DocIdKeys) ->
     {SeqAcc, ViewKVs, DocIdKeys};

@@ -177,12 +177,12 @@ t_survives_mem3_sync_termination(_) ->
     ok = supervisor:terminate_child(mem3_sup, mem3_sync),
     ?assertEqual(undefined, whereis(mem3_sync)),
     ?assertMatch(
-        [[_, _], <<"couchdb_internal_replication_jobs 0">>],
+        [_, _, <<"couchdb_internal_replication_jobs 0">>],
         couch_prometheus:get_internal_replication_jobs_stat()
     ),
     {ok, _} = supervisor:restart_child(mem3_sup, mem3_sync),
     ?assertMatch(
-        [[_, _], <<"couchdb_internal_replication_jobs", _/binary>>],
+        [_, _, <<"couchdb_internal_replication_jobs", _/binary>>],
         couch_prometheus:get_internal_replication_jobs_stat()
     ).
 

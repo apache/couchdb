@@ -69,25 +69,5 @@ t_update_and_get_props(_) ->
     {ok, Info1} = fabric:get_db_info(DbName),
     Props1 = couch_util:get_value(props, Info1),
     ?assertEqual({[{<<"foo">>, 100}]}, Props1),
-
-    ?assertEqual(ok, fabric:update_props(DbName, bar, 101)),
-    {ok, Info2} = fabric:get_db_info(DbName),
-    Props2 = couch_util:get_value(props, Info2),
-    ?assertEqual(
-        {[
-            {<<"foo">>, 100},
-            {bar, 101}
-        ]},
-        Props2
-    ),
-
-    ?assertEqual(ok, fabric:update_props(DbName, <<"foo">>, undefined)),
-    {ok, Info3} = fabric:get_db_info(DbName),
-    ?assertEqual({[{bar, 101}]}, couch_util:get_value(props, Info3)),
-
-    Res = fabric:update_props(DbName, partitioned, true),
-    ?assertMatch({error, {bad_request, _}}, Res),
-    {ok, Info4} = fabric:get_db_info(DbName),
-    ?assertEqual({[{bar, 101}]}, couch_util:get_value(props, Info4)),
-
+    % There are more update_props tests in fabric_meta_tests module
     ok = fabric:delete_db(DbName, []).

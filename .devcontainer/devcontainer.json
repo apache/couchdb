@@ -9,7 +9,7 @@
             // apache/couchdbci-debian:bullseye-erlang-25.3.2.7
             // apache/couchdbci-debian:bookworm-erlang-24.3.4.14
             //
-            "COUCHDB_IMAGE": "apache/couchdbci-debian:bullseye-erlang-24.3.4.14"
+            "COUCHDB_IMAGE": "apache/couchdbci-debian:trixie-erlang-26.2.5.16"
         }
     },
 
@@ -28,7 +28,7 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                "erlang-ls.erlang-ls",
+                "erlang-language-platform.erlang-language-platform",
                 "redhat.java"
             ]
         }

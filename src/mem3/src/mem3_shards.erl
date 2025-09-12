@@ -230,7 +230,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 init([]) ->
-    couch_util:set_mqd_off_heap(?MODULE),
+    erlang:process_flag(message_queue_data, off_heap),
     CacheEtsOpts = [public, named_table, {read_concurrency, true}, {write_concurrency, auto}],
     ets:new(?OPTS, CacheEtsOpts),
     ets:new(?SHARDS, [bag, {keypos, #shard.dbname}] ++ CacheEtsOpts),

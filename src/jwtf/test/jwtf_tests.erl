@@ -88,6 +88,15 @@ invalid_typ_test() ->
         jwtf:decode(Encoded, [typ], nil)
     ).
 
+ignored_typ_test() ->
+    Encoded = encode({[{<<"typ">>, <<"NOPE">>}]}, {[]}),
+    Ref = make_ref(),
+    KS = fun(_, _) -> throw(Ref) end,
+    ?assertEqual(
+        {error, Ref},
+        jwtf:decode(Encoded, [], KS)
+    ).
+
 missing_alg_test() ->
     Encoded = encode({[]}, []),
     ?assertEqual(

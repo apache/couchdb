@@ -46,6 +46,7 @@ identification for certain requests:
 - Restarting the server on a given node (:post:`/_node/{node-name}/_restart`)
 - Reading the active configuration (:get:`/_node/{node-name}/_config`)
 - Updating the active configuration (:put:`/_node/{node-name}/_config/{section}/{key}`)
+- Purging documents (:post:`POST /database/_purge </{db}/_purge>`)
 
 Creating a New Admin User
 -------------------------

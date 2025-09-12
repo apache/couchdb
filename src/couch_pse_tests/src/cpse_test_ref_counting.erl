@@ -15,7 +15,6 @@
 -compile(nowarn_export_all).
 
 -include_lib("eunit/include/eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(NUM_CLIENTS, 1000).
 

@@ -154,7 +154,8 @@ globalThis.dispatch = function(line) {
   const cmd = JSON.parse(line);
   State.line_length = line.length;
   try {
-    switch (cmd.shift()) {
+    const cmdkey = cmd.shift();
+    switch (cmdkey) {
     case "ddoc":
       DDoc.ddoc.apply(null, cmd);
       break;

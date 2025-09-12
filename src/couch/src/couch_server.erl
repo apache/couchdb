@@ -279,8 +279,7 @@ close_db_if_idle(DbName) ->
     end.
 
 init([N]) ->
-    couch_util:set_mqd_off_heap(?MODULE),
-    couch_util:set_process_priority(?MODULE, high),
+    erlang:process_flag(message_queue_data, off_heap),
 
     % Mark pluggable storage engines as a supported feature
     config:enable_feature('pluggable-storage-engines'),

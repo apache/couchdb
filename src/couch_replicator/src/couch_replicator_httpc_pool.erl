@@ -21,8 +21,6 @@
 -export([init/1, handle_call/3, handle_info/2, handle_cast/2]).
 -export([format_status/1]).
 
--include_lib("couch/include/couch_db.hrl").
-
 -import(couch_util, [
     get_value/2
 ]).

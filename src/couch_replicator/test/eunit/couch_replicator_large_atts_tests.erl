@@ -44,7 +44,7 @@ large_atts_test_() ->
 
 should_replicate_atts({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOCS_COUNT),
-    ?assertEqual(ok, replicate(Source, Target)),
+    ?assertMatch({ok, _}, replicate(Source, Target)),
     couch_replicator_test_helper:cluster_compare_dbs(Source, Target).
 
 populate_db(DbName, DocCount) ->

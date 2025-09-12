@@ -241,7 +241,23 @@ n0_stats() ->
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-basic_test() ->
+-define(TIMEOUT, 10).
+
+couch_stats_test_() ->
+    {
+        setup,
+        fun() -> ok end,
+        fun(_) -> ok end,
+        with([
+            ?TDEF(t_basic, ?TIMEOUT),
+            ?TDEF(t_min_extreme, ?TIMEOUT),
+            ?TDEF(t_max_extreme, ?TIMEOUT),
+            ?TDEF(t_normal_dist, ?TIMEOUT),
+            ?TDEF(t_uniform_dist, ?TIMEOUT)
+        ])
+    }.
+
+t_basic(_) ->
     H = couch_stats_histogram:new(),
     Vals = [0.05, 0.9, 0.7, 0.7, 10.1, 11, 100.5, 0.10, 13.5],
     [couch_stats_histogram:update(H, V) || V <- Vals],
@@ -270,7 +286,7 @@ basic_test() ->
     ?assert(flim(103, prop(99, Percentiles))),
     ?assert(flim(104, prop(999, Percentiles))).
 
-min_extreme_test() ->
+t_min_extreme(_) ->
     % All the values in the smallest bin
     H = couch_stats_histogram:new(),
     N = 1000000,
@@ -295,7 +311,7 @@ min_extreme_test() ->
     ?assert(flim(0, prop(99, Percentiles))),
     ?assert(flim(0, prop(999, Percentiles))).
 
-max_extreme_test() ->
+t_max_extreme(_) ->
     % All the values are in the largest bin
     H = couch_stats_histogram:new(),
     N = 1000000,
@@ -327,7 +343,7 @@ max_extreme_test() ->
     ?assert(flim(4191682, prop(99, Percentiles))),
     ?assert(flim(4194041, prop(999, Percentiles))).
 
-normal_dist_test() ->
+t_normal_dist(_) ->
     H = couch_stats_histogram:new(),
     rand:seed(default, {1, 2, 3}),
     N = 1000000,
@@ -359,7 +375,7 @@ normal_dist_test() ->
     ?assert(flim(74, prop(99, Percentiles))),
     ?assert(flim(82, prop(999, Percentiles))).
 
-uniform_dist_test() ->
+t_uniform_dist(_) ->
     H = couch_stats_histogram:new(),
     rand:seed(default, {1, 2, 3}),
     N = 1000000,

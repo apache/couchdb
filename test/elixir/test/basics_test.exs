@@ -64,7 +64,7 @@ defmodule BasicsTest do
     db_count = length(Couch.get("/_all_dbs").body)
     assert db_count > 0
     assert Couch.get("/_all_dbs?limit=0").body == []
-    assert length(Couch.get("/_all_dbs?limit=1").body) >= 1
+    assert not Enum.empty?(Couch.get("/_all_dbs?limit=1").body)
     assert length(Couch.get("/_all_dbs?skip=1").body) == (db_count - 1)
     assert [db] == Couch.get("/_all_dbs?start_key=\"#{db}\"&limit=1").body
   end
@@ -388,4 +388,19 @@ defmodule BasicsTest do
     resp = Couch.get("/", headers: ["X-Couch-Request-ID": uuid])
     assert resp.headers["X-Couch-Request-ID"] == uuid
   end
+
+  @tag
+  test "_all_dbs/_all_docs is not found", _context do
+    resp = Couch.get("/_all_dbs/_all_docs")
+    assert resp.status_code == 404
+    assert resp.body["error"] == "not_found"
+  end
+
+  @tag
+  test "_dbs_info/_all_docs is not found", _context do
+    resp = Couch.get("/_dbs_info/_all_docs")
+    assert resp.status_code == 404
+    assert resp.body["error"] == "not_found"
+  end
+
 end

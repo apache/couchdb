@@ -242,6 +242,13 @@ def get_args_parser():
         help="Start Clouseau nodes",
     )
     parser.add_option(
+        "--no-clouseau-check",
+        dest="no_clouseau_check",
+        default=False,
+        action="store_true",
+        help="Disable erl_call clouseau check",
+    )
+    parser.add_option(
         "--erlang-cookie",
         dest="erlang_cookie",
         default=None,
@@ -266,6 +273,13 @@ def get_args_parser():
         dest="no_tls",
         default=None,
         help="Use TCP for specified node when TLS distribution is enabled",
+    )
+    parser.add_option(
+        "--write-uri-file",
+        dest="write_uri_file",
+        default=False,
+        action="store_true",
+        help="Create the couch.uri file with allocated ports (implied by --auto-ports)",
     )
     return parser
 
@@ -300,10 +314,12 @@ def setup_context(opts, args):
         "locald_configs": opts.locald_configs,
         "with_nouveau": opts.with_nouveau,
         "with_clouseau": opts.with_clouseau,
+        "no_clouseau_check": opts.no_clouseau_check,
         "clouseau_dir": opts.clouseau_dir or CLOUSEAU_DIR,
         "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
         "no_tls": opts.no_tls,
+        "write_uri_file": opts.write_uri_file,
     }
 
 
@@ -370,10 +386,27 @@ def setup_configs(ctx):
             "nouveau_url": "http://127.0.0.1:5987",
             "_default": "",
         }
+        cleanup_uri_file(ctx, node)
         write_config(ctx, node, env)
         write_locald_configs(ctx, node, env)
     generate_haproxy_config(ctx)
     generate_nouveau_config(ctx)
+
+
+def need_uri_file(ctx):
+    return ctx["auto_ports"] or ctx["write_uri_file"]
+
+
+def uri_file_path(ctx, node):
+    return "{}/dev/lib/{}/couch.uri".format(ctx["rootdir"], node)
+
+
+def cleanup_uri_file(ctx, node):
+    if not need_uri_file(ctx):
+        try:
+            os.remove(uri_file_path(ctx, node))
+        except FileNotFoundError:
+            pass
 
 
 def write_locald_configs(ctx, node, env):
@@ -546,7 +579,7 @@ def boot_nouveau(ctx):
     config = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
     gradle = "gradlew.bat" if os.name == "nt" else "gradlew"
     cmd = [
-        os.path.join(ctx["rootdir"], "nouveau", gradle),
+        os.path.join(ctx["rootdir"], "extra", "nouveau", gradle),
         "run",
         "--args",
         f"server '{config}'",
@@ -555,7 +588,7 @@ def boot_nouveau(ctx):
     log = open(logfname, "w")
     return sp.Popen(
         cmd,
-        cwd=os.path.join(ctx["rootdir"], "nouveau"),
+        cwd=os.path.join(ctx["rootdir"], "extra", "nouveau"),
         stdin=sp.PIPE,
         stdout=log,
         stderr=sp.STDOUT,
@@ -583,20 +616,48 @@ class StartupError(Exception):
         super().__init__(self.message)
 
 
-def generate_default_clouseau_ini(path):
-    print("(generate default clouseau.ini)")
-    with open(path, "w") as handle:
-        handle.write(
-            """[clouseau]
+DEFAULT_CLOUSEAU_INI = """[clouseau]
 """
-        )
+
+# Currently it does not support more than 3 concurrent nodes
+DEFAULT_CLOUSEAU_CONF = """logger: {
+  format: Raw
+  output: Stdout
+  level: debug
+}
+config: [
+  {
+    node: {
+      name: clouseau1
+      domain: 127.0.0.1
+    }
+  }
+  {
+    node: {
+      name: clouseau2
+      domain: 127.0.0.1
+    }
+  }
+  {
+    node: {
+      name: clouseau3
+      domain: 127.0.0.1
+    }
+  }
+]
+"""
+
+
+def generate_default_clouseau_config(path, config_file, body):
+    print(f"(generate default {config_file})")
+    with open(path, "w") as handle:
+        handle.write(body)
 
 
 def generate_default_logback_properties(path):
     print("(generate default logback.xml)")
     with open(path, "w") as handle:
-        handle.write(
-            """<configuration>
+        handle.write("""<configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>%d{ISO8601} %c [%p] %m%n</pattern>
@@ -607,8 +668,7 @@ def generate_default_logback_properties(path):
     <appender-ref ref="STDOUT"/>
   </root>
 </configuration>
-"""
-        )
+""")
 
 
 @log("Start Clouseau node clouseau{idx}")
@@ -635,23 +695,41 @@ def boot_clouseau(ctx, idx):
         clouseau_java_home + "/bin/java" if clouseau_java_home else shutil.which("java")
     )
     java_version = get_java_version(java)
+    file_exists = lambda f: os.path.isfile(os.path.join(clouseau_dir, f))
 
-    pom_file = os.path.join(clouseau_dir, "pom.xml")
-    method = "src" if os.path.isfile(pom_file) else "dist"
+    if file_exists("build.sbt"):
+        is_ziose = True
+        method = "src"
+    elif file_exists("pom.xml"):
+        is_ziose = False
+        method = "src"
+    else:
+        is_ziose = file_exists(".ziose")
+        method = "dist"
 
     if not java_version:
         print(
             "Warning: Java version could not be determined, Clouseau may not be able to run"
         )
     else:
-        if method == "src" and (java_version < 1.7 or 1.7 < java_version):
-            raise StartupError(
-                "Java is not suitable to run Clouseau.  Please use JDK 1.7 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
-            )
-        elif java_version < 1.7 or 1.8 < java_version:
-            raise StartupError(
-                "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
-            )
+        if is_ziose:
+            if method == "src" and (java_version < 11):
+                raise StartupError(
+                    "Java is not suitable to build and run Clouseau.  Please use JDK 11 or higher and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
+            elif method == "dist" and (java_version < 21):
+                raise StartupError(
+                    "Java is not suitable to run Clouseau.  Please use JRE 21 or higher configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
+        else:
+            if method == "src" and (java_version < 1.7 or 1.7 < java_version):
+                raise StartupError(
+                    "Java is not suitable to run Clouseau.  Please use JDK 1.7 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
+            elif method == "dist" and (java_version < 1.7 or 1.8 < java_version):
+                raise StartupError(
+                    "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
 
     logfname = os.path.join(log_dir(ctx), "clouseau{}.log".format(idx))
     log = open(logfname, "w")
@@ -666,30 +744,53 @@ def boot_clouseau(ctx, idx):
             env = os.environ.copy()
             if clouseau_java_home:
                 env["JAVA_HOME"] = clouseau_java_home
+                env["PATH"] = f"{clouseau_java_home}/bin:{env['PATH']}"
 
-            clouseau_mvn_home = os.environ.get("CLOUSEAU_M2_HOME") or os.environ.get(
-                "M2_HOME"
-            )
-            mvn = (
-                clouseau_mvn_home + "/bin/mvn"
-                if clouseau_mvn_home
-                else shutil.which("mvn")
-            )
-
-            if not mvn:
-                raise StartupError(
-                    "Maven could not be found.  Please install Maven 3.8 and configure its (root) path in `CLOUSEAU_M2_HOME`"
+            if is_ziose:
+                clouseau_sbt_home = os.environ.get(
+                    "CLOUSEAU_SBT_HOME"
+                ) or os.environ.get("SBT_HOME")
+                sbt = (
+                    clouseau_sbt_home + "/bin/sbt"
+                    if clouseau_sbt_home
+                    else shutil.which("sbt")
                 )
+
+                if not sbt:
+                    raise StartupError(
+                        "Scala Built Tool (SBT) could not be found.  Please install SBT 1.10 or later and configure its (root) path in `CLOUSEAU_SBT_HOME`"
+                    )
+
+                sbt_java_home = (
+                    ["-java-home", clouseau_java_home] if clouseau_java_home else []
+                )
+                cmd = [sbt] + sbt_java_home + ["assembly"]
+            else:
+                clouseau_mvn_home = os.environ.get(
+                    "CLOUSEAU_M2_HOME"
+                ) or os.environ.get("M2_HOME")
+                mvn = (
+                    clouseau_mvn_home + "/bin/mvn"
+                    if clouseau_mvn_home
+                    else shutil.which("mvn")
+                )
+
+                if not mvn:
+                    raise StartupError(
+                        "Maven could not be found.  Please install Maven 3.8 and configure its (root) path in `CLOUSEAU_M2_HOME`"
+                    )
+
+                cmd = [
+                    mvn,
+                    "-B",
+                    "compile",
+                    "dependency:build-classpath",
+                    "-Dmdep.outputFile={}".format(cp_file),
+                ]
 
             try:
                 sp.check_call(
-                    [
-                        mvn,
-                        "-B",
-                        "compile",
-                        "dependency:build-classpath",
-                        "-Dmdep.outputFile={}".format(cp_file),
-                    ],
+                    cmd,
                     cwd=clouseau_dir,
                     env=env,
                     stdin=sp.PIPE,
@@ -700,42 +801,70 @@ def boot_clouseau(ctx, idx):
                 log.write(str(exc))
                 raise StartupError("Could not build Clouseau from sources.")
 
-        with open(cp_file, "r") as handle:
-            classpath_deps = handle.read().rstrip()
+        if is_ziose:
+            clouseau_jars = glob.glob(
+                os.path.join(clouseau_dir, "clouseau", "target", "**", "*.jar"),
+                recursive=True,
+            )
 
-        targets = os.path.join(clouseau_dir, "target", "classes")
-        classpath = separator.join([classpath_deps, targets])
+            if not clouseau_jars:
+                raise StartupError("No JAR files could be built for Clouseau")
+
+            classpath = separator.join(clouseau_jars)
+        else:
+            with open(cp_file, "r") as handle:
+                classpath_deps = handle.read().rstrip()
+
+            targets = os.path.join(clouseau_dir, "target", "classes")
+            classpath = separator.join([classpath_deps, targets])
     else:
-        clouseau_jars = [
-            os.path.join(clouseau_dir, fname)
-            for fname in os.listdir(clouseau_dir)
-            if fname.endswith(".jar")
-        ]
+        clouseau_jars = glob.glob(os.path.join(clouseau_dir, "*.jar"))
 
         if not clouseau_jars:
             raise StartupError("Clouseau has no JAR files")
 
         classpath = separator.join(clouseau_jars)
 
-    clouseau_ini = os.path.join(clouseau_dir, "clouseau.ini")
-    if not os.path.exists(clouseau_ini):
-        generate_default_clouseau_ini(clouseau_ini)
+    if is_ziose:
+        name_property = "node"
+        cookie_property = "cookie"
+        clouseau_name_format = "clouseau{}"
+        gc_config = [
+            "-XX:+HeapDumpOnOutOfMemoryError",
+            "-XX:+UseG1GC",
+            "-XX:+ParallelRefProcEnabled",
+        ]
+        main_class = "com.cloudant.ziose.clouseau.Main"
+        config_file = "clouseau.conf"
+        config_body = DEFAULT_CLOUSEAU_CONF
+    else:
+        name_property = "clouseau.name"
+        cookie_property = "clouseau.cookie"
+        clouseau_name_format = "clouseau{}@127.0.0.1"
+        gc_config = ["-XX:+UseConcMarkSweepGC", "-XX:+CMSParallelRemarkEnabled"]
+        main_class = "com.cloudant.clouseau.Main"
+        config_file = "clouseau.ini"
+        config_body = DEFAULT_CLOUSEAU_INI
 
-    logback_properties = os.path.join(clouseau_dir, "logback.xml")
-    if not os.path.exists(logback_properties):
-        generate_default_logback_properties(logback_properties)
+    config_path = os.path.join(clouseau_dir, config_file)
+    if not os.path.exists(config_path):
+        generate_default_clouseau_config(config_path, config_file, config_body)
 
-    classpath = separator.join([classpath, clouseau_dir])  # for logback.xml
+    if not is_ziose:
+        logback_properties = os.path.join(clouseau_dir, "logback.xml")
+        if not os.path.exists(logback_properties):
+            generate_default_logback_properties(logback_properties)
 
-    clouseau_name = "clouseau{}@127.0.0.1".format(idx)
+        classpath = separator.join([classpath, clouseau_dir])  # for logback.xml
+
     clouseau_indexes_dir = os.path.join(ctx["devdir"], "clouseau{}".format(idx), "data")
 
     if ctx["erlang_cookie"]:
-        clouseau_cookie = ["-Dclouseau.cookie={}".format(ctx["erlang_cookie"])]
+        clouseau_cookie = ["-D{}={}".format(cookie_property, ctx["erlang_cookie"])]
     else:
         clouseau_cookie = []
 
-    # `HOME` must be set for Scalang to find the Erlang cookie
+    # `HOME` must be set for finding the Erlang cookie (when not specified)
     if not os.environ.get("HOME"):
         # This is usually `USERPROFILE` on Windows
         alternativeHome = os.environ.get("USERPROFILE")
@@ -750,18 +879,16 @@ def boot_clouseau(ctx, idx):
             "-Dsun.net.inetaddr.ttl=30",
             "-Dsun.net.inetaddr.negative.ttl=30",
             '-XX:OnOutOfMemoryError="kill -9 %p"',
-            "-XX:+UseConcMarkSweepGC",
-            "-XX:+CMSParallelRemarkEnabled",
+        ]
+        + gc_config
+        + [
             "-cp",
             classpath,
-            "-Dclouseau.name={}".format(clouseau_name),
+            "-D{}={}".format(name_property, clouseau_name_format.format(idx)),
             "-Dclouseau.dir={}".format(clouseau_indexes_dir),
         ]
         + clouseau_cookie
-        + [
-            "com.cloudant.clouseau.Main",
-            clouseau_ini,
-        ]
+        + [main_class, config_path]
     )
 
     try:
@@ -801,7 +928,7 @@ def check_clouseau_node_alive(ctx, idx):
 
 
 def maybe_check_clouseau_node_alive(ctx, idx):
-    if ctx["with_clouseau"]:
+    if ctx["with_clouseau"] and not ctx["no_clouseau_check"]:
         check_clouseau_node_alive(ctx, idx)
 
 
@@ -812,6 +939,14 @@ def hack_default_ini(ctx, node, contents):
         contents,
         flags=re.MULTILINE,
     )
+
+    if need_uri_file(ctx):
+        contents = re.sub(
+            r"^;uri_file =$",
+            "uri_file = {}".format(uri_file_path(ctx, node)),
+            contents,
+            flags=re.MULTILINE,
+        )
 
     if ctx["enable_erlang_views"]:
         contents = re.sub(
@@ -1072,7 +1207,7 @@ def enable_cluster(node_count, port, user, pswd):
             "node_count": node_count,
         }
     )
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         port,
         "POST",
@@ -1099,7 +1234,7 @@ def add_node(lead_port, node_name, node_port, user, pswd):
             "password": pswd,
         }
     )
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         lead_port,
         "POST",
@@ -1112,7 +1247,7 @@ def add_node(lead_port, node_name, node_port, user, pswd):
 
 
 def set_cookie(port, user, pswd):
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         port,
         "POST",
@@ -1125,7 +1260,7 @@ def set_cookie(port, user, pswd):
 
 
 def finish_cluster(port, user, pswd):
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         port,
         "POST",

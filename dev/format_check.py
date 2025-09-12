@@ -23,7 +23,6 @@ import sys
 
 from format_lib import get_source_paths, get_erlang_version
 
-
 if __name__ == "__main__":
     if get_erlang_version() < 21:
         print("Erlang version is < 21. Skipping format check")

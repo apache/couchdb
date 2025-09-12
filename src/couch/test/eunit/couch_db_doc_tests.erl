@@ -115,3 +115,35 @@ add_revisions(Db, DocId, Rev, N) ->
         Rev,
         lists:seq(1, N)
     ).
+
+rev_to_str_test() ->
+    ?assertEqual(<<"0-0">>, couch_doc:rev_to_str({0, "0"})),
+    ?assertEqual(<<"0-0">>, couch_doc:rev_to_str({0, <<"0">>})),
+    ?assertEqual(<<"1-a">>, couch_doc:rev_to_str({1, <<"a">>})),
+    Bytes = <<<<48>> || _ <- lists:seq(1, 16)>>,
+    ?assertEqual(<<"0-0000000000000000">>, couch_doc:rev_to_str({0, Bytes})),
+    ?assertEqual(<<"1-30303030303030303030303030303030">>, couch_doc:rev_to_str({1, Bytes})),
+    ?assertError(badarg, couch_doc:rev_to_str({a, b})),
+    ?assertError(function_clause, couch_doc:rev_to_str({-1, <<"x">>})),
+    ?assertError(function_clause, couch_doc:rev_to_str(foo)).
+
+parse_rev_test() ->
+    ?assertEqual({1, <<"x">>}, couch_doc:parse_rev("1-x")),
+    ?assertEqual({1, <<"x">>}, couch_doc:parse_rev(<<"1-x">>)),
+    ?assertEqual({0, <<"y">>}, couch_doc:parse_rev("0-y")),
+    ?assertEqual({1234567890, <<"abc">>}, couch_doc:parse_rev("1234567890-abc")),
+    ?assertEqual(
+        {0, <<"00000000000000000000000000000000">>},
+        couch_doc:parse_rev("0-00000000000000000000000000000000")
+    ),
+    ?assertEqual(
+        {1, <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>},
+        couch_doc:parse_rev("1-00000000000000000000000000000000")
+    ),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev(foo)),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev("x-y")),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev("x")),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev("0")),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev("1")),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev("-")),
+    ?assertThrow({bad_request, _}, couch_doc:parse_rev("-0-1")).

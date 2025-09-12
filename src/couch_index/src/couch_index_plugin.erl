@@ -16,8 +16,6 @@
 
 -export([before_open/2]).
 
--include_lib("couch/include/couch_db.hrl").
-
 -define(SERVICE_ID, couch_index).
 
 %% ------------------------------------------------------------------

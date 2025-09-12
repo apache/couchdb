@@ -355,7 +355,6 @@ check_ssl_certificates(#rep{} = Rep, Type) ->
                     {is_ssl, true},
                     {ssl_options, [
                         {cacertfile, CACertFile},
-                        {verify, verify_peer},
                         {customize_hostname_check, [
                             {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
                         ]},

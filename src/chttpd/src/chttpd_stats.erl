@@ -12,9 +12,6 @@
 
 -module(chttpd_stats).
 
-% for the stacktrace macro only so far
--include_lib("couch/include/couch_db.hrl").
-
 -export([
     init/0,
     report/2,

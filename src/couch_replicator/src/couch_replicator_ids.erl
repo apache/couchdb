@@ -120,7 +120,15 @@ maybe_append_filters(
                 true ->
                     [<<"winning_revs_only">>]
             end,
-    couch_util:to_hex(couch_hash:md5_hash(?term_to_bin(Base3))).
+    Base4 =
+        Base3 ++
+            case couch_util:get_value(since_seq, Options) of
+                undefined ->
+                    [];
+                SinceSeq ->
+                    [SinceSeq]
+            end,
+    couch_util:to_hex(couch_hash:md5_hash(?term_to_bin(Base4))).
 
 maybe_append_options(Options, RepOptions) ->
     lists:foldl(
