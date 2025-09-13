@@ -46,6 +46,7 @@ CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases
 CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.25.0"}
 CLOUSEAU_DIR="$(pwd)"/clouseau
 ARCH="$(uname -m)"
+MULTIARCH_NAME="$(dpkg-architecture -q DEB_HOST_MULTIARCH || true)"
 ERLANG_VER="$(run_erlang 'io:put_chars(erlang:system_info(otp_release)).')"
 ERLANG_OS="$(run_erlang 'case os:type() of {OS, _} -> io:format("~s~n", [OS]) end.')"
 
@@ -327,6 +328,7 @@ if [ "${WITH_SPIDERMONKEY}" = "true" ] && [ "${ERLANG_OS}" = "unix" ]; then
 
     # This list is taken from src/couch/rebar.config.script, please keep them in sync.
     if [ ! -d "/usr/include/${SM_HEADERS}" ] && \
+        [ ! -d "/usr/include/${MULTIARCH_NAME}/${SM_HEADERS}" ] && \
         [ ! -d "/usr/local/include/${SM_HEADERS}" ] && \
         [ ! -d "/opt/homebrew/include/${SM_HEADERS}" ]; then
         echo "ERROR: SpiderMonkey ${SM_VSN} is not found. Please specify with --spidermonkey-version."
