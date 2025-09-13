@@ -16,11 +16,20 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.Map;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class IndexDefinition {
+
+    public static final int LATEST_LUCENE_VERSION = 10;
+    public static final int LEGACY_LUCENE_VERSION = 9;
+
+    @Max(LATEST_LUCENE_VERSION)
+    @Min(LEGACY_LUCENE_VERSION)
+    private int luceneVersion = LEGACY_LUCENE_VERSION; // Legacy version if not set.
 
     @NotEmpty
     private String defaultAnalyzer;
@@ -31,9 +40,20 @@ public class IndexDefinition {
         // Jackson deserialization
     }
 
-    public IndexDefinition(final String defaultAnalyzer, final Map<String, String> fieldAnalyzers) {
+    public IndexDefinition(
+            final int luceneVersion, final String defaultAnalyzer, final Map<String, String> fieldAnalyzers) {
+        this.luceneVersion = luceneVersion;
         this.defaultAnalyzer = defaultAnalyzer;
         this.fieldAnalyzers = fieldAnalyzers;
+    }
+
+    @JsonProperty
+    public int getLuceneVersion() {
+        return luceneVersion;
+    }
+
+    public void setLuceneVersion(int luceneVersion) {
+        this.luceneVersion = luceneVersion;
     }
 
     @JsonProperty
@@ -62,6 +82,7 @@ public class IndexDefinition {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
+        result = prime * result + luceneVersion;
         result = prime * result + ((defaultAnalyzer == null) ? 0 : defaultAnalyzer.hashCode());
         result = prime * result + ((fieldAnalyzers == null) ? 0 : fieldAnalyzers.hashCode());
         return result;
@@ -73,6 +94,7 @@ public class IndexDefinition {
         if (obj == null) return false;
         if (getClass() != obj.getClass()) return false;
         IndexDefinition other = (IndexDefinition) obj;
+        if (luceneVersion != other.luceneVersion) return false;
         if (defaultAnalyzer == null) {
             if (other.defaultAnalyzer != null) return false;
         } else if (!defaultAnalyzer.equals(other.defaultAnalyzer)) return false;
@@ -84,6 +106,7 @@ public class IndexDefinition {
 
     @Override
     public String toString() {
-        return "IndexDefinition [defaultAnalyzer=" + defaultAnalyzer + ", fieldAnalyzers=" + fieldAnalyzers + "]";
+        return "IndexDefinition [luceneVersion=" + luceneVersion + ", defaultAnalyzer=" + defaultAnalyzer
+                + ", fieldAnalyzers=" + fieldAnalyzers + "]";
     }
 }
