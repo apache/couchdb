@@ -36,16 +36,16 @@ end.
 CouchJSPath = filename:join(["priv", CouchJSName]).
 Version = case os:getenv("COUCHDB_VERSION") of
     false ->
-        string:strip(os:cmd("git describe --always"), right, $\n);
+        string:trim(os:cmd("git describe --always"));
     Version0 ->
-        string:strip(Version0, right)
+        string:trim(Version0)
 end.
 
 GitSha = case os:getenv("COUCHDB_GIT_SHA") of
     false ->
         ""; % release builds won\'t get a fallback
     GitSha0 ->
-        string:strip(GitSha0, right)
+        string:trim(GitSha0)
 end.
 
 CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
@@ -151,6 +151,25 @@ ProperConfig = case code:lib_dir(proper) of
     _ -> [{d, 'WITH_PROPER'}]
 end.
 
+DpkgArchitectureCmd = "dpkg-architecture -q DEB_HOST_MULTIARCH".
+GenericMozJSIncludePaths = "-I/usr/include/mozjs-" ++ SMVsn ++ " -I/usr/local/include/mozjs-" ++ SMVsn.
+GenericMozJSLibPaths = "-L/usr/local/lib -L/opt/homebrew/lib".
+
+WithDpkgArchitecture = case os:find_executable("dpkg-architecture") of
+    false -> false;
+    _ -> true
+end.
+
+MozJSIncludePath = case WithDpkgArchitecture of
+    false -> GenericMozJSIncludePaths;
+    true -> GenericMozJSIncludePaths ++ " -I/usr/include/" ++ string:trim(os:cmd(DpkgArchitectureCmd)) ++ "/mozjs-" ++ SMVsn
+end.
+
+MozJSLibPath = case WithDpkgArchitecture of
+    false -> GenericMozJSLibPaths;
+    true -> GenericMozJSLibPaths ++ " -L/usr/lib/" ++ string:trim(os:cmd(DpkgArchitectureCmd))
+end.
+
 % The include directories (parameters for the `-I` C compiler flag) are
 % considered in the `configure` script as a pre-check for their existence.
 % Please keep them in sync.
@@ -195,45 +214,20 @@ end.
             "-DXP_UNIX -I/usr/include/mozjs-86 -I/usr/local/include/mozjs-86 -I/opt/homebrew/include/mozjs-86/ -std=c++17 -Wno-invalid-offsetof",
             "-L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-86 -lm"
         };
-    {unix, _} when SMVsn == "91" ->
+    {unix, _} when SMVsn == "91"; SMVsn == "102"; SMVsn == "115"; SMVsn == "128" ->
         {
-            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-91 -I/usr/local/include/mozjs-91 -I/opt/homebrew/include/mozjs-91/ -std=c++17 -Wno-invalid-offsetof",
-            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-91 -lm"
-        };
-    {unix, _} when SMVsn == "102" ->
-        {
-            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-102 -I/usr/local/include/mozjs-102 -I/opt/homebrew/include/mozjs-102/ -std=c++17 -Wno-invalid-offsetof",
-            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-102 -lm"
-        };
-    {unix, _} when SMVsn == "115" ->
-        {
-            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-115 -I/usr/local/include/mozjs-115 -I/opt/homebrew/include/mozjs-115/ -std=c++17 -Wno-invalid-offsetof",
-            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-115 -lm"
-        };
-    {unix, _} when SMVsn == "128" ->
-        {
-            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-128 -I/usr/local/include/mozjs-128 -I/opt/homebrew/include/mozjs-128/ -std=c++17 -Wno-invalid-offsetof",
-            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-128 -lm"
+            "$CFLAGS -DXP_UNIX " ++ MozJSIncludePath ++ " -std=c++17 -Wno-invalid-offsetof",
+            "$LDFLAGS " ++ MozJSLibPath ++ " -std=c++17 -lm -lmozjs-" ++ SMVsn
         };
     {win32, _} when SMVsn == "91" ->
         {
             "/std:c++17 /DXP_WIN",
             "$LDFLAGS mozjs-91.lib"
         };
-    {win32, _} when SMVsn == "102" ->
+    {win32, _} when SMVsn == "102"; SMVsn == "115"; SMVsn == "128" ->
         {
             "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
-            "$LDFLAGS mozjs-102.lib"
-         };
-    {win32, _} when SMVsn == "115" ->
-        {
-            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
-            "$LDFLAGS mozjs-115.lib"
-        };
-    {win32, _} when SMVsn == "128" ->
-        {
-            "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
-            "$LDFLAGS mozjs-128.lib"
+            "$LDFLAGS mozjs-" ++ SMVsn ++ ".lib"
         }
 end.
 
@@ -273,12 +267,12 @@ end.
 
 IcuIncludePath = case WithBrew of
     false -> GenericIcuIncludePaths;
-    true -> "-I" ++ string:strip(os:cmd(BrewIcuPrefixCmd), right, $\n) ++ "/include"
+    true -> "-I" ++ string:trim(os:cmd(BrewIcuPrefixCmd)) ++ "/include"
 end.
 
 IcuLibPath = case WithBrew of
     false -> GenericIcuLibPaths;
-    true -> "-L" ++ string:strip(os:cmd(BrewIcuPrefixCmd), right, $\n) ++ "/lib"
+    true -> "-L" ++ string:trim(os:cmd(BrewIcuPrefixCmd)) ++ "/lib"
 end.
 
 IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
