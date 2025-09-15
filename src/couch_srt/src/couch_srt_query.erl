@@ -656,21 +656,16 @@ run(#query{
     case {Aggregation, Selector} of
         {count_by, #selector{aggregation_keys = AKey, value_key = undefined}} ->
             ValFun = fun(_) -> 1 end,
-            {Result, Acc} = group_by(Matcher, AKey, ValFun),
-            to_map({Result, topK(Acc, Limit)});
+            to_map(maybe_apply_limit(group_by(Matcher, AKey, ValFun), Limit));
         {count_by, #selector{aggregation_keys = AKey, value_key = VKey}} ->
-            {Result, Acc} = group_by(Matcher, AKey, VKey),
-            to_map({Result, topK(Acc, Limit)});
+            to_map(maybe_apply_limit(group_by(Matcher, AKey, VKey), Limit));
         {sort_by, #selector{aggregation_keys = AKey, value_key = VKey}} ->
-            {Result, Acc} = group_by(Matcher, AKey, VKey),
-            {Result, topK(Acc, Limit)};
+            maybe_apply_limit(group_by(Matcher, AKey, VKey), Limit);
         {group_by, #selector{aggregation_keys = AKey, value_key = undefined}} ->
             ValFun = fun(_) -> 1 end,
-            {Result, Acc} = group_by(Matcher, AKey, ValFun),
-            to_map({Result, topK(Acc, Limit)});
+            to_map(maybe_apply_limit(group_by(Matcher, AKey, ValFun), Limit));
         {group_by, #selector{aggregation_keys = AKey, value_key = VKey}} ->
-            {Result, Acc} = group_by(Matcher, AKey, VKey),
-            to_map({Result, topK(Acc, Limit)})
+            to_map(maybe_apply_limit(group_by(Matcher, AKey, VKey), Limit))
     end;
 run(#query{}) ->
     {error,
