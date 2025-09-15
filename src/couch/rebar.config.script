@@ -153,21 +153,21 @@ end.
 
 DpkgArchitectureCmd = "dpkg-architecture -q DEB_HOST_MULTIARCH".
 GenericMozJSIncludePaths = "-I/usr/include/mozjs-" ++ SMVsn ++ " -I/usr/local/include/mozjs-" ++ SMVsn.
-GenericMozJSLibPaths = "-L/usr/local/lib -L/opt/homebrew/lib".
+GenericMozJSLibPaths = "-L/usr/local/lib".
 
-WithDpkgArchitecture = case os:find_executable("dpkg-architecture") of
-    false -> false;
-    _ -> true
+WithDpkgArchitecture = os:find_executable("dpkg-architecture") /= false.
+WithHomebrew = os:find_executable("brew") /= false.
+
+MozJSIncludePath = case {WithDpkgArchitecture, WithHomebrew} of
+    {false, false} -> GenericMozJSIncludePaths;
+    {true, false} -> GenericMozJSIncludePaths ++ " -I/usr/include/" ++ string:trim(os:cmd(DpkgArchitectureCmd)) ++ "/mozjs-" ++ SMVsn;
+    {false, true} -> GenericMozJSIncludePaths ++ " -I/opt/homebrew/include/mozjs-" ++ SMVsn
 end.
 
-MozJSIncludePath = case WithDpkgArchitecture of
-    false -> GenericMozJSIncludePaths;
-    true -> GenericMozJSIncludePaths ++ " -I/usr/include/" ++ string:trim(os:cmd(DpkgArchitectureCmd)) ++ "/mozjs-" ++ SMVsn
-end.
-
-MozJSLibPath = case WithDpkgArchitecture of
-    false -> GenericMozJSLibPaths;
-    true -> GenericMozJSLibPaths ++ " -L/usr/lib/" ++ string:trim(os:cmd(DpkgArchitectureCmd))
+MozJSLibPath = case {WithDpkgArchitecture, WithHomebrew} of
+    {false, false} -> GenericMozJSLibPaths;
+    {true, false} -> GenericMozJSLibPaths ++ " -L/usr/lib/" ++ string:trim(os:cmd(DpkgArchitectureCmd));
+    {false, true} -> GenericMozJSLibPaths ++ " -L/opt/homebrew/lib"
 end.
 
 % The include directories (parameters for the `-I` C compiler flag) are
