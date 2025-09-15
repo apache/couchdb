@@ -12,6 +12,10 @@
 
 -module(couch_srt_query_tests).
 
+-ifdef(WITH_PROPER).
+-include_lib("couch/include/couch_eunit_proper.hrl").
+-endif.
+
 -include_lib("couch/include/couch_eunit.hrl").
 
 -include_lib("stdlib/include/ms_transform.hrl").
@@ -657,3 +661,44 @@ count(Aggregated) ->
 
 order_by_value(Grouped) ->
     lists:reverse(lists:keysort(2, maps:to_list(Grouped))).
+
+-ifdef(WITH_PROPER).
+
+new_topK_test_() ->
+    ?EUNIT_QUICKCHECK(60, 10000).
+
+prop_sorted_after_update() ->
+    ?FORALL(
+        Updates,
+        updates_g(),
+        begin
+            TopKResults = couch_srt_query:topK(Updates, 10),
+            NonZeroTopKResults = lists:filter(fun({_, V}) -> V > 0 end, TopKResults),
+            %% non zero elements are sorted
+            NonZeroTopKResults == update_model(Updates)
+        end
+    ).
+
+update_model(Updates) ->
+    UpdatesList = maps:to_list(Updates),
+    NonZeroUpdatesList = lists:filter(fun({_, V}) -> V > 0 end, UpdatesList),
+    SortedResults = lists:sort(fun({AK, AV}, {BK, BV}) ->
+        AV > BV orelse (AV == BV andalso AK >= BK)
+    end, NonZeroUpdatesList),
+    Size = min(10, length(SortedResults)),
+    {Model, _} = lists:split(Size, SortedResults),
+    Model.
+
+non_empty_tuple(Type) ->
+    ?LET(L, non_empty(list(Type)), list_to_tuple(L)).
+
+aggregation_key_g() ->
+    non_empty_tuple(string()).
+
+value_g() ->
+    non_neg_integer().
+
+updates_g() ->
+    map(aggregation_key_g(), value_g()).
+
+-endif.
