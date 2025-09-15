@@ -98,7 +98,7 @@ dummy_value_fun(#rctx{ioq_calls = IoqCalls}) ->
     IoqCalls.
 
 t_group_by_multiple_keys(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username, dbname], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username, dbname], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     V1 = maps:get({<<"user_bar">>, <<"db1">>}, Grouped),
     V2 = maps:get({<<"user_bar">>, <<"db2">>}, Grouped),
@@ -120,7 +120,7 @@ t_group_by_multiple_keys(#{rctxs := Rctxs}) ->
     ok.
 
 t_group_by_single_key(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -138,7 +138,7 @@ t_group_by_single_key(#{rctxs := Rctxs}) ->
     ok.
 
 t_group_by_binary_key(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -361,7 +361,7 @@ t_group_by_bad_request(_) ->
     ok.
 
 t_count_by_multiple_keys(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username, dbname], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username, dbname], ioq_calls, Rctxs),
     Grouped = count(Aggregated),
     V1 = maps:get({<<"user_bar">>, <<"db1">>}, Grouped),
     V2 = maps:get({<<"user_bar">>, <<"db2">>}, Grouped),
@@ -383,7 +383,7 @@ t_count_by_multiple_keys(#{rctxs := Rctxs}) ->
     ok.
 
 t_count_by_single_key(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username], ioq_calls, Rctxs),
     Grouped = count(Aggregated),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -401,7 +401,7 @@ t_count_by_single_key(#{rctxs := Rctxs}) ->
     ok.
 
 t_count_by_binary_key(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username], ioq_calls, Rctxs),
     Grouped = count(Aggregated),
     V1 = maps:get({<<"user_bar">>}, Grouped),
     V2 = maps:get({<<"user_foo">>}, Grouped),
@@ -457,7 +457,7 @@ t_count_by_bad_request(_) ->
     ok.
 
 t_sort_by_multiple_keys(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username, dbname], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username, dbname], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     Ordered = order_by_value(Grouped),
     [
@@ -482,7 +482,7 @@ t_sort_by_multiple_keys(#{rctxs := Rctxs}) ->
     ok.
 
 t_sort_by_single_key(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     Ordered = order_by_value(Grouped),
     [
@@ -503,7 +503,7 @@ t_sort_by_single_key(#{rctxs := Rctxs}) ->
     ok.
 
 t_sort_by_binary_key(#{rctxs := Rctxs}) ->
-    Aggregated = aggregate([username], ioq_calls, Rctxs),
+    Aggregated = aggregate_by([username], ioq_calls, Rctxs),
     Grouped = group(Aggregated),
     Ordered = order_by_value(Grouped),
     [
@@ -626,7 +626,7 @@ add_matcher(Name, MSpec) ->
         Name => {MSpec, ets:match_spec_compile(MSpec)}
     }).
 
-aggregate(AggregationKeys, ValField, Records) ->
+aggregate_by(AggregationKeys, ValField, Records) ->
     lists:foldl(
         fun(Rctx, Acc) ->
             Key = list_to_tuple([couch_srt_entry:value(Field, Rctx) || Field <- AggregationKeys]),
