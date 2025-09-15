@@ -40,7 +40,6 @@ csrt_query_test_() ->
             ?TDEF_FE(t_count_by_binary_key),
             ?TDEF_FE(t_count_by_bad_request),
             ?TDEF_FE(t_sort_by_multiple_keys),
-            ?TDEF_FE(t_sort_by_multiple_keys),
             ?TDEF_FE(t_sort_by_single_key),
             ?TDEF_FE(t_sort_by_binary_key),
             ?TDEF_FE(t_sort_by_bad_request)
