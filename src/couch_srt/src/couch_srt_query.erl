@@ -52,6 +52,10 @@
     unsafe_run/1
 ]).
 
+-ifdef(TEST).
+-export([topK/2]).
+-endif.
+
 -export_type([
     query/0,
     query_expression/0,
@@ -318,7 +322,7 @@ select_rows(Matcher, Limit) ->
 
 -record(topK, {
     % we store ordered elements in ascending order
-    seq = [] :: list({aggregation_key(), pos_integer()}),
+    seq = gb_sets:new() :: gb_sets:set({pos_integer(), aggregation_key()}),
     % we rely on erlang sorting order where `number < atom`
     min = infinite :: infinite | pos_integer(),
     max = 0 :: non_neg_integer(),
@@ -335,26 +339,24 @@ new_topK(K) when K >= 1 ->
 update_topK(_Key, Value, #topK{size = S, capacity = S, min = Min} = Top) when Value < Min ->
     Top#topK{min = Value};
 % when we are at capacity evict smallest value
-update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Seq} = Top) when
+update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Set0} = Top) when
     Value > Max
 ->
-    % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
-    [_ | Truncated] = Seq,
-    Top#topK{max = Value, seq = lists:keysort(2, [{Key, Value} | Truncated])};
+    Set1 = gb_sets:add({Value, Key}, Set0),
+    Top#topK{max = Value, seq = element(2, gb_sets:take_smallest(Set1))};
 % when we are at capacity and value is in between min and max evict smallest value
-update_topK(Key, Value, #topK{size = S, capacity = S, seq = Seq} = Top) ->
-    % capacity cannot be less than 1, so we can avoid handling the case when Seq is empty
-    [_ | Truncated] = Seq,
-    Top#topK{seq = lists:keysort(2, [{Key, Value} | Truncated])};
-update_topK(Key, Value, #topK{size = S, min = Min, seq = Seq} = Top) when Value < Min ->
-    Top#topK{size = S + 1, min = Value, seq = lists:keysort(2, [{Key, Value} | Seq])};
-update_topK(Key, Value, #topK{size = S, max = Max, seq = Seq} = Top) when Value > Max ->
-    Top#topK{size = S + 1, max = Value, seq = lists:keysort(2, [{Key, Value} | Seq])};
-update_topK(Key, Value, #topK{size = S, seq = Seq} = Top) ->
-    Top#topK{size = S + 1, seq = lists:keysort(2, [{Key, Value} | Seq])}.
+update_topK(Key, Value, #topK{size = S, capacity = S, seq = Set0} = Top) ->
+    Set1 = gb_sets:add({Value, Key}, Set0),
+    Top#topK{seq = element(2, gb_sets:take_smallest(Set1))};
+update_topK(Key, Value, #topK{size = S, min = Min, seq = Set0} = Top) when Value < Min ->
+    Top#topK{size = S + 1, min = Value, seq = gb_sets:add({Value, Key}, Set0)};
+update_topK(Key, Value, #topK{size = S, max = Max, seq = Set0} = Top) when Value > Max ->
+    Top#topK{size = S + 1, max = Value, seq = gb_sets:add({Value, Key}, Set0)};
+update_topK(Key, Value, #topK{size = S, seq = Set0} = Top) ->
+    Top#topK{size = S + 1, seq = gb_sets:add({Value, Key}, Set0)}.
 
 get_topK(#topK{seq = S}) ->
-    lists:reverse(S).
+    lists:reverse([{Key, Value} || {Value, Key} <- gb_sets:to_list(S)]).
 
 -spec topK(aggregation_result(), pos_integer()) ->
     ordered_result().
