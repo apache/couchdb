@@ -320,49 +320,20 @@ select_rows(Matcher, Limit) ->
 %% Auxiliary functions to calculate topK
 %%
 
--record(topK, {
-    % we store ordered elements in ascending order
-    seq = gb_sets:new() :: gb_sets:set({pos_integer(), aggregation_key()}),
-    % we rely on erlang sorting order where `number < atom`
-    min = infinite :: infinite | pos_integer(),
-    max = 0 :: non_neg_integer(),
-    size = 0 :: non_neg_integer(),
-    % capacity cannot be less than 1
-    capacity = 1 :: pos_integer()
-}).
-
-new_topK(K) when K >= 1 ->
-    #topK{capacity = K}.
-
-% when we are at capacity
-% don't bother adding the value since it is less than what we already saw
-update_topK(_Key, Value, #topK{size = S, capacity = S, min = Min} = Top) when Value < Min ->
-    Top#topK{min = Value};
-% when we are at capacity evict smallest value
-update_topK(Key, Value, #topK{size = S, capacity = S, max = Max, seq = Set0} = Top) when
-    Value > Max
-->
-    Set1 = gb_sets:add({Value, Key}, Set0),
-    Top#topK{max = Value, seq = element(2, gb_sets:take_smallest(Set1))};
-% when we are at capacity and value is in between min and max evict smallest value
-update_topK(Key, Value, #topK{size = S, capacity = S, seq = Set0} = Top) ->
-    Set1 = gb_sets:add({Value, Key}, Set0),
-    Top#topK{seq = element(2, gb_sets:take_smallest(Set1))};
-update_topK(Key, Value, #topK{size = S, min = Min, seq = Set0} = Top) when Value < Min ->
-    Top#topK{size = S + 1, min = Value, seq = gb_sets:add({Value, Key}, Set0)};
-update_topK(Key, Value, #topK{size = S, max = Max, seq = Set0} = Top) when Value > Max ->
-    Top#topK{size = S + 1, max = Value, seq = gb_sets:add({Value, Key}, Set0)};
-update_topK(Key, Value, #topK{size = S, seq = Set0} = Top) ->
-    Top#topK{size = S + 1, seq = gb_sets:add({Value, Key}, Set0)}.
-
-get_topK(#topK{seq = S}) ->
-    lists:reverse([{Key, Value} || {Value, Key} <- gb_sets:to_list(S)]).
-
--spec topK(aggregation_result(), pos_integer()) ->
-    ordered_result().
-topK(Results, K) ->
-    TopK = maps:fold(fun update_topK/3, new_topK(K), Results),
-    get_topK(TopK).
+topK(#{} = Map, T) when is_integer(T), T > 0 ->
+    Fun = fun(K, V, Set0) ->
+        case gb_sets:size(Set0) >= T of
+            true ->
+                case V =< element(1, gb_sets:smallest(Set0)) of
+                    true -> Set0;
+                    false -> element(2, gb_sets:take_smallest(gb_sets:add({V, K}, Set0)))
+                end;
+            false ->
+                gb_sets:add({V, K}, Set0)
+        end
+    end,
+    Set = maps:fold(Fun, gb_sets:empty(), Map),
+    lists:reverse([{K, V} || {V, K} <- gb_sets:to_list(Set)]).
 
 %%
 %% Query API functions
