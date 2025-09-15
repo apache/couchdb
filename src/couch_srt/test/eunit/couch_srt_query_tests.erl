@@ -663,6 +663,9 @@ order_by_value(Grouped) ->
 
 -ifdef(WITH_PROPER).
 
+format(Fmt, Args) ->
+    lists:flatten(io_lib:format(Fmt, Args)).
+
 new_topK_test_() ->
     ?EUNIT_QUICKCHECK(60, 10000).
 
@@ -671,20 +674,47 @@ prop_sorted_after_update() ->
         Updates,
         updates_g(),
         begin
-            TopKResults = couch_srt_query:topK(Updates, 10),
-            NonZeroTopKResults = lists:filter(fun({_, V}) -> V > 0 end, TopKResults),
-            %% non zero elements are sorted
-            NonZeroTopKResults == update_model(Updates)
+            Limit = 10,
+            TopKResults = couch_srt_query:topK(Updates, Limit),
+            NResults = length(TopKResults),
+            Values = [V || {_K, V} <- TopKResults],
+            ?assert(Values == lists:reverse(lists:sort(Values)), "Expected values to be ordered"),
+            ?assert(
+                NResults =< Limit,
+                format(
+                    "Expected the number of values to be less then the limit topK = ~p, limit = ~p",
+                    [NResults, Limit]
+                )
+            ),
+            Model = update_model(Updates, Limit),
+            ?assert(
+                NResults == length(Model),
+                format(
+                    "Expected the same number of values from topK as in the model topK = ~p, model = ~p",
+                    [NResults, length(Model)]
+                )
+            ),
+            ModelValues = [V || {_K, V} <- Model],
+            ?assert(
+                Values == ModelValues,
+                format(
+                    "Expected values from topK to be equal to values from the model topK = ~p, model = ~p",
+                    [Values, ModelValues]
+                )
+            ),
+            true
         end
     ).
 
-update_model(Updates) ->
+update_model(Updates, Limit) ->
     UpdatesList = maps:to_list(Updates),
-    NonZeroUpdatesList = lists:filter(fun({_, V}) -> V > 0 end, UpdatesList),
-    SortedResults = lists:sort(fun({AK, AV}, {BK, BV}) ->
-        AV > BV orelse (AV == BV andalso AK >= BK)
-    end, NonZeroUpdatesList),
-    Size = min(10, length(SortedResults)),
+    SortedResults = lists:sort(
+        fun({AK, AV}, {BK, BV}) ->
+            AV > BV orelse (AV == BV andalso AK >= BK)
+        end,
+        UpdatesList
+    ),
+    Size = min(Limit, length(SortedResults)),
     {Model, _} = lists:split(Size, SortedResults),
     Model.
 
