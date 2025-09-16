@@ -80,26 +80,38 @@ meta = [
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
-  'base-ppc64': [
-    name: 'Debian POWER',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    quickjs_test262: true,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 'ppc64le'
-  ],
+  // Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
+  // seems like a good thing, however, those workers allow running multiple
+  // agents at a time and often time out even with retries. The build times
+  // take close to an hour, which is at least x2 as long as it takes to run
+  // other arch CI jobs and they still time out often and fail. Disable for
+  // now. This is a low demand arch distro, maybe remove support altogether?
+  //
+  // 'base-ppc64': [
+  //   name: 'Debian POWER',
+  //   spidermonkey_vsn: '78',
+  //   with_nouveau: true,
+  //   with_clouseau: true,
+  //   quickjs_test262: true,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 'ppc64le'
+  // ],
 
-  'base-s390x': [
-    name: 'Debian s390x',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
-    // Test262Error: 51539607552,42,0,4,5,6,7,8
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 's390x'
-  ],
+  // Just like in the ppc64le case we sometimes "pick up" built-in s390x workers added to
+  // our jenkins, but since those are managed by us, our .mix/.venv/.hex packaging
+  // cache hack in /home/jenkins doesn't work, and so elixir tests fail. Skip this arch build
+  // until we figure out caching (probably need to use a proper caching plugin).
+  //
+  // 'base-s390x': [
+  //   name: 'Debian s390x',
+  //   spidermonkey_vsn: '78',
+  //   with_nouveau: true,
+  //   // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
+  //   // Test262Error: 51539607552,42,0,4,5,6,7,8
+  //   quickjs_test262: false,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 's390x'
+  // ],
 
   'base': [
     name: 'Debian x86_64',
