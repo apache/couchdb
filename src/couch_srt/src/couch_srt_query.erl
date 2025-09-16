@@ -239,16 +239,16 @@ group_by(Matcher, KeyFun, Val, AggFun, Limit) when is_atom(Val) ->
     group_by(Matcher, KeyFun, curry_field(Val), AggFun, Limit);
 group_by(Matcher, KeyFun, ValFun, AggFun, Limit) ->
     AggregateFun = fun(Rctx, Acc) ->
-            Key = KeyFun(Rctx),
-            Val = ValFun(Rctx),
-            CurrVal = maps:get(Key, Acc, 0),
-            case AggFun(CurrVal, Val) of
-                0 ->
-                    Acc;
-                NewVal ->
-                    maps:put(Key, NewVal, Acc)
-            end
-        end,
+        Key = KeyFun(Rctx),
+        Val = ValFun(Rctx),
+        CurrVal = maps:get(Key, Acc, 0),
+        case AggFun(CurrVal, Val) of
+            0 ->
+                Acc;
+            NewVal ->
+                maps:put(Key, NewVal, Acc)
+        end
+    end,
     fold_ets(Matcher, AggregateFun, Limit, ?CSRT_ETS).
 
 fold_ets(Matcher, Aggregate, TotalLimit, Table) ->
@@ -258,10 +258,14 @@ fold_ets(Matcher, Aggregate, TotalLimit, Table) ->
 fold_ets(Matcher, Aggregate, BatchSize, LeftToGo, Acc, ok, Table) when LeftToGo > 0 ->
     RequestSize = min(BatchSize, LeftToGo),
     {Status, Rctxs} = select_rows(Matcher, RequestSize),
-    {Size, Aggregated} = lists:foldl(fun(E, {Idx, A}) ->
-        {Idx + 1, Aggregate(E, A)}
-    end, {0, Acc}, Rctxs),
-    case Size < RequestSize  of
+    {Size, Aggregated} = lists:foldl(
+        fun(E, {Idx, A}) ->
+            {Idx + 1, Aggregate(E, A)}
+        end,
+        {0, Acc},
+        Rctxs
+    ),
+    case Size < RequestSize of
         true ->
             {Status, Aggregated};
         false ->
