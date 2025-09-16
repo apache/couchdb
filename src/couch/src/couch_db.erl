@@ -1807,7 +1807,7 @@ validate_epochs(Epochs) ->
     %% Assert order.
     case Epochs == lists:sort(fun({_, A}, {_, B}) -> B =< A end, Epochs) of
         true -> ok;
-        false -> erlang:error(epoch_order)
+        false -> erlang:error({epoch_order, Epochs})
     end.
 
 is_prefix(Pattern, Subject) ->
@@ -2403,7 +2403,10 @@ is_owner_test() ->
     ?assertNot(is_owner(bar, 99, [{baz, 200}, {bar, 100}, {foo, 1}])),
     ?assertNot(is_owner(baz, 199, [{baz, 200}, {bar, 100}, {foo, 1}])),
     ?assertError(duplicate_epoch, validate_epochs([{foo, 1}, {bar, 1}])),
-    ?assertError(epoch_order, validate_epochs([{foo, 100}, {bar, 200}])).
+    ?assertError(
+        {epoch_order, [{foo, 100}, {bar, 200}]},
+        validate_epochs([{foo, 100}, {bar, 200}])
+    ).
 
 to_binary(DbName) when is_list(DbName) ->
     ?l2b(DbName);
