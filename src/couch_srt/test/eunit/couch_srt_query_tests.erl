@@ -82,6 +82,7 @@ setup_query_limit() ->
     config:set("csrt", "enable", "true", false),
     config:set("csrt", "query_cardinality_limit", "5", false),
     config:set("csrt_logger.matchers_enabled", "docs_read", "true", false),
+    config:set_boolean(?CSRT, "randomize_testing", false, false),
     ets:insert(?CSRT_ETS, couch_srt_test_helper:rctxs()),
     #{ctx => Ctx}.
 
