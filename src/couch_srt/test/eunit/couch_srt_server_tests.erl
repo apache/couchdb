@@ -615,5 +615,5 @@ configure_filter(DbName, DDocId, Req, FName) ->
 
 load_rctx(PidRef) ->
     %% Add slight delay to accumulate RPC response deltas
-    timer:sleep(50),
+    timer:sleep(150),
     couch_srt_entry:to_json(couch_srt:get_resource(PidRef)).
