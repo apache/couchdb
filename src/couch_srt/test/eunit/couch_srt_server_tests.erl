@@ -142,11 +142,12 @@ t_all_docs_limit_zero({_Ctx, DbName, _View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_all_docs"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     MArgs = #mrargs{include_docs = false, limit = 0},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -156,7 +157,6 @@ t_all_docs_limit_zero({_Ctx, DbName, _View}) ->
         ioq_calls => assert_gt(),
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 t_all_docs_include_false({_Ctx, DbName, View}) ->
@@ -165,11 +165,12 @@ t_all_docs_include_false({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_all_docs"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     MArgs = #mrargs{include_docs = false},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -178,7 +179,6 @@ t_all_docs_include_false({_Ctx, DbName, View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 t_all_docs_include_true({_Ctx, DbName, View}) ->
@@ -188,11 +188,12 @@ t_all_docs_include_true({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_all_docs"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     MArgs = #mrargs{include_docs = true},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -201,7 +202,6 @@ t_all_docs_include_true({_Ctx, DbName, View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 t_update_docs({_Ctx, DbName, View}) ->
@@ -211,11 +211,12 @@ t_update_docs({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName)
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     Docs = [#doc{id = ?l2b("bar_" ++ integer_to_list(I))} || I <- lists:seq(1, ?DOCS_COUNT)],
     _Res = fabric:update_docs(DbName, Docs, [?ADMIN_CTX]),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, ddoc_dependent_local_io(View)),
+    ?assert(is_map(Rctx), "Expected a zero local io for view"),
     pdebug(rctx, Rctx),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
@@ -225,7 +226,6 @@ t_update_docs({_Ctx, DbName, View}) ->
         docs_written => ?DOCS_COUNT,
         pid_ref => PidRef
     }),
-    ok = ddoc_dependent_local_io_assert(Rctx, View),
     ok = assert_teardown(PidRef).
 
 t_get_doc({_Ctx, DbName, _View}) ->
@@ -236,10 +236,11 @@ t_get_doc({_Ctx, DbName, _View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/" ++ DocId
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     _Res = fabric:open_doc(DbName, DocId, [?ADMIN_CTX]),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io(io_sum)),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     pdebug(rctx, Rctx),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
@@ -249,7 +250,6 @@ t_get_doc({_Ctx, DbName, _View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx, io_sum),
     ok = assert_teardown(PidRef).
 
 t_updated_at({_Ctx, DbName, _View}) ->
@@ -262,11 +262,12 @@ t_updated_at({_Ctx, DbName, _View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/" ++ DocId
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     timer:sleep(TimeDelay),
     _Res = fabric:open_doc(DbName, DocId, [?ADMIN_CTX]),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io(io_sum)),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     %% Get RawRctx to have pre-json-converted timestamps
     RawRctx = couch_srt:get_resource(PidRef),
     pdebug(rctx, Rctx),
@@ -288,7 +289,6 @@ t_updated_at({_Ctx, DbName, _View}) ->
         couch_srt_util:make_dt(Started, Updated, millisecond) < 2 * TimeDelay,
         "updated_at gets updated in a reasonable time frame"
     ),
-    ok = nonzero_local_io_assert(Rctx, io_sum),
     ok = assert_teardown(PidRef).
 
 t_put_doc({_Ctx, DbName, View}) ->
@@ -299,11 +299,12 @@ t_put_doc({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/" ++ DocId
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     Doc = #doc{id = ?l2b(DocId)},
     _Res = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, ddoc_dependent_local_io(View)),
+    ?assert(is_map(Rctx), "Expected a zero local io for view"),
     pdebug(rctx, Rctx),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
@@ -313,7 +314,6 @@ t_put_doc({_Ctx, DbName, View}) ->
         docs_written => 1,
         pid_ref => PidRef
     }),
-    ok = ddoc_dependent_local_io_assert(Rctx, View),
     ok = assert_teardown(PidRef).
 
 t_delete_doc({_Ctx, DbName, View}) ->
@@ -326,10 +326,11 @@ t_delete_doc({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/" ++ DocId
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     _Res = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, ddoc_dependent_local_io(View)),
+    ?assert(is_map(Rctx), "Expected a zero local io for view"),
     pdebug(rctx, Rctx),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
@@ -339,7 +340,6 @@ t_delete_doc({_Ctx, DbName, View}) ->
         docs_written => 1,
         pid_ref => PidRef
     }),
-    ok = ddoc_dependent_local_io_assert(Rctx, View),
     ok = assert_teardown(PidRef).
 
 t_changes({_Ctx, DbName, View}) ->
@@ -349,10 +349,11 @@ t_changes({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_changes"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     _Res = fabric:changes(DbName, fun changes_cb/2, [], #changes_args{}),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -362,7 +363,6 @@ t_changes({_Ctx, DbName, View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 t_changes_limit_zero({_Ctx, DbName, _View}) ->
@@ -371,10 +371,11 @@ t_changes_limit_zero({_Ctx, DbName, _View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_changes"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     _Res = fabric:changes(DbName, fun changes_cb/2, [], #changes_args{limit = 0}),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -384,7 +385,6 @@ t_changes_limit_zero({_Ctx, DbName, _View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 %% TODO: stub in non JS filter with selector
@@ -401,12 +401,13 @@ t_changes_js_filtered({_Ctx, DbName, {DDocId, _ViewName} = View}) ->
     },
     {PidRef, Nonce} = coordinator_context(Context),
     Req = {json_req, null},
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     Filter = configure_filter(DbName, DDocId, Req),
     Args = #changes_args{filter_fun = Filter},
     _Res = fabric:changes(DbName, fun changes_cb/2, [], Args),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => assert_gte(?DB_Q),
@@ -418,7 +419,6 @@ t_changes_js_filtered({_Ctx, DbName, {DDocId, _ViewName} = View}) ->
         js_filter => docs_count(View),
         js_filtered_docs => docs_count(View)
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 t_view_query({_Ctx, DbName, View}) ->
@@ -427,11 +427,12 @@ t_view_query({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_design/foo/_view/bar"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     MArgs = #mrargs{include_docs = false},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -440,7 +441,6 @@ t_view_query({_Ctx, DbName, View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 t_view_query_include_docs({_Ctx, DbName, View}) ->
@@ -449,11 +449,12 @@ t_view_query_include_docs({_Ctx, DbName, View}) ->
         path => "/" ++ ?b2l(DbName) ++ "/_design/foo/_view/bar"
     },
     {PidRef, Nonce} = coordinator_context(Context),
-    Rctx0 = load_rctx(PidRef),
+    Rctx0 = load_rctx(PidRef, Nonce),
     ok = fresh_rctx_assert(Rctx0, PidRef, Nonce),
     MArgs = #mrargs{include_docs = true},
     _Res = fabric:all_docs(DbName, [?ADMIN_CTX], fun view_cb/2, [], MArgs),
-    Rctx = load_rctx(PidRef),
+    Rctx = wait_rctx(PidRef, nonzero_local_io()),
+    ?assert(is_map(Rctx), "Expected a nonzero local io"),
     ok = rctx_assert(Rctx, #{
         nonce => Nonce,
         db_open => ?DB_Q,
@@ -462,7 +463,6 @@ t_view_query_include_docs({_Ctx, DbName, View}) ->
         docs_written => 0,
         pid_ref => PidRef
     }),
-    ok = nonzero_local_io_assert(Rctx),
     ok = assert_teardown(PidRef).
 
 assert_teardown(PidRef) ->
@@ -542,35 +542,51 @@ rctx_assert(Rctx, Asserts0) ->
     ),
     ok.
 
+wait_rctx(PidRef, WaitFun) ->
+    test_util:wait(fun() ->
+        Rctx = couch_srt_entry:to_json(couch_srt:get_resource(PidRef)),
+        WaitFun(Rctx)
+    end).
+
 %% Doc updates and others don't perform local IO, they funnel to another pid
-zero_local_io_assert(Rctx) ->
-    ?assertEqual(0, maps:get(ioq_calls, Rctx)),
-    ?assertEqual(0, maps:get(get_kp_node, Rctx)),
-    ?assertEqual(0, maps:get(get_kv_node, Rctx)),
-    ok.
+zero_local_io() ->
+    fun
+        (#{ioq_calls := 0, get_kp_node := 0, get_kv_node := 0} = Ctx)  ->
+                Ctx;
+        (_) ->
+            wait
+    end.
 
-nonzero_local_io_assert(Rctx) ->
-    nonzero_local_io_assert(Rctx, io_separate).
+nonzero_local_io() ->
+    nonzero_local_io(io_separate).
 
-%% io_sum for when get_kp_node=0
-nonzero_local_io_assert(Rctx, io_sum) ->
-    ?assert(maps:get(ioq_calls, Rctx) > 0),
-    #{
-        get_kp_node := KPNodes,
-        get_kv_node := KVNodes
-    } = Rctx,
-    ?assert((KPNodes + KVNodes) > 0),
-    ok;
-nonzero_local_io_assert(Rctx, io_separate) ->
-    ?assert(maps:get(ioq_calls, Rctx) > 0),
-    ?assert(maps:get(get_kp_node, Rctx) > 0),
-    ?assert(maps:get(get_kv_node, Rctx) > 0),
-    ok.
+nonzero_local_io(io_sum) ->
+    fun
+        (#{
+            ioq_calls := IoqCalls,
+            get_kp_node := KPNodes,
+            get_kv_node := KVNodes
+        } = Ctx) when IoqCalls > 0 andalso (KPNodes + KVNodes) > 0 ->
+            Ctx;
+        (_) ->
+            wait
+    end;
+nonzero_local_io(io_separate) ->
+    fun
+        (#{
+            ioq_calls := IoqCalls,
+            get_kp_node := KPNodes,
+            get_kv_node := KVNodes
+        } = Ctx) when IoqCalls > 0 andalso KPNodes > 0 andalso KVNodes > 0 ->
+            Ctx;
+        (_) ->
+            wait
+    end.
 
-ddoc_dependent_local_io_assert(Rctx, undefined) ->
-    zero_local_io_assert(Rctx);
-ddoc_dependent_local_io_assert(Rctx, {_DDoc, _ViewName}) ->
-    nonzero_local_io_assert(Rctx, io_sum).
+ddoc_dependent_local_io(undefined) ->
+    zero_local_io();
+ddoc_dependent_local_io({_DDoc, _ViewName}) ->
+    nonzero_local_io(io_sum).
 
 coordinator_context(#{method := Method, path := Path}) ->
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
@@ -613,7 +629,11 @@ configure_filter(DbName, DDocId, Req, FName) ->
     Style = main_only,
     {fetch, custom, Style, Req, DIR, FName}.
 
-load_rctx(PidRef) ->
-    %% Add slight delay to accumulate RPC response deltas
-    timer:sleep(300),
-    couch_srt_entry:to_json(couch_srt:get_resource(PidRef)).
+load_rctx(PidRef, NonceString) ->
+    Nonce = list_to_binary(NonceString),
+    wait_rctx(PidRef, fun
+        (#{nonce := N} = Rctx) when N == Nonce -> Rctx;
+        (S) ->
+            ?debugFmt("Nonce = ~p R = ~p~n", [Nonce, S]),
+            wait
+    end).
