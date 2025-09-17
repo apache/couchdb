@@ -511,13 +511,15 @@ reorder_results(Keys, SortedResults, Default) ->
     Map = maps:from_list(SortedResults),
     [maps:get(Key, Map, Default) || Key <- Keys].
 
-url_strip_password(Url) ->
+url_strip_password(Url) when is_list(Url) ->
     re:replace(
         Url,
         "(http|https|socks5)://([^:]+):[^@]+@(.*)$",
         "\\1://\\2:*****@\\3",
         [{return, list}]
-    ).
+    );
+url_strip_password(Other) ->
+    Other.
 
 encode_doc_id(#doc{id = Id}) ->
     encode_doc_id(Id);
