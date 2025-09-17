@@ -24,8 +24,7 @@
     terminate/2,
     handle_call/3,
     handle_info/2,
-    handle_cast/2,
-    format_status/2
+    handle_cast/2
 ]).
 
 -export([
@@ -356,13 +355,6 @@ terminate(_Reason, _State) ->
     stop_clear_all_jobs(?TERMINATE_SHUTDOWN_TIME),
     couch_replicator_share:clear(),
     ok.
-
-format_status(_Opt, [_PDict, State]) ->
-    [
-        {max_jobs, State#state.max_jobs},
-        {running_jobs, running_job_count()},
-        {pending_jobs, pending_job_count()}
-    ].
 
 %% config listener functions
 

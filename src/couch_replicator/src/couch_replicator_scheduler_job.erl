@@ -25,7 +25,6 @@
     handle_call/3,
     handle_info/2,
     handle_cast/2,
-    format_status/2,
     sum_stats/2,
     report_seq_done/3
 ]).
@@ -476,39 +475,6 @@ terminate_cleanup(#rep_state{rep_details = #rep{id = RepId}} = State) ->
     update_task(State),
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
-
-format_status(_Opt, [_PDict, State]) ->
-    #rep_state{
-        source = Source,
-        target = Target,
-        rep_details = RepDetails,
-        start_seq = StartSeq,
-        source_seq = SourceSeq,
-        committed_seq = CommitedSeq,
-        current_through_seq = ThroughSeq,
-        highest_seq_done = HighestSeqDone,
-        session_id = SessionId
-    } = state_strip_creds(State),
-    #rep{
-        id = RepId,
-        options = Options,
-        doc_id = DocId,
-        db_name = DbName
-    } = RepDetails,
-    [
-        {rep_id, RepId},
-        {source, couch_replicator_api_wrap:db_uri(Source)},
-        {target, couch_replicator_api_wrap:db_uri(Target)},
-        {db_name, DbName},
-        {doc_id, DocId},
-        {options, Options},
-        {session_id, SessionId},
-        {start_seq, StartSeq},
-        {source_seq, SourceSeq},
-        {committed_seq, CommitedSeq},
-        {current_through_seq, ThroughSeq},
-        {highest_seq_done, HighestSeqDone}
-    ].
 
 sum_stats(Pid, Stats) when is_pid(Pid) ->
     gen_server:cast(Pid, {sum_stats, Stats}).
@@ -1205,54 +1171,5 @@ replication_start_error_test() ->
         {http_error_code, 503, <<"GET http://x/y">>},
         replication_start_error({http_request_failed, "GET", "http://x/y", {error, {code, 503}}})
     ).
-
-format_status_test_() ->
-    {
-        foreach,
-        fun meck_config/0,
-        fun(_) -> meck:unload() end,
-        [
-            ?TDEF_FE(t_scheduler_job_format_status)
-        ]
-    }.
-
-meck_config() ->
-    meck:expect(config, get, fun(_, _, Default) -> Default end).
-
-t_scheduler_job_format_status(_) ->
-    Source = <<"http://u:p@h1/d1">>,
-    Target = <<"http://u:p@h2/d2">>,
-    Rep = #rep{
-        id = {"base", "+ext"},
-        source = couch_replicator_parse:parse_rep_db(Source, [], []),
-        target = couch_replicator_parse:parse_rep_db(Target, [], []),
-        options = [{create_target, true}],
-        doc_id = <<"mydoc">>,
-        db_name = <<"mydb">>
-    },
-    State = #rep_state{
-        rep_details = Rep,
-        source = Rep#rep.source,
-        target = Rep#rep.target,
-        session_id = <<"a">>,
-        start_seq = <<"1">>,
-        source_seq = <<"2">>,
-        committed_seq = <<"3">>,
-        current_through_seq = <<"4">>,
-        highest_seq_done = <<"5">>
-    },
-    Format = format_status(opts_ignored, [pdict, State]),
-    ?assertEqual("http://h1/d1/", proplists:get_value(source, Format)),
-    ?assertEqual("http://h2/d2/", proplists:get_value(target, Format)),
-    ?assertEqual({"base", "+ext"}, proplists:get_value(rep_id, Format)),
-    ?assertEqual([{create_target, true}], proplists:get_value(options, Format)),
-    ?assertEqual(<<"mydoc">>, proplists:get_value(doc_id, Format)),
-    ?assertEqual(<<"mydb">>, proplists:get_value(db_name, Format)),
-    ?assertEqual(<<"a">>, proplists:get_value(session_id, Format)),
-    ?assertEqual(<<"1">>, proplists:get_value(start_seq, Format)),
-    ?assertEqual(<<"2">>, proplists:get_value(source_seq, Format)),
-    ?assertEqual(<<"3">>, proplists:get_value(committed_seq, Format)),
-    ?assertEqual(<<"4">>, proplists:get_value(current_through_seq, Format)),
-    ?assertEqual(<<"5">>, proplists:get_value(highest_seq_done, Format)).
 
 -endif.
