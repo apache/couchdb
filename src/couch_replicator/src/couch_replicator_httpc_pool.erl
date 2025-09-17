@@ -19,7 +19,7 @@
 
 % gen_server API
 -export([init/1, handle_call/3, handle_info/2, handle_cast/2]).
--export([format_status/2]).
+-export([format_status/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -135,19 +135,23 @@ handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
             {noreply, State}
     end.
 
-format_status(_Opt, [_PDict, State]) ->
-    #state{
-        url = Url,
-        proxy_url = ProxyUrl
-    } = State,
-    [
-        {data, [
-            {"State", State#state{
-                url = couch_util:url_strip_password(Url),
-                proxy_url = couch_util:url_strip_password(ProxyUrl)
-            }}
-        ]}
-    ].
+format_status(Status) ->
+    maps:map(
+        fun
+            (state, State) ->
+                #state{
+                    url = Url,
+                    proxy_url = ProxyUrl
+                } = State,
+                State#state{
+                    url = couch_util:url_strip_password(Url),
+                    proxy_url = couch_util:url_strip_password(ProxyUrl)
+                };
+            (_, Value) ->
+                Value
+        end,
+        Status
+    ).
 
 monitor_client(Callers, Worker, {ClientPid, _}) ->
     [{Worker, erlang:monitor(process, ClientPid)} | Callers].
@@ -196,13 +200,16 @@ release_worker_internal(Worker, State) ->
 
 format_status_test_() ->
     ?_test(begin
-        State = #state{
-            url = "https://username1:password1@$ACCOUNT2.cloudant.com/db",
-            proxy_url = "https://username2:password2@proxy.thing.com:8080/"
+        Status = #{
+            state =>
+                #state{
+                    url = "https://username1:password1@$ACCOUNT2.cloudant.com/db",
+                    proxy_url = "https://username2:password2@proxy.thing.com:8080/"
+                }
         },
-        [{data, [{"State", ScrubbedN}]}] = format_status(normal, [[], State]),
-        ?assertEqual("https://username1:*****@$ACCOUNT2.cloudant.com/db", ScrubbedN#state.url),
-        ?assertEqual("https://username2:*****@proxy.thing.com:8080/", ScrubbedN#state.proxy_url),
+        #{state := State} = format_status(Status),
+        ?assertEqual("https://username1:*****@$ACCOUNT2.cloudant.com/db", State#state.url),
+        ?assertEqual("https://username2:*****@proxy.thing.com:8080/", State#state.proxy_url),
         ok
     end).
 
