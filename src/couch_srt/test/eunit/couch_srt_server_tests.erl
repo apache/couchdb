@@ -551,8 +551,8 @@ wait_rctx(PidRef, WaitFun) ->
 %% Doc updates and others don't perform local IO, they funnel to another pid
 zero_local_io() ->
     fun
-        (#{ioq_calls := 0, get_kp_node := 0, get_kv_node := 0} = Ctx)  ->
-                Ctx;
+        (#{ioq_calls := 0, get_kp_node := 0, get_kv_node := 0} = Ctx) ->
+            Ctx;
         (_) ->
             wait
     end.
@@ -562,22 +562,26 @@ nonzero_local_io() ->
 
 nonzero_local_io(io_sum) ->
     fun
-        (#{
-            ioq_calls := IoqCalls,
-            get_kp_node := KPNodes,
-            get_kv_node := KVNodes
-        } = Ctx) when IoqCalls > 0 andalso (KPNodes + KVNodes) > 0 ->
+        (
+            #{
+                ioq_calls := IoqCalls,
+                get_kp_node := KPNodes,
+                get_kv_node := KVNodes
+            } = Ctx
+        ) when IoqCalls > 0 andalso (KPNodes + KVNodes) > 0 ->
             Ctx;
         (_) ->
             wait
     end;
 nonzero_local_io(io_separate) ->
     fun
-        (#{
-            ioq_calls := IoqCalls,
-            get_kp_node := KPNodes,
-            get_kv_node := KVNodes
-        } = Ctx) when IoqCalls > 0 andalso KPNodes > 0 andalso KVNodes > 0 ->
+        (
+            #{
+                ioq_calls := IoqCalls,
+                get_kp_node := KPNodes,
+                get_kv_node := KVNodes
+            } = Ctx
+        ) when IoqCalls > 0 andalso KPNodes > 0 andalso KVNodes > 0 ->
             Ctx;
         (_) ->
             wait
