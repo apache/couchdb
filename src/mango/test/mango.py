@@ -26,6 +26,19 @@ import user_docs
 import limit_docs
 
 
+class MangoException(requests.exceptions.HTTPError):
+    def __init__(self, err: requests.exceptions.HTTPError):
+        super().__init__(str(err), response=err.response)
+        self.request = err.request
+        self.response = err.response
+
+    def __str__(self):
+        formatted = super().__str__()
+        request = "request: {}".format(self.request.body)
+        response = "response: {}".format(self.response.text)
+        return "\n".join([formatted, request, response])
+
+
 COUCH_HOST = os.environ.get("COUCH_HOST") or "http://127.0.0.1:15984"
 COUCH_USER = os.environ.get("COUCH_USER")
 COUCH_PASS = os.environ.get("COUCH_PASS")
@@ -64,6 +77,13 @@ def clean_up_dbs():
 def delay(n=5, t=0.5):
     for i in range(0, n):
         time.sleep(t)
+
+
+def raise_for_status(resp):
+    try:
+        resp.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        raise MangoException(err) from None
 
 
 class Concurrently(object):
@@ -108,11 +128,11 @@ class Database(object):
         if r.status_code == 404:
             p = str(partitioned).lower()
             r = self.sess.put(self.url, params={"q": q, "n": n, "partitioned": p})
-            r.raise_for_status()
+            raise_for_status(r)
 
     def delete(self):
         r = self.sess.delete(self.url)
-        r.raise_for_status()
+        raise_for_status(r)
 
     def recreate(self):
         r = self.sess.get(self.url)
@@ -132,32 +152,32 @@ class Database(object):
     def save_docs_with_conflicts(self, docs, **kwargs):
         body = json.dumps({"docs": docs, "new_edits": False})
         r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)
-        r.raise_for_status()
+        raise_for_status(r)
 
     def save_docs(self, docs, **kwargs):
         for offset in range(0, len(docs), BULK_BATCH_SIZE):
             chunk = docs[offset : (offset + BULK_BATCH_SIZE)]
             body = {"docs": chunk}
             r = self.sess.post(self.path("_bulk_docs"), json=body, params=kwargs)
-            r.raise_for_status()
+            raise_for_status(r)
             for doc, result in zip(chunk, r.json()):
                 doc["_id"] = result["id"]
                 doc["_rev"] = result["rev"]
 
     def open_doc(self, docid):
         r = self.sess.get(self.path(docid))
-        r.raise_for_status()
+        raise_for_status(r)
         return r.json()
 
     def delete_doc(self, docid):
         r = self.sess.get(self.path(docid))
-        r.raise_for_status()
+        raise_for_status(r)
         original_rev = r.json()["_rev"]
         self.sess.delete(self.path(docid), params={"rev": original_rev})
 
     def ddoc_info(self, ddocid):
         r = self.sess.get(self.path([ddocid, "_info"]))
-        r.raise_for_status()
+        raise_for_status(r)
         return r.json()
 
     def create_index(
@@ -180,7 +200,7 @@ class Database(object):
             body["index"]["partial_filter_selector"] = partial_filter_selector
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        r.raise_for_status()
+        raise_for_status(r)
         assert r.json()["id"] is not None
         assert r.json()["name"] is not None
 
@@ -223,7 +243,7 @@ class Database(object):
             body["ddoc"] = ddoc
         body = json.dumps(body)
         r = self.sess.post(self.path("_index"), data=body)
-        r.raise_for_status()
+        raise_for_status(r)
         return r.json()["result"] == "created"
 
     def list_indexes(self, limit="", skip=""):
@@ -232,7 +252,7 @@ class Database(object):
         if skip != "":
             skip = "skip=" + str(skip)
         r = self.sess.get(self.path("_index?" + limit + ";" + skip))
-        r.raise_for_status()
+        raise_for_status(r)
         return r.json()["indexes"]
 
     def get_index(self, ddocid, name):
@@ -255,7 +275,7 @@ class Database(object):
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
         r = self.sess.delete(self.path(path), params={"w": "3"})
-        r.raise_for_status()
+        raise_for_status(r)
 
         while len(self.get_index(ddocid, name)) == 1:
             delay(t=0.1)
@@ -314,7 +334,7 @@ class Database(object):
         else:
             path = self.path("{}_find".format(ppath))
         r = self.sess.post(path, data=body)
-        r.raise_for_status()
+        raise_for_status(r)
         if explain or return_raw:
             return r.json()
         else:
