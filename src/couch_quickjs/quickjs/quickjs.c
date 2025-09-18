@@ -13002,73 +13002,6 @@ static JSValue JS_ToStringCheckObject(JSContext *ctx, JSValueConst val)
     return JS_ToString(ctx, val);
 }
 
-static JSValue JS_ToQuotedString(JSContext *ctx, JSValueConst val1)
-{
-    JSValue val;
-    JSString *p;
-    int i;
-    uint32_t c;
-    StringBuffer b_s, *b = &b_s;
-    char buf[16];
-
-    val = JS_ToStringCheckObject(ctx, val1);
-    if (JS_IsException(val))
-        return val;
-    p = JS_VALUE_GET_STRING(val);
-
-    if (string_buffer_init(ctx, b, p->len + 2))
-        goto fail;
-
-    if (string_buffer_putc8(b, '\"'))
-        goto fail;
-    for(i = 0; i < p->len; ) {
-        c = string_getc(p, &i);
-        switch(c) {
-        case '\t':
-            c = 't';
-            goto quote;
-        case '\r':
-            c = 'r';
-            goto quote;
-        case '\n':
-            c = 'n';
-            goto quote;
-        case '\b':
-            c = 'b';
-            goto quote;
-        case '\f':
-            c = 'f';
-            goto quote;
-        case '\"':
-        case '\\':
-        quote:
-            if (string_buffer_putc8(b, '\\'))
-                goto fail;
-            if (string_buffer_putc8(b, c))
-                goto fail;
-            break;
-        default:
-            if (c < 32 || is_surrogate(c)) {
-                snprintf(buf, sizeof(buf), "\\u%04x", c);
-                if (string_buffer_puts8(b, buf))
-                    goto fail;
-            } else {
-                if (string_buffer_putc(b, c))
-                    goto fail;
-            }
-            break;
-        }
-    }
-    if (string_buffer_putc8(b, '\"'))
-        goto fail;
-    JS_FreeValue(ctx, val);
-    return string_buffer_end(b);
- fail:
-    JS_FreeValue(ctx, val);
-    string_buffer_free(b);
-    return JS_EXCEPTION;
-}
-
 #define JS_PRINT_MAX_DEPTH 8
 
 typedef struct {
@@ -13126,18 +13059,61 @@ static uint32_t js_string_get_length(JSValueConst val)
     }
 }
 
-static void js_dump_char(JSPrintValueState *s, int c, int sep)
+/* pretty print the first 'len' characters of 'p' */
+static void js_print_string1(JSPrintValueState *s, JSString *p, int len, int sep)
 {
-    if (c == sep || c == '\\') {
-        js_putc(s, '\\');
-        js_putc(s, c);
-    } else if (c >= ' ' && c <= 126) {
-        js_putc(s, c);
-    } else if (c == '\n') {
-        js_putc(s, '\\');
-        js_putc(s, 'n');
-    } else {
-        js_printf(s, "\\u%04x", c);
+    uint8_t buf[UTF8_CHAR_LEN_MAX];
+    int l, i, c, c1;
+
+    for(i = 0; i < len; i++) {
+        c = string_get(p, i);
+        switch(c) {
+        case '\t':
+            c = 't';
+            goto quote;
+        case '\r':
+            c = 'r';
+            goto quote;
+        case '\n':
+            c = 'n';
+            goto quote;
+        case '\b':
+            c = 'b';
+            goto quote;
+        case '\f':
+            c = 'f';
+            goto quote;
+        case '\\':
+        quote:
+            js_putc(s, '\\');
+            js_putc(s, c);
+            break;
+        default:
+            if (c == sep)
+                goto quote;
+            if (c >= 32 && c <= 126) {
+                js_putc(s, c);
+            } else if (c < 32 || 
+                       (c >= 0x7f && c <= 0x9f)) {
+            escape:
+                js_printf(s, "\\u%04x", c);
+            } else {
+                if (is_hi_surrogate(c)) {
+                    if ((i + 1) >= len)
+                        goto escape;
+                    c1 = string_get(p, i + 1);
+                    if (!is_lo_surrogate(c1))
+                        goto escape;
+                    i++;
+                    c = from_surrogate(c, c1);
+                } else if (is_lo_surrogate(c)) {
+                    goto escape;
+                }
+                l = unicode_to_utf8(buf, c);
+                s->write_func(s->write_opaque, (char *)buf, l);
+            }
+            break;
+        }
     }
 }
 
@@ -13146,12 +13122,10 @@ static void js_print_string_rec(JSPrintValueState *s, JSValueConst val,
 {
     if (JS_VALUE_GET_TAG(val) == JS_TAG_STRING) {
         JSString *p = JS_VALUE_GET_STRING(val);
-        uint32_t i, len;
+        uint32_t len;
         if (pos < s->options.max_string_length) {
             len = min_uint32(p->len, s->options.max_string_length - pos);
-            for(i = 0; i < len; i++) {
-                js_dump_char(s, string_get(p, i), sep);
-            }
+            js_print_string1(s, p, len, sep);
         }
     } else if (JS_VALUE_GET_TAG(val) == JS_TAG_STRING_ROPE) {
         JSStringRope *r = JS_VALUE_GET_PTR(val);
@@ -13224,9 +13198,7 @@ static void js_print_atom(JSPrintValueState *s, JSAtom atom)
             }
         } else {
             js_putc(s, '"');
-            for(i = 0; i < p->len; i++) {
-                js_dump_char(s, string_get(p, i), '\"');
-            }
+            js_print_string1(s, p, p->len, '\"');
             js_putc(s, '"');
         }
     }
@@ -16199,6 +16171,7 @@ static __exception int js_append_enumerate(JSContext *ctx, JSValue *sp)
     int is_array_iterator;
     JSValue *arrp;
     uint32_t i, count32, pos;
+    JSCFunctionType ft;
 
     if (JS_VALUE_GET_TAG(sp[-2]) != JS_TAG_INT) {
         JS_ThrowInternalError(ctx, "invalid index for append");
@@ -16216,8 +16189,8 @@ static __exception int js_append_enumerate(JSContext *ctx, JSValue *sp)
     iterator = JS_GetProperty(ctx, sp[-1], JS_ATOM_Symbol_iterator);
     if (JS_IsException(iterator))
         return -1;
-    is_array_iterator = JS_IsCFunction(ctx, iterator,
-                                       (JSCFunction *)js_create_array_iterator,
+    ft.generic_magic = js_create_array_iterator;
+    is_array_iterator = JS_IsCFunction(ctx, iterator, ft.generic,
                                        JS_ITERATOR_KIND_VALUE);
     JS_FreeValue(ctx, iterator);
 
@@ -16229,8 +16202,10 @@ static __exception int js_append_enumerate(JSContext *ctx, JSValue *sp)
         JS_FreeValue(ctx, enumobj);
         return -1;
     }
+
+    ft.iterator_next = js_array_iterator_next;
     if (is_array_iterator
-    &&  JS_IsCFunction(ctx, method, (JSCFunction *)js_array_iterator_next, 0)
+    &&  JS_IsCFunction(ctx, method, ft.generic, 0)
     &&  js_get_fast_array(ctx, sp[-1], &arrp, &count32)) {
         uint32_t len;
         if (js_get_length32(ctx, &len, sp[-1]))
@@ -34963,7 +34938,8 @@ static void free_function_bytecode(JSRuntime *rt, JSFunctionBytecode *b)
                JS_AtomGetStrRT(rt, buf, sizeof(buf), b->func_name));
     }
 #endif
-    free_bytecode_atoms(rt, b->byte_code_buf, b->byte_code_len, TRUE);
+    if (b->byte_code_buf)
+        free_bytecode_atoms(rt, b->byte_code_buf, b->byte_code_len, TRUE);
 
     if (b->vardefs) {
         for(i = 0; i < b->arg_count + b->var_count; i++) {
@@ -40840,8 +40816,10 @@ done:
             goto exception;
         args[0] = ret;
         res = JS_Invoke(ctx, arr, JS_ATOM_set, 1, args);
-        if (check_exception_free(ctx, res))
+        if (check_exception_free(ctx, res)) {
+            JS_FreeValue(ctx, arr);
             goto exception;
+        }
         JS_FreeValue(ctx, ret);
         ret = arr;
     }
@@ -43870,12 +43848,6 @@ static JSValue js_string_trim(JSContext *ctx, JSValueConst this_val,
     return ret;
 }
 
-static JSValue js_string___quote(JSContext *ctx, JSValueConst this_val,
-                                 int argc, JSValueConst *argv)
-{
-    return JS_ToQuotedString(ctx, this_val);
-}
-
 /* return 0 if before the first char */
 static int string_prevc(JSString *p, int *pidx)
 {
@@ -44363,7 +44335,6 @@ static const JSCFunctionListEntry js_string_proto_funcs[] = {
     JS_ALIAS_DEF("trimLeft", "trimStart" ),
     JS_CFUNC_DEF("toString", 0, js_string_toString ),
     JS_CFUNC_DEF("valueOf", 0, js_string_toString ),
-    JS_CFUNC_DEF("__quote", 1, js_string___quote ),
     JS_CFUNC_MAGIC_DEF("toLowerCase", 0, js_string_toLowerCase, 1 ),
     JS_CFUNC_MAGIC_DEF("toUpperCase", 0, js_string_toLowerCase, 0 ),
     JS_CFUNC_MAGIC_DEF("toLocaleLowerCase", 0, js_string_toLowerCase, 1 ),
@@ -46678,10 +46649,72 @@ typedef struct JSONStringifyContext {
     StringBuffer *b;
 } JSONStringifyContext;
 
-static JSValue JS_ToQuotedStringFree(JSContext *ctx, JSValue val) {
-    JSValue r = JS_ToQuotedString(ctx, val);
+static int JS_ToQuotedString(JSContext *ctx, StringBuffer *b, JSValueConst val1)
+{
+    JSValue val;
+    JSString *p;
+    int i;
+    uint32_t c;
+    char buf[16];
+
+    val = JS_ToStringCheckObject(ctx, val1);
+    if (JS_IsException(val))
+        return -1;
+    p = JS_VALUE_GET_STRING(val);
+
+    if (string_buffer_putc8(b, '\"'))
+        goto fail;
+    for(i = 0; i < p->len; ) {
+        c = string_getc(p, &i);
+        switch(c) {
+        case '\t':
+            c = 't';
+            goto quote;
+        case '\r':
+            c = 'r';
+            goto quote;
+        case '\n':
+            c = 'n';
+            goto quote;
+        case '\b':
+            c = 'b';
+            goto quote;
+        case '\f':
+            c = 'f';
+            goto quote;
+        case '\"':
+        case '\\':
+        quote:
+            if (string_buffer_putc8(b, '\\'))
+                goto fail;
+            if (string_buffer_putc8(b, c))
+                goto fail;
+            break;
+        default:
+            if (c < 32 || is_surrogate(c)) {
+                snprintf(buf, sizeof(buf), "\\u%04x", c);
+                if (string_buffer_puts8(b, buf))
+                    goto fail;
+            } else {
+                if (string_buffer_putc(b, c))
+                    goto fail;
+            }
+            break;
+        }
+    }
+    if (string_buffer_putc8(b, '\"'))
+        goto fail;
     JS_FreeValue(ctx, val);
-    return r;
+    return 0;
+ fail:
+    JS_FreeValue(ctx, val);
+    return -1;
+}
+
+static int JS_ToQuotedStringFree(JSContext *ctx, StringBuffer *b, JSValue val) {
+    int ret = JS_ToQuotedString(ctx, b, val);
+    JS_FreeValue(ctx, val);
+    return ret;
 }
 
 static JSValue js_json_check(JSContext *ctx, JSONStringifyContext *jsc,
@@ -46864,13 +46897,11 @@ static int js_json_to_str(JSContext *ctx, JSONStringifyContext *jsc,
                 if (!JS_IsUndefined(v)) {
                     if (has_content)
                         string_buffer_putc8(jsc->b, ',');
-                    prop = JS_ToQuotedStringFree(ctx, prop);
-                    if (JS_IsException(prop)) {
+                    string_buffer_concat_value(jsc->b, sep);
+                    if (JS_ToQuotedString(ctx, jsc->b, prop)) {
                         JS_FreeValue(ctx, v);
                         goto exception;
                     }
-                    string_buffer_concat_value(jsc->b, sep);
-                    string_buffer_concat_value(jsc->b, prop);
                     string_buffer_putc8(jsc->b, ':');
                     string_buffer_concat_value(jsc->b, sep1);
                     if (js_json_to_str(ctx, jsc, val, v, indent1))
@@ -46898,10 +46929,7 @@ static int js_json_to_str(JSContext *ctx, JSONStringifyContext *jsc,
     switch (JS_VALUE_GET_NORM_TAG(val)) {
     case JS_TAG_STRING:
     case JS_TAG_STRING_ROPE:
-        val = JS_ToQuotedStringFree(ctx, val);
-        if (JS_IsException(val))
-            goto exception;
-        goto concat_value;
+        return JS_ToQuotedStringFree(ctx, jsc->b, val);
     case JS_TAG_FLOAT64:
         if (!isfinite(JS_VALUE_GET_FLOAT64(val))) {
             val = JS_NULL;
@@ -50653,6 +50681,7 @@ void JS_AddIntrinsicPromise(JSContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
     JSValue obj1;
+    JSCFunctionType ft;
 
     if (!JS_IsRegisteredClass(rt, JS_CLASS_PROMISE)) {
         init_class_range(rt, js_async_class_def, JS_CLASS_PROMISE,
@@ -50681,7 +50710,8 @@ void JS_AddIntrinsicPromise(JSContext *ctx)
 
     /* AsyncFunction */
     ctx->class_proto[JS_CLASS_ASYNC_FUNCTION] = JS_NewObjectProto(ctx, ctx->function_proto);
-    obj1 = JS_NewCFunction3(ctx, (JSCFunction *)js_function_constructor,
+    ft.generic_magic = js_function_constructor;
+    obj1 = JS_NewCFunction3(ctx, ft.generic,
                             "AsyncFunction", 1,
                             JS_CFUNC_constructor_or_func_magic, JS_FUNC_ASYNC,
                             ctx->function_ctor);
@@ -50717,7 +50747,8 @@ void JS_AddIntrinsicPromise(JSContext *ctx)
     /* AsyncGeneratorFunction */
     ctx->class_proto[JS_CLASS_ASYNC_GENERATOR_FUNCTION] =
         JS_NewObjectProto(ctx, ctx->function_proto);
-    obj1 = JS_NewCFunction3(ctx, (JSCFunction *)js_function_constructor,
+    ft.generic_magic = js_function_constructor;
+    obj1 = JS_NewCFunction3(ctx, ft.generic,
                             "AsyncGeneratorFunction", 1,
                             JS_CFUNC_constructor_or_func_magic,
                             JS_FUNC_ASYNC_GENERATOR,
@@ -52441,6 +52472,7 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
     int i;
     JSValueConst obj, number_obj;
     JSValue obj1;
+    JSCFunctionType ft;
 
     ctx->throw_type_error = JS_NewCFunction(ctx, js_throw_type_error, NULL, 0);
 
@@ -52481,7 +52513,7 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
     JS_SetPropertyFunctionList(ctx, obj1, js_error_funcs, countof(js_error_funcs));
 
     /* Used to squelch a -Wcast-function-type warning. */
-    JSCFunctionType ft = { .generic_magic = js_error_constructor };
+    ft.generic_magic = js_error_constructor;
     for(i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
         JSValue func_obj;
         int n_args;
@@ -52624,7 +52656,8 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
                                countof(js_generator_proto_funcs));
 
     ctx->class_proto[JS_CLASS_GENERATOR_FUNCTION] = JS_NewObjectProto(ctx, ctx->function_proto);
-    obj1 = JS_NewCFunction3(ctx, (JSCFunction *)js_function_constructor,
+    ft.generic_magic = js_function_constructor;
+    obj1 = JS_NewCFunction3(ctx, ft.generic,
                             "GeneratorFunction", 1,
                             JS_CFUNC_constructor_or_func_magic, JS_FUNC_GENERATOR,
                             ctx->function_ctor);
