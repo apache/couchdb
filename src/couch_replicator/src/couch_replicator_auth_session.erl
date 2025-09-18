@@ -61,8 +61,7 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2,
-    format_status/2
+    handle_info/2
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
@@ -153,14 +152,6 @@ handle_cast(Msg, State) ->
 handle_info(Msg, State) ->
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
-
-format_status(_Opt, [_PDict, State]) ->
-    [
-        {epoch, State#state.epoch},
-        {user, State#state.user},
-        {session_url, State#state.session_url},
-        {refresh_tstamp, State#state.refresh_tstamp}
-    ].
 
 %% Private helper functions
 
