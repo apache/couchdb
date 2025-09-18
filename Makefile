@@ -497,7 +497,7 @@ clean:
 	@rm -rf src/mango/.venv
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
-	@rm -f src/couch_dist/certs/out
+	@rm -rf src/couch_dist/certs/out
 	@rm -rf src/docs/build src/docs/.venv
 ifeq ($(with_nouveau), true)
 	@cd nouveau && $(GRADLE) clean
