@@ -1,5 +1,5 @@
---- quickjs-master/Makefile	2025-08-25 12:20:58
-+++ quickjs/Makefile	2025-08-25 15:27:47
+--- quickjs-master/Makefile	2025-09-18 04:42:13
++++ quickjs/Makefile	2025-09-18 11:43:37
 @@ -53,6 +53,10 @@
  #CONFIG_MSAN=y
  # use UB sanitizer
