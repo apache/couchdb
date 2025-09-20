@@ -59,7 +59,7 @@ t_old_db_deletion_works(_Ctx) ->
     % Quick db creation and deletion is racy so
     % we have to wait until the db is gone before proceeding.
     WaitFun = fun() ->
-        try mem3_shards:opts_for_db(Db) of
+        try mem3:props(Db) of
             _ -> wait
         catch
             error:database_does_not_exist ->

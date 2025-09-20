@@ -29,8 +29,7 @@
 ]).
 -export([get_or_create_db/2, get_or_create_db_int/2]).
 -export([is_deleted/1, rotate_list/2]).
--export([get_shard_opts/1, get_engine_opt/1, get_props_opt/1]).
--export([get_shard_props/1, find_dirty_shards/0]).
+-export([get_shard_opts/1]).
 -export([
     iso8601_timestamp/0,
     live_nodes/0,
@@ -230,8 +229,7 @@ build_shards_by_node(DbName, DocProps) ->
                         #shard{
                             dbname = DbName,
                             node = to_atom(Node),
-                            range = [Beg, End],
-                            opts = get_shard_opts(DocProps)
+                            range = [Beg, End]
                         },
                         Suffix
                     )
@@ -257,8 +255,7 @@ build_shards_by_range(DbName, DocProps) ->
                             dbname = DbName,
                             node = to_atom(Node),
                             range = [Beg, End],
-                            order = Order,
-                            opts = get_shard_opts(DocProps)
+                            order = Order
                         },
                         Suffix
                     )
@@ -641,50 +638,6 @@ merge_opts(New, Old) ->
         end,
         Old,
         New
-    ).
-
-get_shard_props(ShardName) ->
-    case couch_db:open_int(ShardName, []) of
-        {ok, Db} ->
-            Props =
-                case couch_db_engine:get_props(Db) of
-                    undefined -> [];
-                    Else -> Else
-                end,
-            %% We don't normally store the default engine name
-            EngineProps =
-                case couch_db_engine:get_engine(Db) of
-                    couch_bt_engine ->
-                        [];
-                    EngineName ->
-                        [{engine, EngineName}]
-                end,
-            [{props, Props} | EngineProps];
-        {not_found, _} ->
-            not_found;
-        Else ->
-            Else
-    end.
-
-find_dirty_shards() ->
-    mem3_shards:fold(
-        fun(#shard{node = Node, name = Name, opts = Opts} = Shard, Acc) ->
-            case Opts of
-                [] ->
-                    Acc;
-                [{props, []}] ->
-                    Acc;
-                _ ->
-                    Props = rpc:call(Node, ?MODULE, get_shard_props, [Name]),
-                    case Props =:= Opts of
-                        true ->
-                            Acc;
-                        false ->
-                            [{Shard, Props} | Acc]
-                    end
-            end
-        end,
-        []
     ).
 
 -ifdef(TEST).
