@@ -11,6 +11,7 @@ defmodule AuthLockoutTest do
                }
              ]
 
+  @tag skip_for_pouchdb_server: true
   test "lockout after multiple failed authentications", _context do
     server_config = [
       %{

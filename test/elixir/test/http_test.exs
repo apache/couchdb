@@ -11,6 +11,7 @@ defmodule HttpTest do
     assert resp.headers.hdrs["location"] == db_url <> "/test"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "location header should include X-Forwarded-Host", context do
     db_name = context[:db_name]
@@ -24,6 +25,7 @@ defmodule HttpTest do
     assert resp.headers.hdrs["location"] == "http://mysite.com/#{db_name}/test2"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "location header should include custom header", context do
     db_name = context[:db_name]
@@ -47,6 +49,7 @@ defmodule HttpTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "COUCHDB-708: newlines document names", context do
     db_name = context[:db_name]

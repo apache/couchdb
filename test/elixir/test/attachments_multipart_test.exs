@@ -9,6 +9,7 @@ defmodule AttachmentMultipartTest do
   """
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "manages attachments multipart requests successfully", context do
     db_name = context[:db_name]
 
@@ -235,6 +236,7 @@ defmodule AttachmentMultipartTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "manages compressed attachments successfully", context do
     db_name = context[:db_name]
 
@@ -260,6 +262,7 @@ defmodule AttachmentMultipartTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "multipart attachments with new_edits=false", context do
     db_name = context[:db_name]
 

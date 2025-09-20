@@ -72,6 +72,7 @@ defmodule ViewCollationRawTest do
     {:ok, [db_name: db_name]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "ascending collation order", context do
     retry_until(fn ->
       resp = Couch.get(url(context))
@@ -95,6 +96,7 @@ defmodule ViewCollationRawTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "descending collation order", context do
     retry_until(fn ->
       resp = Couch.get(url(context), query: %{"descending" => "true"})

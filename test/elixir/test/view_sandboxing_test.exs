@@ -173,6 +173,7 @@ defmodule ViewSandboxingTest do
     assert is_list(row2_values) or !Map.has_key?(row2_values, "c")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "runtime code evaluation can be prevented", context do
     db_name = context[:db_name]

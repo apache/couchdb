@@ -30,6 +30,7 @@ defmodule ViewOffsetTest do
     }
   }
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "basic view offsets", context do
     db_name = context[:db_name]
@@ -59,6 +60,7 @@ defmodule ViewOffsetTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "repeated view offsets" do
     0..14 |> Enum.each(fn _ -> repeated_view_offset_test_fun() end)
   end

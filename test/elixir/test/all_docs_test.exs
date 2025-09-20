@@ -12,6 +12,7 @@ defmodule AllDocsTest do
   # var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "All Docs tests", context do
     db_name = context[:db_name]
     resp1 = Couch.post("/#{db_name}", body: %{:_id => "0", :a => 1, :b => 1}).body
@@ -220,6 +221,7 @@ defmodule AllDocsTest do
 
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "POST with empty body", context do
     db_name = context[:db_name]
 
@@ -236,6 +238,7 @@ defmodule AllDocsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "POST with keys and limit", context do
     db_name = context[:db_name]
 
@@ -276,6 +279,7 @@ defmodule AllDocsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "POST edge case with colliding parameters - query takes precedence", context do
     db_name = context[:db_name]
 

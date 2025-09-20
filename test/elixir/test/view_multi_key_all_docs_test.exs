@@ -98,6 +98,7 @@ defmodule ViewMultiKeyAllDocsTest do
     assert rows_id == Enum.reverse(@keys)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "keys in POST body (descending, skip, limit)", context do
     db_name = context[:db_name]
 
@@ -115,6 +116,7 @@ defmodule ViewMultiKeyAllDocsTest do
     assert Enum.at(rows, 0)["id"] == key
   end
 
+  @tag skip_for_pouchdb_server: true
   test "keys in GET parameters (descending, skip, limit)", context do
     db_name = context[:db_name]
 

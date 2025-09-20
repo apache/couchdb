@@ -105,6 +105,7 @@ defmodule UpdateDocumentsTest do
 
   @document %{word: "plankton", name: "Rusty"}
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "update error invalid path", context do
     db_name = context[:db_name]
@@ -115,6 +116,7 @@ defmodule UpdateDocumentsTest do
     assert resp.body["reason"] == "Invalid path."
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "update document", context do
     db_name = context[:db_name]
@@ -140,6 +142,7 @@ defmodule UpdateDocumentsTest do
     assert resp.body == "<p>Empty World</p>"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "GET is not allowed", context do
     db_name = context[:db_name]
@@ -149,6 +152,7 @@ defmodule UpdateDocumentsTest do
     assert resp.body["error"] == "method_not_allowed"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "doc can be created", context do
     db_name = context[:db_name]
@@ -165,6 +169,7 @@ defmodule UpdateDocumentsTest do
     assert resp.status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "in place update", context do
     db_name = context[:db_name]
@@ -185,6 +190,7 @@ defmodule UpdateDocumentsTest do
     assert resp.body["title"] == "test"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "form update via application/x-www-form-urlencoded", context do
     db_name = context[:db_name]
@@ -210,6 +216,7 @@ defmodule UpdateDocumentsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "bump counter", context do
     db_name = context[:db_name]
     create_doc(db_name, @ddoc)
@@ -242,6 +249,7 @@ defmodule UpdateDocumentsTest do
     assert resp.body["_rev"] == newrev
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Server provides UUID when POSTing without an ID in the URL", context do
     db_name = context[:db_name]
@@ -251,6 +259,7 @@ defmodule UpdateDocumentsTest do
     assert String.length(resp.body) == 32
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "COUCHDB-1229 - allow slashes in doc ids for update handlers", context do
     db_name = context[:db_name]
@@ -268,6 +277,7 @@ defmodule UpdateDocumentsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "COUCHDB-648 - the code in the JSON response should be honored", context do
     db_name = context[:db_name]
     create_doc(db_name, @ddoc)
@@ -294,6 +304,7 @@ defmodule UpdateDocumentsTest do
     assert resp.body["ok"] == true
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "base64 response", context do
     db_name = context[:db_name]
@@ -313,6 +324,7 @@ defmodule UpdateDocumentsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Insert doc with empty id", context do
     db_name = context[:db_name]
     create_doc(db_name, @ddoc)
