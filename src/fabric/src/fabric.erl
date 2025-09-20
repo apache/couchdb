@@ -670,8 +670,7 @@ doc(Db0, {_} = Doc) ->
             true ->
                 Db0;
             false ->
-                Shard = hd(mem3:shards(Db0)),
-                Props = couch_util:get_value(props, Shard#shard.opts, []),
+                Props = mem3:props(Db0),
                 {ok, Db1} = couch_db:clustered_db(Db0, [{props, Props}]),
                 Db1
         end,

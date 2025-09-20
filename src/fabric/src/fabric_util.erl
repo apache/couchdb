@@ -296,15 +296,12 @@ is_users_db(DbName) ->
 path_ends_with(Path, Suffix) ->
     Suffix =:= couch_db:dbname_suffix(Path).
 
-open_cluster_db(#shard{dbname = DbName, opts = Options}) ->
-    case couch_util:get_value(props, Options) of
-        Props when is_list(Props) ->
-            {ok, Db} = couch_db:clustered_db(DbName, [{props, Props}]),
-            Db;
-        _ ->
-            {ok, Db} = couch_db:clustered_db(DbName, []),
-            Db
-    end.
+open_cluster_db(#shard{dbname = DbName}) ->
+    open_cluster_db(DbName);
+open_cluster_db(DbName) when is_binary(DbName) ->
+    Props = mem3:props(DbName),
+    {ok, Db} = couch_db:clustered_db(DbName, [{props, Props}]),
+    Db.
 
 open_cluster_db(DbName, Opts) ->
     % as admin
@@ -320,25 +317,22 @@ kv(Item, Count) ->
 doc_id_and_rev(#doc{id = DocId, revs = {RevNum, [RevHash | _]}}) ->
     {DocId, {RevNum, RevHash}}.
 
-is_partitioned(DbName0) when is_binary(DbName0) ->
-    Shards = mem3:shards(fabric:dbname(DbName0)),
-    is_partitioned(open_cluster_db(hd(Shards)));
+is_partitioned(DbName) when is_binary(DbName) ->
+    is_partitioned(open_cluster_db(DbName));
 is_partitioned(Db) ->
     couch_db:is_partitioned(Db).
 
 validate_all_docs_args(DbName, Args) when is_list(DbName) ->
     validate_all_docs_args(list_to_binary(DbName), Args);
 validate_all_docs_args(DbName, Args) when is_binary(DbName) ->
-    Shards = mem3:shards(fabric:dbname(DbName)),
-    Db = open_cluster_db(hd(Shards)),
+    Db = open_cluster_db(DbName),
     validate_all_docs_args(Db, Args);
 validate_all_docs_args(Db, Args) ->
     true = couch_db:is_clustered(Db),
     couch_mrview_util:validate_all_docs_args(Db, Args).
 
 validate_args(DbName, DDoc, Args) when is_binary(DbName) ->
-    Shards = mem3:shards(fabric:dbname(DbName)),
-    Db = open_cluster_db(hd(Shards)),
+    Db = open_cluster_db(DbName),
     validate_args(Db, DDoc, Args);
 validate_args(Db, DDoc, Args) ->
     true = couch_db:is_clustered(Db),
