@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -42,21 +42,22 @@ import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-public class Lucene9IndexTest {
+public class LuceneIndexTest {
 
     protected final Index setup(final Path path) throws IOException {
-        final IndexDefinition indexDefinition = new IndexDefinition();
+        final IndexDefinition indexDefinition = new IndexDefinition(Version.LATEST.major, "standard", null);
         indexDefinition.setDefaultAnalyzer("standard");
-        final Analyzer analyzer = Lucene9AnalyzerFactory.fromDefinition(indexDefinition);
+        final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         final Directory dir = new DirectIODirectory(FSDirectory.open(path));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
         final SearcherManager searcherManager = new SearcherManager(writer, null);
-        return new Lucene9Index(analyzer, writer, 0L, 0L, searcherManager);
+        return new LuceneIndex(analyzer, writer, 0L, 0L, searcherManager);
     }
 
     protected final void cleanup(final Index index) throws IOException {
