@@ -22,7 +22,7 @@
     dbname :: binary() | 'undefined',
     range :: [non_neg_integer() | '$1' | '$2'] | '_' | 'undefined',
     ref :: reference() | '_' | 'undefined',
-    opts :: list() | 'undefined'
+    opts = []:: list() | 'undefined'
 }).
 
 %% Do not reference outside of mem3.
@@ -33,7 +33,7 @@
     range :: [non_neg_integer() | '$1' | '$2'] | '_',
     ref :: reference() | 'undefined' | '_',
     order :: non_neg_integer() | 'undefined' | '_',
-    opts :: list()
+    opts = []:: list()
 }).
 
 %% types
