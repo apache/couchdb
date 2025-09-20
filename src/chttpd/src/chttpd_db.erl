@@ -454,8 +454,7 @@ delete_db_req(#httpd{} = Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts = [DbName | _], user_ctx = Ctx} = Req, Fun) ->
-    Shard = hd(mem3:shards(DbName)),
-    Props = couch_util:get_value(props, Shard#shard.opts, []),
+    Props = mem3:props(DbName),
     Opts =
         case Ctx of
             undefined ->
