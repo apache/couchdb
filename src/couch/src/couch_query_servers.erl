@@ -299,8 +299,16 @@ log_sum_overflow(InSize, OutSize) ->
         "input size: ~b "
         "output size: ~b",
     Msg = iolist_to_binary(io_lib:format(Fmt, [InSize, OutSize])),
-    couch_log:error(Msg, []),
+    couch_log:error(<<Msg/binary, " (~s)">>, [filename()]),
     Msg.
+
+filename() ->
+    case get(cfile_handle) of
+        {_Pid, File} ->
+            couch_file:filepath(File);
+        undefined ->
+            "unknown path"
+    end.
 
 overflow_threshold() ->
     config:get_integer("query_server_config", "reduce_limit_threshold", 4906).

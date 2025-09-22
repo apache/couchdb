@@ -49,6 +49,7 @@
 -export([append_terms/2, append_terms/3]).
 -export([write_header/2, write_header/3, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
+-export([filepath/1]).
 
 % gen_server callbacks
 -export([init/1, terminate/2, format_status/2]).
@@ -423,6 +424,9 @@ init_delete_dir(RootDir) ->
         )
     end),
     ok.
+
+filepath(#file{} = Fd) ->
+    Fd#file.filepath.
 
 read_header(Fd) ->
     case ioq:call(Fd, find_header, erlang:get(io_priority)) of
