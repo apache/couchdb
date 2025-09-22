@@ -330,6 +330,96 @@ following behavior:
             "ok": true
         }
 
+.. _api/db/auto_purge:
+
+=====================
+``/{db}/_auto_purge``
+=====================
+
+.. http:get:: /{db}/_auto_purge
+    :synopsis: Retrieves auto purge settings
+
+    Retrieves the auto purge settings for the database. These settings
+    are used by the :ref:`auto purge plugin <config/auto_purge_plugin>`.
+
+    :param db: Database name
+    :<header Accept: - :mimetype:`application/json`
+                     - :mimetype:`text/plain`
+    :<header Content-Type: :mimetype:`application/json`
+    :<json object: auto purge settings
+    :>header Content-Type: - :mimetype:`application/json`
+                           - :mimetype:`text/plain; charset=utf-8`
+    :code 200: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
+    :code 500: Internal server error or timeout
+
+    **Request**:
+
+    .. code-block:: http
+
+        GET /db/_auto_purge HTTP/1.1
+        Accept: application/json
+        Host: localhost:5984
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 200 OK
+        Cache-Control: must-revalidate
+        Content-Length: 5
+        Content-Type: application/json
+        Date: Mon, 22 Sep 2025 11:01:00 GMT
+        Server: CouchDB (Erlang/OTP)
+
+        {"deleted_document_ttl": 259200}
+
+.. http:put:: /{db}/_auto_purge
+    :synopsis: Update auto purge settings
+
+    Retrieves the auto purge settings for the database. These settings
+    are used by the :ref:`auto purge plugin <config/auto_purge_plugin>`.
+
+    :param db: Database name
+    :<header Accept: - :mimetype:`application/json`
+                     - :mimetype:`text/plain`
+    :<header Content-Type: :mimetype:`application/json`
+    :<json object: auto purge settings
+    :>header Content-Type: - :mimetype:`application/json`
+                           - :mimetype:`text/plain; charset=utf-8`
+    :code 201: Request completed successfully
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
+    :code 500: Internal server error or timeout
+
+    **Request**:
+
+    .. code-block:: http
+
+        PUT /db/_auto_purge HTTP/1.1
+        Accept: application/json
+        Content-Length: 5
+        Content-Type: application/json
+        Host: localhost:5984
+
+        {"deleted_document_ttl": 259200}
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 202 Accepted
+        Cache-Control: must-revalidate
+        Content-Length: 12
+        Content-Type: application/json
+        Date: Mon, 22 Sep 2025 11:01:00 GMT
+        Server: CouchDB (Erlang/OTP)
+
+        {
+            "ok": true
+        }
+
 .. _api/db/missing_revs:
 
 =======================
