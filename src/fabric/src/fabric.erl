@@ -35,7 +35,9 @@
     set_purge_infos_limit/3,
     get_purged_infos/1,
     compact/1, compact/2,
-    get_partition_info/2
+    get_partition_info/2,
+    get_auto_purge_props/1,
+    set_auto_purge_props/2
 ]).
 
 % Documents
@@ -131,6 +133,12 @@ get_db_info(DbName) ->
     ]}.
 get_partition_info(DbName, Partition) ->
     fabric_db_partition_info:go(dbname(DbName), Partition).
+
+get_auto_purge_props(DbName) ->
+    fabric_auto_purge:get(dbname(DbName)).
+
+set_auto_purge_props(DbName, AutoPurgeProps) ->
+    fabric_auto_purge:set(dbname(DbName), AutoPurgeProps).
 
 %% @doc the number of docs in a database
 %% @equiv get_doc_count(DbName, <<"_all_docs">>)
