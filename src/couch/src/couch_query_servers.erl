@@ -278,7 +278,7 @@ sum_arrays(Else, _) ->
     throw_sum_error(Else).
 
 check_sum_overflow(InSize, OutSize, Sum) ->
-    Overflowed = OutSize > 4906 andalso OutSize * 2 > InSize,
+    Overflowed = OutSize > overflow_threshold() andalso OutSize * overflow_ratio() > InSize,
     case config:get("query_server_config", "reduce_limit", "true") of
         "true" when Overflowed ->
             Msg = log_sum_overflow(InSize, OutSize),
@@ -301,6 +301,12 @@ log_sum_overflow(InSize, OutSize) ->
     Msg = iolist_to_binary(io_lib:format(Fmt, [InSize, OutSize])),
     couch_log:error(Msg, []),
     Msg.
+
+overflow_threshold() ->
+    config:get_integer("query_server_config", "reduce_limit_threshold", 4906).
+
+overflow_ratio() ->
+    config:get_float("query_server_config", "reduce_limit_ratio", 2.0).
 
 builtin_stats(_, []) ->
     {0, 0, 0, 0, 0};
