@@ -68,8 +68,8 @@ go(DbName, DDoc, IndexName, #index_query_args{} = QueryArgs) ->
             #shard.ref,
             fun handle_message/3,
             State,
-            infinity,
-            1000 * 60 * 60
+            fabric_util:timeout("search", "infinity"),
+            fabric_util:timeout("search_permsg", "3600000")
         )
     after
         rexi_monitor:stop(RexiMon),
