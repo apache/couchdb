@@ -23,7 +23,9 @@ setup() ->
     Ctx.
 
 teardown(Ctx) ->
-    config:delete("query_server_config", "reduce_limit", "true", false),
+    config:delete("query_server_config", "reduce_limit", true),
+    config:delete("query_server_config", "reduce_limit_threshold", true),
+    config:delete("query_server_config", "reduce_limit_ratio", true),
     config:delete("log", "level", false),
     test_util:stop_couch(Ctx),
     meck:unload().
@@ -37,6 +39,8 @@ query_server_limits_test_() ->
             fun teardown/1,
             [
                 ?TDEF_FE(builtin_should_return_error_on_overflow),
+                ?TDEF_FE(builtin_should_not_return_error_with_generous_overflow_threshold),
+                ?TDEF_FE(builtin_should_not_return_error_with_generous_overflow_ratio),
                 ?TDEF_FE(builtin_should_return_object_on_log),
                 ?TDEF_FE(builtin_should_return_object_on_false),
                 ?TDEF_FE(js_reduce_should_return_error_on_overflow),
@@ -54,6 +58,22 @@ builtin_should_return_error_on_overflow(_) ->
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
     ?assertMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result),
     ?assert(meck:called(couch_log, error, '_')).
+
+builtin_should_not_return_error_with_generous_overflow_threshold(_) ->
+    config:set("query_server_config", "reduce_limit", "true", false),
+    config:set_integer("query_server_config", "reduce_limit_threshold", 1000000, false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
+    ?assertNotMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result).
+
+builtin_should_not_return_error_with_generous_overflow_ratio(_) ->
+    config:set("query_server_config", "reduce_limit", "true", false),
+    config:set_float("query_server_config", "reduce_limit_ratio", 0.1, false),
+    meck:reset(couch_log),
+    KVs = gen_sum_kvs(),
+    {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
+    ?assertNotMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result).
 
 builtin_should_return_object_on_log(_) ->
     config:set("query_server_config", "reduce_limit", "log", false),

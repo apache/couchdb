@@ -150,6 +150,16 @@ Query Servers Configuration
         option since main propose of `reduce` functions is to *reduce* the
         input.
 
+    .. config:option:: reduce_limit_threshold :: Reduce limit threshold
+
+        The number of bytes a reduce result must exceed to trigger the ``reduce_limit``
+        control. Defaults to 5000.
+
+    .. config:option:: reduce_limit_ratio :: Reduce limit ratio
+
+        The ratio of input/output that must be exceeded to trigger the ``reduce_limit``
+        control. Defaults to 2.0.
+
 .. _config/native_query_servers:
 
 Native Erlang Query Server
