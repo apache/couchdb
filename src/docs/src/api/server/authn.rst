@@ -554,7 +554,7 @@ The TOTP settings are stored per user in the ``_users`` database. Use the genera
 
 3. Add the secret to the TOTP app
 
-Add the secret in the authenticator app. Apps like Aegis, 2FAS, Ente, Google Authenticator etc. can be used to generate these tokens.
+Add the secret in the authenticator app. Apps like Aegis, 2FAS, Ente, Google Authenticator etc. can be used to generate the authentication tokens based on the TOTP key.
 
 Logging in with 2FA
 -------------------
