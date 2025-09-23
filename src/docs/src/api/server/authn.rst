@@ -520,14 +520,16 @@ to be authenticated by this method if the required HTTP header is provided.
 Two-Factor Authentication (2FA)
 ===============================
 
-CouchDB supports built-in time-based one-time password (TOTP) authentication, so that 2FA can be enabled for any user without extra plugins or tools. Here’s how it can be set up.
+CouchDB supports built-in time-based one-time password (TOTP) authentication, so that 2FA
+can be enabled for any user without extra plugins or tools. Here’s how it can be set up.
 
 Setting up 2FA in CouchDB
 -------------------------
 
 1. Generate random token key
 
-A random `base32`_ string is generated and used as the user’s TOTP secret. For `example`_, the following command produces a secure, random key:
+A random `base32`_ string is generated and used as the user’s TOTP secret. For `example`_,
+the following command produces a secure, random key:
 
 .. _base32: https://en.wikipedia.org/wiki/Base32
 .. _example: https://support.yubico.com/hc/en-us/articles/360015668699-Generating-Base32-string-examples
@@ -538,7 +540,8 @@ A random `base32`_ string is generated and used as the user’s TOTP secret. For
 
 2. Create a user with TOTP
 
-The TOTP settings are stored per user in the ``_users`` database. Use the generated key under the ``totp.key.field``:
+The TOTP settings are stored per user in the ``_users`` database. Use the generated key
+under the ``totp.key.field``:
 
 .. code-block:: bash
 
@@ -554,12 +557,14 @@ The TOTP settings are stored per user in the ``_users`` database. Use the genera
 
 3. Add the secret to the TOTP app
 
-Add the secret in the authenticator app. Apps like Aegis, 2FAS, Ente, Google Authenticator etc. can be used to generate the authentication tokens based on the TOTP key.
+Add the secret in the authenticator app. Apps like Aegis, 2FAS, Ente, Google Authenticator
+etc. can be used to generate the authentication tokens based on the TOTP key.
 
 Logging in with 2FA
 -------------------
 
-Now that the user is set up with TOTP, you can log in by sending a POST request to ``/_session`` with ``name``, ``password``, and ``token`` from the authenticator app.
+Now that the user is set up with TOTP, you can log in by sending a POST request to
+``/_session`` with ``name``, ``password``, and ``token`` from the authenticator app.
 
 **Request**:
 
