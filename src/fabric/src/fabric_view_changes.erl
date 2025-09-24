@@ -536,7 +536,7 @@ get_old_seq(#shard{range = R} = Shard, SinceSeqs) ->
 
 get_db_uuid_shards(DbName) ->
     % Need to use an isolated process as we are performing a fabric call from
-    % another fabric call and there is a good chance we'd polute the mailbox
+    % another fabric call and there is a good chance we'd pollute the mailbox
     % with returned messages
     Timeout = fabric_util:request_timeout(),
     IsolatedFun = fun() -> fabric:db_uuids(DbName) end,
