@@ -61,9 +61,10 @@ list(Db) ->
     Trace :: trace().
 get_usable_indexes(Db, Selector, Opts, Kind) ->
     ExistingIndexes = list(Db),
-    GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
+    GlobalIndexes0 = mango_cursor:remove_indexes_with_partial_filter_selector(
         ExistingIndexes
     ),
+    GlobalIndexes = filter_usable_indexes(GlobalIndexes0),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
     PartitionIndexes = filter_partition_indexes(UsableIndexes0, Opts),
@@ -444,6 +445,19 @@ get_idx_partitioned(Db, DDocProps) ->
             Default
     end.
 
+get_idx_usable(_Db, DDocProps) ->
+    case couch_util:get_value(<<"options">>, DDocProps) of
+        {DesignOpts} ->
+            case couch_util:get_value(<<"usable">>, DesignOpts) of
+                U when is_boolean(U) ->
+                    U;
+                undefined ->
+                    true
+            end;
+        undefined ->
+            true
+    end.
+
 is_opts_partitioned(Opts) ->
     case couch_util:get_value(partition, Opts, <<>>) of
         <<>> ->
@@ -462,6 +476,10 @@ filter_partition_indexes(Indexes, Opts) ->
         end,
     Filt = fun(Idx) -> type(Idx) == <<"special">> orelse PFilt(Idx) end,
     lists:filter(Filt, Indexes).
+
+filter_usable_indexes(Indexes) ->
+    UFilt = fun(#idx{} = Idx) -> proplists:get_value(<<"usable">>, Idx#idx.opts) == true end,
+    lists:filter(UFilt, Indexes).
 
 filter_opts([]) ->
     [];

@@ -75,6 +75,12 @@ validate_idx_create({Props}) ->
             {optional, true},
             {default, db_default},
             {validator, fun validate_partitioned/1}
+        ]},
+        {<<"usable">>, [
+            {tag, usable},
+            {optional, true},
+            {default, true},
+            {validator, fun validate_usable/1}
         ]}
     ],
     validate(Props, Opts).
@@ -310,6 +316,13 @@ validate_partitioned(db_default) ->
     {ok, db_default};
 validate_partitioned(Else) ->
     ?MANGO_ERROR({invalid_partitioned_value, Else}).
+
+validate_usable(true) ->
+    {ok, true};
+validate_usable(false) ->
+    {ok, false};
+validate_usable(Else) ->
+    ?MANGO_ERROR({invalid_usable_value, Else}).
 
 validate_partition(<<>>) ->
     {ok, <<>>};
