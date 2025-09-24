@@ -144,7 +144,7 @@ go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
             fun handle_message/3,
             State,
             fabric_util:view_timeout(QueryArgs),
-            5000
+            fabric_util:timeout("all_docs_view_permsg", "5000")
         )
     of
         {ok, NewState} ->
