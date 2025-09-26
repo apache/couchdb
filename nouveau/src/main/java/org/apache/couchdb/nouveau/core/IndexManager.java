@@ -219,7 +219,6 @@ public final class IndexManager implements Managed {
             assertSame(indexDefinition, loadIndexDefinition(name));
             return;
         }
-
         final Lock lock = this.createLock.writeLock(name);
         lock.lock();
         try {

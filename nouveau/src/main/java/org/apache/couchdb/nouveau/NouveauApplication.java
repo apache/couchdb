@@ -28,6 +28,7 @@ import org.apache.couchdb.nouveau.lucene.LuceneModule;
 import org.apache.couchdb.nouveau.lucene.ParallelSearcherFactory;
 import org.apache.couchdb.nouveau.resources.AnalyzeResource;
 import org.apache.couchdb.nouveau.resources.IndexResource;
+import org.apache.couchdb.nouveau.resources.WelcomeResource;
 import org.apache.couchdb.nouveau.tasks.CloseAllIndexesTask;
 
 public class NouveauApplication extends Application<NouveauApplicationConfiguration> {
@@ -66,6 +67,10 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
 
         // Serialization classes
         environment.getObjectMapper().registerModule(new LuceneModule());
+
+        // WelcomeResource
+        final WelcomeResource welcomeResource = new WelcomeResource();
+        environment.jersey().register(welcomeResource);
 
         // AnalyzeResource
         final AnalyzeResource analyzeResource = new AnalyzeResource();
