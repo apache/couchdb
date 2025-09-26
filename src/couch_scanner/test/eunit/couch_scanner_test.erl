@@ -29,6 +29,7 @@ couch_scanner_test_() ->
             ?TDEF_FE(t_conflict_finder_works, 30),
             ?TDEF_FE(t_config_skips, 10),
             ?TDEF_FE(t_resume_after_error, 10),
+            ?TDEF_FE(t_resume_after_skip, 10),
             ?TDEF_FE(t_reset, 10),
             ?TDEF_FE(t_schedule_repeat, 10),
             ?TDEF_FE(t_schedule_after, 15)
@@ -271,6 +272,25 @@ t_resume_after_error(_) ->
     couch_scanner:resume(),
     config:set("couch_scanner_plugins", Plugin, "true", false),
     meck:wait(?FIND_PLUGIN, resume, 2, 10000).
+
+t_resume_after_skip(_) ->
+    meck:reset(?FIND_PLUGIN),
+    meck:expect(
+        ?FIND_PLUGIN,
+        start,
+        2,
+        meck:seq([
+            skip,
+            meck:passthrough()
+        ])
+    ),
+    Plugin = atom_to_list(?FIND_PLUGIN),
+    config:set("couch_scanner", "min_penalty_sec", "1", false),
+    config:set("couch_scanner", "interval_sec", "1", false),
+    config:set(Plugin, "repeat", "2_sec", false),
+    couch_scanner:resume(),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    meck:wait(?FIND_PLUGIN, complete, 1, 10000).
 
 t_reset(_) ->
     meck:reset(?FIND_PLUGIN),

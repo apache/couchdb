@@ -246,7 +246,7 @@ init_from_checkpoint(#st{} = St) ->
             <<"start_sec">> := StartSec
         } ->
             Now = tsec(),
-            PSt = resume_callback(Cbks, SId, EJsonPSt),
+            PSt = resume_callback(Mod, Cbks, SId, EJsonPSt),
             St#st{
                 pst = PSt,
                 cursor = Cur,
@@ -502,20 +502,33 @@ start_callback(Mod, Cbks, Now, ScanId, LastStartSec, #{} = EJson) when
         TSec when is_integer(TSec), TSec =< Now ->
             #{start := StartCbk} = Cbks,
             case StartCbk(ScanId, EJson) of
-                {ok, PSt} -> PSt;
-                skip -> exit_resched(infinity);
-                reset -> exit_resched(reset)
+                {ok, PSt} ->
+                    PSt;
+                skip ->
+                    % If plugin skipped start, count this as an attempt and
+                    % reschedule to possibly retry in the future.
+                    SkipReschedTSec = schedule_time(Mod, Now, Now),
+                    exit_resched(SkipReschedTSec);
+                reset ->
+                    exit_resched(reset)
             end;
         TSec when is_integer(TSec), TSec > Now ->
             exit_resched(TSec)
     end.
 
-resume_callback(#{} = Cbks, SId, #{} = EJsonPSt) when is_binary(SId) ->
+resume_callback(Mod, #{} = Cbks, SId, #{} = EJsonPSt) when is_binary(SId) ->
     #{resume := ResumeCbk} = Cbks,
     case ResumeCbk(SId, EJsonPSt) of
-        {ok, PSt} -> PSt;
-        skip -> exit_resched(infinity);
-        reset -> exit_resched(reset)
+        {ok, PSt} ->
+            PSt;
+        skip ->
+            % If plugin skipped resume, count this as an attempt and
+            % reschedule to possibly retry in the future
+            Now = tsec(),
+            SkipReschedTSec = schedule_time(Mod, Now, Now),
+            exit_resched(SkipReschedTSec);
+        reset ->
+            exit_resched(reset)
     end.
 
 db_opened_callback(#st{pst = PSt, callbacks = Cbks, db = Db} = St) ->
