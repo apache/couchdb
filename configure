@@ -127,6 +127,7 @@ parse_opts() {
             --dev)
                 WITH_DOCS="false"
                 WITH_FAUXTON="false"
+                WITH_SPIDERMONKEY="false"
                 shift
                 continue
                 ;;
@@ -135,6 +136,7 @@ parse_opts() {
                 WITH_DOCS="false"
                 WITH_FAUXTON="false"
                 WITH_NOUVEAU="true"
+                WITH_SPIDERMONKEY="false"
                 shift
                 continue
                 ;;
