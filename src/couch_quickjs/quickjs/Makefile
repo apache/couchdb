@@ -55,8 +55,8 @@ PREFIX?=/usr/local
 #CONFIG_UBSAN=y
 
 # TEST262 bootstrap config: commit id and shallow "since" parameter
-TEST262_COMMIT?=04eaeb99080ceb60d7b86ea0c4bed6355ef4cdcb
-TEST262_SINCE?=2025-08-20
+TEST262_COMMIT?=a5e69a1534de88d1eb29b76657d84c8541b72df7
+TEST262_SINCE?=2025-09-01
 
 OBJDIR=.obj
 
