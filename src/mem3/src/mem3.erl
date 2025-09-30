@@ -39,6 +39,7 @@
 -export([db_is_current/1]).
 -export([shard_creation_time/1]).
 -export([generate_shard_suffix/0]).
+-export([get_db_doc/1, update_db_doc/1]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1]).
@@ -578,6 +579,12 @@ strip_shard_suffix(DbName) when is_binary(DbName) ->
         _ ->
             filename:rootname(DbName)
     end.
+
+get_db_doc(DocId) ->
+    mem3_db_doc_updater:get_db_doc(DocId).
+
+update_db_doc(Doc) ->
+    mem3_db_doc_updater:update_db_doc(Doc).
 
 -ifdef(TEST).
 
