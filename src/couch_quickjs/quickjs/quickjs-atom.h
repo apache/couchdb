@@ -78,6 +78,8 @@ DEF(await, "await")
 /* empty string */
 DEF(empty_string, "")
 /* identifiers */
+DEF(keys, "keys")
+DEF(size, "size")
 DEF(length, "length")
 DEF(fileName, "fileName")
 DEF(lineNumber, "lineNumber")
@@ -189,6 +191,7 @@ DEF(timed_out, "timed-out")
 DEF(ok, "ok")
 /* */
 DEF(toJSON, "toJSON")
+DEF(maxByteLength, "maxByteLength")
 /* class names */
 DEF(Object, "Object")
 DEF(Array, "Array")
@@ -228,6 +231,9 @@ DEF(Map, "Map")
 DEF(Set, "Set") /* Map + 1 */
 DEF(WeakMap, "WeakMap") /* Map + 2 */
 DEF(WeakSet, "WeakSet") /* Map + 3 */
+DEF(Iterator, "Iterator")
+DEF(IteratorHelper, "Iterator Helper")
+DEF(IteratorWrap, "Iterator Wrap")
 DEF(Map_Iterator, "Map Iterator")
 DEF(Set_Iterator, "Set Iterator")
 DEF(Array_Iterator, "Array Iterator")
