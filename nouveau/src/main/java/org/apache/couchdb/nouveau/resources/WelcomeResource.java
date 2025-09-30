@@ -11,19 +11,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.resources;
 
-import com.fasterxml.jackson.core.Version;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import org.apache.lucene.search.Query;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import org.apache.couchdb.nouveau.api.WelcomeResponse;
 
-public class Lucene9Module extends SimpleModule {
+@Path("/")
+@Produces(MediaType.APPLICATION_JSON)
+public final class WelcomeResource {
 
-    public Lucene9Module() {
-        super("lucene9", Version.unknownVersion());
-
-        // Query
-        addSerializer(Query.class, new QuerySerializer());
-        addDeserializer(Query.class, new QueryDeserializer());
+    @GET
+    public WelcomeResponse welcome() {
+        return WelcomeResponse.INSTANCE;
     }
 }
