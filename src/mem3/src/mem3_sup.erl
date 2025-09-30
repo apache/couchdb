@@ -48,6 +48,7 @@ init(_Args) ->
         child(mem3_sync),
         child(mem3_sync_event_listener),
         child(mem3_seeds),
+        child(mem3_db_doc_updater),
         child(mem3_reshard_sup)
     ],
     {ok, {{rest_for_one, 10, 1}, couch_epi:register_service(mem3_epi, Children)}}.
