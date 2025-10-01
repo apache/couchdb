@@ -249,3 +249,14 @@ settings in their ``[{plugin}]`` section.
 
             [couch_scanner_plugin_ddoc_features]
             ddoc_report = false
+
+.. _config/auto_purge_plugin:
+
+.. config:section:: couch_auto_purge_plugin :: Configure the Auto Purge plugin
+
+    .. config:option:: deleted_document_ttl
+
+        Set the default interval, in seconds, before the plugin will purge
+        a deleted document. The database may override this setting with the
+        :ref:`api/db/auto_purge` endpoint. If neither is set, the
+        plugin will not purge deleted documents.

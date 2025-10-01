@@ -30,7 +30,8 @@
     handle_view_cleanup_req/2,
     update_doc/4,
     http_code_from_status/1,
-    handle_partition_req/2
+    handle_partition_req/2,
+    handle_auto_purge_req/2
 ]).
 
 -import(
@@ -389,6 +390,36 @@ update_partition_stats(PathParts) ->
             % ignore path that do not match
             ok
     end.
+
+handle_auto_purge_req(#httpd{method = 'GET'} = Req, Db) ->
+    case fabric:get_auto_purge_props(Db) of
+        {ok, AutoPurgeProps} ->
+            send_json(Req, {AutoPurgeProps});
+        {error, Reason} ->
+            chttpd:send_error(Req, Reason)
+    end;
+handle_auto_purge_req(#httpd{method = 'PUT'} = Req, Db) ->
+    {AutoPurgeProps} = chttpd:json_body_obj(Req),
+    validate_auto_purge_props(AutoPurgeProps),
+    case fabric:set_auto_purge_props(Db, AutoPurgeProps) of
+        ok ->
+            send_json(Req, 201, {[{ok, true}]});
+        {error, Reason} ->
+            chttpd:send_error(Req, Reason)
+    end;
+handle_auto_purge_req(#httpd{} = Req, _Db) ->
+    send_method_not_allowed(Req, "GET,PUT,HEAD").
+
+validate_auto_purge_props([]) ->
+    ok;
+validate_auto_purge_props([{<<"deleted_document_ttl">>, Value} | Rest]) when is_integer(Value) ->
+    validate_auto_purge_props(Rest);
+validate_auto_purge_props([{<<"deleted_document_ttl">>, _Value} | _Rest]) ->
+    throw({bad_request, <<"deleted_document_ttl must be an integer">>});
+validate_auto_purge_props([{_K, _V} | _Rest]) ->
+    throw({bad_request, <<"invalid auto purge property">>});
+validate_auto_purge_props(_Else) ->
+    throw({bad_request, <<"malformed auto purge body">>}).
 
 handle_design_req(
     #httpd{
