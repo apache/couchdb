@@ -39,6 +39,7 @@ import org.apache.couchdb.nouveau.lucene.LuceneIndex;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.misc.store.DirectIODirectory;
 import org.apache.lucene.search.SearcherFactory;
 import org.apache.lucene.search.SearcherManager;
@@ -393,9 +394,12 @@ public final class IndexManager implements Managed {
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
-        final Directory dir = new DirectIODirectory(
-                FSDirectory.open(path.resolve(Integer.toString(indexDefinition.getLuceneVersion()))));
+        final int luceneVersion = indexDefinition.getLuceneVersion();
+        final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve(Integer.toString(luceneVersion))));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
+        if (luceneVersion != IndexDefinition.LATEST_LUCENE_VERSION) {
+            config.setOpenMode(OpenMode.APPEND);
+        }
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
         final long updateSeq = getSeq(writer, "update_seq");

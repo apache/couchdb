@@ -39,7 +39,7 @@ public final class IndexHealthCheck extends HealthCheck {
             // Ignored, index might not exist yet.
         }
 
-        indexResource.createIndex(name, new IndexDefinition(IndexDefinition.LEGACY_LUCENE_VERSION, "standard", null));
+        indexResource.createIndex(name, new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null));
         try {
             final DocumentUpdateRequest documentUpdateRequest =
                     new DocumentUpdateRequest(0, 1, null, Collections.emptyList());

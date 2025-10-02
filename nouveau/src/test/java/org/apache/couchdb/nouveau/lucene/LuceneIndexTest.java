@@ -48,8 +48,8 @@ import org.junit.jupiter.api.io.TempDir;
 public class LuceneIndexTest {
 
     protected final Index setup(final Path path) throws IOException {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         final Directory dir = new DirectIODirectory(FSDirectory.open(path));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);

@@ -257,7 +257,7 @@ public class LuceneAnalyzerFactoryTest {
     @Test
     public void testFieldAnalyzers() throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition(
-                IndexDefinition.LEGACY_LUCENE_VERSION,
+                IndexDefinition.LATEST_LUCENE_VERSION,
                 "standard",
                 Map.of("english", "english", "thai", "thai", "email", "email"));
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
@@ -278,7 +278,7 @@ public class LuceneAnalyzerFactoryTest {
     private void assertAnalyzer(final String name, final Class<? extends Analyzer> clazz) throws Exception {
         assertThat(LuceneAnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
         assertThat(LuceneAnalyzerFactory.fromDefinition(
-                        new IndexDefinition(IndexDefinition.LEGACY_LUCENE_VERSION, name, null)))
+                        new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, name, null)))
                 .isInstanceOf(clazz);
     }
 }
