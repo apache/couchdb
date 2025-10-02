@@ -38,7 +38,7 @@ setup() ->
     Ctx = test_util:start_couch([chttpd, fabric]),
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, []),
-    ok = batch_insert_docs(DbName, 100, 100),
+    ok = batch_insert_docs(DbName, fun couch_uuids:random/0, 100, 100),
     ok = stagger_timeouts(),
     HashedPass = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?ADM, ?b2l(HashedPass), _Persist = false),
@@ -68,24 +68,28 @@ t_find_no_index({_, DbName}) ->
     ?assert(ExpectLo < Duration andalso Duration < ExpectHi),
     ok.
 
-batch_insert_docs(DbName, BatchSize, BatchCount) ->
+batch_insert_docs(DbName, IdFun, BatchSize, BatchCount) ->
     lists:foreach(
         fun(Batch) ->
-            Docs = [doc(I, Batch) || I <- lists:seq(1, BatchSize)],
+            Docs = [doc(IdFun(), I, Batch) || I <- lists:seq(1, BatchSize)],
             {ok, _} = fabric:update_docs(DbName, Docs, [])
         end,
         lists:seq(1, BatchCount)
     ).
 
-doc(I, Batch) ->
+doc(Id, I, Batch) ->
     #doc{
-         id = couch_uuids:random(),
+         id = Id,
          body = {[
              {<<"i">>, I},
              {<<"b">>, Batch},
              {<<"x">>, <<"aaaaaaaaaaab">>}
          ]}
     }.
+
+part_id(Partition) ->
+    Suffix = couch_uuids:random(),
+    <<Partition/binary, ":", Suffix/binary>>.
 
 stagger_timeouts() ->
     lists:foreach(
