@@ -141,6 +141,25 @@ meta = [
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
   ],
 
+  // This runs on a docker ARM64 host. Normally we should be able to run all
+  // ubuntu and centos containers on top any docker host, however spidermonkey
+  // 60 from CentOS cannot build on ARM64 so we're forced to separate it as a
+  // separate build usable for ubuntu/debian only and isolated it from other
+  // builds. At some point when we remove CentOS 8 or switch to QuickJS only,
+  // remove the docker-arm64 label on ubuntu-nc-arm64-12 node in Jenkins and
+  // remove this flavor
+  //
+  'base-arm64': [
+    name: 'Debian ARM64',
+    spidermonkey_vsn: '78',
+    with_nouveau: true,
+    with_clouseau: true,
+    // Test this in in the bookworm-quickjs variant
+    quickjs_test262: false,
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+    node_label: 'docker-arm64'
+  ],
+
   'trixie': [
     name: 'Debian x86_64',
     spidermonkey_vsn: '128',
@@ -628,7 +647,7 @@ pipeline {
       steps {
         script {
           // Including failFast: true in map fails the build immediately if any parallel step fails
-          parallelStagesMap = meta.collectEntries( [failFast: false] ) { key, values ->
+          parallelStagesMap = meta.collectEntries( [failFast: true] ) { key, values ->
             if (values.image) {
               ["${key}": generateContainerStage(key)]
             }
