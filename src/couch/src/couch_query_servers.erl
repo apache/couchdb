@@ -614,6 +614,12 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
     end.
 
 filter_docs_int(Db, DDoc, FName, JsonReq, JsonDocs) ->
+    %% Count usage in _int version as this can be repeated for OS error
+    %% Pros & cons... might not have actually processed `length(JsonDocs)` docs
+    %% but it certainly undercounts if we count in `filter_docs/5` above
+    %% TODO: replace with couchdb.query_server.*.ddoc_filter stats once we can
+    %% funnel back the stats used in the couchjs process to this caller process
+    couch_srt:js_filtered(length(JsonDocs)),
     [true, Passes] = ddoc_prompt(
         Db,
         DDoc,

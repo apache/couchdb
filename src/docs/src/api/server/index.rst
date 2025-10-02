@@ -22,5 +22,6 @@ configuration information.
 
 .. toctree::
     common
+    csrt
     authn
     configuration
