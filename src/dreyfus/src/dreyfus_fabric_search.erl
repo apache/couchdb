@@ -142,7 +142,9 @@ go(DbName, DDoc, IndexName, QueryArgs, Counters, Bookmark, RingOpts) ->
                     {ok, Bookmark1, TotalHits, Hits1, Counts, Ranges}
             end;
         {error, Reason} ->
-            {error, Reason}
+            {error, Reason};
+        {timeout, _State} ->
+            {error, timeout}
     after
         rexi_monitor:stop(RexiMon),
         fabric_streams:cleanup(Workers)
