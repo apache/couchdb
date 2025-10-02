@@ -23,7 +23,7 @@ dependencies {
     implementation 'io.dropwizard.metrics:metrics-jersey2'
     testImplementation 'io.dropwizard:dropwizard-testing'
 
-    def luceneVersion = '9.12.1'
+    def luceneVersion = '10.3.2'
     implementation 'org.apache.lucene:lucene-core:' + luceneVersion
     implementation 'org.apache.lucene:lucene-queryparser:' + luceneVersion
     implementation 'org.apache.lucene:lucene-analysis-common:' + luceneVersion

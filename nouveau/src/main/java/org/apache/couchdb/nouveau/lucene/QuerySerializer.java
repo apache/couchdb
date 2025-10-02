@@ -65,8 +65,8 @@ class QuerySerializer extends StdSerializer<Query> {
             for (final BooleanClause clause : booleanQuery.clauses()) {
                 gen.writeStartObject();
                 gen.writeFieldName("query");
-                serialize(clause.getQuery(), gen, provider);
-                gen.writeStringField("occur", clause.getOccur().name().toLowerCase());
+                serialize(clause.query(), gen, provider);
+                gen.writeStringField("occur", clause.occur().name().toLowerCase());
                 gen.writeEndObject();
             }
             gen.writeEndArray();
