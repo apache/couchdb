@@ -315,9 +315,7 @@ scan_dbs_fold(#full_doc_info{} = FDI, #st{shards_db = Db} = Acc) ->
             {ok, Acc2}
     end.
 
-scan_db([], #st{} = St) ->
-    {ok, St};
-scan_db([_ | _] = Shards, #st{} = St) ->
+scan_db(Shards, #st{} = St) ->
     #st{dbname = DbName, callbacks = Cbks, pst = PSt, skip_dbs = Skip} = St,
     #{db := DbCbk} = Cbks,
     case match_skip_pat(DbName, Skip) of
