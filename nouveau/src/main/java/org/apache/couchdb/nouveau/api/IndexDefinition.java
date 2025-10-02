@@ -13,9 +13,12 @@
 
 package org.apache.couchdb.nouveau.api;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import java.util.Map;
 
@@ -23,7 +26,10 @@ import java.util.Map;
 public class IndexDefinition {
 
     public static final int LEGACY_LUCENE_VERSION = 9;
+    public static final int LATEST_LUCENE_VERSION = 10;
 
+    @Min(LEGACY_LUCENE_VERSION)
+    @Max(LATEST_LUCENE_VERSION)
     private int luceneVersion = LEGACY_LUCENE_VERSION; // Legacy version if not set.
 
     @NotEmpty
@@ -45,6 +51,11 @@ public class IndexDefinition {
     @JsonProperty
     public int getLuceneVersion() {
         return luceneVersion;
+    }
+
+    @JsonIgnore
+    public boolean isLatestVersion() {
+        return luceneVersion == LATEST_LUCENE_VERSION;
     }
 
     public void setLuceneVersion(int luceneVersion) {
