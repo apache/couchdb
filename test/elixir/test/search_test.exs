@@ -290,4 +290,32 @@ defmodule SearchTest do
     %{:body => %{"ranges" => ranges}} = resp
     assert ranges == %{"price" => %{}}
   end
+
+  @tag :with_db
+  test "timeouts do not expose internal state", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    config = [
+      %{
+        :section => "fabric",
+        :key => "search_timeout",
+        :value => "0"
+      }
+    ]
+
+    run_on_modified_server(config, fn ->
+      url = "/#{db_name}/_design/inventory/_search/fruits"
+      resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+      assert resp.status_code == 500
+
+      %{
+        :body => %{
+          "error" => "timeout",
+          "reason" => "The request could not be processed in a reasonable amount of time."
+        }
+      } = resp
+    end)
+  end
 end
