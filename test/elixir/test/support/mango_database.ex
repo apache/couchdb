@@ -11,6 +11,11 @@
 # the License.
 
 defmodule MangoDatabase do
+  def has_text_service() do
+    resp = Couch.get("/")
+    "search" in resp.body["features"]
+  end
+
   def recreate(db, opts \\ []) do
     resp = Couch.get("/#{db}")
     if resp.status_code == 200 do
@@ -39,7 +44,7 @@ defmodule MangoDatabase do
   end
 
   def create_index(db, fields, name) do
-    resp = Couch.post("/#{db}/_index", body: %{
+    Couch.post("/#{db}/_index", body: %{
       "index" => %{"fields" => fields},
       "name" => name,
       "ddoc" => name,
@@ -49,7 +54,11 @@ defmodule MangoDatabase do
   end
 
   def create_text_index(db) do
-    # TODO
+    Couch.post("/#{db}/_index", body: %{
+      "index" => %{},
+      "type" => "text",
+      "w" => 3
+    })
   end
 
   # TODO: port more options from src/mango/test/mango.py `def find(...)`
