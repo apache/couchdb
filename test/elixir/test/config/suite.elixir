@@ -728,5 +728,8 @@
     "Creating-Updating/Deleting doc with overriden quorum should return 201-Created/200-OK",
     "Creating/Deleting DB should return 202-Acepted",
     "Creating/Updating/Deleting doc should return 202-Acepted"
+  ],
+  "BasicFindTest": [
+    "simple find"
   ]
 }
