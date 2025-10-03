@@ -101,7 +101,7 @@ t_no_config_db_create_fails_for_shard_rpc(DbName) ->
         receive
             Resp0 -> Resp0
         end,
-    ?assertMatch({Ref, {'rexi_EXIT', {{error, missing_target}, _}}}, Resp).
+    ?assertMatch({Ref, {'rexi_EXIT', {database_does_not_exist, _}}}, Resp).
 
 t_db_create_with_config(DbName) ->
     MDbName = mem3:dbname(DbName),
