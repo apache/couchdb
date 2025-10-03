@@ -286,7 +286,9 @@ update_db_indexes(Name, State) ->
                 true -> ok
             end;
         {error, timeout} ->
-            exit(resubmit)
+            exit(resubmit);
+        Else ->
+            exit(Else)
     end.
 
 design_docs(Name) ->
