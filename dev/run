@@ -909,6 +909,13 @@ def hack_default_ini(ctx, node, contents):
         flags=re.MULTILINE,
     )
 
+    contents = re.sub(
+        r"^;uri_file =$",
+        "uri_file = ./dev/lib/{}/couch.uri".format(node),
+        contents,
+        flags=re.MULTILINE,
+    )
+
     if ctx["enable_erlang_views"]:
         contents = re.sub(
             r"^\[native_query_servers\]$",
