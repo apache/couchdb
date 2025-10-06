@@ -379,11 +379,18 @@ rexi_call(Node, MFA, Timeout) ->
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
         receive
-            {Ref, {ok, Reply}} ->
-                Reply;
-            {Ref, Error} ->
-                erlang:error(Error);
-            {rexi_DOWN, Mon, _, Reason} ->
+            {Ref, Msg0} ->
+                {Msg, Delta} = couch_srt:extract_delta(Msg0),
+                couch_srt:accumulate_delta(Delta),
+                case Msg of
+                    {ok, Reply} ->
+                        Reply;
+                    Error ->
+                        erlang:error(Error)
+                end;
+            {rexi_DOWN, Mon, _, Reason0} ->
+                {Reason, Delta} = couch_srt:extract_delta(Reason0),
+                couch_srt:accumulate_delta(Delta),
                 erlang:error({rexi_DOWN, {Node, Reason}})
         after Timeout ->
             erlang:error(timeout)

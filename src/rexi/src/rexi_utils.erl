@@ -62,23 +62,37 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
     receive
         {timeout, TimeoutRef} ->
             {timeout, Acc0};
-        {rexi, Ref, Msg} ->
+        {rexi, Ref, Msg0} ->
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
                 Worker ->
                     Fun(Msg, Worker, Acc0)
             end;
-        {rexi, Ref, From, Msg} ->
+        {rexi, Ref, From, Msg0} ->
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};
                 Worker ->
                     Fun(Msg, {Worker, From}, Acc0)
             end;
+        %% Special case for csrt of `{rexi, '$rexi_ping'}` with Delta.
+        %% Including delta in rexi_ping is essential for getting live info
+        %% about long running filtered queries that aren't returning rows, as
+        %% otherwise we won't get the delta until the exhaustion of the find
+        %% query.
+        {{rexi, '$rexi_ping'}, {delta, Delta}} ->
+            couch_srt:accumulate_delta(Delta),
+            {ok, Acc0};
         {rexi, '$rexi_ping'} ->
             {ok, Acc0};
-        {Ref, Msg} ->
+        {Ref, Msg0} ->
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     % this was some non-matching message which we will ignore
@@ -86,7 +100,9 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
                 Worker ->
                     Fun(Msg, Worker, Acc0)
             end;
-        {Ref, From, Msg} ->
+        {Ref, From, Msg0} ->
+            {Msg, Delta} = couch_srt:extract_delta(Msg0),
+            couch_srt:accumulate_delta(Delta),
             case lists:keyfind(Ref, Keypos, RefList) of
                 false ->
                     {ok, Acc0};

@@ -10,12 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(error, {
-    delta,
-    timestamp,
-    reason,
-    mfa,
-    nonce,
-    stack
-}).
-
+{application, couch_srt, [
+    {description,
+        "Couch Stats Resource Tracker (CSRT) - realtime process local stats"},
+    {vsn, git},
+    {registered, [
+        couch_srt_server,
+        couch_srt_logger
+    ]},
+    {applications, [kernel, stdlib, couch_log, couch_stats]},
+    {mod, {couch_srt_app, []}},
+    {env, []}
+]}.

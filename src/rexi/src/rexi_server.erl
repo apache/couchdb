@@ -102,12 +102,12 @@ handle_info({'DOWN', Ref, process, Pid, Error}, #st{workers = Workers} = St) ->
     case find_worker(Ref, Workers) of
         #job{worker_pid = Pid, worker = Ref, client_pid = CPid, client = CRef} = Job ->
             case Error of
-                #error{reason = {_Class, Reason}, stack = Stack} ->
-                    notify_caller({CPid, CRef}, {Reason, Stack}),
+                #error{reason = {_Class, Reason}, stack = Stack, delta = Delta} ->
+                    notify_caller({CPid, CRef}, {Reason, Stack}, Delta),
                     St1 = save_error(Error, St),
                     {noreply, remove_job(Job, St1)};
                 _ ->
-                    notify_caller({CPid, CRef}, Error),
+                    notify_caller({CPid, CRef}, Error, undefined),
                     {noreply, remove_job(Job, St)}
             end;
         false ->
@@ -134,15 +134,22 @@ init_p(From, MFA) ->
     string() | undefined
 ) -> any().
 init_p(From, {M, F, A}, Nonce) ->
+    MFA = {M, F, length(A)},
     put(rexi_from, From),
-    put('$initial_call', {M, F, length(A)}),
+    put('$initial_call', MFA),
     put(nonce, Nonce),
     try
+        couch_srt:create_worker_context(From, MFA, Nonce),
+        couch_srt:maybe_track_rexi_init_p(MFA),
         apply(M, F, A)
     catch
         exit:normal ->
+            couch_srt:destroy_context(),
             ok;
         Class:Reason:Stack0 ->
+            %% Make a CSRT delta manually to funnel back to the caller
+            Delta = couch_srt:make_delta(),
+            couch_srt:destroy_context(),
             Stack = clean_stack(Stack0),
             {ClientPid, _ClientRef} = From,
             couch_log:error(
@@ -158,6 +165,7 @@ init_p(From, {M, F, A}, Nonce) ->
                 ]
             ),
             exit(#error{
+                delta = Delta,
                 timestamp = os:timestamp(),
                 reason = {Class, Reason},
                 mfa = {M, F, A},
@@ -200,8 +208,10 @@ find_worker(Ref, Tab) ->
         [Worker] -> Worker
     end.
 
-notify_caller({Caller, Ref}, Reason) ->
-    rexi_utils:send(Caller, {Ref, {rexi_EXIT, Reason}}).
+notify_caller({Caller, Ref}, Reason, Delta) ->
+    Payload = couch_srt:maybe_add_delta({rexi_EXIT, Reason}, Delta),
+    Msg = {Ref, Payload},
+    rexi_utils:send(Caller, Msg).
 
 kill_worker(FromRef, #st{clients = Clients} = St) ->
     case find_worker(FromRef, Clients) of

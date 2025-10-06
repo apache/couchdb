@@ -1,0 +1,19 @@
+ProperConfig = case code:lib_dir(proper) of
+    {error, bad_name} -> [];
+    _ -> [{d, 'WITH_PROPER'}]
+end.
+
+AddConfig = [
+    {erl_opts, [
+        {i, "../"}
+    ] ++ ProperConfig}
+].
+
+lists:foldl(fun({K, V}, CfgAcc) ->
+    case lists:keyfind(K, 1, CfgAcc) of
+        {K, Existent} when is_list(Existent) andalso is_list(V) ->
+            lists:keystore(K, 1, CfgAcc, {K, Existent ++ V});
+        false ->
+            lists:keystore(K, 1, CfgAcc, {K, V})
+    end
+end, CONFIG, AddConfig).

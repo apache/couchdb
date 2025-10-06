@@ -36,3 +36,4 @@ Configuration
     query-servers
     misc
     resharding
+    csrt
