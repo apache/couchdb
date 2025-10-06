@@ -35,5 +35,8 @@
   ],
   "ElemMatchTests": [
     "elem match non object"
+  ],
+  "LimitTests": [
+    "limit field"
   ]
 }
