@@ -290,20 +290,20 @@ sync(Filepath) when is_list(Filepath) ->
                     ok ->
                         ok;
                     {error, Reason} ->
-                        erlang:error({fsync_error, Reason})
+                        error({fsync_error, Reason})
                 end
             after
                 ok = file:close(Fd)
             end;
         {error, Error} ->
-            erlang:error(Error)
+            error(Error)
     end;
 sync(Fd) ->
     case gen_server:call(Fd, sync, infinity) of
         ok ->
             ok;
         {error, Reason} ->
-            erlang:error({fsync_error, Reason})
+            error({fsync_error, Reason})
     end.
 
 %%----------------------------------------------------------------------

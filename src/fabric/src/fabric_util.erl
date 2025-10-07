@@ -130,7 +130,7 @@ get_db(DbName, Options) ->
     get_shard(Live, Options, Timeout, Factor).
 
 get_shard([], _Opts, _Timeout, _Factor) ->
-    erlang:error({internal_server_error, "No DB shards could be opened."});
+    error({internal_server_error, "No DB shards could be opened."});
 get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
     MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
@@ -408,7 +408,7 @@ isolate(Fun, Timeout) ->
     after Timeout ->
         erlang:demonitor(Ref, [flush]),
         exit(Pid, kill),
-        erlang:error(timeout)
+        error(timeout)
     end.
 
 do_isolate(Fun) ->

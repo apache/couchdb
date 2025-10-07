@@ -496,7 +496,7 @@ get_or_create_db(DbName, Options) ->
         mem3_util:get_or_create_db_int(DbName, Options)
     catch
         throw:{error, missing_target} ->
-            erlang:error(database_does_not_exist, [DbName])
+            error(database_does_not_exist, [DbName])
     end.
 
 get_view_cb(#mrargs{extra = Options}) ->

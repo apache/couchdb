@@ -214,7 +214,7 @@ convert(Path, Val) when is_binary(Val); is_number(Val); is_boolean(Val) ->
     {op_field, {make_field(Path, Val), value_str(Val)}};
 % Anything else is a bad selector.
 convert(_Path, {Props} = Sel) when length(Props) > 1 ->
-    erlang:error({unnormalized_selector, Sel}).
+    error({unnormalized_selector, Sel}).
 
 to_query_nested(Args) ->
     QueryArgs = lists:map(fun to_query/1, Args),

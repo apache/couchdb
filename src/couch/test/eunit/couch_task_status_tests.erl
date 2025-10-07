@@ -222,7 +222,7 @@ get_task_prop(Pid, Prop) ->
     ),
     case couch_util:get_value(Prop, hd(Element), nil) of
         nil ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},

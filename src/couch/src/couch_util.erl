@@ -553,7 +553,7 @@ with_db(Db, Fun) ->
         true ->
             Fun(Db);
         false ->
-            erlang:error({invalid_db, Db})
+            error({invalid_db, Db})
     end.
 
 rfc1123_date() ->
