@@ -697,7 +697,7 @@ merge_lookups([#doc_info{} = DI | RestInfos], [{ok, FDI} | RestLookups]) ->
     % Assert we've matched our lookups
     if
         DI#doc_info.id == FDI#full_doc_info.id -> ok;
-        true -> erlang:error({mismatched_doc_infos, DI#doc_info.id})
+        true -> error({mismatched_doc_infos, DI#doc_info.id})
     end,
     [FDI | merge_lookups(RestInfos, RestLookups)];
 merge_lookups([FDI | RestInfos], Lookups) ->

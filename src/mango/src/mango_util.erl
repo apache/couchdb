@@ -121,7 +121,7 @@ defer(Mod, Fun, Args) ->
         {'DOWN', Ref, process, Pid, {mango_defer_throw, Value}} ->
             erlang:throw(Value);
         {'DOWN', Ref, process, Pid, {mango_defer_error, Value}} ->
-            erlang:error(Value);
+            error(Value);
         {'DOWN', Ref, process, Pid, {mango_defer_exit, Value}} ->
             erlang:exit(Value)
     end.

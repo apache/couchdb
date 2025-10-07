@@ -109,7 +109,7 @@ maybe_name_process(Options) ->
                 true ->
                     ok;
                 {false, Pid} ->
-                    erlang:error({already_started, Pid})
+                    error({already_started, Pid})
             end;
         none ->
             ok
@@ -133,7 +133,7 @@ do_event(#st{module = Module, state = State} = St, DbName, Event) ->
         {stop, Reason, NewState} ->
             do_terminate(Reason, St#st{state = NewState});
         Else ->
-            erlang:error(Else)
+            error(Else)
     end.
 
 do_cast(#st{module = Module, state = State} = St, Message) ->
@@ -145,7 +145,7 @@ do_cast(#st{module = Module, state = State} = St, Message) ->
         {stop, Reason, NewState} ->
             do_terminate(Reason, St#st{state = NewState});
         Else ->
-            erlang:error(Else)
+            error(Else)
     end.
 
 do_info(#st{module = Module, state = State} = St, Message) ->
@@ -157,7 +157,7 @@ do_info(#st{module = Module, state = State} = St, Message) ->
         {stop, Reason, NewState} ->
             do_terminate(Reason, St#st{state = NewState});
         Else ->
-            erlang:error(Else)
+            error(Else)
     end.
 
 do_terminate(Reason, #st{module = Module, state = State}) ->
@@ -192,7 +192,7 @@ get_all_dbnames(Options) ->
     end.
 
 get_all_dbnames([], []) ->
-    erlang:error(no_dbnames_provided);
+    error(no_dbnames_provided);
 get_all_dbnames([], Acc) ->
     lists:usort(convert_dbname_list(Acc));
 get_all_dbnames([{dbname, DbName} | Rest], Acc) ->
@@ -209,4 +209,4 @@ convert_dbname_list([DbName | Rest]) when is_binary(DbName) ->
 convert_dbname_list([DbName | Rest]) when is_list(DbName) ->
     [list_to_binary(DbName) | convert_dbname_list(Rest)];
 convert_dbname_list([DbName | _]) ->
-    erlang:error({invalid_dbname, DbName}).
+    error({invalid_dbname, DbName}).

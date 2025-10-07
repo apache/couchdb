@@ -275,7 +275,7 @@ wait_for_ack(Count, Timeout) ->
     end.
 
 drain_acks(Count) when Count < 0 ->
-    erlang:error(mismatched_rexi_ack);
+    error(mismatched_rexi_ack);
 drain_acks(Count) ->
     receive
         {rexi_ack, N} -> drain_acks(Count - N)

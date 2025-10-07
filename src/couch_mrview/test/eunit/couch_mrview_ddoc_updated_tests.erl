@@ -117,7 +117,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
             {QPid, Msg} ->
                 ?assertEqual(Msg, ddoc_updated)
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},

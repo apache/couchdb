@@ -86,7 +86,7 @@ handle_event(DbName, Event, #st{mod = Mod, func = Func, state = State} = St) ->
                 couch_log:error("~p: else in handle_event for db ~p, event ~p, else ~p", [
                     ?MODULE, DbName, Event, Else
                 ]),
-                erlang:error(Else)
+                error(Else)
         end
     catch
         Class:Reason:Stack ->

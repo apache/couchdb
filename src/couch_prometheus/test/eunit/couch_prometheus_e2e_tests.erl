@@ -158,7 +158,7 @@ t_starts_with_couchdb(Port) ->
                 {match, _} ->
                     ok;
                 nomatch ->
-                    erlang:error(
+                    error(
                         {assertRegexp_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},

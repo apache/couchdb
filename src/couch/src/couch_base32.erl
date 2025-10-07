@@ -150,7 +150,7 @@ decode(Encoded, ByteOffset, Acc) ->
 find_in_set(Char) ->
     case binary:match(?SET, Char) of
         nomatch ->
-            erlang:error(not_base32);
+            error(not_base32);
         {Offset, _} ->
             Offset
     end.

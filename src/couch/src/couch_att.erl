@@ -781,7 +781,7 @@ open_stream(StreamSrc, Data) ->
                 true ->
                     StreamSrc(Data);
                 false ->
-                    erlang:error({invalid_stream_source, StreamSrc})
+                    error({invalid_stream_source, StreamSrc})
             end
     end.
 

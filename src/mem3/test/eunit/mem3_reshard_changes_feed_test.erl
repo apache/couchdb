@@ -232,7 +232,7 @@ continuous_feed_should_work_during_split(#{db1 := Db}) ->
                 {'DOWN', UpdaterRef, process, UpdaterPid, normal} ->
                     ok;
                 {'DOWN', UpdaterRef, process, UpdaterPid, Error} ->
-                    erlang:error(
+                    error(
                         {test_context_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},

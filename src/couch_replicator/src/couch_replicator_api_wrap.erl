@@ -115,7 +115,7 @@ db_open(#httpdb{} = Db1, Create, CreateParams) ->
             throw(Error);
         error:Error ->
             db_close(Db),
-            erlang:error(Error);
+            error(Error);
         exit:Error ->
             db_close(Db),
             erlang:exit(Error)
@@ -828,7 +828,7 @@ run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
         {'DOWN', Ref, process, Pid, {exit_throw, Reason}} ->
             throw(Reason);
         {'DOWN', Ref, process, Pid, {exit_error, Reason}} ->
-            erlang:error(Reason);
+            error(Reason);
         {'DOWN', Ref, process, Pid, {exit_exit, Reason}} ->
             erlang:exit(Reason)
     end.
@@ -844,7 +844,7 @@ restart_remote_open_doc_revs(Ref, NewRef) ->
         {headers, Ref, _} ->
             restart_remote_open_doc_revs(Ref, NewRef)
     after 0 ->
-        erlang:error({restart_open_doc_revs, NewRef})
+        error({restart_open_doc_revs, NewRef})
     end.
 
 remote_open_doc_revs_streamer_start(Parent) ->
