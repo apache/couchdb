@@ -863,7 +863,7 @@ get_engine(Server, DbName) ->
         [Engine] ->
             {ok, Engine};
         _ ->
-            erlang:error(engine_conflict)
+            error(engine_conflict)
     end.
 
 get_possible_engines(DbName, RootDir, Engines) ->

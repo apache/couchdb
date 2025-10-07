@@ -136,7 +136,7 @@ recompact(State) ->
     recompact(State, recompact_retry_count()).
 
 recompact(#mrst{db_name = DbName, idx_name = IdxName}, 0) ->
-    erlang:error({exceeded_recompact_retry_count, [{db_name, DbName}, {idx_name, IdxName}]});
+    error({exceeded_recompact_retry_count, [{db_name, DbName}, {idx_name, IdxName}]});
 recompact(State, RetryCount) ->
     Self = self(),
     link(State#mrst.fd),

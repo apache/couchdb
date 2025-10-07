@@ -382,11 +382,11 @@ rexi_call(Node, MFA, Timeout) ->
             {Ref, {ok, Reply}} ->
                 Reply;
             {Ref, Error} ->
-                erlang:error(Error);
+                error(Error);
             {rexi_DOWN, Mon, _, Reason} ->
-                erlang:error({rexi_DOWN, {Node, Reason}})
+                error({rexi_DOWN, {Node, Reason}})
         after Timeout ->
-            erlang:error(timeout)
+            error(timeout)
         end
     after
         rexi_monitor:stop(Mon)

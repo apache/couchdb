@@ -60,8 +60,8 @@ go(Parent, ParentRef, DbName, Timeout, ClientReq) ->
         end,
     case Resp of
         {ok, _} -> ok;
-        {error, Error} -> erlang:error(Error);
-        Error -> erlang:error(Error)
+        {error, Error} -> error(Error);
+        Error -> error(Error)
     end.
 
 start_update_notifiers(Shards) ->

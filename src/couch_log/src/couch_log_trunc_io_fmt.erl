@@ -56,10 +56,10 @@ format(FmtStr, Args, MaxLen, Opts) when is_list(FmtStr) ->
             ),
             build2(Cs2, Count, MaxLen2 - StrLen);
         false ->
-            erlang:error(badarg)
+            error(badarg)
     end;
 format(_FmtStr, _Args, _MaxLen, _Opts) ->
-    erlang:error(badarg).
+    error(badarg).
 
 collect([$~ | Fmt0], Args0) ->
     {C, Fmt1, Args1} = collect_cseq(Fmt0, Args0),

@@ -223,7 +223,7 @@ db_exists_for_existing_db() ->
 
 db_exists_for_missing_db() ->
     Mock = fun(DbName) ->
-        erlang:error(database_does_not_exist, [DbName])
+        error(database_does_not_exist, [DbName])
     end,
     meck:expect(mem3, shards, Mock),
     ?assertEqual(false, db_exists(<<"foobar">>)),

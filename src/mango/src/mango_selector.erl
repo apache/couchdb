@@ -563,7 +563,7 @@ match({[{Field, Cond}]}, Value, Cmp) ->
             match(Cond, SubValue, Cmp)
     end;
 match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
-    erlang:error({unnormalized_selector, Sel}).
+    error({unnormalized_selector, Sel}).
 
 % Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.

@@ -999,7 +999,7 @@ load_validation_funs(#db{main_pid = Pid, name = <<"shards/", _/binary>>} = Db) -
             Funs;
         {'DOWN', Ref, _, _, {database_does_not_exist, _StackTrace}} ->
             ok = couch_server:close_db_if_idle(Db#db.name),
-            erlang:error(database_does_not_exist);
+            error(database_does_not_exist);
         {'DOWN', Ref, _, _, Reason} ->
             couch_log:error("could not load validation funs ~p", [Reason]),
             throw(internal_server_error)
@@ -1778,12 +1778,12 @@ validate_epochs(Epochs) ->
     %% Assert uniqueness.
     case length(Epochs) == length(lists:ukeysort(2, Epochs)) of
         true -> ok;
-        false -> erlang:error(duplicate_epoch)
+        false -> error(duplicate_epoch)
     end,
     %% Assert order.
     case Epochs == lists:sort(fun({_, A}, {_, B}) -> B =< A end, Epochs) of
         true -> ok;
-        false -> erlang:error({epoch_order, Epochs})
+        false -> error({epoch_order, Epochs})
     end.
 
 is_prefix(Pattern, Subject) ->

@@ -568,7 +568,7 @@ restart_open_doc_revs(Parser, Ref, NewRef) ->
     unlink(Parser),
     exit(Parser, kill),
     flush_parser_messages(Ref),
-    erlang:error({restart_open_doc_revs, NewRef}).
+    error({restart_open_doc_revs, NewRef}).
 
 flush_parser_messages(Ref) ->
     receive

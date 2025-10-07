@@ -460,7 +460,7 @@ load_from_db(ShardDb, DbName) ->
             end,
             {Shards, DbOpts};
         {not_found, _} ->
-            erlang:error(database_does_not_exist, [DbName])
+            error(database_does_not_exist, [DbName])
     end.
 
 load_shards_from_disk(DbName, HashKey) ->

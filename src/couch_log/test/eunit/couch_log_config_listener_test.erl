@@ -36,7 +36,7 @@ check_restart_listener() ->
         {'DOWN', Ref, process, _, _} ->
             ?assertNot(is_process_alive(Listener1))
     after ?TIMEOUT ->
-        erlang:error({timeout, config_listener_mon_death})
+        error({timeout, config_listener_mon_death})
     end,
 
     NewHandler = test_util:wait(

@@ -18,7 +18,7 @@
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
     meck:expect(fabric, open_doc, fun(_, ?FOOBAR, _) ->
-        erlang:error(test_kaboom)
+        error(test_kaboom)
     end),
     Ctx.
 

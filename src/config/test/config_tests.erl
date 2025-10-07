@@ -708,7 +708,7 @@ should_remove_handler_when_pid_exits({_Apps, Pid}) ->
         receive
             {'DOWN', PidRef, _, _, _} -> ok
         after ?TIMEOUT ->
-            erlang:error({timeout, config_listener_death})
+            error({timeout, config_listener_death})
         end,
 
         % Wait for the config_listener_mon process to
@@ -716,7 +716,7 @@ should_remove_handler_when_pid_exits({_Apps, Pid}) ->
         receive
             {'DOWN', MonRef, _, _, normal} -> ok
         after ?TIMEOUT ->
-            erlang:error({timeout, config_listener_mon_death})
+            error({timeout, config_listener_mon_death})
         end,
 
         ?assertEqual(0, n_handlers())
@@ -742,7 +742,7 @@ should_stop_monitor_on_error({_Apps, Pid}) ->
         receive
             {'DOWN', MonRef, _, _, shutdown} -> ok
         after ?TIMEOUT ->
-            erlang:error({timeout, config_listener_mon_shutdown})
+            error({timeout, config_listener_mon_shutdown})
         end,
 
         ?assertEqual(0, n_handlers())
@@ -792,7 +792,7 @@ should_unsubscribe_when_subscriber_gone(_Subscription, {_Apps, Pid}) ->
         receive
             {'DOWN', MonRef, _, _, _} -> ok
         after ?TIMEOUT ->
-            erlang:error({timeout, config_notifier_shutdown})
+            error({timeout, config_notifier_shutdown})
         end,
 
         ?assertNot(is_process_alive(Pid)),
@@ -1023,7 +1023,7 @@ spawn_config_listener() ->
     receive
         registered -> ok
     after ?TIMEOUT ->
-        erlang:error({timeout, config_handler_register})
+        error({timeout, config_handler_register})
     end,
     Pid.
 
@@ -1037,7 +1037,7 @@ spawn_config_notifier(Subscription) ->
     receive
         registered -> ok
     after ?TIMEOUT ->
-        erlang:error({timeout, config_handler_register})
+        error({timeout, config_handler_register})
     end,
     Pid.
 
@@ -1050,7 +1050,7 @@ loop(undefined) ->
         {get_msg, _, _} = Msg ->
             loop(Msg);
         Msg ->
-            erlang:error({invalid_message, Msg})
+            error({invalid_message, Msg})
     end;
 loop({get_msg, From, Ref}) ->
     receive
@@ -1059,7 +1059,7 @@ loop({get_msg, From, Ref}) ->
         {config_change, _, _, _, _} = Msg ->
             From ! {Ref, Msg};
         Msg ->
-            erlang:error({invalid_message, Msg})
+            error({invalid_message, Msg})
     end,
     loop(undefined);
 loop({config_msg, _} = Msg) ->
@@ -1067,7 +1067,7 @@ loop({config_msg, _} = Msg) ->
         {get_msg, From, Ref} ->
             From ! {Ref, Msg};
         Msg ->
-            erlang:error({invalid_message, Msg})
+            error({invalid_message, Msg})
     end,
     loop(undefined).
 
@@ -1077,7 +1077,7 @@ getmsg(Pid) ->
     receive
         {Ref, {config_msg, Msg}} -> Msg
     after ?TIMEOUT ->
-        erlang:error({timeout, config_msg})
+        error({timeout, config_msg})
     end.
 
 n_handlers() ->
