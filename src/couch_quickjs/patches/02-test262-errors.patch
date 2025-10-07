@@ -1,11 +1,11 @@
---- quickjs-master/test262_errors.txt	2025-09-30 04:35:00
-+++ quickjs/test262_errors.txt	2025-09-30 11:47:32
-@@ -5,6 +5,8 @@
- test262/test/annexB/language/expressions/assignmenttargettype/callexpression-in-prefix-update.js:27: SyntaxError: invalid increment/decrement operand
+--- quickjs-master/test262_errors.txt	2025-10-04 04:46:29
++++ quickjs/test262_errors.txt	2025-10-06 23:19:01
+@@ -6,6 +6,8 @@
  test262/test/annexB/language/expressions/assignmenttargettype/callexpression.js:33: SyntaxError: invalid assignment left-hand side
  test262/test/annexB/language/expressions/assignmenttargettype/cover-callexpression-and-asyncarrowhead.js:20: SyntaxError: invalid assignment left-hand side
+ test262/test/language/identifier-resolution/assign-to-global-undefined.js:20: strict mode: expected error
 +test262/test/language/statements/expression/S12.4_A1.js:15: unexpected error type: Test262: This statement should not be evaluated.
 +test262/test/language/statements/expression/S12.4_A1.js:15: strict mode: unexpected error type: Test262: This statement should not be evaluated.
- test262/test/staging/sm/Date/UTC-convert-all-arguments.js:75: Test262Error: index 1: expected 42, got Error: didn't throw Expected SameValue(«Error: didn't throw», «42») to be true
- test262/test/staging/sm/Date/constructor-convert-all-arguments.js:75: Test262Error: index undefined: expected 42, got Error: didn't throw Expected SameValue(«Error: didn't throw», «42») to be true
- test262/test/staging/sm/Date/two-digit-years.js:76: Test262Error: Expected SameValue(«915177600000», «NaN») to be true
+ test262/test/staging/sm/Date/UTC-convert-all-arguments.js:13: Test262Error: index 1: expected 42, got Error: didn't throw Expected SameValue(«Error: didn't throw», «42») to be true
+ test262/test/staging/sm/Date/UTC-convert-all-arguments.js:13: strict mode: Test262Error: index 1: expected 42, got Error: didn't throw Expected SameValue(«Error: didn't throw», «42») to be true
+ test262/test/staging/sm/Date/constructor-convert-all-arguments.js:13: Test262Error: index undefined: expected 42, got Error: didn't throw Expected SameValue(«Error: didn't throw», «42») to be true
