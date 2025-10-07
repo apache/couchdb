@@ -216,7 +216,7 @@ upgrade_tuple(Old) when is_tuple(Old) ->
     {_, New} = lists:foldl(FoldFun, {1, #db_header{}}, OldKVs),
     if
         is_record(New, db_header) -> ok;
-        true -> erlang:error({invalid_header_extension, {Old, New}})
+        true -> error({invalid_header_extension, {Old, New}})
     end,
     New.
 

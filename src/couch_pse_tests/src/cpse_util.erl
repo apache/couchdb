@@ -101,7 +101,7 @@ shutdown_db(Db) ->
         {'DOWN', Ref, _, _, _} ->
             ok
     after ?SHUTDOWN_TIMEOUT ->
-        erlang:error(database_shutdown_timeout)
+        error(database_shutdown_timeout)
     end,
     test_util:wait(fun() ->
         case
@@ -189,7 +189,7 @@ assert_db_props(Module, Line, DbName, Props) when is_binary(DbName) ->
     catch
         error:{assertEqual, Props} ->
             {_, Rest} = proplists:split(Props, [module, line]),
-            erlang:error({assertEqual, [{module, Module}, {line, Line} | Rest]})
+            error({assertEqual, [{module, Module}, {line, Line} | Rest]})
     after
         couch_db:close(Db)
     end;
@@ -199,7 +199,7 @@ assert_db_props(Module, Line, Db, Props) ->
     catch
         error:{assertEqual, Props} ->
             {_, Rest} = proplists:split(Props, [module, line]),
-            erlang:error({assertEqual, [{module, Module}, {line, Line} | Rest]})
+            error({assertEqual, [{module, Module}, {line, Line} | Rest]})
     end.
 
 assert_each_prop(_Db, []) ->
@@ -387,7 +387,7 @@ prep_atts(Db, [{FileName, Data} | Rest]) ->
             {'DOWN', Ref, _, _, Resp} ->
                 Resp
         after ?ATTACHMENT_WRITE_TIMEOUT ->
-            erlang:error(attachment_write_timeout)
+            error(attachment_write_timeout)
         end,
     [Att | prep_atts(Db, Rest)].
 
@@ -630,9 +630,9 @@ compact(Db) ->
         {'DOWN', Ref, _, _, noproc} ->
             ok;
         {'DOWN', Ref, _, _, Reason} ->
-            erlang:error({compactor_died, Reason})
+            error({compactor_died, Reason})
     after ?COMPACTOR_TIMEOUT ->
-        erlang:error(compactor_timed_out)
+        error(compactor_timed_out)
     end,
 
     test_util:wait(fun() ->

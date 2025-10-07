@@ -69,7 +69,7 @@ format(Fmt, Args, Max, Options) ->
         couch_log_trunc_io_fmt:format(Fmt, Args, Max, Options)
     catch
         _What:_Why ->
-            erlang:error(badarg, [Fmt, Args])
+            error(badarg, [Fmt, Args])
     end.
 
 %% @doc Returns an flattened list containing the ASCII representation of the given
@@ -114,7 +114,7 @@ print(Term, Max, Options) when is_list(Options) ->
 print(Term, _Max, #print_options{force_strings = true}) when
     not is_list(Term), not is_binary(Term), not is_atom(Term)
 ->
-    erlang:error(badarg);
+    error(badarg);
 print(_, Max, _Options) when Max < 0 -> {"...", 3};
 print(_, _, #print_options{depth = 0}) ->
     {"...", 3};
@@ -474,7 +474,7 @@ alist([H | T], Max, Options = #print_options{force_strings = true}) when is_bina
             {[List | Final], FLen + Len}
     end;
 alist(_, _, #print_options{force_strings = true}) ->
-    erlang:error(badarg);
+    error(badarg);
 alist([H | _L], _Max, _Options) ->
     throw({unprintable, H});
 alist(H, _Max, _Options) ->

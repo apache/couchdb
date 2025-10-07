@@ -276,7 +276,7 @@ wait_for_open_async_result(CouchServer, Opener) ->
 check_monitor_not_triggered(Ref) ->
     receive
         {'DOWN', Ref, _, _, Reason0} ->
-            erlang:error({monitor_triggered, Reason0})
+            error({monitor_triggered, Reason0})
     after 100 ->
         ok
     end.
@@ -286,5 +286,5 @@ get_next_message() ->
         Msg ->
             Msg
     after 5000 ->
-        erlang:error(timeout)
+        error(timeout)
     end.

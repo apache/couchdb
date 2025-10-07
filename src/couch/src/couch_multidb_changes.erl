@@ -1135,7 +1135,7 @@ kill_mock_changes_reader_and_get_its_args(Pid) ->
         {'DOWN', Ref, _, Pid, {Server, DbName}} ->
             {Server, DbName}
     after 1000 ->
-        erlang:error(spawn_change_reader_timeout)
+        error(spawn_change_reader_timeout)
     end.
 
 mock_changes_reader() ->

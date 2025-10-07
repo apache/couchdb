@@ -170,7 +170,7 @@ wait_target_in_sync(Source, Target) ->
     wait_target_in_sync_loop(SourceDocCount, Target, 300).
 
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
-    erlang:error(
+    error(
         {assertion_failed, [
             {module, ?MODULE},
             {line, ?LINE},
@@ -202,7 +202,7 @@ compare_databases(Source, Target) ->
                 {ok, DocT} ->
                     DocT;
                 Error ->
-                    erlang:error(
+                    error(
                         {assertion_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},
@@ -242,7 +242,7 @@ compact_db(Type, Db0) ->
         {'DOWN', MonRef, process, CompactPid, noproc} ->
             ok;
         {'DOWN', MonRef, process, CompactPid, Reason} ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -258,7 +258,7 @@ compact_db(Type, Db0) ->
                 ]}
             )
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -282,7 +282,7 @@ wait_for_compaction(Type, Db) ->
         {error, noproc} ->
             ok;
         {error, Reason} ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -330,7 +330,7 @@ pause_writer(Pid) ->
         {paused, Ref} ->
             ok
     after ?TIMEOUT_WRITER ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -346,7 +346,7 @@ resume_writer(Pid) ->
         {ok, Ref} ->
             ok
     after ?TIMEOUT_WRITER ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -362,7 +362,7 @@ get_writer_num_docs_written(Pid) ->
         {count, Ref, Count} ->
             Count
     after ?TIMEOUT_WRITER ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},
@@ -383,7 +383,7 @@ stop_writer(Pid) ->
                 {'DOWN', MonRef, process, Pid, _Reason} ->
                     DocsWritten
             after ?TIMEOUT ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -392,7 +392,7 @@ stop_writer(Pid) ->
                 )
             end
     after ?TIMEOUT_WRITER ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},

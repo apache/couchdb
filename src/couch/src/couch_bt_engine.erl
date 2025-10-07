@@ -598,7 +598,7 @@ fold_purge_infos(St, StartSeq0, UserFun, UserAcc, Options) ->
     % automatically.
     if
         MinSeq =< StartSeq -> ok;
-        true -> erlang:error({invalid_start_purge_seq, StartSeq0, MinSeq})
+        true -> error({invalid_start_purge_seq, StartSeq0, MinSeq})
     end,
     Wrapper = fun(Info, _Reds, UAcc) ->
         UserFun(Info, UAcc)

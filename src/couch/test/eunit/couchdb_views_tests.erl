@@ -773,7 +773,7 @@ wait_for_process_shutdown(Pid, ExpectedReason, Error) ->
         {'DOWN', Pid, process, _, Reason} ->
             ?assertEqual(ExpectedReason, Reason)
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [{module, ?MODULE}, {line, ?LINE}, Error]}
         )
     end.
@@ -994,7 +994,7 @@ compact_db(DbName) ->
     wait_db_compact_done(DbName, ?WAIT_DELAY_COUNT).
 
 wait_db_compact_done(_DbName, 0) ->
-    erlang:error(
+    error(
         {assertion_failed, [
             {module, ?MODULE},
             {line, ?LINE},
@@ -1020,7 +1020,7 @@ compact_view_group(DbName, DDocId) when is_binary(DDocId) ->
     wait_view_compact_done(DbName, DDocId, 10).
 
 wait_view_compact_done(_DbName, _DDocId, 0) ->
-    erlang:error(
+    error(
         {assertion_failed, [
             {module, ?MODULE},
             {line, ?LINE},
@@ -1052,7 +1052,7 @@ read_header(File) ->
 stop_indexer(StopFun, Pid, Line, Reason) ->
     case test_util:stop_sync(Pid, StopFun) of
         timeout ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, Line},
