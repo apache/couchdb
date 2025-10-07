@@ -55,7 +55,7 @@ should_swap(Db) ->
         receive
             {'DOWN', MonRef, process, _, _} -> ok
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -68,7 +68,7 @@ should_swap(Db) ->
             {QPid, Count} ->
                 ?assertEqual(1000, Count)
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},
@@ -100,7 +100,7 @@ should_remove(Db) ->
                 ?assert(is_process_alive(IndexPid)),
                 ?assert(is_process_alive(CompactorPid))
         after ?TIMEOUT ->
-            erlang:error(
+            error(
                 {assertion_failed, [
                     {module, ?MODULE},
                     {line, ?LINE},

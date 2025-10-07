@@ -1580,7 +1580,7 @@ update_doc(Db, DocId, #doc{deleted = Deleted, body = DocBody} = Doc, Options) ->
             {'DOWN', Ref, _, _, {exit_throw, Reason}} ->
                 throw(Reason);
             {'DOWN', Ref, _, _, {exit_error, Reason}} ->
-                erlang:error(Reason);
+                error(Reason);
             {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
                 erlang:exit(Reason)
         end,

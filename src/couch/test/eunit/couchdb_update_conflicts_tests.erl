@@ -135,7 +135,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
                 {'DOWN', MonRef, process, Pid, conflict} ->
                     {AccConflicts + 1, AccValue};
                 {'DOWN', MonRef, process, Pid, Error} ->
-                    erlang:error(
+                    error(
                         {assertion_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},
@@ -146,7 +146,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
                         ]}
                     )
             after ?TIMEOUT div 2 ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},

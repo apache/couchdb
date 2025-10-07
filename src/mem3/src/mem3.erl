@@ -265,7 +265,7 @@ choose_shards(DbName, Nodes, Options) ->
     Suffix = couch_util:get_value(shard_suffix, Options, ""),
     N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
     if
-        N =:= 0 -> erlang:error(no_nodes_in_zone);
+        N =:= 0 -> error(no_nodes_in_zone);
         true -> ok
     end,
     Q = mem3_util:q_val(
@@ -315,7 +315,7 @@ dbname(DbName) when is_list(DbName) ->
 dbname(DbName) when is_binary(DbName) ->
     DbName;
 dbname(_) ->
-    erlang:error(badarg).
+    error(badarg).
 
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
 belongs(#shard{} = Shard, DocId) when is_binary(DocId) ->

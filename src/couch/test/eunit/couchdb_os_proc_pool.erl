@@ -562,7 +562,7 @@ get_client_proc({Pid, Ref}, ClientName) ->
     receive
         {proc, Ref, Proc} -> Proc
     after ?TIMEOUT ->
-        erlang:error(
+        error(
             {assertion_failed, [
                 {module, ?MODULE},
                 {line, ?LINE},

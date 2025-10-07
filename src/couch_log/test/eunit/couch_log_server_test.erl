@@ -48,7 +48,7 @@ check_can_restart() ->
     receive
         {'DOWN', Ref, _, _, _} -> ok
     after 1000 ->
-        erlang:error(timeout_restarting_couch_log_server)
+        error(timeout_restarting_couch_log_server)
     end,
 
     ?assert(not is_process_alive(Pid1)),

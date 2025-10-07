@@ -345,7 +345,7 @@ insert_kvs(Info, LRU, Count, Limit) ->
             timer:sleep(1),
             case ets:info(lru_objects, Info) > Limit of
                 true ->
-                    erlang:error(exceeded_limit);
+                    error(exceeded_limit);
                 false ->
                     true
             end;

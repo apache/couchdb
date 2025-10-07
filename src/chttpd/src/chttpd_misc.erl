@@ -252,7 +252,7 @@ replicate({Props} = PostBody, Ctx) ->
             ]),
             case rpc:call(Node, couch_replicator, replicate, [PostBody, Ctx]) of
                 {badrpc, Reason} ->
-                    erlang:error(Reason);
+                    error(Reason);
                 Res ->
                     Res
             end

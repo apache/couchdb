@@ -152,7 +152,7 @@ start_server(ChildMod, ChildId) ->
         {ok, Pid} ->
             {ok, Pid};
         Else ->
-            erlang:error(Else)
+            error(Else)
     end.
 
 stop_server(ChildMod, ChildId) ->

@@ -381,7 +381,7 @@ send_replies(Waiters, UpdateSeq, IdxState) ->
 assert_signature_match(Mod, OldIdxState, NewIdxState) ->
     case {Mod:get(signature, OldIdxState), Mod:get(signature, NewIdxState)} of
         {Sig, Sig} -> ok;
-        _ -> erlang:error(signature_mismatch)
+        _ -> error(signature_mismatch)
     end.
 
 commit_compacted(NewIdxState, State) ->

@@ -29,7 +29,7 @@ recover(DbName) ->
         <<"not_ok">> ->
             {ruh, roh};
         <<"error">> ->
-            erlang:error(thpppt)
+            error(thpppt)
     end.
 
 start_couch() ->

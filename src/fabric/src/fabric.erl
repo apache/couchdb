@@ -693,7 +693,7 @@ dbname(Db) ->
         couch_db:name(Db)
     catch
         error:badarg ->
-            erlang:error({illegal_database_name, Db})
+            error({illegal_database_name, Db})
     end.
 
 %% @doc get db shard uuids
@@ -728,7 +728,7 @@ docid(DocId) ->
 docs(Db, Docs) when is_list(Docs) ->
     [doc(Db, D) || D <- Docs];
 docs(_Db, Docs) ->
-    erlang:error({illegal_docs_list, Docs}).
+    error({illegal_docs_list, Docs}).
 
 doc(_Db, #doc{} = Doc) ->
     Doc;
@@ -744,7 +744,7 @@ doc(Db0, {_} = Doc) ->
         end,
     couch_db:doc_from_json_obj_validate(Db, Doc);
 doc(_Db, Doc) ->
-    erlang:error({illegal_doc_format, Doc}).
+    error({illegal_doc_format, Doc}).
 
 design_doc(#doc{} = DDoc) ->
     DDoc;

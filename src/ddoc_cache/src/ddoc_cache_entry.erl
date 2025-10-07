@@ -98,7 +98,7 @@ open(Pid, Key) ->
         end
     catch
         error:database_does_not_exist ->
-            erlang:error(database_does_not_exist);
+            error(database_does_not_exist);
         exit:_ ->
             % Its possible that this process was evicted just
             % before we tried talking to it. Just fallback

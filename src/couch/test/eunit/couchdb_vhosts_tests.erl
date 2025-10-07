@@ -96,7 +96,7 @@ should_return_database_info({Url, DbName}) ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -120,7 +120,7 @@ should_return_revs_info({Url, DbName}) ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"_revs_info">>, JsonBody));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -146,7 +146,7 @@ should_return_virtual_request_path_field_in_request({Url, DbName}) ->
                     proplists:get_value(<<"requested_path">>, Json)
                 );
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -170,7 +170,7 @@ should_return_real_request_path_field_in_request({Url, DbName}) ->
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -194,7 +194,7 @@ should_match_wildcard_vhost({Url, DbName}) ->
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -218,7 +218,7 @@ should_return_db_info_for_wildcard_vhost_for_custom_db({Url, DbName}) ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -243,7 +243,7 @@ should_replace_rewrite_variables_for_db_and_doc({Url, DbName}) ->
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -267,7 +267,7 @@ should_return_db_info_for_vhost_with_resource({Url, DbName}) ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -291,7 +291,7 @@ should_return_revs_info_for_vhost_with_resource({Url, DbName}) ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"_revs_info">>, JsonBody));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -311,7 +311,7 @@ should_return_db_info_for_vhost_with_wildcard_resource({Url, DbName}) ->
                 {JsonBody} = jiffy:decode(Body),
                 ?assert(proplists:is_defined(<<"db_name">>, JsonBody));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
@@ -335,7 +335,7 @@ should_return_path_for_vhost_with_wildcard_host({Url, DbName}) ->
                 Path = ?l2b("/" ++ DbName ++ "/_design/doc1/_show/test"),
                 ?assertEqual(Path, proplists:get_value(<<"path">>, Json));
             Else ->
-                erlang:error(
+                error(
                     {assertion_failed, [
                         {module, ?MODULE},
                         {line, ?LINE},
