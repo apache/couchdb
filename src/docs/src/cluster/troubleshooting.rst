@@ -97,7 +97,7 @@ the ``--level`` option:
     %MEM    RSS
     0.3  25116
 
-    [debug] Local RPC: erlang:nodes([]) [5000]
+    [debug] Local RPC: nodes([]) [5000]
     [debug] Local RPC: mem3:nodes([]) [5000]
     [warning] Cluster member node3@127.0.0.1 is not connected to this node. Please check whether it is down.
     [info] Process is using 0.3% of available RAM, totalling 25116 KB of real memory.

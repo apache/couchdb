@@ -60,7 +60,7 @@ mean_to_message({Statistic, Mean}) ->
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
     SumOfStats = recon:node_stats(?SAMPLES, 100, fun sum_absolute_stats/2, []),
-    MeanStats = [{K, erlang:round(V / ?SAMPLES)} || {K, V} <- SumOfStats],
+    MeanStats = [{K, round(V / ?SAMPLES)} || {K, V} <- SumOfStats],
     lists:map(fun mean_to_message/1, MeanStats).
 
 -spec format(term()) -> {io:format(), [term()]}.

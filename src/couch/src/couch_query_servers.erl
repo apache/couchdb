@@ -327,8 +327,8 @@ stat_values(Value, Acc) when is_tuple(Value), is_tuple(Acc) ->
     {
         Sum0 + Sum1,
         Cnt0 + Cnt1,
-        erlang:min(Min0, Min1),
-        erlang:max(Max0, Max1),
+        min(Min0, Min1),
+        max(Max0, Max1),
         Sqr0 + Sqr1
     };
 stat_values(Else, _Acc) ->

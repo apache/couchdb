@@ -154,12 +154,12 @@ format_status(Status) ->
     ).
 
 monitor_client(Callers, Worker, {ClientPid, _}) ->
-    [{Worker, erlang:monitor(process, ClientPid)} | Callers].
+    [{Worker, monitor(process, ClientPid)} | Callers].
 
 demonitor_client(Callers, Worker) ->
     case lists:keysearch(Worker, 1, Callers) of
         {value, {Worker, MonRef}} ->
-            erlang:demonitor(MonRef, [flush]),
+            demonitor(MonRef, [flush]),
             lists:keydelete(Worker, 1, Callers);
         false ->
             Callers

@@ -257,7 +257,7 @@ rpc_update_doc(DbName, Doc) ->
     rpc_update_doc(DbName, Doc, [RROpt]).
 
 rpc_update_doc(DbName, Doc, Opts) ->
-    Ref = erlang:make_ref(),
+    Ref = make_ref(),
     put(rexi_from, {self(), Ref}),
     fabric_rpc:update_docs(DbName, [Doc], Opts),
     Reply = test_util:wait(fun() ->

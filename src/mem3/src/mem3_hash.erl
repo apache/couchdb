@@ -36,7 +36,7 @@ calculate(Props, DocId) when is_list(Props) ->
     MFA = get_hash_fun(Props),
     calculate(MFA, DocId);
 calculate({Mod, Fun, Args}, DocId) ->
-    erlang:apply(Mod, Fun, [DocId | Args]).
+    apply(Mod, Fun, [DocId | Args]).
 
 get_hash_fun(#shard{dbname = DbName}) ->
     get_hash_fun(DbName);

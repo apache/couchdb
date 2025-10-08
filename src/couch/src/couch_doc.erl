@@ -390,13 +390,13 @@ max_seq(Tree, UpdateSeq) ->
         case Value of
             {_Deleted, _DiskPos, OldTreeSeq} ->
                 % Older versions didn't track data sizes.
-                erlang:max(MaxOldSeq, OldTreeSeq);
+                max(MaxOldSeq, OldTreeSeq);
             % necessary clause?
             {_Deleted, _DiskPos, OldTreeSeq, _Size} ->
                 % Older versions didn't store #leaf records.
-                erlang:max(MaxOldSeq, OldTreeSeq);
+                max(MaxOldSeq, OldTreeSeq);
             #leaf{seq = OldTreeSeq} ->
-                erlang:max(MaxOldSeq, OldTreeSeq);
+                max(MaxOldSeq, OldTreeSeq);
             _ ->
                 MaxOldSeq
         end

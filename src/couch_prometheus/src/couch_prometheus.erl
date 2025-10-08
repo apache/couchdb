@@ -120,9 +120,9 @@ get_vm_stats() ->
         end,
         erlang:memory()
     ),
-    {NumGCs, WordsReclaimed, _} = erlang:statistics(garbage_collection),
-    CtxSwitches = element(1, erlang:statistics(context_switches)),
-    Reds = element(1, erlang:statistics(reductions)),
+    {NumGCs, WordsReclaimed, _} = statistics(garbage_collection),
+    CtxSwitches = element(1, statistics(context_switches)),
+    Reds = element(1, statistics(reductions)),
     ProcCount = erlang:system_info(process_count),
     ProcLimit = erlang:system_info(process_limit),
     [
@@ -158,7 +158,7 @@ get_vm_stats() ->
     ].
 
 get_io_stats() ->
-    {{input, In}, {output, Out}} = erlang:statistics(io),
+    {{input, In}, {output, Out}} = statistics(io),
     [
         to_prom(
             erlang_io_recv_bytes_total,

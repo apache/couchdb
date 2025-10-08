@@ -206,7 +206,7 @@ notify_caller({Caller, Ref}, Reason) ->
 kill_worker(FromRef, #st{clients = Clients} = St) ->
     case find_worker(FromRef, Clients) of
         #job{worker = KeyRef, worker_pid = Pid} = Job ->
-            erlang:demonitor(KeyRef),
+            demonitor(KeyRef),
             exit(Pid, kill),
             remove_job(Job, St),
             ok;

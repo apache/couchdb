@@ -105,7 +105,7 @@ start_link(#rep{id = Id = {BaseId, Ext}, source = Src, target = Tgt} = Rep) ->
     end.
 
 stop(Pid) when is_pid(Pid) ->
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     unlink(Pid),
     % In the rare case the job is already stopping as we try to stop it, it
     % won't return ok but exit the calling process, usually the scheduler, so
@@ -530,7 +530,7 @@ startup_jitter() ->
         "startup_jitter",
         ?STARTUP_JITTER_DEFAULT
     ),
-    rand:uniform(erlang:max(1, Jitter)).
+    rand:uniform(max(1, Jitter)).
 
 headers_strip_creds([], Acc) ->
     lists:reverse(Acc);

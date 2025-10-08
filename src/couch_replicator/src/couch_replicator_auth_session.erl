@@ -344,7 +344,7 @@ stop_worker_if_server_requested(ResultHeaders0, Worker) ->
     ResultHeaders = mochiweb_headers:make(ResultHeaders0),
     case mochiweb_headers:get_value("Connection", ResultHeaders) of
         "close" ->
-            Ref = erlang:monitor(process, Worker),
+            Ref = monitor(process, Worker),
             ibrowse_http_client:stop(Worker),
             receive
                 {'DOWN', Ref, _, _, _} ->

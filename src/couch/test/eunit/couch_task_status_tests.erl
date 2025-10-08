@@ -181,7 +181,7 @@ loop() ->
     end.
 
 call(Pid, done) ->
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     Pid ! {done, self()},
     Res = wait(Pid),
     receive

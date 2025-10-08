@@ -181,7 +181,7 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
                 offset = Offset
             }};
         false ->
-            FinalOffset = erlang:min(Total, Offset + State#collector.skip),
+            FinalOffset = min(Total, Offset + State#collector.skip),
             Meta =
                 [{total, Total}, {offset, FinalOffset}] ++
                     case UpdateSeq of

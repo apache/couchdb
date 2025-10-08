@@ -239,7 +239,7 @@ help(link_tree) ->
     The function doesn't recurse to pids older than initial one.
     The Pids which are lesser than initial Pid are still shown in the output.
     The info argument is a list of process_info_item() as documented in
-    erlang:process_info/2. We don't do any attempts to prevent dangerous items.
+    process_info/2. We don't do any attempts to prevent dangerous items.
     Be warn that passing some of them such as `messages` for example
     can be dangerous in a very busy system.
     ---
@@ -297,7 +297,7 @@ help(linked_processes_info) ->
         use of link_tree.
           - Pid: initial Pid to start from
           - Info: a list of process_info_item() as documented
-            in erlang:process_info/2.
+            in process_info/2.
 
         ---
     ", []);
@@ -1147,8 +1147,8 @@ random_processes(Acc, Depth) ->
                 end);
             open_port ->
                 spawn_link(fun() ->
-                    Port = erlang:open_port({spawn, "sleep 10"}, [hide]),
-                    true = erlang:link(Port),
+                    Port = open_port({spawn, "sleep 10"}, [hide]),
+                    true = link(Port),
                     Caller ! {Ref, random_processes(Depth - 1)},
                     receive
                         looper -> ok

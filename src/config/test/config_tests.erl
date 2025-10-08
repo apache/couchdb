@@ -700,10 +700,10 @@ should_remove_handler_when_pid_exits({_Apps, Pid}) ->
 
         % Monitor the config_listener_mon process
         {monitored_by, [Mon]} = process_info(Pid, monitored_by),
-        MonRef = erlang:monitor(process, Mon),
+        MonRef = monitor(process, Mon),
 
         % Kill the process synchronously
-        PidRef = erlang:monitor(process, Pid),
+        PidRef = monitor(process, Pid),
         exit(Pid, kill),
         receive
             {'DOWN', PidRef, _, _, _} -> ok
@@ -728,7 +728,7 @@ should_stop_monitor_on_error({_Apps, Pid}) ->
 
         % Monitor the config_listener_mon process
         {monitored_by, [Mon]} = process_info(Pid, monitored_by),
-        MonRef = erlang:monitor(process, Mon),
+        MonRef = monitor(process, Mon),
 
         % Have the process throw an error
         ?assertEqual(ok, config:set("throw_error", "foo", "bar", false)),
@@ -784,7 +784,7 @@ should_unsubscribe_when_subscriber_gone(_Subscription, {_Apps, Pid}) ->
         ?assert(is_process_alive(Pid)),
 
         % Monitor subscriber process
-        MonRef = erlang:monitor(process, Pid),
+        MonRef = monitor(process, Pid),
 
         exit(Pid, kill),
 
@@ -1015,7 +1015,7 @@ wait_config_get(Sec, Key, Val) ->
 
 spawn_config_listener() ->
     Self = self(),
-    Pid = erlang:spawn(fun() ->
+    Pid = spawn(fun() ->
         ok = config:listen_for_changes(?MODULE, {self(), undefined}),
         Self ! registered,
         loop(undefined)
@@ -1029,7 +1029,7 @@ spawn_config_listener() ->
 
 spawn_config_notifier(Subscription) ->
     Self = self(),
-    Pid = erlang:spawn(fun() ->
+    Pid = spawn(fun() ->
         ok = config:subscribe_for_changes(Subscription),
         Self ! registered,
         loop(undefined)
@@ -1072,7 +1072,7 @@ loop({config_msg, _} = Msg) ->
     loop(undefined).
 
 getmsg(Pid) ->
-    Ref = erlang:make_ref(),
+    Ref = make_ref(),
     Pid ! {get_msg, self(), Ref},
     receive
         {Ref, {config_msg, Msg}} -> Msg
@@ -1112,7 +1112,7 @@ wait_process_restart(Name, Timeout, Delay, Started, _Prev) ->
     end.
 
 stop_sync(Pid, Timeout) when is_pid(Pid) ->
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     try
         begin
             catch unlink(Pid),
@@ -1125,7 +1125,7 @@ stop_sync(Pid, Timeout) when is_pid(Pid) ->
             end
         end
     after
-        erlang:demonitor(MRef, [flush])
+        demonitor(MRef, [flush])
     end;
 stop_sync(_, _) ->
     error(badarg).

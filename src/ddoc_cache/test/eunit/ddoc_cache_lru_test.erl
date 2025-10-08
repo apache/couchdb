@@ -91,7 +91,7 @@ check_multi_start(_) ->
     ),
     [#entry{pid = Pid}] = ets:tab2list(?CACHE),
     Opener = element(4, sys:get_state(Pid)),
-    OpenerRef = erlang:monitor(process, Opener),
+    OpenerRef = monitor(process, Opener),
     ?assert(is_process_alive(Opener)),
     Opener ! go,
     receive
@@ -135,7 +135,7 @@ check_multi_open(_) ->
     ),
     [#entry{pid = Pid}] = ets:tab2list(?CACHE),
     Opener = element(4, sys:get_state(Pid)),
-    OpenerRef = erlang:monitor(process, Opener),
+    OpenerRef = monitor(process, Opener),
     ?assert(is_process_alive(Opener)),
     Opener ! go,
     receive
@@ -242,7 +242,7 @@ check_evict_and_exit(_) ->
     ?assertEqual({ok, <<"dbname">>}, ddoc_cache_lru:open(Key)),
     [#entry{key = Key, pid = Pid}] = ets:tab2list(?CACHE),
 
-    erlang:monitor(process, whereis(ddoc_cache_lru)),
+    monitor(process, whereis(ddoc_cache_lru)),
 
     % Pause the LRU so we can queue multiple messages
     erlang:suspend_process(whereis(ddoc_cache_lru)),
