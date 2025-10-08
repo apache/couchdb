@@ -1,5 +1,6 @@
 defmodule PartitionSearchTest do
   use CouchTestCase
+  import Couch.Test.Asserts
 
   @moduletag :search
 
@@ -22,9 +23,7 @@ defmodule PartitionSearchTest do
     end
 
     resp = Couch.post("/#{db_name}/_bulk_docs", headers: ["Content-Type": "application/json"], body: %{:docs => docs}, query: %{w: 3})
-    assert resp.status_code in [201, 202],
-      "Cannot create search docs. " <>
-      "Expected one of [201, 202], got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, [201, 202], "Cannot create search docs.")
   end
 
   def create_ddoc(db_name, opts \\ %{}) do
@@ -41,9 +40,7 @@ defmodule PartitionSearchTest do
     ddoc = Enum.into(opts, default_ddoc)
 
     resp = Couch.put("/#{db_name}/_design/library", body: ddoc)
-    assert resp.status_code in [201, 202],
-      "Cannot create design doc. " <>
-      "Expected one of [201, 202], got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, [201, 202], "Cannot create design doc.")
     assert Map.has_key?(resp.body, "ok") == true
   end
 
@@ -60,17 +57,13 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 200,
-      "Fail to do partition search. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do partitioned search.")
     ids = get_ids(resp)
     assert ids == ["foo:10", "foo:2", "foo:4", "foo:6", "foo:8"]
 
     url = "/#{db_name}/_partition/bar/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 200,
-      "Fail to do partition search. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do partitioned search.")
     ids = get_ids(resp)
     assert ids == ["bar:1", "bar:3", "bar:5", "bar:7", "bar:9"]
   end
@@ -83,9 +76,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 200,
-      "Fail to do partition search. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do partitioned search.")
     ids = get_ids(resp)
     assert ids == ["foo:10", "foo:2", "foo:4", "foo:6", "foo:8"]
   end
@@ -98,32 +89,24 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field", limit: 3})
-    assert resp.status_code == 200,
-      "Fail to do partition search. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do partitioned search.")
     ids = get_ids(resp)
     assert ids == ["foo:10", "foo:2", "foo:4"]
 
     %{:body => %{"bookmark" => bookmark}} = resp
 
     resp = Couch.get(url, query: %{q: "some:field", limit: 3, bookmark: bookmark})
-    assert resp.status_code == 200,
-      "Fail to do partition search with a bookmark. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do partitioned search with a bookmark.")
     ids = get_ids(resp)
     assert ids == ["foo:6", "foo:8"]
 
     resp = Couch.get(url, query: %{q: "some:field", limit: 2000, bookmark: bookmark})
-    assert resp.status_code == 200,
-      "Fail to do partition search with an upper bound on the limit. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do partition search with an upper bound on the limit.")
     ids = get_ids(resp)
     assert ids == ["foo:6", "foo:8"]
 
     resp = Couch.get(url, query: %{q: "some:field", limit: 2001, bookmark: bookmark})
-    assert resp.status_code == 400,
-      "Should fail to do partition search with over limit. " <>
-      "Expected 400, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 400, "Should fail to do partition search with over limit.")
   end
 
   @tag :with_db
@@ -134,9 +117,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.post(url, body: %{:q => "some:field", :limit => 1})
-    assert resp.status_code == 200,
-      "Fail to do POST for non-partitioned db with limit. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do POST for non-partitioned db with limit.")
   end
 
   @tag :with_partitioned_db
@@ -147,9 +128,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.post(url, body: %{:q => "some:field", :limit => 1})
-    assert resp.status_code == 200,
-      "Fail to do POST for partitioned db with limit. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 200, "Fail to do POST for partitioned db with limit.")
   end
 
   @tag :with_partitioned_db
@@ -160,9 +139,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 400,
-      "Expected a failure to do a global query on partitioned view. " <>
-      "Expected 400, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 400, "Expected a failure to do a global query on partitioned view.")
     %{:body => %{"reason" => reason}} = resp
     assert Regex.match?(~r/mandatory for queries to this index./, reason)
   end
@@ -175,10 +152,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 400,
-      "Expected a failure to do a query with a global search ddoc. " <>
-      "Expected 400, got: #{resp.status_code}, body: #{inspect resp.body}"
-
+    assert_on_status(resp, 400, "Expected a failure to do a query with a global search ddoc.")
     %{:body => %{"reason" => reason}} = resp
     assert reason == "`partition` not supported on this index"
   end
@@ -191,10 +165,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 200,
-      "Failed to search on non-partitioned dbs. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
-
+    assert_on_status(resp, 200, "Failed to search on non-partitioned dbs.")
     ids = get_ids(resp)
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
   end
@@ -207,10 +178,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field"})
-    assert resp.status_code == 200,
-      "Failed to search on non-partitioned dbs without the limit. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
-
+    assert_on_status(resp, 200, "Failed to search on non-partitioned dbs without the limit.")
     ids = get_ids(resp)
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
   end
@@ -223,10 +191,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field", limit: 3})
-    assert resp.status_code == 200,
-      "Failed to search on non-partitioned dbs with the limit. " <>
-      "Expected 200, got: #{resp.status_code}, body: #{inspect resp.body}"
-
+    assert_on_status(resp, 200, "Failed to search on non-partitioned dbs with the limit.")
     ids = get_ids(resp)
     assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9"])
   end
@@ -239,10 +204,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_design/library/_search/books"
     resp = Couch.get(url, query: %{q: "some:field", limit: 201})
-    assert resp.status_code == 400,
-      "Expected a failure on non-partitioned dbs with over limit. " <>
-      "Expected 400, got: #{resp.status_code}, body: #{inspect resp.body}"
-
+    assert_on_status(resp, 400, "Expected a failure on non-partitioned dbs with over limit.")
   end
 
   @tag :with_partitioned_db
@@ -253,9 +215,7 @@ defmodule PartitionSearchTest do
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.post(url, body: %{q: "some:field", partition: "bar"})
-    assert resp.status_code == 400,
-      "Expected a failure on conflicting partition values. " <>
-      "Expected 400, got: #{resp.status_code}, body: #{inspect resp.body}"
+    assert_on_status(resp, 400, "Expected a failure on conflicting partition values.")
   end
 
   @tag :with_partitioned_db
