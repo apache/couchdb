@@ -262,7 +262,7 @@ monitored_by(Db) ->
     end.
 
 monitor(#db{main_pid = MainPid}) ->
-    erlang:monitor(process, MainPid).
+    monitor(process, MainPid).
 
 start_compact(#db{} = Db) ->
     gen_server:call(Db#db.main_pid, start_compact).
@@ -277,7 +277,7 @@ wait_for_compaction(#db{main_pid = Pid} = Db, Timeout) ->
     Start = os:timestamp(),
     case gen_server:call(Pid, compactor_pid) of
         CPid when is_pid(CPid) ->
-            Ref = erlang:monitor(process, CPid),
+            Ref = monitor(process, CPid),
             receive
                 {'DOWN', Ref, _, _, normal} when Timeout == infinity ->
                     wait_for_compaction(Db, Timeout);
@@ -287,7 +287,7 @@ wait_for_compaction(#db{main_pid = Pid} = Db, Timeout) ->
                 {'DOWN', Ref, _, _, Reason} ->
                     {error, Reason}
             after Timeout ->
-                erlang:demonitor(Ref, [flush]),
+                demonitor(Ref, [flush]),
                 {error, Timeout}
             end;
         _ ->
@@ -486,7 +486,7 @@ get_minimum_purge_seq(#db{} = Db) ->
                     CS when is_integer(CS) ->
                         case purge_client_exists(DbName, DocId, Props) of
                             true ->
-                                {ok, erlang:min(CS, SeqAcc)};
+                                {ok, min(CS, SeqAcc)};
                             false ->
                                 Fmt1 =
                                     "Missing or stale purge doc '~s' on ~p "
@@ -497,7 +497,7 @@ get_minimum_purge_seq(#db{} = Db) ->
                     _ ->
                         Fmt2 = "Invalid purge doc '~s' on ~p with purge_seq '~w'",
                         couch_log:error(Fmt2, [DocId, DbName, ClientSeq]),
-                        {ok, erlang:min(OldestPurgeSeq, SeqAcc)}
+                        {ok, min(OldestPurgeSeq, SeqAcc)}
                 end;
             _ ->
                 {stop, SeqAcc}
@@ -511,7 +511,7 @@ get_minimum_purge_seq(#db{} = Db) ->
     FinalSeq =
         case MinIdxSeq < PurgeSeq - PurgeInfosLimit of
             true -> MinIdxSeq;
-            false -> erlang:max(0, PurgeSeq - PurgeInfosLimit)
+            false -> max(0, PurgeSeq - PurgeInfosLimit)
         end,
     % Log a warning if we've got a purge sequence exceeding the
     % configured threshold.
@@ -1493,7 +1493,7 @@ write_and_commit(
 ) ->
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
     ReplicatedChanges = lists:member(?REPLICATED_CHANGES, Options),
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     try
         Pid ! {update_docs, self(), DocBuckets, LocalDocs, ReplicatedChanges},
         case collect_results_with_metrics(Pid, MRef, []) of
@@ -1517,7 +1517,7 @@ write_and_commit(
                 end
         end
     after
-        erlang:demonitor(MRef, [flush])
+        demonitor(MRef, [flush])
     end.
 
 prepare_doc_summaries(Db, BucketList) ->

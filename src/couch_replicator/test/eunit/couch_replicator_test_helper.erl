@@ -181,7 +181,7 @@ replicate({[_ | _]} = RepObject) ->
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),
     Pid = get_pid(Rep#rep.id),
-    MonRef = erlang:monitor(process, Pid),
+    MonRef = monitor(process, Pid),
     receive
         {'DOWN', MonRef, process, Pid, _} ->
             ok

@@ -355,7 +355,7 @@ insert_kvs(Info, LRU, Count, Limit) ->
     insert_kvs(Info, LRU, Count - 1, Limit).
 
 stop_lru({ok, LRU}) ->
-    Ref = erlang:monitor(process, LRU),
+    Ref = monitor(process, LRU),
     ets_lru:stop(LRU),
     receive
         {'DOWN', Ref, process, LRU, Reason} -> Reason

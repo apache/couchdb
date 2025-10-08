@@ -148,7 +148,7 @@ handle_cast({resubmit, DbName}, State) ->
 % st index job names have 3 elements, 3rd being 'hastings'. See job record definition.
 handle_cast({trigger_update, #job{name = {_, _, hastings}, server = GPid, seq = Seq} = Job}, State) ->
     % hastings_index:await will trigger a hastings index update
-    {Pid, _} = erlang:spawn_monitor(
+    {Pid, _} = spawn_monitor(
         hastings_index,
         await,
         [GPid, Seq]
@@ -158,7 +158,7 @@ handle_cast({trigger_update, #job{name = {_, _, hastings}, server = GPid, seq = 
     {noreply, State, 0};
 handle_cast({trigger_update, #job{name = {_, Index, nouveau}} = Job}, State) ->
     % nouveau_index_manager:update_index will trigger a search index update.
-    {Pid, _} = erlang:spawn_monitor(
+    {Pid, _} = spawn_monitor(
         nouveau_index_manager,
         update_index,
         [Index]
@@ -169,7 +169,7 @@ handle_cast({trigger_update, #job{name = {_, Index, nouveau}} = Job}, State) ->
 % search index job names have 3 elements. See job record definition.
 handle_cast({trigger_update, #job{name = {_, _, _}, server = GPid, seq = Seq} = Job}, State) ->
     % dreyfus_index:await will trigger a search index update.
-    {Pid, _} = erlang:spawn_monitor(
+    {Pid, _} = spawn_monitor(
         dreyfus_index,
         await,
         [GPid, Seq]
@@ -179,7 +179,7 @@ handle_cast({trigger_update, #job{name = {_, _, _}, server = GPid, seq = Seq} = 
     {noreply, State, 0};
 handle_cast({trigger_update, #job{name = {_, _}, server = SrvPid, seq = Seq} = Job}, State) ->
     % couch_index:get_state/2 will trigger a view group index update.
-    {Pid, _} = erlang:spawn_monitor(couch_index, get_state, [SrvPid, Seq]),
+    {Pid, _} = spawn_monitor(couch_index, get_state, [SrvPid, Seq]),
     Now = erlang:monotonic_time(),
     ets:insert(ken_workers, Job#job{worker_pid = Pid, lru = Now}),
     {noreply, State, 0};

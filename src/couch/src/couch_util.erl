@@ -147,7 +147,7 @@ to_existing_atom(V) when is_atom(V) ->
 shutdown_sync(Pid) when not is_pid(Pid) ->
     ok;
 shutdown_sync(Pid) ->
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     try
         catch unlink(Pid),
         catch exit(Pid, shutdown),
@@ -156,7 +156,7 @@ shutdown_sync(Pid) ->
                 ok
         end
     after
-        erlang:demonitor(MRef, [flush])
+        demonitor(MRef, [flush])
     end.
 
 validate_utf8(Data) when is_list(Data) ->
@@ -630,7 +630,7 @@ find_in_binary(_B, <<>>) ->
 find_in_binary(B, Data) ->
     case binary:match(Data, [B], []) of
         nomatch ->
-            MatchLength = erlang:min(byte_size(B), byte_size(Data)),
+            MatchLength = min(byte_size(B), byte_size(Data)),
             match_prefix_at_end(
                 binary:part(B, {0, MatchLength}),
                 binary:part(Data, {byte_size(Data), -MatchLength}),
@@ -724,7 +724,7 @@ ensure_loaded(_Module) ->
 %% a function that does a receive as it would hijack incoming messages.
 with_proc(M, F, A, Timeout) ->
     {Pid, Ref} = spawn_monitor(fun() ->
-        exit({reply, erlang:apply(M, F, A)})
+        exit({reply, apply(M, F, A)})
     end),
     receive
         {'DOWN', Ref, process, Pid, {reply, Resp}} ->
@@ -732,7 +732,7 @@ with_proc(M, F, A, Timeout) ->
         {'DOWN', Ref, process, Pid, Error} ->
             {error, Error}
     after Timeout ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         {error, timeout}
     end.
 
@@ -772,7 +772,7 @@ version_to_binary(Ver) when is_tuple(Ver) ->
 version_to_binary(Ver) when is_list(Ver) ->
     IsZero = fun(N) -> N == 0 end,
     Ver1 = lists:reverse(lists:dropwhile(IsZero, lists:reverse(Ver))),
-    Ver2 = [erlang:integer_to_list(N) || N <- Ver1],
+    Ver2 = [integer_to_list(N) || N <- Ver1],
     ?l2b(lists:join(".", Ver2)).
 
 verify_hash_names(HashAlgorithms, SupportedHashes) ->

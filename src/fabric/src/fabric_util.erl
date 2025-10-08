@@ -120,7 +120,7 @@ get_db(DbName, Options) ->
     Shards =
         Local ++ lists:keysort(#shard.name, SameZone) ++ lists:keysort(#shard.name, DifferentZone),
     % suppress shards from down nodes
-    Nodes = [node() | erlang:nodes()],
+    Nodes = [node() | nodes()],
     Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
     % Only accept factors > 1, otherwise our math breaks further down
     Factor = max(2, config:get_integer("fabric", "shard_timeout_factor", 2)),
@@ -226,7 +226,7 @@ remove_ancestors([{_, {{not_found, _}, Count}} = Head | Tail], Acc) ->
 remove_ancestors([{_, {{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Acc) ->
     Descendants = lists:dropwhile(
         fun({_, {{ok, #doc{revs = {Pos2, Revs2}}}, _}}) ->
-            case lists:nthtail(erlang:min(Pos2 - Pos, length(Revs2)), Revs2) of
+            case lists:nthtail(min(Pos2 - Pos, length(Revs2)), Revs2) of
                 [] ->
                     % impossible to tell if Revs2 is a descendant - assume no
                     true;
@@ -399,14 +399,14 @@ isolate(Fun) ->
     isolate(Fun, infinity).
 
 isolate(Fun, Timeout) ->
-    {Pid, Ref} = erlang:spawn_monitor(fun() -> exit(do_isolate(Fun)) end),
+    {Pid, Ref} = spawn_monitor(fun() -> exit(do_isolate(Fun)) end),
     receive
         {'DOWN', Ref, _, _, {'$isolres', Res}} ->
             Res;
         {'DOWN', Ref, _, _, {'$isolerr', Tag, Reason, Stack}} ->
             erlang:raise(Tag, Reason, Stack)
     after Timeout ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         exit(Pid, kill),
         error(timeout)
     end.

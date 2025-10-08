@@ -558,7 +558,7 @@ create_init_acc(W) ->
     % about any hashing here.
     WorkerUUIDs = lists:map(
         fun(Shard) ->
-            {Shard#shard{ref = erlang:make_ref()}, [UUID1, UUID2]}
+            {Shard#shard{ref = make_ref()}, [UUID1, UUID2]}
         end,
         Shards
     ),

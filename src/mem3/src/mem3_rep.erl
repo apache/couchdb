@@ -435,7 +435,7 @@ push_purges(Db, BatchSize, SrcShard, Tgt, HashFun) ->
                 couch_util:get_value(<<"purge_seq">>, Props);
             {not_found, _} ->
                 Oldest = couch_db:get_oldest_purge_seq(Db),
-                erlang:max(0, Oldest - 1)
+                max(0, Oldest - 1)
         end,
     BelongsFun = fun(Id) when is_binary(Id) ->
         case TgtRange of
