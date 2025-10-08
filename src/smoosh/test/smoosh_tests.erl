@@ -183,17 +183,17 @@ t_suspend_resume(DbName) ->
     ok = wait_to_enqueue(DbName),
     CompPid = wait_db_compactor_pid(),
     ok = smoosh:suspend(),
-    ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertEqual({status, suspended}, process_info(CompPid, status)),
     ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
     % Suspending twice should work too
     ok = smoosh:suspend(),
-    ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertEqual({status, suspended}, process_info(CompPid, status)),
     ?assertEqual({1, 0, 0}, sync_status("ratio_dbs")),
     ok = smoosh:resume(),
-    ?assertNotEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertNotEqual({status, suspended}, process_info(CompPid, status)),
     % Resuming twice should work too
     ok = smoosh:resume(),
-    ?assertNotEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertNotEqual({status, suspended}, process_info(CompPid, status)),
     CompPid ! continue,
     wait_compacted(DbName).
 
@@ -205,7 +205,7 @@ t_check_window_can_resume(DbName) ->
     ok = wait_to_enqueue(DbName),
     CompPid = wait_db_compactor_pid(),
     ok = smoosh:suspend(),
-    ?assertEqual({status, suspended}, erlang:process_info(CompPid, status)),
+    ?assertEqual({status, suspended}, process_info(CompPid, status)),
     get_channel_pid("ratio_dbs") ! check_window,
     CompPid ! continue,
     wait_compacted(DbName).
@@ -252,7 +252,7 @@ t_checkpointing_works(DbName) ->
     checkpoint(),
     % Stop smoosh and then crash the compaction
     ok = application:stop(smoosh),
-    Ref = erlang:monitor(process, CompPid),
+    Ref = monitor(process, CompPid),
     CompPid ! {raise, exit, kapow},
     receive
         {'DOWN', Ref, _, _, kapow} ->
@@ -276,7 +276,7 @@ t_ignore_checkpoint_resume_if_compacted_already(DbName) ->
     checkpoint(),
     % Stop smoosh and then let the compaction finish
     ok = application:stop(smoosh),
-    Ref = erlang:monitor(process, CompPid),
+    Ref = monitor(process, CompPid),
     CompPid ! continue,
     receive
         {'DOWN', Ref, _, _, normal} -> ok

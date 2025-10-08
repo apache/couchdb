@@ -66,7 +66,7 @@ worker_fun(Id, Rep, WaitSec, WRef) ->
         {'DOWN', Ref, _, Pid, Result} ->
             exit(#doc_worker_result{id = Id, wref = WRef, result = Result})
     after ?WORKER_TIMEOUT_MSEC ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         exit(Pid, kill),
         {DbName, DocId} = Id,
         TimeoutSec = round(?WORKER_TIMEOUT_MSEC / 1000),

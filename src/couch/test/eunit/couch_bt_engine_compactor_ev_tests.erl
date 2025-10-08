@@ -270,7 +270,7 @@ run_successful_compaction(DbName) ->
     {ok, ContinueFun} = ?EV_MOD:set_wait(init),
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, CPid} = couch_db:start_compact(Db),
-    Ref = erlang:monitor(process, CPid),
+    Ref = monitor(process, CPid),
     ContinueFun(CPid),
     receive
         {'DOWN', Ref, _, _, normal} -> ok
@@ -313,7 +313,7 @@ add_bogus_time_seq(Db) ->
 populate_db(_Db, NumDocs) when NumDocs =< 0 ->
     ok;
 populate_db(Db, NumDocs) ->
-    String = [$a || _ <- lists:seq(1, erlang:min(NumDocs, 500))],
+    String = [$a || _ <- lists:seq(1, min(NumDocs, 500))],
     Docs = lists:map(
         fun(_) ->
             couch_doc:from_json_obj(

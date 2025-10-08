@@ -328,9 +328,9 @@ terminate(_Reason, #st{changes_pid = Pid}) ->
 
 start_changes_listener(SinceSeq) ->
     Self = self(),
-    {Pid, _} = erlang:spawn_monitor(fun() ->
-        erlang:spawn_link(fun() ->
-            Ref = erlang:monitor(process, Self),
+    {Pid, _} = spawn_monitor(fun() ->
+        spawn_link(fun() ->
+            Ref = monitor(process, Self),
             receive
                 {'DOWN', Ref, _, _, _} ->
                     ok
@@ -561,7 +561,7 @@ maybe_spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
     end.
 
 spawn_shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
-    erlang:spawn(fun() -> shard_writer(DbName, DbOpts, Shards, IdleTimeout) end).
+    spawn(fun() -> shard_writer(DbName, DbOpts, Shards, IdleTimeout) end).
 
 shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
     try
@@ -579,15 +579,15 @@ shard_writer(DbName, DbOpts, Shards, IdleTimeout) ->
     end.
 
 flush_write(DbName, Writer, WriteTimeout) ->
-    Ref = erlang:monitor(process, Writer),
+    Ref = monitor(process, Writer),
     Writer ! write,
     receive
         {'DOWN', Ref, _, _, normal} ->
             ok;
         {'DOWN', Ref, _, _, Error} ->
-            erlang:exit({mem3_shards_bad_write, Error})
+            exit({mem3_shards_bad_write, Error})
     after WriteTimeout ->
-        erlang:exit({mem3_shards_write_timeout, DbName})
+        exit({mem3_shards_write_timeout, DbName})
     end.
 
 filter_shards_by_range(Range, Shards) ->
@@ -680,7 +680,7 @@ t_maybe_spawn_shard_writer_already_exists(_) ->
 t_maybe_spawn_shard_writer_new(_) ->
     Shards = mock_shards(),
     WPid = maybe_spawn_shard_writer(?DB, [{x, y}], Shards, 1000),
-    WRef = erlang:monitor(process, WPid),
+    WRef = monitor(process, WPid),
     ?assert(is_pid(WPid)),
     ?assert(is_process_alive(WPid)),
     WPid ! write,
@@ -717,7 +717,7 @@ t_flush_writer_crashes(_) ->
 t_writer_deletes_itself_when_done(_) ->
     Shards = mock_shards(),
     WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
-    WRef = erlang:monitor(process, WPid),
+    WRef = monitor(process, WPid),
     ets:insert(?OPENERS, {?DB, WPid}),
     WPid ! write,
     ?assertEqual(normal, wait_writer_result(WRef)),
@@ -728,7 +728,7 @@ t_writer_deletes_itself_when_done(_) ->
 t_writer_does_not_delete_other_writers_for_same_shard(_) ->
     Shards = mock_shards(),
     WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
-    WRef = erlang:monitor(process, WPid),
+    WRef = monitor(process, WPid),
     ets:insert(?OPENERS, {?DB, WPid}),
     % should not be deleted
     ets:insert(?OPENERS, {?DB, self()}),
@@ -774,7 +774,7 @@ t_cache_insert_takes_new_update(_) ->
 t_cache_insert_ignores_stale_update_and_kills_worker(_) ->
     Shards = mock_shards(),
     WPid = spawn_link_mock_writer(?DB, [{x, y}], Shards, ?INFINITY),
-    WRef = erlang:monitor(process, WPid),
+    WRef = monitor(process, WPid),
     Msg = {cache_insert, ?DB, WPid, 1},
     {noreply, NewState} = handle_cast(Msg, mock_state(2)),
     ?assertEqual(normal, wait_writer_result(WRef)),
@@ -810,7 +810,7 @@ wait_writer_result(WRef) ->
     end.
 
 spawn_link_mock_writer(Db, DbOpts, Shards, Timeout) ->
-    erlang:spawn_link(fun() -> shard_writer(Db, DbOpts, Shards, Timeout) end).
+    spawn_link(fun() -> shard_writer(Db, DbOpts, Shards, Timeout) end).
 
 mem3_shards_changes_test_() ->
     {
@@ -829,7 +829,7 @@ should_kill_changes_listener_on_shutdown() ->
     {ok, Pid} = ?MODULE:start_link(),
     {ok, ChangesPid} = get_changes_pid(),
     ?assert(is_process_alive(ChangesPid)),
-    true = erlang:unlink(Pid),
+    true = unlink(Pid),
     true = test_util:stop_sync_throw(
         ChangesPid, fun() -> exit(Pid, shutdown) end, wait_timeout
     ),

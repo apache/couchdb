@@ -120,7 +120,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
                 ]}
             ),
             Pid = spawn_client(DbName, ClientDoc),
-            {Value, Pid, erlang:monitor(process, Pid)}
+            {Value, Pid, monitor(process, Pid)}
         end,
         lists:seq(1, NumClients)
     ),

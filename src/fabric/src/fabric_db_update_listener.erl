@@ -99,7 +99,7 @@ handle_db_event(_DbName, _Event, St) ->
 
 start_cleanup_monitor(Parent, Notifiers, ClientReq) ->
     spawn(fun() ->
-        Ref = erlang:monitor(process, Parent),
+        Ref = monitor(process, Parent),
         cleanup_monitor(Parent, Ref, Notifiers, ClientReq)
     end).
 
@@ -129,11 +129,11 @@ stop({Pid, Ref}) ->
     erlang:send(Pid, {Ref, done}).
 
 wait_db_updated({Pid, Ref}) ->
-    MonRef = erlang:monitor(process, Pid),
+    MonRef = monitor(process, Pid),
     erlang:send(Pid, {Ref, get_state}),
     receive
         {state, Pid, State} ->
-            erlang:demonitor(MonRef, [flush]),
+            demonitor(MonRef, [flush]),
             State;
         {'DOWN', MonRef, process, Pid, _Reason} ->
             changes_feed_died

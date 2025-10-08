@@ -235,7 +235,7 @@ compact_db(Type, Db0) ->
     Name = couch_db:name(Db0),
     {ok, Db} = couch_db:open_int(Name, []),
     {ok, CompactPid} = couch_db:start_compact(Db),
-    MonRef = erlang:monitor(process, CompactPid),
+    MonRef = monitor(process, CompactPid),
     receive
         {'DOWN', MonRef, process, CompactPid, normal} ->
             ok;
@@ -378,7 +378,7 @@ stop_writer(Pid) ->
     Pid ! {stop, Ref},
     receive
         {stopped, Ref, DocsWritten} ->
-            MonRef = erlang:monitor(process, Pid),
+            MonRef = monitor(process, Pid),
             receive
                 {'DOWN', MonRef, process, Pid, _Reason} ->
                     DocsWritten

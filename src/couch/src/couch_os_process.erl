@@ -152,7 +152,7 @@ init([Command]) ->
     couch_stats:increment_counter([couchdb, query_server, process_starts]),
     spawn(fun() ->
         % this ensure the real os process is killed when this process dies.
-        erlang:monitor(process, Pid),
+        monitor(process, Pid),
         killer(OsPid)
     end),
     {ok, OsProc, IdleLimit}.
@@ -191,7 +191,7 @@ handle_call({prompt, Data}, _From, #os_proc{idle = Idle} = OsProc) ->
     end.
 
 handle_cast(garbage_collect, #os_proc{idle = Idle} = OsProc) ->
-    erlang:garbage_collect(),
+    garbage_collect(),
     {noreply, OsProc, Idle};
 handle_cast(stop, OsProc) ->
     {stop, normal, OsProc};
@@ -201,7 +201,7 @@ handle_cast(Msg, #os_proc{idle = Idle} = OsProc) ->
 
 handle_info(timeout, #os_proc{idle = Idle} = OsProc) ->
     couch_proc_manager:os_proc_idle(self()),
-    erlang:garbage_collect(),
+    garbage_collect(),
     {noreply, OsProc, Idle};
 handle_info({Port, {exit_status, 0}}, #os_proc{port = Port} = OsProc) ->
     couch_log:info("OS Process terminated normally", []),

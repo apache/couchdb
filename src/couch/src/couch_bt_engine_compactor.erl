@@ -147,7 +147,7 @@ open_compaction_files(DbName, OldSt, Options) ->
                 }
         end,
     unlink(DataFd),
-    erlang:monitor(process, MetaFd),
+    monitor(process, MetaFd),
     {ok, CompSt}.
 
 copy_purge_info(#comp_st{} = CompSt) ->

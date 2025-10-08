@@ -364,7 +364,7 @@ compact(ShardName, DesignName) ->
     {ok, Pid} = couch_index_server:get_index(
         couch_mrview_index, ShardName, <<"_design/", DesignName/binary>>
     ),
-    Ref = erlang:make_ref(),
+    Ref = make_ref(),
     Pid ! {'$gen_call', {self(), Ref}, compact}.
 
 get_uuid(DbName) ->
@@ -493,7 +493,7 @@ get_node_seqs(Db, Nodes) ->
                 PurgeSeq = couch_util:get_value(<<"purge_seq">>, Props),
                 case lists:keyfind(TgtNode, 1, Acc) of
                     {_, OldSeq} ->
-                        NewSeq = erlang:max(OldSeq, PurgeSeq),
+                        NewSeq = max(OldSeq, PurgeSeq),
                         NewEntry = {TgtNode, NewSeq},
                         NewAcc = lists:keyreplace(TgtNode, 1, Acc, NewEntry),
                         {ok, NewAcc};
@@ -661,7 +661,7 @@ make_att_reader({follows, Parser, Ref}) when is_pid(Parser) ->
                 % First time encountering a particular parser pid. Monitor it,
                 % in case it dies, and notify it about us, so it could monitor
                 % us in case we die.
-                PRef = erlang:monitor(process, Parser),
+                PRef = monitor(process, Parser),
                 put({mp_parser_ref, Parser}, PRef),
                 Parser ! {hello_from_writer, Ref, WriterPid},
                 PRef;

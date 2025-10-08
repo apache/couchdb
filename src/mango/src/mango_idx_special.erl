@@ -28,16 +28,16 @@
 -include("mango.hrl").
 
 validate(_) ->
-    erlang:exit(invalid_call).
+    exit(invalid_call).
 
 add(_, _) ->
-    erlang:exit(invalid_call).
+    exit(invalid_call).
 
 remove(_, _) ->
-    erlang:exit(invalid_call).
+    exit(invalid_call).
 
 from_ddoc(_) ->
-    erlang:exit(invalid_call).
+    exit(invalid_call).
 
 to_json(#idx{def = all_docs}) ->
     {[
