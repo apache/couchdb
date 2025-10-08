@@ -197,7 +197,7 @@ load_purge_infos_rpc(DbName, SrcUUID, BatchSize) ->
                         couch_util:get_value(<<"purge_seq">>, Props);
                     {not_found, _} ->
                         Oldest = couch_db:get_oldest_purge_seq(Db),
-                        erlang:max(0, Oldest - 1)
+                        max(0, Oldest - 1)
                 end,
             FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
                 NewCount = Count + length(Revs),
@@ -265,7 +265,7 @@ compare_rev_epochs([{_, SourceSeq} | _], []) ->
     SourceSeq;
 compare_rev_epochs([{_, SourceSeq} | _], [{_, TargetSeq} | _]) ->
     % The source was moved to a new location independently, take the minimum
-    erlang:min(SourceSeq, TargetSeq) - 1.
+    min(SourceSeq, TargetSeq) - 1.
 
 %% @doc This adds a new update sequence checkpoint to the replication
 %%      history. Checkpoints are keyed by the source node so that we

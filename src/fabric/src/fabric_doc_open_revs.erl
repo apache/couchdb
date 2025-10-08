@@ -213,7 +213,7 @@ maybe_read_repair(Db, IsTree, Replies, NodeRevs, ReplyCount, DoRepair) ->
         [] ->
             ok;
         _ ->
-            erlang:spawn(fun() -> read_repair(Db, Docs, NodeRevs) end)
+            spawn(fun() -> read_repair(Db, Docs, NodeRevs) end)
     end.
 
 tree_repair_docs(_Replies, false) ->

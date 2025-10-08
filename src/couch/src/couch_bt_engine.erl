@@ -213,14 +213,14 @@ handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{fd_monitor = Ref} = St) ->
     {stop, normal, St#st{fd = undefined, fd_monitor = closed}}.
 
 incref(St) ->
-    {ok, St#st{fd_monitor = erlang:monitor(process, St#st.fd)}}.
+    {ok, St#st{fd_monitor = monitor(process, St#st.fd)}}.
 
 decref(St) ->
-    true = erlang:demonitor(St#st.fd_monitor, [flush]),
+    true = demonitor(St#st.fd_monitor, [flush]),
     ok.
 
 monitored_by(St) ->
-    case erlang:process_info(St#st.fd, monitored_by) of
+    case process_info(St#st.fd, monitored_by) of
         {monitored_by, Pids} ->
             lists:filter(fun is_pid/1, Pids);
         _ ->
@@ -483,7 +483,7 @@ write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
 
     NewUpdateSeq = lists:foldl(
         fun(#full_doc_info{update_seq = Seq}, Acc) ->
-            erlang:max(Seq, Acc)
+            max(Seq, Acc)
         end,
         get_update_seq(St),
         Add
@@ -893,7 +893,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     St = #st{
         filepath = FilePath,
         fd = Fd,
-        fd_monitor = erlang:monitor(process, Fd),
+        fd_monitor = monitor(process, Fd),
         header = Header,
         needs_commit = false,
         id_tree = IdTree,

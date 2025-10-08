@@ -1473,7 +1473,7 @@ receive_request_data(Req, Len) when Len == chunked ->
         GetChunk
     };
 receive_request_data(Req, LenLeft) when LenLeft > 0 ->
-    Len = erlang:min(4096, LenLeft),
+    Len = min(4096, LenLeft),
     Data = chttpd:recv(Req, Len),
     {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
 receive_request_data(_Req, _) ->
@@ -1514,13 +1514,13 @@ purge_results_to_json([{DocId, _Revs} | RIn], [{accepted, PRevs} | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
     couch_stats:increment_counter([couchdb, document_purges, success]),
     NewResults = [{DocId, couch_doc:revs_to_strs(PRevs)} | Results],
-    {erlang:max(Code, 202), NewResults};
+    {max(Code, 202), NewResults};
 purge_results_to_json([{DocId, _Revs} | RIn], [Error | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
     {NewCode, ErrorStr, Reason} = chttpd:error_info(Error),
     couch_stats:increment_counter([couchdb, document_purges, failure]),
     NewResults = [{DocId, {[{error, ErrorStr}, {reason, Reason}]}} | Results],
-    {erlang:max(NewCode, Code), NewResults}.
+    {max(NewCode, Code), NewResults}.
 
 send_updated_doc(Req, Db, DocId, Json) ->
     send_updated_doc(Req, Db, DocId, Json, []).
@@ -1582,7 +1582,7 @@ update_doc(Db, DocId, #doc{deleted = Deleted, body = DocBody} = Doc, Options) ->
             {'DOWN', Ref, _, _, {exit_error, Reason}} ->
                 error(Reason);
             {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
-                erlang:exit(Reason)
+                exit(Reason)
         end,
 
     case Result of

@@ -191,7 +191,7 @@ handle_node_req(#httpd{
         "max_http_request_size", 4294967296
     ),
     NewOpts = [{body, MochiReq0:recv_body(MaxSize)} | MochiReq0:get(opts)],
-    Ref = erlang:make_ref(),
+    Ref = make_ref(),
     MochiReq = mochiweb_request:new(
         {remote, self(), Ref},
         NewOpts,

@@ -74,7 +74,7 @@ restart() ->
     ].
 compare_nodelists() ->
     Nodes = mem3:nodes(),
-    AllNodes = erlang:nodes([this, visible]),
+    AllNodes = nodes([this, visible]),
     {Replies, BadNodes} = gen_server:multi_call(Nodes, mem3_nodes, get_nodelist),
     Dict = lists:foldl(
         fun({Node, Nodelist}, D) ->
@@ -473,7 +473,7 @@ gather_ping_results(Refs, Until, Results) ->
             end;
         false ->
             Fun = fun(Ref, true, Acc) ->
-                erlang:demonitor(Ref, [flush]),
+                demonitor(Ref, [flush]),
                 Acc#{Ref => timeout}
             end,
             maps:fold(Fun, Results, Refs)

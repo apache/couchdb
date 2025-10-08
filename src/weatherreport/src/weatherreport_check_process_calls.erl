@@ -62,7 +62,7 @@ fold_processes([{Count, {M, F, A}} | T], Acc, Lim, CallType, Opts) ->
         case proplists:get_value(expert, Opts) of
             true ->
                 PidFun = list_to_atom("find_by_" ++ CallType ++ "_call"),
-                Pids = erlang:apply(recon, PidFun, [M, F]),
+                Pids = apply(recon, PidFun, [M, F]),
                 Pinfos = lists:map(
                     fun(Pid) ->
                         Pinfo = recon:info(Pid),

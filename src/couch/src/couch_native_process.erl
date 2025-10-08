@@ -111,7 +111,7 @@ handle_call({prompt, Data}, _From, State) ->
     end.
 
 handle_cast(garbage_collect, State) ->
-    erlang:garbage_collect(),
+    garbage_collect(),
     {noreply, State, State#evstate.idle};
 handle_cast(stop, State) ->
     {stop, normal, State};
@@ -120,7 +120,7 @@ handle_cast(_Msg, State) ->
 
 handle_info(timeout, State) ->
     couch_proc_manager:os_proc_idle(self()),
-    erlang:garbage_collect(),
+    garbage_collect(),
     {noreply, State, State#evstate.idle};
 handle_info({'EXIT', _, normal}, State) ->
     {noreply, State, State#evstate.idle};

@@ -79,7 +79,7 @@ start_server(Module, Config) ->
 
 stop_server(Key, Cfg) ->
     {Key, Pid} = lists:keyfind(Key, 1, Cfg),
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     true = exit(Pid, kill),
     receive
         {'DOWN', MRef, _, _, _} -> ok

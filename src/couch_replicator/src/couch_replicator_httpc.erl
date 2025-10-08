@@ -154,7 +154,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
 %% {error, req_timedout} error. While in reality is not really a timeout, just
 %% a race condition.
 stop_and_release_worker(Pool, Worker) ->
-    Ref = erlang:monitor(process, Worker),
+    Ref = monitor(process, Worker),
     ibrowse_http_client:stop(Worker),
     receive
         {'DOWN', Ref, _, _, _} ->
@@ -355,7 +355,7 @@ maybe_retry(
         false ->
             ok = timer:sleep(Wait),
             log_retry_error(Params, HttpDb, Wait, Error),
-            Wait2 = erlang:min(Wait * 2, ?MAX_WAIT),
+            Wait2 = min(Wait * 2, ?MAX_WAIT),
             HttpDb1 = HttpDb#httpdb{retries = Retries - 1, wait = Wait2},
             HttpDb2 = update_first_error_timestamp(HttpDb1),
             throw({retry, HttpDb2, Params})

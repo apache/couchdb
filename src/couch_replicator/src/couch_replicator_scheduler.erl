@@ -408,7 +408,7 @@ handle_config_terminate(_, _, _) ->
 stop_clear_all_jobs(TimeLeftMSec) ->
     ShutdownFun = fun(#job{pid = Pid}) ->
         Pid ! shutdown,
-        erlang:monitor(process, Pid)
+        monitor(process, Pid)
     end,
     Refs = lists:map(ShutdownFun, running_jobs()),
     ets:delete_all_objects(?MODULE),
@@ -637,7 +637,7 @@ backoff_micros(CrashCount) ->
     % exponent in Base * 2 ^ CrashCount to achieve an exponential backoff
     % doubling every consecutive failure, starting with the base value of
     % ?BACKOFF_INTERVAL_MICROS.
-    BackoffExp = erlang:min(CrashCount - 1, ?MAX_BACKOFF_EXPONENT),
+    BackoffExp = min(CrashCount - 1, ?MAX_BACKOFF_EXPONENT),
     (1 bsl BackoffExp) * ?BACKOFF_INTERVAL_MICROS.
 
 -spec add_job_int(#job{}) -> boolean().
@@ -938,7 +938,7 @@ update_running_jobs_stats(StatsPid) when is_pid(StatsPid) ->
     ok.
 
 start_stats_updater() ->
-    erlang:spawn_link(?MODULE, stats_updater_loop, [undefined]).
+    spawn_link(?MODULE, stats_updater_loop, [undefined]).
 
 stats_updater_loop(Timer) ->
     receive
@@ -951,7 +951,7 @@ stats_updater_loop(Timer) ->
             ok = stats_updater_refresh(),
             ?MODULE:stats_updater_loop(undefined);
         Else ->
-            erlang:exit({stats_updater_bad_msg, Else})
+            exit({stats_updater_bad_msg, Else})
     end.
 
 -spec stats_updater_refresh() -> ok.

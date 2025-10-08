@@ -249,7 +249,7 @@ print(Fun, Max, _Options) when is_function(Fun) ->
     L = erlang:fun_to_list(Fun),
     case length(L) > Max of
         true ->
-            S = erlang:max(5, Max),
+            S = max(5, Max),
             Res = string:substr(L, 1, S) ++ "..>",
             {Res, length(Res)};
         _ ->
@@ -347,7 +347,7 @@ list_bodyc(X, Max, Options, _Tuple) ->
     {[$|, List], Len + 1}.
 
 map_body(Map, Max, #print_options{depth = Depth}) when Max < 4; Depth =:= 0 ->
-    case erlang:map_size(Map) of
+    case map_size(Map) of
         0 -> {[], 0};
         _ -> {"...", 3}
     end;

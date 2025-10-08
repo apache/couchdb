@@ -728,7 +728,7 @@ couchdb_1283() ->
         ),
 
         % Start and pause compacton
-        WaitRef = erlang:make_ref(),
+        WaitRef = make_ref(),
         meck:expect(couch_mrview_index, compact, fun(Db, State, Opts) ->
             receive
                 {WaitRef, From, init} -> ok
@@ -741,7 +741,7 @@ couchdb_1283() ->
         end),
 
         {ok, CPid} = gen_server:call(Pid, compact),
-        CRef = erlang:monitor(process, CPid),
+        CRef = monitor(process, CPid),
         ?assert(is_process_alive(CPid)),
 
         % Make sure that our compactor is waiting for us

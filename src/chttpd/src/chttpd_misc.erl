@@ -281,7 +281,7 @@ cancel_replication(PostBody, Ctx) ->
 
 choose_node(Key) when is_binary(Key) ->
     Checksum = erlang:crc32(Key),
-    Nodes = lists:sort([node() | erlang:nodes()]),
+    Nodes = lists:sort([node() | nodes()]),
     lists:nth(1 + Checksum rem length(Nodes), Nodes);
 choose_node(Key) ->
     choose_node(?term_to_bin(Key)).

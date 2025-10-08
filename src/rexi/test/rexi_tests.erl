@@ -143,7 +143,7 @@ t_stream2(_) ->
 t_stream2_acks(_) ->
     Ref = rexi:cast(node(), {?MODULE, rpc_test_fun, [stream2_acks]}),
     {WPid, _Tag} = From = stream_init(Ref),
-    Mon = erlang:monitor(process, WPid),
+    Mon = monitor(process, WPid),
     rexi:stream_start(From),
     ?assertEqual(a, recv(Ref)),
     ?assertEqual(b, recv(Ref)),
@@ -168,7 +168,7 @@ t_stream2_acks(_) ->
 t_stream2_cancel(_) ->
     Ref = rexi:cast(node(), {?MODULE, rpc_test_fun, [stream2_init]}),
     {WPid, _Tag} = From = stream_init(Ref),
-    Mon = erlang:monitor(process, WPid),
+    Mon = monitor(process, WPid),
     rexi:stream_cancel(From),
     Res =
         receive

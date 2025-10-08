@@ -817,7 +817,7 @@ receive_request_data(Req) ->
     receive_request_data(Req, couch_httpd:body_length(Req)).
 
 receive_request_data(Req, LenLeft) when LenLeft > 0 ->
-    Len = erlang:min(4096, LenLeft),
+    Len = min(4096, LenLeft),
     Data = couch_httpd:recv(Req, Len),
     {Data, fun() -> receive_request_data(Req, LenLeft - iolist_size(Data)) end};
 receive_request_data(_Req, _) ->

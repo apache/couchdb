@@ -162,7 +162,7 @@ handle_call({get_proc, #client{} = Client}, From, State) ->
     {noreply, State};
 handle_call({ret_proc, #proc{} = Proc}, From, State) ->
     #proc{client = Ref, pid = Pid} = Proc,
-    erlang:demonitor(Ref, [flush]),
+    demonitor(Ref, [flush]),
     gen_server:reply(From, true),
     case ets:lookup(?PROCS, Pid) of
         [#proc{} = ProcInt] ->
@@ -615,7 +615,7 @@ make_proc(Pid, Lang, Mod) when is_binary(Lang) ->
     {ok, Proc}.
 
 assign_proc(Pid, #proc{client = undefined} = Proc0) when is_pid(Pid) ->
-    Proc = Proc0#proc{client = erlang:monitor(process, Pid)},
+    Proc = Proc0#proc{client = monitor(process, Pid)},
     % It's important to insert the proc here instead of doing an update_element
     % as we might have updated the db_key or ddoc_keys in teach_ddoc/4
     ets:insert(?PROCS, Proc),

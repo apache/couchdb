@@ -405,7 +405,7 @@ handle_config_terminate(_Server, _Reason, N) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), {restart_config_listener, N}).
 
 per_couch_server(X) ->
-    erlang:max(1, X div num_servers()).
+    max(1, X div num_servers()).
 
 all_databases() ->
     {ok, DbList} = all_databases(

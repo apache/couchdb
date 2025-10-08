@@ -47,7 +47,7 @@
     term().
 
 start(Mod, Arg, Options) ->
-    Pid = erlang:spawn(?MODULE, do_init, [Mod, Arg, Options]),
+    Pid = spawn(?MODULE, do_init, [Mod, Arg, Options]),
     {ok, Pid}.
 
 start(Name, Mod, Arg, Options) ->
@@ -59,7 +59,7 @@ start(Name, Mod, Arg, Options) ->
     end.
 
 start_link(Mod, Arg, Options) ->
-    Pid = erlang:spawn_link(?MODULE, do_init, [Mod, Arg, Options]),
+    Pid = spawn_link(?MODULE, do_init, [Mod, Arg, Options]),
     {ok, Pid}.
 
 start_link(Name, Mod, Arg, Options) ->
@@ -87,7 +87,7 @@ do_init(Module, Arg, Options) ->
         {ok, State, Timeout} when is_integer(Timeout), Timeout >= 0 ->
             ?MODULE:loop(#st{module = Module, state = State}, Timeout);
         Else ->
-            erlang:exit(Else)
+            exit(Else)
     end.
 
 loop(St, Timeout) ->
@@ -173,7 +173,7 @@ do_terminate(Reason, #st{module = Module, state = State}) ->
             ignore -> normal;
             Else -> Else
         end,
-    erlang:exit(Status).
+    exit(Status).
 
 where({local, Name}) -> whereis(Name).
 

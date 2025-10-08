@@ -27,7 +27,7 @@ decode_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
     NumMpWriters = num_mp_writers(),
     {Parser, ParserRef} = spawn_monitor(fun() ->
-        ParentRef = erlang:monitor(process, Parent),
+        ParentRef = monitor(process, Parent),
         put(mp_parent_ref, ParentRef),
         num_mp_writers(NumMpWriters),
         {<<"--", _/binary>>, _, _} = couch_httpd:parse_multipart_request(
@@ -214,7 +214,7 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
     end.
 
 handle_hello(WriterPid, Counters) ->
-    WriterRef = erlang:monitor(process, WriterPid),
+    WriterRef = monitor(process, WriterPid),
     orddict:store(WriterPid, {WriterRef, 0}, Counters).
 
 update_writer(WriterPid, Counters) ->
@@ -222,7 +222,7 @@ update_writer(WriterPid, Counters) ->
         {ok, {WriterRef, Count}} ->
             orddict:store(WriterPid, {WriterRef, Count + 1}, Counters);
         error ->
-            WriterRef = erlang:monitor(process, WriterPid),
+            WriterRef = monitor(process, WriterPid),
             orddict:store(WriterPid, {WriterRef, 1}, Counters)
     end.
 
@@ -344,7 +344,7 @@ length_multipart_stream(Boundary, JsonBytes, Atts) ->
     end.
 
 abort_multipart_stream(Parser) ->
-    MonRef = erlang:monitor(process, Parser),
+    MonRef = monitor(process, Parser),
     Parser ! abort_parsing,
     receive
         {'DOWN', MonRef, _, _, _} -> ok
