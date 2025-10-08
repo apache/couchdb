@@ -307,7 +307,7 @@ clouseau_major_vsn() ->
 -spec connected() -> boolean().
 
 connected() ->
-    HiddenNodes = erlang:nodes(hidden),
+    HiddenNodes = nodes(hidden),
     case lists:member(clouseau(), HiddenNodes) of
         true ->
             true;

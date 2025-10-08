@@ -69,7 +69,7 @@ init([]) ->
         pending_updates = couch_util:new_set(),
         max_write_delay = MaxWriteDelay,
         dbname = GlobalChangesDbName,
-        handler_ref = erlang:monitor(process, Handler)
+        handler_ref = monitor(process, Handler)
     },
     {ok, State}.
 
@@ -122,7 +122,7 @@ handle_info(flush_updates, State) ->
 handle_info(start_listener, State) ->
     {ok, Handler} = global_changes_listener:start(),
     NewState = State#state{
-        handler_ref = erlang:monitor(process, Handler)
+        handler_ref = monitor(process, Handler)
     },
     {noreply, NewState};
 handle_info({'DOWN', Ref, _, _, Reason}, #state{handler_ref = Ref} = State) ->

@@ -29,7 +29,7 @@ check_restart_listener() ->
 
     Handler1 = get_handler(),
     ?assertNotEqual(not_found, Handler1),
-    Ref = erlang:monitor(process, Listener1),
+    Ref = monitor(process, Listener1),
     ok = gen_event:delete_handler(config_event, get_handler(), testing),
 
     receive

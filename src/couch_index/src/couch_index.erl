@@ -61,7 +61,7 @@ compact(Pid) ->
 compact(Pid, Options) ->
     {ok, CPid} = gen_server:call(Pid, compact),
     case lists:member(monitor, Options) of
-        true -> {ok, erlang:monitor(process, CPid)};
+        true -> {ok, monitor(process, CPid)};
         false -> ok
     end.
 

@@ -338,7 +338,7 @@ query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
             red -> red_fold(Db, View, Args, Callback, Acc)
         end
     after
-        erlang:demonitor(Ref, [flush])
+        demonitor(Ref, [flush])
     end.
 
 get_info(Db, DDoc) ->

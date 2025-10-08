@@ -241,7 +241,7 @@ export(QueryArgs) ->
 time(Metric, {M, F, A}) when is_list(Metric) ->
     Start = os:timestamp(),
     try
-        erlang:apply(M, F, A)
+        apply(M, F, A)
     after
         Length = timer:now_diff(os:timestamp(), Start) / 1000,
         couch_stats:update_histogram([dreyfus | Metric], Length)

@@ -95,7 +95,7 @@ open_db(DbName) ->
 
 shutdown_db(Db) ->
     Pid = couch_db:get_pid(Db),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     exit(Pid, kill),
     receive
         {'DOWN', Ref, _, _, _} ->
@@ -617,7 +617,7 @@ list_diff([T1 | R1], [T2 | R2]) ->
 
 compact(Db) ->
     {ok, Pid} = couch_db:start_compact(Db),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
 
     % Ideally I'd assert that Pid is linked to us
     % at this point but its technically possible

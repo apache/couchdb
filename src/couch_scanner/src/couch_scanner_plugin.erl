@@ -198,7 +198,7 @@ spawn_link(Id) ->
 
 stop(Pid) when is_pid(Pid) ->
     unlink(Pid),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     Pid ! stop,
     receive
         {'DOWN', Ref, _, _, _} -> ok
@@ -369,7 +369,7 @@ scan_docs(#st{} = St, #shard{name = ShardDbName}) ->
                 #st{changes_seq = Seq, changes_opts = Opts} = St3,
                 {ok, St4} = couch_db:fold_changes(Db, Seq, fun scan_docs_fold/2, St3, Opts),
                 St5 = db_closing_callback(St4),
-                erlang:garbage_collect(),
+                garbage_collect(),
                 St5#st{db = undefined}
             after
                 couch_db:close(Db)
@@ -424,7 +424,7 @@ maybe_checkpoint(#st{checkpoint_sec = LastCheckpointTSec} = St) ->
         stop -> exit({shutdown, stop})
     after 0 -> ok
     end,
-    erlang:garbage_collect(),
+    garbage_collect(),
     case tsec() - LastCheckpointTSec > ?CHECKPOINT_INTERVAL_SEC of
         true -> checkpoint(St);
         false -> St

@@ -80,7 +80,7 @@ t_stats_retained_on_job_removal({_Ctx, {Source, Target}}) ->
     couch_replicator_scheduler:remove_job(RepId).
 
 stop_job(RepPid) ->
-    Ref = erlang:monitor(process, RepPid),
+    Ref = monitor(process, RepPid),
     gen_server:cast(couch_replicator_scheduler, {set_max_jobs, 0}),
     couch_replicator_scheduler:reschedule(),
     receive
