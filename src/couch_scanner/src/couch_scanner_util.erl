@@ -22,7 +22,8 @@
     compile_regexes/1,
     match_regexes/2,
     on_first_node/0,
-    consistent_hash_nodes/1
+    consistent_hash_nodes/1,
+    parse_non_weekday_period/1
 ]).
 
 -define(SECOND, 1).

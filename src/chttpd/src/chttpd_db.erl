@@ -412,10 +412,15 @@ handle_auto_purge_req(#httpd{} = Req, _Db) ->
 
 validate_auto_purge_props([]) ->
     ok;
-validate_auto_purge_props([{<<"deleted_document_ttl">>, Value} | Rest]) when is_integer(Value) ->
-    validate_auto_purge_props(Rest);
+validate_auto_purge_props([{<<"deleted_document_ttl">>, Value} | Rest]) when is_binary(Value) ->
+    case couch_scanner_util:parse_non_weekday_period(?b2l(Value)) of
+        undefined ->
+            throw({bad_request, <<"deleted_document_ttl must be a valid string">>});
+        _TTL ->
+            validate_auto_purge_props(Rest)
+    end;
 validate_auto_purge_props([{<<"deleted_document_ttl">>, _Value} | _Rest]) ->
-    throw({bad_request, <<"deleted_document_ttl must be an integer">>});
+    throw({bad_request, <<"deleted_document_ttl must be a valid string">>});
 validate_auto_purge_props([{_K, _V} | _Rest]) ->
     throw({bad_request, <<"invalid auto purge property">>});
 validate_auto_purge_props(_Else) ->

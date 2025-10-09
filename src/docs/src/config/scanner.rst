@@ -256,7 +256,10 @@ settings in their ``[{plugin}]`` section.
 
     .. config:option:: deleted_document_ttl
 
-        Set the default interval, in seconds, before the plugin will purge
-        a deleted document. The database may override this setting with the
+        Set the default interval before the plugin will purge
+        a deleted document. Possible ttl formats are: ``{num}_{timeunit}`` (ex.:
+        ``1000_sec``, ``30_min``, ``8_hours``, ``24_hour``, ``2_days``,
+        ``3_weeks``, ``1_month``).
+        The database may override this setting with the
         :ref:`api/db/auto_purge` endpoint. If neither is set, the
         plugin will not purge deleted documents.

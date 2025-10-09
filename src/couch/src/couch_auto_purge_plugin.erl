@@ -133,14 +133,14 @@ ttl(St, DbName) ->
     DbTTL =
         case fabric:get_auto_purge_props(DbName) of
             {ok, AutoPurgeProps} ->
-                case couch_util:get_value(<<"deleted_document_ttl">>, AutoPurgeProps) of
+                case parse_deleted_document_ttl(AutoPurgeProps) of
                     TTL when is_integer(TTL) ->
                         TTL;
                     undefined ->
                         undefined;
                     Else ->
                         ?WARN(
-                            "TTL in ~s as ttl was '~p', not integer",
+                            "ignoring TTL in ~s as ttl was '~p'",
                             [DbName, Else],
                             meta(St)
                         ),
@@ -156,6 +156,21 @@ ttl(St, DbName) ->
         end,
     if
         DbTTL /= undefined -> DbTTL;
-        DefaultTTL /= undefined -> list_to_integer(DefaultTTL);
+        DefaultTTL /= undefined -> parse_ttl(DefaultTTL);
         true -> undefined
     end.
+
+parse_deleted_document_ttl(AutoPurgeProps) ->
+    case couch_util:get_value(<<"deleted_document_ttl">>, AutoPurgeProps) of
+        undefined ->
+            undefined;
+        Else ->
+            parse_ttl(Else)
+    end.
+
+parse_ttl(Bin) when is_binary(Bin) ->
+    parse_ttl(binary_to_list(Bin));
+parse_ttl([$- | TTL]) ->
+    -(parse_ttl(TTL));
+parse_ttl(TTL) ->
+    couch_scanner_util:parse_non_weekday_period(TTL).
