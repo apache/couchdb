@@ -373,12 +373,12 @@ following behavior:
         Date: Mon, 22 Sep 2025 11:01:00 GMT
         Server: CouchDB (Erlang/OTP)
 
-        {"deleted_document_ttl": 259200}
+        {"deleted_document_ttl": "3_mon"}
 
 .. http:put:: /{db}/_auto_purge
     :synopsis: Update auto purge settings
 
-    Retrieves the auto purge settings for the database. These settings
+    Updates the auto purge settings for the database. These settings
     are used by the :ref:`auto purge plugin <config/auto_purge_plugin>`.
 
     :param db: Database name
@@ -403,7 +403,7 @@ following behavior:
         Content-Type: application/json
         Host: localhost:5984
 
-        {"deleted_document_ttl": 259200}
+        {"deleted_document_ttl": "3_hour"}
 
     **Response**:
 

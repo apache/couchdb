@@ -62,7 +62,7 @@ t_no_auto_purge_by_default({_, DbName}) ->
     ok.
 
 t_auto_purge_after_config_ttl({_, DbName}) ->
-    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-1000000", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
@@ -73,7 +73,7 @@ t_auto_purge_after_config_ttl({_, DbName}) ->
     ok.
 
 t_auto_purge_after_db_ttl({_, DbName}) ->
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, -1000000}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
