@@ -66,6 +66,7 @@ UUIDs Configuration
     .. config:option:: algorithm :: Generation Algorithm
 
         .. versionchanged:: 1.3 Added ``utc_id`` algorithm.
+        .. versionchanged:: 3.6 Added ``uuid_v7`` algorithm.
 
         CouchDB provides various algorithms to generate the UUID values that
         are  used for document `_id`'s by default::
@@ -157,6 +158,25 @@ UUIDs Configuration
                       "04dd32bd5eacad@mycouch"
                   ]
               }
+
+        - ``uuid_v7``: UUID v7 string in hex.
+
+          .. code-block:: javascript
+
+               {
+                   "uuids": [
+                       "0199d2456e7f7b0a9b7130f9a9db8bee",
+                       "0199d2456e7f72dda9f758fcc259c5fc",
+                       "0199d2456e7f751c80b461180f7c7717",
+                       "0199d2456e7f7c569b317d53367ca45a",
+                       "0199d2456e7f77bfbffe92682c9c8c69",
+                       "0199d2456e7f703ea97286f3d976343e",
+                       "0199d2456e7f7f729142ed3b2da9101f",
+                       "0199d2456e7f7723905c1f91f40d54f5",
+                       "0199d2456e7f7e40979c7e2e22ffeb6a",
+                       "0199d2456e7f7a42b43acfcc1e18eb84"
+                   ]
+               }
 
         .. note::
             **Impact of UUID choices:** the choice of UUID has a significant
