@@ -17,7 +17,7 @@
 
 -export([start/0, stop/0]).
 -export([new/0, random/0]).
-
+-export([v7_hex/0, v7_bin/0]).
 -export([init/1]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
@@ -44,6 +44,8 @@ init([]) ->
 
 handle_call(create, _From, random) ->
     {reply, random(), random};
+handle_call(create, _From, uuid_v7) ->
+    {reply, v7_hex(), uuid_v7};
 handle_call(create, _From, {utc_random, ClockSeq}) ->
     {UtcRandom, NewClockSeq} = utc_random(ClockSeq),
     {reply, UtcRandom, {utc_random, NewClockSeq}};
@@ -84,6 +86,32 @@ handle_config_terminate(_Server, _Reason, _State) ->
     gen_server:cast(?MODULE, change),
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
+%% UUID Version 7
+%% https://datatracker.ietf.org/doc/html/rfc9562#name-uuid-version-7
+%%
+%%  0                   1                   2                   3
+%%  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+%% +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+%% |                           unix_ts_ms                          |
+%% +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+%% |          unix_ts_ms           |  ver  |       rand_a          |
+%% +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+%% |var|                        rand_b                             |
+%% +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+%% |                            rand_b                             |
+%% +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+%%
+%% ver = 0111 = 7
+%% var = 10 = 2
+%%
+v7_bin() ->
+    MSec = os:system_time(millisecond),
+    <<RandA:12, RandB:62, _:6>> = crypto:strong_rand_bytes(10),
+    <<MSec:48, 7:4, RandA:12, 2:2, RandB:62>>.
+
+v7_hex() ->
+    couch_util:to_hex_bin(v7_bin()).
+
 new_prefix() ->
     couch_util:to_hex((crypto:strong_rand_bytes(13))).
 
@@ -104,6 +132,8 @@ state() ->
             {utc_id, UtcIdSuffix, ClockSeq};
         sequential ->
             {sequential, new_prefix(), inc()};
+        uuid_v7 ->
+            uuid_v7;
         Unknown ->
             throw({unknown_uuid_algorithm, Unknown})
     end.
