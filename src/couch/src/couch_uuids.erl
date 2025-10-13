@@ -110,7 +110,10 @@ v7_bin() ->
     <<MSec:48, 7:4, RandA:12, 2:2, RandB:62>>.
 
 v7_hex() ->
-    couch_util:to_hex_bin(v7_bin()).
+    <<A:8/binary, B:4/binary, C:4/binary, D:4/binary, E:12/binary>> = couch_util:to_hex_bin(
+        v7_bin()
+    ),
+    <<A/binary, "-", B/binary, "-", C/binary, "-", D/binary, "-", E/binary>>.
 
 new_prefix() ->
     couch_util:to_hex((crypto:strong_rand_bytes(13))).
