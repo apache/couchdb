@@ -17,51 +17,107 @@
 -define(TIMEOUT, 20).
 
 setup_all() ->
-    test_util:start_applications([config, couch_log]),
+    test_util:start_applications([config, couch_stats, couch_log]),
     couch_uuids:start().
 
 teardown_all(_) ->
     couch_uuids:stop(),
-    test_util:stop_applications([config, couch_log]).
+    test_util:stop_applications([config, couch_stats, couch_log]).
 
 uuids_test_() ->
     {
         setup,
         fun setup_all/0,
         fun teardown_all/1,
-        [
-            {timeout, ?TIMEOUT, fun default_algorithm/0},
-            {timeout, ?TIMEOUT, fun sequential_algorithm/0},
-            {timeout, ?TIMEOUT, fun utc_algorithm/0},
-            {timeout, ?TIMEOUT, fun utc_id_suffix_algorithm/0}
-        ]
+        with([
+            ?TDEF(default_algorithm, ?TIMEOUT),
+            ?TDEF(sequential_algorithm, ?TIMEOUT),
+            ?TDEF(utc_algorithm, ?TIMEOUT),
+            ?TDEF(utc_id_suffix_algorithm, ?TIMEOUT),
+            ?TDEF(random_algorithm, ?TIMEOUT),
+            ?TDEF(uuid_v4_rfc9562, ?TIMEOUT),
+            ?TDEF(uuid_v4_base_16, ?TIMEOUT),
+            ?TDEF(uuid_v4_base_36, ?TIMEOUT),
+            ?TDEF(uuid_v7_rfc9562, ?TIMEOUT),
+            ?TDEF(uuid_v7_base_16, ?TIMEOUT),
+            ?TDEF(uuid_v7_base_36, ?TIMEOUT)
+        ])
     }.
 
-default_algorithm() ->
+default_algorithm(_) ->
     config:delete("uuids", "algorithm", false),
     check_unique().
 
-sequential_algorithm() ->
+random_algorithm(_) ->
+    config:set("uuids", "algorithm", "random", false),
+    check_unique(),
+    check_size(32).
+
+sequential_algorithm(_) ->
     config:set("uuids", "algorithm", "sequential", false),
     check_unique(),
     check_increment_monotonically(),
-    check_rollover().
+    check_rollover(),
+    check_size(32).
 
-utc_algorithm() ->
+utc_algorithm(_) ->
     config:set("uuids", "algorithm", "utc_random", false),
     check_unique(),
-    check_increment_monotonically().
+    check_increment_monotonically(),
+    check_size(32).
 
-utc_id_suffix_algorithm() ->
+utc_id_suffix_algorithm(_) ->
     config:set("uuids", "algorithm", "utc_id", false),
     config:set("uuids", "utc_id_suffix", "bozo", false),
     check_unique(),
     check_increment_monotonically(),
-    check_preserve_suffix().
+    check_preserve_suffix(),
+    % 14 character time prefix + bozo
+    check_size(18).
+
+uuid_v4_rfc9562(_) ->
+    config:set("uuids", "algorithm", "uuid_v4", false),
+    config:set("uuids", "format", "rfc9562", false),
+    check_unique(),
+    check_size(36).
+
+uuid_v4_base_16(_) ->
+    config:set("uuids", "algorithm", "uuid_v4", false),
+    config:set("uuids", "format", "base_16", false),
+    check_unique(),
+    check_size(32).
+
+uuid_v4_base_36(_) ->
+    config:set("uuids", "algorithm", "uuid_v4", false),
+    config:set("uuids", "format", "base_36", false),
+    check_unique(),
+    check_size(25).
+
+uuid_v7_rfc9562(_) ->
+    config:set("uuids", "algorithm", "uuid_v7", false),
+    config:set("uuids", "format", "rfc9562", false),
+    check_unique(),
+    check_size(36).
+
+uuid_v7_base_16(_) ->
+    config:set("uuids", "algorithm", "uuid_v7", false),
+    config:set("uuids", "format", "base_16", false),
+    check_unique(),
+    check_size(32).
+
+uuid_v7_base_36(_) ->
+    config:set("uuids", "algorithm", "uuid_v7", false),
+    config:set("uuids", "format", "base_36", false),
+    check_unique(),
+    check_size(25).
 
 check_unique() ->
     %% this one may really runs for too long on slow hosts
     ?assert(test_unique(10000, [couch_uuids:new()])).
+
+check_size(Size) ->
+    %% this one may really runs for too long on slow hosts
+    ?assert(test_size(Size, 10000)).
 
 check_increment_monotonically() ->
     ?assert(couch_uuids:new() < couch_uuids:new()).
@@ -76,6 +132,12 @@ check_preserve_suffix() ->
     UUID = binary_to_list(couch_uuids:new()),
     Suffix = get_suffix(UUID),
     ?assert(test_same_suffix(10000, Suffix)).
+
+test_size(_Size, 0) ->
+    true;
+test_size(Size, N) ->
+    ?assertEqual(Size, byte_size(couch_uuids:new())),
+    test_size(Size, N - 1).
 
 test_unique(0, _) ->
     true;

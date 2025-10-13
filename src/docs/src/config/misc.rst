@@ -66,7 +66,8 @@ UUIDs Configuration
     .. config:option:: algorithm :: Generation Algorithm
 
         .. versionchanged:: 1.3 Added ``utc_id`` algorithm.
-        .. versionchanged:: 3.6 Added ``uuid_v7`` algorithm.
+        .. versionchanged:: 3.6 Added ``uuid_v4`` and ``uuid_v7`` algorithms.
+        .. versionchanged:: 3.6 ``uuid_v7`` algorithm became the default.
 
         CouchDB provides various algorithms to generate the UUID values that
         are  used for document `_id`'s by default::
@@ -159,22 +160,43 @@ UUIDs Configuration
                   ]
               }
 
-        - ``uuid_v7``: UUID v7 string in hex.
+        - ``uuid_v7``: UUID v7. The option :option:`uuids/format` control the
+          encoding format. The default is ``base_16``.
 
           .. code-block:: javascript
 
                {
                    "uuids": [
-                       "0199d2456e7f7b0a9b7130f9a9db8bee",
-                       "0199d2456e7f72dda9f758fcc259c5fc",
-                       "0199d2456e7f751c80b461180f7c7717",
-                       "0199d2456e7f7c569b317d53367ca45a",
-                       "0199d2456e7f77bfbffe92682c9c8c69",
-                       "0199d2456e7f703ea97286f3d976343e",
-                       "0199d2456e7f7f729142ed3b2da9101f",
-                       "0199d2456e7f7723905c1f91f40d54f5",
-                       "0199d2456e7f7e40979c7e2e22ffeb6a",
-                       "0199d2456e7f7a42b43acfcc1e18eb84"
+                      "0199df3833cc79c89bdde9530efc4f0c",
+                      "0199df3833cc7694af52300fce26dc2f",
+                      "0199df3833cc78bf93c0a7b7f1c00d5c",
+                      "0199df3833cc740d84ee0932e8ff1df3",
+                      "0199df3833cc751bb45b27cfbcc3c753",
+                      "0199df3833cc7a7cbce5469d3f52ba83",
+                      "0199df3833cc7b3f8c3f517a3a84b649",
+                      "0199df3833cc74b9b3cacaa0ebfbc842",
+                      "0199df3833cc7f49ae722b96ba1dbb3a",
+                      "0199df3833cc7db39f01868033e1dbec"
+                   ]
+               }
+
+        - ``uuid_v4``: UUID v4. The option :option:`uuids/format` control the
+          encoding format. The default is ``base_16``.
+
+          .. code-block:: javascript
+
+               {
+                   "uuids": [
+                       "e7981ba78fb844b4a87d18c54f4caef4",
+                       "f21cd92e8a4749f390cbd77f693514db",
+                       "4f469b5e6a374da3aa51271754ad027d",
+                       "0ae8035fe7fd42118ef693b996c2516d",
+                       "96250347ba69460197235d3809d74985",
+                       "2b3693f4503b47618df70c6bbe068af5",
+                       "cbec8e3375054a83b5f73fd115bb1500",
+                       "71589f1d9a9748beae8dc09bbe904d04",
+                       "59b581909b1d4f67a00aea5f29cfcb39",
+                       "4f33c962a3e64a5f89b05a05e680f3ee"
                    ]
                }
 
@@ -182,17 +204,37 @@ UUIDs Configuration
             **Impact of UUID choices:** the choice of UUID has a significant
             impact on the layout of the B-tree, prior to compaction.
 
-            For example, using a sequential UUID algorithm while uploading a
-            large batch of documents will avoid the need to rewrite many
-            intermediate B-tree nodes. A random UUID algorithm may require
+            For example, using the UUID v7 or sequential algorithms while
+            uploading a large batch of documents will avoid the need to rewrite
+            many intermediate B-tree nodes. A random UUID algorithm may require
             rewriting intermediate nodes on a regular basis, resulting in
-            significantly decreased throughput and wasted disk space space due to
-            the append-only B-tree design.
+            significantly decreased throughput and wasted disk space space due
+            to the append-only B-tree design.
 
-            It is generally recommended to set your own UUIDs, or use the
-            sequential algorithm unless you have a specific need and take into
-            account the likely need for compaction to re-balance the B-tree and
-            reclaim wasted space.
+            It is generally recommended to set your own UUIDs, or use the UUID
+            v7 or sequential algorithms unless you have a specific need and take
+            into account the likely need for compaction to re-balance the
+            B-tree and reclaim wasted space.
+
+    .. config:option:: format :: Encoding format for UUID v4 and UUID v7 algorithms
+
+        .. versionadded:: 3.6
+
+        Configure encoding format of UUID v4 and v7::
+
+            [uuids]
+            format = base_16
+
+        Available formats:
+
+        - ``base_16``: 32 byte long, hex-encoded value.
+          For example: ``"0199df3759297032b402c3e61fbbf88f"``
+
+        - ``base_36``: 25 byte long, base-36 encoded value using 0-9 and a-z characters.
+          For example: ``"03eudcyamunnfraqdgmopx09b"``
+
+        - ``rfc9562``: 36 byte long standard formatting for UUIDs (see https://www.rfc-editor.org/rfc/rfc9562)
+          For example: ``"0199df37-5929-7032-b402-c3e61fbbf88f"``
 
     .. config:option:: utc_id_suffix :: UTC ID Suffix
 
