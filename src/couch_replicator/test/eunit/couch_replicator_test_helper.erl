@@ -206,6 +206,7 @@ test_setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASSWORD),
     Persist = false,
     ok = config:set("admins", ?USERNAME, ?b2l(Hashed), Persist),
+    ok = config:set("replicator", "use_bulk_get", "true", Persist),
     Source = setup_db(),
     Target = setup_db(),
     {Ctx, {Source, Target}}.
@@ -216,4 +217,5 @@ test_teardown({Ctx, {Source, Target}}) ->
     teardown_db(Target),
     Persist = false,
     config:delete("admins", ?USERNAME, Persist),
+    config:delete("replicator", "use_bulk_get", Persist),
     ok = test_util:stop_couch(Ctx).
