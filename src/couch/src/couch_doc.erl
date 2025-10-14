@@ -189,11 +189,9 @@ from_json_obj(_Other, _) ->
     throw({bad_request, "Document must be a JSON object"}).
 
 parse_revid(RevId) when is_binary(RevId), size(RevId) =:= 32 ->
-    RevInt = binary_to_integer(RevId, 16),
-    <<RevInt:128>>;
+    binary:decode_hex(RevId);
 parse_revid(RevId) when is_list(RevId), length(RevId) =:= 32 ->
-    RevInt = list_to_integer(RevId, 16),
-    <<RevInt:128>>;
+    binary:decode_hex(list_to_binary(RevId));
 parse_revid(RevId) when is_binary(RevId) ->
     RevId;
 parse_revid(RevId) when is_list(RevId) ->
