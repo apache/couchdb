@@ -313,26 +313,17 @@ Configuration of Database Purge
 
 .. config:section:: purge :: Configuration of Database Purge
 
-    .. config:option:: max_document_id_number :: Allowed number of documents \
-        per Delete-Request
-
-        .. versionadded:: 3.0
-
-        Sets the maximum number of documents allowed in a single purge request::
-
-            [purge]
-            max_document_id_number = 100
-
     .. config:option:: max_revisions_number :: Allowed number of accumulated \
         revisions per Purge-Request
 
         .. versionadded:: 3.0
+        .. versionchanged:: 3.6
 
         Sets the maximum number of accumulated revisions allowed in a single purge
         request::
 
             [purge]
-            max_revisions_number = 1000
+            max_revisions_number = infinity
 
     .. config:option:: index_lag_warn_seconds :: Allowed duration for purge \
         checkpoint document
