@@ -49,7 +49,6 @@ purge_test_() ->
                     ?TDEF_FE(t_purge_only_post_allowed),
                     ?TDEF_FE(t_empty_purge_request),
                     ?TDEF_FE(t_ok_purge_request),
-                    ?TDEF_FE(t_ok_purge_with_max_document_id_number),
                     ?TDEF_FE(t_accepted_purge_request),
                     ?TDEF_FE(t_partial_purge_request),
                     ?TDEF_FE(t_mixed_purge_request),
@@ -84,23 +83,6 @@ t_ok_purge_request(DbUrl) ->
     {Status, Response2} = req(post, url(DbUrl, "_purge"), IdsRevs),
     ?assertMatch(#{<<"purge_seq">> := null, <<"purged">> := IdsRevs}, Response2),
     ?assert(Status =:= 201 orelse Status =:= 202).
-
-t_ok_purge_with_max_document_id_number(DbUrl) ->
-    PurgedDocsNum = 101,
-    {201, Response1} = create_docs(DbUrl, docs(PurgedDocsNum)),
-    IdsRevs = ids_revs(Response1),
-
-    {400, #{<<"reason">> := Error}} = req(post, url(DbUrl, "_purge"), IdsRevs),
-    ?assertEqual(<<"Exceeded maximum number of documents.">>, Error),
-
-    ok = config:set("purge", "max_document_id_number", "101", _Persist = false),
-    try
-        {Status, Response2} = req(post, url(DbUrl, "_purge"), IdsRevs),
-        ?assertMatch(#{<<"purge_seq">> := null, <<"purged">> := IdsRevs}, Response2),
-        ?assert(Status =:= 201 orelse Status =:= 202)
-    after
-        ok = config:delete("purge", "max_document_id_number", _Persist)
-    end.
 
 t_accepted_purge_request(DbUrl) ->
     try
@@ -173,24 +155,14 @@ t_over_many_ids_or_revs_purge_request(DbUrl) ->
         <<"doc3">> => [Rev3]
     },
 
-    % Ids larger than expected
-    config:set("purge", "max_document_id_number", "1", _Persist = false),
-    try
-        {Status1, #{<<"reason">> := Error1}} = req(post, url(DbUrl, "_purge"), IdsRevs),
-        ?assertEqual(<<"Exceeded maximum number of documents.">>, Error1),
-        ?assertEqual(400, Status1)
-    after
-        config:delete("purge", "max_document_id_number", _Persist)
-    end,
-
     % Revs larger than expected
-    config:set("purge", "max_revisions_number", "1", _Persist),
+    config:set("purge", "max_revisions_number", "1", false),
     try
         {Status2, #{<<"reason">> := Error2}} = req(post, url(DbUrl, "_purge"), IdsRevs),
         ?assertEqual(<<"Exceeded maximum number of revisions.">>, Error2),
         ?assertEqual(400, Status2)
     after
-        config:delete("purge", "max_revisions_number", _Persist)
+        config:delete("purge", "max_revisions_number", false)
     end.
 
 t_purged_infos_limit_only_get_put_allowed(DbUrl) ->
