@@ -2320,7 +2320,15 @@ See :ref:`Configuration of Prometheus Endpoint <config/prometheus>` for details.
 
     Confirms that the server is up, running, and ready to respond to requests.
     If :config:option:`maintenance_mode <couchdb/maintenance_mode>` is
-    ``true`` or ``nolb``, the endpoint will return a 404 response.
+    ``true`` or ``nolb``, the endpoint will return a 404 response. The status field
+    in the response body also changes to reflect the current ``maintenance_mode``
+    defaulting to ``ok``.
+
+    If :config:option:`maintenance_mode <couchdb/maintenance_mode>` is ``true`` the status
+    field is set to ``maintenance_mode``.
+
+    If :config:option:`maintenance_mode <couchdb/maintenance_mode>` is set to ``nolb`` the
+    status field is set to ``nolb``.
 
     :>header Content-Type: :mimetype:`application/json`
     :code 200: Request completed successfully
