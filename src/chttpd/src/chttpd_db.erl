@@ -730,22 +730,17 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_purge">>]} = Req, Db) ->
     Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}],
     {IdsRevs} = chttpd:json_body_obj(Req),
     IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
-    MaxIds = config:get_integer("purge", "max_document_id_number", 100),
-    case length(IdsRevs2) =< MaxIds of
-        false -> throw({bad_request, "Exceeded maximum number of documents."});
-        true -> ok
-    end,
-    RevsLen = lists:foldl(
-        fun({_Id, Revs}, Acc) ->
-            length(Revs) + Acc
-        end,
-        0,
-        IdsRevs2
-    ),
-    MaxRevs = config:get_integer("purge", "max_revisions_number", 1000),
-    case RevsLen =< MaxRevs of
-        false -> throw({bad_request, "Exceeded maximum number of revisions."});
-        true -> ok
+    case config:get("purge", "max_revisions_number", "infinity") of
+        "infinity" ->
+            ok;
+        Val ->
+            MaxRevs = list_to_integer(Val),
+            SumFun = fun({_Id, Revs}, Acc) -> length(Revs) + Acc end,
+            RevsLen = lists:foldl(SumFun, 0, IdsRevs2),
+            case RevsLen =< MaxRevs of
+                false -> throw({bad_request, "Exceeded maximum number of revisions."});
+                true -> ok
+            end
     end,
     couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
     Results2 =
