@@ -1176,8 +1176,8 @@ static int JS_ToUint8ClampFree(JSContext *ctx, int32_t *pres, JSValue val);
 static JSValue js_new_string8_len(JSContext *ctx, const char *buf, int len);
 static JSValue js_compile_regexp(JSContext *ctx, JSValueConst pattern,
                                  JSValueConst flags);
-static JSValue js_regexp_constructor_internal(JSContext *ctx, JSValueConst ctor,
-                                              JSValue pattern, JSValue bc);
+static JSValue js_regexp_set_internal(JSContext *ctx, JSValue obj,
+                                      JSValue pattern, JSValue bc);
 static void gc_decref(JSRuntime *rt);
 static int JS_NewClass1(JSRuntime *rt, JSClassID class_id,
                         const JSClassDef *class_def, JSAtom name);
@@ -1261,6 +1261,8 @@ static JSValue js_promise_resolve(JSContext *ctx, JSValueConst this_val,
                                   int argc, JSValueConst *argv, int magic);
 static JSValue js_promise_then(JSContext *ctx, JSValueConst this_val,
                                int argc, JSValueConst *argv);
+static BOOL js_string_eq(JSContext *ctx,
+                         const JSString *p1, const JSString *p2);
 static int js_string_compare(JSContext *ctx,
                              const JSString *p1, const JSString *p2);
 static JSValue JS_ToNumber(JSContext *ctx, JSValueConst val);
@@ -3226,9 +3228,9 @@ static JSValue JS_AtomIsNumericIndex1(JSContext *ctx, JSAtom atom)
         JS_FreeValue(ctx, num);
         return str;
     }
-    ret = js_string_compare(ctx, p, JS_VALUE_GET_STRING(str));
+    ret = js_string_eq(ctx, p, JS_VALUE_GET_STRING(str));
     JS_FreeValue(ctx, str);
-    if (ret == 0) {
+    if (ret) {
         return num;
     } else {
         JS_FreeValue(ctx, num);
@@ -4128,6 +4130,16 @@ static int js_string_memcmp(const JSString *p1, int pos1, const JSString *p2,
             res = memcmp16(p1->u.str16 + pos1, p2->u.str16 + pos2, len);
     }
     return res;
+}
+
+static BOOL js_string_eq(JSContext *ctx,
+                         const JSString *p1, const JSString *p2)
+{
+    if (p1->len != p2->len)
+        return FALSE;
+    if (p1 == p2)
+        return TRUE;
+    return js_string_memcmp(p1, 0, p2, 0, p1->len) == 0;
 }
 
 /* return < 0, 0 or > 0 */
@@ -5226,7 +5238,7 @@ static JSValue JS_NewObjectFromShape(JSContext *ctx, JSShape *sh, JSClassID clas
     case JS_CLASS_REGEXP:
         p->u.regexp.pattern = NULL;
         p->u.regexp.bytecode = NULL;
-        goto set_exotic;
+        break;
     default:
     set_exotic:
         if (ctx->rt->class_array[class_id].exotic) {
@@ -13414,6 +13426,11 @@ static void js_print_regexp(JSPrintValueState *s, JSObject *p1)
     int i, n, c, c2, bra, flags;
     static const char regexp_flags[] = { 'g', 'i', 'm', 's', 'u', 'y', 'd', 'v' };
 
+    if (!re->pattern || !re->bytecode) {
+        /* the regexp fields are zeroed at init */
+        js_puts(s, "[uninitialized_regexp]");
+        return;
+    }
     p = re->pattern;
     js_putc(s, '/');
     if (p->len == 0) {
@@ -15265,8 +15282,8 @@ static BOOL js_strict_eq2(JSContext *ctx, JSValue op1, JSValue op2,
             if (!tag_is_string(tag2)) {
                 res = FALSE;
             } else if (tag1 == JS_TAG_STRING && tag2 == JS_TAG_STRING) {
-                res = (js_string_compare(ctx, JS_VALUE_GET_STRING(op1),
-                                         JS_VALUE_GET_STRING(op2)) == 0);
+                res = js_string_eq(ctx, JS_VALUE_GET_STRING(op1),
+                                   JS_VALUE_GET_STRING(op2));
             } else {
                 res = (js_string_rope_compare(ctx, op1, op2, TRUE) == 0);
             }
@@ -17120,18 +17137,6 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         CASE(OP_push_empty_string):
             *sp++ = JS_AtomToString(ctx, JS_ATOM_empty_string);
             BREAK;
-        CASE(OP_get_length):
-            {
-                JSValue val;
-
-                sf->cur_pc = pc;
-                val = JS_GetProperty(ctx, sp[-1], JS_ATOM_length);
-                if (unlikely(JS_IsException(val)))
-                    goto exception;
-                JS_FreeValue(ctx, sp[-1]);
-                sp[-1] = val;
-            }
-            BREAK;
 #endif
         CASE(OP_push_atom_value):
             *sp++ = JS_AtomToValue(ctx, get_u32(pc));
@@ -17638,8 +17643,13 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
         CASE(OP_regexp):
             {
-                sp[-2] = js_regexp_constructor_internal(ctx, JS_UNDEFINED,
-                                                        sp[-2], sp[-1]);
+                JSValue obj;
+                obj = JS_NewObjectClass(ctx, JS_CLASS_REGEXP);
+                if (JS_IsException(obj))
+                    goto exception;
+                sp[-2] = js_regexp_set_internal(ctx, obj, sp[-2], sp[-1]);
+                if (JS_IsException(sp[-2]))
+                    goto exception;
                 sp--;
             }
             BREAK;
@@ -18305,7 +18315,7 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
             }
             BREAK;
 
-#define GET_FIELD_INLINE(name, keep)                                    \
+#define GET_FIELD_INLINE(name, keep, is_length)                         \
             {                                                           \
                 JSValue val, obj;                                       \
                 JSAtom atom;                                            \
@@ -18313,8 +18323,12 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                 JSProperty *pr;                                         \
                 JSShapeProperty *prs;                                   \
                                                                         \
-                atom = get_u32(pc);                                     \
-                pc += 4;                                                \
+                if (is_length) {                                        \
+                    atom = JS_ATOM_length;                              \
+                } else {                                                \
+                    atom = get_u32(pc);                                 \
+                    pc += 4;                                            \
+                }                                                       \
                                                                         \
                 obj = sp[-1];                                           \
                 if (likely(JS_VALUE_GET_TAG(obj) == JS_TAG_OBJECT)) {   \
@@ -18358,13 +18372,19 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
 
             
         CASE(OP_get_field):
-            GET_FIELD_INLINE(get_field, 0);
+            GET_FIELD_INLINE(get_field, 0, 0);
             BREAK;
 
         CASE(OP_get_field2):
-            GET_FIELD_INLINE(get_field2, 1);
+            GET_FIELD_INLINE(get_field2, 1, 0);
             BREAK;
 
+#if SHORT_OPCODES
+        CASE(OP_get_length):
+            GET_FIELD_INLINE(get_length, 0, 1);
+            BREAK;
+#endif
+            
         CASE(OP_put_field):
             {
                 int ret;
@@ -30239,20 +30259,20 @@ static JSValue js_async_module_execution_rejected(JSContext *ctx, JSValueConst t
     module->status = JS_MODULE_STATUS_EVALUATED;
     module->async_evaluation = FALSE;
 
-    for(i = 0; i < module->async_parent_modules_count; i++) {
-        JSModuleDef *m = module->async_parent_modules[i];
-        JSValue m_obj = JS_NewModuleValue(ctx, m);
-        js_async_module_execution_rejected(ctx, JS_UNDEFINED, 1, &error, 0,
-                                           &m_obj);
-        JS_FreeValue(ctx, m_obj);
-    }
-
     if (!JS_IsUndefined(module->promise)) {
         JSValue ret_val;
         assert(module->cycle_root == module);
         ret_val = JS_Call(ctx, module->resolving_funcs[1], JS_UNDEFINED,
                           1, &error);
         JS_FreeValue(ctx, ret_val);
+    }
+
+    for(i = 0; i < module->async_parent_modules_count; i++) {
+        JSModuleDef *m = module->async_parent_modules[i];
+        JSValue m_obj = JS_NewModuleValue(ctx, m);
+        js_async_module_execution_rejected(ctx, JS_UNDEFINED, 1, &error, 0,
+                                           &m_obj);
+        JS_FreeValue(ctx, m_obj);
     }
     return JS_UNDEFINED;
 }
@@ -41537,6 +41557,31 @@ static JSValue js_array_push(JSContext *ctx, JSValueConst this_val,
     int i;
     int64_t len, from, newLen;
 
+    if (likely(JS_VALUE_GET_TAG(this_val) == JS_TAG_OBJECT && !unshift)) {
+        JSObject *p = JS_VALUE_GET_OBJ(this_val);
+        if (likely(p->class_id == JS_CLASS_ARRAY && p->fast_array &&
+                   p->extensible &&
+                   p->shape->proto == JS_VALUE_GET_OBJ(ctx->class_proto[JS_CLASS_ARRAY]) &&
+                   ctx->std_array_prototype &&
+                   JS_VALUE_GET_TAG(p->prop[0].u.value) == JS_TAG_INT &&
+                   JS_VALUE_GET_INT(p->prop[0].u.value) == p->u.array.count &&
+                   (get_shape_prop(p->shape)->flags & JS_PROP_WRITABLE) != 0)) {
+            /* fast case */
+            uint32_t new_len;
+            new_len = p->u.array.count + argc;
+            if (likely(new_len <= INT32_MAX)) {
+                if (unlikely(new_len > p->u.array.u1.size)) {
+                    if (expand_fast_array(ctx, p, new_len))
+                        return JS_EXCEPTION;
+                }
+                for(i = 0; i < argc; i++)
+                    p->u.array.u.values[p->u.array.count + i] = JS_DupValue(ctx, argv[i]);
+                p->prop[0].u.value = JS_NewInt32(ctx, new_len);
+                p->u.array.count = new_len;
+                return JS_NewInt32(ctx, new_len);
+            }
+        }
+    }
     obj = JS_ToObject(ctx, this_val);
     if (js_get_length64(ctx, &len, obj))
         goto exception;
@@ -46084,8 +46129,10 @@ static void js_regexp_finalizer(JSRuntime *rt, JSValue val)
 {
     JSObject *p = JS_VALUE_GET_OBJ(val);
     JSRegExp *re = &p->u.regexp;
-    JS_FreeValueRT(rt, JS_MKPTR(JS_TAG_STRING, re->bytecode));
-    JS_FreeValueRT(rt, JS_MKPTR(JS_TAG_STRING, re->pattern));
+    if (re->bytecode != NULL)
+        JS_FreeValueRT(rt, JS_MKPTR(JS_TAG_STRING, re->bytecode));
+    if (re->pattern != NULL)
+        JS_FreeValueRT(rt, JS_MKPTR(JS_TAG_STRING, re->pattern));
 }
 
 /* create a string containing the RegExp bytecode */
@@ -46167,32 +46214,29 @@ static JSValue js_compile_regexp(JSContext *ctx, JSValueConst pattern,
     return ret;
 }
 
-/* create a RegExp object from a string containing the RegExp bytecode
-   and the source pattern */
-static JSValue js_regexp_constructor_internal(JSContext *ctx, JSValueConst ctor,
-                                              JSValue pattern, JSValue bc)
+/* set the RegExp fields */
+static JSValue js_regexp_set_internal(JSContext *ctx,
+                                      JSValue obj,
+                                      JSValue pattern, JSValue bc)
 {
-    JSValue obj;
     JSObject *p;
     JSRegExp *re;
 
     /* sanity check */
-    if (JS_VALUE_GET_TAG(bc) != JS_TAG_STRING ||
-        JS_VALUE_GET_TAG(pattern) != JS_TAG_STRING) {
+    if (unlikely(JS_VALUE_GET_TAG(bc) != JS_TAG_STRING ||
+                 JS_VALUE_GET_TAG(pattern) != JS_TAG_STRING)) {
         JS_ThrowTypeError(ctx, "string expected");
-    fail:
+        JS_FreeValue(ctx, obj);
         JS_FreeValue(ctx, bc);
         JS_FreeValue(ctx, pattern);
         return JS_EXCEPTION;
     }
 
-    obj = js_create_from_ctor(ctx, ctor, JS_CLASS_REGEXP);
-    if (JS_IsException(obj))
-        goto fail;
     p = JS_VALUE_GET_OBJ(obj);
     re = &p->u.regexp;
     re->pattern = JS_VALUE_GET_STRING(pattern);
     re->bytecode = JS_VALUE_GET_STRING(bc);
+    /* Note: cannot fail because the field is preallocated */
     JS_DefinePropertyValue(ctx, obj, JS_ATOM_lastIndex, JS_NewInt32(ctx, 0),
                            JS_PROP_WRITABLE);
     return obj;
@@ -46229,7 +46273,7 @@ static int js_is_regexp(JSContext *ctx, JSValueConst obj)
 static JSValue js_regexp_constructor(JSContext *ctx, JSValueConst new_target,
                                      int argc, JSValueConst *argv)
 {
-    JSValue pattern, flags, bc, val;
+    JSValue pattern, flags, bc, val, obj = JS_UNDEFINED;
     JSValueConst pat, flags1;
     JSRegExp *re;
     int pat_is_regexp;
@@ -46255,18 +46299,19 @@ static JSValue js_regexp_constructor(JSContext *ctx, JSValueConst new_target,
         }
     }
     re = js_get_regexp(ctx, pat, FALSE);
+    flags = JS_UNDEFINED;
     if (re) {
         pattern = JS_DupValue(ctx, JS_MKPTR(JS_TAG_STRING, re->pattern));
         if (JS_IsUndefined(flags1)) {
             bc = JS_DupValue(ctx, JS_MKPTR(JS_TAG_STRING, re->bytecode));
+            obj = js_create_from_ctor(ctx, new_target, JS_CLASS_REGEXP);
+            if (JS_IsException(obj))
+                goto fail;
             goto no_compilation;
         } else {
-            flags = JS_ToString(ctx, flags1);
-            if (JS_IsException(flags))
-                goto fail;
+            flags = JS_DupValue(ctx, flags1);
         }
     } else {
-        flags = JS_UNDEFINED;
         if (pat_is_regexp) {
             pattern = JS_GetProperty(ctx, pat, JS_ATOM_source);
             if (JS_IsException(pattern))
@@ -46292,15 +46337,19 @@ static JSValue js_regexp_constructor(JSContext *ctx, JSValueConst new_target,
                 goto fail;
         }
     }
+    obj = js_create_from_ctor(ctx, new_target, JS_CLASS_REGEXP);
+    if (JS_IsException(obj))
+        goto fail;
     bc = js_compile_regexp(ctx, pattern, flags);
     if (JS_IsException(bc))
         goto fail;
     JS_FreeValue(ctx, flags);
  no_compilation:
-    return js_regexp_constructor_internal(ctx, new_target, pattern, bc);
+    return js_regexp_set_internal(ctx, obj, pattern, bc);
  fail:
     JS_FreeValue(ctx, pattern);
     JS_FreeValue(ctx, flags);
+    JS_FreeValue(ctx, obj);
     return JS_EXCEPTION;
 }
 
