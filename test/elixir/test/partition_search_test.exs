@@ -190,10 +190,16 @@ defmodule PartitionSearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/library/_search/books"
+
+    # score order varies by Lucene version, so captured this order first.
+    resp = Couch.get(url, query: %{q: "some:field"})
+    assert_on_status(resp, 200, "Failed to search on non-partitioned dbs without the limit.")
+    expected_ids = get_ids(resp)
+
+    # Assert that the limit:3 results are the first 3 results from the unlimited search
     resp = Couch.get(url, query: %{q: "some:field", limit: 3})
     assert_on_status(resp, 200, "Failed to search on non-partitioned dbs with the limit.")
-    ids = get_ids(resp)
-    assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9"])
+    assert List.starts_with?(expected_ids, get_ids(resp))
   end
 
   @tag :with_db
