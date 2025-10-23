@@ -451,7 +451,7 @@ re_enqueue(Obj) ->
 
 cleanup_index_files(DbName) ->
     case should_clean_up_indices() of
-        true -> fabric:cleanup_index_files(DbName);
+        true -> fabric:cleanup_index_files_this_node(DbName);
         false -> ok
     end.
 

@@ -22,13 +22,13 @@
 % public api.
 -export([
     start_link/2,
-    design_doc_to_index/2,
+    design_doc_to_index/3,
     await/2,
     search/2,
     info/1,
     group1/2,
     group2/2,
-    design_doc_to_indexes/1
+    design_doc_to_indexes/2
 ]).
 
 % gen_server api.
@@ -87,14 +87,14 @@ to_index_pid(Pid) ->
         false -> Pid
     end.
 
-design_doc_to_indexes(#doc{body = {Fields}} = Doc) ->
+design_doc_to_indexes(DbName, #doc{body = {Fields}} = Doc) ->
     RawIndexes = couch_util:get_value(<<"indexes">>, Fields, {[]}),
     case RawIndexes of
         {IndexList} when is_list(IndexList) ->
             {IndexNames, _} = lists:unzip(IndexList),
             lists:flatmap(
                 fun(IndexName) ->
-                    case (catch design_doc_to_index(Doc, IndexName)) of
+                    case (catch design_doc_to_index(DbName, Doc, IndexName)) of
                         {ok, #index{} = Index} -> [Index];
                         _ -> []
                     end
@@ -301,7 +301,7 @@ open_index(DbName, #index{analyzer = Analyzer, sig = Sig}) ->
             Error
     end.
 
-design_doc_to_index(#doc{id = Id, body = {Fields}}, IndexName) ->
+design_doc_to_index(DbName, #doc{id = Id, body = {Fields}}, IndexName) ->
     Language = couch_util:get_value(<<"language">>, Fields, <<"javascript">>),
     {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
     InvalidDDocError =
@@ -323,6 +323,7 @@ design_doc_to_index(#doc{id = Id, body = {Fields}}, IndexName) ->
                         )
                     ),
                     {ok, #index{
+                        dbname = DbName,
                         analyzer = Analyzer,
                         ddoc_id = Id,
                         def = Def,

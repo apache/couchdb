@@ -66,9 +66,10 @@
 -export([
     design_docs/1,
     reset_validation_funs/1,
-    cleanup_index_files/0,
-    cleanup_index_files/1,
+    cleanup_index_files_all_nodes/0,
     cleanup_index_files_all_nodes/1,
+    cleanup_index_files_this_node/0,
+    cleanup_index_files_this_node/1,
     dbname/1,
     db_uuids/1
 ]).
@@ -634,54 +635,17 @@ reset_validation_funs(DbName) ->
      || #shard{node = Node, name = Name} <- mem3:shards(DbName)
     ].
 
-%% @doc clean up index files for all Dbs
--spec cleanup_index_files() -> [ok].
-cleanup_index_files() ->
-    {ok, Dbs} = fabric:all_dbs(),
-    [cleanup_index_files(Db) || Db <- Dbs].
+cleanup_index_files_this_node() ->
+    fabric_index_cleanup:cleanup_this_node().
 
-%% @doc clean up index files for a specific db
--spec cleanup_index_files(dbname()) -> ok.
-cleanup_index_files(DbName) ->
-    try
-        ShardNames = [mem3:name(S) || S <- mem3:local_shards(dbname(DbName))],
-        cleanup_local_indices_and_purge_checkpoints(ShardNames)
-    catch
-        error:database_does_not_exist ->
-            ok
-    end.
+cleanup_index_files_this_node(Db) ->
+    fabric_index_cleanup:cleanup_this_node(dbname(Db)).
 
-cleanup_local_indices_and_purge_checkpoints([]) ->
-    ok;
-cleanup_local_indices_and_purge_checkpoints([_ | _] = Dbs) ->
-    AllIndices = lists:map(fun couch_mrview_util:get_index_files/1, Dbs),
-    AllPurges = lists:map(fun couch_mrview_util:get_purge_checkpoints/1, Dbs),
-    Sigs = couch_mrview_util:get_signatures(hd(Dbs)),
-    ok = cleanup_purges(Sigs, AllPurges, Dbs),
-    ok = cleanup_indices(Sigs, AllIndices).
+cleanup_index_files_all_nodes() ->
+    fabric_index_cleanup:cleanup_all_nodes().
 
-cleanup_purges(Sigs, AllPurges, Dbs) ->
-    Fun = fun(DbPurges, Db) ->
-        couch_mrview_cleanup:cleanup_purges(Db, Sigs, DbPurges)
-    end,
-    lists:zipwith(Fun, AllPurges, Dbs),
-    ok.
-
-cleanup_indices(Sigs, AllIndices) ->
-    Fun = fun(DbIndices) ->
-        couch_mrview_cleanup:cleanup_indices(Sigs, DbIndices)
-    end,
-    lists:foreach(Fun, AllIndices).
-
-%% @doc clean up index files for a specific db on all nodes
--spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
-cleanup_index_files_all_nodes(DbName) ->
-    lists:foreach(
-        fun(Node) ->
-            rexi:cast(Node, {?MODULE, cleanup_index_files, [DbName]})
-        end,
-        mem3:nodes()
-    ).
+cleanup_index_files_all_nodes(Db) ->
+    fabric_index_cleanup:cleanup_all_nodes(dbname(Db)).
 
 %% some simple type validation and transcoding
 dbname(DbName) when is_list(DbName) ->

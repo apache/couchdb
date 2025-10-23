@@ -101,7 +101,7 @@ nouveau_indices(DbName, Doc) ->
 
 dreyfus_indices(DbName, Doc) ->
     try
-        Indices = dreyfus_index:design_doc_to_indexes(Doc),
+        Indices = dreyfus_index:design_doc_to_indexes(DbName, Doc),
         [{?DREYFUS, DbName, Index} || Index <- Indices]
     catch
         Tag:Err ->

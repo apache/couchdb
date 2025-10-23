@@ -262,10 +262,17 @@ rename(DbName) ->
 %% and an analyzer represented in a Javascript function in a design document.
 %% `Sig` is used to check if an index description is changed,
 %% and the index needs to be reconstructed.
--spec cleanup(DbName :: string_as_binary(_), ActiveSigs :: [sig()]) ->
+-spec cleanup(DbName :: string_as_binary(_), SigList :: list() | SigMap :: #{sig() => true}) ->
     ok.
 
-cleanup(DbName, ActiveSigs) ->
+% Compatibility clause to help when running search index cleanup during
+% a mixed cluster state. Remove after version 3.6
+%
+cleanup(DbName, SigList) when is_list(SigList) ->
+    SigMap = #{Sig => true || Sig <- SigList},
+    cleanup(DbName, SigMap);
+cleanup(DbName, #{} = SigMap) ->
+    ActiveSigs = maps:keys(SigMap),
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName, ActiveSigs}).
 
 %% a binary with value <<"tokens">>
