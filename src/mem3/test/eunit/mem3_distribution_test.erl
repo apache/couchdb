@@ -143,4 +143,5 @@ ping_nodes_test(_) ->
 dead_nodes_test(_) ->
     meck:expect(mem3, nodes, 0, [n1, n2, n3]),
     meck:expect(mem3_util, live_nodes, 0, [n1, n2]),
-    ?assertEqual([n3], couch_debug:dead_nodes()).
+    Node = node(),
+    ?assertEqual([{Node, [n3]}], couch_debug:dead_nodes()).
