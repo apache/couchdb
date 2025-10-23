@@ -14,11 +14,8 @@
 
 -export([
     run/1,
-    cleanup_purges/3,
-    cleanup_indices/2
+    cleanup/2
 ]).
-
--include_lib("couch/include/couch_db.hrl").
 
 run(Db) ->
     Indices = couch_mrview_util:get_index_files(Db),
@@ -28,15 +25,26 @@ run(Db) ->
     ok = cleanup_purges(Db1, Sigs, Checkpoints),
     ok = cleanup_indices(Sigs, Indices).
 
-cleanup_purges(DbName, Sigs, Checkpoints) when is_binary(DbName) ->
-    couch_util:with_db(DbName, fun(Db) ->
-        cleanup_purges(Db, Sigs, Checkpoints)
-    end);
-cleanup_purges(Db, #{} = Sigs, #{} = CheckpointsMap) ->
-    InactiveMap = maps:without(maps:keys(Sigs), CheckpointsMap),
-    InactiveCheckpoints = maps:values(InactiveMap),
-    DeleteFun = fun(DocId) -> delete_checkpoint(Db, DocId) end,
-    lists:foreach(DeleteFun, InactiveCheckpoints).
+% erpc endpoint for fabric_index_cleanup:cleanup_indexes/2
+%
+cleanup(Dbs, #{} = Sigs) ->
+    try
+        lists:foreach(
+            fun(Db) ->
+                Indices = couch_mrview_util:get_index_files(Db),
+                Checkpoints = couch_mrview_util:get_purge_checkpoints(Db),
+                ok = cleanup_purges(Db, Sigs, Checkpoints),
+                ok = cleanup_indices(Sigs, Indices)
+            end,
+            Dbs
+        )
+    catch
+        error:database_does_not_exist ->
+            ok
+    end.
+
+cleanup_purges(Db, Sigs, Checkpoints) ->
+    couch_index_util:cleanup_purges(Db, Sigs, Checkpoints).
 
 cleanup_indices(#{} = Sigs, #{} = IndexMap) ->
     Fun = fun(_, Files) -> lists:foreach(fun delete_file/1, Files) end,
@@ -52,22 +60,5 @@ delete_file(File) ->
         Tag:Error ->
             ErrLog = "~p : error deleting inactive index file ~s ~p:~p",
             couch_log:error(ErrLog, [?MODULE, File, Tag, Error]),
-            ok
-    end.
-
-delete_checkpoint(Db, DocId) ->
-    DbName = couch_db:name(Db),
-    LogMsg = "~p : deleting inactive purge checkpoint ~s : ~s",
-    couch_log:debug(LogMsg, [?MODULE, DbName, DocId]),
-    try couch_db:open_doc(Db, DocId, []) of
-        {ok, Doc = #doc{}} ->
-            Deleted = Doc#doc{deleted = true, body = {[]}},
-            couch_db:update_doc(Db, Deleted, [?ADMIN_CTX]);
-        {not_found, _} ->
-            ok
-    catch
-        Tag:Error ->
-            ErrLog = "~p : error deleting checkpoint ~s : ~s error: ~p:~p",
-            couch_log:error(ErrLog, [?MODULE, DbName, DocId, Tag, Error]),
             ok
     end.
