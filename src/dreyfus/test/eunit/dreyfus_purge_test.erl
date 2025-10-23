@@ -1102,17 +1102,17 @@ get_sigs(DbName) ->
     {ok, DesignDocs} = fabric:design_docs(DbName),
     lists:usort(
         lists:flatmap(
-            fun active_sigs/1,
+            fun(Doc) -> active_sigs(DbName, Doc) end,
             [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
         )
     ).
 
-active_sigs(#doc{body = {Fields}} = Doc) ->
+active_sigs(DbName, #doc{body = {Fields}} = Doc) ->
     {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
     {IndexNames, _} = lists:unzip(RawIndexes),
     [
         begin
-            {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
+            {ok, Index} = dreyfus_index:design_doc_to_index(DbName, Doc, IndexName),
             Index#index.sig
         end
      || IndexName <- IndexNames

@@ -347,7 +347,7 @@ indices_can_be_built_with_errors(#{db1 := Db}) ->
         end)}.
 
 mock_dreyfus_indices() ->
-    meck:expect(dreyfus_index, design_doc_to_indexes, fun(Doc) ->
+    meck:expect(dreyfus_index, design_doc_to_indexes, fun(_, Doc) ->
         #doc{body = {BodyProps}} = Doc,
         case couch_util:get_value(<<"indexes">>, BodyProps) of
             undefined ->

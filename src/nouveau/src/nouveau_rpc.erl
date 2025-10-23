@@ -17,8 +17,7 @@
 
 -export([
     search/3,
-    info/2,
-    cleanup/2
+    info/2
 ]).
 
 -include("nouveau.hrl").
@@ -88,7 +87,3 @@ info(DbName, #index{} = Index0) ->
         {error, Reason} ->
             rexi:reply({error, Reason})
     end.
-
-cleanup(Path, Exclusions) ->
-    nouveau_api:delete_path(nouveau_util:index_name(Path), Exclusions),
-    rexi:reply(ok).
