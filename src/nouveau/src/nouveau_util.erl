@@ -27,6 +27,8 @@
     maybe_create_local_purge_doc/2,
     get_local_purge_doc_id/1,
     get_local_purge_doc_body/3,
+    get_purge_checkpoints/1,
+    get_signatures_from_ddocs/2,
     nouveau_url/0
 ]).
 
@@ -174,6 +176,9 @@ maybe_create_local_purge_doc(Db, Index) ->
 get_local_purge_doc_id(Sig) ->
     iolist_to_binary([?LOCAL_DOC_PREFIX, "purge-", "nouveau-", Sig]).
 
+get_purge_checkpoints(Db) ->
+    couch_index_util:get_purge_checkpoints(Db, <<"nouveau">>).
+
 get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
     #index{
         name = IdxName,
@@ -192,6 +197,14 @@ get_local_purge_doc_body(LocalDocId, PurgeSeq, Index) ->
             {<<"type">>, <<"nouveau">>}
         ]},
     couch_doc:from_json_obj(JsonList).
+
+get_signatures_from_ddocs(DbName, DesignDocs) ->
+    SigList = lists:flatmap(fun(Doc) -> active_sigs(DbName, Doc) end, DesignDocs),
+    #{Sig => true || Sig <- SigList}.
+
+active_sigs(DbName, #doc{} = Doc) ->
+    Indexes = nouveau_util:design_doc_to_indexes(DbName, Doc),
+    lists:map(fun(Index) -> Index#index.sig end, Indexes).
 
 nouveau_url() ->
     config:get("nouveau", "url", "http://127.0.0.1:5987").

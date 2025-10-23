@@ -341,7 +341,7 @@ update_ddoc_indexes(Name, #doc{} = Doc, State) ->
 search_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"indexes">>) of
         true ->
-            try dreyfus_index:design_doc_to_indexes(Doc) of
+            try dreyfus_index:design_doc_to_indexes(Name, Doc) of
                 SIndexes -> update_ddoc_search_indexes(Name, SIndexes, Seq, State)
             catch
                 _:_ ->

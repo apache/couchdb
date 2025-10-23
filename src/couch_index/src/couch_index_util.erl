@@ -14,6 +14,7 @@
 
 -export([root_dir/0, index_dir/2, index_file/3]).
 -export([load_doc/3, sort_lib/1, hexsig/1]).
+-export([get_purge_checkpoints/2, cleanup_purges/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -72,3 +73,49 @@ sort_lib([{LName, LCode} | Rest], LAcc) ->
 
 hexsig(Sig) ->
     couch_util:to_hex(Sig).
+
+% Helper function for indexes to get their purge checkpoints as signatures.
+%
+get_purge_checkpoints(DbName, Type) when is_binary(DbName), is_binary(Type) ->
+    couch_util:with_db(DbName, fun(Db) -> get_purge_checkpoints(Db, Type) end);
+get_purge_checkpoints(Db, Type) when is_binary(Type) ->
+    Prefix = <<?LOCAL_DOC_PREFIX, "purge-", Type:(byte_size(Type))/binary, "-">>,
+    PrefixSize = byte_size(Prefix),
+    FoldFun = fun(#doc{id = Id}, Acc) ->
+        case Id of
+            <<Prefix:PrefixSize/binary, Sig/binary>> -> {ok, Acc#{Sig => Id}};
+            _ -> {stop, Acc}
+        end
+    end,
+    Opts = [{start_key, Prefix}],
+    {ok, Signatures = #{}} = couch_db:fold_local_docs(Db, FoldFun, #{}, Opts),
+    Signatures.
+
+% Helper functions for indexes to clean their purge checkpoints.
+%
+cleanup_purges(DbName, #{} = Sigs, #{} = Checkpoints) when is_binary(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        cleanup_purges(Db, Sigs, Checkpoints)
+    end);
+cleanup_purges(Db, #{} = Sigs, #{} = CheckpointsMap) ->
+    InactiveMap = maps:without(maps:keys(Sigs), CheckpointsMap),
+    InactiveCheckpoints = maps:values(InactiveMap),
+    DeleteFun = fun(DocId) -> delete_checkpoint(Db, DocId) end,
+    lists:foreach(DeleteFun, InactiveCheckpoints).
+
+delete_checkpoint(Db, DocId) ->
+    DbName = couch_db:name(Db),
+    LogMsg = "~p : deleting inactive purge checkpoint ~s : ~s",
+    couch_log:debug(LogMsg, [?MODULE, DbName, DocId]),
+    try couch_db:open_doc(Db, DocId, []) of
+        {ok, Doc = #doc{}} ->
+            Deleted = Doc#doc{deleted = true, body = {[]}},
+            couch_db:update_doc(Db, Deleted, [?ADMIN_CTX]);
+        {not_found, _} ->
+            ok
+    catch
+        Tag:Error ->
+            ErrLog = "~p : error deleting checkpoint ~s : ~s error: ~p:~p",
+            couch_log:error(ErrLog, [?MODULE, DbName, DocId, Tag, Error]),
+            ok
+    end.
