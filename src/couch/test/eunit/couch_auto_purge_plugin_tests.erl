@@ -25,7 +25,11 @@ couch_quickjs_scanner_plugin_test_() ->
         [
             ?TDEF_FE(t_no_auto_purge_by_default, 10),
             ?TDEF_FE(t_auto_purge_after_config_ttl, 10),
-            ?TDEF_FE(t_auto_purge_after_db_ttl, 10)
+            ?TDEF_FE(t_auto_purge_after_db_ttl, 10),
+            ?TDEF_FE(t_min_batch_size_1, 10),
+            ?TDEF_FE(t_min_batch_size_2, 10),
+            ?TDEF_FE(t_max_batch_size_1, 10),
+            ?TDEF_FE(t_max_batch_size_2, 10)
         ]
     }.
 
@@ -83,6 +87,92 @@ t_auto_purge_after_db_ttl({_, DbName}) ->
     ?assertEqual(0, doc_del_count(DbName)),
     ok.
 
+t_min_batch_size_1({_, DbName}) ->
+    meck:new(fabric, [passthrough]),
+    config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 5),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    [
+        add_doc(DbName, <<"doc", (integer_to_binary(I))/binary>>, #{<<"_deleted">> => true})
+     || I <- lists:seq(1, 10)
+    ],
+    ?assertEqual(10, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(2, meck:num_calls(fabric, purge_docs, '_')),
+    ?assertEqual(0, doc_del_count(DbName)),
+    ok.
+
+t_min_batch_size_2({_, DbName}) ->
+    meck:new(fabric, [passthrough]),
+    config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 5),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    [
+        add_doc(DbName, <<"doc", (integer_to_binary(I))/binary>>, #{<<"_deleted">> => true})
+     || I <- lists:seq(1, 11)
+    ],
+    ?assertEqual(11, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(4, meck:num_calls(fabric, purge_docs, '_')),
+    ?assertEqual(0, doc_del_count(DbName)),
+    ok.
+
+t_max_batch_size_1({_, DbName}) ->
+    meck:new(fabric, [passthrough]),
+    config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 1),
+    config:set_integer(atom_to_list(?PLUGIN), "max_batch_size", 5),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    [
+        add_replicated_doc(
+            DbName,
+            <<"doc">>,
+            #{
+                <<"_rev">> => <<"1-", (couch_uuids:random())/binary>>,
+                <<"foo">> => I,
+                <<"_deleted">> => true
+            }
+        )
+     || I <- lists:seq(1, 10)
+    ],
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(2, meck:num_calls(fabric, purge_docs, '_')),
+    ?assertEqual(0, doc_del_count(DbName)),
+    ok.
+
+t_max_batch_size_2({_, DbName}) ->
+    meck:new(fabric, [passthrough]),
+    config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 1),
+    config:set_integer(atom_to_list(?PLUGIN), "max_batch_size", 5),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    [
+        add_replicated_doc(
+            DbName,
+            <<"doc">>,
+            #{
+                <<"_rev">> => <<"1-", (couch_uuids:random())/binary>>,
+                <<"foo">> => I,
+                <<"_deleted">> => true
+            }
+        )
+     || I <- lists:seq(1, 11)
+    ],
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(3, meck:num_calls(fabric, purge_docs, '_')),
+    ?assertEqual(0, doc_del_count(DbName)),
+    ok.
+
 reset_stats() ->
     Counters = [
         [couchdb, query_server, process_error_exits],
@@ -104,6 +194,10 @@ config_delete_section(Section) ->
 
 add_doc(DbName, DocId, Body) ->
     {ok, _} = fabric:update_doc(DbName, mkdoc(DocId, Body), [?ADMIN_CTX]),
+    ok.
+
+add_replicated_doc(DbName, DocId, Body) ->
+    {ok, _} = fabric:update_doc(DbName, mkdoc(DocId, Body), [?ADMIN_CTX, ?REPLICATED_CHANGES]),
     ok.
 
 mkdoc(Id, #{} = Body) ->
