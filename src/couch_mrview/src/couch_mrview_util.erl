@@ -16,6 +16,7 @@
 -export([get_local_purge_doc_id/1, get_value_from_options/2]).
 -export([verify_view_filename/1, get_signature_from_filename/1]).
 -export([get_signatures/1, get_purge_checkpoints/1, get_index_files/1]).
+-export([get_signatures_from_ddocs/2]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
 -export([make_header/1]).
 -export([index_file/2, compaction_file/2, open_file/1]).
@@ -94,40 +95,35 @@ get_signatures(DbName) when is_binary(DbName) ->
     couch_util:with_db(DbName, fun get_signatures/1);
 get_signatures(Db) ->
     DbName = couch_db:name(Db),
-    % get_design_docs/1 returns ejson for clustered shards, and
-    % #full_doc_info{}'s for other cases.
     {ok, DDocs} = couch_db:get_design_docs(Db),
+    % get_design_docs/1 returns ejson for clustered shards, and
+    % #full_doc_info{}'s for other cases. Both are transformed to #doc{} records
     FoldFun = fun
         ({[_ | _]} = EJsonDoc, Acc) ->
             Doc = couch_doc:from_json_obj(EJsonDoc),
-            {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
-            Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
-            Acc#{Sig => true};
+            [Doc | Acc];
         (#full_doc_info{} = FDI, Acc) ->
             {ok, Doc} = couch_db:open_doc_int(Db, FDI, [ejson_body]),
-            {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
-            Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
-            Acc#{Sig => true}
+            [Doc | Acc]
+    end,
+    DDocs1 = lists:foldl(FoldFun, [], DDocs),
+    get_signatures_from_ddocs(DbName, DDocs1).
+
+% From a list of design #doc{} records returns signatures map: #{Sig => true}
+%
+get_signatures_from_ddocs(DbName, DDocs) when is_list(DDocs) ->
+    FoldFun = fun(#doc{} = Doc, Acc) ->
+        {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
+        Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
+        Acc#{Sig => true}
     end,
     lists:foldl(FoldFun, #{}, DDocs).
 
 % Returns a map of `Sig => DocId` elements for all the purge view
 % checkpoint docs. Sig is a hex-encoded binary.
 %
-get_purge_checkpoints(DbName) when is_binary(DbName) ->
-    couch_util:with_db(DbName, fun get_purge_checkpoints/1);
 get_purge_checkpoints(Db) ->
-    FoldFun = fun(#doc{id = Id}, Acc) ->
-        case Id of
-            <<?LOCAL_DOC_PREFIX, "purge-mrview-", Sig/binary>> ->
-                {ok, Acc#{Sig => Id}};
-            _ ->
-                {stop, Acc}
-        end
-    end,
-    Opts = [{start_key, <<?LOCAL_DOC_PREFIX, "purge-mrview-">>}],
-    {ok, Signatures = #{}} = couch_db:fold_local_docs(Db, FoldFun, #{}, Opts),
-    Signatures.
+    couch_index_util:get_purge_checkpoints(Db, <<"mrview">>).
 
 % Returns a map of `Sig => [FilePath, ...]` elements. Sig is a hex-encoded
 % binary and FilePaths are lists as they intended to be passed to couch_file
