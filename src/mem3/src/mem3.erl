@@ -500,7 +500,7 @@ do_ping(Node, Timeout) ->
             {Tag, Err}
     end.
 
--spec dead_nodes() -> [node() | Error :: term()].
+-spec dead_nodes() -> [{node(), [node()]}].
 
 %% @doc Returns a list of dead nodes from the cluster.
 %%
@@ -518,32 +518,21 @@ do_ping(Node, Timeout) ->
 dead_nodes() ->
     dead_nodes(?PING_TIMEOUT_IN_MS).
 
--spec dead_nodes(Timeout :: pos_integer()) -> [node() | Error :: term()].
+-spec dead_nodes(Timeout :: pos_integer()) -> [{node(), [node()]}].
 
 dead_nodes(Timeout) when is_integer(Timeout), Timeout > 0 ->
     % Here we are trying to detect overlapping partitions where not all the
     % nodes connect to each other. For example: n1 connects to n2 and n3, but
     % n2 and n3 are not connected.
-    DeadFun = fun() ->
-        Expected = ordsets:from_list(mem3:nodes()),
-        Live = ordsets:from_list(mem3_util:live_nodes()),
-        Dead = ordsets:subtract(Expected, Live),
-        ordsets:to_list(Dead)
+    Nodes = [node() | erlang:nodes()],
+    Expected = erpc:multicall(Nodes, mem3, nodes, [], Timeout),
+    Live = erpc:multicall(Nodes, mem3_util, live_nodes, [], Timeout),
+    ZipF = fun
+        (N, {ok, E}, {ok, L}) -> {N, E -- L};
+        (N, _, _) -> {N, Nodes}
     end,
-    {Responses, BadNodes} = multicall(DeadFun, Timeout),
-    AccF = lists:foldl(
-        fun
-            (Dead, Acc) when is_list(Dead) -> ordsets:union(Acc, Dead);
-            (Error, Acc) -> ordsets:union(Acc, [Error])
-        end,
-        ordsets:from_list(BadNodes),
-        Responses
-    ),
-    ordsets:to_list(AccF).
-
-multicall(Fun, Timeout) when is_integer(Timeout), Timeout > 0 ->
-    F = fun() -> catch Fun() end,
-    rpc:multicall(erlang, apply, [F, []], Timeout).
+    DeadPerNode = lists:zipwith3(ZipF, Nodes, Expected, Live),
+    lists:sort([{N, lists:sort(D)} || {N, D} <- DeadPerNode, D =/= []]).
 
 db_is_current(#shard{name = Name}) ->
     db_is_current(Name);
