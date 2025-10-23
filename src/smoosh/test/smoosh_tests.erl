@@ -155,7 +155,7 @@ t_index_cleanup_happens_by_default(DbName) ->
     get_channel_pid("index_cleanup") ! unpause,
     {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar">>),
     % View cleanup should have been invoked
-    meck:wait(fabric, cleanup_index_files, [DbName], 4000),
+    meck:wait(fabric, cleanup_index_files_this_node, [DbName], 4000),
     wait_view_compacted(DbName, <<"foo">>).
 
 t_index_cleanup_can_be_disabled(DbName) ->
