@@ -26,6 +26,7 @@
     doc_id_and_rev/1
 ]).
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1, timeout/2]).
+-export([abs_request_timeout/0]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
 -export([open_cluster_db/1, open_cluster_db/2]).
@@ -35,6 +36,7 @@
 -export([worker_ranges/1]).
 -export([get_uuid_prefix_len/0]).
 -export([isolate/1, isolate/2]).
+-export([get_design_doc_records/1]).
 
 -compile({inline, [{doc_id_and_rev, 1}]}).
 
@@ -106,6 +108,15 @@ log_timeout(Workers, EndPoint) ->
         end,
         Workers
     ).
+
+% Return {abs, MonotonicMSec}. This is a format used by erpc to
+% provide an absolute time limit for a collection or requests
+% See https://www.erlang.org/doc/apps/kernel/erpc.html#t:timeout_time/0
+%
+abs_request_timeout() ->
+    Timeout = fabric_util:request_timeout(),
+    NowMSec = erlang:monotonic_time(millisecond),
+    {abs, NowMSec + Timeout}.
 
 remove_done_workers(Workers, WaitingIndicator) ->
     [W || {W, WI} <- fabric_dict:to_list(Workers), WI == WaitingIndicator].
@@ -391,6 +402,19 @@ worker_ranges(Workers) ->
 get_uuid_prefix_len() ->
     config:get_integer("fabric", "uuid_prefix_len", 7).
 
+% Get design #doc{} records. Run in an isolated process. This is often used
+% when computing signatures of various indexes
+%
+get_design_doc_records(DbName) ->
+    fabric_util:isolate(fun() ->
+        case fabric:design_docs(DbName) of
+            {ok, DDocs} when is_list(DDocs) ->
+                Fun = fun({[_ | _]} = Doc) -> couch_doc:from_json_obj(Doc) end,
+                {ok, lists:map(Fun, DDocs)};
+            Else ->
+                Else
+        end
+    end).
 % If we issue multiple fabric calls from the same process we have to isolate
 % them so in case of error they don't pollute the processes dictionary or the
 % mailbox

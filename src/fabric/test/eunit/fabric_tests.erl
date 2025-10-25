@@ -47,17 +47,20 @@ teardown({Ctx, DbName}) ->
     test_util:stop_couch(Ctx).
 
 t_cleanup_index_files(_) ->
-    CheckFun = fun(Res) -> Res =:= ok end,
-    ?assert(lists:all(CheckFun, fabric:cleanup_index_files())).
+    ?assertEqual(ok, fabric:cleanup_index_files_this_node()),
+    ?assertEqual(ok, fabric:cleanup_index_files_all_nodes()).
 
 t_cleanup_index_files_with_existing_db({_, DbName}) ->
-    ?assertEqual(ok, fabric:cleanup_index_files(DbName)).
+    ?assertEqual(ok, fabric:cleanup_index_files_this_node(DbName)),
+    ?assertEqual(ok, fabric:cleanup_index_files_all_nodes(DbName)),
+    ?assertEqual(ok, fabric:cleanup_index_files_this_node(<<"non_existent">>)),
+    ?assertEqual(ok, fabric:cleanup_index_files_all_nodes(<<"non_existent">>)).
 
 t_cleanup_index_files_with_view_data({_, DbName}) ->
     Sigs = sigs(DbName),
     Indices = indices(DbName),
     Purges = purges(DbName),
-    ok = fabric:cleanup_index_files(DbName),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
     % We haven't inadvertently removed any active index bits
     ?assertEqual(Sigs, sigs(DbName)),
     ?assertEqual(Indices, indices(DbName)),
@@ -65,7 +68,7 @@ t_cleanup_index_files_with_view_data({_, DbName}) ->
 
 t_cleanup_index_files_with_deleted_db(_) ->
     SomeDb = ?tempdb(),
-    ?assertEqual(ok, fabric:cleanup_index_files(SomeDb)).
+    ?assertEqual(ok, fabric:cleanup_index_files_all_nodes(SomeDb)).
 
 t_cleanup_index_file_after_ddoc_update({_, DbName}) ->
     ?assertEqual(
@@ -84,7 +87,7 @@ t_cleanup_index_file_after_ddoc_update({_, DbName}) ->
     ),
 
     update_ddoc(DbName, <<"_design/foo">>, <<"bar1">>),
-    ok = fabric:cleanup_index_files(DbName),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
     {ok, _} = fabric:query_view(DbName, <<"foo">>, <<"bar1">>),
 
     % One 4bc stays, da8 should  gone and 9e3 is added
@@ -120,7 +123,7 @@ t_cleanup_index_file_after_ddoc_delete({_, DbName}) ->
     ),
 
     delete_ddoc(DbName, <<"_design/foo">>),
-    ok = fabric:cleanup_index_files(DbName),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
 
     % 4bc stays the same, da8 should be gone
     ?assertEqual(
@@ -137,13 +140,13 @@ t_cleanup_index_file_after_ddoc_delete({_, DbName}) ->
     ),
 
     delete_ddoc(DbName, <<"_design/boo">>),
-    ok = fabric:cleanup_index_files(DbName),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
 
     ?assertEqual([], indices(DbName)),
     ?assertEqual([], purges(DbName)),
 
     % cleaning a db with all deleted indices should still work
-    ok = fabric:cleanup_index_files(DbName),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
 
     ?assertEqual([], indices(DbName)),
     ?assertEqual([], purges(DbName)).

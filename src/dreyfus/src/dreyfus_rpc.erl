@@ -46,7 +46,7 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
         stale = Stale
     } = QueryArgs,
     {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             try
                 rexi:reply(index_call(Fun, DbName, Index, QueryArgs, MinSeq))
@@ -81,7 +81,7 @@ info(DbName, DDoc, IndexName) ->
 info_int(DbName, DDoc, IndexName) ->
     erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
                 {ok, Pid} ->
@@ -102,7 +102,7 @@ info_int(DbName, DDoc, IndexName) ->
 disk_size(DbName, DDoc, IndexName) ->
     erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             Result = dreyfus_index_manager:get_disk_size(DbName, Index),
             rexi:reply(Result);
