@@ -811,22 +811,22 @@ purge_docs(Db, PurgeReqs) ->
     FDIs = couch_db_engine:open_docs(Db, Ids),
     USeq = couch_db_engine:get_update_seq(Db),
 
-    IdFDIs = lists:zip(Ids, FDIs),
+    IdFDIs = maps:from_list(lists:zip(Ids, FDIs)),
     {NewIdFDIs, Replies} = apply_purge_reqs(PurgeReqs, IdFDIs, USeq, []),
 
-    Pairs = lists:flatmap(
-        fun({DocId, OldFDI}) ->
-            {DocId, NewFDI} = lists:keyfind(DocId, 1, NewIdFDIs),
-            case {OldFDI, NewFDI} of
-                {not_found, not_found} ->
-                    [];
-                {#full_doc_info{} = A, #full_doc_info{} = A} ->
-                    [];
-                {#full_doc_info{}, _} ->
-                    [{OldFDI, NewFDI}]
-            end
-        end,
-        IdFDIs
+    Pairs = lists:sort(
+        maps:fold(
+            fun(DocId, OldFDI, Acc) ->
+                #{DocId := NewFDI} = NewIdFDIs,
+                case {OldFDI, NewFDI} of
+                    {not_found, not_found} -> Acc;
+                    {#full_doc_info{} = A, #full_doc_info{} = A} -> Acc;
+                    {#full_doc_info{}, _} -> [{OldFDI, NewFDI} | Acc]
+                end
+            end,
+            [],
+            IdFDIs
+        )
     ),
 
     PSeq = couch_db_engine:get_purge_seq(Db),
@@ -850,7 +850,7 @@ apply_purge_reqs([], IdFDIs, _USeq, Replies) ->
     {IdFDIs, lists:reverse(Replies)};
 apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
     {_UUID, DocId, Revs} = Req,
-    {value, {_, FDI0}, RestIdFDIs} = lists:keytake(DocId, 1, IdFDIs),
+    #{DocId := FDI0} = IdFDIs,
     {NewFDI, RemovedRevs, NewUSeq} =
         case FDI0 of
             #full_doc_info{rev_tree = Tree} ->
@@ -888,9 +888,8 @@ apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
                 % Not found means nothing to change
                 {not_found, [], USeq}
         end,
-    NewIdFDIs = [{DocId, NewFDI} | RestIdFDIs],
     NewReplies = [{ok, RemovedRevs} | Replies],
-    apply_purge_reqs(RestReqs, NewIdFDIs, NewUSeq, NewReplies).
+    apply_purge_reqs(RestReqs, IdFDIs#{DocId := NewFDI}, NewUSeq, NewReplies).
 
 update_time_seq(#db{time_seq = TSeq} = Db, Seq) when is_integer(Seq) ->
     Timestamp = couch_time_seq:timestamp(),
