@@ -11,7 +11,6 @@
 % the License.
 
 HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name}.
-HaveHastings = code:lib_dir(hastings) /= {error, bad_name}.
 
 BaseApplications = [
     kernel,
@@ -24,7 +23,6 @@ BaseApplications = [
 
 Applications =
     if HaveDreyfus -> [dreyfus]; true -> [] end ++
-    if HaveHastings -> [hastings]; true -> [] end ++
     BaseApplications.
 
 {application, ken, [

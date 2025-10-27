@@ -55,10 +55,6 @@
 -include_lib("dreyfus/include/dreyfus.hrl").
 -endif.
 
--ifdef(HAVE_HASTINGS).
--include_lib("hastings/src/hastings.hrl").
--endif.
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -145,17 +141,6 @@ handle_cast({remove, DbName}, State) ->
 handle_cast({resubmit, DbName}, State) ->
     ets:delete(ken_resubmit, DbName),
     handle_cast({add, DbName}, State);
-% st index job names have 3 elements, 3rd being 'hastings'. See job record definition.
-handle_cast({trigger_update, #job{name = {_, _, hastings}, server = GPid, seq = Seq} = Job}, State) ->
-    % hastings_index:await will trigger a hastings index update
-    {Pid, _} = spawn_monitor(
-        hastings_index,
-        await,
-        [GPid, Seq]
-    ),
-    Now = erlang:monotonic_time(),
-    ets:insert(ken_workers, Job#job{worker_pid = Pid, lru = Now}),
-    {noreply, State, 0};
 handle_cast({trigger_update, #job{name = {_, Index, nouveau}} = Job}, State) ->
     % nouveau_index_manager:update_index will trigger a search index update.
     {Pid, _} = spawn_monitor(
@@ -330,10 +315,9 @@ update_ddoc_indexes(Name, #doc{} = Doc, State) ->
                 ok
         end,
     SearchUpdated = search_updated(Name, Doc, Seq, State),
-    STUpdated = st_updated(Name, Doc, Seq, State),
     NouveauUpdated = nouveau_updated(Name, Doc, Seq, State),
-    case {ViewUpdated, SearchUpdated, STUpdated, NouveauUpdated} of
-        {ok, ok, ok, ok} -> ok;
+    case {ViewUpdated, SearchUpdated, NouveauUpdated} of
+        {ok, ok, ok} -> ok;
         _ -> resubmit
     end.
 
@@ -352,24 +336,6 @@ search_updated(Name, Doc, Seq, State) ->
     end.
 -else.
 search_updated(_Name, _Doc, _Seq, _State) ->
-    ok.
--endif.
-
--ifdef(HAVE_HASTINGS).
-st_updated(Name, Doc, Seq, State) ->
-    case should_update(Doc, <<"st_indexes">>) of
-        true ->
-            try hastings_index:design_doc_to_indexes(Doc) of
-                STIndexes -> update_ddoc_st_indexes(Name, STIndexes, Seq, State)
-            catch
-                _:_ ->
-                    ok
-            end;
-        false ->
-            ok
-    end.
--else.
-st_updated(_Name, _Doc, _Seq, _State) ->
     ok.
 -endif.
 
@@ -440,33 +406,6 @@ update_ddoc_search_indexes(DbName, Indexes, Seq, State) ->
     end.
 -endif.
 
--ifdef(HAVE_HASTINGS).
-update_ddoc_st_indexes(DbName, Indexes, Seq, State) ->
-    if
-        Indexes =/= [] ->
-            % The record name in hastings is #h_idx rather than #index as it is for dreyfus
-            % Spawn a job for each spatial index in the ddoc
-            lists:foldl(
-                fun(#h_idx{ddoc_id = DDocName} = Index, Acc) ->
-                    case hastings_index_manager:get_index(DbName, Index) of
-                        {ok, Pid} ->
-                            case maybe_start_job({DbName, DDocName, hastings}, Pid, Seq, State) of
-                                resubmit -> resubmit;
-                                _ -> Acc
-                            end;
-                        _ ->
-                            % If any job fails, retry the db.
-                            resubmit
-                    end
-                end,
-                ok,
-                Indexes
-            );
-        true ->
-            ok
-    end.
--endif.
-
 update_ddoc_nouveau_indexes(DbName, Indexes, Seq, State) ->
     if
         Indexes =/= [] ->
@@ -504,10 +443,6 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
                     true;
                 A < TotalChannels ->
                     case Name of
-                        % st_index name has three elements
-                        {_, _, hastings} ->
-                            {ok, CurrentSeq} = hastings_index:await(Pid, 0),
-                            (Seq - CurrentSeq) < Threshold;
                         % View name has two elements.
                         _ when IsView ->
                             % Since seq is 0, couch_index:get_state/2 won't

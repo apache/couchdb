@@ -9,7 +9,6 @@ mkdir -p ./tmp
 $REBAR --keep-going --recursive xref $DIALYZE_OPTS | \
                                       grep -v '==>' | \
                                       grep -v 'WARN' | \
-                                      grep -v hastings | \
                                       sort > ./tmp/xref-output.txt
 
 # compare result against known allowed output
