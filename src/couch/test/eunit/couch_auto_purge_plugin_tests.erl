@@ -117,7 +117,7 @@ t_min_batch_size_2({_, DbName}) ->
     meck:reset(?PLUGIN),
     config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
     wait_exit(10000),
-    ?assertEqual(4, meck:num_calls(fabric, purge_docs, '_')),
+    ?assertEqual(3, meck:num_calls(fabric, purge_docs, '_')),
     ?assertEqual(0, doc_del_count(DbName)),
     ok.
 

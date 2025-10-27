@@ -53,7 +53,8 @@ db(St, DbName) ->
     end.
 
 db_opened(#{} = St, Db) ->
-    #{ttl := TTL} = St,
+    #{ttl := TTL, queue := Queue} = St,
+    ?assert(Queue == [], "Queue is not empty from previous operations"),
     EndSeq = couch_time_seq:since(couch_db:get_time_seq(Db), couch_time_seq:timestamp() - TTL),
     ChangeOpts =
         if
@@ -64,9 +65,9 @@ db_opened(#{} = St, Db) ->
     {0, ChangeOpts, St#{count => 0, end_seq => EndSeq}}.
 
 db_closing(#{} = St, Db) ->
-    #{count := Count} = flush_queue(St, Db),
-    ?INFO("purged ~B deleted documents from ~s", [Count, couch_db:name(Db)], meta(St)),
-    {ok, St}.
+    St1 = #{count := Count} = flush_queue(St, Db),
+    ?INFO("purged ~B deleted documents from ~s", [Count, couch_db:name(Db)], meta(St1)),
+    {ok, St1}.
 
 doc_fdi(#{} = St, #full_doc_info{deleted = true} = FDI, Db) ->
     #{end_seq := EndSeq} = St,
@@ -89,19 +90,20 @@ enqueue(#{queue := Queue} = St0, Id, Revs, Db) ->
     if
         NewQueueSize > MaxBatchSize ->
             {RevBatch, RevRest} = lists:split(MaxBatchSize - CurrentQueueSize, Revs),
-            St1 = flush_queue(St0#{queue => [{Id, RevBatch} | Queue]}, Db),
+            St1 = flush_queue(St0#{queue := [{Id, RevBatch} | Queue]}, Db),
             enqueue(St1, Id, RevRest, Db);
         NewQueueSize >= MinBatchSize ->
-            flush_queue(St0#{queue => [{Id, Revs} | Queue]}, Db);
+            flush_queue(St0#{queue := [{Id, Revs} | Queue]}, Db);
         NewQueueSize < MinBatchSize ->
-            St0#{queue => [{Id, Revs} | Queue]}
+            St0#{queue := [{Id, Revs} | Queue]}
     end.
 
 flush_queue(#{queue := []} = St, _Db) ->
     St;
 flush_queue(#{queue := IdRevs} = St, Db) ->
     DbName = mem3:dbname(couch_db:name(Db)),
-    PurgeFun = fun() -> fabric:purge_docs(DbName, IdRevs, [?ADMIN_CTX]) end,
+    N = mem3:n(DbName),
+    PurgeFun = fun() -> fabric:purge_docs(DbName, IdRevs, [?ADMIN_CTX, {w, N}]) end,
     Timeout = fabric_util:request_timeout(),
     try fabric_util:isolate(PurgeFun, Timeout) of
         {Health, Results} when Health == ok; Health == accepted ->
@@ -116,9 +118,9 @@ flush_queue(#{queue := IdRevs} = St, Db) ->
             ),
             timer:sleep(Wait),
             St#{
-                count => Count + length(Results),
-                limiter => Limiter1,
-                queue => []
+                count := Count + length(Results),
+                limiter := Limiter1,
+                queue := []
             };
         Else ->
             ?WARN(
@@ -126,7 +128,8 @@ flush_queue(#{queue := IdRevs} = St, Db) ->
                 [DbName, Else],
                 meta(St)
             ),
-            St
+            % Reset the queue. We'll catch these on the next run.
+            St#{queue := []}
     catch
         Class:Reason ->
             ?WARN(
@@ -134,7 +137,8 @@ flush_queue(#{queue := IdRevs} = St, Db) ->
                 [DbName, Class, Reason],
                 meta(St)
             ),
-            St
+            % Reset the queue. We'll catch these on the next run.
+            St#{queue := []}
     end.
 
 queue_size(Queue) when is_list(Queue) ->
