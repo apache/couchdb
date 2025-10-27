@@ -37,13 +37,13 @@
 -export([get_uuid_prefix_len/0]).
 -export([isolate/1, isolate/2]).
 -export([get_design_doc_records/1]).
+-export([w_from_opts/2, r_from_opts/2]).
 
 -compile({inline, [{doc_id_and_rev, 1}]}).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
--include_lib("eunit/include/eunit.hrl").
 
 remove_down_workers(Workers, BadNode) ->
     remove_down_workers(Workers, BadNode, []).
@@ -261,38 +261,6 @@ create_monitors(Shards) ->
     MonRefs = lists:usort([rexi_utils:server_pid(N) || #shard{node = N} <- Shards]),
     rexi_monitor:start(MonRefs).
 
-%% verify only id and rev are used in key.
-update_counter_test() ->
-    Reply =
-        {ok, #doc{
-            id = <<"id">>,
-            revs = <<"rev">>,
-            body = <<"body">>,
-            atts = <<"atts">>
-        }},
-    ?assertEqual(
-        [{{<<"id">>, <<"rev">>}, {Reply, 1}}],
-        update_counter(Reply, 1, [])
-    ).
-
-remove_ancestors_test() ->
-    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
-    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
-    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
-    Bar2 = {not_found, {1, <<"bar">>}},
-    ?assertEqual(
-        [kv(Bar1, 1), kv(Foo1, 1)],
-        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1)], [])
-    ),
-    ?assertEqual(
-        [kv(Bar1, 1), kv(Foo2, 2)],
-        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1), kv(Foo2, 1)], [])
-    ),
-    ?assertEqual(
-        [kv(Bar1, 2)],
-        remove_ancestors([kv(Bar2, 1), kv(Bar1, 1)], [])
-    ).
-
 is_replicator_db(DbName) ->
     path_ends_with(DbName, <<"_replicator">>).
 
@@ -415,6 +383,30 @@ get_design_doc_records(DbName) ->
                 Else
         end
     end).
+
+w_from_opts(Db, Options) ->
+    quorum_from_opts(Db, couch_util:get_value(w, Options)).
+
+r_from_opts(Db, Options) ->
+    quorum_from_opts(Db, couch_util:get_value(r, Options)).
+
+quorum_from_opts(Db, Val) ->
+    try
+        if
+            is_integer(Val) ->
+                Val;
+            is_list(Val) ->
+                % Compatibility clause. Keep as long as chttpd parses r and w
+                % request parameters as lists (strings).
+                list_to_integer(Val);
+            true ->
+                mem3:quorum(Db)
+        end
+    catch
+        _:_ ->
+            mem3:quorum(Db)
+    end.
+
 % If we issue multiple fabric calls from the same process we have to isolate
 % them so in case of error they don't pollute the processes dictionary or the
 % mailbox
@@ -442,6 +434,41 @@ do_isolate(Fun) ->
         Tag:Reason:Stack ->
             {'$isolerr', Tag, Reason, Stack}
     end.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+%% verify only id and rev are used in key.
+update_counter_test() ->
+    Reply =
+        {ok, #doc{
+            id = <<"id">>,
+            revs = <<"rev">>,
+            body = <<"body">>,
+            atts = <<"atts">>
+        }},
+    ?assertEqual(
+        [{{<<"id">>, <<"rev">>}, {Reply, 1}}],
+        update_counter(Reply, 1, [])
+    ).
+
+remove_ancestors_test() ->
+    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
+    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
+    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
+    Bar2 = {not_found, {1, <<"bar">>}},
+    ?assertEqual(
+        [kv(Bar1, 1), kv(Foo1, 1)],
+        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1)], [])
+    ),
+    ?assertEqual(
+        [kv(Bar1, 1), kv(Foo2, 2)],
+        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1), kv(Foo2, 1)], [])
+    ),
+    ?assertEqual(
+        [kv(Bar1, 2)],
+        remove_ancestors([kv(Bar2, 1), kv(Bar1, 1)], [])
+    ).
 
 get_db_timeout_test() ->
     % Q=1, N=1
@@ -486,3 +513,32 @@ get_db_timeout_test() ->
     % request_timeout was set to infinity, with enough shards it still gets to
     % 100 min timeout at the start from the exponential logic
     ?assertEqual(100, get_db_timeout(64, 2, 100, infinity)).
+
+rw_opts_test_() ->
+    {
+        foreach,
+        fun() -> meck:new(mem3, [passthrough]) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_w_opts_get),
+            ?TDEF_FE(t_r_opts_get)
+        ]
+    }.
+
+t_w_opts_get(_) ->
+    meck:expect(mem3, quorum, 1, 3),
+    ?assertEqual(5, w_from_opts(any_db, [{w, 5}])),
+    ?assertEqual(5, w_from_opts(any_db, [{w, "5"}])),
+    ?assertEqual(3, w_from_opts(any_db, [{w, some_other_type}])),
+    ?assertEqual(3, w_from_opts(any_db, [{w, "five"}])),
+    ?assertEqual(3, w_from_opts(any_db, [])).
+
+t_r_opts_get(_) ->
+    meck:expect(mem3, quorum, 1, 3),
+    ?assertEqual(5, r_from_opts(any_db, [{other_opt, 42}, {r, 5}])),
+    ?assertEqual(5, r_from_opts(any_db, [{r, "5"}, {something_else, "xyz"}])),
+    ?assertEqual(3, r_from_opts(any_db, [{r, some_other_type}])),
+    ?assertEqual(3, r_from_opts(any_db, [{r, "five"}])),
+    ?assertEqual(3, r_from_opts(any_db, [])).
+
+-endif.
