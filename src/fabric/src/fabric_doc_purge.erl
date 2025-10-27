@@ -62,7 +62,7 @@ go(DbName, IdsRevs, Options) ->
         worker_uuids = WorkerUUIDs,
         resps = Responses,
         uuid_counts = UUIDCounts,
-        w = w(DbName, Options)
+        w = fabric_util:w_from_opts(DbName, Options)
     },
     Callback = fun handle_message/3,
     Acc2 =
@@ -127,14 +127,6 @@ group_reqs_by_shard(DbName, Reqs) ->
             lists:foldl(AppendFun, Map0, mem3:shards(DbName, Id))
         end,
     lists:foldl(ReqFoldFun, #{}, Reqs).
-
-w(DbName, Options) ->
-    try
-        list_to_integer(couch_util:get_value(w, Options))
-    catch
-        _:_ ->
-            mem3:quorum(DbName)
-    end.
 
 % Failed WorkerUUIDs = #{#shard{} => [UUIDs, ...]}
 % Resps = #{UUID => [{ok, ...} | {error, ...}]
