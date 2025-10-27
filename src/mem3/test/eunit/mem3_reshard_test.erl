@@ -27,12 +27,6 @@ setup() ->
         false -> ok;
         true -> mock_dreyfus_indices()
     end,
-
-    HaveHastings = code:lib_dir(hastings) /= {error, bad_name},
-    case HaveHastings of
-        false -> ok;
-        true -> mock_hastings_indices()
-    end,
     {Db1, Db2} = {?tempdb(), ?tempdb()},
     create_db(Db1, [{q, 1}, {n, 1}]),
     PartProps = [{partitioned, true}, {hash, [couch_partition, hash, []]}],
@@ -300,17 +294,14 @@ update_docs_before_topoff1(#{db1 := Db}) ->
 indices_are_built(#{db1 := Db}) ->
     {timeout, ?TIMEOUT,
         ?_test(begin
-            HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name},
-            HaveHastings = code:lib_dir(hastings) /= {error, bad_name},
-
-            add_test_docs(Db, #{docs => 10, mrview => 2, search => 2, geo => 2}),
+            add_test_docs(Db, #{docs => 10, mrview => 2, search => 2}),
             [#shard{name = Shard}] = lists:sort(mem3:local_shards(Db)),
             {ok, JobId} = mem3_reshard:start_split_job(Shard),
             wait_state(JobId, completed),
             Shards1 = lists:sort(mem3:local_shards(Db)),
             ?assertEqual(2, length(Shards1)),
             MRViewGroupInfo = get_group_info(Db, <<"_design/mrview00000">>),
-            ?assertMatch(#{<<"update_seq">> := 32}, MRViewGroupInfo),
+            ?assertMatch(#{<<"update_seq">> := 28}, MRViewGroupInfo),
 
             HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name},
             case HaveDreyfus of
@@ -319,15 +310,6 @@ indices_are_built(#{db1 := Db}) ->
                 true ->
                     % 4 because there are 2 indices and 2 target shards
                     ?assertEqual(4, meck:num_calls(dreyfus_index, await, 2))
-            end,
-
-            HaveHastings = code:lib_dir(hastings) /= {error, bad_name},
-            case HaveHastings of
-                false ->
-                    ok;
-                true ->
-                    % 4 because there are 2 indices and 2 target shards
-                    ?assertEqual(4, meck:num_calls(hastings_index, await, 2))
             end
         end)}.
 
@@ -335,7 +317,7 @@ indices_are_built(#{db1 := Db}) ->
 indices_can_be_built_with_errors(#{db1 := Db}) ->
     {timeout, ?TIMEOUT,
         ?_test(begin
-            add_test_docs(Db, #{docs => 10, mrview => 2, search => 2, geo => 2}),
+            add_test_docs(Db, #{docs => 10, mrview => 2, search => 2}),
             [#shard{name = Shard}] = lists:sort(mem3:local_shards(Db)),
             meck:expect(
                 couch_index_server,
@@ -367,7 +349,7 @@ indices_can_be_built_with_errors(#{db1 := Db}) ->
             Shards1 = lists:sort(mem3:local_shards(Db)),
             ?assertEqual(2, length(Shards1)),
             MRViewGroupInfo = get_group_info(Db, <<"_design/mrview00000">>),
-            ?assertMatch(#{<<"update_seq">> := 32}, MRViewGroupInfo)
+            ?assertMatch(#{<<"update_seq">> := 28}, MRViewGroupInfo)
         end)}.
 
 mock_dreyfus_indices() ->
@@ -382,19 +364,6 @@ mock_dreyfus_indices() ->
     end),
     meck:expect(dreyfus_index_manager, get_index, fun(_, _) -> {ok, pid} end),
     meck:expect(dreyfus_index, await, fun(_, _) -> {ok, indexpid, someseq} end).
-
-mock_hastings_indices() ->
-    meck:expect(hastings_index, design_doc_to_indexes, fun(Doc) ->
-        #doc{body = {BodyProps}} = Doc,
-        case couch_util:get_value(<<"st_indexes">>, BodyProps) of
-            undefined ->
-                [];
-            {[_]} ->
-                [{hastings, <<"db">>, hastings_index1}]
-        end
-    end),
-    meck:expect(hastings_index_manager, get_index, fun(_, _) -> {ok, pid} end),
-    meck:expect(hastings_index, await, fun(_, _) -> {ok, someseq} end).
 
 % Split partitioned database
 split_partitioned_db(#{db2 := Db}) ->
@@ -951,7 +920,6 @@ add_test_docs(DbName, #{} = DocSpec) ->
             pdocs(maps:get(pdocs, DocSpec, #{})) ++
             ddocs(mrview, maps:get(mrview, DocSpec, [])) ++
             ddocs(search, maps:get(search, DocSpec, [])) ++
-            ddocs(geo, maps:get(geo, DocSpec, [])) ++
             ldocs(maps:get(local, DocSpec, [])),
     Res = update_docs(DbName, Docs),
     Docs1 = lists:map(
@@ -1045,17 +1013,6 @@ ddprop(mrview) ->
                 {<<"v1">>,
                     {[
                         {<<"map">>, <<"function(d){emit(d);}">>}
-                    ]}}
-            ]}}
-    ];
-ddprop(geo) ->
-    [
-        {<<"st_indexes">>,
-            {[
-                {<<"area">>,
-                    {[
-                        {<<"analyzer">>, <<"standard">>},
-                        {<<"index">>, <<"function(d){if(d.g){st_index(d.g)}}">>}
                     ]}}
             ]}}
     ];
