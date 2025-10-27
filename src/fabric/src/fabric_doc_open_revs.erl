@@ -37,12 +37,11 @@ go(DbName, Id, Revs, Options) ->
         open_revs,
         [Id, Revs, Options]
     ),
-    R = couch_util:get_value(r, Options, integer_to_list(mem3:quorum(DbName))),
     State = #state{
         dbname = DbName,
         worker_count = length(Workers),
         workers = Workers,
-        r = list_to_integer(R),
+        r = fabric_util:r_from_opts(DbName, Options),
         revs = Revs,
         latest = lists:member(latest, Options),
         replies = []

@@ -83,8 +83,7 @@ handle_message(Reason, Worker, #st{} = St) ->
     handle_error(Reason, St#st{workers = Workers1, reqs = Reqs1}).
 
 init_state(DbName, IdsRevsOpts, Options) ->
-    DefaultR = integer_to_list(mem3:quorum(DbName)),
-    R = list_to_integer(couch_util:get_value(r, Options, DefaultR)),
+    R = fabric_util:r_from_opts(DbName, Options),
     {ArgRefs, Reqs0} = build_req_map(IdsRevsOpts),
     ShardMap = build_worker_map(DbName, Reqs0),
     {Workers, Reqs} = spawn_workers(Reqs0, ShardMap, Options),
