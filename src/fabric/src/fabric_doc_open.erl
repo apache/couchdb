@@ -41,11 +41,11 @@ go(DbName, Id, Options) ->
     ),
     SuppressDeletedDoc = not lists:member(deleted, Options),
     N = mem3:n(DbName),
-    R = couch_util:get_value(r, Options, integer_to_list(mem3:quorum(DbName))),
+    R = fabric_util:r_from_opts(DbName, Options),
     Acc0 = #acc{
         dbname = DbName,
         workers = Workers,
-        r = min(N, list_to_integer(R)),
+        r = min(N, R),
         state = r_not_met,
         replies = []
     },
