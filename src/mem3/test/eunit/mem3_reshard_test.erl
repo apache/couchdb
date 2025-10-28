@@ -22,11 +22,7 @@
 -define(TIMEOUT, 60).
 
 setup() ->
-    HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name},
-    case HaveDreyfus of
-        false -> ok;
-        true -> mock_dreyfus_indices()
-    end,
+    mock_dreyfus_indices(),
     {Db1, Db2} = {?tempdb(), ?tempdb()},
     create_db(Db1, [{q, 1}, {n, 1}]),
     PartProps = [{partitioned, true}, {hash, [couch_partition, hash, []]}],
@@ -303,14 +299,8 @@ indices_are_built(#{db1 := Db}) ->
             MRViewGroupInfo = get_group_info(Db, <<"_design/mrview00000">>),
             ?assertMatch(#{<<"update_seq">> := 28}, MRViewGroupInfo),
 
-            HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name},
-            case HaveDreyfus of
-                false ->
-                    ok;
-                true ->
-                    % 4 because there are 2 indices and 2 target shards
-                    ?assertEqual(4, meck:num_calls(dreyfus_index, await, 2))
-            end
+            % 4 because there are 2 indices and 2 target shards
+            ?assertEqual(4, meck:num_calls(dreyfus_index, await, 2))
         end)}.
 
 % This test that indices are built despite intermittent errors.
