@@ -12,8 +12,6 @@
 
 -module(mango_cursor_text).
 
--ifdef(HAVE_DREYFUS).
-
 -export([
     create/4,
     explain/1,
@@ -1224,7 +1222,5 @@ t_explain(_) ->
         ],
     meck:expect(mango_selector_text, convert, [selector], meck:val(converted_selector)),
     ?assertEqual(Response, explain(Cursor)).
-
--endif.
 
 -endif.
