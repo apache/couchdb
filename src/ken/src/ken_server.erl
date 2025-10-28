@@ -51,9 +51,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
--ifdef(HAVE_DREYFUS).
 -include_lib("dreyfus/include/dreyfus.hrl").
--endif.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -321,7 +319,6 @@ update_ddoc_indexes(Name, #doc{} = Doc, State) ->
         _ -> resubmit
     end.
 
--ifdef(HAVE_DREYFUS).
 search_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"indexes">>) of
         true ->
@@ -334,10 +331,6 @@ search_updated(Name, Doc, Seq, State) ->
         false ->
             ok
     end.
--else.
-search_updated(_Name, _Doc, _Seq, _State) ->
-    ok.
--endif.
 
 nouveau_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"nouveau">>) of
@@ -380,7 +373,6 @@ update_ddoc_views(Name, MRSt, Seq, State) ->
             ok
     end.
 
--ifdef(HAVE_DREYFUS).
 update_ddoc_search_indexes(DbName, Indexes, Seq, State) ->
     if
         Indexes =/= [] ->
@@ -404,7 +396,6 @@ update_ddoc_search_indexes(DbName, Indexes, Seq, State) ->
         true ->
             ok
     end.
--endif.
 
 update_ddoc_nouveau_indexes(DbName, Indexes, Seq, State) ->
     if
