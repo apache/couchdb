@@ -13,16 +13,10 @@
 % the License.
 
 
-HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name}.
+ErlOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
+    {erl_opts, Opts} -> Opts;
+    false -> []
+end,
 
-if not HaveDreyfus -> CONFIG; true ->
-    CurrOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
-        {erl_opts, Opts} -> Opts;
-        false -> []
-    end,
-    NewOpts = [
-        {d, 'HAVE_DREYFUS'}
-    ] ++ CurrOpts,
-    lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts})
-end.
+lists:keystore(erl_opts, 1, CONFIG, {erl_opts, ErlOpts}).
 
