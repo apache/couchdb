@@ -150,6 +150,8 @@ SubDirs = [
     "rel"
 ].
 
+% Try to keep deps in sync with .elp.toml deps
+
 DepDescs = [
 %% Independent Apps
 {snappy,           "snappy",           {tag, "CouchDB-1.0.9"}},
