@@ -730,7 +730,35 @@
     "Creating/Updating/Deleting doc should return 202-Acepted"
   ],
   "BasicFindTest": [
-    "simple find"
+    "simple find",
+    "bad selector",
+    "bad limit",
+    "bad skip",
+    "bad sort",
+    "bad fields",
+    "bad r",
+    "bad conflicts",
+    "multi cond and",
+    "multi cond duplicate field",
+    "multi cond or",
+    "multi col idx",
+    "missing not indexed",
+    "limit",
+    "skip",
+    "sort",
+    "sort desc complex",
+    "sort with primary sort not in selector",
+    "sort exists true",
+    "sort desc complex error",
+    "fields",
+    "r",
+    "empty",
+    "empty subsel",
+    "empty subsel match",
+    "unsatisfiable range",
+    "explain view args",
+    "explain options",
+    "sort with all docs"
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
