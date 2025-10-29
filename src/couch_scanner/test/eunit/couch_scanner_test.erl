@@ -63,6 +63,10 @@ setup() ->
     ok = fabric:create_db(DbName1, [{q, "2"}, {n, "1"}]),
     ok = fabric:create_db(DbName2, [{q, "2"}, {n, "1"}]),
     ok = fabric:create_db(DbName3, [{q, "2"}, {n, "1"}]),
+    % Add a design doc the shards db. Scanner should ignore it.
+    {ok, _} = couch_util:with_db(mem3_sync:shards_db(), fun(Db) ->
+        couch_db:update_doc(Db, #doc{id = <<"_design/foo">>}, [])
+    end),
     ok = add_doc(DbName1, ?DOC1, #{foo1 => bar}),
     ok = add_doc(DbName1, ?DOC2, #{
         foo2 => baz,
@@ -113,6 +117,7 @@ teardown({Ctx, {DbName1, DbName2, DbName3}}) ->
     fabric:delete_db(DbName1),
     fabric:delete_db(DbName2),
     fabric:delete_db(DbName3),
+    couch_server:delete(mem3_sync:shards_db(), [?ADMIN_CTX]),
     test_util:stop_couch(Ctx),
     meck:unload().
 
