@@ -21,7 +21,7 @@ defmodule LimitTests do
 
   test "limit field" do
     q = %{"$or" => [%{"user_id" => %{"$lt" => 10}}, %{"filtered_array.[]" => 1}]}
-    docs = MangoDatabase.find(@db_name, q, limit: 10)
+    {:ok, docs} = MangoDatabase.find(@db_name, q, limit: 10)
 
     assert length(docs) == 8
     Enum.each(docs, fn d -> assert d["user_id"] < 10 end)
