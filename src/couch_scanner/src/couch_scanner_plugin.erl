@@ -300,6 +300,9 @@ scan_dbs(#st{cursor = Cursor} = St) ->
         couch_db:close(Db)
     end.
 
+scan_dbs_fold(#full_doc_info{id = <<?DESIGN_DOC_PREFIX, _/binary>>}, Acc) ->
+    % In case user added a design doc in the dbs database
+    {ok, Acc};
 scan_dbs_fold(#full_doc_info{} = FDI, #st{shards_db = Db} = Acc) ->
     Acc1 = Acc#st{cursor = FDI#full_doc_info.id},
     Acc2 = maybe_checkpoint(Acc1),
