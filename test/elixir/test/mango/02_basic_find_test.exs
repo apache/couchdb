@@ -20,7 +20,7 @@ defmodule BasicFindTest do
   end
 
   test "simple find" do
-    docs = MangoDatabase.find(@db_name, %{"age" => %{"$lt" => 35}})
+    {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$lt" => 35}})
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
 
     assert user_ids == [9, 1, 7]

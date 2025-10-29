@@ -360,6 +360,8 @@ defmodule UserDocs do
       "text" -> add_text_indexes(db)
       "special" -> :ok
     end
+
+    :ok
   end
 
   def len() do
@@ -389,7 +391,7 @@ defmodule UserDocs do
     ]
 
     Enum.each(indexes, fn {idx, name} ->
-      MangoDatabase.create_index(db, idx, name)
+      MangoDatabase.create_index(db, idx, name: name, ddoc: name)
     end)
   end
 
