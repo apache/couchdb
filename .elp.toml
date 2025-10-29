@@ -10,7 +10,7 @@ deps = [
     "src/gun",
     "src/recon",
     "src/proper",
-    "src/faxton",
+    "src/fauxton",
     "src/docs",
     "src/meck",
     "src/jiffy",
