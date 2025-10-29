@@ -74,6 +74,10 @@ defmodule MangoDatabase do
       "r" => options[:r],
       "conflicts" => options[:conflicts]
     })
-    resp.body["docs"]
+
+    case resp.status_code do
+      200 -> {:ok, resp.body["docs"]}
+      _ -> {:error, resp}
+    end
   end
 end

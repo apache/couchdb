@@ -21,12 +21,12 @@ defmodule ElemMatchTests do
 
   test "elem match non object" do
     q = %{"bestfriends" => %{"$elemMatch" => %{"$eq" => "Wolverine", "$eq" => "Cyclops"}}}
-    docs = MangoDatabase.find(@db_name, q)
+    {:ok, docs} = MangoDatabase.find(@db_name, q)
     assert length(docs) == 1
     assert Enum.at(docs, 0)["bestfriends"] == ["Wolverine", "Cyclops"]
 
     q = %{"results" => %{"$elemMatch" => %{"$gte" => 80, "$lt" => 85}}}
-    docs = MangoDatabase.find(@db_name, q)
+    {:ok, docs} = MangoDatabase.find(@db_name, q)
     assert length(docs) == 1
     assert Enum.at(docs, 0)["results"] == [82, 85, 88]
   end
