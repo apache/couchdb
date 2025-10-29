@@ -61,22 +61,42 @@ defmodule MangoDatabase do
     })
   end
 
+  # If a certain keyword like sort or field is passed in the options,
+  # then it is added to the request body.
+  defp put_if_set(map, key, opts, opts_key) do
+    if Keyword.has_key?(opts, opts_key) do
+      Map.put(map, key, opts[opts_key])
+    else
+      map
+    end
+  end
+
   # TODO: port more options from src/mango/test/mango.py `def find(...)`
   def find(db, selector, opts \\ []) do
-    defaults = [use_index: nil, skip: 0, limit: 25, r: 1, conflicts: false]
+    defaults = [use_index: nil, skip: 0, limit: 25, r: 1, conflicts: false, explain: false]
     options = Keyword.merge(defaults, opts)
 
-    resp = Couch.post("/#{db}/_find", body: %{
+    path =
+      case options[:explain] do
+        true -> "/#{db}/_explain"
+        _ -> "/#{db}/_find"
+      end
+
+    resp = Couch.post(path, body: %{
       "selector" => selector,
       "use_index" => options[:use_index],
       "skip" => options[:skip],
       "limit" => options[:limit],
       "r" => options[:r],
       "conflicts" => options[:conflicts]
-    })
+    }
+    |> put_if_set("sort", options, :sort)
+    |> put_if_set("fields", options, :fields)
+    )
 
-    case resp.status_code do
-      200 -> {:ok, resp.body["docs"]}
+    case {options[:explain], resp.status_code} do
+      {false, 200} -> {:ok, resp.body["docs"]}
+      {true, 200} -> {:ok, resp.body}
       _ -> {:error, resp}
     end
   end
