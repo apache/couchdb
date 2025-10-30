@@ -66,7 +66,7 @@ UUIDs Configuration
     .. config:option:: algorithm :: Generation Algorithm
 
         .. versionchanged:: 1.3 Added ``utc_id`` algorithm.
-        .. versionchanged:: 3.6 Added ``uuid_v7`` algorithm.
+        .. versionchanged:: 3.5.1 Added ``uuid_v7`` algorithm.
 
         CouchDB provides various algorithms to generate the UUID values that
         are  used for document `_id`'s by default::
@@ -317,7 +317,7 @@ Configuration of Database Purge
         revisions per Purge-Request
 
         .. versionadded:: 3.0
-        .. versionchanged:: 3.6
+        .. versionchanged:: 3.5.1
 
         Sets the maximum number of accumulated revisions allowed in a single purge
         request::
