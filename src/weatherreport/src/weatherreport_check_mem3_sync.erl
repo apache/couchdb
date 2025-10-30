@@ -43,7 +43,7 @@ valid() ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    case erlang:whereis(mem3_sync) of
+    case whereis(mem3_sync) of
         undefined ->
             [{warning, mem3_sync_not_found}];
         Pid ->

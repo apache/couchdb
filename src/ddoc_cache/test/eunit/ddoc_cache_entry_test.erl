@@ -53,7 +53,7 @@ cancel_and_replace_opener(_) ->
     true = ets:insert_new(?CACHE, #entry{key = Key}),
     {ok, Entry} = ddoc_cache_entry:start_link(Key, undefined),
     Opener1 = element(4, sys:get_state(Entry)),
-    Ref1 = erlang:monitor(process, Opener1),
+    Ref1 = monitor(process, Opener1),
     gen_server:cast(Entry, force_refresh),
     receive
         {'DOWN', Ref1, _, _, _} -> ok
@@ -102,7 +102,7 @@ evict_when_not_accessed(_) ->
     Key = {ddoc_cache_entry_custom, {<<"bar">>, ?MODULE}},
     true = ets:insert_new(?CACHE, #entry{key = Key}),
     {ok, Entry} = ddoc_cache_entry:start_link(Key, undefined),
-    Ref = erlang:monitor(process, Entry),
+    Ref = monitor(process, Entry),
     AccessCount1 = element(7, sys:get_state(Entry)),
     ?assertEqual(1, AccessCount1),
     ok = gen_server:cast(Entry, refresh),

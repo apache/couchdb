@@ -515,7 +515,7 @@ def write_config(ctx, node, env):
             content = apply_config_overrides(ctx, content)
         elif base == "local.ini":
             content = hack_local_ini(ctx, content)
-        elif ctx["enable_tls"] and base == "vm.args":
+        elif base == "vm.args":
             content = hack_vm_args(ctx, node, content)
 
         with open(tgt, "w") as handle:
@@ -839,16 +839,23 @@ def hack_local_ini(ctx, contents):
 
 
 def hack_vm_args(ctx, node, contents):
-    contents += f"""
+    if ctx["enable_tls"]:
+        contents += f"""
 -proto_dist couch
 -couch_dist no_tls '"clouseau{node[-1]}@127.0.0.1"'
 -ssl_dist_optfile {ctx["rootdir"]}/src/couch_dist/certs/out/couch_dist.conf
-    """
-    if ctx["no_tls"]:
-        no_tls_nodes = ctx["no_tls"].split(",")
-        for node_name in no_tls_nodes:
-            node_name = node_name if "@" in node_name else f"{node_name}@127.0.0.1"
-            contents += f"""\n-couch_dist no_tls '"{node_name}"'"""
+"""
+        if ctx["no_tls"]:
+            no_tls_nodes = ctx["no_tls"].split(",")
+            for node_name in no_tls_nodes:
+                node_name = node_name if "@" in node_name else f"{node_name}@127.0.0.1"
+                contents += f"""
+-couch_dist no_tls '"{node_name}"'
+"""
+    if ctx["erlang_cookie"]:
+        contents += f"""
+-setcookie {ctx["erlang_cookie"]}
+"""
     return contents
 
 

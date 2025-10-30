@@ -240,7 +240,7 @@ teardown_all(_) ->
 
 setup() ->
     {ok, Pid} = ?MODULE:start_link(),
-    erlang:unlink(Pid),
+    unlink(Pid),
     wait_config_subscribed(Pid),
     Pid.
 
@@ -300,7 +300,7 @@ should_terminate(Pid) ->
         EventMgr = whereis(config_event),
         EventMgrWasAlive = (catch is_process_alive(EventMgr)),
 
-        Ref = erlang:monitor(process, Pid),
+        Ref = monitor(process, Pid),
 
         RestartFun = fun() -> exit(EventMgr, kill) end,
         {_, _} = test_util:with_process_restart(config_event, RestartFun),

@@ -20,7 +20,7 @@
 maybe_sync(#shard{} = Src, #shard{} = Dst) ->
     case is_local(Src#shard.name) of
         false ->
-            erlang:spawn(?MODULE, maybe_sync_int, [Src, Dst]);
+            spawn(?MODULE, maybe_sync_int, [Src, Dst]);
         true ->
             ok
     end.

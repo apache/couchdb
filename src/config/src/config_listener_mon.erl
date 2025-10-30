@@ -40,7 +40,7 @@ subscribe(Module, InitSt) ->
     end.
 
 init({Pid, Mod, InitSt}) ->
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     case config_listener:start(Mod, {Mod, Pid}, {Pid, InitSt}) of
         ok ->
             proc_lib:init_ack({ok, self()}),

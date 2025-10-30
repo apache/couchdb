@@ -104,9 +104,7 @@ json_shards([], AccIn) ->
     List = dict:to_list(AccIn),
     {lists:sort(List)};
 json_shards([#shard{node = Node, range = [B, E]} | Rest], AccIn) ->
-    HexBeg = couch_util:to_hex(<<B:32/integer>>),
-    HexEnd = couch_util:to_hex(<<E:32/integer>>),
-    Range = list_to_binary(HexBeg ++ "-" ++ HexEnd),
+    Range = mem3_util:range_to_hex([B, E]),
     json_shards(Rest, dict:append(Range, Node, AccIn)).
 
 sync_shard(ShardName) ->

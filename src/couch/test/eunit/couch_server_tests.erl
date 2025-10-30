@@ -224,7 +224,7 @@ t_interleaved_create_delete_open(DbName) ->
 
     % Now monitor and resume the couch_server and assert that
     % couch_server does not crash while processing OpenResultMsg
-    CSRef = erlang:monitor(process, CouchServer),
+    CSRef = monitor(process, CouchServer),
     erlang:resume_process(CouchServer),
     check_monitor_not_triggered(CSRef),
 
@@ -253,7 +253,7 @@ get_opener_pid(DbName) ->
 
 wait_for_open_async_result(CouchServer, Opener) ->
     WaitFun = fun() ->
-        {_, Messages} = erlang:process_info(CouchServer, messages),
+        {_, Messages} = process_info(CouchServer, messages),
         Found = lists:foldl(
             fun(Msg, Acc) ->
                 case Msg of
@@ -276,7 +276,7 @@ wait_for_open_async_result(CouchServer, Opener) ->
 check_monitor_not_triggered(Ref) ->
     receive
         {'DOWN', Ref, _, _, Reason0} ->
-            erlang:error({monitor_triggered, Reason0})
+            error({monitor_triggered, Reason0})
     after 100 ->
         ok
     end.
@@ -286,5 +286,5 @@ get_next_message() ->
         Msg ->
             Msg
     after 5000 ->
-        erlang:error(timeout)
+        error(timeout)
     end.

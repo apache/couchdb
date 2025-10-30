@@ -89,7 +89,7 @@ check_db_validity(DbName) ->
 
 with_mecked_emsort(Fun) ->
     meck:new(couch_emsort, [passthrough]),
-    meck:expect(couch_emsort, iter, fun(_) -> erlang:error(kaboom) end),
+    meck:expect(couch_emsort, iter, fun(_) -> error(kaboom) end),
     try
         Fun()
     after
@@ -131,7 +131,7 @@ wait_db_compact_done(_DbName, 0) ->
         {line, ?LINE},
         {reason, "DB compaction failed to finish"}
     ],
-    erlang:error({assertion_failed, Failure});
+    error({assertion_failed, Failure});
 wait_db_compact_done(DbName, N) ->
     IsDone = couch_util:with_db(DbName, fun(Db) ->
         not is_pid(couch_db:get_compactor_pid(Db))

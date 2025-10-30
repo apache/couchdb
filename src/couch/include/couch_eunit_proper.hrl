@@ -18,12 +18,12 @@
         {
             atom_to_list(F),
             {timeout, QuickcheckTimeout,
-                ?_assert(proper:quickcheck(?MODULE:F(), [
+                ?_test(?assertMatch(true, proper:quickcheck(?MODULE:F(), [
                     {to_file, user},
                     {start_size, 2},
                     {numtests, NumTests},
                     long_result
-                 ]))}
+                ]), "Failed property test '" ++ atom_to_list(F) ++ "'"))}
             }
         || {F, 0} <- ?MODULE:module_info(exports), F > 'prop_', F < 'prop`'
     ]).

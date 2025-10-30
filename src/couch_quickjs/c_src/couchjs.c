@@ -86,14 +86,20 @@ static CmdType parse_command(char* str, size_t len) {
   return CMD_VIEW;
 }
 
-static void add_cx_methods(JSContext* cx) {
+// Return true if initializations succeed and false if any fails. Failure
+// will shortcut the sequence and will return early. The only thing to do
+// then is to free the context and return early
+//
+static bool add_cx_methods(JSContext* cx) {
   //TODO: configure some features with env vars of command line switches
-  JS_AddIntrinsicBaseObjects(cx);
-  JS_AddIntrinsicEval(cx);
-  JS_AddIntrinsicJSON(cx);
-  JS_AddIntrinsicRegExp(cx);
-  JS_AddIntrinsicMapSet(cx);
-  JS_AddIntrinsicDate(cx);
+  return ! (
+      JS_AddIntrinsicBaseObjects(cx) ||
+      JS_AddIntrinsicEval(cx) ||
+      JS_AddIntrinsicJSON(cx) ||
+      JS_AddIntrinsicRegExp(cx) ||
+      JS_AddIntrinsicMapSet(cx) ||
+      JS_AddIntrinsicDate(cx)
+  );
 }
 
 // Creates a new JSContext with only the provided sandbox function
@@ -104,7 +110,12 @@ static JSContext* make_sandbox(JSContext* cx, JSValue sbox) {
    if(!cx1) {
      return NULL;
    }
-   add_cx_methods(cx1);
+
+   if(!add_cx_methods(cx1)) {
+       JS_FreeContext(cx1);
+       return NULL;
+   }
+
    JSValue global = JS_GetGlobalObject(cx1);
 
    int i;

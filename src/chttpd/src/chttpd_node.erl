@@ -191,7 +191,7 @@ handle_node_req(#httpd{
         "max_http_request_size", 4294967296
     ),
     NewOpts = [{body, MochiReq0:recv_body(MaxSize)} | MochiReq0:get(opts)],
-    Ref = erlang:make_ref(),
+    Ref = make_ref(),
     MochiReq = mochiweb_request:new(
         {remote, self(), Ref},
         NewOpts,
@@ -286,6 +286,7 @@ get_stats() ->
         {run_queue, SQ},
         {run_queue_dirty_cpu, DCQ},
         {ets_table_count, length(ets:all())},
+        {bt_engine_cache, couch_bt_engine_cache:info()},
         {context_switches, element(1, statistics(context_switches))},
         {reductions, element(1, statistics(reductions))},
         {garbage_collection_count, NumberOfGCs},

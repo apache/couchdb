@@ -107,21 +107,22 @@ if the Nouveau server's certificate is signed by a private CA.
 Configuring Nouveau to authenticate clients
 -------------------------------------------
 
-Nouveau is built on the dropwizard framework, which directly supports the `HTTPS
-<https://www.dropwizard.io/en/stable/manual/configuration.html#https>` transports.
+Nouveau is built on the dropwizard framework, which directly supports the
+`HTTPS <https://www.dropwizard.io/en/stable/manual/configuration.html#http-2-over-tls>`_
+transport.
 
 Acquiring or generating client and server certificates are out of scope of this
 documentation and we assume they have been created from here onward. We further
 assume the user can construct a Java keystore.
 
-in ``nouveau.yaml`` you should remove all connectors of type ``http`` and add new
-ones using ``https``;
+in ``nouveau.yaml`` you should remove all connectors of type ``h2c`` and add new
+ones using ``h2``;
 
   .. code-block:: yaml
 
     server:
       applicationConnectors:
-        - type: https
+        - type: h2
           port: 5987
           keyStorePath: <path to keystore>
           keyStorePassword: <password to keystore>

@@ -245,7 +245,7 @@ tracer_new() ->
     ok.
 
 tracer_delete() ->
-    dbg:stop_clear(),
+    dbg:stop(),
     (catch ets:delete(?MODULE)),
     ok.
 

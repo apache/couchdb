@@ -92,6 +92,12 @@ handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
     ok = couch_server:db_updated(Db2),
     {reply, ok, Db2};
+handle_call({set_props, Props}, _From, Db) ->
+    {ok, Db1} = couch_db_engine:set_props(Db, Props),
+    Db2 = options_set_props(Db1, Props),
+    {ok, Db3} = couch_db_engine:commit_data(Db2),
+    ok = couch_server:db_updated(Db3),
+    {reply, ok, Db3};
 handle_call({purge_docs, [], _}, _From, Db) ->
     {reply, {ok, []}, Db};
 handle_call({purge_docs, PurgeReqs0, Options}, _From, Db) ->
@@ -308,13 +314,17 @@ init_db(DbName, FilePath, EngineState, Options) ->
         after_doc_read = ADR
     },
 
-    DbProps = couch_db_engine:get_props(InitDb),
-
-    InitDb#db{
+    Db = InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
         security = couch_db_engine:get_security(InitDb),
-        options = lists:keystore(props, 1, NonCreateOpts, {props, DbProps})
-    }.
+        options = NonCreateOpts
+    },
+    DbProps = couch_db_engine:get_props(Db),
+    options_set_props(Db, DbProps).
+
+options_set_props(#db{options = Options} = Db, Props) ->
+    Options1 = lists:keystore(props, 1, Options, {props, Props}),
+    Db#db{options = Options1}.
 
 refresh_validate_doc_funs(#db{name = <<"shards/", _/binary>> = Name} = Db) ->
     spawn(fabric, reset_validation_funs, [mem3:dbname(Name)]),
@@ -795,22 +805,22 @@ purge_docs(Db, PurgeReqs) ->
     FDIs = couch_db_engine:open_docs(Db, Ids),
     USeq = couch_db_engine:get_update_seq(Db),
 
-    IdFDIs = lists:zip(Ids, FDIs),
+    IdFDIs = maps:from_list(lists:zip(Ids, FDIs)),
     {NewIdFDIs, Replies} = apply_purge_reqs(PurgeReqs, IdFDIs, USeq, []),
 
-    Pairs = lists:flatmap(
-        fun({DocId, OldFDI}) ->
-            {DocId, NewFDI} = lists:keyfind(DocId, 1, NewIdFDIs),
-            case {OldFDI, NewFDI} of
-                {not_found, not_found} ->
-                    [];
-                {#full_doc_info{} = A, #full_doc_info{} = A} ->
-                    [];
-                {#full_doc_info{}, _} ->
-                    [{OldFDI, NewFDI}]
-            end
-        end,
-        IdFDIs
+    Pairs = lists:sort(
+        maps:fold(
+            fun(DocId, OldFDI, Acc) ->
+                #{DocId := NewFDI} = NewIdFDIs,
+                case {OldFDI, NewFDI} of
+                    {not_found, not_found} -> Acc;
+                    {#full_doc_info{} = A, #full_doc_info{} = A} -> Acc;
+                    {#full_doc_info{}, _} -> [{OldFDI, NewFDI} | Acc]
+                end
+            end,
+            [],
+            IdFDIs
+        )
     ),
 
     PSeq = couch_db_engine:get_purge_seq(Db),
@@ -834,7 +844,7 @@ apply_purge_reqs([], IdFDIs, _USeq, Replies) ->
     {IdFDIs, lists:reverse(Replies)};
 apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
     {_UUID, DocId, Revs} = Req,
-    {value, {_, FDI0}, RestIdFDIs} = lists:keytake(DocId, 1, IdFDIs),
+    #{DocId := FDI0} = IdFDIs,
     {NewFDI, RemovedRevs, NewUSeq} =
         case FDI0 of
             #full_doc_info{rev_tree = Tree} ->
@@ -872,9 +882,8 @@ apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
                 % Not found means nothing to change
                 {not_found, [], USeq}
         end,
-    NewIdFDIs = [{DocId, NewFDI} | RestIdFDIs],
     NewReplies = [{ok, RemovedRevs} | Replies],
-    apply_purge_reqs(RestReqs, NewIdFDIs, NewUSeq, NewReplies).
+    apply_purge_reqs(RestReqs, IdFDIs#{DocId := NewFDI}, NewUSeq, NewReplies).
 
 commit_data(Db) ->
     {ok, Db1} = couch_db_engine:commit_data(Db),

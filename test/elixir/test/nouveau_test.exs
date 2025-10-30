@@ -694,6 +694,23 @@ defmodule NouveauTest do
     assert resp.body["update_latency"] > 0
   end
 
+  @tag :with_db
+  test "stale search", context do
+    db_name = context[:db_name]
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    create_ddoc(db_name)
+
+    resp = Couch.get(url, query: %{q: "*:*", update: false, include_docs: true})
+    assert_status_code(resp, 404)
+
+    create_search_docs(db_name)
+    resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    # nouveau sorts by _id as tie-breaker
+    assert ids == ["doc1", "doc2", "doc3", "doc4"]
+  end
+
   def seq(str) do
     String.to_integer(hd(Regex.run(~r/^[0-9]+/, str)))
   end

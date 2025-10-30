@@ -20,7 +20,8 @@ main_test_() ->
         fun setup/0,
         fun teardown/1,
         with([
-            ?TDEF(t_update_seq_has_uuids)
+            ?TDEF(t_update_seq_has_uuids),
+            ?TDEF(t_update_and_get_props)
         ])
     }.
 
@@ -53,5 +54,40 @@ t_update_seq_has_uuids(_) ->
     Uuids = [binary:part(Uuid, {0, PrefixLen}) || Uuid <- maps:keys(UuidMap)],
     [UuidFromShard] = Uuids,
     ?assertEqual(UuidFromShard, SeqUuid),
+
+    ok = fabric:delete_db(DbName, []).
+
+t_update_and_get_props(_) ->
+    DbName = ?tempdb(),
+    ok = fabric:create_db(DbName, [{q, 1}, {n, 1}]),
+
+    {ok, Info} = fabric:get_db_info(DbName),
+    Props = couch_util:get_value(props, Info),
+    ?assertEqual({[]}, Props),
+
+    ?assertEqual(ok, fabric:update_props(DbName, <<"foo">>, 100)),
+    {ok, Info1} = fabric:get_db_info(DbName),
+    Props1 = couch_util:get_value(props, Info1),
+    ?assertEqual({[{<<"foo">>, 100}]}, Props1),
+
+    ?assertEqual(ok, fabric:update_props(DbName, bar, 101)),
+    {ok, Info2} = fabric:get_db_info(DbName),
+    Props2 = couch_util:get_value(props, Info2),
+    ?assertEqual(
+        {[
+            {<<"foo">>, 100},
+            {bar, 101}
+        ]},
+        Props2
+    ),
+
+    ?assertEqual(ok, fabric:update_props(DbName, <<"foo">>, undefined)),
+    {ok, Info3} = fabric:get_db_info(DbName),
+    ?assertEqual({[{bar, 101}]}, couch_util:get_value(props, Info3)),
+
+    Res = fabric:update_props(DbName, partitioned, true),
+    ?assertMatch({error, {bad_request, _}}, Res),
+    {ok, Info4} = fabric:get_db_info(DbName),
+    ?assertEqual({[{bar, 101}]}, couch_util:get_value(props, Info4)),
 
     ok = fabric:delete_db(DbName, []).

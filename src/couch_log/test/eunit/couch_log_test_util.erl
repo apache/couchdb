@@ -64,7 +64,7 @@ wait_for_config() ->
     receive
         couch_log_config_change_finished -> ok
     after 1000 ->
-        erlang:error(config_change_timeout)
+        error(config_change_timeout)
     end.
 
 with_meck(Mods, Fun) ->
@@ -119,7 +119,7 @@ disable_logs_from(Name) when is_atom(Name) ->
         P when is_pid(P) ->
             disable_logs_from(P);
         undefined ->
-            erlang:error({unknown_pid_name, Name})
+            error({unknown_pid_name, Name})
     end.
 
 last_log_key() ->

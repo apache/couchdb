@@ -51,13 +51,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
--ifdef(HAVE_DREYFUS).
 -include_lib("dreyfus/include/dreyfus.hrl").
--endif.
-
--ifdef(HAVE_HASTINGS).
--include_lib("hastings/src/hastings.hrl").
--endif.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -145,20 +139,9 @@ handle_cast({remove, DbName}, State) ->
 handle_cast({resubmit, DbName}, State) ->
     ets:delete(ken_resubmit, DbName),
     handle_cast({add, DbName}, State);
-% st index job names have 3 elements, 3rd being 'hastings'. See job record definition.
-handle_cast({trigger_update, #job{name = {_, _, hastings}, server = GPid, seq = Seq} = Job}, State) ->
-    % hastings_index:await will trigger a hastings index update
-    {Pid, _} = erlang:spawn_monitor(
-        hastings_index,
-        await,
-        [GPid, Seq]
-    ),
-    Now = erlang:monotonic_time(),
-    ets:insert(ken_workers, Job#job{worker_pid = Pid, lru = Now}),
-    {noreply, State, 0};
 handle_cast({trigger_update, #job{name = {_, Index, nouveau}} = Job}, State) ->
     % nouveau_index_manager:update_index will trigger a search index update.
-    {Pid, _} = erlang:spawn_monitor(
+    {Pid, _} = spawn_monitor(
         nouveau_index_manager,
         update_index,
         [Index]
@@ -169,7 +152,7 @@ handle_cast({trigger_update, #job{name = {_, Index, nouveau}} = Job}, State) ->
 % search index job names have 3 elements. See job record definition.
 handle_cast({trigger_update, #job{name = {_, _, _}, server = GPid, seq = Seq} = Job}, State) ->
     % dreyfus_index:await will trigger a search index update.
-    {Pid, _} = erlang:spawn_monitor(
+    {Pid, _} = spawn_monitor(
         dreyfus_index,
         await,
         [GPid, Seq]
@@ -179,7 +162,7 @@ handle_cast({trigger_update, #job{name = {_, _, _}, server = GPid, seq = Seq} = 
     {noreply, State, 0};
 handle_cast({trigger_update, #job{name = {_, _}, server = SrvPid, seq = Seq} = Job}, State) ->
     % couch_index:get_state/2 will trigger a view group index update.
-    {Pid, _} = erlang:spawn_monitor(couch_index, get_state, [SrvPid, Seq]),
+    {Pid, _} = spawn_monitor(couch_index, get_state, [SrvPid, Seq]),
     Now = erlang:monotonic_time(),
     ets:insert(ken_workers, Job#job{worker_pid = Pid, lru = Now}),
     {noreply, State, 0};
@@ -294,6 +277,12 @@ design_docs(Name) ->
         case fabric:design_docs(mem3:dbname(Name)) of
             {error, {maintenance_mode, _, _Node}} ->
                 {ok, []};
+            {error, {nodedown, _Reason}} ->
+                {ok, []};
+            {ok, DDocs} when is_list(DDocs) ->
+                {ok, DDocs};
+            {ok, _Resp} ->
+                {ok, []};
             Else ->
                 Else
         end
@@ -324,18 +313,16 @@ update_ddoc_indexes(Name, #doc{} = Doc, State) ->
                 ok
         end,
     SearchUpdated = search_updated(Name, Doc, Seq, State),
-    STUpdated = st_updated(Name, Doc, Seq, State),
     NouveauUpdated = nouveau_updated(Name, Doc, Seq, State),
-    case {ViewUpdated, SearchUpdated, STUpdated, NouveauUpdated} of
-        {ok, ok, ok, ok} -> ok;
+    case {ViewUpdated, SearchUpdated, NouveauUpdated} of
+        {ok, ok, ok} -> ok;
         _ -> resubmit
     end.
 
--ifdef(HAVE_DREYFUS).
 search_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"indexes">>) of
         true ->
-            try dreyfus_index:design_doc_to_indexes(Doc) of
+            try dreyfus_index:design_doc_to_indexes(Name, Doc) of
                 SIndexes -> update_ddoc_search_indexes(Name, SIndexes, Seq, State)
             catch
                 _:_ ->
@@ -344,28 +331,6 @@ search_updated(Name, Doc, Seq, State) ->
         false ->
             ok
     end.
--else.
-search_updated(_Name, _Doc, _Seq, _State) ->
-    ok.
--endif.
-
--ifdef(HAVE_HASTINGS).
-st_updated(Name, Doc, Seq, State) ->
-    case should_update(Doc, <<"st_indexes">>) of
-        true ->
-            try hastings_index:design_doc_to_indexes(Doc) of
-                STIndexes -> update_ddoc_st_indexes(Name, STIndexes, Seq, State)
-            catch
-                _:_ ->
-                    ok
-            end;
-        false ->
-            ok
-    end.
--else.
-st_updated(_Name, _Doc, _Seq, _State) ->
-    ok.
--endif.
 
 nouveau_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"nouveau">>) of
@@ -408,7 +373,6 @@ update_ddoc_views(Name, MRSt, Seq, State) ->
             ok
     end.
 
--ifdef(HAVE_DREYFUS).
 update_ddoc_search_indexes(DbName, Indexes, Seq, State) ->
     if
         Indexes =/= [] ->
@@ -432,34 +396,6 @@ update_ddoc_search_indexes(DbName, Indexes, Seq, State) ->
         true ->
             ok
     end.
--endif.
-
--ifdef(HAVE_HASTINGS).
-update_ddoc_st_indexes(DbName, Indexes, Seq, State) ->
-    if
-        Indexes =/= [] ->
-            % The record name in hastings is #h_idx rather than #index as it is for dreyfus
-            % Spawn a job for each spatial index in the ddoc
-            lists:foldl(
-                fun(#h_idx{ddoc_id = DDocName} = Index, Acc) ->
-                    case hastings_index_manager:get_index(DbName, Index) of
-                        {ok, Pid} ->
-                            case maybe_start_job({DbName, DDocName, hastings}, Pid, Seq, State) of
-                                resubmit -> resubmit;
-                                _ -> Acc
-                            end;
-                        _ ->
-                            % If any job fails, retry the db.
-                            resubmit
-                    end
-                end,
-                ok,
-                Indexes
-            );
-        true ->
-            ok
-    end.
--endif.
 
 update_ddoc_nouveau_indexes(DbName, Indexes, Seq, State) ->
     if
@@ -498,10 +434,6 @@ should_start_job(#job{name = Name, seq = Seq, server = Pid}, State) ->
                     true;
                 A < TotalChannels ->
                     case Name of
-                        % st_index name has three elements
-                        {_, _, hastings} ->
-                            {ok, CurrentSeq} = hastings_index:await(Pid, 0),
-                            (Seq - CurrentSeq) < Threshold;
                         % View name has two elements.
                         _ when IsView ->
                             % Since seq is 0, couch_index:get_state/2 won't

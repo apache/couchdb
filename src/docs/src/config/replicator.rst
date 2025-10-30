@@ -303,7 +303,9 @@ Replicator Database Configuration
 
     .. config:option:: verify_ssl_certificates :: Check peer certificates
 
-        Set to true to validate peer certificates::
+        Set to true to validate peer certificates. If
+        ``ssl_trusted_certificates_file`` is set it will be used, otherwise the
+        operating system CA files will be used::
 
             [replicator]
             verify_ssl_certificates = false
@@ -324,6 +326,18 @@ Replicator Database Configuration
 
             [replicator]
             ssl_certificate_max_depth = 3
+
+    .. config:option:: cacert_reload_interval_hours :: CA certificates reload interval
+
+         How often to reload operating system CA certificates (in hours).
+         Erlang VM caches OS CA certificates in memory after they are loaded
+         the first time. This setting specifies how often to clear the cache
+         and force reload certificate from disk. This can be useful if the VM
+         node is up for a long time, and the the CA certificate files are
+         updated using operating system packaging system during that time::
+
+             [replicator]
+             cacert_reload_interval_hours = 24
 
     .. config:option:: auth_plugins :: List of replicator client authentication plugins
 

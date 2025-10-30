@@ -113,7 +113,7 @@ merge_tree([{Depth, Nodes} | Rest], {IDepth, INodes} = Tree, MergeAcc) ->
     % value that's used throughout this module.
     case merge_at([Nodes], Depth - IDepth, [INodes]) of
         {[Merged], Result} ->
-            NewDepth = erlang:min(Depth, IDepth),
+            NewDepth = min(Depth, IDepth),
             {Rest ++ [{NewDepth, Merged} | MergeAcc], Result};
         fail ->
             merge_tree(Rest, Tree, [{Depth, Nodes} | MergeAcc])
@@ -507,12 +507,12 @@ stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
             {SeenAcc, LimitPosAcc, ChildAcc, BranchAcc} = Acc,
             case stem_tree(Depth + 1, Child, Limit, SeenAcc) of
                 {NewSeenAcc, LimitPos, NewChild, NewBranches} ->
-                    NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
+                    NewLimitPosAcc = max(LimitPos, LimitPosAcc),
                     NewChildAcc = [NewChild | ChildAcc],
                     NewBranchAcc = NewBranches ++ BranchAcc,
                     {NewSeenAcc, NewLimitPosAcc, NewChildAcc, NewBranchAcc};
                 {NewSeenAcc, LimitPos, NewBranches} ->
-                    NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
+                    NewLimitPosAcc = max(LimitPos, LimitPosAcc),
                     NewBranchAcc = NewBranches ++ BranchAcc,
                     {NewSeenAcc, NewLimitPosAcc, ChildAcc, NewBranchAcc}
             end

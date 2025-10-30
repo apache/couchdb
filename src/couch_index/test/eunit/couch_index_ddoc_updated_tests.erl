@@ -88,7 +88,7 @@ check_all_indexers_exit_on_ddoc_change({_Ctx, DbName}) ->
         IndexesBefore = get_indexes_by_ddoc(DDocID, N),
         ?assertEqual(N, length(IndexesBefore)),
 
-        AliveBefore = lists:filter(fun erlang:is_process_alive/1, IndexesBefore),
+        AliveBefore = lists:filter(fun is_process_alive/1, IndexesBefore),
         ?assertEqual(N, length(AliveBefore)),
 
         % update ddoc
@@ -121,7 +121,7 @@ check_all_indexers_exit_on_ddoc_change({_Ctx, DbName}) ->
         ?assertEqual(0, length(IndexesAfter)),
 
         %% assert that previously running indexes are gone
-        AliveAfter = lists:filter(fun erlang:is_process_alive/1, IndexesBefore),
+        AliveAfter = lists:filter(fun is_process_alive/1, IndexesBefore),
         ?assertEqual(0, length(AliveAfter)),
         ok
     end).

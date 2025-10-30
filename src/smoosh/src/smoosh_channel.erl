@@ -169,8 +169,8 @@ handle_info({Ref, {ok, Pid}}, #state{} = State) when is_reference(Ref) ->
             LogMsg = "~s: Started compaction for ~s",
             LogArgs = [Name, smoosh_utils:stringify(Key)],
             couch_log:Level(LogMsg, LogArgs),
-            erlang:monitor(process, Pid),
-            erlang:demonitor(Ref, [flush]),
+            monitor(process, Pid),
+            demonitor(Ref, [flush]),
             Active1 = Active#{Key => Pid},
             State1 = State#state{active = Active1, starting = Starting1},
             {noreply, set_status(State1)};
@@ -350,7 +350,7 @@ start_compact(#state{} = State, {Shard, GroupId} = Key) ->
             case couch_index_server:get_index(couch_mrview_index, Shard, GroupId) of
                 {ok, Pid} ->
                     schedule_cleanup_index_files(Shard),
-                    Ref = erlang:monitor(process, Pid),
+                    Ref = monitor(process, Pid),
                     Pid ! {'$gen_call', {self(), Ref}, compact},
                     State#state{starting = Starting#{Ref => Key}};
                 Error ->
@@ -370,12 +370,12 @@ start_compact(#state{} = State, Db) ->
             case couch_db:get_compactor_pid(Db) of
                 nil ->
                     DbPid = couch_db:get_pid(Db),
-                    Ref = erlang:monitor(process, DbPid),
+                    Ref = monitor(process, DbPid),
                     DbPid ! {'$gen_call', {self(), Ref}, start_compact},
                     State#state{starting = Starting#{Ref => Key}};
                 % Compaction is already running, so monitor existing compaction pid.
                 CPid when is_pid(CPid) ->
-                    erlang:monitor(process, CPid),
+                    monitor(process, CPid),
                     Level = smoosh_utils:log_level("compaction_log_level", "notice"),
                     LogMsg = "~s : db ~s continuing compaction",
                     LogArgs = [Name, smoosh_utils:stringify(Key)],
@@ -398,7 +398,7 @@ maybe_remonitor_cpid(#state{} = State, DbName, Reason) when is_binary(DbName) ->
                     re_enqueue(DbName),
                     State;
                 CPid when is_pid(CPid) ->
-                    erlang:monitor(process, CPid),
+                    monitor(process, CPid),
                     Level = smoosh_utils:log_level("compaction_log_level", "notice"),
                     LogMsg = "~s: ~s compaction already running. Re-monitor Pid ~p",
                     LogArgs = [Name, smoosh_utils:stringify(DbName), CPid],
@@ -451,7 +451,7 @@ re_enqueue(Obj) ->
 
 cleanup_index_files(DbName) ->
     case should_clean_up_indices() of
-        true -> fabric:cleanup_index_files(DbName);
+        true -> fabric:cleanup_index_files_this_node(DbName);
         false -> ok
     end.
 

@@ -43,7 +43,7 @@ to_branch(Doc, [RevId | Rest]) ->
 to_json_rev(0, []) ->
     [];
 to_json_rev(Start, [FirstRevId | _]) ->
-    [{<<"_rev">>, ?l2b([integer_to_list(Start), "-", revid_to_str(FirstRevId)])}].
+    [{<<"_rev">>, rev_to_str({Start, FirstRevId})}].
 
 to_json_body(true, {Body}) ->
     Body ++ [{<<"_deleted">>, true}];
@@ -75,11 +75,13 @@ to_json_revisions(Options, Start, RevIds0) ->
 
 revid_to_str(RevId) when size(RevId) =:= 16 ->
     couch_util:to_hex_bin(RevId);
-revid_to_str(RevId) ->
-    RevId.
+revid_to_str(RevId) when is_binary(RevId) ->
+    RevId;
+revid_to_str(RevId) when is_list(RevId) ->
+    list_to_binary(RevId).
 
 rev_to_str({Pos, RevId}) ->
-    ?l2b([integer_to_list(Pos), "-", revid_to_str(RevId)]).
+    <<(integer_to_binary(Pos))/binary, $-, (revid_to_str(RevId))/binary>>.
 
 revs_to_strs([]) ->
     [];
@@ -95,7 +97,7 @@ to_json_meta(Meta) ->
                         JsonObj =
                             {[
                                 {<<"rev">>, rev_to_str({PosAcc, RevId})},
-                                {<<"status">>, ?l2b(atom_to_list(Status))}
+                                {<<"status">>, atom_to_binary(Status)}
                             ]},
                         {JsonObj, PosAcc - 1}
                     end,
@@ -186,12 +188,10 @@ from_json_obj({Props}, DbName) ->
 from_json_obj(_Other, _) ->
     throw({bad_request, "Document must be a JSON object"}).
 
-parse_revid(RevId) when size(RevId) =:= 32 ->
-    RevInt = erlang:list_to_integer(?b2l(RevId), 16),
-    <<RevInt:128>>;
-parse_revid(RevId) when length(RevId) =:= 32 ->
-    RevInt = erlang:list_to_integer(RevId, 16),
-    <<RevInt:128>>;
+parse_revid(RevId) when is_binary(RevId), size(RevId) =:= 32 ->
+    binary:decode_hex(RevId);
+parse_revid(RevId) when is_list(RevId), length(RevId) =:= 32 ->
+    binary:decode_hex(list_to_binary(RevId));
 parse_revid(RevId) when is_binary(RevId) ->
     RevId;
 parse_revid(RevId) when is_list(RevId) ->
@@ -388,13 +388,13 @@ max_seq(Tree, UpdateSeq) ->
         case Value of
             {_Deleted, _DiskPos, OldTreeSeq} ->
                 % Older versions didn't track data sizes.
-                erlang:max(MaxOldSeq, OldTreeSeq);
+                max(MaxOldSeq, OldTreeSeq);
             % necessary clause?
             {_Deleted, _DiskPos, OldTreeSeq, _Size} ->
                 % Older versions didn't store #leaf records.
-                erlang:max(MaxOldSeq, OldTreeSeq);
+                max(MaxOldSeq, OldTreeSeq);
             #leaf{seq = OldTreeSeq} ->
-                erlang:max(MaxOldSeq, OldTreeSeq);
+                max(MaxOldSeq, OldTreeSeq);
             _ ->
                 MaxOldSeq
         end
@@ -566,7 +566,7 @@ restart_open_doc_revs(Parser, Ref, NewRef) ->
     unlink(Parser),
     exit(Parser, kill),
     flush_parser_messages(Ref),
-    erlang:error({restart_open_doc_revs, NewRef}).
+    error({restart_open_doc_revs, NewRef}).
 
 flush_parser_messages(Ref) ->
     receive

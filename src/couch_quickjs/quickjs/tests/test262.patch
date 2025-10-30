@@ -1,5 +1,5 @@
 diff --git a/harness/atomicsHelper.js b/harness/atomicsHelper.js
-index 9828b15..4a5919d 100644
+index 9828b15..9e24d64 100644
 --- a/harness/atomicsHelper.js
 +++ b/harness/atomicsHelper.js
 @@ -272,10 +272,14 @@ $262.agent.waitUntil = function(typedArray, index, expected) {
@@ -14,9 +14,9 @@ index 9828b15..4a5919d 100644
 +//  small: 200,
 +//  long: 1000,
 +//  huge: 10000,
-+  yield: 20,
-+  small: 20,
-+  long: 100,
++  yield: 40,
++  small: 40,
++  long: 200,
 +  huge: 1000,
  };
  
@@ -69,37 +69,4 @@ index b397be0..c197ddc 100644
 +    result += codePointRange(start, end + 1);
    }
    return result;
- }
-diff --git a/harness/sm/non262.js b/harness/sm/non262.js
-index c1829e3..3a3ee27 100644
---- a/harness/sm/non262.js
-+++ b/harness/sm/non262.js
-@@ -41,8 +41,6 @@ globalThis.createNewGlobal = function() {
-   return $262.createRealm().global
- }
- 
--function print(...args) {
--}
- function assertEq(...args) {
-   assert.sameValue(...args)
- }
-@@ -71,4 +69,4 @@ if (globalThis.createExternalArrayBuffer === undefined) {
- if (globalThis.enableGeckoProfilingWithSlowAssertions === undefined) {
-   globalThis.enableGeckoProfilingWithSlowAssertions = globalThis.enableGeckoProfiling =
-     globalThis.disableGeckoProfiling = () => {}
--}
-\ No newline at end of file
-+}
-diff --git a/test/staging/sm/misc/new-with-non-constructor.js b/test/staging/sm/misc/new-with-non-constructor.js
-index 18c2f0c..f9aa209 100644
---- a/test/staging/sm/misc/new-with-non-constructor.js
-+++ b/test/staging/sm/misc/new-with-non-constructor.js
-@@ -16,7 +16,7 @@ function checkConstruct(thing) {
-         new thing();
-         assert.sameValue(0, 1, "not reached " + thing);
-     } catch (e) {
--        assert.sameValue(e.message.includes(" is not a constructor") ||
-+        assert.sameValue(e.message.includes("not a constructor") ||
-                  e.message === "Function.prototype.toString called on incompatible object", true);
-     }
  }

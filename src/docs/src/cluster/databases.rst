@@ -66,6 +66,9 @@ Add a key value pair of the form:
 
     "zone": "metro-dc-a"
 
+Alternatively, you can set the ``COUCHDB_ZONE`` environment variable
+on each node and CouchDB will configure this document for you on startup.
+
 Do this for all of the nodes in your cluster.
 
 In your config file (``local.ini`` or ``default.ini``) on each node, define a

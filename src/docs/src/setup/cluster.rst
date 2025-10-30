@@ -303,7 +303,7 @@ After that we can join all the nodes together. Choose one node as the "setup
 coordination node" to run all these commands on.  This "setup coordination
 node" only manages the setup and requires all other nodes to be able to see it
 and vice versa. *It has no special purpose beyond the setup process; CouchDB
-does not have the concept of a "master" node in a cluster.*
+does not have the concept of a primary node in a cluster.*
 
 Setup will not work with unavailable nodes. All nodes must be online and properly
 preconfigured before the cluster setup process can begin.

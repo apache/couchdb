@@ -155,7 +155,7 @@ stop_sync(Name, Reason, Timeout) when is_atom(Name) ->
 stop_sync(Pid, Reason, Timeout) when is_atom(Reason) and is_pid(Pid) ->
     stop_sync(Pid, fun() -> exit(Pid, Reason) end, Timeout);
 stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
-    MRef = erlang:monitor(process, Pid),
+    MRef = monitor(process, Pid),
     try
         begin
             catch unlink(Pid),
@@ -168,7 +168,7 @@ stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
             end
         end
     after
-        erlang:demonitor(MRef, [flush])
+        demonitor(MRef, [flush])
     end;
 stop_sync(_, _, _) ->
     error(badarg).
@@ -380,7 +380,7 @@ load_applications_with_stats() ->
 
 stats_file_to_app(File) ->
     [_Desc, _Priv, App | _] = lists:reverse(filename:split(File)),
-    erlang:list_to_atom(App).
+    list_to_atom(App).
 
 calculate_start_order(Apps) ->
     AllApps = calculate_start_order(sort_apps(Apps), []),

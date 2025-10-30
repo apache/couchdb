@@ -115,14 +115,24 @@
 -callback shards(St :: term(), [#shard{}]) ->
     {[#shard{}], St1 :: term()}.
 
-% Optional
+% Optional. Called right after a shard file is opened so it gets a Db handle.
+% Should return the change feed start sequence and a list of options along with any changes
+% in a private context. The change feed start sequence should normally be 0 and the list
+% of option can be []. The list of options will be passed directly to couch_db:fold_changes,
+% so any {dir, Dir}, {end_key, EndSeq} could work there.
+%
 -callback db_opened(St :: term(), Db :: term()) ->
-    {ok, St :: term()}.
+    {ChangesSeq :: non_neg_integer(), ChangesOpts :: [term()], St1 :: term()}.
 
-% Optional. If doc is not defined, then ddoc_id default action is {skip, St}.
-% If it is defined, the default action is {ok, St}.
+% Optional. If doc and doc_fdi are not defined, then doc_id default
+% action is {skip, St}. If it is defined, the default action is {ok, St}.
 -callback doc_id(St :: term(), DocId :: binary(), Db :: term()) ->
     {ok | skip | stop, St1 :: term()}.
+
+% Optional. If doc is not defined, then doc_fdi default action is {stop, St}.
+% If it is defined, the default action is {ok, St}.
+-callback doc_fdi(St :: term(), FDI :: #full_doc_info{}, Db :: term()) ->
+    {ok | stop, St1 :: term()}.
 
 % Optional.
 -callback doc(St :: term(), Db :: term(), #doc{}) ->
@@ -139,6 +149,7 @@
     shards/2,
     db_opened/2,
     doc_id/3,
+    doc_fdi/3,
     doc/3,
     db_closing/2
 ]).
@@ -153,12 +164,14 @@
     {shards, 2, fun default_shards/3},
     {db_opened, 2, fun default_db_opened/3},
     {doc_id, 3, fun default_doc_id/3},
+    {doc_fdi, 3, fun default_doc_fdi/3},
     {doc, 3, fun default_doc/3},
     {db_closing, 2, fun default_db_closing/3}
 ]).
 
 -define(CHECKPOINT_INTERVAL_SEC, 10).
 -define(STOP_TIMEOUT_SEC, 5).
+-define(DDOC_BATCH_SIZE, 100).
 
 -record(st, {
     id,
@@ -171,6 +184,8 @@
     cursor,
     shards_db,
     db,
+    changes_seq = 0,
+    changes_opts = [],
     checkpoint_sec = 0,
     start_sec = 0,
     skip_dbs,
@@ -183,7 +198,7 @@ spawn_link(Id) ->
 
 stop(Pid) when is_pid(Pid) ->
     unlink(Pid),
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     Pid ! stop,
     receive
         {'DOWN', Ref, _, _, _} -> ok
@@ -231,7 +246,7 @@ init_from_checkpoint(#st{} = St) ->
             <<"start_sec">> := StartSec
         } ->
             Now = tsec(),
-            PSt = resume_callback(Cbks, SId, EJsonPSt),
+            PSt = resume_callback(Mod, Cbks, SId, EJsonPSt),
             St#st{
                 pst = PSt,
                 cursor = Cur,
@@ -285,6 +300,9 @@ scan_dbs(#st{cursor = Cursor} = St) ->
         couch_db:close(Db)
     end.
 
+scan_dbs_fold(#full_doc_info{id = <<?DESIGN_DOC_PREFIX, _/binary>>}, Acc) ->
+    % In case user added a design doc in the dbs database
+    {ok, Acc};
 scan_dbs_fold(#full_doc_info{} = FDI, #st{shards_db = Db} = Acc) ->
     Acc1 = Acc#st{cursor = FDI#full_doc_info.id},
     Acc2 = maybe_checkpoint(Acc1),
@@ -300,9 +318,7 @@ scan_dbs_fold(#full_doc_info{} = FDI, #st{shards_db = Db} = Acc) ->
             {ok, Acc2}
     end.
 
-scan_db([], #st{} = St) ->
-    {ok, St};
-scan_db([_ | _] = Shards, #st{} = St) ->
+scan_db(Shards, #st{} = St) ->
     #st{dbname = DbName, callbacks = Cbks, pst = PSt, skip_dbs = Skip} = St,
     #{db := DbCbk} = Cbks,
     case match_skip_pat(DbName, Skip) of
@@ -312,7 +328,7 @@ scan_db([_ | _] = Shards, #st{} = St) ->
             case Go of
                 ok ->
                     St2 = rate_limit(St1, db),
-                    St3 = fold_ddocs(fun scan_ddocs_fold/2, St2),
+                    St3 = scan_ddocs(St2),
                     {Shards1, St4} = shards_callback(St3, Shards),
                     St5 = scan_shards(Shards1, St4),
                     {ok, St5};
@@ -324,16 +340,6 @@ scan_db([_ | _] = Shards, #st{} = St) ->
         true ->
             {ok, St}
     end.
-
-scan_ddocs_fold({meta, _}, #st{} = Acc) ->
-    {ok, Acc};
-scan_ddocs_fold({row, RowProps}, #st{} = Acc) ->
-    DDoc = couch_util:get_value(doc, RowProps),
-    scan_ddoc(ejson_to_doc(DDoc), Acc);
-scan_ddocs_fold(complete, #st{} = Acc) ->
-    {ok, Acc};
-scan_ddocs_fold({error, Error}, _Acc) ->
-    exit({shutdown, {scan_ddocs_fold, Error}}).
 
 scan_shards([], #st{} = St) ->
     St;
@@ -363,9 +369,10 @@ scan_docs(#st{} = St, #shard{name = ShardDbName}) ->
             try
                 St2 = St1#st{db = Db},
                 St3 = db_opened_callback(St2),
-                {ok, St4} = couch_db:fold_docs(Db, fun scan_docs_fold/2, St3, []),
+                #st{changes_seq = Seq, changes_opts = Opts} = St3,
+                {ok, St4} = couch_db:fold_changes(Db, Seq, fun scan_docs_fold/2, St3, Opts),
                 St5 = db_closing_callback(St4),
-                erlang:garbage_collect(),
+                garbage_collect(),
                 St5#st{db = undefined}
             after
                 couch_db:close(Db)
@@ -382,12 +389,22 @@ scan_docs_fold(#full_doc_info{id = Id} = FDI, #st{} = St) ->
             {Go, PSt1} = DocIdCbk(PSt, Id, Db),
             St1 = St#st{pst = PSt1},
             case Go of
-                ok -> scan_doc(FDI, St1);
+                ok -> scan_fdi(FDI, St1);
                 skip -> {ok, St1};
                 stop -> {stop, St1}
             end;
         true ->
             {ok, St}
+    end.
+
+scan_fdi(#full_doc_info{} = FDI, #st{} = St) ->
+    #st{db = Db, callbacks = Cbks, pst = PSt} = St,
+    #{doc_fdi := FDICbk} = Cbks,
+    {Go, PSt1} = FDICbk(PSt, FDI, Db),
+    St1 = St#st{pst = PSt1},
+    case Go of
+        ok -> scan_doc(FDI, St1);
+        stop -> {stop, St1}
     end.
 
 scan_doc(#full_doc_info{} = FDI, #st{} = St) ->
@@ -410,7 +427,7 @@ maybe_checkpoint(#st{checkpoint_sec = LastCheckpointTSec} = St) ->
         stop -> exit({shutdown, stop})
     after 0 -> ok
     end,
-    erlang:garbage_collect(),
+    garbage_collect(),
     case tsec() - LastCheckpointTSec > ?CHECKPOINT_INTERVAL_SEC of
         true -> checkpoint(St);
         false -> St
@@ -486,31 +503,44 @@ start_callback(Mod, Cbks, Now, ScanId, LastStartSec, #{} = EJson) when
         TSec when is_integer(TSec), TSec =< Now ->
             #{start := StartCbk} = Cbks,
             case StartCbk(ScanId, EJson) of
-                {ok, PSt} -> PSt;
-                skip -> exit_resched(infinity);
-                reset -> exit_resched(reset)
+                {ok, PSt} ->
+                    PSt;
+                skip ->
+                    % If plugin skipped start, count this as an attempt and
+                    % reschedule to possibly retry in the future.
+                    SkipReschedTSec = schedule_time(Mod, Now, Now),
+                    exit_resched(SkipReschedTSec);
+                reset ->
+                    exit_resched(reset)
             end;
         TSec when is_integer(TSec), TSec > Now ->
             exit_resched(TSec)
     end.
 
-resume_callback(#{} = Cbks, SId, #{} = EJsonPSt) when is_binary(SId) ->
+resume_callback(Mod, #{} = Cbks, SId, #{} = EJsonPSt) when is_binary(SId) ->
     #{resume := ResumeCbk} = Cbks,
     case ResumeCbk(SId, EJsonPSt) of
-        {ok, PSt} -> PSt;
-        skip -> exit_resched(infinity);
-        reset -> exit_resched(reset)
+        {ok, PSt} ->
+            PSt;
+        skip ->
+            % If plugin skipped resume, count this as an attempt and
+            % reschedule to possibly retry in the future
+            Now = tsec(),
+            SkipReschedTSec = schedule_time(Mod, Now, Now),
+            exit_resched(SkipReschedTSec);
+        reset ->
+            exit_resched(reset)
     end.
 
 db_opened_callback(#st{pst = PSt, callbacks = Cbks, db = Db} = St) ->
     #{db_opened := DbOpenedCbk} = Cbks,
-    {ok, PSt1} = DbOpenedCbk(PSt, Db),
-    St#st{pst = PSt1}.
+    {Seq, Opts, PSt1} = DbOpenedCbk(PSt, Db),
+    St#st{pst = PSt1, changes_seq = Seq, changes_opts = Opts}.
 
 db_closing_callback(#st{pst = PSt, callbacks = Cbks, db = Db} = St) ->
     #{db_closing := DbClosingCbk} = Cbks,
     {ok, PSt1} = DbClosingCbk(PSt, Db),
-    St#st{pst = PSt1}.
+    St#st{pst = PSt1, changes_seq = 0, changes_opts = []}.
 
 shards_callback(#st{pst = PSt, callbacks = Cbks} = St, Shards) ->
     #{shards := ShardsCbk} = Cbks,
@@ -575,6 +605,7 @@ default_shards(Mod, _F, _A) when is_atom(Mod) ->
     case
         is_exported(Mod, db_opened, 2) orelse
             is_exported(Mod, doc_id, 3) orelse
+            is_exported(Mod, doc_fdi, 3) orelse
             is_exported(Mod, doc, 3) orelse
             is_exported(Mod, db_closing, 2)
     of
@@ -583,12 +614,18 @@ default_shards(Mod, _F, _A) when is_atom(Mod) ->
     end.
 
 default_db_opened(Mod, _F, _A) when is_atom(Mod) ->
-    fun(St, _Db) -> {ok, St} end.
+    fun(St, _Db) -> {0, [], St} end.
 
 default_doc_id(Mod, _F, _A) when is_atom(Mod) ->
-    case is_exported(Mod, doc, 3) of
+    case is_exported(Mod, doc, 3) orelse is_exported(Mod, doc_fdi, 3) of
         true -> fun(St, _DocId, _Db) -> {ok, St} end;
         false -> fun(St, _DocId, _Db) -> {skip, St} end
+    end.
+
+default_doc_fdi(Mod, _F, _A) when is_atom(Mod) ->
+    case is_exported(Mod, doc, 3) of
+        true -> fun(St, _FDI, _Db) -> {ok, St} end;
+        false -> fun(St, _FDI, _Db) -> {stop, St} end
     end.
 
 default_doc(Mod, _F, _A) when is_atom(Mod) ->
@@ -622,27 +659,86 @@ shards_by_range(Shards) ->
     Dict = lists:foldl(Fun, orddict:new(), Shards),
     orddict:to_list(Dict).
 
-% Design doc fetching helper
+scan_ddocs(#st{mod = Mod} = St) ->
+    case is_exported(Mod, ddoc, 3) of
+        true ->
+            try
+                fold_ddocs_batched(St, <<?DESIGN_DOC_PREFIX>>)
+            catch
+                error:database_does_not_exist ->
+                    St
+            end;
+        false ->
+            % If the plugin doesn't export the ddoc callback, don't bother calling
+            % fabric:all_docs, as it's expensive
+            St
+    end.
 
-fold_ddocs(Fun, #st{dbname = DbName} = Acc) ->
+fold_ddocs_batched(#st{dbname = DbName} = St, <<_/binary>> = StartKey) ->
     QArgs = #mrargs{
         include_docs = true,
-        extra = [{namespace, <<"_design">>}]
+        start_key = StartKey,
+        extra = [{namespace, <<?DESIGN_DOC_PREFIX0>>}],
+        % Need limit > 1 for the algorithm below to work
+        limit = max(2, cfg_ddoc_batch_size())
     },
-    try
-        {ok, Acc1} = fabric:all_docs(DbName, [?ADMIN_CTX], Fun, Acc, QArgs),
-        Acc1
-    catch
-        error:database_does_not_exist ->
-            Acc
+    Cbk =
+        fun
+            ({meta, _}, {Cnt, Id, DDocs}) ->
+                {ok, {Cnt, Id, DDocs}};
+            ({row, Props}, {Cnt, _Id, DDocs}) ->
+                EJson = couch_util:get_value(doc, Props),
+                DDoc = #doc{id = Id} = ejson_to_doc(EJson),
+                case Id =:= StartKey of
+                    true ->
+                        % We get there if we're continuing batched iteration so
+                        % we skip this ddoc as we already processed it. In the
+                        % first batch StartKey will be <<"_design/">> and
+                        % that's an invalid document ID so will never match.
+                        {ok, {Cnt + 1, Id, DDocs}};
+                    false ->
+                        {ok, {Cnt + 1, Id, [DDoc | DDocs]}}
+                end;
+            (complete, {Cnt, Id, DDocs}) ->
+                {ok, {Cnt, Id, lists:reverse(DDocs)}};
+            ({error, Error}, {_Cnt, _Id, _DDocs}) ->
+                exit({shutdown, {scan_ddocs_fold, Error}})
+        end,
+    Acc0 = {0, StartKey, []},
+    {ok, {Cnt, LastId, DDocs}} = fabric:all_docs(DbName, [?ADMIN_CTX], Cbk, Acc0, QArgs),
+    case scan_ddoc_batch(DDocs, {ok, St}) of
+        {ok, #st{} = St1} ->
+            if
+                is_integer(Cnt), Cnt < QArgs#mrargs.limit ->
+                    % We got less than we asked for so we're done
+                    St1;
+                Cnt == QArgs#mrargs.limit ->
+                    % We got all the docs we asked for, there are probably more docs
+                    % so we recurse and fetch the next batch.
+                    fold_ddocs_batched(St1, LastId)
+            end;
+        {stop, #st{} = St1} ->
+            % Plugin wanted to stop scanning ddocs, so we stop
+            St1
     end.
+
+% Call plugin ddocs callback. These may take an arbitrarily long time to
+% process.
+scan_ddoc_batch(_, {stop, #st{} = St}) ->
+    {stop, St};
+scan_ddoc_batch([], {ok, #st{} = St}) ->
+    {ok, St};
+scan_ddoc_batch([#doc{} = DDoc | Rest], {ok, #st{} = St}) ->
+    scan_ddoc_batch(Rest, scan_ddoc(DDoc, St)).
 
 % Simple ejson to #doc{} function to avoid all the extra validation in from_json_obj/1.
 % We just got these docs from the cluster, they are already saved on disk.
 ejson_to_doc({[_ | _] = Props}) ->
     {value, {_, DocId}, Props1} = lists:keytake(<<"_id">>, 1, Props),
-    Props2 = [{K, V} || {K, V} <- Props1, K =:= <<>> orelse binary:first(K) =/= $_],
-    #doc{id = DocId, body = {Props2}}.
+    {value, {_, Rev}, Props2} = lists:keytake(<<"_rev">>, 1, Props1),
+    {Pos, RevId} = couch_doc:parse_rev(Rev),
+    Props3 = [{K, V} || {K, V} <- Props2, K =:= <<>> orelse binary:first(K) =/= $_],
+    #doc{id = DocId, revs = {Pos, [RevId]}, body = {Props3}}.
 
 % Skip patterns
 
@@ -666,6 +762,9 @@ match_skip_pat(<<_/binary>> = Bin, #{} = Pats) ->
 cfg(Mod, Key, Default) when is_list(Key) ->
     Section = atom_to_list(Mod),
     config:get(Section, Key, Default).
+
+cfg_ddoc_batch_size() ->
+    config:get_integer("couch_scanner", "ddoc_batch_size", ?DDOC_BATCH_SIZE).
 
 schedule_time(Mod, LastSec, NowSec) ->
     After = cfg(Mod, "after", "restart"),

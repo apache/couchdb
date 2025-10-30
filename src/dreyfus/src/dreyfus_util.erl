@@ -25,9 +25,11 @@
     ensure_local_purge_docs/2,
     get_value_from_options/2,
     get_local_purge_doc_id/1,
+    get_purge_checkpoints/1,
     get_local_purge_doc_body/4,
     maybe_create_local_purge_doc/2,
     maybe_create_local_purge_doc/3,
+    get_signatures_from_ddocs/2,
     get_signature_from_idxdir/1,
     verify_index_exists/2
 ]).
@@ -241,7 +243,7 @@ export(QueryArgs) ->
 time(Metric, {M, F, A}) when is_list(Metric) ->
     Start = os:timestamp(),
     try
-        erlang:apply(M, F, A)
+        apply(M, F, A)
     after
         Length = timer:now_diff(os:timestamp(), Start) / 1000,
         couch_stats:update_histogram([dreyfus | Metric], Length)
@@ -305,7 +307,7 @@ ensure_local_purge_docs(DbName, DDocs) ->
                     undefined ->
                         false;
                     _ ->
-                        try dreyfus_index:design_doc_to_indexes(DDoc) of
+                        try dreyfus_index:design_doc_to_indexes(DbName, DDoc) of
                             SIndexes -> ensure_local_purge_doc(Db, SIndexes)
                         catch
                             _:_ ->
@@ -359,6 +361,32 @@ maybe_create_local_purge_doc(Db, IndexPid, Index) ->
 
 get_local_purge_doc_id(Sig) ->
     ?l2b(?LOCAL_DOC_PREFIX ++ "purge-" ++ "dreyfus-" ++ Sig).
+
+% Returns a map of `Sig => DocId` elements for all the purge view
+% checkpoint docs. Sig is a hex-encoded binary.
+%
+get_purge_checkpoints(Db) ->
+    couch_index_util:get_purge_checkpoints(Db, <<"dreyfus">>).
+
+get_signatures_from_ddocs(DbName, DesignDocs) ->
+    SigList = lists:flatmap(fun(Doc) -> active_sigs(DbName, Doc) end, DesignDocs),
+    #{Sig => true || Sig <- SigList}.
+
+active_sigs(DbName, #doc{body = {Fields}} = Doc) ->
+    try
+        {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
+        {IndexNames, _} = lists:unzip(RawIndexes),
+        [
+            begin
+                {ok, Index} = dreyfus_index:design_doc_to_index(DbName, Doc, IndexName),
+                Index#index.sig
+            end
+         || IndexName <- IndexNames
+        ]
+    catch
+        error:{badmatch, _Error} ->
+            []
+    end.
 
 get_signature_from_idxdir(IdxDir) ->
     IdxDirList = filename:split(IdxDir),
@@ -415,7 +443,7 @@ verify_index_exists(DbName, Props) ->
                     case couch_db:get_design_doc(Db, DDocId) of
                         {ok, #doc{} = DDoc} ->
                             {ok, IdxState} = dreyfus_index:design_doc_to_index(
-                                DDoc, IndexName
+                                DbName, DDoc, IndexName
                             ),
                             IdxState#index.sig == Sig;
                         {not_found, _} ->

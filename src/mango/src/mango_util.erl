@@ -114,32 +114,32 @@ load_ddoc(Db, DDocId, DbOpts) ->
     end.
 
 defer(Mod, Fun, Args) ->
-    {Pid, Ref} = erlang:spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
+    {Pid, Ref} = spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
     receive
         {'DOWN', Ref, process, Pid, {mango_defer_ok, Value}} ->
             Value;
         {'DOWN', Ref, process, Pid, {mango_defer_throw, Value}} ->
             erlang:throw(Value);
         {'DOWN', Ref, process, Pid, {mango_defer_error, Value}} ->
-            erlang:error(Value);
+            error(Value);
         {'DOWN', Ref, process, Pid, {mango_defer_exit, Value}} ->
-            erlang:exit(Value)
+            exit(Value)
     end.
 
 do_defer(Mod, Fun, Args) ->
-    try erlang:apply(Mod, Fun, Args) of
+    try apply(Mod, Fun, Args) of
         Resp ->
-            erlang:exit({mango_defer_ok, Resp})
+            exit({mango_defer_ok, Resp})
     catch
         throw:Error:Stack ->
             couch_log:error("Defered error: ~w~n    ~p", [{throw, Error}, Stack]),
-            erlang:exit({mango_defer_throw, Error});
+            exit({mango_defer_throw, Error});
         error:Error:Stack ->
             couch_log:error("Defered error: ~w~n    ~p", [{error, Error}, Stack]),
-            erlang:exit({mango_defer_error, Error});
+            exit({mango_defer_error, Error});
         exit:Error:Stack ->
             couch_log:error("Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
-            erlang:exit({mango_defer_exit, Error})
+            exit({mango_defer_exit, Error})
     end.
 
 assert_ejson({Props}) ->

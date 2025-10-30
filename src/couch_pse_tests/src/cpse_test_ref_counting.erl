@@ -82,7 +82,7 @@ start_client(Db0) ->
             {waiting, Pid} ->
                 Pid ! go
         after 1000 ->
-            erlang:error(timeout)
+            error(timeout)
         end,
 
         receive
@@ -90,7 +90,7 @@ start_client(Db0) ->
                 couch_db:close(Db1),
                 ok
         after 1000 ->
-            erlang:error(timeout)
+            error(timeout)
         end
     end).
 
@@ -99,7 +99,7 @@ wait_client({Pid, _Ref}) ->
     receive
         go -> ok
     after 1000 ->
-        erlang:error(timeout)
+        error(timeout)
     end.
 
 close_client({Pid, Ref}) ->
@@ -108,5 +108,5 @@ close_client({Pid, Ref}) ->
         {'DOWN', Ref, _, _, _} ->
             ok
     after 1000 ->
-        erlang:error(timeout)
+        error(timeout)
     end.

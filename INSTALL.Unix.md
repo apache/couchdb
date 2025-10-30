@@ -1,6 +1,6 @@
 # Apache CouchDB INSTALL.Unix
 
-A high-level guide to Unix-like systems, inc. Mac OS X and Ubuntu.
+A high-level guide to Unix-like systems, inc. macOS and Ubuntu.
 
 Community installation guides are available on the wiki:
 
@@ -84,9 +84,9 @@ You can install the dependencies by running:
 
 You can install Node.JS via [NodeSource](https://github.com/nodesource/distributions#rpminstall).
 
-### Mac OS X
+### macOS
 
-To build CouchDB from source on Mac OS X, you will need to install
+To build CouchDB from source on macOS, you will need to install
 the Command Line Tools:
 
     xcode-select --install
@@ -96,6 +96,12 @@ You can then install the other dependencies by running:
     brew install autoconf autoconf-archive automake libtool \
         erlang icu4c spidermonkey pkg-config
 
+Note that newer versions of Homebrew install `icu4c` as “keg-only”.
+That means the CouchDB build system can’t find it. Either follow
+the instructions presented by Homebrew or run
+
+    brew link icu4c
+
 You can install Node.JS via the
 [official Macintosh installer](https://nodejs.org/en/download/).
 
@@ -103,9 +109,9 @@ You will need Homebrew installed to use the `brew` command.
 
 Learn more about Homebrew at:
 
-    http://mxcl.github.com/homebrew/
+    https://brew.sh
 
-Some versions of Mac OS X ship a problematic OpenSSL library. If
+Some versions of macOS ship a problematic OpenSSL library. If
 you're experiencing troubles with CouchDB crashing intermittently with
 a segmentation fault or a bus error, you will need to install your own
 version of OpenSSL. See the wiki, mentioned above, for more information.
@@ -169,7 +175,7 @@ On many Unix-like systems you can run:
             --group --gecos \
             "CouchDB Administrator" couchdb
 
-On Mac OS X you can use the Workgroup Manager to create users up to version
+On macOS you can use the Workgroup Manager to create users up to version
 10.9, and dscl or sysadminctl after version 10.9. Search Apple's support
 site to find the documentation appropriate for your system. As of recent
 versions of OS X, this functionality is also included in Server.app,

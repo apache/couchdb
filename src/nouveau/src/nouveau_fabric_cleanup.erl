@@ -14,30 +14,52 @@
 
 -module(nouveau_fabric_cleanup).
 
--include_lib("couch/include/couch_db.hrl").
-
--include("nouveau.hrl").
--include_lib("mem3/include/mem3.hrl").
-
--export([go/1]).
+-export([go/1, go_local/3]).
 
 go(DbName) ->
-    {ok, DesignDocs} = fabric:design_docs(DbName),
-    ActiveSigs =
-        lists:usort(
-            lists:flatmap(
-                fun(Doc) -> active_sigs(DbName, Doc) end,
-                [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
-            )
-        ),
-    Shards = mem3:shards(DbName),
-    lists:foreach(
-        fun(Shard) ->
-            rexi:cast(Shard#shard.node, {nouveau_rpc, cleanup, [Shard#shard.name, ActiveSigs]})
-        end,
-        Shards
-    ).
+    case fabric_util:get_design_doc_records(DbName) of
+        {ok, DDocs} when is_list(DDocs) ->
+            Sigs = nouveau_util:get_signatures_from_ddocs(DbName, DDocs),
+            Shards = mem3:shards(DbName),
+            ByNode = maps:groups_from_list(fun mem3:node/1, fun mem3:name/1, Shards),
+            Fun = fun(Node, Dbs, Acc) ->
+                erpc:send_request(Node, ?MODULE, go_local, [DbName, Dbs, Sigs], Node, Acc)
+            end,
+            Reqs = maps:fold(Fun, erpc:reqids_new(), ByNode),
+            recv(DbName, Reqs, fabric_util:abs_request_timeout());
+        Error ->
+            couch_log:error("~p : error fetching ddocs db:~p ~p", [?MODULE, DbName, Error]),
+            Error
+    end.
 
-active_sigs(DbName, #doc{} = Doc) ->
-    Indexes = nouveau_util:design_doc_to_indexes(DbName, Doc),
-    lists:map(fun(Index) -> Index#index.sig end, Indexes).
+% erpc endpoint for go/1 and fabric_index_cleanup:cleanup_indexes/2
+%
+go_local(DbName, Dbs, Sigs) ->
+    try
+        lists:foreach(
+            fun(Db) ->
+                Sz = byte_size(DbName),
+                <<"shards/", Range:17/binary, "/", DbName:Sz/binary, ".", _/binary>> = Db,
+                Checkpoints = nouveau_util:get_purge_checkpoints(Db),
+                ok = couch_index_util:cleanup_purges(Db, Sigs, Checkpoints),
+                Path = <<"shards/", Range/binary, "/", DbName/binary, ".*/*">>,
+                nouveau_api:delete_path(nouveau_util:index_name(Path), maps:keys(Sigs))
+            end,
+            Dbs
+        )
+    catch
+        error:database_does_not_exist ->
+            ok
+    end.
+
+recv(DbName, Reqs, Timeout) ->
+    case erpc:receive_response(Reqs, Timeout, true) of
+        {ok, _Label, Reqs1} ->
+            recv(DbName, Reqs1, Timeout);
+        {Error, Label, Reqs1} ->
+            ErrMsg = "~p : error cleaning nouveau indexes db:~p node: ~p error:~p",
+            couch_log:error(ErrMsg, [?MODULE, DbName, Label, Error]),
+            recv(DbName, Reqs1, Timeout);
+        no_request ->
+            ok
+    end.

@@ -71,8 +71,8 @@ persist(true, Waiting, Active, Starting) ->
     % already running. We want them to be the first ones to continue after
     % restart. We're relying on infinity sorting higher than float and integer
     % numeric values here.
-    AMap = maps:map(fun(_, _) -> infinity end, Active),
-    SMap = maps:from_list([{K, infinity} || K <- maps:values(Starting)]),
+    AMap = #{K => infinity || K := _Pid <- Active},
+    SMap = #{K => infinity || _Ref := K <- Starting},
     Path = file_path(Name),
     write(maps:merge(WMap, maps:merge(AMap, SMap)), Path).
 

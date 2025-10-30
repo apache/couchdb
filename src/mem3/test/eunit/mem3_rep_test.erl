@@ -209,7 +209,7 @@ get_all_docs(DbName) ->
     get_all_docs(DbName, #mrargs{}).
 
 get_all_docs(DbName, #mrargs{} = QArgs0) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(
         fun() ->
             Cb = fun
@@ -235,11 +235,11 @@ to_map({[_ | _]} = EJson) ->
     jiffy:decode(jiffy:encode(EJson), [return_maps]).
 
 create_db(DbName, Opts) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(fun() -> fabric:create_db(DbName, Opts) end, GL).
 
 delete_db(DbName) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(fun() -> fabric:delete_db(DbName, [?ADMIN_CTX]) end, GL).
 
 create_local_db(DbName) ->
@@ -259,7 +259,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         case GroupLeader of
             undefined -> ok;
-            _ -> erlang:group_leader(GroupLeader, self())
+            _ -> group_leader(GroupLeader, self())
         end,
         exit({with_proc_res, Fun()})
     end),
@@ -269,7 +269,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
         {'DOWN', Ref, process, Pid, Error} ->
             error(Error)
     after Timeout ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         exit(Pid, kill),
         error({with_proc_timeout, Fun, Timeout})
     end.

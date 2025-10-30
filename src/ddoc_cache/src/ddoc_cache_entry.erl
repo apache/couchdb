@@ -75,16 +75,16 @@ start_link(Key, Default) ->
     {ok, Pid}.
 
 shutdown(Pid) ->
-    Ref = erlang:monitor(process, Pid),
+    Ref = monitor(process, Pid),
     ok = gen_server:cast(Pid, shutdown),
     receive
         {'DOWN', Ref, process, Pid, normal} ->
             ok;
         {'DOWN', Ref, process, Pid, Reason} ->
-            erlang:exit(Reason)
+            exit(Reason)
     after ?ENTRY_SHUTDOWN_TIMEOUT ->
-        erlang:demonitor(Ref, [flush]),
-        erlang:exit({timeout, {entry_shutdown, Pid}})
+        demonitor(Ref, [flush]),
+        exit({timeout, {entry_shutdown, Pid}})
     end.
 
 open(Pid, Key) ->
@@ -98,7 +98,7 @@ open(Pid, Key) ->
         end
     catch
         error:database_does_not_exist ->
-            erlang:error(database_does_not_exist);
+            error(database_does_not_exist);
         exit:_ ->
             % Its possible that this process was evicted just
             % before we tried talking to it. Just fallback
@@ -257,7 +257,7 @@ handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
 spawn_opener(Key) ->
-    {Pid, _} = erlang:spawn_monitor(?MODULE, do_open, [Key]),
+    {Pid, _} = spawn_monitor(?MODULE, do_open, [Key]),
     Pid.
 
 start_timer() ->
@@ -269,10 +269,10 @@ start_timer() ->
 do_open(Key) ->
     try recover(Key) of
         Resp ->
-            erlang:exit({open_ok, Key, Resp})
+            exit({open_ok, Key, Resp})
     catch
         T:R:S ->
-            erlang:exit({open_error, Key, {T, R, S}})
+            exit({open_error, Key, {T, R, S}})
     end.
 
 update_lru(#st{key = Key, ts = Ts} = St) ->

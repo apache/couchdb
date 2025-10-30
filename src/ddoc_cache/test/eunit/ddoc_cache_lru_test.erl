@@ -91,7 +91,7 @@ check_multi_start(_) ->
     ),
     [#entry{pid = Pid}] = ets:tab2list(?CACHE),
     Opener = element(4, sys:get_state(Pid)),
-    OpenerRef = erlang:monitor(process, Opener),
+    OpenerRef = monitor(process, Opener),
     ?assert(is_process_alive(Opener)),
     Opener ! go,
     receive
@@ -135,7 +135,7 @@ check_multi_open(_) ->
     ),
     [#entry{pid = Pid}] = ets:tab2list(?CACHE),
     Opener = element(4, sys:get_state(Pid)),
-    OpenerRef = erlang:monitor(process, Opener),
+    OpenerRef = monitor(process, Opener),
     ?assert(is_process_alive(Opener)),
     Opener ! go,
     receive
@@ -162,7 +162,7 @@ check_capped_size(_) ->
     meck:reset(ddoc_cache_ev),
     lists:foreach(
         fun(I) ->
-            DbName = list_to_binary("big_" ++ integer_to_list(I)),
+            DbName = <<"bin_", (integer_to_binary(I))/binary>>,
             ddoc_cache:open_custom(DbName, ?MODULE),
             meck:wait(I, ddoc_cache_ev, event, [started, '_'], ?EVENT_TIMEOUT),
             ?assert(cache_size() < MaxSize * 2)
@@ -171,7 +171,7 @@ check_capped_size(_) ->
     ),
     lists:foreach(
         fun(I) ->
-            DbName = list_to_binary("big_" ++ integer_to_list(I)),
+            DbName = <<"bin_", (integer_to_binary(I))/binary>>,
             ddoc_cache:open_custom(DbName, ?MODULE),
             meck:wait(I, ddoc_cache_ev, event, [started, '_'], ?EVENT_TIMEOUT),
             ?assert(cache_size() < MaxSize * 2)
@@ -184,7 +184,7 @@ check_cache_refill({DbName, _}) ->
     meck:reset(ddoc_cache_ev),
 
     InitDDoc = fun(I) ->
-        NumBin = list_to_binary(integer_to_list(I)),
+        NumBin = integer_to_binary(I),
         DDocId = <<"_design/", NumBin/binary>>,
         Doc = #doc{id = DDocId, body = {[]}},
         {ok, _} = fabric:update_doc(DbName, Doc, [?ADMIN_CTX]),
@@ -242,7 +242,7 @@ check_evict_and_exit(_) ->
     ?assertEqual({ok, <<"dbname">>}, ddoc_cache_lru:open(Key)),
     [#entry{key = Key, pid = Pid}] = ets:tab2list(?CACHE),
 
-    erlang:monitor(process, whereis(ddoc_cache_lru)),
+    monitor(process, whereis(ddoc_cache_lru)),
 
     % Pause the LRU so we can queue multiple messages
     erlang:suspend_process(whereis(ddoc_cache_lru)),

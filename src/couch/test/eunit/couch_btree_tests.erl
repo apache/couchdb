@@ -13,7 +13,6 @@
 -module(couch_btree_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 -define(ROWS, 1000).
 % seconds
@@ -29,6 +28,35 @@ setup() ->
 
 setup_kvs(_) ->
     setup().
+
+setup_kvs_with_cache(_) ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2},
+        {cache_depth, 2}
+    ]),
+    {Fd, Btree}.
+
+setup_kvs_with_small_chunk_size(_) ->
+    % Less than a 1/4 than current default 1279
+    config:set("couchdb", "btree_chunk_size", "300", false),
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2}
+    ]),
+    {Fd, Btree}.
+
+setup_kvs_with_large_chunk_size(_) ->
+    % About 4x than current default 1279
+    config:set("couchdb", "btree_chunk_size", "5000", false),
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2}
+    ]),
+    {Fd, Btree}.
 
 setup_red() ->
     {_, EvenOddKVs} = lists:foldl(
@@ -48,6 +76,7 @@ setup_red(_) ->
     setup_red().
 
 teardown(Fd) when is_pid(Fd) ->
+    config:delete("couchdb", "btree_chunk_size", false),
     ok = couch_file:close(Fd);
 teardown({Fd, _}) ->
     teardown(Fd).
@@ -81,7 +110,7 @@ btree_open_test_() ->
     {ok, Btree} = couch_btree:open(nil, Fd, [{compression, none}]),
     {
         "Ensure that created btree is really a btree record",
-        ?_assert(is_record(Btree, btree))
+        ?_assert(couch_btree:is_btree(Btree))
     }.
 
 sorted_kvs_test_() ->
@@ -105,7 +134,7 @@ sorted_kvs_test_() ->
 rsorted_kvs_test_() ->
     Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
     Funs = kvs_test_funs(),
-    Reversed = Sorted,
+    Reversed = lists:reverse(Sorted),
     {
         "BTree with backward sorted keys",
         {
@@ -136,6 +165,60 @@ shuffled_kvs_test_() ->
                 fun setup_kvs/1,
                 fun teardown/2,
                 [{Shuffled, Fun} || Fun <- Funs]
+            }
+        }
+    }.
+
+sorted_kvs_with_cache_test_() ->
+    Funs = kvs_test_funs(),
+    Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    {
+        "BTree with a cache and sorted keys",
+        {
+            setup,
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs_with_cache/1,
+                fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
+            }
+        }
+    }.
+
+sorted_kvs_small_chunk_size_test_() ->
+    Funs = kvs_test_funs(),
+    Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    {
+        "BTree with a small chunk size and sorted keys",
+        {
+            setup,
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs_with_small_chunk_size/1,
+                fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
+            }
+        }
+    }.
+
+sorted_kvs_large_chunk_size_test_() ->
+    Funs = kvs_test_funs(),
+    Sorted = [{Seq, rand:uniform()} || Seq <- lists:seq(1, ?ROWS)],
+    {
+        "BTree with a large chunk size and sorted keys",
+        {
+            setup,
+            fun() -> test_util:start_couch() end,
+            fun test_util:stop/1,
+            {
+                foreachx,
+                fun setup_kvs_with_large_chunk_size/1,
+                fun teardown/2,
+                [{Sorted, Fun} || Fun <- Funs]
             }
         }
     }.
@@ -189,10 +272,10 @@ reductions_test_() ->
     }.
 
 should_set_fd_correctly(_, {Fd, Btree}) ->
-    ?_assertMatch(Fd, Btree#btree.fd).
+    ?_assertMatch(Fd, couch_btree:get_fd(Btree)).
 
 should_set_root_correctly(_, {_, Btree}) ->
-    ?_assertMatch(nil, Btree#btree.root).
+    ?_assertMatch(nil, couch_btree:get_state(Btree)).
 
 should_create_zero_sized_btree(_, {_, Btree}) ->
     ?_assertMatch(0, couch_btree:size(Btree)).
@@ -200,7 +283,7 @@ should_create_zero_sized_btree(_, {_, Btree}) ->
 should_set_reduce_option(_, {_, Btree}) ->
     ReduceFun = fun reduce_fun/2,
     Btree1 = couch_btree:set_options(Btree, [{reduce, ReduceFun}]),
-    ?_assertMatch(ReduceFun, Btree1#btree.reduce).
+    ?_assertMatch(ReduceFun, couch_btree:get_reduce_fun(Btree1)).
 
 should_fold_over_empty_btree(_, {_, Btree}) ->
     {ok, _, EmptyRes} = couch_btree:foldl(Btree, fun(_, X) -> {ok, X + 1} end, 0),
@@ -228,7 +311,7 @@ should_have_lesser_size_than_file(Fd, Btree) ->
 should_keep_root_pointer_to_kp_node(Fd, Btree) ->
     ?_assertMatch(
         {ok, {kp_node, _}},
-        couch_file:pread_term(Fd, element(1, Btree#btree.root))
+        couch_file:pread_term(Fd, element(1, couch_btree:get_state(Btree)))
     ).
 
 should_remove_all_keys(KeyValues, Btree) ->
@@ -615,18 +698,15 @@ test_key_access(Btree, List) ->
     FoldFun = fun(Element, {[HAcc | TAcc], Count}) ->
         case Element == HAcc of
             true -> {ok, {TAcc, Count + 1}};
-            _ -> {ok, {TAcc, Count + 1}}
+            _ -> {ok, {TAcc, Count}}
         end
     end,
     Length = length(List),
     Sorted = lists:sort(List),
     {ok, _, {[], Length}} = couch_btree:foldl(Btree, FoldFun, {Sorted, 0}),
-    {ok, _, {[], Length}} = couch_btree:fold(
-        Btree,
-        FoldFun,
-        {Sorted, 0},
-        [{dir, rev}]
-    ),
+    Reversed = lists:reverse(Sorted),
+    RevOpts = [{dir, rev}],
+    {ok, _, {[], Length}} = couch_btree:fold(Btree, FoldFun, {Reversed, 0}, RevOpts),
     ok.
 
 test_lookup_access(Btree, KeyValues) ->

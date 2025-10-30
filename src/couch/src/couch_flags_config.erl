@@ -134,7 +134,7 @@ parse_flags(_Tokens, _) ->
 
 parse_flags_term(FlagsBin) ->
     {Flags, Errors} = lists:splitwith(
-        fun erlang:is_atom/1,
+        fun is_atom/1,
         [parse_flag(F) || F <- split_by_comma(FlagsBin)]
     ),
     case Errors of

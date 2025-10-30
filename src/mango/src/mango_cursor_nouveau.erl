@@ -49,7 +49,7 @@ create(Db, {Indexes, Trace}, Selector, Opts) ->
         end,
 
     NouveauLimit = get_nouveau_limit(),
-    Limit = erlang:min(NouveauLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
+    Limit = min(NouveauLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
 
@@ -297,7 +297,7 @@ update_query_args(CAcc) ->
     }.
 
 get_limit(CAcc) ->
-    erlang:min(get_nouveau_limit(), CAcc#cacc.limit + CAcc#cacc.skip).
+    min(get_nouveau_limit(), CAcc#cacc.limit + CAcc#cacc.skip).
 
 get_nouveau_limit() ->
     config:get_integer("nouveau", "max_limit", 200).

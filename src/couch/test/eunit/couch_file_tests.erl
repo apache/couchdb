@@ -946,3 +946,86 @@ legacy_stats() ->
 reset_legacy_checksum_stats() ->
     Counter = couch_stats:sample([couchdb, legacy_checksums]),
     couch_stats:decrement_counter([couchdb, legacy_checksums], Counter).
+
+write_header_sync_test_() ->
+    {
+        "Test sync options for write_header",
+        {
+            setup,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun unlinked_setup/0,
+                fun teardown/1,
+                [
+                    ?TDEF_FE(should_handle_sync_option),
+                    ?TDEF_FE(should_not_sync_by_default),
+                    ?TDEF_FE(should_handle_error_of_the_first_sync),
+                    ?TDEF_FE(should_handle_error_of_the_second_sync),
+                    ?TDEF_FE(should_handle_error_of_the_file_write)
+                ]
+            }
+        }
+    }.
+
+unlinked_setup() ->
+    Self = self(),
+    ReqId = make_ref(),
+    meck:new(file, [passthrough, unstick]),
+    spawn(fun() ->
+        {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+        Self ! {ReqId, Fd}
+    end),
+    receive
+        {ReqId, Result} -> Result
+    end.
+
+should_handle_sync_option(Fd) ->
+    ok = couch_file:write_header(Fd, {<<"some_data">>, 32}, [sync]),
+    ?assertMatch({ok, {<<"some_data">>, 32}}, couch_file:read_header(Fd)),
+    ?assertEqual(2, meck:num_calls(file, datasync, ['_'])),
+    ok.
+
+should_not_sync_by_default(Fd) ->
+    ok = couch_file:write_header(Fd, {<<"some_data">>, 32}),
+    ?assertMatch({ok, {<<"some_data">>, 32}}, couch_file:read_header(Fd)),
+    ?assertEqual(0, meck:num_calls(file, datasync, ['_'])),
+    ok.
+
+should_handle_error_of_the_first_sync(Fd) ->
+    meck:expect(
+        file,
+        datasync,
+        ['_'],
+        meck:val({error, terminated})
+    ),
+    ?assertEqual({error, terminated}, couch_file:write_header(Fd, {<<"some_data">>, 32}, [sync])),
+    ?assertEqual(1, meck:num_calls(file, datasync, ['_'])),
+    ok.
+
+should_handle_error_of_the_second_sync(Fd) ->
+    meck:expect(
+        file,
+        datasync,
+        ['_'],
+        meck:seq([
+            meck:val(ok),
+            meck:val({error, terminated})
+        ])
+    ),
+    ?assertEqual({error, terminated}, couch_file:write_header(Fd, {<<"some_data">>, 32}, [sync])),
+    ?assertEqual(2, meck:num_calls(file, datasync, ['_'])),
+    ok.
+
+should_handle_error_of_the_file_write(Fd) ->
+    meck:expect(
+        file,
+        write,
+        ['_', '_'],
+        meck:val({error, terminated})
+    ),
+    ?assertEqual({error, terminated}, couch_file:write_header(Fd, {<<"some_data">>, 32}, [sync])),
+    ?assertEqual(1, meck:num_calls(file, datasync, ['_'])),
+    ?assertEqual(1, meck:num_calls(file, write, ['_', '_'])),
+    ok.

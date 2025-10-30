@@ -78,7 +78,7 @@ get_index(Module, <<"shards/", _/binary>> = DbName, DDoc) ->
         {'DOWN', Ref, process, Pid, Error} ->
             Error
     after 61000 ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         {error, timeout}
     end;
 get_index(Module, DbName, DDoc) when is_binary(DbName) ->

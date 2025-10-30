@@ -114,9 +114,9 @@ t_no_duplicate_metrics(Port) ->
     % definition, not the values. These lines always start with
     % a # character.
     MetricDefs = lists:filter(fun(S) -> string:find(S, "#") =:= S end, Lines),
-    ?assertNotEqual(erlang:length(MetricDefs), 0),
+    ?assertNotEqual(length(MetricDefs), 0),
     Diff = get_duplicates(MetricDefs),
-    ?assertEqual(erlang:length(Diff), 0).
+    ?assertEqual(length(Diff), 0).
 
 get_duplicates(List) ->
     List -- sets:to_list(couch_util:set_from_list(List)).
@@ -158,7 +158,7 @@ t_starts_with_couchdb(Port) ->
                 {match, _} ->
                     ok;
                 nomatch ->
-                    erlang:error(
+                    error(
                         {assertRegexp_failed, [
                             {module, ?MODULE},
                             {line, ?LINE},

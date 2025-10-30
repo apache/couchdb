@@ -62,7 +62,7 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    format_status/2
+    format_status/1
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
@@ -154,13 +154,21 @@ handle_info(Msg, State) ->
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-format_status(_Opt, [_PDict, State]) ->
-    [
-        {epoch, State#state.epoch},
-        {user, State#state.user},
-        {session_url, State#state.session_url},
-        {refresh_tstamp, State#state.refresh_tstamp}
-    ].
+format_status(Status) ->
+    maps:map(
+        fun
+            (state, State) ->
+                #{
+                    epoch => State#state.epoch,
+                    user => State#state.user,
+                    session_url => State#state.session_url,
+                    refresh_tstamp => State#state.refresh_tstamp
+                };
+            (_, Value) ->
+                Value
+        end,
+        Status
+    ).
 
 %% Private helper functions
 
@@ -336,7 +344,7 @@ stop_worker_if_server_requested(ResultHeaders0, Worker) ->
     ResultHeaders = mochiweb_headers:make(ResultHeaders0),
     case mochiweb_headers:get_value("Connection", ResultHeaders) of
         "close" ->
-            Ref = erlang:monitor(process, Worker),
+            Ref = monitor(process, Worker),
             ibrowse_http_client:stop(Worker),
             receive
                 {'DOWN', Ref, _, _, _} ->
@@ -379,7 +387,7 @@ parse_cookie(Headers) ->
             {error, cookie_not_found};
         [_ | _] = Cookies ->
             case get_auth_session_cookies_and_age(Cookies) of
-                [] -> {error, cookie_format_invalid};
+                [] -> {error, cookie_not_found};
                 [{Cookie, MaxAge} | _] -> {ok, MaxAge, Cookie}
             end
     end.
@@ -799,5 +807,15 @@ get_auth_session_cookies_and_age_test() ->
             [{"AuthSession", "z"}, {"Foo", "Bar"}]
         ])
     ).
+
+parse_cookie_test() ->
+    NotFound = {error, cookie_not_found},
+    ?assertEqual(NotFound, parse_cookie([])),
+    ?assertEqual(NotFound, parse_cookie([{"abc", "def"}])),
+    ?assertEqual(NotFound, parse_cookie([{"set-cookiee", "c=v"}])),
+    ?assertEqual(NotFound, parse_cookie([{"set-cookie", ""}])),
+    ?assertEqual(NotFound, parse_cookie([{"Set-cOokie", "c=v"}])),
+    ?assertEqual({ok, undefined, "x"}, parse_cookie([{"set-cookie", "authsession=x"}])),
+    ?assertEqual({ok, 4, "x"}, parse_cookie([{"set-cookie", "authsession=x; max-age=4"}])).
 
 -endif.

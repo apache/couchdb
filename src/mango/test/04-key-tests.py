@@ -15,8 +15,9 @@ import mango
 import unittest
 
 TEST_DOCS = [
-    {"type": "complex_key", "title": "normal key"},
+    {"_id": "100", "type": "complex_key", "title": "normal key"},
     {
+        "_id": "200",
         "type": "complex_key",
         "title": "key with dot",
         "dot.key": "dot's value",
@@ -24,14 +25,16 @@ TEST_DOCS = [
         "name.first": "Kvothe",
     },
     {
+        "_id": "300",
         "type": "complex_key",
         "title": "key with peso",
         "$key": "peso",
         "deep": {"$key": "deep peso"},
         "name": {"first": "Master Elodin"},
     },
-    {"type": "complex_key", "title": "unicode key", "": "apple"},
+    {"_id": "400", "type": "complex_key", "title": "unicode key", "": "apple"},
     {
+        "_id": "500",
         "title": "internal_fields_format",
         "utf8-1[]:string": "string",
         "utf8-2[]:boolean[]": True,

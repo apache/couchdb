@@ -1085,7 +1085,7 @@ wait_for_replicate(DbName, DocIds, ExpectRevCount, TimeOut) when
 wait_for_replicate(DbName, DocId, ExpectRevCount, TimeOut) ->
     FDI = fabric:get_full_doc_info(DbName, DocId, []),
     #doc_info{revs = Revs} = couch_doc:to_doc_info(FDI),
-    case erlang:length(Revs) of
+    case length(Revs) of
         ExpectRevCount ->
             couch_log:notice(
                 "[~p] wait end by expect, time used:~p, DocId:~p",
@@ -1102,17 +1102,17 @@ get_sigs(DbName) ->
     {ok, DesignDocs} = fabric:design_docs(DbName),
     lists:usort(
         lists:flatmap(
-            fun active_sigs/1,
+            fun(Doc) -> active_sigs(DbName, Doc) end,
             [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
         )
     ).
 
-active_sigs(#doc{body = {Fields}} = Doc) ->
+active_sigs(DbName, #doc{body = {Fields}} = Doc) ->
     {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
     {IndexNames, _} = lists:unzip(RawIndexes),
     [
         begin
-            {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
+            {ok, Index} = dreyfus_index:design_doc_to_index(DbName, Doc, IndexName),
             Index#index.sig
         end
      || IndexName <- IndexNames

@@ -16,7 +16,8 @@
     set_revs_limit/3,
     set_security/3,
     get_all_security/2,
-    set_purge_infos_limit/3
+    set_purge_infos_limit/3,
+    update_props/4
 ]).
 
 -include_lib("fabric/include/fabric.hrl").
@@ -198,3 +199,25 @@ maybe_finish_get(#acc{workers = []} = Acc) ->
     {stop, Acc};
 maybe_finish_get(Acc) ->
     {ok, Acc}.
+
+update_props(DbName, K, V, Options) ->
+    Shards = mem3:shards(DbName),
+    Workers = fabric_util:submit_jobs(Shards, update_props, [K, V, Options]),
+    Handler = fun handle_update_props_message/3,
+    Acc0 = {Workers, length(Workers) - 1},
+    case fabric_util:recv(Workers, #shard.ref, Handler, Acc0) of
+        {ok, ok} ->
+            ok;
+        {timeout, {DefunctWorkers, _}} ->
+            fabric_util:log_timeout(DefunctWorkers, "update_props"),
+            {error, timeout};
+        Error ->
+            Error
+    end.
+
+handle_update_props_message(ok, _, {_Workers, 0}) ->
+    {stop, ok};
+handle_update_props_message(ok, Worker, {Workers, Waiting}) ->
+    {ok, {lists:delete(Worker, Workers), Waiting - 1}};
+handle_update_props_message(Error, _, _Acc) ->
+    {error, Error}.

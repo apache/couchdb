@@ -49,7 +49,8 @@ mem3_shards_db_create_props_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun partitioned_shards_recreated_properly/1
+                    ?TDEF_FE(partitioned_shards_recreated_properly, ?TIMEOUT),
+                    ?TDEF_FE(update_props, ?TIMEOUT)
                 ]
             }
         }
@@ -61,33 +62,45 @@ mem3_shards_db_create_props_test_() ->
 % properties.
 % SEE: apache/couchdb#3631
 partitioned_shards_recreated_properly(#{dbname := DbName, dbdoc := DbDoc}) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            #doc{body = {Body0}} = DbDoc,
-            Body1 = [{<<"foo">>, <<"bar">>} | Body0],
-            Shards = [Shard | _] = lists:sort(mem3:shards(DbName)),
-            ShardName = Shard#shard.name,
-            ?assert(is_partitioned(Shards)),
-            ok = with_proc(fun() -> couch_server:delete(ShardName, []) end),
-            ?assertThrow({not_found, no_db_file}, is_partitioned(Shard)),
-            ok = mem3_util:update_db_doc(DbDoc#doc{body = {Body1}}),
-            Shards =
-                [Shard | _] = test_util:wait_value(
-                    fun() ->
-                        lists:sort(mem3:shards(DbName))
-                    end,
-                    Shards
-                ),
-            ?assertEqual(
-                true,
-                test_util:wait_value(
-                    fun() ->
-                        catch is_partitioned(Shard)
-                    end,
-                    true
-                )
-            )
-        end)}.
+    #doc{body = {Body0}} = DbDoc,
+    Body1 = [{<<"foo">>, <<"bar">>} | Body0],
+    Shards = [Shard | _] = lists:sort(mem3:shards(DbName)),
+    ShardName = Shard#shard.name,
+    ?assert(is_partitioned(Shards)),
+    ok = with_proc(fun() -> couch_server:delete(ShardName, []) end),
+    ?assertThrow({not_found, no_db_file}, is_partitioned(Shard)),
+    ok = mem3_util:update_db_doc(DbDoc#doc{body = {Body1}}),
+    Shards =
+        [Shard | _] = test_util:wait_value(
+            fun() ->
+                lists:sort(mem3:shards(DbName))
+            end,
+            Shards
+        ),
+    ?assertEqual(
+        true,
+        test_util:wait_value(
+            fun() ->
+                catch is_partitioned(Shard)
+            end,
+            true
+        )
+    ).
+
+update_props(#{dbname := DbName, dbdoc := DbDoc}) ->
+    {ok, Doc} = mem3:get_db_doc(DbName),
+    ?assertEqual(DbDoc, Doc),
+    #doc{body = {Body0}} = Doc,
+    {Props} = couch_util:get_value(<<"props">>, Body0, {[]}),
+    Props1 = couch_util:set_value(<<"baz">>, Props, <<"bar">>),
+    Body1 = couch_util:set_value(<<"props">>, Body0, {Props1}),
+    ResUpdate = mem3:update_db_doc(Doc#doc{body = {Body1}}),
+    ?assertMatch({ok, _}, ResUpdate),
+    {ok, Doc2} = mem3:get_db_doc(DbName),
+    #doc{body = {Body2}} = Doc2,
+    {Props2} = couch_util:get_value(<<"props">>, Body2, {[]}),
+    ?assertEqual(<<"bar">>, couch_util:get_value(<<"baz">>, Props2)),
+    ?assertEqual({error, conflict}, mem3:update_db_doc(Doc#doc{body = {Body1}})).
 
 is_partitioned([#shard{} | _] = Shards) ->
     lists:all(fun is_partitioned/1, Shards);
@@ -97,11 +110,11 @@ is_partitioned(Db) ->
     couch_db:is_partitioned(Db).
 
 create_db(DbName, Opts) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(fun() -> fabric:create_db(DbName, Opts) end, GL).
 
 delete_db(DbName) ->
-    GL = erlang:group_leader(),
+    GL = group_leader(),
     with_proc(fun() -> fabric:delete_db(DbName, [?ADMIN_CTX]) end, GL).
 
 with_proc(Fun) ->
@@ -114,7 +127,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         case GroupLeader of
             undefined -> ok;
-            _ -> erlang:group_leader(GroupLeader, self())
+            _ -> group_leader(GroupLeader, self())
         end,
         exit({with_proc_res, Fun()})
     end),
@@ -124,7 +137,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
         {'DOWN', Ref, process, Pid, Error} ->
             error(Error)
     after Timeout ->
-        erlang:demonitor(Ref, [flush]),
+        demonitor(Ref, [flush]),
         exit(Pid, kill),
         error({with_proc_timeout, Fun, Timeout})
     end.

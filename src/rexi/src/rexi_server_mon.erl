@@ -57,7 +57,6 @@ aggregate_queue_len(ChildMod) ->
 % Mem3 cluster callbacks
 
 cluster_unstable(Server) ->
-    couch_log:notice("~s : cluster unstable", [?MODULE]),
     gen_server:cast(Server, cluster_unstable),
     Server.
 
@@ -75,7 +74,7 @@ init(ChildMod) ->
         ?CLUSTER_STABILITY_PERIOD_SEC
     ),
     start_servers(ChildMod),
-    couch_log:notice("~s : started servers", [ChildMod]),
+    couch_log:info("~s : started servers", [ChildMod]),
     {ok, ChildMod}.
 
 handle_call(status, _From, ChildMod) ->
@@ -93,13 +92,13 @@ handle_call(Msg, _From, St) ->
 % can be started, but do not immediately stop nodes, defer that till cluster
 % stabilized.
 handle_cast(cluster_unstable, ChildMod) ->
-    couch_log:notice("~s : cluster unstable", [ChildMod]),
+    couch_log:info("~s : cluster unstable", [ChildMod]),
     start_servers(ChildMod),
     {noreply, ChildMod};
 % When cluster is stable, start any servers for new nodes and stop servers for
 % the ones that disconnected.
 handle_cast(cluster_stable, ChildMod) ->
-    couch_log:notice("~s : cluster stable", [ChildMod]),
+    couch_log:info("~s : cluster stable", [ChildMod]),
     start_servers(ChildMod),
     stop_servers(ChildMod),
     {noreply, ChildMod};
@@ -153,7 +152,7 @@ start_server(ChildMod, ChildId) ->
         {ok, Pid} ->
             {ok, Pid};
         Else ->
-            erlang:error(Else)
+            error(Else)
     end.
 
 stop_server(ChildMod, ChildId) ->
