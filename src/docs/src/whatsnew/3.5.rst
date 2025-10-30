@@ -20,6 +20,150 @@
     :depth: 1
     :local:
 
+.. _release/3.5.1:
+
+Version 3.5.1
+=============
+
+Features
+--------
+
+* :ghissue:`5626`, :ghissue:`5665`: Debian Trixie support
+* :ghissue:`5709`: Automatic Nouveau and Clouseau index cleanup
+* :ghissue:`5697`: Add UUID v7 as a ``uuid`` algorithm option. The default is
+  still the default ``sequential`` algorithm.
+* :ghissue:`5713`, :ghissue:`5697`, :ghissue:`5701`, :ghissue:`5704`: Purge
+  improvements and fixes. Optimize it up to ~30% faster for large batches.
+  ``max_document_id_number`` setting was removed and ``max_revisions_number``
+  set to ``unlimited`` by default to match ``_bulk_docs`` and ``_bulk_get``
+  endpoints.
+* :ghissue:`5611`: Implement the ability to downgrade CouchDB versions
+* :ghissue:`5588`: Populate zone from ``COUCHDB_ZONE`` env variable in Docker
+* :ghissue:`5563`: Set Erlang/OTP 26 as minimum supported version
+* :ghissue:`5546`, :ghissue:`5641`: Improve Clouseau service checks in
+  ``clouseau_rpc`` module.
+* :ghissue:`5639`: Use OS certificates for replication
+
+Performance
+-----------
+
+* :ghissue:`5625`: BTree engine term cache
+* :ghissue:`5617`: Optimize Nouveau searches when index is fresh
+* :ghissue:`5598`: Use HTTP/2 for Nouveau
+* :ghissue:`5701`: Optimize revid parsing: 50-90% faster. Should help purge
+  requests as well as ``_bulk_docs`` and ``_bulk_get`` endpoints.
+* :ghissue:`5564`: Use the built-in binary hex encode
+* :ghissue:`5613`: Improve scanner performance
+* :ghissue:`5545`: Bump process limit to 1M
+
+Bugfixes
+--------
+
+* :ghissue:`5722`, :ghissue:`5683`, :ghissue:`5678`, :ghissue:`5646`,
+  :ghissue:`5630`, :ghissue:`5615`, :ghissue:`5696`: Scanner fixes. Add write
+  limiting and switch to traversing document by sequence ID instead of by
+  document IDs.
+* :ghissue:`5707`, :ghissue:`5706`, :ghissue:`5706`, :ghissue:`5694`,
+  :ghissue:`5691`, :ghissue:`5669`, :ghissue:`5629`, :ghissue:`5574`,
+  :ghissue:`5573`, :ghissue:`5566`, :ghissue:`5553`, :ghissue:`5550`,
+  :ghissue:`5534`: QuickJS Updates. Optimized string operations, faster context
+  creation, a lot of bug fixes.
+* :ghissue:`5719`: Use "all" ring options for purged_infos
+* :ghissue:`5649`: Retry call to dreyfus index on noproc errors
+* :ghissue:`5663`: More informative error if epochs out of order
+* :ghissue:`5649`: Dreyfus retries on error
+* :ghissue:`5643`: Fix reduce_limit = log feature
+* :ghissue:`5620`: Use copy_props in the compactor instead of set_props
+* :ghissue:`5632`, :ghissue:`5627`, :ghissue:`5607`: Nouveau fixes. Enhance
+  ``_nouveau_cleanup``. Improve security on http/2.
+* :ghissue:`5614`: Stop replication jobs to nodes which are not part of the cluster
+* :ghissue:`5596`: Fix query args parsing during cluster upgrades
+* :ghissue:`5595`: Make replicator shutdown a bit more orderly
+* :ghissue:`5595`: Avoid making a mess in the logs when stopping replicator app
+* :ghissue:`5588`: Fix ``couch_util:set_value/3``
+* :ghissue:`5587`: Improve ``mem3_rep:find_source_seq/4`` logging
+* :ghissue:`5586`: Don't wait indefinitely for replication jobs to stop
+* :ghissue:`5578`: Use ``[sync]`` option in ``couch_bt_engine:commit_data/1``
+* :ghissue:`5556`: Add guards to ``fabric:design_docs/1`` to prevent
+  ``function_clause`` error
+* :ghissue:`5555`: Improve replicator client mailbox flush
+* :ghissue:`5551`: Handle ``bad_generator`` and ``case_clause`` in ``ken_server``
+* :ghissue:`5552`: Improve cluster startup logging
+* :ghissue:`5552`: Improve mem3 supervisor
+* :ghissue:`5552`: Handle shard opener tables not being initializes better
+* :ghissue:`5549`: Don't spawn more than one ``init_delete_dir`` instance
+* :ghissue:`5535`: Disk monintor always allows ``mem3_rep`` checkpoints
+* :ghissue:`5536`: Fix ``mem3_util`` overlapping shards
+* :ghissue:`5533`: No cfile support for 32bit systems
+* :ghissue:`5688`: Handle timeout in ``dreyfus_fabric_search``
+* :ghissue:`5548`: Fix config key typo in mem3_reshard_dbdoc
+* :ghissue:`5540`: Ignore extraneous cookie in replicator session plugin
+
+Cleanups
+--------
+
+* :ghissue:`5717`: Do not check for Dreyfus. It's part of the tree now.
+* :ghissue:`5715`: Remove Hastings references
+* :ghissue:`5714`: Cleanup fabric r/w parameter handling
+* :ghissue:`5693`: Remove explicit erlang module prefix for auto-imported functions
+* :ghissue:`5686`: Remove ``erlang:`` prefix from ``erlang:error()``
+* :ghissue:`5686`: Fix ``case_clause`` when got ``missing_target`` error
+* :ghissue:`5690`: Fix props caching in mem3
+* :ghissue:`5680`: Implement db doc updating
+* :ghissue:`5666`: Replace ``gen_server:format_status/2`` with ``format_status/1``
+* :ghissue:`5672`: Cache and store mem3 shard properties in one place only
+* :ghissue:`5644`: Remove redundant ``*_to_list`` / ``list_to_*`` conversion
+* :ghissue:`5633`: Use ``config:get_integer/3`` in couch_btree
+* :ghissue:`5618`: DRY out ``couch_bt_engine`` header pointer term access
+* :ghissue:`5614`: Stop replication jobs to nodes which are not part of the cluster
+* :ghissue:`5610`: Add a ``range_to_hex/1`` utility function
+* :ghissue:`5565`: Use maps comprehensions and generators in a few places
+* :ghissue:`5649`: Remove pointless message
+* :ghissue:`5649`: Remove absolete clauses from dreyfus
+* :ghissue:`5621`: Minor couch_btree refactoring
+
+Docs
+----
+
+* :ghissue:`5705`: Docs: Update the /_up endpoint docs to include status response's
+* :ghissue:`5653`: Document that _all_dbs endpoint supports inclusive_end query param
+* :ghissue:`5575`: Document how to mitigate high memory usage in docker
+* :ghissue:`5600`: Avoid "master" wording at setup cluster
+* :ghissue:`5381`: Change unauthorized example to 401 for replication
+* :ghissue:`5682`: Update install instructions
+* :ghissue:`5674`: Add setup documentation for two factor authentication
+* :ghissue:`5562`: Add AI policy
+* :ghissue:`5548`: Fix reshard doc section name
+* :ghissue:`5543`: Add ``https`` to allowed replication proxy protocols
+
+Tests/CI/Builds
+---------------
+
+* :ghissue:`5720`: Update deps: Fauxton, meck and PropEr
+* :ghissue:`5708`: Improve search test
+* :ghissue:`5702`: Increase timeout for `process_response/3` to fix flaky tests
+* :ghissue:`5703`: Use determistic doc IDs in Mango key test
+* :ghissue:`5692`: Implement 'assert_on_status' macro
+* :ghissue:`5684`: Sequester docker ARM builds and fail early
+* :ghissue:`5679`: Add ``--disable-spidermonkey`` to ``--dev[-with-nouveau]``
+* :ghissue:`5671`: Print request/response body on errors from mango test suite
+* :ghissue:`5670`: Fix ``make clean`` after ``dev/run --enable-tls``
+* :ghissue:`5668`: Update xxHash
+* :ghissue:`5667`: Update mochiweb to v3.3.0
+* :ghissue:`5664`: Disable ppc64le and s390x builds
+* :ghissue:`5604`: Use ASF fork of ``gun`` for ``cowlib`` dependency
+* :ghissue:`5636`: Reduce btree prop test count a bit
+* :ghissue:`5633`: Fix and improve couch_btree testing
+* :ghissue:`5572`: Remove a few more instances of Ubuntu Focal
+* :ghissue:`5571`: Upgrade Erlang for CI
+* :ghissue:`5570`: Skip macos CI for now and remove Ubuntu Focal
+* :ghissue:`5488`: Bump Clouseau to 2.25.0
+* :ghissue:`5541`: Enable Clouseau for the Windows CI
+* :ghissue:`5537`: Add retries to native full CI stage
+* :ghissue:`5531`: Fix Erlang cookie configuration in ``dev/run``
+* :ghissue:`5662`: Remove old Jenkinsfiles
+* :ghissue:`5661`: Unify CI jobs
+
 .. _release/3.5.0:
 
 Version 3.5.0
