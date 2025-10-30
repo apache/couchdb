@@ -44,12 +44,7 @@ var Views = (function() {
           "input size:", input_length,
           "output size:", reduce_length
       ].join(" ");
-      if (State.query_config.reduce_limit === "log") {
-          log("reduce_overflow_error: " + log_message);
-          print("[true," + reduce_line + "]");
-      } else {
-          throw(["error", "reduce_overflow_error", log_message]);
-      };
+      throw(["error", "reduce_overflow_error", log_message]);
     } else {
       print("[true," + reduce_line + "]");
     }

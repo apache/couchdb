@@ -26,7 +26,8 @@
     reload/0,
     terminate_stale_procs/0,
     get_servers_from_env/1,
-    native_query_server_enabled/0
+    native_query_server_enabled/0,
+    get_reduce_limit/0
 ]).
 
 -export([

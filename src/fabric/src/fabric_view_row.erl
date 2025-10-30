@@ -103,6 +103,8 @@ set_stats({view_row, #{} = Row}, Stats) ->
 
 transform(#view_row{value = {[{reduce_overflow_error, Msg}]}}) ->
     {row, [{key, null}, {id, error}, {value, reduce_overflow_error}, {reason, Msg}]};
+transform(#view_row{value = {[{<<"error">>,<<"builtin_reduce_error">>},{<<"reason">>, Msg}]}}) ->
+    {row, [{key, null}, {id, error}, {value, builtin_reduce_error}, {reason, Msg}]};
 transform(#view_row{key = Key, id = reduced, value = Value}) ->
     {row, [{key, Key}, {value, Value}]};
 transform(#view_row{key = Key, id = undefined}) ->

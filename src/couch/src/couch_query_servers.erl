@@ -282,26 +282,21 @@ check_sum_overflow(InSize, OutSize, Sum) ->
     Overflowed = OutSize > reduce_limit_threshold() andalso OutSize * reduce_limit_ratio() > InSize,
     case config:get("query_server_config", "reduce_limit", "true") of
         "true" when Overflowed ->
-            Msg = log_sum_overflow(InSize, OutSize),
+            Msg = sum_overflow_msg(InSize, OutSize),
             {[
                 {<<"error">>, <<"builtin_reduce_error">>},
                 {<<"reason">>, Msg}
             ]};
-        "log" when Overflowed ->
-            log_sum_overflow(InSize, OutSize),
-            Sum;
         _ ->
             Sum
     end.
 
-log_sum_overflow(InSize, OutSize) ->
+sum_overflow_msg(InSize, OutSize) ->
     Fmt =
         "Reduce output must shrink more rapidly: "
         "input size: ~b "
         "output size: ~b",
-    Msg = iolist_to_binary(io_lib:format(Fmt, [InSize, OutSize])),
-    couch_log:error(Msg, []),
-    Msg.
+    iolist_to_binary(io_lib:format(Fmt, [InSize, OutSize])).
 
 reduce_limit_threshold() ->
     config:get_integer("query_server_config", "reduce_limit_threshold", 4906).
