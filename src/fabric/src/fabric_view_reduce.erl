@@ -17,6 +17,7 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
@@ -50,7 +51,7 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
                 Callback({error, insufficient_storage}, Acc);
             {ok, Workers} ->
                 try
-                    go2(DbName, Workers, VInfo, CoordArgs, Callback, Acc)
+                    go2(DbName, Workers, DDoc, VName, VInfo, CoordArgs, Callback, Acc)
                 after
                     fabric_streams:cleanup(Workers)
                 end;
@@ -64,7 +65,7 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-go2(DbName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
+go2(DbName, Workers, DDoc, VName, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
     #mrargs{limit = Limit, skip = Skip, keys = Keys, update_seq = UpdateSeq} = Args,
     RedSrc = couch_mrview_util:extract_view_reduce(VInfo),
     OsProc =
@@ -74,6 +75,8 @@ go2(DbName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Callback, Acc0) ->
         end,
     State = #collector{
         db_name = DbName,
+        ddoc_name = DDoc#doc.id,
+        view_name = VName,
         query_args = Args,
         callback = Callback,
         counters = fabric_dict:init(Workers, 0),
@@ -169,6 +172,19 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
     end;
 handle_message(#view_row{} = Row, {_, _} = Source, State) ->
     handle_row(Row, Source, State);
+handle_message(
+    {view_row, #{value := {[{reduce_overflow_error, Msg}]}}} = Row, {_, _} = Source, State
+) ->
+    maybe_log_reduce_overflow(State, Msg),
+    handle_row(Row, Source, State);
+handle_message(
+    {view_row, #{value := {[{<<"error">>, <<"builtin_reduce_error">>}, {<<"reason">>, Msg}]}}} =
+        Row,
+    {_, _} = Source,
+    State
+) ->
+    maybe_log_reduce_overflow(State, Msg),
+    handle_row(Row, Source, State);
 handle_message({view_row, #{}} = Row, {_, _} = Source, State) ->
     handle_row(Row, Source, State);
 handle_message(complete, Worker, #collector{counters = Counters0} = State) ->
@@ -179,6 +195,16 @@ handle_message(ddoc_updated, _Worker, State) ->
     {stop, State};
 handle_message(insufficient_storage, _Worker, State) ->
     {stop, State}.
+
+maybe_log_reduce_overflow(State, Msg) ->
+    case couch_proc_manager:get_reduce_limit() of
+        log ->
+            couch_log:warning("reduce_overflow from ~s/~s/_view/~s: ~s", [
+                State#collector.db_name, State#collector.ddoc_name, State#collector.view_name, Msg
+            ]);
+        _Else ->
+            ok
+    end.
 
 os_proc_needed(<<"_", _/binary>>) -> false;
 os_proc_needed(_) -> true.

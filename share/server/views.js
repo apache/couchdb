@@ -36,20 +36,15 @@ var Views = (function() {
     var reduce_line = JSON.stringify(reductions);
     var reduce_length = reduce_line.length;
     var input_length =  State.line_length - code_size
-    // TODO make reduce_limit config into a number
     if (State.query_config && State.query_config.reduce_limit &&
-          reduce_length > 4096 && ((reduce_length * 2) > input_length)) {
+        reduce_length > State.query_config.reduce_limit_threshold &&
+        ((reduce_length * State.query_config.reduce_limit_ratio) > input_length)) {
       var log_message = [
           "Reduce output must shrink more rapidly:",
           "input size:", input_length,
           "output size:", reduce_length
       ].join(" ");
-      if (State.query_config.reduce_limit === "log") {
-          log("reduce_overflow_error: " + log_message);
-          print("[true," + reduce_line + "]");
-      } else {
-          throw(["error", "reduce_overflow_error", log_message]);
-      };
+      throw(["error", "reduce_overflow_error", log_message]);
     } else {
       print("[true," + reduce_line + "]");
     }
@@ -65,8 +60,8 @@ var Views = (function() {
       // fatal_error. But by default if they don't do error handling we
       // just eat the exception and carry on.
       //
-      // In this case we abort map processing but don't destroy the 
-      // JavaScript process. If you need to destroy the JavaScript 
+      // In this case we abort map processing but don't destroy the
+      // JavaScript process. If you need to destroy the JavaScript
       // process, throw the error form matched by the block below.
       throw(["error", "map_runtime_error", "function raised 'fatal_error'"]);
     } else if (err[0] == "fatal") {

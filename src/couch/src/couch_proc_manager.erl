@@ -26,7 +26,8 @@
     reload/0,
     terminate_stale_procs/0,
     get_servers_from_env/1,
-    native_query_server_enabled/0
+    native_query_server_enabled/0,
+    get_reduce_limit/0
 ]).
 
 -export([
@@ -732,6 +733,8 @@ remove_waiting_client(#client{wait_key = Key}) ->
 get_proc_config() ->
     {[
         {<<"reduce_limit">>, get_reduce_limit()},
+        {<<"reduce_limit_threshold">>, couch_query_servers:reduce_limit_threshold()},
+        {<<"reduce_limit_ratio">>, couch_query_servers:reduce_limit_ratio()},
         {<<"timeout">>, get_os_process_timeout()}
     ]}.
 
