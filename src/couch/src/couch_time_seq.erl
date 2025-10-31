@@ -162,10 +162,14 @@ update(#{v := ?VER} = Ctx, Time, Seq) when is_integer(Time), is_integer(Seq), Se
 since(#{v := ?VER} = Ctx, Time) when is_integer(Time) ->
     #{bins := Bins} = Ctx,
     Resolution = resolution_sec(),
-    case lists:dropwhile(fun({T, _}) -> Time < T end, Bins) of
-        [] -> 0;
-        [{T, _} | _] when Time > (T + Resolution) -> now;
-        [{_, Seq} | _] -> Seq
+    case Bins of
+        [{T, _} | _] when Time > T + Resolution ->
+            now;
+        _ ->
+            case lists:dropwhile(fun({T, _}) -> Time < T end, Bins) of
+                [] -> 0;
+                [{_, Seq} | _] -> Seq
+            end
     end.
 
 % @edoc: Return a histogram of formatted time and number of sequence updates which

@@ -172,19 +172,36 @@ update_10_000_with_large_interval_test() ->
     {FirstTime, _} = lists:last(Bins),
     ?assertEqual(test_time(), FirstTime).
 
-before_test() ->
+since_test() ->
     T = test_time(),
-    New = couch_time_seq:new(),
-    TSeq0 = couch_time_seq:update(New, T, 42),
-    TSeq = couch_time_seq:update(TSeq0, T + hours(3), 43),
-    % [{T + 3H, 43}, {T, 42}]
+    T3 = T + hours(3),
+    T9 = T + hours(9),
+    T15 = T + hours(15),
+    TSeq0 = couch_time_seq:update(couch_time_seq:new(), T, 0),
+    TSeq1 = couch_time_seq:update(TSeq0, T3, 42),
+    TSeq2 = couch_time_seq:update(TSeq1, T9, 43),
+    TSeq = couch_time_seq:update(TSeq2, T15, 44),
+
+    % [{T15, 44}, {T9, 43}, {T3, 42}, {T, 0}]
+
     ?assertEqual(0, couch_time_seq:since(TSeq, 0)),
+
     ?assertEqual(0, couch_time_seq:since(TSeq, T - 1)),
-    ?assertEqual(42, couch_time_seq:since(TSeq, T)),
-    ?assertEqual(42, couch_time_seq:since(TSeq, T + 1)),
-    ?assertEqual(42, couch_time_seq:since(TSeq, T + hours(3) - 1)),
-    ?assertEqual(43, couch_time_seq:since(TSeq, T + hours(3))),
-    ?assertEqual(43, couch_time_seq:since(TSeq, T + hours(3) + 1)),
+    ?assertEqual(0, couch_time_seq:since(TSeq, T)),
+    ?assertEqual(0, couch_time_seq:since(TSeq, T + 1)),
+
+    ?assertEqual(0, couch_time_seq:since(TSeq, T3 - 1)),
+    ?assertEqual(42, couch_time_seq:since(TSeq, T3)),
+    ?assertEqual(42, couch_time_seq:since(TSeq, T3 + 1)),
+
+    ?assertEqual(42, couch_time_seq:since(TSeq, T9 - 1)),
+    ?assertEqual(43, couch_time_seq:since(TSeq, T9)),
+    ?assertEqual(43, couch_time_seq:since(TSeq, T9 + 1)),
+
+    ?assertEqual(43, couch_time_seq:since(TSeq, T15 - 1)),
+    ?assertEqual(44, couch_time_seq:since(TSeq, T15)),
+    ?assertEqual(44, couch_time_seq:since(TSeq, T15 + 1)),
+
     ?assertEqual(now, couch_time_seq:since(TSeq, T + hours(999))).
 
 histogram_test() ->
