@@ -14,7 +14,6 @@
 
 -export([go/2]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 -record(acc, {

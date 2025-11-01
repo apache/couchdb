@@ -18,7 +18,6 @@
     execute/3
 ]).
 
--include_lib("couch/include/couch_db.hrl").
 -include_lib("dreyfus/include/dreyfus.hrl").
 -include("mango_cursor.hrl").
 -include("mango.hrl").

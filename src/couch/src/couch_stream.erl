@@ -35,8 +35,6 @@
     handle_info/2
 ]).
 
--include_lib("couch/include/couch_db.hrl").
-
 -define(DEFAULT_BUFFER_SIZE, 4096).
 
 -record(stream, {

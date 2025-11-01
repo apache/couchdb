@@ -25,8 +25,6 @@
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
 
--include_lib("couch/include/couch_db.hrl").
-
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, {bind, '*'}).
 -define(RELISTEN_DELAY, 5000).

@@ -21,8 +21,6 @@
     num_mp_writers/1
 ]).
 
--include_lib("couch/include/couch_db.hrl").
-
 decode_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
     NumMpWriters = num_mp_writers(),

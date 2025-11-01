@@ -13,9 +13,6 @@
 -module(ddoc_cache_entry).
 -behaviour(gen_server).
 
-% for the stacktrace macro only so far
--include_lib("couch/include/couch_db.hrl").
-
 -export([
     dbname/1,
     ddocid/1,

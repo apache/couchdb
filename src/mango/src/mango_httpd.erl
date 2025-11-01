@@ -18,7 +18,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
--include("mango_execution_stats.hrl").
 
 -record(vacc, {
     resp,

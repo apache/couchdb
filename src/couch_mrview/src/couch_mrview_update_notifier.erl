@@ -17,8 +17,6 @@
 -export([start_link/1, notify/1]).
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, stop/1]).
 
--include_lib("couch/include/couch_db.hrl").
-
 start_link(Exec) ->
     couch_event_sup:start_link(
         couch_mrview_update, {couch_mrview_update_notifier, make_ref()}, Exec

@@ -15,7 +15,6 @@
 -export([go/5, start_update_notifier/1, stop/1, wait_db_updated/1]).
 -export([handle_db_event/3]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 -record(worker, {

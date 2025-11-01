@@ -17,8 +17,6 @@
 -module(couch_event_sup).
 -behaviour(gen_server).
 
--include_lib("couch/include/couch_db.hrl").
-
 -export([start_link/3, start_link/4, stop/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
 

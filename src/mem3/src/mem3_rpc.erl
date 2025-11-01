@@ -45,7 +45,6 @@
     replicate_rpc/2
 ]).
 
--include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -define(BATCH_SIZE, 1000).

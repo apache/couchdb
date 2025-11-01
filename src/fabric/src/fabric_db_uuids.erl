@@ -14,7 +14,6 @@
 
 -export([go/1]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 go(DbName) when is_binary(DbName) ->
