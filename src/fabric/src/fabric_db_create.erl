@@ -13,7 +13,6 @@
 -module(fabric_db_create).
 -export([go/2]).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 

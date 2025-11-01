@@ -21,8 +21,6 @@
     handle_config_terminate/3
 ]).
 
--include_lib("couch/include/couch_db.hrl").
-
 start_link() ->
     assert_no_monsters(),
     assert_admins(),

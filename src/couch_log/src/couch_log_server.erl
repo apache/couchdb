@@ -27,8 +27,6 @@
     handle_info/2
 ]).
 
--include("couch_log.hrl").
-
 -record(st, {
     writer
 }).

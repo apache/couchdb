@@ -13,7 +13,6 @@
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(dreyfus_rpc).
--include_lib("couch/include/couch_db.hrl").
 -include("dreyfus.hrl").
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 

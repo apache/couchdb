@@ -22,7 +22,6 @@
     maybe_noop_range/2
 ]).
 
--include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_cursor.hrl").
 

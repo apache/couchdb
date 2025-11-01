@@ -14,7 +14,6 @@
 
 -compile(tuple_calls).
 
--include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -export([
