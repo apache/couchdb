@@ -20,7 +20,7 @@
 
 -export([
     default_authentication_handler/1, default_authentication_handler/2,
-    special_test_authentication_handler/1
+    special_test_authentication_handler/1, authenticate/5
 ]).
 -export([cookie_authentication_handler/1, cookie_authentication_handler/2]).
 -export([null_authentication_handler/1]).
