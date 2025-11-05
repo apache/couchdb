@@ -285,7 +285,14 @@ get_next_row(#collector{reducer = RedSrc} = State0) when RedSrc =/= undefined ->
                 Records
             ),
             Wrapped = [[fabric_view_row:get_value(R)] || R <- Records],
-            {ok, [Reduced]} = couch_query_servers:rereduce(Lang, [RedSrc], Wrapped),
+            ReduceCtx = ?l2b(
+                io_lib:format("~s/~s/_view/~s", [
+                    State0#collector.db_name,
+                    State0#collector.ddoc_name,
+                    State0#collector.view_name
+                ])
+            ),
+            {ok, [Reduced]} = couch_query_servers:rereduce(Lang, [RedSrc], Wrapped, ReduceCtx),
             {ok, Finalized} = couch_query_servers:finalize(RedSrc, Reduced),
             State = State0#collector{keys = RestKeys, rows = RowDict, counters = Counters},
             ViewRow = fabric_view_row:from_props(
@@ -852,7 +859,7 @@ t_get_next_row_reduce(_) ->
     Row2 = {view_row, #{key => Key, id => reduced, value => finalized}},
     meck:expect(rexi, stream_ack, ['_'], meck:val(ok)),
     meck:expect(
-        couch_query_servers, rereduce, [Language, [reducer], Values], meck:val({ok, [reduced]})
+        couch_query_servers, rereduce, [Language, [reducer], Values, '_'], meck:val({ok, [reduced]})
     ),
     meck:expect(couch_query_servers, finalize, [reducer, reduced], meck:val({ok, finalized})),
     ?assertEqual({Row1, State3}, get_next_row(State1)),
