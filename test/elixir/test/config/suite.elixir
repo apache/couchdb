@@ -731,5 +731,18 @@
   ],
   "BasicFindTest": [
     "simple find"
+  ],
+  "CustomFieldsTest": [
+    "test_basic",
+    "test_multi_field",
+    "test_element_access",
+    "test_in_with_array",
+    "test_in_with_array_not_explicit",
+    "test_nin_with_array",
+    "test_missing",
+    "test_field_analyzer_is_keyword",
+    "test_filtered_search_fields",
+    "test_two_or",
+    "test_all_match",
   ]
 }
