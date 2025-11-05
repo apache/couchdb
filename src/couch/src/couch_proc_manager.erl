@@ -732,6 +732,8 @@ remove_waiting_client(#client{wait_key = Key}) ->
 get_proc_config() ->
     {[
         {<<"reduce_limit">>, get_reduce_limit()},
+        {<<"reduce_limit_threshold">>, couch_query_servers:reduce_limit_threshold()},
+        {<<"reduce_limit_ratio">>, couch_query_servers:reduce_limit_ratio()},
         {<<"timeout">>, get_os_process_timeout()}
     ]}.
 
