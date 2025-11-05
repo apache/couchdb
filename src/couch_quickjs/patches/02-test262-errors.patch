@@ -1,5 +1,5 @@
---- quickjs-master/test262_errors.txt	2025-11-03 12:53:32
-+++ quickjs/test262_errors.txt	2025-11-03 16:58:35
+--- quickjs-master/test262_errors.txt	2025-11-05 05:46:20
++++ quickjs/test262_errors.txt	2025-11-05 09:54:50
 @@ -19,6 +19,8 @@
  test262/test/language/expressions/compound-assignment/S11.13.2_A6.10_T1.js:24: Test262Error: #1: innerX === 2. Actual: 5
  test262/test/language/expressions/compound-assignment/S11.13.2_A6.11_T1.js:24: Test262Error: #1: innerX === 2. Actual: 5

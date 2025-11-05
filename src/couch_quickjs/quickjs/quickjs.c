@@ -16673,9 +16673,14 @@ static JSVarRef *js_closure_define_global_var(JSContext *ctx, JSClosureVar *cv,
         if (is_direct_or_indirect_eval)
             flags |= JS_PROP_CONFIGURABLE;
 
+    retry:
         prs = find_own_property(&pr, p, cv->var_name);
         if (prs) {
-            if ((prs->flags & JS_PROP_TMASK) != JS_PROP_VARREF) {
+            if (unlikely((prs->flags & JS_PROP_TMASK) == JS_PROP_AUTOINIT)) {
+                if (JS_AutoInitProperty(ctx, p, cv->var_name, pr, prs))
+                    return NULL;
+                goto retry;
+            } else if ((prs->flags & JS_PROP_TMASK) != JS_PROP_VARREF) {
                 var_ref = js_global_object_get_uninitialized_var(ctx, p, cv->var_name);
                 if (!var_ref)
                     return NULL;
@@ -18011,14 +18016,15 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                         }
                         ret = JS_SetPropertyInternal(ctx, ctx->global_obj, cv->var_name, sp[-1],
                                                      ctx->global_obj, JS_PROP_THROW_STRICT);
+                        sp--;
                         if (ret < 0)
                             goto exception;
                     }
                 } else {
                 put_var_ok:
                    set_value(ctx, var_ref->pvalue, sp[-1]);
+                   sp--;
                 }
-                sp--;
             }
             BREAK;
         CASE(OP_get_loc):
@@ -29729,6 +29735,7 @@ static JSValue js_build_module_ns(JSContext *ctx, JSModuleDef *m)
                                           en->export_name,
                                           JS_AUTOINIT_ID_MODULE_NS,
                                           m, JS_PROP_ENUMERABLE | JS_PROP_WRITABLE) < 0)
+                goto fail;
             break;
         default:
             break;
