@@ -197,14 +197,9 @@ merge_fun(Sort) ->
         compare_order(Sort, OrderA, OrderB)
     end.
 
-%% no sort order specified
-compare_order(null, [A | ARest], [B | BRest]) ->
-    case couch_ejson_compare:less(convert_item(A), convert_item(B)) of
-        0 ->
-            compare_order(null, ARest, BRest);
-        Less ->
-            Less < 1
-    end;
+%% no sort order specified which means sort by relevance (high to low)
+compare_order(null, As, Bs) ->
+    compare_order([<<"-">>], As, Bs);
 %% server-side adds _id on the end of sort order if not present
 compare_order([], [A], [B]) ->
     couch_ejson_compare:less(convert_item(A), convert_item(B)) < 1;
