@@ -34,7 +34,7 @@ public class IOUtils {
 
     @FunctionalInterface
     public interface IORunnable {
-        public abstract void run() throws IOException;
+        void run() throws IOException;
     }
 
     public static void runAll(final IORunnable... runnables) throws IOException {

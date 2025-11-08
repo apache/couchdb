@@ -1,6 +1,6 @@
 plugins {
     id 'application'
-    id 'com.diffplug.spotless' version '6.25.0'
+    id 'com.diffplug.spotless' version '8.0.0'
     id 'jacoco'
 }
 
@@ -24,19 +24,19 @@ dependencies {
     testImplementation 'io.dropwizard:dropwizard-testing'
 
     def luceneVersion = '9.12.1'
-    implementation group: 'org.apache.lucene', name: 'lucene-core', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-queryparser', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-analysis-common', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-analysis-stempel', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-analysis-smartcn', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-analysis-kuromoji', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-facet', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-misc', version: luceneVersion
-    implementation group: 'org.apache.lucene', name: 'lucene-backward-codecs', version: luceneVersion
+    implementation 'org.apache.lucene:lucene-core:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-queryparser:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-analysis-common:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-analysis-stempel:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-analysis-smartcn:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-analysis-kuromoji:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-facet:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-misc:' + luceneVersion
+    implementation 'org.apache.lucene:lucene-backward-codecs:' + luceneVersion
 
     def swaggerVersion = '2.2.8'
-    implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-jakarta', version: swaggerVersion
-    implementation group: 'io.swagger.core.v3', name: 'swagger-jaxrs2-servlet-initializer-v2', version: swaggerVersion
+    implementation 'io.swagger.core.v3:swagger-jaxrs2-jakarta:' + swaggerVersion
+    implementation 'io.swagger.core.v3:swagger-jaxrs2-servlet-initializer-v2:' + swaggerVersion
 
     testImplementation 'org.assertj:assertj-core'
     testImplementation 'org.mockito:mockito-core'
