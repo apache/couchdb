@@ -731,5 +731,8 @@
   ],
   "BasicFindTest": [
     "simple find"
+  ],
+  "IgnoreDesignDocsForAllDocsIndexTests": [
+    "should not return design docs"
   ]
 }
