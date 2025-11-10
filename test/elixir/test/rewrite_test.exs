@@ -420,14 +420,14 @@ defmodule RewriteTest do
           )
 
         assert resp.status_code == 200
-        result = resp.body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+        result = resp.body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
         first_row = Enum.at(result["rows"], 0)
         assert Map.has_key?(first_row, "doc")
 
         # COUCHDB-2031 - path normalization versus qs params
         resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/db/_design/test?meta=true")
         assert resp.status_code == 200
-        result = resp.body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+        result = resp.body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
         assert result["_id"] == "_design/test"
         assert Map.has_key?(result, "_revs_info")
 

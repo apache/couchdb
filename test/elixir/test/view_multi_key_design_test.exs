@@ -53,7 +53,7 @@ defmodule ViewMultiKeyDesignTest do
 
   test "keys in GET parameters", context do
     db_name = context[:db_name]
-    resp = view(db_name, "test/all_docs", keys: :jiffy.encode(@keys))
+    resp = view(db_name, "test/all_docs", keys: :jiffy.encode(@keys, [:use_nil]))
     rows = resp.body["rows"]
     assert length(rows) == length(@keys)
     assert Enum.all?(rows, &Enum.member?(@keys, &1["key"]))
@@ -80,7 +80,7 @@ defmodule ViewMultiKeyDesignTest do
 
   test "keys in GET body (group)", context do
     db_name = context[:db_name]
-    resp = view(db_name, "test/summate", group: true, keys: :jiffy.encode(@keys))
+    resp = view(db_name, "test/summate", group: true, keys: :jiffy.encode(@keys, [:use_nil]))
     rows = resp.body["rows"]
     assert length(rows) == length(@keys)
     assert Enum.all?(rows, &Enum.member?(@keys, &1["key"]))
@@ -117,10 +117,10 @@ defmodule ViewMultiKeyDesignTest do
     db_name = context[:db_name]
 
     badargs = [
-      [startkey: 0, keys: :jiffy.encode(@keys)],
-      [endkey: 0, keys: :jiffy.encode(@keys)],
-      [key: 0, keys: :jiffy.encode(@keys)],
-      [group_level: 2, keys: :jiffy.encode(@keys)]
+      [startkey: 0, keys: :jiffy.encode(@keys, [:use_nil])],
+      [endkey: 0, keys: :jiffy.encode(@keys, [:use_nil])],
+      [key: 0, keys: :jiffy.encode(@keys, [:use_nil])],
+      [group_level: 2, keys: :jiffy.encode(@keys, [:use_nil])]
     ]
 
     Enum.each(badargs, fn args ->
@@ -135,7 +135,7 @@ defmodule ViewMultiKeyDesignTest do
 
     resp =
       Couch.get("/#{db_name}/_design/test/_view/summate",
-        query: [keys: :jiffy.encode(@keys)],
+        query: [keys: :jiffy.encode(@keys, [:use_nil])],
         body: %{"keys" => @keys}
       )
 
@@ -148,7 +148,7 @@ defmodule ViewMultiKeyDesignTest do
     resp = view(db_name, "test/summate", [reduce: false], @keys)
     assert length(resp.body["rows"]) == 5
 
-    resp = view(db_name, "test/summate", reduce: false, keys: :jiffy.encode(@keys))
+    resp = view(db_name, "test/summate", reduce: false, keys: :jiffy.encode(@keys, [:use_nil]))
     assert length(resp.body["rows"]) == 5
   end
 
@@ -191,7 +191,7 @@ defmodule ViewMultiKeyDesignTest do
     assert length(rows) == 1
     assert Enum.at(rows, 0)["key"] == 10
 
-    resp = view(db_name, "test/all_docs", limit: 1, keys: :jiffy.encode(@keys))
+    resp = view(db_name, "test/all_docs", limit: 1, keys: :jiffy.encode(@keys, [:use_nil]))
     rows = resp.body["rows"]
     assert length(rows) == 1
     assert Enum.at(rows, 0)["key"] == 10

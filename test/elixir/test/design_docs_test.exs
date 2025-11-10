@@ -222,7 +222,7 @@ defmodule DesignDocsTest do
     result =
       resp.body
       |> IO.iodata_to_binary()
-      |> :jiffy.decode([:return_maps])
+      |> :jiffy.decode([:return_maps, :use_nil])
 
     assert result["language"] == "javascript"
   end

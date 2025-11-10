@@ -126,7 +126,7 @@ defmodule UsersDbTest do
         headers: [authorization: "Basic Xzpf"]
       )
 
-    assert resp.body["userCtx"]["name"] == :null
+    assert resp.body["userCtx"]["name"] == nil
     assert not Enum.member?(resp.body["info"], "authenticated")
 
     # ok, now create a conflicting edit on the jchris doc, and make sure there's no login.

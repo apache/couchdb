@@ -8,7 +8,7 @@ defmodule ViewCollationTest do
 
   @values [
     # Special values sort before all other types
-    :null,
+    nil,
     false,
     true,
 
@@ -94,7 +94,7 @@ defmodule ViewCollationTest do
   test "key query option", context do
     Enum.each(@values, fn value ->
       retry_until(fn ->
-        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
+        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value, [:use_nil])})
         assert length(resp.body["rows"]) == 1
         assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
       end)
@@ -139,6 +139,6 @@ defmodule ViewCollationTest do
   end
 
   def convert(value) do
-    :jiffy.decode(:jiffy.encode(value), [:return_maps])
+    :jiffy.decode(:jiffy.encode(value, [:use_nil]), [:return_maps, :use_nil])
   end
 end

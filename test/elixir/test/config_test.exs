@@ -23,7 +23,7 @@ defmodule ConfigTest do
   def set_config(context, section, key, val, status_assert) do
     url = "#{context[:config_url]}/#{section}/#{key}"
     headers = ["X-Couch-Persist": "false"]
-    resp = Couch.put(url, headers: headers, body: :jiffy.encode(val))
+    resp = Couch.put(url, headers: headers, body: :jiffy.encode(val, [:use_nil]))
 
     if status_assert do
       assert resp.status_code == status_assert
