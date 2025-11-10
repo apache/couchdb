@@ -19,14 +19,14 @@ DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
 
 // Erlang version embedded in binary packages. Also the version most builds
 // will run.
-ERLANG_VERSION = '26.2.5.15'
+ERLANG_VERSION = '26.2.5.16'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '26.2.5.15'
+MINIMUM_ERLANG_VERSION = '26.2.5.16'
 
 // Highest support Erlang version.
-MAXIMUM_ERLANG_VERSION = '28.0.4'
+MAXIMUM_ERLANG_VERSION = '28.1.1'
 
 // Use these to detect if just documents changed
 docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
@@ -480,9 +480,6 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
-      options {
-        timeout(time: 10, unit: 'MINUTES')
-      }
       steps {
         script {
           env.DOCS_CHANGED = '0'
@@ -518,9 +515,6 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
-      options {
-        timeout(time: 15, unit: 'MINUTES')
-      }
       steps {
         sh '''
           make python-black
@@ -553,9 +547,6 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
-      options {
-        timeout(time: 30, unit: 'MINUTES')
-      }
       steps {
         sh '''
            (cd src/docs && ./setup.sh ; make html)
@@ -582,9 +573,6 @@ pipeline {
           registryUrl 'https://docker.io/'
           registryCredentialsId 'dockerhub_creds'
         }
-      }
-      options {
-        timeout(time: 15, unit: "MINUTES")
       }
       steps {
         sh '''
@@ -618,11 +606,9 @@ pipeline {
         }
       }
       steps {
-        timeout(time: 30, unit: "MINUTES") {
-          sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-          sh "./configure --spidermonkey-version 78 --with-nouveau"
-          sh 'make dist'
-        }
+        sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
+        sh "./configure --spidermonkey-version 78 --with-nouveau"
+        sh 'make dist'
       }
       post {
         success {
@@ -660,26 +646,4 @@ pipeline {
       }
     }
   } // stages
-
-  post {
-    success {
-      mail to: 'notifications@couchdb.apache.org',
-        replyTo: 'notifications@couchdb.apache.org',
-        subject: "[Jenkins] SUCCESS: ${currentBuild.fullDisplayName}",
-        body: "Yay, we passed. ${env.RUN_DISPLAY_URL}"
-    }
-    unstable {
-      mail to: 'notifications@couchdb.apache.org',
-        replyTo: 'notifications@couchdb.apache.org',
-        subject: "[Jenkins] SUCCESS: ${currentBuild.fullDisplayName}",
-        body: "Eep! Build is unstable... ${env.RUN_DISPLAY_URL}"
-    }
-    failure {
-      mail to: 'notifications@couchdb.apache.org',
-        replyTo: 'notifications@couchdb.apache.org',
-        subject: "[Jenkins] FAILURE: ${currentBuild.fullDisplayName}",
-        body: "Boo, we failed. ${env.RUN_DISPLAY_URL}"
-    }
-  }
-
 } // pipeline
