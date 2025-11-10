@@ -14,6 +14,7 @@
 # next steps:
 # try running this, figure out what to do with the vars in the generated files
 # in the bottom
+# ignore me
 
 # cd into this script’s directory
 rootdir="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
