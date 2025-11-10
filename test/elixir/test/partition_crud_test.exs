@@ -154,7 +154,7 @@ defmodule PartitionCrudTest do
                        "error" => "illegal_docid",
                        "id" => "my-partition-post",
                        "reason" => "Doc id must be of form partition:id",
-                       "rev" => :null
+                       "rev" => nil
                      }
                    }
                  ],

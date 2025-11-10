@@ -50,7 +50,7 @@ defmodule DesignOptionsTest do
 
     row_with_key =
       resp.body["rows"]
-      |> Enum.filter(fn p -> p["key"] != :null end)
+      |> Enum.filter(fn p -> p["key"] != nil end)
 
     assert length(row_with_key) == 2
   end

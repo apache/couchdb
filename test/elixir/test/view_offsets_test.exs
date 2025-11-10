@@ -51,7 +51,7 @@ defmodule ViewOffsetTest do
     |> Enum.each(fn [start_key, offset] ->
       result =
         view(db_name, "test/offset", %{
-          "startkey" => :jiffy.encode(start_key),
+          "startkey" => :jiffy.encode(start_key, [:use_nil]),
           "descending" => true
         })
 
