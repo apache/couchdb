@@ -77,7 +77,7 @@ refresh(DbName, DDocIds) ->
     gen_server:cast(?MODULE, {refresh, DbName, DDocIds}).
 
 init(_) ->
-    couch_util:set_mqd_off_heap(?MODULE),
+    erlang:process_flag(message_queue_data, off_heap),
     process_flag(trap_exit, true),
     BaseOpts = [public, named_table],
     CacheOpts =
