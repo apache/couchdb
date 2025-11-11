@@ -183,7 +183,7 @@ run(State, [<<"map_doc">>, Doc]) ->
         State#evstate.funs
     ),
     {State, Resp};
-run(State, [<<"reduce">>, Funs, KVs]) ->
+run(State, [<<"reduce">>, Funs, KVs, _Ctx]) ->
     {Keys, Vals} =
         lists:foldl(
             fun([K, V], {KAcc, VAcc}) ->
@@ -195,7 +195,7 @@ run(State, [<<"reduce">>, Funs, KVs]) ->
     Keys2 = lists:reverse(Keys),
     Vals2 = lists:reverse(Vals),
     {State, catch reduce(State, Funs, Keys2, Vals2, false)};
-run(State, [<<"rereduce">>, Funs, Vals]) ->
+run(State, [<<"rereduce">>, Funs, Vals, _Ctx]) ->
     {State, catch reduce(State, Funs, null, Vals, true)};
 run(#evstate{ddocs = DDocs} = State, [<<"ddoc">>, <<"new">>, DDocId, DDoc]) ->
     DDocs2 = store_ddoc(DDocs, DDocId, DDoc),
