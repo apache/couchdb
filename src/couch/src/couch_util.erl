@@ -39,8 +39,6 @@
 -export([unique_monotonic_integer/0]).
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
--export([set_mqd_off_heap/1]).
--export([set_process_priority/2]).
 -export([hmac/3]).
 -export([version_to_binary/1]).
 -export([verify_hash_names/2]).
@@ -684,29 +682,6 @@ validate_callback_exists(Module, Function, Arity) ->
 check_md5(_NewSig, <<>>) -> ok;
 check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
-
-set_mqd_off_heap(Module) ->
-    case config:get_boolean("off_heap_mqd", atom_to_list(Module), true) of
-        true ->
-            try
-                erlang:process_flag(message_queue_data, off_heap),
-                ok
-            catch
-                error:badarg ->
-                    ok
-            end;
-        false ->
-            ok
-    end.
-
-set_process_priority(Module, Level) ->
-    case config:get_boolean("process_priority", atom_to_list(Module), false) of
-        true ->
-            process_flag(priority, Level),
-            ok;
-        false ->
-            ok
-    end.
 
 ensure_loaded(Module) when is_atom(Module) ->
     case code:ensure_loaded(Module) of
