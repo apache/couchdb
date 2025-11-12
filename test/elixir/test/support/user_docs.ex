@@ -341,7 +341,7 @@ defmodule UserDocs do
     MangoDatabase.save_docs(db, @users_docs)
   end
 
-  def setup(db, index_type \\ "view", partitioned \\ false) do
+  def setup(db, index_type \\ "view", partitioned \\ false, options \\ []) do
     MangoDatabase.recreate(db, [partitioned: partitioned])
     docs = @docs
 
@@ -357,7 +357,7 @@ defmodule UserDocs do
 
     case index_type do
       "view" -> add_view_indexes(db)
-      "text" -> add_text_indexes(db)
+      "text" -> add_text_indexes(db, options)
       "special" -> :ok
     end
 
@@ -395,7 +395,7 @@ defmodule UserDocs do
     end)
   end
 
-  defp add_text_indexes(db) do
-    MangoDatabase.create_text_index(db)
+  defp add_text_indexes(db, options) do
+    MangoDatabase.create_text_index(db, options)
   end
 end
