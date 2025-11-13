@@ -150,7 +150,7 @@ db_opened(#st{} = St, Db) ->
     #st{max_docs = MaxDocs, max_step = MaxStep} = St,
     {ok, DocTotal} = couch_db:get_doc_count(Db),
     Step = min(MaxStep, max(1, DocTotal div MaxDocs)),
-    {0, [], St#st{doc_cnt = 0, doc_step = Step, docs = []}}.
+    {0, [], St#st{doc_cnt = 0, docs_size = 0, doc_step = Step, docs = []}}.
 
 doc_id(#st{} = St, <<?DESIGN_DOC_PREFIX, _/binary>>, _Db) ->
     {skip, St};
@@ -436,6 +436,7 @@ reset_per_db_state(#st{qjs_proc = QjsProc, sm_proc = SmProc} = St) ->
     St#st{
         ddocs = #{},
         docs = [],
+        docs_size = 0,
         qjs_proc = undefined,
         sm_proc = undefined,
         ddoc_cnt = 0
