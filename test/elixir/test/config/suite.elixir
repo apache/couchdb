@@ -840,10 +840,22 @@
     "uses all docs when selector doesnt require fields to exist"
   ],
   "JwtRolesClaimTest": [
-      "case: roles_claim_name (defined) / roles_claim_path (defined)",
-      "case: roles_claim_name (defined) / roles_claim_path (undefined)",
-      "case: roles_claim_name (undefined) / roles_claim_path (defined)",
-      "case: roles_claim_name (undefined) / roles_claim_path (undefined)",
-      "case: roles_claim_path with bad input"
-    ]
+    "case: roles_claim_name (defined) / roles_claim_path (defined)",
+    "case: roles_claim_name (defined) / roles_claim_path (undefined)",
+    "case: roles_claim_name (undefined) / roles_claim_path (defined)",
+    "case: roles_claim_name (undefined) / roles_claim_path (undefined)",
+    "case: roles_claim_path with bad input"
+  ],
+  "PaginateJsonDocs": [
+    "all docs paginate to end",
+    "return previous bookmark for empty",
+    "all docs with skip",
+    "all docs reverse",
+    "bad bookmark",
+    "throws error on text bookmark",
+    "index pagination",
+    "index pagination two keys",
+    "index pagination reverse",
+    "index pagination same emitted key"
+  ]
 }
