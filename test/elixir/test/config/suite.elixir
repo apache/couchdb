@@ -923,5 +923,18 @@
   ],
   "SupportStableAndUpdate": [
     "update updates view when specified"
+  ],
+  "UsersDbFindTests": [
+    "simple find",
+    "multi cond and",
+    "multi cond or",
+    "sort",
+    "fields",
+    "empty"
+  ],
+  "UsersDbIndexFindTests": [
+    "multi cond and",
+    "multi cond or",
+    "sort"
   ]
 }
