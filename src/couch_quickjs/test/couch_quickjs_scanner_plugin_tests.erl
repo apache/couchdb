@@ -38,6 +38,7 @@ couch_quickjs_scanner_plugin_test_() ->
         ]
     }.
 
+-define(DOC0, <<"doc0">>).
 -define(DOC1, <<"doc1">>).
 -define(DOC2, <<"doc2">>).
 -define(DOC3, <<"doc3">>).
@@ -55,6 +56,7 @@ setup() ->
     Ctx = test_util:start_couch([fabric, couch_scanner]),
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, [{q, "2"}, {n, "1"}]),
+    ok = add_doc(DbName, ?DOC0, #{a => d, <<"_deleted">> => true}),
     ok = add_doc(DbName, ?DOC1, #{a => x}),
     ok = add_doc(DbName, ?DOC2, #{a => y}),
     ok = add_doc(DbName, ?DOC3, #{a => z}),

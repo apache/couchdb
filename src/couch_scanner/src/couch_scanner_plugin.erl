@@ -132,7 +132,7 @@
 % Optional. If doc is not defined, then doc_fdi default action is {stop, St}.
 % If it is defined, the default action is {ok, St}.
 -callback doc_fdi(St :: term(), FDI :: #full_doc_info{}, Db :: term()) ->
-    {ok | stop, St1 :: term()}.
+    {ok | skip | stop, St1 :: term()}.
 
 % Optional.
 -callback doc(St :: term(), Db :: term(), #doc{}) ->
@@ -404,6 +404,7 @@ scan_fdi(#full_doc_info{} = FDI, #st{} = St) ->
     St1 = St#st{pst = PSt1},
     case Go of
         ok -> scan_doc(FDI, St1);
+        skip -> {ok, St1};
         stop -> {stop, St1}
     end.
 

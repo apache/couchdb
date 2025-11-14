@@ -165,7 +165,7 @@ doc_id(#st{doc_cnt = C} = St, _DocId, _Db) ->
 
 doc_fdi(#st{} = St, #full_doc_info{deleted = true}, _Db) ->
     % Skip deleted; don't even open the doc body
-    {stop, St};
+    {skip, St};
 doc_fdi(#st{} = St, #full_doc_info{}, _Db) ->
     {ok, St}.
 
