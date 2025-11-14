@@ -17,6 +17,16 @@ defmodule MangoDatabase do
     "search" in resp.body["features"]
   end
 
+  def path(db, parts) do
+    parts_list =
+      case parts do
+        p when is_binary(p) -> [p]
+        p when is_list(p) -> p
+      end
+
+    Path.join(["/#{db}" | parts_list])
+  end
+
   def recreate(db, opts \\ []) do
     resp = Couch.get("/#{db}")
     if resp.status_code == 200 do
@@ -46,6 +56,23 @@ defmodule MangoDatabase do
   def save_docs_with_conflicts(db, docs) do
     body = %{"docs" => docs, "new_edits" => false}
     Couch.post("/#{db}/_bulk_docs", body: body)
+  end
+
+  def open_doc(db, docid) do
+    response = Couch.get("/#{db}/#{docid}")
+    response.body
+  end
+
+  def delete_doc(db, docid) do
+    path = "/#{db}/#{URI.encode(docid)}"
+    doc = Couch.get(path)
+    original_rev = doc.body["_rev"]
+    Couch.delete(path, query: %{"rev" => original_rev})
+  end
+
+  def ddoc_info(db, ddocid) do
+    response = Couch.get("/#{db}/#{ddocid}/_info")
+    response.body
   end
 
   # If a certain keyword like sort or field is passed in the options,
@@ -155,6 +182,17 @@ defmodule MangoDatabase do
     else
       {:error, resp}
     end
+  end
+
+  def delete_index(db, ddocid, name, idx_type \\ "json") do
+    path = Path.join(["_index", ddocid, idx_type, name])
+    Couch.delete("/#{db}/#{path}", params: %{"w" => "3"})
+  end
+
+  def bulk_delete(db, docs) do
+    body = %{"docids" => docs, "w" => 3}
+    resp = Couch.post("/#{db}/_index/_bulk_delete", body: body)
+    resp.body
   end
 
   def find(db, selector, opts \\ []) do
