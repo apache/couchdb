@@ -3,6 +3,7 @@ defmodule ProxyAuthTest do
 
   @moduletag :authentication
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "proxy auth with secret" do
 
@@ -77,6 +78,7 @@ defmodule ProxyAuthTest do
 
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "proxy auth without secret" do
 

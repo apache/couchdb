@@ -65,6 +65,7 @@ defmodule ViewErrorsTest do
     assert key == :null
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "query view with invalid params", context do
     db_name = context[:db_name]
@@ -93,6 +94,7 @@ defmodule ViewErrorsTest do
     assert resp.status_code == 415
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "query parse error", context do
     db_name = context[:db_name]
@@ -165,6 +167,7 @@ defmodule ViewErrorsTest do
     assert resp.body["error"] == "query_parse_error"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "infinite loop", context do
     db_name = context[:db_name]
@@ -194,6 +197,7 @@ defmodule ViewErrorsTest do
     assert Enum.member?(["os_process_error", "timeout", "InternalError"], err_name)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "error responses for invalid multi-get bodies", context do
     db_name = context[:db_name]
@@ -231,6 +235,7 @@ defmodule ViewErrorsTest do
     assert resp.body["reason"] == "`keys` member must be an array."
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "reduce overflow error", context do
     db_name = context[:db_name]
@@ -256,6 +261,7 @@ defmodule ViewErrorsTest do
     assert Enum.at(resp.body["rows"], 0)["error"] == "reduce_overflow_error"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "temporary view should give error message", context do
     db_name = context[:db_name]

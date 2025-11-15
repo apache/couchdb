@@ -4,6 +4,7 @@ defmodule EtagsHeadTest do
   @moduletag :etags
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "etag header on creation", context do
     db_name = context[:db_name]
 
@@ -17,6 +18,7 @@ defmodule EtagsHeadTest do
     assert Map.has_key?(resp.headers.hdrs, "etag")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "etag header on retrieval", context do
     db_name = context[:db_name]
@@ -42,6 +44,7 @@ defmodule EtagsHeadTest do
     assert etag == resp.headers.hdrs["etag"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "etag header on head", context do
     db_name = context[:db_name]
@@ -63,6 +66,7 @@ defmodule EtagsHeadTest do
     assert etag == resp.headers.hdrs["etag"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "etags head", context do
     db_name = context[:db_name]

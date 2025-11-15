@@ -6,6 +6,7 @@ defmodule WithoutQuorumTest do
   @moduledoc """
   Test CouchDB API in a cluster without quorum.
   """
+  @tag skip_for_pouchdb_server: true
   @tag :with_db_name
   test "Creating/Deleting DB should return 202-Acepted", context do
     db_name = context[:db_name]
@@ -16,6 +17,7 @@ defmodule WithoutQuorumTest do
     assert resp.status_code == 202, msg
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db_name
   test "Creating/Updating/Deleting doc should return 202-Acepted", context do
     db_name = context[:db_name]
@@ -81,6 +83,7 @@ defmodule WithoutQuorumTest do
     Couch.delete("/#{db_name}")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db_name
   test "Copy doc should return 202-Acepted", context do
     db_name = context[:db_name]
@@ -100,6 +103,7 @@ defmodule WithoutQuorumTest do
 
   @doc_range 1..5
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db_name
   test "Bulk docs should return 202-Acepted", context do
     db_name = context[:db_name]
@@ -124,6 +128,7 @@ defmodule WithoutQuorumTest do
     Couch.delete("/#{db_name}")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db_name
   test "Attachments should return 202-Acepted", context do
     db_name = context[:db_name]

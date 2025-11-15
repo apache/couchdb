@@ -67,6 +67,7 @@ defmodule SearchTest do
     Enum.map(rows, fn row -> row["doc"]["item"] end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search returns all items for GET", context do
     db_name = context[:db_name]
@@ -80,6 +81,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown single key single value for GET", context do
     db_name = context[:db_name]
@@ -94,6 +96,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown single key multiple values for GET", context do
     db_name = context[:db_name]
@@ -108,6 +111,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown multiple keys single values for GET", context do
     db_name = context[:db_name]
@@ -122,6 +126,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == []
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown multiple query definitions for GET", context do
     db_name = context[:db_name]
@@ -137,6 +142,7 @@ defmodule SearchTest do
   end
 
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search returns all items for POST", context do
     db_name = context[:db_name]
@@ -151,6 +157,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown single key single value for POST", context do
     db_name = context[:db_name]
@@ -165,6 +172,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown single key multiple values for POST", context do
     db_name = context[:db_name]
@@ -179,6 +187,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown multiple keys single values for POST", context do
     db_name = context[:db_name]
@@ -193,6 +202,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == []
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown three keys single values for POST", context do
     db_name = context[:db_name]
@@ -207,6 +217,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == ["apple"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown multiple keys multiple values for POST", context do
     db_name = context[:db_name]
@@ -221,6 +232,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == ["apple"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "drilldown multiple query definitions for POST", context do
     db_name = context[:db_name]
@@ -235,6 +247,7 @@ defmodule SearchTest do
     assert Enum.sort(ids) == ["apple"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "clean up search index with invalid design document", context do
     db_name = context[:db_name]
@@ -246,6 +259,7 @@ defmodule SearchTest do
     assert_on_status(resp, [201, 202], "Fail to do a _search_cleanup.")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "facet counts, non-empty", context do
     db_name = context[:db_name]
@@ -261,6 +275,7 @@ defmodule SearchTest do
     assert counts == %{"place" => %{"kitchen" => 3, "lobby" => 1}}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "facet counts, empty", context do
     db_name = context[:db_name]
@@ -276,6 +291,7 @@ defmodule SearchTest do
     assert counts == %{"place" => %{}}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "facet ranges, non-empty", context do
     db_name = context[:db_name]
@@ -291,6 +307,7 @@ defmodule SearchTest do
     assert ranges == %{"price" => %{"cheap" => 2, "expensive" => 2}}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "facet ranges, empty", context do
     db_name = context[:db_name]

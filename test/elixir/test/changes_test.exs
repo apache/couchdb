@@ -7,6 +7,7 @@ defmodule ChangesTest do
   Test CouchDB /{db}/_changes
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Changes feed negative heartbeat", context do
     db_name = context[:db_name]
@@ -27,6 +28,7 @@ defmodule ChangesTest do
              "The heartbeat value should be a positive integer (in milliseconds)."
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "Changes feed non-integer heartbeat", context do
     db_name = context[:db_name]
@@ -86,12 +88,14 @@ defmodule ChangesTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "non-existing design doc for filtered changes", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_changes?filter=nothingtosee/bop")
     assert resp.status_code == 404
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "non-existing function for filtered changes", context do
     db_name = context[:db_name]
@@ -100,6 +104,7 @@ defmodule ChangesTest do
     assert resp.status_code == 404
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "non-existing design doc and function for filtered changes", context do
     db_name = context[:db_name]
@@ -133,6 +138,7 @@ defmodule ChangesTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "erlang function filtered changes", context do
     db_name = context[:db_name]
     create_erlang_filters_view(db_name)
@@ -215,6 +221,7 @@ defmodule ChangesTest do
     assert Enum.member?(changes_ids, "doc3")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "changes filtering on design docs", context do
     db_name = context[:db_name]
@@ -227,6 +234,7 @@ defmodule ChangesTest do
     assert Enum.at(resp.body["results"], 0)["id"] == "_design/erlang"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "changes filtering on custom filter", context do
     db_name = context[:db_name]
@@ -254,6 +262,7 @@ defmodule ChangesTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "changes fail on invalid payload", context do
     db_name = context[:db_name]
     create_filters_view(db_name)
@@ -352,6 +361,7 @@ defmodule ChangesTest do
     assert length(resp.body["results"]) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "COUCHDB-1923", context do
     db_name = context[:db_name]

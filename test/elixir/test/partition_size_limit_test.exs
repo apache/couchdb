@@ -68,6 +68,7 @@ defmodule PartitionSizeLimitTest do
     assert resp.status_code in [201, 202]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "fill partition manually", context do
     db_name = context[:db_name]
     partition = "foo"
@@ -95,6 +96,7 @@ defmodule PartitionSizeLimitTest do
     assert info["sizes"]["external"] >= @max_size
   end
 
+  @tag skip_for_pouchdb_server: true
   test "full partitions reject POST /dbname", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -106,6 +108,7 @@ defmodule PartitionSizeLimitTest do
     assert body["error"] == "partition_overflow"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "full partitions reject PUT /dbname/docid", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -117,6 +120,7 @@ defmodule PartitionSizeLimitTest do
     assert body["error"] == "partition_overflow"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "full partitions reject POST /dbname/_bulk_docs", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -129,6 +133,7 @@ defmodule PartitionSizeLimitTest do
     assert doc_resp["error"] == "partition_overflow"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "full partitions with mixed POST /dbname/_bulk_docs", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -182,6 +187,7 @@ defmodule PartitionSizeLimitTest do
     delete_doc(db_name, doc)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "replication into a full partition works", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -199,6 +205,7 @@ defmodule PartitionSizeLimitTest do
     assert resp.status_code in [201, 202]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "compacting a full partition works", context do
     db_name = context[:db_name]
     db_info1 = get_db_info(db_name)
@@ -208,6 +215,7 @@ defmodule PartitionSizeLimitTest do
     assert db_info2["sizes"]["file"] != db_info1["sizes"]["file"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "indexing a full partition works", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -231,6 +239,7 @@ defmodule PartitionSizeLimitTest do
     assert length(body["rows"]) > 0
   end
 
+  @tag skip_for_pouchdb_server: true
   test "purging docs allows writes", context do
     db_name = context[:db_name]
     fill_partition(db_name)
@@ -273,6 +282,7 @@ defmodule PartitionSizeLimitTest do
     save_doc(db_name, %{_id: "foo:bar", value: "stuff"})
   end
 
+  @tag skip_for_pouchdb_server: true
   test "decreasing partition size disables more writes", context do
     db_name = context[:db_name]
 
