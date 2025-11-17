@@ -134,7 +134,6 @@ The database's ``purge_seq`` and ``update_seq`` will be increased.
 .. note::
     The _purge endpoint is restricted to admin users (since version 2.3.1)
 
-
 Internal Replication
 ======================
 Purges are automatically replicated between replicas of the same database. Each
