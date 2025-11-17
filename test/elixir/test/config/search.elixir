@@ -38,5 +38,9 @@
   ],
   "LimitTests": [
     "limit field"
+  ],
+  "ExecutionStatsTestsText": [
+    "simple text index",
+    "no execution stats"
   ]
 }
