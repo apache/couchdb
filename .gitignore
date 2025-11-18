@@ -64,12 +64,14 @@ src/hqueue/
 src/ibrowse/
 src/idna/
 src/jiffy/
+src/libgraph/
 src/meck/
 src/metrics/
 src/mimerl/
 src/mochiweb/
 src/oauth/
 src/parse_trans/
+src/propcheck/
 src/proper/
 src/rebar/
 src/recon/
