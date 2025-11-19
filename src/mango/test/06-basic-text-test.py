@@ -15,9 +15,6 @@ import mango
 import unittest
 import user_docs
 import math
-from hypothesis import given, assume, example, settings
-import hypothesis.strategies as st
-
 
 @unittest.skipIf(mango.has_text_service(), "text service exists")
 class TextIndexCheckTests(mango.DbPerClass):

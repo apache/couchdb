@@ -17,7 +17,6 @@
 .vscode
 .rebar/
 .eunit/
-.hypothesis/
 cover/
 /core
 debian/
