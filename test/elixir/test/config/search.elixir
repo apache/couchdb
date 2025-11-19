@@ -38,5 +38,12 @@
   ],
   "LimitTests": [
     "limit field"
+  ],
+  "ExplainIndexTextTests": [
+    "basic index candidates",
+    "basic selector hints"
+  ],
+  "ExplainIndexMixedTests": [
+    "basic"
   ]
 }

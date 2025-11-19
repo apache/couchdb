@@ -735,5 +735,16 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "ExplainIndexJSONTests": [
+    "basic index candidates",
+    "basic selector hints"
+  ],
+  "ExplainIndexTestsNoIndexes": [
+    "basic",
+    "no usable index"
+  ],
+  "ExplainIndexTestsPartitionedNoIndexes": [
+    "basic"
   ]
 }
