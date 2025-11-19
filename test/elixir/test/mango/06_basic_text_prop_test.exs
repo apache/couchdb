@@ -8,7 +8,7 @@ defmodule BasicTextTest do
     property "test floating point value",
       numtests: 1_000 do # takes about 10 seconds
         MangoDatabase.recreate("/#{@db_name}")
-        forall f <- union([float(), "NaN", "Infinity"]) do
+        forall f <- weighted_union([{100, float()}, {1, "NaN"}, {1, "Infinity"}]) do
             # create doc with float
             :ok == test_float(f)
         end
