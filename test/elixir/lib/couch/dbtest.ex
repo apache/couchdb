@@ -90,7 +90,7 @@ defmodule Couch.DBTest do
         if prev_value != "" do
           url = "/_node/#{node}/_config/#{section}/#{key}"
           headers = ["X-Couch-Persist": "false"]
-          body = :jiffy.encode(prev_value)
+          body = :jiffy.encode(prev_value, [:use_nil])
           resp = Couch.put(url, headers: headers, body: body)
           assert resp.status_code == 200
         else
@@ -109,7 +109,7 @@ defmodule Couch.DBTest do
     Enum.map(resp.body["all_nodes"], fn node ->
       url = "/_node/#{node}/_config/#{section}/#{key}"
       headers = ["X-Couch-Persist": "false"]
-      body = :jiffy.encode(value)
+      body = :jiffy.encode(value, [:use_nil])
       resp = Couch.put(url, headers: headers, body: body)
       assert resp.status_code == 200
       {node, resp.body}
@@ -494,7 +494,7 @@ defmodule Couch.DBTest do
               Couch.put(
                 "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
                 headers: ["X-Couch-Persist": false],
-                body: :jiffy.encode(setting.value)
+                body: :jiffy.encode(setting.value, [:use_nil])
               )
 
             assert resp.status_code == 200
@@ -525,7 +525,7 @@ defmodule Couch.DBTest do
               Couch.put(
                 "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
                 headers: ["X-Couch-Persist": false],
-                body: :jiffy.encode(value)
+                body: :jiffy.encode(value, [:use_nil])
               )
 
             assert resp.status_code == 200

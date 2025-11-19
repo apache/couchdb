@@ -1627,7 +1627,7 @@ defmodule ReplicationTest do
   end
 
   def set_security(db_name, sec_props) do
-    resp = Couch.put("/#{db_name}/_security", body: :jiffy.encode(sec_props))
+    resp = Couch.put("/#{db_name}/_security", body: :jiffy.encode(sec_props, [:use_nil]))
     assert HTTPotion.Response.success?(resp)
     assert resp.body["ok"]
   end

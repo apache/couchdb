@@ -13,7 +13,7 @@ defmodule ViewCollationRawTest do
     3,
     4,
     false,
-    :null,
+    nil,
     true,
 
     # Then objects, compared each key value in the list until different.
@@ -109,7 +109,7 @@ defmodule ViewCollationRawTest do
   test "key query option", context do
     Enum.each(@values, fn value ->
       retry_until(fn ->
-        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
+        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value, [:use_nil])})
         assert length(resp.body["rows"]) == 1
         assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
       end)
@@ -154,6 +154,6 @@ defmodule ViewCollationRawTest do
   end
 
   def convert(value) do
-    :jiffy.decode(:jiffy.encode(value), [:return_maps])
+    :jiffy.decode(:jiffy.encode(value, [:use_nil]), [:return_maps, :use_nil])
   end
 end

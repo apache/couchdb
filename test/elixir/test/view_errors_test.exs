@@ -20,7 +20,7 @@ defmodule ViewErrorsTest do
     # being included in the view results as null
     results = query(db_name, map_fun)
     assert results["total_rows"] == 1
-    assert Enum.at(results["rows"], 0)["key"] == :null
+    assert Enum.at(results["rows"], 0)["key"] == nil
   end
 
   @tag :with_db
@@ -62,7 +62,7 @@ defmodule ViewErrorsTest do
       |> Map.get("key")
       |> Enum.at(1)
 
-    assert key == :null
+    assert key == nil
   end
 
   @tag :with_db

@@ -152,7 +152,7 @@ defmodule AttachmentMultipartTest do
     assert Enum.at(sections, 2).headers["Content-Disposition"] ==
              ~s(attachment; filename="bar.txt")
 
-    doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps])
+    doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps, :use_nil])
 
     assert doc["_attachments"]["foo.txt"]["follows"] == true
     assert doc["_attachments"]["bar.txt"]["follows"] == true
@@ -175,7 +175,7 @@ defmodule AttachmentMultipartTest do
     sections = parse_multipart(resp)
     assert length(sections) == 2
 
-    doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps])
+    doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps, :use_nil])
 
     assert doc["_attachments"]["foo.txt"]["stub"] == true
     assert doc["_attachments"]["bar.txt"]["follows"] == true
@@ -206,7 +206,7 @@ defmodule AttachmentMultipartTest do
     assert length(inner_sections) == 2
     assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
 
-    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps])
+    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["foo.txt"]["stub"] == true
     assert doc["_attachments"]["bar.txt"]["follows"] == true
 
@@ -228,7 +228,7 @@ defmodule AttachmentMultipartTest do
 
     assert length(sections) == 2
 
-    doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps])
+    doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["foo.txt"]["stub"] == true
     assert doc["_attachments"]["bar.txt"]["follows"] == true
     assert Enum.at(sections, 1).body == "this is 18 chars l"
@@ -377,7 +377,7 @@ defmodule AttachmentMultipartTest do
     assert length(inner_sections) == 3
     assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
 
-    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps])
+    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["lorem.txt"]["follows"] == true
     assert doc["_attachments"]["lorem.txt"]["encoding"] == "gzip"
     assert doc["_attachments"]["data.bin"]["follows"] == true
@@ -414,7 +414,7 @@ defmodule AttachmentMultipartTest do
     # 2 inner sections: a document body section plus 1 attachment data section
     assert length(inner_sections) == 2
     assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
-    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps])
+    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["lorem.txt"]["follows"] == true
     assert doc["_attachments"]["lorem.txt"]["encoding"] == "gzip"
     assert Enum.at(inner_sections, 1).body != lorem
@@ -434,7 +434,7 @@ defmodule AttachmentMultipartTest do
     boundary = Enum.at(String.split(boundary_arg, "="), 1)
 
     if String.starts_with?(boundary, ~s(")) do
-      :jiffy.decode(boundary)
+      :jiffy.decode(boundary, [:use_nil])
     else
       boundary
     end

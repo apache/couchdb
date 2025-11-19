@@ -10,18 +10,20 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-import mango
-import unittest
+defmodule LimitTests do
+  use CouchTestCase
 
-DOCS = [
-    {"_id": "_design/my-design-doc"},
-    {"_id": "54af50626de419f5109c962f", "user_id": 0, "age": 10, "name": "Jimi"},
-    {"_id": "54af50622071121b25402dc3", "user_id": 1, "age": 11, "name": "Eddie"},
-]
+  @db_name "limit-docs"
 
+  setup do
+    LimitDocs.setup(@db_name, "text")
+  end
 
-class IgnoreDesignDocsForAllDocsIndexTests(mango.DbPerClass):
-    def test_should_not_return_design_docs(self):
-        self.db.save_docs(DOCS)
-        docs = self.db.find({"_id": {"$gte": None}})
-        assert len(docs) == 2
+  test "limit field" do
+    q = %{"$or" => [%{"user_id" => %{"$lt" => 10}}, %{"filtered_array.[]" => 1}]}
+    {:ok, docs} = MangoDatabase.find(@db_name, q, limit: 10)
+
+    assert length(docs) == 8
+    Enum.each(docs, fn d -> assert d["user_id"] < 10 end)
+  end
+end

@@ -140,7 +140,7 @@ defmodule NouveauTest do
 
   def assert_status_code(resp, code) do
     assert resp.status_code == code,
-      "status code: #{resp.status_code}, resp body: #{:jiffy.encode(resp.body)}"
+      "status code: #{resp.status_code}, resp body: #{:jiffy.encode(resp.body, [:use_nil])}"
   end
 
   test "user-agent header is forbidden", _context do

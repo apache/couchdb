@@ -284,7 +284,7 @@ ifneq ($(_WITH_CLOUSEAU), )
 		"$(_WITH_CLOUSEAU)" \
 		"$(TEST_OPTS)" \
 		--locald-config test/config/test-config.ini \
-		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir'
+		--no-eval 'mix test --trace --include test/elixir/test/config/search.elixir $(EXUNIT_OPTS)'
 else
 	@echo "Warning: Clouseau is not enabled, \`elixir-search\` cannot be run."
 endif

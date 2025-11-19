@@ -46,7 +46,7 @@ defmodule Rawresp do
 
   def process_request_body(body) do
     if is_map(body) do
-      :jiffy.encode(body)
+      :jiffy.encode(body, [:use_nil])
     else
       body
     end

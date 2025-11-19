@@ -24,12 +24,12 @@ defmodule ReshardBasicTest do
   test "basic api querying, no jobs present" do
     summary = get_summary()
     assert summary["state"] == "running"
-    assert summary["state_reason"] == :null
+    assert summary["state_reason"] == nil
     assert summary["total"] == 0
     assert summary["completed"] == 0
     assert summary["failed"] == 0
     assert summary["stopped"] == 0
-    assert get_state() == %{"state" => "running", "reason" => :null}
+    assert get_state() == %{"state" => "running", "reason" => nil}
     assert get_jobs() == []
   end
 
@@ -57,11 +57,11 @@ defmodule ReshardBasicTest do
   end
 
   test "toggle global state" do
-    assert get_state() == %{"state" => "running", "reason" => :null}
+    assert get_state() == %{"state" => "running", "reason" => nil}
     put_state_stopped("xyz")
     assert get_state() == %{"state" => "stopped", "reason" => "xyz"}
     put_state_running()
-    assert get_state() == %{"state" => "running", "reason" => :null}
+    assert get_state() == %{"state" => "running", "reason" => nil}
   end
 
   test "split q=1 db shards on node1 (1 job)", context do

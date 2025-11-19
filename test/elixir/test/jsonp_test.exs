@@ -107,7 +107,7 @@ defmodule JsonpTest do
       |> Enum.map(fn p ->
         p
         |> IO.iodata_to_binary()
-        |> :jiffy.decode([:return_maps])
+        |> :jiffy.decode([:return_maps, :use_nil])
       end)
       |> Enum.at(0)
 

@@ -407,7 +407,7 @@ defmodule ChangesAsyncTest do
   end
 
   defp parse_chunk(msg) do
-    msg.chunk |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+    msg.chunk |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
   end
 
   defp parse_event(msg) do
@@ -419,7 +419,7 @@ defmodule ChangesAsyncTest do
     |> Enum.map(fn p ->
       p
       |> IO.iodata_to_binary()
-      |> :jiffy.decode([:return_maps])
+      |> :jiffy.decode([:return_maps, :use_nil])
     end)
   end
 
@@ -497,7 +497,7 @@ defmodule ChangesAsyncTest do
     body_lines
     |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(fn line ->
-      line |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+      line |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
     end)
   end
 

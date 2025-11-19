@@ -117,7 +117,7 @@ defmodule Couch do
 
   def process_request_body(body) do
     if is_map(body) do
-      :jiffy.encode(body)
+      :jiffy.encode(body, [:use_nil])
     else
       body
     end
@@ -131,7 +131,7 @@ defmodule Couch do
     content_type = headers[:"Content-Type"]
 
     if !!content_type and String.match?(content_type, ~r/application\/json/) do
-      body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+      body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
     else
       process_response_body(body)
     end

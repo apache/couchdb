@@ -478,7 +478,7 @@ defmodule PartitionMangoTest do
     %{:body => body} = resp
 
     assert body["index"]["name"] == "_all_docs"
-    assert body["mrargs"]["partition"] == :null
+    assert body["mrargs"]["partition"] == nil
 
     resp =
       Couch.post(
@@ -493,7 +493,7 @@ defmodule PartitionMangoTest do
     %{:body => body} = resp
 
     assert body["index"]["def"] == %{"fields" => [%{"some" => "asc"}]}
-    assert body["mrargs"]["partition"] == :null
+    assert body["mrargs"]["partition"] == nil
   end
 
   @tag :with_partitioned_db

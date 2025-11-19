@@ -116,7 +116,7 @@ defmodule AllDocsTest do
     assert row["key"] == "1"
     assert row["id"] == "1"
     assert row["value"]["deleted"]
-    assert row["doc"] == :null
+    assert row["doc"] == nil
 
     # Add conflicts
     conflicted_doc1 = %{

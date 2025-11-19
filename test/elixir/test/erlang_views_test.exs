@@ -96,7 +96,7 @@ defmodule ErlangViewsTest do
         "erlang"
       )
 
-    assert Map.get(List.first(results["rows"]), "key", :null) == :null
+    assert Map.get(List.first(results["rows"]), "key", nil) == nil
     assert List.first(results["rows"])["value"] > 0
   end
 

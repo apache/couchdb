@@ -27,7 +27,7 @@ defmodule ViewMultiKeyAllDocsTest do
 
   test "keys in GET parameters", context do
     db_name = context[:db_name]
-    resp = all_docs(db_name, keys: :jiffy.encode(@keys))
+    resp = all_docs(db_name, keys: :jiffy.encode(@keys, [:use_nil]))
     assert resp.status_code == 200
     rows = resp.body["rows"]
     assert length(rows) == length(@keys)
@@ -47,7 +47,7 @@ defmodule ViewMultiKeyAllDocsTest do
 
   test "keys in GET parameters (limit)", context do
     db_name = context[:db_name]
-    resp = all_docs(db_name, limit: 1, keys: :jiffy.encode(@keys))
+    resp = all_docs(db_name, limit: 1, keys: :jiffy.encode(@keys, [:use_nil]))
     assert resp.status_code == 200
     rows = resp.body["rows"]
     assert length(rows) == 1
@@ -68,7 +68,7 @@ defmodule ViewMultiKeyAllDocsTest do
 
   test "keys in GET parameters (skip)", context do
     db_name = context[:db_name]
-    resp = all_docs(db_name, skip: 2, keys: :jiffy.encode(@keys))
+    resp = all_docs(db_name, skip: 2, keys: :jiffy.encode(@keys, [:use_nil]))
     assert resp.status_code == 200
     rows = resp.body["rows"]
     assert length(rows) == 3
@@ -90,7 +90,7 @@ defmodule ViewMultiKeyAllDocsTest do
 
   test "keys in GET parameters (descending)", context do
     db_name = context[:db_name]
-    resp = all_docs(db_name, descending: true, keys: :jiffy.encode(@keys))
+    resp = all_docs(db_name, descending: true, keys: :jiffy.encode(@keys, [:use_nil]))
     assert resp.status_code == 200
     rows = resp.body["rows"]
     assert length(rows) == length(@keys)
@@ -119,7 +119,7 @@ defmodule ViewMultiKeyAllDocsTest do
     db_name = context[:db_name]
 
     resp =
-      all_docs(db_name, descending: "true", skip: 3, limit: 1, keys: :jiffy.encode(@keys))
+      all_docs(db_name, descending: "true", skip: 3, limit: 1, keys: :jiffy.encode(@keys, [:use_nil]))
 
     assert resp.status_code == 200
     rows = resp.body["rows"]

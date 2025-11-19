@@ -198,7 +198,7 @@ defmodule ChangesTest do
     assert Enum.member?(changes_ids, "doc1")
     assert Enum.member?(changes_ids, "doc3")
 
-    encoded_doc_ids = doc_ids.doc_ids |> :jiffy.encode()
+    encoded_doc_ids = doc_ids.doc_ids |> :jiffy.encode([:use_nil])
 
     resp =
       Couch.get("/#{db_name}/_changes",
