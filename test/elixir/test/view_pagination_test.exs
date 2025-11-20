@@ -8,6 +8,7 @@ defmodule ViewPaginationTest do
   This is a port of the view_pagination.js test suite.
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "basic view pagination", context do
     db_name = context[:db_name]
@@ -29,6 +30,7 @@ defmodule ViewPaginationTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "aliases start_key and start_key_doc_id should work", context do
     db_name = context[:db_name]
@@ -50,6 +52,7 @@ defmodule ViewPaginationTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "descending view pagination", context do
     db_name = context[:db_name]
@@ -79,6 +82,7 @@ defmodule ViewPaginationTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "descending=false parameter should just be ignored", context do
     db_name = context[:db_name]
@@ -106,6 +110,7 @@ defmodule ViewPaginationTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "endkey document id", context do
     db_name = context[:db_name]
@@ -126,6 +131,7 @@ defmodule ViewPaginationTest do
     test_end_key_doc_id(result, docs)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "endkey document id, but with end_key_doc_id alias", context do
     db_name = context[:db_name]

@@ -6,6 +6,7 @@ defmodule DesignOptionsTest do
   @moduledoc """
   Test CouchDB design documents options include_design and local_seq
   """
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "design doc options - include_desing=true", context do
     db_name = context[:db_name]
@@ -40,6 +41,7 @@ defmodule DesignOptionsTest do
     assert Enum.empty?(Map.get(resp, :body)["rows"])
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "design doc options - local_seq=true", context do
     db_name = context[:db_name]

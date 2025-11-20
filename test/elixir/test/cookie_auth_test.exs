@@ -185,6 +185,7 @@ defmodule CookieAuthTest do
     logout(sess)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "cookie auth" do
     # test that the users db is born with the auth ddoc
     ddoc = open_as(@users_db, "_design/_auth", user: "jan")
@@ -374,6 +375,7 @@ defmodule CookieAuthTest do
     login("jan", "apple")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "basic+cookie auth interaction" do
     # performing a successful basic authentication will create a session cookie
     resp = Couch.get(

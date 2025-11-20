@@ -48,6 +48,7 @@ defmodule PartitionMangoTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "query using _id and partition works", context do
     db_name = context[:db_name]
@@ -95,6 +96,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "bar")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "query using _id works for global and local query", context do
     db_name = context[:db_name]
@@ -142,6 +144,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "bar")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "query with partitioned:true using index and $eq", context do
     db_name = context[:db_name]
@@ -185,6 +188,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "bar")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query using _all_docs with $eq", context do
     db_name = context[:db_name]
@@ -271,6 +275,7 @@ defmodule PartitionMangoTest do
     assert partitions == ["foo", "foo", "foo", "foo", "foo"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query using index and range scan", context do
     db_name = context[:db_name]
@@ -318,6 +323,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "bar42")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query using _all_docs and range scan", context do
     db_name = context[:db_name]
@@ -365,6 +371,7 @@ defmodule PartitionMangoTest do
   end
 
   @tag :with_partitioned_db
+  @tag skip_for_pouchdb_server: true
   test "partitioned query using _all_docs", context do
     db_name = context[:db_name]
     create_partition_docs(db_name, "foo", "bar42")
@@ -410,6 +417,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "bar42")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "explain works with partitions", context do
     db_name = context[:db_name]
@@ -455,6 +463,7 @@ defmodule PartitionMangoTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "explain works with non partitioned db", context do
     db_name = context[:db_name]
     create_partition_docs(db_name)
@@ -496,6 +505,7 @@ defmodule PartitionMangoTest do
     assert body["mrargs"]["partition"] == :null
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query using bookmarks", context do
     db_name = context[:db_name]
@@ -546,6 +556,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "foo")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query with query server config set", context do
     db_name = context[:db_name]
@@ -627,6 +638,7 @@ defmodule PartitionMangoTest do
     assert length(partitions) == 100
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "global query does not use partition index", context do
     db_name = context[:db_name]
@@ -655,6 +667,7 @@ defmodule PartitionMangoTest do
     assert length(partitions) == 100
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query does not use global index", context do
     db_name = context[:db_name]
@@ -684,6 +697,7 @@ defmodule PartitionMangoTest do
     assert_correct_partition(partitions, "foo")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned _find and _explain with missing partition returns 400", context do
     db_name = context[:db_name]
@@ -707,6 +721,7 @@ defmodule PartitionMangoTest do
     assert Regex.match?(~r/Partition must not start/, reason)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "partitioned query sends correct errors for sort errors", context do
     db_name = context[:db_name]

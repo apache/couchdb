@@ -10,6 +10,7 @@ defmodule BulkDocsTest do
 
   @doc_range 1..5
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "bulk docs can create, update, & delete many docs per request", ctx do
     db = ctx[:db_name]
@@ -77,6 +78,7 @@ defmodule BulkDocsTest do
     assert res["rev"]
   end
 
+@tag skip_for_pouchdb_server: true
   @tag :with_db
   test "bulk docs raises error for `all_or_nothing` option", ctx do
     opts = [body: %{docs: create_docs(@doc_range), all_or_nothing: true}]
@@ -100,6 +102,7 @@ defmodule BulkDocsTest do
     assert Enum.count(body, &Map.get(&1, "rev")) == 1
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "bulk docs raises error for missing `docs` parameter", ctx do
     docs = [%{foo: "bar"}]
@@ -108,11 +111,13 @@ defmodule BulkDocsTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "bulk docs raises error for invalid `docs` parameter", ctx do
     resp = Couch.post("/#{ctx[:db_name]}/_bulk_docs", body: %{docs: "foo"})
     assert_bad_request(resp, "`docs` parameter must be an array.")
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "bulk docs raises error for invalid `new_edits` parameter", ctx do
     opts = [body: %{docs: [], new_edits: 0}]
