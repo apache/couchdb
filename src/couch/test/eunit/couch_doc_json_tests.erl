@@ -94,6 +94,16 @@ from_json_success_cases() ->
             "_rev stored in revs."
         },
         {
+            {[{<<"_rev">>, <<"0-11111111111111111111111111111111">>}]},
+            #doc{revs = {0, [<<"11111111111111111111111111111111">>]}},
+            "_rev with start 0 stored in revs (local docs case)."
+        },
+        {
+            {[{<<"_rev">>, <<"2-11111111111111111111111111111111">>}]},
+            #doc{revs = {2, [<<17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17>>]}},
+            "_rev with start 1 and size 32 stored in revs."
+        },
+        {
             {[{<<"soap">>, 35}]},
             #doc{body = {[{<<"soap">>, 35}]}},
             "Non underscore prefixed fields stored in body."
@@ -287,7 +297,7 @@ from_json_error_cases() ->
             {[
                 {<<"_revisions">>,
                     {[
-                        {<<"start">>, 0},
+                        {<<"start">>, 1},
                         {<<"ids">>, [<<"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">>]}
                     ]}}
             ]},
