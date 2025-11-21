@@ -68,20 +68,20 @@ to_json_revisions(Options, Start, RevIds0) ->
                 {<<"_revisions">>,
                     {[
                         {<<"start">>, Start},
-                        {<<"ids">>, [revid_to_str(R) || R <- RevIds]}
+                        {<<"ids">>, [revid_to_str(Start, R) || R <- RevIds]}
                     ]}}
             ]
     end.
 
-revid_to_str(RevId) when size(RevId) =:= 16 ->
+revid_to_str(Start, RevId) when Start =/= 0, byte_size(RevId) =:= 16 ->
     couch_util:to_hex_bin(RevId);
-revid_to_str(RevId) when is_binary(RevId) ->
+revid_to_str(Start, RevId) when is_integer(Start), Start >= 0, is_binary(RevId) ->
     RevId;
-revid_to_str(RevId) when is_list(RevId) ->
+revid_to_str(Start, RevId) when is_integer(Start), Start >= 0, is_list(RevId) ->
     list_to_binary(RevId).
 
 rev_to_str({Pos, RevId}) ->
-    <<(integer_to_binary(Pos))/binary, $-, (revid_to_str(RevId))/binary>>.
+    <<(integer_to_binary(Pos))/binary, $-, (revid_to_str(Pos, RevId))/binary>>.
 
 revs_to_strs([]) ->
     [];
@@ -188,13 +188,13 @@ from_json_obj({Props}, DbName) ->
 from_json_obj(_Other, _) ->
     throw({bad_request, "Document must be a JSON object"}).
 
-parse_revid(RevId) when is_binary(RevId), size(RevId) =:= 32 ->
+parse_revid(Start, RevId) when Start =/= 0, is_binary(RevId), byte_size(RevId) =:= 32 ->
     binary:decode_hex(RevId);
-parse_revid(RevId) when is_list(RevId), length(RevId) =:= 32 ->
+parse_revid(Start, RevId) when Start =/= 0, is_list(RevId), length(RevId) =:= 32 ->
     binary:decode_hex(list_to_binary(RevId));
-parse_revid(RevId) when is_binary(RevId) ->
+parse_revid(Start, RevId) when is_integer(Start), Start >= 0, is_binary(RevId) ->
     RevId;
-parse_revid(RevId) when is_list(RevId) ->
+parse_revid(Start, RevId) when is_integer(Start), Start >= 0, is_list(RevId) ->
     ?l2b(RevId).
 
 parse_rev(Rev) when is_binary(Rev) ->
@@ -211,7 +211,7 @@ parse_rev(Rev) when is_list(Rev) ->
         {Pos, [$- | RevId]} ->
             try
                 IntPos = list_to_integer(Pos),
-                {IntPos, parse_revid(RevId)}
+                {IntPos, parse_revid(IntPos, RevId)}
             catch
                 error:badarg -> throw({bad_request, <<"Invalid rev format">>})
             end;
@@ -313,7 +313,7 @@ transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc, DbName) ->
     RevIds2 = lists:map(
         fun(RevId) ->
             try
-                parse_revid(RevId)
+                parse_revid(Start, RevId)
             catch
                 error:function_clause ->
                     throw({doc_validation, "RevId isn't a string"});
