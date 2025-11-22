@@ -191,7 +191,7 @@ verify_purge_checkpoint(DbName, Props) ->
                             end
                         end,
                         [],
-                        mem3:shards(DbName)
+                        mem3:shards(mem3:dbname(DbName))
                     ),
                     lists:member(Source, Nodes) andalso lists:member(Target, Nodes)
                 catch
