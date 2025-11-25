@@ -182,6 +182,22 @@ defmodule ConfigTest do
     assert resp.status_code == 200
   end
 
+  test "Auto-reload config", context do
+    {:ok, fd} = File.open "dev/lib/node1/etc/local.ini", [:append]
+    IO.puts(fd, "[foo]\nbar = baz")
+    File.close fd
+    assert !Map.has_key?(get_config(context, "foo"), "bar")
+
+    # enable config auto-reload
+    set_config(context, "config", "auto_reload_secs", "1")
+    on_exit(fn ->
+      delete_config(context, "config", "auto_reload_secs", nil)
+    end)
+
+    :timer.sleep(1200)
+    assert get_config(context, "foo", "bar") == "baz"
+  end
+
   # Those are negative test cases.  The positive cases are implicitly
   # tested by other ones.
   test "Only JSON strings are accepted", context do
