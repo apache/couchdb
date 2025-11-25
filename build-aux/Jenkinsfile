@@ -173,7 +173,7 @@ meta = [
       name: 'FreeBSD x86_64',
       spidermonkey_vsn: '91',
       with_clouseau: true,
-      clouseau_java_home: '/usr/local/openjdk8-jre',
+      clouseau_java_home: '/usr/local/openjdk21',
       quickjs_test262: false,
       gnu_make: 'gmake'
   ],
@@ -184,7 +184,7 @@ meta = [
      name: 'FreeBSD ARM64 QuickJS',
      disable_spidermonkey: true,
      with_clouseau: true,
-     clouseau_java_home: '/usr/local/openjdk8-jre',
+     clouseau_java_home: '/usr/local/openjdk21',
      quickjs_test262: false,
      gnu_make: 'gmake'
   ],
