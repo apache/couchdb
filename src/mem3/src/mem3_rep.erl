@@ -19,6 +19,7 @@
     make_local_id/3,
     make_purge_id/2,
     verify_purge_checkpoint/2,
+    cleanup_purge_checkpoints/1,
     find_source_seq/4,
     find_split_target_seq/4,
     local_id_hash/1
@@ -56,6 +57,10 @@
 }).
 
 -define(DEFAULT_REXI_TIMEOUT, 600000).
+-define(CHECKPOINT_PREFIX, "_local/shard-sync-").
+-define(PURGE_PREFIX, "_local/purge-mem3-").
+-define(UUID_SIZE, 32).
+-define(PURGE_TYPE, <<"internal_replication">>).
 
 go(Source, Target) ->
     go(Source, Target, []).
@@ -148,12 +153,12 @@ make_local_id(#shard{node = SourceNode}, #shard{node = TargetNode}, Filter) ->
 make_local_id(SourceThing, TargetThing, F) when is_binary(F) ->
     S = local_id_hash(SourceThing),
     T = local_id_hash(TargetThing),
-    <<"_local/shard-sync-", S/binary, "-", T/binary, F/binary>>;
+    <<?CHECKPOINT_PREFIX, S/binary, "-", T/binary, F/binary>>;
 make_local_id(SourceThing, TargetThing, Filter) ->
     S = local_id_hash(SourceThing),
     T = local_id_hash(TargetThing),
     F = filter_hash(Filter),
-    <<"_local/shard-sync-", S/binary, "-", T/binary, F/binary>>.
+    <<?CHECKPOINT_PREFIX, S/binary, "-", T/binary, F/binary>>.
 
 filter_hash(Filter) when is_function(Filter) ->
     {new_uniq, Hash} = erlang:fun_info(Filter, new_uniq),
@@ -166,43 +171,97 @@ local_id_hash(Thing) ->
     couch_util:encodeBase64Url(couch_hash:md5_hash(?term_to_bin(Thing))).
 
 make_purge_id(SourceUUID, TargetUUID) ->
-    <<"_local/purge-mem3-", SourceUUID/binary, "-", TargetUUID/binary>>.
+    <<?PURGE_PREFIX, SourceUUID/binary, "-", TargetUUID/binary>>.
+
+remote_id_to_local(<<?PURGE_PREFIX, Remote:?UUID_SIZE/binary, "-", Local:?UUID_SIZE/binary>>) ->
+    <<?PURGE_PREFIX, Local/binary, "-", Remote/binary>>.
+
+% If the shard map changed, nodes are decomissioned, or user upgraded from a
+% version before 3.6 we may have some some checkpoints to clean up. Call this
+% function before compacting, right before we calculate the minimum purge
+% sequence, and also before we replicate purges to/from other copies.
+%
+cleanup_purge_checkpoints(ShardName) when is_binary(ShardName) ->
+    couch_util:with_db(ShardName, fun(Db) -> cleanup_purge_checkpoints(Db) end);
+cleanup_purge_checkpoints(Db) ->
+    Shards = shards(couch_db:name(Db)),
+    UUID = couch_db:get_uuid(Db),
+    FoldFun = fun(#doc{id = Id, body = {Props}}, Acc) ->
+        case Id of
+            <<?PURGE_PREFIX, UUID:?UUID_SIZE/binary, "-", _:?UUID_SIZE/binary>> ->
+                case verify_checkpoint_shard(Shards, Props) of
+                    true -> {ok, Acc};
+                    false -> {ok, [Id | Acc]}
+                end;
+            <<?PURGE_PREFIX, _:?UUID_SIZE/binary, "-", _:?UUID_SIZE/binary>> ->
+                % Cleanup checkpoints not originating at the current shard.
+                % Previously, before version 3.6, during a pull from shard B to
+                % shard A we checkpointed on target B with doc ID
+                % mem3-purge-$AUuid-$BUuid. That created a redundant checkpoint
+                % which was the same as target B pushing changes to target A,
+                % which already had a checkpoint: mem3-purge-$BUuid-$AUuid,
+                % with the same direction and same purge sequence ID. So here
+                % we remove those redundant checkpoints.
+                {ok, [Id | Acc]};
+            _ ->
+                {stop, Acc}
+        end
+    end,
+    Opts = [{start_key, list_to_binary(?PURGE_PREFIX)}],
+    {ok, ToDelete} = couch_db:fold_local_docs(Db, FoldFun, [], Opts),
+    DeleteFun = fun(DocId) -> delete_checkpoint(Db, DocId) end,
+    lists:foreach(DeleteFun, ToDelete).
+
+delete_checkpoint(Db, DocId) ->
+    DbName = couch_db:name(Db),
+    LogMsg = "~p : deleting inactive purge checkpoint ~s : ~s",
+    couch_log:warning(LogMsg, [?MODULE, DbName, DocId]),
+    try couch_db:open_doc(Db, DocId, []) of
+        {ok, Doc = #doc{}} ->
+            Deleted = Doc#doc{deleted = true, body = {[]}},
+            couch_db:update_doc(Db, Deleted, [?ADMIN_CTX]);
+        {not_found, _} ->
+            ok
+    catch
+        Tag:Error ->
+            ErrLog = "~p : error deleting checkpoint ~s : ~s error: ~p:~p",
+            couch_log:error(ErrLog, [?MODULE, DbName, DocId, Tag, Error]),
+            ok
+    end.
 
 verify_purge_checkpoint(DbName, Props) ->
     try
-        Type = couch_util:get_value(<<"type">>, Props),
-        if
-            Type =/= <<"internal_replication">> ->
-                false;
-            true ->
-                SourceBin = couch_util:get_value(<<"source">>, Props),
-                TargetBin = couch_util:get_value(<<"target">>, Props),
-                Range = couch_util:get_value(<<"range">>, Props),
-
-                Source = binary_to_existing_atom(SourceBin, latin1),
-                Target = binary_to_existing_atom(TargetBin, latin1),
-
-                try
-                    Nodes = lists:foldl(
-                        fun(Shard, Acc) ->
-                            case Shard#shard.range == Range of
-                                true -> [Shard#shard.node | Acc];
-                                false -> Acc
-                            end
-                        end,
-                        [],
-                        mem3:shards(mem3:dbname(DbName))
-                    ),
-                    lists:member(Source, Nodes) andalso lists:member(Target, Nodes)
-                catch
-                    error:database_does_not_exist ->
-                        false
-                end
+        case couch_util:get_value(<<"type">>, Props) of
+            ?PURGE_TYPE -> verify_checkpoint_shard(shards(DbName), Props);
+            _ -> false
         end
     catch
-        _:_ ->
+        Tag:Error ->
+            ErrLog = "~p : invalid checkpoint shard:~s props:~p error: ~p:~p",
+            couch_log:error(ErrLog, [?MODULE, DbName, Props, Tag, Error]),
             false
     end.
+
+shards(DbName) ->
+    try
+        mem3:shards(mem3:dbname(DbName))
+    catch
+        error:database_does_not_exist ->
+            []
+    end.
+
+verify_checkpoint_shard(Shards, Props) when is_list(Shards), is_list(Props) ->
+    Range = couch_util:get_value(<<"range">>, Props),
+    Fun = fun(S, Acc) ->
+        case mem3:range(S) == Range of
+            true -> [mem3:node(S) | Acc];
+            false -> Acc
+        end
+    end,
+    Nodes = lists:foldl(Fun, [], Shards),
+    TBin = couch_util:get_value(<<"target">>, Props),
+    TNode = binary_to_existing_atom(TBin, latin1),
+    lists:member(TNode, Nodes) andalso lists:member(TNode, mem3:nodes()).
 
 %% @doc Find and return the largest update_seq in SourceDb
 %% that the client has seen from TargetNode.
@@ -335,6 +394,7 @@ pull_purges_multi(#acc{} = Acc0) ->
         hashfun = HashFun
     } = Acc0,
     with_src_db(Acc0, fun(Db) ->
+        cleanup_purge_checkpoints(Db),
         Targets = maps:map(
             fun(_, #tgt{} = T) ->
                 pull_purges(Db, Count, Source, T, HashFun)
@@ -365,9 +425,9 @@ pull_purges(Db, Count, #shard{} = SrcShard, #tgt{} = Tgt0, HashFun) ->
     #tgt{shard = TgtShard} = Tgt0,
     SrcUUID = couch_db:get_uuid(Db),
     #shard{node = TgtNode, name = TgtDbName} = TgtShard,
-    {LocalPurgeId, Infos, ThroughSeq, Remaining} =
+    {RemoteId, Infos, ThroughSeq, Remaining} =
         mem3_rpc:load_purge_infos(TgtNode, TgtDbName, SrcUUID, Count),
-    Tgt = Tgt0#tgt{purgeid = LocalPurgeId},
+    Tgt = Tgt0#tgt{purgeid = RemoteId},
     if
         Infos == [] ->
             ok;
@@ -391,7 +451,7 @@ pull_purges(Db, Count, #shard{} = SrcShard, #tgt{} = Tgt0, HashFun) ->
             Infos1 = lists:filter(BelongsFun, Infos),
             {ok, _} = couch_db:purge_docs(Db, Infos1, [?REPLICATED_CHANGES]),
             Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
-            mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, LocalPurgeId, Body)
+            mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, RemoteId, Body)
     end,
     Tgt#tgt{remaining = max(0, Remaining)}.
 
@@ -427,7 +487,8 @@ push_purges_multi(#acc{} = Acc) ->
     end).
 
 push_purges(Db, BatchSize, SrcShard, Tgt, HashFun) ->
-    #tgt{shard = TgtShard, purgeid = LocalPurgeId} = Tgt,
+    #tgt{shard = TgtShard, purgeid = RemotePurgeId} = Tgt,
+    LocalPurgeId = remote_id_to_local(RemotePurgeId),
     #shard{node = TgtNode, range = TgtRange, name = TgtDbName} = TgtShard,
     StartSeq =
         case couch_db:open_doc(Db, LocalPurgeId, []) of
@@ -741,21 +802,19 @@ update_locals(Target, Db, Seq) ->
     {ok, _} = couch_db:update_doc(Db, #doc{id = Id, body = NewBody}, []).
 
 purge_cp_body(#shard{} = Source, #shard{} = Target, PurgeSeq) ->
-    {Mega, Secs, _} = os:timestamp(),
-    NowSecs = Mega * 1000000 + Secs,
     {[
-        {<<"type">>, <<"internal_replication">>},
-        {<<"updated_on">>, NowSecs},
+        {<<"type">>, ?PURGE_TYPE},
+        {<<"updated_on">>, os:system_time(second)},
         {<<"purge_seq">>, PurgeSeq},
         {<<"source">>, atom_to_binary(Source#shard.node, latin1)},
         {<<"target">>, atom_to_binary(Target#shard.node, latin1)},
-        {<<"range">>, Source#shard.range}
+        {<<"range">>, Target#shard.range}
     ]}.
 
 find_repl_doc(SrcDb, TgtUUIDPrefix) ->
     SrcUUID = couch_db:get_uuid(SrcDb),
     S = local_id_hash(SrcUUID),
-    DocIdPrefix = <<"_local/shard-sync-", S/binary, "-">>,
+    DocIdPrefix = <<?CHECKPOINT_PREFIX, S/binary, "-">>,
     FoldFun = fun(#doc{id = DocId, body = {BodyProps}} = Doc, _) ->
         TgtUUID = couch_util:get_value(<<"target_uuid">>, BodyProps, <<>>),
         case is_prefix(DocIdPrefix, DocId) of
@@ -802,7 +861,7 @@ find_split_target_seq_int(TgtDb, Node, SrcUUIDPrefix) ->
                 {ok, not_found}
         end
     end,
-    Options = [{start_key, <<"_local/shard-sync-">>}],
+    Options = [{start_key, <<?CHECKPOINT_PREFIX>>}],
     case couch_db:fold_local_docs(TgtDb, FoldFun, not_found, Options) of
         {ok, Seqs} when is_list(Seqs) ->
             {ok, Seqs};
