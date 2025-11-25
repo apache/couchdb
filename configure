@@ -30,6 +30,7 @@ WITH_FAUXTON="true"
 WITH_DOCS="true"
 WITH_NOUVEAU="false"
 WITH_CLOUSEAU="false"
+WITH_ZIOSE="true"
 ERLANG_MD5="false"
 SKIP_DEPS="false"
 WITH_SPIDERMONKEY="true"
@@ -43,7 +44,7 @@ JS_ENGINE=${JS_ENGINE:-"spidermonkey"}
 SM_VSN=${SM_VSN:-"91"}
 CLOUSEAU_MTH=${CLOUSEAU_MTH:-"dist"}
 CLOUSEAU_URI=${CLOUSEAU_URI:-"https://github.com/cloudant-labs/clouseau/releases/download/%s/clouseau-%s-dist.zip"}
-CLOUSEAU_VSN=${CLOUSEAU_VSN:-"2.25.0"}
+CLOUSEAU_VSN=${CLOUSEAU_VSN:-"3.0.0"}
 CLOUSEAU_DIR="$(pwd)"/clouseau
 ARCH="$(uname -m)"
 MULTIARCH_NAME="$(command -v dpkg-architecture > /dev/null && dpkg-architecture -q DEB_HOST_MULTIARCH || true)"
@@ -314,6 +315,10 @@ parse_opts() {
 
 parse_opts $@
 
+if [ "$(echo "$CLOUSEAU_VSN" | cut -d '.' -f 1)" -lt "3" ]; then
+    WITH_ZIOSE="false"
+fi
+
 if [ "${WITH_SPIDERMONKEY}" = "true" ] && [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]; then
   echo "ERROR: SpiderMonkey 60 is known broken on ARM 64 (aarch64). Use another version instead."
   exit 1
@@ -488,14 +493,17 @@ install_local_clouseau() {
     case "$CLOUSEAU_MTH" in
 	dist)
 	    _DIST_URL=$(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN")
-	    _MAVEN_BASE_URI=https://repo1.maven.org/maven2
-	    _LOGBACK_DIST_URL="$_MAVEN_BASE_URI"/ch/qos/logback
 
-	    : "${LOGBACK_VERSION:=1.2.13}"
-	    _LOGBACK_CORE_JAR=logback-core-"$LOGBACK_VERSION".jar
-	    _LOGBACK_CORE_URL="$_LOGBACK_DIST_URL"/logback-core/"$LOGBACK_VERSION"/"$_LOGBACK_CORE_JAR"
-	    _LOGBACK_CLASSIC_JAR=logback-classic-"$LOGBACK_VERSION".jar
-	    _LOGBACK_CLASSIC_URL="$_LOGBACK_DIST_URL"/logback-classic/"$LOGBACK_VERSION"/"$_LOGBACK_CLASSIC_JAR"
+	    if [ "${WITH_ZIOSE}" = "false" ]; then
+		_MAVEN_BASE_URI=https://repo1.maven.org/maven2
+		_LOGBACK_DIST_URL="$_MAVEN_BASE_URI"/ch/qos/logback
+
+		: "${LOGBACK_VERSION:=1.2.13}"
+		_LOGBACK_CORE_JAR=logback-core-"$LOGBACK_VERSION".jar
+		_LOGBACK_CORE_URL="$_LOGBACK_DIST_URL"/logback-core/"$LOGBACK_VERSION"/"$_LOGBACK_CORE_JAR"
+		_LOGBACK_CLASSIC_JAR=logback-classic-"$LOGBACK_VERSION".jar
+		_LOGBACK_CLASSIC_URL="$_LOGBACK_DIST_URL"/logback-classic/"$LOGBACK_VERSION"/"$_LOGBACK_CLASSIC_JAR"
+	    fi
 
 	    check_local_clouseau_dir "$CLOUSEAU_DIR"
 	    mkdir -p "$CLOUSEAU_DIR"
@@ -511,10 +519,16 @@ install_local_clouseau() {
 
 	    rm clouseau.zip
 
-	    echo "Fetching Logback $LOGBACK_VERSION from $_LOGBACK_DIST_URL..."
+	    if [ "${WITH_ZIOSE}" = "false" ]; then
+		echo "Fetching Logback $LOGBACK_VERSION from $_LOGBACK_DIST_URL..."
 
-	    fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CORE_JAR" "$_LOGBACK_CORE_URL"
-	    fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CLASSIC_JAR" "$_LOGBACK_CLASSIC_URL"
+		fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CORE_JAR" "$_LOGBACK_CORE_URL"
+		fetch_file "$CLOUSEAU_DIR"/"$_LOGBACK_CLASSIC_JAR" "$_LOGBACK_CLASSIC_URL"
+	    fi
+
+	    if [ "${WITH_ZIOSE}" = "true" ]; then
+		touch "$CLOUSEAU_DIR"/.ziose
+	    fi
 	    ;;
 
 	git)
