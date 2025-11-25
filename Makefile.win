@@ -261,7 +261,7 @@ endif
 elixir-search: export MIX_ENV=integration
 elixir-search: elixir-init devclean
 ifneq ($(_WITH_CLOUSEAU), )
-	@dev\run -n 1 -q -a adm:pass \
+	@dev\run -n 1 -a adm:pass \
 		"$(_WITH_CLOUSEAU)" \
 		"$(TEST_OPTS)" \
 		--locald-config test/config/test-config.ini \
