@@ -664,6 +664,11 @@ def boot_clouseau(ctx, idx):
         clouseau_java_home + "/bin/java" if clouseau_java_home else shutil.which("java")
     )
     java_version = get_java_version(java)
+
+    print(f"DEBUG: clouseau_java_home = {clouseau_java_home}")
+    print(f"DEBUG: java = {java}")
+    print(f"DEBUG: java_version = {java_version}")
+
     file_exists = lambda f: os.path.isfile(os.path.join(clouseau_dir, f))
 
     if file_exists("build.sbt"):

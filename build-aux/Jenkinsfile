@@ -298,7 +298,7 @@ def generateNativeStage(platform) {
                 // deleteDir is OK here because we're not inside of a Docker container!
                 deleteDir()
                 unstash 'tarball'
-                powershell( script: "git clone https://github.com/pgj/couchdb-glazier -b support-clouseau-3.x", label: 'Cloning couchdb-glazier repository' )
+                powershell( script: "git clone https://github.com/pgj/couchdb-glazier -b support-clouseau-3.x", label: 'Cloning couchdb-glazier repository (pgj fork)' )
                 powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
                 powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
                 dir( "${platform}/build" ) {
@@ -317,6 +317,7 @@ def generateNativeStage(platform) {
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                    gci env:* | sort-object name
                     make -f Makefile.win elixir-search ERLANG_COOKIE=crumbles
                   """, label: 'Clouseau tests')
 
