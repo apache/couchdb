@@ -110,5 +110,17 @@
   "PartitionMangoTest": [
     "explain options (text)",
     "explain works with bookmarks (text)"
-  ]
+  ],
+  "NoDefaultFieldTest": [
+    "basic",
+    "other fields exist",
+  ],
+  "NoDefaultFieldWithAnalyzer": [
+    "basic",
+    "other fields exist",
+  ],
+  "DefaultFieldWithCustomAnalyzer": [
+    "basic",
+    "not analyzed",
+  ],
 }
