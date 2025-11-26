@@ -12,7 +12,7 @@
 
 % Reads CouchDB's ini file and gets queried for configuration parameters.
 % This module is initialized with a list of ini files that it consecutively
-% reads Key/Value pairs from and saves them in an ets table. If more an one
+% reads Key/Value pairs from and saves them as persistent terms. If more an one
 % ini file is specified, the last one is used to write changes that are made
 % with store/2 back to that ini file.
 
@@ -364,16 +364,16 @@ handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
 handle_call(reload, _From, #config{} = Config) ->
     #config{ini_files_dirs = IniFilesDirs} = Config,
     IniFiles = expand_dirs(IniFilesDirs),
-    % Update ets with ini values.
+    % Update persistent term with ini values.
     IniMap = ini_map(IniFiles),
     maps:foreach(
         fun({Sec, Key}, V) ->
             VExisting = get_value(Sec, Key, undefined),
-            put_value(Sec, Key, V),
             case V =:= VExisting of
                 true ->
                     ok;
                 false ->
+                    put_value(Sec, Key, V),
                     Msg = "Reload detected config change ~s.~s = ~p",
                     Args = [Sec, Key, maybe_conceal(V, is_sensitive(Sec, Key))],
                     couch_log:notice(Msg, Args),
@@ -383,7 +383,7 @@ handle_call(reload, _From, #config{} = Config) ->
         end,
         IniMap
     ),
-    % And remove anything in ets that wasn't on disk.
+    % And remove anything in persistent terms that wasn't on disk.
     lists:foreach(
         fun
             ({{Sec, Key}, _}) when not is_map_key({Sec, Key}, IniMap) ->
