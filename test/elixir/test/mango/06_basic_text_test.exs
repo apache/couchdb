@@ -127,6 +127,7 @@ defmodule BasicTextTests do
     assert Enum.at(docs, 0)["user_id"] == 9
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$lt" => 33}})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [1, 9]
 
@@ -141,22 +142,24 @@ defmodule BasicTextTests do
     assert Enum.at(docs, 0)["company"] == "Affluex"
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"foo" => %{"$lt" => "bar car apple"}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
   end
 
   test "lte" do
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$lte" => 21}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$lte" => 22}})
     assert length(docs) == 1
     assert Enum.at(docs, 0)["user_id"] == 9
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$lte" => 33}})
+    assert length(docs) == 3
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [1, 7, 9]
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"company" => %{"$lte" => "Dreamia"}})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert user_ids == [0, 11]
 
@@ -167,7 +170,7 @@ defmodule BasicTextTests do
 
   test "eq" do
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => 21})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => 22})
     assert length(docs) == 1
@@ -194,6 +197,7 @@ defmodule BasicTextTests do
 
   test "gt" do
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$gt" => 77}})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [3, 13]
 
@@ -202,13 +206,13 @@ defmodule BasicTextTests do
     assert Enum.at(docs, 0)["user_id"] == 3
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$gt" => 79}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"company" => %{"$gt" => "Zialactic"}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"foo" => %{"$gt" => "bar car apple"}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"foo" => %{"$gt" => "bar car"}})
     assert length(docs) == 1
@@ -217,10 +221,12 @@ defmodule BasicTextTests do
 
   test "gte" do
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$gte" => 77}})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [3, 13]
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$gte" => 78}})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [3, 13]
 
@@ -229,7 +235,7 @@ defmodule BasicTextTests do
     assert Enum.at(docs, 0)["user_id"] == 3
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$gte" => 80}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"company" => %{"$gte" => "Zialactic"}})
     assert length(docs) == 1
@@ -246,14 +252,14 @@ defmodule BasicTextTests do
     assert Enum.at(docs, 0)["user_id"] == 9
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => 22, "manager" => false})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"$and" => [%{"age" => 22}, %{"manager" => true}]})
     assert length(docs) == 1
     assert Enum.at(docs, 0)["user_id"] == 9
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"$and" => [%{"age" => 22}, %{"manager" => false}]})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"$text" => "Ramona", "age" => 22})
     assert length(docs) == 1
@@ -270,11 +276,13 @@ defmodule BasicTextTests do
 
   test "or" do
     {:ok, docs} = MangoDatabase.find(@db_name, %{"$or" => [%{"age" => 22}, %{"age" => 33}]})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [7, 9]
 
     q = %{"$or" => [%{"$text" => "Ramona"}, %{"$text" => "Stephanie"}]}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [0, 9]
 
@@ -292,11 +300,13 @@ defmodule BasicTextTests do
 
     q = %{"$or" => [%{"age" => 22}, %{"age" => 43, "manager" => true}]}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [9, 10]
 
     q = %{"$or" => [%{"$text" => "Ramona"}, %{"age" => 43, "manager" => true}]}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [9, 10]
   end
@@ -311,13 +321,14 @@ defmodule BasicTextTests do
 
   test "in with value" do
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$in" => [1, 5]}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$in" => [1, 5, 22]}})
     assert length(docs) == 1
     assert Enum.at(docs, 0)["user_id"] == 9
 
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$in" => [1, 5, 22, 31]}})
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [1, 9]
 
@@ -368,7 +379,7 @@ defmodule BasicTextTests do
 
     # Limits on boolean clauses?
     {:ok, docs} = MangoDatabase.find(@db_name, %{"age" => %{"$nin" =>  Enum.to_list(0..1000)}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
   end
 
   test "nin with array" do
@@ -383,7 +394,7 @@ defmodule BasicTextTests do
 
     vals = [%{"val1" => 1, "val2" => "val2"}]
     {:ok, docs} = MangoDatabase.find(@db_name, %{"test_in" => %{"$nin" => vals}})
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
   end
 
   test "all" do
@@ -476,7 +487,7 @@ defmodule BasicTextTests do
       ]
     }
     {:ok, docs} = MangoDatabase.find(@db_name, q)
-    assert assert Enum.empty?(docs)
+    assert Enum.empty?(docs)
 
     # Translates to manager exists or exists_object.should doesn't
     # exist, which will match all docs
@@ -526,6 +537,7 @@ defmodule ElemMatchTests do
   test "elem match" do
     q = %{"friends" => %{"$elemMatch" => %{"name.first" => "Vargas"}}}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [0, 1]
 
@@ -537,6 +549,7 @@ defmodule ElemMatchTests do
     # Check that we can do logic in elemMatch
     q = %{"friends" => %{"$elemMatch" => %{"name.first" => "Ochoa", "type" => "work"}}}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [1, 15]
 
@@ -549,6 +562,7 @@ defmodule ElemMatchTests do
       }
     }
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 3
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [1, 4, 15]
 
@@ -562,6 +576,7 @@ defmodule ElemMatchTests do
       }
     }
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 3
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [1, 4, 15]
 
@@ -596,6 +611,7 @@ defmodule ElemMatchTests do
     }
 
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 3
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [10, 11, 12]
   end
@@ -613,6 +629,7 @@ defmodule AllMatchTests do
   test "all match" do
     q = %{"friends" => %{"$allMatch" => %{"type" => "personal"}}}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
+    assert length(docs) == 2
     user_ids = Enum.map(docs, fn doc -> doc["user_id"] end)
     assert Enum.sort(user_ids) == [5, 8]
 
