@@ -10,7 +10,54 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-# TODO module TextIndexCheckTests
+defmodule TextIndexCheckTests do
+  use CouchTestCase
+
+  @db_name "text-index-check"
+  @users_db "_users"
+
+  @moduletag config: [
+    {
+      "chttpd_auth",
+      "authentication_db",
+      @users_db
+    },
+    {
+      "couch_httpd_auth",
+      "authentication_db",
+      @users_db
+    },
+    {
+      "chttpd_auth",
+      "iterations",
+      "1"
+    },
+    {
+      "admins",
+      "jan",
+      "apple"
+    }
+  ]
+
+  setup do
+    MangoDatabase.recreate(@db_name)
+    MangoDatabase.recreate(@users_db)
+    :ok
+  end
+
+  test "create text index" do
+    sess = Couch.login("jan", "apple")
+
+    resp = Couch.Session.post(
+      sess,
+      "/#{@db_name}/_index",
+      body: %{"index" => %{}, "type" => "text"}
+    )
+
+    assert resp.status_code == 503
+    assert resp
+  end
+end
 
 defmodule BasicTextTests do
   use CouchTestCase
@@ -596,5 +643,3 @@ defmodule AllMatchTests do
     assert Enum.at(docs, 0)["user_id"] == 15
   end
 end
-
-# TODO module NumStringTests
