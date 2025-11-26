@@ -149,6 +149,7 @@
     "Non-term whitelist values allow further modification of the whitelist",
     "PORT `BUGGED` ?raw tests from config.js",
     "Reload config",
+    "Auto-reload config",
     "Server-side password hashing, and raw updates disabling that",
     "Settings can be altered with undefined whitelist allowing any change",
     "Standard config options are present",
