@@ -40,6 +40,7 @@ meta = [
     spidermonkey_vsn: '60',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
@@ -49,6 +50,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
   ],
@@ -58,6 +60,7 @@ meta = [
     spidermonkey_vsn: '91',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
   ],
@@ -67,6 +70,7 @@ meta = [
     spidermonkey_vsn: '115',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
   ],
@@ -76,6 +80,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
@@ -118,6 +123,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     // Test this in in the bookworm-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
@@ -128,6 +134,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}"
   ],
@@ -137,6 +144,7 @@ meta = [
     disable_spidermonkey: true,
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
   ],
@@ -154,6 +162,7 @@ meta = [
     spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     // Test this in in the bookworm-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
@@ -165,6 +174,7 @@ meta = [
     spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}"
   ],
@@ -205,6 +215,7 @@ meta = [
     name: 'Windows 2022',
     spidermonkey_vsn: '128',
     with_clouseau: true,
+    clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
     quickjs_test262: false,
     node_label: 'win'
   ]
@@ -302,7 +313,12 @@ def generateNativeStage(platform) {
                 powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
                 powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
                 dir( "${platform}/build" ) {
-                  withClouseau = meta[platform].with_clouseau ? '-WithClouseau' : ''
+                  def withClouseau = meta[platform].with_clouseau ? '-WithClouseau' : ''
+                  def setClouseauJavaHome = ''
+
+                  if (meta[platform].clouseau_java_home) {
+                    setClouseauJavaHome = "Set-Item -Path env:CLOUSEAU_JAVA_HOME -Value '${meta[platform].clouseau_java_home}'"
+                  }
 
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
@@ -317,12 +333,14 @@ def generateNativeStage(platform) {
                   powershell( script: """
                     .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                    ${setClouseauJavaHome}
                     make -f Makefile.win elixir-search ERLANG_COOKIE=crumbles
                   """, label: 'Clouseau tests')
 
                   powershell( script: """
                       .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
                       Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                      ${setClouseauJavaHome}
                       make -f Makefile.win mango-test ERLANG_COOKIE=crumbles
                     """, label: 'Mango tests')
 
@@ -382,14 +400,20 @@ def generateContainerStage(platform) {
                   sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
                   quickjs_tests262 = meta[platform].quickjs_test262
+                  def setClouseauJavaHome = ''
+
+                  if (meta[platform].clouseau_java_home) {
+                    setClouseauJavaHome = "env CLOUSEAU_JAVA_HOME='${meta[platform].clouseau_java_home}' "
+                  }
+
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
                     retry(3) {sh 'make eunit'}
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
-                    retry(3) {sh 'make elixir-search'}
-                    retry(3) {sh 'make mango-test'}
+                    retry(3) {sh "${setClouseauJavaHome}make elixir-search"}
+                    retry(3) {sh "${setClouseauJavaHome}make mango-test"}
                     retry(3) {sh 'make weatherreport-test'}
                     retry(3) {sh 'make nouveau-test'}
                   }
