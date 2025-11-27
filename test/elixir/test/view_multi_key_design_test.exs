@@ -87,6 +87,7 @@ defmodule ViewMultiKeyDesignTest do
     assert Enum.all?(rows, &(&1["key"] == &1["value"]))
   end
 
+  @tag skip_for_pouchdb_server: true
   test "POST - invalid parameter combinations get rejected ", context do
     db_name = context[:db_name]
 
@@ -113,6 +114,7 @@ defmodule ViewMultiKeyDesignTest do
     assert resp.body["error"] == "query_parse_error"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "GET - invalid parameter combinations get rejected ", context do
     db_name = context[:db_name]
 
@@ -152,6 +154,7 @@ defmodule ViewMultiKeyDesignTest do
     assert length(resp.body["rows"]) == 5
   end
 
+  @tag skip_for_pouchdb_server: true
   test "that limiting by startkey_docid and endkey_docid get applied", context do
     db_name = context[:db_name]
 
@@ -226,6 +229,7 @@ defmodule ViewMultiKeyDesignTest do
     assert expect_rows == rows
   end
 
+  @tag skip_for_pouchdb_server: true
   test "dir descending works", context do
     db_name = context[:db_name]
 
@@ -262,13 +266,6 @@ defmodule ViewMultiKeyDesignTest do
     assert length(rows) == 2
 
     resp =
-      view(db_name, "test/multi_emit", [skip: 0, limit: 1, startkey_docid: "13"], [0])
-
-    rows = resp.body["rows"]
-    assert length(rows) == 1
-    assert Enum.at(rows, 0)["value"] == 13
-
-    resp =
       view(db_name, "test/multi_emit", [skip: 2, limit: 3, startkey_docid: "13"], [0])
 
     rows = resp.body["rows"]
@@ -284,6 +281,18 @@ defmodule ViewMultiKeyDesignTest do
 
     rows = resp.body["rows"]
     assert length(rows) == 3
+  end
+
+  @tag skip_for_pouchdb_server: true
+  test "argument combinations startkey_docid and endkey_docid", context do
+    db_name = context[:db_name]
+
+    resp =
+      view(db_name, "test/multi_emit", [skip: 0, limit: 1, startkey_docid: "13"], [0])
+
+    rows = resp.body["rows"]
+    assert length(rows) == 1
+    assert Enum.at(rows, 0)["value"] == 13
 
     resp =
       view(

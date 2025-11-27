@@ -110,6 +110,7 @@ defmodule PasswordCacheTest do
     Map.put(result, "_rev", resp.body["rev"])
   end
 
+  @tag skip_for_pouchdb_server: true
   test "password hash cache" do
     user1 = make_user(@users_db, "user1")
 

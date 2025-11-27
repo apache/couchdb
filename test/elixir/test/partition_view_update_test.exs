@@ -5,6 +5,7 @@ defmodule PartitionViewUpdateTest do
   @moduledoc """
   Test Partition view update functionality
   """
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "view updates properly remove old keys", context do
     db_name = context[:db_name]
@@ -30,6 +31,7 @@ defmodule PartitionViewUpdateTest do
   end
 
   @tag :skip_on_jenkins
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "query with update=false works", context do
     db_name = context[:db_name]
@@ -76,6 +78,7 @@ defmodule PartitionViewUpdateTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "purge removes view rows", context do
     db_name = context[:db_name]
@@ -104,6 +107,7 @@ defmodule PartitionViewUpdateTest do
     assert length(body["rows"]) == 49
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "purged conflict changes view rows", context do
     db_name = context[:db_name]

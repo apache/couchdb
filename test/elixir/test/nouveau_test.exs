@@ -143,12 +143,14 @@ defmodule NouveauTest do
       "status code: #{resp.status_code}, resp body: #{:jiffy.encode(resp.body)}"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "user-agent header is forbidden", _context do
     resp = Couch.get("http://127.0.0.1:5987",
       headers: ["User-Agent": "couchdb"])
     assert_status_code(resp, 403)
   end
 
+  @tag skip_for_pouchdb_server: true
   test "search analyze", _context do
     url = "/_nouveau_analyze"
     resp = Couch.post(url,
@@ -158,6 +160,7 @@ defmodule NouveauTest do
     assert resp.body ==  %{"tokens" => ["hello", "there"]}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search info", context do
     db_name = context[:db_name]
@@ -179,6 +182,7 @@ defmodule NouveauTest do
     assert String.length(Map.get(info, "signature")) > 0
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search returns all items for GET", context do
     db_name = context[:db_name]
@@ -193,6 +197,7 @@ defmodule NouveauTest do
     assert ids == ["doc1", "doc2", "doc3", "doc4"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search returns all matches for hello by relevance", context do
     db_name = context[:db_name]
@@ -222,6 +227,7 @@ defmodule NouveauTest do
     assert ids == ["doc1", "doc2", "doc3", "doc4"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search returns all items (paginated)", context do
     db_name = context[:db_name]
@@ -243,6 +249,7 @@ defmodule NouveauTest do
     assert ids == ["doc3", "doc4"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search for foo:bar", context do
     db_name = context[:db_name]
@@ -256,6 +263,7 @@ defmodule NouveauTest do
     assert ids == ["doc3"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "search for numeric ranges with locales", context do
     db_name = context[:db_name]
@@ -275,6 +283,7 @@ defmodule NouveauTest do
     assert ids == ["doc2"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "multiple values for stored field", context do
     db_name = context[:db_name]
@@ -306,6 +315,7 @@ defmodule NouveauTest do
       ["red", "orange", "yellow", "green", "blue", "indigo", "violet"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "sort by string field (asc)", context do
     db_name = context[:db_name]
@@ -319,6 +329,7 @@ defmodule NouveauTest do
     assert ids == ["doc3", "doc1", "doc4", "doc2"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "sort by string field (desc)", context do
     db_name = context[:db_name]
@@ -332,6 +343,7 @@ defmodule NouveauTest do
     assert ids == ["doc2", "doc4", "doc1", "doc3"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "sort by numeric field (asc)", context do
     db_name = context[:db_name]
@@ -345,6 +357,7 @@ defmodule NouveauTest do
     assert ids == ["doc1", "doc3", "doc4", "doc2"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "sort by numeric field (desc)", context do
     db_name = context[:db_name]
@@ -358,6 +371,7 @@ defmodule NouveauTest do
     assert ids == ["doc2", "doc4", "doc3", "doc1"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "counts", context do
     db_name = context[:db_name]
@@ -371,6 +385,7 @@ defmodule NouveauTest do
     assert counts == %{"foo" => %{"bar" => 1, "baz" => 1, "foo" => 1, "foobar" => 1}}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "ranges", context do
     db_name = context[:db_name]
@@ -387,6 +402,7 @@ defmodule NouveauTest do
     assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "ranges (open)", context do
     db_name = context[:db_name]
@@ -403,6 +419,7 @@ defmodule NouveauTest do
     assert ranges == %{"bar" => %{"cheap" => 3, "expensive" => 1}}
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "top_n", context do
     db_name = context[:db_name]
@@ -446,6 +463,7 @@ defmodule NouveauTest do
     assert ids == ["doc4"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "mango search by text", context do
     db_name = context[:db_name]
@@ -459,6 +477,7 @@ defmodule NouveauTest do
     assert ids == ["doc4", "doc3"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "mango sort by number", context do
     db_name = context[:db_name]
@@ -472,6 +491,7 @@ defmodule NouveauTest do
     assert ids == ["doc3", "doc4", "doc2"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "mango sort by string", context do
     db_name = context[:db_name]
@@ -485,6 +505,7 @@ defmodule NouveauTest do
     assert ids == ["doc3", "doc1", "doc4", "doc2"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "search GET (partitioned)", context do
     db_name = context[:db_name]
@@ -504,6 +525,7 @@ defmodule NouveauTest do
     assert ids == ["bar:doc2", "bar:doc3"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "search POST (partitioned)", context do
     db_name = context[:db_name]
@@ -523,6 +545,7 @@ defmodule NouveauTest do
     assert ids == ["bar:doc2", "bar:doc3"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_partitioned_db
   test "mango (partitioned)", context do
     db_name = context[:db_name]
@@ -542,6 +565,7 @@ defmodule NouveauTest do
     assert ids == ["bar:doc3"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "delete", context do
     db_name = context[:db_name]
@@ -571,6 +595,7 @@ defmodule NouveauTest do
     assert resp.body["search_index"]["purge_seq"] == 0
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "purge", context do
     db_name = context[:db_name]
@@ -604,6 +629,7 @@ defmodule NouveauTest do
     assert seq(db_info["purge_seq"]) == resp.body["search_index"]["purge_seq"]
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "purge with conflicts", context do
     db_name = context[:db_name]
@@ -694,6 +720,7 @@ defmodule NouveauTest do
     assert_status_code(resp, 400)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "index not found", context do
     db_name = context[:db_name]
@@ -704,6 +731,7 @@ defmodule NouveauTest do
     assert_status_code(resp, 404)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "meta", context do
     db_name = context[:db_name]

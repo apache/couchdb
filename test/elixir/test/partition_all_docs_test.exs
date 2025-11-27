@@ -16,6 +16,7 @@ defmodule PartitionAllDocsTest do
     {:ok, [db_name: db_name]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "all_docs with partitioned:true returns partitioned fields", context do
     db_name = context[:db_name]
 
@@ -32,6 +33,7 @@ defmodule PartitionAllDocsTest do
     assert Enum.dedup(partitions) == ["bar"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition all_docs errors with incorrect partition supplied", context do
     db_name = context[:db_name]
 
@@ -44,6 +46,7 @@ defmodule PartitionAllDocsTest do
     assert resp.status_code == 400
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partitioned _all_docs works with startkey, endkey range", context do
     db_name = context[:db_name]
 
@@ -55,6 +58,7 @@ defmodule PartitionAllDocsTest do
     assert Enum.dedup(partitions) == ["foo"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partitioned _all_docs works with keys", context do
     db_name = context[:db_name]
 
@@ -66,6 +70,7 @@ defmodule PartitionAllDocsTest do
     assert ids == ["foo:2", "foo:4", "foo:6"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition _all_docs works with limit", context do
     db_name = context[:db_name]
 
@@ -77,6 +82,7 @@ defmodule PartitionAllDocsTest do
     assert Enum.dedup(partitions) == ["foo"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition _all_docs with descending", context do
     db_name = context[:db_name]
 
@@ -94,6 +100,7 @@ defmodule PartitionAllDocsTest do
     assert ids == ["foo:10", "foo:100", "foo:12", "foo:14", "foo:16"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition _all_docs with skip", context do
     db_name = context[:db_name]
 
@@ -105,6 +112,7 @@ defmodule PartitionAllDocsTest do
     assert ids == ["foo:18", "foo:2", "foo:20", "foo:22", "foo:24"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition _all_docs with key", context do
     db_name = context[:db_name]
 
@@ -116,6 +124,7 @@ defmodule PartitionAllDocsTest do
     assert ids == ["foo:22"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "partition all docs can set query limits", context do
     set_config({"query_server_config", "partition_query_limit", "2000"})
 

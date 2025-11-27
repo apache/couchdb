@@ -18,6 +18,7 @@ defmodule ReshardAllDocsTest do
     {:ok, [db: db]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "all_docs after splitting all shards on node1", context do
     db = context[:db]
     node1 = get_first_node()
@@ -36,6 +37,7 @@ defmodule ReshardAllDocsTest do
     assert remove_job(jobid).status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   test "all_docs after splitting the same range on all nodes", context do
     db = context[:db]
     docs = add_docs(1..100, db)

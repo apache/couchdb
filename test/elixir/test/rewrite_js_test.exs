@@ -212,6 +212,7 @@ defmodule RewriteJSTest do
   Enum.each(
     ["test_rewrite_suite_db", "test_rewrite_suite_db%2Fwith_slashes"],
     fn db_name ->
+      @tag skip_for_pouchdb_server: true
       @tag with_random_db: db_name
       test "Test basic js rewrites on #{db_name}", context do
         db_name = context[:db_name]
@@ -315,6 +316,7 @@ defmodule RewriteJSTest do
       end
 
       @tag with_random_db: db_name
+      @tag skip_for_pouchdb_server: true
       test "early response on #{db_name}", context do
         db_name = context[:db_name]
 
@@ -346,6 +348,7 @@ defmodule RewriteJSTest do
       end
 
       @tag with_random_db: db_name
+      @tag skip_for_pouchdb_server: true
       test "path relative to server on #{db_name}", context do
         db_name = context[:db_name]
 
@@ -364,6 +367,7 @@ defmodule RewriteJSTest do
         assert length(resp.body["uuids"]) == 1
       end
 
+      @tag skip_for_pouchdb_server: true
       @tag with_random_db: db_name
       test "loop on #{db_name}", context do
         db_name = context[:db_name]
@@ -383,6 +387,7 @@ defmodule RewriteJSTest do
       end
 
       @tag with_random_db: db_name
+      @tag skip_for_pouchdb_server: true
       test "requests with body preserve the query string rewrite on #{db_name}",
            context do
         db_name = context[:db_name]

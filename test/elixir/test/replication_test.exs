@@ -15,6 +15,7 @@ defmodule ReplicationTest do
   # happens for JavaScript tests.
   @moduletag config: [{"replicator", "startup_jitter", "0"}]
 
+  @tag skip_for_pouchdb_server: true
   test "source database not found with host" do
     name = random_db_name()
     src_url = "http://127.0.0.1:15984/" <> name <> "_src"
@@ -28,6 +29,7 @@ defmodule ReplicationTest do
     assert resp.body["error"] == "db_not_found"
   end
 
+  @tag skip_for_pouchdb_server: true
   test "replicating attachment without conflict - COUCHDB-885" do
     name = random_db_name()
     src_db_name = name <> "_src"
@@ -103,6 +105,7 @@ defmodule ReplicationTest do
     refute Map.has_key?(atts["foo.dat"], "encoding")
   end
 
+  @tag skip_for_pouchdb_server: true
   test "replication cancellation" do
     name = random_db_name()
     src_db_name = name <> "_src"
@@ -145,6 +148,7 @@ defmodule ReplicationTest do
   end
 
   @tag user: [name: "joe", password: "erly", roles: ["erlanger"]]
+  @tag skip_for_pouchdb_server: true
   test "unauthorized replication cancellation", ctx do
     name = random_db_name()
     src_db_name = name <> "_src"
@@ -188,6 +192,7 @@ defmodule ReplicationTest do
     assert resp.status_code == 200
   end
 
+  @tag skip_for_pouchdb_server: true
   test "default headers returned for _scheduler/jobs" do
     resp = Couch.get("/_scheduler/jobs")
     assert resp.headers["Content-Type"] == "application/json"
@@ -195,6 +200,7 @@ defmodule ReplicationTest do
     assert resp.headers["X-CouchDB-Body-Time"]
   end
 
+  @tag skip_for_pouchdb_server: true
   test "default headers returned for _scheduler/docs " do
     resp = Couch.get("/_scheduler/docs")
     assert resp.headers["Content-Type"] == "application/json"
@@ -206,34 +212,42 @@ defmodule ReplicationTest do
     @src_prefix src_prefix
     @tgt_prefix tgt_prefix
 
+    @tag skip_for_pouchdb_server: true
     test "simple #{name} replication - #{name}" do
       run_simple_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "replicate with since_seq - #{name}" do
       run_since_seq_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "validate_doc_update failure replications - #{name}" do
       run_vdu_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "create_target filter option - #{name}" do
       run_create_target_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "filtered replications - #{name}" do
       run_filtered_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "replication restarts after filter change - COUCHDB-892 - #{name}" do
       run_filter_changed_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "replication by doc ids - #{name}" do
       run_by_id_repl(@src_prefix, @tgt_prefix)
     end
 
+    @tag skip_for_pouchdb_server: true
     test "continuous replication - #{name}" do
       run_continuous_repl(@src_prefix, @tgt_prefix)
     end
@@ -242,16 +256,19 @@ defmodule ReplicationTest do
            {"attachments", "compression_level", "8"},
            {"attachments", "compressible_types", "text/*"}
          ]
+    @tag skip_for_pouchdb_server: true
     test "compressed attachment replication - #{name}" do
       run_compressed_att_repl(@src_prefix, @tgt_prefix)
     end
 
     @tag user: [name: "joe", password: "erly", roles: ["erlanger"]]
+    @tag skip_for_pouchdb_server: true
     test "non-admin user on target - #{name}", ctx do
       run_non_admin_target_user_repl(@src_prefix, @tgt_prefix, ctx)
     end
 
     @tag user: [name: "joe", password: "erly", roles: ["erlanger"]]
+    @tag skip_for_pouchdb_server: true
     test "non-admin or reader user on source - #{name}", ctx do
       run_non_admin_or_reader_source_user_repl(@src_prefix, @tgt_prefix, ctx)
     end

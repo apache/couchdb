@@ -14,6 +14,7 @@ defmodule JsonpTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "jsonp unchunked callbacks", context do
     db_name = context[:db_name]
 
@@ -44,6 +45,7 @@ defmodule JsonpTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "jsonp chunked callbacks", context do
     db_name = context[:db_name]

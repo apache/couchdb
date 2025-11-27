@@ -21,6 +21,7 @@ defmodule ReshardBasicTest do
     {:ok, [db1: db1, db2: db2]}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "basic api querying, no jobs present" do
     summary = get_summary()
     assert summary["state"] == "running"
@@ -33,6 +34,7 @@ defmodule ReshardBasicTest do
     assert get_jobs() == []
   end
 
+  @tag skip_for_pouchdb_server: true
   test "check validation of invalid parameters", context do
     db1 = context[:db1]
     node1 = get_first_node()
@@ -56,6 +58,7 @@ defmodule ReshardBasicTest do
     assert resp.status_code == 404
   end
 
+  @tag skip_for_pouchdb_server: true
   test "toggle global state" do
     assert get_state() == %{"state" => "running", "reason" => :null}
     put_state_stopped("xyz")
@@ -64,6 +67,7 @@ defmodule ReshardBasicTest do
     assert get_state() == %{"state" => "running", "reason" => :null}
   end
 
+  @tag skip_for_pouchdb_server: true
   test "split q=1 db shards on node1 (1 job)", context do
     db = context[:db1]
     node1 = get_first_node()
@@ -127,6 +131,7 @@ defmodule ReshardBasicTest do
     assert summary["completed"] == 0
   end
 
+  @tag skip_for_pouchdb_server: true
   test "split q=2 shards on node1 (2 jobs)", context do
     db = context[:db2]
     node1 = get_first_node()

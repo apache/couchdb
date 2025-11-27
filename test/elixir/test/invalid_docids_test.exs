@@ -8,6 +8,7 @@ defmodule InvalidDocIDsTest do
   This is a port of the invalid_docids.js suite
   """
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "_local-prefixed ids are illegal", context do
     db_name = context[:db_name]
@@ -25,6 +26,7 @@ defmodule InvalidDocIDsTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "using a non-string id is forbidden", context do
     db_name = context[:db_name]
@@ -34,6 +36,7 @@ defmodule InvalidDocIDsTest do
     assert body["reason"] === "Document id must be a string"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "a PUT request with absent _id is forbidden", context do
     db_name = context[:db_name]
@@ -42,6 +45,7 @@ defmodule InvalidDocIDsTest do
     assert body["error"] === "illegal_docid"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "accidental POST to form handling code", context do
     db_name = context[:db_name]
@@ -50,6 +54,7 @@ defmodule InvalidDocIDsTest do
     assert body["error"] === "illegal_docid"
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "invalid _prefix", context do
     db_name = context[:db_name]
@@ -62,6 +67,7 @@ defmodule InvalidDocIDsTest do
     assert body["reason"] === "Only reserved document ids may start with underscore."
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "explicit _bulk_docks policy", context do
     db_name = context[:db_name]

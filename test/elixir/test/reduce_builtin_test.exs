@@ -36,6 +36,7 @@ defmodule ReduceBuiltinTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Builtin reduce functions", context do
     db_name = context[:db_name]
     num_docs = 500
@@ -187,6 +188,7 @@ defmodule ReduceBuiltinTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Builtin reduce functions with trailings", context do
     db_name = context[:db_name]
     num_docs = 500
@@ -239,6 +241,7 @@ defmodule ReduceBuiltinTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Builtin count and sum reduce for key as array", context do
     db_name = context[:db_name]
 
@@ -345,6 +348,7 @@ defmodule ReduceBuiltinTest do
   end
 
   @tag :with_db
+  @tag skip_for_pouchdb_server: true
   test "Invalid built-in reduce functions", context do
     db_name = context[:db_name]
     ddoc_url = random_ddoc(db_name)

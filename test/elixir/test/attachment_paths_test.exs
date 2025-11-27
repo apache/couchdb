@@ -41,6 +41,7 @@ defmodule AttachmentPathsTest do
   """
 
   @tag :with_db_name
+  @tag skip_for_pouchdb_server: true
   test "manages attachment paths successfully", context do
     db_name =
       URI.encode(

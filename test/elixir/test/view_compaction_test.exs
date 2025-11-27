@@ -35,6 +35,7 @@ defmodule ViewCompactionTest do
     end)
   end
 
+  @tag skip_for_pouchdb_server: true
   @tag :with_db
   test "view compaction", context do
     db_name = context[:db_name]

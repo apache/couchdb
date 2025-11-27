@@ -39,6 +39,7 @@ defmodule UUIDsTest do
     assert resp.status_code == 405
   end
 
+  @tag skip_for_pouchdb_server: true
   test "Bad Request error when exceeding max UUID count" do
     resp = Couch.get("/_uuids", query: %{:count => 1001})
     assert resp.status_code == 400
@@ -47,6 +48,7 @@ defmodule UUIDsTest do
   @tag config: [
          {"uuids", "algorithm", "sequential"}
        ]
+  @tag skip_for_pouchdb_server: true
   test "sequential uuids are sequential" do
     resp = Couch.get("/_uuids", query: %{:count => 1000})
     assert resp.status_code == 200
@@ -60,7 +62,8 @@ defmodule UUIDsTest do
 
   @tag config: [
          {"uuids", "algorithm", "utc_random"}
-       ]
+        ]
+  @tag skip_for_pouchdb_server: true
   test "utc_random uuids are roughly random" do
     resp = Couch.get("/_uuids", query: %{:count => 1000})
     assert resp.status_code == 200
@@ -81,7 +84,8 @@ defmodule UUIDsTest do
   @tag config: [
          {"uuids", "algorithm", "utc_id"},
          {"uuids", "utc_id_suffix", @utc_id_suffix}
-       ]
+        ]
+  @tag skip_for_pouchdb_server: true
   test "utc_id uuids are correct" do
     resp = Couch.get("/_uuids", query: %{:count => 10})
     assert resp.status_code == 200
