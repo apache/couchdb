@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.util.Collection;
 import java.util.Objects;
 import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
@@ -27,6 +28,9 @@ public class SearchHit {
     @NotEmpty
     private String id;
 
+    @Positive
+    private long seq;
+
     @NotNull
     private PrimitiveWrapper<?>[] order;
 
@@ -35,14 +39,20 @@ public class SearchHit {
 
     public SearchHit() {}
 
-    public SearchHit(final String id, final PrimitiveWrapper<?>[] order, final Collection<StoredField> fields) {
+    public SearchHit(
+            final String id, final long seq, final PrimitiveWrapper<?>[] order, final Collection<StoredField> fields) {
         this.id = id;
+        this.seq = seq;
         this.order = Objects.requireNonNull(order);
         this.fields = Objects.requireNonNull(fields);
     }
 
     public String getId() {
         return id;
+    }
+
+    public long getSeq() {
+        return seq;
     }
 
     public PrimitiveWrapper<?>[] getOrder() {
@@ -55,6 +65,6 @@ public class SearchHit {
 
     @Override
     public String toString() {
-        return "SearchHit [id=" + id + ", order=" + order + ", fields=" + fields + "]";
+        return "SearchHit [id=" + id + ", seq=" + seq + ", order=" + order + ", fields=" + fields + "]";
     }
 }
