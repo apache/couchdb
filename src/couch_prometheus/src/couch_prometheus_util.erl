@@ -116,7 +116,7 @@ couch_to_prom(Path, Info, _All) ->
 type_def(Metric, Type, Desc) ->
     Name = to_prom_name(Metric),
     [
-        to_bin(io_lib:format("\n# HELP ~s ~s\r", [Name, Desc])),
+        to_bin(io_lib:format("\n# HELP ~s ~s", [Name, Desc])),
         to_bin(io_lib:format("# TYPE ~s ~s", [Name, Type]))
     ].
 
@@ -126,7 +126,7 @@ to_prom(_Metric, _Type, _Desc, []) ->
     [];
 to_prom(Metric, Type, Desc, Instances) when is_list(Instances) ->
     TypeStr = type_def(Metric, Type, Desc),
-    [TypeStr] ++ lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);
+    TypeStr ++ lists:flatmap(fun(Inst) -> to_prom(Metric, Inst) end, Instances);
 to_prom(Metric, Type, Desc, Data) ->
     to_prom(Metric, Type, Desc, [Data]).
 
@@ -221,6 +221,23 @@ desc(Info) ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
+to_prom_annotations_test() ->
+    Out = to_prom(couchdb_bt_engine_cache_size, gauge, "number of entries in the btree cache", 9),
+    [
+        ?assertEqual(
+            <<"\n# HELP couchdb_couchdb_bt_engine_cache_size number of entries in the btree cache">>,
+            lists:nth(1, Out)
+        ),
+        ?assertEqual(
+            <<"# TYPE couchdb_couchdb_bt_engine_cache_size gauge">>,
+            lists:nth(2, Out)
+        ),
+        ?assertEqual(
+            <<"couchdb_couchdb_bt_engine_cache_size 9">>,
+            lists:nth(3, Out)
+        )
+    ].
+
 to_prom_counter_test() ->
     [
         ?assertEqual(
@@ -288,10 +305,10 @@ counter_metric_test_() ->
 
 test_to_prom_output(Metric, Type, Desc, Val) ->
     Out = to_prom(Metric, Type, Desc, Val),
-    lists:nth(2, Out).
+    lists:nth(3, Out).
 
 test_to_prom_summary_output(Metric, Info) ->
     Out = to_prom_summary(Metric, Info),
-    lists:nth(3, Out).
+    lists:nth(4, Out).
 
 -endif.
