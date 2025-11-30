@@ -1,5 +1,5 @@
---- quickjs-master/quickjs.c	2025-11-22 06:10:55.000000000 -0500
-+++ quickjs/quickjs.c	2025-11-22 12:45:37.890107480 -0500
+--- quickjs-master/quickjs.c	2025-11-29 09:14:41.000000000 -0500
++++ quickjs/quickjs.c	2025-11-29 20:38:38.829402534 -0500
 @@ -31420,10 +31420,24 @@
      if (s->token.val == TOK_FUNCTION ||
          (token_is_pseudo_keyword(s, JS_ATOM_async) &&

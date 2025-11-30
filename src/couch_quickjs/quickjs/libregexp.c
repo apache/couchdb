@@ -55,7 +55,7 @@ typedef enum {
 } REOPCodeEnum;
 
 #define CAPTURE_COUNT_MAX 255
-#define STACK_SIZE_MAX 255
+#define REGISTER_COUNT_MAX 255
 /* must be large enough to have a negligible runtime cost and small
    enough to call the interrupt callback often. */
 #define INTERRUPT_COUNTER_INIT 10000
@@ -105,10 +105,10 @@ static const REOpCode reopcode_info[REOP_COUNT] = {
 #undef DEF
 };
 
-#define RE_HEADER_FLAGS         0
-#define RE_HEADER_CAPTURE_COUNT 2
-#define RE_HEADER_STACK_SIZE    3
-#define RE_HEADER_BYTECODE_LEN  4
+#define RE_HEADER_FLAGS          0
+#define RE_HEADER_CAPTURE_COUNT  2
+#define RE_HEADER_REGISTER_COUNT 3
+#define RE_HEADER_BYTECODE_LEN   4
 
 #define RE_HEADER_LEN 8
 
@@ -468,8 +468,8 @@ static __maybe_unused void lre_dump_bytecode(const uint8_t *buf,
     re_flags = lre_get_flags(buf);
     bc_len = get_u32(buf + RE_HEADER_BYTECODE_LEN);
     assert(bc_len + RE_HEADER_LEN <= buf_len);
-    printf("flags: 0x%x capture_count=%d aux_stack_size=%d\n",
-           re_flags, buf[RE_HEADER_CAPTURE_COUNT], buf[RE_HEADER_STACK_SIZE]);
+    printf("flags: 0x%x capture_count=%d reg_count=%d\n",
+           re_flags, buf[RE_HEADER_CAPTURE_COUNT], buf[RE_HEADER_REGISTER_COUNT]);
     if (re_flags & LRE_FLAG_NAMED_GROUPS) {
         const char *p;
         p = (char *)buf + RE_HEADER_LEN + bc_len;
@@ -530,7 +530,20 @@ static __maybe_unused void lre_dump_bytecode(const uint8_t *buf,
             val2 = buf[pos + 1];
             val = get_u32(buf + pos + 2);
             val += (pos + 6);
-            printf(" %u, %u", val2, val);
+            printf(" r%u, %u", val2, val);
+            break;
+        case REOP_loop_split_goto_first:
+        case REOP_loop_split_next_first:
+        case REOP_loop_check_adv_split_goto_first:
+        case REOP_loop_check_adv_split_next_first:
+            {
+                uint32_t limit;
+                val2 = buf[pos + 1];
+                limit = get_u32(buf + pos + 2);
+                val = get_u32(buf + pos + 6);
+                val += (pos + 10);
+                printf(" r%u, %u, %u", val2, limit, val);
+            }
             break;
         case REOP_save_start:
         case REOP_save_end:
@@ -543,15 +556,15 @@ static __maybe_unused void lre_dump_bytecode(const uint8_t *buf,
         case REOP_save_reset:
             printf(" %u %u", buf[pos + 1], buf[pos + 2]);
             break;
-        case REOP_push_i32:
+        case REOP_set_i32:
             val = buf[pos + 1];
             val2 = get_u32(buf + pos + 2);
-            printf(" %u, %d", val, val2);
+            printf(" r%u, %d", val, val2);
             break;
-        case REOP_push_char_pos:
+        case REOP_set_char_pos:
         case REOP_check_advance:
             val = buf[pos + 1];
-            printf(" %u", val);
+            printf(" r%u", val);
             break;
         case REOP_range:
         case REOP_range_i:
@@ -615,6 +628,17 @@ static int re_emit_goto_u8(REParseState *s, int op, uint32_t arg, uint32_t val)
     int pos;
     dbuf_putc(&s->byte_code, op);
     dbuf_putc(&s->byte_code, arg);
+    pos = s->byte_code.size;
+    dbuf_put_u32(&s->byte_code, val - (pos + 4));
+    return pos;
+}
+
+static int re_emit_goto_u8_u32(REParseState *s, int op, uint32_t arg0, uint32_t arg1, uint32_t val)
+{
+    int pos;
+    dbuf_putc(&s->byte_code, op);
+    dbuf_putc(&s->byte_code, arg0);
+    dbuf_put_u32(&s->byte_code, arg1);
     pos = s->byte_code.size;
     dbuf_put_u32(&s->byte_code, val - (pos + 4));
     return pos;
@@ -1546,8 +1570,8 @@ static BOOL re_need_check_advance(const uint8_t *bc_buf, int bc_buf_len)
         case REOP_line_start_m:
         case REOP_line_end:
         case REOP_line_end_m:
-        case REOP_push_i32:
-        case REOP_push_char_pos:
+        case REOP_set_i32:
+        case REOP_set_char_pos:
         case REOP_word_boundary:
         case REOP_word_boundary_i:
         case REOP_not_word_boundary:
@@ -2173,7 +2197,7 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                         put_u32(s->byte_code.buf + last_atom_start + 1,
                                 len + 5 * has_goto + add_zero_advance_check * 2 * 2);
                         if (add_zero_advance_check) {
-                            s->byte_code.buf[last_atom_start + 1 + 4] = REOP_push_char_pos;
+                            s->byte_code.buf[last_atom_start + 1 + 4] = REOP_set_char_pos;
                             s->byte_code.buf[last_atom_start + 1 + 4 + 1] = 0;
                             re_emit_op_u8(s, REOP_check_advance, 0);
                         }
@@ -2183,62 +2207,46 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir)
                         if (dbuf_insert(&s->byte_code, last_atom_start, 11 + add_zero_advance_check * 2))
                             goto out_of_memory;
                         pos = last_atom_start;
-                        s->byte_code.buf[pos++] = REOP_push_i32;
+                        s->byte_code.buf[pos++] = REOP_split_goto_first + greedy;
+                        put_u32(s->byte_code.buf + pos, 6 + add_zero_advance_check * 2 + len + 10);
+                        pos += 4;
+
+                        s->byte_code.buf[pos++] = REOP_set_i32;
                         s->byte_code.buf[pos++] = 0;
                         put_u32(s->byte_code.buf + pos, quant_max);
                         pos += 4;
-
-                        s->byte_code.buf[pos++] = REOP_split_goto_first + greedy;
-                        put_u32(s->byte_code.buf + pos, len + 6 + add_zero_advance_check * 2 * 2);
-                        pos += 4;
+                        last_atom_start = pos;
                         if (add_zero_advance_check) {
-                            s->byte_code.buf[pos++] = REOP_push_char_pos;
+                            s->byte_code.buf[pos++] = REOP_set_char_pos;
                             s->byte_code.buf[pos++] = 0;
-                            re_emit_op_u8(s, REOP_check_advance, 0);
                         }
-                        re_emit_goto_u8(s, REOP_loop, 0, last_atom_start + 6);
+                        re_emit_goto_u8_u32(s, (add_zero_advance_check ? REOP_loop_check_adv_split_next_first : REOP_loop_split_next_first) - greedy, 0, quant_max, last_atom_start);
                     }
                 } else if (quant_min == 1 && quant_max == INT32_MAX &&
                            !add_zero_advance_check) {
                     re_emit_goto(s, REOP_split_next_first - greedy,
                                  last_atom_start);
                 } else {
-                    if (quant_min == 1) {
-                        /* nothing to add */
-                    } else {
-                        if (dbuf_insert(&s->byte_code, last_atom_start, 6))
-                            goto out_of_memory;
-                        s->byte_code.buf[last_atom_start++] = REOP_push_i32;
-                        s->byte_code.buf[last_atom_start++] = 0;
-                        put_u32(s->byte_code.buf + last_atom_start, quant_min);
-                        last_atom_start += 4;
-                        re_emit_goto_u8(s, REOP_loop, 0, last_atom_start);
+                    if (quant_min == quant_max)
+                        add_zero_advance_check = FALSE;
+                    if (dbuf_insert(&s->byte_code, last_atom_start, 6 + add_zero_advance_check * 2))
+                        goto out_of_memory;
+                    /* Note: we assume the string length is < INT32_MAX */
+                    pos = last_atom_start;
+                    s->byte_code.buf[pos++] = REOP_set_i32;
+                    s->byte_code.buf[pos++] = 0;
+                    put_u32(s->byte_code.buf + pos, quant_max);
+                    pos += 4;
+                    last_atom_start = pos;
+                    if (add_zero_advance_check) {
+                        s->byte_code.buf[pos++] = REOP_set_char_pos;
+                        s->byte_code.buf[pos++] = 0;
                     }
-                    if (quant_max == INT32_MAX) {
-                        pos = s->byte_code.size;
-                        re_emit_op_u32(s, REOP_split_goto_first + greedy,
-                                       len + 5 + add_zero_advance_check * 2 * 2);
-                        if (add_zero_advance_check)
-                            re_emit_op_u8(s, REOP_push_char_pos, 0);
-                        /* copy the atom */
-                        dbuf_put_self(&s->byte_code, last_atom_start, len);
-                        if (add_zero_advance_check)
-                            re_emit_op_u8(s, REOP_check_advance, 0);
-                        re_emit_goto(s, REOP_goto, pos);
-                    } else if (quant_max > quant_min) {
-                        re_emit_op_u8(s, REOP_push_i32, 0);
-                        dbuf_put_u32(&s->byte_code, quant_max - quant_min);
-                        
-                        pos = s->byte_code.size;
-                        re_emit_op_u32(s, REOP_split_goto_first + greedy,
-                                       len + 6 + add_zero_advance_check * 2 * 2);
-                        if (add_zero_advance_check)
-                            re_emit_op_u8(s, REOP_push_char_pos, 0);
-                        /* copy the atom */
-                        dbuf_put_self(&s->byte_code, last_atom_start, len);
-                        if (add_zero_advance_check)
-                            re_emit_op_u8(s, REOP_check_advance, 0);
-                        re_emit_goto_u8(s, REOP_loop, 0, pos);
+                    if (quant_min == quant_max) {
+                        /* a simple loop is enough */
+                        re_emit_goto_u8(s, REOP_loop, 0, last_atom_start);
+                    } else {
+                        re_emit_goto_u8_u32(s, (add_zero_advance_check ? REOP_loop_check_adv_split_next_first : REOP_loop_split_next_first) - greedy, 0, quant_max - quant_min, last_atom_start);
                     }
                 }
                 last_atom_start = -1;
@@ -2322,9 +2330,9 @@ static int re_parse_disjunction(REParseState *s, BOOL is_backward_dir)
     return 0;
 }
 
-/* the control flow is recursive so the analysis can be linear. As a
-   side effect, the auxiliary stack addresses are computed. */
-static int compute_stack_size(uint8_t *bc_buf, int bc_buf_len)
+/* Allocate the registers as a stack. The control flow is recursive so
+   the analysis can be linear. */
+static int compute_register_count(uint8_t *bc_buf, int bc_buf_len)
 {
     int stack_size, stack_size_max, pos, opcode, len;
     uint32_t val;
@@ -2340,20 +2348,28 @@ static int compute_stack_size(uint8_t *bc_buf, int bc_buf_len)
         assert(opcode < REOP_COUNT);
         assert((pos + len) <= bc_buf_len);
         switch(opcode) {
-        case REOP_push_i32:
-        case REOP_push_char_pos:
+        case REOP_set_i32:
+        case REOP_set_char_pos:
             bc_buf[pos + 1] = stack_size;
             stack_size++;
             if (stack_size > stack_size_max) {
-                if (stack_size > STACK_SIZE_MAX)
+                if (stack_size > REGISTER_COUNT_MAX)
                     return -1;
                 stack_size_max = stack_size;
             }
             break;
         case REOP_check_advance:
         case REOP_loop:
+        case REOP_loop_split_goto_first:
+        case REOP_loop_split_next_first:
             assert(stack_size > 0);
             stack_size--;
+            bc_buf[pos + 1] = stack_size;
+            break;
+        case REOP_loop_check_adv_split_goto_first:
+        case REOP_loop_check_adv_split_next_first:
+            assert(stack_size >= 2);
+            stack_size -= 2;
             bc_buf[pos + 1] = stack_size;
             break;
         case REOP_range:
@@ -2392,7 +2408,7 @@ uint8_t *lre_compile(int *plen, char *error_msg, int error_msg_size,
                      void *opaque)
 {
     REParseState s_s, *s = &s_s;
-    int stack_size;
+    int register_count;
     BOOL is_sticky;
 
     memset(s, 0, sizeof(*s));
@@ -2453,14 +2469,14 @@ uint8_t *lre_compile(int *plen, char *error_msg, int error_msg_size,
         goto error;
     }
 
-    stack_size = compute_stack_size(s->byte_code.buf, s->byte_code.size);
-    if (stack_size < 0) {
+    register_count = compute_register_count(s->byte_code.buf, s->byte_code.size);
+    if (register_count < 0) {
         re_parse_error(s, "too many imbricated quantifiers");
         goto error;
     }
 
     s->byte_code.buf[RE_HEADER_CAPTURE_COUNT] = s->capture_count;
-    s->byte_code.buf[RE_HEADER_STACK_SIZE] = stack_size;
+    s->byte_code.buf[RE_HEADER_REGISTER_COUNT] = register_count;
     put_u32(s->byte_code.buf + RE_HEADER_BYTECODE_LEN,
             s->byte_code.size - RE_HEADER_LEN);
 
@@ -2604,7 +2620,6 @@ typedef struct {
     /* 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16 */
     int cbuf_type;
     int capture_count;
-    int stack_size_max;
     BOOL is_unicode;
     int interrupt_counter;
     void *opaque; /* used for stack overflow check */
@@ -2649,7 +2664,7 @@ static no_inline int stack_realloc(REExecContext *s, size_t n)
 
 /* return 1 if match, 0 if not match or < 0 if error. */
 static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
-                                   uint8_t **aux_stack, const uint8_t *pc, const uint8_t *cptr)
+                                   uint8_t **regs, const uint8_t *pc, const uint8_t *cptr)
 {
     int opcode;
     int cbuf_type;
@@ -2689,7 +2704,7 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
     }
 
     /* avoid saving the previous value if already saved */
-#define SAVE_AUX_STACK(idx, value)              \
+#define SAVE_REG(idx, value)                    \
     {                                           \
         StackElem *sp1;                         \
         sp1 = sp;                               \
@@ -2701,12 +2716,12 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
             } else {                                    \
                 CHECK_STACK_SPACE(2);                   \
                 sp[0].val = -(int)(idx + 1);            \
-                sp[1].ptr = aux_stack[idx];             \
+                sp[1].ptr = regs[idx];                  \
                 sp += 2;                                \
                 break;                                  \
             }                                           \
         }                                               \
-        aux_stack[idx] = (value);                       \
+        regs[idx] = (value);                            \
     }
 
 
@@ -2731,13 +2746,13 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 REExecStateEnum type;
                 if (bp == s->stack_buf)
                     return 0;
-                /* undo the modifications to capture[] and aux_stack[] */
+                /* undo the modifications to capture[] and regs[] */
                 while (sp > bp) {
                     intptr_t idx2 = sp[-2].val;
                     if (idx2 >= 0)
                         capture[idx2] = sp[-1].ptr;
                     else
-                        aux_stack[-idx2 - 1] = sp[-1].ptr;
+                        regs[-idx2 - 1] = sp[-1].ptr;
                     sp -= 2;
                 }
                 
@@ -2749,6 +2764,8 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 if (type != RE_EXEC_STATE_LOOKAHEAD)
                     break;
             }
+            if (lre_poll_timeout(s))
+                return LRE_RET_TIMEOUT;
             break;
         case REOP_lookahead_match:
             /* pop all the saved states until reaching the start of
@@ -2788,13 +2805,13 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
             for(;;) {
                 REExecStateEnum type;
                 type = bp[-1].bp.type;
-                /* undo the modifications to capture[] and aux_stack[] */
+                /* undo the modifications to capture[] and regs[] */
                 while (sp > bp) {
                     intptr_t idx2 = sp[-2].val;
                     if (idx2 >= 0)
                         capture[idx2] = sp[-1].ptr;
                     else
-                        aux_stack[-idx2 - 1] = sp[-1].ptr;
+                        regs[-idx2 - 1] = sp[-1].ptr;
                     sp -= 2;
                 }
                 pc = sp[-3].ptr;
@@ -2851,19 +2868,6 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
         case REOP_negative_lookahead:
             val = get_u32(pc);
             pc += 4;
-            if (opcode == REOP_lookahead && bp != s->stack_buf && 0) {
-                int i;
-                /* save all the capture state so that they can be
-                   restored in case of failure after the lookahead
-                   matches */
-                idx = 4 * s->capture_count;
-                CHECK_STACK_SPACE(idx);
-                for(i = 0; i < 2 * s->capture_count; i++) {
-                    sp[0].val = i;
-                    sp[1].ptr = capture[i];
-                    sp += 2;
-                }
-            }
             CHECK_STACK_SPACE(3);
             sp[0].ptr = (uint8_t *)(pc + (int)val);
             sp[1].ptr = (uint8_t *)cptr;
@@ -2934,11 +2938,11 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 }
             }
             break;
-        case REOP_push_i32:
+        case REOP_set_i32:
             idx = pc[0];
             val = get_u32(pc + 1);
             pc += 5;
-            SAVE_AUX_STACK(idx, (void *)(uintptr_t)val);
+            SAVE_REG(idx, (void *)(uintptr_t)val);
             break;
         case REOP_loop:
             {
@@ -2947,8 +2951,8 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 val = get_u32(pc + 1);
                 pc += 5;
 
-                val2 = (uintptr_t)aux_stack[idx] - 1;
-                SAVE_AUX_STACK(idx, (void *)(uintptr_t)val2);
+                val2 = (uintptr_t)regs[idx] - 1;
+                SAVE_REG(idx, (void *)(uintptr_t)val2);
                 if (val2 != 0) {
                     pc += (int)val;
                     if (lre_poll_timeout(s))
@@ -2956,15 +2960,65 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                 }
             }
             break;
-        case REOP_push_char_pos:
+        case REOP_loop_split_goto_first:
+        case REOP_loop_split_next_first:
+        case REOP_loop_check_adv_split_goto_first:
+        case REOP_loop_check_adv_split_next_first:
+            {
+                const uint8_t *pc1;
+                uint32_t val2, limit;
+                idx = pc[0];
+                limit = get_u32(pc + 1);
+                val = get_u32(pc + 5);
+                pc += 9;
+
+                /* decrement the counter */
+                val2 = (uintptr_t)regs[idx] - 1;
+                SAVE_REG(idx, (void *)(uintptr_t)val2);
+
+                if (val2 > limit) {
+                    /* normal loop if counter > limit */
+                    pc += (int)val;
+                    if (lre_poll_timeout(s))
+                        return LRE_RET_TIMEOUT;
+                } else {
+                    /* check advance */
+                    if ((opcode == REOP_loop_check_adv_split_goto_first ||
+                         opcode == REOP_loop_check_adv_split_next_first) &&
+                        regs[idx + 1] == cptr &&
+                        val2 != limit) {
+                        goto no_match;
+                    }
+                    
+                    /* otherwise conditional split */
+                    if (val2 != 0) {
+                        if (opcode == REOP_loop_split_next_first ||
+                            opcode == REOP_loop_check_adv_split_next_first) {
+                            pc1 = pc + (int)val;
+                        } else {
+                            pc1 = pc;
+                            pc = pc + (int)val;
+                        }
+                        CHECK_STACK_SPACE(3);
+                        sp[0].ptr = (uint8_t *)pc1;
+                        sp[1].ptr = (uint8_t *)cptr;
+                        sp[2].bp.val = bp - s->stack_buf;
+                        sp[2].bp.type = RE_EXEC_STATE_SPLIT;
+                        sp += 3;
+                        bp = sp;
+                    }
+                }
+            }
+            break;
+        case REOP_set_char_pos:
             idx = pc[0];
             pc++;
-            SAVE_AUX_STACK(idx, (uint8_t *)cptr);
+            SAVE_REG(idx, (uint8_t *)cptr);
             break;
         case REOP_check_advance:
             idx = pc[0];
             pc++;
-            if (aux_stack[idx] == cptr)
+            if (regs[idx] == cptr)
                 goto no_match;
             break;
         case REOP_word_boundary:
@@ -3146,14 +3200,13 @@ int lre_exec(uint8_t **capture,
              int cbuf_type, void *opaque)
 {
     REExecContext s_s, *s = &s_s;
-    int re_flags, i, ret;
-    uint8_t **aux_stack;
+    int re_flags, i, ret, register_count;
+    uint8_t **regs;
     const uint8_t *cptr;
 
     re_flags = lre_get_flags(bc_buf);
     s->is_unicode = (re_flags & (LRE_FLAG_UNICODE | LRE_FLAG_UNICODE_SETS)) != 0;
     s->capture_count = bc_buf[RE_HEADER_CAPTURE_COUNT];
-    s->stack_size_max = bc_buf[RE_HEADER_STACK_SIZE];
     s->cbuf = cbuf;
     s->cbuf_end = cbuf + (clen << cbuf_type);
     s->cbuf_type = cbuf_type;
@@ -3167,7 +3220,10 @@ int lre_exec(uint8_t **capture,
 
     for(i = 0; i < s->capture_count * 2; i++)
         capture[i] = NULL;
-    aux_stack = alloca(s->stack_size_max * sizeof(aux_stack[0]));
+    /* XXX: modify the API so that the registers are allocated after
+       the captures to suppress some tests */
+    register_count = bc_buf[RE_HEADER_REGISTER_COUNT];
+    regs = alloca(register_count * sizeof(regs[0]));
 
     cptr = cbuf + (cindex << cbuf_type);
     if (0 < cindex && cindex < clen && s->cbuf_type == 2) {
@@ -3177,7 +3233,7 @@ int lre_exec(uint8_t **capture,
         }
     }
 
-    ret = lre_exec_backtrack(s, capture, aux_stack, bc_buf + RE_HEADER_LEN,
+    ret = lre_exec_backtrack(s, capture, regs, bc_buf + RE_HEADER_LEN,
                              cptr);
     if (s->stack_buf != s->static_stack_buf)
         lre_realloc(s->opaque, s->stack_buf, 0);
