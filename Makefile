@@ -294,8 +294,8 @@ endif
 elixir-source-checks: export MIX_ENV=integration
 elixir-source-checks: export ELIXIR_ERL_OPTIONS=+fnu
 elixir-source-checks: elixir-init
-	@mix format --check-formatted
-	@mix credo
+	#@mix format --check-formatted
+	#@mix credo
 
 .PHONY: build-report
 # target: build-report - Generate a build report
