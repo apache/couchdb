@@ -398,6 +398,7 @@ handle_auto_purge_req(#httpd{method = 'GET'} = Req, Db) ->
             chttpd:send_error(Req, Reason)
     end;
 handle_auto_purge_req(#httpd{method = 'PUT'} = Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
     {AutoPurgeProps} = chttpd:json_body_obj(Req),
     validate_auto_purge_props(AutoPurgeProps),
     case fabric:set_auto_purge_props(Db, AutoPurgeProps) of
