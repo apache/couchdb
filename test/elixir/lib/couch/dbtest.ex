@@ -196,7 +196,7 @@ defmodule Couch.DBTest do
           query: [feed: "longpoll", timeout: 5000, filter: "_design"]
         )
       results = resp.body["results"]
-      is_list(results) && length(results) > 0
+      is_list(results) && not Enum.empty?(results)
     end, 500, 60_000)
   end
 
