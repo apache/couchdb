@@ -12,7 +12,7 @@
 
 % Reads CouchDB's ini file and gets queried for configuration parameters.
 % This module is initialized with a list of ini files that it consecutively
-% reads Key/Value pairs from and saves them in an ets table. If more an one
+% reads Key/Value pairs from and saves them as persistent terms. If more an one
 % ini file is specified, the last one is used to write changes that are made
 % with store/2 back to that ini file.
 
@@ -26,7 +26,7 @@
 -export([set/3, set/4, set/5]).
 -export([delete/2, delete/3, delete/4]).
 
--export([get_integer/3, set_integer/3, set_integer/4]).
+-export([get_integer/3, set_integer/3, set_integer/4, get_integer_or_infinity/3]).
 -export([get_float/3, set_float/3, set_float/4]).
 -export([get_boolean/3, set_boolean/3, set_boolean/4]).
 
@@ -38,7 +38,7 @@
 -export([subscribe_for_changes/1]).
 
 -export([init/1]).
--export([handle_call/3, handle_cast/2]).
+-export([handle_call/3, handle_cast/2, handle_info/2]).
 -export([terminate/2]).
 
 -export([is_sensitive/2]).
@@ -64,7 +64,9 @@
     % Just *.ini files: original *.ini + expanded *.d dirs
     ini_files,
     % The file we write config values to
-    write_filename
+    write_filename,
+    % Reload timer ref
+    reload_tref
 }).
 
 start_link(IniFilesDirs) ->
@@ -80,6 +82,17 @@ all() ->
     lists:sort(lists:filtermap(fun settings_fmap_fun/1, persistent_term:get())).
 
 get_integer(Section, Key, Default) when is_integer(Default) ->
+    get_integer_int(Section, Key, Default).
+
+get_integer_or_infinity(Section, Key, Default) when is_integer(Default); Default == infinity ->
+    case get_value(Section, Key, Default) of
+        infinity ->
+            infinity;
+        _Value ->
+            get_integer_int(Section, Key, Default)
+    end.
+
+get_integer_int(Section, Key, Default) ->
     try
         to_integer(get_value(Section, Key, Default))
     catch
@@ -294,7 +307,7 @@ init(IniFilesDirs) ->
     % correct node name and distribution mode.
     case check_distribution_mode() of
         ok ->
-            {ok, Config};
+            {ok, schedule_reload(Config)};
         {error, Msg} ->
             erlang:display(Msg),
             timer:sleep(500),
@@ -331,9 +344,9 @@ handle_call({set, Sec, Key, Val, Opts}, _From, Config) ->
                 ok ->
                     Event = {config_change, Sec, Key, Val, Persist},
                     gen_event:sync_notify(config_event, Event),
-                    {reply, ok, Config};
+                    {reply, ok, schedule_reload(Config)};
                 {error, Else} ->
-                    {reply, {error, Else}, Config}
+                    {reply, {error, Else}, schedule_reload(Config)}
             end
     end;
 handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
@@ -357,53 +370,19 @@ handle_call({delete, Sec, Key, Persist, Reason}, _From, Config) ->
         ok ->
             Event = {config_change, Sec, Key, deleted, Persist},
             gen_event:sync_notify(config_event, Event),
-            {reply, ok, Config};
+            {reply, ok, schedule_reload(Config)};
         Else ->
-            {reply, Else, Config}
+            {reply, Else, schedule_reload(Config)}
     end;
 handle_call(reload, _From, #config{} = Config) ->
-    #config{ini_files_dirs = IniFilesDirs} = Config,
-    IniFiles = expand_dirs(IniFilesDirs),
-    % Update ets with ini values.
-    IniMap = ini_map(IniFiles),
-    maps:foreach(
-        fun({Sec, Key}, V) ->
-            VExisting = get_value(Sec, Key, undefined),
-            put_value(Sec, Key, V),
-            case V =:= VExisting of
-                true ->
-                    ok;
-                false ->
-                    Msg = "Reload detected config change ~s.~s = ~p",
-                    Args = [Sec, Key, maybe_conceal(V, is_sensitive(Sec, Key))],
-                    couch_log:notice(Msg, Args),
-                    Event = {config_change, Sec, Key, V, true},
-                    gen_event:sync_notify(config_event, Event)
-            end
-        end,
-        IniMap
-    ),
-    % And remove anything in ets that wasn't on disk.
-    lists:foreach(
-        fun
-            ({{Sec, Key}, _}) when not is_map_key({Sec, Key}, IniMap) ->
-                NoticeMsg = "Reload deleting in-memory config ~s.~s",
-                couch_log:notice(NoticeMsg, [Sec, Key]),
-                erase_value(Sec, Key),
-                Event = {config_change, Sec, Key, deleted, true},
-                gen_event:sync_notify(config_event, Event);
-            (_) ->
-                ok
-        end,
-        all()
-    ),
-    Config1 = Config#config{
-        ini_files = IniFiles,
-        write_filename = get_write_file(IniFiles)
-    },
-    {reply, ok, Config1}.
+    {reply, ok, reload(Config)}.
 
 handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(reload, #config{} = Config) ->
+    {noreply, schedule_reload(reload(Config))};
+handle_info(_Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
@@ -614,6 +593,58 @@ settings_fmap_fun({{?MODULE, ?SETTINGS, Sec, Key}, Val}) ->
     {true, {{Sec, Key}, Val}};
 settings_fmap_fun(_) ->
     false.
+
+reload(Config) ->
+    #config{ini_files_dirs = IniFilesDirs} = Config,
+    IniFiles = expand_dirs(IniFilesDirs),
+    % Update ets with ini values.
+    IniMap = ini_map(IniFiles),
+    maps:foreach(
+        fun({Sec, Key}, V) ->
+            VExisting = get_value(Sec, Key, undefined),
+            case V =:= VExisting of
+                true ->
+                    ok;
+                false ->
+                    put_value(Sec, Key, V),
+                    Msg = "Reload detected config change ~s.~s = ~p",
+                    Args = [Sec, Key, maybe_conceal(V, is_sensitive(Sec, Key))],
+                    couch_log:notice(Msg, Args),
+                    Event = {config_change, Sec, Key, V, true},
+                    gen_event:sync_notify(config_event, Event)
+            end
+        end,
+        IniMap
+    ),
+    % And remove anything in ets that wasn't on disk.
+    lists:foreach(
+        fun
+            ({{Sec, Key}, _}) when not is_map_key({Sec, Key}, IniMap) ->
+                NoticeMsg = "Reload deleting in-memory config ~s.~s",
+                couch_log:notice(NoticeMsg, [Sec, Key]),
+                erase_value(Sec, Key),
+                Event = {config_change, Sec, Key, deleted, true},
+                gen_event:sync_notify(config_event, Event);
+            (_) ->
+                ok
+        end,
+        all()
+    ),
+    Config#config{
+        ini_files = IniFiles,
+        write_filename = get_write_file(IniFiles)
+    }.
+
+schedule_reload(#config{} = Config) ->
+    timer:cancel(Config#config.reload_tref),
+    case get_integer_or_infinity("config", "auto_reload_secs", infinity) of
+        infinity ->
+            Config;
+        AutoReloadSecs when AutoReloadSecs > 0 ->
+            AutoReloadMS = erlang:convert_time_unit(AutoReloadSecs, second, millisecond),
+            TRef = erlang:send_after(AutoReloadMS, ?MODULE, reload),
+            Config#config{reload_tref = TRef}
+    end.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

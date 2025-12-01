@@ -258,8 +258,7 @@ handle_call({add_job, Job}, _From, State) ->
     true = add_job_int(Job),
     ok = maybe_start_newly_added_job(Job, State),
     couch_stats:increment_counter([couch_replicator, jobs, adds]),
-    TotalJobs = ets:info(?MODULE, size),
-    couch_stats:update_gauge([couch_replicator, jobs, total], TotalJobs),
+    update_total_jobs_stats(),
     {reply, ok, State};
 handle_call({remove_job, Id}, _From, State) ->
     ok = maybe_remove_job_int(Id, State),
@@ -464,6 +463,7 @@ handle_crashed_job(Job, Reason, State) ->
             update_running_jobs_stats(State#state.stats_pid),
             ok;
         false ->
+            update_total_jobs_stats(),
             ok
     end.
 
@@ -480,6 +480,7 @@ maybe_start_newly_added_job(Job, State) ->
             update_running_jobs_stats(State#state.stats_pid),
             ok;
         false ->
+            update_total_jobs_stats(),
             ok
     end.
 
@@ -655,16 +656,13 @@ maybe_remove_job_int(JobId, State) ->
             ok = stop_job_int(Job, State),
             true = remove_job_int(Job),
             couch_stats:increment_counter([couch_replicator, jobs, removes]),
-            TotalJobs = ets:info(?MODULE, size),
-            couch_stats:update_gauge(
-                [couch_replicator, jobs, total],
-                TotalJobs
-            ),
             update_running_jobs_stats(State#state.stats_pid),
             ok;
         {error, not_found} ->
             ok
-    end.
+    end,
+    update_total_jobs_stats(),
+    ok.
 
 start_job_int(#job{pid = Pid}, _State) when Pid /= undefined ->
     ok;
@@ -964,6 +962,7 @@ stats_updater_refresh() ->
     couch_stats:update_gauge([couch_replicator, jobs, pending], PendingN),
     couch_stats:update_gauge([couch_replicator, jobs, running], RunningN),
     couch_stats:update_gauge([couch_replicator, jobs, crashed], CrashedN),
+    update_total_jobs_stats(),
     ok.
 
 -spec stats_fold(#job{}, #stats_acc{}) -> #stats_acc{}.
@@ -975,6 +974,10 @@ stats_fold(#job{pid = undefined, history = [{{crashed, _}, _} | _]}, Acc) ->
     Acc#stats_acc{crashed_n = Acc#stats_acc.crashed_n + 1};
 stats_fold(#job{pid = P, history = [{started, _} | _]}, Acc) when is_pid(P) ->
     Acc#stats_acc{running_n = Acc#stats_acc.running_n + 1}.
+
+update_total_jobs_stats() ->
+    TotalJobs = ets:info(?MODULE, size),
+    couch_stats:update_gauge([couch_replicator, jobs, total], TotalJobs).
 
 -spec existing_replication(#rep{}) -> boolean().
 existing_replication(#rep{} = NewRep) ->

@@ -278,31 +278,32 @@ suites, and let Clouseau automatically manage them.
 Although the ``./configure`` and the ``./dev/run`` scripts try to take
 care of the details of the Clouseau deployment, it is still the
 responsibility of the user to provide a suitable Java environment for
-running.  Clouseau can run with JRE 1.7 and 1.8 only.  Also, when
-Nouveau is in use, which uses a more recent Java environment, the old
-JDK has to be installed separately and the ``CLOUSEAU_JAVA_HOME``
-environment variable has to be set to point its location.
+running.  Depending on the version, Clouseau can run with either JRE
+1.7 and 1.8 only, when 2.x is selected, or JRE 21 for 3.x.  Also, when
+Nouveau is installed, which might require a different Java
+environment, the one specific for Clouseau has to be installed
+separately and the ``CLOUSEAU_JAVA_HOME`` environment variable has to
+be set to point its location.
 
 Fortunately, the ```asdf`` tool <https://asdf-vm.com/>` provides a
-convenient way to install old versions of JDK through its ```java``
-plugin <https://github.com/halcyon/asdf-java>`::
+convenient way to install different versions of JDK through its
+```java`` plugin <https://github.com/halcyon/asdf-java>`::
 
     asdf plugin add java
 
-Then use ``asdf`` to install it::
+Then use ``asdf`` to install it, for example::
 
-    asdf install java zulu-jre-8.74.0.17
+    asdf install java openjdk-21
 
 Finally, use ``asdf`` to set the ``CLOUSEAU_JAVA_HOME`` environment
 variable::
 
-    export CLOUSEAU_JAVA_HOME=$(asdf where java zulu-jre-8.74.0.17)
+    export CLOUSEAU_JAVA_HOME=$(asdf where java openjdk-21)
 
-If the use of ``asdf`` is not an option, `the Zulu site
-<https://cdn.azul.com/zulu/bin/>` could be used directly to get the
-distribution package for the appropriate JRE version.  But this is
-just one of the possibilities to access installers for old Java
-environments.
+If the use of ``asdf`` is not an option, any standard Java installer
+would do it, and the Zulu site <https://cdn.azul.com/zulu/bin/>` could
+be used directly to get the distribution package for the older JRE and
+JDK versions, for example.
 
 Once both Clouseau and the corresponding Java environment are set,
 they are not put in use automatically.  In order to do so, the
@@ -333,15 +334,16 @@ respective test targets, e.g. ``mango-test``::
 This can even be done if there was no local Clouseau deployment
 configured previously.  Mind that this will require building Clouseau
 from source, which causes the nodes start up somewhat slower.  It also
-requires JDK 1.7 and Apache Maven 3.8 to be present, that is why it is
-important the set the ``CLOUSEAU_JAVA_HOME`` and the
-``CLOUSEAU_M2_HOME`` environment variables accordingly, for instance::
+requires JDK 11 (or later) and SBT 1.10 (or later) to be present.
+That is why it is important the set the ``CLOUSEAU_JAVA_HOME`` and the
+``CLOUSEAU_SBT_HOME`` environment variables accordingly, for
+instance::
 
-    asdf install java zulu-7.56.0.11
-    asdf plugin add maven
-    asdf install maven 3.8.8
-    export CLOUSEAU_JAVA_HOME=$(asdf where java zulu-7.56.0.11)
-    export CLOUSEAU_M2_HOME=$(asdf where maven 3.8.8)
+    asdf install java openjdk-21
+    asdf plugin add sbt
+    asdf install sbt 1.11.7
+    export CLOUSEAU_JAVA_HOME=$(asdf where java openjdk-21)
+    export CLOUSEAU_SBT_HOME=$(asdf where sbt 1.11.7)
 
 Static Code Analysis
 ~~~~~~~~~~~~~~~~~~~~
