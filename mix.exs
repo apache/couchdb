@@ -85,7 +85,7 @@ defmodule CouchDBTest.Mixfile do
       {:httpotion, ">= 3.2.0", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.18.3", only: :test},
       {:ibrowse, path: path("ibrowse"), override: true},
-      {:credo, "~> 1.7.11", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "== 1.7.11", only: [:dev, :test, :integration], runtime: false}
     ]
 
     extra_deps = [:b64url, :jiffy, :jwtf, :meck, :mochiweb]
