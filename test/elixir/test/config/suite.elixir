@@ -735,5 +735,17 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
-  ]
+  ],
+  "ChooseCorrectIndexForDocs": [
+    "choose index with one field in index",
+    "choose index with two",
+    "choose index alphabetically",
+    "choose index most accurate",
+    "choose index most accurate in memory selector",
+    "warn on full db scan",
+    "chooses idxA",
+    "can query with range on secondary column",
+    "choose index with id",
+    "choose index with rev"
+  ],
 }
