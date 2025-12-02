@@ -735,5 +735,17 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "PaginateJsonDocs": [
+    "all docs paginate to end",
+    "return previous bookmark for empty",
+    "all docs with skip",
+    "all docs reverse",
+    "bad bookmark",
+    "throws error on text bookmark",
+    "index pagination",
+    "index pagination two keys",
+    "index pagination reverse",
+    "index pagination same emitted key"
   ]
 }
