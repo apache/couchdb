@@ -735,5 +735,8 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "SupportStableAndUpdate": [
+    "update updates view when specified"
   ]
 }
