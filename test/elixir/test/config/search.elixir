@@ -38,5 +38,17 @@
   ],
   "LimitTests": [
     "limit field"
-  ]
+  ],
+  "NoDefaultFieldTest": [
+    "basic",
+    "other fields exist",
+  ],
+  "NoDefaultFieldWithAnalyzer": [
+    "basic",
+    "other fields exist",
+  ],
+  "DefaultFieldWithCustomAnalyzer": [
+    "basic",
+    "not analyzed",
+  ],
 }
