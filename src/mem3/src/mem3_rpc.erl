@@ -189,7 +189,12 @@ load_purge_infos_rpc(DbName, SrcUUID, BatchSize) ->
     case get_or_create_db(DbName, [?ADMIN_CTX]) of
         {ok, Db} ->
             TgtUUID = couch_db:get_uuid(Db),
-            PurgeDocId = mem3_rep:make_purge_id(SrcUUID, TgtUUID),
+            % This is the remote checkpoint running on the target to pull
+            % purges to the source. The changes are flowing from the target to
+            % the source, that's why checkpoint is from tgt to src here. This
+            % is also the same checkpoint used when the target pushed changes
+            % to the source.
+            PurgeDocId = mem3_rep:make_purge_id(TgtUUID, SrcUUID),
             StartSeq =
                 case couch_db:open_doc(Db, PurgeDocId, []) of
                     {ok, #doc{body = {Props}}} ->
@@ -222,17 +227,34 @@ save_purge_checkpoint_rpc(DbName, PurgeDocId, Body) ->
     erlang:put(io_priority, {internal_repl, DbName}),
     case get_or_create_db(DbName, [?ADMIN_CTX]) of
         {ok, Db} ->
-            Doc = #doc{id = PurgeDocId, body = Body},
-            Resp =
-                try couch_db:update_doc(Db, Doc, []) of
-                    Resp0 -> Resp0
-                catch
-                    T:R ->
-                        {T, R}
-                end,
-            rexi:reply(Resp);
+            case purge_checkpoint_updated(Db, PurgeDocId, Body) of
+                true ->
+                    % Checkpoint on the target updated while source pulled the
+                    % changes. Do not update the doc then to avoid rewinding
+                    % back.
+                    rexi:reply({ok, stale});
+                false ->
+                    Doc = #doc{id = PurgeDocId, body = Body},
+                    rexi:reply(
+                        try
+                            couch_db:update_doc(Db, Doc, [])
+                        catch
+                            T:R -> {T, R}
+                        end
+                    )
+            end;
         Error ->
             rexi:reply(Error)
+    end.
+
+purge_checkpoint_updated(Db, DocId, {Props}) when is_binary(DocId), is_list(Props) ->
+    Seq = couch_util:get_value(<<"purge_seq">>, Props),
+    case couch_db:open_doc(Db, DocId, []) of
+        {ok, #doc{body = {DocProps}}} ->
+            DocSeq = couch_util:get_value(<<"purge_seq">>, DocProps),
+            is_integer(Seq) andalso is_integer(DocSeq) andalso DocSeq > Seq;
+        {not_found, _} ->
+            false
     end.
 
 replicate_rpc(DbName, Target) ->

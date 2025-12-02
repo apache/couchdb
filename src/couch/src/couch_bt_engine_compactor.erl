@@ -158,6 +158,10 @@ copy_purge_info(#comp_st{} = CompSt) ->
         retry = Retry
     } = CompSt,
     ?COMP_EVENT(purge_init),
+    % The minumum purge sequence calculation involves finding the lowest
+    % reported purge sequence across all checkpoints. Make sure to clean up any
+    % stale or deprecated internal replicator checkpoints beforehand.
+    ok = mem3_rep:cleanup_purge_checkpoints(DbName),
     MinPurgeSeq = couch_util:with_db(DbName, fun(Db) ->
         couch_db:get_minimum_purge_seq(Db)
     end),

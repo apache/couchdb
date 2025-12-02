@@ -1,9 +1,9 @@
---- quickjs-master/test262_errors.txt	2025-11-15 08:52:50
-+++ quickjs/test262_errors.txt	2025-11-17 17:35:22
-@@ -19,6 +19,8 @@
- test262/test/language/expressions/compound-assignment/S11.13.2_A6.10_T1.js:24: Test262Error: #1: innerX === 2. Actual: 5
- test262/test/language/expressions/compound-assignment/S11.13.2_A6.11_T1.js:24: Test262Error: #1: innerX === 2. Actual: 5
- test262/test/language/identifier-resolution/assign-to-global-undefined.js:20: strict mode: expected error
+--- quickjs-master/test262_errors.txt	2025-11-29 09:14:41.000000000 -0500
++++ quickjs/test262_errors.txt	2025-11-29 20:38:38.835402578 -0500
+@@ -23,6 +23,8 @@
+ test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js:74: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js' is ambiguous
+ test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js:75: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js' is ambiguous
+ test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js:74: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js' is ambiguous
 +test262/test/language/statements/expression/S12.4_A1.js:15: unexpected error type: Test262: This statement should not be evaluated.
 +test262/test/language/statements/expression/S12.4_A1.js:15: strict mode: unexpected error type: Test262: This statement should not be evaluated.
  test262/test/staging/sm/Function/arguments-parameter-shadowing.js:14: Test262Error: Expected SameValue(«true», «false») to be true

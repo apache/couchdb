@@ -228,7 +228,7 @@ defmodule PartitionSizeLimitTest do
     assert resp.status_code in [200, 202]
     %{body: body} = resp
 
-    assert length(body["rows"]) > 0
+    assert not Enum.empty?(body["rows"])
   end
 
   test "purging docs allows writes", context do

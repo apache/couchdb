@@ -583,13 +583,42 @@ class StartupError(Exception):
         super().__init__(self.message)
 
 
-def generate_default_clouseau_ini(path):
-    print("(generate default clouseau.ini)")
-    with open(path, "w") as handle:
-        handle.write(
-            """[clouseau]
+DEFAULT_CLOUSEAU_INI = """[clouseau]
 """
-        )
+
+# Currently it does not support more than 3 concurrent nodes
+DEFAULT_CLOUSEAU_CONF = """logger: {
+  format: Raw
+  output: Stdout
+  level: debug
+}
+config: [
+  {
+    node: {
+      name: clouseau1
+      domain: 127.0.0.1
+    }
+  }
+  {
+    node: {
+      name: clouseau2
+      domain: 127.0.0.1
+    }
+  }
+  {
+    node: {
+      name: clouseau3
+      domain: 127.0.0.1
+    }
+  }
+]
+"""
+
+
+def generate_default_clouseau_config(path, config_file, body):
+    print(f"(generate default {config_file})")
+    with open(path, "w") as handle:
+        handle.write(body)
 
 
 def generate_default_logback_properties(path):
@@ -635,23 +664,41 @@ def boot_clouseau(ctx, idx):
         clouseau_java_home + "/bin/java" if clouseau_java_home else shutil.which("java")
     )
     java_version = get_java_version(java)
+    file_exists = lambda f: os.path.isfile(os.path.join(clouseau_dir, f))
 
-    pom_file = os.path.join(clouseau_dir, "pom.xml")
-    method = "src" if os.path.isfile(pom_file) else "dist"
+    if file_exists("build.sbt"):
+        is_ziose = True
+        method = "src"
+    elif file_exists("pom.xml"):
+        is_ziose = False
+        method = "src"
+    else:
+        is_ziose = file_exists(".ziose")
+        method = "dist"
 
     if not java_version:
         print(
             "Warning: Java version could not be determined, Clouseau may not be able to run"
         )
     else:
-        if method == "src" and (java_version < 1.7 or 1.7 < java_version):
-            raise StartupError(
-                "Java is not suitable to run Clouseau.  Please use JDK 1.7 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
-            )
-        elif java_version < 1.7 or 1.8 < java_version:
-            raise StartupError(
-                "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
-            )
+        if is_ziose:
+            if method == "src" and (java_version < 11):
+                raise StartupError(
+                    "Java is not suitable to build and run Clouseau.  Please use JDK 11 or higher and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
+            elif method == "dist" and (java_version < 21):
+                raise StartupError(
+                    "Java is not suitable to run Clouseau.  Please use JRE 21 or higher configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
+        else:
+            if method == "src" and (java_version < 1.7 or 1.7 < java_version):
+                raise StartupError(
+                    "Java is not suitable to run Clouseau.  Please use JDK 1.7 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
+            elif method == "dist" and (java_version < 1.7 or 1.8 < java_version):
+                raise StartupError(
+                    "Java is not suitable to run Clouseau.  Please use JRE 1.7 or 1.8 and configure its (root) path in `CLOUSEAU_JAVA_HOME`"
+                )
 
     logfname = os.path.join(log_dir(ctx), "clouseau{}.log".format(idx))
     log = open(logfname, "w")
@@ -666,30 +713,53 @@ def boot_clouseau(ctx, idx):
             env = os.environ.copy()
             if clouseau_java_home:
                 env["JAVA_HOME"] = clouseau_java_home
+                env["PATH"] = f"{clouseau_java_home}/bin:{env['PATH']}"
 
-            clouseau_mvn_home = os.environ.get("CLOUSEAU_M2_HOME") or os.environ.get(
-                "M2_HOME"
-            )
-            mvn = (
-                clouseau_mvn_home + "/bin/mvn"
-                if clouseau_mvn_home
-                else shutil.which("mvn")
-            )
-
-            if not mvn:
-                raise StartupError(
-                    "Maven could not be found.  Please install Maven 3.8 and configure its (root) path in `CLOUSEAU_M2_HOME`"
+            if is_ziose:
+                clouseau_sbt_home = os.environ.get(
+                    "CLOUSEAU_SBT_HOME"
+                ) or os.environ.get("SBT_HOME")
+                sbt = (
+                    clouseau_sbt_home + "/bin/sbt"
+                    if clouseau_sbt_home
+                    else shutil.which("sbt")
                 )
+
+                if not sbt:
+                    raise StartupError(
+                        "Scala Built Tool (SBT) could not be found.  Please install SBT 1.10 or later and configure its (root) path in `CLOUSEAU_SBT_HOME`"
+                    )
+
+                sbt_java_home = (
+                    ["-java-home", clouseau_java_home] if clouseau_java_home else []
+                )
+                cmd = [sbt] + sbt_java_home + ["assembly"]
+            else:
+                clouseau_mvn_home = os.environ.get(
+                    "CLOUSEAU_M2_HOME"
+                ) or os.environ.get("M2_HOME")
+                mvn = (
+                    clouseau_mvn_home + "/bin/mvn"
+                    if clouseau_mvn_home
+                    else shutil.which("mvn")
+                )
+
+                if not mvn:
+                    raise StartupError(
+                        "Maven could not be found.  Please install Maven 3.8 and configure its (root) path in `CLOUSEAU_M2_HOME`"
+                    )
+
+                cmd = [
+                    mvn,
+                    "-B",
+                    "compile",
+                    "dependency:build-classpath",
+                    "-Dmdep.outputFile={}".format(cp_file),
+                ]
 
             try:
                 sp.check_call(
-                    [
-                        mvn,
-                        "-B",
-                        "compile",
-                        "dependency:build-classpath",
-                        "-Dmdep.outputFile={}".format(cp_file),
-                    ],
+                    cmd,
                     cwd=clouseau_dir,
                     env=env,
                     stdin=sp.PIPE,
@@ -700,42 +770,70 @@ def boot_clouseau(ctx, idx):
                 log.write(str(exc))
                 raise StartupError("Could not build Clouseau from sources.")
 
-        with open(cp_file, "r") as handle:
-            classpath_deps = handle.read().rstrip()
+        if is_ziose:
+            clouseau_jars = glob.glob(
+                os.path.join(clouseau_dir, "clouseau", "target", "**", "*.jar"),
+                recursive=True,
+            )
 
-        targets = os.path.join(clouseau_dir, "target", "classes")
-        classpath = separator.join([classpath_deps, targets])
+            if not clouseau_jars:
+                raise StartupError("No JAR files could be built for Clouseau")
+
+            classpath = separator.join(clouseau_jars)
+        else:
+            with open(cp_file, "r") as handle:
+                classpath_deps = handle.read().rstrip()
+
+            targets = os.path.join(clouseau_dir, "target", "classes")
+            classpath = separator.join([classpath_deps, targets])
     else:
-        clouseau_jars = [
-            os.path.join(clouseau_dir, fname)
-            for fname in os.listdir(clouseau_dir)
-            if fname.endswith(".jar")
-        ]
+        clouseau_jars = glob.glob(os.path.join(clouseau_dir, "*.jar"))
 
         if not clouseau_jars:
             raise StartupError("Clouseau has no JAR files")
 
         classpath = separator.join(clouseau_jars)
 
-    clouseau_ini = os.path.join(clouseau_dir, "clouseau.ini")
-    if not os.path.exists(clouseau_ini):
-        generate_default_clouseau_ini(clouseau_ini)
+    if is_ziose:
+        name_property = "node"
+        cookie_property = "cookie"
+        clouseau_name_format = "clouseau{}"
+        gc_config = [
+            "-XX:+HeapDumpOnOutOfMemoryError",
+            "-XX:+UseG1GC",
+            "-XX:+ParallelRefProcEnabled",
+        ]
+        main_class = "com.cloudant.ziose.clouseau.Main"
+        config_file = "clouseau.conf"
+        config_body = DEFAULT_CLOUSEAU_CONF
+    else:
+        name_property = "clouseau.name"
+        cookie_property = "clouseau.cookie"
+        clouseau_name_format = "clouseau{}@127.0.0.1"
+        gc_config = ["-XX:+UseConcMarkSweepGC", "-XX:+CMSParallelRemarkEnabled"]
+        main_class = "com.cloudant.clouseau.Main"
+        config_file = "clouseau.ini"
+        config_body = DEFAULT_CLOUSEAU_INI
 
-    logback_properties = os.path.join(clouseau_dir, "logback.xml")
-    if not os.path.exists(logback_properties):
-        generate_default_logback_properties(logback_properties)
+    config_path = os.path.join(clouseau_dir, config_file)
+    if not os.path.exists(config_path):
+        generate_default_clouseau_config(config_path, config_file, config_body)
 
-    classpath = separator.join([classpath, clouseau_dir])  # for logback.xml
+    if not is_ziose:
+        logback_properties = os.path.join(clouseau_dir, "logback.xml")
+        if not os.path.exists(logback_properties):
+            generate_default_logback_properties(logback_properties)
 
-    clouseau_name = "clouseau{}@127.0.0.1".format(idx)
+        classpath = separator.join([classpath, clouseau_dir])  # for logback.xml
+
     clouseau_indexes_dir = os.path.join(ctx["devdir"], "clouseau{}".format(idx), "data")
 
     if ctx["erlang_cookie"]:
-        clouseau_cookie = ["-Dclouseau.cookie={}".format(ctx["erlang_cookie"])]
+        clouseau_cookie = ["-D{}={}".format(cookie_property, ctx["erlang_cookie"])]
     else:
         clouseau_cookie = []
 
-    # `HOME` must be set for Scalang to find the Erlang cookie
+    # `HOME` must be set for finding the Erlang cookie (when not specified)
     if not os.environ.get("HOME"):
         # This is usually `USERPROFILE` on Windows
         alternativeHome = os.environ.get("USERPROFILE")
@@ -750,18 +848,16 @@ def boot_clouseau(ctx, idx):
             "-Dsun.net.inetaddr.ttl=30",
             "-Dsun.net.inetaddr.negative.ttl=30",
             '-XX:OnOutOfMemoryError="kill -9 %p"',
-            "-XX:+UseConcMarkSweepGC",
-            "-XX:+CMSParallelRemarkEnabled",
+        ]
+        + gc_config
+        + [
             "-cp",
             classpath,
-            "-Dclouseau.name={}".format(clouseau_name),
+            "-D{}={}".format(name_property, clouseau_name_format.format(idx)),
             "-Dclouseau.dir={}".format(clouseau_indexes_dir),
         ]
         + clouseau_cookie
-        + [
-            "com.cloudant.clouseau.Main",
-            clouseau_ini,
-        ]
+        + [main_class, config_path]
     )
 
     try:

@@ -66,7 +66,7 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauVersion = "2.25.0", # select the version of Clouseau to use (default 2.25.0)
+    [string]$ClouseauVersion = "3.0.0", # select the version of Clouseau to use (default 3.0.0)
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.25.0/clouseau-2.25.0-dist.zip)
     [ValidateNotNullOrEmpty()]
@@ -150,6 +150,7 @@ $BuildDocs = (-not $DisableDocs).ToString().ToLower()
 $WithProper = (-not $DisableProper).ToString().ToLower()
 $ErlangMD5 = ($EnableErlangMD5).ToString().ToLower()
 $WithSpiderMonkey = (-not $DisableSpiderMonkey).ToString().ToLower()
+$WithZIOSE = [int]($ClouseauVersion.Split('.')[0]) -ge 3
 
 if ($JSEngine -eq "quickjs") {
     $WithSpiderMonkey = "false"
@@ -333,12 +334,15 @@ if ($WithClouseau)
 
 	New-Item -Path $ClouseauDir -ItemType Directory | Out-Null
 
-	$LogbackVersion = "1.2.13"
 	$ClouseauDistUrl = $ClouseauUri -f $ClouseauVersion
-	$LogbackCoreJar = "logback-core-$LogbackVersion.jar"
-	$LogbackCoreJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-core/$LogbackVersion/$LogbackCoreJar"
-	$LogbackClassicJar = "logback-classic-$LogbackVersion.jar"
-	$LogbackClassicJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-classic/$LogbackVersion/$LogbackClassicJar"
+
+	If (-not $WithZIOSE) {
+	    $LogbackVersion = "1.2.13"
+	    $LogbackCoreJar = "logback-core-$LogbackVersion.jar"
+	    $LogbackCoreJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-core/$LogbackVersion/$LogbackCoreJar"
+	    $LogbackClassicJar = "logback-classic-$LogbackVersion.jar"
+	    $LogbackClassicJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-classic/$LogbackVersion/$LogbackClassicJar"
+	}
 
 	Set-Variable ProgressPreference SilentlyContinue
 	Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
@@ -356,16 +360,22 @@ if ($WithClouseau)
 	Remove-Item "$ClouseauDir\clouseau-$ClouseauVersion"
 	Remove-Item clouseau.zip
 
-	Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackCoreJar" $LogbackCoreJarUrl
-	If ($LASTEXITCODE -ne 0) {
-	    Write-Output "ERROR: $LogbackCoreJarUrl could not be downloaded."
-	    exit 1
+	If (-not $WithZIOSE) {
+	    Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackCoreJar" $LogbackCoreJarUrl
+	    If ($LASTEXITCODE -ne 0) {
+		Write-Output "ERROR: $LogbackCoreJarUrl could not be downloaded."
+		exit 1
+	    }
+
+	    Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackClassicJar" $LogbackClassicJarUrl
+	    If ($LASTEXITCODE -ne 0) {
+		Write-Output "ERROR: $LogbackClassicJarUrl could not be downloaded."
+		exit 1
+	    }
 	}
 
-	Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackClassicJar" $LogbackClassicJarUrl
-	If ($LASTEXITCODE -ne 0) {
-	    Write-Output "ERROR: $LogbackClassicJarUrl could not be downloaded."
-	    exit 1
+	If ($WithZIOSE) {
+	    New-Item -ItemType File -Path "$ClouseauDir\.ziose"
 	}
     }
     elseif ($ClouseauMethod -eq "git") {
