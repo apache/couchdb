@@ -30,7 +30,8 @@
     update_doc/4,
     http_code_from_status/1,
     handle_partition_req/2,
-    handle_auto_purge_req/2
+    handle_auto_purge_req/2,
+    handle_db_config_req/2
 ]).
 
 -import(
@@ -425,6 +426,71 @@ validate_auto_purge_props([{_K, _V} | _Rest]) ->
     throw({bad_request, <<"invalid auto purge property">>});
 validate_auto_purge_props(_Else) ->
     throw({bad_request, <<"malformed auto purge body">>}).
+
+%% Database configuration API handlers
+handle_db_config_req(#httpd{method = 'GET', path_parts = [_, <<"_config">>]} = Req, Db) ->
+    % GET /{db}/_config - return all config sections
+    Config = get_all_db_config(Db),
+    send_json(Req, {Config});
+handle_db_config_req(
+    #httpd{method = 'GET', path_parts = [_, <<"_config">>, Section]} = Req,
+    Db
+) ->
+    % GET /{db}/_config/{section} - return all keys in section
+    case get_db_config_section(Db, Section) of
+        {ok, SectionConfig} ->
+            send_json(Req, {SectionConfig});
+        {error, unknown_section} ->
+            throw({not_found, <<"unknown config section">>})
+    end;
+handle_db_config_req(
+    #httpd{method = 'GET', path_parts = [_, <<"_config">>, Section, Key]} = Req,
+    Db
+) ->
+    % GET /{db}/_config/{section}/{key} - return specific value
+    case get_db_config_value(Db, Section, Key) of
+        {ok, Value} ->
+            send_json(Req, Value);
+        {error, unknown_section} ->
+            throw({not_found, <<"unknown config section">>});
+        {error, unknown_key} ->
+            throw({not_found, <<"unknown config key">>})
+    end;
+handle_db_config_req(
+    #httpd{method = 'PUT', path_parts = [_, <<"_config">>, Section, Key]} = Req,
+    Db
+) ->
+    % PUT /{db}/_config/{section}/{key} - update value
+    chttpd:validate_ctype(Req, "application/json"),
+    NewValue = chttpd:json_body(Req),
+    case set_db_config_value(Db, Section, Key, NewValue, Req#httpd.user_ctx) of
+        {ok, OldValue} ->
+            send_json(Req, OldValue);
+        {error, unknown_section} ->
+            throw({not_found, <<"unknown config section">>});
+        {error, unknown_key} ->
+            throw({not_found, <<"unknown config key">>});
+        {error, Reason} ->
+            throw(Reason)
+    end;
+handle_db_config_req(
+    #httpd{method = 'DELETE', path_parts = [_, <<"_config">>, Section, Key]} = Req,
+    Db
+) ->
+    % DELETE /{db}/_config/{section}/{key} - reset to default
+    case delete_db_config_value(Db, Section, Key, Req#httpd.user_ctx) of
+        {ok, OldValue} ->
+            send_json(Req, OldValue);
+        {error, unknown_section} ->
+            throw({not_found, <<"unknown config section">>});
+        {error, unknown_key} ->
+            throw({not_found, <<"unknown config key">>});
+        {error, Reason} ->
+            throw(Reason)
+    end;
+handle_db_config_req(#httpd{path_parts = [_, <<"_config">> | _]} = Req, _Db) ->
+    send_method_not_allowed(Req, "GET,PUT,DELETE").
+
 
 handle_design_req(
     #httpd{
@@ -2801,3 +2867,157 @@ t_should_throw_on_invalid_placement() ->
     }.
 
 -endif.
+
+%% Database configuration helper functions
+
+%% Get all database configuration sections
+get_all_db_config(Db) ->
+    [
+        {<<"revs">>, {get_revs_section(Db)}},
+        {<<"purges">>, {get_purges_section(Db)}},
+        {<<"auto_purge">>, {get_auto_purge_section(Db)}},
+        {<<"compaction">>, {get_compaction_section(Db)}}
+    ].
+
+%% Get configuration for a specific section
+get_db_config_section(Db, <<"revs">>) ->
+    {ok, get_revs_section(Db)};
+get_db_config_section(Db, <<"purges">>) ->
+    {ok, get_purges_section(Db)};
+get_db_config_section(Db, <<"auto_purge">>) ->
+    {ok, get_auto_purge_section(Db)};
+get_db_config_section(Db, <<"compaction">>) ->
+    {ok, get_compaction_section(Db)};
+get_db_config_section(_Db, _Section) ->
+    {error, unknown_section}.
+
+%% Get a specific configuration value
+get_db_config_value(Db, <<"revs">>, <<"limit">>) ->
+    {ok, fabric:get_revs_limit(Db)};
+get_db_config_value(Db, <<"purges">>, <<"limit">>) ->
+    {ok, fabric:get_purge_infos_limit(Db)};
+get_db_config_value(Db, <<"auto_purge">>, <<"deleted_document_ttl">>) ->
+    case fabric:get_auto_purge_props(Db) of
+        {ok, Props} ->
+            case couch_util:get_value(<<"deleted_document_ttl">>, Props) of
+                undefined -> {ok, null};
+                Value -> {ok, Value}
+            end;
+        {error, _} ->
+            {ok, null}
+    end;
+get_db_config_value(_Db, <<"compaction">>, <<"generations">>) ->
+    % Future feature - return default for now
+    {ok, 0};
+get_db_config_value(_Db, Section, _Key) ->
+    case lists:member(Section, [<<"revs">>, <<"purges">>, <<"auto_purge">>, <<"compaction">>]) of
+        true -> {error, unknown_key};
+        false -> {error, unknown_section}
+    end.
+
+%% Set a specific configuration value
+set_db_config_value(Db, <<"revs">>, <<"limit">>, NewValue, UserCtx) when is_integer(NewValue) ->
+    OldValue = fabric:get_revs_limit(Db),
+    ok = fabric:set_revs_limit(Db, NewValue, [{user_ctx, UserCtx}]),
+    {ok, OldValue};
+set_db_config_value(_Db, <<"revs">>, <<"limit">>, _NewValue, _UserCtx) ->
+    {error, {bad_request, <<"limit must be an integer">>}};
+set_db_config_value(Db, <<"purges">>, <<"limit">>, NewValue, UserCtx) when
+    is_integer(NewValue), NewValue > 0
+->
+    OldValue = fabric:get_purge_infos_limit(Db),
+    case fabric:set_purge_infos_limit(Db, NewValue, [{user_ctx, UserCtx}]) of
+        ok -> {ok, OldValue};
+        Error -> {error, Error}
+    end;
+set_db_config_value(_Db, <<"purges">>, <<"limit">>, _NewValue, _UserCtx) ->
+    {error, {bad_request, <<"limit must be a positive integer">>}};
+set_db_config_value(Db, <<"auto_purge">>, <<"deleted_document_ttl">>, NewValue, _UserCtx) when
+    is_binary(NewValue)
+->
+    % Validate the TTL value
+    case couch_scanner_util:parse_non_weekday_period(?b2l(NewValue)) of
+        undefined ->
+            {error, {bad_request, <<"deleted_document_ttl must be a valid time period string">>}};
+        _TTL ->
+            % Get old value
+            OldValue =
+                case fabric:get_auto_purge_props(Db) of
+                    {ok, Props} ->
+                        couch_util:get_value(<<"deleted_document_ttl">>, Props, null);
+                    {error, _} ->
+                        null
+                end,
+            % Set new value
+            AutoPurgeProps = [{<<"deleted_document_ttl">>, NewValue}],
+            case fabric:set_auto_purge_props(Db, AutoPurgeProps) of
+                ok -> {ok, OldValue};
+                Error -> {error, Error}
+            end
+    end;
+set_db_config_value(_Db, <<"auto_purge">>, <<"deleted_document_ttl">>, _NewValue, _UserCtx) ->
+    {error, {bad_request, <<"deleted_document_ttl must be a string">>}};
+set_db_config_value(_Db, <<"compaction">>, <<"generations">>, _NewValue, _UserCtx) ->
+    % Future feature - not implemented yet
+    {error, {not_implemented, <<"compaction generations not yet supported">>}};
+set_db_config_value(_Db, Section, _Key, _NewValue, _UserCtx) ->
+    case lists:member(Section, [<<"revs">>, <<"purges">>, <<"auto_purge">>, <<"compaction">>]) of
+        true -> {error, unknown_key};
+        false -> {error, unknown_section}
+    end.
+
+%% Delete (reset to default) a specific configuration value
+delete_db_config_value(Db, <<"revs">>, <<"limit">>, UserCtx) ->
+    OldValue = fabric:get_revs_limit(Db),
+    DefaultValue = 1000,
+    ok = fabric:set_revs_limit(Db, DefaultValue, [{user_ctx, UserCtx}]),
+    {ok, OldValue};
+delete_db_config_value(Db, <<"purges">>, <<"limit">>, UserCtx) ->
+    OldValue = fabric:get_purge_infos_limit(Db),
+    DefaultValue = 1000,
+    case fabric:set_purge_infos_limit(Db, DefaultValue, [{user_ctx, UserCtx}]) of
+        ok -> {ok, OldValue};
+        Error -> {error, Error}
+    end;
+delete_db_config_value(Db, <<"auto_purge">>, <<"deleted_document_ttl">>, _UserCtx) ->
+    % Get old value
+    OldValue =
+        case fabric:get_auto_purge_props(Db) of
+            {ok, Props} ->
+                couch_util:get_value(<<"deleted_document_ttl">>, Props, null);
+            {error, _} ->
+                null
+        end,
+    % Reset by setting empty props (which should use defaults)
+    case fabric:set_auto_purge_props(Db, []) of
+        ok -> {ok, OldValue};
+        Error -> {error, Error}
+    end;
+delete_db_config_value(_Db, <<"compaction">>, <<"generations">>, _UserCtx) ->
+    % Future feature - not implemented yet
+    {error, {not_implemented, <<"compaction generations not yet supported">>}};
+delete_db_config_value(_Db, Section, _Key, _UserCtx) ->
+    case lists:member(Section, [<<"revs">>, <<"purges">>, <<"auto_purge">>, <<"compaction">>]) of
+        true -> {error, unknown_key};
+        false -> {error, unknown_section}
+    end.
+
+%% Helper functions to get section configurations
+get_revs_section(Db) ->
+    [{<<"limit">>, fabric:get_revs_limit(Db)}].
+
+get_purges_section(Db) ->
+    [{<<"limit">>, fabric:get_purge_infos_limit(Db)}].
+
+get_auto_purge_section(Db) ->
+    case fabric:get_auto_purge_props(Db) of
+        {ok, Props} ->
+            TTL = couch_util:get_value(<<"deleted_document_ttl">>, Props, null),
+            [{<<"deleted_document_ttl">>, TTL}];
+        {error, _} ->
+            [{<<"deleted_document_ttl">>, null}]
+    end.
+
+get_compaction_section(_Db) ->
+    % Future feature - return default for now
+    [{<<"generations">>, 0}].
