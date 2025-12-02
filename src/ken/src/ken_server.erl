@@ -485,7 +485,7 @@ maybe_start_job(JobName, IndexPid, Seq, State) ->
             gen_server:cast(?MODULE, {trigger_update, Job}),
             ok;
         false ->
-            ok
+            resubmit
     end.
 
 debrief_worker(Pid, Reason, _State) ->
