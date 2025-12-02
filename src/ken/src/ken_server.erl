@@ -185,7 +185,7 @@ handle_info(start_event_handler, State) ->
 handle_info(timeout, #state{prune_interval = I, pruned_last = Last} = State) ->
     Now = erlang:monotonic_time(),
     Interval = erlang:convert_time_unit(
-        State#state.delay, millisecond, native
+        State#state.prune_interval, millisecond, native
     ),
     case Now - Last > Interval of
         true ->
@@ -193,7 +193,7 @@ handle_info(timeout, #state{prune_interval = I, pruned_last = Last} = State) ->
         _ ->
             NewState = State
     end,
-    {noreply, maybe_start_next_queued_job(NewState), I};
+    {noreply, maybe_start_next_queued_job(NewState), 0};
 handle_info({'DOWN', _, _, Pid, Reason}, #state{dbworker = {Name, Pid}} = St) ->
     maybe_resubmit(Name, Reason),
     {noreply, St#state{dbworker = nil}, 0};
