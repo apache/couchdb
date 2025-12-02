@@ -165,7 +165,8 @@ defmodule MangoDatabase do
       r: 1,
       conflicts: false,
       explain: false,
-      return_raw: false
+      return_raw: false,
+      bookmark: nil,
     ]
     options = Keyword.merge(defaults, opts)
 
@@ -187,6 +188,7 @@ defmodule MangoDatabase do
     |> put_if_set("fields", options, :fields)
     |> put_if_set("execution_stats", options, :executionStats)
     |> put_if_set("allow_fallback", options, :allow_fallback)
+    |> put_if_set("bookmark", options, :bookmark)
     )
 
     case {(options[:explain] or options[:return_raw]), resp.status_code} do

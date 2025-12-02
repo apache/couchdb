@@ -109,4 +109,8 @@ defmodule LimitDocs do
   defp add_text_indexes(db) do
     MangoDatabase.create_text_index(db)
   end
+
+  def get_docs_length() do
+    length(@docs)
+  end
 end

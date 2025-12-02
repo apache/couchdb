@@ -37,6 +37,18 @@
     "elem match non object"
   ],
   "LimitTests": [
-    "limit field"
+    "limit field",
+    "limit field 2",
+    "limit field 3",
+    "limit field 4",
+    "limit field 5",
+    "limit skip field 1",
+    "limit skip field 2",
+    "limit skip field 3",
+    "limit skip field 4",
+    "limit skip field 5",
+    "limit skip field 6",
+    "limit bookmark",
+    "limit bookmark with sort",
   ]
 }
