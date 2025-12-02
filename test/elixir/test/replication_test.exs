@@ -1671,7 +1671,7 @@ defmodule ReplicationTest do
     revs_checked = task["revisions_checked"]
     changes = get_db_changes(src_db_name, %{:since => through_seq})
 
-    if length(changes["results"]) > 0 or revs_checked < expect_revs_checked do
+    if not Enum.empty?(changes["results"]) or revs_checked < expect_revs_checked do
       :timer.sleep(500)
       wait_for_repl(src_db_name, repl_id, expect_revs_checked, wait_left - 500)
     end
