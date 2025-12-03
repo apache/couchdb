@@ -34,9 +34,43 @@
     "facet ranges, non-empty"
   ],
   "ElemMatchTests": [
-    "elem match non object"
+    "elem match non object",
+    "elem match"
+  ],
+  "AllMatchTests": [
+    "all match"
   ],
   "LimitTests": [
     "limit field"
+  ],
+  "BasicTextTests": [
+    "simple",
+    "with integer",
+    "with boolean",
+    "with array",
+    "array ref",
+    "number ref",
+    "lt",
+    "lte",
+    "eq",
+    "ne",
+    "gt",
+    "gte",
+    "and",
+    "or",
+    "and or",
+    "nor",
+    "in with value",
+    "in with array",
+    "nin with value",
+    "nin with array",
+    "all",
+    "exists field",
+    "exists array",
+    "exists object",
+    "exists object member",
+    "exists and",
+    "value chars",
+    "regex",
   ]
 }

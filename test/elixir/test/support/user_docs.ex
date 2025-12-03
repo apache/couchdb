@@ -217,7 +217,7 @@ defmodule UserDocs do
       "twitter" => nil,
       "favorites" => ["Lisp", "Erlang", "Python"],
       "exists_array" => ["should", "exist", "array1"],
-      "complex_field_value" => '+-()%{}[]^~&&*||"\\/? =>!',
+      "complex_field_value" => "+-(){}[]^~&&*||\"\\/?:!",
       "ordered" => true,
     },
     %{
