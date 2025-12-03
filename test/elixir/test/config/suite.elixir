@@ -735,5 +735,37 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "RegularCoveringIndexTest": [
+    "index covers query 1 field index id",
+    "index covers query 2 field index id",
+    "index covers query 2 field index extract field",
+    "index covers query 2 field index extract field force index",
+    "index covers query elemMatch",
+    "index covers query composite field_id",
+    "index does not cover query empty selector",
+    "index does not cover query field not in index",
+    "index does not cover query all fields",
+    "index does not cover query partial selector id",
+    "index does not cover query partial selector",
+    "index does not cover selector with more fields",
+    "covering index provides correct answer 2 field index",
+    "covering index provides correct answer id"
+  ],
+  "PartitionedCoveringIndexTest": [
+    "index covers query 1 field index id",
+    "index covers query 2 field index id",
+    "index covers query 2 field index extract field",
+    "index covers query 2 field index extract field force index",
+    "index covers query elemMatch",
+    "index covers query composite field_id",
+    "index does not cover query empty selector",
+    "index does not cover query field not in index",
+    "index does not cover query all fields",
+    "index does not cover query partial selector id",
+    "index does not cover query partial selector",
+    "index does not cover selector with more fields",
+    "covering index provides correct answer 2 field index",
+    "covering index provides correct answer id"
   ]
 }

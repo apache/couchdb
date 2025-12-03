@@ -165,29 +165,33 @@ defmodule MangoDatabase do
       r: 1,
       conflicts: false,
       explain: false,
-      return_raw: false
+      return_raw: false,
+      partition: false,
     ]
     options = Keyword.merge(defaults, opts)
 
-    path =
-      case options[:explain] do
-        true -> "/#{db}/_explain"
-        _ -> "/#{db}/_find"
-      end
+    ppath =
+      if options[:partition],
+        do: "_partition/#{options[:partition]}/",
+        else: ""
 
-    resp = Couch.post(path, body: %{
-      "selector" => selector,
-      "use_index" => options[:use_index],
-      "skip" => options[:skip],
-      "limit" => options[:limit],
-      "r" => options[:r],
-      "conflicts" => options[:conflicts]
-    }
-    |> put_if_set("sort", options, :sort)
-    |> put_if_set("fields", options, :fields)
-    |> put_if_set("execution_stats", options, :executionStats)
-    |> put_if_set("allow_fallback", options, :allow_fallback)
-    )
+    suffix = if options[:explain], do: "_explain", else: "_find"
+    path = "/#{db}/#{ppath}#{suffix}"
+
+    resp =
+      Couch.post(path, body: %{
+        "selector" => selector,
+        "use_index" => options[:use_index],
+        "skip" => options[:skip],
+        "limit" => options[:limit],
+        "r" => options[:r],
+        "conflicts" => options[:conflicts]
+      }
+      |> put_if_set("sort", options, :sort)
+      |> put_if_set("fields", options, :fields)
+      |> put_if_set("execution_stats", options, :executionStats)
+      |> put_if_set("allow_fallback", options, :allow_fallback)
+      )
 
     case {(options[:explain] or options[:return_raw]), resp.status_code} do
       {false, 200} -> {:ok, resp.body["docs"]}
