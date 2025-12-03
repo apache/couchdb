@@ -735,5 +735,18 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "ExecutionStatsTests": [
+    "simple json index",
+    "no execution stats",
+    "quorum json index",
+    "results returned limit",
+    "no matches index scan",
+    "covering json index",
+    "scenario with limit",
+    "scenario partial matches",
+    "scenario no matches, using _all_docs",
+    "scenario no matches, indexed column (no keys examined)",
+    "scenario no matches, indexed column"
   ]
 }
