@@ -404,10 +404,10 @@ should_flush(MemThreshHold) ->
     end.
 
 encodeBase64Url(Url) ->
-    b64url:encode(Url).
+    base64:encode_url(Url).
 
 decodeBase64Url(Url64) ->
-    b64url:decode(Url64).
+    base64:decode_url(Url64).
 
 dict_find(Key, Dict, DefaultValue) ->
     case dict:find(Key, Dict) of

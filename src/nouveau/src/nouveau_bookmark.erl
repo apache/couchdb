@@ -50,7 +50,7 @@ unpack(_DbName, Empty) when Empty == undefined; Empty == nil; Empty == null ->
 unpack(DbName, PackedBookmark) when is_list(PackedBookmark) ->
     unpack(DbName, list_to_binary(PackedBookmark));
 unpack(DbName, PackedBookmark) when is_binary(PackedBookmark) ->
-    Bookmark = jiffy:decode(b64url:decode(PackedBookmark), [return_maps]),
+    Bookmark = jiffy:decode(base64:decode_url(PackedBookmark), [return_maps]),
     #{range_of(DbName, V) => V || V <- Bookmark}.
 
 pack(nil) ->
@@ -58,7 +58,8 @@ pack(nil) ->
 pack({EJson}) when is_list(EJson) ->
     pack(from_ejson(EJson));
 pack(UnpackedBookmark) when is_map(UnpackedBookmark) ->
-    b64url:encode(jiffy:encode(maps:values(UnpackedBookmark))).
+    
+    base64:encode_url(jiffy:encode(maps:values(UnpackedBookmark)))
 
 %% legacy use of ejson within mango
 from_ejson({Props}) ->
