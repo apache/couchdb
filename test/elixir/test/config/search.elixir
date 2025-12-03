@@ -33,6 +33,17 @@
     "facet ranges, empty",
     "facet ranges, non-empty"
   ],
+  "EmptySelectorTextTests": [
+    "empty",
+    "empty array or",
+    "empty array or with age",
+    "empty array in with age",
+    "empty array and with age",
+    "empty array all age",
+    "empty array nested all with age",
+    "empty arrays complex",
+    "empty nin"
+  ],
   "ElemMatchTests": [
     "elem match non object"
   ],
