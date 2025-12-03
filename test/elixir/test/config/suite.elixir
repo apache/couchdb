@@ -733,6 +733,33 @@
   "BasicFindTest": [
     "simple find"
   ],
+  "OperatorTest": [
+    "all",
+    "all non array",
+    "elem match",
+    "all match",
+    "empty all match",
+    "in operator array",
+    "nin operator array",
+    "regex",
+    "exists false",
+    "eq null does not include missing",
+    "ne includes null but not missing",
+    "lte includes null but not missing",
+    "lte at z except null excludes null and missing",
+    "range gte null includes null but not missing",
+    "exists false returns missing but not null",
+    "beginsWith",
+    "beginsWith invalid prefix"
+  ],
+  "OperatorJSONTests": [
+    "lt includes null but not missing",
+    "lte includes null but not missing",
+    "lte respects unicode collation",
+    "gte respects unicode collation",
+    "keymap match"
+  ],
+  "OperatorAllDocsTests": ["range id eq"],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
   ]
