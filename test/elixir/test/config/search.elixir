@@ -38,5 +38,18 @@
   ],
   "LimitTests": [
     "limit field"
+  ],
+  "SortTests": [
+    "number sort",
+    "number sort desc",
+    "string sort",
+    "notype sort",
+    "array sort",
+    "multi sort",
+    "guess type sort",
+    "guess dup type sort",
+    "guess ambiguous type sort",
+    "guess multi sort",
+    "guess mix sort"
   ]
 }
