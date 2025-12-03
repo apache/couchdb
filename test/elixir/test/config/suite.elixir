@@ -735,5 +735,11 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "MultiValueFieldTests": [
+    "can query with name",
+    "can query with name subfield",
+    "can query with name range",
+    "can query with age and name range"
   ]
 }
