@@ -735,5 +735,19 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "BeginsWithOperator": [
+    "basic",
+    "json range",
+    "compound key",
+    "sort",
+    "sort fwd",
+    "sort rev",
+    "all docs range",
+    "no index",
+    "invalid operand",
+    "does not match non string value",
+    "no matches",
+    "case sensitivity"
   ]
 }
