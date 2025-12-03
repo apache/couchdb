@@ -735,5 +735,19 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "JSONIndexSortOptimisations": [
+    "test_works_for_basic_case",
+    "test_works_for_all_fields_specified",
+    "test_works_for_no_sort_fields_specified",
+    "test_works_for_opp_dir_sort",
+    "test_not_work_for_non_constant_field",
+    "test_three_index_one",
+    "test_three_index_two",
+    "test_three_index_fails",
+    "test_empty_sort",
+    "test_in_between",
+    "test_ignore_after_set_sort_value",
+    "test_not_use_index_if_other_fields_in_sort"
   ]
 }
