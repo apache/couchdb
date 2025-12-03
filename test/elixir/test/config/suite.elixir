@@ -730,6 +730,25 @@
     "Creating/Deleting DB should return 202-Acepted",
     "Creating/Updating/Deleting doc should return 202-Acepted"
   ],
+  "IndexCrudTests": [
+    "bad fields",
+    "bad types",
+    "bad names",
+    "bad ddocs",
+    "bad urls",
+    "create idx 01",
+    "create idx 01 exists",
+    "create idx 02",
+    "read idx doc",
+    "delete idx escaped",
+    "delete idx unescaped",
+    "delete idx no design",
+    "bulk delete",
+    "recreate index",
+    "delete missing",
+    "limit skip index",
+    "out of sync"
+  ],
   "BasicFindTest": [
     "simple find"
   ],
