@@ -168,23 +168,34 @@ check: all
 	@$(MAKE) nouveau-test
 
 ifdef apps
-subdirs = $(apps)
+SUBDIRS = $(apps)
 else
-subdirs=$(shell ls src)
+SUBDIRS=$(shell ls src)
 endif
 
-.PHONY: eunit
+# Used for comparing behaviour against he new `eunit` target, delete once we
+# are happy with the new `eunit`.
+.PHONY: old-eunit
+old-eunit: export BUILDDIR = $(CURDIR)
+old-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
+old-eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
+old-eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+old-eunit:
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
+	@for dir in $(SUBDIRS); do \
+     COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
+  done
+
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
+.PHONY: eunit $(SUBDIRS)
 eunit: export BUILDDIR = $(CURDIR)
 eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-eunit: couch
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
-	@for dir in $(subdirs); do \
-            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-        done
+eunit: ${SUBDIRS}
 
+$(SUBDIRS): setup-eunit
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ #|| exit 1
 
 setup-eunit: export BUILDDIR = $(CURDIR)
 setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
