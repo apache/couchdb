@@ -211,14 +211,18 @@ meta = [
  //    gnu_make: 'make'
  //  ],
 
-  'win2022': [
-    name: 'Windows 2022',
-    spidermonkey_vsn: '128',
-    with_clouseau: true,
-    clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
-    quickjs_test262: false,
-    node_label: 'win'
-  ]
+  // Disable temporarily. The behavior we see is that the windows job
+  // locks up and doesn't emit any logs to Jenkins. It just waits for
+  // up to 2h+ sometimes blocking pull requests.
+  //
+  // 'win2022': [
+  //   name: 'Windows 2022',
+  //   spidermonkey_vsn: '128',
+  //   with_clouseau: true,
+  //   clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
+  //   quickjs_test262: false,
+  //   node_label: 'win'
+  // ]
 ]
 
 def String configure(config) {
