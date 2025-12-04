@@ -32,7 +32,7 @@ teardown(#{dbname := DbName}) ->
     delete_db(DbName).
 
 start_couch() ->
-    test_util:start_couch(?CONFIG_CHAIN, [mem3, fabric]).
+    test_util:start_couch([mem3, fabric]).
 
 stop_couch(Ctx) ->
     test_util:stop_couch(Ctx).
