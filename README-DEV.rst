@@ -223,6 +223,22 @@ to specify exact ``rebar eunit`` options::
 
     make eunit EUNIT_OPTS="apps=couch,chttpd"
 
+Running Erlang tests in Parallel
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If you have GNU make (`gmake`) installed, you can supply a `-jN` parameter to
+run as many jobs in parallel. To avoid clobbering output, use the
+`--output-sync` option.
+
+    gmake eunit -j2 --output-sync=target
+
+This runs two test modules in parallel at a time. On a machine with two or more
+CPUs, this should reduce the total wall clock time of testing to up to one half.
+
+Higher `N` might also work, but the test suite is still undergoing hardening to
+support full parallelism, so spurious errors that do not occur with `-j1` might
+show up.
+
 Elixir Integration Tests
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
