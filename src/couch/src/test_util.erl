@@ -108,12 +108,15 @@ start_couch(IniFiles, ExtraApps) ->
     ok = filelib:ensure_path(RandomDataDir),
     ok = filelib:ensure_dir(RandomLogFile),
 
-    RandomIniFiles = lists:map(fun(SourceFile) ->
-        TargetFileName = lists:last(filename:split(SourceFile)),
-        TargetFile = filename:join([RandomEtcDir, TargetFileName]),
-        {ok, _} = file:copy(SourceFile, TargetFile),
-        ?b2l(TargetFile)
-    end, IniFiles),
+    RandomIniFiles = lists:map(
+        fun(SourceFile) ->
+            TargetFileName = lists:last(filename:split(SourceFile)),
+            TargetFile = filename:join([RandomEtcDir, TargetFileName]),
+            {ok, _} = file:copy(SourceFile, TargetFile),
+            ?b2l(TargetFile)
+        end,
+        IniFiles
+    ),
     load_applications_with_stats(),
     ok = application:set_env(config, ini_files, RandomIniFiles),
     Apps = start_applications(?DEFAULT_APPS ++ ExtraApps),
@@ -127,10 +130,9 @@ start_couch(IniFiles, ExtraApps) ->
 stop_couch() ->
     ok = stop_applications(?DEFAULT_APPS).
 
-stop_couch(#test_context{started = Apps, dir = RandomDir }) ->
+stop_couch(#test_context{started = Apps, dir = RandomDir}) ->
     file:del_dir_r(RandomDir),
     stop_applications(Apps);
-
 stop_couch(_) ->
     stop_couch().
 with_couch_server_restart(Fun) ->
