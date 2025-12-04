@@ -106,7 +106,7 @@ endif
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs escriptize nouveau
+all: couch-core fauxton docs escriptize nouveau
 
 
 .PHONY: help
@@ -123,9 +123,9 @@ help:
 ################################################################################
 
 
-.PHONY: couch
-# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
-couch: config.erl
+.PHONY: couch-core
+# target: couch-core - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
+couch-core: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 ifeq ($(with_spidermonkey), true)
 	@cp src/couch/priv/couchjs bin/
@@ -146,7 +146,7 @@ fauxton: share/www
 
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
-escriptize: couch
+escriptize: couch-core
 	@$(REBAR) -r escriptize apps=weatherreport
 	@cp src/weatherreport/weatherreport bin/weatherreport
 
@@ -199,7 +199,7 @@ just-eunit:
 .PHONY: soak-eunit
 soak-eunit: export BUILDDIR = $(CURDIR)
 soak-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-soak-eunit: couch
+soak-eunit: couch-core
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
@@ -356,7 +356,7 @@ weatherreport-test: devclean escriptize
 
 .PHONY: quickjs-test262
 # target: quickjs-javascript-tests - Run QuickJS JS conformance tests
-quickjs-test262: couch
+quickjs-test262: couch-core
 	make -C src/couch_quickjs/quickjs test2-bootstrap
 	make -C src/couch_quickjs/quickjs test2
 
@@ -578,7 +578,7 @@ endif
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
-nouveau-test-gradle: couch nouveau
+nouveau-test-gradle: couch-core nouveau
 ifeq ($(with_nouveau), true)
 	@cd nouveau && $(GRADLE) test --info --rerun
 endif
@@ -586,7 +586,7 @@ endif
 .PHONY: nouveau-test-elixir
 nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
-nouveau-test-elixir: couch nouveau
+nouveau-test-elixir: couch-core nouveau
 ifeq ($(with_nouveau), true)
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/config/test-config.ini \
