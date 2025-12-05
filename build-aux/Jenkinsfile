@@ -30,7 +30,8 @@ MAXIMUM_ERLANG_VERSION = '28.1.1'
 
 // Use these to detect if just documents changed
 docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
-other_changes = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q -v '^src/docs/'"
+github_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^.github'"
+other_changes = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q -v -e '^src/docs/' -e '^.github'"
 
 // We create parallel build / test / package stages for each OS using the metadata
 // in this map. Adding a new OS should ideally only involve adding a new entry here.
@@ -211,14 +212,18 @@ meta = [
  //    gnu_make: 'make'
  //  ],
 
-  'win2022': [
-    name: 'Windows 2022',
-    spidermonkey_vsn: '128',
-    with_clouseau: true,
-    clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
-    quickjs_test262: false,
-    node_label: 'win'
-  ]
+  // Disable temporarily. The behavior we see is that the windows job
+  // locks up and doesn't emit any logs to Jenkins. It just waits for
+  // up to 2h+ sometimes blocking pull requests.
+  //
+  // 'win2022': [
+  //   name: 'Windows 2022',
+  //   spidermonkey_vsn: '128',
+  //   with_clouseau: true,
+  //   clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
+  //   quickjs_test262: false,
+  //   node_label: 'win'
+  // ]
 ]
 
 def String configure(config) {
@@ -508,10 +513,18 @@ pipeline {
         script {
           env.DOCS_CHANGED = '0'
           env.ONLY_DOCS_CHANGED = '0'
+          env.GITHUB_CHANGED = '0'
+          env.ONLY_GITHUB_CHANGED = '0'
           if ( sh(returnStatus: true, script: docs_changed) == 0 ) {
             env.DOCS_CHANGED = '1'
             if (sh(returnStatus: true, script: other_changes) == 1) {
               env.ONLY_DOCS_CHANGED = '1'
+            }
+          }
+          if ( sh(returnStatus: true, script: github_changed) == 0 ) {
+            env.GITHUB_CHANGED = '1'
+            if (sh(returnStatus: true, script: other_changes) == 1) {
+              env.ONLY_GITHUB_CHANGED = '1'
             }
           }
         }
@@ -587,7 +600,7 @@ pipeline {
     stage('Source Format Checks') {
       when {
         beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' }
+        expression { ONLY_DOCS_CHANGED == '0' && ONLY_GITHUB_CHANGED == '0' }
       }
       agent {
         docker {
@@ -618,7 +631,7 @@ pipeline {
     stage('Build Release Tarball') {
       when {
         beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' }
+        expression { ONLY_DOCS_CHANGED == '0' && ONLY_GITHUB_CHANGED == '0' }
       }
       agent {
         docker {
@@ -652,7 +665,7 @@ pipeline {
     stage('Test and Package') {
       when {
         beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' }
+        expression { ONLY_DOCS_CHANGED == '0' && ONLY_GITHUB_CHANGED == '0' }
       }
       steps {
         script {
