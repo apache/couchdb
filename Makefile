@@ -158,6 +158,7 @@ escriptize: couch-core
 
 .PHONY: check
 # target: check - Test everything
+check: ulimit -n 20480
 check: all
 	@$(MAKE) xref
 	@$(MAKE) eunit
