@@ -598,6 +598,10 @@ config: [
       name: clouseau1
       domain: 127.0.0.1
     }
+    clouseau: {
+      concurrent_search_enabled: false
+      commit_interval_secs: 1
+    }
   }
   {
     node: {

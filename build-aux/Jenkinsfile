@@ -408,7 +408,7 @@ def generateContainerStage(platform) {
                   def setClouseauJavaHome = ''
 
                   if (meta[platform].clouseau_java_home) {
-                    setClouseauJavaHome = "env CLOUSEAU_JAVA_HOME='${meta[platform].clouseau_java_home}' JAVA_OPTS='-XX:ActiveProcessorCount=1' "
+                    setClouseauJavaHome = "env CLOUSEAU_JAVA_HOME='${meta[platform].clouseau_java_home}' "
                   }
 
                   dir( "${platform}/build" ) {
