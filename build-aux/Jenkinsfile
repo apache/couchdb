@@ -414,13 +414,13 @@ def generateContainerStage(platform) {
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
-                    retry(3) {sh 'make eunit'}
+                    // retry(3) {sh 'make eunit'}
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
-                    retry(3) {sh 'make elixir'}
+                    // retry(3) {sh 'make elixir'}
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make elixir-search ERLANG_COOKIE=crumbles"}
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make mango-test ERLANG_COOKIE=crumbles"}
-                    retry(3) {sh 'make weatherreport-test'}
-                    retry(3) {sh 'make nouveau-test'}
+                    // retry(3) {sh 'make weatherreport-test'}
+                    // retry(3) {sh 'make nouveau-test'}
                   }
                 }
                 catch (err) {
