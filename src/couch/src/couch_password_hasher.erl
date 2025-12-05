@@ -42,6 +42,7 @@ maybe_upgrade_password_hash(Req, UserName, Password, UserProps, AuthModule, Auth
     UpgradeEnabled = config:get_boolean("chttpd_auth", "upgrade_hash_on_auth", true),
     IsDoc = is_doc(UserProps),
     NeedsUpgrade = needs_upgrade(UserProps),
+    io:format("~n +++++++ NeedsUpgrade:~p <- ~p:~p@~B~n", [NeedsUpgrade, ?MODULE, ?FUNCTION_NAME, ?LINE]),
     InProgress = in_progress(AuthModule, UserName),
     if
         UpgradeEnabled andalso IsDoc andalso NeedsUpgrade andalso not InProgress ->
@@ -121,7 +122,12 @@ needs_upgrade(UserProps) ->
     TargetIterations = chttpd_util:get_chttpd_auth_config_integer(
         "iterations", 600000
     ),
+    io:format("~n +++++++ UserProps:~p <- ~p:~p@~B~n", [UserProps, ?MODULE, ?FUNCTION_NAME, ?LINE]),
+    io:format("~n +++++++ {CurrentScheme, CurrentIterations, CurrentPRF}:~p <- ~p:~p@~B~n", [{CurrentScheme, CurrentIterations, CurrentPRF}, ?MODULE, ?FUNCTION_NAME, ?LINE]),
+    io:format("~n +++++++ {TargetScheme, TargetIterations, TargetPRF}:~p <- ~p:~p@~B~n", [{TargetScheme, TargetIterations, TargetPRF}, ?MODULE, ?FUNCTION_NAME, ?LINE]),
     case {TargetScheme, TargetIterations, TargetPRF} of
+        {CurrentScheme, _, _} when CurrentScheme == <<"simple">>, CurrentIterations =:= undefined ->
+            false;
         {CurrentScheme, CurrentIterations, _} when CurrentScheme == <<"simple">> ->
             false;
         {CurrentScheme, CurrentIterations, CurrentPRF} when CurrentScheme == <<"pbkdf2">> ->
