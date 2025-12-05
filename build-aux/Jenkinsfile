@@ -40,7 +40,7 @@ meta = [
     name: 'CentOS 8',
     spidermonkey_vsn: '60',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
@@ -408,7 +408,7 @@ def generateContainerStage(platform) {
                   def setClouseauJavaHome = ''
 
                   if (meta[platform].clouseau_java_home) {
-                    setClouseauJavaHome = "env CLOUSEAU_JAVA_HOME='${meta[platform].clouseau_java_home}' "
+                    setClouseauJavaHome = "env CLOUSEAU_JAVA_HOME='${meta[platform].clouseau_java_home}' JAVA_OPTS='-XX:ActiveProcessorCount=1' "
                   }
 
                   dir( "${platform}/build" ) {
