@@ -84,6 +84,11 @@ defmodule MangoDatabase do
     end
   end
 
+  def open_doc(db, docid) do
+    resp = Couch.get("/#{db}/#{docid}")
+    resp.body
+  end
+
   def create_index(db, fields, options \\ []) do
     index = %{
       "fields" => fields,
