@@ -19,7 +19,7 @@ include version.mk
 REBAR?=$(CURDIR)/bin/rebar
 REBAR3?=$(CURDIR)/bin/rebar3
 ERLFMT?=$(CURDIR)/bin/erlfmt
-GRADLE?=$(CURDIR)/extra/nouveau/gradlew
+GRADLE?=$(CURDIR)/nouveau/gradlew
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -106,7 +106,7 @@ endif
 
 .PHONY: all
 # target: all - Build everything
-all: couch-core fauxton docs escriptize extra/nouveau
+all: couch-core fauxton docs escriptize nouveau
 
 
 .PHONY: help
@@ -461,8 +461,8 @@ endif
 
 ifeq ($(with_nouveau), true)
 	@mkdir rel/couchdb/nouveau
-	@cd extra/nouveau && $(GRADLE) installDist
-	@cp -R extra/nouveau/build/install/nouveau rel/couchdb
+	@cd nouveau && $(GRADLE) installDist
+	@cp -R nouveau/build/install/nouveau rel/couchdb
 endif
 
 	@echo "... done"
@@ -511,7 +511,7 @@ clean:
 	@rm -rf src/couch_dist/certs/out
 	@rm -rf src/docs/build src/docs/.venv
 ifeq ($(with_nouveau), true)
-	@cd extra/nouveau && $(GRADLE) clean
+	@cd nouveau && $(GRADLE) clean
 endif
 
 
@@ -576,12 +576,12 @@ derived:
 # Nouveau
 ################################################################################
 
-.PHONY: extra/nouveau
+.PHONY: nouveau
 # target: nouveau - Build nouveau
-extra/nouveau:
+nouveau:
 ifeq ($(with_nouveau), true)
-	@cd extra/nouveau && $(GRADLE) spotlessApply
-	@cd extra/nouveau && $(GRADLE) build -x test
+	@cd nouveau && $(GRADLE) spotlessApply
+	@cd nouveau && $(GRADLE) build -x test
 endif
 
 .PHONY: nouveau-test
@@ -589,15 +589,15 @@ endif
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
-nouveau-test-gradle: couch-core extra/nouveau
+nouveau-test-gradle: couch-core nouveau
 ifeq ($(with_nouveau), true)
-	@cd extra/nouveau && $(GRADLE) test --info --rerun
+	@cd nouveau && $(GRADLE) test --info --rerun
 endif
 
 .PHONY: nouveau-test-elixir
 nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
-nouveau-test-elixir: couch-core extra/nouveau
+nouveau-test-elixir: couch-core nouveau
 ifeq ($(with_nouveau), true)
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/config/test-config.ini \
