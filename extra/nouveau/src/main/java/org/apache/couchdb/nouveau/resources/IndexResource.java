@@ -26,7 +26,9 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
@@ -57,6 +59,10 @@ public final class IndexResource {
     @PUT
     public Ok createIndex(@PathParam("name") String name, @NotNull @Valid IndexDefinition indexDefinition)
             throws IOException {
+        if (!indexDefinition.isLatestVersion()) {
+            throw new WebApplicationException(
+                    "Cannot create a new version " + indexDefinition.getLuceneVersion() + " index", Status.BAD_REQUEST);
+        }
         indexManager.create(name, indexDefinition);
         return Ok.INSTANCE;
     }
