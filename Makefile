@@ -155,18 +155,12 @@ escriptize: couch-core
 # Testing
 ################################################################################
 
-
-.PHONY: check
+CHECKS="xref elixir eunit elixir-search weatherreport-test nouveau-test"
+.PHONY: check $(CHECKS)
 # target: check - Test everything
-check: ulimit -n 20480
-check: all
-	@$(MAKE) xref
-	@$(MAKE) eunit
-	@$(MAKE) mango-test
-	@$(MAKE) elixir
-	@$(MAKE) elixir-search
-	@$(MAKE) weatherreport-test
-	@$(MAKE) nouveau-test
+check: all $(CHECKS)
+	@${MAKE} mango-test
+	@${MAKE} nouveau-test
 
 ifdef apps
 SUBDIRS = $(apps)
