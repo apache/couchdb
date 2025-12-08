@@ -26,7 +26,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
-import org.apache.couchdb.nouveau.lucene9.ParallelSearcherFactory;
+import org.apache.couchdb.nouveau.lucene.ParallelSearcherFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,8 +61,8 @@ public class IndexManagerTest {
 
     @Test
     public void managerReturnsUsableIndex() throws Exception {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
         manager.create("foo", indexDefinition);
         var searchRequest = new SearchRequest();
         searchRequest.setQuery("*:*");
@@ -72,8 +72,8 @@ public class IndexManagerTest {
 
     @Test
     public void managerReopensAClosedIndex() throws Exception {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
 
         manager.create("bar", indexDefinition);
 
@@ -90,8 +90,8 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByName() throws Exception {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("bar", indexDefinition);
@@ -102,8 +102,8 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByPath() throws Exception {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
@@ -114,8 +114,8 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByGlob() throws Exception {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
@@ -126,8 +126,8 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByGlobExceptExclusions() throws Exception {
-        final IndexDefinition indexDefinition = new IndexDefinition();
-        indexDefinition.setDefaultAnalyzer("standard");
+        final IndexDefinition indexDefinition =
+                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);

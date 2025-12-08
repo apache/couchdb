@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.couchdb.nouveau.lucene9;
+package org.apache.couchdb.nouveau.lucene;
 
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
@@ -32,7 +32,7 @@ import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.api.TextField;
 import org.apache.lucene.queryparser.flexible.standard.config.PointsConfig;
 
-final class Lucene9IndexSchema {
+final class LuceneIndexSchema {
 
     public enum Type {
         STRING,
@@ -56,23 +56,23 @@ final class Lucene9IndexSchema {
 
     private final ConcurrentMap<String, Type> map;
 
-    private Lucene9IndexSchema(Map<String, Type> map) {
+    private LuceneIndexSchema(Map<String, Type> map) {
         this.map = new ConcurrentHashMap<>(map);
         this.map.put("_id", Type.STRING);
     }
 
-    public static Lucene9IndexSchema emptySchema() {
-        return new Lucene9IndexSchema(new HashMap<String, Type>());
+    public static LuceneIndexSchema emptySchema() {
+        return new LuceneIndexSchema(new HashMap<String, Type>());
     }
 
-    public static Lucene9IndexSchema fromString(final String schemaStr) {
+    public static LuceneIndexSchema fromString(final String schemaStr) {
         Objects.requireNonNull(schemaStr);
         if (schemaStr.isEmpty()) {
             return emptySchema();
         }
         var map = Arrays.stream(schemaStr.split(","))
                 .collect(Collectors.toMap(i -> i.split(":")[0], i -> Type.valueOf(i.split(":")[1])));
-        return new Lucene9IndexSchema(map);
+        return new LuceneIndexSchema(map);
     }
 
     public void update(final Collection<Field> fields) {
