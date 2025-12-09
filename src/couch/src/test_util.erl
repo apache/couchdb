@@ -44,7 +44,7 @@
 -include("couch_db_int.hrl").
 -include("couch_bt_engine.hrl").
 
--record(test_context, {mocked = [], started = [], module}).
+-record(test_context, {mocked = [], started = [], module, dir}).
 
 -define(DEFAULT_APPS, [inets, ibrowse, ssl, config, couch_epi, couch_event, couch]).
 
@@ -81,21 +81,60 @@ start_couch() ->
 start_couch(ExtraApps) ->
     start_couch(?CONFIG_CHAIN, ExtraApps).
 
+% This function starts CouchDB with optional extra apps in a dedicated
+% directory under tmp/couchdb-tests/<uuid>/ — That is, all instances
+% run isolated so that if more than one runs at a time, it does not
+% interfere with any of the others.
+% The sub-directories here are etc/ log/ and data/ for configuration
+% logs and databases and view indexes respectively.
+% The function copies the initial bespoke test-ini files to the new
+% random directory and configures CouchDB to use those.
+% The two pieces of state created here are the random dir in the file system and
+% the process env var {config, ini_files} that is read by couch_config on
+% startup. These need to be reset at the right points in time.
+% the random dir is deleted and the env var reset when CouchDB is stopped.
+% Note: there is currently a case where stop_couch/0 could be called and
+% the file system cleanup can’t be run because we don’t get passed the test
+% context with the random directory value. At the moment stop_couch/0 is not
+% used anywhere, tho. Maybe we should remove it?
 start_couch(IniFiles, ExtraApps) ->
+    RandomDir = filename:join([builddir(), "tmp", "couchdb-tests", couch_uuids:random()]),
+    RandomEtcDir = filename:join([RandomDir, "etc"]),
+    RandomDataDir = ?b2l(filename:join([RandomDir, "data"])),
+    RandomLogFile = ?b2l(filename:join([RandomDir, "log", "couch.log"])),
+
+    ok = filelib:ensure_path(RandomDir),
+    ok = filelib:ensure_path(RandomEtcDir),
+    ok = filelib:ensure_path(RandomDataDir),
+    ok = filelib:ensure_dir(RandomLogFile),
+
+    RandomIniFiles = lists:map(
+        fun(SourceFile) ->
+            TargetFileName = lists:last(filename:split(SourceFile)),
+            TargetFile = filename:join([RandomEtcDir, TargetFileName]),
+            {ok, _} = file:copy(SourceFile, TargetFile),
+            ?b2l(TargetFile)
+        end,
+        IniFiles
+    ),
     load_applications_with_stats(),
-    ok = application:set_env(config, ini_files, IniFiles),
+    ok = application:set_env(config, ini_files, RandomIniFiles),
     Apps = start_applications(?DEFAULT_APPS ++ ExtraApps),
+
+    ok = config:set("couchdb", "database_dir", RandomDataDir, false),
+    ok = config:set("couchdb", "view_index_dir", RandomDataDir, false),
+    ok = config:set("log", "file", RandomLogFile, false),
     ok = config:delete("compactions", "_default", false),
-    #test_context{started = Apps}.
+    #test_context{started = Apps, dir = RandomDir}.
 
 stop_couch() ->
     ok = stop_applications(?DEFAULT_APPS).
 
-stop_couch(#test_context{started = Apps}) ->
+stop_couch(#test_context{started = Apps, dir = RandomDir}) ->
+    file:del_dir_r(RandomDir),
     stop_applications(Apps);
 stop_couch(_) ->
     stop_couch().
-
 with_couch_server_restart(Fun) ->
     Servers = couch_server:names(),
     test_util:with_processes_restart(Servers, Fun).
@@ -125,6 +164,7 @@ start_applications([App | Apps], Acc) ->
 
 stop_applications(Apps) ->
     [application:stop(App) || App <- lists:reverse(Apps)],
+    ok = application:unset_env(config, ini_files),
     ok.
 
 start_config(Chain) ->

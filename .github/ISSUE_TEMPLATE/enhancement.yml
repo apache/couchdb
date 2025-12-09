@@ -2,7 +2,6 @@ name: Enhancement request
 description: Suggest an idea for a future version of CouchDB
 title: '[ENHANCEMENT]: '
 labels: ["enhancement", "needs-triage"]
-type: enhancement
 body:
   - type: textarea
     id: summary
@@ -14,8 +13,10 @@ body:
       label: Tell us how the new feature should work. Be specific
   - type: textarea
     id: possible-solution
-    label: Not required. Suggest how to implement the addition or change
+    attributes:
+      label: Not required. Suggest how to implement the addition or change
   - type: textarea
     id: additional-context
-    label: Additional Context
-    description:  Why does this feature matter to you? What unique circumstances do you have?
+    attributes:
+      label: Additional Context
+      description:  Why does this feature matter to you? What unique circumstances do you have?
