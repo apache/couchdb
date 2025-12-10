@@ -1,10 +1,10 @@
-defmodule BasicTextTest do
+defmodule NumStringTests do
      use PropCheck
      use CouchTestCase
 
     @moduletag :search_props
     @db_name "changeme-proptest-db"
-    
+
     property "test floating point value",
       numtests: 1_000 do # takes about 10 seconds
         MangoDatabase.recreate("/#{@db_name}")

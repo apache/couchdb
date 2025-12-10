@@ -304,16 +304,6 @@ else
 	@echo "Warning: Clouseau is not enabled, \`elixir-search\` cannot be run."
 endif
 
-.PHONY: elixir-test-search-props
-elixir-test-search-props: export MIX_ENV=integration
-elixir-test-search-props:
-	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
-		--enable-erlang-views \
-		--no-join \
-		--locald-config test/elixir/test/config/test-config.ini \
-		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --only search_props $(EXUNIT_OPTS)'
-
 .PHONY: elixir-source-checks
 # target: elixir-source-checks - Check source code formatting of Elixir test files
 elixir-source-checks: export MIX_ENV=integration
