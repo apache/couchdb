@@ -230,17 +230,20 @@ supported_lucene_versions() ->
 %% private functions
 
 index_path(Path) when is_binary(Path) ->
-    [<<"/index/">>, couch_util:url_encode(Path)];
+    [<<"/index/">>, disambiguate_path(Path)];
 index_path(#index{} = Index) ->
-    [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
+    [<<"/index/">>, disambiguate_path(nouveau_util:index_name(Index))].
 
 doc_path(#index{} = Index, DocId) ->
     [
         <<"/index/">>,
-        couch_util:url_encode(nouveau_util:index_name(Index)),
+        disambiguate_path(nouveau_util:index_name(Index)),
         <<"/doc/">>,
-        couch_util:url_encode(DocId)
+        DocId
     ].
+
+disambiguate_path(Path) ->
+    re:replace(Path, "/", ":", [global]).
 
 search_path(#index{} = Index) ->
     [index_path(Index), <<"/search">>].

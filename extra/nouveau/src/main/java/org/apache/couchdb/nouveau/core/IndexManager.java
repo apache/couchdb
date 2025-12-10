@@ -102,8 +102,7 @@ public final class IndexManager implements Managed {
 
     private StripedLock<String> createLock;
 
-    public <R> R with(final String name, final IndexFunction<Index, R> indexFun)
-            throws IOException, InterruptedException {
+    public <R> R with(String name, final IndexFunction<Index, R> indexFun) throws IOException, InterruptedException {
         evictIfOverCapacity();
 
         retry:
@@ -214,7 +213,7 @@ public final class IndexManager implements Managed {
         }
     }
 
-    public void create(final String name, IndexDefinition indexDefinition) throws IOException {
+    public void create(String name, IndexDefinition indexDefinition) throws IOException {
         if (exists(name)) {
             assertSame(indexDefinition, loadIndexDefinition(name));
             return;

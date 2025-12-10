@@ -63,7 +63,7 @@ public final class IndexResource {
             throw new WebApplicationException(
                     "Cannot create a new version " + indexDefinition.getLuceneVersion() + " index", Status.BAD_REQUEST);
         }
-        indexManager.create(name, indexDefinition);
+        indexManager.create(fix(name), indexDefinition);
         return Ok.INSTANCE;
     }
 
@@ -74,7 +74,7 @@ public final class IndexResource {
             @PathParam("docId") String docId,
             @NotNull @Valid DocumentDeleteRequest request)
             throws Exception {
-        return indexManager.with(name, (index) -> {
+        return indexManager.with(fix(name), (index) -> {
             index.delete(docId, request);
             return Ok.INSTANCE;
         });
@@ -82,20 +82,20 @@ public final class IndexResource {
 
     @DELETE
     public Ok deletePath(@PathParam("name") String path, @Valid final List<String> exclusions) throws IOException {
-        indexManager.deleteAll(path, exclusions);
+        indexManager.deleteAll(fix(path), exclusions);
         return Ok.INSTANCE;
     }
 
     @GET
     public IndexInfo getIndexInfo(@PathParam("name") String name) throws Exception {
-        return indexManager.with(name, (index) -> {
+        return indexManager.with(fix(name), (index) -> {
             return index.info();
         });
     }
 
     @POST
     public Ok setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
-        return indexManager.with(name, (index) -> {
+        return indexManager.with(fix(name), (index) -> {
             if (request.getMatchUpdateSeq().isPresent()
                     && request.getUpdateSeq().isPresent()) {
                 index.setUpdateSeq(
@@ -115,7 +115,7 @@ public final class IndexResource {
     @Path("/search")
     public SearchResults searchIndex(@PathParam("name") String name, @NotNull @Valid SearchRequest request)
             throws Exception {
-        return indexManager.with(name, (index) -> {
+        return indexManager.with(fix(name), (index) -> {
             return index.search(request);
         });
     }
@@ -127,9 +127,13 @@ public final class IndexResource {
             @PathParam("docId") String docId,
             @NotNull @Valid DocumentUpdateRequest request)
             throws Exception {
-        return indexManager.with(name, (index) -> {
+        return indexManager.with(fix(name), (index) -> {
             index.update(docId, request);
             return Ok.INSTANCE;
         });
+    }
+
+    private String fix(final String path) {
+        return path.replaceAll(":", "/");
     }
 }
