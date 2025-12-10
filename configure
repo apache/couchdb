@@ -62,13 +62,15 @@ Options:
 
   -h | --help                 display a short help message and exit
   -u | --user USER            set the username to run as (defaults to $COUCHDB_USER)
+  --dev                       alias for --disable-docs --disable-fauxton --disable-spidermonkey
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
+  --disable-spidermonkey      disable spidermonkey, don't try to build it
+  --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
+  --js-engine=ENGINE          use js engine: spidermonkey or quickjs, defaults to spidermonkey
   --with-nouveau              build the new experimental search module
   --with-clouseau             build the Clouseau search module
   --erlang-md5                use erlang for md5 hash operations
-  --dev                       alias for --disable-docs --disable-fauxton
-  --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --clouseau-method MTH       specify the method for Clouseau to deploy: git or dist (defaults to $CLOUSEAU_MTH)
   --clouseau-uri URI          specify the location for retrieving Clouseau (defaults $(printf "$CLOUSEAU_URI" "$CLOUSEAU_VSN" "$CLOUSEAU_VSN"))
   --clouseau-version VSN      specify the version (tag/branch for git) of Clouseau to use (defaults to $CLOUSEAU_VSN)
@@ -76,8 +78,6 @@ Options:
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
   --rebar3=PATH               use rebar3 by specified path
   --erlfmt=PATH               use erlfmt by specified path
-  --js-engine=ENGINE          use js engine: spidermonkey or quickjs, defaults to spidermonkey
-  --disable-spidermonkey      disable spidermonkey, don't try to build it
 EOF
 }
 
