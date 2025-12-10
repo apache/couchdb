@@ -38,5 +38,11 @@
   ],
   "LimitTests": [
     "limit field"
+  ],
+  "PaginatedResultsTest": [
+    "query with lot of results",
+    "no duplicates on interleaved updates",
+    "no duplicates on interleaved updates heavy",
+    "no duplicates on interleaved updates with limit skip"
   ]
 }
