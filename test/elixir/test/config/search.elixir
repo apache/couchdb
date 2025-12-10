@@ -38,5 +38,16 @@
   ],
   "LimitTests": [
     "limit field"
+  ],
+  "IndexSelectorText": [
+    "saves partialfilterselector in index",
+    "uses partial index for query selector",
+    "uses partial index with different selector",
+    "doesnot use selector when not specified",
+    "doesnot use selector when not specified with index",
+    "old selector still supported",
+    "old selector still supported via api",
+    "partial filter only in return if not default",
+    "uses partial index with non indexable selector"
   ]
 }

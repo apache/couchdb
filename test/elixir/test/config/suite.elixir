@@ -763,5 +763,17 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "IndexSelectorJson": [
+    "saves partial filter selector in index",
+    "partial filter only in return if not default",
+    "saves selector in index throws",
+    "uses partial index for query selector",
+    "uses partial index with different selector",
+    "doesnot use selector when not specified",
+    "doesnot use selector when not specified with index",
+    "old selector with no selector still supported",
+    "old selector still supported",
+    "uses partial index with non indexable selector"
   ]
 }
