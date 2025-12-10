@@ -763,5 +763,27 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "EmptySelectorUserDocTests": [
+    "empty",
+    "empty array or",
+    "empty array or with age",
+    "empty array in with age",
+    "empty array and with age",
+    "empty array all age",
+    "empty array nested all with age",
+    "empty arrays complex",
+    "empty nin"
+  ],
+  "EmptySelectorNoIndexTests": [
+    "empty",
+    "empty array or",
+    "empty array or with age",
+    "empty array in with age",
+    "empty array and with age",
+    "empty array all age",
+    "empty array nested all with age",
+    "empty arrays complex",
+    "empty nin"
   ]
 }
