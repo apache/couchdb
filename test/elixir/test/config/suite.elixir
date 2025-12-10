@@ -763,5 +763,8 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "ChooseCorrectIndexForDocs": [
+    "retrieve conflicts"
   ]
 }
