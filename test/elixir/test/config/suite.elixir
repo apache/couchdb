@@ -763,5 +763,32 @@
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "JSONIndexSelectionTest": [
+    "basic",
+    "with and",
+    "with nested and",
+    "with or",
+    "use most columns",
+    "no valid sort index",
+    "invalid use index",
+    "uses index when no range or equals",
+    "reject use index invalid fields",
+    "reject use index ddoc and name invalid fields",
+    "reject use index sort order",
+    "use index fallback if valid sort",
+    "prefer use index over optimal index",
+    "manual bad view idx01",
+    "explain sort reverse",
+    "use index with invalid name",
+    "use index without fallback succeeds for valid index",
+    "use index without fallback fails for invalid index with fallback available",
+    "use index without fallback succeeds for empty index",
+    "use index without fallback fails for empty index",
+    "use index without fallback fails for invalid index no fallback exists",
+    "index without fallback",
+    "no index without fallback",
+    "uses all docs when fields do not match selector",
+    "uses all docs when selector doesnt require fields to exist"
   ]
 }
