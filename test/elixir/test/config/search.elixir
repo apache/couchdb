@@ -47,5 +47,18 @@
     "internal field tests",
     "escape period",
     "object period"
+  "TextIndexSelectionTest": [
+    "with text",
+    "no view index",
+    "with or",
+    "manual bad text idx"
+  ],
+  "MultiTextIndexSelectionTest": [
+    "fallback to json with multi text",
+    "multi text index is error",
+    "use index works"
+  ],
+  "RegexVsTextIndexTest": [
+    "regex works with text index"
   ]
 }
