@@ -12,7 +12,7 @@
   -WithClouseau              build the Clouseau search module (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
-  -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 91)
+  -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (default 128)
   -JSEngine ENGINE           select JS engine to use (spidermonkey or quickjs) (default spidermonkey)
   -ClouseauVersion VSN       select the version of Clouseau to use (default 2.25.0)
   -ClouseauMethod MTH        method for Clouseau to deploy: git or dist (default dist)
@@ -60,7 +60,7 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$CouchDBUser = [Environment]::UserName, # set the username to run as (defaults to current user)
     [ValidateNotNullOrEmpty()]
-    [string]$SpiderMonkeyVersion = "91", # select the version of SpiderMonkey to use (default 91)
+    [string]$SpiderMonkeyVersion = "128", # select the version of SpiderMonkey to use (default 91)
     [ValidateNotNullOrEmpty()]
     [string]$JSEngine = "spidermonkey", # select the JS engine (spidermonkey | quickjs) to use (default spidermonkey)
     [ValidateNotNullOrEmpty()]
