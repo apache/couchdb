@@ -374,45 +374,14 @@ defmodule CookieAuthTest do
     login("jan", "apple")
   end
 
-  test "basic+cookie auth interaction" do
+  test "header doesn't contain set-cookie" do
     # performing a successful basic authentication will create a session cookie
     resp = Couch.get(
-      "/_all_dbs",
-      no_auth: true,
-      headers: [authorization: "Basic #{:base64.encode("jan:apple")}"])
+        "/_all_dbs",
+        no_auth: true,
+        headers: [authorization: "Basic #{:base64.encode("jan:apple")}"])
+
     assert resp.status_code == 200
-
-    # extract cookie value
-    cookie = resp.headers[:"set-cookie"]
-    [token | _] = String.split(cookie, ";")
-
-    # Cookie is usable on its own
-    resp = Couch.get(
-      "/_session",
-      no_auth: true,
-      headers: [cookie: token])
-    assert resp.status_code == 200
-    assert resp.body["userCtx"]["name"]  == "jan"
-    assert resp.body["info"]["authenticated"] == "cookie"
-
-    # Cookie is usable with basic auth if usernames match
-    resp = Couch.get(
-      "/_session",
-      no_auth: true,
-      headers: [
-        authorization: "Basic #{:base64.encode("jan:apple")}",
-        cookie: token])
-    assert resp.status_code == 200
-    assert resp.body["userCtx"]["name"] == "jan"
-    assert resp.body["info"]["authenticated"] == "cookie"
-
-    # Cookie is not usable with basic auth if usernames don't match
-    resp = Couch.get(
-      "/_session",
-      no_auth: true,
-      headers: [
-        authorization: "Basic #{:base64.encode("notjan:banana")}",
-        cookie: token])
-    assert resp.status_code == 401
+    assert resp.headers["set-cookie"] == nil
   end
 end
