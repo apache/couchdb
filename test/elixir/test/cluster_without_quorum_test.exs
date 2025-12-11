@@ -7,23 +7,24 @@ defmodule WithoutQuorumTest do
   Test CouchDB API in a cluster without quorum.
   """
   @tag :with_db_name
-  test "Creating/Deleting DB should return 202-Acepted", context do
+  test "Creating/Deleting DB should return 201-Created/200-OK", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}")
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 201-Created"
+    assert resp.status_code == 201, msg
     resp = Couch.delete("/#{db_name}")
-    assert resp.status_code == 202, msg
+    msg = "Should return 200-OK"
+    assert resp.status_code == 200, msg
   end
 
   @tag :with_db_name
-  test "Creating/Updating/Deleting doc should return 202-Acepted", context do
+  test "Creating/Updating/Deleting doc should return 201-Created/200-OK", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
 
     resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0", :a => 1})
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 201-Created"
+    assert resp.status_code == 201, msg
 
     resp = Couch.get("/#{context[:db_name]}/0")
     rev = resp.body["_rev"]
@@ -31,20 +32,20 @@ defmodule WithoutQuorumTest do
     resp =
       Couch.put("/#{context[:db_name]}/0", body: %{:_id => "0", :_rev => rev, :a => 2})
 
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 201-Created"
+    assert resp.status_code == 201, msg
 
     resp = Couch.get("/#{context[:db_name]}/0")
     rev = resp.body["_rev"]
     resp = Couch.delete("/#{context[:db_name]}/0", query: %{:rev => rev})
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 200-OK"
+    assert resp.status_code == 200, msg
 
     Couch.delete("/#{db_name}")
   end
 
   @tag :with_db_name
-  test "Creating-Updating/Deleting doc with overriden quorum should return 201-Created/200-OK",
+  test "Creating-Updating/Deleting doc with overridden quorum should return 201-Created/200-OK",
        context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
@@ -82,7 +83,7 @@ defmodule WithoutQuorumTest do
   end
 
   @tag :with_db_name
-  test "Copy doc should return 202-Acepted", context do
+  test "Copy doc should return 201-Created", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
 
@@ -93,27 +94,27 @@ defmodule WithoutQuorumTest do
 
     headers = [Destination: "1"]
     resp = Couch.request(:copy, "/#{context[:db_name]}/0", headers: headers)
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 201-Created"
+    assert resp.status_code == 201, msg
     Couch.delete("/#{db_name}")
   end
 
   @doc_range 1..5
 
   @tag :with_db_name
-  test "Bulk docs should return 202-Acepted", context do
+  test "Bulk docs should return 201-Created", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
     docs = create_docs(@doc_range)
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs})
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 201-Created"
+    assert resp.status_code == 201, msg
 
     Couch.delete("/#{db_name}")
   end
 
   @tag :with_db_name
-  test "Bulk docs overriden quorum should return 201-Created", context do
+  test "Bulk docs overridden quorum should return 201-Created", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
     docs = create_docs(@doc_range)
@@ -125,7 +126,7 @@ defmodule WithoutQuorumTest do
   end
 
   @tag :with_db_name
-  test "Attachments should return 202-Acepted", context do
+  test "Attachments should return 201-Created", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
     resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0"})
@@ -139,8 +140,8 @@ defmodule WithoutQuorumTest do
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
 
-    msg = "Should return 202-Acepted"
-    assert resp.status_code == 202, msg
+    msg = "Should return 201-Created"
+    assert resp.status_code == 201, msg
 
     rev = resp.body["rev"]
     resp = Couch.delete("/#{context[:db_name]}/0/foo.txt", query: %{:rev => rev})
@@ -151,7 +152,7 @@ defmodule WithoutQuorumTest do
   end
 
   @tag :with_db_name
-  test "Attachments overriden quorum should return 201-Created", context do
+  test "Attachments overridden quorum should return 201-Created", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
     resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0"})
