@@ -36,7 +36,6 @@
     "etags for attachments",
     "implicit doc creation allows creating docs with a reserved id. COUCHDB-565",
     "large attachments COUCHDB-366",
-    "md5 header for attachments",
     "reads attachment successfully",
     "saves attachment successfully",
     "saves binary",
@@ -48,7 +47,7 @@
   ],
   "AuthLockoutTest": [
     "lockout after multiple failed authentications",
-    "lockout warning after multiple failed authentications"
+    "do not lockout after multiple failed authentications"
   ],
   "BasicsTest": [
     "'+' in document name should encode to '+'",
@@ -156,7 +155,8 @@
     "Only JSON strings are accepted"
   ],
   "CookieAuthTest": [
-    "cookie auth"
+    "cookie auth",
+    "header doesn't contain set-cookie"
   ],
   "CopyDocTest": [
     "Copy doc tests"
@@ -256,6 +256,9 @@
     "jwt auth with RSA secret",
     "jwt auth with required iss claim",
     "jwt auth without secret"
+  ],
+  "LargeDocsTest": [
+    "Large docs"
   ],
   "ListViewsTest": [
     "COUCHDB-1113",
@@ -413,7 +416,7 @@
     "view updates properly remove old keys"
   ],
   "PasswordCacheTest": [
-    "password cache"
+    "password hash cache"
   ],
   "ProxyAuthTest": [
     "proxy auth with secret",
@@ -458,8 +461,6 @@
     "default headers returned for _scheduler/docs ",
     "default headers returned for _scheduler/jobs",
     "filtered replications - remote-to-remote",
-    "non-admin or reader user on source - remote-to-remote",
-    "non-admin user on target - remote-to-remote",
     "replicate with since_seq - remote-to-remote",
     "replicating attachment without conflict - COUCHDB-885",
     "replication by doc ids - remote-to-remote",
@@ -467,7 +468,6 @@
     "replication restarts after filter change - COUCHDB-892 - remote-to-remote",
     "simple remote-to-remote replication - remote-to-remote",
     "source database not found with host",
-    "unauthorized replication cancellation",
     "validate_doc_update failure replications - remote-to-remote"
   ],
   "ReshardAllDocsTest": [
@@ -481,6 +481,9 @@
     "split q=2 shards on node1 (2 jobs)",
     "toggle global state"
   ],
+  "ReshardChangesFeedTest": [
+    "all_docs after splitting all shards on node1"
+  ],
   "RevStemmingTest": [
     "revs limit is kept after compaction",
     "revs limit produces replication conflict ",
@@ -493,8 +496,8 @@
     "multiple updates with same _rev raise conflict errors"
   ],
   "RewriteJSTest": [
-    "Test basic js rewrites on test_rewrite_suite_db",
-    "Test basic js rewrites on test_rewrite_suite_db%2Fwith_slashes",
+    "basic js rewrites on test_rewrite_suite_db",
+    "basic js rewrites on test_rewrite_suite_db%2Fwith_slashes",
     "early response on test_rewrite_suite_db",
     "early response on test_rewrite_suite_db%2Fwith_slashes",
     "loop on test_rewrite_suite_db",
@@ -505,8 +508,8 @@
     "requests with body preserve the query string rewrite on test_rewrite_suite_db%2Fwith_slashes"
   ],
   "RewriteTest": [
-    "Test basic rewrites on test_rewrite_suite_db",
-    "Test basic rewrites on test_rewrite_suite_db%2Fwith_slashes",
+    "basic rewrites on test_rewrite_suite_db",
+    "basic rewrites on test_rewrite_suite_db%2Fwith_slashes",
     "loop detection on test_rewrite_suite_db",
     "loop detection on test_rewrite_suite_db%2Fwith_slashes",
     "path relative to server on test_rewrite_suite_db",
@@ -643,7 +646,8 @@
     "GET - invalid parameter combinations get rejected ",
     "POST - invalid parameter combinations get rejected ",
     "argument combinations",
-    "dir works",
+    "dir ascending works",
+    "dir descending works",
     "empty keys",
     "keys in GET body (group)",
     "keys in GET parameters",
@@ -711,24 +715,24 @@
     "view update seq"
   ],
   "WithQuorumTest": [
-    "Attachments overriden quorum should return 202-Acepted",
+    "Attachments overridden quorum should return 202-Accepted",
     "Attachments should return 201-Created",
-    "Bulk docs overriden quorum should return 202-Acepted",
+    "Bulk docs overridden quorum should return 202-Accepted",
     "Bulk docs should return 201-Created",
     "Copy doc should return 201-Created",
     "Creating-Updating/Deleting doc should return 201-Created/200-OK",
-    "Creating-Updating/Deleting doc with overriden quorum should return 202-Acepted/200-OK",
-    "Creating/Deleting DB should return 201-Created/202-Acepted"
+    "Creating-Updating/Deleting doc with overridden quorum should return 202-Accepted/200-OK",
+    "Creating/Deleting DB should return 201-Created/200-OK"
   ],
   "WithoutQuorumTest": [
-    "Attachments overriden quorum should return 201-Created",
-    "Attachments should return 202-Acepted",
-    "Bulk docs overriden quorum should return 201-Created",
-    "Bulk docs should return 202-Acepted",
-    "Copy doc should return 202-Acepted",
-    "Creating-Updating/Deleting doc with overriden quorum should return 201-Created/200-OK",
-    "Creating/Deleting DB should return 202-Acepted",
-    "Creating/Updating/Deleting doc should return 202-Acepted"
+    "Attachments overridden quorum should return 201-Created",
+    "Attachments should return 201-Created",
+    "Bulk docs overridden quorum should return 201-Created",
+    "Bulk docs should return 201-Created",
+    "Copy doc should return 201-Created",
+    "Creating-Updating/Deleting doc with overridden quorum should return 201-Created/200-OK",
+    "Creating/Deleting DB should return 201-Created/200-OK",
+    "Creating/Updating/Deleting doc should return 201-Created/200-OK"
   ],
   "BasicFindTest": [
     "simple find",
@@ -801,8 +805,6 @@
     "json range",
     "compound key",
     "sort",
-    "sort fwd",
-    "sort rev",
     "all docs range",
     "no index",
     "invalid operand",
