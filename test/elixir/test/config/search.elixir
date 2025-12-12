@@ -39,6 +39,15 @@
   "LimitTests": [
     "limit field"
   ],
+  "KeyTest": [
+    "dot key",
+    "peso key",
+    "unicode in fieldname",
+    "unicode in selector field",
+    "internal field tests",
+    "escape period",
+    "object period"
+  ],
   "TextIndexSelectionTest": [
     "with text",
     "no view index",
