@@ -47,6 +47,7 @@
     "internal field tests",
     "escape period",
     "object period"
+  ],
   "TextIndexSelectionTest": [
     "with text",
     "no view index",
