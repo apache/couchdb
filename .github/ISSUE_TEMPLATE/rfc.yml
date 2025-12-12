@@ -1,0 +1,93 @@
+name: Formal RFC
+description: Submit a formal Request For Comments for consideration by the team.
+title: '[RFC]: '
+labels: ["rfc", "discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Requirements Language
+
+        The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+        "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL" in this
+        document are to be interpreted as described in
+        [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119.txt).
+  - type: textarea
+    id: abstract
+    attributes:
+      label: Provide a 1-to-3 paragraph overview of the requested change.
+  - type: textarea
+    id: terminology
+    attributes:
+      label: Terminology
+  - type: textarea
+    id: detailed-description
+    attributes:
+      label: Detailed Description
+      description: |
+        Describe the solution being proposed in greater detail.  Assume your
+        audience has knowledge of, but not necessarily familiarity with, the
+        CouchDB internals. Provide enough context so that the reader can make an
+        informed decision about the proposal.
+
+        Artwork may be attached to the submission and linked as necessary.
+        ASCII artwork can also be included in code blocks, if desired.
+  - type: textarea
+    id: advantages-and-disadvantages
+    attributes:
+      label: Advantages and Disadvantages
+      description: |
+        Briefly, list the benefits and drawbacks that would be realized should
+        the proposal be accepted for inclusion into Apache CouchDB.
+  - type: textarea
+    id: key-changes
+    attributes:
+      label: Key Changes
+      description: If the changes will affect how a user interacts with CouchDB, explain
+  - type: textarea
+    id: applications-and-modules-affected
+    attributes:
+      label: Applications and Modules affected
+      description:  List the OTP applications or functional modules in CouchDB affected by the proposal
+  - type: textarea
+    id: http-api-additions
+    attributes:
+      label: HTTP API additions
+      description: |
+        Provide *exact* detail on each new API endpoint, including:
+          HTTP methods [HEAD, GET, PUT, POST, DELETE, etc.]
+          Synopsis of functionality
+          Headers and parameters accepted
+          JSON in [if a PUT or POST type]
+          JSON out
+          Valid status codes and their definitions
+          A proposed Request and Response block
+      placeholder: None
+  - type: textarea
+    id: http-api-deprecations
+    attributes:
+      label: HTTP API deprecations
+      description: |
+        Provide *exact* detail on the API endpoints to be deprecated.
+        If these endpoints are replaced by new endpoints, list those as well.
+        State the proposed version in which the deprecation and removal will occur.
+      placeholder: None
+  - type: textarea
+    id: security-considerations
+    attributes:
+      label: Security Considerations
+      description: Include any impact to the security of CouchDB here
+      placeholder: None
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: |
+        Include any references to CouchDB documentation, mailing list discussion,
+        external standards or other links here.
+      placeholder: None
+  - type: textarea
+    id: acknowledgements
+    attributes:
+      label: Acknowledgements
+      placeholder: None

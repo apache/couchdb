@@ -122,7 +122,7 @@ needs_upgrade(UserProps) ->
         "iterations", 600000
     ),
     case {TargetScheme, TargetIterations, TargetPRF} of
-        {CurrentScheme, CurrentIterations, _} when CurrentScheme == <<"simple">> ->
+        {CurrentScheme, _, _} when CurrentScheme == <<"simple">> ->
             false;
         {CurrentScheme, CurrentIterations, CurrentPRF} when CurrentScheme == <<"pbkdf2">> ->
             false;
