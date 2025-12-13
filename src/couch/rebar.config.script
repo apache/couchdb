@@ -97,13 +97,15 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
         "115";
     {_, "128"} ->
         "128";
+    {_, "140"} ->
+        "140";
     undefined ->
-        "91";
+        "140";
     {_, Unsupported} ->
         io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
         erlang:halt(1);
     false ->
-        "91"
+        "140"
 end.
 
 ConfigH = [
@@ -129,6 +131,8 @@ CouchJSConfig = case SMVsn of
         "priv/couch_js/102/config.h";
     "128" ->
         "priv/couch_js/102/config.h";
+    "140" ->
+    "priv/couch_js/140/config.h";
     _ ->
         "priv/couch_js/" ++ SMVsn ++ "/config.h"
 end.
@@ -214,7 +218,7 @@ end.
             "-DXP_UNIX -I/usr/include/mozjs-86 -I/usr/local/include/mozjs-86 -I/opt/homebrew/include/mozjs-86/ -std=c++17 -Wno-invalid-offsetof",
             "-L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-86 -lm"
         };
-    {unix, _} when SMVsn == "91"; SMVsn == "102"; SMVsn == "115"; SMVsn == "128" ->
+    {unix, _} when SMVsn == "91"; SMVsn == "102"; SMVsn == "115"; SMVsn == "128"; SMVsn == "140" ->
         {
             "$CFLAGS -DXP_UNIX " ++ MozJSIncludePath ++ " -std=c++17 -Wno-invalid-offsetof",
             "$LDFLAGS " ++ MozJSLibPath ++ " -std=c++17 -lm -lmozjs-" ++ SMVsn
@@ -224,7 +228,7 @@ end.
             "/std:c++17 /DXP_WIN",
             "$LDFLAGS mozjs-91.lib"
         };
-    {win32, _} when SMVsn == "102"; SMVsn == "115"; SMVsn == "128" ->
+    {win32, _} when SMVsn == "102"; SMVsn == "115"; SMVsn == "128"; SMVsn == "140" ->
         {
             "/std:c++17 /DXP_WIN /Zc:preprocessor /utf-8",
             "$LDFLAGS mozjs-" ++ SMVsn ++ ".lib"
@@ -240,7 +244,8 @@ CouchJSSrc = case SMVsn of
     "91" -> ["priv/couch_js/86/*.cpp"];
     "102" -> ["priv/couch_js/102/*.cpp"];
     "115" -> ["priv/couch_js/102/*.cpp"];
-    "128" -> ["priv/couch_js/102/*.cpp"]
+    "128" -> ["priv/couch_js/102/*.cpp"];
+    "140" -> ["priv/couch_js/140/*.cpp"]
 end.
 
 CouchJSEnv = case SMVsn of
