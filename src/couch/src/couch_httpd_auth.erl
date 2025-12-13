@@ -209,14 +209,15 @@ proxy_auth_user(Req) ->
                     case chttpd_util:get_chttpd_auth_config("secret") of
                         undefined ->
                             Req#httpd{user_ctx = #user_ctx{name = ?l2b(UserName), roles = Roles}};
-                        Secret ->
-                            HashAlgorithms = couch_util:get_config_hash_algorithms(),
-                            Token = header_value(Req, XHeaderToken),
-                            VerifyTokens = fun(HashAlg) ->
-                                Hmac = couch_util:hmac(HashAlg, Secret, UserName),
-                                couch_passwords:verify(couch_util:to_hex(Hmac), Token)
-                            end,
-                            case lists:any(VerifyTokens, HashAlgorithms) of
+                        _Secret ->
+                            Token =
+                                try
+                                    binary:decode_hex(?l2b(header_value(Req, XHeaderToken)))
+                                catch
+                                    error:badarg ->
+                                        undefined
+                                end,
+                            case couch_secrets:verify(UserName, Token) of
                                 true ->
                                     Req#httpd{
                                         user_ctx = #user_ctx{
@@ -355,35 +356,30 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                 end,
             % Verify expiry and hash
             CurrentTime = make_cookie_time(),
-            HashAlgorithms = couch_util:get_config_hash_algorithms(),
             case chttpd_util:get_chttpd_auth_config("secret") of
                 undefined ->
                     couch_log:debug("cookie auth secret is not set", []),
                     Req;
-                SecretStr ->
-                    Secret = ?l2b(SecretStr),
+                _SecretStr ->
                     case AuthModule:get_user_creds(Req, User) of
                         nil ->
                             Req;
                         {ok, UserProps, _AuthCtx} ->
                             UserSalt = couch_util:get_value(<<"salt">>, UserProps, <<"">>),
-                            FullSecret = <<Secret/binary, UserSalt/binary>>,
                             Hash = ?l2b(HashStr),
-                            VerifyHash = fun(HashAlg) ->
-                                Hmac = couch_util:hmac(
-                                    HashAlg,
-                                    FullSecret,
-                                    lists:join(":", [User, TimeStr])
-                                ),
-                                couch_passwords:verify(Hmac, Hash)
-                            end,
                             Timeout = chttpd_util:get_chttpd_auth_config_integer(
                                 "timeout", 600
                             ),
                             couch_log:debug("timeout ~p", [Timeout]),
                             case (catch list_to_integer(TimeStr, 16)) of
                                 TimeStamp when CurrentTime < TimeStamp + Timeout ->
-                                    case lists:any(VerifyHash, HashAlgorithms) of
+                                    case
+                                        couch_secrets:verify(
+                                            lists:join(":", [User, TimeStr]),
+                                            UserSalt,
+                                            Hash
+                                        )
+                                    of
                                         true ->
                                             TimeLeft = TimeStamp + Timeout - CurrentTime,
                                             couch_log:debug(
@@ -398,7 +394,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                                                     )
                                                 },
                                                 auth =
-                                                    {FullSecret, TimeLeft < Timeout * 0.9}
+                                                    {UserSalt, TimeLeft < Timeout * 0.9}
                                             };
                                         _Else ->
                                             Req
@@ -413,7 +409,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
 cookie_auth_header(#httpd{user_ctx = #user_ctx{name = null}}, _Headers) ->
     [];
 cookie_auth_header(
-    #httpd{user_ctx = #user_ctx{name = User}, auth = {Secret, _SendCookie = true}} =
+    #httpd{user_ctx = #user_ctx{name = User}, auth = {UserSalt, _SendCookie = true}} =
         Req,
     Headers
 ) ->
@@ -430,21 +426,20 @@ cookie_auth_header(
     if
         AuthSession == undefined ->
             TimeStamp = make_cookie_time(),
-            [cookie_auth_cookie(Req, User, Secret, TimeStamp)];
+            [cookie_auth_cookie(Req, User, UserSalt, TimeStamp)];
         true ->
             []
     end;
 cookie_auth_header(_Req, _Headers) ->
     [].
 
-cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
+cookie_auth_cookie(Req, User, UserSalt, TimeStamp) ->
     SessionItems = [User, integer_to_list(TimeStamp, 16)],
-    cookie_auth_cookie(Req, Secret, SessionItems).
+    cookie_auth_cookie(Req, UserSalt, SessionItems).
 
-cookie_auth_cookie(Req, Secret, SessionItems) when is_list(SessionItems) ->
+cookie_auth_cookie(Req, UserSalt, SessionItems) when is_list(SessionItems) ->
     SessionData = lists:join(":", SessionItems),
-    [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
-    Hash = couch_util:hmac(HashAlgorithm, Secret, SessionData),
+    Hash = couch_secrets:sign(SessionData, UserSalt),
     mochiweb_cookies:cookie(
         "AuthSession",
         couch_util:encodeBase64Url(lists:join(":", [SessionData, Hash])),
@@ -465,9 +460,21 @@ ensure_cookie_auth_secret() ->
         undefined ->
             NewSecret = ?b2l(couch_uuids:random()),
             config:set("chttpd_auth", "secret", NewSecret),
+            wait_for_secret(10),
             NewSecret;
         Secret ->
             Secret
+    end.
+
+wait_for_secret(0) ->
+    ok;
+wait_for_secret(N) ->
+    case couch_secrets:secret_is_set() of
+        true ->
+            ok;
+        false ->
+            timer:sleep(50),
+            wait_for_secret(N - 1)
     end.
 
 % session handlers
@@ -514,11 +521,11 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
                 Req, UserName, Password, UserProps, AuthModule, AuthCtx
             ),
             % setup the session cookie
-            Secret = ?l2b(ensure_cookie_auth_secret()),
+            ensure_cookie_auth_secret(),
             UserSalt = couch_util:get_value(<<"salt">>, UserProps),
             CurrentTime = make_cookie_time(),
             Cookie = cookie_auth_cookie(
-                Req, UserName, <<Secret/binary, UserSalt/binary>>, CurrentTime
+                Req, UserName, UserSalt, CurrentTime
             ),
             % TODO document the "next" feature in Futon
             {Code, Headers} =
