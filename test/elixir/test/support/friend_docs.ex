@@ -276,7 +276,7 @@ defmodule FriendDocs do
     :ok
   end
 
-  defp add_view_indexes(db) do
+  defp add_view_indexes(_db) do
     # TODO: this function is not defined in the Python version of this module?
   end
 
