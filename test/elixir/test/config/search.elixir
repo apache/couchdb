@@ -61,5 +61,8 @@
   ],
   "RegexVsTextIndexTest": [
     "regex works with text index"
+  ],
+  "NumStringTests": [
+    "single floating point test"
   ]
 }
