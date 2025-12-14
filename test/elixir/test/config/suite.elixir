@@ -836,5 +836,12 @@
     "no index without fallback",
     "uses all docs when fields do not match selector",
     "uses all docs when selector doesnt require fields to exist"
-  ]
+  ],
+  "JwtRolesClaimTest": [
+      "case: roles_claim_name (defined) / roles_claim_path (defined)",
+      "case: roles_claim_name (defined) / roles_claim_path (undefined)",
+      "case: roles_claim_name (undefined) / roles_claim_path (defined)",
+      "case: roles_claim_name (undefined) / roles_claim_path (undefined)",
+      "case: roles_claim_path with bad input"
+    ]
 }
