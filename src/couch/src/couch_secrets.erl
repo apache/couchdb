@@ -41,7 +41,7 @@ sign(Message) ->
 
 sign(Message, ExtraSecret) ->
     [HashAlgorithm | _] = couch_util:get_config_hash_algorithms(),
-    case current_secret_from_ets() of
+    case current_secret() of
         undefined ->
             throw({internal_server_error, <<"cookie auth secret is not set">>});
         CurrentSecret ->
@@ -53,7 +53,7 @@ verify(Message, ExpectedMAC) ->
     verify(Message, <<>>, ExpectedMAC).
 
 verify(Message, ExtraSecret, ExpectedMAC) ->
-    FullSecrets = [<<Secret/binary, ExtraSecret/binary>> || Secret <- all_secrets_from_ets()],
+    FullSecrets = [<<Secret/binary, ExtraSecret/binary>> || Secret <- all_secrets()],
     AllAlgorithms = couch_util:get_config_hash_algorithms(),
     verify(Message, AllAlgorithms, FullSecrets, ExpectedMAC).
 
@@ -177,11 +177,31 @@ current_secret_from_config() ->
             ?l2b(Secret)
     end.
 
+current_secret() ->
+    case current_secret_from_ets() of
+        undefined ->
+            current_secret_from_config();
+        CurrentSecret ->
+            CurrentSecret
+    end.
+
 current_secret_from_ets() ->
     current_secret_from_ets(node()).
 
 current_secret_from_ets(Node) ->
     secret_from_ets({Node, current}).
+
+all_secrets() ->
+    case all_secrets_from_ets() of
+        [] ->
+            CurrentSecret = current_secret_from_config(),
+            if
+                CurrentSecret == undefined -> [];
+                true -> [CurrentSecret]
+            end;
+        AllSecrets ->
+            AllSecrets
+    end.
 
 all_secrets_from_ets() ->
     secret_from_ets(all_secrets).
