@@ -460,21 +460,9 @@ ensure_cookie_auth_secret() ->
         undefined ->
             NewSecret = ?b2l(couch_uuids:random()),
             config:set("chttpd_auth", "secret", NewSecret),
-            wait_for_secret(10),
             NewSecret;
         Secret ->
             Secret
-    end.
-
-wait_for_secret(0) ->
-    ok;
-wait_for_secret(N) ->
-    case couch_secrets:secret_is_set() of
-        true ->
-            ok;
-        false ->
-            timer:sleep(50),
-            wait_for_secret(N - 1)
     end.
 
 % session handlers
