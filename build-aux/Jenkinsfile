@@ -205,7 +205,7 @@ meta = [
      disable_spidermonkey: true,
      with_nouveau: false,
      with_clouseau: true,
-     clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
+     clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
      gnu_make: 'gmake',
      gnu_make_eunit_opts: '-j4 --output-sync=target'
    ]
