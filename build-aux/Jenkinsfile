@@ -206,7 +206,8 @@ meta = [
      with_nouveau: false,
      with_clouseau: true,
      clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
-     gnu_make: 'make'
+     gnu_make: 'gmake',
+     gnu_make_eunit_opts: '-j4 --output-sync=target'
    ]
 
   // Disable temporarily. The behavior we see is that the windows job
@@ -275,7 +276,7 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
-                  retry (3) {sh '$MAKE eunit'}
+                  retry (3) {sh '$MAKE eunit ' + meta[platform].gnu_make_eunit_opts}
                   if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
                   retry (3) {sh '$MAKE elixir-search ERLANG_COOKIE=crumbles'}
