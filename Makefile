@@ -193,6 +193,8 @@ eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: ${SUBDIRS}
+	@cat tmp/couchdb-tests/*/log/couch.log > tmp/couch.log
+	@rm -rf tmp/couchdb-tests/*
 
 $(SUBDIRS): setup-eunit
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ #|| exit 1
