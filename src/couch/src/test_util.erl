@@ -131,7 +131,8 @@ stop_couch() ->
     ok = stop_applications(?DEFAULT_APPS).
 
 stop_couch(#test_context{started = Apps, dir = RandomDir}) ->
-    file:del_dir_r(RandomDir),
+    % deletion now happens in Makefile
+    % file:del_dir_r(RandomDir),
     stop_applications(Apps);
 stop_couch(_) ->
     stop_couch().
