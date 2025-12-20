@@ -645,7 +645,7 @@ pipeline {
       steps {
         sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
         sh "./configure --spidermonkey-version 78 --with-nouveau"
-        sh 'make dist'
+        sh 'make -j4 dist'
       }
       post {
         success {
