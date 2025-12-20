@@ -200,17 +200,14 @@ meta = [
      gnu_make: 'gmake'
   ],
 
- // Disable temporarily. Forks / shell execs seem to fail there currently
- //
- //
- // 'macos': [
- //    name: 'macOS',
- //    spidermonkey_vsn: '128',
- //    with_nouveau: false,
- //    with_clouseau: true,
- //    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
- //    gnu_make: 'make'
- //  ],
+  'macos': [
+     name: 'macOS',
+     disable_spidermonkey: true,
+     with_nouveau: false,
+     with_clouseau: true,
+     clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
+     gnu_make: 'make'
+   ]
 
   // Disable temporarily. The behavior we see is that the windows job
   // locks up and doesn't emit any logs to Jenkins. It just waits for
