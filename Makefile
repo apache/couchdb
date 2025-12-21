@@ -168,53 +168,27 @@ check: all
 	@$(MAKE) nouveau-test
 
 ifdef apps
-SUBDIRS = $(apps)
+EUNIT_SUBDIRS = $(strip $(subst $(comma),$(space),$(apps)))
 else
-SUBDIRS=$(shell ls src)
+EUNIT_SUBDIRS = $(filter-out fauxton docs, $(shell ls src))
 endif
 
-# Used for comparing behaviour against he new `eunit` target, delete once we
-# are happy with the new `eunit`.
-.PHONY: old-eunit
-old-eunit: export BUILDDIR = $(CURDIR)
-old-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-old-eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
-old-eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-old-eunit:
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
-	@for dir in $(SUBDIRS); do \
-     COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-  done
-
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
-.PHONY: eunit $(SUBDIRS)
-eunit: export BUILDDIR = $(CURDIR)
+.PHONY: eunit $(EUNIT_SUBDIRS)
 eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-eunit: ${SUBDIRS}
-	@cat tmp/couchdb-tests/*/log/couch.log > tmp/couch.log
-	@rm -rf tmp/couchdb-tests/*
+eunit: ${EUNIT_SUBDIRS}
 
-$(SUBDIRS): setup-eunit
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ #|| exit 1
+$(EUNIT_SUBDIRS):
+	@rm -rf tmp/$@
+	@$(REBAR) setup_eunit app=$@ >/dev/null
+	@BUILDDIR=$(CURDIR)/tmp/$@ COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ && rm -rf tmp/$@
 
-setup-eunit: export BUILDDIR = $(CURDIR)
-setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-setup-eunit:
-	@$(REBAR) setup_eunit 2> /dev/null
-
-just-eunit: export BUILDDIR = $(CURDIR)
-just-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
-
-.PHONY: soak-eunit
-soak-eunit: export BUILDDIR = $(CURDIR)
-soak-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-soak-eunit: couch-core
-	@$(REBAR) setup_eunit 2> /dev/null
-	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+# cat together couch_log files after running eunit test
+.PHONY: catlogs
+catlogs:
+	@ls tmp/*/couch.log 2>/dev/null | xargs cat > tmp/couch.log || true
 
 # target: erlfmt-check - Check Erlang source code formatting
 erlfmt-check:
@@ -316,6 +290,7 @@ build-report:
 	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log || true
 	cat ./dev/logs/node1.log || true
 	cat ./dev/logs/nouveau.log || true
+	$(MAKE) catlogs || true
 	cat ./tmp/couch.log || true
 	cat test-results.log || true
 
