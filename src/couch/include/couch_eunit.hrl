@@ -25,21 +25,22 @@
         end
     end).
 -define(CONFIG_DEFAULT,
-    filename:join([?BUILDDIR(), "tmp", "etc", "default_eunit.ini"])).
+    filename:join([?BUILDDIR(), "etc", "default_eunit.ini"])).
 -define(CONFIG_CHAIN, [
     ?CONFIG_DEFAULT,
-    filename:join([?BUILDDIR(), "tmp", "etc", "local_eunit.ini"]),
-    filename:join([?BUILDDIR(), "tmp", "etc", "eunit.ini"])]).
--define(FIXTURESDIR,
-    filename:join([?BUILDDIR(), "src", "couch", "test", "eunit", "fixtures"])).
+    filename:join([?BUILDDIR(), "etc", "local_eunit.ini"]),
+    filename:join([?BUILDDIR(), "etc", "eunit.ini"])]).
 -define(TEMPDIR,
-    filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
+    filename:join([?BUILDDIR(), "tmp_data"])).
 
 -define(APPDIR, filename:dirname(element(2, file:get_cwd()))).
 %% Account for the fact that source files are in src/<app>/.eunit/<module>.erl
 %% when run from eunit
 -define(ABS_PATH(File), %% src/<app>/.eunit/<module>.erl
     filename:join([?APPDIR, File])).
+
+-define(FIXTURESDIR,
+    ?ABS_PATH("test/eunit/fixtures")).
 
 -define(tempfile,
     fun() ->
