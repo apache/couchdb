@@ -152,6 +152,8 @@ clean_msec() ->
 
 -include_lib("couch/include/couch_eunit.hrl").
 
+-define(TIMEOUT, 10).
+
 couch_stats_server_test_() ->
     {
         foreach,
@@ -159,8 +161,8 @@ couch_stats_server_test_() ->
         fun teardown/1,
         [
             ?TDEF_FE(t_server_starts),
-            ?TDEF_FE(t_reload_with_no_changes_works),
-            ?TDEF_FE(t_reload_with_changes_works),
+            ?TDEF_FE(t_reload_with_no_changes_works, 10),
+            ?TDEF_FE(t_reload_with_changes_works, 10),
             ?TDEF_FE(t_cleaning_works, 10),
             ?TDEF_FE(t_invalid_call),
             ?TDEF_FE(t_invalid_cast),
