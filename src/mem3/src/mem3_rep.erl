@@ -250,11 +250,20 @@ have_all_purge_checkpoints(true, Db, [_ | _] = Shards) ->
                 % mem3:shards/1 returns a single #shard{} record with node =
                 % node(), name = _dbs, range = [0, ?RING_END] and it should
                 % replicate in a ring to the dbs copy on "next" node in a ring.
+                % We push purges to the next node and the previous node pull
+                % purges from us, so we expect to have only two purge
+                % checkpoints for the next and previous nodes.
                 Next = mem3_sync:find_next_node(),
-                % If we're the only node, then next == node()
+                Prev = mem3_sync:find_previous_node(),
+                % If we're the only node, then next == node() and prev == node()
                 case Next == config:node_name() of
-                    true -> couch_util:new_set();
-                    false -> couch_util:set_from_list([{Next, [0, ?RING_END]}])
+                    true ->
+                        couch_util:new_set();
+                    false ->
+                        couch_util:set_from_list([
+                            {Next, [0, ?RING_END]},
+                            {Prev, [0, ?RING_END]}
+                        ])
                 end;
             false ->
                 % Keep only shard copies. These are not necessarily ones with a matching
@@ -325,12 +334,15 @@ verify_checkpoint_shard(Shards, Props) when is_list(Shards), is_list(Props) ->
     case Shards of
         [#shard{dbname = ShardsDb}] ->
             % This is shards db itself. It's a special case since replications
-            % copies are other shard db copies replicated in a ring
+            % copies are other shard db copies replicated in a ring. We push
+            % purges to the next and node and the previous node pull purges
+            % from us. So we expect to have two purge replication checkpoints.
             Next = mem3_sync:find_next_node(),
+            Prev = mem3_sync:find_previous_node(),
             % If we're the only node, the next == node()
             case Next == config:node_name() of
                 true -> false;
-                false -> TNode == Next
+                false -> TNode == Next orelse TNode == Prev
             end;
         _ ->
             Range = couch_util:get_value(<<"range">>, Props),
@@ -1437,13 +1449,16 @@ t_have_all_shards_db(_) ->
 
     Src1 = #shard{name = Dbs, node = node(), range = Range},
     Tgt1 = #shard{name = Dbs, node = 'n2', range = Range},
+    Tgt2 = #shard{name = Dbs, node = 'n3', range = Range},
 
     % We're the only node: don't expect any other checkpoints
     meck:expect(mem3_sync, find_next_node, 0, node()),
+    meck:expect(mem3_sync, find_previous_node, 0, node()),
     ?assert(have_all_purge_checkpoints(Dbs)),
 
     % There is another node and we don't have a checkpoint for it
     meck:expect(mem3_sync, find_next_node, 0, 'n2'),
+    meck:expect(mem3_sync, find_previous_node, 0, 'n3'),
     ?assert(not have_all_purge_checkpoints(Dbs)),
 
     Body1 = purge_cp_body(Src1, Tgt1, 42),
@@ -1451,11 +1466,21 @@ t_have_all_shards_db(_) ->
     DocId1 = make_purge_id(SrcUuid, TgtUuid1),
     Doc1 = #doc{id = DocId1, body = Body1},
     {ok, _} = couch_db:update_doc(Db, Doc1, [?ADMIN_CTX]),
-    couch_db:close(Db),
 
-    % After adding the checkpoint for n2, we should get true again
+    % After adding the checkpoint for n2, we should still get false because
+    % there is no previous checkpoint for n3 pull purges from us
+    ?assert(not have_all_purge_checkpoints(Dbs)),
+
+    Body2 = purge_cp_body(Src1, Tgt2, 43),
+    TgtUuid2 = couch_uuids:random(),
+    DocId2 = make_purge_id(SrcUuid, TgtUuid2),
+    Doc2 = #doc{id = DocId2, body = Body2},
+    {ok, _} = couch_db:update_doc(Db, Doc2, [?ADMIN_CTX]),
+
+    % After adding the checkpoint for n3, we should get true
     ?assert(have_all_purge_checkpoints(Dbs)),
 
+    couch_db:close(Db),
     ok = couch_server:delete(Dbs, [?ADMIN_CTX]).
 
 t_verify_checkpoint_shards_db(_) ->
@@ -1470,6 +1495,14 @@ t_verify_checkpoint_shards_db(_) ->
     ],
     ?assert(not verify_checkpoint_shard(Shards, Props1)),
     meck:expect(mem3_sync, find_next_node, 0, 'n2'),
-    ?assert(verify_checkpoint_shard(Shards, Props1)).
+    ?assert(verify_checkpoint_shard(Shards, Props1)),
+
+    Props2 = [
+        {<<"target">>, atom_to_binary(n3, latin1)},
+        {<<"range">>, Range}
+    ],
+    ?assert(not verify_checkpoint_shard(Shards, Props2)),
+    meck:expect(mem3_sync, find_previous_node, 0, 'n3'),
+    ?assert(verify_checkpoint_shard(Shards, Props2)).
 
 -endif.
