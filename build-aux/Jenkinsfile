@@ -276,7 +276,11 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
-                  retry (3) {sh '$MAKE eunit ' + meta[platform].gnu_make_eunit_opts}
+                  eunit_opts = ''
+                  if ( meta[platform].gnu_make_eunit_opts ) {
+                    eunit_opts = meta[platform].gnu_make_eunit_opts
+                  }
+                  retry (3) {sh '$MAKE eunit ' + eunit_opts}
                   if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
                   retry (3) {sh '$MAKE elixir-search ERLANG_COOKIE=crumbles'}
