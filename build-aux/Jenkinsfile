@@ -275,16 +275,26 @@ def generateNativeStage(platform) {
                 sh 'echo "JAIL_HOST: ${JAIL_HOST}"'
                 sh( script: "mkdir -p ${platform}/build", label: 'Create build directories' )
                 sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
-                dir( "${platform}/build" ) {
-                  sh "${configure(meta[platform])}"
-                  sh '$MAKE'
-                  retry (3) {sh '$MAKE eunit'}
-                  if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
-                  retry (3) {sh '$MAKE elixir'}
-                  retry (3) {sh '$MAKE elixir-search ERLANG_COOKIE=crumbles'}
-                  retry (3) {sh '$MAKE mango-test ERLANG_COOKIE=crumbles'}
-                  retry (3) {sh '$MAKE weatherreport-test'}
-                  retry (3) {sh '$MAKE nouveau-test'}
+                cache(
+                  maxCacheSize: 250,
+                  defaultBranch: 'main',
+                    caches: [
+                      arbitraryFileCache(
+                        path: '_build',
+                        compressionMethod: 'TAR', // for binaries
+                        cacheValidityDecidingFile: 'mix.exs')
+                  ]) {
+                    dir( "${platform}/build" ) {
+                      sh "${configure(meta[platform])}"
+                      sh '$MAKE'
+                      retry (3) {sh '$MAKE eunit'}
+                      if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
+                      retry (3) {sh '$MAKE elixir'}
+                      retry (3) {sh '$MAKE elixir-search ERLANG_COOKIE=crumbles'}
+                      retry (3) {sh '$MAKE mango-test ERLANG_COOKIE=crumbles'}
+                      retry (3) {sh '$MAKE weatherreport-test'}
+                      retry (3) {sh '$MAKE nouveau-test'}
+                    }
                 }
               }
             }
@@ -410,17 +420,26 @@ def generateContainerStage(platform) {
                   if (meta[platform].clouseau_java_home) {
                     setClouseauJavaHome = "env CLOUSEAU_JAVA_HOME='${meta[platform].clouseau_java_home}' "
                   }
-
-                  dir( "${platform}/build" ) {
-                    sh "${configure(meta[platform])}"
-                    sh 'make'
-                    retry(3) {sh 'make eunit'}
-                    if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
-                    retry(3) {sh 'make elixir'}
-                    retry(3) {sh "${setClouseauJavaHome}timeout 5m make elixir-search ERLANG_COOKIE=crumbles"}
-                    retry(3) {sh "${setClouseauJavaHome}timeout 5m make mango-test ERLANG_COOKIE=crumbles"}
-                    retry(3) {sh 'make weatherreport-test'}
-                    retry(3) {sh 'make nouveau-test'}
+                  cache(
+                    maxCacheSize: 250,
+                    defaultBranch: 'main',
+                      caches: [
+                        arbitraryFileCache(
+                          path: '_build',
+                          compressionMethod: 'TAR', // for binaries
+                          cacheValidityDecidingFile: 'mix.exs')
+                    ]) {
+                    dir( "${platform}/build" ) {
+                      sh "${configure(meta[platform])}"
+                      sh 'make'
+                      retry(3) {sh 'make eunit'}
+                      if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
+                      retry(3) {sh 'make elixir'}
+                      retry(3) {sh "${setClouseauJavaHome}timeout 5m make elixir-search ERLANG_COOKIE=crumbles"}
+                      retry(3) {sh "${setClouseauJavaHome}timeout 5m make mango-test ERLANG_COOKIE=crumbles"}
+                      retry(3) {sh 'make weatherreport-test'}
+                      retry(3) {sh 'make nouveau-test'}
+                    }
                   }
                 }
                 catch (err) {
@@ -498,7 +517,6 @@ pipeline {
   }
 
   stages {
-
     stage('Setup Env') {
       agent {
         docker {
@@ -612,13 +630,23 @@ pipeline {
         }
       }
       steps {
-        sh '''
-          rm -rf apache-couchdb-*
-          ./configure --skip-deps --spidermonkey-version 78
-          make erlfmt-check
-          make elixir-source-checks
-          make python-black
-        '''
+        cache(
+          maxCacheSize: 250,
+          defaultBranch: 'main',
+            caches: [
+              arbitraryFileCache(
+                path: '_build',
+                compressionMethod: 'TAR', // for binaries
+                cacheValidityDecidingFile: 'mix.exs')
+          ]) {
+          sh '''
+            rm -rf apache-couchdb-*
+            ./configure --skip-deps --spidermonkey-version 78
+            make erlfmt-check
+            make elixir-source-checks
+            make python-black
+          '''
+        }
       }
       post {
         cleanup {
