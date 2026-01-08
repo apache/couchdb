@@ -521,6 +521,12 @@
     "serial execution is not spuriously counted as loop on test_rewrite_suite_db",
     "serial execution is not spuriously counted as loop on test_rewrite_suite_db%2Fwith_slashes"
   ],
+  "ValidateDocUpdateTest": [
+    "JavaScript VDU accepts a valid document",
+    "JavaScript VDU rejects an invalid document",
+    "JavaScript VDU accepts a valid change",
+    "JavaScript VDU rejects an invalid change",
+  ],
   "SecurityValidationTest": [
     "Author presence and user security",
     "Author presence and user security when replicated",
