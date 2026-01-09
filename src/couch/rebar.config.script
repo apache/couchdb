@@ -256,7 +256,7 @@ CouchJSEnv = case SMVsn of
         ]
 end.
 
-BrewIcuPrefixCmd = "brew --prefix icu4c".
+BrewIcuPrefixCmd = "brew --prefix icu4c 2> /dev/null".
 GenericIcuIncludePaths = "-I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include".
 GenericIcuLibPaths = "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib".
 

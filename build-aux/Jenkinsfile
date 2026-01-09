@@ -200,17 +200,15 @@ meta = [
      gnu_make: 'gmake'
   ],
 
- // Disable temporarily. Forks / shell execs seem to fail there currently
- //
- //
- // 'macos': [
- //    name: 'macOS',
- //    spidermonkey_vsn: '128',
- //    with_nouveau: false,
- //    with_clouseau: true,
- //    clouseau_java_home: '/opt/java/openjdk8/zulu-8.jre/Contents/Home',
- //    gnu_make: 'make'
- //  ],
+  'macos': [
+     name: 'macOS',
+     disable_spidermonkey: true,
+     with_nouveau: false,
+     with_clouseau: true,
+     clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
+     gnu_make: 'gmake',
+     gnu_make_eunit_opts: '-j4 --output-sync=target'
+   ]
 
   // Disable temporarily. The behavior we see is that the windows job
   // locks up and doesn't emit any logs to Jenkins. It just waits for
@@ -278,7 +276,11 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
-                  retry (3) {sh '$MAKE eunit'}
+                  eunit_opts = ''
+                  if ( meta[platform].gnu_make_eunit_opts ) {
+                    eunit_opts = meta[platform].gnu_make_eunit_opts
+                  }
+                  retry (3) {sh '$MAKE eunit ' + eunit_opts}
                   if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
                   retry (3) {sh '$MAKE elixir-search ERLANG_COOKIE=crumbles'}
@@ -645,7 +647,7 @@ pipeline {
       steps {
         sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
         sh "./configure --spidermonkey-version 78 --with-nouveau"
-        sh 'make dist'
+        sh 'make -j4 dist'
       }
       post {
         success {
