@@ -526,6 +526,12 @@
     "JavaScript VDU rejects an invalid document",
     "JavaScript VDU accepts a valid change",
     "JavaScript VDU rejects an invalid change",
+    "Mango VDU accepts a valid document",
+    "Mango VDU rejects an invalid document",
+    "updating a Mango VDU updates its effects",
+    "converting a Mango VDU to JavaScript updates its effects",
+    "deleting a Mango VDU removes its effects",
+    "Mango VDU rejects a doc if any existing ddoc fails to match",
   ],
   "SecurityValidationTest": [
     "Author presence and user security",
