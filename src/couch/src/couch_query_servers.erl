@@ -477,18 +477,18 @@ builtin_cmp_last(A, B) ->
 validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
     JsonDiskDoc = json_doc(DiskDoc),
-    Resp = ddoc_prompt(
-        Db,
-        DDoc,
-        [<<"validate_doc_update">>],
-        [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]
-    ),
-    if
-        Resp == 1 -> ok;
-        true -> couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1)
-    end,
+    Args = [JsonEditDoc, JsonDiskDoc, Ctx, SecObj],
+
+    Resp =
+        case ddoc_prompt(Db, DDoc, [<<"validate_doc_update">>], Args) of
+            Code when Code =:= 1; Code =:= ok; Code =:= true ->
+                ok;
+            Other ->
+                couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1),
+                Other
+        end,
     case Resp of
-        RespCode when RespCode =:= 1; RespCode =:= ok; RespCode =:= true ->
+        ok ->
             ok;
         {[{<<"forbidden">>, Message}]} ->
             throw({forbidden, Message});
