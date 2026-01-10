@@ -75,7 +75,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=meck,mochiweb,triq,proper,snappy,ibrowse
+skip_deps=meck,mochiweb,triq,proper,snappy,ibrowse,gun,recon
 suites=
 tests=
 
