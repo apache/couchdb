@@ -2051,7 +2051,8 @@ parse_shards_opt("access", _Req, _Value) ->
 parse_shards_opt(Param, Req, Default) ->
     Val = chttpd:qs_value(Req, Param, Default),
     case couch_util:validate_positive_int(Val) of
-        true -> Val;
+        true ->
+            Val;
         false ->
             Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
             throw({bad_request, Err})
