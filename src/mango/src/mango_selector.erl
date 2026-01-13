@@ -1070,7 +1070,7 @@ check_beginswith(Field, Prefix) ->
     % in the middle of test output.
     match_int(mango_selector:normalize(Selector), ?TEST_DOC).
 
-match_beginswith_test() ->
+match_beginswith_errors_test() ->
     % matching
     ?assertEqual(true, check_beginswith(<<"_id">>, <<"f">>)),
     % no match (user_id field in the test doc contains an integer)
@@ -1086,5 +1086,621 @@ match_beginswith_test() ->
         {mango_error, mango_selector, {bad_arg, '$beginsWith', InvalidArg}},
         check_beginswith(<<"user_id">>, InvalidArg)
     ).
+
+check_selector(Selector, Results) ->
+    SelPos = normalize({[{<<"x">>, Selector}]}),
+    SelNeg = normalize({[{<<"x">>, {[{<<"$not">>, Selector}]}}]}),
+
+    Check = fun({Result, Value}) ->
+        Doc = {[{<<"x">>, Value}]},
+        ?assertEqual(Result, match_int(SelPos, Doc)),
+        ?assertEqual(not Result, match_int(SelNeg, Doc))
+    end,
+
+    lists:foreach(Check, Results).
+
+match_lt_test() ->
+    check_selector({[{<<"$lt">>, 5}]}, [{true, 4}, {false, 5}, {false, 6}]),
+
+    check_selector({[{<<"$lt">>, <<"hello">>}]}, [
+        {true, <<"held">>},
+        {false, <<"hello">>},
+        {false, <<"help">>}
+    ]),
+
+    check_selector({[{<<"$lt">>, [1, 2, 3]}]}, [
+        {true, [1, 2, 2]},
+        {true, [1, 2]},
+        {false, [1, 2, 3]},
+        {false, [1, 2, 4]},
+        {false, [1, 3]}
+    ]).
+
+match_lte_test() ->
+    check_selector({[{<<"$lte">>, 5}]}, [{true, 4}, {true, 5}, {false, 6}]),
+
+    check_selector({[{<<"$lte">>, <<"hello">>}]}, [
+        {true, <<"held">>},
+        {true, <<"hello">>},
+        {false, <<"help">>}
+    ]),
+
+    check_selector({[{<<"$lte">>, [1, 2, 3]}]}, [
+        {true, [1, 2, 2]},
+        {true, [1, 2]},
+        {true, [1, 2, 3]},
+        {false, [1, 2, 4]},
+        {false, [1, 3]}
+    ]).
+
+match_gt_test() ->
+    check_selector({[{<<"$gt">>, 5}]}, [{false, 4}, {false, 5}, {true, 6}]),
+
+    check_selector({[{<<"$gt">>, <<"hello">>}]}, [
+        {false, <<"held">>},
+        {false, <<"hello">>},
+        {true, <<"help">>}
+    ]),
+
+    check_selector({[{<<"$gt">>, [1, 2, 3]}]}, [
+        {false, [1, 2, 2]},
+        {false, [1, 2]},
+        {false, [1, 2, 3]},
+        {true, [1, 2, 4]},
+        {true, [1, 3]}
+    ]).
+
+match_gte_test() ->
+    check_selector({[{<<"$gte">>, 5}]}, [{false, 4}, {true, 5}, {true, 6}]),
+
+    check_selector({[{<<"$gte">>, <<"hello">>}]}, [
+        {false, <<"held">>},
+        {true, <<"hello">>},
+        {true, <<"help">>}
+    ]),
+
+    check_selector({[{<<"$gte">>, [1, 2, 3]}]}, [
+        {false, [1, 2, 2]},
+        {false, [1, 2]},
+        {true, [1, 2, 3]},
+        {true, [1, 2, 4]},
+        {true, [1, 3]}
+    ]).
+
+match_eq_test() ->
+    check_selector({[{<<"$eq">>, 5}]}, [{true, 5}, {false, 6}]),
+    check_selector({[{<<"$eq">>, <<"hello">>}]}, [{true, <<"hello">>}, {false, <<"help">>}]),
+
+    check_selector({[{<<"$eq">>, [1, [2, 3, 4], 5]}]}, [
+        {true, [1, [2, 3, 4], 5]},
+        {false, [1, [2, 3, 4]]},
+        {false, [1, [2, 3, 4], 5, 6]},
+        {false, [1, [2, 7, 4], 5]}
+    ]),
+
+    check_selector({[{<<"$eq">>, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 7}]}}]}}]}}]}, [
+        {true, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 7}]}}]}}]}},
+        {false, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 8}]}}]}}]}},
+        {false, {[{<<"a">>, {[{<<"b">>, {[{<<"d">>, 7}]}}]}}]}},
+        {false, {[{<<"a">>, {[{<<"d">>, {[{<<"c">>, 7}]}}]}}]}}
+    ]).
+
+match_ne_test() ->
+    check_selector({[{<<"$ne">>, 5}]}, [{false, 5}, {true, 6}]),
+
+    % the %ne operator still requires a value to be present...
+    SelInt = normalize({[{<<"x">>, {[{<<"$ne">>, 5}]}}]}),
+    ?assertEqual(false, match_int(SelInt, {[]})),
+
+    % ... which, due to normalization, means that using $not with $eq does not
+    % match the empty doc
+    SelNotEq = normalize({[{<<"$not">>, {[{<<"x">>, 5}]}}]}),
+    ?assertEqual(false, match_int(SelNotEq, {[]})),
+
+    check_selector({[{<<"$ne">>, <<"hello">>}]}, [{false, <<"hello">>}, {true, <<"help">>}]),
+
+    check_selector({[{<<"$ne">>, [1, [2, 3, 4], 5]}]}, [
+        {false, [1, [2, 3, 4], 5]},
+        {true, [1, [2, 3, 4]]},
+        {true, [1, [2, 3, 4], 5, 6]},
+        {true, [1, [2, 7, 4], 5]}
+    ]),
+
+    check_selector({[{<<"$ne">>, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 7}]}}]}}]}}]}, [
+        {false, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 7}]}}]}}]}},
+        {true, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 8}]}}]}}]}},
+        {true, {[{<<"a">>, {[{<<"b">>, {[{<<"d">>, 7}]}}]}}]}},
+        {true, {[{<<"a">>, {[{<<"d">>, {[{<<"c">>, 7}]}}]}}]}}
+    ]).
+
+match_in_test() ->
+    check_selector({[{<<"$in">>, []}]}, [
+        {false, 0},
+        {false, true},
+        {false, <<"foo">>}
+    ]),
+
+    check_selector(
+        {[
+            {<<"$in">>, [
+                42,
+                false,
+                <<"bar">>,
+                [[<<"nested">>], <<"list">>],
+                {[{<<"b">>, 2}]}
+            ]}
+        ]},
+        [
+            {true, 42},
+            {true, false},
+            {true, <<"bar">>},
+            {true, {[{<<"b">>, 2}]}},
+
+            {false, 43},
+            {false, true},
+            {false, <<"bars">>},
+            {false, {[{<<"b">>, 2}, {<<"c">>, 3}]}},
+
+            % when the input is an array, $in matches if any of the array items
+            % match...
+            {true, [0, 42]},
+            {true, [0, false]},
+            {true, [0, <<"bar">>]},
+            {true, [0, {[{<<"b">>, 2}]}]},
+
+            % ... which means it doesn't directly match when one of the
+            % candiate values is itself an array
+            {false, [[<<"nested">>], <<"list">>]},
+            {true, [0, [[<<"nested">>], <<"list">>]]}
+        ]
+    ).
+
+match_nin_test() ->
+    check_selector({[{<<"$nin">>, []}]}, [
+        {true, 0},
+        {true, true},
+        {true, <<"foo">>}
+    ]),
+
+    check_selector(
+        {[
+            {<<"$nin">>, [
+                42,
+                false,
+                <<"bar">>,
+                [[<<"nested">>], <<"list">>],
+                {[{<<"b">>, 2}]}
+            ]}
+        ]},
+        [
+            {false, 42},
+            {false, false},
+            {false, <<"bar">>},
+            {false, {[{<<"b">>, 2}]}},
+
+            {true, 43},
+            {true, true},
+            {true, <<"bars">>},
+            {true, {[{<<"b">>, 2}, {<<"c">>, 3}]}},
+
+            % when the input is an array, $nin matches if none of the array items
+            % match...
+            {false, [0, 42]},
+            {false, [0, false]},
+            {false, [0, <<"bar">>]},
+            {false, [0, {[{<<"b">>, 2}]}]},
+
+            % ... which means it doesn't directly match when one of the
+            % candiate values is itself an array
+            {true, [[<<"nested">>], <<"list">>]},
+            {false, [0, [[<<"nested">>], <<"list">>]]}
+        ]
+    ).
+
+match_all_test() ->
+    % { "$all": [] } matches nothing, not even arrays
+    check_selector({[{<<"$all">>, []}]}, [
+        {false, []},
+        {false, [42]},
+        {false, {[]}},
+        {false, <<"foo">>}
+    ]),
+
+    % normally, input lists can contain the required items in any order
+    check_selector({[{<<"$all">>, [1, 2, 3, 4]}]}, [
+        {true, [3, 2, 4, 1]},
+        {true, [0, 4, 3, 5, 2, 1, 6]},
+        {false, [3, 2, 4]},
+        {false, []}
+    ]),
+
+    % negation means the input must lack at least one of the items
+    check_selector({[{<<"$not">>, {[{<<"$all">>, [1, 2, 3, 4]}]}}]}, [
+        {true, [2, 4, 1]},
+        {false, [2, 4, 1, 3]},
+        {true, []}
+    ]),
+
+    % the special $all: [List] form allows the input to exactly match List...
+    check_selector({[{<<"$all">>, [[1, 2, 3, 4]]}]}, [
+        {true, [1, 2, 3, 4]},
+        {false, [4, 3, 2, 1]},
+        {false, [1, 3, 4]},
+        {false, []},
+        % ... or to contain List
+        {true, [5, [1, 2, 3, 4], 6]},
+        {false, [5, [1, 3, 4], 6]},
+        {false, [5, [1, 3, 2, 4], 6]}
+    ]),
+
+    % the special behaviour of $all: [X] only applies when X is a list
+    check_selector({[{<<"$all">>, [<<"hello">>]}]}, [
+        {false, <<"hello">>},
+        {true, [<<"hello">>]},
+        {true, [0, <<"hello">>, 1]},
+        {false, []}
+    ]),
+
+    % values must match exactly and not contain extra fields
+    check_selector({[{<<"$all">>, [{[{<<"a">>, 1}]}]}]}, [
+        {true, [{[{<<"a">>, 1}]}]},
+        {false, [{[{<<"a">>, 1}, {<<"b">>, 2}]}]}
+    ]).
+
+match_exists_test() ->
+    check_selector({[{<<"x">>, {[{<<"$exists">>, true}]}}]}, [
+        {true, {[{<<"x">>, 0}]}},
+        {false, {[{<<"y">>, 0}]}},
+        {false, {[]}}
+    ]),
+
+    check_selector({[{<<"x">>, {[{<<"$exists">>, false}]}}]}, [
+        {false, {[{<<"x">>, 0}]}},
+        {true, {[{<<"y">>, 0}]}},
+        {true, {[]}}
+    ]),
+
+    % due to normalizing to { "x": { "$ne": 0 } }, this does not match the empty doc
+    SelNeg = normalize({[{<<"x">>, {[{<<"$not">>, {[{<<"$eq">>, 0}]}}]}}]}),
+    SelPos = normalize({[{<<"x">>, 0}]}),
+    ?assertEqual(false, match_int(SelNeg, {[]})),
+    ?assertEqual(false, match_int(SelPos, {[]})),
+
+    % including { "$exists": true } in the negated part *does* match the empty doc
+    check_selector(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$not">>,
+                        {[
+                            {<<"$exists">>, true},
+                            {<<"$eq">>, 0}
+                        ]}}
+                ]}}
+        ]},
+        [
+            {true, {[{<<"x">>, 1}]}},
+            {false, {[{<<"x">>, 0}]}},
+            {true, {[]}}
+        ]
+    ).
+
+match_type_test() ->
+    check_selector({[{<<"$type">>, <<"null">>}]}, [
+        {true, null},
+        {false, false},
+        {false, {[]}}
+    ]),
+
+    check_selector({[{<<"$type">>, <<"boolean">>}]}, [
+        {true, true},
+        {true, false},
+        {false, 0}
+    ]),
+
+    check_selector({[{<<"$type">>, <<"number">>}]}, [
+        {true, 42},
+        {true, 3.14},
+        {true, 0},
+        {false, true},
+        {false, [1]},
+        {false, <<"1">>}
+    ]),
+
+    check_selector({[{<<"$type">>, <<"string">>}]}, [
+        {true, <<"">>},
+        {true, <<"hello">>},
+        {false, []}
+    ]),
+
+    check_selector({[{<<"$type">>, <<"array">>}]}, [
+        {true, []},
+        {true, [1, 2]},
+        {false, {[]}},
+        {false, <<"hi">>}
+    ]),
+
+    check_selector({[{<<"$type">>, <<"object">>}]}, [
+        {true, {[]}},
+        {true, {[{<<"a">>, 1}]}},
+        {false, [{<<"a">>, 1}]},
+        {false, null}
+    ]).
+
+match_regex_test() ->
+    check_selector({[{<<"$regex">>, <<"^[0-9a-f]+$">>}]}, [
+        {false, <<"">>},
+        {true, <<"3a0df5e">>},
+        {false, <<"3a0gf5e">>},
+        {false, 42}
+    ]).
+
+match_beginswith_test() ->
+    check_selector({[{<<"$beginsWith">>, <<"foo">>}]}, [
+        {true, <<"foo">>},
+        {true, <<"food">>},
+        {true, <<"fool me once">>},
+        {false, <<"more food">>},
+        {false, <<"fo">>},
+        {false, 42}
+    ]).
+
+match_mod_test() ->
+    check_selector({[{<<"$mod">>, [28, 1]}]}, [
+        {true, 1},
+        {true, 29},
+        {true, 57},
+        {false, 58},
+        {false, <<"57">>}
+    ]).
+
+match_size_test() ->
+    check_selector({[{<<"$size">>, 3}]}, [
+        {false, 3},
+        {false, <<"fun">>},
+        {true, [0, 0, 0]},
+        {false, [0, 0]},
+        {false, [0, 0, 0, 0]}
+    ]).
+
+match_allmatch_test() ->
+    % $allMatch is defined to return false for empty lists
+    check_selector({[{<<"$allMatch">>, {[{<<"$eq">>, 0}]}}]}, [
+        {false, []},
+        {true, [0]},
+        {false, [1]},
+        {false, [0, 1]}
+    ]),
+
+    % because of their behaviour on empty lists, { "$not": { "$allMatch": S } }
+    % is not equivalent to { "$elemMatch": { "$not": S } }
+    check_selector({[{<<"$elemMatch">>, {[{<<"$ne">>, 0}]}}]}, [
+        {false, []},
+        {false, [0]},
+        {true, [1]},
+        {true, [0, 1]}
+    ]).
+
+match_elemmatch_test() ->
+    check_selector({[{<<"$elemMatch">>, {[{<<"$eq">>, 0}]}}]}, [
+        {false, []},
+        {true, [0]},
+        {false, [1]},
+        {true, [0, 1]}
+    ]).
+
+match_keymapmatch_test() ->
+    check_selector({[{<<"$keyMapMatch">>, {[{<<"$regex">>, <<"^[a-z]+$">>}]}}]}, [
+        {true, {[{<<"hello">>, 0}]}},
+        {true, {[{<<"a">>, 1}, {<<"b">>, 2}]}},
+        {true, {[{<<"a">>, 1}, {<<"b4">>, 2}]}},
+        {false, {[{<<"b4">>, 2}]}},
+        {false, {[]}}
+    ]).
+
+match_object_test() ->
+    Doc1 = {[]},
+    Doc2 = {[{<<"x">>, {[]}}]},
+    Doc3 = {[{<<"x">>, {[{<<"a">>, 1}]}}]},
+    Doc4 = {[{<<"x">>, {[{<<"a">>, 1}, {<<"b">>, 2}]}}]},
+    Doc5 = {[{<<"x">>, []}]},
+
+    % the empty selector matches any document
+    SelEmpty = normalize({[]}),
+    ?assertEqual({[]}, SelEmpty),
+    ?assertEqual(true, match_int(SelEmpty, Doc1)),
+    ?assertEqual(true, match_int(SelEmpty, Doc2)),
+    ?assertEqual(true, match_int(SelEmpty, Doc3)),
+    ?assertEqual(true, match_int(SelEmpty, Doc4)),
+    ?assertEqual(true, match_int(SelEmpty, Doc5)),
+
+    % an inner empty object selector matches only empty objects
+    SelEmptyField = normalize({[{<<"x">>, {[]}}]}),
+    ?assertEqual({[{<<"x">>, {[{<<"$eq">>, {[]}}]}}]}, SelEmptyField),
+    ?assertEqual(false, match_int(SelEmptyField, Doc1)),
+    ?assertEqual(true, match_int(SelEmptyField, Doc2)),
+    ?assertEqual(false, match_int(SelEmptyField, Doc3)),
+    ?assertEqual(false, match_int(SelEmptyField, Doc4)),
+    ?assertEqual(false, match_int(SelEmptyField, Doc5)),
+
+    % negated empty object selector matches a value which is present and is not the empty object
+    SelNotEmptyField = normalize({[{<<"$not">>, {[{<<"x">>, {[]}}]}}]}),
+    ?assertEqual({[{<<"x">>, {[{<<"$ne">>, {[]}}]}}]}, SelNotEmptyField),
+    ?assertEqual(false, match_int(SelNotEmptyField, Doc1)),
+    ?assertEqual(false, match_int(SelNotEmptyField, Doc2)),
+    ?assertEqual(true, match_int(SelNotEmptyField, Doc3)),
+    ?assertEqual(true, match_int(SelNotEmptyField, Doc4)),
+    ?assertEqual(true, match_int(SelNotEmptyField, Doc5)),
+
+    % inner object selectors with fields match objects with at least those fields
+    Sel1Field = normalize({[{<<"x">>, {[{<<"a">>, 1}]}}]}),
+    ?assertEqual({[{<<"x.a">>, {[{<<"$eq">>, 1}]}}]}, Sel1Field),
+    ?assertEqual(false, match_int(Sel1Field, Doc1)),
+    ?assertEqual(false, match_int(Sel1Field, Doc2)),
+    ?assertEqual(true, match_int(Sel1Field, Doc3)),
+    ?assertEqual(true, match_int(Sel1Field, Doc4)),
+    ?assertEqual(false, match_int(Sel1Field, Doc5)),
+
+    % inner object selectors with multiple fields are normalized with $and
+    Sel2Field = normalize({[{<<"x">>, {[{<<"a">>, 1}, {<<"b">>, 2}]}}]}),
+    ?assertEqual(
+        {[
+            {<<"$and">>, [
+                {[{<<"x.a">>, {[{<<"$eq">>, 1}]}}]},
+                {[{<<"x.b">>, {[{<<"$eq">>, 2}]}}]}
+            ]}
+        ]},
+        Sel2Field
+    ),
+    ?assertEqual(false, match_int(Sel2Field, Doc1)),
+    ?assertEqual(false, match_int(Sel2Field, Doc2)),
+    ?assertEqual(false, match_int(Sel2Field, Doc3)),
+    ?assertEqual(true, match_int(Sel2Field, Doc4)),
+    ?assertEqual(false, match_int(Sel2Field, Doc5)),
+
+    % check shorthand syntax
+    SelShort = normalize({[{<<"x.b">>, 2}]}),
+    ?assertEqual({[{<<"x.b">>, {[{<<"$eq">>, 2}]}}]}, SelShort),
+    ?assertEqual(false, match_int(SelShort, Doc1)),
+    ?assertEqual(false, match_int(SelShort, Doc2)),
+    ?assertEqual(false, match_int(SelShort, Doc3)),
+    ?assertEqual(true, match_int(SelShort, Doc4)),
+    ?assertEqual(false, match_int(SelShort, Doc5)).
+
+match_and_test() ->
+    % $and with an empty array matches anything
+    SelEmpty = normalize({[{<<"x">>, {[{<<"$and">>, []}]}}]}),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, 0}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, false}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, []}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[]})),
+
+    % due to { "$or": [] } matching anything, negating { "$and": [] } also
+    % matches anything
+    SelNotEmpty = normalize({[{<<"x">>, {[{<<"$not">>, {[{<<"$and">>, []}]}}]}}]}),
+    ?assertEqual(true, match_int(SelNotEmpty, {[{<<"x">>, 0}]})),
+    ?assertEqual(true, match_int(SelNotEmpty, {[{<<"x">>, false}]})),
+    ?assertEqual(true, match_int(SelNotEmpty, {[{<<"x">>, []}]})),
+
+    % and, because { "x": { "$and": [A, B] } } normalizes to
+    % { "$and": [{ "x": A }, { "x": B }] }, that means
+    % { "x": { "$not": { "$and": [] } } } normalizes to { "$or": [] },
+    % so it matches docs where "x" is not present
+    ?assertEqual(true, match_int(SelNotEmpty, {[]})),
+
+    % $and with multiple selectors matches if all selectors match
+    SelMulti = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$and">>, [
+                        {[{<<"$gt">>, 3}]},
+                        {[{<<"$lt">>, 7}]}
+                    ]}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(true, match_int(SelMulti, {[{<<"x">>, 6}]})),
+    ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 2}]})),
+    ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 9}]})),
+    ?assertEqual(false, match_int(SelMulti, {[]})),
+
+    % $not -> $and with multiple selectors matches if any selector does not match
+    SelNotMulti = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$not">>,
+                        {[
+                            {<<"$and">>, [
+                                {[{<<"$gt">>, 3}]},
+                                {[{<<"$lt">>, 7}]}
+                            ]}
+                        ]}}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(false, match_int(SelNotMulti, {[{<<"x">>, 6}]})),
+    ?assertEqual(true, match_int(SelNotMulti, {[{<<"x">>, 2}]})),
+    ?assertEqual(true, match_int(SelNotMulti, {[{<<"x">>, 9}]})),
+    ?assertEqual(false, match_int(SelNotMulti, {[]})).
+
+match_or_test() ->
+    % $or with an empty array matches anything
+    SelEmpty = normalize({[{<<"x">>, {[{<<"$or">>, []}]}}]}),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, 0}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, false}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, []}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[]})),
+
+    % similar to $and, due to { "$or": [] } matching anything and our
+    % normalization rules, negating $or also matches anything
+    SelNotEmpty = normalize({[{<<"x">>, {[{<<"$not">>, {[{<<"$or">>, []}]}}]}}]}),
+    ?assertEqual(true, match_int(SelNotEmpty, {[{<<"x">>, 0}]})),
+    ?assertEqual(true, match_int(SelNotEmpty, {[{<<"x">>, false}]})),
+    ?assertEqual(true, match_int(SelNotEmpty, {[{<<"x">>, []}]})),
+    ?assertEqual(true, match_int(SelNotEmpty, {[]})),
+
+    % $or with multiple selectors matches if any selector matches
+    SelMulti = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$or">>, [
+                        {[{<<"$lt">>, 3}]},
+                        {[{<<"$gt">>, 7}]}
+                    ]}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 6}]})),
+    ?assertEqual(true, match_int(SelMulti, {[{<<"x">>, 2}]})),
+    ?assertEqual(true, match_int(SelMulti, {[{<<"x">>, 9}]})),
+    ?assertEqual(false, match_int(SelMulti, {[]})),
+
+    % $not -> $or with multiple selectors matches if no selector matches
+    SelNotMulti = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$not">>,
+                        {[
+                            {<<"$or">>, [
+                                {[{<<"$lt">>, 3}]},
+                                {[{<<"$gt">>, 7}]}
+                            ]}
+                        ]}}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(true, match_int(SelNotMulti, {[{<<"x">>, 6}]})),
+    ?assertEqual(false, match_int(SelNotMulti, {[{<<"x">>, 2}]})),
+    ?assertEqual(false, match_int(SelNotMulti, {[{<<"x">>, 9}]})),
+    ?assertEqual(false, match_int(SelNotMulti, {[]})).
+
+match_nor_test() ->
+    % $nor with an empty array matches anything
+    SelEmpty = normalize({[{<<"x">>, {[{<<"$nor">>, []}]}}]}),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, 0}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, false}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[{<<"x">>, []}]})),
+    ?assertEqual(true, match_int(SelEmpty, {[]})),
+
+    % $nor with multiple selectors matches if no selector matches
+    SelMulti = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$nor">>, [
+                        {[{<<"$lt">>, 3}]},
+                        {[{<<"$gt">>, 7}]}
+                    ]}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(true, match_int(SelMulti, {[{<<"x">>, 6}]})),
+    ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 2}]})),
+    ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 9}]})),
+    ?assertEqual(false, match_int(SelMulti, {[]})).
 
 -endif.
