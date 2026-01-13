@@ -23,6 +23,12 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
+-record(failure, {
+    op,
+    type = mismatch,
+    params = []
+}).
+
 % Validate and normalize each operator. This translates
 % every selector operator into a consistent version that
 % we can then rely on for all other selector functions.
@@ -53,12 +59,19 @@ match(Selector, D) ->
     couch_stats:increment_counter([mango, evaluate_selector]),
     match_int(Selector, D).
 
+match_int(Selector, D) ->
+    case match_failures(Selector, D) of
+        [] -> true;
+        [_ | _] -> false;
+        Other -> Other
+    end.
+
 % An empty selector matches any value.
-match_int({[]}, _) ->
-    true;
-match_int(Selector, #doc{body = Body}) ->
+match_failures({[]}, _) ->
+    [];
+match_failures(Selector, #doc{body = Body}) ->
     match(Selector, Body, fun mango_json:cmp/2);
-match_int(Selector, {Props}) ->
+match_failures(Selector, {Props}) ->
     match(Selector, {Props}, fun mango_json:cmp/2).
 
 % Convert each operator into a normalized version as well
@@ -365,35 +378,45 @@ negate({[{Field, Cond}]}) ->
 % We need to treat an empty array as always true. This will be applied
 % for $or, $in, $all, $nin as well.
 match({[{<<"$and">>, []}]}, _, _) ->
-    true;
+    [];
 match({[{<<"$and">>, Args}]}, Value, Cmp) ->
-    Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
-    lists:all(Pred, Args);
+    MatchSubSel = fun(SubSel) -> match(SubSel, Value, Cmp) end,
+    lists:flatmap(MatchSubSel, Args);
 match({[{<<"$or">>, []}]}, _, _) ->
-    true;
+    [];
 match({[{<<"$or">>, Args}]}, Value, Cmp) ->
-    Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
-    lists:any(Pred, Args);
+    SubSelFailures = [match(A, Value, Cmp) || A <- Args],
+    case lists:member([], SubSelFailures) of
+        true -> [];
+        _ -> lists:flatten(SubSelFailures)
+    end;
+% TODO: producing good failure messages requires that normalize/1 fully removes
+% $not from the tree by pushing it to the leaves.
 match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
-    not match(Arg, Value, Cmp);
-match({[{<<"$all">>, []}]}, _, _) ->
-    false;
+    case match(Arg, Value, Cmp) of
+        [] -> [#failure{op = 'not'}];
+        _ -> []
+    end;
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
+match({[{<<"$all">>, []}]}, _Values, _Cmp) ->
+    % { "$all": [] } is defined to eval to false, so return a failure
+    [#failure{op = all, params = [[]]}];
+match({[{<<"$all">>, [A]}]}, Values, _Cmp) when is_list(A), A == Values ->
+    [];
 match({[{<<"$all">>, Args}]}, Values, _Cmp) when is_list(Values) ->
-    Pred = fun(A) -> lists:member(A, Values) end,
-    HasArgs = lists:all(Pred, Args),
-    IsArgs =
-        case Args of
-            [A] when is_list(A) ->
-                A == Values;
-            _ ->
-                false
+    lists:flatmap(
+        fun(Arg) ->
+            case lists:member(Arg, Values) of
+                true -> [];
+                _ -> [#failure{op = all, params = [Arg]}]
+            end
         end,
-    HasArgs orelse IsArgs;
-match({[{<<"$all">>, _Args}]}, _Values, _Cmp) ->
-    false;
+        Args
+    );
+match({[{<<"$all">>, _}]}, Value, _Cmp) ->
+    [#failure{op = all, type = bad_value, params = [Value]}];
 %% This is for $elemMatch, $allMatch, and possibly $in because of our normalizer.
 %% A selector such as {"field_name": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
 %% gets normalized to:
@@ -410,83 +433,48 @@ match({[{<<>>, Arg}]}, Values, Cmp) ->
     match(Arg, Values, Cmp);
 % Matches when any element in values matches the
 % sub-selector Arg.
+match({[{<<"$elemMatch">>, _Arg}]}, [], _Cmp) ->
+    [#failure{op = elemMatch, type = empty_list}];
 match({[{<<"$elemMatch">>, Arg}]}, Values, Cmp) when is_list(Values) ->
-    try
-        lists:foreach(
-            fun(V) ->
-                case match(Arg, V, Cmp) of
-                    true -> throw(matched);
-                    _ -> ok
-                end
-            end,
-            Values
-        ),
-        false
-    catch
-        throw:matched ->
-            true;
-        _:_ ->
-            false
+    ValueFailures = [match(Arg, V, Cmp) || V <- Values],
+    case lists:member([], ValueFailures) of
+        true -> [];
+        _ -> lists:flatten(ValueFailures)
     end;
-match({[{<<"$elemMatch">>, _Arg}]}, _Value, _Cmp) ->
-    false;
+match({[{<<"$elemMatch">>, _}]}, Value, _Cmp) ->
+    [#failure{op = elemMatch, type = bad_value, params = [Value]}];
 % Matches when all elements in values match the
 % sub-selector Arg.
 match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, Cmp) ->
-    try
-        lists:foreach(
-            fun(V) ->
-                case match(Arg, V, Cmp) of
-                    false -> throw(unmatched);
-                    _ -> ok
-                end
-            end,
-            Values
-        ),
-        true
-    catch
-        _:_ ->
-            false
-    end;
-match({[{<<"$allMatch">>, _Arg}]}, _Value, _Cmp) ->
-    false;
+    MatchValue = fun(Value) -> match(Arg, Value, Cmp) end,
+    lists:flatmap(MatchValue, Values);
+match({[{<<"$allMatch">>, _}]}, Value, _Cmp) ->
+    [#failure{op = allMatch, type = bad_value, params = [Value]}];
 % Matches when any key in the map value matches the
 % sub-selector Arg.
-match({[{<<"$keyMapMatch">>, Arg}]}, Value, Cmp) when is_tuple(Value) ->
-    try
-        lists:foreach(
-            fun(V) ->
-                case match(Arg, V, Cmp) of
-                    true -> throw(matched);
-                    _ -> ok
-                end
-            end,
-            [Key || {Key, _} <- element(1, Value)]
-        ),
-        false
-    catch
-        throw:matched ->
-            true;
-        _:_ ->
-            false
+match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, _Cmp) ->
+    [#failure{op = keyMapMatch, type = empty_list}];
+match({[{<<"$keyMapMatch">>, Arg}]}, {Value}, Cmp) when is_list(Value) ->
+    KeyFailures = [match(Arg, K, Cmp) || {K, _} <- Value],
+    case lists:member([], KeyFailures) of
+        true -> [];
+        _ -> lists:flatten(KeyFailures)
     end;
-match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, _Cmp) ->
-    false;
+match({[{<<"$keyMapMatch">>, _}]}, Value, _Cmp) ->
+    [#failure{op = keyMapMatch, type = bad_value, params = [Value]}];
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value, Cmp) ->
-    Cmp(Value, Arg) < 0;
+    compare(lt, Arg, Cmp(Value, Arg) < 0);
 match({[{<<"$lte">>, Arg}]}, Value, Cmp) ->
-    Cmp(Value, Arg) =< 0;
+    compare(lte, Arg, Cmp(Value, Arg) =< 0);
 match({[{<<"$eq">>, Arg}]}, Value, Cmp) ->
-    Cmp(Value, Arg) == 0;
+    compare(eq, Arg, Cmp(Value, Arg) == 0);
 match({[{<<"$ne">>, Arg}]}, Value, Cmp) ->
-    Cmp(Value, Arg) /= 0;
+    compare(ne, Arg, Cmp(Value, Arg) /= 0);
 match({[{<<"$gte">>, Arg}]}, Value, Cmp) ->
-    Cmp(Value, Arg) >= 0;
+    compare(gte, Arg, Cmp(Value, Arg) >= 0);
 match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
-    Cmp(Value, Arg) > 0;
-match({[{<<"$in">>, []}]}, _, _) ->
-    false;
+    compare(gt, Arg, Cmp(Value, Arg) > 0);
 match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values) ->
     Pred = fun(Arg) ->
         lists:foldl(
@@ -497,50 +485,88 @@ match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values) ->
             Values
         )
     end,
-    lists:any(Pred, Args);
+    case lists:any(Pred, Args) of
+        true -> [];
+        _ -> [#failure{op = in, params = [Args]}]
+    end;
 match({[{<<"$in">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
-    lists:any(Pred, Args);
-match({[{<<"$nin">>, []}]}, _, _) ->
-    true;
+    case lists:any(Pred, Args) of
+        true -> [];
+        _ -> [#failure{op = in, params = [Args]}]
+    end;
 match({[{<<"$nin">>, Args}]}, Values, Cmp) when is_list(Values) ->
-    not match({[{<<"$in">>, Args}]}, Values, Cmp);
+    Pred = fun(Arg) ->
+        lists:foldl(
+            fun(Value, Match) ->
+                (Cmp(Value, Arg) /= 0) and Match
+            end,
+            true,
+            Values
+        )
+    end,
+    case lists:all(Pred, Args) of
+        true -> [];
+        _ -> [#failure{op = nin, params = [Args]}]
+    end;
 match({[{<<"$nin">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) /= 0 end,
-    lists:all(Pred, Args);
+    case lists:all(Pred, Args) of
+        true -> [];
+        _ -> [#failure{op = nin, params = [Args]}]
+    end;
 % This logic is a bit subtle. Basically, if value is
 % not undefined, then it exists.
 match({[{<<"$exists">>, ShouldExist}]}, Value, _Cmp) ->
-    Exists = Value /= undefined,
-    ShouldExist andalso Exists;
+    case {ShouldExist, Value} of
+        {true, undefined} -> [#failure{op = exists, params = [ShouldExist]}];
+        {true, _} -> [];
+        {false, undefined} -> [];
+        {false, _} -> [#failure{op = exists, params = [ShouldExist]}]
+    end;
 match({[{<<"$type">>, Arg}]}, Value, _Cmp) when is_binary(Arg) ->
-    Arg == mango_json:type(Value);
+    case mango_json:type(Value) of
+        Arg -> [];
+        _ -> [#failure{op = type, params = [Arg]}]
+    end;
 match({[{<<"$mod">>, [D, R]}]}, Value, _Cmp) when is_integer(Value) ->
-    Value rem D == R;
-match({[{<<"$mod">>, _}]}, _Value, _Cmp) ->
-    false;
+    case Value rem D of
+        R -> [];
+        _ -> [#failure{op = mod, params = [D, R]}]
+    end;
+match({[{<<"$mod">>, _}]}, Value, _Cmp) ->
+    [#failure{op = mod, type = bad_value, params = [Value]}];
 match({[{<<"$beginsWith">>, Prefix}]}, Value, _Cmp) when is_binary(Prefix), is_binary(Value) ->
-    string:prefix(Value, Prefix) /= nomatch;
+    case string:prefix(Value, Prefix) of
+        nomatch -> [#failure{op = beginsWith, params = [Prefix]}];
+        _ -> []
+    end;
 % When Value is not a string, do not match
-match({[{<<"$beginsWith">>, Prefix}]}, _, _Cmp) when is_binary(Prefix) ->
-    false;
+match({[{<<"$beginsWith">>, Prefix}]}, Value, _Cmp) when is_binary(Prefix) ->
+    [#failure{op = beginsWith, type = bad_value, params = [Value]}];
 match({[{<<"$regex">>, Regex}]}, Value, _Cmp) when is_binary(Value) ->
     try
-        match == re:run(Value, Regex, [{capture, none}])
+        case re:run(Value, Regex, [{capture, none}]) of
+            match -> [];
+            _ -> [#failure{op = regex, params = [Regex]}]
+        end
     catch
         _:_ ->
-            false
+            [#failure{op = regex, params = [Regex]}]
     end;
-match({[{<<"$regex">>, _}]}, _Value, _Cmp) ->
-    false;
+match({[{<<"$regex">>, _}]}, Value, _Cmp) ->
+    [#failure{op = regex, type = bad_value, params = [Value]}];
 match({[{<<"$size">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
-    length(Values) == Arg;
-match({[{<<"$size">>, _}]}, _Value, _Cmp) ->
-    false;
+    case length(Values) of
+        Arg -> [];
+        _ -> [#failure{op = size, params = [Arg]}]
+    end;
+match({[{<<"$size">>, _}]}, Value, _Cmp) ->
+    [#failure{op = size, type = bad_value, params = [Value]}];
 % We don't have any choice but to believe that the text
 % index returned valid matches
 match({[{<<"$default">>, _}]}, _Value, _Cmp) ->
-    true;
+    [];
 % All other operators are internal assertion errors for
 % matching because we either should've removed them during
 % normalization or something else broke.
@@ -552,11 +578,11 @@ match({[{<<"$", _/binary>> = Op, _}]}, _, _) ->
 match({[{Field, Cond}]}, Value, Cmp) ->
     case mango_doc:get_field(Value, Field) of
         not_found when Cond == {[{<<"$exists">>, false}]} ->
-            true;
+            [];
         not_found ->
-            false;
+            [#failure{op = '$'}];
         bad_path ->
-            false;
+            [#failure{op = '$'}];
         SubValue when Field == <<"_id">> ->
             match(Cond, SubValue, fun mango_json:cmp_raw/2);
         SubValue ->
@@ -564,6 +590,12 @@ match({[{Field, Cond}]}, Value, Cmp) ->
     end;
 match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
     error({unnormalized_selector, Sel}).
+
+compare(Op, Arg, Cond) ->
+    case Cond of
+        true -> [];
+        _ -> [#failure{op = Op, params = [Arg]}]
+    end.
 
 % Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.
