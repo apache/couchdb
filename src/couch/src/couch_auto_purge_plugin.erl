@@ -28,21 +28,39 @@
 -include_lib("stdlib/include/assert.hrl").
 
 start(ScanId, #{}) ->
-    St = init_config(ScanId),
-    ?INFO("Starting.", [], St),
-    {ok, St}.
+    case dead_nodes() of
+        true ->
+            ?INFO("Not starting. Found dead nodes", [], #{sid => ScanId}),
+            skip;
+        false ->
+            St = init_config(ScanId),
+            ?INFO("Starting.", [], St),
+            {ok, St}
+    end.
 
 resume(ScanId, #{}) ->
-    St = init_config(ScanId),
-    ?INFO("Resuming.", [], St),
-    {ok, St}.
+    case dead_nodes() of
+        true ->
+            ?INFO("Not resuming. Found dead nodes", [], #{sid => ScanId}),
+            skip;
+        false ->
+            St = init_config(ScanId),
+            ?INFO("Resuming.", [], St),
+            {ok, St}
+    end.
 
 complete(St) ->
     ?INFO("Completed", [], St),
     {ok, #{}}.
 
-checkpoint(_St) ->
-    {ok, #{}}.
+checkpoint(St) ->
+    case dead_nodes() of
+        true ->
+            ?WARN("Stopping. Found dead nodes", [], meta(St)),
+            {stop, #{}};
+        false ->
+            {ok, #{}}
+    end.
 
 db(St, DbName) ->
     case ttl(St, DbName) of
@@ -213,3 +231,6 @@ min_batch_size() ->
 
 max_batch_size() ->
     erlang:max(min_batch_size(), config:get_integer(atom_to_list(?MODULE), "max_batch_size", 500)).
+
+dead_nodes() ->
+    [] =/= (mem3:nodes() -- mem3_util:live_nodes()).
