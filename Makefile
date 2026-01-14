@@ -247,8 +247,12 @@ elixir-cluster-with-quorum: elixir-init devclean
 
 .PHONY: elixir
 # target: elixir - Run Elixir-based integration tests
-elixir: export MIX_ENV=integration
 elixir: elixir-init devclean
+	@$(MAKE) elixir-test
+
+.PHONY: elixir-test
+elixir-test: export MIX_ENV=integration
+elixir-test:
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
 		--enable-erlang-views \
 		--no-join \
