@@ -24,6 +24,7 @@ couch_scanner_test_() ->
             ?TDEF_FE(t_top_level_api),
             ?TDEF_FE(t_start_stop),
             ?TDEF_FE(t_start_stop_mm_mode, 10),
+            ?TDEF_FE(t_start_stop_upgrade_in_progress, 10),
             ?TDEF_FE(t_stop_auto_purge_on_dead_nodes, 10),
             ?TDEF_FE(t_run_through_all_callbacks_basic, 10),
             ?TDEF_FE(t_find_reporting_works, 10),
@@ -107,6 +108,7 @@ setup() ->
 
 teardown({Ctx, {DbName1, DbName2, DbName3}}) ->
     config:delete("couchdb", "maintenance_mode", false),
+    config:delete("couchdb", "upgrade_in_progress", false),
     config_delete_section("couch_scanner"),
     config_delete_section("couch_scanner_plugins"),
     config_delete_section(atom_to_list(?FEATURES_PLUGIN)),
@@ -156,6 +158,22 @@ t_start_stop_mm_mode(_) ->
     #{pids := Pids1, stopped := false} = couch_scanner:status(),
     ?assertEqual(#{}, Pids1),
     config:set("couchdb", "maintenance_mode", "false", true),
+    ?assertEqual(ok, couch_scanner:stop()),
+    ?assertEqual(ok, couch_scanner:resume()),
+    #{pids := Pids2, stopped := false} = couch_scanner:status(),
+    ?assertMatch(#{<<"couch_scanner_plugin_find">> := Pid} when is_pid(Pid), Pids2),
+    ?assertEqual(ok, couch_scanner:stop()).
+
+t_start_stop_upgrade_in_progress(_) ->
+    ?assertEqual(ok, couch_scanner:stop()),
+    Plugin = atom_to_list(?FIND_PLUGIN),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    meck:expect(?FIND_PLUGIN, shards, fun(_, _) -> timer:sleep(10000) end),
+    config:set("couchdb", "upgrade_in_progress", "true", true),
+    ?assertEqual(ok, couch_scanner:resume()),
+    #{pids := Pids1, stopped := false} = couch_scanner:status(),
+    ?assertEqual(#{}, Pids1),
+    config:set("couchdb", "upgrade_in_progress", "false", true),
     ?assertEqual(ok, couch_scanner:stop()),
     ?assertEqual(ok, couch_scanner:resume()),
     #{pids := Pids2, stopped := false} = couch_scanner:status(),
