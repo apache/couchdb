@@ -41,20 +41,27 @@
 % scan starts from the beginning (first db, first shard, ...), and resume/2 is
 % called when the scanning hasn't finished and has to continue.
 %
-% If start/2 or resume/2 returns `reset` then the checkpoint will be reset and
-% the plugin will be restarted. This may be useful in cases when the plugin
-% detects configuration changes since last scanning session had already
-% started, or when the plugin module was updated and the checkpoint version is
-% stale.
-%
 % The checkpoint/1 callback is periodically called to checkpoint the scanning
 % progress. start/2 and resume/2 function will be called with the last saved
 % checkpoint map value.
 %
+% If start/2, resume/2 or checkpoint/1 returns `reset` then the checkpoint will
+% be reset and the plugin will be restarted. This may be useful in cases when
+% the plugin detects configuration changes since last scanning session had
+% already started, or when the plugin module was updated and the checkpoint
+% version is stale.
+%
+% To stop or pause execution of the plugin, start/2 and resume/2 may return
+% `skip` and checkpoint/1 can return `{stop, State}`. Skipping on start or
+% resume counts as a "run" at that time and the plugin is scheduled to run next
+% time according to it schedule. A `{stop, State}` return from a checkpoint
+% will persist the `State` in the checkpoint and next time the plugin will
+% resume from that checkpoint.
+%
 % The complete/1 callback is called when the scan has finished. The complete
-% callback should return final checkpoint map object. The last checkpoint will
-% be written and then it will be passed to the start/2 callback if the plugin
-% runs again.
+% callback should return a final checkpoint map object. The last checkpoint
+% will be written, and then it will be passed to the start/2 callback if the
+% plugin runs again.
 %
 % As the cluster dbs, shards, ddocs and individual docs are discovered during
 % scanning, the appropriate callbacks will be called. Most callbacks, besides
@@ -100,7 +107,7 @@
 
 % Optional
 -callback checkpoint(St :: term()) ->
-    {ok, EJson :: #{}}.
+    {ok | stop, EJson :: #{}} | reset.
 
 -callback db(St :: term(), DbName :: binary()) ->
     {ok | skip | stop, St1 :: term()}.
@@ -444,13 +451,14 @@ rate_limit(#st{rlimiter = RLimiter} = St, Type) ->
 checkpoint(#st{} = St) ->
     #st{
         id = Id,
+        mod = Mod,
         callbacks = Cbks,
         pst = PSt,
         cursor = Cursor,
         start_sec = StartSec,
         scan_id = SId
     } = St,
-    EJsonPSt = checkpoint_callback(Cbks, PSt),
+    {Go, EJsonPSt} = checkpoint_callback(Cbks, PSt),
     EJson = #{
         <<"cursor">> => Cursor,
         <<"pst">> => EJsonPSt,
@@ -459,7 +467,16 @@ checkpoint(#st{} = St) ->
         <<"start_sec">> => StartSec
     },
     ok = couch_scanner_checkpoint:write(Id, EJson),
-    St#st{checkpoint_sec = tsec()}.
+    case Go of
+        ok ->
+            St#st{checkpoint_sec = tsec()};
+        stop ->
+            % Plugin wants to stop. Exit and let it reschedule again for
+            % whatever scheduling setup it's configured with. Next time
+            % it runs, it will resume from the checkpoint it just performed.
+            ReschedTSec = schedule_time(Mod, StartSec, tsec()),
+            exit_resched(ReschedTSec)
+    end.
 
 finalize(#st{} = St) ->
     #st{
@@ -551,7 +568,7 @@ shards_callback(#st{pst = PSt, callbacks = Cbks} = St, Shards) ->
 start_checkpoint(Id, #{} = Cbks, StartSec, ScanId, Cur, PSt) when
     is_binary(Id), is_binary(ScanId), is_integer(StartSec)
 ->
-    EJsonPSt = checkpoint_callback(Cbks, PSt),
+    {ok, EJsonPSt} = checkpoint_callback(Cbks, PSt),
     EJson = #{
         <<"cursor">> => Cur,
         <<"pst">> => EJsonPSt,
@@ -564,7 +581,8 @@ start_checkpoint(Id, #{} = Cbks, StartSec, ScanId, Cur, PSt) when
 checkpoint_callback(#{} = Cbks, PSt) ->
     #{checkpoint := CheckpointCbk} = Cbks,
     case CheckpointCbk(PSt) of
-        {ok, #{} = EJsonPSt} -> couch_scanner_util:ejson_map(EJsonPSt);
+        {ok, #{} = EJsonPSt} -> {ok, couch_scanner_util:ejson_map(EJsonPSt)};
+        {stop, #{} = EJsonPSt} -> {stop, couch_scanner_util:ejson_map(EJsonPSt)};
         reset -> exit_resched(reset)
     end.
 
