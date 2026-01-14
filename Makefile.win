@@ -104,7 +104,7 @@ endif
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs nouveau
+all: couch-core fauxton docs extra/nouveau
 
 
 .PHONY: help
@@ -118,9 +118,9 @@ help:
 ################################################################################
 
 
-.PHONY: couch
-# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
-couch: config.erl
+.PHONY: couch-core
+# target: couch-core - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
+couch-core: config.erl
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile $(COMPILE_OPTS)
 ifeq ($(with_spidermonkey), true)
 	@copy src\couch\priv\couchjs.exe bin
@@ -163,10 +163,16 @@ endif
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 .PHONY: eunit $(EUNIT_SUBDIRS)
 
+
+eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
+eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
+eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+eunit: $(EUNIT_SUBDIRS)
+
 $(EUNIT_SUBDIRS):
-	@rd /s /q tmp/$@
-	@$(REBAR) setup_eunit app=$@ >/dev/null
-	@BUILDDIR=$(CURDIR)/tmp/$@ COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ & rd /s /q tmp/$@
+	@rm -rf tmp\$@
+	@$(REBAR) setup_eunit app=$@
+	@set BUILDDIR=$(CURDIR)/tmp/$@ & set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@
 
 # cat together couch_log files after running eunit test
 .PHONY: catlogs
@@ -513,12 +519,12 @@ derived:
 # Nouveau
 ################################################################################
 
-.PHONY: nouveau
+.PHONY: extra/nouveau
 # target: nouveau - Build nouveau
-nouveau:
+extra/nouveau:
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) spotlessApply
-	@cd nouveau && $(GRADLE) build -x test
+	@cd extra/nouveau && $(GRADLE) spotlessApply
+	@cd extra/nouveau && $(GRADLE) build -x test
 endif
 
 .PHONY: nouveau-test
@@ -526,16 +532,15 @@ endif
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
-nouveau-test-gradle: couch nouveau
+nouveau-test-gradle: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
 	@cd nouveau && $(GRADLE) test --info --rerun
-	
 endif
 
 .PHONY: nouveau-test-elixir
 nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
-nouveau-test-elixir: couch nouveau
+nouveau-test-elixir: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
 	@dev\run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/elixir/test/config/test-config.ini \
