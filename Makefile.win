@@ -22,7 +22,7 @@ REBAR?=$(CURDIR)/bin/rebar.cmd
 PYTHON=python.exe
 ERLFMT?=$(CURDIR)/bin/erlfmt.cmd
 MAKE=make -f Makefile.win
-GRADLE?=$(CURDIR)/nouveau/gradlew.bat
+GRADLE?=$(CURDIR)/extra/nouveau/gradlew.bat
 # REBAR?=$(shell where rebar.cmd)
 
 # Handle the following scenarios:
@@ -162,17 +162,15 @@ endif
 
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 .PHONY: eunit $(EUNIT_SUBDIRS)
-
-
 eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: $(EUNIT_SUBDIRS)
 
 $(EUNIT_SUBDIRS):
-	@rm -rf tmp\$@
+	-@rmdir /s /q tmp\$@
 	@$(REBAR) setup_eunit app=$@
-	@set BUILDDIR=$(CURDIR)/tmp/$@ & set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@
+	@set BUILDDIR=$(CURDIR)/tmp/$@ && set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ && @rmdir /s/q tmp\$@
 
 # cat together couch_log files after running eunit test
 .PHONY: catlogs
@@ -240,7 +238,6 @@ elixir-cluster-with-quorum: elixir-init devclean
 .PHONY: elixir
 # target: elixir - Run Elixir-based integration tests
 elixir: export MIX_ENV=integration
-elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init devclean
 	@dev\run "$(TEST_OPTS)" -n 1 -q -a adm:pass \
 		--enable-erlang-views \
@@ -305,7 +302,6 @@ list-eunit-suites:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@$(PYTHON) -m venv src\mango\.venv && \
 		src\mango\.venv\Scripts\pip.exe install -r src\mango\requirements.txt
@@ -491,8 +487,8 @@ config.erl:
 
 
 src\docs\build:
-	@echo 'Building docs...'
 ifeq ($(with_docs), true)
+	@echo 'Building docs...'
 	@cd src\docs && setup.bat && make.bat html && make.bat man
 endif
 
@@ -534,7 +530,7 @@ nouveau-test: nouveau-test-gradle nouveau-test-elixir
 .PHONY: nouveau-test-gradle
 nouveau-test-gradle: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) test --info --rerun
+	@cd extra/nouveau && $(GRADLE) test --info --rerun
 endif
 
 .PHONY: nouveau-test-elixir
