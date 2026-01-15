@@ -191,14 +191,19 @@ meta = [
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
   // use QuickJS for now
-  'freebsd-arm64': [
-     name: 'FreeBSD ARM64 QuickJS',
-     disable_spidermonkey: true,
-     with_clouseau: true,
-     clouseau_java_home: '/usr/local/openjdk21',
-     quickjs_test262: false,
-     gnu_make: 'gmake'
-  ],
+  //
+  // Disable for now due to repeated failures in elixir tests:
+  // 1) test Server-side password hashing, and raw updates disabling that (ConfigTest)
+  // ** (KeyError) key :status_code not found in: %HTTPotion.ErrorResponse{message: "retry_later"}
+  //
+  // 'freebsd-arm64': [
+  //    name: 'FreeBSD ARM64 QuickJS',
+  //    disable_spidermonkey: true,
+  //    with_clouseau: true,
+  //    clouseau_java_home: '/usr/local/openjdk21',
+  //    quickjs_test262: false,
+  //    gnu_make: 'gmake'
+  // ],
 
   'macos': [
      name: 'macOS',
