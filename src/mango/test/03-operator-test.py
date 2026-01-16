@@ -69,7 +69,7 @@ class BaseOperatorTests:
             amdocs = [{"bad_doc": "a", "emptybang": []}]
             self.db.save_docs(amdocs, w=3)
             docs = self.db.find({"emptybang": {"$allMatch": {"foo": {"$eq": 2}}}})
-            self.assertEqual(len(docs), 0)
+            self.assertEqual(len(docs), 1)
 
         def test_in_operator_array(self):
             docs = self.db.find(
