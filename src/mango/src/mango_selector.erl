@@ -350,6 +350,10 @@ negate({[{<<"$and">>, Args}]}) ->
     {[{<<"$or">>, [negate(A) || A <- Args]}]};
 negate({[{<<"$or">>, Args}]}) ->
     {[{<<"$and">>, [negate(A) || A <- Args]}]};
+negate({[{<<"$elemMatch">>, Arg}]}) ->
+    {[{<<"$allMatch">>, negate(Arg)}]};
+negate({[{<<"$allMatch">>, Arg}]}) ->
+    {[{<<"$elemMatch">>, negate(Arg)}]};
 negate({[{<<"$default">>, _}]} = Arg) ->
     ?MANGO_ERROR({bad_arg, '$not', Arg});
 % Negating comparison operators is straight forward
@@ -454,7 +458,7 @@ match({[{<<"$elemMatch">>, _}]}, Value, Ctx) ->
     [#failure{op = elemMatch, type = bad_value, params = [Value], path = Ctx#ctx.path}];
 % Matches when all elements in values match the
 % sub-selector Arg.
-match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, #ctx{path = Path} = Ctx) ->
+match({[{<<"$allMatch">>, Arg}]}, Values, #ctx{path = Path} = Ctx) when is_list(Values) ->
     EnumValues = lists:enumerate(0, Values),
     MatchValue = fun({Idx, Value}) -> match(Arg, Value, Ctx#ctx{path = [Idx | Path]}) end,
     lists:flatmap(MatchValue, EnumValues);
@@ -1507,9 +1511,10 @@ match_size_test() ->
     ]).
 
 match_allmatch_test() ->
-    % $allMatch is defined to return false for empty lists
+    % TODO: we have made a breaking change and made $allMatch return true for
+    % empty lists, since this makes negation consistent
     check_selector({[{<<"$allMatch">>, {[{<<"$eq">>, 0}]}}]}, [
-        {false, []},
+        {true, []},
         {true, [0]},
         {false, [1]},
         {false, [0, 1]}
