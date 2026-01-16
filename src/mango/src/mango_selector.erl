@@ -25,6 +25,7 @@
 
 -record(ctx, {
     cmp,
+    negate = false,
     path = []
 }).
 
@@ -32,6 +33,7 @@
     op,
     type = mismatch,
     params = [],
+    negate = false,
     path = []
 }).
 
@@ -400,31 +402,42 @@ match({[{<<"$or">>, Args}]}, Value, Ctx) ->
         true -> [];
         _ -> lists:flatten(SubSelFailures)
     end;
-% TODO: producing good failure messages requires that normalize/1 fully removes
-% $not from the tree by pushing it to the leaves.
-match({[{<<"$not">>, Arg}]}, Value, Ctx) ->
-    case match(Arg, Value, Ctx) of
-        [] -> [#failure{op = 'not', path = Ctx#ctx.path}];
-        _ -> []
-    end;
+match({[{<<"$not">>, Arg}]}, Value, #ctx{negate = Neg} = Ctx) ->
+    match(Arg, Value, Ctx#ctx{negate = not Neg});
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
-match({[{<<"$all">>, []}]}, _Values, Ctx) ->
+match({[{<<"$all">>, []}]}, _Values, #ctx{negate = Neg, path = Path}) ->
     % { "$all": [] } is defined to eval to false, so return a failure
-    [#failure{op = all, params = [[]], path = Ctx#ctx.path}];
-match({[{<<"$all">>, [A]}]}, Values, _Ctx) when is_list(A), A == Values ->
-    [];
-match({[{<<"$all">>, Args}]}, Values, Ctx) when is_list(Values) ->
+    case Neg of
+        true -> [];
+        false -> [#failure{op = all, params = [[]], negate = Neg, path = Path}]
+    end;
+match({[{<<"$all">>, [A]}]}, Values, #ctx{negate = Neg, path = Path}) when
+    is_list(A), A == Values
+->
+    case Neg of
+        true -> [#failure{op = all, params = [[A]], negate = Neg, path = Path}];
+        false -> []
+    end;
+match({[{<<"$all">>, Args}]}, Values, #ctx{negate = true, path = Path}) when is_list(Values) ->
+    ArgResults = [lists:member(Arg, Values) || Arg <- Args],
+    case lists:member(false, ArgResults) of
+        true -> [];
+        false -> [#failure{op = app, params = [Args], negate = true, path = Path}]
+    end;
+match({[{<<"$all">>, Args}]}, Values, #ctx{path = Path}) when is_list(Values) ->
     lists:flatmap(
         fun(Arg) ->
             case lists:member(Arg, Values) of
                 true -> [];
-                _ -> [#failure{op = all, params = [Arg], path = Ctx#ctx.path}]
+                _ -> [#failure{op = all, params = [Arg], path = Path}]
             end
         end,
         Args
     );
+match({[{<<"$all">>, _}]}, _Value, #ctx{negate = true}) ->
+    [];
 match({[{<<"$all">>, _}]}, Value, Ctx) ->
     [#failure{op = all, type = bad_value, params = [Value], path = Ctx#ctx.path}];
 %% This is for $elemMatch, $allMatch, and possibly $in because of our normalizer.
@@ -466,8 +479,13 @@ match({[{<<"$allMatch">>, _}]}, Value, Ctx) ->
     [#failure{op = allMatch, type = bad_value, params = [Value], path = Ctx#ctx.path}];
 % Matches when any key in the map value matches the
 % sub-selector Arg.
-match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, Ctx) ->
-    [#failure{op = keyMapMatch, type = empty_list, path = Ctx#ctx.path}];
+match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, #ctx{negate = true}) ->
+    [];
+match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, #ctx{path = Path}) ->
+    [#failure{op = keyMapMatch, type = empty_list, path = Path}];
+match({[{<<"$keyMapMatch">>, Arg}]}, {Value}, #ctx{negate = true} = Ctx) when is_list(Value) ->
+    MatchKey = fun(K) -> match(Arg, K, Ctx) end,
+    lists:flatmap(MatchKey, [K || {K, _} <- Value]);
 match({[{<<"$keyMapMatch">>, Arg}]}, {Value}, Ctx) when is_list(Value) ->
     KeyFailures = [match(Arg, K, Ctx) || {K, _} <- Value],
     case lists:member([], KeyFailures) of
@@ -538,45 +556,60 @@ match({[{<<"$exists">>, ShouldExist}]}, Value, Ctx) ->
         {false, undefined} -> [];
         {false, _} -> [#failure{op = exists, params = [ShouldExist], path = Ctx#ctx.path}]
     end;
-match({[{<<"$type">>, Arg}]}, Value, Ctx) when is_binary(Arg) ->
-    case mango_json:type(Value) of
-        Arg -> [];
-        _ -> [#failure{op = type, params = [Arg], path = Ctx#ctx.path}]
+match({[{<<"$type">>, Arg}]}, Value, #ctx{negate = Neg, path = Path}) when is_binary(Arg) ->
+    case {Neg, mango_json:type(Value)} of
+        {false, Arg} -> [];
+        {true, Type} when Type /= Arg -> [];
+        _ -> [#failure{op = type, params = [Arg], negate = Neg, path = Path}]
     end;
-match({[{<<"$mod">>, [D, R]}]}, Value, Ctx) when is_integer(Value) ->
-    case Value rem D of
-        R -> [];
-        _ -> [#failure{op = mod, params = [D, R], path = Ctx#ctx.path}]
+match({[{<<"$mod">>, [D, R]}]}, Value, #ctx{negate = Neg, path = Path}) when is_integer(Value) ->
+    case {Neg, Value rem D} of
+        {false, R} -> [];
+        {true, Rem} when Rem /= R -> [];
+        _ -> [#failure{op = mod, params = [D, R], negate = Neg, path = Path}]
     end;
-match({[{<<"$mod">>, _}]}, Value, Ctx) ->
-    [#failure{op = mod, type = bad_value, params = [Value], path = Ctx#ctx.path}];
-match({[{<<"$beginsWith">>, Prefix}]}, Value, Ctx) when is_binary(Prefix), is_binary(Value) ->
-    case string:prefix(Value, Prefix) of
-        nomatch -> [#failure{op = beginsWith, params = [Prefix], path = Ctx#ctx.path}];
-        _ -> []
+match({[{<<"$mod">>, _}]}, _Value, #ctx{negate = true}) ->
+    [];
+match({[{<<"$mod">>, _}]}, Value, #ctx{path = Path}) ->
+    [#failure{op = mod, type = bad_value, params = [Value], path = Path}];
+match({[{<<"$beginsWith">>, Prefix}]}, Value, #ctx{negate = Neg, path = Path}) when
+    is_binary(Prefix), is_binary(Value)
+->
+    case {Neg, string:prefix(Value, Prefix)} of
+        {true, nomatch} -> [];
+        {false, M} when M /= nomatch -> [];
+        _ -> [#failure{op = beginsWith, params = [Prefix], negate = Neg, path = Path}]
     end;
 % When Value is not a string, do not match
-match({[{<<"$beginsWith">>, Prefix}]}, Value, Ctx) when is_binary(Prefix) ->
-    [#failure{op = beginsWith, type = bad_value, params = [Value], path = Ctx#ctx.path}];
-match({[{<<"$regex">>, Regex}]}, Value, Ctx) when is_binary(Value) ->
+match({[{<<"$beginsWith">>, _Prefix}]}, _Value, #ctx{negate = true}) ->
+    [];
+match({[{<<"$beginsWith">>, _Prefix}]}, Value, #ctx{path = Path}) ->
+    [#failure{op = beginsWith, type = bad_value, params = [Value], path = Path}];
+match({[{<<"$regex">>, Regex}]}, Value, #ctx{negate = Neg, path = Path}) when is_binary(Value) ->
     try
-        case re:run(Value, Regex, [{capture, none}]) of
-            match -> [];
-            _ -> [#failure{op = regex, params = [Regex], path = Ctx#ctx.path}]
+        case {Neg, re:run(Value, Regex, [{capture, none}])} of
+            {false, match} -> [];
+            {true, M} when M /= match -> [];
+            _ -> [#failure{op = regex, params = [Regex], negate = Neg, path = Path}]
         end
     catch
         _:_ ->
-            [#failure{op = regex, params = [Regex], path = Ctx#ctx.path}]
+            [#failure{op = regex, params = [Regex], negate = Neg, path = Path}]
     end;
-match({[{<<"$regex">>, _}]}, Value, Ctx) ->
-    [#failure{op = regex, type = bad_value, params = [Value], path = Ctx#ctx.path}];
-match({[{<<"$size">>, Arg}]}, Values, Ctx) when is_list(Values) ->
-    case length(Values) of
-        Arg -> [];
-        _ -> [#failure{op = size, params = [Arg], path = Ctx#ctx.path}]
+match({[{<<"$regex">>, _}]}, _Value, #ctx{negate = true}) ->
+    [];
+match({[{<<"$regex">>, _}]}, Value, #ctx{path = Path}) ->
+    [#failure{op = regex, type = bad_value, params = [Value], path = Path}];
+match({[{<<"$size">>, Arg}]}, Values, #ctx{negate = Neg, path = Path}) when is_list(Values) ->
+    case {Neg, length(Values)} of
+        {false, Arg} -> [];
+        {true, Len} when Len /= Arg -> [];
+        _ -> [#failure{op = size, params = [Arg], negate = Neg, path = Path}]
     end;
-match({[{<<"$size">>, _}]}, Value, Ctx) ->
-    [#failure{op = size, type = bad_value, params = [Value], path = Ctx#ctx.path}];
+match({[{<<"$size">>, _}]}, _Value, #ctx{negate = true}) ->
+    [];
+match({[{<<"$size">>, _}]}, Value, #ctx{path = Path}) ->
+    [#failure{op = size, type = bad_value, params = [Value], path = Path}];
 % We don't have any choice but to believe that the text
 % index returned valid matches
 match({[{<<"$default">>, _}]}, _Value, _Ctx) ->
