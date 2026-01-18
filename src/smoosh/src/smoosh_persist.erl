@@ -79,10 +79,10 @@ persist(true, Waiting, Active, Starting) ->
 check_setup(false) ->
     disabled;
 check_setup(true) ->
+    io:format(user, "~ncheck_setup(true)...", []),
     StateDir = state_dir(),
-    Path = filename:join(StateDir, "smooshq.test"),
     Data = #{<<"test">> => 1},
-    case file:read_file_info(StateDir) of
+    RInfo = case file:read_file_info(StateDir) of
         {ok, #file_info{access = A}} when A == read; A == read_write ->
             ok;
         {ok, #file_info{access = Invalid}} ->
@@ -90,10 +90,16 @@ check_setup(true) ->
         {error, Error1} ->
             throw({fail, "read", Error1})
     end,
-    case write(Data, Path) of
+    %io:format(user, "~nRInfo:      ~s", [RInfo]),
+    io:format(user, "~nStateDir: ~s", [StateDir]),
+    io:format(user, "~nFI-StateDir:~p", [file:read_file_info(StateDir)]),
+    Path = filename:join(StateDir, "smooshq.test"),
+    io:format(user, "~nPath:     ~s", [Path]),
+    WInfo = case write(Data, Path) of
         ok -> ok;
         {error, Error2} -> throw({fail, "write", Error2})
     end,
+    %io:format(user, "~nWInfo:    ~s", [WInfo]),
     file:delete(Path, [raw]).
 
 write(#{} = QData, Path) when is_list(Path), map_size(QData) == 0 ->
@@ -208,8 +214,14 @@ t_check_setup(_) ->
     ok = file:change_mode(Dir, 8#500),
     % Did the setup work?
     {ok, #file_info{access = Access}} = file:read_file_info(Dir),
+    % FileInfo = file:read_file_info(Dir),
+    io:format(user, "~nAccess: ~p", [Access]),
+    io:format(user, "~nDir:      ~s", [Dir]),
+    io:format(user, "~nTDir:     ~s", [TDir]),
     case Access of
         read ->
+            %CS1 = check_setup(),
+            %io:format(user, "~nCS1:     ~p", [CS1]),
             ?assertEqual({error, {"write", eacces}}, check_setup()),
             % Can't read, only write
             ok = file:change_mode(Dir, 8#300),
@@ -219,6 +231,7 @@ t_check_setup(_) ->
             % unreadable for ourselves, so skip this part.
             ok
     end,
+    erlang:halt(),
     ok = file:del_dir_r(Dir).
 
 t_persist_unpersist_disabled(_) ->
