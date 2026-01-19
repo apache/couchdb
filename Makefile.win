@@ -397,8 +397,8 @@ endif
 
 ifeq ($(with_nouveau), true)
 	-@mkdir rel\couchdb\nouveau
-	@cd nouveau && $(GRADLE) installDist
-	@xcopy nouveau\build\install\nouveau rel\couchdb\nouveau /E /I
+	@cd extra\nouveau && $(GRADLE) installDist
+	@xcopy extra\nouveau\build\install\nouveau rel\couchdb\nouveau /E /I
 endif
 
 	@echo ... done
@@ -444,7 +444,7 @@ clean:
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log >NUL 2>&1 || true
 	-@rmdir /s/q src\docs\build src\docs\.venv >NUL 2>&1 || true
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) clean
+	@cd extra\nouveau && $(GRADLE) clean
 endif
 
 .PHONY: distclean
