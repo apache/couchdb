@@ -29,7 +29,7 @@ recover(DbName) ->
     %% The VDU function is used to validate documents update before
     %% storing them in the database.
     %% Raise an error when invalid instead of returning an empty list.
-    DDocs0 =
+    DDocs =
         case fabric:design_docs(mem3:dbname(DbName)) of
             {ok, Resp} when is_list(Resp) ->
                 Resp;
@@ -38,7 +38,6 @@ recover(DbName) ->
             {error, Error} ->
                 error(Error)
         end,
-    DDocs = lists:filter(fun couch_doc:has_no_access/1, DDocs0),
     Funs = lists:flatmap(
         fun(DDoc) ->
             case couch_doc:get_validate_doc_fun(DbName, DDoc) of
