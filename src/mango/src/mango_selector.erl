@@ -15,6 +15,7 @@
 -export([
     normalize/1,
     match/2,
+    match_failures/2,
     has_required_fields/2,
     is_constant_field/2,
     fields/1
@@ -25,6 +26,7 @@
 
 -record(ctx, {
     cmp,
+    verbose = false,
     negate = false,
     path = []
 }).
@@ -33,8 +35,7 @@
     op,
     type = mismatch,
     params = [],
-    negate = false,
-    path = []
+    ctx
 }).
 
 % Validate and normalize each operator. This translates
@@ -67,20 +68,19 @@ match(Selector, D) ->
     couch_stats:increment_counter([mango, evaluate_selector]),
     match_int(Selector, D).
 
-match_int(Selector, D) ->
-    case match_failures(Selector, D) of
-        [] -> true;
-        [_ | _] -> false;
-        Other -> Other
-    end.
+match_failures(Selector, D) ->
+    couch_stats:increment_counter([mango, evaluate_selector]),
+    match_int(Selector, D, true).
 
-% An empty selector matches any value.
-match_failures({[]}, _) ->
-    [];
-match_failures(Selector, #doc{body = Body}) ->
-    match_failures(Selector, Body);
-match_failures(Selector, {Props}) ->
-    match(Selector, {Props}, #ctx{cmp = fun mango_json:cmp/2}).
+match_int(Selector, D) ->
+    match_int(Selector, D, false).
+
+match_int(Selector, D, Verbose) ->
+    Ctx = #ctx{cmp = fun mango_json:cmp/2, verbose = Verbose},
+    case D of
+        #doc{body = Body} -> match(Selector, Body, Ctx);
+        Other -> match(Selector, Other, Ctx)
+    end.
 
 % Convert each operator into a normalized version as well
 % as convert an implicit operators into their explicit
@@ -352,10 +352,6 @@ negate({[{<<"$and">>, Args}]}) ->
     {[{<<"$or">>, [negate(A) || A <- Args]}]};
 negate({[{<<"$or">>, Args}]}) ->
     {[{<<"$and">>, [negate(A) || A <- Args]}]};
-negate({[{<<"$elemMatch">>, Arg}]}) ->
-    {[{<<"$allMatch">>, negate(Arg)}]};
-negate({[{<<"$allMatch">>, Arg}]}) ->
-    {[{<<"$elemMatch">>, negate(Arg)}]};
 negate({[{<<"$default">>, _}]} = Arg) ->
     ?MANGO_ERROR({bad_arg, '$not', Arg});
 % Negating comparison operators is straight forward
@@ -387,59 +383,76 @@ negate({[{<<"$", _/binary>>, _}]} = Cond) ->
 negate({[{Field, Cond}]}) ->
     {[{Field, negate(Cond)}]}.
 
+% An empty selector matches any value.
+match({[]}, _, #ctx{verbose = false}) ->
+    true;
+match({[]}, _, #ctx{verbose = true}) ->
+    [];
 % We need to treat an empty array as always true. This will be applied
 % for $or, $in, $all, $nin as well.
-match({[{<<"$and">>, []}]}, _, _) ->
+match({[{<<"$and">>, []}]}, _, #ctx{verbose = false}) ->
+    true;
+match({[{<<"$and">>, []}]}, _, #ctx{negate = false}) ->
     [];
+match({[{<<"$and">>, []}]}, _, Ctx) ->
+    [#failure{op = 'and', type = empty_list, params = [[]], ctx = Ctx}];
+match({[{<<"$and">>, Args}]}, Value, #ctx{verbose = false} = Ctx) ->
+    Pred = fun(SubSel) -> match(SubSel, Value, Ctx) end,
+    lists:all(Pred, Args);
+match({[{<<"$and">>, Args}]}, Value, #ctx{negate = true} = Ctx) ->
+    NotArgs = [{[{<<"$not">>, A}]} || A <- Args],
+    PosCtx = Ctx#ctx{negate = false},
+    match({[{<<"$or">>, NotArgs}]}, Value, PosCtx);
 match({[{<<"$and">>, Args}]}, Value, Ctx) ->
     MatchSubSel = fun(SubSel) -> match(SubSel, Value, Ctx) end,
     lists:flatmap(MatchSubSel, Args);
-match({[{<<"$or">>, []}]}, _, _) ->
+match({[{<<"$or">>, []}]}, _, #ctx{verbose = false}) ->
+    true;
+match({[{<<"$or">>, []}]}, _, #ctx{negate = false}) ->
     [];
+match({[{<<"$or">>, []}]}, _, Ctx) ->
+    [#failure{op = 'or', type = empty_list, params = [[]], ctx = Ctx}];
+match({[{<<"$or">>, Args}]}, Value, #ctx{verbose = false} = Ctx) ->
+    Pred = fun(SubSel) -> match(SubSel, Value, Ctx) end,
+    lists:any(Pred, Args);
+match({[{<<"$or">>, Args}]}, Value, #ctx{negate = true} = Ctx) ->
+    NotArgs = [{[{<<"$not">>, A}]} || A <- Args],
+    PosCtx = Ctx#ctx{negate = false},
+    match({[{<<"$and">>, NotArgs}]}, Value, PosCtx);
 match({[{<<"$or">>, Args}]}, Value, Ctx) ->
     SubSelFailures = [match(A, Value, Ctx) || A <- Args],
-    case lists:any(fun(Res) -> Res == [] end, SubSelFailures) of
+    case lists:member([], SubSelFailures) of
         true -> [];
-        _ -> lists:flatten(SubSelFailures)
+        false -> lists:flatten(SubSelFailures)
     end;
+match({[{<<"$not">>, Arg}]}, Value, #ctx{verbose = false} = Ctx) ->
+    not match(Arg, Value, Ctx);
 match({[{<<"$not">>, Arg}]}, Value, #ctx{negate = Neg} = Ctx) ->
     match(Arg, Value, Ctx#ctx{negate = not Neg});
+match({[{<<"$all">>, []}]}, _, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$all">>, []}]}, _, #ctx{negate = false} = Ctx) ->
+    [#failure{op = all, type = empty_list, params = [[]], ctx = Ctx}];
+match({[{<<"$all">>, []}]}, _, #ctx{negate = true}) ->
+    [];
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
-match({[{<<"$all">>, []}]}, _Values, #ctx{negate = Neg, path = Path}) ->
-    % { "$all": [] } is defined to eval to false, so return a failure
-    case Neg of
-        true -> [];
-        false -> [#failure{op = all, params = [[]], negate = Neg, path = Path}]
-    end;
-match({[{<<"$all">>, [A]}]}, Values, #ctx{negate = Neg, path = Path}) when
-    is_list(A), A == Values
-->
-    case Neg of
-        true -> [#failure{op = all, params = [[A]], negate = Neg, path = Path}];
-        false -> []
-    end;
-match({[{<<"$all">>, Args}]}, Values, #ctx{negate = true, path = Path}) when is_list(Values) ->
-    ArgResults = [lists:member(Arg, Values) || Arg <- Args],
-    case lists:member(false, ArgResults) of
-        true -> [];
-        false -> [#failure{op = app, params = [Args], negate = true, path = Path}]
-    end;
-match({[{<<"$all">>, Args}]}, Values, #ctx{path = Path}) when is_list(Values) ->
-    lists:flatmap(
-        fun(Arg) ->
-            case lists:member(Arg, Values) of
-                true -> [];
-                _ -> [#failure{op = all, params = [Arg], path = Path}]
-            end
+match({[{<<"$all">>, Args}]}, Values, #ctx{verbose = false}) when is_list(Values) ->
+    Pred = fun(A) -> lists:member(A, Values) end,
+    HasArgs = lists:all(Pred, Args),
+    IsArgs =
+        case Args of
+            [A] when is_list(A) ->
+                A == Values;
+            _ ->
+                false
         end,
-        Args
-    );
-match({[{<<"$all">>, _}]}, _Value, #ctx{negate = true}) ->
-    [];
-match({[{<<"$all">>, _}]}, Value, Ctx) ->
-    [#failure{op = all, type = bad_value, params = [Value], path = Ctx#ctx.path}];
+    HasArgs orelse IsArgs;
+match({[{<<"$all">>, _Args}]}, _Values, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$all">>, Args}]} = Expr, Values, Ctx) ->
+    match_with_failure(Expr, Values, all, [Args], Ctx);
 %% This is for $elemMatch, $allMatch, and possibly $in because of our normalizer.
 %% A selector such as {"field_name": {"$elemMatch": {"$gte": 80, "$lt": 85}}}
 %% gets normalized to:
@@ -456,58 +469,131 @@ match({[{<<>>, Arg}]}, Values, Ctx) ->
     match(Arg, Values, Ctx);
 % Matches when any element in values matches the
 % sub-selector Arg.
-match({[{<<"$elemMatch">>, _Arg}]}, [], Ctx) ->
-    [#failure{op = elemMatch, type = empty_list, path = Ctx#ctx.path}];
-match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{path = Path} = Ctx) when is_list(Values) ->
+
+match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{verbose = false} = Ctx) when is_list(Values) ->
+    try
+        lists:foreach(
+            fun(V) ->
+                case match(Arg, V, Ctx) of
+                    true -> throw(matched);
+                    _ -> ok
+                end
+            end,
+            Values
+        ),
+        false
+    catch
+        throw:matched ->
+            true;
+        _:_ ->
+            false
+    end;
+match({[{<<"$elemMatch">>, _Arg}]}, _Value, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$elemMatch">>, _Arg}]}, [], #ctx{negate = false} = Ctx) ->
+    [#failure{op = elemMatch, type = empty_list, ctx = Ctx}];
+match({[{<<"$elemMatch">>, _Arg}]}, [], #ctx{negate = true}) ->
+    [];
+match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{negate = true} = Ctx) ->
+    PosCtx = Ctx#ctx{negate = false},
+    match({[{<<"$allMatch">>, {[{<<"$not">>, Arg}]}}]}, Values, PosCtx);
+match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{path = Path} = Ctx) ->
     ValueFailures = [
         match(Arg, V, Ctx#ctx{path = [Idx | Path]})
      || {Idx, V} <- lists:enumerate(0, Values)
     ],
     case lists:member([], ValueFailures) of
         true -> [];
-        _ -> lists:flatten(ValueFailures)
+        false -> lists:flatten(ValueFailures)
     end;
-match({[{<<"$elemMatch">>, _}]}, Value, Ctx) ->
-    [#failure{op = elemMatch, type = bad_value, params = [Value], path = Ctx#ctx.path}];
 % Matches when all elements in values match the
 % sub-selector Arg.
-match({[{<<"$allMatch">>, Arg}]}, Values, #ctx{path = Path} = Ctx) when is_list(Values) ->
+match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, #ctx{verbose = false} = Ctx) ->
+    try
+        lists:foreach(
+            fun(V) ->
+                case match(Arg, V, Ctx) of
+                    false -> throw(unmatched);
+                    _ -> ok
+                end
+            end,
+            Values
+        ),
+        true
+    catch
+        _:_ ->
+            false
+    end;
+match({[{<<"$allMatch">>, _Arg}]}, _Value, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$allMatch">>, _Arg}]}, [], #ctx{negate = false} = Ctx) ->
+    [#failure{op = allMatch, type = empty_list, ctx = Ctx}];
+match({[{<<"$allMatch">>, _Arg}]}, [], #ctx{negate = true}) ->
+    [];
+match({[{<<"$allMatch">>, Arg}]}, Values, #ctx{negate = true} = Ctx) ->
+    PosCtx = Ctx#ctx{negate = false},
+    match({[{<<"$elemMatch">>, {[{<<"$not">>, Arg}]}}]}, Values, PosCtx);
+match({[{<<"$allMatch">>, Arg}]}, Values, #ctx{path = Path} = Ctx) ->
+    MatchValue = fun({Idx, V}) -> match(Arg, V, Ctx#ctx{path = [Idx | Path]}) end,
     EnumValues = lists:enumerate(0, Values),
-    MatchValue = fun({Idx, Value}) -> match(Arg, Value, Ctx#ctx{path = [Idx | Path]}) end,
     lists:flatmap(MatchValue, EnumValues);
-match({[{<<"$allMatch">>, _}]}, Value, Ctx) ->
-    [#failure{op = allMatch, type = bad_value, params = [Value], path = Ctx#ctx.path}];
 % Matches when any key in the map value matches the
 % sub-selector Arg.
+match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{verbose = false} = Ctx) when is_tuple(Value) ->
+    try
+        lists:foreach(
+            fun(V) ->
+                case match(Arg, V, Ctx) of
+                    true -> throw(matched);
+                    _ -> ok
+                end
+            end,
+            [Key || {Key, _} <- element(1, Value)]
+        ),
+        false
+    catch
+        throw:matched ->
+            true;
+        _:_ ->
+            false
+    end;
+match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, #ctx{negate = false} = Ctx) ->
+    [#failure{op = keyMapMatch, type = empty_list, ctx = Ctx}];
 match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, #ctx{negate = true}) ->
     [];
-match({[{<<"$keyMapMatch">>, _Arg}]}, {[]}, #ctx{path = Path}) ->
-    [#failure{op = keyMapMatch, type = empty_list, path = Path}];
-match({[{<<"$keyMapMatch">>, Arg}]}, {Value}, #ctx{negate = true} = Ctx) when is_list(Value) ->
-    MatchKey = fun(K) -> match(Arg, K, Ctx) end,
-    lists:flatmap(MatchKey, [K || {K, _} <- Value]);
-match({[{<<"$keyMapMatch">>, Arg}]}, {Value}, Ctx) when is_list(Value) ->
-    KeyFailures = [match(Arg, K, Ctx) || {K, _} <- Value],
+match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{negate = true, path = Path} = Ctx) when
+    is_tuple(Value)
+->
+    Keys = [Key || {Key, _} <- element(1, Value)],
+    MatchKey = fun(K) -> match(Arg, K, Ctx#ctx{path = [K | Path]}) end,
+    lists:flatmap(MatchKey, Keys);
+match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{path = Path} = Ctx) when is_tuple(Value) ->
+    Keys = [Key || {Key, _} <- element(1, Value)],
+    KeyFailures = [match(Arg, K, Ctx#ctx{path = [K | Path]}) || K <- Keys],
     case lists:member([], KeyFailures) of
         true -> [];
-        _ -> lists:flatten(KeyFailures)
+        false -> lists:flatten(KeyFailures)
     end;
-match({[{<<"$keyMapMatch">>, _}]}, Value, Ctx) ->
-    [#failure{op = keyMapMatch, type = bad_value, params = [Value], path = Ctx#ctx.path}];
+match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, Ctx) ->
+    [#failure{op = keyMapMatch, type = bad_value, ctx = Ctx}];
 % Our comparison operators are fairly straight forward
-match({[{<<"$lt">>, Arg}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
-    compare(lt, Arg, Path, Cmp(Value, Arg) < 0);
-match({[{<<"$lte">>, Arg}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
-    compare(lte, Arg, Path, Cmp(Value, Arg) =< 0);
-match({[{<<"$eq">>, Arg}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
-    compare(eq, Arg, Path, Cmp(Value, Arg) == 0);
-match({[{<<"$ne">>, Arg}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
-    compare(ne, Arg, Path, Cmp(Value, Arg) /= 0);
-match({[{<<"$gte">>, Arg}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
-    compare(gte, Arg, Path, Cmp(Value, Arg) >= 0);
-match({[{<<"$gt">>, Arg}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
-    compare(gt, Arg, Path, Cmp(Value, Arg) > 0);
-match({[{<<"$in">>, Args}]}, Values, #ctx{cmp = Cmp, path = Path}) when is_list(Values) ->
+match({[{<<"$lt">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
+    compare(lt, Arg, Ctx, Cmp(Value, Arg) < 0);
+match({[{<<"$lte">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
+    compare(lte, Arg, Ctx, Cmp(Value, Arg) =< 0);
+match({[{<<"$eq">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
+    compare(eq, Arg, Ctx, Cmp(Value, Arg) == 0);
+match({[{<<"$ne">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
+    compare(ne, Arg, Ctx, Cmp(Value, Arg) /= 0);
+match({[{<<"$gte">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
+    compare(gte, Arg, Ctx, Cmp(Value, Arg) >= 0);
+match({[{<<"$gt">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
+    compare(gt, Arg, Ctx, Cmp(Value, Arg) > 0);
+match({[{<<"$in">>, []}]}, _, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$in">>, Args}]}, Values, #ctx{verbose = false, cmp = Cmp}) when is_list(Values) ->
     Pred = fun(Arg) ->
         lists:foldl(
             fun(Value, Match) ->
@@ -517,103 +603,68 @@ match({[{<<"$in">>, Args}]}, Values, #ctx{cmp = Cmp, path = Path}) when is_list(
             Values
         )
     end,
-    case lists:any(Pred, Args) of
-        true -> [];
-        _ -> [#failure{op = in, params = [Args], path = Path}]
-    end;
-match({[{<<"$in">>, Args}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
+    lists:any(Pred, Args);
+match({[{<<"$in">>, Args}]}, Value, #ctx{verbose = false, cmp = Cmp}) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
-    case lists:any(Pred, Args) of
-        true -> [];
-        _ -> [#failure{op = in, params = [Args], path = Path}]
-    end;
-match({[{<<"$nin">>, Args}]}, Values, #ctx{cmp = Cmp, path = Path}) when is_list(Values) ->
-    Pred = fun(Arg) ->
-        lists:foldl(
-            fun(Value, Match) ->
-                (Cmp(Value, Arg) /= 0) and Match
-            end,
-            true,
-            Values
-        )
-    end,
-    case lists:all(Pred, Args) of
-        true -> [];
-        _ -> [#failure{op = nin, params = [Args], path = Path}]
-    end;
-match({[{<<"$nin">>, Args}]}, Value, #ctx{cmp = Cmp, path = Path}) ->
+    lists:any(Pred, Args);
+match({[{<<"$in">>, Args}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, in, [Args], Ctx);
+match({[{<<"$nin">>, []}]}, _, #ctx{verbose = false}) ->
+    true;
+match({[{<<"$nin">>, Args}]}, Values, #ctx{verbose = false} = Ctx) when is_list(Values) ->
+    not match({[{<<"$in">>, Args}]}, Values, Ctx);
+match({[{<<"$nin">>, Args}]}, Value, #ctx{verbose = false, cmp = Cmp}) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) /= 0 end,
-    case lists:all(Pred, Args) of
-        true -> [];
-        _ -> [#failure{op = nin, params = [Args], path = Path}]
-    end;
+    lists:all(Pred, Args);
+match({[{<<"$nin">>, Args}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, nin, [Args], Ctx);
 % This logic is a bit subtle. Basically, if value is
 % not undefined, then it exists.
-match({[{<<"$exists">>, ShouldExist}]}, Value, Ctx) ->
-    case {ShouldExist, Value} of
-        {true, undefined} -> [#failure{op = exists, params = [ShouldExist], path = Ctx#ctx.path}];
-        {true, _} -> [];
-        {false, undefined} -> [];
-        {false, _} -> [#failure{op = exists, params = [ShouldExist], path = Ctx#ctx.path}]
-    end;
-match({[{<<"$type">>, Arg}]}, Value, #ctx{negate = Neg, path = Path}) when is_binary(Arg) ->
-    case {Neg, mango_json:type(Value)} of
-        {false, Arg} -> [];
-        {true, Type} when Type /= Arg -> [];
-        _ -> [#failure{op = type, params = [Arg], negate = Neg, path = Path}]
-    end;
-match({[{<<"$mod">>, [D, R]}]}, Value, #ctx{negate = Neg, path = Path}) when is_integer(Value) ->
-    case {Neg, Value rem D} of
-        {false, R} -> [];
-        {true, Rem} when Rem /= R -> [];
-        _ -> [#failure{op = mod, params = [D, R], negate = Neg, path = Path}]
-    end;
-match({[{<<"$mod">>, _}]}, _Value, #ctx{negate = true}) ->
-    [];
-match({[{<<"$mod">>, _}]}, Value, #ctx{path = Path}) ->
-    [#failure{op = mod, type = bad_value, params = [Value], path = Path}];
-match({[{<<"$beginsWith">>, Prefix}]}, Value, #ctx{negate = Neg, path = Path}) when
+match({[{<<"$exists">>, ShouldExist}]}, Value, #ctx{verbose = false}) ->
+    Exists = Value /= undefined,
+    ShouldExist andalso Exists;
+match({[{<<"$exists">>, ShouldExist}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, exists, [ShouldExist], Ctx);
+match({[{<<"$type">>, Arg}]}, Value, #ctx{verbose = false}) when is_binary(Arg) ->
+    Arg == mango_json:type(Value);
+match({[{<<"$type">>, Arg}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, type, [Arg], Ctx);
+match({[{<<"$mod">>, [D, R]}]}, Value, #ctx{verbose = false}) when is_integer(Value) ->
+    Value rem D == R;
+match({[{<<"$mod">>, _}]}, _Value, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$mod">>, [D, R]}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, mod, [D, R], Ctx);
+match({[{<<"$beginsWith">>, Prefix}]}, Value, #ctx{verbose = false}) when
     is_binary(Prefix), is_binary(Value)
 ->
-    case {Neg, string:prefix(Value, Prefix)} of
-        {true, nomatch} -> [];
-        {false, M} when M /= nomatch -> [];
-        _ -> [#failure{op = beginsWith, params = [Prefix], negate = Neg, path = Path}]
-    end;
+    string:prefix(Value, Prefix) /= nomatch;
 % When Value is not a string, do not match
-match({[{<<"$beginsWith">>, _Prefix}]}, _Value, #ctx{negate = true}) ->
-    [];
-match({[{<<"$beginsWith">>, _Prefix}]}, Value, #ctx{path = Path}) ->
-    [#failure{op = beginsWith, type = bad_value, params = [Value], path = Path}];
-match({[{<<"$regex">>, Regex}]}, Value, #ctx{negate = Neg, path = Path}) when is_binary(Value) ->
+match({[{<<"$beginsWith">>, Prefix}]}, _, #ctx{verbose = false}) when is_binary(Prefix) ->
+    false;
+match({[{<<"$beginsWith">>, Prefix}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, beginsWith, [Prefix], Ctx);
+match({[{<<"$regex">>, Regex}]}, Value, #ctx{verbose = false}) when is_binary(Value) ->
     try
-        case {Neg, re:run(Value, Regex, [{capture, none}])} of
-            {false, match} -> [];
-            {true, M} when M /= match -> [];
-            _ -> [#failure{op = regex, params = [Regex], negate = Neg, path = Path}]
-        end
+        match == re:run(Value, Regex, [{capture, none}])
     catch
         _:_ ->
-            [#failure{op = regex, params = [Regex], negate = Neg, path = Path}]
+            false
     end;
-match({[{<<"$regex">>, _}]}, _Value, #ctx{negate = true}) ->
-    [];
-match({[{<<"$regex">>, _}]}, Value, #ctx{path = Path}) ->
-    [#failure{op = regex, type = bad_value, params = [Value], path = Path}];
-match({[{<<"$size">>, Arg}]}, Values, #ctx{negate = Neg, path = Path}) when is_list(Values) ->
-    case {Neg, length(Values)} of
-        {false, Arg} -> [];
-        {true, Len} when Len /= Arg -> [];
-        _ -> [#failure{op = size, params = [Arg], negate = Neg, path = Path}]
-    end;
-match({[{<<"$size">>, _}]}, _Value, #ctx{negate = true}) ->
-    [];
-match({[{<<"$size">>, _}]}, Value, #ctx{path = Path}) ->
-    [#failure{op = size, type = bad_value, params = [Value], path = Path}];
+match({[{<<"$regex">>, _}]}, _Value, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$regex">>, Regex}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, regex, [Regex], Ctx);
+match({[{<<"$size">>, Arg}]}, Values, #ctx{verbose = false}) when is_list(Values) ->
+    length(Values) == Arg;
+match({[{<<"$size">>, _}]}, _Value, #ctx{verbose = false}) ->
+    false;
+match({[{<<"$size">>, Arg}]} = Expr, Value, Ctx) ->
+    match_with_failure(Expr, Value, size, [Arg], Ctx);
 % We don't have any choice but to believe that the text
 % index returned valid matches
-match({[{<<"$default">>, _}]}, _Value, _Ctx) ->
-    [];
+match({[{<<"$default">>, _}]}, _Value, #ctx{verbose = false}) ->
+    true;
 % All other operators are internal assertion errors for
 % matching because we either should've removed them during
 % normalization or something else broke.
@@ -622,15 +673,24 @@ match({[{<<"$", _/binary>> = Op, _}]}, _, _) ->
 % We need to traverse value to find field. The call to
 % mango_doc:get_field/2 may return either not_found or
 % bad_path in which case matching fails.
-match({[{Field, Cond}]}, Value, #ctx{path = Path} = Ctx) ->
+match({[{Field, Cond}]}, Value, #ctx{verbose = Verb, path = Path} = Ctx) ->
     InnerCtx = Ctx#ctx{path = [Field | Path]},
     case mango_doc:get_field(Value, Field) of
         not_found when Cond == {[{<<"$exists">>, false}]} ->
-            [];
+            case Verb of
+                true -> [];
+                false -> true
+            end;
         not_found ->
-            [#failure{op = field, type = not_found, path = InnerCtx#ctx.path}];
+            case Verb of
+                true -> [#failure{op = field, type = not_found, ctx = InnerCtx}];
+                false -> false
+            end;
         bad_path ->
-            [#failure{op = field, type = bad_path, path = InnerCtx#ctx.path}];
+            case Verb of
+                true -> [#failure{op = field, type = bad_path, ctx = InnerCtx}];
+                false -> false
+            end;
         SubValue when Field == <<"_id">> ->
             match(Cond, SubValue, InnerCtx#ctx{cmp = fun mango_json:cmp_raw/2});
         SubValue ->
@@ -639,10 +699,18 @@ match({[{Field, Cond}]}, Value, #ctx{path = Path} = Ctx) ->
 match({[_, _ | _] = _Props} = Sel, _Value, _Ctx) ->
     error({unnormalized_selector, Sel}).
 
-compare(Op, Arg, Path, Cond) ->
-    case Cond of
-        true -> [];
-        _ -> [#failure{op = Op, params = [Arg], path = Path}]
+match_with_failure(Expr, Value, Op, Params, #ctx{negate = Neg} = Ctx) ->
+    case not match(Expr, Value, Ctx#ctx{verbose = false}) of
+        Neg -> [];
+        _ -> [#failure{op = Op, params = Params, ctx = Ctx}]
+    end.
+
+compare(_, _, #ctx{verbose = false}, Cond) ->
+    Cond;
+compare(Op, Arg, #ctx{negate = Neg} = Ctx, Cond) ->
+    case not Cond of
+        Neg -> [];
+        _ -> [#failure{op = Op, params = [Arg], ctx = Ctx}]
     end.
 
 % Returns true if Selector requires all
@@ -1171,10 +1239,21 @@ check_selector(Selector, Results) ->
     SelPos = normalize({[{<<"x">>, Selector}]}),
     SelNeg = normalize({[{<<"x">>, {[{<<"$not">>, Selector}]}}]}),
 
+    ListToBool = fun(List) ->
+        case List of
+            [] -> true;
+            [_ | _] -> false
+        end
+    end,
+
     Check = fun({Result, Value}) ->
         Doc = {[{<<"x">>, Value}]},
-        ?assertEqual(Result, match_int(SelPos, Doc)),
-        ?assertEqual(not Result, match_int(SelNeg, Doc))
+
+        ?assertEqual(Result, match_int(SelPos, Doc, false)),
+        ?assertEqual(Result, ListToBool(match_int(SelPos, Doc, true))),
+
+        ?assertEqual(not Result, match_int(SelNeg, Doc, false)),
+        ?assertEqual(not Result, ListToBool(match_int(SelNeg, Doc, true)))
     end,
 
     lists:foreach(Check, Results).
@@ -1544,10 +1623,9 @@ match_size_test() ->
     ]).
 
 match_allmatch_test() ->
-    % TODO: we have made a breaking change and made $allMatch return true for
-    % empty lists, since this makes negation consistent
+    % $allMatch is defined to return false for empty lists
     check_selector({[{<<"$allMatch">>, {[{<<"$eq">>, 0}]}}]}, [
-        {true, []},
+        {false, []},
         {true, [0]},
         {false, [1]},
         {false, [0, 1]}
@@ -1808,8 +1886,8 @@ match_failures_object_test() ->
             {<<"b">>, {[{<<"c">>, 3}]}}
         ]}
     ),
-    ?assertEqual(
-        [#failure{op = eq, type = mismatch, params = [1], path = [<<"a">>]}],
+    ?assertMatch(
+        [#failure{op = eq, type = mismatch, params = [1], ctx = #ctx{path = [<<"a">>]}}],
         Fails1
     ),
 
@@ -1820,8 +1898,8 @@ match_failures_object_test() ->
             {<<"b">>, {[{<<"c">>, 4}]}}
         ]}
     ),
-    ?assertEqual(
-        [#failure{op = eq, type = mismatch, params = [3], path = [<<"b.c">>]}],
+    ?assertMatch(
+        [#failure{op = eq, type = mismatch, params = [3], ctx = #ctx{path = [<<"b.c">>]}}],
         Fails2
     ).
 
@@ -1843,18 +1921,18 @@ match_failures_elemmatch_test() ->
     Fails1 = match_failures(
         SelElemMatch, {[{<<"a">>, []}]}
     ),
-    ?assertEqual(
-        [#failure{op = elemMatch, type = empty_list, params = [], path = [<<"a">>]}],
+    ?assertMatch(
+        [#failure{op = elemMatch, type = empty_list, params = [], ctx = #ctx{path = [<<"a">>]}}],
         Fails1
     ),
 
     Fails2 = match_failures(
         SelElemMatch, {[{<<"a">>, [3, 2]}]}
     ),
-    ?assertEqual(
+    ?assertMatch(
         [
-            #failure{op = gt, type = mismatch, params = [4], path = [0, <<"a">>]},
-            #failure{op = gt, type = mismatch, params = [4], path = [1, <<"a">>]}
+            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [0, <<"a">>]}},
+            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [1, <<"a">>]}}
         ],
         Fails2
     ).
@@ -1877,18 +1955,18 @@ match_failures_allmatch_test() ->
     Fails1 = match_failures(
         SelAllMatch, {[{<<"a">>, [4]}]}
     ),
-    ?assertEqual(
-        [#failure{op = gt, type = mismatch, params = [4], path = [0, <<"a">>]}],
+    ?assertMatch(
+        [#failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [0, <<"a">>]}}],
         Fails1
     ),
 
     Fails2 = match_failures(
         SelAllMatch, {[{<<"a">>, [5, 6, 3, 7, 0]}]}
     ),
-    ?assertEqual(
+    ?assertMatch(
         [
-            #failure{op = gt, type = mismatch, params = [4], path = [2, <<"a">>]},
-            #failure{op = gt, type = mismatch, params = [4], path = [4, <<"a">>]}
+            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [2, <<"a">>]}},
+            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [4, <<"a">>]}}
         ],
         Fails2
     ).
@@ -1911,8 +1989,12 @@ match_failures_allmatch_object_test() ->
     Fails1 = match_failures(
         SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 4}]}]}]}}]}
     ),
-    ?assertEqual(
-        [#failure{op = gt, type = mismatch, params = [4], path = [<<"c">>, 0, <<"a.b">>]}],
+    ?assertMatch(
+        [
+            #failure{
+                op = gt, type = mismatch, params = [4], ctx = #ctx{path = [<<"c">>, 0, <<"a.b">>]}
+            }
+        ],
         Fails1
     ),
 
@@ -1920,8 +2002,12 @@ match_failures_allmatch_object_test() ->
         SelAllMatch,
         {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}, {[{<<"c">>, 6}]}, {[{<<"c">>, 3}]}]}]}}]}
     ),
-    ?assertEqual(
-        [#failure{op = gt, type = mismatch, params = [4], path = [<<"c">>, 2, <<"a.b">>]}],
+    ?assertMatch(
+        [
+            #failure{
+                op = gt, type = mismatch, params = [4], ctx = #ctx{path = [<<"c">>, 2, <<"a.b">>]}
+            }
+        ],
         Fails2
     ),
 
@@ -1929,10 +2015,17 @@ match_failures_allmatch_object_test() ->
         SelAllMatch,
         {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 1}]}, {[]}]}]}}]}
     ),
-    ?assertEqual(
+    ?assertMatch(
         [
-            #failure{op = gt, type = mismatch, params = [4], path = [<<"c">>, 0, <<"a.b">>]},
-            #failure{op = field, type = not_found, params = [], path = [<<"c">>, 1, <<"a.b">>]}
+            #failure{
+                op = gt, type = mismatch, params = [4], ctx = #ctx{path = [<<"c">>, 0, <<"a.b">>]}
+            },
+            #failure{
+                op = field,
+                type = not_found,
+                params = [],
+                ctx = #ctx{path = [<<"c">>, 1, <<"a.b">>]}
+            }
         ],
         Fails3
     ).
