@@ -29,7 +29,9 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_min_batch_size_1, 10),
             ?TDEF_FE(t_min_batch_size_2, 10),
             ?TDEF_FE(t_max_batch_size_1, 10),
-            ?TDEF_FE(t_max_batch_size_2, 10)
+            ?TDEF_FE(t_max_batch_size_2, 10),
+            ?TDEF_FE(t_dry_run, 10),
+            ?TDEF_FE(t_dry_run_with_non_default_log_level, 10)
         ]
     }.
 
@@ -42,6 +44,7 @@ setup() ->
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, [{q, "2"}, {n, "1"}]),
     config:set(atom_to_list(?PLUGIN), "max_batch_items", "1", false),
+    config:set(atom_to_list(?PLUGIN), "dry_run", "false", false),
     reset_stats(),
     {Ctx, DbName}.
 
@@ -85,6 +88,37 @@ t_auto_purge_after_db_ttl({_, DbName}) ->
     config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
     wait_exit(10000),
     ?assertEqual(0, doc_del_count(DbName)),
+    ok.
+
+t_dry_run({_, DbName}) ->
+    config:set(atom_to_list(?PLUGIN), "dry_run", "true", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(couch_scanner_util),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, doc_del_count(DbName)),
+    ?assert(log_calls(info) >= 3),
+    ?assert(log_calls(warning) < 3),
+    ok.
+
+t_dry_run_with_non_default_log_level({_, DbName}) ->
+    config:set(atom_to_list(?PLUGIN), "dry_run", "true", false),
+    config:set(atom_to_list(?PLUGIN), "log_level", "warning", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, doc_del_count(DbName)),
+    ?assert(log_calls(warning) >= 3),
+    ?assert(log_calls(info) < 3),
     ok.
 
 t_min_batch_size_1({_, DbName}) ->
@@ -210,3 +244,6 @@ wait_exit(MSec) ->
 doc_del_count(DbName) ->
     {ok, DbInfo} = fabric:get_db_info(DbName),
     couch_util:get_value(doc_del_count, DbInfo).
+
+log_calls(Level) ->
+    meck:num_calls(couch_scanner_util, log, [Level, ?PLUGIN, '_', '_', '_']).
