@@ -15,10 +15,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/src/mem3_reshard.hrl").
-% for all_docs function
--include_lib("couch_mrview/include/couch_mrview.hrl").
 
--define(ID, <<"_id">>).
 -define(TIMEOUT, 60).
 
 setup() ->
@@ -69,7 +66,7 @@ partitioned_shards_recreated_properly(#{dbname := DbName, dbdoc := DbDoc}) ->
     ?assert(is_partitioned(Shards)),
     ok = with_proc(fun() -> couch_server:delete(ShardName, []) end),
     ?assertThrow({not_found, no_db_file}, is_partitioned(Shard)),
-    ok = mem3_util:update_db_doc(DbDoc#doc{body = {Body1}}),
+    {ok, {2, _Rev}} = mem3:update_db_doc(DbDoc#doc{body = {Body1}}),
     Shards =
         [Shard | _] = test_util:wait_value(
             fun() ->
