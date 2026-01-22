@@ -263,3 +263,21 @@ settings in their ``[{plugin}]`` section.
         The database may override this setting with the
         :ref:`api/db/auto_purge` endpoint. If neither is set, the
         plugin will not purge deleted documents.
+
+    .. config:option:: log_level
+
+        Set the log level for starting, stopping and purge report summary log entries. ::
+
+            [couch_auto_purge_plugin]
+            log_level = info
+
+    .. config:option:: dry_run
+
+        When set to ``true`` the plugin does everything (scanning, revision
+        processing, etc) but skips the actual purge step. Optionally use the
+        ``log_level`` plugin setting to increase the severity of log reports so
+        it's clear when the plugin starts, stops and how many revisions it found
+        to purge. ::
+
+            [couch_auto_purge_plugin]
+            dry_run = false

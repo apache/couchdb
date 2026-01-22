@@ -30,27 +30,27 @@
 start(ScanId, #{}) ->
     case dead_nodes() of
         true ->
-            ?INFO("Not starting. Found dead nodes", [], #{sid => ScanId}),
+            ?LOG(level(), "Not starting. Found dead nodes", [], #{sid => ScanId}),
             skip;
         false ->
             St = init_config(ScanId),
-            ?INFO("Starting.", [], St),
+            ?LOG(level(), "Starting.", [], St),
             {ok, St}
     end.
 
 resume(ScanId, #{}) ->
     case dead_nodes() of
         true ->
-            ?INFO("Not resuming. Found dead nodes", [], #{sid => ScanId}),
+            ?LOG(level(), "Not resuming. Found dead nodes", [], #{sid => ScanId}),
             skip;
         false ->
             St = init_config(ScanId),
-            ?INFO("Resuming.", [], St),
+            ?LOG(level(), "Resuming.", [], St),
             {ok, St}
     end.
 
 complete(St) ->
-    ?INFO("Completed", [], St),
+    ?LOG(level(), "Completed.", [], St),
     {ok, #{}}.
 
 checkpoint(St) ->
@@ -84,7 +84,13 @@ db_opened(#{} = St, Db) ->
 
 db_closing(#{} = St, Db) ->
     St1 = #{count := Count} = flush_queue(St, Db),
-    ?INFO("purged ~B deleted documents from ~s", [Count, couch_db:name(Db)], meta(St1)),
+    case Count > 0 of
+        true ->
+            LogArgs = [Count, couch_db:name(Db)],
+            ?LOG(level(), "purged ~B deleted documents from ~s", LogArgs, meta(St1));
+        false ->
+            ok
+    end,
     {ok, St1}.
 
 doc_fdi(#{} = St, #full_doc_info{deleted = true} = FDI, Db) ->
@@ -121,7 +127,11 @@ flush_queue(#{queue := []} = St, _Db) ->
 flush_queue(#{queue := IdRevs} = St, Db) ->
     DbName = mem3:dbname(couch_db:name(Db)),
     N = mem3:n(DbName),
-    PurgeFun = fun() -> fabric:purge_docs(DbName, IdRevs, [?ADMIN_CTX, {w, N}]) end,
+    PurgeFun =
+        case dry_run() of
+            false -> fun() -> fabric:purge_docs(DbName, IdRevs, [?ADMIN_CTX, {w, N}]) end;
+            true -> fun() -> {ok, [{ok, Revs} || {_Id, Revs} <- IdRevs]} end
+        end,
     Timeout = fabric_util:request_timeout(),
     try fabric_util:isolate(PurgeFun, Timeout) of
         {Health, Results} when Health == ok; Health == accepted ->
@@ -231,6 +241,13 @@ min_batch_size() ->
 
 max_batch_size() ->
     erlang:max(min_batch_size(), config:get_integer(atom_to_list(?MODULE), "max_batch_size", 500)).
+
+dry_run() ->
+    config:get_boolean(atom_to_list(?MODULE), "dry_run", false).
+
+level() ->
+    Level = config:get(atom_to_list(?MODULE), "log_level", "info"),
+    couch_log_util:level_to_atom(Level).
 
 dead_nodes() ->
     [] =/= (mem3:nodes() -- mem3_util:live_nodes()).
