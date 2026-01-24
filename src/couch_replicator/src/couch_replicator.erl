@@ -78,7 +78,16 @@ replicate(PostBody, Ctx) ->
         false ->
             check_authorization(RepId, UserCtx),
             {ok, Listener} = rep_result_listener(RepId),
-            Result = do_replication_loop(Rep),
+            % fudge replication id
+            Result =
+                case do_replication_loop(Rep) of
+                    {ok, {ResultJson}} ->
+                        % TODO: check with options
+                        {PublicRepId, _} = couch_replicator_ids:replication_id(Rep),
+                        {ok, {[{<<"replication_id">>, ?l2b(PublicRepId)} | ResultJson]}};
+                    Else ->
+                        Else
+                end,
             couch_replicator_notifier:stop(Listener),
             Result
     end.
