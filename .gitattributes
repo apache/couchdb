@@ -1,3 +1,3 @@
-nouveau/**/* text eol=lf
-nouveau/**/*.bat text eol=crlf
-nouveau/**/*.jar binary
+extra/nouveau/**/* text eol=lf
+extra/nouveau/**/*.bat text eol=crlf
+extra/nouveau/**/*.jar binary
