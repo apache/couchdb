@@ -34,6 +34,10 @@
     "facet ranges, non-empty",
     "timeouts do not expose internal state"
   ],
+  "BasicTextTest": [
+    "explain options",
+    "explain with bookmarks"
+  ],
   "ElemMatchTests": [
     "elem match non object"
   ],
@@ -62,5 +66,9 @@
   ],
   "RegexVsTextIndexTest": [
     "regex works with text index"
+  ],
+  "PartitionMangoTest": [
+    "explain options (text)",
+    "explain works with bookmarks (text)"
   ]
 }
