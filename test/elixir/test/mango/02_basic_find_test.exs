@@ -315,6 +315,17 @@ defmodule BasicFindTest do
     assert opts["allow_fallback"] == true
   end
 
+  test "explain with bookmarks" do
+    query = %{"age" => %{"$gt" => 42}}
+
+    {:ok, resp} = MangoDatabase.find(@db_name, query, limit: 1, return_raw: true)
+    assert length(resp["docs"]) == 1
+    assert resp["bookmark"] != "nil"
+    {:ok, explain} = MangoDatabase.find(@db_name, query, bookmark: resp["bookmark"], explain: true)
+    assert is_binary(explain["opts"]["bookmark"])
+    assert resp["bookmark"] == explain["opts"]["bookmark"]
+  end
+
   test "sort with all docs" do
     {:ok, explain} = MangoDatabase.find(@db_name,
       %{"_id" => %{"$gt" => 0}, "age" => %{"$gt" => 0}},

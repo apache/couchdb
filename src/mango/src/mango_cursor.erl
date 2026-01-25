@@ -338,18 +338,32 @@ explain(#cursor{} = Cursor) ->
             false ->
                 Opts1
         end,
+    % For `text` indexes, bookmarks are not stored as strings
+    % but lists (in their raw form), so we will have to employ
+    % the appropriate conversions so that `jiffy:encode/1` will
+    % not crash.
+    BookmarkValue = lists:keyfind(bookmark, 1, Opts2),
+    Opts3 =
+        case BookmarkValue of
+            {bookmark, []} ->
+                lists:keyreplace(bookmark, 1, Opts2, {bookmark, <<"nil">>});
+            {bookmark, [_ | _] = Bookmark} ->
+                lists:keyreplace(bookmark, 1, Opts2, {bookmark, dreyfus_bookmark:pack(Bookmark)});
+            _ ->
+                Opts2
+        end,
     Fields =
         case Fields0 of
             all_fields -> [];
             Value -> Value
         end,
-    OptsFields = lists:keyfind(fields, 1, Opts2),
+    OptsFields = lists:keyfind(fields, 1, Opts3),
     Opts =
         case OptsFields of
             {fields, all_fields} ->
-                lists:keyreplace(fields, 1, Opts2, {fields, []});
+                lists:keyreplace(fields, 1, Opts3, {fields, []});
             _ ->
-                Opts2
+                Opts3
         end,
     CandidateIndexes = extract_candidate_indexes(Cursor),
     SelectorHints = extract_selector_hints(Selector),

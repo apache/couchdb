@@ -10,6 +10,51 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+defmodule BasicTextTest do
+  use CouchTestCase
+
+  @db_name "basic-text"
+
+  setup do
+    UserDocs.setup(@db_name, "text")
+  end
+
+  test "explain options" do
+    {:ok, explain} = MangoDatabase.find(
+      @db_name,
+      %{"age" => %{"$gt" => 0}},
+      fields: ["manager"],
+      explain: true
+    )
+    opts = explain["opts"]
+    assert opts["r"] == 1
+    assert opts["limit"] == 25
+    assert opts["skip"] == 0
+    assert opts["fields"] == ["manager"]
+    assert opts["sort"] == %{}
+    assert opts["bookmark"] == "nil"
+    assert opts["conflicts"] == false
+    assert opts["execution_stats"] == false
+    assert opts["partition"] == ""
+    assert opts["stable"] == false
+    assert opts["stale"] == false
+    assert opts["update"] == true
+    assert opts["use_index"] == []
+    assert opts["allow_fallback"] == true
+  end
+
+  test "explain with bookmarks" do
+    query = %{"age" => %{"$gt" => 42}}
+
+    {:ok, resp} = MangoDatabase.find(@db_name, query, limit: 1, return_raw: true)
+    assert length(resp["docs"]) == 1
+    assert resp["bookmark"] != "nil"
+    {:ok, explain} = MangoDatabase.find(@db_name, query, bookmark: resp["bookmark"], explain: true)
+    assert is_binary(explain["opts"]["bookmark"])
+    assert resp["bookmark"] == explain["opts"]["bookmark"]
+  end
+end
+
 defmodule ElemMatchTests do
   use CouchTestCase
 
