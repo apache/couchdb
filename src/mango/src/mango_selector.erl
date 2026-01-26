@@ -2324,4 +2324,52 @@ format_path_test() ->
     ?assertEqual([<<"a">>, <<"b">>, <<"c">>], format_path([<<"b.c">>, <<"a">>])),
     ?assertEqual([<<"a">>, 42, <<"b">>, <<"c">>], format_path([<<"b.c">>, 42, <<"a">>])).
 
+% The following benchmarks can be run by adding the following dependencies to
+% rebar.config.script:
+%
+%       {argparse, {url, "https://github.com/max-au/argparse"}, "1.2.4"},
+%       {erlperf, {url, "https://github.com/max-au/erlperf"}, "2.3.0"}
+%
+% and then uncommenting the following functions and running the unit tests for
+% this module via this command:
+%
+%       make eunit apps=mango suites=mango_selector
+%
+% bench(Name, Selector, Doc) ->
+%     Sel1 = normalize(Selector),
+%     [Normal, Verbose] = erlperf:compare(
+%         [
+%             #{runner => fun() -> match_int(Sel1, Doc, V) end}
+%          || V <- [false, true]
+%         ],
+%         #{}
+%     ),
+%     ?debugFmt("~nbench[~s: normal ] = ~p~n", [Name, Normal]),
+%     ?debugFmt("~nbench[~s: verbose] = ~p~n", [Name, Verbose]).
+%
+% bench_and_test() ->
+%     Sel =
+%         {[
+%             {<<"x">>,
+%                 {[
+%                     {<<"$and">>, [{[{<<"$gt">>, V}]} || V <- [100, 200, 300, 400, 500]]}
+%                 ]}}
+%         ]},
+%     Doc = {[{<<"x">>, 25}]},
+%     bench("$and", Sel, Doc).
+%
+% bench_allmatch_test() ->
+%     Sel =
+%         {[
+%             {<<"x">>,
+%                 {[
+%                     {<<"$allMatch">>, {[{<<"$gt">>, 10}]}}
+%                 ]}}
+%         ]},
+%     Doc =
+%         {[
+%             {<<"x">>, [0, 23, 45, 67, 89, 12, 34, 56, 78]}
+%         ]},
+%     bench("$allMatch", Sel, Doc).
+
 -endif.
