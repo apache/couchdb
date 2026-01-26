@@ -2029,4 +2029,41 @@ match_failures_allmatch_object_test() ->
         Fails3
     ).
 
+bench(Name, Selector, Doc) ->
+    Sel1 = normalize(Selector),
+    [Normal, Verbose] = erlperf:compare(
+        [
+            #{runner => fun() -> match_int(Sel1, Doc, V) end}
+         || V <- [false, true]
+        ],
+        #{}
+    ),
+    ?debugFmt("~nbench[~s: normal ] = ~p~n", [Name, Normal]),
+    ?debugFmt("~nbench[~s: verbose] = ~p~n", [Name, Verbose]).
+
+bench_and_test() ->
+    Sel =
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$and">>, [{[{<<"$gt">>, V}]} || V <- [100, 200, 300, 400, 500]]}
+                ]}}
+        ]},
+    Doc = {[{<<"x">>, 25}]},
+    bench("$and", Sel, Doc).
+
+bench_allmatch_test() ->
+    Sel =
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$allMatch">>, {[{<<"$gt">>, 10}]}}
+                ]}}
+        ]},
+    Doc =
+        {[
+            {<<"x">>, [0, 23, 45, 67, 89, 12, 34, 56, 78]}
+        ]},
+    bench("$allMatch", Sel, Doc).
+
 -endif.
