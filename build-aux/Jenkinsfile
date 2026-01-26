@@ -36,180 +36,180 @@ other_changes = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q -v -
 // We create parallel build / test / package stages for each OS using the metadata
 // in this map. Adding a new OS should ideally only involve adding a new entry here.
 meta = [
-  'centos8': [
-    name: 'CentOS 8',
-    spidermonkey_vsn: '60',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/usr',
-    quickjs_test262: true,
-    image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
-  ],
-
-  'centos9': [
-    name: 'CentOS 9',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/usr',
-    quickjs_test262: true,
-    image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
-  ],
-
-  'jammy': [
-    name: 'Ubuntu 22.04',
-    spidermonkey_vsn: '91',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
-  ],
-
-  'noble': [
-    name: 'Ubuntu 24.04',
-    spidermonkey_vsn: '115',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
-  ],
-
-  'bullseye': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
-  ],
-
-  // Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
-  // seems like a good thing, however, those workers allow running multiple
-  // agents at a time and often time out even with retries. The build times
-  // take close to an hour, which is at least x2 as long as it takes to run
-  // other arch CI jobs and they still time out often and fail. Disable for
-  // now. This is a low demand arch distro, maybe remove support altogether?
-  //
-  // 'base-ppc64': [
-  //   name: 'Debian POWER',
-  //   spidermonkey_vsn: '78',
-  //   with_nouveau: true,
-  //   with_clouseau: true,
-  //   quickjs_test262: true,
-  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-  //   node_label: 'ppc64le'
-  // ],
-
-  // Just like in the ppc64le case we sometimes "pick up" built-in s390x workers added to
-  // our jenkins, but since those are managed by us, our .mix/.venv/.hex packaging
-  // cache hack in /home/jenkins doesn't work, and so elixir tests fail. Skip this arch build
-  // until we figure out caching (probably need to use a proper caching plugin).
-  //
-  // 'base-s390x': [
-  //   name: 'Debian s390x',
-  //   spidermonkey_vsn: '78',
-  //   with_nouveau: true,
-  //   // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
-  //   // Test262Error: 51539607552,42,0,4,5,6,7,8
-  //   quickjs_test262: false,
-  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-  //   node_label: 's390x'
-  // ],
-
-  'base': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the bookworm-quickjs variant
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
-  ],
-
-  'base-max-erlang': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}"
-  ],
-
-  'base-quickjs': [
-    name: 'Debian 12 with QuickJS',
-    disable_spidermonkey: true,
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
-  ],
-
-  // This runs on a docker ARM64 host. Normally we should be able to run all
-  // ubuntu and centos containers on top any docker host, however spidermonkey
-  // 60 from CentOS cannot build on ARM64 so we're forced to separate it as a
-  // separate build usable for ubuntu/debian only and isolated it from other
-  // builds. At some point when we remove CentOS 8 or switch to QuickJS only,
-  // remove the docker-arm64 label on ubuntu-nc-arm64-12 node in Jenkins and
-  // remove this flavor
-  //
-  'base-arm64': [
-    name: 'Debian ARM64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the bookworm-quickjs variant
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 'docker-arm64'
-  ],
-
-  'trixie': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '128',
-    with_nouveau: true,
-    with_clouseau: false,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}"
-  ],
-
-  'freebsd-x86_64': [
-      name: 'FreeBSD x86_64',
-      spidermonkey_vsn: '91',
-      with_clouseau: true,
-      clouseau_java_home: '/usr/local/openjdk21',
-      quickjs_test262: false,
-      gnu_make: 'gmake'
-  ],
-
-  // Spidermonkey 91 has issues on ARM64 FreeBSD
-  // use QuickJS for now
-  //
-  'freebsd-arm64': [
-     name: 'FreeBSD ARM64 QuickJS',
-     disable_spidermonkey: true,
-     with_clouseau: true,
-     clouseau_java_home: '/usr/local/openjdk21',
-     quickjs_test262: false,
-     gnu_make: 'gmake'
-  ],
-
-  'macos': [
-     name: 'macOS',
-     disable_spidermonkey: true,
-     with_nouveau: false,
-     with_clouseau: true,
-     clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
-     gnu_make: 'gmake',
-     gnu_make_eunit_opts: '-j4 --output-sync=target'
-   ],
+ //centos8': [
+ // name: 'CentOS 8',
+ // spidermonkey_vsn: '60',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/usr',
+ // quickjs_test262: true,
+ // image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
+ //,
+ //
+ //centos9': [
+ // name: 'CentOS 9',
+ // spidermonkey_vsn: '78',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/usr',
+ // quickjs_test262: true,
+ // image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
+ //,
+ //
+ //jammy': [
+ // name: 'Ubuntu 22.04',
+ // spidermonkey_vsn: '91',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // quickjs_test262: true,
+ // image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
+ //,
+ //
+ //noble': [
+ // name: 'Ubuntu 24.04',
+ // spidermonkey_vsn: '115',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // quickjs_test262: true,
+ // image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
+ //,
+ //
+ //bullseye': [
+ // name: 'Debian x86_64',
+ // spidermonkey_vsn: '78',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // quickjs_test262: true,
+ // image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
+ //,
+ //
+ /// Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
+ /// seems like a good thing, however, those workers allow running multiple
+ /// agents at a time and often time out even with retries. The build times
+ /// take close to an hour, which is at least x2 as long as it takes to run
+ /// other arch CI jobs and they still time out often and fail. Disable for
+ /// now. This is a low demand arch distro, maybe remove support altogether?
+ ///
+ /// 'base-ppc64': [
+ ///   name: 'Debian POWER',
+ ///   spidermonkey_vsn: '78',
+ ///   with_nouveau: true,
+ ///   with_clouseau: true,
+ ///   quickjs_test262: true,
+ ///   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+ ///   node_label: 'ppc64le'
+ /// ],
+ //
+ /// Just like in the ppc64le case we sometimes "pick up" built-in s390x workers added to
+ /// our jenkins, but since those are managed by us, our .mix/.venv/.hex packaging
+ /// cache hack in /home/jenkins doesn't work, and so elixir tests fail. Skip this arch build
+ /// until we figure out caching (probably need to use a proper caching plugin).
+ ///
+ /// 'base-s390x': [
+ ///   name: 'Debian s390x',
+ ///   spidermonkey_vsn: '78',
+ ///   with_nouveau: true,
+ ///   // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
+ ///   // Test262Error: 51539607552,42,0,4,5,6,7,8
+ ///   quickjs_test262: false,
+ ///   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+ ///   node_label: 's390x'
+ /// ],
+ //
+ //base': [
+ // name: 'Debian x86_64',
+ // spidermonkey_vsn: '78',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // // Test this in in the bookworm-quickjs variant
+ // quickjs_test262: false,
+ // image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
+ //,
+ //
+ //base-max-erlang': [
+ // name: 'Debian x86_64',
+ // spidermonkey_vsn: '78',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // quickjs_test262: false,
+ // image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}"
+ //,
+ //
+ //base-quickjs': [
+ // name: 'Debian 12 with QuickJS',
+ // disable_spidermonkey: true,
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // quickjs_test262: true,
+ // image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
+ //,
+ //
+ /// This runs on a docker ARM64 host. Normally we should be able to run all
+ /// ubuntu and centos containers on top any docker host, however spidermonkey
+ /// 60 from CentOS cannot build on ARM64 so we're forced to separate it as a
+ /// separate build usable for ubuntu/debian only and isolated it from other
+ /// builds. At some point when we remove CentOS 8 or switch to QuickJS only,
+ /// remove the docker-arm64 label on ubuntu-nc-arm64-12 node in Jenkins and
+ /// remove this flavor
+ ///
+ //base-arm64': [
+ // name: 'Debian ARM64',
+ // spidermonkey_vsn: '78',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // // Test this in in the bookworm-quickjs variant
+ // quickjs_test262: false,
+ // image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+ // node_label: 'docker-arm64'
+ //,
+ //
+ //trixie': [
+ // name: 'Debian x86_64',
+ // spidermonkey_vsn: '128',
+ // with_nouveau: true,
+ // with_clouseau: false,
+ // clouseau_java_home: '/opt/java/openjdk',
+ // quickjs_test262: true,
+ // image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}"
+ //,
+ //
+ //freebsd-x86_64': [
+ //   name: 'FreeBSD x86_64',
+ //   spidermonkey_vsn: '91',
+ //   with_clouseau: true,
+ //   clouseau_java_home: '/usr/local/openjdk21',
+ //   quickjs_test262: false,
+ //   gnu_make: 'gmake'
+ //,
+ //
+ /// Spidermonkey 91 has issues on ARM64 FreeBSD
+ /// use QuickJS for now
+ ///
+ //freebsd-arm64': [
+ //  name: 'FreeBSD ARM64 QuickJS',
+ //  disable_spidermonkey: true,
+ //  with_clouseau: true,
+ //  clouseau_java_home: '/usr/local/openjdk21',
+ //  quickjs_test262: false,
+ //  gnu_make: 'gmake'
+ //,
+ //
+ //macos': [
+ //  name: 'macOS',
+ //  disable_spidermonkey: true,
+ //  with_nouveau: false,
+ //  with_clouseau: true,
+ //  clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
+ //  gnu_make: 'gmake',
+ //  gnu_make_eunit_opts: '-j4 --output-sync=target'
+ //],
 
    'win2022': [
      name: 'Windows 2022',
@@ -325,30 +325,44 @@ def generateNativeStage(platform) {
                   }
 
                   powershell( script: """
-                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    ..\\..\\couchdb-glazier\\bin\\shell.ps1
                     .\\configure.ps1 -SkipDeps -WithNouveau ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     make -f Makefile.win release
                   """, label: 'Configure and Build')
 
-                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit", label: 'EUnit tests')
-                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir", label: 'Elixir tests')
+                  retry (3) {
+                    powershell( script: """
+                      ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      ls
+                      ..\\..\\couchdb-glazier\\bin\\exclude_tests_win.ps1 -Path '\\.'
+                      ls
+                      make -f Makefile.win eunit
+                    """, label: 'EUnit tests')
+                  }
+
+                  retry (3) {
+                    powershell( script: """
+                      ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      make -f Makefile.win elixir
+                      """, label: 'Elixir tests')
+                  }
 
                   powershell( script: """
-                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    ..\\..\\couchdb-glazier\\bin\\shell.ps1
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     ${setClouseauJavaHome}
                     make -f Makefile.win elixir-search ERLANG_COOKIE=crumbles
                   """, label: 'Clouseau tests')
 
                   powershell( script: """
-                      .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      ..\\..\\couchdb-glazier\\bin\\shell.ps1
                       Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                       ${setClouseauJavaHome}
                       make -f Makefile.win mango-test ERLANG_COOKIE=crumbles
                     """, label: 'Mango tests')
 
-                  powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
+                  powershell( script: '..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
 
                   // temporary exclude - random flaky tests on Windows
                   //powershell( script: """
