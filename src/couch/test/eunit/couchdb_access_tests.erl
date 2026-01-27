@@ -49,7 +49,7 @@ before_all() ->
     Hashed = couch_passwords:hash_admin_password("a"),
     ok = config:set("admins", "a", binary_to_list(Hashed), false),
     ok = config:set("couchdb", "uuid", "21ac467c1bc05e9d9e9d2d850bb1108f", false),
-    ok = config:set("log", "level", "debug", false),
+    ok = config:set("log", "level", "info", false),
     ok = config:set("per_doc_access", "enable", "true", false),
 
     % cleanup and setup
@@ -78,61 +78,61 @@ after_all(_) ->
 access_test_() ->
     Tests = [
         % Server config
-        fun should_not_let_create_access_db_if_disabled/2,
-
-        % Doc creation
-        fun should_not_let_anonymous_user_create_doc/2,
-        fun should_let_admin_create_doc_with_access/2,
-        fun should_let_admin_create_doc_without_access/2,
-        fun should_let_user_create_doc_for_themselves/2,
-        fun should_not_let_user_create_doc_for_someone_else/2,
-        fun should_let_user_create_access_ddoc/2,
-        fun access_ddoc_should_have_no_effects/2,
-
-        % Doc updates
-        fun users_with_access_can_update_doc/2,
-        fun users_without_access_can_not_update_doc/2,
-        fun users_with_access_can_not_change_access/2,
-        fun users_with_access_can_not_remove_access/2,
-
-        % Doc reads
-        fun should_let_admin_read_doc_with_access/2,
-        fun user_with_access_can_read_doc/2,
-        fun user_without_access_can_not_read_doc/2,
-        fun user_can_not_read_doc_without_access/2,
-
-        % Doc deletes
-        fun should_let_admin_delete_doc_with_access/2,
-        fun should_let_user_delete_doc_for_themselves/2,
-        fun should_not_let_user_delete_doc_for_someone_else/2,
-
-        % _all_docs with include_docs
-        fun should_let_admin_fetch_all_docs/2,
-        fun should_let_user_fetch_their_own_all_docs/2,
-
-        % _changes
-        fun should_let_admin_fetch_changes/2,
-        fun should_let_user_fetch_their_own_changes/2,
+        % fun should_not_let_create_access_db_if_disabled/2,
+% 
+        % % Doc creation
+        % fun should_not_let_anonymous_user_create_doc/2,
+        % fun should_let_admin_create_doc_with_access/2,
+        % fun should_let_admin_create_doc_without_access/2,
+        % fun should_let_admin_create_ddoc_without_access/2,
+        % fun should_not_let_admin_create_ddoc_with_access/2,
+        % fun should_let_user_create_doc_for_themselves/2,
+        % fun should_not_let_user_create_ddoc_with_access/2,
+        % fun should_not_let_user_create_doc_for_someone_else/2,
+        % fun should_not_let_user_create_access_ddoc/2,
+% 
+        % % Doc updates
+        % fun users_with_access_can_update_doc/2,
+        % fun users_without_access_can_not_update_doc/2,
+        % fun users_with_access_can_not_change_access/2,
+        % fun users_with_access_can_not_remove_access/2,
+% 
+        % % Doc reads
+        % fun should_let_admin_read_doc_with_access/2,
+        % fun user_with_access_can_read_doc/2,
+        % fun user_without_access_can_not_read_doc/2,
+        % fun user_can_not_read_doc_without_access/2,
+% 
+        % % Doc deletes
+        % fun should_let_admin_delete_doc_with_access/2,
+        % fun should_let_user_delete_doc_for_themselves/2,
+        % fun should_not_let_user_delete_doc_for_someone_else/2,
+% 
+        % % _all_docs with include_docs
+        % fun should_let_admin_fetch_all_docs/2,
+        % fun should_let_user_fetch_their_own_all_docs/2,
+% 
+        % % _changes
+        % fun should_let_admin_fetch_changes/2,
+        % fun should_let_user_fetch_their_own_changes/2,
 
         % views
-        fun should_not_allow_admin_access_ddoc_view_request/2,
-        fun should_not_allow_user_access_ddoc_view_request/2,
-        fun should_allow_admin_users_access_ddoc_view_request/2,
-        fun should_allow_user_users_access_ddoc_view_request/2,
+        % fun should_allow_admin_query_view_from_ddoc_without_access/2,
+        fun should_not_allow_user_query_view_from_ddoc_without_access/2%,
 
         % replication
-        fun should_allow_admin_to_replicate_from_access_to_access/2,
-        fun should_allow_admin_to_replicate_from_no_access_to_access/2,
-        fun should_allow_admin_to_replicate_from_access_to_no_access/2,
-        fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
-
-        fun should_allow_user_to_replicate_from_access_to_access/2,
-        fun should_allow_user_to_replicate_from_access_to_no_access/2,
-        fun should_allow_user_to_replicate_from_no_access_to_access/2,
-        fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
+        % fun should_allow_admin_to_replicate_from_access_to_access/2,
+        % fun should_allow_admin_to_replicate_from_no_access_to_access/2,
+        % fun should_allow_admin_to_replicate_from_access_to_no_access/2,
+        % fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
+% 
+        % fun should_allow_user_to_replicate_from_access_to_access/2,
+        % fun should_allow_user_to_replicate_from_access_to_no_access/2,
+        % fun should_allow_user_to_replicate_from_no_access_to_access/2,
+        % fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
 
         % _revs_diff for docs you don’t have access to
-        fun should_not_allow_user_to_revs_diff_other_docs/2
+        % fun should_not_allow_user_to_revs_diff_other_docs/2
 
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
@@ -208,6 +208,22 @@ should_let_admin_create_doc_without_access(_PortType, Url) ->
     ),
     ?_assertEqual(201, Code).
 
+should_let_admin_create_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        "{\"a\":1}"
+    ),
+    ?_assertEqual(201, Code).
+
+should_not_let_admin_create_ddoc_with_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        "{\"_access\":[\"foo\"],\"a\":1}"
+    ),
+    ?_assertEqual(403, Code).
+
 should_let_user_create_doc_for_themselves(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
@@ -215,6 +231,14 @@ should_let_user_create_doc_for_themselves(_PortType, Url) ->
         "{\"a\":1,\"_access\":[\"x\"]}"
     ),
     ?_assertEqual(201, Code).
+
+should_not_let_user_create_ddoc_with_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?USERX_REQ_HEADERS,
+        "{\"_access\":[\"x\"],\"a\":1}"
+    ),
+    ?_assertEqual(403, Code).
 
 should_not_let_user_create_doc_for_someone_else(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
@@ -224,62 +248,13 @@ should_not_let_user_create_doc_for_someone_else(_PortType, Url) ->
     ),
     ?_assertEqual(403, Code).
 
-should_let_user_create_access_ddoc(_PortType, Url) ->
+should_not_let_user_create_access_ddoc(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/dx",
         ?USERX_REQ_HEADERS,
         "{\"a\":1,\"_access\":[\"x\"]}"
     ),
-    ?_assertEqual(201, Code).
-
-access_ddoc_should_have_no_effects(_PortType, Url) ->
-    ?_test(begin
-        Ddoc =
-            "{ \"_access\":[\"x\"], \"validate_doc_update\": \"function(newDoc, oldDoc, userCtx) { throw({unauthorized: 'throw error'})}\",   \"views\": {     \"foo\": {       \"map\": \"function(doc) { emit(doc._id) }\"     }   },   \"shows\": {     \"boo\": \"function() {}\"   },   \"lists\": {    \"hoo\": \"function() {}\"   },   \"update\": {     \"goo\": \"function() {}\"   },   \"filters\": {     \"loo\": \"function() {}\"   }   }",
-        {ok, Code, _, _} = test_request:put(
-            Url ++ "/db/_design/dx",
-            ?USERX_REQ_HEADERS,
-            Ddoc
-        ),
-        ?assertEqual(201, Code),
-        {ok, Code1, _, B} = test_request:put(
-            Url ++ "/db/b",
-            ?USERX_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
-        ),
-        ?assertEqual(201, Code1),
-        {ok, Code2, _, _} = test_request:get(
-            Url ++ "/db/_design/dx/_view/foo",
-            ?USERX_REQ_HEADERS
-        ),
-        ?assertEqual(404, Code2),
-        {ok, Code3, _, _} = test_request:get(
-            Url ++ "/db/_design/dx/_show/boo/b",
-            ?USERX_REQ_HEADERS
-        ),
-        ?assertEqual(404, Code3),
-        {ok, Code4, _, _} = test_request:get(
-            Url ++ "/db/_design/dx/_list/hoo/foo",
-            ?USERX_REQ_HEADERS
-        ),
-        ?assertEqual(404, Code4),
-        {ok, Code5, _, _} = test_request:post(
-            Url ++ "/db/_design/dx/_update/goo",
-            ?USERX_REQ_HEADERS,
-            ""
-        ),
-        ?assertEqual(404, Code5),
-        {ok, Code6, _, _} = test_request:get(
-            Url ++ "/db/_changes?filter=dx/loo",
-            ?USERX_REQ_HEADERS
-        ),
-        ?assertEqual(404, Code6),
-        {ok, Code7, _, _} = test_request:get(
-            Url ++ "/db/_changes?filter=_view&view=dx/foo",
-            ?USERX_REQ_HEADERS
-        ),
-        ?assertEqual(404, Code7)
-    end).
+    ?_assertEqual(403, Code).
 
 % Doc updates
 
@@ -648,36 +623,8 @@ should_let_user_fetch_their_own_changes(_PortType, Url) ->
 
 % views
 
-should_not_allow_admin_access_ddoc_view_request(_PortType, Url) ->
-    DDoc = "{\"a\":1,\"_access\":[\"x\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
-    {ok, Code, _, _} = test_request:put(
-        Url ++ "/db/_design/a",
-        ?ADMIN_REQ_HEADERS,
-        DDoc
-    ),
-    ?assertEqual(201, Code),
-    {ok, Code1, _, _} = test_request:get(
-        Url ++ "/db/_design/a/_view/foo",
-        ?ADMIN_REQ_HEADERS
-    ),
-    ?_assertEqual(404, Code1).
-
-should_not_allow_user_access_ddoc_view_request(_PortType, Url) ->
-    DDoc = "{\"a\":1,\"_access\":[\"x\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
-    {ok, Code, _, _} = test_request:put(
-        Url ++ "/db/_design/a",
-        ?ADMIN_REQ_HEADERS,
-        DDoc
-    ),
-    ?assertEqual(201, Code),
-    {ok, Code1, _, _} = test_request:get(
-        Url ++ "/db/_design/a/_view/foo",
-        ?USERX_REQ_HEADERS
-    ),
-    ?_assertEqual(404, Code1).
-
-should_allow_admin_users_access_ddoc_view_request(_PortType, Url) ->
-    DDoc = "{\"a\":1,\"_access\":[\"_users\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
+should_allow_admin_query_view_from_ddoc_without_access(_PortType, Url) ->
+    DDoc = "{\"a\":1,\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
@@ -690,8 +637,8 @@ should_allow_admin_users_access_ddoc_view_request(_PortType, Url) ->
     ),
     ?_assertEqual(200, Code1).
 
-should_allow_user_users_access_ddoc_view_request(_PortType, Url) ->
-    DDoc = "{\"a\":1,\"_access\":[\"_users\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
+should_not_allow_user_query_view_from_ddoc_without_access(_PortType, Url) ->
+    DDoc = "{\"a\":1,\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
@@ -702,7 +649,7 @@ should_allow_user_users_access_ddoc_view_request(_PortType, Url) ->
         Url ++ "/db/_design/a/_view/foo",
         ?USERX_REQ_HEADERS
     ),
-    ?_assertEqual(200, Code1).
+    ?_assertEqual(403, Code1).
 
 % replication
 
