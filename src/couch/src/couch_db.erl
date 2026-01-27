@@ -308,9 +308,6 @@ is_compacting(DbName) ->
 has_access_enabled(#db{access = true}) -> true;
 has_access_enabled(_) -> false.
 
-is_read_from_ddoc_cache(Options) ->
-    lists:member(ddoc_cache, Options).
-
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id = Id, revs = [Rev], deleted = true} || Rev <- Revisions],
     {ok, [Result]} = update_docs(Db, DeletedDocs, []),
@@ -827,18 +824,11 @@ validate_access(Db, Doc, Options) ->
 
 validate_access1(false, _Db, _Doc, _Options) ->
     ok;
-validate_access1(true, Db, #doc{id = <<"_design", _/binary>>} = Doc, Options) ->
-    case is_read_from_ddoc_cache(Options) andalso is_per_user_ddoc(Doc) of
-        true -> throw({not_found, missing});
-        _False -> validate_access2(Db, Doc)
-    end;
 validate_access1(true, Db, #doc{} = Doc, _Options) ->
-    validate_access2(Db, Doc).
-validate_access2(Db, Doc) ->
-    validate_access3(check_access(Db, Doc)).
+    validate_access2(check_access(Db, Doc)).
 
-validate_access3(true) -> ok;
-validate_access3(_) -> throw({forbidden, <<"access denied">>}).
+validate_access2(true) -> ok;
+validate_access2(_) -> throw({forbidden, <<"access denied">>}).
 
 check_access(Db, #doc{access = Access}) ->
     check_access(Db, Access);
