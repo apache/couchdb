@@ -1016,7 +1016,7 @@ required_fields_disjoint_fields_test() ->
     ?assertEqual([<<"field1">>, <<"field2">>, <<"field3">>], required_fields(Cursor1)),
     Fields2 = [<<"field1">>, <<"field2">>],
     Selector2 = to_selector(#{<<"field3">> => undefined, <<"field4">> => undefined}),
-    Cursor2 = #cursor{fields = Fields2, selector = to_selector(Selector2)},
+    Cursor2 = #cursor{fields = Fields2, selector = Selector2},
     ?assertEqual(
         [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor2)
     ).
