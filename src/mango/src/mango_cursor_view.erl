@@ -882,7 +882,7 @@ consider_index_coverage_positive_test() ->
             type = <<"json">>,
             def = {[{<<"fields">>, {[]}}]}
         },
-    Fields = [<<"_id">>],
+    Fields = [[<<"_id">>]],
     MRArgs =
         #mrargs{
             include_docs = true,
@@ -1010,29 +1010,29 @@ required_fields_all_fields_test() ->
     ?assertEqual(all_fields, required_fields(Cursor)).
 
 required_fields_disjoint_fields_test() ->
-    Fields1 = [<<"field1">>, <<"field2">>, <<"field3">>],
+    Fields1 = [[<<"field1">>], [<<"field2">>], [<<"field3">>]],
     Selector1 = to_selector(#{}),
     Cursor1 = #cursor{fields = Fields1, selector = Selector1},
-    ?assertEqual([<<"field1">>, <<"field2">>, <<"field3">>], required_fields(Cursor1)),
-    Fields2 = [<<"field1">>, <<"field2">>],
+    ?assertEqual([[<<"field1">>], [<<"field2">>], [<<"field3">>]], required_fields(Cursor1)),
+    Fields2 = [[<<"field1">>], [<<"field2">>]],
     Selector2 = to_selector(#{<<"field3">> => undefined, <<"field4">> => undefined}),
-    Cursor2 = #cursor{fields = Fields2, selector = to_selector(Selector2)},
+    Cursor2 = #cursor{fields = Fields2, selector = Selector2},
     ?assertEqual(
-        [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor2)
+        [[<<"field1">>], [<<"field2">>], [<<"field3">>], [<<"field4">>]], required_fields(Cursor2)
     ).
 
 required_fields_overlapping_fields_test() ->
-    Fields1 = [<<"field1">>, <<"field2">>, <<"field3">>],
+    Fields1 = [[<<"field1">>], [<<"field2">>], [<<"field3">>]],
     Selector1 = to_selector(#{<<"field3">> => undefined, <<"field4">> => undefined}),
     Cursor1 = #cursor{fields = Fields1, selector = Selector1},
     ?assertEqual(
-        [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor1)
+        [[<<"field1">>], [<<"field2">>], [<<"field3">>], [<<"field4">>]], required_fields(Cursor1)
     ),
-    Fields2 = [<<"field3">>, <<"field1">>, <<"field2">>],
+    Fields2 = [[<<"field3">>], [<<"field1">>], [<<"field2">>]],
     Selector2 = to_selector(#{<<"field4">> => undefined, <<"field1">> => undefined}),
     Cursor2 = #cursor{fields = Fields2, selector = Selector2},
     ?assertEqual(
-        [<<"field1">>, <<"field2">>, <<"field3">>, <<"field4">>], required_fields(Cursor2)
+        [[<<"field1">>], [<<"field2">>], [<<"field3">>], [<<"field4">>]], required_fields(Cursor2)
     ).
 
 explain_test() ->

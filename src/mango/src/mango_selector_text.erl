@@ -179,8 +179,10 @@ convert(Path, {[{Field0, Cond}]}) ->
         case Field0 of
             <<>> ->
                 {ok, []};
-            _ ->
-                mango_util:parse_field(Field0)
+            F when is_binary(F) ->
+                mango_util:parse_field(F);
+            F when is_list(F) ->
+                {ok, F}
         end,
     % Later on, we perform a lucene_escape_user call on the
     % final Path, which calls parse_field again. Calling the function
