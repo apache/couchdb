@@ -33,7 +33,7 @@
     Options :: cursor_options().
 create(Db, {Indexes, Trace0}, Selector, Opts) ->
     InitialRange = mango_idx_view:field_ranges(Selector),
-    CatchAll = [{<<"_id">>, {'$gt', null, '$lt', mango_json_max}}],
+    CatchAll = [{[<<"_id">>], {'$gt', null, '$lt', mango_json_max}}],
     % order matters here - we only want to use the catchall index
     % if no other range can fulfill the query (because we know)
     % catchall is the most expensive range

@@ -286,8 +286,10 @@ extract_selector_hints(Selector) ->
             UnindexableFields = sets:subtract(AllFields, IndexableFields),
             {[
                 {type, IndexType},
-                {indexable_fields, lists:sort(sets:to_list(IndexableFields))},
-                {unindexable_fields, lists:sort(sets:to_list(UnindexableFields))}
+                {indexable_fields,
+                    lists:sort([mango_util:join_field(F) || F <- sets:to_list(IndexableFields)])},
+                {unindexable_fields,
+                    lists:sort([mango_util:join_field(F) || F <- sets:to_list(UnindexableFields)])}
             ]}
         end,
     lists:map(Populate, Modules).
@@ -358,7 +360,7 @@ explain(#cursor{} = Cursor) ->
             {dbname, DbName},
             {index, JSON},
             {partitioned, Partitioned},
-            {selector, Selector},
+            {selector, mango_util:join_keys(Selector)},
             {opts, {Opts}},
             {limit, Limit},
             {skip, Skip},
@@ -1112,14 +1114,14 @@ extract_selector_hints_test_() ->
 t_extract_selector_hints_view(_) ->
     meck:expect(dreyfus, available, [], meck:val(false)),
     meck:expect(nouveau, enabled, [], meck:val(false)),
-    meck:expect(mango_selector, fields, [selector], meck:val(["field1", "field2", "field3"])),
-    meck:expect(mango_idx_view, indexable_fields, [selector], meck:val(["field2"])),
+    meck:expect(mango_selector, fields, [selector], meck:val([["field1"], ["field2"], ["field3"]])),
+    meck:expect(mango_idx_view, indexable_fields, [selector], meck:val([["field2"]])),
     Hints =
         [
             {[
                 {type, json},
-                {indexable_fields, ["field2"]},
-                {unindexable_fields, ["field1", "field3"]}
+                {indexable_fields, [<<"field2">>]},
+                {unindexable_fields, [<<"field1">>, <<"field3">>]}
             ]}
         ],
     ?assertEqual(Hints, extract_selector_hints(selector)).
@@ -1127,20 +1129,20 @@ t_extract_selector_hints_view(_) ->
 t_extract_selector_hints_text(_) ->
     meck:expect(dreyfus, available, [], meck:val(true)),
     meck:expect(nouveau, enabled, [], meck:val(false)),
-    meck:expect(mango_selector, fields, [selector], meck:val(["field1", "field2", "field3"])),
-    meck:expect(mango_idx_view, indexable_fields, [selector], meck:val(["field2"])),
-    meck:expect(mango_idx_text, indexable_fields, [selector], meck:val(["field1"])),
+    meck:expect(mango_selector, fields, [selector], meck:val([["field1"], ["field2"], ["field3"]])),
+    meck:expect(mango_idx_view, indexable_fields, [selector], meck:val([["field2"]])),
+    meck:expect(mango_idx_text, indexable_fields, [selector], meck:val([["field1"]])),
     Hints =
         [
             {[
                 {type, json},
-                {indexable_fields, ["field2"]},
-                {unindexable_fields, ["field1", "field3"]}
+                {indexable_fields, [<<"field2">>]},
+                {unindexable_fields, [<<"field1">>, <<"field3">>]}
             ]},
             {[
                 {type, text},
-                {indexable_fields, ["field1"]},
-                {unindexable_fields, ["field2", "field3"]}
+                {indexable_fields, [<<"field1">>]},
+                {unindexable_fields, [<<"field2">>, <<"field3">>]}
             ]}
         ],
     ?assertEqual(Hints, extract_selector_hints(selector)).
@@ -1148,20 +1150,20 @@ t_extract_selector_hints_text(_) ->
 t_extract_selector_hints_nouveau(_) ->
     meck:expect(dreyfus, available, [], meck:val(false)),
     meck:expect(nouveau, enabled, [], meck:val(true)),
-    meck:expect(mango_selector, fields, [selector], meck:val(["field1", "field2", "field3"])),
-    meck:expect(mango_idx_view, indexable_fields, [selector], meck:val(["field2"])),
-    meck:expect(mango_idx_nouveau, indexable_fields, [selector], meck:val(["field1"])),
+    meck:expect(mango_selector, fields, [selector], meck:val([["field1"], ["field2"], ["field3"]])),
+    meck:expect(mango_idx_view, indexable_fields, [selector], meck:val([["field2"]])),
+    meck:expect(mango_idx_nouveau, indexable_fields, [selector], meck:val([["field1"]])),
     Hints =
         [
             {[
                 {type, json},
-                {indexable_fields, ["field2"]},
-                {unindexable_fields, ["field1", "field3"]}
+                {indexable_fields, [<<"field2">>]},
+                {unindexable_fields, [<<"field1">>, <<"field3">>]}
             ]},
             {[
                 {type, nouveau},
-                {indexable_fields, ["field1"]},
-                {unindexable_fields, ["field2", "field3"]}
+                {indexable_fields, [<<"field1">>]},
+                {unindexable_fields, [<<"field2">>, <<"field3">>]}
             ]}
         ],
     ?assertEqual(Hints, extract_selector_hints(selector)).

@@ -38,7 +38,7 @@ normalize(Selector) ->
     ],
     {NProps} = lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps),
     FieldNames = [Name || {Name, _} <- NProps],
-    case lists:member(<<>>, FieldNames) of
+    case lists:member([], FieldNames) of
         true ->
             ?MANGO_ERROR({invalid_selector, missing_field_name});
         false ->
@@ -210,7 +210,7 @@ norm_ops(Value) ->
 norm_fields({[]}) ->
     {[]};
 norm_fields(Selector) ->
-    norm_fields(Selector, <<>>).
+    norm_fields(Selector, []).
 
 % Operators where we can push the field names further
 % down the operator tree
@@ -237,7 +237,7 @@ norm_fields({[{<<"$keyMapMatch">>, Arg}]}, Path) ->
 % $default field. This also asserts that the $default
 % field is at the root as well as that it only has
 % a $text operator applied.
-norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]} = Sel, <<>>) ->
+norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]} = Sel, []) ->
     Sel;
 norm_fields({[{<<"$default">>, _}]} = Selector, _) ->
     ?MANGO_ERROR({bad_field, Selector});
@@ -249,12 +249,11 @@ norm_fields({[{<<"$", _/binary>>, _}]} = Cond, Path) ->
 % We've found a field name. Append it to the path
 % and skip this node as we unroll the stack as
 % the full path will be further down the branch.
-norm_fields({[{Field, Cond}]}, <<>>) ->
-    % Don't include the '.' for the first element of
-    % the path.
-    norm_fields(Cond, Field);
-norm_fields({[{Field, Cond}]}, Path) ->
-    norm_fields(Cond, <<Path/binary, ".", Field/binary>>);
+norm_fields({[{Field, Cond}]}, Path) when is_binary(Field) ->
+    {ok, F} = mango_util:parse_field(Field),
+    norm_fields({[{F, Cond}]}, Path);
+norm_fields({[{Field, Cond}]}, Path) when is_list(Field) ->
+    norm_fields(Cond, Path ++ Field);
 % An empty selector
 norm_fields({[]}, Path) ->
     {Path, {[]}};
@@ -672,7 +671,7 @@ fields({[]}) ->
 
 is_constant_field_basic_test() ->
     Selector = normalize({[{<<"A">>, <<"foo">>}]}),
-    Field = <<"A">>,
+    Field = [<<"A">>],
     ?assertEqual(true, is_constant_field(Selector, Field)).
 
 is_constant_field_basic_two_test() ->
@@ -684,7 +683,7 @@ is_constant_field_basic_two_test() ->
             ]}
         ]}
     ),
-    Field = <<"cars">>,
+    Field = [<<"cars">>],
     ?assertEqual(true, is_constant_field(Selector, Field)).
 
 is_constant_field_not_eq_test() ->
@@ -696,7 +695,7 @@ is_constant_field_not_eq_test() ->
             ]}
         ]}
     ),
-    Field = <<"age">>,
+    Field = [<<"age">>],
     ?assertEqual(false, is_constant_field(Selector, Field)).
 
 is_constant_field_missing_field_test() ->
@@ -708,7 +707,7 @@ is_constant_field_missing_field_test() ->
             ]}
         ]}
     ),
-    Field = <<"wrong">>,
+    Field = [<<"wrong">>],
     ?assertEqual(false, is_constant_field(Selector, Field)).
 
 is_constant_field_or_field_test() ->
@@ -720,12 +719,12 @@ is_constant_field_or_field_test() ->
             ]}
         ]},
     Normalized = normalize(Selector),
-    Field = <<"A">>,
+    Field = [<<"A">>],
     ?assertEqual(false, is_constant_field(Normalized, Field)).
 
 is_constant_field_empty_selector_test() ->
     Selector = normalize({[]}),
-    Field = <<"wrong">>,
+    Field = [<<"wrong">>],
     ?assertEqual(false, is_constant_field(Selector, Field)).
 
 is_constant_nested_and_test() ->
@@ -750,8 +749,8 @@ is_constant_nested_and_test() ->
         ]},
 
     Normalized = normalize(Selector),
-    ?assertEqual(true, is_constant_field(Normalized, <<"A">>)),
-    ?assertEqual(false, is_constant_field(Normalized, <<"B">>)).
+    ?assertEqual(true, is_constant_field(Normalized, [<<"A">>])),
+    ?assertEqual(false, is_constant_field(Normalized, [<<"B">>])).
 
 is_constant_combined_or_and_equals_test() ->
     Selector =
@@ -764,35 +763,35 @@ is_constant_combined_or_and_equals_test() ->
             {<<"C">>, "qux"}
         ]},
     Normalized = normalize(Selector),
-    ?assertEqual(true, is_constant_field(Normalized, <<"C">>)),
-    ?assertEqual(false, is_constant_field(Normalized, <<"B">>)).
+    ?assertEqual(true, is_constant_field(Normalized, [<<"C">>])),
+    ?assertEqual(false, is_constant_field(Normalized, [<<"B">>])).
 
 has_required_fields_basic_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector = {[{<<"A">>, <<"foo">>}]},
     Normalized = normalize(Selector),
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_basic_failure_test() ->
-    RequiredFields = [<<"B">>],
+    RequiredFields = [[<<"B">>]],
     Selector = {[{<<"A">>, <<"foo">>}]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_empty_selector_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector = {[]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_exists_false_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector = {[{<<"A">>, {[{<<"$exists">>, false}]}}]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_true_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector =
         {[
             {<<"$and">>, [
@@ -804,7 +803,7 @@ has_required_fields_and_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_nested_and_true_test() ->
-    RequiredFields = [<<"A">>, <<"B">>],
+    RequiredFields = [[<<"A">>], [<<"B">>]],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -829,7 +828,7 @@ has_required_fields_nested_and_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_false_test() ->
-    RequiredFields = [<<"A">>, <<"C">>],
+    RequiredFields = [[<<"A">>], [<<"C">>]],
     Selector =
         {[
             {<<"$and">>, [
@@ -841,7 +840,7 @@ has_required_fields_and_false_test() ->
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_false_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector =
         {[
             {<<"$or">>, [
@@ -853,7 +852,7 @@ has_required_fields_or_false_test() ->
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_true_test() ->
-    RequiredFields = [<<"A">>, <<"B">>, <<"C">>],
+    RequiredFields = [[<<"A">>], [<<"B">>], [<<"C">>]],
     Selector =
         {[
             {<<"A">>, "foo"},
@@ -867,7 +866,7 @@ has_required_fields_or_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_nested_or_true_test() ->
-    RequiredFields = [<<"A">>, <<"B">>],
+    RequiredFields = [[<<"A">>], [<<"B">>]],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -902,7 +901,7 @@ has_required_fields_and_nested_or_true_test() ->
     ?assertEqual(true, has_required_fields(NormalizedReverse, RequiredFields)).
 
 has_required_fields_and_nested_or_false_test() ->
-    RequiredFields = [<<"A">>, <<"B">>],
+    RequiredFields = [[<<"A">>], [<<"B">>]],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -938,7 +937,7 @@ has_required_fields_and_nested_or_false_test() ->
     ?assertEqual(false, has_required_fields(NormalizedReverse, RequiredFields)).
 
 has_required_fields_or_nested_and_true_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -962,7 +961,7 @@ has_required_fields_or_nested_and_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_nested_or_true_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector1 =
         {[
             {<<"$or">>, [
@@ -986,7 +985,7 @@ has_required_fields_or_nested_or_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_nested_or_false_test() ->
-    RequiredFields = [<<"A">>],
+    RequiredFields = [[<<"A">>]],
     Selector1 =
         {[
             {<<"$or">>, [
@@ -1034,11 +1033,11 @@ fields_empty_test() ->
 
 fields_primitive_test() ->
     Selector = #{<<"field">> => undefined},
-    ?assertEqual([<<"field">>], fields_of(Selector)).
+    ?assertEqual([[<<"field">>]], fields_of(Selector)).
 
 fields_nested_test() ->
     Selector = #{<<"field1">> => #{<<"field2">> => undefined}},
-    ?assertEqual([<<"field1.field2">>], fields_of(Selector)).
+    ?assertEqual([[<<"field1">>, <<"field2">>]], fields_of(Selector)).
 
 fields_and_test() ->
     Selector1 = #{<<"$and">> => []},
@@ -1046,7 +1045,7 @@ fields_and_test() ->
     Selector2 = #{
         <<"$and">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
-    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
+    ?assertEqual([[<<"field1">>], [<<"field2">>]], fields_of(Selector2)).
 
 fields_or_test() ->
     Selector1 = #{<<"$or">> => []},
@@ -1054,7 +1053,7 @@ fields_or_test() ->
     Selector2 = #{
         <<"$or">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
-    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
+    ?assertEqual([[<<"field1">>], [<<"field2">>]], fields_of(Selector2)).
 
 fields_nor_test() ->
     Selector1 = #{<<"$nor">> => []},
@@ -1062,7 +1061,7 @@ fields_nor_test() ->
     Selector2 = #{
         <<"$nor">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
-    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
+    ?assertEqual([[<<"field1">>], [<<"field2">>]], fields_of(Selector2)).
 
 check_beginswith(Field, Prefix) ->
     Selector = {[{Field, {[{<<"$beginsWith">>, Prefix}]}}]},
@@ -1516,7 +1515,7 @@ match_object_test() ->
 
     % an inner empty object selector matches only empty objects
     SelEmptyField = normalize({[{<<"x">>, {[]}}]}),
-    ?assertEqual({[{<<"x">>, {[{<<"$eq">>, {[]}}]}}]}, SelEmptyField),
+    ?assertEqual({[{[<<"x">>], {[{<<"$eq">>, {[]}}]}}]}, SelEmptyField),
     ?assertEqual(false, match_int(SelEmptyField, Doc1)),
     ?assertEqual(true, match_int(SelEmptyField, Doc2)),
     ?assertEqual(false, match_int(SelEmptyField, Doc3)),
@@ -1525,7 +1524,7 @@ match_object_test() ->
 
     % negated empty object selector matches a value which is present and is not the empty object
     SelNotEmptyField = normalize({[{<<"$not">>, {[{<<"x">>, {[]}}]}}]}),
-    ?assertEqual({[{<<"x">>, {[{<<"$ne">>, {[]}}]}}]}, SelNotEmptyField),
+    ?assertEqual({[{[<<"x">>], {[{<<"$ne">>, {[]}}]}}]}, SelNotEmptyField),
     ?assertEqual(false, match_int(SelNotEmptyField, Doc1)),
     ?assertEqual(false, match_int(SelNotEmptyField, Doc2)),
     ?assertEqual(true, match_int(SelNotEmptyField, Doc3)),
@@ -1534,7 +1533,7 @@ match_object_test() ->
 
     % inner object selectors with fields match objects with at least those fields
     Sel1Field = normalize({[{<<"x">>, {[{<<"a">>, 1}]}}]}),
-    ?assertEqual({[{<<"x.a">>, {[{<<"$eq">>, 1}]}}]}, Sel1Field),
+    ?assertEqual({[{[<<"x">>, <<"a">>], {[{<<"$eq">>, 1}]}}]}, Sel1Field),
     ?assertEqual(false, match_int(Sel1Field, Doc1)),
     ?assertEqual(false, match_int(Sel1Field, Doc2)),
     ?assertEqual(true, match_int(Sel1Field, Doc3)),
@@ -1546,8 +1545,8 @@ match_object_test() ->
     ?assertEqual(
         {[
             {<<"$and">>, [
-                {[{<<"x.a">>, {[{<<"$eq">>, 1}]}}]},
-                {[{<<"x.b">>, {[{<<"$eq">>, 2}]}}]}
+                {[{[<<"x">>, <<"a">>], {[{<<"$eq">>, 1}]}}]},
+                {[{[<<"x">>, <<"b">>], {[{<<"$eq">>, 2}]}}]}
             ]}
         ]},
         Sel2Field
@@ -1560,7 +1559,7 @@ match_object_test() ->
 
     % check shorthand syntax
     SelShort = normalize({[{<<"x.b">>, 2}]}),
-    ?assertEqual({[{<<"x.b">>, {[{<<"$eq">>, 2}]}}]}, SelShort),
+    ?assertEqual({[{[<<"x">>, <<"b">>], {[{<<"$eq">>, 2}]}}]}, SelShort),
     ?assertEqual(false, match_int(SelShort, Doc1)),
     ?assertEqual(false, match_int(SelShort, Doc2)),
     ?assertEqual(false, match_int(SelShort, Doc3)),
