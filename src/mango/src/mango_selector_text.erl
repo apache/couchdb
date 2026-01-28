@@ -177,8 +177,6 @@ convert(_Path, {[{<<"$", _/binary>> = Op, _}]}) ->
 convert(Path, {[{Field0, Cond}]}) ->
     {ok, PP0} =
         case Field0 of
-            <<>> ->
-                {ok, []};
             F when is_binary(F) ->
                 mango_util:parse_field(F);
             F when is_list(F) ->

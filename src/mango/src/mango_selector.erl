@@ -574,7 +574,14 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
 % match against.
 
 has_required_fields(Selector, RequiredFields) ->
-    Remainder = has_required_fields_int(Selector, RequiredFields),
+    Paths = lists:map(
+        fun(Field) ->
+            {ok, Path} = mango_util:parse_field(Field),
+            Path
+        end,
+        RequiredFields
+    ),
+    Remainder = has_required_fields_int(Selector, Paths),
     Remainder == [].
 
 % Empty selector
@@ -633,6 +640,9 @@ has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     end.
 
 % Returns true if a field in the selector is a constant value e.g. {a: {$eq: 1}}
+is_constant_field(Selector, Field) when not is_list(Field) ->
+    {ok, Path} = mango_util:parse_field(Field),
+    is_constant_field(Selector, Path);
 is_constant_field({[]}, _Field) ->
     false;
 is_constant_field(Selector, Field) when not is_list(Selector) ->
@@ -652,7 +662,7 @@ is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
 fields({[{<<"$", _/binary>>, Args}]}) when is_list(Args) ->
     lists:flatmap(fun fields/1, Args);
 fields({[{Field, _Cond}]}) ->
-    [Field];
+    [mango_util:join_field(Field)];
 fields({[]}) ->
     [].
 
@@ -671,7 +681,7 @@ fields({[]}) ->
 
 is_constant_field_basic_test() ->
     Selector = normalize({[{<<"A">>, <<"foo">>}]}),
-    Field = [<<"A">>],
+    Field = <<"A">>,
     ?assertEqual(true, is_constant_field(Selector, Field)).
 
 is_constant_field_basic_two_test() ->
@@ -683,7 +693,7 @@ is_constant_field_basic_two_test() ->
             ]}
         ]}
     ),
-    Field = [<<"cars">>],
+    Field = <<"cars">>,
     ?assertEqual(true, is_constant_field(Selector, Field)).
 
 is_constant_field_not_eq_test() ->
@@ -695,7 +705,7 @@ is_constant_field_not_eq_test() ->
             ]}
         ]}
     ),
-    Field = [<<"age">>],
+    Field = <<"age">>,
     ?assertEqual(false, is_constant_field(Selector, Field)).
 
 is_constant_field_missing_field_test() ->
@@ -707,7 +717,7 @@ is_constant_field_missing_field_test() ->
             ]}
         ]}
     ),
-    Field = [<<"wrong">>],
+    Field = <<"wrong">>,
     ?assertEqual(false, is_constant_field(Selector, Field)).
 
 is_constant_field_or_field_test() ->
@@ -719,12 +729,12 @@ is_constant_field_or_field_test() ->
             ]}
         ]},
     Normalized = normalize(Selector),
-    Field = [<<"A">>],
+    Field = <<"A">>,
     ?assertEqual(false, is_constant_field(Normalized, Field)).
 
 is_constant_field_empty_selector_test() ->
     Selector = normalize({[]}),
-    Field = [<<"wrong">>],
+    Field = <<"wrong">>,
     ?assertEqual(false, is_constant_field(Selector, Field)).
 
 is_constant_nested_and_test() ->
@@ -749,8 +759,8 @@ is_constant_nested_and_test() ->
         ]},
 
     Normalized = normalize(Selector),
-    ?assertEqual(true, is_constant_field(Normalized, [<<"A">>])),
-    ?assertEqual(false, is_constant_field(Normalized, [<<"B">>])).
+    ?assertEqual(true, is_constant_field(Normalized, <<"A">>)),
+    ?assertEqual(false, is_constant_field(Normalized, <<"B">>)).
 
 is_constant_combined_or_and_equals_test() ->
     Selector =
@@ -763,35 +773,35 @@ is_constant_combined_or_and_equals_test() ->
             {<<"C">>, "qux"}
         ]},
     Normalized = normalize(Selector),
-    ?assertEqual(true, is_constant_field(Normalized, [<<"C">>])),
-    ?assertEqual(false, is_constant_field(Normalized, [<<"B">>])).
+    ?assertEqual(true, is_constant_field(Normalized, <<"C">>)),
+    ?assertEqual(false, is_constant_field(Normalized, <<"B">>)).
 
 has_required_fields_basic_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector = {[{<<"A">>, <<"foo">>}]},
     Normalized = normalize(Selector),
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_basic_failure_test() ->
-    RequiredFields = [[<<"B">>]],
+    RequiredFields = [<<"B">>],
     Selector = {[{<<"A">>, <<"foo">>}]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_empty_selector_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector = {[]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_exists_false_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector = {[{<<"A">>, {[{<<"$exists">>, false}]}}]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_true_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector =
         {[
             {<<"$and">>, [
@@ -803,7 +813,7 @@ has_required_fields_and_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_nested_and_true_test() ->
-    RequiredFields = [[<<"A">>], [<<"B">>]],
+    RequiredFields = [<<"A">>, <<"B">>],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -828,7 +838,7 @@ has_required_fields_nested_and_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_false_test() ->
-    RequiredFields = [[<<"A">>], [<<"C">>]],
+    RequiredFields = [<<"A">>, <<"C">>],
     Selector =
         {[
             {<<"$and">>, [
@@ -840,7 +850,7 @@ has_required_fields_and_false_test() ->
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_false_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector =
         {[
             {<<"$or">>, [
@@ -852,7 +862,7 @@ has_required_fields_or_false_test() ->
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_true_test() ->
-    RequiredFields = [[<<"A">>], [<<"B">>], [<<"C">>]],
+    RequiredFields = [<<"A">>, <<"B">>, <<"C">>],
     Selector =
         {[
             {<<"A">>, "foo"},
@@ -866,7 +876,7 @@ has_required_fields_or_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_and_nested_or_true_test() ->
-    RequiredFields = [[<<"A">>], [<<"B">>]],
+    RequiredFields = [<<"A">>, <<"B">>],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -901,7 +911,7 @@ has_required_fields_and_nested_or_true_test() ->
     ?assertEqual(true, has_required_fields(NormalizedReverse, RequiredFields)).
 
 has_required_fields_and_nested_or_false_test() ->
-    RequiredFields = [[<<"A">>], [<<"B">>]],
+    RequiredFields = [<<"A">>, <<"B">>],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -937,7 +947,7 @@ has_required_fields_and_nested_or_false_test() ->
     ?assertEqual(false, has_required_fields(NormalizedReverse, RequiredFields)).
 
 has_required_fields_or_nested_and_true_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector1 =
         {[
             {<<"$and">>, [
@@ -961,7 +971,7 @@ has_required_fields_or_nested_and_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_nested_or_true_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector1 =
         {[
             {<<"$or">>, [
@@ -985,7 +995,7 @@ has_required_fields_or_nested_or_true_test() ->
     ?assertEqual(true, has_required_fields(Normalized, RequiredFields)).
 
 has_required_fields_or_nested_or_false_test() ->
-    RequiredFields = [[<<"A">>]],
+    RequiredFields = [<<"A">>],
     Selector1 =
         {[
             {<<"$or">>, [
@@ -1033,11 +1043,11 @@ fields_empty_test() ->
 
 fields_primitive_test() ->
     Selector = #{<<"field">> => undefined},
-    ?assertEqual([[<<"field">>]], fields_of(Selector)).
+    ?assertEqual([<<"field">>], fields_of(Selector)).
 
 fields_nested_test() ->
     Selector = #{<<"field1">> => #{<<"field2">> => undefined}},
-    ?assertEqual([[<<"field1">>, <<"field2">>]], fields_of(Selector)).
+    ?assertEqual([<<"field1.field2">>], fields_of(Selector)).
 
 fields_and_test() ->
     Selector1 = #{<<"$and">> => []},
@@ -1045,7 +1055,7 @@ fields_and_test() ->
     Selector2 = #{
         <<"$and">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
-    ?assertEqual([[<<"field1">>], [<<"field2">>]], fields_of(Selector2)).
+    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
 
 fields_or_test() ->
     Selector1 = #{<<"$or">> => []},
@@ -1053,7 +1063,7 @@ fields_or_test() ->
     Selector2 = #{
         <<"$or">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
-    ?assertEqual([[<<"field1">>], [<<"field2">>]], fields_of(Selector2)).
+    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
 
 fields_nor_test() ->
     Selector1 = #{<<"$nor">> => []},
@@ -1061,7 +1071,7 @@ fields_nor_test() ->
     Selector2 = #{
         <<"$nor">> => [#{<<"field1">> => undefined}, #{<<"field2">> => undefined}]
     },
-    ?assertEqual([[<<"field1">>], [<<"field2">>]], fields_of(Selector2)).
+    ?assertEqual([<<"field1">>, <<"field2">>], fields_of(Selector2)).
 
 check_beginswith(Field, Prefix) ->
     Selector = {[{Field, {[{<<"$beginsWith">>, Prefix}]}}]},
