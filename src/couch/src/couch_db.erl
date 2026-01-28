@@ -216,11 +216,13 @@ clustered_db(DbName, Options) when is_list(Options) ->
     UserCtx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
     SecProps = couch_util:get_value(security, Options, []),
     Props = couch_util:get_value(props, Options, []),
+    Access = couch_util:get_value(access, Props, false),
     {ok, #db{
         name = DbName,
         user_ctx = UserCtx,
         security = SecProps,
-        options = [{props, Props}]
+        options = [{props, Props}],
+        access = Access
     }};
 clustered_db(DbName, #user_ctx{} = UserCtx) ->
     clustered_db(DbName, [{user_ctx, UserCtx}]).
@@ -1015,7 +1017,7 @@ group_alike_docs([Doc | Rest], [Bucket | RestBuckets]) ->
 validate_doc_update(#db{} = Db, #doc{id = <<"_design/", _/binary>>} = Doc, _GetDiskDocFun) ->
     case couch_doc:has_access(Doc) of
         true ->
-            validate_ddoc(Db, Doc);
+            {forbidden, ddocs_with_access, <<"Design Docs with an _access property are not allowed">>};
         false ->
             case catch check_is_admin(Db) of
                 ok -> validate_ddoc(Db, Doc);

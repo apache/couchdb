@@ -316,7 +316,8 @@ init_db(DbName, FilePath, EngineState, Options) ->
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
 
-    Access = couch_util:get_value(access, Options, false),
+    Props = couch_util:get_value(props, Options, []),
+    Access = couch_util:get_value(access, Props, false),
     NonCreateOpts = [Opt || Opt <- Options, Opt /= create],
 
     InitDb = #db{

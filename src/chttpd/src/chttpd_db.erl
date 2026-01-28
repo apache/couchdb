@@ -464,7 +464,7 @@ create_db_req(#httpd{} = Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
     ShardsOpt = parse_shards_opt(Req),
     EngineOpt = parse_engine_opt(Req),
-    DbProps = parse_partitioned_opt(Req),
+    DbProps = parse_db_props(Req),
     Options = lists:append([ShardsOpt, [{props, DbProps}], EngineOpt]),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
@@ -2002,11 +2002,9 @@ parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
 
 parse_shards_opt(Req) ->
-    AccessValue = list_to_existing_atom(chttpd:qs_value(Req, "access", "false")),
     [
         {n, parse_shards_opt("n", Req, config:get_integer("cluster", "n", 3))},
         {q, parse_shards_opt("q", Req, config:get_integer("cluster", "q", 2))},
-        {access, parse_shards_opt("access", Req, AccessValue)},
         {placement,
             parse_shards_opt(
                 "placement", Req, config:get("cluster", "placement")
@@ -2035,19 +2033,6 @@ parse_shards_opt("placement", Req, Default) ->
                     throw({bad_request, Err})
             end
     end;
-parse_shards_opt("access", _Req, true) ->
-    case config:get_boolean("per_doc_access", "enable", false) of
-        true ->
-            true;
-        false ->
-            Err = <<"The `access` option is not available on this CouchDB installation.">>,
-            throw({bad_request, Err})
-    end;
-parse_shards_opt("access", _Req, false) ->
-    false;
-parse_shards_opt("access", _Req, _Value) ->
-    Err = <<"The `access` value should be a boolean.">>,
-    throw({bad_request, Err});
 parse_shards_opt(Param, Req, Default) ->
     Val = chttpd:qs_value(Req, Param, Default),
     case couch_util:validate_positive_int(Val) of
@@ -2071,6 +2056,29 @@ parse_engine_opt(Req) ->
                     throw({bad_request, invalid_engine_extension})
             end
     end.
+
+parse_access_opt(Req) ->
+    case config:get_boolean("per_doc_access", "enable", false) of
+        false ->
+            Err = <<"The `access` option is not available on this CouchDB installation.">>,
+            throw({bad_request, Err});
+        _ ->
+            AccessValue = list_to_existing_atom(chttpd:qs_value(Req, "access", "false")),
+            case AccessValue of
+                true ->
+                    [{access, true}];
+                false ->
+                    [];
+                _ ->
+                    Err = <<"The `access` value should be a boolean.">>,
+                    throw({bad_request, Err})
+            end
+    end.
+
+parse_db_props(Req) ->
+    Partitioned = parse_partitioned_opt(Req),
+    Access = parse_access_opt(Req),
+    Partitioned ++ Access.
 
 parse_partitioned_opt(Req) ->
     case chttpd:qs_value(Req, "partitioned") of
