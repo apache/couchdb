@@ -55,20 +55,13 @@ to_json(#idx{def = all_docs}) ->
     ]}.
 
 columns(#idx{def = all_docs}) ->
-    [[<<"_id">>]].
-
-parse_field(Field) when is_binary(Field) ->
-    {ok, Path} = mango_util:parse_field(Field),
-    Path;
-parse_field(Field) ->
-    Field.
+    [<<"_id">>].
 
 is_usable(#idx{def = all_docs}, _Selector, []) ->
     {true, #{reason => []}};
-is_usable(#idx{def = all_docs} = Idx, Selector, SortFields0) ->
+is_usable(#idx{def = all_docs} = Idx, Selector, SortFields) ->
     Fields = mango_idx_view:indexable_fields(Selector),
-    SortFields = [parse_field(F) || F <- SortFields0],
-    SelectorHasRequiredFields = lists:member([<<"_id">>], Fields),
+    SelectorHasRequiredFields = lists:member(<<"_id">>, Fields),
     CanUseSort = can_use_sort(Idx, SortFields, Selector),
     Reason =
         [field_mismatch || not SelectorHasRequiredFields] ++
@@ -124,7 +117,7 @@ is_usable_test() ->
     SortOrderMismatch = {false, #{reason => [sort_order_mismatch]}},
 
     Index = #idx{def = all_docs},
-    ?assertEqual(FieldMismatch, usable(Index, #{}, [[<<"_id">>]])),
+    ?assertEqual(FieldMismatch, usable(Index, #{}, [<<"_id">>])),
     ?assertEqual(SortOrderMismatch, usable(Index, #{<<"_id">> => 11}, [<<"field3">>])),
     ?assertEqual(Usable, usable(Index, #{}, [])).
 -endif.

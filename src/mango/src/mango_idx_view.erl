@@ -111,16 +111,10 @@ to_json(Idx) ->
 columns(Idx) ->
     {Props} = Idx#idx.def,
     {<<"fields">>, {Fields}} = lists:keyfind(<<"fields">>, 1, Props),
-    [parse_field(F) || {F, _} <- Fields].
-
-parse_field(Field) when is_binary(Field) ->
-    {ok, Path} = mango_util:parse_field(Field),
-    Path;
-parse_field(Field) ->
-    Field.
+    [Key || {Key, _} <- Fields].
 
 -spec is_usable(#idx{}, selector(), [field()]) -> {boolean(), rejection_details()}.
-is_usable(Idx, Selector, SortFields0) ->
+is_usable(Idx, Selector, SortFields) ->
     % This index is usable if all of the columns are
     % restricted by the selector such that they are required to exist
     % and the selector is not a text search (so requires a text index)
@@ -128,14 +122,13 @@ is_usable(Idx, Selector, SortFields0) ->
 
     % sort fields are required to exist in the results so
     % we don't need to check the selector for these
-    SortFields = [parse_field(F) || F <- SortFields0],
     RequiredFields1 = ordsets:subtract(lists:usort(RequiredFields), lists:usort(SortFields)),
 
     % _id and _rev are implicitly in every document so
     % we don't need to check the selector for these either
     RequiredFields2 = ordsets:subtract(
         RequiredFields1,
-        [[<<"_id">>], [<<"_rev">>]]
+        [<<"_id">>, <<"_rev">>]
     ),
 
     SelectorHasRequiredFields = mango_selector:has_required_fields(Selector, RequiredFields2),
@@ -278,15 +271,18 @@ validate_ddoc(VProps) ->
 % the equivalent of a multi-query. But that's for another
 % day.
 
+indexable_fields(Selector) ->
+    [mango_util:join_field(F) || F <- indexable_paths(Selector)].
+
 % We can see through '$and' trivially
-indexable_fields({[{<<"$and">>, Args}]}) ->
-    lists:usort(lists:flatmap(fun(A) -> indexable_fields(A) end, Args));
+indexable_paths({[{<<"$and">>, Args}]}) ->
+    lists:usort(lists:flatmap(fun(A) -> indexable_paths(A) end, Args));
 % So far we can't see through any other operator
-indexable_fields({[{<<"$", _/binary>>, _}]}) ->
+indexable_paths({[{<<"$", _/binary>>, _}]}) ->
     [];
 % If we have a field with a terminator that is locatable
 % using an index then the field is a possible index
-indexable_fields({[{Field, Cond}]}) ->
+indexable_paths({[{Field, Cond}]}) ->
     case indexable(Cond) of
         true ->
             [Field];
@@ -294,7 +290,7 @@ indexable_fields({[{Field, Cond}]}) ->
             []
     end;
 % An empty selector
-indexable_fields({[]}) ->
+indexable_paths({[]}) ->
     [].
 
 % Check if a condition is indexable. The logical
@@ -327,8 +323,8 @@ indexable({[{<<"$", _/binary>>, _}]}) ->
 
 % For each field, return {Field, Range}
 field_ranges(Selector) ->
-    Fields = indexable_fields(Selector),
-    field_ranges(Selector, Fields).
+    Fields = indexable_paths(Selector),
+    [{mango_util:join_field(F), R} || {F, R} <- field_ranges(Selector, Fields)].
 
 field_ranges(Selector, Fields) ->
     field_ranges(Selector, Fields, []).
@@ -555,13 +551,12 @@ can_use_sort([Col | RestCols], SortFields, Selector) ->
 -spec covers(#idx{}, fields()) -> boolean().
 covers(_, all_fields) ->
     false;
-covers(Idx, Fields0) ->
+covers(Idx, Fields) ->
     case mango_idx:def(Idx) of
         all_docs ->
             false;
         _ ->
-            Fields = [parse_field(F) || F <- Fields0],
-            Available = [[<<"_id">>] | columns(Idx)],
+            Available = [<<"_id">> | columns(Idx)],
             sets:is_subset(couch_util:set_from_list(Fields), couch_util:set_from_list(Available))
     end.
 
@@ -576,7 +571,7 @@ indexable_fields_empty_test() ->
 
 indexable_fields_and_test() ->
     Selector = #{<<"$and">> => [#{<<"field1">> => undefined, <<"field2">> => undefined}]},
-    ?assertEqual([[<<"field1">>], [<<"field2">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field1">>, <<"field2">>], indexable_fields_of(Selector)).
 
 indexable_fields_or_test() ->
     Selector = #{<<"$or">> => [#{<<"field1">> => undefined, <<"field2">> => undefined}]},
@@ -616,15 +611,15 @@ indexable_fields_not_test() ->
 
 indexable_fields_lt_test() ->
     Selector = #{<<"field">> => #{<<"$lt">> => undefined}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_lte_test() ->
     Selector = #{<<"field">> => #{<<"$lte">> => undefined}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_eq_test() ->
     Selector = #{<<"field">> => #{<<"$eq">> => undefined}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_ne_test() ->
     Selector = #{<<"field">> => #{<<"$ne">> => undefined}},
@@ -632,15 +627,15 @@ indexable_fields_ne_test() ->
 
 indexable_fields_gte_test() ->
     Selector = #{<<"field">> => #{<<"$gte">> => undefined}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_beginswith_test() ->
     Selector = #{<<"field">> => #{<<"$beginsWith">> => undefined}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_gt_test() ->
     Selector = #{<<"field">> => #{<<"$gt">> => undefined}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_mod_test() ->
     Selector = #{<<"field">> => #{<<"$mod">> => [0, 0]}},
@@ -652,7 +647,7 @@ indexable_fields_regex_test() ->
 
 indexable_fields_exists_test() ->
     Selector = #{<<"field">> => #{<<"$exists">> => true}},
-    ?assertEqual([[<<"field">>]], indexable_fields_of(Selector)).
+    ?assertEqual([<<"field">>], indexable_fields_of(Selector)).
 
 indexable_fields_type_test() ->
     Selector = #{<<"field">> => #{<<"$type">> => undefined}},
@@ -715,7 +710,7 @@ is_usable_test() ->
     ?assertEqual(
         SortOrderMismatch,
         usable(Index, #{<<"field1">> => <<"value1">>, <<"field2">> => 42}, [
-            [<<"field3">>], [<<"field4">>]
+            <<"field3">>, <<"field4">>
         ])
     ),
     ?assertEqual(
