@@ -857,5 +857,18 @@
     "index pagination two keys",
     "index pagination reverse",
     "index pagination same emitted key"
+  ],
+  "UsersDbFindTests": [
+    "simple find",
+    "multi cond and",
+    "multi cond or",
+    "sort",
+    "fields",
+    "empty"
+  ],
+  "UsersDbIndexFindTests": [
+    "multi cond and",
+    "multi cond or",
+    "sort"
   ]
 }

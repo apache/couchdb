@@ -308,7 +308,7 @@ defmodule UserDocs do
 
   @users_docs [
     %{
-      "_id" => "org.couchdb.user =>demo01",
+      "_id" => "org.couchdb.user:demo01",
       "name" => "demo01",
       "username" => "demo01",
       "password" => "apple01",
@@ -317,7 +317,7 @@ defmodule UserDocs do
       "type" => "user",
     },
     %{
-      "_id" => "org.couchdb.user =>demo02",
+      "_id" => "org.couchdb.user:demo02",
       "name" => "demo02",
       "username" => "demo02",
       "password" => "apple02",
@@ -326,7 +326,7 @@ defmodule UserDocs do
       "type" => "user",
     },
     %{
-      "_id" => "org.couchdb.user =>demo03",
+      "_id" => "org.couchdb.user:demo03",
       "name" => "demo03",
       "username" => "demo03",
       "password" => "apple03",
@@ -339,6 +339,8 @@ defmodule UserDocs do
   def setup_users(db) do
     MangoDatabase.recreate(db)
     MangoDatabase.save_docs(db, @users_docs)
+
+    :ok
   end
 
   def setup(db, index_type \\ "view", partitioned \\ false) do
