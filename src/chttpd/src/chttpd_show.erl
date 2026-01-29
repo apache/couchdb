@@ -79,6 +79,7 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
     %% Will throw an exception if the _show handler is missing
+    couch_log:notice("~n DDoc: '~p'~n", [DDoc]),
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"shows">>, ShowName]),
     % get responder for ddoc/showname
     CurrentEtag = show_etag(Req, Doc, DDoc, []),

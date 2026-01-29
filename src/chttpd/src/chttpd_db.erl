@@ -2058,21 +2058,25 @@ parse_engine_opt(Req) ->
     end.
 
 parse_access_opt(Req) ->
-    case config:get_boolean("per_doc_access", "enable", false) of
-        false ->
-            Err = <<"The `access` option is not available on this CouchDB installation.">>,
-            throw({bad_request, Err});
-        _ ->
-            AccessValue = list_to_existing_atom(chttpd:qs_value(Req, "access", "false")),
-            case AccessValue of
-                true ->
-                    [{access, true}];
+    % TODO memleak vector if random strings are provided?
+    AccessValue = list_to_existing_atom(chttpd:qs_value(Req, "access", "false")),
+    AccessEnabled = config:get_boolean("per_doc_access", "enable", false),
+    couch_log:notice("~n AccessValue: '~p'~n", [AccessValue]),
+    couch_log:notice("~n AccessEnabled: '~p'~n", [AccessEnabled]),
+    case AccessValue of
+        true ->
+            case AccessEnabled of
                 false ->
-                    [];
+                    Err = <<"The `access` option is not available on this CouchDB installation.">>,
+                    throw({bad_request, Err});
                 _ ->
-                    Err = <<"The `access` value should be a boolean.">>,
-                    throw({bad_request, Err})
-            end
+                    [{access, true}]
+                end;
+        false ->
+            [];
+        _ ->
+            Err = <<"The `access` value should be a boolean.">>,
+            throw({bad_request, Err})
     end.
 
 parse_db_props(Req) ->
