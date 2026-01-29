@@ -79,7 +79,7 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
     %% Will throw an exception if the _show handler is missing
-    couch_log:notice("~n DDoc: '~p'~n", [DDoc]),
+    ok = couch_db:validate_access(Db, DDoc),
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"shows">>, ShowName]),
     % get responder for ddoc/showname
     CurrentEtag = show_etag(Req, Doc, DDoc, []),
@@ -138,6 +138,7 @@ handle_doc_update_req(Req, _Db, _DDoc) ->
 
 send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     %% Will throw an exception if the _update handler is missing
+    % ok = couch_db:validate_access(Db, DDoc),
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"updates">>, UpdateName]),
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
@@ -250,6 +251,7 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     %% Will throw an exception if the _list handler is missing
+    ok = couch_db:validate_access(Db, DDoc),
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"lists">>, LName]),
     DbName = couch_db:name(Db),
     {ok, VDoc} = ddoc_cache:open(DbName, <<"_design/", ViewDesignName/binary>>),

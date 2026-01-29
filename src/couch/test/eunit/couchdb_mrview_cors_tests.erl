@@ -18,7 +18,6 @@
 -define(DDOC,
     {[
         {<<"_id">>, <<"_design/foo">>},
-        {<<"_access">>, [<<"user_a">>]},
         {<<"shows">>,
             {[
                 {<<"bar">>, <<"function(doc, req) {return '<h1>wosh</h1>';}">>}
@@ -98,7 +97,7 @@ should_make_shows_request(_, {Host, DbName}) ->
     end).
 
 create_db(backdoor, DbName) ->
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX, {access, true}]),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db);
 create_db(clustered, DbName) ->
     {ok, Status, _, _} = test_request:put(db_url(DbName), [?AUTH], ""),

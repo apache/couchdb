@@ -120,6 +120,16 @@ access_test_() ->
         fun should_allow_admin_query_view_from_ddoc_without_access/2,
         fun should_not_allow_user_query_view_from_ddoc_without_access/2,
 
+        % show, list & view
+        fun should_allow_admin_show_view_from_ddoc_without_access/2,
+        fun should_not_allow_user_show_view_from_ddoc_without_access/2,
+        fun should_allow_admin_list_view_from_ddoc_without_access/2,
+        fun should_not_allow_user_list_view_from_ddoc_without_access/2,
+        fun should_allow_admin_update_with_ddoc_without_access/2,
+        fun should_not_allow_user_update_with_ddoc_without_access/2,
+        % once we allow access ddocs, we must not allow updating a doc
+        % that does not belong to us
+
         % replication
         fun should_allow_admin_to_replicate_from_access_to_access/2,
         fun should_allow_admin_to_replicate_from_no_access_to_access/2,
@@ -648,6 +658,116 @@ should_not_allow_user_query_view_from_ddoc_without_access(_PortType, Url) ->
     {ok, Code1, _, _} = test_request:get(
         Url ++ "/db/_design/a/_view/foo",
         ?USERX_REQ_HEADERS
+    ),
+    ?_assertEqual(403, Code1).
+
+% show, list & updates
+
+-define(SHOW_DDOC, #{
+        views =>  #{
+            foo => #{
+                map => <<"function() {}">>
+            }
+        },
+        shows => #{
+            show1 => <<"function(doc) { return 'hi' }">>
+        }
+    }).
+
+should_allow_admin_show_view_from_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(?SHOW_DDOC)
+    ),
+    ?assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:get(
+        Url ++ "/db/_design/a/_show/show1",
+        ?ADMIN_REQ_HEADERS
+    ),
+    ?_assertEqual(200, Code1).
+
+should_not_allow_user_show_view_from_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(?SHOW_DDOC)
+    ),
+    ?assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:get(
+        Url ++ "/db/_design/a/_show/show1",
+        ?USERX_REQ_HEADERS
+    ),
+    ?_assertEqual(403, Code1).
+
+-define(LIST_DDOC, #{
+        views =>  #{
+            foo => #{
+                map => <<"function() {}">>
+            }
+        },
+        lists => #{
+            list1 => <<"function(head, req) { send('hi') }">>
+        }
+    }).
+
+should_allow_admin_list_view_from_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(?LIST_DDOC)
+    ),
+    ?assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:get(
+        Url ++ "/db/_design/a/_list/list1/foo",
+        ?ADMIN_REQ_HEADERS
+    ),
+    ?_assertEqual(200, Code1).
+
+should_not_allow_user_list_view_from_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(?LIST_DDOC)
+    ),
+    ?assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:get(
+        Url ++ "/db/_design/a/_list/list1/foo",
+        ?USERX_REQ_HEADERS
+    ),
+    ?_assertEqual(403, Code1).
+
+-define(UPDATE_DDOC, #{
+        updates =>  #{
+            update1 => <<"function(doc) { return [{_id: 'yay', a: 2}, 'done!']; }">>
+        }
+    }).
+
+should_allow_admin_update_with_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(?UPDATE_DDOC)
+    ),
+    ?assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:post(
+        Url ++ "/db/_design/a/_update/update1",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(#{a => 1})
+    ),
+    ?_assertEqual(201, Code1).
+
+should_not_allow_user_update_with_ddoc_without_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS,
+        jiffy:encode(?UPDATE_DDOC)
+    ),
+    ?assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:post(
+        Url ++ "/db/_design/a/_update/update1",
+        ?USERX_REQ_HEADERS,
+        jiffy:encode(#{a => 1})
     ),
     ?_assertEqual(403, Code1).
 
