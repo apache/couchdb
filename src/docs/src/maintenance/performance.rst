@@ -60,8 +60,8 @@ operations add the following to ``(prefix)/etc/defaults/couchdb``
 
 Since Erlang OTP 21, the linked-in drivers have been migrated to dirty IO schedulers. 
 These schedulers can be configured by ``ERL_FLAGS`` environment
-variable. For example, to give Erlang 80 dirty schedulers 
-add the following to ``(prefix)/etc/defaults/couchdb`` 
+variable. For example, to give Erlang 80 dirty schedulers
+add the following to ``(prefix)/etc/defaults/couchdb``
 (or equivalent)::
 
     export ERL_FLAGS="+Sdio 80"
