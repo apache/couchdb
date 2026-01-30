@@ -70,7 +70,7 @@ match(Selector, D) ->
 
 match_failures(Selector, D) ->
     couch_stats:increment_counter([mango, evaluate_selector]),
-    match_int(Selector, D, true).
+    [format_failure(F) || F <- match_int(Selector, D, true)].
 
 match_int(Selector, D) ->
     match_int(Selector, D, false).
@@ -574,8 +574,8 @@ match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{path = Path} = Ctx) when is_tup
         true -> [];
         false -> lists:flatten(KeyFailures)
     end;
-match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, Ctx) ->
-    [#failure{op = keyMapMatch, type = bad_value, ctx = Ctx}];
+match({[{<<"$keyMapMatch">>, _Arg}]}, Value, Ctx) ->
+    [#failure{op = keyMapMatch, type = bad_value, params = [Value], ctx = Ctx}];
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
     compare(lt, Arg, Ctx, Cmp(Value, Arg) < 0);
@@ -716,6 +716,90 @@ compare(Op, Arg, #ctx{negate = Neg} = Ctx, Cond) ->
         Neg -> [];
         _ -> [#failure{op = Op, params = [Arg], ctx = Ctx}]
     end.
+
+format_failure(#failure{op = Op, type = Type, params = Params, ctx = Ctx}) ->
+    Path = format_path(Ctx#ctx.path),
+    Msg = format_op(Op, Ctx#ctx.negate, Type, Params),
+    {[{<<"path">>, Path}, {<<"message">>, list_to_binary(Msg)}]}.
+
+format_op(Op, _, empty_list, _) ->
+    io_lib:format("operator $~p was invoked with an empty list", [Op]);
+format_op(Op, _, bad_value, [Value]) ->
+    io_lib:format("operator $~p was invoked with a bad value: ~s", [Op, jiffy:encode(Value)]);
+format_op(_, _, not_found, []) ->
+    io_lib:format("must be present", []);
+format_op(_, _, bad_path, []) ->
+    io_lib:format("used an invalid path", []);
+format_op(eq, false, mismatch, [X]) ->
+    io_lib:format("must be equal to ~s", [jiffy:encode(X)]);
+format_op(eq, true, Type, Params) ->
+    format_op(ne, false, Type, Params);
+format_op(ne, false, mismatch, [X]) ->
+    io_lib:format("must not be equal to ~s", [jiffy:encode(X)]);
+format_op(ne, true, Type, Params) ->
+    format_op(eq, false, Type, Params);
+format_op(lt, false, mismatch, [X]) ->
+    io_lib:format("must be less than ~s", [jiffy:encode(X)]);
+format_op(lt, true, Type, Params) ->
+    format_op(gte, false, Type, Params);
+format_op(lte, false, mismatch, [X]) ->
+    io_lib:format("must be less than or equal to ~s", [jiffy:encode(X)]);
+format_op(lte, true, Type, Params) ->
+    format_op(gt, false, Type, Params);
+format_op(gt, false, mismatch, [X]) ->
+    io_lib:format("must be greater than ~s", [jiffy:encode(X)]);
+format_op(gt, true, Type, Params) ->
+    format_op(lte, false, Type, Params);
+format_op(gte, false, mismatch, [X]) ->
+    io_lib:format("must be greater than or equal to ~s", [jiffy:encode(X)]);
+format_op(gte, true, Type, Params) ->
+    format_op(le, false, Type, Params);
+format_op(in, false, mismatch, [X]) ->
+    io_lib:format("must be one of ~s", [jiffy:encode(X)]);
+format_op(in, true, Type, Params) ->
+    format_op(nin, false, Type, Params);
+format_op(nin, false, mismatch, [X]) ->
+    io_lib:format("must not be one of ~s", [jiffy:encode(X)]);
+format_op(nin, true, Type, Params) ->
+    format_op(in, false, Type, Params);
+format_op(all, false, mismatch, [X]) ->
+    io_lib:format("must contain all the values in ~s", [jiffy:encode(X)]);
+format_op(all, true, mismatch, [X]) ->
+    io_lib:format("must not contain at least one of the values in ~s", [jiffy:encode(X)]);
+format_op(exists, false, mismatch, [true]) ->
+    io_lib:format("must be present", []);
+format_op(exists, false, mismatch, [false]) ->
+    io_lib:format("must not be present", []);
+format_op(exists, true, Type, [Exist]) ->
+    format_op(exists, false, Type, [not Exist]);
+format_op(type, false, mismatch, [Type]) ->
+    io_lib:format("must be of type '~s'", [Type]);
+format_op(type, true, mismatch, [Type]) ->
+    io_lib:format("must not be of type '~s'", [Type]);
+format_op(mod, false, mismatch, [D, R]) ->
+    io_lib:format("must leave a remainder of ~p when divided by ~p", [R, D]);
+format_op(mod, true, mismatch, [D, R]) ->
+    io_lib:format("must leave a remainder other than ~p when divided by ~p", [R, D]);
+format_op(regex, false, mismatch, [P]) ->
+    io_lib:format("must match the pattern '~s'", [P]);
+format_op(regex, true, mismatch, [P]) ->
+    io_lib:format("must not match the pattern '~s'", [P]);
+format_op(beginsWith, false, mismatch, [P]) ->
+    io_lib:format("must begin with '~s'", [P]);
+format_op(beginsWith, true, mismatch, [P]) ->
+    io_lib:format("must not begin with '~s'", [P]);
+format_op(size, false, mismatch, [N]) ->
+    io_lib:format("must contain ~p items", [N]);
+format_op(size, true, mismatch, [N]) ->
+    io_lib:format("must not contain ~p items", [N]).
+
+format_path([]) ->
+    [];
+format_path([Item | Rest]) when is_binary(Item) ->
+    {ok, Path} = mango_util:parse_field(Item),
+    format_path(Rest) ++ Path;
+format_path([Item | Rest]) when is_integer(Item) ->
+    format_path(Rest) ++ [Item].
 
 % Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.
@@ -1287,7 +1371,14 @@ match_lt_test() ->
         {false, [1, 2, 3]},
         {false, [1, 2, 4]},
         {false, [1, 3]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$lt">>, 5}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 6}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be less than 5">>}]}],
+        Fails
+    ).
 
 match_lte_test() ->
     check_selector({[{<<"$lte">>, 5}]}, [{true, 4}, {true, 5}, {false, 6}]),
@@ -1304,7 +1395,14 @@ match_lte_test() ->
         {true, [1, 2, 3]},
         {false, [1, 2, 4]},
         {false, [1, 3]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$lte">>, 5}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 6}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be less than or equal to 5">>}]}],
+        Fails
+    ).
 
 match_gt_test() ->
     check_selector({[{<<"$gt">>, 5}]}, [{false, 4}, {false, 5}, {true, 6}]),
@@ -1321,7 +1419,14 @@ match_gt_test() ->
         {false, [1, 2, 3]},
         {true, [1, 2, 4]},
         {true, [1, 3]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$gt">>, 5}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 4}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be greater than 5">>}]}],
+        Fails
+    ).
 
 match_gte_test() ->
     check_selector({[{<<"$gte">>, 5}]}, [{false, 4}, {true, 5}, {true, 6}]),
@@ -1338,7 +1443,14 @@ match_gte_test() ->
         {true, [1, 2, 3]},
         {true, [1, 2, 4]},
         {true, [1, 3]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$gte">>, 5}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 4}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be greater than or equal to 5">>}]}],
+        Fails
+    ).
 
 match_eq_test() ->
     check_selector({[{<<"$eq">>, 5}]}, [{true, 5}, {false, 6}]),
@@ -1356,7 +1468,14 @@ match_eq_test() ->
         {false, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 8}]}}]}}]}},
         {false, {[{<<"a">>, {[{<<"b">>, {[{<<"d">>, 7}]}}]}}]}},
         {false, {[{<<"a">>, {[{<<"d">>, {[{<<"c">>, 7}]}}]}}]}}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, 5}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 4}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be equal to 5">>}]}],
+        Fails
+    ).
 
 match_ne_test() ->
     check_selector({[{<<"$ne">>, 5}]}, [{false, 5}, {true, 6}]),
@@ -1384,7 +1503,14 @@ match_ne_test() ->
         {true, {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 8}]}}]}}]}},
         {true, {[{<<"a">>, {[{<<"b">>, {[{<<"d">>, 7}]}}]}}]}},
         {true, {[{<<"a">>, {[{<<"d">>, {[{<<"c">>, 7}]}}]}}]}}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$ne">>, 5}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 5}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must not be equal to 5">>}]}],
+        Fails
+    ).
 
 match_in_test() ->
     check_selector({[{<<"$in">>, []}]}, [
@@ -1426,6 +1552,13 @@ match_in_test() ->
             {false, [[<<"nested">>], <<"list">>]},
             {true, [0, [[<<"nested">>], <<"list">>]]}
         ]
+    ),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$in">>, [42, false, [<<"bar">>]]}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 5}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be one of [42,false,[\"bar\"]]">>}]}],
+        Fails
     ).
 
 match_nin_test() ->
@@ -1468,6 +1601,18 @@ match_nin_test() ->
             {true, [[<<"nested">>], <<"list">>]},
             {false, [0, [[<<"nested">>], <<"list">>]]}
         ]
+    ),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$nin">>, [42, false, [<<"bar">>]]}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, false}]}),
+    ?assertEqual(
+        [
+            {[
+                {<<"path">>, [<<"x">>]},
+                {<<"message">>, <<"must not be one of [42,false,[\"bar\"]]">>}
+            ]}
+        ],
+        Fails
     ).
 
 match_all_test() ->
@@ -1518,7 +1663,31 @@ match_all_test() ->
     check_selector({[{<<"$all">>, [{[{<<"a">>, 1}]}]}]}, [
         {true, [{[{<<"a">>, 1}]}]},
         {false, [{[{<<"a">>, 1}, {<<"b">>, 2}]}]}
-    ]).
+    ]),
+
+    SelEmpty = normalize({[{<<"x">>, {[{<<"$all">>, []}]}}]}),
+    FailsEmpty = match_failures(SelEmpty, {[{<<"x">>, 0}]}),
+    ?assertEqual(
+        [
+            {[
+                {<<"path">>, [<<"x">>]},
+                {<<"message">>, <<"operator $all was invoked with an empty list">>}
+            ]}
+        ],
+        FailsEmpty
+    ),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$all">>, [1, 2, 3]}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, [2, 3]}]}),
+    ?assertEqual(
+        [
+            {[
+                {<<"path">>, [<<"x">>]},
+                {<<"message">>, <<"must contain all the values in [1,2,3]">>}
+            ]}
+        ],
+        Fails
+    ).
 
 match_exists_test() ->
     check_selector({[{<<"x">>, {[{<<"$exists">>, true}]}}]}, [
@@ -1556,6 +1725,13 @@ match_exists_test() ->
             {false, {[{<<"x">>, 0}]}},
             {true, {[]}}
         ]
+    ),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$exists">>, true}]}}]}),
+    Fails = match_failures(Sel, {[]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be present">>}]}],
+        Fails
     ).
 
 match_type_test() ->
@@ -1598,7 +1774,14 @@ match_type_test() ->
         {true, {[{<<"a">>, 1}]}},
         {false, [{<<"a">>, 1}]},
         {false, null}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$type">>, <<"number">>}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, true}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be of type 'number'">>}]}],
+        Fails
+    ).
 
 match_regex_test() ->
     check_selector({[{<<"$regex">>, <<"^[0-9a-f]+$">>}]}, [
@@ -1606,7 +1789,14 @@ match_regex_test() ->
         {true, <<"3a0df5e">>},
         {false, <<"3a0gf5e">>},
         {false, 42}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$regex">>, <<"^[0-9a-f]+$">>}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, <<"hello">>}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must match the pattern '^[0-9a-f]+$'">>}]}],
+        Fails
+    ).
 
 match_beginswith_test() ->
     check_selector({[{<<"$beginsWith">>, <<"foo">>}]}, [
@@ -1616,7 +1806,14 @@ match_beginswith_test() ->
         {false, <<"more food">>},
         {false, <<"fo">>},
         {false, 42}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$beginsWith">>, <<"foo">>}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, <<"hello">>}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must begin with 'foo'">>}]}],
+        Fails
+    ).
 
 match_mod_test() ->
     check_selector({[{<<"$mod">>, [28, 1]}]}, [
@@ -1625,7 +1822,19 @@ match_mod_test() ->
         {true, 57},
         {false, 58},
         {false, <<"57">>}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$mod">>, [28, 1]}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, 27}]}),
+    ?assertEqual(
+        [
+            {[
+                {<<"path">>, [<<"x">>]},
+                {<<"message">>, <<"must leave a remainder of 1 when divided by 28">>}
+            ]}
+        ],
+        Fails
+    ).
 
 match_size_test() ->
     check_selector({[{<<"$size">>, 3}]}, [
@@ -1634,7 +1843,14 @@ match_size_test() ->
         {true, [0, 0, 0]},
         {false, [0, 0]},
         {false, [0, 0, 0, 0]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$size">>, 3}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, [0, 1]}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must contain 3 items">>}]}],
+        Fails
+    ).
 
 match_allmatch_test() ->
     % $allMatch is defined to return false for empty lists
@@ -1652,7 +1868,14 @@ match_allmatch_test() ->
         {false, [0]},
         {true, [1]},
         {true, [0, 1]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$allMatch">>, {[{<<"$eq">>, 0}]}}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, [0, 1]}]}),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>, 1]}, {<<"message">>, <<"must be equal to 0">>}]}],
+        Fails
+    ).
 
 match_elemmatch_test() ->
     check_selector({[{<<"$elemMatch">>, {[{<<"$eq">>, 0}]}}]}, [
@@ -1660,7 +1883,17 @@ match_elemmatch_test() ->
         {true, [0]},
         {false, [1]},
         {true, [0, 1]}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$elemMatch">>, {[{<<"$eq">>, 0}]}}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, [1, 2]}]}),
+    ?assertEqual(
+        [
+            {[{<<"path">>, [<<"x">>, 0]}, {<<"message">>, <<"must be equal to 0">>}]},
+            {[{<<"path">>, [<<"x">>, 1]}, {<<"message">>, <<"must be equal to 0">>}]}
+        ],
+        Fails
+    ).
 
 match_keymapmatch_test() ->
     check_selector({[{<<"$keyMapMatch">>, {[{<<"$regex">>, <<"^[a-z]+$">>}]}}]}, [
@@ -1669,7 +1902,17 @@ match_keymapmatch_test() ->
         {true, {[{<<"a">>, 1}, {<<"b4">>, 2}]}},
         {false, {[{<<"b4">>, 2}]}},
         {false, {[]}}
-    ]).
+    ]),
+
+    Sel = normalize({[{<<"x">>, {[{<<"$keyMapMatch">>, {[{<<"$beginsWith">>, <<"a">>}]}}]}}]}),
+    Fails = match_failures(Sel, {[{<<"x">>, {[{<<"bravo">>, 0}, {<<"charlie">>, 1}]}}]}),
+    ?assertEqual(
+        [
+            {[{<<"path">>, [<<"x">>, <<"bravo">>]}, {<<"message">>, <<"must begin with 'a'">>}]},
+            {[{<<"path">>, [<<"x">>, <<"charlie">>]}, {<<"message">>, <<"must begin with 'a'">>}]}
+        ],
+        Fails
+    ).
 
 match_object_test() ->
     Doc1 = {[]},
@@ -1738,7 +1981,13 @@ match_object_test() ->
     ?assertEqual(false, match_int(SelShort, Doc2)),
     ?assertEqual(false, match_int(SelShort, Doc3)),
     ?assertEqual(true, match_int(SelShort, Doc4)),
-    ?assertEqual(false, match_int(SelShort, Doc5)).
+    ?assertEqual(false, match_int(SelShort, Doc5)),
+
+    Fails = match_failures(SelShort, Doc3),
+    ?assertEqual(
+        [{[{<<"path">>, [<<"x">>, <<"b">>]}, {<<"message">>, <<"must be present">>}]}],
+        Fails
+    ).
 
 match_and_test() ->
     % $and with an empty array matches anything
@@ -1796,7 +2045,16 @@ match_and_test() ->
     ?assertEqual(false, match_int(SelNotMulti, {[{<<"x">>, 6}]})),
     ?assertEqual(true, match_int(SelNotMulti, {[{<<"x">>, 2}]})),
     ?assertEqual(true, match_int(SelNotMulti, {[{<<"x">>, 9}]})),
-    ?assertEqual(false, match_int(SelNotMulti, {[]})).
+    ?assertEqual(false, match_int(SelNotMulti, {[]})),
+
+    Fails = match_failures(SelNotMulti, {[{<<"x">>, 6}]}),
+    ?assertEqual(
+        [
+            {[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be less than or equal to 3">>}]},
+            {[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be greater than or equal to 7">>}]}
+        ],
+        Fails
+    ).
 
 match_or_test() ->
     % $or with an empty array matches anything
@@ -1849,7 +2107,15 @@ match_or_test() ->
     ?assertEqual(true, match_int(SelNotMulti, {[{<<"x">>, 6}]})),
     ?assertEqual(false, match_int(SelNotMulti, {[{<<"x">>, 2}]})),
     ?assertEqual(false, match_int(SelNotMulti, {[{<<"x">>, 9}]})),
-    ?assertEqual(false, match_int(SelNotMulti, {[]})).
+    ?assertEqual(false, match_int(SelNotMulti, {[]})),
+
+    Fails = match_failures(SelNotMulti, {[{<<"x">>, 2}]}),
+    ?assertEqual(
+        [
+            {[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be greater than or equal to 3">>}]}
+        ],
+        Fails
+    ).
 
 match_nor_test() ->
     % $nor with an empty array matches anything
@@ -1874,7 +2140,15 @@ match_nor_test() ->
     ?assertEqual(true, match_int(SelMulti, {[{<<"x">>, 6}]})),
     ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 2}]})),
     ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 9}]})),
-    ?assertEqual(false, match_int(SelMulti, {[]})).
+    ?assertEqual(false, match_int(SelMulti, {[]})),
+
+    Fails = match_failures(SelMulti, {[{<<"x">>, 2}]}),
+    ?assertEqual(
+        [
+            {[{<<"path">>, [<<"x">>]}, {<<"message">>, <<"must be greater than or equal to 3">>}]}
+        ],
+        Fails
+    ).
 
 match_failures_object_test() ->
     Selector = normalize(
@@ -1901,7 +2175,7 @@ match_failures_object_test() ->
         ]}
     ),
     ?assertMatch(
-        [#failure{op = eq, type = mismatch, params = [1], ctx = #ctx{path = [<<"a">>]}}],
+        [{[{<<"path">>, [<<"a">>]}, {<<"message">>, <<"must be equal to 1">>}]}],
         Fails1
     ),
 
@@ -1913,7 +2187,7 @@ match_failures_object_test() ->
         ]}
     ),
     ?assertMatch(
-        [#failure{op = eq, type = mismatch, params = [3], ctx = #ctx{path = [<<"c">>, <<"b">>]}}],
+        [{[{<<"path">>, [<<"b">>, <<"c">>]}, {<<"message">>, <<"must be equal to 3">>}]}],
         Fails2
     ),
 
@@ -1926,8 +2200,8 @@ match_failures_object_test() ->
     ),
     ?assertMatch(
         [
-            #failure{op = eq, type = mismatch, params = [1], ctx = #ctx{path = [<<"a">>]}},
-            #failure{op = eq, type = mismatch, params = [3], ctx = #ctx{path = [<<"c">>, <<"b">>]}}
+            {[{<<"path">>, [<<"a">>]}, {<<"message">>, <<"must be equal to 1">>}]},
+            {[{<<"path">>, [<<"b">>, <<"c">>]}, {<<"message">>, <<"must be equal to 3">>}]}
         ],
         Fails3
     ).
@@ -1942,26 +2216,25 @@ match_failures_elemmatch_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
-        SelElemMatch, {[{<<"a">>, [5, 3, 2]}]}
-    ),
+    Fails0 = match_failures(SelElemMatch, {[{<<"a">>, [5, 3, 2]}]}),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
-        SelElemMatch, {[{<<"a">>, []}]}
-    ),
+    Fails1 = match_failures(SelElemMatch, {[{<<"a">>, []}]}),
     ?assertMatch(
-        [#failure{op = elemMatch, type = empty_list, params = [], ctx = #ctx{path = [<<"a">>]}}],
+        [
+            {[
+                {<<"path">>, [<<"a">>]},
+                {<<"message">>, <<"operator $elemMatch was invoked with an empty list">>}
+            ]}
+        ],
         Fails1
     ),
 
-    Fails2 = match_failures(
-        SelElemMatch, {[{<<"a">>, [3, 2]}]}
-    ),
+    Fails2 = match_failures(SelElemMatch, {[{<<"a">>, [3, 2]}]}),
     ?assertMatch(
         [
-            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [0, <<"a">>]}},
-            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [1, <<"a">>]}}
+            {[{<<"path">>, [<<"a">>, 0]}, {<<"message">>, <<"must be greater than 4">>}]},
+            {[{<<"path">>, [<<"a">>, 1]}, {<<"message">>, <<"must be greater than 4">>}]}
         ],
         Fails2
     ).
@@ -1976,26 +2249,20 @@ match_failures_allmatch_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
-        SelAllMatch, {[{<<"a">>, [5]}]}
-    ),
+    Fails0 = match_failures(SelAllMatch, {[{<<"a">>, [5]}]}),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
-        SelAllMatch, {[{<<"a">>, [4]}]}
-    ),
+    Fails1 = match_failures(SelAllMatch, {[{<<"a">>, [4]}]}),
     ?assertMatch(
-        [#failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [0, <<"a">>]}}],
+        [{[{<<"path">>, [<<"a">>, 0]}, {<<"message">>, <<"must be greater than 4">>}]}],
         Fails1
     ),
 
-    Fails2 = match_failures(
-        SelAllMatch, {[{<<"a">>, [5, 6, 3, 7, 0]}]}
-    ),
+    Fails2 = match_failures(SelAllMatch, {[{<<"a">>, [5, 6, 3, 7, 0]}]}),
     ?assertMatch(
         [
-            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [2, <<"a">>]}},
-            #failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [4, <<"a">>]}}
+            {[{<<"path">>, [<<"a">>, 2]}, {<<"message">>, <<"must be greater than 4">>}]},
+            {[{<<"path">>, [<<"a">>, 4]}, {<<"message">>, <<"must be greater than 4">>}]}
         ],
         Fails2
     ).
@@ -2010,22 +2277,16 @@ match_failures_allmatch_object_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
-        SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}]}]}}]}
-    ),
+    Fails0 = match_failures(SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}]}]}}]}),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
-        SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 4}]}]}]}}]}
-    ),
+    Fails1 = match_failures(SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 4}]}]}]}}]}),
     ?assertMatch(
         [
-            #failure{
-                op = gt,
-                type = mismatch,
-                params = [4],
-                ctx = #ctx{path = [<<"c">>, 0, <<"b">>, <<"a">>]}
-            }
+            {[
+                {<<"path">>, [<<"a">>, <<"b">>, 0, <<"c">>]},
+                {<<"message">>, <<"must be greater than 4">>}
+            ]}
         ],
         Fails1
     ),
@@ -2036,36 +2297,31 @@ match_failures_allmatch_object_test() ->
     ),
     ?assertMatch(
         [
-            #failure{
-                op = gt,
-                type = mismatch,
-                params = [4],
-                ctx = #ctx{path = [<<"c">>, 2, <<"b">>, <<"a">>]}
-            }
+            {[
+                {<<"path">>, [<<"a">>, <<"b">>, 2, <<"c">>]},
+                {<<"message">>, <<"must be greater than 4">>}
+            ]}
         ],
         Fails2
     ),
 
-    Fails3 = match_failures(
-        SelAllMatch,
-        {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 1}]}, {[]}]}]}}]}
-    ),
+    Fails3 = match_failures(SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 1}]}, {[]}]}]}}]}),
     ?assertMatch(
         [
-            #failure{
-                op = gt,
-                type = mismatch,
-                params = [4],
-                ctx = #ctx{path = [<<"c">>, 0, <<"b">>, <<"a">>]}
-            },
-            #failure{
-                op = field,
-                type = not_found,
-                params = [],
-                ctx = #ctx{path = [<<"c">>, 1, <<"b">>, <<"a">>]}
-            }
+            {[
+                {<<"path">>, [<<"a">>, <<"b">>, 0, <<"c">>]},
+                {<<"message">>, <<"must be greater than 4">>}
+            ]},
+            {[{<<"path">>, [<<"a">>, <<"b">>, 1, <<"c">>]}, {<<"message">>, <<"must be present">>}]}
         ],
         Fails3
     ).
+
+format_path_test() ->
+    ?assertEqual([], format_path([])),
+    ?assertEqual([<<"a">>], format_path([<<"a">>])),
+    ?assertEqual([<<"a">>, <<"b">>], format_path([<<"b">>, <<"a">>])),
+    ?assertEqual([<<"a">>, <<"b">>, <<"c">>], format_path([<<"b.c">>, <<"a">>])),
+    ?assertEqual([<<"a">>, 42, <<"b">>, <<"c">>], format_path([<<"b.c">>, 42, <<"a">>])).
 
 -endif.
