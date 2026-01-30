@@ -490,6 +490,8 @@ validate_doc_update(Db, DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     case Resp of
         ok ->
             ok;
+        {[{<<"forbidden">>, Message}, {<<"failures">>, Failures}]} ->
+            throw({forbidden, Message, Failures});
         {[{<<"forbidden">>, Message}]} ->
             throw({forbidden, Message});
         {[{<<"unauthorized">>, Message}]} ->

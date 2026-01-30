@@ -115,9 +115,14 @@ handle_call({prompt, [<<"ddoc">>, DDocId, [<<"validate_doc_update">>], Args]}, _
             [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
             Struct = {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, OldDoc}]},
             Reply =
-                case mango_selector:match(Selector, Struct) of
-                    true -> true;
-                    _ -> {[{<<"forbidden">>, <<"document is not valid">>}]}
+                case mango_selector:match_failures(Selector, Struct) of
+                    [] ->
+                        true;
+                    Failures ->
+                        {[
+                            {<<"forbidden">>, <<"forbidden">>},
+                            {<<"failures">>, Failures}
+                        ]}
                 end,
             {reply, Reply, St}
     end;

@@ -105,6 +105,9 @@ defmodule ValidateDocUpdateTest do
     resp = Couch.put("/#{db}/doc", body: %{"no" => "type"})
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
+    assert resp.body["reason"] == [
+      %{"path" => ["newDoc", "type"], "message" => "must be present"}
+    ]
   end
 
   @tag :with_db

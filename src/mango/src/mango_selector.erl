@@ -70,7 +70,7 @@ match(Selector, D) ->
 
 match_failures(Selector, D) ->
     couch_stats:increment_counter([mango, evaluate_selector]),
-    match_int(Selector, D, true).
+    [format_failure(F) || F <- match_int(Selector, D, true)].
 
 match_int(Selector, D) ->
     match_int(Selector, D, false).
@@ -575,8 +575,8 @@ match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{path = Path} = Ctx) when is_tup
         true -> [];
         false -> lists:flatten(KeyFailures)
     end;
-match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, Ctx) ->
-    [#failure{op = keyMapMatch, type = bad_value, ctx = Ctx}];
+match({[{<<"$keyMapMatch">>, _Arg}]}, Value, Ctx) ->
+    [#failure{op = keyMapMatch, type = bad_value, params = [Value], ctx = Ctx}];
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value, #ctx{cmp = Cmp} = Ctx) ->
     compare(lt, Arg, Ctx, Cmp(Value, Arg) < 0);
@@ -711,6 +711,88 @@ compare(Op, Arg, #ctx{negate = Neg} = Ctx, Cond) ->
         Neg -> [];
         _ -> [#failure{op = Op, params = [Arg], ctx = Ctx}]
     end.
+
+format_failure(#failure{op = Op, type = Type, params = Params, ctx = Ctx}) ->
+    Path = format_path(Ctx#ctx.path),
+    Msg = format_op(Op, Ctx#ctx.negate, Type, Params),
+    {[{<<"path">>, Path}, {<<"message">>, list_to_binary(Msg)}]}.
+
+format_op(Op, _, empty_list, _) ->
+    io_lib:format("operator $~p was invoked with an empty list", [Op]);
+format_op(Op, _, bad_value, [Value]) ->
+    io_lib:format("operator $~p was invoked with a bad value: ~s", [Op, jiffy:encode(Value)]);
+format_op(_, _, not_found, []) ->
+    io_lib:format("must be present", []);
+format_op(_, _, bad_path, []) ->
+    io_lib:format("used an invalid path", []);
+format_op(eq, false, mismatch, [X]) ->
+    io_lib:format("must be equal to ~s", [jiffy:encode(X)]);
+format_op(ne, false, mismatch, [X]) ->
+    io_lib:format("must not be equal to ~s", [jiffy:encode(X)]);
+format_op(lt, false, mismatch, [X]) ->
+    io_lib:format("must be less than ~s", [jiffy:encode(X)]);
+format_op(lte, false, mismatch, [X]) ->
+    io_lib:format("must be less than or equal to ~s", [jiffy:encode(X)]);
+format_op(gt, false, mismatch, [X]) ->
+    io_lib:format("must be greater than ~s", [jiffy:encode(X)]);
+format_op(gte, false, mismatch, [X]) ->
+    io_lib:format("must be greater than or equal to ~s", [jiffy:encode(X)]);
+format_op(in, false, mismatch, [X]) ->
+    io_lib:format("must be one of ~s", [jiffy:encode(X)]);
+format_op(nin, false, mismatch, [X]) ->
+    io_lib:format("must not be one of ~s", [jiffy:encode(X)]);
+format_op(all, false, mismatch, [X]) ->
+    io_lib:format("must contain all the values in ~s", [jiffy:encode(X)]);
+format_op(exists, false, mismatch, [true]) ->
+    io_lib:format("must be present", []);
+format_op(exists, false, mismatch, [false]) ->
+    io_lib:format("must not be present", []);
+format_op(type, false, mismatch, [Type]) ->
+    io_lib:format("must be of type '~s'", [Type]);
+format_op(type, true, mismatch, [Type]) ->
+    io_lib:format("must not be of type '~s'", [Type]);
+format_op(mod, false, mismatch, [D, R]) ->
+    io_lib:format("must leave a remainder of ~p when divided by ~p", [R, D]);
+format_op(mod, true, mismatch, [D, R]) ->
+    io_lib:format("must leave a remainder other than ~p when divided by ~p", [R, D]);
+format_op(regex, false, mismatch, [P]) ->
+    io_lib:format("must match the pattern '~s'", [P]);
+format_op(regex, true, mismatch, [P]) ->
+    io_lib:format("must not match the pattern '~s'", [P]);
+format_op(beginsWith, false, mismatch, [P]) ->
+    io_lib:format("must begin with '~s'", [P]);
+format_op(beginsWith, true, mismatch, [P]) ->
+    io_lib:format("must not begin with '~s'", [P]);
+format_op(size, false, mismatch, [N]) ->
+    io_lib:format("must contain ~p items", [N]);
+format_op(size, true, mismatch, [N]) ->
+    io_lib:format("must not contain ~p items", [N]);
+format_op(eq, true, Type, Params) ->
+    format_op(ne, false, Type, Params);
+format_op(ne, true, Type, Params) ->
+    format_op(eq, false, Type, Params);
+format_op(lt, true, Type, Params) ->
+    format_op(gte, false, Type, Params);
+format_op(lte, true, Type, Params) ->
+    format_op(gt, false, Type, Params);
+format_op(gt, true, Type, Params) ->
+    format_op(lte, false, Type, Params);
+format_op(gte, true, Type, Params) ->
+    format_op(le, false, Type, Params);
+format_op(in, true, Type, Params) ->
+    format_op(nin, false, Type, Params);
+format_op(nin, true, Type, Params) ->
+    format_op(in, false, Type, Params);
+format_op(exists, true, Type, [Exist]) ->
+    format_op(exists, false, Type, [not Exist]).
+
+format_path([]) ->
+    [];
+format_path([Item | Rest]) when is_binary(Item) ->
+    {ok, Path} = mango_util:parse_field(Item),
+    format_path(Rest) ++ Path;
+format_path([Item | Rest]) when is_integer(Item) ->
+    format_path(Rest) ++ [list_to_binary(integer_to_list(Item))].
 
 % Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.
@@ -1869,33 +1951,36 @@ match_failures_object_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
+    Fails0 = match_int(
         Selector,
         {[
             {<<"a">>, 1},
             {<<"b">>, {[{<<"c">>, 3}]}}
-        ]}
+        ]},
+        true
     ),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
+    Fails1 = match_int(
         Selector,
         {[
             {<<"a">>, 0},
             {<<"b">>, {[{<<"c">>, 3}]}}
-        ]}
+        ]},
+        true
     ),
     ?assertMatch(
         [#failure{op = eq, type = mismatch, params = [1], ctx = #ctx{path = [<<"a">>]}}],
         Fails1
     ),
 
-    Fails2 = match_failures(
+    Fails2 = match_int(
         Selector,
         {[
             {<<"a">>, 1},
             {<<"b">>, {[{<<"c">>, 4}]}}
-        ]}
+        ]},
+        true
     ),
     ?assertMatch(
         [#failure{op = eq, type = mismatch, params = [3], ctx = #ctx{path = [<<"b.c">>]}}],
@@ -1912,21 +1997,21 @@ match_failures_elemmatch_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
-        SelElemMatch, {[{<<"a">>, [5, 3, 2]}]}
+    Fails0 = match_int(
+        SelElemMatch, {[{<<"a">>, [5, 3, 2]}]}, true
     ),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
-        SelElemMatch, {[{<<"a">>, []}]}
+    Fails1 = match_int(
+        SelElemMatch, {[{<<"a">>, []}]}, true
     ),
     ?assertMatch(
         [#failure{op = elemMatch, type = empty_list, params = [], ctx = #ctx{path = [<<"a">>]}}],
         Fails1
     ),
 
-    Fails2 = match_failures(
-        SelElemMatch, {[{<<"a">>, [3, 2]}]}
+    Fails2 = match_int(
+        SelElemMatch, {[{<<"a">>, [3, 2]}]}, true
     ),
     ?assertMatch(
         [
@@ -1946,21 +2031,21 @@ match_failures_allmatch_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
-        SelAllMatch, {[{<<"a">>, [5]}]}
+    Fails0 = match_int(
+        SelAllMatch, {[{<<"a">>, [5]}]}, true
     ),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
-        SelAllMatch, {[{<<"a">>, [4]}]}
+    Fails1 = match_int(
+        SelAllMatch, {[{<<"a">>, [4]}]}, true
     ),
     ?assertMatch(
         [#failure{op = gt, type = mismatch, params = [4], ctx = #ctx{path = [0, <<"a">>]}}],
         Fails1
     ),
 
-    Fails2 = match_failures(
-        SelAllMatch, {[{<<"a">>, [5, 6, 3, 7, 0]}]}
+    Fails2 = match_int(
+        SelAllMatch, {[{<<"a">>, [5, 6, 3, 7, 0]}]}, true
     ),
     ?assertMatch(
         [
@@ -1980,13 +2065,13 @@ match_failures_allmatch_object_test() ->
         ]}
     ),
 
-    Fails0 = match_failures(
-        SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}]}]}}]}
+    Fails0 = match_int(
+        SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}]}]}}]}, true
     ),
     ?assertEqual([], Fails0),
 
-    Fails1 = match_failures(
-        SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 4}]}]}]}}]}
+    Fails1 = match_int(
+        SelAllMatch, {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 4}]}]}]}}]}, true
     ),
     ?assertMatch(
         [
@@ -1997,9 +2082,10 @@ match_failures_allmatch_object_test() ->
         Fails1
     ),
 
-    Fails2 = match_failures(
+    Fails2 = match_int(
         SelAllMatch,
-        {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}, {[{<<"c">>, 6}]}, {[{<<"c">>, 3}]}]}]}}]}
+        {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 5}]}, {[{<<"c">>, 6}]}, {[{<<"c">>, 3}]}]}]}}]},
+        true
     ),
     ?assertMatch(
         [
@@ -2010,9 +2096,10 @@ match_failures_allmatch_object_test() ->
         Fails2
     ),
 
-    Fails3 = match_failures(
+    Fails3 = match_int(
         SelAllMatch,
-        {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 1}]}, {[]}]}]}}]}
+        {[{<<"a">>, {[{<<"b">>, [{[{<<"c">>, 1}]}, {[]}]}]}}]},
+        true
     ),
     ?assertMatch(
         [
@@ -2028,6 +2115,13 @@ match_failures_allmatch_object_test() ->
         ],
         Fails3
     ).
+
+format_path_test() ->
+    ?assertEqual([], format_path([])),
+    ?assertEqual([<<"a">>], format_path([<<"a">>])),
+    ?assertEqual([<<"a">>, <<"b">>], format_path([<<"b">>, <<"a">>])),
+    ?assertEqual([<<"a">>, <<"b">>, <<"c">>], format_path([<<"b.c">>, <<"a">>])),
+    ?assertEqual([<<"a">>, <<"42">>, <<"b">>, <<"c">>], format_path([<<"b.c">>, 42, <<"a">>])).
 
 bench(Name, Selector, Doc) ->
     Sel1 = normalize(Selector),
