@@ -113,6 +113,11 @@ access_test_() ->
         fun should_let_admin_fetch_all_docs/2,
         fun should_let_user_fetch_their_own_all_docs/2,
 
+        % % _bulk_get
+        fun should_let_admin_fetch_all_docs_with_bulk_get/2,
+        fun should_let_user_fetch_their_docs_with_bulk_get/2,
+        fun should_not_let_user_fetch_other_docs_with_bulk_get/2,
+
         % _changes
         fun should_let_admin_fetch_changes/2,
         fun should_let_user_fetch_their_own_changes/2,
@@ -534,6 +539,150 @@ should_let_user_fetch_their_own_all_docs(_PortType, Url) ->
             Json1
         )
     end).
+
+% _bulk_get
+-define(BULK_DOCS, #{ docs => [
+    #{ '_id' => <<"1">>, '_access' => [<<"x">>] },
+    #{ '_id' => <<"2">>, '_access' => [<<"x">>] },
+    #{ '_id' => <<"3">>, '_access' => [<<"y">>] },
+    #{ '_id' => <<"4">>, '_access' => [<<"y">>] }
+]}).
+
+-define(BULK_GET_ADMIN, #{ docs => [
+    #{ id => <<"1">> },
+    #{ id => <<"2">> },
+    #{ id => <<"3">> },
+    #{ id => <<"4">> }
+]}).
+
+-define(BULK_GET_USERX, #{ docs => [
+    #{ id => <<"1">> },
+    #{ id => <<"2">> }
+]}).
+
+-define(BULK_GET_USERY, #{ docs => [
+    #{ id => <<"3">> },
+    #{ id => <<"4">> }
+]}).
+
+should_let_admin_fetch_all_docs_with_bulk_get(_PortType, Url) ->
+    {ok, 201, _, _} = test_request:post(
+        Url ++ "/db/_bulk_docs",
+        ?ADMIN_REQ_HEADERS,
+        ?BULK_DOCS
+    ),
+    {ok, 200, _, BulkResult} = test_request:post(
+        Url ++ "/db/_bulk_get",
+        ?ADMIN_REQ_HEADERS,
+        ?BULK_GET_ADMIN
+    ),
+    ?_assertEqual(jiffy:decode(BulkResult), {[{<<"results">>,
+        [{[{<<"id">>,<<"1">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"1">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"x">>]}]}}]}]}]},
+        {[{<<"id">>,<<"2">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"2">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"x">>]}]}}]}]}]},
+        {[{<<"id">>,<<"3">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"3">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"y">>]}]}}]}]}]},
+        {[{<<"id">>,<<"4">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"4">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"y">>]}]}}]}]}]}
+    ]}]}).
+
+    
+should_let_user_fetch_their_docs_with_bulk_get(_PortType, Url) ->
+    {ok, 201, _, _} = test_request:post(
+        Url ++ "/db/_bulk_docs",
+        ?ADMIN_REQ_HEADERS,
+        ?BULK_DOCS
+    ),
+    {ok, 200, _, BulkResult} = test_request:post(
+        Url ++ "/db/_bulk_get",
+        ?USERX_REQ_HEADERS,
+        ?BULK_GET_ADMIN
+    ),
+    ?_assertEqual({[{<<"results">>,
+        [{[{<<"id">>,<<"1">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"1">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"x">>]}]}}]}]}]},
+            {[{<<"id">>,<<"2">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"2">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"x">>]}]}}]}]}]},
+            {[{<<"id">>,<<"3">>},
+            {<<"docs">>,
+            [{[{<<"error">>,
+                {[{<<"rev">>,<<"undefined">>},
+                    {<<"reason">>,<<"missing">>},
+                    {<<"id">>,<<"3">>},
+                    {<<"error">>,<<"not_found">>}]}}]}]}]},
+            {[{<<"id">>,<<"4">>},
+            {<<"docs">>,
+            [{[{<<"error">>,
+                {[{<<"rev">>,<<"undefined">>},
+                    {<<"reason">>,<<"missing">>},
+                    {<<"id">>,<<"4">>},
+                    {<<"error">>,<<"not_found">>}]}}]}]}]}]}]},
+        jiffy:decode(BulkResult)).
+
+should_not_let_user_fetch_other_docs_with_bulk_get(_PortType, Url) ->
+    {ok, 201, _, _} = test_request:post(
+        Url ++ "/db/_bulk_docs",
+        ?ADMIN_REQ_HEADERS,
+        ?BULK_DOCS
+    ),
+    {ok, 200, _, BulkResult} = test_request:post(
+        Url ++ "/db/_bulk_get",
+        ?USERY_REQ_HEADERS,
+        ?BULK_GET_ADMIN
+    ),
+    ?_assertEqual({[{<<"results">>,
+        [{[{<<"id">>,<<"1">>},
+            {<<"docs">>,
+            [{[{<<"error">>,
+                {[{<<"rev">>,<<"undefined">>},
+                    {<<"reason">>,<<"missing">>},
+                    {<<"id">>,<<"1">>},
+                    {<<"error">>,<<"not_found">>}]}}]}]}]},
+            {[{<<"id">>,<<"2">>},
+            {<<"docs">>,
+            [{[{<<"error">>,
+                {[{<<"rev">>,<<"undefined">>},
+                    {<<"reason">>,<<"missing">>},
+                    {<<"id">>,<<"2">>},
+                    {<<"error">>,<<"not_found">>}]}}]}]}]},
+            {[{<<"id">>,<<"3">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"3">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"y">>]}]}}]}]}]},
+            {[{<<"id">>,<<"4">>},
+            {<<"docs">>,
+            [{[{<<"ok">>,
+                {[{<<"_id">>,<<"4">>},
+                    {<<"_rev">>,<<"1-967a00dff5e02add41819138abb3284d">>},
+                    {<<"_access">>,[<<"y">>]}]}}]}]}]}]}]},
+        jiffy:decode(BulkResult)).
 
 % _changes
 

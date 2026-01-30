@@ -333,7 +333,7 @@ open_doc(Db, Id, Options) ->
     end.
 
 apply_open_options(Db, {ok, Doc}, Options) ->
-    ok = validate_access(Db, Doc, Options),
+    ok = validate_access(Db, Doc),
     apply_open_options1({ok, Doc}, Options);
 apply_open_options(_Db, Else, _Options) ->
     Else.
@@ -830,6 +830,8 @@ validate_access1(true, Db, #doc{} = Doc, _Options) ->
 validate_access2(true) -> ok;
 validate_access2(_) -> throw({forbidden, <<"access denied">>}).
 
+check_access(Db, #full_doc_info{access = Access}) ->
+    check_access(Db, Access);
 check_access(Db, #doc{access = Access}) ->
     check_access(Db, Access);
 check_access(Db, Access) ->
@@ -1977,38 +1979,44 @@ open_doc_revs_int(Db, IdRevs, Options) ->
         fun({Id, Revs}, Lookup) ->
             case Lookup of
                 #full_doc_info{rev_tree = RevTree, access = Access} ->
-                    {FoundRevs, MissingRevs} =
-                        case Revs of
-                            all ->
-                                {couch_key_tree:get_all_leafs(RevTree), []};
-                            _ ->
-                                case lists:member(latest, Options) of
-                                    true ->
-                                        couch_key_tree:get_key_leafs(RevTree, Revs);
-                                    false ->
-                                        couch_key_tree:get(RevTree, Revs)
-                                end
-                        end,
-                    FoundResults =
-                        lists:map(
-                            fun({Value, {Pos, [Rev | _]} = FoundRevPath}) ->
-                                case Value of
-                                    ?REV_MISSING ->
-                                        % we have the rev in our list but know nothing about it
-                                        {{not_found, missing}, {Pos, Rev}};
-                                    #leaf{deleted = IsDeleted, ptr = SummaryPtr} ->
-                                        {ok,
-                                            make_doc(
-                                                Db, Id, IsDeleted, SummaryPtr, FoundRevPath, Access
-                                            )}
-                                end
-                            end,
-                            FoundRevs
-                        ),
-                    Results =
-                        FoundResults ++
-                            [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
-                    {ok, Results};
+                    Check = check_access(Db, Lookup),
+                    case Check of
+                        false ->
+                            {ok, []};
+                        true ->
+                            {FoundRevs, MissingRevs} =
+                                case Revs of
+                                    all ->
+                                        {couch_key_tree:get_all_leafs(RevTree), []};
+                                    _ ->
+                                        case lists:member(latest, Options) of
+                                            true ->
+                                                couch_key_tree:get_key_leafs(RevTree, Revs);
+                                            false ->
+                                                couch_key_tree:get(RevTree, Revs)
+                                        end
+                                end,
+                            FoundResults =
+                                lists:map(
+                                    fun({Value, {Pos, [Rev | _]} = FoundRevPath}) ->
+                                        case Value of
+                                            ?REV_MISSING ->
+                                                % we have the rev in our list but know nothing about it
+                                                {{not_found, missing}, {Pos, Rev}};
+                                            #leaf{deleted = IsDeleted, ptr = SummaryPtr} ->
+                                                {ok,
+                                                    make_doc(
+                                                        Db, Id, IsDeleted, SummaryPtr, FoundRevPath, Access
+                                                    )}
+                                        end
+                                    end,
+                                    FoundRevs
+                                ),
+                            Results =
+                                FoundResults ++
+                                    [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
+                            {ok, Results}
+                    end;
                 not_found when Revs == all ->
                     {ok, []};
                 not_found ->
