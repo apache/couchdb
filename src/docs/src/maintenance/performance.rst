@@ -58,7 +58,7 @@ operations add the following to ``(prefix)/etc/defaults/couchdb``
 
 .. _command line flag +A in erl(1): http://erlang.org/doc/man/erl.html
 
-Since Erlang OTP 21, the linked-in drivers have been migrated to dirty IO schedulers. 
+Since Erlang OTP 21, the linked-in drivers have been migrated to dirty IO schedulers.
 These schedulers can be configured by ``ERL_FLAGS`` environment
 variable. For example, to give Erlang 80 dirty schedulers
 add the following to ``(prefix)/etc/defaults/couchdb``
