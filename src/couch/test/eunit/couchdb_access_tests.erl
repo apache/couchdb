@@ -62,11 +62,11 @@ before_all() ->
     {ok, 201, _, _} = test_request:put(UserDbUrl, ?ADMIN_REQ_HEADERS, ""),
 
     UserXDocUrl = url() ++ "/_users/org.couchdb.user:x",
-    UserXDocBody = "{ \"name\":\"x\", \"roles\": [], \"password\":\"x\", \"type\": \"user\" }",
+    UserXDocBody = #{ name => <<"x">>, roles => [], password => <<"x">>, type => <<"user">> },
     {ok, 201, _, _} = test_request:put(UserXDocUrl, ?ADMIN_REQ_HEADERS, UserXDocBody),
 
     UserYDocUrl = url() ++ "/_users/org.couchdb.user:y",
-    UserYDocBody = "{ \"name\":\"y\", \"roles\": [], \"password\":\"y\", \"type\": \"user\" }",
+    UserYDocBody = #{ name => <<"y">>, roles => [], password => <<"y">>, type => <<"user">> },
     {ok, 201, _, _} = test_request:put(UserYDocUrl, ?ADMIN_REQ_HEADERS, UserYDocBody),
     Couch.
 
@@ -77,10 +77,10 @@ after_all(_) ->
 
 access_test_() ->
     Tests = [
-        % Server config
+        % server config
         fun should_not_let_create_access_db_if_disabled/2,
 
-        % Doc creation
+        % doc creation
         fun should_not_let_anonymous_user_create_doc/2,
         fun should_let_admin_create_doc_with_access/2,
         fun should_let_admin_create_doc_without_access/2,
@@ -91,19 +91,19 @@ access_test_() ->
         fun should_not_let_user_create_doc_for_someone_else/2,
         fun should_not_let_user_create_access_ddoc/2,
 
-        % Doc updates
+        % doc updates
         fun users_with_access_can_update_doc/2,
         fun users_without_access_can_not_update_doc/2,
         fun users_with_access_can_not_change_access/2,
         fun users_with_access_can_not_remove_access/2,
 
-        % Doc reads
+        % doc reads
         fun should_let_admin_read_doc_with_access/2,
         fun user_with_access_can_read_doc/2,
         fun user_without_access_can_not_read_doc/2,
         fun user_can_not_read_doc_without_access/2,
 
-        % Doc deletes
+        % doc deletes
         fun should_let_admin_delete_doc_with_access/2,
         fun should_let_user_delete_doc_for_themselves/2,
         fun should_not_let_user_delete_doc_for_someone_else/2,
@@ -168,45 +168,21 @@ make_test_cases(Mod, Funs) ->
         {foreachx, fun before_each/1, fun after_each/2, [{Mod, Fun} || Fun <- Funs]}
     }.
 
-% Doc creation
-% http://127.0.0.1:64903/db/a?revs=true&open_revs=%5B%221-23202479633c2b380f79507a776743d5%22%5D&latest=true
-
-% should_do_the_thing(_PortType, Url) ->
-%   ?_test(begin
-%       {ok, _, _, _} = test_request:put(Url ++ "/db/a",
-%           ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
-%       {ok, Code, _, _} = test_request:get(Url ++ "/db/a?revs=true&open_revs=%5B%221-23202479633c2b380f79507a776743d5%22%5D&latest=true",
-%           ?USERX_REQ_HEADERS),
-%       ?assertEqual(200, Code)
-%   end).
-%
-
-should_not_let_create_access_db_if_disabled(_PortType, Url) ->
+should_not_let_create_access_db_if_disabled(_PortType, _Url) ->
     ok = config:set("per_doc_access", "enable", "false", false),
     {ok, Code, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
     ok = config:set("per_doc_access", "enable", "true", false),
     ?_assertEqual(400, Code).
 
 should_not_let_anonymous_user_create_doc(_PortType, Url) ->
-    % TODO: debugging leftover
-    % BulkDocsBody = {[
-    %   {<<"docs">>, [
-    %       {[{<<"_id">>, <<"a">>}]},
-    %       {[{<<"_id">>, <<"a">>}]},
-    %       {[{<<"_id">>, <<"b">>}]},
-    %       {[{<<"_id">>, <<"c">>}]}
-    %   ]}
-    % ]},
-    % Resp = test_request:post(Url ++ "/db/_bulk_docs", ?ADMIN_REQ_HEADERS, jiffy:encode(BulkDocsBody)),
-    % ?debugFmt("~nResp: ~p~n", [Resp]),
-    {ok, Code, _, _} = test_request:put(Url ++ "/db/a", "{\"a\":1,\"_access\":[\"x\"]}"),
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/a", #{ a => 1, '_access' => [<<"x">>] }),
     ?_assertEqual(401, Code).
 
 should_let_admin_create_doc_with_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{a => 1, '_access' => [<<"x">>]}
     ),
     ?_assertEqual(201, Code).
 
@@ -214,7 +190,7 @@ should_let_admin_create_doc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1}"
+        #{ a => 1 }
     ),
     ?_assertEqual(201, Code).
 
@@ -222,7 +198,7 @@ should_let_admin_create_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1}"
+        #{ a => 1 }
     ),
     ?_assertEqual(201, Code).
 
@@ -230,7 +206,7 @@ should_not_let_admin_create_ddoc_with_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"_access\":[\"foo\"],\"a\":1}"
+        #{ a => 1, '_access' => [<<"foo">>] }
     ),
     ?_assertEqual(403, Code).
 
@@ -238,7 +214,7 @@ should_let_user_create_doc_for_themselves(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     ?_assertEqual(201, Code).
 
@@ -246,7 +222,7 @@ should_not_let_user_create_ddoc_with_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?USERX_REQ_HEADERS,
-        "{\"_access\":[\"x\"],\"a\":1}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     ?_assertEqual(403, Code).
 
@@ -254,7 +230,7 @@ should_not_let_user_create_doc_for_someone_else(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/c",
         ?USERY_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     ?_assertEqual(403, Code).
 
@@ -262,24 +238,24 @@ should_not_let_user_create_access_ddoc(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/dx",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     ?_assertEqual(403, Code).
 
-% Doc updates
+% doc updates
 
 users_with_access_can_update_doc(_PortType, Url) ->
     {ok, _, _, Body} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {Json} = jiffy:decode(Body),
     Rev = couch_util:get_value(<<"rev">>, Json),
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":2,\"_access\":[\"x\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"
+        #{ a => 2, '_access' => [<<"x">>], '_rev' => Rev }
     ),
     ?_assertEqual(201, Code).
 
@@ -287,14 +263,14 @@ users_without_access_can_not_update_doc(_PortType, Url) ->
     {ok, _, _, Body} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {Json} = jiffy:decode(Body),
     Rev = couch_util:get_value(<<"rev">>, Json),
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
         ?USERY_REQ_HEADERS,
-        "{\"a\":2,\"_access\":[\"y\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"
+        #{ a => 2, '_access' => [<<"x">>], '_rev' => Rev }
     ),
     ?_assertEqual(403, Code).
 
@@ -302,14 +278,14 @@ users_with_access_can_not_change_access(_PortType, Url) ->
     {ok, _, _, Body} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {Json} = jiffy:decode(Body),
     Rev = couch_util:get_value(<<"rev">>, Json),
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":2,\"_access\":[\"y\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"
+        #{ a => 2, '_access' => [<<"y">>], '_rev' => Rev }
     ),
     ?_assertEqual(403, Code).
 
@@ -317,24 +293,24 @@ users_with_access_can_not_remove_access(_PortType, Url) ->
     {ok, _, _, Body} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {Json} = jiffy:decode(Body),
     Rev = couch_util:get_value(<<"rev">>, Json),
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
         ?USERX_REQ_HEADERS,
-        "{\"a\":2,\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"
+        #{ a => 2, '_rev' => Rev }
     ),
     ?_assertEqual(403, Code).
 
-% Doc reads
+% doc reads
 
 should_let_admin_read_doc_with_access(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, Code, _, _} = test_request:get(
         Url ++ "/db/a",
@@ -346,7 +322,7 @@ user_with_access_can_read_doc(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, Code, _, _} = test_request:get(
         Url ++ "/db/a",
@@ -358,7 +334,7 @@ user_without_access_can_not_read_doc(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, Code, _, _} = test_request:get(
         Url ++ "/db/a",
@@ -370,7 +346,7 @@ user_can_not_read_doc_without_access(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1}"
+        #{ a => 1}
     ),
     {ok, Code, _, _} = test_request:get(
         Url ++ "/db/a",
@@ -378,13 +354,13 @@ user_can_not_read_doc_without_access(_PortType, Url) ->
     ),
     ?_assertEqual(403, Code).
 
-% Doc deletes
+% doc deletes
 
 should_let_admin_delete_doc_with_access(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, Code, _, _} = test_request:delete(
         Url ++ "/db/a?rev=1-23202479633c2b380f79507a776743d5",
@@ -396,7 +372,7 @@ should_let_user_delete_doc_for_themselves(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, _, _, _} = test_request:get(
         Url ++ "/db/a",
@@ -412,7 +388,7 @@ should_not_let_user_delete_doc_for_someone_else(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?USERX_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, Code, _, _} = test_request:delete(
         Url ++ "/db/a?rev=1-23202479633c2b380f79507a776743d5",
@@ -426,22 +402,22 @@ should_let_admin_fetch_all_docs(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/b",
         ?ADMIN_REQ_HEADERS,
-        "{\"b\":2,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/c",
         ?ADMIN_REQ_HEADERS,
-        "{\"c\":3,\"_access\":[\"y\"]}"
+        #{ c => 3, '_access' => [<<"y">>] }
     ),
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/d",
         ?ADMIN_REQ_HEADERS,
-        "{\"d\":4,\"_access\":[\"y\"]}"
+        #{ d => 4, '_access' => [<<"y">>] }
     ),
     {ok, 200, _, Body} = test_request:get(
         Url ++ "/db/_all_docs?include_docs=true",
@@ -455,22 +431,22 @@ should_let_user_fetch_their_own_all_docs(_PortType, Url) ->
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/b",
             ?USERX_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/d",
             ?USERY_REQ_HEADERS,
-            "{\"d\":4,\"_access\":[\"y\"]}"
+            #{ d => 4, '_access' => [<<"y">>] }
         ),
         {ok, 200, _, Body} = test_request:get(
             Url ++ "/db/_all_docs?include_docs=true",
@@ -556,22 +532,22 @@ should_let_admin_fetch_changes(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/a",
         ?ADMIN_REQ_HEADERS,
-        "{\"a\":1,\"_access\":[\"x\"]}"
+        #{ a => 1, '_access' => [<<"x">>] }
     ),
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/b",
         ?ADMIN_REQ_HEADERS,
-        "{\"b\":2,\"_access\":[\"x\"]}"
+        #{ b => 2, '_access' => [<<"x">>] }
     ),
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/c",
         ?ADMIN_REQ_HEADERS,
-        "{\"c\":3,\"_access\":[\"y\"]}"
+        #{ c => 3, '_access' => [<<"y">>] }
     ),
     {ok, 201, _, _} = test_request:put(
         Url ++ "/db/d",
         ?ADMIN_REQ_HEADERS,
-        "{\"d\":4,\"_access\":[\"y\"]}"
+        #{ d => 4, '_access' => [<<"y">>] }
     ),
     {ok, 200, _, Body} = test_request:get(
         Url ++ "/db/_changes",
@@ -586,22 +562,22 @@ should_let_user_fetch_their_own_changes(_PortType, Url) ->
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
         {ok, 201, _, _} = test_request:put(
             Url ++ "/db/d",
             ?ADMIN_REQ_HEADERS,
-            "{\"d\":4,\"_access\":[\"y\"]}"
+            #{ d => 4, '_access' => [<<"y">>] }
         ),
         {ok, 200, _, Body} = test_request:get(
             Url ++ "/db/_changes",
@@ -633,12 +609,28 @@ should_let_user_fetch_their_own_changes(_PortType, Url) ->
 
 % views
 
+-define(TEST_DDOC, #{
+        views =>  #{
+            foo => #{
+                map => <<"function() {}">>
+            }
+        },
+        shows => #{
+            show1 => <<"function(doc) { return 'hi' }">>
+        },
+        lists => #{
+            list1 => <<"function(head, req) { send('hi') }">>
+        },
+        updates =>  #{
+            update1 => <<"function(doc) { return [{_id: 'yay', a: 2}, 'done!']; }">>
+        }
+    }).
+
 should_allow_admin_query_view_from_ddoc_without_access(_PortType, Url) ->
-    DDoc = "{\"a\":1,\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        DDoc
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(
@@ -648,11 +640,10 @@ should_allow_admin_query_view_from_ddoc_without_access(_PortType, Url) ->
     ?_assertEqual(200, Code1).
 
 should_not_allow_user_query_view_from_ddoc_without_access(_PortType, Url) ->
-    DDoc = "{\"a\":1,\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        DDoc
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(
@@ -663,22 +654,11 @@ should_not_allow_user_query_view_from_ddoc_without_access(_PortType, Url) ->
 
 % show, list & updates
 
--define(SHOW_DDOC, #{
-        views =>  #{
-            foo => #{
-                map => <<"function() {}">>
-            }
-        },
-        shows => #{
-            show1 => <<"function(doc) { return 'hi' }">>
-        }
-    }).
-
 should_allow_admin_show_view_from_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        jiffy:encode(?SHOW_DDOC)
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(
@@ -691,7 +671,7 @@ should_not_allow_user_show_view_from_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        jiffy:encode(?SHOW_DDOC)
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(
@@ -700,22 +680,11 @@ should_not_allow_user_show_view_from_ddoc_without_access(_PortType, Url) ->
     ),
     ?_assertEqual(403, Code1).
 
--define(LIST_DDOC, #{
-        views =>  #{
-            foo => #{
-                map => <<"function() {}">>
-            }
-        },
-        lists => #{
-            list1 => <<"function(head, req) { send('hi') }">>
-        }
-    }).
-
 should_allow_admin_list_view_from_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        jiffy:encode(?LIST_DDOC)
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(
@@ -728,7 +697,7 @@ should_not_allow_user_list_view_from_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        jiffy:encode(?LIST_DDOC)
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(
@@ -737,17 +706,11 @@ should_not_allow_user_list_view_from_ddoc_without_access(_PortType, Url) ->
     ),
     ?_assertEqual(403, Code1).
 
--define(UPDATE_DDOC, #{
-        updates =>  #{
-            update1 => <<"function(doc) { return [{_id: 'yay', a: 2}, 'done!']; }">>
-        }
-    }).
-
 should_allow_admin_update_with_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        jiffy:encode(?UPDATE_DDOC)
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:post(
@@ -761,13 +724,13 @@ should_not_allow_user_update_with_ddoc_without_access(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS,
-        jiffy:encode(?UPDATE_DDOC)
+        ?TEST_DDOC
     ),
     ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:post(
         Url ++ "/db/_design/a/_update/update1",
         ?USERX_REQ_HEADERS,
-        jiffy:encode(#{a => 1})
+        #{a => 1}
     ),
     ?_assertEqual(403, Code1).
 
@@ -792,17 +755,17 @@ should_allow_admin_to_replicate_from_access_to_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"x\"]}"
+            #{ c => 3, '_access' => [<<"x">>] }
         ),
 
         % replicate
@@ -864,17 +827,17 @@ should_allow_admin_to_replicate_from_no_access_to_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"x\"]}"
+            #{ c => 3, '_access' => [<<"x">>] }
         ),
 
         % replicate
@@ -936,17 +899,17 @@ should_allow_admin_to_replicate_from_access_to_no_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"x\"]}"
+            #{ c => 3, '_access' => [<<"x">>] }
         ),
 
         % replicate
@@ -1020,17 +983,17 @@ should_allow_admin_to_replicate_from_no_access_to_no_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"x\"]}"
+            #{ c => 3, '_access' => [<<"x">>] }
         ),
 
         % replicate
@@ -1092,17 +1055,17 @@ should_allow_user_to_replicate_from_access_to_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
 
         % replicate
@@ -1117,7 +1080,6 @@ should_allow_user_to_replicate_from_access_to_access(_PortType, Url) ->
             ?USERX_REQ_HEADERS,
             jiffy:encode(EJRequestBody)
         ),
-        % ?debugFmt("~nResponseBody: ~p~n", [ResponseBody]),
 
         % assert replication status
         {EJResponseBody} = jiffy:decode(ResponseBody),
@@ -1182,17 +1144,17 @@ should_allow_user_to_replicate_from_access_to_no_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
 
         % replicate
@@ -1262,17 +1224,17 @@ should_allow_user_to_replicate_from_no_access_to_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
 
         % replicate
@@ -1345,17 +1307,17 @@ should_allow_user_to_replicate_from_no_access_to_no_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db2/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
 
         % replicate
@@ -1405,17 +1367,17 @@ should_not_allow_user_to_revs_diff_other_docs(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/a",
             ?ADMIN_REQ_HEADERS,
-            "{\"a\":1,\"_access\":[\"x\"]}"
+            #{ a => 1, '_access' => [<<"x">>] }
         ),
         {ok, _, _, _} = test_request:put(
             Url ++ "/db/b",
             ?ADMIN_REQ_HEADERS,
-            "{\"b\":2,\"_access\":[\"x\"]}"
+            #{ b => 2, '_access' => [<<"x">>] }
         ),
-        {ok, _, _, V} = test_request:put(
+        {ok, _, _, _} = test_request:put(
             Url ++ "/db/c",
             ?ADMIN_REQ_HEADERS,
-            "{\"c\":3,\"_access\":[\"y\"]}"
+            #{ c => 3, '_access' => [<<"y">>] }
         ),
 
         % nothing missing
@@ -1483,20 +1445,20 @@ port() ->
 % Potential future feature:%
 % should_let_user_fetch_their_own_all_docs_plus_users_ddocs(_PortType, Url) ->
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/a",
-%         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+%         ?ADMIN_REQ_HEADERS, #{ a => 1, '_access' => [<<"x">>] }),
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/foo",
 %         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"_users\"]}"),
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/bar",
 %         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"houdini\"]}"),
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/b",
-%         ?USERX_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+%         ?USERX_REQ_HEADERS, #{ b => 2, '_access' => [<<"x">>] }),
 %
 %     % % TODO: add allowing non-admin users adding non-admin ddocs
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/x",
-%         ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+%         ?ADMIN_REQ_HEADERS, #{ b => 2, '_access' => [<<"x">>] }),
 %
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/c",
-%         ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+%         ?ADMIN_REQ_HEADERS, #{ c => 3, '_access' => [<<"y">>] }),
 %     {ok, 201, _, _} = test_request:put(Url ++ "/db/d",
 %         ?USERY_REQ_HEADERS, "{\"d\":4,\"_access\":[\"y\"]}"),
 %     {ok, 200, _, Body} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
