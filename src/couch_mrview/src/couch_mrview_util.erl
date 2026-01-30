@@ -552,7 +552,7 @@ validate_all_docs_args_int(Db, Args0) ->
     DbPartitioned = couch_db:is_partitioned(Db),
     Partition = get_extra(Args, partition),
 
-    case {DbPartitioned, Partition} of
+    Args2 = case {DbPartitioned, Partition} of
         {false, <<_/binary>>} ->
             mrverror(<<"`partition` parameter is not supported on this db">>);
         {_, <<_/binary>>} ->
@@ -560,7 +560,9 @@ validate_all_docs_args_int(Db, Args0) ->
             apply_all_docs_partition(Args1, Partition);
         _ ->
             apply_limit(false, Args)
-    end.
+    end,
+    check_range(Args2, fun({A, _}, {B, _}) -> A < B end),
+    Args2.
 
 validate_args(#mrargs{} = Args) ->
     case get_extra(Args, validated, false) of
