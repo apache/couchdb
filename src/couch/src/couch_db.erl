@@ -1979,11 +1979,18 @@ open_doc_revs_int(Db, IdRevs, Options) ->
         fun({Id, Revs}, Lookup) ->
             case Lookup of
                 #full_doc_info{rev_tree = RevTree, access = Access} ->
-                    Check = check_access(Db, Lookup),
+                    % TODO: bit clunky but I wanted to avoid even deeper nesting
+                    %       and duplication of clauses
+                    Check = {has_access_enabled(Db), check_access(Db, Lookup)},
                     case Check of
-                        false ->
-                            {ok, []};
-                        true ->
+                        {true, false} ->
+                            case Revs of
+                                all ->
+                                    {ok, []};
+                                _ ->
+                                    {ok, [{{not_found, missing}, Rev} || Rev <- Revs]}
+                            end;
+                        {_, _} ->
                             {FoundRevs, MissingRevs} =
                                 case Revs of
                                     all ->
