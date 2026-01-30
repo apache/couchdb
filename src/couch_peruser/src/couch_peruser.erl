@@ -23,7 +23,8 @@
     init/1,
     handle_call/3,
     handle_cast/2,
-    handle_info/2
+    handle_info/2,
+    terminate/2
 ]).
 
 -export([init_changes_handler/1, changes_handler/3]).
@@ -49,7 +50,7 @@
     db_name :: binary(),
     delete_dbs :: boolean(),
     states :: list(),
-    mem3_cluster_pid :: pid(),
+    mem3_cluster_pid :: pid() | undefined,
     cluster_stable :: boolean(),
     q_for_peruser_db :: integer(),
     peruser_dbname_prefix :: binary()
@@ -69,12 +70,23 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec init_state() -> #state{}.
-init_state() ->
+%% @doc Initialize the state, optionally reusing an existing mem3_cluster process.
+%% When ExistingMem3Pid is undefined, a new mem3_cluster process is started if
+%% couch_peruser is enabled. When ExistingMem3Pid is provided, it is reused.
+-spec init_state(ExistingMem3Pid :: pid() | undefined) -> #state{}.
+init_state(ExistingMem3Pid) ->
     couch_log:debug("peruser: starting on node ~p in pid ~p", [node(), self()]),
     case config:get_boolean("couch_peruser", "enable", false) of
         false ->
             couch_log:debug("peruser: disabled on node ~p", [node()]),
+            % If we have an existing mem3_cluster process and peruser is now disabled,
+            % we need to stop it
+            case ExistingMem3Pid of
+                undefined ->
+                    ok;
+                Pid when is_pid(Pid) ->
+                    stop_mem3_cluster(Pid)
+            end,
             #state{};
         true ->
             couch_log:debug("peruser: enabled on node ~p", [node()]),
@@ -99,28 +111,34 @@ init_state() ->
                     throw(Error)
             end,
 
-            % set up cluster-stable listener
-            Period = abs(
-                config:get_integer(
-                    "couch_peruser",
-                    "cluster_quiet_period",
-                    ?DEFAULT_QUIET_PERIOD
-                )
-            ),
-            StartPeriod = abs(
-                config:get_integer(
-                    "couch_peruser",
-                    "cluster_start_period",
-                    ?DEFAULT_START_PERIOD
-                )
-            ),
-
-            {ok, Mem3Cluster} = mem3_cluster:start_link(
-                ?MODULE,
-                self(),
-                StartPeriod,
-                Period
-            ),
+            % Reuse existing mem3_cluster process or start a new one
+            Mem3Cluster = case ExistingMem3Pid of
+                undefined ->
+                    % set up cluster-stable listener
+                    Period = abs(
+                        config:get_integer(
+                            "couch_peruser",
+                            "cluster_quiet_period",
+                            ?DEFAULT_QUIET_PERIOD
+                        )
+                    ),
+                    StartPeriod = abs(
+                        config:get_integer(
+                            "couch_peruser",
+                            "cluster_start_period",
+                            ?DEFAULT_START_PERIOD
+                        )
+                    ),
+                    {ok, NewMem3Cluster} = mem3_cluster:start_link(
+                        ?MODULE,
+                        self(),
+                        StartPeriod,
+                        Period
+                    ),
+                    NewMem3Cluster;
+                Pid when is_pid(Pid) ->
+                    Pid
+            end,
 
             #state{
                 parent = self(),
@@ -134,8 +152,11 @@ init_state() ->
     end.
 
 -spec start_listening(State :: #state{}) -> #state{} | ok.
+start_listening(#state{mem3_cluster_pid = undefined} = State) ->
+    % peruser is disabled, nothing to do
+    State;
 start_listening(#state{states = ChangesStates} = State) when
-    length(ChangesStates) > 0
+    is_list(ChangesStates), length(ChangesStates) > 0
 ->
     % couch_log:debug("peruser: start_listening() already run on node ~p in pid ~p", [node(), self()]),
     State;
@@ -407,14 +428,25 @@ user_db_name(Prefix, User) ->
 
 -spec exit_changes(State :: #state{}) -> ok.
 exit_changes(State) ->
-    lists:foreach(
-        fun(ChangesState) ->
-            demonitor(ChangesState#changes_state.changes_ref, [flush]),
-            unlink(ChangesState#changes_state.changes_pid),
-            exit(ChangesState#changes_state.changes_pid, kill)
-        end,
-        State#state.states
-    ).
+    case State#state.states of
+        undefined ->
+            ok;
+        States when is_list(States) ->
+            lists:foreach(
+                fun(ChangesState) ->
+                    demonitor(ChangesState#changes_state.changes_ref, [flush]),
+                    unlink(ChangesState#changes_state.changes_pid),
+                    exit(ChangesState#changes_state.changes_pid, kill)
+                end,
+                States
+            )
+    end.
+
+-spec stop_mem3_cluster(Pid :: pid()) -> ok.
+stop_mem3_cluster(Pid) ->
+    unlink(Pid),
+    exit(Pid, shutdown),
+    ok.
 
 -spec is_stable() -> true | false.
 is_stable() ->
@@ -445,25 +477,28 @@ cluster_stable(Server) ->
 -spec init(Options :: list()) -> {ok, #state{}}.
 init([]) ->
     ok = subscribe_for_changes(),
-    {ok, init_state()}.
+    {ok, init_state(undefined)}.
 
 handle_call(is_stable, _From, #state{cluster_stable = IsStable} = State) ->
     {reply, IsStable, State};
 handle_call(_Msg, _From, State) ->
     {reply, error, State}.
 
-handle_cast(update_config, State) when State#state.states =/= undefined ->
+handle_cast(update_config, State) ->
     exit_changes(State),
-    {noreply, init_state()};
-handle_cast(update_config, _) ->
-    {noreply, init_state()};
+    % Reuse the existing mem3_cluster process
+    NewState = init_state(State#state.mem3_cluster_pid),
+    {noreply, NewState};
 handle_cast(stop, State) ->
     {stop, normal, State};
-handle_cast(cluster_unstable, State) when State#state.states =/= undefined ->
+handle_cast(cluster_unstable, State) ->
     exit_changes(State),
-    {noreply, init_state()};
-handle_cast(cluster_unstable, _) ->
-    {noreply, init_state()};
+    % Reset to waiting for cluster_stable, but keep the mem3_cluster process
+    NewState = State#state{
+        states = undefined,
+        cluster_stable = false
+    },
+    {noreply, NewState};
 handle_cast(cluster_stable, State) ->
     {noreply, start_listening(State)};
 handle_cast(_Msg, State) ->
@@ -495,3 +530,13 @@ handle_info(restart_config_listener, State) ->
     {noreply, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
+
+terminate(_Reason, State) ->
+    exit_changes(State),
+    case State#state.mem3_cluster_pid of
+        undefined ->
+            ok;
+        Pid when is_pid(Pid) ->
+            stop_mem3_cluster(Pid)
+    end,
+    ok.
