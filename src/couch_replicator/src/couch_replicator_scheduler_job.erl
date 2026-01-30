@@ -650,6 +650,10 @@ cancel_timer(#rep_state{timer = Timer} = State) ->
     {ok, cancel} = timer:cancel(Timer),
     State#rep_state{timer = nil}.
 
+get_prop_value(Prop, Info) ->
+    {Props} = couch_util:get_value(<<"props">>, Info),
+    couch_util:get_value(Prop, Props).
+
 init_state(Rep) ->
     #rep{
         id = {BaseId, _Ext},
@@ -708,8 +712,8 @@ init_state(Rep) ->
         rep_starttime = StartTime,
         src_starttime = get_value(<<"instance_start_time">>, SourceInfo),
         tgt_starttime = get_value(<<"instance_start_time">>, TargetInfo),
-        src_access = get_value(<<"access">>, SourceInfo),
-        tgt_access = get_value(<<"access">>, TargetInfo),
+        src_access = get_prop_value(<<"access">>, SourceInfo),
+        tgt_access = get_prop_value(<<"access">>, TargetInfo),
         session_id = couch_uuids:random(),
         source_seq = SourceSeq,
         use_checkpoints = get_value(use_checkpoints, Options, true),

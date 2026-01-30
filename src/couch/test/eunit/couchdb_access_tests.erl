@@ -87,6 +87,7 @@ access_test_() ->
         fun should_let_admin_create_ddoc_without_access/2,
         fun should_not_let_admin_create_ddoc_with_access/2,
         fun should_let_user_create_doc_for_themselves/2,
+        fun should_let_user_create_local_doc_for_themselves/2,
         fun should_not_let_user_create_ddoc_with_access/2,
         fun should_not_let_user_create_doc_for_someone_else/2,
         fun should_not_let_user_create_access_ddoc/2,
@@ -213,6 +214,14 @@ should_not_let_admin_create_ddoc_with_access(_PortType, Url) ->
 should_let_user_create_doc_for_themselves(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(
         Url ++ "/db/b",
+        ?USERX_REQ_HEADERS,
+        #{ a => 1, '_access' => [<<"x">>] }
+    ),
+    ?_assertEqual(201, Code).
+
+should_let_user_create_local_doc_for_themselves(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(
+        Url ++ "/db/_local/b",
         ?USERX_REQ_HEADERS,
         #{ a => 1, '_access' => [<<"x">>] }
     ),

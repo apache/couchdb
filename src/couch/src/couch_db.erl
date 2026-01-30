@@ -221,8 +221,7 @@ clustered_db(DbName, Options) when is_list(Options) ->
         name = DbName,
         user_ctx = UserCtx,
         security = SecProps,
-        options = [{props, Props}],
-        access = Access
+        options = [{props, Props}]
     }};
 clustered_db(DbName, #user_ctx{} = UserCtx) ->
     clustered_db(DbName, [{user_ctx, UserCtx}]).
@@ -307,8 +306,9 @@ wait_for_compaction(#db{main_pid = Pid} = Db, Timeout) ->
 is_compacting(DbName) ->
     couch_server:is_compacting(DbName).
 
-has_access_enabled(#db{access = true}) -> true;
-has_access_enabled(_) -> false.
+has_access_enabled(Db) ->
+    Props = get_props(Db),
+    couch_util:get_value(access, Props, false).
 
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id = Id, revs = [Rev], deleted = true} || Rev <- Revisions],
@@ -656,8 +656,7 @@ get_db_info(Db) ->
         name = Name,
         compactor_pid = Compactor,
         instance_start_time = StartTime,
-        committed_update_seq = CommittedUpdateSeq,
-        access = Access
+        committed_update_seq = CommittedUpdateSeq
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
@@ -688,8 +687,7 @@ get_db_info(Db) ->
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
         {props, {Props}},
-        {uuid, Uuid},
-        {access, Access}
+        {uuid, Uuid}
     ],
     {ok, InfoList}.
 

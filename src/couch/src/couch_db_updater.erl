@@ -327,8 +327,7 @@ init_db(DbName, FilePath, EngineState, Options) ->
         instance_start_time = StartTime,
         options = NonCreateOpts,
         before_doc_update = BDU,
-        after_doc_read = ADR,
-        access = Access
+        after_doc_read = ADR
     },
 
     Db = InitDb#db{
