@@ -563,7 +563,7 @@ doc(Db, DocId) ->
     end.
 
 -spec doc_lookup(binary(), binary(), integer()) ->
-    {ok, {[_]}} | {error, not_found}.
+    {ok, {[_]} | nil} | {error, not_found}.
 doc_lookup(Db, DocId, HealthThreshold) ->
     case ets:lookup(?MODULE, {Db, DocId}) of
         [#rdoc{} = RDoc] ->
