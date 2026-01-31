@@ -562,7 +562,12 @@ validate_all_docs_args_int(Db, Args0) ->
             _ ->
                 apply_limit(false, Args)
         end,
-    check_range(Args2, fun({A, _}, {B, _}) -> A < B end),
+    % Only check range if both start_key and end_key are specified
+    case {Args2#mrargs.start_key, Args2#mrargs.end_key} of
+        {undefined, _} -> ok;
+        {_, undefined} -> ok;
+        _ -> check_range(Args2, fun({A, _}, {B, _}) -> A < B end)
+    end,
     Args2.
 
 validate_args(#mrargs{} = Args) ->
