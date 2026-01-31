@@ -58,7 +58,7 @@
 -define(MIN_START_DELAY_MSEC, 500).
 
 -type filter_type() :: nil | view | user | docids | mango.
--type repstate() :: initializing | error | scheduled | not_owner.
+-type repstate() :: initializing | error | scheduled | not_owner | pending.
 
 -record(st, {
     % Timer reference
@@ -584,7 +584,13 @@ ejson_doc(#rdoc{state = scheduled} = RDoc, HealthThreshold) ->
     JobProps = couch_replicator_scheduler:job_summary(RepId, HealthThreshold),
     case JobProps of
         nil ->
-            nil;
+            % The job is in the doc processor table as "scheduled" but it's not
+            % in the scheduler's table. This is a transitional state and may
+            % happen, for example, when jobs complete, but the replicator doc
+            % processor hasn't yet noticed the "completed" changes feed event
+            % from the doc update. Since know some info about the job return
+            % that as pending state instead of just returning nil.
+            ejson_doc(RDoc#rdoc{state = pending}, HealthThreshold);
         [{_, _} | _] ->
             {[
                 {doc_id, DocId},
