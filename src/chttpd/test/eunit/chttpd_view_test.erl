@@ -117,7 +117,9 @@ all_docs_test_() ->
                     ?TDEF_FE(t_all_docs_with_limit),
                     ?TDEF_FE(t_all_docs_with_skip),
                     ?TDEF_FE(t_all_docs_with_limit_and_skip),
-                    ?TDEF_FE(t_all_docs_with_configured_query_limit)
+                    ?TDEF_FE(t_all_docs_with_configured_query_limit),
+                    ?TDEF_FE(t_all_docs_with_inverted_range),
+                    ?TDEF_FE(t_all_docs_with_inverted_range_descending)
                 ]
             }
         }
@@ -415,26 +417,12 @@ t_all_docs_with_limit_and_skip(Db) ->
             <<"total_rows">> := 4,
             <<"rows">> := [
                 #{<<"id">> := <<"b">>}
-            ]
-        },
-        Res
-    ).
-
-t_all_docs_with_configured_query_limit(Db) ->
-    config:set("query_server_config", "query_limit", "2", false),
-    {Code, Res} = req(get, url(Db, "_all_docs")),
-    ?assertEqual(200, Code),
-    ?assertMatch(
-        #{
-            <<"offset">> := 0,
-            <<"total_rows">> := 4,
-            <<"rows">> := [
-                #{<<"id">> := <<"_design/ddoc">>},
                 #{<<"id">> := <<"a">>}
             ]
         },
         Res
-    ).
+    ),
+    ?assertEqual(200, Code).
 
 %%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
 url(Db) ->
