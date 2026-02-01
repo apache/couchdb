@@ -22,7 +22,7 @@
 %
 % The algorithm referenced above estimates a rate, whereas the implemented
 % algorithm uses an interval (in milliseconds). It preserves the original
-% semantics, that is the failure part is multplicative and the success part is
+% semantics, that is the failure part is multiplicative and the success part is
 % additive. The relationship between rate and interval is: rate = 1000 /
 % interval.
 %

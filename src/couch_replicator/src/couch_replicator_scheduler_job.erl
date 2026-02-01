@@ -110,7 +110,7 @@ stop(Pid) when is_pid(Pid) ->
     % In the rare case the job is already stopping as we try to stop it, it
     % won't return ok but exit the calling process, usually the scheduler, so
     % we guard against that. See:
-    %  www.erlang.org/doc/apps/stdlib/gen_server.html#stop/3
+    %  https://www.erlang.org/doc/apps/stdlib/gen_server.html#stop/3
     catch gen_server:stop(Pid, shutdown, ?STOP_TIMEOUT_MSEC),
     exit(Pid, kill),
     receive
@@ -189,7 +189,7 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx = UserCtx} = Rep) -
     % Restarting a temporary supervised child implies that the original arguments
     % (#rep{} record) specified in the MFA component of the supervisor
     % child spec will always be used whenever the child is restarted.
-    % This implies the same replication performance tunning parameters will
+    % This implies the same replication performance tuning parameters will
     % always be used. The solution is to delete the child spec (see
     % cancel_replication/1) and then start the replication again, but this is
     % unfortunately not immune to race conditions.
