@@ -361,6 +361,8 @@
   "PartitionMangoTest": [
     "explain works with non partitioned db",
     "explain works with partitions",
+    "explain works with bookmarks",
+    "explain options",
     "global query does not use partition index",
     "global query uses global index",
     "non-partitioned query using _all_docs and $eq",
@@ -763,6 +765,7 @@
     "unsatisfiable range",
     "explain view args",
     "explain options",
+    "explain with bookmarks",
     "sort with all docs"
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [

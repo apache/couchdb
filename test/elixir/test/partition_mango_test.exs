@@ -733,4 +733,118 @@ defmodule PartitionMangoTest do
     %{:body => %{"reason" => reason}} = resp
     assert Regex.match?(~r/No global index exists for this sort/, reason)
   end
+
+  @tag :with_partitioned_db
+  test "explain options", context do
+    db_name = context[:db_name]
+    UserDocs.setup(db_name, "view", true)
+
+    {:ok, explain} = MangoDatabase.find(
+      db_name, %{"age" => %{"$gt" => 0}},
+      fields: ["manager"], partition: "0", explain: true
+    )
+    opts = explain["opts"]
+    assert opts["r"] == 1
+    assert opts["limit"] == 25
+    assert opts["skip"] == 0
+    assert opts["fields"] == ["manager"]
+    assert opts["sort"] == %{}
+    assert opts["bookmark"] == "nil"
+    assert opts["conflicts"] == false
+    assert opts["execution_stats"] == false
+    assert opts["partition"] == "0"
+    assert opts["stable"] == false
+    assert opts["stale"] == false
+    assert opts["update"] == true
+    assert opts["use_index"] == []
+    assert opts["allow_fallback"] == true
+  end
+
+  @tag :with_partitioned_db
+  test "explain options (text)", context do
+    db_name = context[:db_name]
+    UserDocs.setup(db_name, "text", true)
+
+    {:ok, explain} = MangoDatabase.find(
+      db_name,
+      %{"age" => %{"$gt" => 0}},
+      fields: ["manager"],
+      partition: "0",
+      allow_fallback: false,
+      explain: true
+    )
+    opts = explain["opts"]
+    assert opts["r"] == 1
+    assert opts["limit"] == 25
+    assert opts["skip"] == 0
+    assert opts["fields"] == ["manager"]
+    assert opts["sort"] == %{}
+    assert opts["bookmark"] == "nil"
+    assert opts["conflicts"] == false
+    assert opts["execution_stats"] == false
+    assert opts["partition"] == "0"
+    assert opts["stable"] == false
+    assert opts["stale"] == false
+    assert opts["update"] == true
+    assert opts["use_index"] == []
+    assert opts["allow_fallback"] == false
+  end
+
+  @tag :with_partitioned_db
+  test "explain works with bookmarks", context do
+    db_name = context[:db_name]
+    UserDocs.setup(db_name, "view", true)
+
+    query = %{"age" => %{"$gt" => 42}}
+    partition = "0"
+
+    {:ok, resp} = MangoDatabase.find(
+      db_name,
+      query,
+      partition: partition,
+      limit: 1,
+      return_raw: true
+    )
+    assert length(resp["docs"]) == 1
+    assert resp["bookmark"] != "nil"
+    {:ok, explain} = MangoDatabase.find(
+      db_name,
+      query,
+      partition: partition,
+      bookmark: resp["bookmark"],
+      explain: true
+    )
+    assert is_binary(explain["opts"]["bookmark"])
+    assert resp["bookmark"] == explain["opts"]["bookmark"]
+  end
+
+  @tag :with_partitioned_db
+  test "explain works with bookmarks (text)", context do
+    db_name = context[:db_name]
+    UserDocs.setup(db_name, "text", true)
+
+    query = %{"age" => %{"$gt" => 42}}
+    partition = "0"
+
+    {:ok, resp} = MangoDatabase.find(
+      db_name,
+      query,
+      partition: partition,
+      limit: 1,
+      allow_fallback: false,
+      return_raw: true
+    )
+    assert length(resp["docs"]) == 1
+    assert resp["bookmark"] != "nil"
+    {:ok, explain} = MangoDatabase.find(
+      db_name,
+      query,
+      partition: partition,
+      bookmark: resp["bookmark"],
+      allow_fallback: false,
+      explain: true
+    )
+    assert is_binary(explain["opts"]["bookmark"])
+    assert resp["bookmark"] == explain["opts"]["bookmark"]
+  end
 end
