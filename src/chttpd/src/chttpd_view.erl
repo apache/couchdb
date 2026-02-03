@@ -66,6 +66,7 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     fabric_query_view(Db, Req, DDoc, ViewName, Args).
 
 fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
+    ok = couch_db:validate_access(Db, DDoc),
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db = Db, req = Req, threshold = Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],

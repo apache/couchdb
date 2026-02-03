@@ -92,7 +92,7 @@ request(Method, Url, Headers, Body, Opts, N) ->
         _ ->
             ok
     end,
-    case ibrowse:send_req(Url, Headers, Method, Body, Opts) of
+    case ibrowse:send_req(Url, Headers, Method, encode_body(Body), Opts) of
         {ok, Code0, RespHeaders, RespBody0} ->
             Code = list_to_integer(Code0),
             RespBody = iolist_to_binary(RespBody0),
@@ -108,3 +108,7 @@ request(Method, Url, Headers, Body, Opts, N) ->
         Error ->
             Error
     end.
+
+encode_body(Body) when is_list(Body) -> Body;
+encode_body(Body) when is_binary(Body) -> Body;
+encode_body(Body) when is_map(Body) -> jiffy:encode(Body).

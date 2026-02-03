@@ -238,7 +238,7 @@ defmodule ViewIncludeDocsTest do
     doc2 = %{_id: "bar", value: 2, str: "2"}
     {:ok, _} = create_doc(db_name_a, doc2)
 
-    replicate(db_name_a, db_name_b)
+    replicate("http://127.0.0.1:15984/#{db_name_a}", "http://127.0.0.1:15984/#{db_name_b}")
 
     resp = Couch.get("/#{db_name_b}/foo", query: [conflicts: true])
     assert resp.status_code == 200
