@@ -685,7 +685,12 @@ init_state(Rep) ->
     Stats = couch_replicator_stats:max_stats(ArgStats1, HistoryStats),
 
     StartSeq1 = get_value(since_seq, Options, StartSeq0),
-    StartSeq = {0, StartSeq1},
+    StartSeq2 =
+        case StartSeq0 > StartSeq1 of
+            true -> StartSeq0;
+            false -> StartSeq1
+        end,
+    StartSeq = {0, StartSeq2},
 
     SourceSeq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ),
 
