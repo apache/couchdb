@@ -684,7 +684,16 @@ init_state(Rep) ->
         end,
     Stats = couch_replicator_stats:max_stats(ArgStats1, HistoryStats),
 
-    StartSeq1 = get_value(since_seq, Options, StartSeq0),
+    StartSeq1 =
+        case StartSeq0 of
+            0 ->
+                % Checkpoint doesn't exist, use the `since_seq` to replicate;
+                % If `since_seq` is not defined, replicate from scratch.
+                get_value(since_seq, Options, 0);
+            _ ->
+                % Replicate with the checkpoint and ignore `since_seq`.
+                StartSeq0
+        end,
     StartSeq = {0, StartSeq1},
 
     SourceSeq = get_value(<<"update_seq">>, SourceInfo, ?LOWEST_SEQ),
