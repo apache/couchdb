@@ -358,7 +358,7 @@ explain(#cursor{} = Cursor) ->
             {dbname, DbName},
             {index, JSON},
             {partitioned, Partitioned},
-            {selector, Selector},
+            {selector, mango_util:join_keys(Selector)},
             {opts, {Opts}},
             {limit, Limit},
             {skip, Skip},

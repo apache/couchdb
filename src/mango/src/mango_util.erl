@@ -41,6 +41,8 @@
     join/2,
 
     parse_field/1,
+    join_field/1,
+    join_keys/1,
 
     cached_re/2
 ]).
@@ -369,6 +371,25 @@ parse_field_slow(Field) ->
         re:split(Field, <<"(?<!\\\\)\\.">>)
     ),
     {ok, Path}.
+
+join_keys({Sel}) when is_list(Sel) ->
+    Pairs = [{join_field(K), join_keys(V)} || {K, V} <- Sel],
+    {Pairs};
+join_keys(Sel) when is_list(Sel) ->
+    [join_keys(S) || S <- Sel];
+join_keys(Sel) ->
+    Sel.
+
+join_field(Field) when is_list(Field) ->
+    Parts = [field_to_binary(F) || F <- Field],
+    binary:join(Parts, <<".">>);
+join_field(Field) ->
+    Field.
+
+field_to_binary(Field) when is_list(Field) ->
+    list_to_binary(Field);
+field_to_binary(Field) when is_binary(Field) ->
+    Field.
 
 check_non_empty(Field, Parts) ->
     case lists:member(<<>>, Parts) of

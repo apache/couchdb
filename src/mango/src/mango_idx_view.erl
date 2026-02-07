@@ -233,7 +233,7 @@ opts() ->
 make_view(Idx) ->
     View =
         {[
-            {<<"map">>, Idx#idx.def},
+            {<<"map">>, mango_util:join_keys(Idx#idx.def)},
             {<<"reduce">>, <<"_count">>},
             {<<"options">>, {Idx#idx.opts}}
         ]},
@@ -271,15 +271,18 @@ validate_ddoc(VProps) ->
 % the equivalent of a multi-query. But that's for another
 % day.
 
+indexable_fields(Selector) ->
+    [mango_util:join_field(F) || F <- indexable_paths(Selector)].
+
 % We can see through '$and' trivially
-indexable_fields({[{<<"$and">>, Args}]}) ->
-    lists:usort(lists:flatten([indexable_fields(A) || A <- Args]));
+indexable_paths({[{<<"$and">>, Args}]}) ->
+    lists:usort(lists:flatmap(fun(A) -> indexable_paths(A) end, Args));
 % So far we can't see through any other operator
-indexable_fields({[{<<"$", _/binary>>, _}]}) ->
+indexable_paths({[{<<"$", _/binary>>, _}]}) ->
     [];
 % If we have a field with a terminator that is locatable
 % using an index then the field is a possible index
-indexable_fields({[{Field, Cond}]}) ->
+indexable_paths({[{Field, Cond}]}) ->
     case indexable(Cond) of
         true ->
             [Field];
@@ -287,7 +290,7 @@ indexable_fields({[{Field, Cond}]}) ->
             []
     end;
 % An empty selector
-indexable_fields({[]}) ->
+indexable_paths({[]}) ->
     [].
 
 % Check if a condition is indexable. The logical
@@ -320,8 +323,8 @@ indexable({[{<<"$", _/binary>>, _}]}) ->
 
 % For each field, return {Field, Range}
 field_ranges(Selector) ->
-    Fields = indexable_fields(Selector),
-    field_ranges(Selector, Fields).
+    Fields = indexable_paths(Selector),
+    [{mango_util:join_field(F), R} || {F, R} <- field_ranges(Selector, Fields)].
 
 field_ranges(Selector, Fields) ->
     field_ranges(Selector, Fields, []).
