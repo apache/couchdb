@@ -60,7 +60,7 @@ parse(Options) ->
 
 % Fetches body of filter function from source database. Guaranteed to either
 % return {ok, Body} or an {error, Reason}. Also assume this function might
-% block due to network / socket issues for an undeterminted amount of time.
+% block due to network / socket issues for an undetermined amount of time.
 -spec fetch(binary(), binary(), binary()) ->
     {ok, {[_]}} | {error, binary()}.
 fetch(DDocName, FilterName, Source) ->

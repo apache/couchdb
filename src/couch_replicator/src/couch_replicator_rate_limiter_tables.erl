@@ -20,7 +20,7 @@
 % in effect (also configurable).
 %
 % This module is also in charge of calculating ownership of replications based
-% on where their _repicator db documents shards live.
+% on where their _replicator db documents shards live.
 
 -module(couch_replicator_rate_limiter_tables).
 

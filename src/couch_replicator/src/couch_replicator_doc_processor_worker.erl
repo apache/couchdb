@@ -230,7 +230,7 @@ t_ignore_if_doc_deleted(_) ->
     ?assertEqual(ignore, maybe_start_replication(Id, Rep, make_ref())),
     ?assertNot(added_job()).
 
-% Should not add job if by the time worker got to fetchign the filter
+% Should not add job if by the time worker got to fetch the filter
 % and building a replication id, another worker was spawned.
 t_ignore_if_worker_ref_does_not_match(_) ->
     Id = {?DB, ?DOC1},

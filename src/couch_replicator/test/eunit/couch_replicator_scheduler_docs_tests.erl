@@ -48,7 +48,6 @@ setup_prefixed_replicator_db_with_update_docs_true() ->
     {Ctx, {RepDb, Source, Target}}.
 
 teardown({Ctx, {RepDb, Source, Target}}) ->
-    meck:unload(),
     ok = fabric:delete_db(RepDb, [?ADMIN_CTX]),
     config:delete("replicator", "update_docs", _Persist = false),
     couch_replicator_test_helper:test_teardown({Ctx, {Source, Target}}).
@@ -76,7 +75,7 @@ scheduler_docs_test_prefixed_db_test_() ->
 replicator_bdu_test_main_db_test_() ->
     {
         setup,
-        fun setup_prefixed_replicator_db/0,
+        fun setup_main_replicator_db/0,
         fun teardown/1,
         with([
             ?TDEF(t_local_docs_can_be_written),

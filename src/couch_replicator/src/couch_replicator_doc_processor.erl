@@ -167,7 +167,7 @@ process_updated({DbName, _DocId} = Id, JsonRepDoc, Owner = true) ->
     % Parsing replication doc (but not calculating the id) could throw an
     % exception which would indicate this document is malformed. This exception
     % should propagate to db_change function and will be recorded as permanent
-    % failure in the document. User will have to update the documet to fix the
+    % failure in the document. User will have to update the document to fix the
     % problem.
     Rep0 = couch_replicator_parse:parse_rep_doc_without_id(JsonRepDoc),
     Rep = Rep0#rep{db_name = DbName, start_time = os:timestamp()},
@@ -675,8 +675,8 @@ start_scanner(#st{mdb_changes_pid = undefined} = St) ->
 
 start_delay_msec() ->
     DefaultSec = ?DEFAULT_START_DELAY_MSEC div 1000,
-    % We're using a compatiblity config setting (cluster_start_period) to avoid
-    % introducting a new config value.
+    % We're using a compatibility config setting (cluster_start_period) to avoid
+    % introducing a new config value.
     MSec = 1000 * config:get_integer("replicator", "cluster_start_period", DefaultSec),
     max(MSec, ?MIN_START_DELAY_MSEC).
 
