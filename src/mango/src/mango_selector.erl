@@ -85,6 +85,13 @@ match_int(Selector, D, Verbose) ->
 % Convert each operator into a normalized version as well
 % as convert an implicit operators into their explicit
 % versions.
+% {$Op: {$data: Path}}
+norm_ops({[{<<"$", _/binary>>, {[{<<"$data">>, Path}]}}]} = Cond) when is_binary(Path) ->
+    norm_data(Cond);
+% {Field: {$data: Path}}
+norm_ops({[{Field, {[{<<"$data">>, Path}]}}]}) when is_binary(Path) ->
+    Eq = norm_data({[{<<"$eq">>, {[{<<"$data">>, Path}]}}]}),
+    {[{Field, Eq}]};
 norm_ops({[{<<"$and">>, Args}]}) when is_list(Args) ->
     {[{<<"$and">>, [norm_ops(A) || A <- Args]}]};
 norm_ops({[{<<"$and">>, Arg}]}) ->
@@ -128,8 +135,8 @@ norm_ops({[{<<"$regex">>, Regex}]} = Cond) when is_binary(Regex) ->
         _ ->
             ?MANGO_ERROR({bad_arg, '$regex', Regex})
     end;
-norm_ops({[{<<"$all">>, Args}]}) when is_list(Args) ->
-    {[{<<"$all">>, Args}]};
+norm_ops({[{<<"$all">>, Args}]} = Cond) when is_list(Args) ->
+    Cond;
 norm_ops({[{<<"$all">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$all', Arg});
 norm_ops({[{<<"$elemMatch">>, {_} = Arg}]}) ->
@@ -144,8 +151,8 @@ norm_ops({[{<<"$keyMapMatch">>, {_} = Arg}]}) ->
     {[{<<"$keyMapMatch">>, norm_ops(Arg)}]};
 norm_ops({[{<<"$keyMapMatch">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$keyMapMatch', Arg});
-norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
-    {[{<<"$size">>, Arg}]};
+norm_ops({[{<<"$size">>, Arg}]} = Cond) when is_integer(Arg), Arg >= 0 ->
+    Cond;
 norm_ops({[{<<"$size">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$size', Arg});
 norm_ops({[{<<"$text">>, Arg}]}) when
@@ -204,6 +211,37 @@ norm_ops({[_, _ | _] = Props}) ->
 % A bare value condition means equality
 norm_ops(Value) ->
     {[{<<"$eq">>, Value}]}.
+
+% {$data: Path} may only be used as an argument to "leaf" operators that expect
+% a literal value as input. If it were combined with combinators like $and or
+% $allMatch it would allow the input document to inject its own selectors.
+-define(DATA_OPS, [
+    <<"$eq">>,
+    <<"$ne">>,
+    <<"$lt">>,
+    <<"$lte">>,
+    <<"$gt">>,
+    <<"$gte">>,
+    <<"$in">>,
+    <<"$nin">>,
+    <<"$all">>,
+    <<"$type">>,
+    <<"$size">>,
+    <<"$mod">>,
+    <<"$regex">>,
+    <<"$beginsWith">>
+]).
+
+norm_data({[{Op, {[{<<"$data">>, Field}]}}]}) when is_binary(Field) ->
+    case lists:member(Op, ?DATA_OPS) of
+        true ->
+            {ok, Path} = mango_util:parse_field(Field, relative),
+            {[{Op, {[{<<"$data">>, Path}]}}]};
+        false ->
+            ?MANGO_ERROR({bad_arg, '$data', Op})
+    end;
+norm_data({[{_, _}]} = Cond) ->
+    Cond.
 
 % This takes a selector and normalizes all of the
 % field names as far as possible. For instance:
@@ -898,6 +936,94 @@ fields({[]}) ->
         {<<"user_id">>, 11}
     ]}
 ).
+
+normalize_data_basic_test() ->
+    Selector = normalize({[{<<"a">>, {[{<<"$data">>, <<"b">>}]}}]}),
+    ?assertEqual(
+        {[
+            {
+                <<"a">>, {[{<<"$eq">>, {[{<<"$data">>, [<<"b">>]}]}}]}
+            }
+        ]},
+        Selector
+    ).
+
+normalize_data_path_test() ->
+    Selector = normalize({[{<<"a">>, {[{<<"$data">>, <<"b.c.42.d">>}]}}]}),
+    ?assertEqual(
+        {[
+            {
+                <<"a">>, {[{<<"$eq">>, {[{<<"$data">>, [<<"b">>, <<"c">>, <<"42">>, <<"d">>]}]}}]}
+            }
+        ]},
+        Selector
+    ).
+
+normalize_data_sibling_test() ->
+    Selector = normalize({[{<<"a">>, {[{<<"$data">>, <<".b">>}]}}]}),
+    ?assertEqual(
+        {[
+            {
+                <<"a">>, {[{<<"$eq">>, {[{<<"$data">>, [{[{<<"parent">>, 1}]}, <<"b">>]}]}}]}
+            }
+        ]},
+        Selector
+    ).
+
+normalize_data_parent_test() ->
+    Selector = normalize({[{<<"a">>, {[{<<"$data">>, <<"..b">>}]}}]}),
+    ?assertEqual(
+        {[
+            {
+                <<"a">>, {[{<<"$eq">>, {[{<<"$data">>, [{[{<<"parent">>, 2}]}, <<"b">>]}]}}]}
+            }
+        ]},
+        Selector
+    ).
+
+normalize_data_allowed_operator_test() ->
+    Selector = normalize({[{<<"a">>, {[{<<"$lt">>, {[{<<"$data">>, <<"b">>}]}}]}}]}),
+    ?assertEqual(
+        {[
+            {
+                <<"a">>, {[{<<"$lt">>, {[{<<"$data">>, [<<"b">>]}]}}]}
+            }
+        ]},
+        Selector
+    ).
+
+normalize_data_allowed_operator_all_test() ->
+    Selector = normalize({[{<<"a">>, {[{<<"$all">>, {[{<<"$data">>, <<"b">>}]}}]}}]}),
+    ?assertEqual(
+        {[
+            {
+                <<"a">>, {[{<<"$all">>, {[{<<"$data">>, [<<"b">>]}]}}]}
+            }
+        ]},
+        Selector
+    ).
+
+normalize_data_disallowed_operator_test() ->
+    Selector = {[{<<"a">>, {[{<<"$allMatch">>, {[{<<"$data">>, <<"b">>}]}}]}}]},
+    Error = {mango_error, mango_selector, {bad_arg, '$data', <<"$allMatch">>}},
+    ?assertException(throw, Error, normalize(Selector)).
+
+normalize_data_multi_field_test() ->
+    Selector = normalize(
+        {[
+            {<<"a">>, {[{<<"$data">>, <<"c">>}]}},
+            {<<"b">>, {[{<<"$data">>, <<"c">>}]}}
+        ]}
+    ),
+    ?assertEqual(
+        {[
+            {<<"$and">>, [
+                {[{<<"a">>, {[{<<"$eq">>, {[{<<"$data">>, [<<"c">>]}]}}]}}]},
+                {[{<<"b">>, {[{<<"$eq">>, {[{<<"$data">>, [<<"c">>]}]}}]}}]}
+            ]}
+        ]},
+        Selector
+    ).
 
 is_constant_field_basic_test() ->
     Selector = normalize({[{<<"A">>, <<"foo">>}]}),
