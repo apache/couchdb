@@ -138,3 +138,4 @@ test/javascript/junit.xml
 *.lock
 
 .tool-versions
+mise.local.toml
