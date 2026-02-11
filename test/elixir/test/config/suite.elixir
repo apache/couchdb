@@ -530,6 +530,7 @@
     "converting a Mango VDU to JavaScript updates its effects",
     "deleting a Mango VDU removes its effects",
     "Mango VDU rejects a doc if any existing ddoc fails to match",
+    "Mango VDU allows comparisons via $data",
   ],
   "SecurityValidationTest": [
     "Author presence and user security",

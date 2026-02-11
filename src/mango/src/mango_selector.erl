@@ -28,7 +28,8 @@
     cmp,
     verbose = false,
     negate = false,
-    path = []
+    path = [],
+    stack = []
 }).
 
 -record(failure, {
@@ -426,6 +427,22 @@ match({[]}, _, #ctx{verbose = false}) ->
     true;
 match({[]}, _, #ctx{verbose = true}) ->
     [];
+% Resolve $data lookups before evaluating the surrounding operator
+match({[{Op, {[{<<"$data">>, Path}]}}]}, Value, #ctx{stack = Stack, verbose = Verbose} = Ctx) ->
+    case mango_doc:get_field_from_stack(Path, Stack) of
+        not_found ->
+            case Verbose of
+                true -> [#failure{op = data, type = not_found, ctx = Ctx#ctx{path = Path}}];
+                false -> false
+            end;
+        bad_path ->
+            case Verbose of
+                true -> [#failure{op = data, type = bad_path, ctx = Ctx#ctx{path = Path}}];
+                false -> false
+            end;
+        Found ->
+            match({[{Op, Found}]}, Value, Ctx)
+    end;
 % We need to treat an empty array as always true. This will be applied
 % for $or, $in, $all, $nin as well.
 match({[{<<"$and">>, []}]}, _, #ctx{verbose = false}) ->
@@ -710,28 +727,28 @@ match({[{<<"$", _/binary>> = Op, _}]}, _, _) ->
 % We need to traverse value to find field. The call to
 % mango_doc:get_field/2 may return either not_found or
 % bad_path in which case matching fails.
-match({[{Field, Cond}]}, Value, #ctx{verbose = Verb, path = Path} = Ctx) ->
+match({[{Field, Cond}]}, Value, #ctx{verbose = Verb, path = Path, stack = Stack} = Ctx) ->
     InnerCtx = Ctx#ctx{path = [Field | Path]},
-    case mango_doc:get_field(Value, Field) of
-        not_found when Cond == {[{<<"$exists">>, false}]} ->
+    case mango_doc:get_field_with_stack(Value, Field, Stack) of
+        {not_found, _} when Cond == {[{<<"$exists">>, false}]} ->
             case Verb of
                 true -> [];
                 false -> true
             end;
-        not_found ->
+        {not_found, _} ->
             case Verb of
                 true -> [#failure{op = field, type = not_found, ctx = InnerCtx}];
                 false -> false
             end;
-        bad_path ->
+        {bad_path, _} ->
             case Verb of
                 true -> [#failure{op = field, type = bad_path, ctx = InnerCtx}];
                 false -> false
             end;
-        SubValue when Field == <<"_id">> ->
-            match(Cond, SubValue, InnerCtx#ctx{cmp = fun mango_json:cmp_raw/2});
-        SubValue ->
-            match(Cond, SubValue, InnerCtx)
+        {SubValue, NewStack} when Field == <<"_id">> ->
+            match(Cond, SubValue, InnerCtx#ctx{cmp = fun mango_json:cmp_raw/2, stack = NewStack});
+        {SubValue, NewStack} ->
+            match(Cond, SubValue, InnerCtx#ctx{stack = NewStack})
     end;
 match({[_, _ | _] = _Props} = Sel, _Value, _Ctx) ->
     error({unnormalized_selector, Sel}).
@@ -1932,6 +1949,68 @@ match_object_test() ->
     ?assertEqual(false, match_int(SelShort, Doc3)),
     ?assertEqual(true, match_int(SelShort, Doc4)),
     ?assertEqual(false, match_int(SelShort, Doc5)).
+
+match_data_test() ->
+    SelAbs = normalize({[{<<"a">>, {[{<<"$gt">>, {[{<<"$data">>, <<"b">>}]}}]}}]}),
+    ?assertEqual(true, match_int(SelAbs, {[{<<"a">>, 2}, {<<"b">>, 1}]})),
+    ?assertEqual(false, match_int(SelAbs, {[{<<"a">>, 2}, {<<"b">>, 2}]})),
+
+    ?assertEqual(false, match_int(SelAbs, {[{<<"a">>, 2}]})),
+    ?assertMatch(
+        [#failure{op = data, type = not_found, params = [], ctx = #ctx{path = [<<"b">>]}}],
+        match_int(SelAbs, {[{<<"a">>, 2}]}, true)
+    ),
+
+    ?assertEqual(false, match_int(SelAbs, {[{<<"b">>, 2}]})),
+    ?assertMatch(
+        [#failure{op = field, type = not_found, params = [], ctx = #ctx{path = [<<"a">>]}}],
+        match_int(SelAbs, {[{<<"b">>, 2}]}, true)
+    ),
+
+    SelRel = normalize({[{<<"a.b">>, {[{<<"$gt">>, {[{<<"$data">>, <<".c">>}]}}]}}]}),
+    ?assertEqual(true, match_int(SelRel, {[{<<"a">>, {[{<<"b">>, 2}, {<<"c">>, 1}]}}]})),
+    ?assertEqual(false, match_int(SelRel, {[{<<"a">>, {[{<<"b">>, 2}, {<<"c">>, 2}]}}]})),
+
+    SelRelOutOfBounds = normalize({[{<<"a">>, {[{<<"$gt">>, {[{<<"$data">>, <<"..b">>}]}}]}}]}),
+    ?assertEqual(false, match_int(SelRelOutOfBounds, {[{<<"a">>, 1}]})),
+
+    SelRelAllMatch = normalize(
+        {[
+            {<<"a">>,
+                {[
+                    {<<"$allMatch">>,
+                        {[
+                            {<<"b">>, {[{<<"$gt">>, {[{<<"$data">>, <<".c">>}]}}]}}
+                        ]}}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(
+        true,
+        match_int(
+            SelRelAllMatch,
+            {[
+                {<<"a">>, [
+                    {[{<<"b">>, 2}, {<<"c">>, 1}]},
+                    {[{<<"b">>, 5}, {<<"c">>, 3}]},
+                    {[{<<"b">>, 7}, {<<"c">>, 6}]}
+                ]}
+            ]}
+        )
+    ),
+    ?assertEqual(
+        false,
+        match_int(
+            SelRelAllMatch,
+            {[
+                {<<"a">>, [
+                    {[{<<"b">>, 2}, {<<"c">>, 1}]},
+                    {[{<<"b">>, 2}, {<<"c">>, 3}]},
+                    {[{<<"b">>, 7}, {<<"c">>, 6}]}
+                ]}
+            ]}
+        )
+    ).
 
 match_and_test() ->
     % $and with an empty array matches anything

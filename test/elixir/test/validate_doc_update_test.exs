@@ -212,4 +212,45 @@ defmodule ValidateDocUpdateTest do
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
   end
+
+  @tag :with_db
+  test "Mango VDU allows comparisons via $data", context do
+    db = context[:db_name]
+
+    resp = Couch.put("/#{db}/_design/mango-test", body: %{
+      language: "query",
+
+      validate_doc_update: %{
+        "$or" => [
+          %{ "oldDoc" => :null },
+          %{ "oldDoc.tags" => %{ "$size" => 0 } },
+          %{ "newDoc.tags" => %{ "$all" => %{ "$data" => "oldDoc.tags" } } }
+        ]
+      }
+    })
+    assert resp.status_code == 201
+
+    resp = Couch.put("/#{db}/doc", body: %{
+      "tags" => ["a"]
+    })
+    assert resp.status_code == 201
+    rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/doc", query: %{rev: rev}, body: %{
+      "tags" => ["a", "b"]
+    })
+    assert resp.status_code == 201
+    rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/doc", query: %{rev: rev}, body: %{
+      "tags" => ["b", "a", "c"]
+    })
+    assert resp.status_code == 201
+    rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/doc", query: %{rev: rev}, body: %{
+      "tags" => ["b", "c"]
+    })
+    assert resp.status_code == 403
+  end
 end
