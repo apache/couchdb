@@ -21,6 +21,8 @@
 
     get_field/2,
     get_field/3,
+    get_field_with_stack/3,
+    get_field_from_stack/2,
     rem_field/2,
     set_field/3
 ]).
@@ -377,26 +379,31 @@ do_update_to_insert([{_, _} | Rest], Doc) ->
 get_field(Props, Field) ->
     get_field(Props, Field, no_validation).
 
-get_field(Props, Field, Validator) when is_binary(Field) ->
-    {ok, Path} = mango_util:parse_field(Field),
-    get_field(Props, Path, Validator);
-get_field(Props, [], no_validation) ->
-    Props;
-get_field(Props, [], Validator) ->
-    case (catch Validator(Props)) of
+get_field(Props, Field, no_validation) ->
+    {Value, _} = get_field_with_stack(Props, Field, []),
+    Value;
+get_field(Props, Field, Validator) ->
+    {Value, _} = get_field_with_stack(Props, Field, []),
+    case (catch Validator(Value)) of
         true ->
-            Props;
+            Value;
         _ ->
             invalid_value
-    end;
-get_field({Props}, [Name | Rest], Validator) ->
+    end.
+
+get_field_with_stack(Props, Field, Stack) when is_binary(Field) ->
+    {ok, Path} = mango_util:parse_field(Field),
+    get_field_with_stack(Props, Path, Stack);
+get_field_with_stack(Props, [], Stack) ->
+    {Props, Stack};
+get_field_with_stack({Props}, [Name | Rest], Stack) ->
     case lists:keyfind(Name, 1, Props) of
         {Name, Value} ->
-            get_field(Value, Rest, Validator);
+            get_field_with_stack(Value, Rest, [{Props} | Stack]);
         false ->
-            not_found
+            {not_found, [{Props} | Stack]}
     end;
-get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
+get_field_with_stack(Values, [Name | Rest], Stack) when is_list(Values) ->
     % Name might be an integer index into an array
     try
         Pos = binary_to_integer(Name),
@@ -404,16 +411,24 @@ get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
             true ->
                 % +1 because Erlang uses 1 based list indices
                 Value = lists:nth(Pos + 1, Values),
-                get_field(Value, Rest, Validator);
+                get_field_with_stack(Value, Rest, Stack);
             false ->
-                bad_path
+                {bad_path, Stack}
         end
     catch
         error:badarg ->
-            bad_path
+            {bad_path, Stack}
     end;
-get_field(_, [_ | _], _) ->
-    bad_path.
+get_field_with_stack(_, [_ | _], Stack) ->
+    {bad_path, Stack}.
+
+get_field_from_stack([{[{<<"parent">>, N}]} | Rest], Stack) ->
+    case length(Stack) >= N of
+        true -> get_field(lists:nth(N, Stack), Rest);
+        false -> not_found
+    end;
+get_field_from_stack(Path, Stack) ->
+    get_field(lists:last(Stack), Path).
 
 rem_field(Props, Field) when is_binary(Field) ->
     {ok, Path} = mango_util:parse_field(Field),

@@ -164,7 +164,9 @@ DepDescs = [
 {jiffy,            "jiffy",            {tag, "1.1.2"}},
 {mochiweb,         "mochiweb",         {tag, "v3.3.0"}},
 {meck,             "meck",             {tag, "v1.1.0"}},
-{recon,            "recon",            {tag, "2.5.6"}}
+{recon,            "recon",            {tag, "2.5.6"}},
+{argparse,         {url, "https://github.com/max-au/argparse"}, "1.2.4"},
+{erlperf,          {url, "https://github.com/max-au/erlperf"}, "2.3.0"}
 ].
 
 WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.

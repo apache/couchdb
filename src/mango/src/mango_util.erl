@@ -41,6 +41,7 @@
     join/2,
 
     parse_field/1,
+    parse_field/2,
 
     cached_re/2
 ]).
@@ -350,16 +351,36 @@ cached_re(Name, RE) ->
     end.
 
 parse_field(Field) ->
-    case binary:match(Field, <<"\\">>, []) of
-        nomatch ->
-            % Fast path, no regex required
-            {ok, check_non_empty(Field, binary:split(Field, <<".">>, [global]))};
-        _ ->
-            parse_field_slow(Field)
-    end.
+    parse_field(Field, absolute).
+
+parse_field(Field, Mode) ->
+    Parts =
+        case binary:match(Field, <<"\\">>, []) of
+            nomatch ->
+                % Fast path, no regex required
+                binary:split(Field, <<".">>, [global]);
+            _ ->
+                parse_field_slow(Field)
+        end,
+    {Prefix, Path} =
+        case Mode of
+            absolute ->
+                {[], Parts};
+            relative ->
+                lists:foldl(
+                    fun
+                        (<<>>, {[], []}) -> {[{[{<<"parent">>, 1}]}], []};
+                        (<<>>, {[{[{<<"parent">>, N}]}], []}) -> {[{[{<<"parent">>, N + 1}]}], []};
+                        (Pt, {Pre, Pts}) -> {Pre, Pts ++ [Pt]}
+                    end,
+                    {[], []},
+                    Parts
+                )
+        end,
+    {ok, check_non_empty(Field, Prefix ++ Path)}.
 
 parse_field_slow(Field) ->
-    Path = lists:map(
+    lists:map(
         fun
             (P) when P =:= <<>> ->
                 ?MANGO_ERROR({invalid_field_name, Field});
@@ -367,8 +388,7 @@ parse_field_slow(Field) ->
                 re:replace(P, <<"\\\\">>, <<>>, [global, {return, binary}])
         end,
         re:split(Field, <<"(?<!\\\\)\\.">>)
-    ),
-    {ok, Path}.
+    ).
 
 check_non_empty(Field, Parts) ->
     case lists:member(<<>>, Parts) of
