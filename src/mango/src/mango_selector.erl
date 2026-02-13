@@ -38,7 +38,7 @@ normalize(Selector) ->
     ],
     {NProps} = lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps),
     FieldNames = [Name || {Name, _} <- NProps],
-    case lists:member(<<>>, FieldNames) of
+    case lists:member([], FieldNames) of
         true ->
             ?MANGO_ERROR({invalid_selector, missing_field_name});
         false ->
@@ -210,7 +210,7 @@ norm_ops(Value) ->
 norm_fields({[]}) ->
     {[]};
 norm_fields(Selector) ->
-    norm_fields(Selector, <<>>).
+    norm_fields(Selector, []).
 
 % Operators where we can push the field names further
 % down the operator tree
@@ -237,7 +237,7 @@ norm_fields({[{<<"$keyMapMatch">>, Arg}]}, Path) ->
 % $default field. This also asserts that the $default
 % field is at the root as well as that it only has
 % a $text operator applied.
-norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]} = Sel, <<>>) ->
+norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]} = Sel, []) ->
     Sel;
 norm_fields({[{<<"$default">>, _}]} = Selector, _) ->
     ?MANGO_ERROR({bad_field, Selector});
@@ -249,12 +249,11 @@ norm_fields({[{<<"$", _/binary>>, _}]} = Cond, Path) ->
 % We've found a field name. Append it to the path
 % and skip this node as we unroll the stack as
 % the full path will be further down the branch.
-norm_fields({[{Field, Cond}]}, <<>>) ->
-    % Don't include the '.' for the first element of
-    % the path.
-    norm_fields(Cond, Field);
-norm_fields({[{Field, Cond}]}, Path) ->
-    norm_fields(Cond, <<Path/binary, ".", Field/binary>>);
+norm_fields({[{Field, Cond}]}, Path) when is_binary(Field) ->
+    {ok, F} = mango_util:parse_field(Field),
+    norm_fields({[{F, Cond}]}, Path);
+norm_fields({[{Field, Cond}]}, Path) when is_list(Field) ->
+    norm_fields(Cond, Path ++ Field);
 % An empty selector
 norm_fields({[]}, Path) ->
     {Path, {[]}};
@@ -575,7 +574,9 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
 % match against.
 
 has_required_fields(Selector, RequiredFields) ->
-    Remainder = has_required_fields_int(Selector, RequiredFields),
+    Paths0 = [mango_util:parse_field(F) || F <- RequiredFields],
+    Paths = [P || {ok, P} <- Paths0],
+    Remainder = has_required_fields_int(Selector, Paths),
     Remainder == [].
 
 % Empty selector
@@ -634,6 +635,9 @@ has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     end.
 
 % Returns true if a field in the selector is a constant value e.g. {a: {$eq: 1}}
+is_constant_field(Selector, Field) when not is_list(Field) ->
+    {ok, Path} = mango_util:parse_field(Field),
+    is_constant_field(Selector, Path);
 is_constant_field({[]}, _Field) ->
     false;
 is_constant_field(Selector, Field) when not is_list(Selector) ->
@@ -653,7 +657,7 @@ is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
 fields({[{<<"$", _/binary>>, Args}]}) when is_list(Args) ->
     lists:flatmap(fun fields/1, Args);
 fields({[{Field, _Cond}]}) ->
-    [Field];
+    [mango_util:join_field(Field)];
 fields({[]}) ->
     [].
 
@@ -1086,5 +1090,92 @@ match_beginswith_test() ->
         {mango_error, mango_selector, {bad_arg, '$beginsWith', InvalidArg}},
         check_beginswith(<<"user_id">>, InvalidArg)
     ).
+
+bench(Cases) ->
+    Benches = lists:map(
+        fun({_, Sel0, Doc}) ->
+            Sel = normalize(Sel0),
+            #{runner => fun() -> match_int(Sel, Doc) end}
+        end,
+        Cases
+    ),
+    Results = erlperf:compare(Benches, #{}),
+    ?debugFmt("", []),
+    lists:foreach(
+        fun({{Name, _, _}, Result}) ->
+            ?debugFmt("bench [~s] = ~p", [Name, Result])
+        end,
+        lists:zip(Cases, Results)
+    ).
+
+bench_test() ->
+    bench([
+        {
+            "1 field",
+            {[{<<"a">>, 1}]},
+            {[{<<"a">>, 1}]}
+        },
+        {
+            "3 sibling fields",
+            {[{<<"a">>, 1}, {<<"b">>, 2}, {<<"c">>, 3}]},
+            {[{<<"a">>, 1}, {<<"b">>, 2}, {<<"c">>, 3}]}
+        },
+        {
+            "3 nested fields",
+            {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 1}]}}]}}]},
+            {[{<<"a">>, {[{<<"b">>, {[{<<"c">>, 1}]}}]}}]}
+        },
+        {
+            "allMatch: 1 field",
+            {[
+                {<<"a">>,
+                    {[
+                        {<<"$allMatch">>,
+                            {[
+                                {<<"b">>, {[{<<"$gt">>, 0}]}}
+                            ]}}
+                    ]}}
+            ]},
+            {[
+                {<<"a">>, [{[{<<"b">>, N}]} || N <- lists:seq(1, 10)]}
+            ]}
+        },
+        {
+            "allMatch: 3 sibling fields",
+            {[
+                {<<"a">>,
+                    {[
+                        {<<"$allMatch">>,
+                            {[
+                                {<<"b">>, {[{<<"$gt">>, 0}]}},
+                                {<<"c">>, {[{<<"$gt">>, 0}]}},
+                                {<<"d">>, {[{<<"$gt">>, 0}]}}
+                            ]}}
+                    ]}}
+            ]},
+            {[
+                {<<"a">>, [
+                    {[{<<"b">>, N}, {<<"c">>, N}, {<<"d">>, N}]}
+                 || N <- lists:seq(1, 10)
+                ]}
+            ]}
+        },
+        {
+            "allMatch: 3 nested fields",
+            {[
+                {<<"a">>,
+                    {[
+                        {<<"$allMatch">>,
+                            {[{<<"b">>, {[{<<"c">>, {[{<<"d">>, {[{<<"$gt">>, 0}]}}]}}]}}]}}
+                    ]}}
+            ]},
+            {[
+                {<<"a">>, [
+                    {[{<<"b">>, {[{<<"c">>, {[{<<"d">>, N}]}}]}}]}
+                 || N <- lists:seq(1, 10)
+                ]}
+            ]}
+        }
+    ]).
 
 -endif.
