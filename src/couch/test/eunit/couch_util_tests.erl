@@ -206,3 +206,83 @@ ejson_to_map_test() ->
     ?assertEqual(#{a => 1, b => 2}, couch_util:ejson_to_map({[{b, 2}, {a, 1}]})),
     ?assertEqual(#{<<"a">> => [1, #{}]}, couch_util:ejson_to_map({[{<<"a">>, [1, {[]}]}]})),
     ?assertEqual([#{true => 1}], couch_util:ejson_to_map([{[{true, 1}]}])).
+
+hibernate_after_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?TDEF_FE(t_hibernate),
+            ?TDEF_FE(t_do_not_hibernate)
+        ]
+    }.
+
+setup() ->
+    test_util:start_applications([config]).
+
+teardown(Ctx) ->
+    config:delete("hibernate_after", "couch_work_queue", false),
+    test_util:stop_applications(Ctx).
+
+t_hibernate(_) ->
+    ?assertEqual([{hibernate_after, 5000}], hibernate_cfg()),
+
+    % Set non-default value
+    config:set("hibernate_after", "couch_work_queue", "100", false),
+    ?assertEqual([{hibernate_after, 100}], hibernate_cfg()),
+
+    {ok, Q} = couch_work_queue:new([]),
+    % Enqueue item, creating gen_server activity
+    ok = couch_work_queue:queue(Q, potato),
+
+    % Assert that we eventually hibernate
+    wait_hibernate(Q),
+    {current_function, {_, F, _}} = process_info(Q, current_function),
+    % Note: different versions of OTP hibernate at a different function
+    ?assert(hibernate == F orelse loop_hibernate == F),
+
+    % We can wait wake up from hibernation and get back to work
+    ?assertEqual({ok, [potato]}, couch_work_queue:dequeue(Q)),
+
+    % Then we can get back into hibernatation
+    wait_hibernate(Q),
+    {current_function, {_, F, _}} = process_info(Q, current_function),
+    ?assert(hibernate == F orelse loop_hibernate == F),
+
+    couch_work_queue:close(Q).
+
+t_do_not_hibernate(_) ->
+    config:set("hibernate_after", "couch_work_queue", "infinity", false),
+    ?assertEqual([], hibernate_cfg()),
+
+    {ok, Q} = couch_work_queue:new([]),
+
+    % Enqueue item, creating some gen_server activity
+    ok = couch_work_queue:queue(Q, potato),
+
+    % Assert that we do not hibernate
+    timer:sleep(200),
+    {current_function, {_, F, _}} = process_info(Q, current_function),
+    ?assertNot(hibernate == F orelse loop_hibernate == F),
+
+    % The queue works as expected without hibernation
+    ?assertEqual({ok, [potato]}, couch_work_queue:dequeue(Q)),
+
+    couch_work_queue:close(Q).
+
+% Helper functions
+
+hibernate_cfg() ->
+    couch_util:hibernate_after(couch_work_queue).
+
+wait_hibernate(Pid) ->
+    WaitFun = fun() ->
+        {current_function, {M, F, _}} = process_info(Pid, current_function),
+        case {M, F} of
+            {erlang, hibernate} -> ok;
+            {gen_server, loop_hibernate} -> ok;
+            {_, _} -> wait
+        end
+    end,
+    test_util:wait(WaitFun).
