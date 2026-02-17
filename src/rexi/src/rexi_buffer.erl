@@ -42,7 +42,8 @@
 }).
 
 start_link(ServerId) ->
-    gen_server:start_link({local, ServerId}, ?MODULE, [ServerId], []).
+    GenOpts = couch_util:hibernate_after(?MODULE),
+    gen_server:start_link({local, ServerId}, ?MODULE, [ServerId], GenOpts).
 
 send(Dest, Msg) ->
     Server = list_to_atom(lists:concat([rexi_buffer, "_", get_node(Dest)])),
@@ -90,9 +91,10 @@ handle_info(timeout, #state{sender = nil, count = C} = State) when C > 0 ->
     counters:add(Counter, 1, -1),
     case erlang:send(Dest, Msg, [noconnect, nosuspend]) of
         ok when C =:= 1 ->
-            % We just sent the last queued messsage, we'll use this opportunity
-            % to hibernate the process and run a garbage collection
-            {noreply, NewState, hibernate};
+            % We just sent the last queued messsage. If we stay idle for a
+            % while, as configured via couch_util:hibernate_after/2 we'll go
+            % into hibernation.
+            {noreply, NewState};
         ok when C > 1 ->
             % Use a zero timeout to recurse into this handler ASAP
             {noreply, NewState, 0};

@@ -34,7 +34,8 @@
 }).
 
 new(Options) ->
-    gen_server:start_link(couch_work_queue, Options, []).
+    GenOpts = couch_util:hibernate_after(?MODULE),
+    gen_server:start_link(couch_work_queue, Options, GenOpts).
 
 queue(Wq, Item) when is_binary(Item) ->
     gen_server:call(Wq, {queue, Item, byte_size(Item)}, infinity);
@@ -73,7 +74,7 @@ init(Options) ->
         max_size = couch_util:get_value(max_size, Options, nil),
         max_items = couch_util:get_value(max_items, Options, nil)
     },
-    {ok, Q, hibernate}.
+    {ok, Q}.
 
 terminate(_Reason, #q{worker = undefined}) ->
     ok;
@@ -87,18 +88,13 @@ handle_call({queue, Item, Size}, From, #q{worker = undefined} = Q0) ->
         items = Q0#q.items + 1,
         queue = queue:in({Item, Size}, Q0#q.queue)
     },
-    case
-        (Q#q.size >= Q#q.max_size) orelse
-            (Q#q.items >= Q#q.max_items)
-    of
-        true ->
-            {noreply, Q#q{blocked = [From | Q#q.blocked]}, hibernate};
-        false ->
-            {reply, ok, Q, hibernate}
+    case (Q#q.size >= Q#q.max_size) orelse (Q#q.items >= Q#q.max_items) of
+        true -> {noreply, Q#q{blocked = [From | Q#q.blocked]}};
+        false -> {reply, ok, Q}
     end;
 handle_call({queue, Item, _}, _From, #q{worker = {W, _Max}} = Q) ->
     gen_server:reply(W, {ok, [Item]}),
-    {reply, ok, Q#q{worker = undefined}, hibernate};
+    {reply, ok, Q#q{worker = undefined}};
 handle_call({dequeue, _Max}, _From, #q{worker = {_, _}}) ->
     % Something went wrong - the same or a different worker is
     % trying to dequeue an item. We only allow one worker to wait
