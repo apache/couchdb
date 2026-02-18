@@ -22,7 +22,10 @@
     doc_count,
     w,
     grouped_docs,
-    reply
+    reply,
+    dbname,
+    update_options = [],
+    started = []
 }).
 
 go(_, [], _) ->
@@ -33,10 +36,8 @@ go(DbName, AllDocs0, Opts) ->
     validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
     Options = lists:delete(all_or_nothing, Opts),
     GroupedDocs = lists:map(
-        fun({#shard{name = Name, node = Node} = Shard, Docs}) ->
-            Docs1 = untag_docs(Docs),
-            Ref = rexi:cast(Node, {fabric_rpc, update_docs, [Name, Docs1, Options]}),
-            {Shard#shard{ref = Ref}, Docs}
+        fun({#shard{} = Shard, Docs}) ->
+            {Shard#shard{ref = make_ref()}, Docs}
         end,
         group_docs_by_shard(DbName, AllDocs)
     ),
@@ -47,10 +48,13 @@ go(DbName, AllDocs0, Opts) ->
         doc_count = length(AllDocs),
         w = fabric_util:w_from_opts(DbName, Options),
         grouped_docs = GroupedDocs,
-        reply = dict:new()
+        reply = dict:new(),
+        dbname = DbName,
+        update_options = Options
     },
     Timeout = fabric_util:request_timeout(),
-    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
+    Acc1 = start_workers(Acc0),
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc1, infinity, Timeout) of
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
@@ -349,6 +353,31 @@ validate_atomic_update(_DbName, AllDocs, true) ->
         AllDocs
     ),
     throw({aborted, PreCommitFailures}).
+
+start_workers(#acc{} = Acc) ->
+    lists:foldl(
+        fun({Worker, Docs}, AccIn) ->
+            start_worker(Worker, Docs, AccIn)
+        end,
+        Acc,
+        Acc#acc.grouped_docs
+    ).
+
+start_worker(#shard{ref = Ref} = Worker, Docs, #acc{} = Acc) when is_reference(Ref) ->
+    #shard{name = Name, node = Node} = Worker,
+    #acc{update_options = UpdateOptions} = Acc,
+    case lists:member(Ref, Acc#acc.started) of
+        true ->
+            Acc;
+        false ->
+            Ref = rexi:cast_ref(
+                Ref, Node, {fabric_rpc, update_docs, [Name, untag_docs(Docs), UpdateOptions]}
+            ),
+            Acc#acc{started = [Ref | Acc#acc.started]}
+    end;
+start_worker(#shard{}, _Docs, #acc{} = Acc) ->
+    %% for unit tests below.
+    Acc.
 
 -ifdef(TEST).
 
