@@ -42,7 +42,7 @@ public final class IndexHealthCheck extends HealthCheck {
         indexResource.createIndex(name, new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null));
         try {
             final DocumentUpdateRequest documentUpdateRequest =
-                    new DocumentUpdateRequest(0, 1, null, Collections.emptyList());
+                    new DocumentUpdateRequest("foo", 0, 1, null, Collections.emptyList());
             indexResource.updateDoc(name, "foo", documentUpdateRequest);
 
             final SearchRequest searchRequest = new SearchRequest();

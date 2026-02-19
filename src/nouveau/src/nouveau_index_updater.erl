@@ -27,6 +27,7 @@
 -import(nouveau_util, [index_path/1]).
 
 -record(acc, {
+    pool_stream_ref,
     db,
     index,
     proc,
@@ -80,14 +81,15 @@ update(#index{} = Index) ->
                     index_update_seq = IndexUpdateSeq,
                     index_purge_seq = IndexPurgeSeq
                 },
-                {ok, PurgeAcc1} = purge_index(Db, Index, PurgeAcc0),
-
+                {async, PoolStreamRef} = nouveau_api:start_update(Index),
+                {ok, PurgeAcc1} = purge_index(PoolStreamRef, Db, Index, PurgeAcc0),
                 NewCurSeq = couch_db:get_update_seq(Db),
                 Proc = get_os_process(Index#index.def_lang),
                 try
                     true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
 
                     Acc0 = #acc{
+                        pool_stream_ref = PoolStreamRef,
                         db = Db,
                         index = Index,
                         proc = Proc,
@@ -99,8 +101,10 @@ update(#index{} = Index) ->
                     {ok, Acc1} = couch_db:fold_changes(
                         Db, Acc0#acc.update_seq, fun load_docs/2, Acc0, []
                     ),
-                    exit(nouveau_api:set_update_seq(Index, Acc1#acc.update_seq, NewCurSeq))
+		    nouveau_api:set_update_seq(PoolStreamRef, Acc1#acc.update_seq, NewCurSeq),
+                    exit(nouveau_api:end_update(PoolStreamRef))
                 after
+		    gun_pool:cancel(PoolStreamRef),
                     ret_os_process(Proc)
                 end
         end
@@ -125,8 +129,8 @@ load_docs(FDI, #acc{} = Acc1) ->
             false ->
                 case
                     update_or_delete_index(
+                        Acc1#acc.pool_stream_ref,
                         Acc1#acc.db,
-                        Acc1#acc.index,
                         Acc1#acc.update_seq,
                         DI,
                         Acc1#acc.proc
@@ -142,11 +146,11 @@ load_docs(FDI, #acc{} = Acc1) ->
         end,
     {ok, Acc2#acc{changes_done = Acc2#acc.changes_done + 1}}.
 
-update_or_delete_index(Db, #index{} = Index, MatchSeq, #doc_info{} = DI, Proc) ->
+update_or_delete_index(PoolStreamRef, Db, MatchSeq, #doc_info{} = DI, Proc) ->
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]} = DI,
     case Del of
         true ->
-            nouveau_api:delete_doc(Index, Id, MatchSeq, Seq);
+            nouveau_api:delete_doc(PoolStreamRef, Id, MatchSeq, Seq);
         false ->
             {ok, Doc} = couch_db:open_doc(Db, DI, []),
             Json = couch_doc:to_json_obj(Doc, []),
@@ -160,10 +164,10 @@ update_or_delete_index(Db, #index{} = Index, MatchSeq, #doc_info{} = DI, Proc) -
                 end,
             case Fields of
                 [] ->
-                    nouveau_api:delete_doc(Index, Id, MatchSeq, Seq);
+                    nouveau_api:delete_doc(PoolStreamRef, Id, MatchSeq, Seq);
                 _ ->
                     nouveau_api:update_doc(
-                        Index, Id, MatchSeq, Seq, Partition, Fields
+                        PoolStreamRef, Id, MatchSeq, Seq, Partition, Fields
                     )
             end
     end.
@@ -209,7 +213,7 @@ index_definition(#index{} = Index) ->
         <<"field_analyzers">> => Index#index.field_analyzers
     }.
 
-purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
+purge_index(PoolStreamRef, Db, Index, #purge_acc{} = PurgeAcc0) ->
     Proc = get_os_process(Index#index.def_lang),
     try
         true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
@@ -218,7 +222,7 @@ purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
                 case couch_db:get_full_doc_info(Db, Id) of
                     not_found ->
                         ok = nouveau_api:purge_doc(
-                            Index, Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
+                            PoolStreamRef, Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
                         ),
                         PurgeAcc1#purge_acc{index_purge_seq = PurgeSeq};
                     FDI ->
@@ -229,8 +233,8 @@ purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
                                 PurgeAcc1;
                             false ->
                                 update_or_delete_index(
+                                    PoolStreamRef,
                                     Db,
-                                    Index,
                                     PurgeAcc1#purge_acc.index_update_seq,
                                     DI,
                                     Proc
@@ -250,7 +254,7 @@ purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
         ),
         DbPurgeSeq = couch_db:get_purge_seq(Db),
         ok = nouveau_api:set_purge_seq(
-            Index, PurgeAcc3#purge_acc.index_purge_seq, DbPurgeSeq
+            PoolStreamRef, PurgeAcc3#purge_acc.index_purge_seq, DbPurgeSeq
         ),
         update_local_doc(Db, Index, DbPurgeSeq),
         {ok, PurgeAcc3}

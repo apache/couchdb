@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Positive;
 import java.util.OptionalLong;
 
-public final class IndexInfoRequest {
+public final class IndexInfoRequest extends UpdateRequest {
 
     private final OptionalLong matchUpdateSeq;
 

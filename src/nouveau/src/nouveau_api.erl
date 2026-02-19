@@ -26,6 +26,8 @@
     delete_doc/4,
     purge_doc/4,
     update_doc/6,
+    start_update/1,
+    end_update/1,
     search/2,
     set_purge_seq/3,
     set_update_seq/3,
@@ -34,6 +36,7 @@
 ]).
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
+-define(JSON_SEQ_CONTENT_TYPE, {"Content-Type", "application/json-seq"}).
 
 analyze(Text, Analyzer) when
     is_binary(Text), is_binary(Analyzer)
@@ -99,41 +102,54 @@ delete_path(Path, Exclusions) when
             send_error(Reason)
     end.
 
-delete_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq) when
+delete_doc({_, _} = PoolStreamRef, DocId, MatchSeq, UpdateSeq) when
     is_binary(DocId),
     is_integer(MatchSeq),
     MatchSeq >= 0,
     is_integer(UpdateSeq),
     UpdateSeq > 0
 ->
-    ReqBody = #{match_seq => MatchSeq, seq => UpdateSeq, purge => false},
-    Resp = send_if_enabled(
-        doc_path(Index, DocId),
-        [?JSON_CONTENT_TYPE],
-        <<"DELETE">>,
-        jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
+    Row = #{
+        <<"@type">> => delete,
+        doc_id => DocId,
+        match_seq => MatchSeq,
+        seq => UpdateSeq,
+        purge => false
+    },
+    ok = gun_pool:data(PoolStreamRef, nofin, encode_json_seq(Row)),
+    check_status(PoolStreamRef).
 
-purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
+purge_doc({_, _} = PoolStreamRef, DocId, MatchSeq, PurgeSeq) when
     is_binary(DocId),
     is_integer(MatchSeq),
     MatchSeq >= 0,
     is_integer(PurgeSeq),
     PurgeSeq > 0
 ->
-    ReqBody = #{match_seq => MatchSeq, seq => PurgeSeq, purge => true},
-    Resp = send_if_enabled(
-        doc_path(Index, DocId), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(ReqBody)
-    ),
-    case Resp of
+    Row = #{
+        <<"@type">> => delete,
+        doc_id => DocId,
+        match_seq => MatchSeq,
+        seq => PurgeSeq,
+        purge => true
+    },
+    ok = gun_pool:data(PoolStreamRef, nofin, encode_json_seq(Row)),
+    check_status(PoolStreamRef).
+
+start_update(#index{} = Index) ->
+    case nouveau:enabled() of
+        true ->
+            gun_pool:post(
+                update_path(Index),
+                [nouveau_gun:host_header(), ?JSON_SEQ_CONTENT_TYPE]
+            );
+        false ->
+            {error, nouveau_not_enabled}
+    end.
+
+end_update({_, _} = PoolStreamRef) ->
+    ok = gun_pool:data(PoolStreamRef, fin, <<>>),
+    case await(PoolStreamRef) of
         {ok, 200, _, _} ->
             ok;
         {ok, StatusCode, _, RespBody} ->
@@ -142,7 +158,7 @@ purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
             send_error(Reason)
     end.
 
-update_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
+update_doc({_, _} = PoolStreamRef, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
     is_binary(DocId),
     is_integer(MatchSeq),
     MatchSeq >= 0,
@@ -151,26 +167,16 @@ update_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
     (is_binary(Partition) orelse Partition == null),
     is_list(Fields)
 ->
-    ReqBody = #{
+    Row = #{
+        <<"@type">> => update,
+        doc_id => DocId,
         match_seq => MatchSeq,
         seq => UpdateSeq,
         partition => Partition,
         fields => Fields
     },
-    Resp = send_if_enabled(
-        doc_path(Index, DocId),
-        [?JSON_CONTENT_TYPE],
-        <<"PUT">>,
-        jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
+    ok = gun_pool:data(PoolStreamRef, nofin, encode_json_seq(Row)),
+    check_status(PoolStreamRef).
 
 search(#index{} = Index, QueryArgs) ->
     Resp = send_if_enabled(
@@ -188,32 +194,23 @@ search(#index{} = Index, QueryArgs) ->
             send_error(Reason)
     end.
 
-set_update_seq(#index{} = Index, MatchSeq, UpdateSeq) ->
-    ReqBody = #{
+set_update_seq({_, _} = PoolStreamRef, MatchSeq, UpdateSeq) ->
+    Row = #{
+	<<"@type">> => index_info,
         match_update_seq => MatchSeq,
         update_seq => UpdateSeq
     },
-    set_seq(Index, ReqBody).
+    ok = gun_pool:data(PoolStreamRef, nofin, encode_json_seq(Row)),
+    check_status(PoolStreamRef).
 
-set_purge_seq(#index{} = Index, MatchSeq, PurgeSeq) ->
-    ReqBody = #{
+set_purge_seq({_, _} = PoolStreamRef, MatchSeq, PurgeSeq) ->
+    Row = #{
+	<<"@type">> => index_info,
         match_purge_seq => MatchSeq,
         purge_seq => PurgeSeq
     },
-    set_seq(Index, ReqBody).
-
-set_seq(#index{} = Index, ReqBody) ->
-    Resp = send_if_enabled(
-        index_path(Index), [?JSON_CONTENT_TYPE], <<"POST">>, jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
+    ok = gun_pool:data(PoolStreamRef, nofin, encode_json_seq(Row)),
+    check_status(PoolStreamRef).
 
 supported_lucene_versions() ->
     Resp = send_if_enabled(<<"/">>, [], <<"GET">>),
@@ -234,16 +231,11 @@ index_path(Path) when is_binary(Path) ->
 index_path(#index{} = Index) ->
     [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
 
-doc_path(#index{} = Index, DocId) ->
-    [
-        <<"/index/">>,
-        couch_util:url_encode(nouveau_util:index_name(Index)),
-        <<"/doc/">>,
-        couch_util:url_encode(DocId)
-    ].
-
 search_path(#index{} = Index) ->
     [index_path(Index), <<"/search">>].
+
+update_path(#index{} = Index) ->
+    [index_path(Index), <<"/update">>].
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};
@@ -291,20 +283,7 @@ send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries) ->
                 )
             of
                 {async, PoolStreamRef} ->
-                    Timeout = config:get_integer("nouveau", "request_timeout", 30000),
-                    case gun_pool:await(PoolStreamRef, Timeout) of
-                        {response, fin, Status, RespHeaders} ->
-                            {ok, Status, RespHeaders, []};
-                        {response, nofin, Status, RespHeaders} ->
-                            case gun_pool:await_body(PoolStreamRef, Timeout) of
-                                {ok, RespBody} ->
-                                    {ok, Status, RespHeaders, RespBody};
-                                {error, Reason} ->
-                                    {error, Reason}
-                            end;
-                        {error, Reason} ->
-                            {error, Reason}
-                    end;
+                    await(PoolStreamRef);
                 {error, no_connection_available, _Reason} when RemainingTries > 0 ->
                     timer:sleep(1000),
                     send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries - 1);
@@ -313,4 +292,51 @@ send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries) ->
             end;
         false ->
             {error, nouveau_not_enabled}
+    end.
+
+await(PoolStreamRef) ->
+    Timeout = config:get_integer("nouveau", "request_timeout", 30000),
+    await(PoolStreamRef, Timeout).
+
+await({ConnPid, _} = PoolStreamRef, Timeout) ->
+    MRef = monitor(process, ConnPid),
+    T0 = now_ms(),
+    Res =
+        case gun_pool:await(PoolStreamRef, Timeout, MRef) of
+            {response, fin, Status, RespHeaders} ->
+                {ok, Status, RespHeaders, []};
+            {response, nofin, Status, RespHeaders} ->
+                Elapsed = now_ms() - T0,
+                case gun_pool:await_body(PoolStreamRef, max(0, Timeout - Elapsed), MRef) of
+                    {ok, RespBody} ->
+                        {ok, Status, RespHeaders, RespBody};
+                    {'DOWN', MRef, process, ConnPid, Reason} ->
+                        {error, Reason};
+                    {error, Reason} ->
+                        {error, Reason}
+                end;
+            {'DOWN', MRef, process, ConnPid, Reason} ->
+                {error, Reason};
+            {error, Reason} ->
+                {error, Reason}
+        end,
+    demonitor(MRef, [flush]),
+    Res.
+
+now_ms() ->
+    erlang:monotonic_time(millisecond).
+
+encode_json_seq(Data) ->
+    [$\x{1e}, jiffy:encode(Data), $\n].
+
+check_status({_, _} = PoolStreamRef) ->
+    case await(PoolStreamRef, 0) of
+        {error, timeout} ->
+            ok;
+        {ok, 200, _, _} ->
+            ok;
+        {ok, StatusCode, _, RespBody} ->
+            {error, jaxrs_error(StatusCode, RespBody)};
+        {error, Reason} ->
+            send_error(Reason)
     end.
