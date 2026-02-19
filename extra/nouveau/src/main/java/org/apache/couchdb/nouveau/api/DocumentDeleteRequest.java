@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
-public final class DocumentDeleteRequest {
+public final class DocumentDeleteRequest extends DocumentRequest {
 
     @PositiveOrZero
     private final long matchSeq;
@@ -28,9 +28,11 @@ public final class DocumentDeleteRequest {
     private final boolean purge;
 
     public DocumentDeleteRequest(
+            @JsonProperty("doc_id") final String id,
             @JsonProperty("match_seq") final long matchSeq,
             @JsonProperty("seq") final long seq,
             @JsonProperty("purge") final boolean purge) {
+        super(id);
         if (matchSeq < 0) {
             throw new IllegalArgumentException("matchSeq must be 0 or greater");
         }

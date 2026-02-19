@@ -77,7 +77,7 @@ public class NouveauApplication extends Application<NouveauApplicationConfigurat
         environment.jersey().register(analyzeResource);
 
         // IndexResource
-        final IndexResource indexResource = new IndexResource(indexManager);
+        final IndexResource indexResource = new IndexResource(indexManager, environment.getObjectMapper());
         environment.jersey().register(indexResource);
 
         // Health checks

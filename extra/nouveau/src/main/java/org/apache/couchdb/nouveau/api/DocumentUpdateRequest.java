@@ -20,7 +20,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.util.Collection;
 
-public final class DocumentUpdateRequest {
+public final class DocumentUpdateRequest extends DocumentRequest {
 
     @PositiveOrZero
     private final long matchSeq;
@@ -35,10 +35,12 @@ public final class DocumentUpdateRequest {
     private final Collection<Field> fields;
 
     public DocumentUpdateRequest(
+            @JsonProperty("doc_id") final String id,
             @JsonProperty("match_seq") final long matchSeq,
             @JsonProperty("seq") final long seq,
             @JsonProperty("partition") final String partition,
             @JsonProperty("fields") final Collection<Field> fields) {
+        super(id);
         this.matchSeq = matchSeq;
         this.seq = seq;
         this.partition = partition;

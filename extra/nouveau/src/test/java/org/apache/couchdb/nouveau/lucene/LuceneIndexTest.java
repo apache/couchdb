@@ -77,7 +77,7 @@ public class LuceneIndexTest {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
                 final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
-                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(null, i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
@@ -97,7 +97,7 @@ public class LuceneIndexTest {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
                 final Collection<Field> fields = List.of(new StringField("foo", "bar", false));
-                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(null, i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
@@ -118,7 +118,7 @@ public class LuceneIndexTest {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
                 final Collection<Field> fields = List.of(new StringField("bar", "baz", false));
-                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(null, i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
@@ -139,7 +139,7 @@ public class LuceneIndexTest {
             final int count = 100;
             for (int i = 1; i <= count; i++) {
                 final Collection<Field> fields = List.of(new DoubleField("bar", (double) i, false));
-                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(null, i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
             final SearchRequest request = new SearchRequest();
@@ -164,13 +164,13 @@ public class LuceneIndexTest {
             final int count = 50;
             for (int i = 1; i <= count; i++) {
                 final Collection<Field> fields = List.of(new StringField("bar", "bar", false));
-                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(null, i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
 
             for (int i = count + 1; i <= (count * 2) + 5; i++) {
                 final Collection<Field> fields = List.of(new StringField("bar", "baz", false));
-                final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
+                final DocumentUpdateRequest request = new DocumentUpdateRequest(null, i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
 
@@ -195,15 +195,15 @@ public class LuceneIndexTest {
             // get match seq wrong
             assertThrows(
                     UpdatesOutOfOrderException.class,
-                    () -> index.update("foo", new DocumentUpdateRequest(1, 2, null, fields)));
+                    () -> index.update("foo", new DocumentUpdateRequest(null, 1, 2, null, fields)));
 
             // Go to 2.
-            index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
+            index.update("foo", new DocumentUpdateRequest(null, 0, 2, null, fields));
 
             // Should be prevented from going down to 1.
             assertThrows(
                     UpdatesOutOfOrderException.class,
-                    () -> index.update("foo", new DocumentUpdateRequest(2, 1, null, fields)));
+                    () -> index.update("foo", new DocumentUpdateRequest(null, 2, 1, null, fields)));
         } finally {
             cleanup(index);
         }
@@ -235,7 +235,7 @@ public class LuceneIndexTest {
             assertThat(info.getUpdateSeq()).isEqualTo(0);
 
             final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
-            index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
+            index.update("foo", new DocumentUpdateRequest(null, 0, 2, null, fields));
             index.commit();
 
             info = index.info();
@@ -252,13 +252,13 @@ public class LuceneIndexTest {
         Index index = setup(path);
         try {
             final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
-            index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
+            index.update("foo", new DocumentUpdateRequest(null, 0, 2, null, fields));
             index.commit();
 
             IndexInfo info = index.info();
             assertThat(info.getNumDocs()).isEqualTo(1);
 
-            index.delete("foo", new DocumentDeleteRequest(2, 3, false));
+            index.delete("foo", new DocumentDeleteRequest(null, 2, 3, false));
             index.commit();
 
             info = index.info();
@@ -274,13 +274,13 @@ public class LuceneIndexTest {
         Index index = setup(path);
         try {
             final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
-            index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
+            index.update("foo", new DocumentUpdateRequest(null, 0, 2, null, fields));
             index.commit();
 
             IndexInfo info = index.info();
             assertThat(info.getNumDocs()).isEqualTo(1);
 
-            index.delete("foo", new DocumentDeleteRequest(0, 3, true));
+            index.delete("foo", new DocumentDeleteRequest(null, 0, 3, true));
             index.commit();
 
             info = index.info();
