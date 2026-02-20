@@ -191,15 +191,15 @@ meta = [
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
   // use QuickJS for now
-  //
-  'freebsd-arm64': [
-     name: 'FreeBSD ARM64 QuickJS',
-     disable_spidermonkey: true,
-     with_clouseau: true,
-     clouseau_java_home: '/usr/local/openjdk21',
-     quickjs_test262: false,
-     gnu_make: 'gmake'
-  ],
+  // Temporarily disabled because on too slow a host
+  // 'freebsd-arm64': [
+  //    name: 'FreeBSD ARM64 QuickJS',
+  //    disable_spidermonkey: true,
+  //    with_clouseau: true,
+  //    clouseau_java_home: '/usr/local/openjdk21',
+  //    quickjs_test262: false,
+  //    gnu_make: 'gmake'
+  // ],
 
   'macos': [
      name: 'macOS',
