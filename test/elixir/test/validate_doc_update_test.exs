@@ -253,4 +253,74 @@ defmodule ValidateDocUpdateTest do
     })
     assert resp.status_code == 403
   end
+
+  @tag :with_db
+  test "Mango VDU provides access to the user context", context do
+    db = context[:db_name]
+    admin_name = System.get_env("EX_USERNAME") || "adm"
+
+    resp = Couch.put("/#{db}/_design/mango-test", body: %{
+      language: "query",
+
+      validate_doc_update: %{
+        "userCtx" => %{"name" => admin_name}
+      }
+    })
+    assert resp.status_code == 201
+    design_rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/doc", body: %{})
+    assert resp.status_code == 201
+    doc_rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/_design/mango-test", query: %{rev: design_rev}, body: %{
+      language: "query",
+
+      validate_doc_update: %{
+        "userCtx" => %{"name" => "no-such-user"}
+      }
+    })
+    assert resp.status_code == 201
+
+    resp = Couch.put("/#{db}/doc", query: %{rev: doc_rev}, body: %{})
+    assert resp.status_code == 403
+  end
+
+  @tag :with_db
+  test "Mango VDU provides access to the security object", context do
+    db = context[:db_name]
+
+    resp = Couch.put("/#{db}/_security", body: %{
+      "admins" => %{
+        "roles" => ["_admin"]
+      }
+    })
+    assert resp.status_code == 200
+
+    resp = Couch.put("/#{db}/_design/mango-test", body: %{
+      language: "query",
+
+      validate_doc_update: %{
+        "security.admins.roles" => %{"$all" => ["_admin"]}
+      }
+    })
+    assert resp.status_code == 201
+    design_rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/doc", body: %{})
+    assert resp.status_code == 201
+    doc_rev = resp.body["rev"]
+
+    resp = Couch.put("/#{db}/_design/mango-test", query: %{rev: design_rev}, body: %{
+      language: "query",
+
+      validate_doc_update: %{
+        "security.admins.roles" => %{"$all" => ["no-such-role"]}
+      }
+    })
+    assert resp.status_code == 201
+
+    resp = Couch.put("/#{db}/doc", query: %{rev: doc_rev}, body: %{})
+    assert resp.status_code == 403
+  end
 end

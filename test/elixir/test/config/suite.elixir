@@ -531,6 +531,8 @@
     "deleting a Mango VDU removes its effects",
     "Mango VDU rejects a doc if any existing ddoc fails to match",
     "Mango VDU allows comparisons via $data",
+    "Mango VDU provides access to the user context",
+    "Mango VDU provides access to the security object",
   ],
   "SecurityValidationTest": [
     "Author presence and user security",
