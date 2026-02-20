@@ -19,14 +19,19 @@ DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
 
 // Erlang version embedded in binary packages. Also the version most builds
 // will run.
-ERLANG_VERSION = '26.2.5.16'
+ERLANG_VERSION = '26.2.5.17'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '26.2.5.16'
+MINIMUM_ERLANG_VERSION = '26.2.5.17'
 
 // Highest support Erlang version.
-MAXIMUM_ERLANG_VERSION = '28.1.1'
+MAXIMUM_ERLANG_VERSION = '28.3.2'
+
+// Test a min + 1 version. This is specially useful before we're about
+// to bump the minimum version to at least make sure the CI image
+// works.
+INTERMEDIATE_ERLANG_VERSION = '27.3.4.8'
 
 // Use these to detect if just documents changed
 docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
@@ -54,6 +59,16 @@ meta = [
     clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
+  ],
+
+  'centos10': [
+    name: 'CentOS 10',
+    disable_spidermonkey: true,
+    with_nouveau: true,
+    with_clouseau: false,
+    clouseau_java_home: '/usr',
+    quickjs_test262: true,
+    image: "apache/couchdbci-centos:10-erlang-${ERLANG_VERSION}"
   ],
 
   'jammy': [
@@ -138,6 +153,16 @@ meta = [
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}"
+  ],
+
+  'base-intermediate-erlang': [
+    name: 'Debian x86_64',
+    spidermonkey_vsn: '78',
+    with_nouveau: true,
+    with_clouseau: false,
+    clouseau_java_home: '/opt/java/openjdk',
+    quickjs_test262: false,
+    image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}"
   ],
 
   'base-quickjs': [
