@@ -45,6 +45,7 @@ share/server/main-coffee.js
 share/server/main.js
 share/server/main-ast-bypass.js
 share/www
+src/argparse/
 src/bear/
 src/certifi/
 src/couch/priv/couch_js/**/config.h
@@ -55,6 +56,7 @@ src/couch/priv/couch_js/**/*.d
 src/couch/priv/icu_driver/couch_icu_driver.d
 src/cowlib/
 src/mango/src/mango_cursor_text.nocompile
+src/erlperf/
 src/excoveralls/
 src/fauxton/
 src/folsom/
