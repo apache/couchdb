@@ -81,7 +81,9 @@
     "_all_docs POST error when multi-get is not a {'key': [...]} structure",
     "_bulk_docs POST error when body not an object",
     "oops, the doc id got lost in code nirwana",
-    "request ID can be specified at the client"
+    "request ID can be specified at the client",
+    "_all_dbs/_all_docs is not found",
+    "_dbs_info/_all_docs is not found"
   ],
   "BatchSaveTest": [
     "batch post",
@@ -361,6 +363,8 @@
   "PartitionMangoTest": [
     "explain works with non partitioned db",
     "explain works with partitions",
+    "explain works with bookmarks",
+    "explain options",
     "global query does not use partition index",
     "global query uses global index",
     "non-partitioned query using _all_docs and $eq",
@@ -763,10 +767,23 @@
     "unsatisfiable range",
     "explain view args",
     "explain options",
+    "explain with bookmarks",
     "sort with all docs"
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
+  ],
+  "ChooseCorrectIndexForDocs": [
+    "choose index with one field in index",
+    "choose index with two",
+    "choose index alphabetically",
+    "choose index most accurate",
+    "choose index most accurate in memory selector",
+    "warn on full db scan",
+    "chooses idxA",
+    "can query with range on secondary column",
+    "choose index with id",
+    "choose index with rev"
   ],
   "RegularCoveringIndexTest": [
     "index covers query 1 field index id",
@@ -840,10 +857,22 @@
     "uses all docs when selector doesnt require fields to exist"
   ],
   "JwtRolesClaimTest": [
-      "case: roles_claim_name (defined) / roles_claim_path (defined)",
-      "case: roles_claim_name (defined) / roles_claim_path (undefined)",
-      "case: roles_claim_name (undefined) / roles_claim_path (defined)",
-      "case: roles_claim_name (undefined) / roles_claim_path (undefined)",
-      "case: roles_claim_path with bad input"
-    ]
+    "case: roles_claim_name (defined) / roles_claim_path (defined)",
+    "case: roles_claim_name (defined) / roles_claim_path (undefined)",
+    "case: roles_claim_name (undefined) / roles_claim_path (defined)",
+    "case: roles_claim_name (undefined) / roles_claim_path (undefined)",
+    "case: roles_claim_path with bad input"
+  ],
+  "PaginateJsonDocs": [
+    "all docs paginate to end",
+    "return previous bookmark for empty",
+    "all docs with skip",
+    "all docs reverse",
+    "bad bookmark",
+    "throws error on text bookmark",
+    "index pagination",
+    "index pagination two keys",
+    "index pagination reverse",
+    "index pagination same emitted key"
+  ]
 }

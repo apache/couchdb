@@ -129,7 +129,8 @@ compact(State) ->
     {ok, EmptyState#mrst{
         id_btree = NewIdBtree,
         views = NewViews,
-        update_seq = Seq
+        update_seq = Seq,
+        start_time = now_secs()
     }}.
 
 recompact(State) ->
@@ -248,10 +249,12 @@ swap_compacted(OldState, NewState) ->
 
     {ok, Pre} = couch_file:bytes(Fd),
     {ok, Post} = couch_file:bytes(NewFd),
-    couch_log:notice("Compaction swap for view ~s ~p ~p", [
+    Duration = now_secs() - NewState#mrst.start_time,
+    couch_log:notice("Compaction swap for view ~s ~p ~p ~Bs", [
         IndexFName,
         Pre,
-        Post
+        Post,
+        Duration
     ]),
     ok = couch_file:delete(RootDir, IndexFName),
     ok = file:rename(CompactFName, IndexFName),
@@ -259,13 +262,16 @@ swap_compacted(OldState, NewState) ->
     unlink(OldState#mrst.fd),
     demonitor(OldState#mrst.fd_monitor, [flush]),
 
-    {ok, NewState#mrst{fd_monitor = Ref}}.
+    {ok, NewState#mrst{fd_monitor = Ref, start_time = now_secs()}}.
 
 remove_compacted(#mrst{sig = Sig, db_name = DbName} = State) ->
     RootDir = couch_index_util:root_dir(),
     CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
     ok = couch_file:delete(RootDir, CompactFName),
     {ok, State}.
+
+now_secs() ->
+    erlang:monotonic_time(second).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

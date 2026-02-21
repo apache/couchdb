@@ -87,6 +87,10 @@ get_integer(Section, Key, Default) when is_integer(Default) ->
 get_integer_or_infinity(Section, Key, Default) when is_integer(Default); Default == infinity ->
     case get_value(Section, Key, Default) of
         infinity ->
+            % We got the default infinity
+            infinity;
+        "infinity" ->
+            % Value was actually set to "infinity"
             infinity;
         _Value ->
             get_integer_int(Section, Key, Default)

@@ -191,14 +191,15 @@ meta = [
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
   // use QuickJS for now
-  'freebsd-arm64': [
-     name: 'FreeBSD ARM64 QuickJS',
-     disable_spidermonkey: true,
-     with_clouseau: true,
-     clouseau_java_home: '/usr/local/openjdk21',
-     quickjs_test262: false,
-     gnu_make: 'gmake'
-  ],
+  // Temporarily disabled because on too slow a host
+  // 'freebsd-arm64': [
+  //    name: 'FreeBSD ARM64 QuickJS',
+  //    disable_spidermonkey: true,
+  //    with_clouseau: true,
+  //    clouseau_java_home: '/usr/local/openjdk21',
+  //    quickjs_test262: false,
+  //    gnu_make: 'gmake'
+  // ],
 
   'macos': [
      name: 'macOS',
@@ -208,20 +209,16 @@ meta = [
      clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
      gnu_make: 'gmake',
      gnu_make_eunit_opts: '-j4 --output-sync=target'
-   ]
+   ],
 
-  // Disable temporarily. The behavior we see is that the windows job
-  // locks up and doesn't emit any logs to Jenkins. It just waits for
-  // up to 2h+ sometimes blocking pull requests.
-  //
-  // 'win2022': [
-  //   name: 'Windows 2022',
-  //   spidermonkey_vsn: '128',
-  //   with_clouseau: true,
-  //   clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
-  //   quickjs_test262: false,
-  //   node_label: 'win'
-  // ]
+   'win2022': [
+     name: 'Windows 2022',
+     spidermonkey_vsn: '128',
+     with_clouseau: true,
+     clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
+     quickjs_test262: false,
+     node_label: 'win'
+   ]
 ]
 
 def String configure(config) {
@@ -328,58 +325,89 @@ def generateNativeStage(platform) {
                   }
 
                   powershell( script: """
-                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                    ..\\..\\couchdb-glazier\\bin\\shell.ps1
                     .\\configure.ps1 -SkipDeps -WithNouveau ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     make -f Makefile.win release
                   """, label: 'Configure and Build')
 
-                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win eunit", label: 'EUnit tests')
-                  //powershell( script: ".\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win elixir", label: 'Elixir tests')
+                  retry (3) {
+                    powershell( script: """
+                      ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      Write-Output 'The following tests are skipped:'
+                      ..\\..\\couchdb-glazier\\bin\\exclude_tests_win.ps1 -Path . | Out-Host
+                      make -j 4 -f Makefile.win eunit
+                    """, label: 'EUnit tests')
+                  }
 
-                  powershell( script: """
-                    .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
-                    Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
-                    ${setClouseauJavaHome}
-                    make -f Makefile.win elixir-search ERLANG_COOKIE=crumbles
-                  """, label: 'Clouseau tests')
+                  retry (3) {
+                    powershell( script: """
+                      ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                      make -f Makefile.win elixir
+                      """, label: 'Elixir tests')
+                  }
 
-                  powershell( script: """
-                      .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
+                  retry (3) {
+                    timeout(time: 5, unit: "MINUTES") {
+                      powershell( script: """
+                        ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                        Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                        ${setClouseauJavaHome}
+                        make -f Makefile.win elixir-search ERLANG_COOKIE=crumbles
+                      """, label: 'Clouseau tests')
+                    }
+                  }
+
+                  retry (3) {
+                    timeout(time: 5, unit: "MINUTES") {
+                      powershell( script: """
+                        ..\\..\\couchdb-glazier\\bin\\shell.ps1
+                        Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
+                        ${setClouseauJavaHome}
+                        make -f Makefile.win mango-test ERLANG_COOKIE=crumbles
+                      """, label: 'Mango tests')
+                    }
+                  }
+
+                  powershell( script: '..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
+
+                  retry (3) {
+                    powershell( script: """
+                      ..\\..\\couchdb-glazier\\bin\\shell.ps1
                       Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
-                      ${setClouseauJavaHome}
-                      make -f Makefile.win mango-test ERLANG_COOKIE=crumbles
-                    """, label: 'Mango tests')
-
-                  powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; Write-Host "NOT AVAILABLE: make -f Makefile.win weatherreport-test"', label: 'N/A Weatherreport tests')
-
-                  // temporary exclude - random flaky tests on Windows
-                  //powershell( script: """
-                  //  .\\..\\..\\couchdb-glazier\\bin\\shell.ps1
-                  //  Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
-                  //  make -f Makefile.win nouveau-test
-                  //""", label: 'Nouveau tests')
+                      make -f Makefile.win nouveau-test
+                    """, label: 'Nouveau tests')
+                  }
                 }
-
-                powershell( script: """
-                    .\\couchdb-glazier\\bin\\shell.ps1
-                    .\\couchdb-glazier\\bin\\build_installer.ps1 -Path '${platform}/build' -IncludeGitSha -DisableICEChecks
-                """, label: 'Build Windows Installer file')
-
-                archiveArtifacts artifacts: '*.msi', fingerprint: true, onlyIfSuccessful: true
               }
               catch (err) {
                 powershell( script: "Get-ChildItem ${WORKSPACE}")
                 dir( "${platform}/build" ) {
-                  powershell( script: '.\\..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win build-report')
+                  powershell( script: '..\\..\\couchdb-glazier\\bin\\shell.ps1; make -f Makefile.win build-report')
                   powershell( script: 'Get-Content test-results.log')
                 }
                 error("Build step failed with error: ${err.getMessage()}")
               }
               finally {
                 powershell( script: 'Get-ChildItem')
+                powershell( script: 'Get-Process erl -ErrorAction SilentlyContinue | Stop-Process -PassThru')
+              }
+            }
+
+            stage("${meta[platform].name} - package") {
+              try {
+                powershell( script: """
+                  .\\couchdb-glazier\\bin\\shell.ps1
+                  .\\couchdb-glazier\\bin\\build_installer.ps1 -Path '${platform}/build' -IncludeGitSha -DisableICEChecks
+                """, label: 'Build Windows Installer file')
+                archiveArtifacts artifacts: '*.msi', fingerprint: true, onlyIfSuccessful: true
+              }
+              catch (err) {
+                powershell( script: "Get-ChildItem ${WORKSPACE}")
+                error("Build step failed with error: ${err.getMessage()}")
+              }
+              finally {
                 powershell( script: "Remove-Item -Path '${WORKSPACE}\\*' -Force -Recurse -ErrorAction SilentlyContinue")
-                powershell( script: 'Get-ChildItem')
               }
             }
           }

@@ -21,7 +21,7 @@
             false ->
                 throw("BUILDDIR environment variable must be set");
             Dir ->
-                Dir
+                string:strip(Dir)
         end
     end).
 -define(CONFIG_DEFAULT,

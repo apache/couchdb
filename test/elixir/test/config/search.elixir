@@ -34,6 +34,10 @@
     "facet ranges, non-empty",
     "timeouts do not expose internal state"
   ],
+  "BasicTextTest": [
+    "explain options",
+    "explain with bookmarks"
+  ],
   "ElemMatchTests": [
     "elem match non object"
   ],
@@ -65,14 +69,18 @@
   ],
   "NoDefaultFieldTest": [
     "basic",
-    "other fields exist",
+    "other fields exist"
   ],
   "NoDefaultFieldWithAnalyzer": [
     "basic",
-    "other fields exist",
+    "other fields exist"
   ],
   "DefaultFieldWithCustomAnalyzer": [
     "basic",
-    "not analyzed",
+    "not analyzed"
   ],
+  "PartitionMangoTest": [
+    "explain options (text)",
+    "explain works with bookmarks (text)"
+  ]
 }

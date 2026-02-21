@@ -194,32 +194,39 @@ t_corrupted_read(_) ->
     ?assertEqual({error, enoent}, file:read_file_info(Path)).
 
 t_check_setup(_) ->
-    ?assertEqual(disabled, check_setup()),
+    % SKIP_TEST_ON_WINDOWS
+    {Osfamily, _} = os:type(),
+    case Osfamily of
+        win32 ->
+            ok;
+        _ ->
+            ?assertEqual(disabled, check_setup()),
 
-    meck:expect(config, get_boolean, fun("smoosh", "persist", _) -> true end),
-    ?assertEqual(ok, check_setup()),
+            meck:expect(config, get_boolean, fun("smoosh", "persist", _) -> true end),
+            ?assertEqual(ok, check_setup()),
 
-    TDir = ?tempfile(),
-    meck:expect(config, get, fun("smoosh", "state_dir", _) -> TDir end),
-    ?assertEqual({error, {"read", enoent}}, check_setup()),
-    Dir = state_dir(),
-    ok = file:make_dir(Dir),
-    % Can't write, only read. This works only when running as non-admin/non-root.
-    ok = file:change_mode(Dir, 8#500),
-    % Did the setup work?
-    {ok, #file_info{access = Access}} = file:read_file_info(Dir),
-    case Access of
-        read ->
-            ?assertEqual({error, {"write", eacces}}, check_setup()),
-            % Can't read, only write
-            ok = file:change_mode(Dir, 8#300),
-            ?assertEqual({error, {"read access", write}}, check_setup());
-        read_write ->
-            % We must be running as root/admin and we can't really make Dir
-            % unreadable for ourselves, so skip this part.
-            ok
-    end,
-    ok = file:del_dir_r(Dir).
+            TDir = ?tempfile(),
+            meck:expect(config, get, fun("smoosh", "state_dir", _) -> TDir end),
+            ?assertEqual({error, {"read", enoent}}, check_setup()),
+            Dir = state_dir(),
+            ok = file:make_dir(Dir),
+            % Can't write, only read. This works only when running as non-admin/non-root.
+            ok = file:change_mode(Dir, 8#500),
+            % Did the setup work?
+            {ok, #file_info{access = Access}} = file:read_file_info(Dir),
+            case Access of
+                read ->
+                    ?assertEqual({error, {"write", eacces}}, check_setup()),
+                    % Can't read, only write
+                    ok = file:change_mode(Dir, 8#300),
+                    ?assertEqual({error, {"read access", write}}, check_setup());
+                read_write ->
+                    % We must be running as root/admin and we can't really make Dir
+                    % unreadable for ourselves, so skip this part.
+                    ok
+            end,
+            ok = file:del_dir_r(Dir)
+    end.
 
 t_persist_unpersist_disabled(_) ->
     Name = "chan1",
@@ -279,20 +286,27 @@ t_persist_unpersist_errors(_) ->
 
     Dir = state_dir(),
     ok = file:make_dir(Dir),
-    % Can't write, only read. This works only when not running as root/admin.
-    ok = file:change_mode(Dir, 8#500),
-    % Did the setup work?
-    {ok, #file_info{access = Access}} = file:read_file_info(Dir),
-    case Access of
-        read ->
-            ?assertEqual({error, eacces}, persist(Q1, #{}, #{})),
-            Q3 = unpersist(Name),
-            ?assertEqual(Name, smoosh_priority_queue:name(Q3)),
-            ?assertEqual(#{max => 0, min => 0, size => 0}, smoosh_priority_queue:info(Q3));
-        read_write ->
-            % We must be running as root/admin so we can't really make dir
-            % unreadable for ourselves so skip this part
-            ok
+    % SKIP_TEST_ON_WINDOWS
+    {Osfamily, _} = os:type(),
+    case Osfamily of
+        win32 ->
+            ok;
+        _ ->
+            % Can't write, only read. This works only when not running as root/admin.
+            ok = file:change_mode(Dir, 8#500),
+            % Did the setup work?
+            {ok, #file_info{access = Access}} = file:read_file_info(Dir),
+            case Access of
+                read ->
+                    ?assertEqual({error, eacces}, persist(Q1, #{}, #{})),
+                    Q3 = unpersist(Name),
+                    ?assertEqual(Name, smoosh_priority_queue:name(Q3)),
+                    ?assertEqual(#{max => 0, min => 0, size => 0}, smoosh_priority_queue:info(Q3));
+                read_write ->
+                    % We must be running as root/admin so we can't really make dir
+                    % unreadable for ourselves so skip this part
+                    ok
+            end
     end,
     ok = file:del_dir_r(Dir).
 

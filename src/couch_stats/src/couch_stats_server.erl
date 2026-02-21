@@ -10,20 +10,13 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-% couch_stats_server is in charge of:
-%   - Initial metric loading from application stats descriptions.
-%   - Recycling(resetting to 0) stale histogram counters.
-%   - Checking and reloading if stats descriptions change.
-%   - Checking and reloading if histogram interval config value changes.
+% couch_stats_server is in charge of initially loading stats definition into a
+% persistent term then recycling(resetting to 0) stale histogram counters.
 %
 
 -module(couch_stats_server).
 
 -behaviour(gen_server).
-
--export([
-    reload/0
-]).
 
 -export([
     start_link/0,
@@ -33,44 +26,52 @@
     handle_info/2
 ]).
 
--define(RELOAD_INTERVAL_SEC, 600).
+% config_listener
+-export([
+    handle_config_change/5,
+    handle_config_terminate/3
+]).
 
 -record(st, {
-    hist_interval,
     histograms,
-    clean_tref,
-    reload_tref
+    clean_tref
 }).
-
-reload() ->
-    gen_server:call(?MODULE, reload).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
+    ok = config:listen_for_changes(?MODULE, self()),
     St = #st{
-        hist_interval = config:get("stats", "interval"),
         clean_tref = erlang:send_after(clean_msec(), self(), clean),
-        reload_tref = erlang:send_after(reload_msec(), self(), reload)
+        histograms = couch_stats_util:histograms(couch_stats_util:load())
     },
-    {_, Stats} = try_reload(St),
-    {ok, St#st{histograms = couch_stats_util:histograms(Stats)}}.
+    {ok, St}.
 
-handle_call(reload, _From, #st{} = St) ->
-    {reply, ok, do_reload(St)};
 handle_call(Msg, _From, #st{} = St) ->
     {stop, {unknown_call, Msg}, unknown_call, St}.
 
 handle_cast(Msg, #st{} = St) ->
     {stop, {unknown_cast, Msg}, St}.
 
-handle_info(reload, #st{} = St) ->
-    {noreply, do_reload(St)};
 handle_info(clean, #st{} = St) ->
     {noreply, do_clean(St)};
+handle_info(restart_config_listener, #st{} = St) ->
+    ok = config:listen_for_changes(?MODULE, self()),
+    {noreply, St};
 handle_info(Msg, #st{} = St) ->
     {stop, {unknown_info, Msg}, St}.
+
+handle_config_change("stats", "interval", _, _, Pid) ->
+    Pid ! clean,
+    {ok, Pid};
+handle_config_change(_, _, _, _, Pid) ->
+    {ok, Pid}.
+
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, Pid) ->
+    erlang:send_after(1000, Pid, restart_config_listener).
 
 do_clean(#st{} = St) ->
     timer:cancel(St#st.clean_tref),
@@ -97,50 +98,6 @@ do_clean(#st{} = St) ->
     ),
     St#st{clean_tref = HistTRef}.
 
-do_reload(#st{} = St) ->
-    timer:cancel(St#st.reload_tref),
-    RTRef = erlang:send_after(reload_msec(), self(), reload),
-    case try_reload(St) of
-        {true, NewStats} ->
-            timer:cancel(St#st.clean_tref),
-            Histograms = couch_stats_util:histograms(NewStats),
-            HTRef = erlang:send_after(clean_msec(), self(), clean),
-            St#st{
-                histograms = Histograms,
-                clean_tref = HTRef,
-                reload_tref = RTRef,
-                hist_interval = config:get("stats", "interval")
-            };
-        {false, _} ->
-            St#st{reload_tref = RTRef}
-    end.
-
-try_reload(#st{} = St) ->
-    NewDefs = couch_stats_util:load_metrics_for_applications(),
-    Stats = couch_stats_util:stats(),
-    MetricsChanged = couch_stats_util:metrics_changed(Stats, NewDefs),
-    IntervalChanged = interval_changed(St),
-    case MetricsChanged orelse IntervalChanged of
-        true ->
-            couch_stats_util:reset_histogram_interval_sec(),
-            NewStats = couch_stats_util:create_metrics(NewDefs),
-            couch_stats_util:replace_stats(NewStats),
-            {true, NewStats};
-        false ->
-            {false, Stats}
-    end.
-
-interval_changed(#st{hist_interval = OldInterval}) ->
-    case config:get("stats", "interval") of
-        Interval when OldInterval =:= Interval ->
-            false;
-        _ ->
-            true
-    end.
-
-reload_msec() ->
-    1000 * ?RELOAD_INTERVAL_SEC.
-
 clean_msec() ->
     % We want to wake up more often than our interval so we decide to wake
     % about twice as often. If the interval is 10 seconds, we'd wake up every 5
@@ -152,8 +109,6 @@ clean_msec() ->
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(TIMEOUT, 10).
-
 couch_stats_server_test_() ->
     {
         foreach,
@@ -161,8 +116,6 @@ couch_stats_server_test_() ->
         fun teardown/1,
         [
             ?TDEF_FE(t_server_starts),
-            ?TDEF_FE(t_reload_with_no_changes_works, 10),
-            ?TDEF_FE(t_reload_with_changes_works, 10),
             ?TDEF_FE(t_cleaning_works, 10),
             ?TDEF_FE(t_invalid_call),
             ?TDEF_FE(t_invalid_cast),
@@ -180,50 +133,13 @@ teardown(Ctx) ->
 t_server_starts(_) ->
     ?assert(is_process_alive(whereis(?MODULE))).
 
-t_reload_with_no_changes_works(_) ->
-    Pid = whereis(?MODULE),
-    ?assert(is_process_alive(Pid)),
-    ?assertEqual(ok, reload()),
-    ?assertEqual(Pid, whereis(?MODULE)),
-    ?assert(is_process_alive(Pid)),
-    % Let's reload a few more hundred times
-    lists:foreach(
-        fun(_) ->
-            ?assertEqual(ok, reload()),
-            ?assertEqual(Pid, whereis(?MODULE)),
-            ?assert(is_process_alive(Pid))
-        end,
-        lists:seq(1, 100)
-    ).
-
-t_reload_with_changes_works(_) ->
-    Pid = whereis(?MODULE),
-    ?assert(is_process_alive(Pid)),
-    #st{hist_interval = Interval0} = sys:get_state(Pid),
-    ?assertEqual(undefined, Interval0),
-
-    config:set("stats", "interval", "7", false),
-    ?assertEqual(ok, reload()),
-    ?assertEqual(Pid, whereis(?MODULE)),
-    ?assert(is_process_alive(Pid)),
-    #st{hist_interval = Interval1} = sys:get_state(Pid),
-    ?assertEqual("7", Interval1),
-
-    #st{histograms = Hists} = sys:get_state(Pid),
-    [{_Key, {histogram, HCtx1, _Desc}} | _] = maps:to_list(Hists),
-    % Histogram window size should now be shorter
-    % 7 (active time window) + 7 (stale) + 5 + 5 for buffers = 24.
-    ?assertEqual(24, tuple_size(HCtx1)).
-
 t_cleaning_works(_) ->
     config:set("stats", "interval", "1", false),
     sys:log(?MODULE, {true, 100}),
-    ok = reload(),
     timer:sleep(2000),
     {ok, Events} = sys:log(?MODULE, get),
     ok = sys:log(?MODULE, false),
     config:set("stats", "interval", "10", false),
-    ok = reload(),
     % Events looks like: [{in, Msg} | {noreply, ...} | {out, ..}, ...]
     CleanEvents = [clean || {in, clean} <- Events],
     ?assert(length(CleanEvents) >= 3).
