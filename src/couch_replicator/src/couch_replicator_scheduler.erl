@@ -73,7 +73,7 @@
 
 % Worker children get a default 5 second shutdown timeout, so pick a value just
 % a bit less than that: 4.5 seconds. In couch_replicator_sup our scheduler
-% worker doesn't specify the timeout, so it up picks ups the OTP default of 5
+% worker doesn't specify the timeout, so it picks up the OTP default of 5
 % seconds https://www.erlang.org/doc/system/sup_princ.html#child-specification
 %
 -define(TERMINATE_SHUTDOWN_TIME, 4500).
@@ -173,9 +173,9 @@ job_proxy_url(_Endpoint) ->
     null.
 
 % Health threshold is the minimum amount of time an unhealthy job should run
-% crashing before it is considered to be healthy again. HealtThreashold should
+% crashing before it is considered to be healthy again. Health threshold should
 % not be 0 as jobs could start and immediately crash, and it shouldn't be
-% infinity, since then  consecutive crashes would accumulate forever even if
+% infinity, since then consecutive crashes would accumulate forever even if
 % job is back to normal.
 -spec health_threshold() -> non_neg_integer().
 health_threshold() ->
@@ -522,7 +522,7 @@ pending_fold(Job, {Set, Now, Count, HealthThreshold}) ->
 
 % Replace Job in the accumulator if it has a higher priority (lower priority
 % value) than the lowest priority there. Job priority is indexed by
-% {FairSharePiority, LastStarted} tuples. If the FairSharePriority is the same
+% {FairSharePriority, LastStarted} tuples. If the FairSharePriority is the same
 % then last started timestamp is used to pick. The goal is to keep up to Count
 % oldest jobs during the iteration. For example, if there are jobs with these
 % priorities accumulated so far [5, 7, 11], and the priority of current job is
@@ -594,14 +594,13 @@ not_recently_crashed(#job{history = History}, Now, HealthThreshold) ->
 % and running successfully without crashing for a period of time. That period
 % of time is the HealthThreshold.
 %
-
 -spec consecutive_crashes(history(), non_neg_integer()) -> non_neg_integer().
 consecutive_crashes(History, HealthThreshold) when is_list(History) ->
     consecutive_crashes(History, HealthThreshold, 0).
 
 -spec consecutive_crashes(history(), non_neg_integer(), non_neg_integer()) ->
     non_neg_integer().
-consecutive_crashes([], _HealthThreashold, Count) ->
+consecutive_crashes([], _HealthThreshold, Count) ->
     Count;
 consecutive_crashes(
     [{{crashed, _}, CrashT}, {_, PrevT} = PrevEvent | Rest],
@@ -795,7 +794,7 @@ rotate_jobs(State, ChurnSoFar) ->
     if
         SlotsAvailable >= 0 ->
             % If there is are enough SlotsAvailable reduce StopCount to avoid
-            % unnesessarily stopping jobs. `stop_jobs/3` ignores 0 or negative
+            % unnecessarily stopping jobs. `stop_jobs/3` ignores 0 or negative
             % values so we don't worry about that here.
             StopCount = lists:min([Pending - SlotsAvailable, Running, Churn]),
             stop_jobs(StopCount, true, State),
@@ -930,7 +929,7 @@ optimize_int_option({Key, Val}, #rep{options = Options} = Rep) ->
 % Updater is a separate process. It receives `update_stats` messages and
 % updates scheduler stats from the scheduler jobs table. Updates are
 % performed no more frequently than once per ?STATS_UPDATE_WAIT milliseconds.
-
+%
 update_running_jobs_stats(StatsPid) when is_pid(StatsPid) ->
     StatsPid ! update_stats,
     ok.

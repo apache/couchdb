@@ -22,7 +22,7 @@ REBAR?=$(CURDIR)/bin/rebar.cmd
 PYTHON=python.exe
 ERLFMT?=$(CURDIR)/bin/erlfmt.cmd
 MAKE=make -f Makefile.win
-GRADLE?=$(CURDIR)/nouveau/gradlew.bat
+GRADLE?=$(CURDIR)/extra/nouveau/gradlew.bat
 # REBAR?=$(shell where rebar.cmd)
 
 # Handle the following scenarios:
@@ -80,7 +80,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=meck,mochiweb,triq,proper,snappy,ibrowse,local
+skip_deps=meck,mochiweb,triq,proper,snappy,ibrowse,gun,recon
 suites=
 tests=
 
@@ -104,7 +104,7 @@ endif
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs nouveau
+all: couch-core fauxton docs extra/nouveau
 
 
 .PHONY: help
@@ -118,9 +118,9 @@ help:
 ################################################################################
 
 
-.PHONY: couch
-# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
-couch: config.erl
+.PHONY: couch-core
+# target: couch-core - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
+couch-core: config.erl
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile $(COMPILE_OPTS)
 ifeq ($(with_spidermonkey), true)
 	@copy src\couch\priv\couchjs.exe bin
@@ -155,30 +155,27 @@ check: all
 	@$(MAKE) nouveau-test
 
 ifdef apps
-subdirs=$(apps)
+EUNIT_SUBDIRS = $(strip $(subst $(comma),$(space),$(apps)))
 else
-subdirs=$(shell dir /b src)
+EUNIT_SUBDIRS = $(filter-out fauxton docs, $(shell dir /b src))
 endif
 
-.PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
-eunit: export BUILDDIR = $(CURDIR)
+.PHONY: eunit $(EUNIT_SUBDIRS)
 eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-eunit: couch
-	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) setup_eunit 2> nul
-	@cmd /c "FOR %d IN ($(subdirs)) DO set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=%d || exit /b 1"
+eunit: $(EUNIT_SUBDIRS)
 
-setup-eunit: export BUILDDIR = $(CURDIR)
-setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-setup-eunit:
-	@$(REBAR) setup_eunit 2> nul
+$(EUNIT_SUBDIRS):
+	-@rmdir /s /q tmp\$@
+	@$(REBAR) setup_eunit app=$@
+	@set BUILDDIR=$(CURDIR)/tmp/$@ && set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ && @rmdir /s/q tmp\$@
 
-just-eunit: export BUILDDIR = $(CURDIR)
-just-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+# cat together couch_log files after running eunit test
+.PHONY: catlogs
+catlogs:
+	@type tmp/*/couch.log > tmp/couch.log || true
 
 # target: erlfmt-check - Check Erlang source code formatting
 erlfmt-check: export ERLFMT_PATH = $(ERLFMT)
@@ -240,6 +237,7 @@ elixir-cluster-with-quorum: elixir-init devclean
 
 .PHONY: elixir
 # target: elixir - Run Elixir-based integration tests
+elixir: export MIX_ENV=integration
 elixir: elixir-init devclean
 	@$(MAKE) elixir-test
 
@@ -288,6 +286,7 @@ build-report:
 	@$(PYTHON) build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log || true
 	cat .\dev\logs\node1.log || true
 	cat .\dev\logs\nouveau.log || true
+	$(MAKE) catlogs || true
 	cat .\tmp\couch.log || true
 	cat test-results.log || true
 
@@ -309,7 +308,6 @@ list-eunit-suites:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@$(PYTHON) -m venv src\mango\.venv && \
 		src\mango\.venv\Scripts\pip.exe install -r src\mango\requirements.txt
@@ -405,8 +403,8 @@ endif
 
 ifeq ($(with_nouveau), true)
 	-@mkdir rel\couchdb\nouveau
-	@cd nouveau && $(GRADLE) installDist
-	@xcopy nouveau\build\install\nouveau rel\couchdb\nouveau /E /I
+	@cd extra\nouveau && $(GRADLE) installDist
+	@xcopy extra\nouveau\build\install\nouveau rel\couchdb\nouveau /E /I
 endif
 
 	@echo ... done
@@ -452,7 +450,7 @@ clean:
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log >NUL 2>&1 || true
 	-@rmdir /s/q src\docs\build src\docs\.venv >NUL 2>&1 || true
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) clean
+	@cd extra\nouveau && $(GRADLE) clean
 endif
 
 .PHONY: distclean
@@ -495,8 +493,8 @@ config.erl:
 
 
 src\docs\build:
-	@echo 'Building docs...'
 ifeq ($(with_docs), true)
+	@echo 'Building docs...'
 	@cd src\docs && setup.bat && make.bat html && make.bat man
 endif
 
@@ -523,12 +521,12 @@ derived:
 # Nouveau
 ################################################################################
 
-.PHONY: nouveau
+.PHONY: extra/nouveau
 # target: nouveau - Build nouveau
-nouveau:
+extra/nouveau:
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) spotlessApply
-	@cd nouveau && $(GRADLE) build -x test
+	@cd extra/nouveau && $(GRADLE) spotlessApply
+	@cd extra/nouveau && $(GRADLE) build -x test
 endif
 
 .PHONY: nouveau-test
@@ -536,16 +534,15 @@ endif
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
-nouveau-test-gradle: couch nouveau
+nouveau-test-gradle: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) test --info --rerun
-	
+	@cd extra/nouveau && $(GRADLE) test --info --rerun
 endif
 
 .PHONY: nouveau-test-elixir
 nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
-nouveau-test-elixir: couch nouveau
+nouveau-test-elixir: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
 	@dev\run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/elixir/test/config/test-config.ini \

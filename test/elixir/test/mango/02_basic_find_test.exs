@@ -210,7 +210,7 @@ defmodule BasicFindTest do
         "company" => %{"$lt" => "M"},
         "$or" => [%{"company" => "Dreamia"}, %{"manager" => true}],
       },
-      sort: [%{"company" => "desc"}, %{"manager" => "desc"}],
+      sort: [%{"company" => "desc"}, %{"manager" => "desc"}]
     )
     companies_returned = Enum.map(docs, fn doc -> doc["company"] end)
     desc_companies = Enum.sort(companies_returned, :desc)
@@ -241,7 +241,7 @@ defmodule BasicFindTest do
         "company" => %{"$lt" => "M"},
         "$or": [%{"company" => "Dreamia"}, %{"manager" => true}],
       },
-      sort: [%{"company" => "desc"}],
+      sort: [%{"company" => "desc"}]
     )
     assert resp.status_code == 400
     assert resp.body["error"] == "no_usable_index"
@@ -275,7 +275,7 @@ defmodule BasicFindTest do
   end
 
   test "empty subsel match" do
-    resp = MangoDatabase.save_docs(@db_name, [%{"user_id" => "eo", "empty_obj" => %{}}])
+    _resp = MangoDatabase.save_docs(@db_name, [%{"user_id" => "eo", "empty_obj" => %{}}])
     {:ok, docs} = MangoDatabase.find(@db_name, %{"_id" => %{"$gt" => nil}, "empty_obj" => %{}})
     assert length(docs) == 1
     assert Enum.at(docs, 0)["user_id"] == "eo"
@@ -313,6 +313,17 @@ defmodule BasicFindTest do
     assert opts["update"] == true
     assert opts["use_index"] == []
     assert opts["allow_fallback"] == true
+  end
+
+  test "explain with bookmarks" do
+    query = %{"age" => %{"$gt" => 42}}
+
+    {:ok, resp} = MangoDatabase.find(@db_name, query, limit: 1, return_raw: true)
+    assert length(resp["docs"]) == 1
+    assert resp["bookmark"] != "nil"
+    {:ok, explain} = MangoDatabase.find(@db_name, query, bookmark: resp["bookmark"], explain: true)
+    assert is_binary(explain["opts"]["bookmark"])
+    assert resp["bookmark"] == explain["opts"]["bookmark"]
   end
 
   test "sort with all docs" do
