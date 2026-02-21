@@ -67,6 +67,18 @@
   "RegexVsTextIndexTest": [
     "regex works with text index"
   ],
+  "NoDefaultFieldTest": [
+    "basic",
+    "other fields exist"
+  ],
+  "NoDefaultFieldWithAnalyzer": [
+    "basic",
+    "other fields exist"
+  ],
+  "DefaultFieldWithCustomAnalyzer": [
+    "basic",
+    "not analyzed"
+  ],
   "PartitionMangoTest": [
     "explain options (text)",
     "explain works with bookmarks (text)"
