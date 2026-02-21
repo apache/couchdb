@@ -53,7 +53,7 @@ events(Data, EventFun) when is_binary(Data) ->
 events(DataFun, EventFun) ->
     parse_one(DataFun, EventFun, <<>>).
 
-% converts the JSON directly to the erlang represention of Json
+% converts the JSON directly to the erlang representation of Json
 to_ejson(DF) ->
     {_DF2, EF, _Rest} = events(DF, fun(Ev) -> collect_events(Ev, []) end),
     [[EJson]] = make_ejson(EF(get_results), [[]]),
@@ -63,7 +63,7 @@ to_ejson(DF) ->
 %
 % Return this function from inside an event function right after getting an
 % object_start event. It then collects the remaining events for that object
-% and converts it to the erlang represention of Json.
+% and converts it to the erlang representation of Json.
 %
 % It then calls your ReturnControl function with the erlang object. Your
 % return control function then should yield another event function.

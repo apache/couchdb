@@ -1,5 +1,5 @@
---- quickjs-master/test262_errors.txt	2025-11-29 09:14:41.000000000 -0500
-+++ quickjs/test262_errors.txt	2025-11-29 20:38:38.835402578 -0500
+--- quickjs-master/test262_errors.txt	2025-12-22 09:12:46
++++ quickjs/test262_errors.txt	2026-01-04 23:55:00
 @@ -23,6 +23,8 @@
  test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js:74: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js' is ambiguous
  test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js:75: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js' is ambiguous

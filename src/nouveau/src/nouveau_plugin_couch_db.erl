@@ -13,9 +13,45 @@
 -module(nouveau_plugin_couch_db).
 
 -export([
+    before_doc_update/3,
     is_valid_purge_client/2,
     on_compact/2
 ]).
+
+-include("nouveau.hrl").
+-include_lib("couch/include/couch_db.hrl").
+
+%% New index definitions get an explicit lucene version property, if missing.
+before_doc_update(
+    #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>, revs = {0, []}} = Doc,
+    Db,
+    ?INTERACTIVE_EDIT = UpdateType
+) ->
+    #doc{body = {Fields}} = Doc,
+    case couch_util:get_value(<<"nouveau">>, Fields) of
+        {Indexes} when is_list(Indexes) ->
+            [add_versions_to_doc(Doc), Db, UpdateType];
+        _ ->
+            [Doc, Db, UpdateType]
+    end;
+before_doc_update(Doc, Db, UpdateType) ->
+    [Doc, Db, UpdateType].
+
+add_versions_to_doc(#doc{} = Doc) ->
+    #doc{body = {Fields0}} = Doc,
+    {Indexes0} = couch_util:get_value(<<"nouveau">>, Fields0),
+    Indexes1 = lists:map(fun add_version_to_index/1, Indexes0),
+    Fields1 = couch_util:set_value(<<"nouveau">>, Fields0, {Indexes1}),
+    Doc#doc{body = {Fields1}}.
+
+add_version_to_index({IndexName, {Index}}) ->
+    case couch_util:get_value(<<"lucene_version">>, Index) of
+        undefined ->
+            {IndexName,
+                {couch_util:set_value(<<"lucene_version">>, Index, ?TARGET_LUCENE_VERSION)}};
+        _ ->
+            {IndexName, {Index}}
+    end.
 
 is_valid_purge_client(DbName, Props) ->
     nouveau_util:verify_index_exists(DbName, Props).

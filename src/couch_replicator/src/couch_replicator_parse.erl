@@ -63,7 +63,7 @@ default_options() ->
 % database. If failure or parsing of filter docs fails, parse_doc throws a
 % {filter_fetch_error, Error} exception. This exception should be considered
 % transient in respect to the contents of the document itself, since it depends
-% on netowrk availability of the source db and other factors.
+% on network availability of the source db and other factors.
 -spec parse_rep_doc({[_]}) -> #rep{}.
 parse_rep_doc(RepDoc) ->
     {ok, Rep} =
@@ -167,7 +167,7 @@ parse_proxy_settings(Props) when is_list(Props) ->
     end.
 
 % Update a #rep{} record with a replication_id. Calculating the id might involve
-% fetching a filter from the source db, and so it could fail intermetently.
+% fetching a filter from the source db, and so it could fail intermittently.
 % In case of a failure to fetch the filter this function will throw a
 %  `{filter_fetch_error, Reason} exception.
 update_rep_id(Rep) ->

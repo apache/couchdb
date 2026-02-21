@@ -24,7 +24,7 @@
 -define(RESTART_TIMEOUT_IN_MILLISEC, 3000).
 
 -define(CONFIG_FIXTURESDIR,
-    filename:join([?BUILDDIR(), "src", "config", "test", "fixtures"])
+    ?ABS_PATH("test/fixtures")
 ).
 
 -define(CONFIG_DEFAULT_TEST,

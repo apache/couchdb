@@ -61,29 +61,32 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, #acc{} = Acc) ->
         error ->
             {error, {nodedown, <<"progress not possible">>}}
     end;
-handle_message({rexi_EXIT, Reason}, Shard, #acc{} = Acc) ->
-    #acc{counters = Counters, ring_opts = RingOpts} = Acc,
+handle_message({rexi_EXIT, Reason}, #shard{dbname = Name} = Shard, #acc{} = Acc) ->
+    #acc{counters = Counters, ring_opts = RingOpts, replies = Replies} = Acc,
     NewCounters = fabric_dict:erase(Shard, Counters),
     case fabric_ring:is_progress_possible(NewCounters, RingOpts) of
         true ->
             {ok, Acc#acc{counters = NewCounters}};
         false ->
-            {error, Reason}
+            case Replies of
+                [_ | _] -> {stop, format_response(Name, Replies)};
+                _ -> {error, Reason}
+            end
     end;
 handle_message({ok, Info}, #shard{dbname = Name} = Shard, #acc{} = Acc) ->
     #acc{counters = Counters, replies = Replies} = Acc,
     Replies1 = [Info | Replies],
     Counters1 = fabric_dict:erase(Shard, Counters),
     case fabric_dict:size(Counters1) =:= 0 of
-        true ->
-            [FirstInfo | RestInfos] = Replies1,
-            PartitionInfo = get_max_partition_size(FirstInfo, RestInfos),
-            {stop, [{db_name, Name} | format_partition(PartitionInfo)]};
-        false ->
-            {ok, Acc#acc{counters = Counters1, replies = Replies1}}
+        true -> {stop, format_response(Name, Replies1)};
+        false -> {ok, Acc#acc{counters = Counters1, replies = Replies1}}
     end;
 handle_message(_, _, #acc{} = Acc) ->
     {ok, Acc}.
+
+format_response(DbName, [FirstInfo | RestInfos]) ->
+    PartitionInfo = get_max_partition_size(FirstInfo, RestInfos),
+    [{db_name, DbName} | format_partition(PartitionInfo)].
 
 get_max_partition_size(Max, []) ->
     Max;
@@ -138,6 +141,43 @@ worker_exit_test() ->
     ?assertEqual([{S2, nil}], Acc2#acc.counters),
 
     ?assertEqual({error, bam}, handle_message({rexi_EXIT, bam}, S2, Acc2)).
+
+worker_down_and_mm_test() ->
+    [S1, S2, S3] = [
+        mk_shard("n1", [0, 4]),
+        mk_shard("n2", [0, 8]),
+        mk_shard("n3", [0, 4])
+    ],
+    Acc1 = #acc{
+        counters = fabric_dict:init([S1, S2, S3], nil),
+        ring_opts = [{any, [S1, S2, S3]}],
+        replies = []
+    },
+
+    N1 = S1#shard.node,
+    {ok, Acc2} = handle_message({rexi_DOWN, nil, {nil, N1}, nil}, nil, Acc1),
+
+    Info = [
+        {partition, <<"xx">>},
+        {doc_count, 0},
+        {doc_del_count, 0},
+        {sizes, [{active, 0}, {external, 0}]}
+    ],
+
+    {ok, Acc3} = handle_message({ok, Info}, S2, Acc2),
+
+    N3 = S3#shard.node,
+    {stop, Res} = handle_message({rexi_EXIT, {maintenance_mode, N3}}, S3, Acc3),
+    ?assertMatch(
+        [
+            {db_name, _},
+            {sizes, {[{active, 0}, {external, 0}]}},
+            {partition, <<"xx">>},
+            {doc_count, 0},
+            {doc_del_count, 0}
+        ],
+        Res
+    ).
 
 mk_shard(Name, Range) ->
     Node = list_to_atom(Name),

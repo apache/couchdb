@@ -36,7 +36,6 @@
     "etags for attachments",
     "implicit doc creation allows creating docs with a reserved id. COUCHDB-565",
     "large attachments COUCHDB-366",
-    "md5 header for attachments",
     "reads attachment successfully",
     "saves attachment successfully",
     "saves binary",
@@ -48,7 +47,7 @@
   ],
   "AuthLockoutTest": [
     "lockout after multiple failed authentications",
-    "lockout warning after multiple failed authentications"
+    "do not lockout after multiple failed authentications"
   ],
   "BasicsTest": [
     "'+' in document name should encode to '+'",
@@ -82,7 +81,9 @@
     "_all_docs POST error when multi-get is not a {'key': [...]} structure",
     "_bulk_docs POST error when body not an object",
     "oops, the doc id got lost in code nirwana",
-    "request ID can be specified at the client"
+    "request ID can be specified at the client",
+    "_all_dbs/_all_docs is not found",
+    "_dbs_info/_all_docs is not found"
   ],
   "BatchSaveTest": [
     "batch post",
@@ -156,7 +157,8 @@
     "Only JSON strings are accepted"
   ],
   "CookieAuthTest": [
-    "cookie auth"
+    "cookie auth",
+    "header doesn't contain set-cookie"
   ],
   "CopyDocTest": [
     "Copy doc tests"
@@ -256,6 +258,9 @@
     "jwt auth with RSA secret",
     "jwt auth with required iss claim",
     "jwt auth without secret"
+  ],
+  "LargeDocsTest": [
+    "Large docs"
   ],
   "ListViewsTest": [
     "COUCHDB-1113",
@@ -358,6 +363,8 @@
   "PartitionMangoTest": [
     "explain works with non partitioned db",
     "explain works with partitions",
+    "explain works with bookmarks",
+    "explain options",
     "global query does not use partition index",
     "global query uses global index",
     "non-partitioned query using _all_docs and $eq",
@@ -413,7 +420,7 @@
     "view updates properly remove old keys"
   ],
   "PasswordCacheTest": [
-    "password cache"
+    "password hash cache"
   ],
   "ProxyAuthTest": [
     "proxy auth with secret",
@@ -458,8 +465,6 @@
     "default headers returned for _scheduler/docs ",
     "default headers returned for _scheduler/jobs",
     "filtered replications - remote-to-remote",
-    "non-admin or reader user on source - remote-to-remote",
-    "non-admin user on target - remote-to-remote",
     "replicate with since_seq - remote-to-remote",
     "replicating attachment without conflict - COUCHDB-885",
     "replication by doc ids - remote-to-remote",
@@ -467,7 +472,6 @@
     "replication restarts after filter change - COUCHDB-892 - remote-to-remote",
     "simple remote-to-remote replication - remote-to-remote",
     "source database not found with host",
-    "unauthorized replication cancellation",
     "validate_doc_update failure replications - remote-to-remote"
   ],
   "ReshardAllDocsTest": [
@@ -481,6 +485,9 @@
     "split q=2 shards on node1 (2 jobs)",
     "toggle global state"
   ],
+  "ReshardChangesFeedTest": [
+    "all_docs after splitting all shards on node1"
+  ],
   "RevStemmingTest": [
     "revs limit is kept after compaction",
     "revs limit produces replication conflict ",
@@ -493,8 +500,8 @@
     "multiple updates with same _rev raise conflict errors"
   ],
   "RewriteJSTest": [
-    "Test basic js rewrites on test_rewrite_suite_db",
-    "Test basic js rewrites on test_rewrite_suite_db%2Fwith_slashes",
+    "basic js rewrites on test_rewrite_suite_db",
+    "basic js rewrites on test_rewrite_suite_db%2Fwith_slashes",
     "early response on test_rewrite_suite_db",
     "early response on test_rewrite_suite_db%2Fwith_slashes",
     "loop on test_rewrite_suite_db",
@@ -505,8 +512,8 @@
     "requests with body preserve the query string rewrite on test_rewrite_suite_db%2Fwith_slashes"
   ],
   "RewriteTest": [
-    "Test basic rewrites on test_rewrite_suite_db",
-    "Test basic rewrites on test_rewrite_suite_db%2Fwith_slashes",
+    "basic rewrites on test_rewrite_suite_db",
+    "basic rewrites on test_rewrite_suite_db%2Fwith_slashes",
     "loop detection on test_rewrite_suite_db",
     "loop detection on test_rewrite_suite_db%2Fwith_slashes",
     "path relative to server on test_rewrite_suite_db",
@@ -643,7 +650,8 @@
     "GET - invalid parameter combinations get rejected ",
     "POST - invalid parameter combinations get rejected ",
     "argument combinations",
-    "dir works",
+    "dir ascending works",
+    "dir descending works",
     "empty keys",
     "keys in GET body (group)",
     "keys in GET parameters",
@@ -711,27 +719,56 @@
     "view update seq"
   ],
   "WithQuorumTest": [
-    "Attachments overriden quorum should return 202-Acepted",
+    "Attachments overridden quorum should return 202-Accepted",
     "Attachments should return 201-Created",
-    "Bulk docs overriden quorum should return 202-Acepted",
+    "Bulk docs overridden quorum should return 202-Accepted",
     "Bulk docs should return 201-Created",
     "Copy doc should return 201-Created",
     "Creating-Updating/Deleting doc should return 201-Created/200-OK",
-    "Creating-Updating/Deleting doc with overriden quorum should return 202-Acepted/200-OK",
-    "Creating/Deleting DB should return 201-Created/202-Acepted"
+    "Creating-Updating/Deleting doc with overridden quorum should return 202-Accepted/200-OK",
+    "Creating/Deleting DB should return 201-Created/200-OK"
   ],
   "WithoutQuorumTest": [
-    "Attachments overriden quorum should return 201-Created",
-    "Attachments should return 202-Acepted",
-    "Bulk docs overriden quorum should return 201-Created",
-    "Bulk docs should return 202-Acepted",
-    "Copy doc should return 202-Acepted",
-    "Creating-Updating/Deleting doc with overriden quorum should return 201-Created/200-OK",
-    "Creating/Deleting DB should return 202-Acepted",
-    "Creating/Updating/Deleting doc should return 202-Acepted"
+    "Attachments overridden quorum should return 201-Created",
+    "Attachments should return 201-Created",
+    "Bulk docs overridden quorum should return 201-Created",
+    "Bulk docs should return 201-Created",
+    "Copy doc should return 201-Created",
+    "Creating-Updating/Deleting doc with overridden quorum should return 201-Created/200-OK",
+    "Creating/Deleting DB should return 201-Created/200-OK",
+    "Creating/Updating/Deleting doc should return 201-Created/200-OK"
   ],
   "BasicFindTest": [
-    "simple find"
+    "simple find",
+    "bad selector",
+    "bad limit",
+    "bad skip",
+    "bad sort",
+    "bad fields",
+    "bad r",
+    "bad conflicts",
+    "multi cond and",
+    "multi cond duplicate field",
+    "multi cond or",
+    "multi col idx",
+    "missing not indexed",
+    "limit",
+    "skip",
+    "sort",
+    "sort desc complex",
+    "sort with primary sort not in selector",
+    "sort exists true",
+    "sort desc complex error",
+    "fields",
+    "r",
+    "empty",
+    "empty subsel",
+    "empty subsel match",
+    "unsatisfiable range",
+    "explain view args",
+    "explain options",
+    "explain with bookmarks",
+    "sort with all docs"
   ],
   "IgnoreDesignDocsForAllDocsIndexTests": [
     "should not return design docs"
@@ -748,4 +785,94 @@
     "choose index with id",
     "choose index with rev"
   ],
+  "RegularCoveringIndexTest": [
+    "index covers query 1 field index id",
+    "index covers query 2 field index id",
+    "index covers query 2 field index extract field",
+    "index covers query 2 field index extract field force index",
+    "index covers query elemMatch",
+    "index covers query composite field_id",
+    "index does not cover query empty selector",
+    "index does not cover query field not in index",
+    "index does not cover query all fields",
+    "index does not cover query partial selector id",
+    "index does not cover query partial selector",
+    "index does not cover selector with more fields",
+    "covering index provides correct answer 2 field index",
+    "covering index provides correct answer id"
+  ],
+  "PartitionedCoveringIndexTest": [
+    "index covers query 1 field index id",
+    "index covers query 2 field index id",
+    "index covers query 2 field index extract field",
+    "index covers query 2 field index extract field force index",
+    "index covers query elemMatch",
+    "index covers query composite field_id",
+    "index does not cover query empty selector",
+    "index does not cover query field not in index",
+    "index does not cover query all fields",
+    "index does not cover query partial selector id",
+    "index does not cover query partial selector",
+    "index does not cover selector with more fields",
+    "covering index provides correct answer 2 field index",
+    "covering index provides correct answer id"
+  ],
+  "BeginsWithOperator": [
+    "basic",
+    "json range",
+    "compound key",
+    "sort",
+    "all docs range",
+    "no index",
+    "invalid operand",
+    "does not match non string value",
+    "no matches",
+    "case sensitivity"
+  ],
+  "JSONIndexSelectionTest": [
+    "basic",
+    "with and",
+    "with nested and",
+    "with or",
+    "use most columns",
+    "no valid sort index",
+    "invalid use index",
+    "uses index when no range or equals",
+    "reject use index invalid fields",
+    "reject use index ddoc and name invalid fields",
+    "reject use index sort order",
+    "use index fallback if valid sort",
+    "prefer use index over optimal index",
+    "manual bad view idx01",
+    "explain sort reverse",
+    "use index with invalid name",
+    "use index without fallback succeeds for valid index",
+    "use index without fallback fails for invalid index with fallback available",
+    "use index without fallback succeeds for empty index",
+    "use index without fallback fails for empty index",
+    "use index without fallback fails for invalid index no fallback exists",
+    "index without fallback",
+    "no index without fallback",
+    "uses all docs when fields do not match selector",
+    "uses all docs when selector doesnt require fields to exist"
+  ],
+  "JwtRolesClaimTest": [
+    "case: roles_claim_name (defined) / roles_claim_path (defined)",
+    "case: roles_claim_name (defined) / roles_claim_path (undefined)",
+    "case: roles_claim_name (undefined) / roles_claim_path (defined)",
+    "case: roles_claim_name (undefined) / roles_claim_path (undefined)",
+    "case: roles_claim_path with bad input"
+  ],
+  "PaginateJsonDocs": [
+    "all docs paginate to end",
+    "return previous bookmark for empty",
+    "all docs with skip",
+    "all docs reverse",
+    "bad bookmark",
+    "throws error on text bookmark",
+    "index pagination",
+    "index pagination two keys",
+    "index pagination reverse",
+    "index pagination same emitted key"
+  ]
 }
