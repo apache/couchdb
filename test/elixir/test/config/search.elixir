@@ -38,6 +38,11 @@
     "explain options",
     "explain with bookmarks"
   ],
+  "IndexCrudTextTests": [
+    "create text idx",
+    "create bad text idx",
+    "limit skip idx"
+  ],
   "ElemMatchTests": [
     "elem match non object"
   ],
