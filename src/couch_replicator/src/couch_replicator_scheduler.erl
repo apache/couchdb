@@ -665,7 +665,8 @@ maybe_remove_job_int(JobId, State) ->
 
 start_job_int(#job{pid = Pid}, _State) when Pid /= undefined ->
     ok;
-start_job_int(#job{} = Job0, State) ->
+start_job_int(#job{rep = Rep} = Job0, State) ->
+    ok = couch_replicator_utils:verify_endpoint_domain_log(Rep),
     Job = maybe_optimize_job_for_rate_limiting(Job0),
     case couch_replicator_scheduler_job:start_link(Job#job.rep) of
         {ok, Child} ->

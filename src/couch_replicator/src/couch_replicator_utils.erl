@@ -29,6 +29,7 @@
     remove_basic_auth_creds/1,
     normalize_basic_auth/1,
     seq_encode/1,
+    verify_endpoint_domain_log/1,
     valid_endpoint_protocols_log/1,
     verify_ssl_certificates_log/1,
     cacert_get/0
@@ -329,6 +330,40 @@ url_from_type(#rep{} = Rep, source) ->
     Rep#rep.source#httpdb.url;
 url_from_type(#rep{} = Rep, target) ->
     Rep#rep.target#httpdb.url.
+
+%% Log uses of disallowed domain
+verify_endpoint_domain_log(#rep{source = undefined, target = undefined}) ->
+    % When we cancel continuous transient replications (with a POST to _replicate)
+    % source and target will be undefined
+    ok;
+verify_endpoint_domain_log(#rep{} = Rep) ->
+    VerifyEnabled = config:get_boolean("replicator", "verify_endpoint_domain_log", false),
+    case VerifyEnabled of
+        true ->
+            AllowedDomainCfg = config:get("replicator", "valid_endpoint_domain", "[]"),
+            {ok, AllowedDomain} = couch_util:parse_term(AllowedDomainCfg),
+            ok = check_endpoint_domain(Rep, source, AllowedDomain),
+            ok = check_endpoint_domain(Rep, target, AllowedDomain);
+        false ->
+            ok
+    end.
+
+check_endpoint_domain(#rep{}, _, []) ->
+    ok;
+check_endpoint_domain(#rep{} = Rep, Type, AllowedDomain) ->
+    Url = url_from_type(Rep, Type),
+    #url{host = Host} = ibrowse_lib:parse_url(Url),
+    case lists:member(Host, AllowedDomain) of
+        true ->
+            ok;
+        false ->
+            couch_log:warning(
+                "**disallowed domain** replication ~s used disallowed domain ~s at ~s", [
+                    rep_principal(Rep), Type, Url
+                ]
+            ),
+            ok
+    end.
 
 %% log uses of https protocol where verify_peer would fail.
 verify_ssl_certificates_log(#rep{} = Rep) ->
@@ -810,6 +845,64 @@ t_allow_canceling_transient_jobs(_) ->
     % target endpoints defined. They are left undefined.
     ?assertEqual(ok, valid_endpoint_protocols_log(#rep{})),
     ?assertEqual(0, meck:num_calls(couch_log, warning, 2)).
+
+verify_endpoint_domain_log_setup() ->
+    Ctx = test_util:start_couch(),
+    config:set_boolean("replicator", "verify_endpoint_domain_log", true, false),
+    meck:new(couch_log, [passthrough]),
+    Ctx.
+
+verify_endpoint_domain_log_teardown(Ctx) ->
+    meck:unload(),
+    config:delete("replicator", "verify_endpoint_domain_log", false),
+    test_util:stop_couch(Ctx).
+
+verify_endpoint_domain_log_test_() ->
+    {
+        foreach,
+        fun verify_endpoint_domain_log_setup/0,
+        fun verify_endpoint_domain_log_teardown/1,
+        [
+            ?TDEF_FE(t_dont_warn_when_valid_endpoint_domain_is_empty),
+            ?TDEF_FE(t_warn_when_replicate_with_invalid_endpoint_domain)
+        ]
+    }.
+
+t_dont_warn_when_valid_endpoint_domain_is_empty(_) ->
+    set_allowed_domain("[]"),
+    Rep = #rep{
+        source = #httpdb{url = "https://foo.local"},
+        target = #httpdb{url = "https://127.0.0.2"}
+    },
+    meck:reset(couch_log),
+    ?assertEqual(ok, verify_endpoint_domain_log(Rep)),
+    ?assertEqual(0, meck:num_calls(couch_log, warning, 2)),
+    reset_allowed_domain().
+
+t_warn_when_replicate_with_invalid_endpoint_domain(_) ->
+    set_allowed_domain("[\"example.com\", \"127.0.0.1\"]"),
+    Rep1 = #rep{
+        source = #httpdb{url = "https://foo.local"},
+        target = #httpdb{url = "https://127.0.0.1"}
+    },
+    meck:reset(couch_log),
+    ?assertEqual(ok, verify_endpoint_domain_log(Rep1)),
+    ?assertEqual(1, meck:num_calls(couch_log, warning, 2)),
+
+    meck:reset(couch_log),
+    Rep2 = #rep{
+        source = #httpdb{url = "https://foo.local"},
+        target = #httpdb{url = "https://127.0.0.2"}
+    },
+    ?assertEqual(ok, verify_endpoint_domain_log(Rep2)),
+    ?assertEqual(2, meck:num_calls(couch_log, warning, 2)),
+    reset_allowed_domain().
+
+set_allowed_domain(Domains) ->
+    config:set("replicator", "valid_endpoint_domain", Domains, false).
+
+reset_allowed_domain() ->
+    config:delete("replicator", "valid_endpoint_domain", false).
 
 cacert_test() ->
     Old = ?CACERT_DEFAULT_TIMESTAMP,
