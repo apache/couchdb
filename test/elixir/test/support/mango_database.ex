@@ -230,6 +230,7 @@ defmodule MangoDatabase do
       |> put_if_set("execution_stats", options, :executionStats)
       |> put_if_set("allow_fallback", options, :allow_fallback)
       |> put_if_set("bookmark", options, :bookmark)
+      |> put_if_set("update", options, :update)
       )
 
     case {(options[:explain] or options[:return_raw]), resp.status_code} do

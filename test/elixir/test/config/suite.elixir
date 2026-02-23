@@ -920,5 +920,8 @@
     "index pagination two keys",
     "index pagination reverse",
     "index pagination same emitted key"
+  ],
+  "SupportStableAndUpdate": [
+    "update updates view when specified"
   ]
 }
