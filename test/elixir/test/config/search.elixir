@@ -95,6 +95,9 @@
   "RegexVsTextIndexTest": [
     "regex works with text index"
   ],
+  "NumStringTests": [
+    "single floating point test"
+  ],
   "NoDefaultFieldTest": [
     "basic",
     "other fields exist"

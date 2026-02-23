@@ -100,7 +100,7 @@ Gentoo-based Systems
 ::
 
     sudo emerge gnupg coreutils pkgconfig help2man sphinx python
-    sudo pip install hypothesis requests nose
+    sudo pip install requests nose
 
 Centos 7 and RHEL 7
 ~~~~~~~~~~~~~~~~~~~
@@ -136,7 +136,7 @@ FreeBSD
 ::
 
     pkg install help2man gnupg py27-sphinx node
-    pip install nose requests hypothesis
+    pip install nose requests
 
 Windows
 ~~~~~~~

@@ -15,9 +15,6 @@ import mango
 import unittest
 import user_docs
 import math
-from hypothesis import given, assume, example, settings
-import hypothesis.strategies as st
-
 
 @unittest.skipIf(mango.has_text_service(), "text service exists")
 class TextIndexCheckTests(mango.DbPerClass):
@@ -564,39 +561,3 @@ class AllMatchTests(mango.FriendDocsTextTests):
         docs = self.db.find(q)
         assert len(docs) == 1
         assert docs[0]["user_id"] == 15
-
-
-# Test numeric strings for $text
-@unittest.skipUnless(mango.has_text_service(), "requires text service")
-class NumStringTests(mango.DbPerClass):
-    @classmethod
-    def setUpClass(klass):
-        super(NumStringTests, klass).setUpClass()
-        klass.db.recreate()
-        klass.db.create_text_index()
-
-    # not available for python 2.7.x
-    def isFinite(num):
-        not (math.isinf(num) or math.isnan(num))
-
-    @given(f=st.floats().filter(isFinite).map(str) | st.floats().map(lambda f: f.hex()))
-    @settings(deadline=1000)
-    @example("NaN")
-    @example("Infinity")
-    def test_floating_point_val(self, f):
-        doc = {"number_string": f}
-        self.db.save_doc(doc)
-        q = {"$text": f}
-        docs = self.db.find(q)
-        if len(docs) == 1:
-            assert docs[0]["number_string"] == f
-        if len(docs) == 2:
-            if docs[0]["number_string"] != f:
-                assert docs[1]["number_string"] == f
-        q = {"number_string": f}
-        docs = self.db.find(q)
-        if len(docs) == 1:
-            assert docs[0]["number_string"] == f
-        if len(docs) == 2:
-            if docs[0]["number_string"] != f:
-                assert docs[1]["number_string"] == f
