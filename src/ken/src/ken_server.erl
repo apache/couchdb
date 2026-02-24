@@ -269,16 +269,20 @@ update_db_indexes(Name, State) ->
                 true -> ok
             end;
         {error, timeout} ->
+            exit(resubmit);
+        {error, {nodedown, _}} ->
+            exit(resubmit);
+        {error, {maintenance_mode, _, _}} ->
             exit(resubmit)
     end.
 
 design_docs(Name) ->
     try
         case fabric:design_docs(mem3:dbname(Name)) of
-            {error, {maintenance_mode, _, _Node}} ->
-                {ok, []};
-            {error, {nodedown, _Reason}} ->
-                {ok, []};
+            {error, {maintenance_mode, _, _Node}} = Error ->
+                Error;
+            {error, {nodedown, _Reason}} = Error ->
+                Error;
             {ok, DDocs} when is_list(DDocs) ->
                 {ok, DDocs};
             {ok, _Resp} ->
