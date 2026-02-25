@@ -197,6 +197,8 @@ ttl(St, DbName) ->
                 case parse_deleted_document_ttl(AutoPurgeProps) of
                     TTL when is_integer(TTL) ->
                         TTL;
+                    infinity ->
+                        infinity;
                     undefined ->
                         undefined;
                     Else ->
@@ -215,22 +217,33 @@ ttl(St, DbName) ->
                 ),
                 undefined
         end,
-    if
-        DbTTL /= undefined -> DbTTL;
-        DefaultTTL /= undefined -> parse_ttl(DefaultTTL);
-        true -> undefined
+    case {DbTTL, DefaultTTL} of
+        {undefined, undefined} ->
+            undefined;
+        {undefined, infinity} ->
+            undefined;
+        {infinity, _} ->
+            undefined;
+        {undefined, Val} when is_list(Val) ->
+            parse_ttl(Val);
+        {Val, _} when is_integer(Val) ->
+            Val
     end.
 
 parse_deleted_document_ttl(AutoPurgeProps) ->
     case couch_util:get_value(<<"deleted_document_ttl">>, AutoPurgeProps) of
         undefined ->
             undefined;
+        <<"infinity">> ->
+            infinity;
         Else ->
             parse_ttl(Else)
     end.
 
 parse_ttl(Bin) when is_binary(Bin) ->
     parse_ttl(binary_to_list(Bin));
+parse_ttl("infinity") ->
+    infinity;
 parse_ttl([$- | TTL]) ->
     -(parse_ttl(TTL));
 parse_ttl(TTL) ->

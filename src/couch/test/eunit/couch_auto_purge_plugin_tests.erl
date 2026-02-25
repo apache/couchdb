@@ -26,6 +26,9 @@ couch_quickjs_scanner_plugin_test_() ->
             ?TDEF_FE(t_no_auto_purge_by_default, 10),
             ?TDEF_FE(t_auto_purge_after_config_ttl, 10),
             ?TDEF_FE(t_auto_purge_after_db_ttl, 10),
+            ?TDEF_FE(t_no_auto_purge_after_db_ttl_set_to_infinity, 10),
+            ?TDEF_FE(t_no_auto_purge_after_config_ttl_set_to_infinity, 10),
+            ?TDEF_FE(t_db_auto_purge_overrides_cluster_ttl_infinity, 10),
             ?TDEF_FE(t_min_batch_size_1, 10),
             ?TDEF_FE(t_min_batch_size_2, 10),
             ?TDEF_FE(t_max_batch_size_1, 10),
@@ -80,6 +83,41 @@ t_auto_purge_after_config_ttl({_, DbName}) ->
     ok.
 
 t_auto_purge_after_db_ttl({_, DbName}) ->
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(0, doc_del_count(DbName)),
+    ok.
+
+t_no_auto_purge_after_config_ttl_set_to_infinity({_, DbName}) ->
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "infinity", false),
+    ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, doc_del_count(DbName)),
+    ok.
+
+t_no_auto_purge_after_db_ttl_set_to_infinity({_, DbName}) ->
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, <<"infinity">>}]),
+    ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
+    ?assertEqual(1, doc_del_count(DbName)),
+    meck:reset(couch_scanner_server),
+    meck:reset(?PLUGIN),
+    config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, doc_del_count(DbName)),
+    ok.
+
+t_db_auto_purge_overrides_cluster_ttl_infinity({_, DbName}) ->
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "infinity", false),
     ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
