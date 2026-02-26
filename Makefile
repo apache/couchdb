@@ -254,7 +254,7 @@ elixir: elixir-init devclean
 		--no-join \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
+		--no-eval 'mix test --max-failures 1 --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
 ifneq ($(CLOUSEAU_DIR),)
 _WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
