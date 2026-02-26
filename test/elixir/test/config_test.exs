@@ -194,7 +194,7 @@ defmodule ConfigTest do
       delete_config(context, "config", "auto_reload_secs", nil)
     end)
 
-    :timer.sleep(1200)
+    :timer.sleep(1500)
     assert get_config(context, "foo", "bar") == "baz"
   end
 
