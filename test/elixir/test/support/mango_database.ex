@@ -28,15 +28,25 @@ defmodule MangoDatabase do
   end
 
   def recreate(db, opts \\ []) do
+    delete(db)
+    wait_for_delete(db)
+    create(db, opts)
+    wait_for_db_info(db)
+  end
+
+  def wait_for_delete(db) do
     resp = Couch.get("/#{db}")
-    if resp.status_code == 200 do
-      docs = resp.body["doc_count"] + resp.body["doc_del_count"]
-      if docs > 0 do
-        delete(db)
-        create(db, opts)
-      end
-    else
-      create(db, opts)
+    if resp.status_code != 404 do
+      :timer.sleep(100)
+      wait_for_delete(db)
+    end
+  end
+
+  def wait_for_db_info(db) do
+    resp = Couch.get("/#{db}")
+    if resp.status_code == 404 do
+      :timer.sleep(100)
+      wait_for_db_info(db)
     end
   end
 
