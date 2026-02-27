@@ -151,11 +151,8 @@ handle_changes_req1(#httpd{} = Req, Db) ->
                 mochi = Req,
                 threshold = Max
             },
-            try
-                fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
-            after
-                couch_stats:decrement_counter([couchdb, httpd, clients_requesting_changes])
-            end;
+            couch_changes_mon:decrement_clients_requesting_changes_on_exit(),
+            fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs);
         _ ->
             Msg = <<"Supported `feed` types: normal, continuous, live, longpoll, eventsource">>,
             throw({bad_request, Msg})
