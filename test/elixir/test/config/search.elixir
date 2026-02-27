@@ -72,6 +72,10 @@
   "LimitTests": [
     "limit field"
   ],
+  "DisableIndexArrayLengthsTest": [
+    "disable index array length",
+    "enable index array length"
+  ],
   "KeyTest": [
     "dot key",
     "peso key",
