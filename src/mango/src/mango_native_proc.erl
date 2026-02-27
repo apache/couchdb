@@ -29,6 +29,7 @@
 
 -record(st, {
     indexes = [],
+    validators = [],
     timeout = 5000
 }).
 
@@ -94,6 +95,32 @@ handle_call({prompt, [<<"nouveau_index_doc">>, Doc]}, _From, St) ->
                 Else
         end,
     {reply, Vals, St};
+handle_call({prompt, [<<"ddoc">>, <<"new">>, DDocId, {DDoc}]}, _From, St) ->
+    NewSt =
+        case couch_util:get_value(<<"validate_doc_update">>, DDoc) of
+            undefined ->
+                St;
+            Selector0 ->
+                Selector = mango_selector:normalize(Selector0),
+                Validators = couch_util:set_value(DDocId, St#st.validators, Selector),
+                St#st{validators = Validators}
+        end,
+    {reply, true, NewSt};
+handle_call({prompt, [<<"ddoc">>, DDocId, [<<"validate_doc_update">>], Args]}, _From, St) ->
+    case couch_util:get_value(DDocId, St#st.validators) of
+        undefined ->
+            Msg = [<<"validate_doc_update">>, DDocId],
+            {stop, {invalid_call, Msg}, {invalid_call, Msg}, St};
+        Selector ->
+            [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
+            Struct = {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, OldDoc}]},
+            Reply =
+                case mango_selector:match(Selector, Struct) of
+                    true -> true;
+                    _ -> {[{<<"forbidden">>, <<"document is not valid">>}]}
+                end,
+            {reply, Reply, St}
+    end;
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
 
