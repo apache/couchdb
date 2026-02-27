@@ -22,7 +22,11 @@
     doc_count,
     w,
     grouped_docs,
-    reply
+    reply,
+    dbname,
+    update_options = [],
+    leaders = [],
+    started = []
 }).
 
 go(_, [], _) ->
@@ -33,10 +37,8 @@ go(DbName, AllDocs0, Opts) ->
     validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
     Options = lists:delete(all_or_nothing, Opts),
     GroupedDocs = lists:map(
-        fun({#shard{name = Name, node = Node} = Shard, Docs}) ->
-            Docs1 = untag_docs(Docs),
-            Ref = rexi:cast(Node, {fabric_rpc, update_docs, [Name, Docs1, Options]}),
-            {Shard#shard{ref = Ref}, Docs}
+        fun({#shard{} = Shard, Docs}) ->
+            {Shard#shard{ref = make_ref()}, Docs}
         end,
         group_docs_by_shard(DbName, AllDocs)
     ),
@@ -47,10 +49,13 @@ go(DbName, AllDocs0, Opts) ->
         doc_count = length(AllDocs),
         w = fabric_util:w_from_opts(DbName, Options),
         grouped_docs = GroupedDocs,
-        reply = dict:new()
+        reply = dict:new(),
+        dbname = DbName,
+        update_options = Options
     },
     Timeout = fabric_util:request_timeout(),
-    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
+    Acc1 = start_leaders(Acc0),
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc1, infinity, Timeout) of
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
@@ -73,22 +78,33 @@ go(DbName, AllDocs0, Opts) ->
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Worker, #acc{} = Acc0) ->
     #acc{grouped_docs = GroupedDocs} = Acc0,
-    NewGrpDocs = [X || {#shard{node = N}, _} = X <- GroupedDocs, N =/= NodeRef],
-    skip_message(Acc0#acc{waiting_count = length(NewGrpDocs), grouped_docs = NewGrpDocs});
+    {NewGrpDocs, DroppedGrpDocs} = lists:partition(
+        fun({#shard{node = N}, _}) -> N =/= NodeRef end, GroupedDocs
+    ),
+    DroppedRanges = lists:usort([S#shard.range || {S, _} <- DroppedGrpDocs]),
+    Acc1 = Acc0#acc{waiting_count = length(NewGrpDocs), grouped_docs = NewGrpDocs},
+    Acc2 = start_followers(DroppedRanges, Acc1),
+    skip_message(Acc2);
 handle_message({rexi_EXIT, _}, Worker, #acc{} = Acc0) ->
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs},
+    Acc2 = start_followers([Worker#shard.range], Acc1),
+    skip_message(Acc2);
 handle_message({error, all_dbs_active}, Worker, #acc{} = Acc0) ->
     % treat it like rexi_EXIT, the hope at least one copy will return successfully
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs},
+    Acc2 = start_followers([Worker#shard.range], Acc1),
+    skip_message(Acc2);
 handle_message(internal_server_error, Worker, #acc{} = Acc0) ->
     % happens when we fail to load validation functions in an RPC worker
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    Acc1 = Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs},
+    Acc2 = start_followers([Worker#shard.range], Acc1),
+    skip_message(Acc2);
 handle_message(attachment_chunk_received, _Worker, #acc{} = Acc0) ->
     {ok, Acc0};
 handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
@@ -99,7 +115,15 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
         grouped_docs = GroupedDocs,
         reply = DocReplyDict0
     } = Acc0,
-    {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
+    {value, {_, Docs}, NewGrpDocs0} = lists:keytake(Worker, 1, GroupedDocs),
+    NewGrpDocs =
+        case lists:member(Worker#shard.ref, Acc0#acc.leaders) of
+            true ->
+                remove_conflicted_docs(Docs, Replies, NewGrpDocs0);
+            false ->
+                NewGrpDocs0
+        end,
+    Acc2 = start_followers([Worker#shard.range], Acc0#acc{grouped_docs = NewGrpDocs}),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),
     case {WaitingCount, dict:size(DocReplyDict)} of
         {1, _} ->
@@ -114,7 +138,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
             % we've got at least one reply for each document, let's take a look
             case dict:fold(fun maybe_reply/3, {stop, W, []}, DocReplyDict) of
                 continue ->
-                    {ok, Acc0#acc{
+                    {ok, Acc2#acc{
                         waiting_count = WaitingCount - 1,
                         grouped_docs = NewGrpDocs,
                         reply = DocReplyDict
@@ -123,7 +147,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
                     {stop, {ok, FinalReplies}}
             end;
         _ ->
-            {ok, Acc0#acc{
+            {ok, Acc2#acc{
                 waiting_count = WaitingCount - 1, grouped_docs = NewGrpDocs, reply = DocReplyDict
             }}
     end;
@@ -177,8 +201,11 @@ tag_docs([#doc{meta = Meta} = Doc | Rest]) ->
 
 untag_docs([]) ->
     [];
-untag_docs([#doc{meta = Meta} = Doc | Rest]) ->
-    [Doc#doc{meta = lists:keydelete(ref, 1, Meta)} | untag_docs(Rest)].
+untag_docs([#doc{} = Doc | Rest]) ->
+    [untag_doc(Doc) | untag_docs(Rest)].
+
+untag_doc(#doc{} = Doc) ->
+    Doc#doc{meta = lists:keydelete(ref, 1, Doc#doc.meta)}.
 
 force_reply(Doc, [], {_, W, Acc}) ->
     {error, W, [{Doc, {error, internal_server_error}} | Acc]};
@@ -349,6 +376,67 @@ validate_atomic_update(_DbName, AllDocs, true) ->
         AllDocs
     ),
     throw({aborted, PreCommitFailures}).
+
+start_leaders(#acc{} = Acc0) ->
+    #acc{dbname = DbName, grouped_docs = GroupedDocs} = Acc0,
+    {Workers, _} = lists:unzip(GroupedDocs),
+    LeaderRefs = lists:foldl(
+        fun({Worker, Docs}, RefAcc) ->
+            case is_leader(DbName, Worker, Workers) of
+                true ->
+                    start_worker(Worker, Docs, Acc0),
+                    [Worker#shard.ref | RefAcc];
+                false ->
+                    RefAcc
+            end
+        end,
+        [],
+        GroupedDocs
+    ),
+    Acc0#acc{leaders = LeaderRefs, started = LeaderRefs}.
+
+start_followers(Ranges, #acc{} = Acc0) ->
+    Followers = [
+        {Worker, Docs}
+     || {Worker, Docs} <- Acc0#acc.grouped_docs,
+        lists:member(Worker#shard.range, Ranges),
+        not lists:member(Worker#shard.ref, Acc0#acc.started)
+    ],
+    lists:foreach(
+        fun({Worker, Docs}) ->
+            start_worker(Worker, Docs, Acc0)
+        end,
+        Followers
+    ),
+    Started = [Ref || {#shard{ref = Ref}, _Docs} <- Followers],
+    Acc0#acc{started = lists:append([Started, Acc0#acc.started])}.
+
+%% use 'lowest' node that hosts this shard range as leader
+is_leader(DbName, Worker, Workers) ->
+    Nodes0 = lists:sort([W#shard.node || W <- Workers, W#shard.range == Worker#shard.range]),
+    Nodes1 = mem3_util:rotate_list(DbName, Nodes0),
+    Worker#shard.node == hd(Nodes1).
+
+start_worker(#shard{ref = Ref} = Worker, Docs, #acc{} = Acc) when is_reference(Ref) ->
+    #shard{name = Name, node = Node} = Worker,
+    #acc{update_options = UpdateOptions} = Acc,
+    rexi:cast_ref(Ref, Node, {fabric_rpc, update_docs, [Name, untag_docs(Docs), UpdateOptions]}),
+    ok;
+start_worker(#shard{ref = undefined}, _Docs, #acc{}) ->
+    % for unit tests below.
+    ok.
+
+%% Remove all remaining doc update attempts if a conflict occurred at leader
+remove_conflicted_docs(Docs, Replies, GroupedDocs) when length(Docs) == length(Replies) ->
+    ConflictDocs = [Doc || {Doc, conflict} <- lists:zip(Docs, Replies)],
+    UntaggedConflictDocs = untag_docs(ConflictDocs),
+    [
+        {W, [D || D <- Ds, not lists:member(untag_doc(D), UntaggedConflictDocs)]}
+     || {W, Ds} <- GroupedDocs
+    ];
+remove_conflicted_docs(_Docs, _Replies, GroupedDocs) ->
+    %% replies can be shorter for replicated changes as only errors show up in the result
+    GroupedDocs.
 
 -ifdef(TEST).
 
