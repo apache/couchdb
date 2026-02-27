@@ -58,6 +58,8 @@
             "ok": true
         }
 
+.. _api/db/nouveau_cleanup:
+
 ==========================
 ``/{db}/_nouveau_cleanup``
 ==========================

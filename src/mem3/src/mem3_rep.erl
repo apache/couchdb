@@ -20,6 +20,7 @@
     make_purge_id/2,
     verify_purge_checkpoint/2,
     cleanup_purge_checkpoints/1,
+    have_all_purge_checkpoints/1,
     find_source_seq/4,
     find_split_target_seq/4,
     local_id_hash/1
@@ -207,10 +208,81 @@ cleanup_purge_checkpoints(Db) ->
                 {stop, Acc}
         end
     end,
-    Opts = [{start_key, list_to_binary(?PURGE_PREFIX)}],
-    {ok, ToDelete} = couch_db:fold_local_docs(Db, FoldFun, [], Opts),
+    ToDelete = fold_purge_checkpoints(Db, FoldFun, []),
     DeleteFun = fun(DocId) -> delete_checkpoint(Db, DocId) end,
     lists:foreach(DeleteFun, ToDelete).
+
+% Check if we have all the internal replicator purge checkpoints. Call this
+% before compaction starts to avoid removing purge infos before the internal
+% replicator has managed to create the first checkpoint.
+%
+have_all_purge_checkpoints(ShardName) when is_binary(ShardName) ->
+    couch_util:with_db(ShardName, fun(Db) -> have_all_purge_checkpoints(Db) end);
+have_all_purge_checkpoints(Db) ->
+    Shards = shards(couch_db:name(Db)),
+    ReplicatePurges = config:get_boolean("mem3", "replicate_purges", true),
+    have_all_purge_checkpoints(ReplicatePurges, Db, Shards).
+
+have_all_purge_checkpoints(true, Db, [_ | _] = Shards) ->
+    ShardName = couch_db:name(Db),
+    UUID = couch_db:get_uuid(Db),
+    FoldFun = fun(#doc{id = Id, body = {Props}}, Acc) ->
+        case Id of
+            <<?PURGE_PREFIX, UUID:?UUID_SIZE/binary, "-", _:?UUID_SIZE/binary>> ->
+                case verify_checkpoint_shard(Shards, Props) of
+                    true ->
+                        Range = couch_util:get_value(<<"range">>, Props),
+                        TBin = couch_util:get_value(<<"target">>, Props),
+                        TNode = binary_to_existing_atom(TBin, latin1),
+                        {ok, sets:add_element({TNode, Range}, Acc)};
+                    false ->
+                        {ok, Acc}
+                end;
+            _ ->
+                {stop, Acc}
+        end
+    end,
+    CheckpointSet = fold_purge_checkpoints(Db, FoldFun, couch_util:new_set()),
+    CopySet =
+        case ShardName == mem3_sync:shards_db() of
+            true ->
+                % We're dealing with the shards db itself. By convention
+                % mem3:shards/1 returns a single #shard{} record with node =
+                % node(), name = _dbs, range = [0, ?RING_END] and it should
+                % replicate in a ring to the dbs copy on "next" node in a ring.
+                % We push purges to the next node and the previous node pull
+                % purges from us, so we expect to have only two purge
+                % checkpoints for the next and previous nodes.
+                Next = mem3_sync:find_next_node(),
+                Prev = mem3_sync:find_previous_node(),
+                % If we're the only node, then next == node() and prev == node()
+                case Next == config:node_name() of
+                    true ->
+                        couch_util:new_set();
+                    false ->
+                        couch_util:set_from_list([
+                            {Next, [0, ?RING_END]},
+                            {Prev, [0, ?RING_END]}
+                        ])
+                end;
+            false ->
+                % Keep only shard copies. These are not necessarily ones with a matching
+                % ranges but also overlapping ranges, since the shards may have been split.
+                SrcRange = mem3:range(ShardName),
+                IsCopy = fun(#shard{name = Name, node = Node, range = Range}) ->
+                    (not (Name == ShardName andalso Node == config:node_name())) andalso
+                        mem3_util:range_overlap(SrcRange, Range)
+                end,
+                Copies = [{T, R} || #shard{node = T, range = R} = S <- Shards, IsCopy(S)],
+                couch_util:set_from_list(Copies)
+        end,
+    sets:size(sets:subtract(CopySet, CheckpointSet)) == 0;
+have_all_purge_checkpoints(false, _Db, _Shards) ->
+    % If purges are not replicated then we assume we have all (0) checkpoints.
+    true;
+have_all_purge_checkpoints(_, _Db, []) ->
+    % For a unsharded db we also assume we have all (0) checkpoints.
+    true.
 
 delete_checkpoint(Db, DocId) ->
     DbName = couch_db:name(Db),
@@ -228,6 +300,11 @@ delete_checkpoint(Db, DocId) ->
             couch_log:error(ErrLog, [?MODULE, DbName, DocId, Tag, Error]),
             ok
     end.
+
+fold_purge_checkpoints(Db, FoldFun, Acc0) ->
+    Opts = [{start_key, list_to_binary(?PURGE_PREFIX)}],
+    {ok, Acc1} = couch_db:fold_local_docs(Db, FoldFun, Acc0, Opts),
+    Acc1.
 
 verify_purge_checkpoint(DbName, Props) ->
     try
@@ -251,17 +328,33 @@ shards(DbName) ->
     end.
 
 verify_checkpoint_shard(Shards, Props) when is_list(Shards), is_list(Props) ->
-    Range = couch_util:get_value(<<"range">>, Props),
-    Fun = fun(S, Acc) ->
-        case mem3:range(S) == Range of
-            true -> [mem3:node(S) | Acc];
-            false -> Acc
-        end
-    end,
-    Nodes = lists:foldl(Fun, [], Shards),
     TBin = couch_util:get_value(<<"target">>, Props),
     TNode = binary_to_existing_atom(TBin, latin1),
-    lists:member(TNode, Nodes) andalso lists:member(TNode, mem3:nodes()).
+    ShardsDb = mem3_sync:shards_db(),
+    case Shards of
+        [#shard{dbname = ShardsDb}] ->
+            % This is shards db itself. It's a special case since replications
+            % copies are other shard db copies replicated in a ring. We push
+            % purges to the next and node and the previous node pull purges
+            % from us. So we expect to have two purge replication checkpoints.
+            Next = mem3_sync:find_next_node(),
+            Prev = mem3_sync:find_previous_node(),
+            % If we're the only node, the next == node()
+            case Next == config:node_name() of
+                true -> false;
+                false -> TNode == Next orelse TNode == Prev
+            end;
+        _ ->
+            Range = couch_util:get_value(<<"range">>, Props),
+            Fun = fun(S, Acc) ->
+                case mem3:range(S) == Range of
+                    true -> [mem3:node(S) | Acc];
+                    false -> Acc
+                end
+            end,
+            Nodes = lists:foldl(Fun, [], Shards),
+            lists:member(TNode, Nodes) andalso lists:member(TNode, mem3:nodes())
+    end.
 
 %% @doc Find and return the largest update_seq in SourceDb
 %% that the client has seen from TargetNode.
@@ -1231,5 +1324,185 @@ target_not_in_shard_map(_) ->
     Map = targets_map(Src, Tgt),
     ?assertEqual(1, map_size(Map)),
     ?assertMatch(#{R0f := #shard{name = Name, node = 'n3'}}, Map).
+
+purge_checkpoints_test_() ->
+    {
+        foreach,
+        fun() ->
+            Ctx = test_util:start_couch([mem3, fabric]),
+            config:set("mem3", "replicate_purges", "true", false),
+            meck:new(mem3, [passthrough]),
+            meck:new(mem3_sync, [passthrough]),
+            meck:expect(mem3, nodes, 0, [node(), n2, n3]),
+            Ctx
+        end,
+        fun(Ctx) ->
+            meck:unload(),
+            config:delete("mem3", "replicate_purges", false),
+            test_util:stop_couch(Ctx)
+        end,
+        [
+            ?TDEF_FE(t_not_sharded),
+            ?TDEF_FE(t_purges_not_replicated),
+            ?TDEF_FE(t_have_all_checkpoints),
+            ?TDEF_FE(t_have_all_shards_db),
+            ?TDEF_FE(t_verify_checkpoint_shards_db)
+        ]
+    }.
+
+t_not_sharded(_) ->
+    meck:expect(mem3, shards, 1, meck:raise(error, database_does_not_exist)),
+    Name = <<"mem3_rep_test", (couch_uuids:random())/binary>>,
+    {ok, Db} = couch_server:create(Name, [?ADMIN_CTX]),
+    couch_db:close(Db),
+    ?assert(have_all_purge_checkpoints(Name)),
+    ok = couch_server:delete(Name, [?ADMIN_CTX]).
+
+t_purges_not_replicated(_) ->
+    R07 = [16#00000000, 16#7fffffff],
+    R8f = [16#80000000, 16#ffffffff],
+    R0f = [16#00000000, 16#ffffffff],
+
+    Shards = [
+        #shard{node = node(), range = R07},
+        #shard{node = node(), range = R8f},
+        #shard{node = 'n2', range = R07},
+        #shard{node = 'n2', range = R8f},
+        #shard{node = 'n3', range = R0f}
+    ],
+    meck:expect(mem3, shards, 1, Shards),
+
+    SrcName = <<"shards/00000000-7fffffff/d.1551893550">>,
+    {ok, Db} = couch_server:create(SrcName, [?ADMIN_CTX]),
+    couch_db:close(Db),
+    ?assert(not have_all_purge_checkpoints(SrcName)),
+    config:set("mem3", "replicate_purges", "false", false),
+    ?assert(have_all_purge_checkpoints(SrcName)),
+    ok = couch_server:delete(SrcName, [?ADMIN_CTX]).
+
+t_have_all_checkpoints(_) ->
+    R07 = [16#00000000, 16#7fffffff],
+    R8f = [16#80000000, 16#ffffffff],
+    R0f = [16#00000000, 16#ffffffff],
+
+    SrcName = <<"shards/00000000-7fffffff/d.1551893551">>,
+    SrcName1 = <<"shards/80000000-ffffffff/d.1551893551">>,
+    TgtName1 = <<"shards/00000000-7fffffff/d.1551893551">>,
+    TgtName2 = <<"shards/80000000-ffffffff/d.1551893551">>,
+    TgtName3 = <<"shards/00000000-ffffffff/d.1551893551">>,
+
+    Shards = [
+        #shard{node = node(), name = SrcName, range = R07},
+        #shard{node = node(), name = SrcName1, range = R8f},
+        #shard{node = 'n2', name = TgtName1, range = R07},
+        #shard{node = 'n2', name = TgtName2, range = R8f},
+        #shard{node = 'n3', name = TgtName3, range = R0f}
+    ],
+    meck:expect(mem3, shards, 1, Shards),
+
+    Src1 = #shard{name = SrcName, node = node(), range = R07},
+    Tgt1 = #shard{name = TgtName1, node = 'n2', range = R07},
+    Tgt2 = #shard{name = TgtName2, node = 'n2', range = R8f},
+    Tgt3 = #shard{name = TgtName3, node = 'n3', range = R0f},
+
+    {ok, Db} = couch_server:create(SrcName, [?ADMIN_CTX]),
+    SrcUuid = couch_db:get_uuid(Db),
+
+    TgtUuid1 = couch_uuids:random(),
+    % <<"875ce187a5c0f36ee75896d74d10300c">>,
+    Body1 = purge_cp_body(Src1, Tgt1, 42),
+    DocId1 = make_purge_id(SrcUuid, TgtUuid1),
+    Doc1 = #doc{id = DocId1, body = Body1},
+    {ok, _} = couch_db:update_doc(Db, Doc1, [?ADMIN_CTX]),
+    % Not enough checkpoints
+    ?assert(not have_all_purge_checkpoints(SrcName)),
+
+    Body2 = purge_cp_body(Src1, Tgt2, 43),
+    TgtUuid2 = couch_uuids:random(),
+    DocId2 = make_purge_id(SrcUuid, TgtUuid2),
+    Doc2 = #doc{id = DocId2, body = Body2},
+    {ok, _} = couch_db:update_doc(Db, Doc2, [?ADMIN_CTX]),
+    % Still not enough checkpoints
+    ?assert(not have_all_purge_checkpoints(SrcName)),
+
+    Body3 = purge_cp_body(Src1, Tgt3, 44),
+    TgtUuid3 = couch_uuids:random(),
+    DocId3 = make_purge_id(SrcUuid, TgtUuid3),
+    Doc3 = #doc{id = DocId3, body = Body3},
+    {ok, _} = couch_db:update_doc(Db, Doc3, [?ADMIN_CTX]),
+    % Now should have all the checkpoints
+    ?assert(have_all_purge_checkpoints(SrcName)),
+
+    couch_db:close(Db),
+    ok = couch_server:delete(SrcName, [?ADMIN_CTX]).
+
+t_have_all_shards_db(_) ->
+    Dbs = mem3_sync:shards_db(),
+    {ok, Db} = mem3_util:ensure_exists(Dbs),
+    SrcUuid = couch_db:get_uuid(Db),
+
+    Range = [0, ?RING_END],
+    Shards = [
+        #shard{node = node(), name = Dbs, dbname = Dbs, range = Range}
+    ],
+    meck:expect(mem3, shards, 1, Shards),
+
+    Src1 = #shard{name = Dbs, node = node(), range = Range},
+    Tgt1 = #shard{name = Dbs, node = 'n2', range = Range},
+    Tgt2 = #shard{name = Dbs, node = 'n3', range = Range},
+
+    % We're the only node: don't expect any other checkpoints
+    meck:expect(mem3_sync, find_next_node, 0, node()),
+    meck:expect(mem3_sync, find_previous_node, 0, node()),
+    ?assert(have_all_purge_checkpoints(Dbs)),
+
+    % There is another node and we don't have a checkpoint for it
+    meck:expect(mem3_sync, find_next_node, 0, 'n2'),
+    meck:expect(mem3_sync, find_previous_node, 0, 'n3'),
+    ?assert(not have_all_purge_checkpoints(Dbs)),
+
+    Body1 = purge_cp_body(Src1, Tgt1, 42),
+    TgtUuid1 = couch_uuids:random(),
+    DocId1 = make_purge_id(SrcUuid, TgtUuid1),
+    Doc1 = #doc{id = DocId1, body = Body1},
+    {ok, _} = couch_db:update_doc(Db, Doc1, [?ADMIN_CTX]),
+
+    % After adding the checkpoint for n2, we should still get false because
+    % there is no previous checkpoint for n3 pull purges from us
+    ?assert(not have_all_purge_checkpoints(Dbs)),
+
+    Body2 = purge_cp_body(Src1, Tgt2, 43),
+    TgtUuid2 = couch_uuids:random(),
+    DocId2 = make_purge_id(SrcUuid, TgtUuid2),
+    Doc2 = #doc{id = DocId2, body = Body2},
+    {ok, _} = couch_db:update_doc(Db, Doc2, [?ADMIN_CTX]),
+
+    % After adding the checkpoint for n3, we should get true
+    ?assert(have_all_purge_checkpoints(Dbs)),
+
+    couch_db:close(Db),
+    ok = couch_server:delete(Dbs, [?ADMIN_CTX]).
+
+t_verify_checkpoint_shards_db(_) ->
+    Dbs = mem3_sync:shards_db(),
+    Range = [0, ?RING_END],
+    Shards = [
+        #shard{node = node(), name = Dbs, dbname = Dbs, range = Range}
+    ],
+    Props1 = [
+        {<<"target">>, atom_to_binary(n2, latin1)},
+        {<<"range">>, Range}
+    ],
+    ?assert(not verify_checkpoint_shard(Shards, Props1)),
+    meck:expect(mem3_sync, find_next_node, 0, 'n2'),
+    ?assert(verify_checkpoint_shard(Shards, Props1)),
+
+    Props2 = [
+        {<<"target">>, atom_to_binary(n3, latin1)},
+        {<<"range">>, Range}
+    ],
+    ?assert(not verify_checkpoint_shard(Shards, Props2)),
+    meck:expect(mem3_sync, find_previous_node, 0, 'n3'),
+    ?assert(verify_checkpoint_shard(Shards, Props2)).
 
 -endif.

@@ -99,10 +99,11 @@
         - A valid update sequence, for example, from a ``_changes`` feed response.
         - ``now``
         - ``0``
-        - A timestmap string matching the ``YYYY-MM-DDTHH:MM:SSZ``
+        - A timestamp string matching the ``YYYY-MM-DDTHH:MM:SSZ``
           format. The results returned will depend on the time-sequence
           intervals recorded by the time-seq data structure. To inspect or reset
-          it use the :ref:`_time_seq <api/db/time_seq>` endpoint.
+          it use the :ref:`_time_seq <api/db/time_seq>` endpoint. For additional
+          details see the :ref:`changes/timeseq` section below.
     :query string style: Specifies how many revisions are returned in the
         changes array. The default, ``main_only``, will only return the current
         "winning" revision; ``all_docs`` will return all leaf revisions
@@ -833,3 +834,177 @@ amount of duplicated code.
             }
         ]
     }
+
+.. _changes/timeseq:
+
+Time-based changes feeds
+========================
+
+.. versionadded:: 3.6
+
+Starting with version 3.6 :ref:`api/db/changes` API can emit rows starting from
+a point in time. To use this feature set the ``since`` parameter value to a
+timestamp in the ``YYYY-MM-DDTHH:MM:SSZ`` format. That's a standard format in
+both the ISO 8601 and RFC 3339 standards.
+
+**Request**:
+
+.. code-block:: http
+
+    GET db/_changes?since=2026-01-09T19:01:02Z HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+    Transfer-Encoding: chunked
+
+    {
+        "last_seq": "112-g1AAAABLeJzLYWBgYMxgTmHgz8tPSTV0MDQy1zMAQsMcoARTIkMeC8N_IMjKYE4syAUKsZumWJgZGVhgasgCAKx6Erk",
+        "pending": 0,
+        "results": [
+            {
+                "changes": [{"rev": "1-967a00dff5e02add41819138abb3284d"}],
+                "id": "019ba3f4f9b77e06900cf8b631821a3a",
+                "seq": "111-g1AAAABLeJzLYWBgYMxgTmHgz8tPSTV0MDQy1zMAQsMcoARTIkMeC8N_IMjKYE7MzwUKsZumWJgZGVhgasgCAKxaErg"
+            },
+            {
+                "changes": [{"rev": "1-967a00dff5e02add41819138abb3284d"}],
+                "id": "019ba3f51e077f0c82ca136136de2d7f",
+                "seq": "112-g1AAAABLeJzLYWBgYMxgTmHgz8tPSTV0MDQy1zMAQsMcoARTIkMeC8N_IMjKYE4syAUKsZumWJgZGVhgasgCAKx6Erk"
+            }
+        ]
+    }
+
+Implementation Details
+----------------------
+
+CouchDB automatically maps time intervals to db update sequences as documents
+get updated. This is implemented with a histogram data structure which looks
+like ``[{t3, seq3}, {t2, seq2}, {t1, seq1}, ...]``.
+
+In order to avoid any performance impact, and provide constant update and read
+algorithmic complexity, there is a maximum number (60) of these histogram bins
+per shard file. As a trade-off, however, it means not having exact timestamps
+for individual changes; a single bin may represent a group of updates.
+
+Bin sizes increase exponentially the further back in time they go. This means,
+for example, that for the recent 24 hours it's possible to target individual
+hour blocks; a week back it's only possible to target individual days; and a
+few years back can only target individual months.
+
+How Time Bins Are Updated Over Time
+-----------------------------------
+
+The smallest time granularity is 3 hours. It's not possible to target time
+intervals smaller than that.
+
+A new database starts with an empty list of time bins (``[]``). On the first
+update, the first 3 hour bin will be created.
+
+.. code-block:: text
+
+   [3h]
+
+If updates continue, after 3 hours there might be a few more ``3h`` bins added
+
+.. code-block:: text
+
+   [3h, 3h, 3h]
+
+After about ``60 * 3hs ~= 1 week``, all ``60`` bins would be filled with ``3h`` bins.
+
+.. code-block:: text
+
+   [3h, 3h, ..., 3h, 3h, 3h]
+   <--------- 60 ---------->
+
+Next, some of the oldest bins will start to be merged together to form 6 hour bins:
+
+.. code-block:: text
+
+   [6h, 6h, ..., 3h, 3h, 3h]
+   <--------- 60 ---------->
+
+And after a few years it might look like:
+
+.. code-block:: text
+
+   [4y, 2y, ... 12h, 6h, 3h]
+   <--------- 60 ---------->
+
+``_time_seq`` Endpoint
+----------------------
+
+The new :ref:`_time_seq <api/db/time_seq>` API endpoint can help inspect the
+time histograms for each db shard file.
+
+**Request**:
+
+.. code-block:: http
+
+    GET db/_time_seq HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+**Response**:
+
+.. code-block:: http
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+        "time_seq": {
+            "00000000-ffffffff": {
+                "node1@127.0.0.1": [
+                    ["2026-01-08T03:00:00Z", 14],
+                    ["2026-01-08T09:00:00Z", 5],
+                    ["2026-01-08T15:00:00Z", 22],
+                    ["2026-01-08T18:00:00Z", 8],
+                    ["2026-01-08T21:00:00Z", 16],
+                    ["2026-01-09T03:00:00Z", 20],
+                    ["2026-01-09T06:00:00Z", 5],
+                    ["2026-01-09T09:00:00Z", 5],
+                    ["2026-01-09T12:00:00Z", 5],
+                    ["2026-01-09T15:00:00Z", 10],
+                    ["2026-01-09T18:00:00Z", 2]
+                ]
+            }
+        }
+    }
+
+The times are the start times of each bin, and the values are the number of
+changes which occurred in that time interval. For example, in the time bin
+started at ``2026-01-08T09:00:00Z`` there were ``5`` changes.
+
+Since this is a histogram we can pipe it into a Python script with matlotlib and
+visualise it.
+
+.. figure:: ../../../images/time_seq.png
+     :align: center
+
+     Time seq histogram.
+
+Times are not exact
+-------------------
+
+If the ``since`` time instant falls in the middle of a time bin interval, then
+all the rows from that time bine are returned. In other words, there is a
+chance to get some older rows than the provided ``since`` timestamp. If
+there is a need to get exact time bounded rows, use a custom time value
+per document and a selector filter with the ``since`` timestamp parameter.
+
+This can be seen in the example above -- the passed in ``since`` value
+``2026-01-09T19:01:02Z`` doesn't fall on a bin start. So we got all the rows
+from the start of the ``2026-01-09T18:00:00Z`` bin. If we zoom in on the
+rendered histogram to the right this might look like this:
+
+.. figure:: ../../../images/time_seq_zoom.png
+     :align: center
+
+     Zoom in to last three bins.

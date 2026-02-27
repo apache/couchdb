@@ -546,7 +546,7 @@ def boot_nouveau(ctx):
     config = os.path.join(ctx["devdir"], "lib", "nouveau.yaml")
     gradle = "gradlew.bat" if os.name == "nt" else "gradlew"
     cmd = [
-        os.path.join(ctx["rootdir"], "nouveau", gradle),
+        os.path.join(ctx["rootdir"], "extra", "nouveau", gradle),
         "run",
         "--args",
         f"server '{config}'",
@@ -555,7 +555,7 @@ def boot_nouveau(ctx):
     log = open(logfname, "w")
     return sp.Popen(
         cmd,
-        cwd=os.path.join(ctx["rootdir"], "nouveau"),
+        cwd=os.path.join(ctx["rootdir"], "extra", "nouveau"),
         stdin=sp.PIPE,
         stdout=log,
         stderr=sp.STDOUT,
@@ -905,6 +905,13 @@ def hack_default_ini(ctx, node, contents):
     contents = re.sub(
         r"^\[httpd\]$",
         "[httpd]\nenable = true",
+        contents,
+        flags=re.MULTILINE,
+    )
+
+    contents = re.sub(
+        r"^;uri_file =$",
+        "uri_file = ./dev/lib/{}/couch.uri".format(node),
         contents,
         flags=re.MULTILINE,
     )

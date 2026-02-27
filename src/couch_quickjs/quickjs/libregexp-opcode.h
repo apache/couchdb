@@ -31,6 +31,8 @@ DEF(char32, 5)
 DEF(char32_i, 5)
 DEF(dot, 1)
 DEF(any, 1) /* same as dot but match any character including line terminator */
+DEF(space, 1)
+DEF(not_space, 1) /* must come after */
 DEF(line_start, 1)
 DEF(line_start_m, 1)
 DEF(line_end, 1)
@@ -54,7 +56,7 @@ DEF(word_boundary, 1)
 DEF(word_boundary_i, 1)
 DEF(not_word_boundary, 1)
 DEF(not_word_boundary_i, 1)
-DEF(back_reference, 2)
+DEF(back_reference, 2) /* variable length */
 DEF(back_reference_i, 2) /* must come after */
 DEF(backward_back_reference, 2) /* must come after */
 DEF(backward_back_reference_i, 2) /* must come after */
