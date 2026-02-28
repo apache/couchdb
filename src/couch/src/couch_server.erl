@@ -302,11 +302,17 @@ init([N]) ->
         "couchdb", "update_lru_on_read", false
     ),
     ok = config:listen_for_changes(?MODULE, N),
-    % Spawn async .deleted files recursive cleaner, but only
-    % for the first sharded couch_server instance
+
     case N of
-        1 -> ok = couch_file:init_delete_dir(RootDir);
-        _ -> ok
+        1 ->
+            % Update mm and upgrade_in_progress stats gauges
+            update_maintenance_mode_gauge(),
+            update_upgrade_in_progress_gauge(),
+            % Spawn async .deleted files recursive cleaner, but only
+            % for the first sharded couch_server instance
+            ok = couch_file:init_delete_dir(RootDir);
+        _ ->
+            ok
     end,
     ets:new(couch_dbs(N), [
         set,
@@ -394,6 +400,12 @@ handle_config_change("httpd", "port", _, _, 1 = N) ->
     {ok, N};
 handle_config_change("httpd", "max_connections", _, _, 1 = N) ->
     couch_httpd:stop(),
+    {ok, N};
+handle_config_change("couchdb", "maintenance_mode", _, _, 1 = N) ->
+    update_maintenance_mode_gauge(),
+    {ok, N};
+handle_config_change("couchdb", "upgrade_in_progress", _, _, 1 = N) ->
+    update_upgrade_in_progress_gauge(),
     {ok, N};
 handle_config_change(_, _, _, _, N) ->
     {ok, N}.
@@ -1017,6 +1029,19 @@ try_lock(Table, DbName) when is_atom(Table), is_binary(DbName) ->
 
 unlock(Table, DbName) when is_atom(Table), is_binary(DbName) ->
     ets:update_element(Table, DbName, {#entry.lock, unlocked}).
+
+update_maintenance_mode_gauge() ->
+    % Note, it's not necessarily a boolean, could be "nolb" as well
+    case config:get("couchdb", "maintenance_mode", "false") of
+        "false" -> couch_stats:update_gauge([couchdb, maintenance_mode], 0);
+        _ -> couch_stats:update_gauge([couchdb, maintenance_mode], 1)
+    end.
+
+update_upgrade_in_progress_gauge() ->
+    case config:get_boolean("couchdb", "upgrade_in_progress", false) of
+        false -> couch_stats:update_gauge([couchdb, upgrade_in_progress], 0);
+        true -> couch_stats:update_gauge([couchdb, upgrade_in_progress], 1)
+    end.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

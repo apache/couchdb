@@ -186,7 +186,8 @@ replicate({[_ | _]} = RepObject) ->
         {'DOWN', MonRef, process, Pid, _} ->
             ok
     end,
-    ok = couch_replicator_scheduler:remove_job(Rep#rep.id).
+    ok = couch_replicator_scheduler:remove_job(Rep#rep.id),
+    {ok, Rep#rep.id}.
 
 setup_db() ->
     DbName = ?tempdb(),

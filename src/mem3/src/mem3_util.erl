@@ -24,8 +24,7 @@
     delete_db_doc/1,
     shard_info/1,
     ensure_exists/1,
-    open_db_doc/1,
-    update_db_doc/1
+    open_db_doc/1
 ]).
 -export([get_or_create_db/2, get_or_create_db_int/2]).
 -export([is_deleted/1, rotate_list/2]).
@@ -126,36 +125,6 @@ write_db_doc(DbName, #doc{id = Id, body = Body} = Doc, ShouldMutate) ->
                 conflict ->
                     % check to see if this was a replication race or a different edit
                     write_db_doc(DbName, Doc, false)
-            end;
-        _ ->
-            % the doc already exists in a different state
-            conflict
-    after
-        couch_db:close(Db)
-    end.
-
-update_db_doc(Doc) ->
-    update_db_doc(mem3_sync:shards_db(), Doc, true).
-
-update_db_doc(DbName, #doc{id = Id, body = Body} = Doc, ShouldMutate) ->
-    ioq:maybe_set_io_priority({system, DbName}),
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
-    try couch_db:open_doc(Db, Id, [ejson_body]) of
-        {ok, #doc{body = Body}} ->
-            % the doc is already in the desired state, we're done here
-            ok;
-        {ok, #doc{body = Body1}} ->
-            % the doc has a new body to be written
-            {ok, _} = couch_db:update_doc(Db, Doc#doc{body = Body1}, []),
-            ok;
-        {not_found, _} when ShouldMutate ->
-            try couch_db:update_doc(Db, Doc, []) of
-                {ok, _} ->
-                    ok
-            catch
-                conflict ->
-                    % check to see if this was a replication race or a different edit
-                    update_db_doc(DbName, Doc, false)
             end;
         _ ->
             % the doc already exists in a different state

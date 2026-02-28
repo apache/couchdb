@@ -386,7 +386,11 @@ delete_dbs(DbList) ->
 
 setup_fabric() ->
     Ctx = test_util:start_couch([fabric]),
-    ok = clear_shards_db(),
+    ok =
+        case clear_shards_db() of
+            ok -> ok;
+            not_found -> ok
+        end,
     Ctx.
 
 teardown_fabric(Ctx) ->

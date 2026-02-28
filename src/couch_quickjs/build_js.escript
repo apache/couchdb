@@ -74,7 +74,7 @@ compile_bytecode(Js, CBytecode) ->
     Tmp = CBytecode ++ ".tmp",
     {ok, Cwd} = file:get_cwd(),
     CompileCmd = Cwd ++ "/quickjs/qjsc -c -N bytecode -o c_src/" ++ Tmp ++ " priv/" ++ Js,
-    os:cmd(CompileCmd),
+    os:cmd(CompileCmd, #{exception_on_failure => true}),
     Changed = cp_if_different("c_src/" ++ Tmp, "c_src/" ++ CBytecode),
     rm("c_src/" ++ Tmp),
     Changed.

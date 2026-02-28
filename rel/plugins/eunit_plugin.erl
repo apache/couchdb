@@ -25,37 +25,56 @@ is_base_dir(RebarConf) ->
     filename:absname(rebar_utils:get_cwd()) =:=
         rebar_config:get_xconf(RebarConf, base_dir, undefined).
 
-build_eunit_config(Config0, AppFile) ->
+build_eunit_config(Config, AppFile) ->
     Cwd = filename:absname(rebar_utils:get_cwd()),
-    DataDir = Cwd ++ "/tmp/data",
-    ViewIndexDir = Cwd ++ "/tmp/data",
-    StateDir = Cwd ++ "/tmp/data",
-    TmpDataDir = Cwd ++ "/tmp/tmp_data",
-    LogDir = Cwd ++ "/tmp",
-    cleanup_dirs([DataDir, TmpDataDir]),
-    Config1 = rebar_config:set_global(Config0, template, "setup_eunit"),
-    Config2 = rebar_config:set_global(Config1, prefix, Cwd),
+    App = rebar_config:get_global(Config, app, undefined),
+    case is_list(App) of
+        true -> ok;
+        false -> error(app_parameter_must_be_defined)
+    end,
+    case re:run(App, "^[_a-z0-9]+$") of
+        nomatch ->
+            error({app_parameter_must_be_just_one_app, App});
+        {match, _} ->
+            Prefix = Cwd ++ "/tmp/" ++ App,
+            DataDir = Prefix ++ "/data",
+            ViewIndexDir = Prefix ++ "/data",
+            StateDir = Prefix ++ "/data",
+            TmpDataDir = Prefix ++ "/tmp_data",
+            EtcDir = Prefix ++ "/etc",
+            LogDir = Prefix,
+            build_config(
+                Config,
+                AppFile,
+                Prefix,
+                DataDir,
+                ViewIndexDir,
+                StateDir,
+                TmpDataDir,
+                EtcDir,
+                LogDir
+            )
+    end.
+
+build_config(Config, AppFile, Prefix, DataDir, ViewIndexDir, StateDir, TmpDataDir, EtcDir, LogDir) ->
+    cleanup_dirs([DataDir, TmpDataDir, EtcDir]),
+    Config1 = rebar_config:set_global(Config, template, "setup_eunit"),
+    Config2 = rebar_config:set_global(Config1, prefix, Prefix),
     Config3 = rebar_config:set_global(Config2, data_dir, DataDir),
     Config4 = rebar_config:set_global(Config3, view_index_dir, ViewIndexDir),
     Config5 = rebar_config:set_global(Config4, log_dir, LogDir),
-    Config = rebar_config:set_global(Config5, state_dir, StateDir),
-    rebar_templater:create(Config, AppFile).
+    Config6 = rebar_config:set_global(Config5, etc_dir, EtcDir),
+    Config7 = rebar_config:set_global(Config6, tmp_data, TmpDataDir),
+    Config8 = rebar_config:set_global(Config7, state_dir, StateDir),
+    rebar_templater:create(Config8, AppFile).
 
 cleanup_dirs(Dirs) ->
     lists:foreach(
         fun(Dir) ->
             case filelib:is_dir(Dir) of
-                true -> del_dir(Dir);
+                true -> file:del_dir_r(Dir);
                 false -> ok
             end
         end,
         Dirs
     ).
-
-del_dir(Dir) ->
-    All = filelib:wildcard(Dir ++ "/**"),
-    {Dirs, Files} = lists:partition(fun filelib:is_dir/1, All),
-    ok = lists:foreach(fun file:delete/1, Files),
-    SortedDirs = lists:sort(fun(A, B) -> length(A) > length(B) end, Dirs),
-    ok = lists:foreach(fun file:del_dir/1, SortedDirs),
-    ok = file:del_dir(Dir).

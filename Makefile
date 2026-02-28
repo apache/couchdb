@@ -19,7 +19,7 @@ include version.mk
 REBAR?=$(CURDIR)/bin/rebar
 REBAR3?=$(CURDIR)/bin/rebar3
 ERLFMT?=$(CURDIR)/bin/erlfmt
-GRADLE?=$(CURDIR)/nouveau/gradlew
+GRADLE?=$(CURDIR)/extra/nouveau/gradlew
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -75,7 +75,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=meck,mochiweb,triq,proper,snappy,ibrowse
+skip_deps=meck,mochiweb,triq,proper,snappy,ibrowse,gun,recon
 suites=
 tests=
 
@@ -106,7 +106,7 @@ endif
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs escriptize nouveau
+all: couch-core fauxton docs escriptize extra/nouveau
 
 
 .PHONY: help
@@ -123,9 +123,9 @@ help:
 ################################################################################
 
 
-.PHONY: couch
-# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
-couch: config.erl
+.PHONY: couch-core
+# target: couch-core - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
+couch-core: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 ifeq ($(with_spidermonkey), true)
 	@cp src/couch/priv/couchjs bin/
@@ -146,7 +146,7 @@ fauxton: share/www
 
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
-escriptize: couch
+escriptize: couch-core
 	@$(REBAR) -r escriptize apps=weatherreport
 	@cp src/weatherreport/weatherreport bin/weatherreport
 
@@ -168,40 +168,27 @@ check: all
 	@$(MAKE) nouveau-test
 
 ifdef apps
-subdirs = $(apps)
+EUNIT_SUBDIRS = $(strip $(subst $(comma),$(space),$(apps)))
 else
-subdirs=$(shell ls src)
+EUNIT_SUBDIRS = $(filter-out fauxton docs, $(shell ls src))
 endif
 
-.PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
-eunit: export BUILDDIR = $(CURDIR)
+.PHONY: eunit $(EUNIT_SUBDIRS)
 eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(CURDIR)/bin/couchjs $(CURDIR)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-eunit: couch
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
-	@for dir in $(subdirs); do \
-            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-        done
+eunit: ${EUNIT_SUBDIRS}
 
+$(EUNIT_SUBDIRS):
+	@rm -rf tmp/$@
+	@$(REBAR) setup_eunit app=$@ >/dev/null
+	@BUILDDIR=$(CURDIR)/tmp/$@ COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$@ && rm -rf tmp/$@
 
-setup-eunit: export BUILDDIR = $(CURDIR)
-setup-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-setup-eunit:
-	@$(REBAR) setup_eunit 2> /dev/null
-
-just-eunit: export BUILDDIR = $(CURDIR)
-just-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
-
-.PHONY: soak-eunit
-soak-eunit: export BUILDDIR = $(CURDIR)
-soak-eunit: export ERL_AFLAGS = -config $(CURDIR)/rel/files/eunit.config
-soak-eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
-	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+# cat together couch_log files after running eunit test
+.PHONY: catlogs
+catlogs:
+	@ls tmp/*/couch.log 2>/dev/null | xargs cat > tmp/couch.log || true
 
 # target: erlfmt-check - Check Erlang source code formatting
 erlfmt-check:
@@ -267,7 +254,7 @@ elixir: elixir-init devclean
 		--no-join \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
+		--no-eval 'mix test --max-failures 1 --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
 ifneq ($(CLOUSEAU_DIR),)
 _WITH_CLOUSEAU="--with-clouseau --clouseau-dir=$(CLOUSEAU_DIR)"
@@ -303,6 +290,7 @@ build-report:
 	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log || true
 	cat ./dev/logs/node1.log || true
 	cat ./dev/logs/nouveau.log || true
+	$(MAKE) catlogs || true
 	cat ./tmp/couch.log || true
 	cat test-results.log || true
 
@@ -356,7 +344,7 @@ weatherreport-test: devclean escriptize
 
 .PHONY: quickjs-test262
 # target: quickjs-javascript-tests - Run QuickJS JS conformance tests
-quickjs-test262: couch
+quickjs-test262: couch-core
 	make -C src/couch_quickjs/quickjs test2-bootstrap
 	make -C src/couch_quickjs/quickjs test2
 
@@ -450,8 +438,8 @@ endif
 
 ifeq ($(with_nouveau), true)
 	@mkdir rel/couchdb/nouveau
-	@cd nouveau && $(GRADLE) installDist
-	@cp -R nouveau/build/install/nouveau rel/couchdb
+	@cd extra/nouveau && $(GRADLE) installDist
+	@cp -R extra/nouveau/build/install/nouveau rel/couchdb
 endif
 
 	@echo "... done"
@@ -500,7 +488,7 @@ clean:
 	@rm -rf src/couch_dist/certs/out
 	@rm -rf src/docs/build src/docs/.venv
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) clean
+	@cd extra/nouveau && $(GRADLE) clean
 endif
 
 
@@ -565,12 +553,12 @@ derived:
 # Nouveau
 ################################################################################
 
-.PHONY: nouveau
+.PHONY: extra/nouveau
 # target: nouveau - Build nouveau
-nouveau:
+extra/nouveau:
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) spotlessApply
-	@cd nouveau && $(GRADLE) build -x test
+	@cd extra/nouveau && $(GRADLE) spotlessApply
+	@cd extra/nouveau && $(GRADLE) build -x test
 endif
 
 .PHONY: nouveau-test
@@ -578,15 +566,15 @@ endif
 nouveau-test: nouveau-test-gradle nouveau-test-elixir
 
 .PHONY: nouveau-test-gradle
-nouveau-test-gradle: couch nouveau
+nouveau-test-gradle: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
-	@cd nouveau && $(GRADLE) test --info --rerun
+	@cd extra/nouveau && $(GRADLE) test --info --rerun
 endif
 
 .PHONY: nouveau-test-elixir
 nouveau-test-elixir: export MIX_ENV=integration
 nouveau-test-elixir: elixir-init devclean
-nouveau-test-elixir: couch nouveau
+nouveau-test-elixir: couch-core extra/nouveau
 ifeq ($(with_nouveau), true)
 	@dev/run "$(TEST_OPTS)" -n 1 -q -a adm:pass --with-nouveau \
 		--locald-config test/config/test-config.ini \

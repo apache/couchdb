@@ -177,7 +177,7 @@ stop_in_maintenance(#st{pids = Pids} = St) ->
     end.
 
 start_stop(#st{stopped = Stopped} = St) ->
-    case in_maintenance() orelse Stopped of
+    case in_maintenance() orelse Stopped orelse upgrade_in_progress() of
         true -> stop_in_maintenance(St);
         false -> start_stop_cfg(St)
     end.
@@ -278,6 +278,9 @@ penalize(Now, #sched{error_count = ErrorCount} = Sched) ->
 
 in_maintenance() ->
     "false" /= config:get("couchdb", "maintenance_mode", "false").
+
+upgrade_in_progress() ->
+    config:get_boolean("couchdb", "upgrade_in_progress", false).
 
 tsec() ->
     erlang:system_time(second).

@@ -317,7 +317,7 @@ queue_fetch_loop(#fetch_st{} = St) ->
                 ok = gen_server:call(Parent, {batch_doc, Doc}, infinity)
             end,
             lists:foreach(BatchFun, lists:sort(maps:to_list(Docs))),
-            % Invidually upload docs with attachments.
+            % Individually upload docs with attachments.
             maps:map(FetchFun, maps:without(maps:keys(Docs), IdRevs1)),
             {ok, Stats} = gen_server:call(Parent, flush, infinity),
             ok = report_seq_done(Cp, ReportSeq, Stats),
@@ -384,7 +384,7 @@ attempt_revs_diff(#fetch_stats{} = St, NowSec) ->
 
 % Update fail ratio. Use the basic exponential moving average formula to smooth
 % over minor bumps in case we encounter a few % attachments and then get back
-% to replicationg documents without attachments.
+% to replicating documents without attachments.
 %
 update_fetch_stats(#fetch_stats{} = St, Successes, Attempts, Decay, NowSec) ->
     #fetch_stats{ratio = Avg} = St,
