@@ -820,7 +820,7 @@
     "should not return design docs"
   ],
   "ChooseCorrectIndexForDocs": [
-    "retrieve conflicts"
+    "retrieve conflicts",
     "choose index with one field in index",
     "choose index with two",
     "choose index alphabetically",
