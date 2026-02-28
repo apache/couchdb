@@ -31,12 +31,88 @@
     "facet counts, non-empty",
     "facet counts, empty",
     "facet ranges, empty",
-    "facet ranges, non-empty"
+    "facet ranges, non-empty",
+    "timeouts do not expose internal state"
+  ],
+  "BasicTextTest": [
+    "explain options",
+    "explain with bookmarks"
+  ],
+  "IndexCrudTextTests": [
+    "create text idx",
+    "create bad text idx",
+    "limit skip idx"
   ],
   "ElemMatchTests": [
     "elem match non object"
   ],
+  "CustomFieldsTest": [
+    "basic",
+    "multi field",
+    "element access",
+    "index selection",
+    "in with array",
+    "in with array not explicit",
+    "in different types",
+    "nin with array",
+    "missing",
+    "missing type",
+    "field analyzer is keyword",
+    "escaped field",
+    "filtered search fields",
+    "two or",
+    "all match",
+  ],
+  "CustomFieldsExistsTest": [
+    "exists field",
+    "exists array",
+    "exists object member",
+    "exists false same as views"
+  ],
   "LimitTests": [
     "limit field"
+  ],
+  "DisableIndexArrayLengthsTest": [
+    "disable index array length",
+    "enable index array length"
+  ],
+  "KeyTest": [
+    "dot key",
+    "peso key",
+    "unicode in fieldname",
+    "unicode in selector field",
+    "internal field tests",
+    "escape period",
+    "object period"
+  ],
+  "TextIndexSelectionTest": [
+    "with text",
+    "no view index",
+    "with or",
+    "manual bad text idx"
+  ],
+  "MultiTextIndexSelectionTest": [
+    "fallback to json with multi text",
+    "multi text index is error",
+    "use index works"
+  ],
+  "RegexVsTextIndexTest": [
+    "regex works with text index"
+  ],
+  "NoDefaultFieldTest": [
+    "basic",
+    "other fields exist"
+  ],
+  "NoDefaultFieldWithAnalyzer": [
+    "basic",
+    "other fields exist"
+  ],
+  "DefaultFieldWithCustomAnalyzer": [
+    "basic",
+    "not analyzed"
+  ],
+  "PartitionMangoTest": [
+    "explain options (text)",
+    "explain works with bookmarks (text)"
   ]
 }

@@ -40,7 +40,7 @@ A description of each child:
     control algorithm to converge on the channel capacity. Implemented using a
     16-way sharded ETS table to maintain connection state. The table sharding
     code is split out to `couch_replicator_rate_limiter_tables` module. The
-    purpose of the module it to maintain and continually estimate sleep
+    purpose of the module is to maintain and continually estimate sleep
     intervals for each connection represented as a `{Method, Url}` pair. The
     interval is updated accordingly on each call to `failure/1` or `success/1`
     calls. For a successful request, a client should call `success/1`. Whenever
@@ -79,7 +79,7 @@ A description of each child:
     jobs running less than `replicator.max_jobs` (default 500). So the
     functions does these operations (actual code paste):
 
-    ```
+    ```erl
     Running = running_job_count(),
     Pending = pending_job_count(),
     stop_excess_jobs(State, Running),
@@ -116,7 +116,7 @@ A description of each child:
     interesting part is how the scheduler picks which jobs to stop and which
     ones to start:
 
-    * Stopping: When picking jobs to stop the scheduler will pick longest
+    * Stopping: When picking jobs to stop the scheduler will pick the longest
       running continuous jobs first. The sorting callback function to get the
       longest running jobs is unsurprisingly called `longest_running/2`. To
       pick the longest running jobs it looks at the most recent `started`
@@ -143,14 +143,14 @@ A description of each child:
     on how this algorithm works.
 
     The last part is how the scheduler treats jobs which keep crashing. If a
-    job is started but then crashes then that job is considered unhealthy. The
+    job is started but then crashes, that job is considered unhealthy. The
     main idea is to penalize such jobs such that they are forced to wait an
     exponentially larger amount of time with each consecutive crash. A central
     part to this algorithm is determining what forms a sequence of consecutive
     crashes. If a job starts then quickly crashes, and after its next start it
     crashes again, then that would become a sequence of 2 consecutive crashes.
     The penalty then would be calculated by `backoff_micros/1` function where
-    the consecutive crash count would end up as the exponent. However for
+    the consecutive crash count would end up as the exponent. However, for
     practical concerns there is also maximum penalty specified and that's the
     equivalent of 10 consecutive crashes. Timewise it ends up being about 8
     hours. That means even a job which keep crashing will still get a chance to
@@ -189,10 +189,10 @@ A description of each child:
    is handling of upgrades from the previous version of the replicator when
    transient states were written to the documents. Two such states were
    `triggered` and `error`. Both of those states are removed from the document
-   then then update proceeds in the regular fashion. `failed` documents are
+   then update proceeds in the regular fashion. `failed` documents are
    also ignored here. `failed` is a terminal state which indicates the document
    was somehow unsuitable to become a replication job (it was malformed or a
-   duplicate). Otherwise the state update proceeds to `process_updated/2`.
+   duplicate). Otherwise, the state update proceeds to `process_updated/2`.
 
    `process_updated/2` is where replication document updates are parsed and
    translated to `#rep{}` records. The interesting part here is that the
@@ -236,7 +236,7 @@ A description of each child:
      1. Filter fetching code has failed. In that case worker returns an error.
         But because the error could be a transient network error, another
         worker is started to try again. It could fail and return an error
-        again, then another one is started and so on. However each consecutive
+        again, then another one is started and so on. However, each consecutive
         worker will do an exponential backoff, not unlike the scheduler code.
         `error_backoff/1` is where the backoff period is calculated.
         Consecutive errors are held in the `errcnt` field in the ETS table.
@@ -255,6 +255,3 @@ A description of each child:
         cluster, it's ok to check filter changes often. But when there are lots
         of replications running, having each one checking their filter often is
         not a good idea.
-
-
-

@@ -125,6 +125,7 @@ start_applications([App | Apps], Acc) ->
 
 stop_applications(Apps) ->
     [application:stop(App) || App <- lists:reverse(Apps)],
+    ok = application:unset_env(config, ini_files),
     ok.
 
 start_config(Chain) ->
@@ -374,7 +375,7 @@ mock(couch_stats) ->
     ok.
 
 load_applications_with_stats() ->
-    Wildcard = filename:join([?BUILDDIR(), "src/*/priv/stats_descriptions.cfg"]),
+    Wildcard = ?ABS_PATH("../*/priv/stats_descriptions.cfg"),
     [application:load(stats_file_to_app(File)) || File <- filelib:wildcard(Wildcard)],
     ok.
 

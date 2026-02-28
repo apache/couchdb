@@ -347,7 +347,7 @@ to determine for each document whether it is in a conflicting state:
 View map functions
 ==================
 
-Views only get the winning revision of a document. However they do also get a
+Views only get the winning revision of a document. However, they do also get a
 ``_conflicts`` member if there are any conflicting revisions. This means you can
 write a view whose job is specifically to locate documents with conflicts.
 Here is a simple map function which achieves this:

@@ -163,7 +163,20 @@ copy_purge_info(#comp_st{} = CompSt) ->
     % stale or deprecated internal replicator checkpoints beforehand.
     ok = mem3_rep:cleanup_purge_checkpoints(DbName),
     MinPurgeSeq = couch_util:with_db(DbName, fun(Db) ->
-        couch_db:get_minimum_purge_seq(Db)
+        % If we don't (yet) have all the expected internal replicator purge
+        % checkpoints, use the oldest purge sequence instead of the minimum.
+        % This is to avoid the removing some purge infos too early before the
+        % checkpoint is created. For example, if the oldest sequence = 1,
+        % minimum sequence = 1000, and current purge sequence = 2000, we can
+        % compact and remove all the purge infos from 1 to 1000. While
+        % compaction happens, a checkpoint is created with sequence = 500. In
+        % that case we'd end up with a "hole" between 500 and 1001 -- a new
+        % minimum purge sequence of 500, but the oldest checkpoint is would be
+        % 1001.
+        case mem3_rep:have_all_purge_checkpoints(Db) of
+            true -> couch_db:get_minimum_purge_seq(Db);
+            false -> couch_db:get_oldest_purge_seq(Db)
+        end
     end),
     OldPSTree = OldSt#st.purge_seq_tree,
     StartSeq = couch_bt_engine:get_purge_seq(NewSt) + 1,

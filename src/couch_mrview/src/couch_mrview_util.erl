@@ -61,6 +61,8 @@
         (C >= $A andalso C =< $F))
 ).
 
+-define(DEFAULT_BTREE_CACHE_DEPTH, 3).
+
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
@@ -369,7 +371,8 @@ init_state(Db, Fd, State, Header) ->
     }} = maybe_update_header(Header),
 
     IdBtOpts = [
-        {compression, couch_compress:get_compression_method()}
+        {compression, couch_compress:get_compression_method()},
+        {cache_depth, btree_cache_depth()}
     ],
     {ok, IdBtree} = couch_btree:open(IdBtreeState, Fd, IdBtOpts),
 
@@ -394,7 +397,8 @@ open_view(_Db, Fd, Lang, ViewState, View) ->
     ViewBtOpts = [
         {less, LessFun},
         {reduce, ReduceFun},
-        {compression, Compression}
+        {compression, Compression},
+        {cache_depth, btree_cache_depth()}
     ],
     {ok, Btree} = couch_btree:open(BTState, Fd, ViewBtOpts),
 
@@ -1365,3 +1369,6 @@ compact_on_collator_upgrade() ->
 
 commit_on_header_upgrade() ->
     config:get_boolean("view_upgrade", "commit_on_header_upgrade", true).
+
+btree_cache_depth() ->
+    config:get_integer("bt_engine_cache", "view_btree_cache_depth", ?DEFAULT_BTREE_CACHE_DEPTH).

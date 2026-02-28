@@ -112,9 +112,11 @@ handle_utils_dir_req(#httpd{method = 'GET'} = Req, DocumentRoot) ->
 handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_all_dbs_req(#httpd{method = 'GET'} = Req) ->
+handle_all_dbs_req(#httpd{method = 'GET', path_parts = [<<"_all_dbs">>]} = Req) ->
     handle_all_dbs_info_req(Req);
-handle_all_dbs_req(Req) ->
+handle_all_dbs_req(#httpd{method = 'GET', path_parts = [<<"_all_dbs">> | _]} = Req) ->
+    chttpd:send_error(Req, not_found);
+handle_all_dbs_req(#httpd{path_parts = [<<"_all_dbs">>]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_info_req(Req) ->
@@ -170,9 +172,9 @@ all_dbs_info_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp = Resp1}}.
 
-handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
+handle_dbs_info_req(#httpd{method = 'GET', path_parts = [<<"_dbs_info">>]} = Req) ->
     handle_all_dbs_info_req(Req);
-handle_dbs_info_req(#httpd{method = 'POST'} = Req) ->
+handle_dbs_info_req(#httpd{method = 'POST', path_parts = [<<"_dbs_info">>]} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
@@ -209,6 +211,10 @@ handle_dbs_info_req(#httpd{method = 'POST'} = Req) ->
     ),
     send_chunk(Resp, "]"),
     chttpd:end_json_response(Resp);
+handle_dbs_info_req(#httpd{method = Method, path_parts = [<<"_dbs_info">> | _]} = Req) when
+    Method == 'GET'; Method == 'POST'
+->
+    chttpd:send_error(Req, not_found);
 handle_dbs_info_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST").
 

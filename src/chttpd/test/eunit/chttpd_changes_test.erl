@@ -534,6 +534,14 @@ t_time_since({_, DbUrl}) ->
         "Invalid time"
     ),
 
+    Params4 = "?since=1000-01-01T01:01:01Z",
+    Res4 = {_, _, _} = changes(DbUrl, Params4),
+    ?assertEqual(
+        Res4,
+        changes(DbUrl, "?since=0"),
+        "Expected the same result as from '?since=0'"
+    ),
+
     {TSeqCode, TSeqRes} = reqraw(get, DbUrl ++ "/_time_seq"),
     ?assertEqual(200, TSeqCode),
     Year = integer_to_binary(element(1, date())),

@@ -288,3 +288,43 @@ get_next_message() ->
     after 5000 ->
         error(timeout)
     end.
+
+get_stats_and_gagues_test_() ->
+    {
+        foreach,
+        fun() ->
+            Ctx = test_util:start_couch(),
+            config:set("couchdb", "maintenance_mode", "false", false),
+            config:set("couchdb", "upgrade_in_progress", "false", false),
+            Ctx
+        end,
+        fun(Ctx) ->
+            config:delete("couchdb", "maintenance_mode", false),
+            config:delete("couchdb", "upgrade_in_progress", false),
+            test_util:stop(Ctx)
+        end,
+        [
+            ?TDEF_FE(t_maintenance_mode_metric),
+            ?TDEF_FE(t_upgrade_in_progress_metric),
+            ?TDEF_FE(t_get_stats)
+        ]
+    }.
+
+t_maintenance_mode_metric(_) ->
+    ?assertEqual(0, couch_stats:sample([couchdb, maintenance_mode])),
+    config:set("couchdb", "maintenance_mode", "true", false),
+    ?assertEqual(1, couch_stats:sample([couchdb, maintenance_mode])),
+    config:set("couchdb", "maintenance_mode", "nolb", false),
+    ?assertEqual(1, couch_stats:sample([couchdb, maintenance_mode])),
+    config:set("couchdb", "maintenance_mode", "false", false),
+    ?assertEqual(0, couch_stats:sample([couchdb, maintenance_mode])).
+
+t_upgrade_in_progress_metric(_) ->
+    ?assertEqual(0, couch_stats:sample([couchdb, upgrade_in_progress])),
+    config:set("couchdb", "upgrade_in_progress", "true", false),
+    ?assertEqual(1, couch_stats:sample([couchdb, upgrade_in_progress])),
+    config:set("couchdb", "upgrade_in_progress", "false", false),
+    ?assertEqual(0, couch_stats:sample([couchdb, upgrade_in_progress])).
+
+t_get_stats(_) ->
+    ?assertMatch([{start_time, _}, {dbs_open, _}], couch_server:get_stats()).

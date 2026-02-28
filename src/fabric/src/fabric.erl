@@ -678,6 +678,8 @@ time_seq_since(DbName, Time) when is_list(Time) ->
         _:_ ->
             {error, invalid_time_format}
     end;
+time_seq_since(DbName, Time) when is_integer(Time), Time < 0 ->
+    time_seq_since(DbName, 0);
 time_seq_since(DbName, Time) when is_integer(Time), Time >= 0 ->
     fabric_time_seq:since(dbname(DbName), Time).
 

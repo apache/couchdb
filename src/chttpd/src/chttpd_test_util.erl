@@ -17,7 +17,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 
 start_couch() ->
-    start_couch(?CONFIG_CHAIN).
+    test_util:start_couch([chttpd]).
 
 start_couch(IniFiles) ->
     test_util:start_couch(IniFiles, [chttpd]).

@@ -259,7 +259,28 @@ settings in their ``[{plugin}]`` section.
         Set the default interval before the plugin will purge
         a deleted document. Possible ttl formats are: ``{num}_{timeunit}`` (ex.:
         ``1000_sec``, ``30_min``, ``8_hours``, ``24_hour``, ``2_days``,
-        ``3_weeks``, ``1_month``).
+        ``3_weeks``, ``1_month``) or ``infinity``.
+
         The database may override this setting with the
-        :ref:`api/db/auto_purge` endpoint. If neither is set, the
-        plugin will not purge deleted documents.
+        :ref:`api/db/auto_purge` endpoint. If neither is set, the plugin will
+        not purge deleted documents. Setting the config value to ``infinity``
+        disables cluster level auto-purge, which may be used to run auto-purge
+        only for specific databases with the database level settings.
+
+    .. config:option:: log_level
+
+        Set the log level for starting, stopping and purge report summary log entries. ::
+
+            [couch_auto_purge_plugin]
+            log_level = info
+
+    .. config:option:: dry_run
+
+        When set to ``true`` the plugin does everything (scanning, revision
+        processing, etc) but skips the actual purge step. Optionally use the
+        ``log_level`` plugin setting to increase the severity of log reports so
+        it's clear when the plugin starts, stops and how many revisions it found
+        to purge. ::
+
+            [couch_auto_purge_plugin]
+            dry_run = false
