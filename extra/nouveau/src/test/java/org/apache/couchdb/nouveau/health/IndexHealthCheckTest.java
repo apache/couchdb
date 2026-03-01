@@ -29,17 +29,18 @@ public class IndexHealthCheckTest {
     @Test
     public void testIndexHealthCheck(@TempDir final Path tempDir) throws Exception {
         var manager = new IndexManager();
+        var objectMapper = new ObjectMapper();
         manager.setCommitIntervalSeconds(30);
         manager.setIdleSeconds(60);
         manager.setMaxIndexesOpen(1);
-        manager.setObjectMapper(new ObjectMapper());
+        manager.setObjectMapper(objectMapper);
         manager.setRootDir(tempDir);
         manager.setScheduledExecutorService(Executors.newScheduledThreadPool(2));
         manager.setSearcherFactory(new SearcherFactory());
         manager.start();
 
         try {
-            var resource = new IndexResource(manager);
+            var resource = new IndexResource(manager, objectMapper);
             var check = new IndexHealthCheck(resource);
             var result = check.check();
             assertTrue(result.isHealthy(), result.toString());

@@ -16,6 +16,8 @@ package org.apache.couchdb.nouveau.resources;
 import com.codahale.metrics.annotation.ExceptionMetered;
 import com.codahale.metrics.annotation.Metered;
 import com.codahale.metrics.annotation.ResponseMetered;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
@@ -27,6 +29,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response.Status;
 import java.io.IOException;
@@ -40,7 +43,10 @@ import org.apache.couchdb.nouveau.api.IndexInfoRequest;
 import org.apache.couchdb.nouveau.api.Ok;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
+import org.apache.couchdb.nouveau.api.UpdateRequest;
 import org.apache.couchdb.nouveau.core.IndexManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Path("/index/{name}")
 @Metered
@@ -50,10 +56,15 @@ import org.apache.couchdb.nouveau.core.IndexManager;
 @Produces(MediaType.APPLICATION_JSON)
 public final class IndexResource {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(IndexResource.class);
+
     private final IndexManager indexManager;
 
-    public IndexResource(final IndexManager indexManager) {
+    private final ObjectMapper objectMapper;
+
+    public IndexResource(final IndexManager indexManager, final ObjectMapper objectMapper) {
         this.indexManager = Objects.requireNonNull(indexManager);
+        this.objectMapper = Objects.requireNonNull(objectMapper);
     }
 
     @PUT
@@ -67,6 +78,7 @@ public final class IndexResource {
         return Ok.INSTANCE;
     }
 
+    @Deprecated(since = "2.5.2", forRemoval = true)
     @DELETE
     @Path("/doc/{docId}")
     public Ok deleteDoc(
@@ -120,6 +132,7 @@ public final class IndexResource {
         });
     }
 
+    @Deprecated(since = "2.5.2", forRemoval = true)
     @PUT
     @Path("/doc/{docId}")
     public Ok updateDoc(
@@ -129,6 +142,46 @@ public final class IndexResource {
             throws Exception {
         return indexManager.with(name, (index) -> {
             index.update(docId, request);
+            return Ok.INSTANCE;
+        });
+    }
+
+    @POST
+    @Path("/update")
+    @Consumes({"application/json-seq"})
+    public Ok updates(@PathParam("name") String name, @Context HttpServletRequest req) throws Exception {
+        var reader = req.getReader();
+        return indexManager.with(name, (index) -> {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.charAt(0) != 30) {
+                    throw new WebApplicationException("malformed row", Status.BAD_REQUEST);
+                }
+                var updateReq = objectMapper.readValue(line.substring(1), UpdateRequest.class);
+                if (updateReq instanceof DocumentUpdateRequest) {
+                    var documentUpdateRequest = (DocumentUpdateRequest) updateReq;
+                    index.update(documentUpdateRequest.getId(), documentUpdateRequest);
+                }
+                if (updateReq instanceof DocumentDeleteRequest) {
+                    var documentDeleteRequest = (DocumentDeleteRequest) updateReq;
+                    index.delete(documentDeleteRequest.getId(), documentDeleteRequest);
+                }
+                if (updateReq instanceof IndexInfoRequest) {
+                    var indexInfoRequest = (IndexInfoRequest) updateReq;
+                    if (indexInfoRequest.getMatchUpdateSeq().isPresent()
+                            && indexInfoRequest.getUpdateSeq().isPresent()) {
+                        index.setUpdateSeq(
+                                indexInfoRequest.getMatchUpdateSeq().getAsLong(),
+                                indexInfoRequest.getUpdateSeq().getAsLong());
+                    }
+                    if (indexInfoRequest.getMatchPurgeSeq().isPresent()
+                            && indexInfoRequest.getPurgeSeq().isPresent()) {
+                        index.setPurgeSeq(
+                                indexInfoRequest.getMatchPurgeSeq().getAsLong(),
+                                indexInfoRequest.getPurgeSeq().getAsLong());
+                    }
+                }
+            }
             return Ok.INSTANCE;
         });
     }
