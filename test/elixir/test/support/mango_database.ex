@@ -17,16 +17,36 @@ defmodule MangoDatabase do
     "search" in resp.body["features"]
   end
 
-  def recreate(db, opts \\ []) do
-    resp = Couch.get("/#{db}")
-    if resp.status_code == 200 do
-      docs = resp.body["doc_count"] + resp.body["doc_del_count"]
-      if docs > 0 do
-        delete(db)
-        create(db, opts)
+  def path(db, parts) do
+    parts_list =
+      case parts do
+        p when is_binary(p) -> [p]
+        p when is_list(p) -> p
       end
-    else
-      create(db, opts)
+
+    Path.join(["/#{db}" | parts_list])
+  end
+
+  def recreate(db, opts \\ []) do
+    delete(db)
+    wait_for_delete(db)
+    create(db, opts)
+    wait_for_db_info(db)
+  end
+
+  def wait_for_delete(db) do
+    resp = Couch.get("/#{db}")
+    if resp.status_code != 404 do
+      :timer.sleep(100)
+      wait_for_delete(db)
+    end
+  end
+
+  def wait_for_db_info(db) do
+    resp = Couch.get("/#{db}")
+    if resp.status_code == 404 do
+      :timer.sleep(100)
+      wait_for_db_info(db)
     end
   end
 
@@ -46,6 +66,23 @@ defmodule MangoDatabase do
   def save_docs_with_conflicts(db, docs) do
     body = %{"docs" => docs, "new_edits" => false}
     Couch.post("/#{db}/_bulk_docs", body: body)
+  end
+
+  def open_doc(db, docid) do
+    response = Couch.get("/#{db}/#{docid}")
+    response.body
+  end
+
+  def delete_doc(db, docid) do
+    path = "/#{db}/#{URI.encode(docid)}"
+    doc = Couch.get(path)
+    original_rev = doc.body["_rev"]
+    Couch.delete(path, query: %{"rev" => original_rev})
+  end
+
+  def ddoc_info(db, ddocid) do
+    response = Couch.get("/#{db}/#{ddocid}/_info")
+    response.body
   end
 
   # If a certain keyword like sort or field is passed in the options,
@@ -157,6 +194,17 @@ defmodule MangoDatabase do
     end
   end
 
+  def delete_index(db, ddocid, name, idx_type \\ "json") do
+    path = Path.join(["_index", ddocid, idx_type, name])
+    Couch.delete("/#{db}/#{path}", params: %{"w" => "3"})
+  end
+
+  def bulk_delete(db, docs) do
+    body = %{"docids" => docs, "w" => 3}
+    resp = Couch.post("/#{db}/_index/_bulk_delete", body: body)
+    resp.body
+  end
+
   def find(db, selector, opts \\ []) do
     defaults = [
       use_index: nil,
@@ -165,29 +213,35 @@ defmodule MangoDatabase do
       r: 1,
       conflicts: false,
       explain: false,
-      return_raw: false
+      return_raw: false,
+      partition: false,
     ]
     options = Keyword.merge(defaults, opts)
 
-    path =
-      case options[:explain] do
-        true -> "/#{db}/_explain"
-        _ -> "/#{db}/_find"
-      end
+    ppath =
+      if options[:partition],
+        do: "_partition/#{options[:partition]}/",
+        else: ""
 
-    resp = Couch.post(path, body: %{
-      "selector" => selector,
-      "use_index" => options[:use_index],
-      "skip" => options[:skip],
-      "limit" => options[:limit],
-      "r" => options[:r],
-      "conflicts" => options[:conflicts]
-    }
-    |> put_if_set("sort", options, :sort)
-    |> put_if_set("fields", options, :fields)
-    |> put_if_set("execution_stats", options, :executionStats)
-    |> put_if_set("allow_fallback", options, :allow_fallback)
-    )
+    suffix = if options[:explain], do: "_explain", else: "_find"
+    path = "/#{db}/#{ppath}#{suffix}"
+
+    resp =
+      Couch.post(path, body: %{
+        "selector" => selector,
+        "use_index" => options[:use_index],
+        "skip" => options[:skip],
+        "limit" => options[:limit],
+        "r" => options[:r],
+        "conflicts" => options[:conflicts]
+      }
+      |> put_if_set("sort", options, :sort)
+      |> put_if_set("fields", options, :fields)
+      |> put_if_set("execution_stats", options, :executionStats)
+      |> put_if_set("allow_fallback", options, :allow_fallback)
+      |> put_if_set("bookmark", options, :bookmark)
+      |> put_if_set("update", options, :update)
+      )
 
     case {(options[:explain] or options[:return_raw]), resp.status_code} do
       {false, 200} -> {:ok, resp.body["docs"]}

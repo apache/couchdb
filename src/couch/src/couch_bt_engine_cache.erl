@@ -13,6 +13,7 @@
 -module(couch_bt_engine_cache).
 
 -include_lib("stdlib/include/ms_transform.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 % Main API
 %
@@ -52,7 +53,7 @@
 -define(MISSES, misses).
 -define(FULL, full).
 
--record(cache, {tid, max_size}).
+-record(cache, {tid, max_size, max_term}).
 
 % Main API
 
@@ -60,11 +61,11 @@ insert(Key, Term) ->
     insert(Key, Term, 1).
 
 insert(Key, Term, Priority) when is_integer(Priority) ->
-    Priority1 = min(?MAX_PRIORITY, max(0, Priority)),
     case get_cache(Key) of
-        #cache{tid = Tid, max_size = Max} ->
-            case ets:info(Tid, memory) < Max of
+        #cache{tid = Tid, max_size = Max, max_term = MaxTerm} ->
+            case ets:info(Tid, memory) < Max andalso ?term_size(Term) =< MaxTerm of
                 true ->
+                    Priority1 = min(?MAX_PRIORITY, max(0, Priority)),
                     case ets:insert_new(Tid, {Key, Priority1, Term}) of
                         true ->
                             true;
@@ -107,11 +108,13 @@ info() ->
         Caches when is_tuple(Caches) ->
             SizeMem = [info(C) || C <- tuple_to_list(Caches)],
             MaxMem = [Max || #cache{max_size = Max} <- tuple_to_list(Caches)],
+            #cache{max_term = MaxTerm} = element(1, Caches),
             {Sizes, Mem} = lists:unzip(SizeMem),
             #{
                 size => lists:sum(Sizes),
                 memory => lists:sum(Mem),
                 max_memory => lists:sum(MaxMem) * wordsize(),
+                max_term => MaxTerm,
                 full => sample_metric(?FULL),
                 hits => sample_metric(?HITS),
                 misses => sample_metric(?MISSES),
@@ -207,8 +210,13 @@ new() ->
     Opts = [public, {write_concurrency, true}, {read_concurrency, true}],
     Max0 = round(max_size() / wordsize() / shard_count()),
     % Some per-table overhead for the table metadata
-    Max = Max0 + round(250 * 1024 / wordsize()),
-    #cache{tid = ets:new(?MODULE, Opts), max_size = Max}.
+    MaxSize = Max0 + round(250 * 1024 / wordsize()),
+    MaxTerm = couch_btree:get_chunk_size() * 4,
+    #cache{
+        tid = ets:new(?MODULE, Opts),
+        max_size = MaxSize,
+        max_term = MaxTerm
+    }.
 
 get_cache(Term) ->
     case persistent_term:get(?PTERM_KEY, undefined) of

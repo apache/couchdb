@@ -412,6 +412,10 @@ handle_auto_purge_req(#httpd{} = Req, _Db) ->
 
 validate_auto_purge_props([]) ->
     ok;
+validate_auto_purge_props([{<<"deleted_document_ttl">>, <<"infinity">>} | Rest]) ->
+    % Setting the value to "infinity" is way to explicilty disable auto-purge
+    % individual databases while allowing cluster level auto-purge to happen
+    validate_auto_purge_props(Rest);
 validate_auto_purge_props([{<<"deleted_document_ttl">>, Value} | Rest]) when is_binary(Value) ->
     case couch_scanner_util:parse_non_weekday_period(?b2l(Value)) of
         undefined ->

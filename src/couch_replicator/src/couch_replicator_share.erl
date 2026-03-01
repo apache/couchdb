@@ -39,7 +39,7 @@
 %   3) Jobs which run longer accumulate more charges and get assigned a
 %   higher priority value and get to wait longer to run.
 %
-% In order to prevent job starvation, all job priorities are periodicaly
+% In order to prevent job starvation, all job priorities are periodically
 % decayed (decreased). This effectively moves all the jobs towards the front of
 % the run queue. So, in effect, there are two competing processes: one
 % uniformly moves all jobs to the front, and the other throws them back in
@@ -86,7 +86,7 @@
 % priority 0, and would render this algorithm useless. The default value of
 % 0.98 is picked such that if a job ran for one scheduler cycle, then didn't
 % get to run for 7 hours, it would still have priority > 0. 7 hours was picked
-% as it was close enought to 8 hours which is the default maximum error backoff
+% as it was close enough to 8 hours which is the default maximum error backoff
 % interval.
 %
 % Example calculation:
@@ -215,7 +215,7 @@ decay_priorities() ->
     % is missing we assume it is 0
     clear_zero(?PRIORITIES).
 
-% This is the main part of the alrgorithm. In [1] it is described in the
+% This is the main part of the algorithm. In [1] it is described in the
 % "Priority Adjustment" section.
 %
 update_priority(#job{} = Job) ->

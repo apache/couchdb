@@ -49,7 +49,8 @@ init({Engine, DbName, FilePath, Options0}) ->
         % couch_db:validate_doc_update, which loads them lazily.
         NewDb = Db#db{main_pid = self()},
         proc_lib:init_ack({ok, NewDb}),
-        gen_server:enter_loop(?MODULE, [], NewDb)
+        GenOpts = couch_util:hibernate_after(?MODULE),
+        gen_server:enter_loop(?MODULE, GenOpts, NewDb)
     catch
         throw:InitError ->
             proc_lib:init_ack(InitError)
@@ -220,11 +221,11 @@ handle_info(
                     false ->
                         Db2
                 end,
-            {noreply, Db3, hibernate}
+            {noreply, Db3}
     catch
         throw:retry ->
             [catch (ClientPid ! {retry, self()}) || ClientPid <- Clients],
-            {noreply, Db, hibernate}
+            {noreply, Db}
     end;
 handle_info({'EXIT', _Pid, normal}, Db) ->
     {noreply, Db};

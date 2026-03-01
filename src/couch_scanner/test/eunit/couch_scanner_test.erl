@@ -23,6 +23,9 @@ couch_scanner_test_() ->
         [
             ?TDEF_FE(t_top_level_api),
             ?TDEF_FE(t_start_stop),
+            ?TDEF_FE(t_start_stop_mm_mode, 10),
+            ?TDEF_FE(t_start_stop_upgrade_in_progress, 10),
+            ?TDEF_FE(t_stop_auto_purge_on_dead_nodes, 10),
             ?TDEF_FE(t_run_through_all_callbacks_basic, 10),
             ?TDEF_FE(t_find_reporting_works, 10),
             ?TDEF_FE(t_ddoc_features_works, 20),
@@ -46,13 +49,17 @@ couch_scanner_test_() ->
 -define(FIND_PLUGIN, couch_scanner_plugin_find).
 -define(FEATURES_PLUGIN, couch_scanner_plugin_ddoc_features).
 -define(CONFLICTS_PLUGIN, couch_scanner_plugin_conflict_finder).
+-define(AUTO_PURGE_PLUGIN, couch_auto_purge_plugin).
 
 setup() ->
     {module, _} = code:ensure_loaded(?FIND_PLUGIN),
+    {module, _} = code:ensure_loaded(?AUTO_PURGE_PLUGIN),
     meck:new(?FIND_PLUGIN, [passthrough]),
+    meck:new(?AUTO_PURGE_PLUGIN, [passthrough]),
     meck:new(fabric, [passthrough]),
     meck:new(couch_scanner_server, [passthrough]),
     meck:new(couch_scanner_util, [passthrough]),
+    meck:new(mem3, [passthrough]),
     Ctx = test_util:start_couch([fabric, couch_scanner]),
     % Run with the smallest batch size to exercise the batched
     % ddoc iteration
@@ -100,11 +107,13 @@ setup() ->
     {Ctx, {DbName1, DbName2, DbName3}}.
 
 teardown({Ctx, {DbName1, DbName2, DbName3}}) ->
-    config:delete("couch_scanner", "maintenance_mode", false),
+    config:delete("couchdb", "maintenance_mode", false),
+    config:delete("couchdb", "upgrade_in_progress", false),
     config_delete_section("couch_scanner"),
     config_delete_section("couch_scanner_plugins"),
     config_delete_section(atom_to_list(?FEATURES_PLUGIN)),
     config_delete_section(atom_to_list(?FIND_PLUGIN)),
+    config_delete_section(atom_to_list(?AUTO_PURGE_PLUGIN)),
     config_delete_section(atom_to_list(?CONFLICTS_PLUGIN)),
     lists:foreach(
         fun(Subsection) ->
@@ -138,6 +147,49 @@ t_start_stop(_) ->
     ?assertMatch(#{stopped := false}, couch_scanner:status()),
     ?assertEqual(ok, couch_scanner_server:resume()),
     ?assertMatch(#{stopped := false}, couch_scanner:status()).
+
+t_start_stop_mm_mode(_) ->
+    ?assertEqual(ok, couch_scanner:stop()),
+    Plugin = atom_to_list(?FIND_PLUGIN),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    meck:expect(?FIND_PLUGIN, shards, fun(_, _) -> timer:sleep(10000) end),
+    config:set("couchdb", "maintenance_mode", "true", true),
+    ?assertEqual(ok, couch_scanner:resume()),
+    #{pids := Pids1, stopped := false} = couch_scanner:status(),
+    ?assertEqual(#{}, Pids1),
+    config:set("couchdb", "maintenance_mode", "false", true),
+    ?assertEqual(ok, couch_scanner:stop()),
+    ?assertEqual(ok, couch_scanner:resume()),
+    #{pids := Pids2, stopped := false} = couch_scanner:status(),
+    ?assertMatch(#{<<"couch_scanner_plugin_find">> := Pid} when is_pid(Pid), Pids2),
+    ?assertEqual(ok, couch_scanner:stop()).
+
+t_start_stop_upgrade_in_progress(_) ->
+    ?assertEqual(ok, couch_scanner:stop()),
+    Plugin = atom_to_list(?FIND_PLUGIN),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    meck:expect(?FIND_PLUGIN, shards, fun(_, _) -> timer:sleep(10000) end),
+    config:set("couchdb", "upgrade_in_progress", "true", true),
+    ?assertEqual(ok, couch_scanner:resume()),
+    #{pids := Pids1, stopped := false} = couch_scanner:status(),
+    ?assertEqual(#{}, Pids1),
+    config:set("couchdb", "upgrade_in_progress", "false", true),
+    ?assertEqual(ok, couch_scanner:stop()),
+    ?assertEqual(ok, couch_scanner:resume()),
+    #{pids := Pids2, stopped := false} = couch_scanner:status(),
+    ?assertMatch(#{<<"couch_scanner_plugin_find">> := Pid} when is_pid(Pid), Pids2),
+    ?assertEqual(ok, couch_scanner:stop()).
+
+t_stop_auto_purge_on_dead_nodes(_) ->
+    meck:reset(couch_scanner_server),
+    meck:reset(couch_scanner_util),
+    meck:expect(mem3, nodes, fun() -> ['potato@127.0.0.1'] end),
+    Plugin = atom_to_list(?AUTO_PURGE_PLUGIN),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    wait_exit(10000),
+    ?assertEqual(1, num_calls(?AUTO_PURGE_PLUGIN, start, 2)),
+    ?assertEqual(0, num_calls(?AUTO_PURGE_PLUGIN, complete, 1)),
+    ?assertEqual(1, log_calls(?AUTO_PURGE_PLUGIN, info)).
 
 t_run_through_all_callbacks_basic({_, {DbName1, DbName2, _}}) ->
     % Run the "find" plugin without any regexes
@@ -351,10 +403,16 @@ add_docs(DbName, Docs) ->
     {ok, []} = fabric:update_docs(DbName, Docs, [?REPLICATED_CHANGES, ?ADMIN_CTX]).
 
 num_calls(Fun, Args) ->
-    meck:num_calls(?FIND_PLUGIN, Fun, Args).
+    num_calls(?FIND_PLUGIN, Fun, Args).
+
+num_calls(Mod, Fun, Args) ->
+    meck:num_calls(Mod, Fun, Args).
 
 log_calls(Level) ->
-    meck:num_calls(couch_scanner_util, log, [Level, ?FIND_PLUGIN, '_', '_', '_']).
+    log_calls(?FIND_PLUGIN, Level).
+
+log_calls(Mod, Level) ->
+    meck:num_calls(couch_scanner_util, log, [Level, Mod, '_', '_', '_']).
 
 wait_exit(MSec) ->
     meck:wait(couch_scanner_server, handle_info, [{'EXIT', '_', '_'}, '_'], MSec).

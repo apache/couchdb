@@ -24,6 +24,7 @@ init([]) ->
     ],
     Daemons =
         [
+            {couch_secrets, {couch_secrets, start_link, []}},
             {query_servers, {couch_proc_manager, start_link, []}},
             {vhosts, {couch_httpd_vhost, start_link, []}},
             {uuids, {couch_uuids, start, []}},

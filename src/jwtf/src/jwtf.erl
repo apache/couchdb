@@ -168,7 +168,8 @@ validate_typ(Props, Checks) ->
     Required = prop(typ, Checks),
     TYP = prop(<<"typ">>, Props),
     case {Required, TYP} of
-        {undefined, undefined} ->
+        % ignore unrequired check
+        {undefined, _} ->
             ok;
         {true, undefined} ->
             throw({bad_request, <<"Missing typ header parameter">>});
