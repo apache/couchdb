@@ -20,7 +20,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.util.Collection;
 
-public final class DocumentUpdateRequest {
+public final class DocumentUpdateRequest extends DocumentRequest {
 
     @PositiveOrZero
     private final long matchSeq;
