@@ -72,6 +72,10 @@
   "LimitTests": [
     "limit field"
   ],
+  "ExecutionStatsTestsText": [
+    "simple text index",
+    "no execution stats"
+ ],
   "DisableIndexArrayLengthsTest": [
     "disable index array length",
     "enable index array length"
