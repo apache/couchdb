@@ -44,7 +44,7 @@ ResetFlags = [
 ].
 
 UnixEnv = [
-    {"CFLAGS", "$CFLAGS -g -Wall -O2 -Iquickjs"},
+    {"CFLAGS", "$CFLAGS -g -Wall -O2 -Iquickjs -fvisibility=hidden"},
     {"LDFLAGS", "$LDFLAGS quickjs/libquickjs.a -lpthread -lm"}
 ] ++ ResetFlags.
 
