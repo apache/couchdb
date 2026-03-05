@@ -240,14 +240,10 @@ verify_index_exists(DbName, Props) ->
                 couch_util:with_db(DbName, fun(Db) ->
                     case couch_db:get_design_doc(Db, DDocId) of
                         {ok, #doc{} = DDoc} ->
-                            {ok, IdxState} = couch_mrview_util:ddoc_to_mrst(
-                                DbName, DDoc
-                            ),
+                            {ok, IdxState} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
                             IdxSig = IdxState#mrst.sig,
-                            SigInLocal = couch_util:get_value(
-                                <<"signature">>, Props
-                            ),
-                            couch_index_util:hexsig(IdxSig) == SigInLocal;
+                            DocSig = couch_util:get_value(<<"signature">>, Props),
+                            match_signatures(IdxSig, DocSig);
                         {not_found, _} ->
                             false
                     end
@@ -257,6 +253,16 @@ verify_index_exists(DbName, Props) ->
         _:_ ->
             false
     end.
+
+match_signatures(IdxSig, DocSig) when is_binary(IdxSig), is_list(DocSig) ->
+    % Compatibility clause. In versions =< 3.5.1 mvrview signatures in purge
+    % checkpoints where written as lists of integers instead of a binary. After
+    % a few versions 3.6, 3.7 consider automatically upgrading them to binaries
+    % on open when we find the older format. For now keep it as is as we'd like
+    % to be able to roll back to a previous version on upgrade.
+    couch_index_util:hexsig(IdxSig) == DocSig;
+match_signatures(IdxSig, DocSig) when is_binary(IdxSig), is_binary(DocSig) ->
+    couch_util:to_hex_bin(IdxSig) == DocSig.
 
 set_partitioned(Db, State) ->
     #mrst{
@@ -305,16 +311,14 @@ update_local_purge_doc(Db, State) ->
 update_local_purge_doc(Db, State, PSeq) ->
     Sig = couch_index_util:hexsig(State#mrst.sig),
     DocId = couch_mrview_util:get_local_purge_doc_id(Sig),
-    {Mega, Secs, _} = os:timestamp(),
-    NowSecs = Mega * 1000000 + Secs,
     BaseDoc = couch_doc:from_json_obj(
         {[
             {<<"_id">>, DocId},
             {<<"type">>, <<"mrview">>},
             {<<"purge_seq">>, PSeq},
-            {<<"updated_on">>, NowSecs},
+            {<<"updated_on">>, erlang:system_time(second)},
             {<<"ddoc_id">>, get(idx_name, State)},
-            {<<"signature">>, Sig}
+            {<<"signature">>, list_to_binary(Sig)}
         ]}
     ),
     Doc =
