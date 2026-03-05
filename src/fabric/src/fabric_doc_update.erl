@@ -105,7 +105,8 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
         grouped_docs = GroupedDocs,
         reply = DocReplyDict0
     } = Acc0,
-    {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
+    {value, {_, Docs}, NewGrpDocs0} = lists:keytake(Worker, 1, GroupedDocs),
+    NewGrpDocs = remove_conflicted_docs(Docs, Replies, NewGrpDocs0),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),
     case {WaitingCount, dict:size(DocReplyDict)} of
         {1, _} ->
@@ -115,7 +116,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
                 {ok, W, []},
                 DocReplyDict
             ),
-            start_remaining_workers(Acc0),
+            start_remaining_workers(Acc0#acc{grouped_docs = NewGrpDocs}),
             {stop, {Health, Reply}};
         {_, DocCount} ->
             % we've got at least one reply for each document, let's take a look
@@ -128,7 +129,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
                             reply = DocReplyDict
                         })};
                 {stop, W, FinalReplies} ->
-                    start_remaining_workers(Acc0),
+                    start_remaining_workers(Acc0#acc{grouped_docs = NewGrpDocs}),
                     {stop, {ok, FinalReplies}}
             end;
         _ ->
@@ -189,8 +190,11 @@ tag_docs([#doc{meta = Meta} = Doc | Rest]) ->
 
 untag_docs([]) ->
     [];
-untag_docs([#doc{meta = Meta} = Doc | Rest]) ->
-    [Doc#doc{meta = lists:keydelete(ref, 1, Meta)} | untag_docs(Rest)].
+untag_docs([#doc{} = Doc | Rest]) ->
+    [untag_doc(Doc) | untag_docs(Rest)].
+
+untag_doc(#doc{} = Doc) ->
+    Doc#doc{meta = lists:keydelete(ref, 1, Doc#doc.meta)}.
 
 force_reply(Doc, [], {_, W, Acc}) ->
     {error, W, [{Doc, {error, internal_server_error}} | Acc]};
@@ -297,7 +301,15 @@ update_quorum_met(W, Replies) ->
         Replies
     ),
     GoodReplies = lists:filter(fun good_reply/1, Counters),
-    case lists:dropwhile(fun({_, Count}) -> Count < W end, GoodReplies) of
+    case
+        lists:dropwhile(
+            fun
+                ({conflict, _}) -> false;
+                ({_, Count}) -> Count < W
+            end,
+            GoodReplies
+        )
+    of
         [] ->
             false;
         [{FinalReply, _} | _] ->
@@ -307,6 +319,8 @@ update_quorum_met(W, Replies) ->
 good_reply({{ok, _}, _}) ->
     true;
 good_reply({noreply, _}) ->
+    true;
+good_reply({conflict, _}) ->
     true;
 good_reply(_) ->
     false.
@@ -401,6 +415,18 @@ start_worker(#shard{ref = Ref} = Worker, Docs, #acc{} = Acc) when is_reference(R
 start_worker(#shard{}, _Docs, #acc{} = Acc) ->
     %% for unit tests below.
     Acc.
+
+%% Remove all remaining doc update attempts if a conflict occurred
+remove_conflicted_docs(Docs, Replies, GroupedDocs) when length(Docs) == length(Replies) ->
+    ConflictDocs = [Doc || {Doc, conflict} <- lists:zip(Docs, Replies)],
+    UntaggedConflictDocs = untag_docs(ConflictDocs),
+    [
+        {W, [D || D <- Ds, not lists:member(untag_doc(D), UntaggedConflictDocs)]}
+     || {W, Ds} <- GroupedDocs
+    ];
+remove_conflicted_docs(_Docs, _Replies, GroupedDocs) ->
+    %% replies can be shorter for replicated changes as only errors show up in the result
+    GroupedDocs.
 
 -ifdef(TEST).
 
