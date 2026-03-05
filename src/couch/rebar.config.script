@@ -275,7 +275,7 @@ IcuLibPath = case WithBrew of
     true -> "-L" ++ string:trim(os:cmd(BrewIcuPrefixCmd)) ++ "/lib"
 end.
 
-IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
+IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common -fvisibility=hidden"},
           {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"},
           {"LDFLAGS", "$LDFLAGS"},
           {"CFLAGS", "$CFLAGS"}].
@@ -289,7 +289,7 @@ IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
-CouchCFileEnv = [{"CFLAGS", "$CFLAGS -Wall -Werror -DNDEBUG -O3"}].
+CouchCFileEnv = [{"CFLAGS", "$CFLAGS -Wall -Werror -DNDEBUG -O3 -fvisibility=hidden"}].
 CouchCFilePath = "priv/couch_cfile.so".
 CouchCFileSrc = ["priv/couch_cfile/*.c"].
 
