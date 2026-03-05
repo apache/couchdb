@@ -53,192 +53,198 @@ view_purge_fabric_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun test_purge_verify_index/1,
-                    fun test_purge_hook_before_compaction/1
+                    ?TDEF_FE(test_purge_verify_index, ?TIMEOUT),
+                    ?TDEF_FE(test_purge_hook_before_compaction, ?TIMEOUT)
                 ]
             }
         }
     }.
 
 test_purge_verify_index(DbName) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            Docs1 = couch_mrview_test_util:make_docs(normal, 5),
-            {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
-            {ok, _} = fabric:update_doc(
-                DbName,
-                couch_mrview_test_util:ddoc(map),
-                [?ADMIN_CTX]
-            ),
+    Docs1 = couch_mrview_test_util:make_docs(normal, 5),
+    {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
+    {ok, _} = fabric:update_doc(
+        DbName,
+        couch_mrview_test_util:ddoc(map),
+        [?ADMIN_CTX]
+    ),
 
-            Result1 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
-            Expect1 =
-                {ok, [
-                    {meta, [{total, 5}, {offset, 0}]},
-                    {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
-                    {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
-                    {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
-                    {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
-                    {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
-                ]},
-            ?assertEqual(Expect1, Result1),
+    Result1 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
+    Expect1 =
+        {ok, [
+            {meta, [{total, 5}, {offset, 0}]},
+            {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+    ?assertEqual(Expect1, Result1),
 
-            {ok, #doc{body = {Props1}}} = get_local_purge_doc(DbName),
-            ?assertEqual(0, couch_util:get_value(<<"purge_seq">>, Props1)),
-            ShardNames = [Sh || #shard{name = Sh} <- mem3:local_shards(DbName)],
-            [ShardDbName | _Rest] = ShardNames,
-            ?assertEqual(
-                true,
-                couch_mrview_index:verify_index_exists(
-                    ShardDbName, Props1
-                )
-            ),
+    {ok, #doc{body = {Props1}}} = get_local_purge_doc(DbName),
+    ?assertEqual(0, couch_util:get_value(<<"purge_seq">>, Props1)),
+    ShardNames = [Sh || #shard{name = Sh} <- mem3:local_shards(DbName)],
+    [ShardDbName | _Rest] = ShardNames,
+    ?assertEqual(
+        true,
+        couch_mrview_index:verify_index_exists(
+            ShardDbName, Props1
+        )
+    ),
 
-            purge_docs(DbName, [<<"1">>]),
+    purge_docs(DbName, [<<"1">>]),
 
-            Result2 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
-            Expect2 =
-                {ok, [
-                    {meta, [{total, 4}, {offset, 0}]},
-                    {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
-                    {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
-                    {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
-                    {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
-                ]},
-            ?assertEqual(Expect2, Result2),
+    Result2 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
+    Expect2 =
+        {ok, [
+            {meta, [{total, 4}, {offset, 0}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+    ?assertEqual(Expect2, Result2),
 
-            {ok, #doc{body = {Props2}}} = get_local_purge_doc(DbName),
-            ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props2)),
-            ?assertEqual(
-                true,
-                couch_mrview_index:verify_index_exists(
-                    ShardDbName, Props2
-                )
-            )
-        end)}.
+    {ok, #doc{body = {Props2}}} = get_local_purge_doc(DbName),
+    ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props2)),
+    ?assertEqual(
+        true,
+        couch_mrview_index:verify_index_exists(
+            ShardDbName, Props2
+        )
+    ),
+
+    % Make sure we can verify an older format in versions =< 3.5.1
+    % where signatures were lists (arrays) of integers
+    DocSig = couch_util:get_value(<<"signature">>, Props2),
+    DocSig1 = binary_to_list(DocSig),
+    Props3 = lists:keyreplace(<<"signature">>, 1, Props2, {<<"signature">>, DocSig1}),
+    ?assertEqual(
+        true,
+        couch_mrview_index:verify_index_exists(
+            ShardDbName, Props3
+        )
+    ).
 
 test_purge_hook_before_compaction(DbName) ->
-    {timeout, ?TIMEOUT,
-        ?_test(begin
-            Docs1 = couch_mrview_test_util:make_docs(normal, 5),
-            {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
-            {ok, _} = fabric:update_doc(
-                DbName,
-                couch_mrview_test_util:ddoc(map),
-                [?ADMIN_CTX]
-            ),
+    Docs1 = couch_mrview_test_util:make_docs(normal, 5),
+    {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
+    {ok, _} = fabric:update_doc(
+        DbName,
+        couch_mrview_test_util:ddoc(map),
+        [?ADMIN_CTX]
+    ),
 
-            Result1 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
-            Expect1 =
-                {ok, [
-                    {meta, [{total, 5}, {offset, 0}]},
-                    {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
-                    {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
-                    {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
-                    {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
-                    {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
-                ]},
-            ?assertEqual(Expect1, Result1),
+    Result1 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
+    Expect1 =
+        {ok, [
+            {meta, [{total, 5}, {offset, 0}]},
+            {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+    ?assertEqual(Expect1, Result1),
 
-            purge_docs(DbName, [<<"1">>]),
+    purge_docs(DbName, [<<"1">>]),
 
-            Result2 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
-            Expect2 =
-                {ok, [
-                    {meta, [{total, 4}, {offset, 0}]},
-                    {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
-                    {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
-                    {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
-                    {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
-                ]},
-            ?assertEqual(Expect2, Result2),
+    Result2 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
+    Expect2 =
+        {ok, [
+            {meta, [{total, 4}, {offset, 0}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+    ?assertEqual(Expect2, Result2),
 
-            {ok, #doc{body = {Props1}}} = get_local_purge_doc(DbName),
-            ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props1)),
+    {ok, #doc{body = {Props1}}} = get_local_purge_doc(DbName),
+    ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props1)),
 
-            [ShardName | _] = local_shards(DbName),
-            couch_util:with_db(ShardName, fun(Db) ->
-                {ok, _} = couch_db:start_compact(Db)
-            end),
-            wait_compaction(ShardName, ?LINE),
+    [ShardName | _] = local_shards(DbName),
+    couch_util:with_db(ShardName, fun(Db) ->
+        {ok, _} = couch_db:start_compact(Db)
+    end),
+    wait_compaction(ShardName, ?LINE),
 
-            ?assertEqual(
-                ok,
-                meck:wait(
-                    1,
-                    couch_mrview_index,
-                    ensure_local_purge_docs,
-                    '_',
-                    5000
-                )
-            ),
+    ?assertEqual(
+        ok,
+        meck:wait(
+            1,
+            couch_mrview_index,
+            ensure_local_purge_docs,
+            '_',
+            5000
+        )
+    ),
 
-            % Make sure compaction didn't change the update seq
-            {ok, #doc{body = {Props1}}} = get_local_purge_doc(DbName),
-            ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props1)),
+    % Make sure compaction didn't change the update seq
+    {ok, #doc{body = {Props1}}} = get_local_purge_doc(DbName),
+    ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props1)),
 
-            purge_docs(DbName, [<<"2">>]),
+    purge_docs(DbName, [<<"2">>]),
 
-            couch_util:with_db(ShardName, fun(Db) ->
-                {ok, _} = couch_db:start_compact(Db)
-            end),
-            wait_compaction(ShardName, ?LINE),
+    couch_util:with_db(ShardName, fun(Db) ->
+        {ok, _} = couch_db:start_compact(Db)
+    end),
+    wait_compaction(ShardName, ?LINE),
 
-            ?assertEqual(
-                ok,
-                meck:wait(
-                    2,
-                    couch_mrview_index,
-                    ensure_local_purge_docs,
-                    '_',
-                    5000
-                )
-            ),
+    ?assertEqual(
+        ok,
+        meck:wait(
+            2,
+            couch_mrview_index,
+            ensure_local_purge_docs,
+            '_',
+            5000
+        )
+    ),
 
-            % Make sure compaction after a purge didn't overwrite
-            % the local purge doc for the index
-            {ok, #doc{body = {Props2}}} = get_local_purge_doc(DbName),
-            ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props2)),
+    % Make sure compaction after a purge didn't overwrite
+    % the local purge doc for the index
+    {ok, #doc{body = {Props2}}} = get_local_purge_doc(DbName),
+    ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props2)),
 
-            % Force another update to ensure that we update
-            % the local doc appropriate after compaction
-            Result3 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
-            Expect3 =
-                {ok, [
-                    {meta, [{total, 3}, {offset, 0}]},
-                    {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
-                    {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
-                    {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
-                ]},
-            ?assertEqual(Expect3, Result3),
+    % Force another update to ensure that we update
+    % the local doc appropriate after compaction
+    Result3 = fabric:query_view(DbName, <<"bar">>, <<"baz">>, #mrargs{}),
+    Expect3 =
+        {ok, [
+            {meta, [{total, 3}, {offset, 0}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+    ?assertEqual(Expect3, Result3),
 
-            {ok, #doc{body = {Props3}}} = get_local_purge_doc(DbName),
-            ?assertEqual(2, couch_util:get_value(<<"purge_seq">>, Props3)),
+    {ok, #doc{body = {Props3}}} = get_local_purge_doc(DbName),
+    ?assertEqual(2, couch_util:get_value(<<"purge_seq">>, Props3)),
 
-            % Check that if the local doc doesn't exist that one
-            % is created for the index on compaction
-            delete_local_purge_doc(DbName),
-            ?assertMatch({not_found, _}, get_local_purge_doc(DbName)),
+    % Check that if the local doc doesn't exist that one
+    % is created for the index on compaction
+    delete_local_purge_doc(DbName),
+    ?assertMatch({not_found, _}, get_local_purge_doc(DbName)),
 
-            couch_util:with_db(ShardName, fun(Db) ->
-                {ok, _} = couch_db:start_compact(Db)
-            end),
-            wait_compaction(ShardName, ?LINE),
+    couch_util:with_db(ShardName, fun(Db) ->
+        {ok, _} = couch_db:start_compact(Db)
+    end),
+    wait_compaction(ShardName, ?LINE),
 
-            ?assertEqual(
-                ok,
-                meck:wait(
-                    3,
-                    couch_mrview_index,
-                    ensure_local_purge_docs,
-                    '_',
-                    5000
-                )
-            ),
+    ?assertEqual(
+        ok,
+        meck:wait(
+            3,
+            couch_mrview_index,
+            ensure_local_purge_docs,
+            '_',
+            5000
+        )
+    ),
 
-            {ok, #doc{body = {Props4}}} = get_local_purge_doc(DbName),
-            ?assertEqual(2, couch_util:get_value(<<"purge_seq">>, Props4))
-        end)}.
+    {ok, #doc{body = {Props4}}} = get_local_purge_doc(DbName),
+    ?assertEqual(2, couch_util:get_value(<<"purge_seq">>, Props4)).
 
 get_local_purge_doc(DbName) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/bar">>, []),
