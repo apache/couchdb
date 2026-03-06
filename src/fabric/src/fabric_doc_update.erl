@@ -456,6 +456,8 @@ doc_update_test_() ->
             fun doc_update1/0,
             fun doc_update2/0,
             fun doc_update3/0,
+            fun early_termination_on_conflict_1/0,
+            fun early_termination_on_conflict_2/0,
             fun handle_all_dbs_active/0,
             fun handle_two_all_dbs_actives/0,
             fun one_forbid/0,
@@ -620,6 +622,48 @@ doc_update3() ->
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
 
     ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+
+early_termination_on_conflict_1() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    [S1 | _] =
+        Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc0 = #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 2,
+        grouped_docs = GroupedDocs,
+        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+    ?assertEqual(
+        {stop, {ok, [{Doc1, conflict}, {Doc2, conflict}]}},
+        handle_message({ok, [conflict, conflict]}, S1, Acc0)
+    ).
+
+early_termination_on_conflict_2() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    [S1, S2 | _] =
+        Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc0 = #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 3,
+        grouped_docs = GroupedDocs,
+        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+    {ok, #acc{} = Acc1} =
+        handle_message({ok, [internal_server_error, internal_server_error]}, S1, Acc0),
+    ?assertEqual(
+        {stop, {ok, [{Doc1, conflict}, {Doc2, conflict}]}},
+        handle_message({ok, [conflict, conflict]}, S2, Acc1)
+    ).
 
 handle_all_dbs_active() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
