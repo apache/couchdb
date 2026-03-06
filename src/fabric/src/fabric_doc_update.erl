@@ -335,7 +335,14 @@ group_docs_by_shard(DbName, Docs) ->
                         dict:append(Shard, Doc, D1)
                     end,
                     D0,
-                    mem3:shards(DbName, Id)
+                    begin
+                        case mem3:shards(DbName, Id) of
+                            [] ->
+                                [];
+                            [#shard{range = Range} | _] = Shards ->
+                                mem3_util:rotate_list({Range, DbName}, Shards)
+                        end
+                    end
                 )
             end,
             dict:new(),
