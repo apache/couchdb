@@ -361,15 +361,12 @@ should_update(#doc{body = {Props}}, IndexType) ->
     end.
 
 update_ddoc_views(Name, MRSt, Seq, State) ->
-    Language = couch_mrview_index:get(language, MRSt),
-    Allowed = lists:member(Language, allowed_languages()),
-    Views = couch_mrview_index:get(views, MRSt),
-    if
-        Allowed andalso Views =/= [] ->
+    case couch_mrview_util:mrst_has_valid_views(MRSt) of
+        true ->
             {ok, Pid} = couch_index_server:get_index(couch_mrview_index, MRSt),
             GroupName = couch_mrview_index:get(idx_name, MRSt),
             maybe_start_job({Name, GroupName}, Pid, Seq, State);
-        true ->
+        false ->
             ok
     end.
 
@@ -530,20 +527,6 @@ prune_worker_table(State) ->
     Guard = {'<', '$1', C},
     ets:select_delete(ken_workers, [{MatchHead, [Guard], [true]}]),
     State#state{pruned_last = erlang:monotonic_time()}.
-
-allowed_languages() ->
-    % These are always available
-    BuiltIn = [<<"javascript">>, <<"javascript_quickjs">>, <<"query">>],
-    Config =
-        couch_proc_manager:get_servers_from_env("COUCHDB_QUERY_SERVER_") ++
-            couch_proc_manager:get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_"),
-    Allowed0 = [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config],
-    Allowed =
-        case couch_proc_manager:native_query_server_enabled() of
-            true -> [<<"erlang">> | Allowed0];
-            _Else -> Allowed0
-        end,
-    lists:usort(BuiltIn ++ Allowed).
 
 config(Key, Default) ->
     config:get("ken", Key, Default).
