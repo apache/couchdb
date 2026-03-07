@@ -27,7 +27,9 @@ cleanup_index_files_test_() ->
             ?TDEF_FE(t_cleanup_index_files_with_view_data),
             ?TDEF_FE(t_cleanup_index_files_with_deleted_db),
             ?TDEF_FE(t_cleanup_index_file_after_ddoc_update),
-            ?TDEF_FE(t_cleanup_index_file_after_ddoc_delete)
+            ?TDEF_FE(t_cleanup_index_file_after_ddoc_delete),
+            ?TDEF_FE(t_cleanup_empty_view_checkpoints),
+            ?TDEF_FE(t_cleanup_disallowed_language_checkpoints)
         ]
     }.
 
@@ -151,6 +153,76 @@ t_cleanup_index_file_after_ddoc_delete({_, DbName}) ->
     ?assertEqual([], indices(DbName)),
     ?assertEqual([], purges(DbName)).
 
+t_cleanup_empty_view_checkpoints({_, DbName}) ->
+    ?assertEqual(
+        [
+            "4bcdf852098ff6b0578ddf472c320e9c.view",
+            "da817c3d3f7413c1a610f25635a0c521.view"
+        ],
+        indices(DbName)
+    ),
+    ?assertEqual(
+        [
+            <<"_local/purge-mrview-4bcdf852098ff6b0578ddf472c320e9c">>,
+            <<"_local/purge-mrview-da817c3d3f7413c1a610f25635a0c521">>
+        ],
+        purges(DbName)
+    ),
+
+    update_empty_ddoc(DbName, <<"_design/foo">>),
+    {ok, _} = fabric:get_view_group_info(DbName, <<"foo">>),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
+
+    % One 4bc stays, da8 should gone. If it weren't for the check to
+    % empty views it would have used signature "3e823c2a4383ac0c18d4e574135a5b08"
+    ?assertEqual(
+        [
+            "4bcdf852098ff6b0578ddf472c320e9c.view"
+        ],
+        indices(DbName)
+    ),
+    ?assertEqual(
+        [
+            <<"_local/purge-mrview-4bcdf852098ff6b0578ddf472c320e9c">>
+        ],
+        purges(DbName)
+    ).
+
+t_cleanup_disallowed_language_checkpoints({_, DbName}) ->
+    ?assertEqual(
+        [
+            "4bcdf852098ff6b0578ddf472c320e9c.view",
+            "da817c3d3f7413c1a610f25635a0c521.view"
+        ],
+        indices(DbName)
+    ),
+    ?assertEqual(
+        [
+            <<"_local/purge-mrview-4bcdf852098ff6b0578ddf472c320e9c">>,
+            <<"_local/purge-mrview-da817c3d3f7413c1a610f25635a0c521">>
+        ],
+        purges(DbName)
+    ),
+
+    update_invalid_language(DbName, <<"_design/foo">>, <<"bar">>),
+    {ok, _} = fabric:get_view_group_info(DbName, <<"foo">>),
+    ok = fabric:cleanup_index_files_all_nodes(DbName),
+
+    % One 4bc stays, the new view uses an invalid language which can't index with
+    % so we don't create a checkpoint for it
+    ?assertEqual(
+        [
+            "4bcdf852098ff6b0578ddf472c320e9c.view"
+        ],
+        indices(DbName)
+    ),
+    ?assertEqual(
+        [
+            <<"_local/purge-mrview-4bcdf852098ff6b0578ddf472c320e9c">>
+        ],
+        purges(DbName)
+    ).
+
 shard_names(DbName) ->
     [mem3:name(S) || S <- mem3:local_shards(DbName)].
 
@@ -233,6 +305,28 @@ update_ddoc(DbName, DDocId, ViewName) ->
                         {ViewName,
                             {[
                                 {<<"map">>, <<"function(doc) { emit(doc.value, 1); }">>}
+                            ]}}
+                    ]}}
+            ]}
+    },
+    fabric:update_doc(DbName, DDoc, [?ADMIN_CTX]).
+
+update_empty_ddoc(DbName, DDocId) ->
+    {ok, DDoc0} = fabric:open_doc(DbName, DDocId, [?ADMIN_CTX]),
+    DDoc = DDoc0#doc{body = {[]}},
+    fabric:update_doc(DbName, DDoc, [?ADMIN_CTX]).
+
+update_invalid_language(DbName, DDocId, ViewName) ->
+    {ok, DDoc0} = fabric:open_doc(DbName, DDocId, [?ADMIN_CTX]),
+    DDoc = DDoc0#doc{
+        body =
+            {[
+                {<<"language">>, <<"cobol">>},
+                {<<"views">>,
+                    {[
+                        {ViewName,
+                            {[
+                                {<<"map">>, <<"MAIN-PROCEDURE. PERFORM MAP">>}
                             ]}}
                     ]}}
             ]}

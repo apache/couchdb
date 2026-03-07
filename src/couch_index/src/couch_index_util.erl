@@ -15,6 +15,7 @@
 -export([root_dir/0, index_dir/2, index_file/3]).
 -export([load_doc/3, sort_lib/1, hexsig/1]).
 -export([get_purge_checkpoints/2, cleanup_purges/3]).
+-export([delete_checkpoint/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 

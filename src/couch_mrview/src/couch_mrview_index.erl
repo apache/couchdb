@@ -292,13 +292,22 @@ ensure_local_purge_docs(DbName, DDocs) ->
     end).
 
 ensure_local_purge_doc(Db, #mrst{} = State) ->
+    IsValid = couch_mrview_util:mrst_has_valid_views(State),
     Sig = couch_index_util:hexsig(get(signature, State)),
     DocId = couch_mrview_util:get_local_purge_doc_id(Sig),
-    case couch_db:open_doc(Db, DocId, []) of
-        {not_found, _} ->
+    case {IsValid, couch_db:open_doc(Db, DocId, [])} of
+        {true, {not_found, _}} ->
+            % Is valid and doc doesn't exist => create it
             create_local_purge_doc(Db, State);
-        {ok, _} ->
-            ok
+        {false, {not_found, _}} ->
+            % Invalid and doc doesn't exist => do nothing
+            ok;
+        {true, {ok, _}} ->
+            % Is valid and doc exists already => do nothing
+            ok;
+        {false, {ok, _}} ->
+            % Invalid and doc exists => cleanup
+            couch_index_util:delete_checkpoint(Db, DocId)
     end.
 
 create_local_purge_doc(Db, State) ->

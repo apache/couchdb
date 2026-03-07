@@ -25,8 +25,7 @@
     new_proc/1,
     reload/0,
     terminate_stale_procs/0,
-    get_servers_from_env/1,
-    native_query_server_enabled/0
+    allowed_languages/0
 ]).
 
 -export([
@@ -503,6 +502,18 @@ split_by_char(String, Char) ->
     {Key, Value}.
 
 get_servers_from_env(Spec) ->
+    case persistent_term:get({?MODULE, Spec}, undefined) of
+        undefined ->
+            % Save some time since os:getenv() can potentially be very large
+            % and we don't want to reparse it all every time.
+            Val = get_servers_from_env_raw(Spec),
+            persistent_term:put({?MODULE, Spec}, Val),
+            Val;
+        Val ->
+            Val
+    end.
+
+get_servers_from_env_raw(Spec) ->
     SpecLen = length(Spec),
     % loop over os:getenv(), match SPEC_
     lists:filtermap(
@@ -516,6 +527,23 @@ get_servers_from_env(Spec) ->
         end,
         os:getenv()
     ).
+
+% Get the list of all the languages we know how to handle. Some are built-in
+% and some are configurable via config settings or env vars
+%
+allowed_languages() ->
+    % These are always available
+    BuiltIn = [<<"javascript">>, <<"javascript_quickjs">>, <<"query">>],
+    Config =
+        get_servers_from_env("COUCHDB_QUERY_SERVER_") ++
+            get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_"),
+    Allowed0 = [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config],
+    Allowed =
+        case native_query_server_enabled() of
+            true -> [<<"erlang">> | Allowed0];
+            _Else -> Allowed0
+        end,
+    lists:usort(BuiltIn ++ Allowed).
 
 configure_language_servers() ->
     ets:delete_all_objects(?SERVERS),

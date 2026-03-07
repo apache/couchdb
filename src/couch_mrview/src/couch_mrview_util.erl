@@ -18,6 +18,7 @@
 -export([get_signatures/1, get_purge_checkpoints/1, get_index_files/1]).
 -export([get_signatures_from_ddocs/2]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
+-export([mrst_has_valid_views/1]).
 -export([make_header/1]).
 -export([index_file/2, compaction_file/2, open_file/1]).
 -export([delete_files/2, delete_index_file/2, delete_compaction_file/2]).
@@ -112,12 +113,23 @@ get_signatures(Db) ->
     get_signatures_from_ddocs(DbName, DDocs1).
 
 % From a list of design #doc{} records returns signatures map: #{Sig => true}
-%
+% This will be valid signatures of views we expect to run and build on this
+% node.
 get_signatures_from_ddocs(DbName, DDocs) when is_list(DDocs) ->
     FoldFun = fun(#doc{} = Doc, Acc) ->
-        {ok, Mrst} = ddoc_to_mrst(DbName, Doc),
-        Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
-        Acc#{Sig => true}
+        try ddoc_to_mrst(DbName, Doc) of
+            {ok, Mrst} ->
+                case couch_mrview_util:mrst_has_valid_views(Mrst) of
+                    true ->
+                        Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
+                        Acc#{Sig => true};
+                    false ->
+                        Acc
+                end
+        catch
+            _:_ ->
+                Acc
+        end
     end,
     lists:foldl(FoldFun, #{}, DDocs).
 
@@ -345,6 +357,21 @@ view_sig_term(BaseSig, UpdateSeq, PurgeSeq) ->
 
 view_sig_term(BaseSig, UpdateSeq, PurgeSeq, Args) ->
     {BaseSig, UpdateSeq, PurgeSeq, Args}.
+
+% We can construct an MRSt from design document which may have languages this
+% server doesn't support, or may have no views. That view group won't build on
+% this server, and we can use this utility function to filter it out. Ken and
+% purge checkpoint cleanups use this function.
+%
+mrst_has_valid_views(MRSt) ->
+    case couch_mrview_index:get(views, MRSt) of
+        [_ | _] ->
+            Language = couch_mrview_index:get(language, MRSt),
+            AllowedLanguages = couch_proc_manager:allowed_languages(),
+            lists:member(Language, AllowedLanguages);
+        [] ->
+            false
+    end.
 
 init_state(Db, Fd, #mrst{views = Views} = State, nil) ->
     PurgeSeq = couch_db:get_purge_seq(Db),
