@@ -33,6 +33,9 @@ MAXIMUM_ERLANG_VERSION = '28.3.2'
 // works.
 INTERMEDIATE_ERLANG_VERSION = '27.3.4.8'
 
+// Default GNU Make Eunit Options for supported platforms
+DEFAULT_GNU_MAKE_EUNIT_OPTS = '-j4 --output-sync=target'
+
 // Use these to detect if just documents changed
 docs_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^src/docs/'"
 github_changed = "git diff --name-only origin/${env.CHANGE_TARGET} | grep -q '^.github'"
@@ -48,7 +51,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
-    image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'centos9': [
@@ -58,7 +62,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
-    image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'centos10': [
@@ -68,7 +73,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
-    image: "apache/couchdbci-centos:10-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-centos:10-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'jammy': [
@@ -78,7 +84,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'noble': [
@@ -88,7 +95,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'bullseye': [
@@ -98,7 +106,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   // Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
@@ -115,7 +124,8 @@ meta = [
   //   with_clouseau: true,
   //   quickjs_test262: true,
   //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-  //   node_label: 'ppc64le'
+  //   node_label: 'ppc64le',
+  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   // ],
 
   // Just like in the ppc64le case we sometimes "pick up" built-in s390x workers added to
@@ -131,7 +141,8 @@ meta = [
   //   // Test262Error: 51539607552,42,0,4,5,6,7,8
   //   quickjs_test262: false,
   //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-  //   node_label: 's390x'
+  //   node_label: 's390x',
+  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   // ],
 
   'base': [
@@ -142,7 +153,8 @@ meta = [
     clouseau_java_home: '/opt/java/openjdk',
     // Test this in in the bookworm-quickjs variant
     quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'base-max-erlang': [
@@ -152,7 +164,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}"
+    image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'base-intermediate-erlang': [
@@ -162,7 +175,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}"
+    image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'base-quickjs': [
@@ -172,7 +186,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   // This runs on a docker ARM64 host. Normally we should be able to run all
@@ -192,7 +207,8 @@ meta = [
     // Test this in in the bookworm-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 'docker-arm64'
+    node_label: 'docker-arm64',
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'trixie': [
@@ -202,7 +218,8 @@ meta = [
     with_clouseau: false,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}"
+    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   'freebsd-x86_64': [
@@ -211,7 +228,8 @@ meta = [
       with_clouseau: true,
       clouseau_java_home: '/usr/local/openjdk21',
       quickjs_test262: false,
-      gnu_make: 'gmake'
+      gnu_make: 'gmake',
+      gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
@@ -223,7 +241,8 @@ meta = [
   //    with_clouseau: true,
   //    clouseau_java_home: '/usr/local/openjdk21',
   //    quickjs_test262: false,
-  //    gnu_make: 'gmake'
+  //    gnu_make: 'gmake',
+  //    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   // ],
 
   'macos': [
@@ -233,7 +252,7 @@ meta = [
      with_clouseau: true,
      clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
      gnu_make: 'gmake',
-     gnu_make_eunit_opts: '-j4 --output-sync=target'
+     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
    ],
 
    'win2022': [
@@ -242,7 +261,8 @@ meta = [
      with_clouseau: true,
      clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
      quickjs_test262: false,
-     node_label: 'win'
+     node_label: 'win',
+     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
    ]
 ]
 
@@ -302,7 +322,7 @@ def generateNativeStage(platform) {
                   if ( meta[platform].gnu_make_eunit_opts ) {
                     eunit_opts = meta[platform].gnu_make_eunit_opts
                   }
-                  retry (3) {sh '$MAKE eunit ' + eunit_opts}
+                  retry (3) {sh '$MAKE ' + eunit_opts + ' eunit' }
                   if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
                   retry (3) {sh '$MAKE elixir-search ERLANG_COOKIE=crumbles'}
@@ -361,7 +381,7 @@ def generateNativeStage(platform) {
                       ..\\..\\couchdb-glazier\\bin\\shell.ps1
                       Write-Output 'The following tests are skipped:'
                       ..\\..\\couchdb-glazier\\bin\\exclude_tests_win.ps1 -Path . | Out-Host
-                      make -j 4 -f Makefile.win eunit
+                      make ${meta[platform].gnu_make_eunit_opts} -f Makefile.win eunit
                     """, label: 'EUnit tests')
                   }
 
@@ -469,7 +489,11 @@ def generateContainerStage(platform) {
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
-                    retry(3) {sh 'make eunit'}
+                    eunit_opts = ''
+                    if ( meta[platform].gnu_make_eunit_opts ) {
+                        eunit_opts = meta[platform].gnu_make_eunit_opts
+                    }
+                    retry (3) {sh "make ${eunit_opts} eunit" }
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make elixir-search ERLANG_COOKIE=crumbles"}
