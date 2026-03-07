@@ -22,7 +22,10 @@
     doc_count,
     w,
     grouped_docs,
-    reply
+    reply,
+    dbname,
+    update_options = [],
+    started = []
 }).
 
 go(_, [], _) ->
@@ -33,10 +36,8 @@ go(DbName, AllDocs0, Opts) ->
     validate_atomic_update(DbName, AllDocs, lists:member(all_or_nothing, Opts)),
     Options = lists:delete(all_or_nothing, Opts),
     GroupedDocs = lists:map(
-        fun({#shard{name = Name, node = Node} = Shard, Docs}) ->
-            Docs1 = untag_docs(Docs),
-            Ref = rexi:cast(Node, {fabric_rpc, update_docs, [Name, Docs1, Options]}),
-            {Shard#shard{ref = Ref}, Docs}
+        fun({#shard{} = Shard, Docs}) ->
+            {Shard#shard{ref = make_ref()}, Docs}
         end,
         group_docs_by_shard(DbName, AllDocs)
     ),
@@ -47,10 +48,13 @@ go(DbName, AllDocs0, Opts) ->
         doc_count = length(AllDocs),
         w = fabric_util:w_from_opts(DbName, Options),
         grouped_docs = GroupedDocs,
-        reply = dict:new()
+        reply = dict:new(),
+        dbname = DbName,
+        update_options = Options
     },
     Timeout = fabric_util:request_timeout(),
-    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
+    Acc1 = start_workers(Acc0),
+    try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc1, infinity, Timeout) of
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
@@ -74,21 +78,23 @@ go(DbName, AllDocs0, Opts) ->
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Worker, #acc{} = Acc0) ->
     #acc{grouped_docs = GroupedDocs} = Acc0,
     NewGrpDocs = [X || {#shard{node = N}, _} = X <- GroupedDocs, N =/= NodeRef],
-    skip_message(Acc0#acc{waiting_count = length(NewGrpDocs), grouped_docs = NewGrpDocs});
+    skip_message(
+        start_workers(Acc0#acc{waiting_count = length(NewGrpDocs), grouped_docs = NewGrpDocs})
+    );
 handle_message({rexi_EXIT, _}, Worker, #acc{} = Acc0) ->
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    skip_message(start_workers(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs}));
 handle_message({error, all_dbs_active}, Worker, #acc{} = Acc0) ->
     % treat it like rexi_EXIT, the hope at least one copy will return successfully
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    skip_message(start_workers(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs}));
 handle_message(internal_server_error, Worker, #acc{} = Acc0) ->
     % happens when we fail to load validation functions in an RPC worker
     #acc{waiting_count = WC, grouped_docs = GrpDocs} = Acc0,
     NewGrpDocs = lists:keydelete(Worker, 1, GrpDocs),
-    skip_message(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs});
+    skip_message(start_workers(Acc0#acc{waiting_count = WC - 1, grouped_docs = NewGrpDocs}));
 handle_message(attachment_chunk_received, _Worker, #acc{} = Acc0) ->
     {ok, Acc0};
 handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
@@ -99,7 +105,8 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
         grouped_docs = GroupedDocs,
         reply = DocReplyDict0
     } = Acc0,
-    {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
+    {value, {_, Docs}, NewGrpDocs0} = lists:keytake(Worker, 1, GroupedDocs),
+    NewGrpDocs = remove_conflicted_docs(Docs, Replies, NewGrpDocs0),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),
     case {WaitingCount, dict:size(DocReplyDict)} of
         {1, _} ->
@@ -109,23 +116,29 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
                 {ok, W, []},
                 DocReplyDict
             ),
+            start_remaining_workers(Acc0#acc{grouped_docs = NewGrpDocs}),
             {stop, {Health, Reply}};
         {_, DocCount} ->
             % we've got at least one reply for each document, let's take a look
             case dict:fold(fun maybe_reply/3, {stop, W, []}, DocReplyDict) of
                 continue ->
-                    {ok, Acc0#acc{
-                        waiting_count = WaitingCount - 1,
-                        grouped_docs = NewGrpDocs,
-                        reply = DocReplyDict
-                    }};
+                    {ok,
+                        start_workers(Acc0#acc{
+                            waiting_count = WaitingCount - 1,
+                            grouped_docs = NewGrpDocs,
+                            reply = DocReplyDict
+                        })};
                 {stop, W, FinalReplies} ->
+                    start_remaining_workers(Acc0#acc{grouped_docs = NewGrpDocs}),
                     {stop, {ok, FinalReplies}}
             end;
         _ ->
-            {ok, Acc0#acc{
-                waiting_count = WaitingCount - 1, grouped_docs = NewGrpDocs, reply = DocReplyDict
-            }}
+            {ok,
+                start_workers(Acc0#acc{
+                    waiting_count = WaitingCount - 1,
+                    grouped_docs = NewGrpDocs,
+                    reply = DocReplyDict
+                })}
     end;
 handle_message({missing_stub, Stub}, _, _) ->
     throw({missing_stub, Stub});
@@ -177,8 +190,11 @@ tag_docs([#doc{meta = Meta} = Doc | Rest]) ->
 
 untag_docs([]) ->
     [];
-untag_docs([#doc{meta = Meta} = Doc | Rest]) ->
-    [Doc#doc{meta = lists:keydelete(ref, 1, Meta)} | untag_docs(Rest)].
+untag_docs([#doc{} = Doc | Rest]) ->
+    [untag_doc(Doc) | untag_docs(Rest)].
+
+untag_doc(#doc{} = Doc) ->
+    Doc#doc{meta = lists:keydelete(ref, 1, Doc#doc.meta)}.
 
 force_reply(Doc, [], {_, W, Acc}) ->
     {error, W, [{Doc, {error, internal_server_error}} | Acc]};
@@ -285,7 +301,15 @@ update_quorum_met(W, Replies) ->
         Replies
     ),
     GoodReplies = lists:filter(fun good_reply/1, Counters),
-    case lists:dropwhile(fun({_, Count}) -> Count < W end, GoodReplies) of
+    case
+        lists:dropwhile(
+            fun
+                ({conflict, _}) -> false;
+                ({_, Count}) -> Count < W
+            end,
+            GoodReplies
+        )
+    of
         [] ->
             false;
         [{FinalReply, _} | _] ->
@@ -295,6 +319,8 @@ update_quorum_met(W, Replies) ->
 good_reply({{ok, _}, _}) ->
     true;
 good_reply({noreply, _}) ->
+    true;
+good_reply({conflict, _}) ->
     true;
 good_reply(_) ->
     false.
@@ -309,7 +335,14 @@ group_docs_by_shard(DbName, Docs) ->
                         dict:append(Shard, Doc, D1)
                     end,
                     D0,
-                    mem3:shards(DbName, Id)
+                    begin
+                        case mem3:shards(DbName, Id) of
+                            [] ->
+                                [];
+                            [#shard{range = Range} | _] = Shards ->
+                                mem3_util:rotate_list({Range, DbName}, Shards)
+                        end
+                    end
                 )
             end,
             dict:new(),
@@ -350,6 +383,58 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     ),
     throw({aborted, PreCommitFailures}).
 
+% Start one worker per range per invocation of this function
+start_workers(#acc{} = Acc) ->
+    Ranges = lists:usort([W#shard.range || {W, _} <- Acc#acc.grouped_docs]),
+    lists:foldl(
+        fun(Range, AccIn) ->
+            [{Worker, Docs} | _] = [
+                {W, D}
+             || {W, D} <- Acc#acc.grouped_docs, W#shard.range == Range
+            ],
+            start_worker(Worker, Docs, AccIn)
+        end,
+        Acc,
+        Ranges
+    ).
+
+start_remaining_workers(#acc{} = Acc) ->
+    lists:foldl(
+        fun({Worker, Docs}, AccIn) ->
+            start_worker(Worker, Docs, AccIn)
+        end,
+        Acc,
+        Acc#acc.grouped_docs
+    ).
+
+start_worker(#shard{ref = Ref} = Worker, Docs, #acc{} = Acc) when is_reference(Ref) ->
+    #shard{name = Name, node = Node} = Worker,
+    #acc{update_options = UpdateOptions} = Acc,
+    case lists:member(Ref, Acc#acc.started) of
+        true ->
+            Acc;
+        false ->
+            Ref = rexi:cast_ref(
+                Ref, Node, {fabric_rpc, update_docs, [Name, untag_docs(Docs), UpdateOptions]}
+            ),
+            Acc#acc{started = [Ref | Acc#acc.started]}
+    end;
+start_worker(#shard{}, _Docs, #acc{} = Acc) ->
+    %% for unit tests below.
+    Acc.
+
+%% Remove all remaining doc update attempts if a conflict occurred
+remove_conflicted_docs(Docs, Replies, GroupedDocs) when length(Docs) == length(Replies) ->
+    ConflictDocs = [Doc || {Doc, conflict} <- lists:zip(Docs, Replies)],
+    UntaggedConflictDocs = untag_docs(ConflictDocs),
+    [
+        {W, [D || D <- Ds, not lists:member(untag_doc(D), UntaggedConflictDocs)]}
+     || {W, Ds} <- GroupedDocs
+    ];
+remove_conflicted_docs(_Docs, _Replies, GroupedDocs) ->
+    %% replies can be shorter for replicated changes as only errors show up in the result
+    GroupedDocs.
+
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -371,6 +456,7 @@ doc_update_test_() ->
             fun doc_update1/0,
             fun doc_update2/0,
             fun doc_update3/0,
+            fun early_termination_on_conflict/0,
             fun handle_all_dbs_active/0,
             fun handle_two_all_dbs_actives/0,
             fun one_forbid/0,
@@ -535,6 +621,25 @@ doc_update3() ->
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
 
     ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+
+early_termination_on_conflict() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc0 = #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 2,
+        grouped_docs = GroupedDocs,
+        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+    ?assertEqual(
+        {stop, {ok, [{Doc1, conflict}, {Doc2, conflict}]}},
+        handle_message({ok, [conflict, conflict]}, hd(Shards), Acc0)
+    ).
 
 handle_all_dbs_active() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
