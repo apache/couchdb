@@ -92,30 +92,27 @@ purge_index(Db, IndexPid, Index) ->
     Proc = get_os_process(Index#index.def_lang),
     try
         true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def]),
-        FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, {Acc, _}) ->
-            Acc0 =
-                case couch_db:get_full_doc_info(Db, Id) of
-                    not_found ->
-                        ok = clouseau_rpc:delete(IndexPid, Id),
-                        Acc;
-                    FDI ->
-                        DI = couch_doc:to_doc_info(FDI),
-                        #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
-                        case lists:member({Id, Rev}, Acc) of
-                            true ->
-                                Acc;
-                            false ->
-                                update_or_delete_index(IndexPid, Db, DI, Proc),
-                                [{Id, Rev} | Acc]
-                        end
-                end,
-            update_task(1),
-            {ok, {Acc0, PurgeSeq}}
+        FoldFun = fun({_PurgeSeq, _UUID, Id, _Revs}, Acc) ->
+            case couch_db:get_full_doc_info(Db, Id) of
+                not_found ->
+                    ok = clouseau_rpc:delete(IndexPid, Id),
+                    update_task(1),
+                    {ok, Acc};
+                FDI ->
+                    DI = couch_doc:to_doc_info(FDI),
+                    #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
+                    case lists:member({Id, Rev}, Acc) of
+                        true ->
+                            {ok, Acc};
+                        false ->
+                            update_or_delete_index(IndexPid, Db, DI, Proc),
+                            update_task(1),
+                            {ok, [{Id, Rev} | Acc]}
+                    end
+            end
         end,
-
-        {ok, {ExcludeList, NewPurgeSeq}} = couch_db:fold_purge_infos(
-            Db, IdxPurgeSeq, FoldFun, {[], 0}, []
-        ),
+        {ok, ExcludeList} = couch_db:fold_purge_infos(Db, IdxPurgeSeq, FoldFun, []),
+        NewPurgeSeq = couch_db:get_purge_seq(Db),
         clouseau_rpc:set_purge_seq(IndexPid, NewPurgeSeq),
         update_local_doc(Db, Index, NewPurgeSeq),
         {ok, ExcludeList}
