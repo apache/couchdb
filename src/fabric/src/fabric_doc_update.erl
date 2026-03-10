@@ -53,7 +53,7 @@ go(DbName, AllDocs0, Opts) ->
         update_options = Options
     },
     Timeout = fabric_util:request_timeout(),
-    Acc1 = start_workers(Acc0),
+    Acc1 = start_workers_strategy(Acc0),
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc1, infinity, Timeout) of
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
@@ -382,6 +382,24 @@ validate_atomic_update(_DbName, AllDocs, true) ->
         AllDocs
     ),
     throw({aborted, PreCommitFailures}).
+
+%% serialize worker startup for interactive edits unless disabled in config.
+start_workers_strategy(#acc{} = Acc) ->
+    SerializeWorkerStartup = config:get_boolean("fabric", "serialize_worker_startup", true),
+    case {update_type(Acc), SerializeWorkerStartup} of
+        {?REPLICATED_CHANGES, _} ->
+            start_remaining_workers(Acc);
+        {_, true} ->
+            start_workers(Acc);
+        _ ->
+            start_remaining_workers(Acc)
+    end.
+
+update_type(#acc{} = Acc) ->
+    case proplists:get_value(?REPLICATED_CHANGES, Acc#acc.update_options) of
+        true -> ?REPLICATED_CHANGES;
+        _ -> ?INTERACTIVE_EDIT
+    end.
 
 % Start one worker per range per invocation of this function
 start_workers(#acc{} = Acc) ->
