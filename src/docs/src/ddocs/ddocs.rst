@@ -937,3 +937,78 @@ modified by a user with the ``_admin`` role:
     CouchDB Guide:
         - `Validation Functions
           <http://guide.couchdb.org/editions/1/en/validation.html>`_
+
+Validation using Mango selectors
+--------------------------------
+
+The ``validate_doc_update`` field may be written as a :ref:`Mango selector
+<find/selectors>`, instead of as a JavaScript function. This provides greater
+performance since documents do not need to be sent to an external process for
+validation, but is more restrictive in terms of what kinds of validation rules
+can be expressed. Mango selectors can express declarative rules about the
+strucure of the existing document stored on disk, and the new version of the
+document; the document must match the given selector in order for the update to
+be accepted.
+
+To use Mango selectors for validation, the design document must have the
+``language`` field set to ``query``. The selector is applied to a JSON structure
+containing the following fields:
+
+* ``newDoc``: New version of document that will be stored.
+* ``oldDoc``: Previous version of document that is already stored.
+
+For example, to check that all docs contain a ``title`` which is a string, and a
+``year`` which is a number:
+
+.. code-block:: json
+
+    {
+      "language": "query",
+
+      "validate_doc_update": {
+        "newDoc": {
+          "title": { "$type": "string" },
+          "year": { "$type": "number" }
+        }
+      }
+    }
+
+All the features of Mango selectors are supported here, so any condition that
+can be expressed as a selector can be implemented in this way. Operators like
+``$lt`` and ``$gt`` can be used to restrict values to a given range,
+``$allMatch`` can be used to check all the items in an array match some schema,
+and it is even possible to implement conditional checks using logical
+combinators.
+
+For example, say we want documents with ``"type": "movie"`` to have a ``title``
+and ``year`` as above, and documents with ``"type": "actor"`` to have a ``name``
+and a non-empty list of strings under ``movies``. This can be achieved using
+this design document:
+
+.. code-block:: json
+
+    {
+      "language": "query",
+
+      "validate_doc_update": {
+        "newDoc": {
+          "type": { "$in": ["movie", "actor"] },
+          "$or": [
+            {
+              "type": "movie",
+              "title": { "$type": "string" },
+              "year": { "$type": "number" }
+            },
+            {
+              "type": "actor",
+              "name": { "$type": "string" },
+              "movies": {
+                "$type": "array",
+                "$not": { "$size": 0 },
+                "$allMatch": { "$type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
