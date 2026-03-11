@@ -63,10 +63,13 @@ checkpoint(St) ->
     end.
 
 db(St, DbName) ->
-    case ttl(St, DbName) of
+    try ttl(St, DbName) of
         TTL when is_integer(TTL) ->
             {ok, St#{ttl => TTL}};
         undefined ->
+            {skip, St}
+    catch
+        error:database_does_not_exist ->
             {skip, St}
     end.
 
