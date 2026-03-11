@@ -4,6 +4,9 @@ defmodule DiskMonitorTest do
   @moduletag :disk_monitor
 
   setup_all do
+    set_config({"disk_monitor", "interactive_view_indexing_threshold", "100"})
+    set_config({"disk_monitor", "background_view_indexing_threshold", "100"})
+    set_config({"disk_monitor", "interactive_database_writes_threshold", "100"})
     set_config({"disk_monitor", "enable", "true"})
     :ok
   end

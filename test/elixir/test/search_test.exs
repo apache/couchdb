@@ -307,6 +307,28 @@ defmodule SearchTest do
   end
 
   @tag :with_db
+  test "group search", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    ranges = %{"price" => %{}}
+    resp = Couch.get(url, query: %{q: "*:*", group_field: "state"})
+    assert_on_status(resp, 200, "Fail to do search.")
+
+    %{:body => %{"groups" => groups}} = resp
+    assert length(groups) == 3
+    Enum.each(groups, fn g ->
+      case g["by"] do
+        "new" -> assert g["total_rows"] == 2
+        "old" -> assert g["total_rows"] == 1
+        "unknown" -> assert g["total_rows"] == 1
+      end
+    end)
+  end
+
+  @tag :with_db
   test "timeouts do not expose internal state", context do
     db_name = context[:db_name]
     create_search_docs(db_name)
