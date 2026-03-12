@@ -497,7 +497,7 @@ def generateContainerStage(platform) {
                   unstash 'tarball'
                   sh( script: "mkdir -p ${platform}/couchdb", label: 'Create build directory' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/couchdb", label: 'Unpack release' )
-                  sh( script: "cd ${platform} && git clone https://github.com/apache/couchdb-pkg", label: 'Clone packaging helper repo' )
+                  sh( script: "cd ${platform} && git clone --single-branch --branch upgrade-debhelper-compact-level https://github.com/apache/couchdb-pkg", label: 'Clone packaging helper repo from upgrade-debhelper-compact-level branch' )
                   dir( "${platform}/couchdb-pkg" ) {
                     sh( script: 'make', label: 'Build packages' )
                   }
