@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
-public final class DocumentDeleteRequest {
+public final class DocumentDeleteRequest extends DocumentRequest {
 
     @PositiveOrZero
     private final long matchSeq;

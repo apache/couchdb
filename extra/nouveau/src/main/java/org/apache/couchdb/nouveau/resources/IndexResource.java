@@ -32,6 +32,7 @@ import jakarta.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
@@ -67,6 +68,7 @@ public final class IndexResource {
         return Ok.INSTANCE;
     }
 
+    @Deprecated(since = "3.5.2", forRemoval = true)
     @DELETE
     @Path("/doc/{docId}")
     public Ok deleteDoc(
@@ -120,6 +122,7 @@ public final class IndexResource {
         });
     }
 
+    @Deprecated(since = "3.5.2", forRemoval = true)
     @PUT
     @Path("/doc/{docId}")
     public Ok updateDoc(
@@ -129,6 +132,22 @@ public final class IndexResource {
             throws Exception {
         return indexManager.with(name, (index) -> {
             index.update(docId, request);
+            return Ok.INSTANCE;
+        });
+    }
+
+    @POST
+    @Path("/update")
+    public Ok update(@PathParam("name") String name, @NotNull @Valid BulkUpdateRequest request) throws Exception {
+        return indexManager.with(name, (index) -> {
+            for (var update : request.updates()) {
+                if (update.request() instanceof DocumentUpdateRequest) {
+                    index.update(update.docId(), (DocumentUpdateRequest) update.request());
+                }
+                if (update.request() instanceof DocumentDeleteRequest) {
+                    index.delete(update.docId(), (DocumentDeleteRequest) update.request());
+                }
+            }
             return Ok.INSTANCE;
         });
     }

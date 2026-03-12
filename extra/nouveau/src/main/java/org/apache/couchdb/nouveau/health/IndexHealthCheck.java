@@ -16,6 +16,9 @@ package org.apache.couchdb.nouveau.health;
 import com.codahale.metrics.health.HealthCheck;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
+import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
+import org.apache.couchdb.nouveau.api.DocumentUpdate;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.SearchRequest;
@@ -41,10 +44,10 @@ public final class IndexHealthCheck extends HealthCheck {
 
         indexResource.createIndex(name, new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null));
         try {
-            final DocumentUpdateRequest documentUpdateRequest =
-                    new DocumentUpdateRequest(0, 1, null, Collections.emptyList());
-            indexResource.updateDoc(name, "foo", documentUpdateRequest);
-
+            indexResource.update(
+                    name,
+                    new BulkUpdateRequest(List.of(new DocumentUpdate(
+                            "foo", new DocumentUpdateRequest(0, 1, null, Collections.emptyList())))));
             final SearchRequest searchRequest = new SearchRequest();
             searchRequest.setQuery("_id:foo");
             searchRequest.setMinUpdateSeq(1);

@@ -63,6 +63,7 @@ spotless {
   java {
     importOrder()
     removeUnusedImports()
+    forbidWildcardImports()
     cleanthat()
     palantirJavaFormat()
   }
