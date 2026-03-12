@@ -119,5 +119,22 @@
   "PartitionMangoTest": [
     "explain options (text)",
     "explain works with bookmarks (text)"
+  ],
+  "DreyfusPurgeTest": [
+    "purge single document",
+    "purge multiple documents",
+    "purge multiple documents in batches",
+    "purge conflict",
+    "purge conflict twice removes all",
+    "purge conflict then purge remaining",
+    "purge conflict with all revs",
+    "purge after update",
+    "purge after many updates",
+    "delete document",
+    "delete purge conflict",
+    "delete conflict",
+    "purge then search",
+    "purge updates local checkpoint doc",
+    "delete design doc cleans up local purge doc"
   ]
 }
