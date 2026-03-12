@@ -4,3 +4,4 @@ erlang = '26'
 java = '21'
 nodejs = '24'
 python = '3'
+sbt = "1.11.7"
