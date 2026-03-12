@@ -54,8 +54,9 @@
     * **rewrites** (*array* or *string*): Rewrite rules definition. *Deprecated.*
     * **shows** (*object*): :ref:`Show functions <showfun>` definition. *Deprecated.*
     * **updates** (*object*): :ref:`Update functions <updatefun>` definition
-    * **validate_doc_update** (*string*): :ref:`Validate document update
-      <vdufun>` function source
+    * **validate_doc_update** (*string* or *object*): :ref:`Validate document
+      update <vdufun>` JavaScript function source, or :ref:`Mango selector
+      <find/selectors>`
     * **views** (*object*): :ref:`View functions <viewfun>` definition.
     * **autoupdate** (*boolean*): Indicates whether to automatically build
       indexes defined in this design document. Default is ``true``.
