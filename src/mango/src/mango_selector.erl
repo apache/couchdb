@@ -38,7 +38,7 @@ normalize(Selector) ->
     ],
     {NProps} = lists:foldl(fun(Step, Sel) -> Step(Sel) end, Selector, Steps),
     FieldNames = [Name || {Name, _} <- NProps],
-    case lists:member(<<>>, FieldNames) of
+    case lists:member([], FieldNames) of
         true ->
             ?MANGO_ERROR({invalid_selector, missing_field_name});
         false ->
@@ -210,7 +210,7 @@ norm_ops(Value) ->
 norm_fields({[]}) ->
     {[]};
 norm_fields(Selector) ->
-    norm_fields(Selector, <<>>).
+    norm_fields(Selector, []).
 
 % Operators where we can push the field names further
 % down the operator tree
@@ -237,7 +237,7 @@ norm_fields({[{<<"$keyMapMatch">>, Arg}]}, Path) ->
 % $default field. This also asserts that the $default
 % field is at the root as well as that it only has
 % a $text operator applied.
-norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]} = Sel, <<>>) ->
+norm_fields({[{<<"$default">>, {[{<<"$text">>, _Arg}]}}]} = Sel, []) ->
     Sel;
 norm_fields({[{<<"$default">>, _}]} = Selector, _) ->
     ?MANGO_ERROR({bad_field, Selector});
@@ -249,12 +249,11 @@ norm_fields({[{<<"$", _/binary>>, _}]} = Cond, Path) ->
 % We've found a field name. Append it to the path
 % and skip this node as we unroll the stack as
 % the full path will be further down the branch.
-norm_fields({[{Field, Cond}]}, <<>>) ->
-    % Don't include the '.' for the first element of
-    % the path.
-    norm_fields(Cond, Field);
-norm_fields({[{Field, Cond}]}, Path) ->
-    norm_fields(Cond, <<Path/binary, ".", Field/binary>>);
+norm_fields({[{Field, Cond}]}, Path) when is_binary(Field) ->
+    {ok, F} = mango_util:parse_field(Field),
+    norm_fields({[{F, Cond}]}, Path);
+norm_fields({[{Field, Cond}]}, Path) when is_list(Field) ->
+    norm_fields(Cond, Path ++ Field);
 % An empty selector
 norm_fields({[]}, Path) ->
     {Path, {[]}};
@@ -575,7 +574,9 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
 % match against.
 
 has_required_fields(Selector, RequiredFields) ->
-    Remainder = has_required_fields_int(Selector, RequiredFields),
+    Paths0 = [mango_util:parse_field(F) || F <- RequiredFields],
+    Paths = [P || {ok, P} <- Paths0],
+    Remainder = has_required_fields_int(Selector, Paths),
     Remainder == [].
 
 % Empty selector
@@ -634,6 +635,9 @@ has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     end.
 
 % Returns true if a field in the selector is a constant value e.g. {a: {$eq: 1}}
+is_constant_field(Selector, Field) when not is_list(Field) ->
+    {ok, Path} = mango_util:parse_field(Field),
+    is_constant_field(Selector, Path);
 is_constant_field({[]}, _Field) ->
     false;
 is_constant_field(Selector, Field) when not is_list(Selector) ->
@@ -653,7 +657,7 @@ is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
 fields({[{<<"$", _/binary>>, Args}]}) when is_list(Args) ->
     lists:flatmap(fun fields/1, Args);
 fields({[{Field, _Cond}]}) ->
-    [Field];
+    [mango_util:join_field(Field)];
 fields({[]}) ->
     [].
 
@@ -1516,7 +1520,7 @@ match_object_test() ->
 
     % an inner empty object selector matches only empty objects
     SelEmptyField = normalize({[{<<"x">>, {[]}}]}),
-    ?assertEqual({[{<<"x">>, {[{<<"$eq">>, {[]}}]}}]}, SelEmptyField),
+    ?assertEqual({[{[<<"x">>], {[{<<"$eq">>, {[]}}]}}]}, SelEmptyField),
     ?assertEqual(false, match_int(SelEmptyField, Doc1)),
     ?assertEqual(true, match_int(SelEmptyField, Doc2)),
     ?assertEqual(false, match_int(SelEmptyField, Doc3)),
@@ -1525,7 +1529,7 @@ match_object_test() ->
 
     % negated empty object selector matches a value which is present and is not the empty object
     SelNotEmptyField = normalize({[{<<"$not">>, {[{<<"x">>, {[]}}]}}]}),
-    ?assertEqual({[{<<"x">>, {[{<<"$ne">>, {[]}}]}}]}, SelNotEmptyField),
+    ?assertEqual({[{[<<"x">>], {[{<<"$ne">>, {[]}}]}}]}, SelNotEmptyField),
     ?assertEqual(false, match_int(SelNotEmptyField, Doc1)),
     ?assertEqual(false, match_int(SelNotEmptyField, Doc2)),
     ?assertEqual(true, match_int(SelNotEmptyField, Doc3)),
@@ -1534,7 +1538,7 @@ match_object_test() ->
 
     % inner object selectors with fields match objects with at least those fields
     Sel1Field = normalize({[{<<"x">>, {[{<<"a">>, 1}]}}]}),
-    ?assertEqual({[{<<"x.a">>, {[{<<"$eq">>, 1}]}}]}, Sel1Field),
+    ?assertEqual({[{[<<"x">>, <<"a">>], {[{<<"$eq">>, 1}]}}]}, Sel1Field),
     ?assertEqual(false, match_int(Sel1Field, Doc1)),
     ?assertEqual(false, match_int(Sel1Field, Doc2)),
     ?assertEqual(true, match_int(Sel1Field, Doc3)),
@@ -1546,8 +1550,8 @@ match_object_test() ->
     ?assertEqual(
         {[
             {<<"$and">>, [
-                {[{<<"x.a">>, {[{<<"$eq">>, 1}]}}]},
-                {[{<<"x.b">>, {[{<<"$eq">>, 2}]}}]}
+                {[{[<<"x">>, <<"a">>], {[{<<"$eq">>, 1}]}}]},
+                {[{[<<"x">>, <<"b">>], {[{<<"$eq">>, 2}]}}]}
             ]}
         ]},
         Sel2Field
@@ -1560,7 +1564,7 @@ match_object_test() ->
 
     % check shorthand syntax
     SelShort = normalize({[{<<"x.b">>, 2}]}),
-    ?assertEqual({[{<<"x.b">>, {[{<<"$eq">>, 2}]}}]}, SelShort),
+    ?assertEqual({[{[<<"x">>, <<"b">>], {[{<<"$eq">>, 2}]}}]}, SelShort),
     ?assertEqual(false, match_int(SelShort, Doc1)),
     ?assertEqual(false, match_int(SelShort, Doc2)),
     ?assertEqual(false, match_int(SelShort, Doc3)),
