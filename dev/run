@@ -242,6 +242,13 @@ def get_args_parser():
         help="Start Clouseau nodes",
     )
     parser.add_option(
+        "--no-clouseau-check",
+        dest="no_clouseau_check",
+        default=False,
+        action="store_true",
+        help="Disable erl_call clouseau check",
+    )
+    parser.add_option(
         "--erlang-cookie",
         dest="erlang_cookie",
         default=None,
@@ -300,6 +307,7 @@ def setup_context(opts, args):
         "locald_configs": opts.locald_configs,
         "with_nouveau": opts.with_nouveau,
         "with_clouseau": opts.with_clouseau,
+        "no_clouseau_check": opts.no_clouseau_check,
         "clouseau_dir": opts.clouseau_dir or CLOUSEAU_DIR,
         "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
@@ -897,7 +905,7 @@ def check_clouseau_node_alive(ctx, idx):
 
 
 def maybe_check_clouseau_node_alive(ctx, idx):
-    if ctx["with_clouseau"]:
+    if ctx["with_clouseau"] and not ctx["no_clouseau_check"]:
         check_clouseau_node_alive(ctx, idx)
 
 
