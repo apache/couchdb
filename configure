@@ -350,12 +350,12 @@ if [ "${WITH_SPIDERMONKEY}" = "false" ] && [ "${JS_ENGINE}" = "spidermonkey" ]; 
 fi
 
 # If we're in a release tarball and we don't have proper, then mark it as skipped
-if [ ! -d .git ] && [ "$WITH_PROPER" = "true" ] && [ ! -d src/proper ]; then
+if [ ! -e .git ] && [ "$WITH_PROPER" = "true" ] && [ ! -d src/proper ]; then
     WITH_PROPER="false"
 fi
 
 # If we're in a release tarball and we don't have spidermonkey, then mark it as skipped and enable quickjs
-if [ ! -d .git ] && [ "$WITH_SPIDERMONKEY" = "true" ] && [ ! -d src/couch/priv/couch_js ]; then
+if [ ! -e .git ] && [ "$WITH_SPIDERMONKEY" = "true" ] && [ ! -d src/couch/priv/couch_js ]; then
     echo "NOTICE: Spidermonkey was disabled in release tarball. Setting JS_ENGINE=quickjs"
     WITH_SPIDERMONKEY="false"
     JS_ENGINE="quickjs"
@@ -562,7 +562,7 @@ if [ "$WITH_CLOUSEAU" = "true" ]; then
 fi
 
 # only update dependencies, when we are not in a release tarball
-if [ -d .git ] && [ "$SKIP_DEPS" = "false" ]; then
+if [ -e .git ] && [ "$SKIP_DEPS" = "false" ]; then
     echo "==> updating dependencies"
     ${REBAR} get-deps update-deps
 fi

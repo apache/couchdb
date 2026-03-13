@@ -31,7 +31,7 @@ GRADLE?=$(CURDIR)/extra/nouveau/gradlew
 
 COUCHDB_GIT_SHA=$(git_sha)
 
-IN_RELEASE = $(shell if [ ! -d .git ]; then echo true; fi)
+IN_RELEASE = $(shell if [ ! -e .git ]; then echo true; fi)
 ifeq ($(IN_RELEASE), true)
 
 # 1. Building from tarball, use version.mk.
