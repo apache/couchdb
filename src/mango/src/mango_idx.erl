@@ -154,7 +154,7 @@ add(DDoc, Idx) ->
     {ok, NewDDoc1} = Mod:add(DDoc, Idx),
     NewDDoc2 = set_ddoc_partitioned(NewDDoc1, Idx),
     % Round trip through JSON for normalization
-    Body = ?JSON_DECODE(?JSON_ENCODE(NewDDoc2#doc.body)),
+    Body = ?JSON_DECODE(?JSON_ENCODE(mango_util:join_keys(NewDDoc2#doc.body))),
     {ok, NewDDoc2#doc{body = Body}}.
 
 remove(DDoc, Idx) ->
