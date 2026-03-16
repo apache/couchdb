@@ -393,7 +393,7 @@ public final class IndexManager implements Managed {
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
-        final int luceneVersion = indexDefinition.getLuceneVersion();
+        final int luceneVersion = indexDefinition.luceneVersion();
         final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve(Integer.toString(luceneVersion))));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         if (luceneVersion != IndexDefinition.LATEST_LUCENE_VERSION) {

@@ -31,12 +31,12 @@ public class IndexDefinitionTest {
     @Test
     public void legacyLuceneVersionIfMissing() throws Exception {
         var indexDefinition = mapper.readValue("{}", IndexDefinition.class);
-        assertThat(indexDefinition.getLuceneVersion()).isEqualTo(IndexDefinition.LEGACY_LUCENE_VERSION);
+        assertThat(indexDefinition.luceneVersion()).isEqualTo(IndexDefinition.LEGACY_LUCENE_VERSION);
     }
 
     @Test
     public void luceneVersionIsDeserializedIfPresent() throws Exception {
         var indexDefinition = mapper.readValue("{\"lucene_version\":10}", IndexDefinition.class);
-        assertThat(indexDefinition.getLuceneVersion()).isEqualTo(10);
+        assertThat(indexDefinition.luceneVersion()).isEqualTo(10);
     }
 }

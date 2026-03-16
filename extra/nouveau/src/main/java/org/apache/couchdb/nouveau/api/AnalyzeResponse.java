@@ -14,28 +14,8 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class AnalyzeResponse {
-
-    @NotNull
-    private List<@NotEmpty String> tokens;
-
-    public AnalyzeResponse() {
-        // Jackson deserialization
-    }
-
-    public AnalyzeResponse(List<String> tokens) {
-        this.tokens = tokens;
-    }
-
-    @JsonProperty
-    public List<String> getTokens() {
-        return tokens;
-    }
-}
+public record AnalyzeResponse(@JsonProperty @NotNull List<@NotEmpty String> tokens) {}

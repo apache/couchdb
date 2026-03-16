@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -41,6 +40,7 @@ import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.SearchHit;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
+import org.apache.couchdb.nouveau.api.SearchResultsBuilder;
 import org.apache.couchdb.nouveau.api.StoredField;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.api.TextField;
@@ -144,7 +144,7 @@ public class LuceneIndex extends Index {
     public void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException {
         final Term docIdTerm = docIdTerm(docId);
         final Document doc = toDocument(docId, request);
-        schema.update(request.getFields());
+        schema.update(request.fields());
         writer.updateDocument(docIdTerm, doc);
     }
 
@@ -224,7 +224,7 @@ public class LuceneIndex extends Index {
     private CollectorManager<?, ? extends TopDocs> hitCollector(final SearchRequest searchRequest) {
         final Sort sort = toSort(searchRequest);
 
-        final PrimitiveWrapper<?>[] after = searchRequest.getAfter();
+        final PrimitiveWrapper<?>[] after = searchRequest.after();
         final FieldDoc fieldDoc;
         if (after != null) {
             fieldDoc = toFieldDoc(after);
@@ -237,7 +237,7 @@ public class LuceneIndex extends Index {
             fieldDoc = null;
         }
 
-        return new TopFieldCollectorManager(sort, searchRequest.getLimit(), fieldDoc, 1000);
+        return new TopFieldCollectorManager(sort, searchRequest.limit(), fieldDoc, 1000);
     }
 
     private SortField getLastSortField(final Sort sort) {
@@ -248,15 +248,16 @@ public class LuceneIndex extends Index {
     private SearchResults toSearchResults(
             final SearchRequest searchRequest, final IndexSearcher searcher, final Object[] reduces)
             throws IOException {
-        final SearchResults result = new SearchResults();
-        collectHits(searcher, (TopDocs) reduces[0], result);
+        final SearchResultsBuilder builder = new SearchResultsBuilder();
+        collectHits(searcher, (TopDocs) reduces[0], builder);
         if (reduces.length == 2) {
-            collectFacets(searchRequest, searcher, (FacetsCollector) reduces[1], result);
+            collectFacets(searchRequest, searcher, (FacetsCollector) reduces[1], builder);
         }
-        return result;
+        return builder.build();
     }
 
-    private void collectHits(final IndexSearcher searcher, final TopDocs topDocs, final SearchResults searchResults)
+    private void collectHits(
+            final IndexSearcher searcher, final TopDocs topDocs, final SearchResultsBuilder searchResultsBuilder)
             throws IOException {
         final List<SearchHit> hits = new ArrayList<SearchHit>(topDocs.scoreDocs.length);
         final StoredFields storedFields = searcher.storedFields();
@@ -290,38 +291,37 @@ public class LuceneIndex extends Index {
             hits.add(new SearchHit(doc.get("_id"), after, fields));
         }
 
-        searchResults.setTotalHits(topDocs.totalHits.value());
-        searchResults.setTotalHitsRelation(topDocs.totalHits.relation());
-        searchResults.setHits(hits);
+        searchResultsBuilder.setTotalHits(topDocs.totalHits);
+        searchResultsBuilder.setHits(hits);
     }
 
     private void collectFacets(
             final SearchRequest searchRequest,
             final IndexSearcher searcher,
             final FacetsCollector fc,
-            final SearchResults searchResults)
+            final SearchResultsBuilder searchResultsBuilder)
             throws IOException {
         if (searchRequest.hasCounts()) {
             final Map<String, Map<String, Number>> countsMap = new HashMap<String, Map<String, Number>>(
-                    searchRequest.getCounts().size());
-            for (final String field : searchRequest.getCounts()) {
+                    searchRequest.counts().size());
+            for (final String field : searchRequest.counts()) {
                 final StringDocValuesReaderState state =
                         new StringDocValuesReaderState(searcher.getIndexReader(), field);
                 final StringValueFacetCounts counts = new StringValueFacetCounts(state, fc);
-                countsMap.put(field, collectFacets(counts, searchRequest.getTopN(), field));
+                countsMap.put(field, collectFacets(counts, searchRequest.topN(), field));
             }
-            searchResults.setCounts(countsMap);
+            searchResultsBuilder.setCounts(countsMap);
         }
 
         if (searchRequest.hasRanges()) {
             final Map<String, Map<String, Number>> rangesMap = new HashMap<String, Map<String, Number>>(
-                    searchRequest.getRanges().size());
+                    searchRequest.ranges().size());
             for (final Entry<String, List<DoubleRange>> entry :
-                    searchRequest.getRanges().entrySet()) {
+                    searchRequest.ranges().entrySet()) {
                 final DoubleRangeFacetCounts counts = toDoubleRangeFacetCounts(fc, entry.getKey(), entry.getValue());
-                rangesMap.put(entry.getKey(), collectFacets(counts, searchRequest.getTopN(), entry.getKey()));
+                rangesMap.put(entry.getKey(), collectFacets(counts, searchRequest.topN(), entry.getKey()));
             }
-            searchResults.setRanges(rangesMap);
+            searchResultsBuilder.setRanges(rangesMap);
         }
     }
 
@@ -332,10 +332,10 @@ public class LuceneIndex extends Index {
         for (int i = 0; i < luceneRanges.length; i++) {
             final DoubleRange range = ranges.get(i);
             luceneRanges[i] = new org.apache.lucene.facet.range.DoubleRange(
-                    range.getLabel(),
-                    range.getMin() != null ? range.getMin() : Double.NEGATIVE_INFINITY,
+                    range.label(),
+                    range.min() != null ? range.min() : Double.NEGATIVE_INFINITY,
                     range.isMinInclusive(),
-                    range.getMax() != null ? range.getMax() : Double.POSITIVE_INFINITY,
+                    range.max() != null ? range.max() : Double.POSITIVE_INFINITY,
                     range.isMaxInclusive());
         }
         return new DoubleRangeFacetCounts(field, fc, luceneRanges);
@@ -357,7 +357,7 @@ public class LuceneIndex extends Index {
             return DEFAULT_SORT;
         }
 
-        final List<String> sort = new ArrayList<String>(searchRequest.getSort());
+        final List<String> sort = new ArrayList<String>(searchRequest.sort());
         final String last = sort.get(sort.size() - 1);
         // Append _id field if not already present.
         switch (last) {
@@ -411,41 +411,41 @@ public class LuceneIndex extends Index {
 
         // partition (optional)
         if (request.hasPartition()) {
-            result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
+            result.add(new org.apache.lucene.document.StringField("_partition", request.partition(), Store.NO));
         }
 
         final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
 
-        for (Field field : request.getFields()) {
+        for (Field field : request.fields()) {
             // Underscore-prefix is reserved.
-            if (field.getName().startsWith("_")) {
+            if (field.name().startsWith("_")) {
                 continue;
             }
             if (field instanceof TextField) {
                 var f = (TextField) field;
                 result.add(new org.apache.lucene.document.TextField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
                 var f = (StringField) field;
                 result.add(new org.apache.lucene.document.KeywordField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
                 result.add(new org.apache.lucene.document.DoubleField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof StoredField) {
                 var f = (StoredField) field;
-                var val = f.getValue();
+                var val = f.value();
                 if (val instanceof String) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) val));
+                    result.add(new org.apache.lucene.document.StoredField(f.name(), (String) val));
                 } else if (val instanceof Number) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number) val).doubleValue()));
+                    result.add(new org.apache.lucene.document.StoredField(f.name(), ((Number) val).doubleValue()));
                 } else if (val instanceof byte[]) {
                     try {
                         final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap((byte[]) val));
-                        result.add(new org.apache.lucene.document.StoredField(f.getName(), buf.toString()));
+                        result.add(new org.apache.lucene.document.StoredField(f.name(), buf.toString()));
                     } catch (final CharacterCodingException e) {
-                        result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
+                        result.add(new org.apache.lucene.document.StoredField(f.name(), (byte[]) val));
                     }
                 } else {
                     throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
@@ -518,16 +518,15 @@ public class LuceneIndex extends Index {
     }
 
     private Query parse(final SearchRequest request) {
-        var locale = request.getLocale() != null ? request.getLocale() : Locale.getDefault();
-        var pointsConfigMap = schema.toPointsConfigMap(locale);
+        var pointsConfigMap = schema.toPointsConfigMap(request.locale());
         var queryParser = new NouveauQueryParser(analyzer, pointsConfigMap);
 
         Query result;
         try {
-            result = queryParser.parse(request.getQuery(), "default");
+            result = queryParser.parse(request.query(), "default");
             if (request.hasPartition()) {
                 final BooleanQuery.Builder builder = new BooleanQuery.Builder();
-                builder.add(new TermQuery(new Term("_partition", request.getPartition())), Occur.MUST);
+                builder.add(new TermQuery(new Term("_partition", request.partition())), Occur.MUST);
                 builder.add(result, Occur.MUST);
                 result = builder.build();
             }

@@ -14,60 +14,21 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import java.util.Collection;
 
-public final class DocumentUpdateRequest extends DocumentRequest {
-
-    @PositiveOrZero
-    private final long matchSeq;
-
-    @Positive
-    private final long seq;
-
-    private final String partition;
-
-    @NotEmpty
-    @Valid
-    private final Collection<Field> fields;
-
-    public DocumentUpdateRequest(
-            @JsonProperty("match_seq") final long matchSeq,
-            @JsonProperty("seq") final long seq,
-            @JsonProperty("partition") final String partition,
-            @JsonProperty("fields") final Collection<Field> fields) {
-        this.matchSeq = matchSeq;
-        this.seq = seq;
-        this.partition = partition;
-        this.fields = fields;
-    }
-
-    public long getMatchSeq() {
-        return matchSeq;
-    }
-
-    public long getSeq() {
-        return seq;
-    }
-
-    public String getPartition() {
-        return partition;
-    }
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public record DocumentUpdateRequest(
+        @PositiveOrZero @JsonProperty long matchSeq,
+        @Positive @JsonProperty long seq,
+        @JsonProperty String partition,
+        @JsonProperty Collection<Field> fields)
+        implements DocumentRequest {
 
     public boolean hasPartition() {
         return partition != null;
-    }
-
-    public Collection<Field> getFields() {
-        return fields;
-    }
-
-    @Override
-    public String toString() {
-        return "DocumentUpdateRequest [matchSeq=" + matchSeq + ", seq=" + seq + ", partition=" + partition + ", fields="
-                + fields + "]";
     }
 }

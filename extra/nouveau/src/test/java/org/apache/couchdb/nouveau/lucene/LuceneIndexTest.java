@@ -29,7 +29,7 @@ import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.couchdb.nouveau.api.IndexInfo;
-import org.apache.couchdb.nouveau.api.SearchRequest;
+import org.apache.couchdb.nouveau.api.SearchRequestBuilder;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
 import org.apache.couchdb.nouveau.core.Index;
@@ -80,11 +80,11 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            final SearchResults results = index.search(request);
-            assertThat(results.getTotalHits()).isEqualTo(count);
+            final SearchRequestBuilder builder = new SearchRequestBuilder();
+            builder.setMinUpdateSeq(count);
+            builder.setQuery("*:*");
+            final SearchResults results = index.search(builder.build());
+            assertThat(results.totalHits()).isEqualTo(count);
         } finally {
             cleanup(index);
         }
@@ -100,12 +100,12 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setSort(List.of("foo"));
-            final SearchResults results = index.search(request);
-            assertThat(results.getTotalHits()).isEqualTo(count);
+            final SearchRequestBuilder builder = new SearchRequestBuilder();
+            builder.setMinUpdateSeq(count);
+            builder.setQuery("*:*");
+            builder.setSort(List.of("foo"));
+            final SearchResults results = index.search(builder.build());
+            assertThat(results.totalHits()).isEqualTo(count);
         } finally {
             cleanup(index);
         }
@@ -121,12 +121,12 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setCounts(List.of("bar"));
-            final SearchResults results = index.search(request);
-            assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
+            final SearchRequestBuilder builder = new SearchRequestBuilder();
+            builder.setMinUpdateSeq(count);
+            builder.setQuery("*:*");
+            builder.setCounts(List.of("bar"));
+            final SearchResults results = index.search(builder.build());
+            assertThat(results.counts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
         } finally {
             cleanup(index);
         }
@@ -142,16 +142,16 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setRanges(Map.of(
+            final SearchRequestBuilder builder = new SearchRequestBuilder();
+            builder.setMinUpdateSeq(count);
+            builder.setQuery("*:*");
+            builder.setRanges(Map.of(
                     "bar",
                     List.of(
                             new DoubleRange("low", 0.0, true, (double) count / 2, true),
                             new DoubleRange("high", (double) count / 2, true, (double) count, true))));
-            final SearchResults results = index.search(request);
-            assertThat(results.getRanges()).isEqualTo(Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
+            final SearchResults results = index.search(builder.build());
+            assertThat(results.ranges()).isEqualTo(Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
         } finally {
             cleanup(index);
         }
@@ -174,13 +174,13 @@ public class LuceneIndexTest {
                 index.update("doc" + i, request);
             }
 
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setCounts(List.of("bar"));
-            request.setTopN(1);
-            final SearchResults results = index.search(request);
-            assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count + 5)));
+            final SearchRequestBuilder builder = new SearchRequestBuilder();
+            builder.setMinUpdateSeq(count);
+            builder.setQuery("*:*");
+            builder.setCounts(List.of("bar"));
+            builder.setTopN(1);
+            final SearchResults results = index.search(builder.build());
+            assertThat(results.counts()).isEqualTo(Map.of("bar", Map.of("baz", count + 5)));
         } finally {
             cleanup(index);
         }
@@ -215,10 +215,10 @@ public class LuceneIndexTest {
         try {
             // Require min seq 1 on new, empty index should fail.
             assertThrows(StaleIndexException.class, () -> {
-                final SearchRequest request = new SearchRequest();
-                request.setMinUpdateSeq(1);
-                request.setQuery("*:*");
-                index.search(request);
+                final SearchRequestBuilder builder = new SearchRequestBuilder();
+                builder.setMinUpdateSeq(1);
+                builder.setQuery("*:*");
+                index.search(builder.build());
             });
         } finally {
             cleanup(index);
@@ -230,18 +230,18 @@ public class LuceneIndexTest {
         Index index = setup(path);
         try {
             IndexInfo info = index.info();
-            assertThat(info.getDiskSize()).isEqualTo(0);
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getUpdateSeq()).isEqualTo(0);
+            assertThat(info.diskSize()).isEqualTo(0);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.updateSeq()).isEqualTo(0);
 
             final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
             info = index.info();
-            assertThat(info.getDiskSize()).isGreaterThan(0);
-            assertThat(info.getNumDocs()).isEqualTo(1);
-            assertThat(info.getUpdateSeq()).isEqualTo(2);
+            assertThat(info.diskSize()).isGreaterThan(0);
+            assertThat(info.numDocs()).isEqualTo(1);
+            assertThat(info.updateSeq()).isEqualTo(2);
         } finally {
             cleanup(index);
         }
@@ -256,14 +256,14 @@ public class LuceneIndexTest {
             index.commit();
 
             IndexInfo info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(1);
+            assertThat(info.numDocs()).isEqualTo(1);
 
             index.delete("foo", new DocumentDeleteRequest(2, 3, false));
             index.commit();
 
             info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getUpdateSeq()).isEqualTo(3);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.updateSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }
@@ -278,14 +278,14 @@ public class LuceneIndexTest {
             index.commit();
 
             IndexInfo info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(1);
+            assertThat(info.numDocs()).isEqualTo(1);
 
             index.delete("foo", new DocumentDeleteRequest(0, 3, true));
             index.commit();
 
             info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getPurgeSeq()).isEqualTo(3);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.purgeSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }

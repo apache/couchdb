@@ -16,8 +16,6 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -28,159 +26,44 @@ import java.util.Map;
 import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class SearchRequest {
+public record SearchRequest(
+        @JsonProperty @NotNull String query,
+        @JsonProperty @PositiveOrZero long minUpdateSeq,
+        @JsonProperty @PositiveOrZero long minPurgeSeq,
+        @JsonProperty Locale locale,
+        @JsonProperty String partition,
+        @JsonProperty @Positive Integer limit,
+        @JsonProperty List<@NotEmpty String> sort,
+        @JsonProperty List<@NotEmpty String> counts,
+        @JsonProperty Map<@NotEmpty String, List<@NotNull DoubleRange>> ranges,
+        @JsonProperty PrimitiveWrapper<?>[] after,
+        @JsonProperty Integer topN) {
 
-    @NotNull
-    private String query;
-
-    @PositiveOrZero
-    private long minUpdateSeq;
-
-    @PositiveOrZero
-    private long minPurgeSeq;
-
-    private Locale locale;
-
-    private String partition;
-
-    @Positive
-    private int limit = 25;
-
-    private List<@NotEmpty String> sort;
-
-    private List<@NotEmpty String> counts;
-
-    private Map<@NotEmpty String, List<@NotNull DoubleRange>> ranges;
-
-    private PrimitiveWrapper<?>[] after;
-
-    @Min(1)
-    @Max(1000)
-    private int topN = 10;
-
-    public SearchRequest() {
-        // Jackson deserialization
-    }
-
-    public void setQuery(final String query) {
-        this.query = query;
-    }
-
-    @JsonProperty
-    public String getQuery() {
-        return query;
-    }
-
-    public void setMinUpdateSeq(final long minUpdateSeq) {
-        this.minUpdateSeq = minUpdateSeq;
-    }
-
-    @JsonProperty
-    public long getMinUpdateSeq() {
-        return minUpdateSeq;
-    }
-
-    public void setMinPurgeSeq(final long minPurgeSeq) {
-        this.minPurgeSeq = minPurgeSeq;
-    }
-
-    @JsonProperty
-    public long getMinPurgeSeq() {
-        return minPurgeSeq;
-    }
-
-    public void setLocale(final Locale locale) {
-        this.locale = locale;
-    }
-
-    @JsonProperty
-    public Locale getLocale() {
-        return locale;
-    }
-
-    public void setPartition(final String partition) {
-        this.partition = partition;
-    }
-
-    @JsonProperty
-    public String getPartition() {
-        return partition;
+    public SearchRequest {
+        if (topN == null) {
+            topN = 10;
+        }
+        if (limit == null) {
+            limit = 25;
+        }
+        if (locale == null) {
+            locale = Locale.getDefault();
+        }
     }
 
     public boolean hasPartition() {
         return partition != null;
     }
 
-    public void setLimit(final int limit) {
-        this.limit = limit;
-    }
-
-    @JsonProperty
-    public int getLimit() {
-        return limit;
-    }
-
     public boolean hasSort() {
         return sort != null;
-    }
-
-    @JsonProperty
-    public List<String> getSort() {
-        return sort;
-    }
-
-    public void setSort(List<String> sort) {
-        this.sort = sort;
     }
 
     public boolean hasCounts() {
         return counts != null;
     }
 
-    public void setCounts(final List<String> counts) {
-        this.counts = counts;
-    }
-
-    @JsonProperty
-    public List<String> getCounts() {
-        return counts;
-    }
-
     public boolean hasRanges() {
         return ranges != null;
-    }
-
-    public void setRanges(final Map<String, List<DoubleRange>> ranges) {
-        this.ranges = ranges;
-    }
-
-    @JsonProperty
-    public Map<String, List<DoubleRange>> getRanges() {
-        return ranges;
-    }
-
-    public void setTopN(final int topN) {
-        this.topN = topN;
-    }
-
-    @JsonProperty
-    public int getTopN() {
-        return topN;
-    }
-
-    public void setAfter(final PrimitiveWrapper<?>[] after) {
-        this.after = after;
-    }
-
-    @JsonProperty
-    public PrimitiveWrapper<?>[] getAfter() {
-        return after;
-    }
-
-    @Override
-    public String toString() {
-        return "SearchRequest [query=" + query + ", min_update_seq=" + minUpdateSeq + ", min_purge_seq=" + minPurgeSeq
-                + ", locale=" + locale + ", sort=" + sort + ", limit=" + limit + ", after=" + after + ", counts="
-                + counts + ", ranges=" + ranges + "]";
     }
 }

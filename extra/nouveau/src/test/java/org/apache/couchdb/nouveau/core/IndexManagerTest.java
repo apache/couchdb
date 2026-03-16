@@ -25,7 +25,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.api.SearchRequest;
+import org.apache.couchdb.nouveau.api.SearchRequestBuilder;
 import org.apache.couchdb.nouveau.lucene.ParallelSearcherFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,10 +64,10 @@ public class IndexManagerTest {
         final IndexDefinition indexDefinition =
                 new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
         manager.create("foo", indexDefinition);
-        var searchRequest = new SearchRequest();
-        searchRequest.setQuery("*:*");
-        var searchResults = manager.with("foo", (index) -> index.search(searchRequest));
-        assertThat(searchResults.getTotalHits()).isEqualTo(0);
+        var searchRequestBuilder = new SearchRequestBuilder();
+        searchRequestBuilder.setQuery("*:*");
+        var searchResults = manager.with("foo", (index) -> index.search(searchRequestBuilder.build()));
+        assertThat(searchResults.totalHits()).isEqualTo(0);
     }
 
     @Test

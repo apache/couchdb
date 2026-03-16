@@ -13,15 +13,33 @@
 
 package org.apache.couchdb.nouveau.api;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import jakarta.validation.constraints.NotEmpty;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class DoubleRange extends Range<Double> {
+public record DoubleRange(
+        @JsonProperty @NotEmpty String label,
+        @JsonProperty Double min,
+        @JsonProperty Boolean minInclusive,
+        @JsonProperty Double max,
+        @JsonProperty Boolean maxInclusive) {
 
-    public DoubleRange() {}
+    public DoubleRange {
+        if (minInclusive == null) {
+            minInclusive = true;
+        }
+        if (maxInclusive == null) {
+            maxInclusive = true;
+        }
+    }
 
-    public DoubleRange(String name, Double min, boolean minInclusive, Double max, boolean maxInclusive) {
-        super(name, min, minInclusive, max, maxInclusive);
+    public boolean isMinInclusive() {
+        return minInclusive;
+    }
+
+    public boolean isMaxInclusive() {
+        return maxInclusive;
     }
 }

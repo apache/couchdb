@@ -14,40 +14,7 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.NotNull;
-import java.util.Objects;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public final class StringField extends Field {
-
-    @NotNull
-    private final String value;
-
-    private final boolean store;
-
-    public StringField(
-            @JsonProperty("name") final String name,
-            @JsonProperty("value") final String value,
-            @JsonProperty("store") final boolean store) {
-        super(name);
-        this.value = Objects.requireNonNull(value);
-        this.store = store;
-    }
-
-    @JsonProperty
-    public String getValue() {
-        return value;
-    }
-
-    @JsonProperty
-    public boolean isStore() {
-        return store;
-    }
-
-    @Override
-    public String toString() {
-        return "StringField [name=" + name + ", value=" + value + ", store=" + store + "]";
-    }
-}
+public record StringField(@JsonProperty String name, @JsonProperty @NotNull String value, @JsonProperty boolean store)
+        implements Field {}

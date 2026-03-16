@@ -21,7 +21,7 @@ import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdate;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.api.SearchRequest;
+import org.apache.couchdb.nouveau.api.SearchRequestBuilder;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.resources.IndexResource;
 
@@ -48,16 +48,16 @@ public final class IndexHealthCheck extends HealthCheck {
                     name,
                     new BulkUpdateRequest(List.of(new DocumentUpdate(
                             "foo", new DocumentUpdateRequest(0, 1, null, Collections.emptyList())))));
-            final SearchRequest searchRequest = new SearchRequest();
-            searchRequest.setQuery("_id:foo");
-            searchRequest.setMinUpdateSeq(1);
+            final SearchRequestBuilder searchRequestBuilder = new SearchRequestBuilder();
+            searchRequestBuilder.setQuery("_id:foo");
+            searchRequestBuilder.setMinUpdateSeq(1);
 
-            final SearchResults searchResults = indexResource.searchIndex(name, searchRequest);
-            if (searchResults.getTotalHits() == 1) {
+            final SearchResults searchResults = indexResource.searchIndex(name, searchRequestBuilder.build());
+            if (searchResults.totalHits() == 1) {
                 return Result.healthy();
             } else {
                 return Result.unhealthy(
-                        "Wrong number of search results, expected 1, got %d", searchResults.getTotalHits());
+                        "Wrong number of search results, expected 1, got %d", searchResults.totalHits());
             }
         } finally {
             indexResource.deletePath(name, null);

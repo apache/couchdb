@@ -14,32 +14,10 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public final class StoredField extends Field {
-
-    @NotNull
-    @Schema(oneOf = {String.class, Double.class, byte[].class})
-    private final Object value;
-
-    public StoredField(@JsonProperty("name") final String name, @JsonProperty("value") final Object value) {
-        super(name);
-        if (!(value instanceof String || value instanceof Number || value instanceof byte[])) {
-            throw new IllegalArgumentException(value + " must be a string, number or byte array");
-        }
-        this.value = value;
-    }
-
-    public Object getValue() {
-        return value;
-    }
-
-    @Override
-    public String toString() {
-        return "StoredField [name=" + name + ", value=" + value + "]";
-    }
-}
+public record StoredField(
+        @JsonProperty String name,
+        @JsonProperty @NotNull @Schema(oneOf = {String.class, Double.class, byte[].class}) Object value)
+        implements Field {}

@@ -47,12 +47,12 @@ public class SearchRequestTest {
     }
 
     private SearchRequest asObject() {
-        final SearchRequest result = new SearchRequest();
-        result.setQuery("*:*");
-        result.setLimit(10);
-        result.setCounts(List.of("bar"));
-        result.setTopN(5);
-        result.setRanges(Map.of("foo", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))));
-        return result;
+        final SearchRequestBuilder builder = new SearchRequestBuilder();
+        builder.setQuery("*:*");
+        builder.setLimit(10);
+        builder.setCounts(List.of("bar"));
+        builder.setTopN(5);
+        builder.setRanges(Map.of("foo", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))));
+        return builder.build();
     }
 }

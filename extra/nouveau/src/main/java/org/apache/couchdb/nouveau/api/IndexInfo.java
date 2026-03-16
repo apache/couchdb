@@ -19,50 +19,8 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.PositiveOrZero;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public final class IndexInfo {
-
-    @PositiveOrZero
-    private final long updateSeq;
-
-    @PositiveOrZero
-    private final long purgeSeq;
-
-    @PositiveOrZero
-    private final int numDocs;
-
-    @PositiveOrZero
-    private final long diskSize;
-
-    public IndexInfo(
-            @JsonProperty("update_seq") final long updateSeq,
-            @JsonProperty("purge_seq") final long purgeSeq,
-            @JsonProperty("num_docs") final int numDocs,
-            @JsonProperty("disk_size") final long diskSize) {
-        this.updateSeq = updateSeq;
-        this.purgeSeq = purgeSeq;
-        this.numDocs = numDocs;
-        this.diskSize = diskSize;
-    }
-
-    public int getNumDocs() {
-        return numDocs;
-    }
-
-    public long getDiskSize() {
-        return diskSize;
-    }
-
-    public long getUpdateSeq() {
-        return updateSeq;
-    }
-
-    public long getPurgeSeq() {
-        return purgeSeq;
-    }
-
-    @Override
-    public String toString() {
-        return "IndexInfo [updateSeq=" + updateSeq + ", purgeSeq=" + purgeSeq + ", numDocs=" + numDocs + ", diskSize="
-                + diskSize + "]";
-    }
-}
+public record IndexInfo(
+        @JsonProperty @PositiveOrZero long updateSeq,
+        @JsonProperty @PositiveOrZero long purgeSeq,
+        @JsonProperty @PositiveOrZero int numDocs,
+        @JsonProperty @PositiveOrZero long diskSize) {}

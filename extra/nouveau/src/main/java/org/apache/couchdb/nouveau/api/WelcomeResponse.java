@@ -14,21 +14,8 @@
 package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public final class WelcomeResponse {
+public record WelcomeResponse(@JsonProperty("supported_lucene_versions") int[] supportedLuceneVersions) {
 
-    public static final WelcomeResponse INSTANCE = new WelcomeResponse();
-
-    private final int[] supportedLuceneVersions =
-            new int[] {IndexDefinition.LEGACY_LUCENE_VERSION, IndexDefinition.LATEST_LUCENE_VERSION};
-
-    private WelcomeResponse() {}
-
-    @JsonProperty
-    public int[] getSupportedLuceneVersions() {
-        return supportedLuceneVersions;
-    }
+    public static final WelcomeResponse INSTANCE = new WelcomeResponse(new int[] {9, 10});
 }

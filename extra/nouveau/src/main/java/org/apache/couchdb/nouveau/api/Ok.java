@@ -15,12 +15,7 @@ package org.apache.couchdb.nouveau.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class Ok {
+public record Ok(@JsonProperty boolean ok) {
 
-    public static final Ok INSTANCE = new Ok();
-
-    @JsonProperty
-    public boolean ok() {
-        return true;
-    }
+    public static final Ok INSTANCE = new Ok(true);
 }

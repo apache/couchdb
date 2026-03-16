@@ -65,13 +65,12 @@ public final class LuceneAnalyzerFactory {
     private LuceneAnalyzerFactory() {}
 
     public static Analyzer fromDefinition(final IndexDefinition indexDefinition) {
-        final Analyzer defaultAnalyzer = newAnalyzer(indexDefinition.getDefaultAnalyzer());
+        final Analyzer defaultAnalyzer = newAnalyzer(indexDefinition.defaultAnalyzer());
         if (!indexDefinition.hasFieldAnalyzers()) {
             return defaultAnalyzer;
         }
         final Map<String, Analyzer> fieldAnalyzers = new HashMap<String, Analyzer>();
-        for (Map.Entry<String, String> entry :
-                indexDefinition.getFieldAnalyzers().entrySet()) {
+        for (Map.Entry<String, String> entry : indexDefinition.fieldAnalyzers().entrySet()) {
             fieldAnalyzers.put(entry.getKey(), newAnalyzer(entry.getValue()));
         }
         return new PerFieldAnalyzerWrapper(defaultAnalyzer, fieldAnalyzers);
