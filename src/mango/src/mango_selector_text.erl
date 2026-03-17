@@ -394,7 +394,7 @@ append_sort_type(RawSortField, Selector) ->
     end.
 
 get_sort_type(Field, Selector) ->
-    Types = get_sort_types(Field, Selector, []),
+    Types = get_sort_types(Field, mango_util:join_keys(Selector), []),
     case lists:usort(Types) of
         [str] -> <<"_3astring<string>">>;
         [num] -> <<"_3anumber<number>">>;
