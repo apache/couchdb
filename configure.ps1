@@ -141,6 +141,9 @@ If (-Not $DisableSpiderMonkey) {
     }
 }
 
+$Rebar3Branch="3.27.0"
+$ErlfmtVersion="v1.8.0"
+
 # Translate ./configure variables to CouchDB variables
 $PackageAuthorName="The Apache Software Foundation"
 $InstallDir="$LibDir\couchdb"
@@ -292,7 +295,7 @@ if ($null -eq (Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue))
    Write-Verbose "==> rebar3.cmd not found; bootstrapping..."
    if (-Not (Test-Path "src\rebar3"))
    {
-      git clone --depth 1 https://github.com/erlang/rebar3.git $rootdir\src\rebar3
+      git clone --depth 1 --branch $Rebar3Branch https://github.com/erlang/rebar3.git $rootdir\src\rebar3
    }
    Set-Location src\rebar3
    .\bootstrap.ps1
@@ -309,7 +312,7 @@ if ($null -eq (Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue))
    Write-Verbose "==> erlfmt.cmd not found; bootstrapping..."
    if (-Not (Test-Path "src\erlfmt"))
    {
-      git clone --depth 1 https://github.com/WhatsApp/erlfmt.git $rootdir\src\erlfmt
+      git clone --depth 1 --branch $ErlfmtVersion https://github.com/WhatsApp/erlfmt.git $rootdir\src\erlfmt
    }
    Set-Location src\erlfmt
    rebar3 as release escriptize
