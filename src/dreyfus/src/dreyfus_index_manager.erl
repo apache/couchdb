@@ -64,7 +64,7 @@ handle_call({get_index, DbName, #index{sig = Sig} = Index}, From, State) ->
             ets:insert(?BY_SIG, {{DbName, Sig}, [From | WaitList]}),
             {noreply, State};
         [{_, ExistingPid}] ->
-            {reply, {ok, ExistingPid}, State}
+            {reply, {ok, {pid, ExistingPid}}, State}
     end;
 handle_call({open_ok, DbName, Sig, NewPid}, {OpenerPid, _}, State) ->
     link(NewPid),
