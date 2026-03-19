@@ -353,13 +353,13 @@ connected() ->
     end.
 
 rpc(Key, Message) ->
-    { Ref, Msg } = case Key of
-	      {pid, Pid} -> { Pid, Message };
-	      {path, Path} -> { main, {forward, Path, Message} };
-	      Other -> Other
-	  end,
+    {Ref, Msg} =
+        case Key of
+            {pid, Pid} -> {Pid, Message};
+            {path, Path} -> {main, {forward, Path, Message}};
+            Other -> Other
+        end,
     ioq:call_search(Ref, Msg, erlang:get(io_priority)).
-
 
 clouseau() ->
     list_to_atom(config:get("dreyfus", "name", "clouseau@127.0.0.1")).

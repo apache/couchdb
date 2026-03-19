@@ -84,10 +84,11 @@ info(Key0) ->
 to_index_key(Key) ->
     Pid = clouseau_rpc:get_index_pid_from_key(Key),
     case node(Pid) == node() of
-	true ->
-	    IndexPid = gen_server:call(Pid, get_index_pid, infinity),
-	    clouseau_rpc:index_key_from_pid(IndexPid);
-	false -> Key
+        true ->
+            IndexPid = gen_server:call(Pid, get_index_pid, infinity),
+            clouseau_rpc:index_key_from_pid(IndexPid);
+        false ->
+            Key
     end.
 
 design_doc_to_indexes(DbName, #doc{body = {Fields}} = Doc) ->
@@ -246,22 +247,26 @@ handle_info(
     end;
 handle_info({'EXIT', _, {updated, _}}, State) ->
     {noreply, State};
-handle_info({'EXIT', FromPid, Reason}, #state{index = Index, index_key = IndexKey, updater_pid = UpdaterPid, waiting_list = WaitList} = State) ->
+handle_info(
+    {'EXIT', FromPid, Reason},
+    #state{index = Index, index_key = IndexKey, updater_pid = UpdaterPid, waiting_list = WaitList} =
+        State
+) ->
     case clouseau_rpc:get_index_pid_from_key(IndexKey) of
-	IndexerPid when FromPid == IndexerPid ->
-	    couch_log:notice(
-	      "index for ~p closed with reason ~p", [index_name(Index), Reason]
-	     ),
-	    [gen_server:reply(Pid, {error, Reason}) || {Pid, _} <- WaitList];
-	_ when FromPid == UpdaterPid ->
-	    couch_log:info(
-	      "Shutting down index server ~p, updater ~p closing w/ reason ~w",
-	      [index_name(Index), UpdaterPid, Reason]
-	     ),
-	    [gen_server:reply(Pid, {error, Reason}) || {Pid, _} <- WaitList];
-	_ ->
-	    % probably dreyfus_index_manager.
-	    couch_log:notice("Unknown pid ~p closed with reason ~p", [FromPid, Reason])
+        IndexerPid when FromPid == IndexerPid ->
+            couch_log:notice(
+                "index for ~p closed with reason ~p", [index_name(Index), Reason]
+            ),
+            [gen_server:reply(Pid, {error, Reason}) || {Pid, _} <- WaitList];
+        _ when FromPid == UpdaterPid ->
+            couch_log:info(
+                "Shutting down index server ~p, updater ~p closing w/ reason ~w",
+                [index_name(Index), UpdaterPid, Reason]
+            ),
+            [gen_server:reply(Pid, {error, Reason}) || {Pid, _} <- WaitList];
+        _ ->
+            % probably dreyfus_index_manager.
+            couch_log:notice("Unknown pid ~p closed with reason ~p", [FromPid, Reason])
     end,
     {stop, normal, State};
 handle_info(
@@ -284,7 +289,7 @@ open_index(DbName, #index{analyzer = Analyzer, sig = Sig}) ->
     Path = <<DbName/binary, "/", Sig/binary>>,
     case clouseau_rpc:open_index(self(), Path, Analyzer) of
         {ok, Pid} ->
-	    Key = clouseau_rpc:index_key_from_pid(Pid),
+            Key = clouseau_rpc:index_key_from_pid(Pid),
             case clouseau_rpc:get_update_seq(Key) of
                 {ok, Seq} ->
                     {ok, Key, Seq};
