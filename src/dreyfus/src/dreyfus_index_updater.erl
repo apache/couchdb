@@ -20,7 +20,7 @@
 
 -import(couch_query_servers, [get_os_process/1, ret_os_process/1, proc_prompt/2]).
 
-update(IndexPid, Index) ->
+update(IndexKey, Index) ->
     #index{
         current_seq = CurSeq,
         dbname = DbName,
@@ -31,7 +31,7 @@ update(IndexPid, Index) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     try
         TotalUpdateChanges = couch_db:count_changes_since(Db, CurSeq),
-        TotalPurgeChanges = count_pending_purged_docs_since(Db, IndexPid),
+        TotalPurgeChanges = count_pending_purged_docs_since(Db, IndexKey),
         TotalChanges = TotalUpdateChanges + TotalPurgeChanges,
 
         couch_task_status:add_task([
@@ -49,7 +49,7 @@ update(IndexPid, Index) ->
 
         %ExcludeIdRevs is [{Id1, Rev1}, {Id2, Rev2}, ...]
         %The Rev is the final Rev, not purged Rev.
-        {ok, ExcludeIdRevs} = purge_index(Db, IndexPid, Index),
+        {ok, ExcludeIdRevs} = purge_index(Db, IndexKey, Index),
         %% compute on all docs modified since we last computed.
 
         NewCurSeq = couch_db:get_update_seq(Db),
@@ -58,9 +58,9 @@ update(IndexPid, Index) ->
             true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def]),
             EnumFun = fun ?MODULE:load_docs/2,
             [Changes] = couch_task_status:get([changes_done]),
-            Acc0 = {Changes, IndexPid, Db, Proc, TotalChanges, erlang:timestamp(), ExcludeIdRevs},
+            Acc0 = {Changes, IndexKey, Db, Proc, TotalChanges, erlang:timestamp(), ExcludeIdRevs},
             {ok, _} = couch_db:fold_changes(Db, CurSeq, EnumFun, Acc0, []),
-            ok = clouseau_rpc:commit(IndexPid, NewCurSeq)
+            ok = clouseau_rpc:commit(IndexKey, NewCurSeq)
         after
             ret_os_process(Proc)
         end,
@@ -69,33 +69,33 @@ update(IndexPid, Index) ->
         couch_db:close(Db)
     end.
 
-load_docs(FDI, {I, IndexPid, Db, Proc, Total, LastCommitTime, ExcludeIdRevs} = Acc) ->
+load_docs(FDI, {I, IndexKey, Db, Proc, Total, LastCommitTime, ExcludeIdRevs} = Acc) ->
     couch_task_status:update([{changes_done, I}, {progress, (I * 100) div Total}]),
     DI = couch_doc:to_doc_info(FDI),
     #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{rev = Rev} | _]} = DI,
     %check if it is processed in purge_index to avoid update the index again.
     case lists:member({Id, Rev}, ExcludeIdRevs) of
         true -> ok;
-        false -> update_or_delete_index(IndexPid, Db, DI, Proc)
+        false -> update_or_delete_index(IndexKey, Db, DI, Proc)
     end,
     %% Force a commit every minute
     case timer:now_diff(Now = erlang:timestamp(), LastCommitTime) >= 60000000 of
         true ->
-            ok = clouseau_rpc:commit(IndexPid, Seq),
-            {ok, {I + 1, IndexPid, Db, Proc, Total, Now, ExcludeIdRevs}};
+            ok = clouseau_rpc:commit(IndexKey, Seq),
+            {ok, {I + 1, IndexKey, Db, Proc, Total, Now, ExcludeIdRevs}};
         false ->
             {ok, setelement(1, Acc, I + 1)}
     end.
 
-purge_index(Db, IndexPid, Index) ->
-    {ok, IdxPurgeSeq} = clouseau_rpc:get_purge_seq(IndexPid),
+purge_index(Db, IndexKey, Index) ->
+    {ok, IdxPurgeSeq} = clouseau_rpc:get_purge_seq(IndexKey),
     Proc = get_os_process(Index#index.def_lang),
     try
         true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def]),
         FoldFun = fun({_PurgeSeq, _UUID, Id, _Revs}, Acc) ->
             case couch_db:get_full_doc_info(Db, Id) of
                 not_found ->
-                    ok = clouseau_rpc:delete(IndexPid, Id),
+                    ok = clouseau_rpc:delete(IndexKey, Id),
                     update_task(1),
                     {ok, Acc};
                 FDI ->
@@ -105,7 +105,7 @@ purge_index(Db, IndexPid, Index) ->
                         true ->
                             {ok, Acc};
                         false ->
-                            update_or_delete_index(IndexPid, Db, DI, Proc),
+                            update_or_delete_index(IndexKey, Db, DI, Proc),
                             update_task(1),
                             {ok, [{Id, Rev} | Acc]}
                     end
@@ -113,23 +113,23 @@ purge_index(Db, IndexPid, Index) ->
         end,
         {ok, ExcludeList} = couch_db:fold_purge_infos(Db, IdxPurgeSeq, FoldFun, []),
         NewPurgeSeq = couch_db:get_purge_seq(Db),
-        ok = clouseau_rpc:set_purge_seq(IndexPid, NewPurgeSeq),
+        ok = clouseau_rpc:set_purge_seq(IndexKey, NewPurgeSeq),
         update_local_doc(Db, Index, NewPurgeSeq),
         {ok, ExcludeList}
     after
         ret_os_process(Proc)
     end.
 
-count_pending_purged_docs_since(Db, IndexPid) ->
+count_pending_purged_docs_since(Db, IndexKey) ->
     DbPurgeSeq = couch_db:get_purge_seq(Db),
-    {ok, IdxPurgeSeq} = clouseau_rpc:get_purge_seq(IndexPid),
+    {ok, IdxPurgeSeq} = clouseau_rpc:get_purge_seq(IndexKey),
     DbPurgeSeq - IdxPurgeSeq.
 
-update_or_delete_index(IndexPid, Db, DI, Proc) ->
+update_or_delete_index(IndexKey, Db, DI, Proc) ->
     #doc_info{id = Id, revs = [#rev_info{deleted = Del} | _]} = DI,
     case Del of
         true ->
-            ok = clouseau_rpc:delete(IndexPid, Id);
+            ok = clouseau_rpc:delete(IndexKey, Id);
         false ->
             case maybe_skip_doc(Db, Id) of
                 true ->
@@ -141,8 +141,8 @@ update_or_delete_index(IndexPid, Db, DI, Proc) ->
                     Fields1 = [list_to_tuple(Field) || Field <- Fields],
                     Fields2 = maybe_add_partition(Db, Id, Fields1),
                     case Fields2 of
-                        [] -> ok = clouseau_rpc:delete(IndexPid, Id);
-                        _ -> ok = clouseau_rpc:update(IndexPid, Id, Fields2)
+                        [] -> ok = clouseau_rpc:delete(IndexKey, Id);
+                        _ -> ok = clouseau_rpc:update(IndexKey, Id, Fields2)
                     end
             end
     end.
