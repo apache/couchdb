@@ -83,8 +83,8 @@ info_int(DbName, DDoc, IndexName) ->
     case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    case dreyfus_index:info(Pid) of
+                {ok, Key} ->
+                    case dreyfus_index:info(Key) of
                         {ok, Fields} ->
                             Info = [{signature, Index#index.sig} | Fields],
                             rexi:reply({ok, Info});
