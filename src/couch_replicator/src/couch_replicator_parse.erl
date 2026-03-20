@@ -491,7 +491,6 @@ ssl_verify_options(true) ->
     % https://security.erlef.org/secure_coding_and_deployment_hardening/ssl.html
     ssl_ca_cert_opts() ++
         [
-            {verify, verify_peer},
             {customize_hostname_check, [
                 {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
             ]}
