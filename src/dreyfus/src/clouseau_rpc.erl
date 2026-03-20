@@ -51,11 +51,11 @@
 -type indexer_key() :: {path, string_as_binary(_), pid()} | {pid, pid()}.
 
 -spec index_key_from_pid(pid()) -> indexer_key().
-index_key_from_pid(Pid) ->
+index_key_from_pid(Pid) when is_pid(Pid) ->
     {pid, Pid}.
 
 -spec index_key_from_path(string_as_binary(_), pid()) -> indexer_key().
-index_key_from_path(Path, Pid) ->
+index_key_from_path(Path, Pid) when is_pid(Pid) ->
     {path, Path, Pid}.
 
 -spec get_index_pid_from_key(indexer_key()) -> pid().
@@ -101,7 +101,7 @@ get_root_dir() ->
     rpc({main, clouseau()}, {get_root_dir}).
 
 %% not used ???
--spec await(Ref :: indexer_key(), MinSeq :: commit_seq()) ->
+-spec await(Key :: indexer_key(), MinSeq :: commit_seq()) ->
     ok | error().
 
 await(Ref, MinSeq) ->
@@ -356,8 +356,8 @@ rpc(Key, Message) ->
     {Ref, Msg} =
         case Key of
             {pid, Pid} -> {Pid, Message};
-            {path, Path} -> {main, {forward, Path, Message}};
-            Other -> Other
+            {path, Path, _Pid} -> {{main, clouseau()}, {forward, Path, Message}};
+            Other -> {Other, Message}
         end,
     ioq:call_search(Ref, Msg, erlang:get(io_priority)).
 
