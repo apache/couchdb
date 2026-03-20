@@ -56,7 +56,8 @@ start_link(DbName, Index) ->
     proc_lib:start_link(?MODULE, init, [{DbName, Index}]).
 
 await(Key, MinSeq) ->
-    MFA = {gen_server, call, [Key, {await, MinSeq}, infinity]},
+    Pid = clouseau_rpc:get_index_pid_from_key(Key),
+    MFA = {gen_server, call, [Pid, {await, MinSeq}, infinity]},
     dreyfus_util:time([index, await], MFA).
 
 search(Key0, QueryArgs) ->
