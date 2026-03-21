@@ -18,7 +18,7 @@
 -include("nouveau.hrl").
 
 %% public api
--export([outdated/1, get_db_info/1]).
+-export([get_db_info/1]).
 
 %% callbacks
 -export([update/1]).
@@ -46,16 +46,6 @@
     batch_size,
     batch
 }).
-
-outdated(#index{} = Index) ->
-    case open_or_create_index(Index) of
-        {ok, #{} = Info} ->
-            #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
-            {DbUpdateSeq, DbPurgeSeq} = get_db_info(Index),
-            DbUpdateSeq > IndexUpdateSeq orelse DbPurgeSeq > IndexPurgeSeq;
-        {error, Reason} ->
-            {error, Reason}
-    end.
 
 update(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
