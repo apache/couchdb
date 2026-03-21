@@ -13,7 +13,7 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
-public record BulkUpdateRequest(@JsonProperty List<DocumentUpdate> updates) {}
+public record BulkUpdateRequest(@NotEmpty List<DocumentUpdate> updates) {}
