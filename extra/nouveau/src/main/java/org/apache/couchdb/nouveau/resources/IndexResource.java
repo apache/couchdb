@@ -62,7 +62,8 @@ public final class IndexResource {
             throws IOException {
         if (!indexDefinition.isLatestVersion()) {
             throw new WebApplicationException(
-                    "Cannot create a new version " + indexDefinition.getLuceneVersion() + " index", Status.BAD_REQUEST);
+                    "Cannot create a new version " + indexDefinition.luceneVersionAsInt() + " index",
+                    Status.BAD_REQUEST);
         }
         indexManager.create(name, indexDefinition);
         return Ok.INSTANCE;

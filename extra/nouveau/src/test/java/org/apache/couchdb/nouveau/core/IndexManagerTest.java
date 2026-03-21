@@ -43,9 +43,12 @@ public class IndexManagerTest {
         executorService = Executors.newScheduledThreadPool(2);
         rootDir = path;
 
+        var mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
+
         manager = new IndexManager();
         manager.setRootDir(path);
-        manager.setObjectMapper(new ObjectMapper());
+        manager.setObjectMapper(mapper);
         manager.setCommitIntervalSeconds(10);
         manager.setScheduledExecutorService(executorService);
         manager.setSearcherFactory(new ParallelSearcherFactory(ForkJoinPool.commonPool()));
@@ -61,8 +64,7 @@ public class IndexManagerTest {
 
     @Test
     public void managerReturnsUsableIndex() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
         manager.create("foo", indexDefinition);
         var searchRequest = new SearchRequest();
         searchRequest.setQuery("*:*");
@@ -72,8 +74,7 @@ public class IndexManagerTest {
 
     @Test
     public void managerReopensAClosedIndex() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
 
         manager.create("bar", indexDefinition);
 
@@ -90,8 +91,7 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByName() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("bar", indexDefinition);
@@ -102,8 +102,7 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByPath() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
@@ -114,8 +113,7 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByGlob() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
@@ -126,8 +124,7 @@ public class IndexManagerTest {
 
     @Test
     public void deleteAllRemovesIndexByGlobExceptExclusions() throws Exception {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
