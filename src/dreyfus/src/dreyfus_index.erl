@@ -290,7 +290,11 @@ open_index(DbName, #index{analyzer = Analyzer, sig = Sig}) ->
     Path = <<DbName/binary, "/", Sig/binary>>,
     case clouseau_rpc:open_index(self(), Path, Analyzer) of
         {ok, Pid} ->
-            Key = clouseau_rpc:index_key_from_pid(Pid),
+            Key =
+                case config:get_boolean("dreyfus", "path_keys", false) of
+                    true -> clouseau_rpc:index_key_with_path(Path, Pid);
+                    false -> clouseau_rpc:index_key_from_pid(Pid)
+                end,
             case clouseau_rpc:get_update_seq(Key) of
                 {ok, Seq} ->
                     {ok, Key, Seq};

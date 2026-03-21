@@ -16,7 +16,7 @@
 
 -include("dreyfus.hrl").
 
--export([index_key_from_pid/1, index_key_from_path/2, get_index_pid_from_key/1]).
+-export([index_key_from_pid/1, index_key_with_path/2, get_index_pid_from_key/1]).
 -export([open_index/3]).
 -export([await/2, commit/2, get_update_seq/1, info/1, search/2]).
 -export([group1/7, group2/2]).
@@ -54,12 +54,12 @@
 index_key_from_pid(Pid) when is_pid(Pid) ->
     {pid, Pid}.
 
--spec index_key_from_path(string_as_binary(_), pid()) -> indexer_key().
-index_key_from_path(Path, Pid) when is_pid(Pid) ->
+-spec index_key_with_path(string_as_binary(_), pid()) -> indexer_key().
+index_key_with_path(Path, Pid) when is_pid(Pid) ->
     {path, Path, Pid}.
 
 -spec get_index_pid_from_key(indexer_key()) -> pid().
-get_index_pid_from_key({path, _, Pid}) ->
+get_index_pid_from_key({path, _Path, Pid}) ->
     Pid;
 get_index_pid_from_key({pid, Pid}) ->
     Pid.
