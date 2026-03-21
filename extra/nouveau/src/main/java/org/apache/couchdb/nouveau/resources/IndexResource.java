@@ -36,8 +36,8 @@ import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.IndexInfoRequest;
+import org.apache.couchdb.nouveau.api.IndexInfoResponse;
 import org.apache.couchdb.nouveau.api.Ok;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
@@ -89,7 +89,7 @@ public final class IndexResource {
     }
 
     @GET
-    public IndexInfo getIndexInfo(@PathParam("name") String name) throws Exception {
+    public IndexInfoResponse getIndexInfo(@PathParam("name") String name) throws Exception {
         return indexManager.with(name, (index) -> {
             return index.info();
         });
@@ -98,16 +98,14 @@ public final class IndexResource {
     @POST
     public Ok setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
-            if (request.getMatchUpdateSeq().isPresent()
-                    && request.getUpdateSeq().isPresent()) {
+            if (request.matchUpdateSeq().isPresent() && request.updateSeq().isPresent()) {
                 index.setUpdateSeq(
-                        request.getMatchUpdateSeq().getAsLong(),
-                        request.getUpdateSeq().getAsLong());
+                        request.matchUpdateSeq().getAsLong(),
+                        request.updateSeq().getAsLong());
             }
-            if (request.getMatchPurgeSeq().isPresent() && request.getPurgeSeq().isPresent()) {
+            if (request.matchPurgeSeq().isPresent() && request.purgeSeq().isPresent()) {
                 index.setPurgeSeq(
-                        request.getMatchPurgeSeq().getAsLong(),
-                        request.getPurgeSeq().getAsLong());
+                        request.matchPurgeSeq().getAsLong(), request.purgeSeq().getAsLong());
             }
             return Ok.INSTANCE;
         });

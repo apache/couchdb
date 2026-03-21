@@ -28,7 +28,7 @@ import org.apache.couchdb.nouveau.api.DoubleField;
 import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.IndexInfoResponse;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
@@ -229,19 +229,19 @@ public class LuceneIndexTest {
     public void testInfo(@TempDir Path path) throws IOException {
         Index index = setup(path);
         try {
-            IndexInfo info = index.info();
-            assertThat(info.getDiskSize()).isEqualTo(0);
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getUpdateSeq()).isEqualTo(0);
+            IndexInfoResponse info = index.info();
+            assertThat(info.diskSize()).isEqualTo(0);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.updateSeq()).isEqualTo(0);
 
             final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
             info = index.info();
-            assertThat(info.getDiskSize()).isGreaterThan(0);
-            assertThat(info.getNumDocs()).isEqualTo(1);
-            assertThat(info.getUpdateSeq()).isEqualTo(2);
+            assertThat(info.diskSize()).isGreaterThan(0);
+            assertThat(info.numDocs()).isEqualTo(1);
+            assertThat(info.updateSeq()).isEqualTo(2);
         } finally {
             cleanup(index);
         }
@@ -255,15 +255,15 @@ public class LuceneIndexTest {
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
-            IndexInfo info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(1);
+            IndexInfoResponse info = index.info();
+            assertThat(info.numDocs()).isEqualTo(1);
 
             index.delete("foo", new DocumentDeleteRequest(2, 3, false));
             index.commit();
 
             info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getUpdateSeq()).isEqualTo(3);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.updateSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }
@@ -277,15 +277,15 @@ public class LuceneIndexTest {
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
-            IndexInfo info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(1);
+            IndexInfoResponse info = index.info();
+            assertThat(info.numDocs()).isEqualTo(1);
 
             index.delete("foo", new DocumentDeleteRequest(0, 3, true));
             index.commit();
 
             info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getPurgeSeq()).isEqualTo(3);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.purgeSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }

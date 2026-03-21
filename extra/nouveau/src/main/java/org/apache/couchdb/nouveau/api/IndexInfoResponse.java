@@ -16,11 +16,10 @@ package org.apache.couchdb.nouveau.api;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.PositiveOrZero;
-import java.util.OptionalLong;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public record IndexInfoRequest(
-        @PositiveOrZero OptionalLong matchUpdateSeq,
-        @PositiveOrZero OptionalLong updateSeq,
-        @PositiveOrZero OptionalLong matchPurgeSeq,
-        @PositiveOrZero OptionalLong purgeSeq) {}
+public record IndexInfoResponse(
+        @PositiveOrZero long updateSeq,
+        @PositiveOrZero long purgeSeq,
+        @PositiveOrZero long numDocs,
+        @PositiveOrZero long diskSize) {}

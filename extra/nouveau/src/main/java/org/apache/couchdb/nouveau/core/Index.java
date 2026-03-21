@@ -19,7 +19,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
-import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.IndexInfoResponse;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 
@@ -44,10 +44,10 @@ public abstract class Index implements Closeable {
         this.purgeSeq = purgeSeq;
     }
 
-    public final IndexInfo info() throws IOException {
+    public final IndexInfoResponse info() throws IOException {
         final int numDocs = doNumDocs();
         final long diskSize = doDiskSize();
-        return new IndexInfo(updateSeq, purgeSeq, numDocs, diskSize);
+        return new IndexInfoResponse(updateSeq, purgeSeq, numDocs, diskSize);
     }
 
     protected abstract int doNumDocs() throws IOException;
