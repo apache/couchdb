@@ -66,10 +66,9 @@ public class IndexManagerTest {
     public void managerReturnsUsableIndex() throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition();
         manager.create("foo", indexDefinition);
-        var searchRequest = new SearchRequest();
-        searchRequest.setQuery("*:*");
+        var searchRequest = new SearchRequest.Builder().setQuery("*:*").build();
         var searchResults = manager.with("foo", (index) -> index.search(searchRequest));
-        assertThat(searchResults.getTotalHits()).isEqualTo(0);
+        assertThat(searchResults.totalHits()).isEqualTo(0);
     }
 
     @Test

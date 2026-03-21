@@ -77,7 +77,7 @@ public abstract class Index implements Closeable {
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults search(final SearchRequest request) throws IOException {
-        assertMinSeqs(request.getMinUpdateSeq(), request.getMinPurgeSeq());
+        assertMinSeqs(request.minUpdateSeq(), request.minPurgeSeq());
         return doSearch(request);
     }
 
