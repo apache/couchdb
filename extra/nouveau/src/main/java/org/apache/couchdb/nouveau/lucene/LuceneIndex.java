@@ -20,8 +20,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -414,7 +414,7 @@ public class LuceneIndex extends Index {
             result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
         }
 
-        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
+        final CharsetDecoder utf8Decoder = StandardCharsets.UTF_8.newDecoder();
 
         for (Field field : request.getFields()) {
             // Underscore-prefix is reserved.
@@ -475,7 +475,7 @@ public class LuceneIndex extends Index {
     }
 
     private PrimitiveWrapper<?>[] toAfter(final FieldDoc fieldDoc) {
-        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
+        final CharsetDecoder utf8Decoder = StandardCharsets.UTF_8.newDecoder();
         final PrimitiveWrapper<?>[] fields = new PrimitiveWrapper<?>[fieldDoc.fields.length];
         for (int i = 0; i < fields.length; i++) {
             if (fieldDoc.fields[i] instanceof String) {
