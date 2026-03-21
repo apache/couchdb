@@ -144,7 +144,7 @@ public class LuceneIndex extends Index {
     public void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException {
         final Term docIdTerm = docIdTerm(docId);
         final Document doc = toDocument(docId, request);
-        schema.update(request.getFields());
+        schema.update(request.fields());
         writer.updateDocument(docIdTerm, doc);
     }
 
@@ -410,13 +410,13 @@ public class LuceneIndex extends Index {
         result.add(new SortedDocValuesField("_id", new BytesRef(docId)));
 
         // partition (optional)
-        if (request.hasPartition()) {
-            result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
-        }
+        request.partition()
+                .ifPresent(partition ->
+                        result.add(new org.apache.lucene.document.StringField("_partition", partition, Store.NO)));
 
         final CharsetDecoder utf8Decoder = StandardCharsets.UTF_8.newDecoder();
 
-        for (Field field : request.getFields()) {
+        for (Field field : request.fields()) {
             // Underscore-prefix is reserved.
             if (field.getName().startsWith("_")) {
                 continue;

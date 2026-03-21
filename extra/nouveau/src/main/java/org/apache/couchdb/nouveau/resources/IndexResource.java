@@ -139,11 +139,11 @@ public final class IndexResource {
     public Ok update(@PathParam("name") String name, @NotNull @Valid BulkUpdateRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
             for (var update : request.updates()) {
-                if (update.request() instanceof DocumentUpdateRequest) {
-                    index.update(update.docId(), (DocumentUpdateRequest) update.request());
+                if (update.update() instanceof DocumentUpdateRequest) {
+                    index.update(update.docId(), (DocumentUpdateRequest) update.update());
                 }
-                if (update.request() instanceof DocumentDeleteRequest) {
-                    index.delete(update.docId(), (DocumentDeleteRequest) update.request());
+                if (update.update() instanceof DocumentDeleteRequest) {
+                    index.delete(update.docId(), (DocumentDeleteRequest) update.update());
                 }
             }
             return Ok.INSTANCE;

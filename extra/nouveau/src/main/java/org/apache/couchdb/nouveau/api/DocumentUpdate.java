@@ -13,6 +13,8 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 
-public record DocumentUpdate(@JsonProperty("doc_id") String docId, @JsonProperty("update") DocumentRequest request) {}
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public record DocumentUpdate(String docId, DocumentRequest update) {}
