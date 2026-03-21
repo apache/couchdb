@@ -33,7 +33,7 @@ public final class AnalyzeHealthCheck extends HealthCheck {
         final AnalyzeRequest request = new AnalyzeRequest("standard", "hello goodbye");
         final AnalyzeResponse response = analyzeResource.analyzeText(request);
         final List<String> expected = Arrays.asList("hello", "goodbye");
-        final List<String> actual = response.getTokens();
+        final List<String> actual = response.tokens();
         if (expected.equals(actual)) {
             return Result.healthy();
         } else {
