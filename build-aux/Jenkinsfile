@@ -346,7 +346,7 @@ def generateNativeStage(platform) {
             finally {
               junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               sh 'killall -9 beam.smp || true'
-              sh 'rm -rf ${WORKSPACE}/*'
+              sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
             }
           } else {
             //steps to configure and build CouchDB on Windows platforms
@@ -505,7 +505,7 @@ def generateContainerStage(platform) {
                 }
                 finally {
                   junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                  sh 'rm -rf ${WORKSPACE}/*'
+                  sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
                 }
               }
 
@@ -531,7 +531,7 @@ def generateContainerStage(platform) {
                   error("Build step failed with error: ${err.getMessage()}")
                 }
                 finally {
-                  sh 'rm -rf ${WORKSPACE}/*'
+                  sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
                 }
               }
             }
@@ -604,7 +604,7 @@ pipeline {
       post {
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
+          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
         }
       }
     } // stage 'Setup Environment'
@@ -635,7 +635,7 @@ pipeline {
       post {
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
+          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
         }
       }
     } // stage Docs Check
@@ -664,7 +664,7 @@ pipeline {
       post {
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
+          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
         }
       }
     } // stage Build Docs
@@ -695,7 +695,7 @@ pipeline {
       post {
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
+          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
         }
       }
     } // stage Erlfmt
@@ -729,7 +729,7 @@ pipeline {
         }
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
+          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
         }
       }
     } // stage Build Release Tarball
