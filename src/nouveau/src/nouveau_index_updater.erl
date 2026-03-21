@@ -50,10 +50,11 @@
 update(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
     try
-        case open_or_create_index(Db, Index) of
+        case open_or_create_index(Index) of
             {error, Reason} ->
                 exit({error, Reason});
             {ok, #{} = Info} ->
+                nouveau_util:maybe_create_local_purge_doc(Db, Index),
                 #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
                 ChangesSince = couch_db:count_changes_since(Db, IndexUpdateSeq),
                 PurgesSince = couch_db:get_purge_seq(Db) - IndexPurgeSeq,
@@ -212,15 +213,6 @@ open_or_create_index(#index{} = Index) ->
             end;
         {error, Reason} ->
             {error, Reason}
-    end.
-
-open_or_create_index(Db, #index{} = Index) ->
-    case open_or_create_index(Index) of
-        {ok, #{} = Info} ->
-            nouveau_util:maybe_create_local_purge_doc(Db, Index),
-            {ok, Info};
-        Else ->
-            Else
     end.
 
 get_db_info(#index{} = Index) ->
