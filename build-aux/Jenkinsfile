@@ -609,37 +609,6 @@ pipeline {
       }
     } // stage 'Setup Environment'
 
-    stage('Docs Check') {
-      // Run docs `make check` stage if any docs changed
-      when {
-        beforeOptions true
-        expression { DOCS_CHANGED == '1' }
-      }
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      steps {
-        sh '''
-          make python-black
-        '''
-        sh '''
-          (cd src/docs && make check)
-        '''
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
-        }
-      }
-    } // stage Docs Check
-
     stage('Build Docs') {
       // Build docs separately if only docs changed. If there are other changes, docs are
       // already built as part of `make dist`
@@ -657,9 +626,9 @@ pipeline {
         }
       }
       steps {
-        sh '''
-           (cd src/docs && ./setup.sh ; make html)
-         '''
+        sh 'make python-black'
+        sh '(cd src/docs && ./setup.sh  ; make check)'
+        sh '(cd src/docs && make html)'
       }
       post {
         cleanup {
@@ -668,37 +637,6 @@ pipeline {
         }
       }
     } // stage Build Docs
-
-    stage('Source Format Checks') {
-      when {
-        beforeOptions true
-        expression { ONLY_DOCS_CHANGED == '0' && ONLY_GITHUB_CHANGED == '0' }
-      }
-      agent {
-        docker {
-          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
-          label 'docker'
-          args "${DOCKER_ARGS}"
-          registryUrl 'https://docker.io/'
-          registryCredentialsId 'dockerhub_creds'
-        }
-      }
-      steps {
-        sh '''
-          rm -rf apache-couchdb-*
-          ./configure --skip-deps --spidermonkey-version 78
-          make erlfmt-check
-          make elixir-source-checks
-          make python-black
-        '''
-      }
-      post {
-        cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
-        }
-      }
-    } // stage Erlfmt
 
     stage('Build Release Tarball') {
       when {
@@ -717,6 +655,9 @@ pipeline {
       steps {
         sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
         sh "./configure --spidermonkey-version 78 --with-nouveau"
+        sh 'make erlfmt-check'
+        sh 'make elixir-source-checks'
+        sh 'make python-black'
         sh 'make -j4 dist'
       }
       post {
