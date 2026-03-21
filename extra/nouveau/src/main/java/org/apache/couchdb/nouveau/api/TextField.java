@@ -13,41 +13,6 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import jakarta.validation.constraints.NotNull;
-import java.util.Objects;
+import jakarta.validation.constraints.NotEmpty;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public final class TextField extends Field {
-
-    @NotNull
-    private final String value;
-
-    private final boolean store;
-
-    public TextField(
-            @JsonProperty("name") final String name,
-            @JsonProperty("value") final String value,
-            @JsonProperty("store") final boolean store) {
-        super(name);
-        this.value = Objects.requireNonNull(value);
-        this.store = store;
-    }
-
-    @JsonProperty
-    public String getValue() {
-        return value;
-    }
-
-    @JsonProperty
-    public boolean isStore() {
-        return store;
-    }
-
-    @Override
-    public String toString() {
-        return "TextField [name=" + name + ", value=" + value + ", store=" + store + "]";
-    }
-}
+public record TextField(String name, @NotEmpty String value, boolean store) implements Field {}

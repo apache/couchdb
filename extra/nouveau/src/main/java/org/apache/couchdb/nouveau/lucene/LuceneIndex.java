@@ -418,34 +418,34 @@ public class LuceneIndex extends Index {
 
         for (Field field : request.fields()) {
             // Underscore-prefix is reserved.
-            if (field.getName().startsWith("_")) {
+            if (field.name().startsWith("_")) {
                 continue;
             }
             if (field instanceof TextField) {
                 var f = (TextField) field;
                 result.add(new org.apache.lucene.document.TextField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
                 var f = (StringField) field;
                 result.add(new org.apache.lucene.document.KeywordField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
                 result.add(new org.apache.lucene.document.DoubleField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof StoredField) {
                 var f = (StoredField) field;
-                var val = f.getValue();
+                var val = f.value();
                 if (val instanceof String) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) val));
+                    result.add(new org.apache.lucene.document.StoredField(f.name(), (String) val));
                 } else if (val instanceof Number) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number) val).doubleValue()));
+                    result.add(new org.apache.lucene.document.StoredField(f.name(), ((Number) val).doubleValue()));
                 } else if (val instanceof byte[]) {
                     try {
                         final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap((byte[]) val));
-                        result.add(new org.apache.lucene.document.StoredField(f.getName(), buf.toString()));
+                        result.add(new org.apache.lucene.document.StoredField(f.name(), buf.toString()));
                     } catch (final CharacterCodingException e) {
-                        result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
+                        result.add(new org.apache.lucene.document.StoredField(f.name(), (byte[]) val));
                     }
                 } else {
                     throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
