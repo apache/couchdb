@@ -282,6 +282,16 @@ def String configure(config) {
   return result
 }
 
+// Use this to delete all the files inside the workspace dir without deleting
+// the directory itself. There is an issue withing docker containers related to
+// that https://issues.jenkins-ci.org/browse/JENKINS-41894 (also
+// https://github.com/jenkinsci/docker-workflow-plugin/issues/478, but both
+// stale and closed now).
+//
+def String wscleanup() {
+  return 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z0-9]*'
+}
+
 // Credit to https://stackoverflow.com/a/69222555 for this technique.
 // We can use the scripted pipeline syntax to dynamically generate stages,
 // and inject them into a map that we pass to the `parallel` step in a script.
@@ -346,7 +356,7 @@ def generateNativeStage(platform) {
             finally {
               junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               sh 'killall -9 beam.smp || true'
-              sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
+              sh "${wscleanup()}"
             }
           } else {
             //steps to configure and build CouchDB on Windows platforms
@@ -505,7 +515,7 @@ def generateContainerStage(platform) {
                 }
                 finally {
                   junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                  sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
+                  sh "${wscleanup()}"
                 }
               }
 
@@ -531,7 +541,7 @@ def generateContainerStage(platform) {
                   error("Build step failed with error: ${err.getMessage()}")
                 }
                 finally {
-                  sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
+                  sh "${wscleanup()}"
                 }
               }
             }
@@ -603,8 +613,7 @@ pipeline {
       }
       post {
         cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
+          sh "${wscleanup()}"
         }
       }
     } // stage 'Setup Environment'
@@ -632,8 +641,7 @@ pipeline {
       }
       post {
         cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
+          sh "${wscleanup()}"
         }
       }
     } // stage Build Docs
@@ -669,8 +677,7 @@ pipeline {
           sh 'ls -l ${WORKSPACE}'
         }
         cleanup {
-          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/* ${WORKSPACE}/.[a-zA-Z]'
+          sh "${wscleanup()}"
         }
       }
     } // stage Build Release Tarball
