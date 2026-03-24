@@ -52,7 +52,7 @@ compact(State) ->
 
         {ok, Count} = couch_db:get_doc_count(Db),
 
-        {ESt, Count}
+        {ESt#mrst{start_time = now_secs()}, Count}
     end),
 
     #mrst{
@@ -129,8 +129,7 @@ compact(State) ->
     {ok, EmptyState#mrst{
         id_btree = NewIdBtree,
         views = NewViews,
-        update_seq = Seq,
-        start_time = now_secs()
+        update_seq = Seq
     }}.
 
 recompact(State) ->
