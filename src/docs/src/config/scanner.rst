@@ -132,14 +132,26 @@ settings in their ``[{plugin}]`` section.
 
     .. config:option:: repeat
 
-        Run the plugin periodically. By default it will run once after node the
-        node starts. Possible period formats are: ``{num}_{timeunit}`` (ex.:
+        Run the plugin periodically. By default it will run once after node
+        starts. Possible period formats are: ``{num}_{timeunit}`` (ex.:
         ``1000_sec``, ``30_min``, ``8_hours``, ``24_hour``, ``2_days``,
         ``3_weeks``, ``1_month``) or ``{weekday}`` (ex.: ``mon``, ``monday``,
         ``Thu``, etc.) ::
 
           [{plugin}]
           repeat = restart
+
+    .. config:option:: jitter
+
+        How much jitter to apply to the period. The default is 10% of the
+        period value. Jitter can spread the load on the cluster by adding some
+        randomness to when the plugins start. Possible formats are
+        ``{num}_percent`` (ex.: ``25_percent``) or ``{num}_{timeunit}`` (ex.:
+        ``1000_sec``, ``30_min``, ``8_hours``, ``24_hour``, ``2_days``). The
+        default is ``10_percent``, which means 10% of the period value ::
+
+          [{plugin}]
+          jitter = 10_percent
 
 .. config:section:: {plugin}.skip_dbs :: Skip databases
 

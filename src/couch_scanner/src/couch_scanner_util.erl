@@ -17,7 +17,7 @@
     log/5,
     ejson_map/1,
     restart_tsec/0,
-    schedule_time/5,
+    schedule_time/6,
     load_regexes/1,
     compile_regexes/1,
     match_regexes/2,
@@ -60,7 +60,7 @@ consistent_hash_nodes(Item) ->
     Nodes = mem3_util:live_nodes(),
     hd(mem3_util:rotate_list(Item, Nodes)) =:= node().
 
-schedule_time(Now, Last, Restart, AfterCfg, RepeatCfg) when
+schedule_time(Now, Last, Restart, AfterCfg, RepeatCfg, JitterCfg) when
     is_integer(Now), is_integer(Restart), is_integer(Last)
 ->
     RepeatPeriod = repeat_period(Now, Last, parse_repeat(RepeatCfg)),
@@ -77,14 +77,47 @@ schedule_time(Now, Last, Restart, AfterCfg, RepeatCfg) when
         {After, undefined} when is_integer(After), Last < After ->
             % Run once, haven't run yet, schedule to run
             max(Now, After);
-        {undefined, Period} ->
+        {undefined, Period} when is_integer(Period) ->
             % No after time, just period. Either need to wait
             % since last time it ran, or is actually ready to run
-            max(Now, Last + Period);
-        {After, Period} ->
+            Jitter = rand:uniform(jitter(JitterCfg, Period)),
+            max(Now, Last + Period + Jitter);
+        {After, Period} when is_integer(After), is_integer(Period) ->
             % Both after time set and a period. Wait for whichever
             % takes the longest
-            lists:max([Now, After, Last + Period])
+            Jitter = rand:uniform(jitter(JitterCfg, Period)),
+            lists:max([Now, After, Last + Period + Jitter])
+    end.
+
+% Parse jitter configuration as number of seconds.
+%
+% JitterCfg formats can be:
+%   N_percent : where N is value 0-100 and then it return N% of Period
+%   N_Unit : where N is a number and Unit is any unit (parse_period_unit/1 can parse)
+%
+% Result will always be in the range of [1, Period] seconds.
+%
+jitter(JitterCfg, Period) when is_integer(Period), Period > 0 ->
+    try string:split(JitterCfg, "_") of
+        [PctStr, "percent"] ->
+            try list_to_integer(PctStr) of
+                Pct ->
+                    Val = round(Period * Pct / 100),
+                    max(1, min(Period, Val))
+            catch
+                _:_ ->
+                    1
+            end;
+        [_, _] ->
+            case parse_non_weekday_period(JitterCfg) of
+                undefined -> 1;
+                Val when is_integer(Val), Val > 0 -> min(Period, Val)
+            end;
+        _ ->
+            1
+    catch
+        _:_ ->
+            1
     end.
 
 load_regexes(KVs) when is_list(KVs) ->
@@ -341,6 +374,30 @@ repeat_period_test() ->
     ?assertEqual(0, repeat_period(Now, Now - 999999, {weekday, 5})),
     ?assertEqual(?WEEK, repeat_period(Now, Now - 1, {weekday, 5})),
     ?assertEqual(1 * ?DAY, repeat_period(Now, Now - 999999, {weekday, 6})).
+
+jitter_test() ->
+    ?assertEqual(1, jitter("foo", 1)),
+    ?assertEqual(1, jitter(undefined, 1)),
+    ?assertEqual(1, jitter("", 1)),
+    ?assertEqual(1, jitter("_", 1)),
+    ?assertEqual(1, jitter("1_", 1)),
+    ?assertEqual(1, jitter("_percent", 1)),
+    ?assertEqual(1, jitter("1", 1)),
+    ?assertEqual(1, jitter("X_percent", 1)),
+    ?assertEqual(1, jitter("Z_seconds", 1)),
+    ?assertEqual(1, jitter("1_percent_years", 1)),
+    ?assertEqual(1, jitter("0_percent", 1)),
+    ?assertEqual(1, jitter("50_percent", 1)),
+    ?assertEqual(1, jitter("100_percent", 1)),
+    ?assertEqual(1, jitter("100000000000_percent", 1)),
+    ?assertEqual(1, jitter("1_sec", 1)),
+    ?assertEqual(1, jitter("2_sec", 1)),
+    ?assertEqual(2, jitter("2_sec", 2)),
+    ?assertEqual(2, jitter("2_sec", 3)),
+    ?assertEqual(50, jitter("50_percent", 100)),
+    ?assertEqual(100, jitter("100_percent", 100)),
+    ?assertEqual(100, jitter("10000000000_percent", 100)),
+    ?assertEqual(100, jitter("10000000000_years", 100)).
 
 regex_compile_test() ->
     KVs = [{"x", "a[d-f]"}, {"y", "**"}],
