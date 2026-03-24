@@ -19,21 +19,24 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record IndexDefinition(
         @Min(LEGACY_LUCENE_VERSION) @Max(LATEST_LUCENE_VERSION) OptionalInt luceneVersion,
         @NotEmpty String defaultAnalyzer,
-        Optional<Map<@NotEmpty String, @NotEmpty String>> fieldAnalyzers) {
+        Optional<Map<@NotEmpty String, @NotEmpty String>> fieldAnalyzers,
+        @NotNull OptionalLong initialPurgeSeq) {
 
     public static final int LEGACY_LUCENE_VERSION = 9;
     public static final int LATEST_LUCENE_VERSION = 10;
 
     public IndexDefinition() {
-        this(OptionalInt.of(LATEST_LUCENE_VERSION), "standard", Optional.empty());
+        this(OptionalInt.of(LATEST_LUCENE_VERSION), "standard", Optional.empty(), OptionalLong.empty());
     }
 
     @JsonIgnore
@@ -44,5 +47,10 @@ public record IndexDefinition(
     @JsonIgnore
     public boolean isLatestVersion() {
         return luceneVersion.getAsInt() == LATEST_LUCENE_VERSION;
+    }
+
+    @JsonIgnore
+    public long initialPurgeSeqAsLong() {
+        return initialPurgeSeq.orElse(0L);
     }
 }

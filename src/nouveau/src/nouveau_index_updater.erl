@@ -50,7 +50,7 @@
 update(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
     try
-        case open_or_create_index(Index) of
+        case open_or_create_index(Db, Index) of
             {error, Reason} ->
                 exit({error, Reason});
             {ok, #{} = Info} ->
@@ -200,12 +200,13 @@ flush_batch(#purge_acc{} = Acc) ->
             {error, Reason}
     end.
 
-open_or_create_index(#index{} = Index) ->
+open_or_create_index(Db, #index{} = Index) ->
     case nouveau_api:index_info(Index) of
         {ok, #{} = Info} ->
             {ok, Info};
         {error, {not_found, _}} ->
-            case nouveau_api:create_index(Index, index_definition(Index)) of
+            InitialPurgeSeq = couch_db:get_purge_seq(Db),
+            case nouveau_api:create_index(Index, index_definition(Index, InitialPurgeSeq)) of
                 ok ->
                     nouveau_api:index_info(Index);
                 {error, Reason} ->
@@ -225,11 +226,12 @@ get_db_info(#index{} = Index) ->
         couch_db:close(Db)
     end.
 
-index_definition(#index{} = Index) ->
+index_definition(#index{} = Index, InitialPurgeSeq) ->
     #{
         <<"lucene_version">> => Index#index.lucene_version,
         <<"default_analyzer">> => Index#index.default_analyzer,
-        <<"field_analyzers">> => Index#index.field_analyzers
+        <<"field_analyzers">> => Index#index.field_analyzers,
+        <<"initial_purge_seq">> => InitialPurgeSeq
     }.
 
 purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->

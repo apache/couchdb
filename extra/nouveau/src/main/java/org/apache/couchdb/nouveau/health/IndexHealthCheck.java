@@ -19,6 +19,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.OptionalLong;
 import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdate;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
@@ -47,7 +48,10 @@ public final class IndexHealthCheck extends HealthCheck {
         indexResource.createIndex(
                 name,
                 new IndexDefinition(
-                        OptionalInt.of(IndexDefinition.LATEST_LUCENE_VERSION), "standard", Optional.empty()));
+                        OptionalInt.of(IndexDefinition.LATEST_LUCENE_VERSION),
+                        "standard",
+                        Optional.empty(),
+                        OptionalLong.empty()));
         try {
             indexResource.update(
                     name,
