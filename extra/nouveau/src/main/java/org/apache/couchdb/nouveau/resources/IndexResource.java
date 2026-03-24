@@ -99,14 +99,20 @@ public final class IndexResource {
     @POST
     public Ok setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
+            var shouldCommit = false;
             if (request.matchUpdateSeq().isPresent() && request.updateSeq().isPresent()) {
                 index.setUpdateSeq(
                         request.matchUpdateSeq().getAsLong(),
                         request.updateSeq().getAsLong());
+                shouldCommit = true;
             }
             if (request.matchPurgeSeq().isPresent() && request.purgeSeq().isPresent()) {
                 index.setPurgeSeq(
                         request.matchPurgeSeq().getAsLong(), request.purgeSeq().getAsLong());
+                shouldCommit = true;
+            }
+            if (shouldCommit && request.shouldCommit()) {
+                index.commit();
             }
             return Ok.INSTANCE;
         });
