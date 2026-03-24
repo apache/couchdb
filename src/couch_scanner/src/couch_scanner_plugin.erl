@@ -788,8 +788,9 @@ cfg_ddoc_batch_size() ->
 schedule_time(Mod, LastSec, NowSec) ->
     After = cfg(Mod, "after", "restart"),
     Repeat = cfg(Mod, "repeat", "restart"),
+    Jitter = cfg(Mod, "jitter", "10_percent"),
     Restart = couch_scanner_util:restart_tsec(),
-    couch_scanner_util:schedule_time(NowSec, LastSec, Restart, After, Repeat).
+    couch_scanner_util:schedule_time(NowSec, LastSec, Restart, After, Repeat, Jitter).
 
 tsec() ->
     erlang:system_time(second).
