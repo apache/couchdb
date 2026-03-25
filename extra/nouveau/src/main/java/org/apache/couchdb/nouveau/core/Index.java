@@ -19,7 +19,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
-import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.IndexInfoResponse;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 
@@ -44,10 +44,10 @@ public abstract class Index implements Closeable {
         this.purgeSeq = purgeSeq;
     }
 
-    public final IndexInfo info() throws IOException {
+    public final IndexInfoResponse info() throws IOException {
         final int numDocs = doNumDocs();
         final long diskSize = doDiskSize();
-        return new IndexInfo(updateSeq, purgeSeq, numDocs, diskSize);
+        return new IndexInfoResponse(updateSeq, purgeSeq, numDocs, diskSize);
     }
 
     protected abstract int doNumDocs() throws IOException;
@@ -55,29 +55,29 @@ public abstract class Index implements Closeable {
     protected abstract long doDiskSize() throws IOException;
 
     public final synchronized void update(final String docId, final DocumentUpdateRequest request) throws IOException {
-        assertUpdateSeqProgress(request.getMatchSeq(), request.getSeq());
+        assertUpdateSeqProgress(request.matchSeq(), request.seq());
         doUpdate(docId, request);
-        incrementUpdateSeq(request.getMatchSeq(), request.getSeq());
+        incrementUpdateSeq(request.matchSeq(), request.seq());
     }
 
     protected abstract void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException;
 
     public final synchronized void delete(final String docId, final DocumentDeleteRequest request) throws IOException {
-        if (request.isPurge()) {
-            assertPurgeSeqProgress(request.getMatchSeq(), request.getSeq());
+        if (request.purge()) {
+            assertPurgeSeqProgress(request.matchSeq(), request.seq());
             doDelete(docId, request);
-            incrementPurgeSeq(request.getMatchSeq(), request.getSeq());
+            incrementPurgeSeq(request.matchSeq(), request.seq());
         } else {
-            assertUpdateSeqProgress(request.getMatchSeq(), request.getSeq());
+            assertUpdateSeqProgress(request.matchSeq(), request.seq());
             doDelete(docId, request);
-            incrementUpdateSeq(request.getMatchSeq(), request.getSeq());
+            incrementUpdateSeq(request.matchSeq(), request.seq());
         }
     }
 
     protected abstract void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException;
 
     public final SearchResults search(final SearchRequest request) throws IOException {
-        assertMinSeqs(request.getMinUpdateSeq(), request.getMinPurgeSeq());
+        assertMinSeqs(request.minUpdateSeq(), request.minPurgeSeq());
         return doSearch(request);
     }
 

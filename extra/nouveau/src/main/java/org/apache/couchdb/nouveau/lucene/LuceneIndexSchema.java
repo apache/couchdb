@@ -78,7 +78,7 @@ final class LuceneIndexSchema {
     public void update(final Collection<Field> fields) {
         Objects.requireNonNull(fields);
         for (var field : fields) {
-            map.putIfAbsent(field.getName(), Type.fromField(field));
+            map.putIfAbsent(field.name(), Type.fromField(field));
             assertType(field);
         }
     }
@@ -90,13 +90,13 @@ final class LuceneIndexSchema {
     public void assertType(final Field field) {
         Objects.requireNonNull(field);
         var expectedType = Type.fromField(field);
-        var actualType = map.get(field.getName());
+        var actualType = map.get(field.name());
         if (actualType == null) {
-            throw new WebApplicationException("Unknown field " + field.getName(), Status.BAD_REQUEST);
+            throw new WebApplicationException("Unknown field " + field.name(), Status.BAD_REQUEST);
         }
         if (expectedType != actualType) {
             throw new WebApplicationException(
-                    String.format("field %s is of type %s not %s", field.getName(), expectedType, actualType),
+                    String.format("field %s is of type %s not %s", field.name(), expectedType, actualType),
                     Status.BAD_REQUEST);
         }
     }

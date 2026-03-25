@@ -109,7 +109,7 @@ public class QueryDeserializer extends StdDeserializer<Query> {
             case "point_range": {
             }
             case "match_all":
-                return new MatchAllDocsQuery();
+                return MatchAllDocsQuery.INSTANCE;
         }
         throw new JsonParseException(parser, type + " not a supported query type");
     }

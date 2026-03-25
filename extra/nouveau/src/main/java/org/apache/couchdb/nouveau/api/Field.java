@@ -13,14 +13,10 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.Pattern;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
 @JsonSubTypes({
     @JsonSubTypes.Type(value = DoubleField.class, name = "double"),
@@ -28,17 +24,8 @@ import jakarta.validation.constraints.Pattern;
     @JsonSubTypes.Type(value = StringField.class, name = "string"),
     @JsonSubTypes.Type(value = TextField.class, name = "text"),
 })
-public abstract class Field {
+public interface Field {
 
     @Pattern(regexp = "^\\$?[a-zA-Z][a-zA-Z0-9_]*$")
-    protected final String name;
-
-    protected Field(final String name) {
-        this.name = name;
-    }
-
-    @JsonProperty
-    public String getName() {
-        return name;
-    }
+    String name();
 }

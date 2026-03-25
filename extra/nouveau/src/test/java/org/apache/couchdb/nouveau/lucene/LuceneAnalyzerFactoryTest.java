@@ -19,6 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import jakarta.ws.rs.WebApplicationException;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.ar.ArabicAnalyzer;
@@ -257,9 +260,10 @@ public class LuceneAnalyzerFactoryTest {
     @Test
     public void testFieldAnalyzers() throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition(
-                IndexDefinition.LATEST_LUCENE_VERSION,
+                OptionalInt.of(IndexDefinition.LATEST_LUCENE_VERSION),
                 "standard",
-                Map.of("english", "english", "thai", "thai", "email", "email"));
+                Optional.of(Map.of("english", "english", "thai", "thai", "email", "email")),
+                OptionalLong.empty());
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         assertThat(analyzer).isInstanceOf(PerFieldAnalyzerWrapper.class);
         final Method m = PerFieldAnalyzerWrapper.class.getDeclaredMethod("getWrappedAnalyzer", String.class);
@@ -277,8 +281,11 @@ public class LuceneAnalyzerFactoryTest {
 
     private void assertAnalyzer(final String name, final Class<? extends Analyzer> clazz) throws Exception {
         assertThat(LuceneAnalyzerFactory.newAnalyzer(name)).isInstanceOf(clazz);
-        assertThat(LuceneAnalyzerFactory.fromDefinition(
-                        new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, name, null)))
+        assertThat(LuceneAnalyzerFactory.fromDefinition(new IndexDefinition(
+                        OptionalInt.of(IndexDefinition.LATEST_LUCENE_VERSION),
+                        name,
+                        Optional.empty(),
+                        OptionalLong.empty())))
                 .isInstanceOf(clazz);
     }
 }
