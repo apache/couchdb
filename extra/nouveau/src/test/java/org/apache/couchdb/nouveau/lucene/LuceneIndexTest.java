@@ -28,7 +28,7 @@ import org.apache.couchdb.nouveau.api.DoubleField;
 import org.apache.couchdb.nouveau.api.DoubleRange;
 import org.apache.couchdb.nouveau.api.Field;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.api.IndexInfo;
+import org.apache.couchdb.nouveau.api.IndexInfoResponse;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
 import org.apache.couchdb.nouveau.api.StringField;
@@ -48,8 +48,7 @@ import org.junit.jupiter.api.io.TempDir;
 public class LuceneIndexTest {
 
     protected final Index setup(final Path path) throws IOException {
-        final IndexDefinition indexDefinition =
-                new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null);
+        final IndexDefinition indexDefinition = new IndexDefinition();
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
         final Directory dir = new DirectIODirectory(FSDirectory.open(path));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
@@ -80,11 +79,12 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
+            final SearchRequest request = new SearchRequest.Builder()
+                    .setMinUpdateSeq(count)
+                    .setQuery("*:*")
+                    .build();
             final SearchResults results = index.search(request);
-            assertThat(results.getTotalHits()).isEqualTo(count);
+            assertThat(results.totalHits()).isEqualTo(count);
         } finally {
             cleanup(index);
         }
@@ -100,12 +100,13 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setSort(List.of("foo"));
+            final SearchRequest request = new SearchRequest.Builder()
+                    .setMinUpdateSeq(count)
+                    .setQuery("*:*")
+                    .setSort(List.of("foo"))
+                    .build();
             final SearchResults results = index.search(request);
-            assertThat(results.getTotalHits()).isEqualTo(count);
+            assertThat(results.totalHits()).isEqualTo(count);
         } finally {
             cleanup(index);
         }
@@ -121,12 +122,13 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setCounts(List.of("bar"));
+            final SearchRequest request = new SearchRequest.Builder()
+                    .setMinUpdateSeq(count)
+                    .setQuery("*:*")
+                    .setCounts(List.of("bar"))
+                    .build();
             final SearchResults results = index.search(request);
-            assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
+            assertThat(results.counts()).isEqualTo(Map.of("bar", Map.of("baz", count)));
         } finally {
             cleanup(index);
         }
@@ -142,16 +144,17 @@ public class LuceneIndexTest {
                 final DocumentUpdateRequest request = new DocumentUpdateRequest(i - 1, i, null, fields);
                 index.update("doc" + i, request);
             }
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setRanges(Map.of(
-                    "bar",
-                    List.of(
-                            new DoubleRange("low", 0.0, true, (double) count / 2, true),
-                            new DoubleRange("high", (double) count / 2, true, (double) count, true))));
+            final SearchRequest request = new SearchRequest.Builder()
+                    .setMinUpdateSeq(count)
+                    .setQuery("*:*")
+                    .setRanges(Map.of(
+                            "bar",
+                            List.of(
+                                    new DoubleRange("low", 0.0, true, (double) count / 2, true),
+                                    new DoubleRange("high", (double) count / 2, true, (double) count, true))))
+                    .build();
             final SearchResults results = index.search(request);
-            assertThat(results.getRanges()).isEqualTo(Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
+            assertThat(results.ranges()).isEqualTo(Map.of("bar", Map.of("low", count / 2, "high", count / 2 + 1)));
         } finally {
             cleanup(index);
         }
@@ -174,13 +177,14 @@ public class LuceneIndexTest {
                 index.update("doc" + i, request);
             }
 
-            final SearchRequest request = new SearchRequest();
-            request.setMinUpdateSeq(count);
-            request.setQuery("*:*");
-            request.setCounts(List.of("bar"));
-            request.setTopN(1);
+            final SearchRequest request = new SearchRequest.Builder()
+                    .setMinUpdateSeq(count)
+                    .setQuery("*:*")
+                    .setCounts(List.of("bar"))
+                    .setTopN(1)
+                    .build();
             final SearchResults results = index.search(request);
-            assertThat(results.getCounts()).isEqualTo(Map.of("bar", Map.of("baz", count + 5)));
+            assertThat(results.counts()).isEqualTo(Map.of("bar", Map.of("baz", count + 5)));
         } finally {
             cleanup(index);
         }
@@ -215,9 +219,10 @@ public class LuceneIndexTest {
         try {
             // Require min seq 1 on new, empty index should fail.
             assertThrows(StaleIndexException.class, () -> {
-                final SearchRequest request = new SearchRequest();
-                request.setMinUpdateSeq(1);
-                request.setQuery("*:*");
+                final SearchRequest request = new SearchRequest.Builder()
+                        .setMinUpdateSeq(1)
+                        .setQuery("*:*")
+                        .build();
                 index.search(request);
             });
         } finally {
@@ -229,19 +234,19 @@ public class LuceneIndexTest {
     public void testInfo(@TempDir Path path) throws IOException {
         Index index = setup(path);
         try {
-            IndexInfo info = index.info();
-            assertThat(info.getDiskSize()).isEqualTo(0);
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getUpdateSeq()).isEqualTo(0);
+            IndexInfoResponse info = index.info();
+            assertThat(info.diskSize()).isEqualTo(0);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.updateSeq()).isEqualTo(0);
 
             final Collection<Field> fields = List.of(new DoubleField("bar", 12.0, false));
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
             info = index.info();
-            assertThat(info.getDiskSize()).isGreaterThan(0);
-            assertThat(info.getNumDocs()).isEqualTo(1);
-            assertThat(info.getUpdateSeq()).isEqualTo(2);
+            assertThat(info.diskSize()).isGreaterThan(0);
+            assertThat(info.numDocs()).isEqualTo(1);
+            assertThat(info.updateSeq()).isEqualTo(2);
         } finally {
             cleanup(index);
         }
@@ -255,15 +260,15 @@ public class LuceneIndexTest {
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
-            IndexInfo info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(1);
+            IndexInfoResponse info = index.info();
+            assertThat(info.numDocs()).isEqualTo(1);
 
             index.delete("foo", new DocumentDeleteRequest(2, 3, false));
             index.commit();
 
             info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getUpdateSeq()).isEqualTo(3);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.updateSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }
@@ -277,15 +282,15 @@ public class LuceneIndexTest {
             index.update("foo", new DocumentUpdateRequest(0, 2, null, fields));
             index.commit();
 
-            IndexInfo info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(1);
+            IndexInfoResponse info = index.info();
+            assertThat(info.numDocs()).isEqualTo(1);
 
             index.delete("foo", new DocumentDeleteRequest(0, 3, true));
             index.commit();
 
             info = index.info();
-            assertThat(info.getNumDocs()).isEqualTo(0);
-            assertThat(info.getPurgeSeq()).isEqualTo(3);
+            assertThat(info.numDocs()).isEqualTo(0);
+            assertThat(info.purgeSeq()).isEqualTo(3);
         } finally {
             cleanup(index);
         }

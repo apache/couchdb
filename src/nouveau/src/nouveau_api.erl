@@ -284,7 +284,8 @@ set_update_seq(#index{} = Index, MatchSeq, UpdateSeq) ->
 set_purge_seq(#index{} = Index, MatchSeq, PurgeSeq) ->
     ReqBody = #{
         match_purge_seq => MatchSeq,
-        purge_seq => PurgeSeq
+        purge_seq => PurgeSeq,
+        commit => true
     },
     set_seq(Index, ReqBody).
 

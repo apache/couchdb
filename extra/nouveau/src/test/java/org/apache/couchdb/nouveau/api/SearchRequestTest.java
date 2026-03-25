@@ -28,6 +28,7 @@ public class SearchRequestTest {
     @BeforeAll
     public static void setupMapper() {
         mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
     }
 
     @Test
@@ -47,12 +48,12 @@ public class SearchRequestTest {
     }
 
     private SearchRequest asObject() {
-        final SearchRequest result = new SearchRequest();
-        result.setQuery("*:*");
-        result.setLimit(10);
-        result.setCounts(List.of("bar"));
-        result.setTopN(5);
-        result.setRanges(Map.of("foo", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))));
-        return result;
+        return new SearchRequest.Builder()
+                .setQuery("*:*")
+                .setLimit(10)
+                .setCounts(List.of("bar"))
+                .setTopN(5)
+                .setRanges(Map.of("foo", List.of(new DoubleRange("0 to 100 inc", 0.0, true, 100.0, true))))
+                .build();
     }
 }

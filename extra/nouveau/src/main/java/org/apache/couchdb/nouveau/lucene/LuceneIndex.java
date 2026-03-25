@@ -20,14 +20,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
@@ -144,7 +144,7 @@ public class LuceneIndex extends Index {
     public void doUpdate(final String docId, final DocumentUpdateRequest request) throws IOException {
         final Term docIdTerm = docIdTerm(docId);
         final Document doc = toDocument(docId, request);
-        schema.update(request.getFields());
+        schema.update(request.fields());
         writer.updateDocument(docIdTerm, doc);
     }
 
@@ -223,21 +223,20 @@ public class LuceneIndex extends Index {
 
     private CollectorManager<?, ? extends TopDocs> hitCollector(final SearchRequest searchRequest) {
         final Sort sort = toSort(searchRequest);
+        final FieldDoc fieldDoc = searchRequest
+                .after()
+                .map(after -> {
+                    var result = toFieldDoc(after);
+                    if (getLastSortField(sort).getReverse()) {
+                        result.doc = 0;
+                    } else {
+                        result.doc = Integer.MAX_VALUE;
+                    }
+                    return result;
+                })
+                .orElse(null);
 
-        final PrimitiveWrapper<?>[] after = searchRequest.getAfter();
-        final FieldDoc fieldDoc;
-        if (after != null) {
-            fieldDoc = toFieldDoc(after);
-            if (getLastSortField(sort).getReverse()) {
-                fieldDoc.doc = 0;
-            } else {
-                fieldDoc.doc = Integer.MAX_VALUE;
-            }
-        } else {
-            fieldDoc = null;
-        }
-
-        return new TopFieldCollectorManager(sort, searchRequest.getLimit(), fieldDoc, 1000);
+        return new TopFieldCollectorManager(sort, searchRequest.limitAsInt(), fieldDoc, 1000);
     }
 
     private SortField getLastSortField(final Sort sort) {
@@ -248,17 +247,20 @@ public class LuceneIndex extends Index {
     private SearchResults toSearchResults(
             final SearchRequest searchRequest, final IndexSearcher searcher, final Object[] reduces)
             throws IOException {
-        final SearchResults result = new SearchResults();
-        collectHits(searcher, (TopDocs) reduces[0], result);
+        final TopDocs topDocs = (TopDocs) reduces[0];
+        final var hits = collectHits(searcher, topDocs);
+        Map<String, Map<String, Number>> counts = Collections.emptyMap();
+        Map<String, Map<String, Number>> ranges = Collections.emptyMap();
+
         if (reduces.length == 2) {
-            collectFacets(searchRequest, searcher, (FacetsCollector) reduces[1], result);
+            counts = collectCounts(searchRequest, searcher, (FacetsCollector) reduces[1]);
+            ranges = collectRanges(searchRequest, searcher, (FacetsCollector) reduces[1]);
         }
-        return result;
+        return new SearchResults(topDocs.totalHits.value(), topDocs.totalHits.relation(), hits, counts, ranges);
     }
 
-    private void collectHits(final IndexSearcher searcher, final TopDocs topDocs, final SearchResults searchResults)
-            throws IOException {
-        final List<SearchHit> hits = new ArrayList<SearchHit>(topDocs.scoreDocs.length);
+    private List<SearchHit> collectHits(final IndexSearcher searcher, final TopDocs topDocs) throws IOException {
+        final List<SearchHit> result = new ArrayList<SearchHit>(topDocs.scoreDocs.length);
         final StoredFields storedFields = searcher.storedFields();
 
         for (final ScoreDoc scoreDoc : topDocs.scoreDocs) {
@@ -287,42 +289,40 @@ public class LuceneIndex extends Index {
             }
 
             final PrimitiveWrapper<?>[] after = toAfter(((FieldDoc) scoreDoc));
-            hits.add(new SearchHit(doc.get("_id"), after, fields));
+            result.add(new SearchHit(doc.get("_id"), after, fields));
         }
-
-        searchResults.setTotalHits(topDocs.totalHits.value());
-        searchResults.setTotalHitsRelation(topDocs.totalHits.relation());
-        searchResults.setHits(hits);
+        return result;
     }
 
-    private void collectFacets(
-            final SearchRequest searchRequest,
-            final IndexSearcher searcher,
-            final FacetsCollector fc,
-            final SearchResults searchResults)
+    private Map<String, Map<String, Number>> collectCounts(
+            final SearchRequest searchRequest, final IndexSearcher searcher, final FacetsCollector fc)
             throws IOException {
-        if (searchRequest.hasCounts()) {
-            final Map<String, Map<String, Number>> countsMap = new HashMap<String, Map<String, Number>>(
-                    searchRequest.getCounts().size());
-            for (final String field : searchRequest.getCounts()) {
-                final StringDocValuesReaderState state =
-                        new StringDocValuesReaderState(searcher.getIndexReader(), field);
-                final StringValueFacetCounts counts = new StringValueFacetCounts(state, fc);
-                countsMap.put(field, collectFacets(counts, searchRequest.getTopN(), field));
-            }
-            searchResults.setCounts(countsMap);
+        if (!searchRequest.hasCounts()) {
+            return Collections.emptyMap();
         }
+        var c = searchRequest.counts().get();
+        final Map<String, Map<String, Number>> result = new HashMap<String, Map<String, Number>>(c.size());
+        for (final String field : c) {
+            final StringDocValuesReaderState state = new StringDocValuesReaderState(searcher.getIndexReader(), field);
+            final StringValueFacetCounts counts = new StringValueFacetCounts(state, fc);
+            result.put(field, collectFacets(counts, searchRequest.topNAsInt(), field));
+        }
+        return result;
+    }
 
-        if (searchRequest.hasRanges()) {
-            final Map<String, Map<String, Number>> rangesMap = new HashMap<String, Map<String, Number>>(
-                    searchRequest.getRanges().size());
-            for (final Entry<String, List<DoubleRange>> entry :
-                    searchRequest.getRanges().entrySet()) {
-                final DoubleRangeFacetCounts counts = toDoubleRangeFacetCounts(fc, entry.getKey(), entry.getValue());
-                rangesMap.put(entry.getKey(), collectFacets(counts, searchRequest.getTopN(), entry.getKey()));
-            }
-            searchResults.setRanges(rangesMap);
+    private Map<String, Map<String, Number>> collectRanges(
+            final SearchRequest searchRequest, final IndexSearcher searcher, final FacetsCollector fc)
+            throws IOException {
+        if (!searchRequest.hasRanges()) {
+            return Collections.emptyMap();
         }
+        var r = searchRequest.ranges().get();
+        final Map<String, Map<String, Number>> result = new HashMap<String, Map<String, Number>>(r.size());
+        for (final Entry<String, List<DoubleRange>> entry : r.entrySet()) {
+            final DoubleRangeFacetCounts counts = toDoubleRangeFacetCounts(fc, entry.getKey(), entry.getValue());
+            result.put(entry.getKey(), collectFacets(counts, searchRequest.topNAsInt(), entry.getKey()));
+        }
+        return result;
     }
 
     private DoubleRangeFacetCounts toDoubleRangeFacetCounts(
@@ -353,21 +353,22 @@ public class LuceneIndex extends Index {
 
     // Ensure _id is final sort field so we can paginate.
     private Sort toSort(final SearchRequest searchRequest) {
-        if (!searchRequest.hasSort()) {
-            return DEFAULT_SORT;
-        }
-
-        final List<String> sort = new ArrayList<String>(searchRequest.getSort());
-        final String last = sort.get(sort.size() - 1);
-        // Append _id field if not already present.
-        switch (last) {
-            case "-_id":
-            case "_id":
-                break;
-            default:
-                sort.add("_id");
-        }
-        return convertSort(sort);
+        return searchRequest
+                .sort()
+                .map(s -> {
+                    final List<String> sort = new ArrayList<String>(s);
+                    final String last = sort.get(sort.size() - 1);
+                    // Append _id field if not already present.
+                    switch (last) {
+                        case "-_id":
+                        case "_id":
+                            break;
+                        default:
+                            sort.add("_id");
+                    }
+                    return convertSort(sort);
+                })
+                .orElse(DEFAULT_SORT);
     }
 
     private Sort convertSort(final List<String> sort) {
@@ -410,42 +411,42 @@ public class LuceneIndex extends Index {
         result.add(new SortedDocValuesField("_id", new BytesRef(docId)));
 
         // partition (optional)
-        if (request.hasPartition()) {
-            result.add(new org.apache.lucene.document.StringField("_partition", request.getPartition(), Store.NO));
-        }
+        request.partition()
+                .ifPresent(partition ->
+                        result.add(new org.apache.lucene.document.StringField("_partition", partition, Store.NO)));
 
-        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
+        final CharsetDecoder utf8Decoder = StandardCharsets.UTF_8.newDecoder();
 
-        for (Field field : request.getFields()) {
+        for (Field field : request.fields()) {
             // Underscore-prefix is reserved.
-            if (field.getName().startsWith("_")) {
+            if (field.name().startsWith("_")) {
                 continue;
             }
             if (field instanceof TextField) {
                 var f = (TextField) field;
                 result.add(new org.apache.lucene.document.TextField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof StringField) {
                 var f = (StringField) field;
                 result.add(new org.apache.lucene.document.KeywordField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof DoubleField) {
                 var f = (DoubleField) field;
                 result.add(new org.apache.lucene.document.DoubleField(
-                        f.getName(), f.getValue(), f.isStore() ? Store.YES : Store.NO));
+                        f.name(), f.value(), f.store() ? Store.YES : Store.NO));
             } else if (field instanceof StoredField) {
                 var f = (StoredField) field;
-                var val = f.getValue();
+                var val = f.value();
                 if (val instanceof String) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), (String) val));
+                    result.add(new org.apache.lucene.document.StoredField(f.name(), (String) val));
                 } else if (val instanceof Number) {
-                    result.add(new org.apache.lucene.document.StoredField(f.getName(), ((Number) val).doubleValue()));
+                    result.add(new org.apache.lucene.document.StoredField(f.name(), ((Number) val).doubleValue()));
                 } else if (val instanceof byte[]) {
                     try {
                         final CharBuffer buf = utf8Decoder.decode(ByteBuffer.wrap((byte[]) val));
-                        result.add(new org.apache.lucene.document.StoredField(f.getName(), buf.toString()));
+                        result.add(new org.apache.lucene.document.StoredField(f.name(), buf.toString()));
                     } catch (final CharacterCodingException e) {
-                        result.add(new org.apache.lucene.document.StoredField(f.getName(), (byte[]) val));
+                        result.add(new org.apache.lucene.document.StoredField(f.name(), (byte[]) val));
                     }
                 } else {
                     throw new WebApplicationException(field + " is not valid", Status.BAD_REQUEST);
@@ -475,7 +476,7 @@ public class LuceneIndex extends Index {
     }
 
     private PrimitiveWrapper<?>[] toAfter(final FieldDoc fieldDoc) {
-        final CharsetDecoder utf8Decoder = Charset.forName("UTF-8").newDecoder();
+        final CharsetDecoder utf8Decoder = StandardCharsets.UTF_8.newDecoder();
         final PrimitiveWrapper<?>[] fields = new PrimitiveWrapper<?>[fieldDoc.fields.length];
         for (int i = 0; i < fields.length; i++) {
             if (fieldDoc.fields[i] instanceof String) {
@@ -518,23 +519,22 @@ public class LuceneIndex extends Index {
     }
 
     private Query parse(final SearchRequest request) {
-        var locale = request.getLocale() != null ? request.getLocale() : Locale.getDefault();
-        var pointsConfigMap = schema.toPointsConfigMap(locale);
+        var pointsConfigMap = schema.toPointsConfigMap(request.getLocale());
         var queryParser = new NouveauQueryParser(analyzer, pointsConfigMap);
 
-        Query result;
         try {
-            result = queryParser.parse(request.getQuery(), "default");
-            if (request.hasPartition()) {
-                final BooleanQuery.Builder builder = new BooleanQuery.Builder();
-                builder.add(new TermQuery(new Term("_partition", request.getPartition())), Occur.MUST);
-                builder.add(result, Occur.MUST);
-                result = builder.build();
-            }
+            var result = queryParser.parse(request.query(), "default");
+            return request.partition()
+                    .map(partition -> {
+                        final BooleanQuery.Builder builder = new BooleanQuery.Builder();
+                        builder.add(new TermQuery(new Term("_partition", partition)), Occur.MUST);
+                        builder.add(result, Occur.MUST);
+                        return (Query) builder.build();
+                    })
+                    .orElse(result);
         } catch (final QueryNodeException e) {
             throw new WebApplicationException(e.getMessage(), e, Status.BAD_REQUEST);
         }
-        return result;
     }
 
     private LuceneIndexSchema initSchema(IndexWriter writer) {

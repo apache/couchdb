@@ -13,36 +13,6 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.NotEmpty;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class AnalyzeRequest {
-
-    @NotEmpty
-    private String analyzer;
-
-    @NotEmpty
-    private String text;
-
-    public AnalyzeRequest() {
-        // Jackson deserialization
-    }
-
-    public AnalyzeRequest(final String analyzer, final String text) {
-        this.analyzer = analyzer;
-        this.text = text;
-    }
-
-    @JsonProperty
-    public String getAnalyzer() {
-        return analyzer;
-    }
-
-    @JsonProperty
-    public String getText() {
-        return text;
-    }
-}
+public record AnalyzeRequest(@NotEmpty String analyzer, @NotEmpty String text) {}

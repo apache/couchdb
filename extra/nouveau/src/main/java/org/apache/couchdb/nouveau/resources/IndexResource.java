@@ -36,8 +36,8 @@ import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
 import org.apache.couchdb.nouveau.api.IndexDefinition;
-import org.apache.couchdb.nouveau.api.IndexInfo;
 import org.apache.couchdb.nouveau.api.IndexInfoRequest;
+import org.apache.couchdb.nouveau.api.IndexInfoResponse;
 import org.apache.couchdb.nouveau.api.Ok;
 import org.apache.couchdb.nouveau.api.SearchRequest;
 import org.apache.couchdb.nouveau.api.SearchResults;
@@ -62,7 +62,8 @@ public final class IndexResource {
             throws IOException {
         if (!indexDefinition.isLatestVersion()) {
             throw new WebApplicationException(
-                    "Cannot create a new version " + indexDefinition.getLuceneVersion() + " index", Status.BAD_REQUEST);
+                    "Cannot create a new version " + indexDefinition.luceneVersionAsInt() + " index",
+                    Status.BAD_REQUEST);
         }
         indexManager.create(name, indexDefinition);
         return Ok.INSTANCE;
@@ -89,7 +90,7 @@ public final class IndexResource {
     }
 
     @GET
-    public IndexInfo getIndexInfo(@PathParam("name") String name) throws Exception {
+    public IndexInfoResponse getIndexInfo(@PathParam("name") String name) throws Exception {
         return indexManager.with(name, (index) -> {
             return index.info();
         });
@@ -98,16 +99,20 @@ public final class IndexResource {
     @POST
     public Ok setIndexInfo(@PathParam("name") String name, @NotNull @Valid IndexInfoRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
-            if (request.getMatchUpdateSeq().isPresent()
-                    && request.getUpdateSeq().isPresent()) {
+            var shouldCommit = false;
+            if (request.matchUpdateSeq().isPresent() && request.updateSeq().isPresent()) {
                 index.setUpdateSeq(
-                        request.getMatchUpdateSeq().getAsLong(),
-                        request.getUpdateSeq().getAsLong());
+                        request.matchUpdateSeq().getAsLong(),
+                        request.updateSeq().getAsLong());
+                shouldCommit = true;
             }
-            if (request.getMatchPurgeSeq().isPresent() && request.getPurgeSeq().isPresent()) {
+            if (request.matchPurgeSeq().isPresent() && request.purgeSeq().isPresent()) {
                 index.setPurgeSeq(
-                        request.getMatchPurgeSeq().getAsLong(),
-                        request.getPurgeSeq().getAsLong());
+                        request.matchPurgeSeq().getAsLong(), request.purgeSeq().getAsLong());
+                shouldCommit = true;
+            }
+            if (shouldCommit && request.shouldCommit()) {
+                index.commit();
             }
             return Ok.INSTANCE;
         });
@@ -141,11 +146,11 @@ public final class IndexResource {
     public Ok update(@PathParam("name") String name, @NotNull @Valid BulkUpdateRequest request) throws Exception {
         return indexManager.with(name, (index) -> {
             for (var update : request.updates()) {
-                if (update.request() instanceof DocumentUpdateRequest) {
-                    index.update(update.docId(), (DocumentUpdateRequest) update.request());
+                if (update.update() instanceof DocumentUpdateRequest) {
+                    index.update(update.docId(), (DocumentUpdateRequest) update.update());
                 }
-                if (update.request() instanceof DocumentDeleteRequest) {
-                    index.delete(update.docId(), (DocumentDeleteRequest) update.request());
+                if (update.update() instanceof DocumentDeleteRequest) {
+                    index.delete(update.docId(), (DocumentDeleteRequest) update.update());
                 }
             }
             return Ok.INSTANCE;

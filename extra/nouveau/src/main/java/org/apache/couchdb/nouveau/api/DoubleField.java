@@ -13,40 +13,4 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
-import jakarta.validation.constraints.NotNull;
-
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class DoubleField extends Field {
-
-    @NotNull
-    private final Double value;
-
-    private final boolean store;
-
-    public DoubleField(
-            @JsonProperty("name") final String name,
-            @JsonProperty("value") final Double value,
-            @JsonProperty("store") final boolean store) {
-        super(name);
-        this.value = value;
-        this.store = store;
-    }
-
-    @JsonProperty
-    public Double getValue() {
-        return value;
-    }
-
-    @JsonProperty
-    public boolean isStore() {
-        return store;
-    }
-
-    @Override
-    public String toString() {
-        return "DoubleField [name=" + name + ", value=" + value + ", store=" + store + "]";
-    }
-}
+public record DoubleField(String name, double value, boolean store) implements Field {}

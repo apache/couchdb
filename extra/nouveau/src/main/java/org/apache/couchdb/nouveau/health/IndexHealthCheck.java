@@ -17,6 +17,9 @@ import com.codahale.metrics.health.HealthCheck;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import org.apache.couchdb.nouveau.api.BulkUpdateRequest;
 import org.apache.couchdb.nouveau.api.DocumentUpdate;
 import org.apache.couchdb.nouveau.api.DocumentUpdateRequest;
@@ -42,22 +45,28 @@ public final class IndexHealthCheck extends HealthCheck {
             // Ignored, index might not exist yet.
         }
 
-        indexResource.createIndex(name, new IndexDefinition(IndexDefinition.LATEST_LUCENE_VERSION, "standard", null));
+        indexResource.createIndex(
+                name,
+                new IndexDefinition(
+                        OptionalInt.of(IndexDefinition.LATEST_LUCENE_VERSION),
+                        "standard",
+                        Optional.empty(),
+                        OptionalLong.empty()));
         try {
             indexResource.update(
                     name,
                     new BulkUpdateRequest(List.of(new DocumentUpdate(
                             "foo", new DocumentUpdateRequest(0, 1, null, Collections.emptyList())))));
-            final SearchRequest searchRequest = new SearchRequest();
-            searchRequest.setQuery("_id:foo");
-            searchRequest.setMinUpdateSeq(1);
-
+            final SearchRequest searchRequest = new SearchRequest.Builder()
+                    .setQuery("_id:foo")
+                    .setMinUpdateSeq(1)
+                    .build();
             final SearchResults searchResults = indexResource.searchIndex(name, searchRequest);
-            if (searchResults.getTotalHits() == 1) {
+            if (searchResults.totalHits() == 1) {
                 return Result.healthy();
             } else {
                 return Result.unhealthy(
-                        "Wrong number of search results, expected 1, got %d", searchResults.getTotalHits());
+                        "Wrong number of search results, expected 1, got %d", searchResults.totalHits());
             }
         } finally {
             indexResource.deletePath(name, null);

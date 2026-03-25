@@ -21,4 +21,4 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = DocumentDeleteRequest.class, name = "delete"),
     @JsonSubTypes.Type(value = DocumentUpdateRequest.class, name = "update"),
 })
-public abstract class DocumentRequest {}
+public interface DocumentRequest {}

@@ -26,17 +26,18 @@ public class IndexDefinitionTest {
     @BeforeAll
     public static void setup() {
         mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
     }
 
     @Test
     public void legacyLuceneVersionIfMissing() throws Exception {
         var indexDefinition = mapper.readValue("{}", IndexDefinition.class);
-        assertThat(indexDefinition.getLuceneVersion()).isEqualTo(IndexDefinition.LEGACY_LUCENE_VERSION);
+        assertThat(indexDefinition.luceneVersionAsInt()).isEqualTo(IndexDefinition.LEGACY_LUCENE_VERSION);
     }
 
     @Test
     public void luceneVersionIsDeserializedIfPresent() throws Exception {
         var indexDefinition = mapper.readValue("{\"lucene_version\":10}", IndexDefinition.class);
-        assertThat(indexDefinition.getLuceneVersion()).isEqualTo(10);
+        assertThat(indexDefinition.luceneVersionAsInt()).isEqualTo(10);
     }
 }

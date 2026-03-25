@@ -393,7 +393,7 @@ public final class IndexManager implements Managed {
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
         final Analyzer analyzer = LuceneAnalyzerFactory.fromDefinition(indexDefinition);
-        final int luceneVersion = indexDefinition.getLuceneVersion();
+        final int luceneVersion = indexDefinition.luceneVersionAsInt();
         final Directory dir = new DirectIODirectory(FSDirectory.open(path.resolve(Integer.toString(luceneVersion))));
         final IndexWriterConfig config = new IndexWriterConfig(analyzer);
         if (luceneVersion != IndexDefinition.LATEST_LUCENE_VERSION) {
@@ -401,16 +401,16 @@ public final class IndexManager implements Managed {
         }
         config.setUseCompoundFile(false);
         final IndexWriter writer = new IndexWriter(dir, config);
-        final long updateSeq = getSeq(writer, "update_seq");
-        final long purgeSeq = getSeq(writer, "purge_seq");
+        final long updateSeq = getSeq(writer, "update_seq", 0);
+        final long purgeSeq = getSeq(writer, "purge_seq", indexDefinition.initialPurgeSeqAsLong());
         final SearcherManager searcherManager = new SearcherManager(writer, searcherFactory);
         return new LuceneIndex(analyzer, writer, updateSeq, purgeSeq, searcherManager);
     }
 
-    private long getSeq(final IndexWriter writer, final String key) throws IOException {
+    private long getSeq(final IndexWriter writer, final String key, final long defaultValue) throws IOException {
         final Iterable<Map.Entry<String, String>> commitData = writer.getLiveCommitData();
         if (commitData == null) {
-            return 0L;
+            return defaultValue;
         }
         for (Map.Entry<String, String> entry : commitData) {
             if (entry.getKey().equals(key)) {

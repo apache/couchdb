@@ -13,50 +13,22 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.Positive;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import java.util.Optional;
 import java.util.OptionalLong;
 
-public final class IndexInfoRequest {
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public record IndexInfoRequest(
+        @PositiveOrZero OptionalLong matchUpdateSeq,
+        @PositiveOrZero OptionalLong updateSeq,
+        @PositiveOrZero OptionalLong matchPurgeSeq,
+        @PositiveOrZero OptionalLong purgeSeq,
+        @NotNull Optional<Boolean> commit) {
 
-    private final OptionalLong matchUpdateSeq;
-
-    private final OptionalLong updateSeq;
-
-    private final OptionalLong matchPurgeSeq;
-
-    private final OptionalLong purgeSeq;
-
-    public IndexInfoRequest(
-            @JsonProperty("match_update_seq") @Positive final OptionalLong matchUpdateSeq,
-            @JsonProperty("update_seq") @Positive final OptionalLong updateSeq,
-            @JsonProperty("match_purge_seq") @Positive final OptionalLong matchPurgeSeq,
-            @JsonProperty("purge_seq") @Positive final OptionalLong purgeSeq) {
-        this.matchUpdateSeq = matchUpdateSeq;
-        this.updateSeq = updateSeq;
-        this.matchPurgeSeq = matchPurgeSeq;
-        this.purgeSeq = purgeSeq;
-    }
-
-    public OptionalLong getMatchUpdateSeq() {
-        return matchUpdateSeq;
-    }
-
-    public OptionalLong getUpdateSeq() {
-        return updateSeq;
-    }
-
-    public OptionalLong getMatchPurgeSeq() {
-        return matchPurgeSeq;
-    }
-
-    public OptionalLong getPurgeSeq() {
-        return purgeSeq;
-    }
-
-    @Override
-    public String toString() {
-        return "IndexInfoRequest [matchUpdateSeq=" + matchUpdateSeq + ", updateSeq=" + updateSeq + ", matchPurgeSeq="
-                + matchPurgeSeq + ", purgeSeq=" + purgeSeq + "]";
+    public boolean shouldCommit() {
+        return commit.orElse(false);
     }
 }

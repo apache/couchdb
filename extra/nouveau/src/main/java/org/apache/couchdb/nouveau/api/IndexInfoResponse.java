@@ -13,7 +13,13 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import jakarta.validation.constraints.NotEmpty;
-import java.util.List;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import jakarta.validation.constraints.PositiveOrZero;
 
-public record BulkUpdateRequest(@NotEmpty List<DocumentUpdate> updates) {}
+@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
+public record IndexInfoResponse(
+        @PositiveOrZero long updateSeq,
+        @PositiveOrZero long purgeSeq,
+        @PositiveOrZero long numDocs,
+        @PositiveOrZero long diskSize) {}

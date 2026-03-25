@@ -28,11 +28,14 @@ public class IndexHealthCheckTest {
 
     @Test
     public void testIndexHealthCheck(@TempDir final Path tempDir) throws Exception {
+        var mapper = new ObjectMapper();
+        mapper.findAndRegisterModules();
+
         var manager = new IndexManager();
         manager.setCommitIntervalSeconds(30);
         manager.setIdleSeconds(60);
         manager.setMaxIndexesOpen(1);
-        manager.setObjectMapper(new ObjectMapper());
+        manager.setObjectMapper(mapper);
         manager.setRootDir(tempDir);
         manager.setScheduledExecutorService(Executors.newScheduledThreadPool(2));
         manager.setSearcherFactory(new SearcherFactory());

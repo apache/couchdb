@@ -13,7 +13,6 @@
 
 package org.apache.couchdb.nouveau.api;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import jakarta.validation.constraints.Max;
@@ -25,162 +24,126 @@ import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class SearchRequest {
+public record SearchRequest(
+        @NotNull String query,
+        @PositiveOrZero long minUpdateSeq,
+        @PositiveOrZero long minPurgeSeq,
+        Optional<Locale> locale,
+        Optional<String> partition,
+        @Positive OptionalInt limit,
+        @NotNull Optional<List<@NotEmpty String>> sort,
+        @NotNull Optional<List<@NotEmpty String>> counts,
+        @NotNull Optional<Map<@NotEmpty String, List<@NotNull DoubleRange>>> ranges,
+        @NotNull Optional<PrimitiveWrapper<?>[]> after,
+        @Min(1) @Max(1000) OptionalInt topN) {
 
-    @NotNull
-    private String query;
-
-    @PositiveOrZero
-    private long minUpdateSeq;
-
-    @PositiveOrZero
-    private long minPurgeSeq;
-
-    private Locale locale;
-
-    private String partition;
-
-    @Positive
-    private int limit = 25;
-
-    private List<@NotEmpty String> sort;
-
-    private List<@NotEmpty String> counts;
-
-    private Map<@NotEmpty String, List<@NotNull DoubleRange>> ranges;
-
-    private PrimitiveWrapper<?>[] after;
-
-    @Min(1)
-    @Max(1000)
-    private int topN = 10;
-
-    public SearchRequest() {
-        // Jackson deserialization
+    public int limitAsInt() {
+        return limit.orElse(25);
     }
 
-    public void setQuery(final String query) {
-        this.query = query;
-    }
-
-    @JsonProperty
-    public String getQuery() {
-        return query;
-    }
-
-    public void setMinUpdateSeq(final long minUpdateSeq) {
-        this.minUpdateSeq = minUpdateSeq;
-    }
-
-    @JsonProperty
-    public long getMinUpdateSeq() {
-        return minUpdateSeq;
-    }
-
-    public void setMinPurgeSeq(final long minPurgeSeq) {
-        this.minPurgeSeq = minPurgeSeq;
-    }
-
-    @JsonProperty
-    public long getMinPurgeSeq() {
-        return minPurgeSeq;
-    }
-
-    public void setLocale(final Locale locale) {
-        this.locale = locale;
-    }
-
-    @JsonProperty
-    public Locale getLocale() {
-        return locale;
-    }
-
-    public void setPartition(final String partition) {
-        this.partition = partition;
-    }
-
-    @JsonProperty
-    public String getPartition() {
-        return partition;
-    }
-
-    public boolean hasPartition() {
-        return partition != null;
-    }
-
-    public void setLimit(final int limit) {
-        this.limit = limit;
-    }
-
-    @JsonProperty
-    public int getLimit() {
-        return limit;
-    }
-
-    public boolean hasSort() {
-        return sort != null;
-    }
-
-    @JsonProperty
-    public List<String> getSort() {
-        return sort;
-    }
-
-    public void setSort(List<String> sort) {
-        this.sort = sort;
+    public int topNAsInt() {
+        return topN.orElse(10);
     }
 
     public boolean hasCounts() {
-        return counts != null;
-    }
-
-    public void setCounts(final List<String> counts) {
-        this.counts = counts;
-    }
-
-    @JsonProperty
-    public List<String> getCounts() {
-        return counts;
+        return !counts.isEmpty();
     }
 
     public boolean hasRanges() {
-        return ranges != null;
+        return !ranges.isEmpty();
     }
 
-    public void setRanges(final Map<String, List<DoubleRange>> ranges) {
-        this.ranges = ranges;
+    public Locale getLocale() {
+        return locale.orElse(Locale.getDefault());
     }
 
-    @JsonProperty
-    public Map<String, List<DoubleRange>> getRanges() {
-        return ranges;
-    }
+    public static class Builder {
 
-    public void setTopN(final int topN) {
-        this.topN = topN;
-    }
+        private String query;
 
-    @JsonProperty
-    public int getTopN() {
-        return topN;
-    }
+        private long minUpdateSeq;
 
-    public void setAfter(final PrimitiveWrapper<?>[] after) {
-        this.after = after;
-    }
+        private long minPurgeSeq;
 
-    @JsonProperty
-    public PrimitiveWrapper<?>[] getAfter() {
-        return after;
-    }
+        private Optional<Locale> locale = Optional.empty();
 
-    @Override
-    public String toString() {
-        return "SearchRequest [query=" + query + ", min_update_seq=" + minUpdateSeq + ", min_purge_seq=" + minPurgeSeq
-                + ", locale=" + locale + ", sort=" + sort + ", limit=" + limit + ", after=" + after + ", counts="
-                + counts + ", ranges=" + ranges + "]";
+        private Optional<String> partition = Optional.empty();
+
+        private OptionalInt limit = OptionalInt.empty();
+
+        private Optional<List<String>> sort = Optional.empty();
+
+        private Optional<List<String>> counts = Optional.empty();
+
+        private Optional<Map<String, List<DoubleRange>>> ranges = Optional.empty();
+
+        private Optional<PrimitiveWrapper<?>[]> after = Optional.empty();
+
+        private OptionalInt topN = OptionalInt.empty();
+
+        public Builder setQuery(final String query) {
+            this.query = query;
+            return this;
+        }
+
+        public Builder setMinUpdateSeq(final long minUpdateSeq) {
+            this.minUpdateSeq = minUpdateSeq;
+            return this;
+        }
+
+        public Builder setMinPurgeSeq(final long minPurgeSeq) {
+            this.minPurgeSeq = minPurgeSeq;
+            return this;
+        }
+
+        public Builder setLocale(final Locale locale) {
+            this.locale = Optional.of(locale);
+            return this;
+        }
+
+        public Builder setPartition(final String partition) {
+            this.partition = Optional.of(partition);
+            return this;
+        }
+
+        public Builder setLimit(final int limit) {
+            this.limit = OptionalInt.of(limit);
+            return this;
+        }
+
+        public Builder setSort(List<String> sort) {
+            this.sort = Optional.of(sort);
+            return this;
+        }
+
+        public Builder setCounts(final List<String> counts) {
+            this.counts = Optional.of(counts);
+            return this;
+        }
+
+        public Builder setRanges(final Map<String, List<DoubleRange>> ranges) {
+            this.ranges = Optional.of(ranges);
+            return this;
+        }
+
+        public Builder setTopN(final int topN) {
+            this.topN = OptionalInt.of(topN);
+            return this;
+        }
+
+        public Builder setAfter(final PrimitiveWrapper<?>[] after) {
+            this.after = Optional.of(after);
+            return this;
+        }
+
+        public SearchRequest build() {
+            return new SearchRequest(
+                    query, minUpdateSeq, minPurgeSeq, locale, partition, limit, sort, counts, ranges, after, topN);
+        }
     }
 }
