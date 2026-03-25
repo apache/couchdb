@@ -38,7 +38,8 @@ couch_js_test_() ->
                 ?TDEF(should_allow_js_string_mutations),
                 ?TDEF(should_bump_timing_and_call_stats),
                 ?TDEF(should_exit_on_internal_error, 60),
-                ?TDEF(should_use_bigint)
+                ?TDEF(should_use_bigint),
+                ?TDEF(should_handle_invalid_command)
             ])
         }
     }.
@@ -464,6 +465,11 @@ should_use_bigint(_) ->
         <<"spidermonkey">> ->
             ?assertThrow({compilation_error, _}, prompt(Proc, [<<"add_fun">>, Src]))
     end.
+
+should_handle_invalid_command(_) ->
+    Proc = couch_query_servers:get_os_process(<<"javascript">>),
+    BadCmd = [<<"bad">>, <<"foo">>],
+    ?assertThrow({unknown_command, <<"unknown command 'bad'">>}, prompt(Proc, BadCmd)).
 
 sample_time(Stat) ->
     couch_stats:sample([couchdb, query_server, time, Stat]).
