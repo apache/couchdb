@@ -72,7 +72,7 @@ t_no_auto_purge_by_default({_, DbName}) ->
     ok.
 
 t_auto_purge_after_config_ttl({_, DbName}) ->
-    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-6_hour", false),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
@@ -83,7 +83,7 @@ t_auto_purge_after_config_ttl({_, DbName}) ->
     ok.
 
 t_auto_purge_after_db_ttl({_, DbName}) ->
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-6_hour"}]),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
@@ -105,7 +105,7 @@ t_no_auto_purge_after_config_ttl_set_to_infinity({_, DbName}) ->
     ok.
 
 t_no_auto_purge_after_db_ttl_set_to_infinity({_, DbName}) ->
-    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-6_hour", false),
     ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, <<"infinity">>}]),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
@@ -118,7 +118,7 @@ t_no_auto_purge_after_db_ttl_set_to_infinity({_, DbName}) ->
 
 t_db_auto_purge_overrides_cluster_ttl_infinity({_, DbName}) ->
     config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "infinity", false),
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-6_hour"}]),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
@@ -130,7 +130,7 @@ t_db_auto_purge_overrides_cluster_ttl_infinity({_, DbName}) ->
 
 t_dry_run({_, DbName}) ->
     config:set(atom_to_list(?PLUGIN), "dry_run", "true", false),
-    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-6_hour", false),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
@@ -146,7 +146,7 @@ t_dry_run({_, DbName}) ->
 t_dry_run_with_non_default_log_level({_, DbName}) ->
     config:set(atom_to_list(?PLUGIN), "dry_run", "true", false),
     config:set(atom_to_list(?PLUGIN), "log_level", "warning", false),
-    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-3_hour", false),
+    config:set(atom_to_list(?PLUGIN), "deleted_document_ttl", "-6_hour", false),
     ok = add_doc(DbName, <<"doc1">>, #{<<"_deleted">> => true}),
     ?assertEqual(1, doc_del_count(DbName)),
     meck:reset(couch_scanner_server),
@@ -162,7 +162,7 @@ t_dry_run_with_non_default_log_level({_, DbName}) ->
 t_min_batch_size_1({_, DbName}) ->
     meck:new(fabric, [passthrough]),
     config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 5),
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-6_hour"}]),
     [
         add_doc(DbName, <<"doc", (integer_to_binary(I))/binary>>, #{<<"_deleted">> => true})
      || I <- lists:seq(1, 10)
@@ -179,7 +179,7 @@ t_min_batch_size_1({_, DbName}) ->
 t_min_batch_size_2({_, DbName}) ->
     meck:new(fabric, [passthrough]),
     config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 5),
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-6_hour"}]),
     [
         add_doc(DbName, <<"doc", (integer_to_binary(I))/binary>>, #{<<"_deleted">> => true})
      || I <- lists:seq(1, 11)
@@ -197,7 +197,7 @@ t_max_batch_size_1({_, DbName}) ->
     meck:new(fabric, [passthrough]),
     config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 1),
     config:set_integer(atom_to_list(?PLUGIN), "max_batch_size", 5),
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-6_hour"}]),
     [
         add_replicated_doc(
             DbName,
@@ -223,7 +223,7 @@ t_max_batch_size_2({_, DbName}) ->
     meck:new(fabric, [passthrough]),
     config:set_integer(atom_to_list(?PLUGIN), "min_batch_size", 1),
     config:set_integer(atom_to_list(?PLUGIN), "max_batch_size", 5),
-    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-3_hour"}]),
+    ok = fabric:set_auto_purge_props(DbName, [{<<"deleted_document_ttl">>, "-6_hour"}]),
     [
         add_replicated_doc(
             DbName,
