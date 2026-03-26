@@ -329,6 +329,7 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
+                  sh '$MAKE xref'
                   retry (3) {sh "$MAKE ${meta[platform].gnu_make_eunit_opts} eunit" }
                   if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
@@ -496,6 +497,7 @@ def generateContainerStage(platform) {
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
+                    sh 'make xref'
                     retry (3) {sh "make ${meta[platform].gnu_make_eunit_opts} eunit" }
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
