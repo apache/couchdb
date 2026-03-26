@@ -18,7 +18,7 @@
 -include("nouveau.hrl").
 
 %% public api
--export([get_db_info/1]).
+-export([outdated/1, get_db_info/1]).
 
 %% callbacks
 -export([update/1]).
@@ -46,6 +46,21 @@
     batch_size,
     batch
 }).
+
+outdated(#index{} = Index) ->
+    {ok, Db} = couch_db:open_int(Index#index.dbname, []),
+    try
+        case open_or_create_index(Db, Index) of
+            {ok, #{} = Info} ->
+                #{<<"update_seq">> := IndexUpdateSeq, <<"purge_seq">> := IndexPurgeSeq} = Info,
+                {DbUpdateSeq, DbPurgeSeq} = get_db_info(Db),
+                DbUpdateSeq > IndexUpdateSeq orelse DbPurgeSeq > IndexPurgeSeq;
+            {error, Reason} ->
+                {error, Reason}
+        end
+    after
+        couch_db:close(Db)
+    end.
 
 update(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
@@ -219,12 +234,14 @@ open_or_create_index(Db, #index{} = Index) ->
 get_db_info(#index{} = Index) ->
     {ok, Db} = couch_db:open_int(Index#index.dbname, []),
     try
-        UpdateSeq = couch_db:get_update_seq(Db),
-        PurgeSeq = couch_db:get_purge_seq(Db),
-        {UpdateSeq, PurgeSeq}
+        get_db_info(Db)
     after
         couch_db:close(Db)
-    end.
+    end;
+get_db_info(Db) ->
+    UpdateSeq = couch_db:get_update_seq(Db),
+    PurgeSeq = couch_db:get_purge_seq(Db),
+    {UpdateSeq, PurgeSeq}.
 
 index_definition(#index{} = Index, InitialPurgeSeq) ->
     #{
