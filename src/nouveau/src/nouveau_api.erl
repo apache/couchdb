@@ -41,7 +41,8 @@
     make_purge/3
 ]).
 
--define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
+-define(JSON_CONTENT_TYPE, {<<"content-type">>, <<"application/json">>}).
+-define(ACCEPT, {<<"accept">>, <<"application/json">>}).
 
 -deprecated([
     {purge_doc, 4, "replaced by updates/2"},
@@ -376,7 +377,7 @@ send_if_enabled(Path, ReqHeaders, Method, ReqBody, RemainingTries) ->
                 gun_pool:request(
                     Method,
                     Path,
-                    [nouveau_gun:host_header() | ReqHeaders],
+                    [nouveau_gun:host_header(), ?ACCEPT | ReqHeaders],
                     ReqBody
                 )
             of
