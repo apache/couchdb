@@ -128,26 +128,26 @@ If (-Not $DisableSpiderMonkey) {
     # is available on the linker path.  This heuristic is taken from
     # src/couch/rebar.config.script, please keep them in sync.
     If ($SpiderMonkeyVersion -eq "1.8.5") {
-	$SpiderMonkeyLib = "mozjs185-1.0.lib"
+        $SpiderMonkeyLib = "mozjs185-1.0.lib"
     }
     else {
-	$SpiderMonkeyLib = "mozjs-$SpiderMonkeyVersion.lib"
+        $SpiderMonkeyLib = "mozjs-$SpiderMonkeyVersion.lib"
     }
 
     &link $SpiderMonkeyLib /SUBSYSTEM:CONSOLE /NOENTRY /DLL /OUT:NUL *> $null
     If ($LASTEXITCODE -ne 0) {
-	Write-Output "ERROR: SpiderMonkey $SpiderMonkeyVersion is not found. Please specify with -SpiderMonkeyVersion."
-	exit 1
+        Write-Output "ERROR: SpiderMonkey $SpiderMonkeyVersion is not found. Please specify with -SpiderMonkeyVersion."
+        exit 1
     }
 }
 
-$Rebar3Branch="3.27.0"
-$ErlfmtVersion="v1.8.0"
+$Rebar3Branch = "3.27.0"
+$ErlfmtVersion = "v1.8.0"
 
 # Translate ./configure variables to CouchDB variables
-$PackageAuthorName="The Apache Software Foundation"
-$InstallDir="$LibDir\couchdb"
-$LogFile="$LogDir\couch.log"
+$PackageAuthorName = "The Apache Software Foundation"
+$InstallDir = "$LibDir\couchdb"
+$LogFile = "$LogDir\couch.log"
 $BuildFauxton = (-not $DisableFauxton).ToString().ToLower()
 $BuildDocs = (-not $DisableDocs).ToString().ToLower()
 $WithProper = (-not $DisableProper).ToString().ToLower()
@@ -272,123 +272,115 @@ $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
 if (($null -eq (Get-Command "rebar.cmd" -ErrorAction SilentlyContinue)) -or
     ($null -eq (Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue)) -or
     ($null -eq (Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue))) {
-  $env:Path += ";$rootdir\bin"
+    $env:Path += ";$rootdir\bin"
 }
 
 # check for rebar; if not found, build it and add it to our path
-if ($null -eq (Get-Command "rebar.cmd" -ErrorAction SilentlyContinue))
-{
-   Write-Verbose "==> rebar.cmd not found; bootstrapping..."
-   if (-Not (Test-Path "src\rebar"))
-   {
-      git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\src\rebar
-   }
-   cmd /c "cd src\rebar && $rootdir\src\rebar\bootstrap.bat"
-   Copy-Item $rootdir\src\rebar\rebar $rootdir\bin\rebar
-   Copy-Item $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
-   make -C $rootdir\src\rebar clean
+if ($null -eq (Get-Command "rebar.cmd" -ErrorAction SilentlyContinue)) {
+    Write-Verbose "==> rebar.cmd not found; bootstrapping..."
+    if (-Not (Test-Path "src\rebar")) {
+        git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\src\rebar
+    }
+    cmd /c "cd src\rebar && $rootdir\src\rebar\bootstrap.bat"
+    Copy-Item $rootdir\src\rebar\rebar $rootdir\bin\rebar
+    Copy-Item $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
+    make -C $rootdir\src\rebar clean
 }
 
 # check for rebar3; if not found, build it and add it to our path
-if ($null -eq (Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue))
-{
-   Write-Verbose "==> rebar3.cmd not found; bootstrapping..."
-   if (-Not (Test-Path "src\rebar3"))
-   {
-      git clone --depth 1 --branch $Rebar3Branch https://github.com/erlang/rebar3.git $rootdir\src\rebar3
-   }
-   Set-Location src\rebar3
-   .\bootstrap.ps1
-   Copy-Item $rootdir\src\rebar3\rebar3 $rootdir\bin\rebar3
-   Copy-Item $rootdir\src\rebar3\rebar3.cmd $rootdir\bin\rebar3.cmd
-   Copy-Item $rootdir\src\rebar3\rebar3.ps1 $rootdir\bin\rebar3.ps1
-   make -C $rootdir\src\rebar3 clean
-   Set-Location ..\..
+if ($null -eq (Get-Command "rebar3.cmd" -ErrorAction SilentlyContinue)) {
+    Write-Verbose "==> rebar3.cmd not found; bootstrapping..."
+    if (-Not (Test-Path "src\rebar3")) {
+        git clone --depth 1 --branch $Rebar3Branch https://github.com/erlang/rebar3.git $rootdir\src\rebar3
+    }
+    Set-Location src\rebar3
+    .\bootstrap.ps1
+    Copy-Item $rootdir\src\rebar3\rebar3 $rootdir\bin\rebar3
+    Copy-Item $rootdir\src\rebar3\rebar3.cmd $rootdir\bin\rebar3.cmd
+    Copy-Item $rootdir\src\rebar3\rebar3.ps1 $rootdir\bin\rebar3.ps1
+    make -C $rootdir\src\rebar3 clean
+    Set-Location ..\..
 }
 
 # check for erlfmt; if not found, build it and add it to our path
-if ($null -eq (Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue))
-{
-   Write-Verbose "==> erlfmt.cmd not found; bootstrapping..."
-   if (-Not (Test-Path "src\erlfmt"))
-   {
-      git clone --depth 1 --branch $ErlfmtVersion https://github.com/WhatsApp/erlfmt.git $rootdir\src\erlfmt
-   }
-   Set-Location src\erlfmt
-   rebar3 as release escriptize
-   Copy-Item $rootdir\src\erlfmt\_build\release\bin\erlfmt $rootdir\bin\erlfmt
-   Copy-Item $rootdir\src\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
-   make -C $rootdir\src\erlfmt clean
-   Set-Location ..\..
+if ($null -eq (Get-Command "erlfmt.cmd" -ErrorAction SilentlyContinue)) {
+    Write-Verbose "==> erlfmt.cmd not found; bootstrapping..."
+    if (-Not (Test-Path "src\erlfmt")) {
+        git clone --depth 1 --branch $ErlfmtVersion https://github.com/WhatsApp/erlfmt.git $rootdir\src\erlfmt
+    }
+    Set-Location src\erlfmt
+    rebar3 as release escriptize
+    Copy-Item $rootdir\src\erlfmt\_build\release\bin\erlfmt $rootdir\bin\erlfmt
+    Copy-Item $rootdir\src\erlfmt\_build\release\bin\erlfmt.cmd $rootdir\bin\erlfmt.cmd
+    make -C $rootdir\src\erlfmt clean
+    Set-Location ..\..
 }
 
 $ClouseauDir = "$rootdir\clouseau"
 
-if ($WithClouseau)
-{
+if ($WithClouseau) {
 
     if (Test-Path $ClouseauDir) {
-	Write-Output "ERROR: ""$ClouseauDir"" already exists.  Please remove or move it away first."
-	exit 1
+        Write-Output "ERROR: ""$ClouseauDir"" already exists.  Please remove or move it away first."
+        exit 1
     }
 
     if ($ClouseauMethod -eq "dist") {
-	Write-Verbose "===> fetching Clouseau from $ClouseauDistUrl..."
+        Write-Verbose "===> fetching Clouseau from $ClouseauDistUrl..."
 
-	New-Item -Path $ClouseauDir -ItemType Directory | Out-Null
+        New-Item -Path $ClouseauDir -ItemType Directory | Out-Null
 
-	$ClouseauDistUrl = $ClouseauUri -f $ClouseauVersion
+        $ClouseauDistUrl = $ClouseauUri -f $ClouseauVersion
 
-	If (-not $WithZIOSE) {
-	    $LogbackVersion = "1.2.13"
-	    $LogbackCoreJar = "logback-core-$LogbackVersion.jar"
-	    $LogbackCoreJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-core/$LogbackVersion/$LogbackCoreJar"
-	    $LogbackClassicJar = "logback-classic-$LogbackVersion.jar"
-	    $LogbackClassicJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-classic/$LogbackVersion/$LogbackClassicJar"
-	}
+        If (-not $WithZIOSE) {
+            $LogbackVersion = "1.2.13"
+            $LogbackCoreJar = "logback-core-$LogbackVersion.jar"
+            $LogbackCoreJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-core/$LogbackVersion/$LogbackCoreJar"
+            $LogbackClassicJar = "logback-classic-$LogbackVersion.jar"
+            $LogbackClassicJarUrl = "https://repo1.maven.org/maven2/ch/qos/logback/logback-classic/$LogbackVersion/$LogbackClassicJar"
+        }
 
-	Set-Variable ProgressPreference SilentlyContinue
-	Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
-	If ($LASTEXITCODE -ne 0) {
-	    Write-Output "ERROR: $ClouseauDistUrl could not be downloaded."
-	    exit 1
-	}
+        Set-Variable ProgressPreference SilentlyContinue
+        Invoke-WebRequest -MaximumRedirection 1 -OutFile clouseau.zip $ClouseauDistUrl
+        If ($LASTEXITCODE -ne 0) {
+            Write-Output "ERROR: $ClouseauDistUrl could not be downloaded."
+            exit 1
+        }
 
-	Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
-	If ($LASTEXITCODE -ne 0) {
-	    Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
-	    exit 1
-	}
-	Move-Item "$ClouseauDir\*\*.jar" "$ClouseauDir"
-	Remove-Item "$ClouseauDir\clouseau-$ClouseauVersion"
-	Remove-Item clouseau.zip
+        Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
+        If ($LASTEXITCODE -ne 0) {
+            Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
+            exit 1
+        }
 
-	If (-not $WithZIOSE) {
-	    Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackCoreJar" $LogbackCoreJarUrl
-	    If ($LASTEXITCODE -ne 0) {
-		Write-Output "ERROR: $LogbackCoreJarUrl could not be downloaded."
-		exit 1
-	    }
+        Remove-Item clouseau.zip
 
-	    Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackClassicJar" $LogbackClassicJarUrl
-	    If ($LASTEXITCODE -ne 0) {
-		Write-Output "ERROR: $LogbackClassicJarUrl could not be downloaded."
-		exit 1
-	    }
-	}
+        If (-not $WithZIOSE) {
+            Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackCoreJar" $LogbackCoreJarUrl
+            If ($LASTEXITCODE -ne 0) {
+                Write-Output "ERROR: $LogbackCoreJarUrl could not be downloaded."
+                exit 1
+            }
 
-	If ($WithZIOSE) {
-	    New-Item -ItemType File -Path "$ClouseauDir\.ziose"
-	}
+            Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackClassicJar" $LogbackClassicJarUrl
+            If ($LASTEXITCODE -ne 0) {
+                Write-Output "ERROR: $LogbackClassicJarUrl could not be downloaded."
+                exit 1
+            }
+        }
+
+        If ($WithZIOSE) {
+            New-Item -ItemType File -Path "$ClouseauDir\.ziose" | Out-Null
+        }
     }
     elseif ($ClouseauMethod -eq "git") {
-	Write-Verbose "===> cloning Clouseau from $ClouseauDistUrl ($ClouseauVersion)..."
+        Write-Verbose "===> cloning Clouseau from $ClouseauDistUrl ($ClouseauVersion)..."
 
-	git clone --depth 1 --branch $ClouseauVersion $ClouseauUri $ClouseauDir
+        git clone --depth 1 --branch $ClouseauVersion $ClouseauUri $ClouseauDir
     }
     else {
-	Write-Output "ERROR: Invalid deployment method for Clouseau.  Please use either `dist` or `git`."
-	exit 1
+        Write-Output "ERROR: Invalid deployment method for Clouseau.  Please use either `dist` or `git`."
+        exit 1
     }
 }
 

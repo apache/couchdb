@@ -148,6 +148,8 @@ handle_message({not_found, no_db_file} = X, Worker, #acc{} = Acc0) ->
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0);
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg});
+handle_message({bad_request, Error, Reason}, _, _) ->
+    throw({bad_request, Error, Reason});
 handle_message({forbidden, Msg}, _, _) ->
     throw({forbidden, Msg});
 handle_message({request_entity_too_large, Entity}, _, _) ->
@@ -484,7 +486,8 @@ doc_update_test_() ->
             fun other_errors_one_forbid/0,
             fun one_error_two_forbid/0,
             fun one_success_two_forbid/0,
-            fun worker_before_doc_update_forbidden/0
+            fun worker_before_doc_update_forbidden/0,
+            fun handle_bad_request/0
         ]
     }.
 
@@ -964,6 +967,28 @@ worker_before_doc_update_forbidden() ->
         reply = dict:from_list([{Doc, []} || Doc <- Docs])
     },
     ?assertThrow({forbidden, <<"msg">>}, handle_message({forbidden, <<"msg">>}, hd(Shards), Acc)).
+
+handle_bad_request() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Docs = [Doc1],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc = #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 2,
+        grouped_docs = GroupedDocs,
+        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+    ?assertThrow(
+        {bad_request, msg},
+        handle_message({bad_request, msg}, hd(Shards), Acc)
+    ),
+    ?assertThrow(
+        {bad_request, err, reason},
+        handle_message({bad_request, err, reason}, hd(Shards), Acc)
+    ).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->
