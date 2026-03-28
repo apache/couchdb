@@ -359,8 +359,7 @@ if ($WithClouseau)
 	    Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
 	    exit 1
 	}
-	Move-Item "$ClouseauDir\*\*.jar" "$ClouseauDir"
-	Remove-Item "$ClouseauDir\clouseau-$ClouseauVersion"
+
 	Remove-Item clouseau.zip
 
 	If (-not $WithZIOSE) {
@@ -378,7 +377,7 @@ if ($WithClouseau)
 	}
 
 	If ($WithZIOSE) {
-	    New-Item -ItemType File -Path "$ClouseauDir\.ziose"
+	    New-Item -ItemType File -Path "$ClouseauDir\.ziose" | Out-Null
 	}
     }
     elseif ($ClouseauMethod -eq "git") {
