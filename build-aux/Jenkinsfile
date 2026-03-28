@@ -358,7 +358,8 @@ def generateNativeStage(platform) {
             finally {
               junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               sh 'killall -9 beam.smp || true'
-              sh "${wscleanup()}"
+              // deleteDir is OK here because we're not inside of a Docker container!
+              deleteDir()
             }
           } else {
             //steps to configure and build CouchDB on Windows platforms
@@ -462,7 +463,8 @@ def generateNativeStage(platform) {
                 error("Build step failed with error: ${err.getMessage()}")
               }
               finally {
-                powershell( script: "Remove-Item -Path '${WORKSPACE}\\*' -Force -Recurse -ErrorAction SilentlyContinue")
+                // deleteDir is OK here because we're not inside of a Docker container!
+                deleteDir()
               }
             }
           }
