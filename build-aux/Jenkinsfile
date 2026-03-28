@@ -259,6 +259,7 @@ meta = [
    'win2022': [
      name: 'Windows 2022',
      spidermonkey_vsn: '128',
+     with_nouveau: true,
      with_clouseau: true,
      clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
      quickjs_test262: false,
@@ -370,6 +371,7 @@ def generateNativeStage(platform) {
                 powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
                 powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
                 dir( "${platform}/build" ) {
+                  def withNouveau = meta[platform].with_nouveau ? '-WithNouveau' : ''
                   def withClouseau = meta[platform].with_clouseau ? '-WithClouseau' : ''
                   def setClouseauJavaHome = ''
 
@@ -379,7 +381,7 @@ def generateNativeStage(platform) {
 
                   powershell( script: """
                     ..\\..\\couchdb-glazier\\bin\\shell.ps1
-                    .\\configure.ps1 -SkipDeps -WithNouveau ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    .\\configure.ps1 -SkipDeps ${withNouveau} ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     make -f Makefile.win release
                   """, label: 'Configure and Build')
