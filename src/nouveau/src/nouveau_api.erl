@@ -318,23 +318,23 @@ supported_lucene_versions() ->
 %% private functions
 
 index_path(Path) when is_binary(Path) ->
-    [<<"/index/">>, couch_util:url_encode(Path)];
+    [<<"/index?name=">>, couch_util:url_encode(Path)];
 index_path(#index{} = Index) ->
-    [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
+    [<<"/index?name=">>, couch_util:url_encode(nouveau_util:index_name(Index))].
 
 doc_path(#index{} = Index, DocId) ->
     [
-        <<"/index/">>,
+        <<"/index?name=">>,
         couch_util:url_encode(nouveau_util:index_name(Index)),
-        <<"/doc/">>,
+        <<"&doc_id=">>,
         couch_util:url_encode(DocId)
     ].
 
 search_path(#index{} = Index) ->
-    [index_path(Index), <<"/search">>].
+    [<<"/index/search?name=">>, couch_util:url_encode(nouveau_util:index_name(Index))].
 
 update_path(#index{} = Index) ->
-    [index_path(Index), <<"/update">>].
+    [<<"/index/update?name=">>, couch_util:url_encode(nouveau_util:index_name(Index))].
 
 jaxrs_error(400, Body) ->
     {bad_request, message(Body)};
