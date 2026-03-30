@@ -259,6 +259,7 @@ meta = [
    'win2022': [
      name: 'Windows 2022',
      spidermonkey_vsn: '128',
+     with_nouveau: true,
      with_clouseau: true,
      clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
      quickjs_test262: false,
@@ -329,6 +330,7 @@ def generateNativeStage(platform) {
                 dir( "${platform}/build" ) {
                   sh "${configure(meta[platform])}"
                   sh '$MAKE'
+                  sh '$MAKE xref'
                   retry (3) {sh "$MAKE ${meta[platform].gnu_make_eunit_opts} eunit" }
                   if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                   retry (3) {sh '$MAKE elixir'}
@@ -356,7 +358,8 @@ def generateNativeStage(platform) {
             finally {
               junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               sh 'killall -9 beam.smp || true'
-              sh "${wscleanup()}"
+              // deleteDir is OK here because we're not inside of a Docker container!
+              deleteDir()
             }
           } else {
             //steps to configure and build CouchDB on Windows platforms
@@ -369,6 +372,7 @@ def generateNativeStage(platform) {
                 powershell( script: "New-Item -ItemType Directory -Path '${platform}/build' -Force", label: 'Create build directories' )
                 powershell( script: "tar -xf (Get-Item apache-couchdb-*.tar.gz) -C '${platform}/build' --strip-components=1", label: 'Unpack release' )
                 dir( "${platform}/build" ) {
+                  def withNouveau = meta[platform].with_nouveau ? '-WithNouveau' : ''
                   def withClouseau = meta[platform].with_clouseau ? '-WithClouseau' : ''
                   def setClouseauJavaHome = ''
 
@@ -378,7 +382,7 @@ def generateNativeStage(platform) {
 
                   powershell( script: """
                     ..\\..\\couchdb-glazier\\bin\\shell.ps1
-                    .\\configure.ps1 -SkipDeps -WithNouveau ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
+                    .\\configure.ps1 -SkipDeps ${withNouveau} ${withClouseau} -SpiderMonkeyVersion ${meta[platform].spidermonkey_vsn}
                     Set-Item -Path env:GRADLE_OPTS -Value '-Dorg.gradle.daemon=false'
                     make -f Makefile.win release
                   """, label: 'Configure and Build')
@@ -459,7 +463,8 @@ def generateNativeStage(platform) {
                 error("Build step failed with error: ${err.getMessage()}")
               }
               finally {
-                powershell( script: "Remove-Item -Path '${WORKSPACE}\\*' -Force -Recurse -ErrorAction SilentlyContinue")
+                // deleteDir is OK here because we're not inside of a Docker container!
+                deleteDir()
               }
             }
           }
@@ -496,6 +501,7 @@ def generateContainerStage(platform) {
                   dir( "${platform}/build" ) {
                     sh "${configure(meta[platform])}"
                     sh 'make'
+                    sh 'make xref'
                     retry (3) {sh "make ${meta[platform].gnu_make_eunit_opts} eunit" }
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
