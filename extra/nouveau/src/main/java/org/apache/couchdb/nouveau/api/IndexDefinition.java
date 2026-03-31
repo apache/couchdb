@@ -46,7 +46,7 @@ public record IndexDefinition(
 
     @JsonIgnore
     public boolean isLatestVersion() {
-        return luceneVersion.getAsInt() == LATEST_LUCENE_VERSION;
+        return luceneVersionAsInt() == LATEST_LUCENE_VERSION;
     }
 
     @JsonIgnore
