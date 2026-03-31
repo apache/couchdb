@@ -189,13 +189,8 @@ handle_changes_req1(Req, Db, ChangesArgs, ChangesFun) ->
     couch_stats:increment_counter(
         [couchdb, httpd, clients_requesting_changes]
     ),
-    try
-        WrapperFun(ChangesFun)
-    after
-        couch_stats:decrement_counter(
-            [couchdb, httpd, clients_requesting_changes]
-        )
-    end.
+    couch_changes_mon:decrement_clients_requesting_changes_on_exit(),
+    WrapperFun(ChangesFun).
 
 handle_compact_req(#httpd{method = 'POST'} = Req, Db) ->
     case Req#httpd.path_parts of
