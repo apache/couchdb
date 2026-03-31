@@ -33,6 +33,7 @@ public class IndexDefinitionTest {
     public void legacyLuceneVersionIfMissing() throws Exception {
         var indexDefinition = mapper.readValue("{}", IndexDefinition.class);
         assertThat(indexDefinition.luceneVersionAsInt()).isEqualTo(IndexDefinition.LEGACY_LUCENE_VERSION);
+        assertThat(indexDefinition.isLatestVersion()).isFalse();
     }
 
     @Test
