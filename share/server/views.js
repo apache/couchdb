@@ -70,7 +70,7 @@ var Views = (function() {
       // JavaScript process. If you need to destroy the JavaScript
       // process, throw the error form matched by the block below.
       throw(["error", "map_runtime_error", "function raised 'fatal_error'"]);
-    } else if (err[0] == "fatal") {
+    } else if (err && err[0] == "fatal") {
       // Throwing errors of the form ["fatal","error_key","reason"]
       // will kill the OS process. This is not normally what you want.
       throw(err);

@@ -17,7 +17,7 @@ var Nouveau = (function () {
   function handleIndexError(err, doc) {
     if (err == "fatal_error") {
       throw (["error", "map_runtime_error", "function raised 'fatal_error'"]);
-    } else if (err[0] == "fatal") {
+    } else if (err && err[0] == "fatal") {
       throw (err);
     }
     var message = "function raised exception " + err.toSource();
