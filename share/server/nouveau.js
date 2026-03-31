@@ -39,6 +39,11 @@ var Nouveau = (function () {
 
   return {
     index: function (doc) {
+      // convert dreyfus syntax to nouveau syntax
+      if (arguments.length == 2 || (arguments.length == 3 && typeof arguments[2] == 'object')) {
+        arguments.unshift(typeof arguments[1] == 'number' ? 'double' : 'text');
+      }
+
       var type = arguments[0];
       var name = arguments[1];
 
