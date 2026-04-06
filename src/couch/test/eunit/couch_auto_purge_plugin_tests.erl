@@ -91,6 +91,10 @@ t_auto_purge_after_db_ttl({_, DbName}) ->
     config:set("couch_scanner_plugins", atom_to_list(?PLUGIN), "true", false),
     wait_exit(10000),
     ?assertEqual(0, doc_del_count(DbName)),
+    ?assertEqual(1, couch_stats:sample([auto_purge, start])),
+    ?assertEqual(1, couch_stats:sample([auto_purge, complete])),
+    ?assertEqual(2, couch_stats:sample([auto_purge, db_open])),
+    ?assertEqual(1, couch_stats:sample([auto_purge, purge])),
     ok.
 
 t_no_auto_purge_after_config_ttl_set_to_infinity({_, DbName}) ->
@@ -249,7 +253,11 @@ reset_stats() ->
     Counters = [
         [couchdb, query_server, process_error_exits],
         [couchdb, query_server, process_errors],
-        [couchdb, query_server, process_exits]
+        [couchdb, query_server, process_exits],
+        [auto_purge, start],
+        [auto_purge, complete],
+        [auto_purge, db_open],
+        [auto_purge, purge]
     ],
     [reset_counter(C) || C <- Counters].
 

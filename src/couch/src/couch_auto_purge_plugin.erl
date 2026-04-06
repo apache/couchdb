@@ -34,6 +34,7 @@ start(ScanId, #{}) ->
             skip;
         false ->
             St = init_config(ScanId),
+            couch_stats:increment_counter([auto_purge, start]),
             ?LOG(level(), "Starting.", [], St),
             {ok, St}
     end.
@@ -45,12 +46,14 @@ resume(ScanId, #{}) ->
             skip;
         false ->
             St = init_config(ScanId),
+            couch_stats:increment_counter([auto_purge, start]),
             ?LOG(level(), "Resuming.", [], St),
             {ok, St}
     end.
 
 complete(St) ->
     ?LOG(level(), "Completed.", [], St),
+    couch_stats:increment_counter([auto_purge, complete]),
     {ok, #{}}.
 
 checkpoint(St) ->
@@ -74,6 +77,7 @@ db(St, DbName) ->
     end.
 
 db_opened(#{} = St, Db) ->
+    couch_stats:increment_counter([auto_purge, db_open]),
     #{ttl := TTL, queue := Queue} = St,
     ?assert(Queue == [], "Queue is not empty from previous operations"),
     EndSeq = couch_time_seq:since(couch_db:get_time_seq(Db), couch_time_seq:timestamp() - TTL),
@@ -144,12 +148,14 @@ flush_queue(#{queue := IdRevs} = St, Db) ->
                 meta(St)
             ),
             #{count := Count, limiter := Limiter0} = St,
+            ResCount = length(Results),
+            couch_stats:increment_counter([auto_purge, purge], ResCount),
             {Wait, Limiter1} = couch_scanner_rate_limiter:update(
-                Limiter0, doc_write, length(Results)
+                Limiter0, doc_write, ResCount
             ),
             timer:sleep(Wait),
             St#{
-                count := Count + length(Results),
+                count := Count + ResCount,
                 limiter := Limiter1,
                 queue := []
             };
