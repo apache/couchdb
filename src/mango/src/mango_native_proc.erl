@@ -113,7 +113,11 @@ handle_call({prompt, [<<"ddoc">>, DDocId, [<<"validate_doc_update">>], Args]}, _
             {stop, {invalid_call, Msg}, {invalid_call, Msg}, St};
         Selector ->
             [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
-            Struct = {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, OldDoc}]},
+            Struct =
+                case OldDoc of
+                    null -> {[{<<"newDoc">>, NewDoc}]};
+                    Doc -> {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, Doc}]}
+                end,
             Reply =
                 case mango_selector:match_failures(Selector, Struct) of
                     [] ->
