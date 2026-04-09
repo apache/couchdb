@@ -17,6 +17,7 @@
     match/2,
     match_failures/2,
     has_required_fields/2,
+    has_allowed_fields/2,
     is_constant_field/2,
     fields/1
 ]).
@@ -876,6 +877,39 @@ has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
             has_required_fields_int(Rest, lists:delete(Field, RequiredFields))
     end.
 
+has_allowed_fields(Selector, AllowedFields) ->
+    Paths = lists:map(
+        fun(Field) ->
+            {ok, Path} = mango_util:parse_field(Field),
+            Path
+        end,
+        AllowedFields
+    ),
+    has_allowed_fields_int(Selector, Paths).
+
+has_allowed_fields_int({[{Field, Cond}]}, Paths) when is_list(Field) ->
+    Stemmed = [match_prefix(Field, Path) || Path <- Paths],
+    Matched = [Path || Path <- Stemmed, Path /= nil],
+    case Matched of
+        [] -> false;
+        M -> has_allowed_fields_int(Cond, M)
+    end;
+has_allowed_fields_int({[{_Op, Conds}]}, Paths) when is_list(Conds) ->
+    lists:all(fun(Cond) -> has_allowed_fields_int(Cond, Paths) end, Conds);
+has_allowed_fields_int({[{_Op, Cond}]}, Paths) ->
+    has_allowed_fields_int(Cond, Paths);
+has_allowed_fields_int(_, _) ->
+    true.
+
+match_prefix([A | Rest1], [A | Rest2]) ->
+    match_prefix(Rest1, Rest2);
+match_prefix([], Rest) ->
+    Rest;
+match_prefix(_, []) ->
+    [];
+match_prefix(_, _) ->
+    nil.
+
 % Returns true if a field in the selector is a constant value e.g. {a: {$eq: 1}}
 is_constant_field(Selector, Field) when not is_list(Field) ->
     {ok, Path} = mango_util:parse_field(Field),
@@ -1254,6 +1288,23 @@ has_required_fields_or_nested_or_false_test() ->
         ]},
     Normalized = normalize(Selector),
     ?assertEqual(false, has_required_fields(Normalized, RequiredFields)).
+
+has_allowed_fields_test() ->
+    Sel1 = normalize({[{<<"a">>, 1}]}),
+    ?assertEqual(has_allowed_fields(Sel1, [<<"a">>]), true),
+    ?assertEqual(has_allowed_fields(Sel1, [<<"a">>, <<"b">>]), true),
+    ?assertEqual(has_allowed_fields(Sel1, [<<"b">>]), false),
+
+    Sel2 = normalize({[{<<"$or">>, [{[{<<"a.b">>, 1}]}, {[{<<"c.d">>, 2}]}]}]}),
+    ?assertEqual(has_allowed_fields(Sel2, [<<"a">>, <<"c">>]), true),
+    ?assertEqual(has_allowed_fields(Sel2, [<<"a.b">>, <<"c.d">>]), true),
+    ?assertEqual(has_allowed_fields(Sel2, [<<"a">>]), false),
+
+    Sel3 = normalize({[{<<"a">>, {[{<<"$or">>, [{[{<<"b">>, 1}]}, {[{<<"c">>, 2}]}]}]}}]}),
+    ?assertEqual(has_allowed_fields(Sel3, [<<"a">>]), true),
+    ?assertEqual(has_allowed_fields(Sel3, [<<"a.b">>, <<"a.c">>]), true),
+    ?assertEqual(has_allowed_fields(Sel3, [<<"a.c">>]), false),
+    ?assertEqual(has_allowed_fields(Sel3, [<<"b">>]), false).
 
 check_match(Selector) ->
     % Call match_int/2 to avoid ERROR for missing metric; this is confusing
