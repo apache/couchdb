@@ -212,4 +212,22 @@ defmodule ValidateDocUpdateTest do
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
   end
+
+  @tag :with_db
+  test "Mango VDU rejects a design doc if it contains unknown fields", context do
+    db = context[:db_name]
+
+    ddoc = %{
+      language: "query",
+
+      validate_doc_update: %{
+        "wrongField" => %{"year" => %{"$lt" => 2026}}
+      }
+    }
+    resp = Couch.put("/#{db}/_design/mango-test-2", body: ddoc)
+    assert resp.status_code == 201
+
+    resp = Couch.put("/#{db}/doc", body: %{"year" => 1994})
+    assert resp.status_code == 500
+  end
 end
