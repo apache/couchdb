@@ -9,18 +9,19 @@ defmodule SearchTest do
   """
 
   def create_search_docs(db_name) do
-      resp = Couch.post("/#{db_name}/_bulk_docs",
-        headers: ["Content-Type": "application/json"],
-        body: %{:docs => [
-                  %{"item" => "apple",  "place" => "kitchen", "state" => "new",     "price" => 0.99},
-                  %{"item" => "banana", "place" => "kitchen", "state" => "new",     "price" => 1.49},
-                  %{"item" => "carrot", "place" => "kitchen", "state" => "old",     "price" => 0.75},
-                  %{"item" => "date",   "place" => "lobby",   "state" => "unknown", "price" => 1.25},
-        ]}
-      )
-      assert resp.status_code in [201, 202],
-             "Cannot create search docs. " <>
-             "Expected one of [201, 202], got: #{resp.status_code}, body: #{inspect resp.body}"
+    resp = Couch.post("/#{db_name}/_bulk_docs",
+      headers: ["Content-Type": "application/json"],
+      body: %{:docs => [
+                %{"item" => "apple",  "place" => "kitchen", "state" => "new",     "price" => 0.99},
+                %{"item" => "banana", "place" => "kitchen", "state" => "new",     "price" => 1.49},
+                %{"item" => "carrot", "place" => "kitchen", "state" => "old",     "price" => 0.75},
+                %{"item" => "date",   "place" => "lobby",   "state" => "unknown", "price" => 1.25},
+      ]}
+    )
+    assert resp.status_code in [201, 202],
+      "Cannot create search docs. " <>
+      "Expected one of [201, 202], got: #{resp.status_code}, body: #{inspect resp.body}"
+
   end
 
   def create_ddoc(db_name, opts \\ %{}) do
@@ -73,13 +74,10 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
-
-      ids = get_items(resp)
-      assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
-    end)
+    resp = Couch.get(url, query: %{q: "*:*", include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
   end
 
   @tag :with_db
@@ -89,13 +87,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode(["place", "kitchen"]), include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode(["place", "kitchen"]), include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
   end
 
   @tag :with_db
@@ -105,13 +101,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode(["state", "new", "unknown"]), include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode(["state", "new", "unknown"]), include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
   end
 
   @tag :with_db
@@ -121,13 +115,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode([["state", "old"], ["item", "apple"]]), include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "*:*", drilldown: :jiffy.encode([["state", "old"], ["item", "apple"]]), include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == []
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == []
   end
 
   @tag :with_db
@@ -137,13 +129,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits?q=*:*&drilldown=[\"state\",\"old\"]&drilldown=[\"item\",\"apple\"]&include_docs=true"
-    retry_until(fn ->
-      resp = Couch.get(url)
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url)
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == []
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == []
   end
 
 
@@ -154,13 +144,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: %{q: "*:*", include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot", "date"])
   end
 
   @tag :with_db
@@ -170,13 +158,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: %{query: "*:*", drilldown: ["place", "kitchen"], include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: %{query: "*:*", drilldown: ["place", "kitchen"], include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "carrot"])
   end
 
   @tag :with_db
@@ -186,13 +172,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: %{query: "*:*", drilldown: ["state", "new", "unknown"], include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: %{query: "*:*", drilldown: ["state", "new", "unknown"], include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == Enum.sort(["apple", "banana", "date"])
   end
 
   @tag :with_db
@@ -202,13 +186,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: %{q: "*:*", drilldown: [["state", "old"], ["item", "apple"]], include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: %{q: "*:*", drilldown: [["state", "old"], ["item", "apple"]], include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == []
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == []
   end
 
   @tag :with_db
@@ -218,13 +200,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: %{q: "*:*", drilldown: [["place", "kitchen"], ["state", "new"], ["item", "apple"]], include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: %{q: "*:*", drilldown: [["place", "kitchen"], ["state", "new"], ["item", "apple"]], include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == ["apple"]
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == ["apple"]
   end
 
   @tag :with_db
@@ -234,13 +214,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: %{q: "*:*", drilldown: [["state", "old", "new"], ["item", "apple"]], include_docs: true})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: %{q: "*:*", drilldown: [["state", "old", "new"], ["item", "apple"]], include_docs: true})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == ["apple"]
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == ["apple"]
   end
 
   @tag :with_db
@@ -250,13 +228,11 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.post(url, body: "{\"include_docs\": true, \"q\": \"*:*\", \"drilldown\": [\"state\", \"old\"], \"drilldown\": [\"item\", \"apple\"]}")
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.post(url, body: "{\"include_docs\": true, \"q\": \"*:*\", \"drilldown\": [\"state\", \"old\"], \"drilldown\": [\"item\", \"apple\"]}")
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      ids = get_items(resp)
-      assert Enum.sort(ids) == ["apple"]
-    end)
+    ids = get_items(resp)
+    assert Enum.sort(ids) == ["apple"]
   end
 
   @tag :with_db
@@ -266,10 +242,8 @@ defmodule SearchTest do
     create_ddoc(db_name)
     create_invalid_ddoc(db_name)
 
-    retry_until(fn ->
-      resp = Couch.post("/#{db_name}/_search_cleanup")
-      assert_on_status(resp, [201, 202], "Fail to do a _search_cleanup.")
-    end)
+    resp = Couch.post("/#{db_name}/_search_cleanup")
+    assert_on_status(resp, [201, 202], "Fail to do a _search_cleanup.")
   end
 
   @tag :with_db
@@ -280,13 +254,11 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     counts = ["place"]
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", limit: 0, counts: :jiffy.encode(counts)})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "*:*", limit: 0, counts: :jiffy.encode(counts)})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      %{:body => %{"counts" => counts}} = resp
-      assert counts == %{"place" => %{"kitchen" => 3, "lobby" => 1}}
-    end)
+    %{:body => %{"counts" => counts}} = resp
+    assert counts == %{"place" => %{"kitchen" => 3, "lobby" => 1}}
   end
 
   @tag :with_db
@@ -297,13 +269,11 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     counts = ["place"]
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "item:tomato", limit: 0, counts: :jiffy.encode(counts)})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "item:tomato", limit: 0, counts: :jiffy.encode(counts)})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      %{:body => %{"counts" => counts}} = resp
-      assert counts == %{"place" => %{}}
-    end)
+    %{:body => %{"counts" => counts}} = resp
+    assert counts == %{"place" => %{}}
   end
 
   @tag :with_db
@@ -314,13 +284,11 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     ranges = %{"price" => %{"cheap" => "[0 TO 0.99]", "expensive" => "[1.00 TO Infinity]"}}
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      %{:body => %{"ranges" => ranges}} = resp
-      assert ranges == %{"price" => %{"cheap" => 2, "expensive" => 2}}
-    end)
+    %{:body => %{"ranges" => ranges}} = resp
+    assert ranges == %{"price" => %{"cheap" => 2, "expensive" => 2}}
   end
 
   @tag :with_db
@@ -331,13 +299,11 @@ defmodule SearchTest do
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
     ranges = %{"price" => %{}}
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
-      assert_on_status(resp, 200, "Fail to do search.")
+    resp = Couch.get(url, query: %{q: "*:*", limit: 0, ranges: :jiffy.encode(ranges)})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      %{:body => %{"ranges" => ranges}} = resp
-      assert ranges == %{"price" => %{}}
-    end)
+    %{:body => %{"ranges" => ranges}} = resp
+    assert ranges == %{"price" => %{}}
   end
 
   @tag :with_db
@@ -347,19 +313,18 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    retry_until(fn ->
-      resp = Couch.get(url, query: %{q: "*:*", group_field: "state"})
-      assert_on_status(resp, 200, "Fail to do search.")
+    ranges = %{"price" => %{}}
+    resp = Couch.get(url, query: %{q: "*:*", group_field: "state"})
+    assert_on_status(resp, 200, "Fail to do search.")
 
-      %{:body => %{"groups" => groups}} = resp
-      assert length(groups) == 3
-      Enum.each(groups, fn g ->
-        case g["by"] do
-          "new" -> assert g["total_rows"] == 2
-          "old" -> assert g["total_rows"] == 1
-          "unknown" -> assert g["total_rows"] == 1
-        end
-      end)
+    %{:body => %{"groups" => groups}} = resp
+    assert length(groups) == 3
+    Enum.each(groups, fn g ->
+      case g["by"] do
+        "new" -> assert g["total_rows"] == 2
+        "old" -> assert g["total_rows"] == 1
+        "unknown" -> assert g["total_rows"] == 1
+      end
     end)
   end
 
