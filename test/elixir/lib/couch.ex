@@ -77,8 +77,8 @@ defmodule Couch do
   # specifically fires during an active HTTP response and defaults to 10_000
   # if not specified. We're defining it to a different value than the
   # request_timeout largely just so we know which timeout fired.
-  @request_timeout 60_000
-  @inactivity_timeout 55_000
+  @request_timeout 120_000
+  @inactivity_timeout 110_000
 
   def process_url("http://" <> _ = url) do
     url

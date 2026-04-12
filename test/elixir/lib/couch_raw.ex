@@ -4,8 +4,8 @@ defmodule Rawresp do
   @moduledoc """
   HTTP client that provides raw response as result
   """
-  @request_timeout 60_000
-  @inactivity_timeout 55_000
+  @request_timeout 120_000
+  @inactivity_timeout 110_000
 
   def process_url("http://" <> _ = url) do
     url
