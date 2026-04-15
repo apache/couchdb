@@ -51,7 +51,7 @@ implode([H], Sep, Acc) ->
 implode([H | T], Sep, Acc) ->
     implode(T, Sep, [Sep, H | Acc]).
 
-% if this as an executable with arguments, seperate out the arguments
+% if this as an executable with arguments, separate out the arguments
 % ""./foo\ bar.sh -baz=blah" -> {"./foo\ bar.sh", " -baz=blah"}
 separate_cmd_args("", CmdAcc) ->
     {lists:reverse(CmdAcc), ""};
