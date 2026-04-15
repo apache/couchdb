@@ -508,6 +508,7 @@ endif
 .PHONY: devclean
 # target: devclean - Remove dev cluster artifacts
 devclean:
+	@rm -rf dev/lib/*/couch.uri
 	@rm -rf dev/lib/*/data
 	@rm -rf dev/lib/*/etc
 

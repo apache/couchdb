@@ -463,6 +463,9 @@ endif
 .PHONY: devclean
 # target: devclean - Remove dev cluster artifacts
 devclean:
+	-@del dev\lib\node1\couch.uri >NUL 2>&1 || true
+	-@del dev\lib\node2\couch.uri >NUL 2>&1 || true
+	-@del dev\lib\node3\couch.uri >NUL 2>&1 || true
 	-@rmdir /s/q dev\lib\node1\data >NUL 2>&1 || true
 	-@rmdir /s/q dev\lib\node2\data >NUL 2>&1 || true
 	-@rmdir /s/q dev\lib\node3\data >NUL 2>&1 || true
