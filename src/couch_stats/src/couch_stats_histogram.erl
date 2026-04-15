@@ -68,7 +68,7 @@
 % and then the histogram time index is computed as `Time rem TimeWindow`. So,
 % as the monotonic time is advancing forward, the histogram time index will
 % loop around. This comes with a minor annoynance of having to allocate a
-% larger time window to accomodate some process which cleans stale (expired)
+% larger time window to accommodate some process which cleans stale (expired)
 % histogram entries, possibly with some extra buffers to ensure the currently
 % updated interval and the interval ready to be cleaned would not overlap.
 %

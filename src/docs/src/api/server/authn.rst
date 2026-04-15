@@ -414,7 +414,7 @@ list as long as the JWT token is valid.
 .. note::
 
     Before CouchDB v3.3.2 it was only possible to define roles as a JSON
-    array of strings. Now you can also use a comma-seperated list to define
+    array of strings. Now you can also use a comma-separated list to define
     the user roles in your JWT token. The following declarations
     are equal:
 
@@ -426,7 +426,7 @@ list as long as the JWT token is valid.
             "_couchdb.roles": ["accounting-role", "view-role"]
         }
 
-    JSON comma-seperated strings:
+    JSON comma-separated strings:
 
     .. code-block:: json
 
