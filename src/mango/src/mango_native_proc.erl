@@ -112,14 +112,30 @@ handle_call({prompt, [<<"ddoc">>, DDocId, [<<"validate_doc_update">>], Args]}, _
             Msg = [<<"validate_doc_update">>, DDocId],
             {stop, {invalid_call, Msg}, {invalid_call, Msg}, St};
         Selector ->
-            [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
-            Struct = {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, OldDoc}]},
-            Reply =
-                case mango_selector:match(Selector, Struct) of
-                    true -> true;
-                    _ -> {[{<<"forbidden">>, <<"document is not valid">>}]}
-                end,
-            {reply, Reply, St}
+            case mango_selector:has_allowed_fields(Selector, [<<"newDoc">>, <<"oldDoc">>]) of
+                false ->
+                    Msg =
+                        <<"'validate_doc_update' may only contain 'newDoc' and 'oldDoc' as top-level fields">>,
+                    {stop, {invalid_call, Msg}, {invalid_call, Msg}, St};
+                true ->
+                    [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
+                    Struct =
+                        case OldDoc of
+                            null -> {[{<<"newDoc">>, NewDoc}]};
+                            Doc -> {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, Doc}]}
+                        end,
+                    Reply =
+                        case mango_selector:match_failures(Selector, Struct) of
+                            [] ->
+                                true;
+                            Failures ->
+                                {[
+                                    {<<"forbidden">>, <<"forbidden">>},
+                                    {<<"failures">>, Failures}
+                                ]}
+                        end,
+                    {reply, Reply, St}
+            end
     end;
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
