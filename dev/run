@@ -920,7 +920,7 @@ def hack_default_ini(ctx, node, contents):
     if ctx["auto_ports"]:
         contents = re.sub(
             r"^;uri_file =$",
-            "uri_file = ./dev/lib/{}/couch.uri".format(node),
+            "uri_file = {}/dev/lib/{}/couch.uri".format(ctx["rootdir"], node),
             contents,
             flags=re.MULTILINE,
         )
