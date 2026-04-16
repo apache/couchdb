@@ -274,6 +274,13 @@ def get_args_parser():
         default=None,
         help="Use TCP for specified node when TLS distribution is enabled",
     )
+    parser.add_option(
+        "--write-uri-file",
+        dest="write_uri_file",
+        default=False,
+        action="store_true",
+        help="Create the couch.uri file with allocated ports (implied by --auto-ports)",
+    )
     return parser
 
 
@@ -312,6 +319,7 @@ def setup_context(opts, args):
         "erlang_cookie": opts.erlang_cookie,
         "enable_tls": opts.enable_tls,
         "no_tls": opts.no_tls,
+        "write_uri_file": opts.write_uri_file,
     }
 
 
@@ -378,10 +386,27 @@ def setup_configs(ctx):
             "nouveau_url": "http://127.0.0.1:5987",
             "_default": "",
         }
+        cleanup_uri_file(ctx, node)
         write_config(ctx, node, env)
         write_locald_configs(ctx, node, env)
     generate_haproxy_config(ctx)
     generate_nouveau_config(ctx)
+
+
+def need_uri_file(ctx):
+    return ctx["auto_ports"] or ctx["write_uri_file"]
+
+
+def uri_file_path(ctx, node):
+    return "{}/dev/lib/{}/couch.uri".format(ctx["rootdir"], node)
+
+
+def cleanup_uri_file(ctx, node):
+    if not need_uri_file(ctx):
+        try:
+            os.remove(uri_file_path(ctx, node))
+        except FileNotFoundError:
+            pass
 
 
 def write_locald_configs(ctx, node, env):
@@ -917,10 +942,10 @@ def hack_default_ini(ctx, node, contents):
         flags=re.MULTILINE,
     )
 
-    if ctx["auto_ports"]:
+    if need_uri_file(ctx):
         contents = re.sub(
             r"^;uri_file =$",
-            "uri_file = {}/dev/lib/{}/couch.uri".format(ctx["rootdir"], node),
+            "uri_file = {}".format(uri_file_path(ctx, node)),
             contents,
             flags=re.MULTILINE,
         )
