@@ -200,7 +200,7 @@ erlfmt-format:
 
 .venv/bin/black:
 	@python3 -m venv .venv
-	@.venv/bin/pip3 install black==23.3.0 || touch .venv/bin/black
+	@.venv/bin/pip3 install black==26.3.1 || touch .venv/bin/black
 
 # target: python-black - Check Python code formatting (requires Python >= 3.6)
 python-black: .venv/bin/black

@@ -657,8 +657,7 @@ def generate_default_clouseau_config(path, config_file, body):
 def generate_default_logback_properties(path):
     print("(generate default logback.xml)")
     with open(path, "w") as handle:
-        handle.write(
-            """<configuration>
+        handle.write("""<configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
     <encoder>
       <pattern>%d{ISO8601} %c [%p] %m%n</pattern>
@@ -669,8 +668,7 @@ def generate_default_logback_properties(path):
     <appender-ref ref="STDOUT"/>
   </root>
 </configuration>
-"""
-        )
+""")
 
 
 @log("Start Clouseau node clouseau{idx}")
@@ -1209,7 +1207,7 @@ def enable_cluster(node_count, port, user, pswd):
             "node_count": node_count,
         }
     )
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         port,
         "POST",
@@ -1236,7 +1234,7 @@ def add_node(lead_port, node_name, node_port, user, pswd):
             "password": pswd,
         }
     )
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         lead_port,
         "POST",
@@ -1249,7 +1247,7 @@ def add_node(lead_port, node_name, node_port, user, pswd):
 
 
 def set_cookie(port, user, pswd):
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         port,
         "POST",
@@ -1262,7 +1260,7 @@ def set_cookie(port, user, pswd):
 
 
 def finish_cluster(port, user, pswd):
-    (status, response) = try_request(
+    status, response = try_request(
         "127.0.0.1",
         port,
         "POST",
