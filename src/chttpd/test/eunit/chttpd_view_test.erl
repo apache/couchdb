@@ -117,7 +117,10 @@ all_docs_test_() ->
                     ?TDEF_FE(t_all_docs_with_limit),
                     ?TDEF_FE(t_all_docs_with_skip),
                     ?TDEF_FE(t_all_docs_with_limit_and_skip),
-                    ?TDEF_FE(t_all_docs_with_configured_query_limit)
+                    ?TDEF_FE(t_all_docs_with_configured_query_limit),
+                    ?TDEF_FE(t_all_docs_impossible_range_fwd),
+                    ?TDEF_FE(t_all_docs_valid_range_descending),
+                    ?TDEF_FE(t_all_docs_impossible_range_descending)
                 ]
             }
         }
@@ -186,9 +189,17 @@ t_view_with_key_and_start_key(Db) ->
 t_all_docs_with_key_and_start_key(Db) ->
     {Code1, Res1} = req(get, url(Db, "_all_docs", "key=\"a\"&startkey=\"b\"")),
     {Code2, Res2} = req(get, url(Db, "_all_docs", "startkey=\"b\"&key=\"a\"")),
-    ?assertMatch(#{<<"rows">> := []}, Res1),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> :=
+                <<"No rows can match your key range, reverse your ",
+                    "start_key and end_key or set descending=true">>
+        },
+        Res1
+    ),
     ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"a">>}]}, Res2),
-    ?assertEqual(200, Code1),
+    ?assertEqual(400, Code1),
     ?assertEqual(200, Code2).
 
 t_view_with_key_and_end_key(Db) ->
@@ -435,6 +446,37 @@ t_all_docs_with_configured_query_limit(Db) ->
         },
         Res
     ).
+
+t_all_docs_impossible_range_fwd(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs", "startkey=\"z\"&endkey=\"a\"")),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> :=
+                <<"No rows can match your key range, reverse your ",
+                    "start_key and end_key or set descending=true">>
+        },
+        Res
+    ),
+    ?assertEqual(400, Code).
+
+t_all_docs_valid_range_descending(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs", "startkey=\"c\"&endkey=\"a\"&descending=true")),
+    ?assertMatch(#{<<"rows">> := [#{<<"id">> := <<"c">>}, #{<<"id">> := <<"b">>}, #{<<"id">> := <<"a">>}]}, Res),
+    ?assertEqual(200, Code).
+
+t_all_docs_impossible_range_descending(Db) ->
+    {Code, Res} = req(get, url(Db, "_all_docs", "startkey=\"a\"&endkey=\"z\"&descending=true")),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> :=
+                <<"No rows can match your key range, reverse your ",
+                    "start_key and end_key or set descending=false">>
+        },
+        Res
+    ),
+    ?assertEqual(400, Code).
 
 %%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
 url(Db) ->
