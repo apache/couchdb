@@ -7,7 +7,6 @@ import os
 import re
 import xml.dom.minidom as md
 
-
 TEST_COLLECTIONS = {
     "EUnit": "src/**/.eunit/*.xml",
     "EXUnit": "_build/integration/lib/couchdbtest/*.xml",

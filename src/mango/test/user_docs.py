@@ -49,7 +49,6 @@ With this pattern:
 ]
 """
 
-
 import copy
 
 

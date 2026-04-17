@@ -17,7 +17,6 @@
 import os
 import re
 
-
 RULES = []
 HAS_ERRORS = False
 IGNORE_ERROR = False
@@ -116,8 +115,7 @@ def silent_scream(file):
 @register_rule
 def license_adviser(file):
     """Each source file must include ASF license header."""
-    header = iter(
-        """
+    header = iter("""
 .. Licensed under the Apache License, Version 2.0 (the "License"); you may not
 .. use this file except in compliance with the License. You may obtain a copy of
 .. the License at
@@ -130,10 +128,7 @@ def license_adviser(file):
 .. License for the specific language governing permissions and limitations under
 .. the License.
 
-""".lstrip().splitlines(
-            False
-        )
-    )
+""".lstrip().splitlines(False))
     error = None
     for n, hline in enumerate(header):
         fline = yield error
