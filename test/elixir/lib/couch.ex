@@ -29,14 +29,14 @@ defmodule Couch.Session do
     Couch.get("/_session", headers: headers).body
   end
 
-  def get(sess, url, opts \\ []), do: go(sess, :get, url, opts)
-  def get!(sess, url, opts \\ []), do: go!(sess, :get, url, opts)
-  def put(sess, url, opts \\ []), do: go(sess, :put, url, opts)
-  def put!(sess, url, opts \\ []), do: go!(sess, :put, url, opts)
-  def post(sess, url, opts \\ []), do: go(sess, :post, url, opts)
-  def post!(sess, url, opts \\ []), do: go!(sess, :post, url, opts)
-  def delete(sess, url, opts \\ []), do: go(sess, :delete, url, opts)
-  def delete!(sess, url, opts \\ []), do: go!(sess, :delete, url, opts)
+  def get(sess, url, opts \\ [timeout: 90_000]), do: go(sess, :get, url, opts)
+  def get!(sess, url, opts \\ [timeout: 90_000]), do: go!(sess, :get, url, opts)
+  def put(sess, url, opts \\ [timeout: 90_000]), do: go(sess, :put, url, opts)
+  def put!(sess, url, opts \\ [timeout: 90_000]), do: go!(sess, :put, url, opts)
+  def post(sess, url, opts \\ [timeout: 90_000]), do: go(sess, :post, url, opts)
+  def post!(sess, url, opts \\ [timeout: 90_000]), do: go!(sess, :post, url, opts)
+  def delete(sess, url, opts \\ [timeout: 90_000]), do: go(sess, :delete, url, opts)
+  def delete!(sess, url, opts \\ [timeout: 90_000]), do: go!(sess, :delete, url, opts)
 
   # Skipping head/patch/options for YAGNI. Feel free to add
   # if the need arises.
