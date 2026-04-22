@@ -5,7 +5,7 @@ Apache CouchDB README
 | |1| |2| |
 +---------+
 
-.. |1| image:: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/main/badge/icon
+.. |1| image:: https://ci-couchdb.apache.org/buildStatus/icon?job=jenkins-cm1%2FFullPlatformMatrix%2Fmain&subject=main
     :target: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/main/
 .. |2| image:: https://readthedocs.org/projects/couchdb/badge/?version=latest
     :target: https://docs.couchdb.org/en/latest/?badge=latest
