@@ -48,7 +48,9 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, insufficient_storage} ->
-                Callback({error, insufficient_storage}, Acc);
+                Callback(
+                    {error, {insufficient_storage, <<"not enough room to update index">>}}, Acc
+                );
             {ok, Workers} ->
                 try
                     go2(DbName, DDoc#doc.id, VName, Workers, VInfo, CoordArgs, Callback, Acc)

@@ -460,6 +460,8 @@ view_cb(complete, #mrargs{extra = Options} = Acc) ->
     % Finish view output
     ok = rexi:stream_last(complete),
     {ok, Acc};
+view_cb(ok, insufficient_storage) ->
+    rexi:reply({ok, insufficient_storage});
 view_cb(ok, ddoc_updated) ->
     rexi:reply({ok, ddoc_updated}).
 
