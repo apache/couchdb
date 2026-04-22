@@ -19,19 +19,19 @@ DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
 
 // Erlang version embedded in binary packages. Also the version most builds
 // will run.
-ERLANG_VERSION = '26.2.5.17'
+ERLANG_VERSION = '26.2.5.20'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '26.2.5.17'
+MINIMUM_ERLANG_VERSION = '26.2.5.20'
 
 // Highest support Erlang version.
-MAXIMUM_ERLANG_VERSION = '28.3.2'
+MAXIMUM_ERLANG_VERSION = '28.4.3'
 
 // Test a min + 1 version. This is specially useful before we're about
 // to bump the minimum version to at least make sure the CI image
 // works.
-INTERMEDIATE_ERLANG_VERSION = '27.3.4.8'
+INTERMEDIATE_ERLANG_VERSION = '27.3.4.11'
 
 // Default GNU Make Eunit Options for supported platforms
 DEFAULT_GNU_MAKE_EUNIT_OPTS = '-j2 --output-sync=target'
