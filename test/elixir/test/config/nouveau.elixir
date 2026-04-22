@@ -31,6 +31,7 @@
     "purge with conflicts",
     "index same field with different field types",
     "index not found",
+    "index function throws",
     "meta",
     "stale search"
   ]
