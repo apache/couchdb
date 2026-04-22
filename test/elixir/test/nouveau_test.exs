@@ -705,6 +705,30 @@ defmodule NouveauTest do
   end
 
   @tag :with_db
+  test "index function throws", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    ddoc =  %{
+      nouveau: %{
+        bar: %{
+          default_analyzer: "standard",
+          index: """
+            function (doc) {
+              throw(new Error("some error"));
+              index("string", "foo", doc.foo, {store: true});
+            }
+          """
+        }
+      }
+    }
+    create_ddoc(db_name, ddoc)
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.post(url, body: %{q: "foo:bar", include_docs: true})
+    assert_status_code(resp, 200)
+    assert resp.body["hits"] == []
+  end
+
+  @tag :with_db
   test "meta", context do
     db_name = context[:db_name]
     create_search_docs(db_name)
