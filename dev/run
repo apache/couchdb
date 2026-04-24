@@ -631,17 +631,26 @@ config: [
       name: clouseau1
       domain: 127.0.0.1
     }
+    clouseau: {
+      liveness: 10
+    }
   }
   {
     node: {
       name: clouseau2
       domain: 127.0.0.1
     }
+    clouseau: {
+      liveness: 10
+    }
   }
   {
     node: {
       name: clouseau3
       domain: 127.0.0.1
+    }
+    clouseau: {
+      liveness: 10
     }
   }
 ]
