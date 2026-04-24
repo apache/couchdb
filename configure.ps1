@@ -66,7 +66,7 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauVersion = "3.0.0", # select the version of Clouseau to use (default 3.0.0)
+    [string]$ClouseauVersion = "3.3.1-RC1", # select the version of Clouseau to use (default 3.0.0)
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/2.25.0/clouseau-2.25.0-dist.zip)
     [ValidateNotNullOrEmpty()]
