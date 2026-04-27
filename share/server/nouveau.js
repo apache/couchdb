@@ -75,7 +75,7 @@ var Nouveau = (function () {
         case 'stored':
           var value = arguments[2];
           if (typeof value != 'number' && typeof value != 'string') {
-            throw ({ name: 'TypeError', message: 'type of ' + value + ' must be a string or number' });
+            throw ({ name: 'TypeError', message: 'type of value must be a string or number not ' + typeof value });
           }
           index_results.push({
             '@type': type,
