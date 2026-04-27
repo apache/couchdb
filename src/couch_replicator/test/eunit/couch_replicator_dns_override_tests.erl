@@ -38,20 +38,20 @@ teardown(Ctx) ->
 
 should_replicate_with_dns_override({_Ctx, {Source, Target}}) ->
     create_doc(Source),
-    
+
     SourceUrl = db_url(Source),
     #url{host = SourceHost} = ibrowse_lib:parse_url(binary_to_list(SourceUrl)),
-    
+
     % configure DNS override: example.com -> actual source host
     OverrideConfig = "example.com:" ++ SourceHost,
     config:set("replicator", "dns_overrides", OverrideConfig, false),
-    
+
     % replace source host with example.com
     OverrideUrl = re:replace(SourceUrl, SourceHost, "example.com", [{return, binary}]),
-    
+
     % replicate using overridden URL
     replicate(OverrideUrl, db_url(Target)),
-    
+
     % verify replication succeeded by comparing doc counts
     ?assertEqual(ok, compare(Source, Target)).
 
