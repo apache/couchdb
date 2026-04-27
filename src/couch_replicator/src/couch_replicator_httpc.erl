@@ -20,6 +20,7 @@
 -export([send_req/3]).
 -export([stop_http_worker/0]).
 -export([full_url/2]).
+-export([add_sni_option/2]).
 
 -import(couch_util, [
     get_value/2,
@@ -113,6 +114,10 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
     {Headers2, HttpDb} = couch_replicator_auth:update_headers(HttpDb0, Headers1),
     Url = full_url(HttpDb, Params),
     Body = get_value(body, Params, []),
+
+    % Apply DNS override using connect_to ibrowse option
+    #url{host = Host, protocol = Protocol} = ibrowse_lib:parse_url(Url),
+    {TargetHost, OriginalHost} = couch_replicator_dns:resolve_host(Host),
     case get_value(path, Params) == "_changes" of
         true ->
             Timeout = infinity;
@@ -131,7 +136,7 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
             {User, Pass} when is_list(User), is_list(Pass) ->
                 [{basic_auth, {User, Pass}}]
         end,
-    IbrowseOptions =
+    IbrowseOptions0 =
         BasicAuthOpts ++
             [
                 {response_format, binary},
@@ -142,6 +147,30 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
                     HttpDb#httpdb.ibrowse_options
                 )
             ],
+
+    % Add connect_to ibrowse option if DNS override is active
+    IbrowseOptions1 =
+        case OriginalHost of
+            undefined ->
+                IbrowseOptions0;
+            _ ->
+                % Log DNS override for debugging with protocol info
+                couch_log:debug(
+                    "DNS override (~p): ~s -> ~s",
+                    [Protocol, OriginalHost, TargetHost]
+                ),
+                [{connect_to, TargetHost} | IbrowseOptions0]
+        end,
+
+    % Add SNI for HTTPS with DNS override
+    IbrowseOptions =
+        case {Protocol, OriginalHost} of
+            {https, OrigHost} when is_list(OrigHost) ->
+                add_sni_option(IbrowseOptions1, OrigHost);
+            _ ->
+                IbrowseOptions1
+        end,
+
     backoff_before_request(Worker, HttpDb, Params),
     Response = ibrowse:send_req_direct(
         Worker, Url, Headers2, Method, Body, IbrowseOptions, Timeout
@@ -534,6 +563,15 @@ merge_headers(Headers1, Headers2) when is_list(Headers1), is_list(Headers2) ->
     Empty = mochiweb_headers:empty(),
     Merged = mochiweb_headers:enter_from_list(Headers1 ++ Headers2, Empty),
     mochiweb_headers:to_list(Merged).
+
+%% Add SNI to SSL options
+add_sni_option(IbrowseOpts, Host) ->
+    SslOpts = proplists:get_value(ssl_options, IbrowseOpts, []),
+    SslOpts1 = [
+        {server_name_indication, Host}
+        | proplists:delete(server_name_indication, SslOpts)
+    ],
+    lists:keystore(ssl_options, 1, IbrowseOpts, {ssl_options, SslOpts1}).
 
 -ifdef(TEST).
 

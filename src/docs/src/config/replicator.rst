@@ -279,6 +279,15 @@ Replicator Database Configuration
         on error; however, in some cases it may be useful to prevent spending
         time attempting to call ``_bulk_get`` altogether.
 
+    .. config:option:: dns_overrides :: DNS overrides for replication requests
+
+        Comma delimited DNS overrides to use for replicator requests. This is
+        useful for cases where outbound HTTP requests must be made through a
+        transparent SNI proxy, for example::
+
+            [replicator]
+            dns_overrides = *.example.test:127.0.0.1,foo.bar.com:127.0.0.1
+
     .. config:option:: cert_file :: Path to user PEM certificate file
 
         Path to a file containing the user's certificate::
