@@ -28,7 +28,8 @@ init([]) ->
             {query_servers, {couch_proc_manager, start_link, []}},
             {vhosts, {couch_httpd_vhost, start_link, []}},
             {uuids, {couch_uuids, start, []}},
-            {disk_manager, {couch_disk_monitor, start_link, []}}
+            {disk_manager, {couch_disk_monitor, start_link, []}},
+            {couch_index_cleanup, {couch_index_cleanup, start_link, []}}
         ] ++ couch_index_servers(),
 
     MaybeHttp =

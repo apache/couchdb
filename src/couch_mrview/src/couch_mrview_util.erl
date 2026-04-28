@@ -112,17 +112,19 @@ get_signatures(Db) ->
     DDocs1 = lists:foldl(FoldFun, [], DDocs),
     get_signatures_from_ddocs(DbName, DDocs1).
 
-% From a list of design #doc{} records returns signatures map: #{Sig => true}
-% This will be valid signatures of views we expect to run and build on this
-% node.
+% From a list of design #doc{} records returns the map
+% #{Sig => #{DDocId => true}}. The keys are the valid sig of views
+% and inner maps are ddocs referencing those sigs (we can have multiple
+% ddocs referencing the same sig).
 get_signatures_from_ddocs(DbName, DDocs) when is_list(DDocs) ->
-    FoldFun = fun(#doc{} = Doc, Acc) ->
+    FoldFun = fun(#doc{id = DDocId} = Doc, Acc) ->
         try ddoc_to_mrst(DbName, Doc) of
             {ok, Mrst} ->
                 case couch_mrview_util:mrst_has_valid_views(Mrst) of
                     true ->
                         Sig = couch_util:to_hex_bin(Mrst#mrst.sig),
-                        Acc#{Sig => true};
+                        Inner = maps:get(Sig, Acc, #{}),
+                        Acc#{Sig => Inner#{DDocId => true}};
                     false ->
                         Acc
                 end
