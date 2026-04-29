@@ -159,15 +159,24 @@ update(Idx, Mod, IdxState) ->
             end
         end,
 
-        Proc = fun(DocInfo, {IdxStateAcc, _}) ->
-            case CommittedOnly and (GetSeq(DocInfo) > DbCommittedSeq) of
+        GcInterval = config:get_integer_or_infinity("view_updater", "gc_interval_docs", 1000),
+        Proc = fun(DocInfo, {IdxStateAcc, _, NDocs}) ->
+            case CommittedOnly andalso (GetSeq(DocInfo) > DbCommittedSeq) of
                 true ->
-                    {stop, {IdxStateAcc, false}};
+                    {stop, {IdxStateAcc, false, NDocs}};
                 false ->
                     {Doc, Seq} = LoadDoc(DocInfo),
                     {ok, NewSt} = Mod:process_doc(Doc, Seq, IdxStateAcc),
-                    garbage_collect(),
-                    {ok, {NewSt, true}}
+                    NDocs1 = NDocs + 1,
+                    case GcInterval of
+                        infinity ->
+                            ok;
+                        _ when NDocs1 rem GcInterval == 0 ->
+                            garbage_collect();
+                        _ ->
+                            ok
+                    end,
+                    {ok, {NewSt, true, NDocs1}}
             end
         end,
         {ok, InitIdxState} = Mod:start_update(
@@ -177,9 +186,9 @@ update(Idx, Mod, IdxState) ->
             NumPurgeChanges
         ),
 
-        Acc0 = {InitIdxState, true},
+        Acc0 = {InitIdxState, true, 0},
         {ok, Acc} = couch_db:fold_changes(Db, CurrSeq, Proc, Acc0, []),
-        {ProcIdxSt, SendLast} = Acc,
+        {ProcIdxSt, SendLast, _} = Acc,
 
         % If we didn't bail due to hitting the last committed seq we need
         % to send our last update_seq through.
