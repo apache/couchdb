@@ -53,7 +53,8 @@ parse_config_test_() ->
                 )
             )
         ),
-        ?_assertEqual([], couch_replicator_dns:parse_config(""))
+        ?_assertEqual([], couch_replicator_dns:parse_config("")),
+        ?_assertEqual([], couch_replicator_dns:parse_config("*.example.test:,:proxy.internal, ,"))
     ].
 
 resolve_host_test_() ->
