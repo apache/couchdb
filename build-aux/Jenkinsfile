@@ -48,7 +48,7 @@ meta = [
     name: 'CentOS 8',
     spidermonkey_vsn: '60',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}",
@@ -59,7 +59,7 @@ meta = [
     name: 'CentOS 9',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:9-erlang-${ERLANG_VERSION}",
@@ -70,7 +70,7 @@ meta = [
     name: 'CentOS 10',
     disable_spidermonkey: true,
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/usr',
     quickjs_test262: true,
     image: "apache/couchdbci-centos:10-erlang-${ERLANG_VERSION}",
@@ -81,7 +81,7 @@ meta = [
     name: 'Ubuntu 22.04',
     spidermonkey_vsn: '91',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:jammy-erlang-${ERLANG_VERSION}",
@@ -92,7 +92,7 @@ meta = [
     name: 'Ubuntu 24.04',
     spidermonkey_vsn: '115',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-ubuntu:noble-erlang-${ERLANG_VERSION}",
@@ -103,7 +103,7 @@ meta = [
     name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
@@ -149,7 +149,7 @@ meta = [
     name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     // Test this in in the bookworm-quickjs variant
     quickjs_test262: false,
@@ -161,7 +161,7 @@ meta = [
     name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${MAXIMUM_ERLANG_VERSION}",
@@ -172,7 +172,7 @@ meta = [
     name: 'Debian x86_64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}",
@@ -183,7 +183,7 @@ meta = [
     name: 'Debian 12 with QuickJS',
     disable_spidermonkey: true,
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
@@ -202,7 +202,7 @@ meta = [
     name: 'Debian ARM64',
     spidermonkey_vsn: '78',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     // Test this in in the bookworm-quickjs variant
     quickjs_test262: false,
@@ -215,7 +215,7 @@ meta = [
     name: 'Debian x86_64',
     spidermonkey_vsn: '128',
     with_nouveau: true,
-    with_clouseau: false,
+    with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
     image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}",
@@ -267,6 +267,24 @@ meta = [
      gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
    ]
 ]
+
+containerClouseauConfig = '''logger: {
+  format: Raw
+  output: Stdout
+  level: debug
+}
+config: [
+  {
+    node: {
+      name: clouseau1
+      domain: 127.0.0.1
+    }
+    clouseau: {
+      commit_interval_secs: 1
+    }
+  }
+]
+'''
 
 def String configure(config) {
   if (config.disable_spidermonkey) {
@@ -505,6 +523,7 @@ def generateContainerStage(platform) {
                     retry (3) {sh "make ${meta[platform].gnu_make_eunit_opts} eunit" }
                     if (meta[platform].quickjs_test262) {retry(3) {sh 'make quickjs-test262'}}
                     retry(3) {sh 'make elixir'}
+                    writeFile(file: 'clouseau/clouseau.conf', text: containerClouseauConfig)
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make elixir-search ERLANG_COOKIE=crumbles"}
                     retry(3) {sh "${setClouseauJavaHome}timeout 5m make mango-test ERLANG_COOKIE=crumbles"}
                     retry(3) {sh 'make weatherreport-test'}
