@@ -70,6 +70,14 @@ setup() ->
     {ok, _} = couch_db:update_doc(Db, DDoc, []),
     ok = couch_db:close(Db),
     ok = refresh_index(DbName),
+    % Another update and refresh. A forced second b-tree update will guarantee
+    % to create garbage so compaction has something to chew on. Otherwise a
+    % single bulk build can pack the tree optimally so compact_view won't have
+    % anything to do.
+    {ok, Db2} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    ok = populate_db(Db2, ?DOCS_COUNT),
+    ok = couch_db:close(Db2),
+    ok = refresh_index(DbName),
     DbName.
 
 teardown(DbName) ->
