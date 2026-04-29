@@ -66,6 +66,7 @@
 ]).
 
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
+-include_lib("ibrowse/include/ibrowse.hrl").
 
 -type headers() :: [{string(), string()}].
 -type code() :: non_neg_integer().
@@ -317,11 +318,9 @@ http_request(#state{httpdb_pool = Pool} = State, Url, Headers, Method, Body) ->
         case ibrowse_lib:parse_url(Url) of
             {error, _} ->
                 {undefined, undefined, undefined};
-            ParsedUrl ->
-                Host = element(3, ParsedUrl),
-                ProtoVal = element(2, ParsedUrl),
+            #url{host = Host, protocol = Protocol} ->
                 {THost, OHost} = couch_replicator_dns:resolve_host(Host),
-                {THost, OHost, ProtoVal}
+                {THost, OHost, Protocol}
         end,
 
     Opts0 = [
@@ -341,10 +340,15 @@ http_request(#state{httpdb_pool = Pool} = State, Url, Headers, Method, Body) ->
         end,
 
     % Add SNI for HTTPS with DNS override
+    % SNI extension requires a hostname, not an IP address
     Opts =
         case {Proto, OriginalHost} of
             {https, OrigHost} when is_list(OrigHost) ->
-                couch_replicator_httpc:add_sni_option(Opts1, OrigHost);
+                case inet:is_ip_address(OrigHost) of
+                    % Skip SNI for IP addresses
+                    true -> Opts1;
+                    false -> couch_replicator_httpc:add_sni_option(Opts1, OrigHost)
+                end;
             _ ->
                 Opts1
         end,

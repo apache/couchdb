@@ -13,17 +13,22 @@
 -module(couch_replicator_dns).
 
 -export([
-    resolve_host/1,
+    resolve_host/1
+]).
+
+-ifdef(TEST).
+-export([
     parse_config/1,
     match_pattern/2,
     get_overrides/0
 ]).
+-endif.
 
 -type dns_override() :: {binary(), binary()}.
 
 -spec resolve_host(string()) -> {string(), string() | undefined}.
 resolve_host(Host) ->
-    case find_override(unicode:characters_to_binary(Host), get_overrides()) of
+    case find_override(list_to_binary(Host), get_overrides()) of
         {ok, Target} ->
             {binary_to_list(Target), Host};
         not_found ->
@@ -41,10 +46,14 @@ get_overrides() ->
 
 -spec parse_config(string()) -> [dns_override()].
 parse_config(ConfigStr) ->
-    ConfigBin = unicode:characters_to_binary(ConfigStr),
+    ConfigBin = list_to_binary(ConfigStr),
     Entries = binary:split(ConfigBin, <<",">>, [global, trim]),
     lists:filtermap(fun parse_entry/1, Entries).
 
+% Note: IPv6 addresses in targets must be enclosed in brackets.
+% Format: pattern:target
+% Valid:   *.example.com:[2001:db8::1]
+% Invalid: [2001:db8::1]:proxy.internal (IPv6 as pattern not supported)
 parse_entry(<<>>) ->
     false;
 parse_entry(Entry0) ->
@@ -54,9 +63,15 @@ parse_entry(Entry0) ->
             Pattern = string:trim(Pattern0),
             Target = string:trim(Target0),
             case {Pattern, Target} of
-                {<<>>, _} -> invalid_entry(Entry);
-                {_, <<>>} -> invalid_entry(Entry);
-                _ -> {true, {Pattern, Target}}
+                {<<>>, _} ->
+                    invalid_entry(Entry);
+                {_, <<>>} ->
+                    invalid_entry(Entry);
+                % Reject IPv6 addresses as patterns (they start with '[')
+                {<<"[", _/binary>>, _} ->
+                    invalid_entry_reason(Entry, "IPv6 addresses cannot be used as patterns");
+                _ ->
+                    {true, {Pattern, Target}}
             end;
         _ ->
             invalid_entry(Entry)
@@ -64,6 +79,10 @@ parse_entry(Entry0) ->
 
 invalid_entry(Entry) ->
     couch_log:warning("Invalid dns_override entry: ~ts", [Entry]),
+    false.
+
+invalid_entry_reason(Entry, Reason) ->
+    couch_log:warning("Invalid dns_override entry: ~ts (~s)", [Entry, Reason]),
     false.
 
 find_override(_Host, []) ->
@@ -76,8 +95,24 @@ find_override(Host, [{Pattern, Target} | Rest]) ->
             find_override(Host, Rest)
     end.
 
+% DNS Override Pattern Matching
+%
+% Supports leading wildcard patterns only:
+%   - *.example.com matches any.subdomain.example.com
+%   - *.example.com does NOT match example.com (requires at least one subdomain)
+%
+% Not supported:
+%   - middle wildcards: sub.*.example.com
+%   - trailing wildcards: example.*
+%   - multiple wildcards: *.*.example.com
 -spec match_pattern(binary(), binary()) -> boolean().
-match_pattern(Host, <<"*", Suffix/binary>>) when is_binary(Host) ->
+match_pattern(Host, Pattern) when is_binary(Host), is_binary(Pattern) ->
+    % DNS names are case-insensitive
+    HostLower = string:lowercase(Host),
+    PatternLower = string:lowercase(Pattern),
+    match_pattern_impl(HostLower, PatternLower).
+
+match_pattern_impl(Host, <<"*", Suffix/binary>>) ->
     % wildcard match: extract last N bytes from Host and compare to Suffix
     HostSize = byte_size(Host),
     SuffixSize = byte_size(Suffix),
@@ -89,5 +124,5 @@ match_pattern(Host, <<"*", Suffix/binary>>) when is_binary(Host) ->
         false ->
             false
     end;
-match_pattern(Host, Pattern) ->
+match_pattern_impl(Host, Pattern) ->
     Host =:= Pattern.

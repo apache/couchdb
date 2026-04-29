@@ -16,6 +16,7 @@
 
 match_pattern_test_() ->
     [
+        % wildcard matching
         ?_assert(
             couch_replicator_dns:match_pattern(
                 <<"account.example.test">>, <<"*.example.test">>
@@ -26,6 +27,7 @@ match_pattern_test_() ->
                 <<"example.test">>, <<"*.example.test">>
             )
         ),
+        % exact matching
         ?_assert(
             couch_replicator_dns:match_pattern(
                 <<"exact.example.test">>, <<"exact.example.test">>
@@ -39,6 +41,32 @@ match_pattern_test_() ->
         ?_assertNot(
             couch_replicator_dns:match_pattern(
                 <<"short">>, <<"*.verylongpattern.example.test">>
+            )
+        ),
+        % case-insensitive matching
+        ?_assert(
+            couch_replicator_dns:match_pattern(
+                <<"Account.Example.Test">>, <<"*.example.test">>
+            )
+        ),
+        ?_assert(
+            couch_replicator_dns:match_pattern(
+                <<"account.example.test">>, <<"*.Example.Test">>
+            )
+        ),
+        ?_assert(
+            couch_replicator_dns:match_pattern(
+                <<"ACCOUNT.EXAMPLE.TEST">>, <<"*.example.test">>
+            )
+        ),
+        ?_assert(
+            couch_replicator_dns:match_pattern(
+                <<"Exact.Example.Test">>, <<"exact.example.test">>
+            )
+        ),
+        ?_assert(
+            couch_replicator_dns:match_pattern(
+                <<"exact.example.test">>, <<"Exact.Example.Test">>
             )
         )
     ].
@@ -54,7 +82,27 @@ parse_config_test_() ->
             )
         ),
         ?_assertEqual([], couch_replicator_dns:parse_config("")),
-        ?_assertEqual([], couch_replicator_dns:parse_config("*.example.test:,:proxy.internal, ,"))
+        ?_assertEqual([], couch_replicator_dns:parse_config("*.example.test:,:proxy.internal, ,")),
+        % IPv6 targets are allowed (in brackets)
+        ?_assertEqual(
+            1,
+            length(
+                couch_replicator_dns:parse_config(
+                    "*.example.test:[2001:db8::1]"
+                )
+            )
+        ),
+        ?_assertEqual(
+            1,
+            length(
+                couch_replicator_dns:parse_config(
+                    "*.example.test:[::1]"
+                )
+            )
+        ),
+        % IPv6 patterns are rejected
+        ?_assertEqual([], couch_replicator_dns:parse_config("[2001:db8::1]:proxy.internal")),
+        ?_assertEqual([], couch_replicator_dns:parse_config("[::1]:127.0.0.1"))
     ].
 
 resolve_host_test_() ->

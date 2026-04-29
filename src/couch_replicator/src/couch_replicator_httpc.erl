@@ -163,10 +163,15 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
         end,
 
     % Add SNI for HTTPS with DNS override
+    % SNI extension requires a hostname, not an IP address
     IbrowseOptions =
         case {Protocol, OriginalHost} of
             {https, OrigHost} when is_list(OrigHost) ->
-                add_sni_option(IbrowseOptions1, OrigHost);
+                case inet:is_ip_address(OrigHost) of
+                    % Skip SNI for IP addresses
+                    true -> IbrowseOptions1;
+                    false -> add_sni_option(IbrowseOptions1, OrigHost)
+                end;
             _ ->
                 IbrowseOptions1
         end,
