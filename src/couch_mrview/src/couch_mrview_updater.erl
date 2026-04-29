@@ -229,11 +229,10 @@ accumulate_writes(State, W, Acc0) ->
 
 accumulate_more(NumDocIds, Acc) ->
     % check if we have enough items now
-    MinItems = config:get("view_updater", "min_writer_items", "100"),
-    MinSize = config:get("view_updater", "min_writer_size", "16777216"),
+    MinItems = config:get_integer("view_updater", "min_writer_items", 100),
+    MinSize = config:get_integer("view_updater", "min_writer_size", 16777216),
     CurrMem = ?term_size(Acc),
-    NumDocIds < list_to_integer(MinItems) andalso
-        CurrMem < list_to_integer(MinSize).
+    NumDocIds < MinItems andalso CurrMem < MinSize.
 
 merge_results([], SeqAcc, ViewKVs, DocIdKeys) ->
     {SeqAcc, ViewKVs, DocIdKeys};
