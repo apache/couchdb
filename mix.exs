@@ -83,7 +83,7 @@ defmodule CouchDBTest.Mixfile do
     deps1 = [
       {:junit_formatter, "~> 3.4", only: [:dev, :test, :integration]},
       {:httpotion, ">= 3.2.0", only: [:dev, :test, :integration], runtime: false},
-      {:excoveralls, "~> 0.18.3", only: :test},
+      {:excoveralls, "~> 0.18.5", only: :test},
       {:ibrowse, path: path("ibrowse"), override: true},
       {:credo, "== 1.7.16", only: [:dev, :test, :integration], runtime: false}
     ]

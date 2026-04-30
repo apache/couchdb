@@ -154,16 +154,16 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{snappy,           "snappy",           {tag, "CouchDB-1.0.9"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.10"}},
 
 %% %% Non-Erlang deps
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.3.5"}, [raw]},
-{ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-6"}},
+                   {tag, "v1.3.6"}, [raw]},
+{ibrowse,          "ibrowse",          {tag, "v4.5.0"}},
 {gun,              "gun",              {tag, "2.2.0-couchdb"}},
 {jiffy,            "jiffy",            {tag, "2.0.0"}},
 {mochiweb,         "mochiweb",         {tag, "v3.3.0"}},
-{meck,             "meck",             {tag, "v1.1.0"}},
+{meck,             "meck",             {tag, "v1.1.1"}},
 {recon,            "recon",            {tag, "2.5.6"}}
 ].
 
