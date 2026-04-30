@@ -279,6 +279,25 @@ Replicator Database Configuration
         on error; however, in some cases it may be useful to prevent spending
         time attempting to call ``_bulk_get`` altogether.
 
+    .. config:option:: dns_overrides :: DNS overrides for replication requests
+
+        Comma delimited ``pattern:target`` mappings to use for replicator
+        requests. This is useful for cases where outbound HTTP requests must be
+        made through a transparent SNI proxy.
+
+        ``pattern`` may be either an exact hostname such as ``foo.bar.com`` or a
+        leading wildcard for subdomains such as ``*.example.test``. Wildcards
+        are supported only at the start of the pattern.
+
+        ``target`` may be an IPv4 address, a hostname, or a bracketed IPv6
+        address. Brackets avoid ambiguity with the ``:`` separator used between
+        the pattern and target.
+
+        For example::
+
+            [replicator]
+            dns_overrides = foo.bar.com:proxy.internal,*.example.test:127.0.0.1,[2001:db8::10]:[2001:db8::20]
+
     .. config:option:: cert_file :: Path to user PEM certificate file
 
         Path to a file containing the user's certificate::
