@@ -261,10 +261,11 @@ meta = [
      spidermonkey_vsn: '128',
      with_nouveau: true,
      with_clouseau: true,
-     clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
+     //Usually set via https://github.com/apache/couchdb-glazier/blob/main/bin/shell.ps1
+     //clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
      quickjs_test262: false,
      node_label: 'win',
-     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+     gnu_make_eunit_opts: "-j3 --output-sync=target"
    ]
 ]
 
