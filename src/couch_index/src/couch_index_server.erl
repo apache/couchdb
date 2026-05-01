@@ -23,6 +23,9 @@
 -export([num_servers/0, server_name/1, by_sig/1, by_pid/1, by_db/1, openers/1]).
 -export([aggregate_queue_len/0, names/0]).
 
+% Cluster cleanup helpers (used by couch_mrview_cleanup)
+-export([shard_entries/1, shard_index_pid/2, forget_ddoc_binding/3]).
+
 % Exported for callbacks
 -export([
     handle_config_change/5,
@@ -358,51 +361,9 @@ handle_db_event(DbName, created, St) ->
 handle_db_event(DbName, deleted, St) ->
     gen_server:cast(St#st.server_name, {reset_indexes, DbName}),
     {ok, St};
-handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated, DDocId}, St) ->
-    %% this handle_db_event function must not crash (or it takes down the couch_index_server)
-    try
-        DDocResult = couch_util:with_db(DbName, fun(Db) ->
-            couch_db:open_doc(Db, DDocId, [ejson_body, ?ADMIN_CTX])
-        end),
-        LocalShards = mem3:local_shards(mem3:dbname(DbName)),
-        DbShards = [mem3:name(Sh) || Sh <- LocalShards],
-        lists:foreach(
-            fun(DbShard) ->
-                lists:foreach(
-                    fun({_DbShard, {_DDocId, Sig}}) ->
-                        % check if there are other ddocs with the same Sig for the same db
-                        SigDDocs = ets:match_object(St#st.by_db, {DbShard, {'$1', Sig}}),
-                        if
-                            length(SigDDocs) > 1 ->
-                                % remove records from by_db for this DDoc
-                                Args = [DbShard, DDocId, Sig],
-                                gen_server:cast(St#st.server_name, {rem_from_ets, Args});
-                            true ->
-                                % single DDoc with this Sig - close couch_index processes
-                                case ets:lookup(St#st.by_sig, {DbShard, Sig}) of
-                                    [{_, IndexPid}] ->
-                                        (catch gen_server:cast(
-                                            IndexPid, {ddoc_updated, DDocResult}
-                                        ));
-                                    [] ->
-                                        []
-                                end
-                        end
-                    end,
-                    ets:match_object(St#st.by_db, {DbShard, {DDocId, '$1'}})
-                )
-            end,
-            DbShards
-        ),
-        {ok, St}
-    catch
-        Class:Reason:Stack ->
-            couch_log:warning("~p: handle_db_event ~p for db ~p, reason ~p, stack ~p", [
-                ?MODULE, Class, DbName, Reason, Stack
-            ]),
-            gen_server:cast(St#st.server_name, {rem_from_ets, [DbName, Reason]}),
-            {ok, St}
-    end;
+handle_db_event(<<"shards/", _/binary>>, {ddoc_updated, _DDocId}, St) ->
+    %% Cluster dbs cleanup is handled by couch_index_cleanup
+    {ok, St};
 handle_db_event(DbName, {ddoc_updated, DDocId}, St) ->
     lists:foreach(
         fun({_DbName, {_DDocId, Sig}}) ->
@@ -436,6 +397,23 @@ by_db(Arg) ->
 
 openers(Arg) ->
     name("couchdb_indexes_openers", Arg).
+
+% Return {DDocId, Sig} entries for a  shard. Used by cluster cleanup
+shard_entries(ShardName) when is_binary(ShardName) ->
+    Rows = ets:match_object(by_db(ShardName), {ShardName, '_'}),
+    [Entry || {_ShardName, Entry} <- Rows].
+
+% Return indexer Pid for {ShardName, Sig} or not_found
+shard_index_pid(ShardName, Sig) when is_binary(ShardName) ->
+    case ets:lookup(by_sig(ShardName), {ShardName, Sig}) of
+        [{_, Pid}] when is_pid(Pid) -> {ok, Pid};
+        _ -> not_found
+    end.
+
+% Remove {ShardName, {DDocId, Sig}} row from by_db. The indexer process is left
+% as is. This is for removing one of the ddocs pointing to the same sig
+forget_ddoc_binding(ShardName, DDocId, Sig) when is_binary(ShardName) ->
+    gen_server:cast(server_name(ShardName), {rem_from_ets, [ShardName, DDocId, Sig]}).
 
 name(BaseName, Arg) when is_list(Arg) ->
     name(BaseName, ?l2b(Arg));

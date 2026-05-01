@@ -98,7 +98,8 @@ t_get_signatures_local({_, Db}) ->
     Sigs = couch_mrview_util:get_signatures(DbName),
     ?assert(is_map(Sigs)),
     ?assertEqual(1, map_size(Sigs)),
-    [{Sig, true}] = maps:to_list(Sigs),
+    [{Sig, DDocs}] = maps:to_list(Sigs),
+    ?assertEqual(#{?DDOC_ID => true}, DDocs),
     {ok, Info} = couch_mrview:get_info(Db, ?DDOC_ID),
     ?assertEqual(proplists:get_value(signature, Info), Sig),
 
@@ -115,7 +116,8 @@ t_get_signatures_clustered({DbName, _Db}) ->
     ?assertEqual(Sigs, couch_mrview_util:get_signatures(ShardName2)),
     ?assert(is_map(Sigs)),
     ?assertEqual(1, map_size(Sigs)),
-    [{Sig, true}] = maps:to_list(Sigs),
+    [{Sig, DDocs}] = maps:to_list(Sigs),
+    ?assertEqual(#{?DDOC_ID => true}, DDocs),
     {ok, Info} = couch_mrview:get_info(ShardName1, ?DDOC_ID),
     ?assertEqual(proplists:get_value(signature, Info), Sig),
 
