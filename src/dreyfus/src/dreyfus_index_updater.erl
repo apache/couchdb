@@ -25,8 +25,7 @@ update(IndexKey, Index) ->
         current_seq = CurSeq,
         dbname = DbName,
         ddoc_id = DDocId,
-        name = IndexName,
-        key = IndexKey
+        name = IndexName
     } = Index,
     erlang:put(io_priority, {search, DbName, IndexName}),
     {ok, Db} = couch_db:open_int(DbName, []),
