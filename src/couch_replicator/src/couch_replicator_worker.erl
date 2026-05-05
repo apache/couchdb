@@ -24,7 +24,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 
--define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).
+-define(DOC_BUFFER_BYTE_SIZE, 4 * 1024 * 1024).
 -define(STATS_DELAY_SEC, 10).
 -define(MISSING_DOC_RETRY_MSEC, 2000).
 
@@ -148,9 +148,6 @@ handle_call(
             },
             {noreply, NewState}
     end;
-handle_call({batch_doc, Doc}, From, State) ->
-    gen_server:reply(From, ok),
-    {noreply, maybe_flush_docs(Doc, State)};
 handle_call(
     flush,
     {Pid, _} = From,
@@ -171,6 +168,8 @@ handle_call(
         end,
     {noreply, State2#state{flush_waiter = From}}.
 
+handle_cast({batch_doc, Doc}, State) ->
+    {noreply, maybe_flush_docs(Doc, State)};
 handle_cast({sum_stats, IncStats}, #state{stats = Stats} = State) ->
     SumStats = couch_replicator_utils:sum_stats(Stats, IncStats),
     {noreply, maybe_report_stats(State#state{stats = SumStats})};
@@ -314,7 +313,7 @@ queue_fetch_loop(#fetch_st{} = St) ->
             IdRevs1 = maps:without(maps:keys(DDocIdRevs), IdRevs),
             {Docs, BgSt1} = bulk_get(UseBulkGet, Source, IdRevs1, Parent, BgSt),
             BatchFun = fun({_, #doc{} = Doc}) ->
-                ok = gen_server:call(Parent, {batch_doc, Doc}, infinity)
+                gen_server:cast(Parent, {batch_doc, Doc})
             end,
             lists:foreach(BatchFun, lists:sort(maps:to_list(Docs))),
             % Individually upload docs with attachments.
@@ -461,7 +460,7 @@ remote_doc_handler({ok, #doc{atts = [_ | _]} = Doc}, Acc) ->
     couch_log:debug("Worker flushing doc with attachments", []),
     doc_handler_flush_doc(Doc, Acc);
 remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
-    ok = gen_server:call(Parent, {batch_doc, Doc}, infinity),
+    gen_server:cast(Parent, {batch_doc, Doc}),
     {ok, Acc};
 remote_doc_handler({{not_found, missing}, _}, _Acc) ->
     throw(missing_doc).
