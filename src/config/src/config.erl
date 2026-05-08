@@ -26,7 +26,7 @@
 -export([set/3, set/4, set/5]).
 -export([delete/2, delete/3, delete/4]).
 
--export([get_integer/3, set_integer/3, set_integer/4]).
+-export([get_integer/3, set_integer/3, set_integer/4, get_integer_or_infinity/3]).
 -export([get_float/3, set_float/3, set_float/4]).
 -export([get_boolean/3, set_boolean/3, set_boolean/4]).
 
@@ -85,6 +85,26 @@ get_integer(Section, Key, Default) when is_integer(Default) ->
     catch
         error:badarg ->
             Default
+    end.
+
+get_integer_or_infinity(Section, Key, Default) when is_integer(Default); Default == infinity ->
+    case get_value(Section, Key, Default) of
+        infinity ->
+            infinity;
+        "infinity" ->
+            infinity;
+        _Value ->
+            IntDefault =
+                case Default of
+                    infinity -> 0;
+                    D when is_integer(D) -> D
+                end,
+            try
+                to_integer(get_value(Section, Key, IntDefault))
+            catch
+                error:badarg ->
+                    Default
+            end
     end.
 
 set_integer(Section, Key, Value) ->
