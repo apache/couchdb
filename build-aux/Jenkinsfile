@@ -222,15 +222,6 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'trixie': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '128',
-    with_nouveau: true,
-    with_clouseau: true,
-    quickjs_test262: true,
-    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}"
-  ],
-
   'freebsd-x86_64': [
       name: 'FreeBSD x86_64',
       spidermonkey_vsn: '91',
