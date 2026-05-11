@@ -399,13 +399,13 @@ match({[{<<"$all">>, _Args}]}, _Values, _Cmp) ->
 %% {[{<<"field_name">>,
 %%     {[{<<"$elemMatch">>,
 %%         {[{<<"$and">>, [
-%%             {[{<<>>,{[{<<"$gte">>,80}]}}]},
-%%             {[{<<>>,{[{<<"$lt">>,85}]}}]}
+%%             {[{[],{[{<<"$gte">>,80}]}}]},
+%%             {[{[],{[{<<"$lt">>,85}]}}]}
 %%         ]}]}
 %%     }]}
 %% }]}.
-%% So we filter out the <<>>.
-match({[{<<>>, Arg}]}, Values, Cmp) ->
+%% So we filter out the [].
+match({[{[], Arg}]}, Values, Cmp) ->
     match(Arg, Values, Cmp);
 % Matches when any element in values matches the
 % sub-selector Arg.
