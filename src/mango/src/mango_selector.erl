@@ -299,9 +299,16 @@ norm_negations({[{<<"$or">>, Args}]}) ->
 norm_negations({[{<<"$elemMatch">>, Arg}]}) ->
     {[{<<"$elemMatch">>, norm_negations(Arg)}]};
 norm_negations({[{<<"$allMatch">>, Arg}]}) ->
-    {[{<<"$allMatch">>, norm_negations(Arg)}]};
+    Out = norm_negations(Arg),
+    {[{<<"$allMatch">>, Out}]};
 norm_negations({[{<<"$keyMapMatch">>, Arg}]}) ->
     {[{<<"$keyMapMatch">>, norm_negations(Arg)}]};
+% Sometimes a top-level key will be a doc field because it
+% can't be pushed down through its corresponding operator,
+% e.g. {x: {$allMatch: S}}. Negation inside the $allMatch
+% should still be normalized.
+norm_negations({[{Field, Cond}]}) when is_list(Field) ->
+    {[{Field, norm_negations(Cond)}]};
 % All other conditions can't introduce negations anywhere
 % further down the operator tree.
 norm_negations(Cond) ->
@@ -1716,5 +1723,64 @@ match_id_raw_collation_test() ->
     % _id compares by byte-order, not by ICU rules
     Sel = normalize({[{<<"_id">>, {[{<<"$gte">>, <<"Z">>}]}}]}),
     ?assertEqual(true, match_int(Sel, {[{<<"_id">>, <<"a">>}]})).
+
+normalize_nor_test() ->
+    Sel1 = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$nor">>, [
+                        {[{<<"$lt">>, 3}]}, {[{<<"$gt">>, 5}]}
+                    ]}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(
+        {[
+            {<<"$and">>, [
+                {[{[<<"x">>], {[{<<"$gte">>, 3}]}}]},
+                {[{[<<"x">>], {[{<<"$lte">>, 5}]}}]}
+            ]}
+        ]},
+        Sel1
+    ),
+    ?assertEqual(true, match_int(Sel1, {[{<<"x">>, 4}]})),
+    ?assertEqual(false, match_int(Sel1, {[{<<"x">>, 40}]})),
+
+    Sel2 = normalize(
+        {[
+            {<<"x">>,
+                {[
+                    {<<"$allMatch">>,
+                        {[
+                            {<<"y">>,
+                                {[
+                                    {<<"$nor">>, [
+                                        {[{<<"$lt">>, 3}]}, {[{<<"$gt">>, 5}]}
+                                    ]}
+                                ]}}
+                        ]}}
+                ]}}
+        ]}
+    ),
+    ?assertEqual(
+        {[
+            {
+                [<<"x">>],
+                {[
+                    {<<"$allMatch">>,
+                        {[
+                            {<<"$and">>, [
+                                {[{[<<"y">>], {[{<<"$gte">>, 3}]}}]},
+                                {[{[<<"y">>], {[{<<"$lte">>, 5}]}}]}
+                            ]}
+                        ]}}
+                ]}
+            }
+        ]},
+        Sel2
+    ),
+    ?assertEqual(true, match_int(Sel2, {[{<<"x">>, [{[{<<"y">>, 4}]}]}]})),
+    ?assertEqual(false, match_int(Sel2, {[{<<"x">>, [{[{<<"y">>, 40}]}]}]})).
 
 -endif.
