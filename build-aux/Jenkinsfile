@@ -99,6 +99,17 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
+  'resolute': [
+    name: 'Ubuntu 26.04',
+    spidermonkey_vsn: '128',
+    with_nouveau: true,
+    with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
+    quickjs_test262: true,
+    image: "apache/couchdbci-ubuntu:resolute-erlang-${ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  ],
+
   'bullseye': [
     name: 'Debian x86_64',
     spidermonkey_vsn: '78',
