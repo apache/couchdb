@@ -34,58 +34,61 @@ Features
   upgrade scanner (``nouveau_index_upgrader``) can rebuild them at a configurable
   rate.
 * :ghissue:`5896`: Nouveau bulk index updates. Replace doc-at-a-time updates
-  to bulk updates which should improve index building.
-* :ghissue:`5942`: Fix cluster index cleanup. Adds the ``[couchdb]
+  with bulk updates which should improve index building.
+* :ghissue:`5986`: Fix cluster index cleanup. Adds the ``[couchdb]
   index_cleanup_delay_msec`` setting.
 * :ghissue:`5624`: Use SpiderMonkey 128 as the default version.
 * :ghissue:`5754`: Support safe secret rotation.
-* :ghissue:`5811`: Avoid updating password hash when request uses simple password
+* :ghissue:`5820`: Avoid updating password hash when request uses simple password
   scheme.
 
 Performance
 -----------
 
-* :ghissue:`5984`: Update Jiffy to ``2.0``. Jiffy 2.0 has a number of
-  performance optimization which should speed up both encoding and decoding.
-* :ghissue:`5908`: Optimize replicator. Use ``gen_server`` casts to queue docs
+* :ghissue:`5982`: Update Jiffy to ``2.0``. Jiffy 2.0 has a number of
+  performance optimizations which should speed up both encoding and decoding.
+* :ghissue:`5994`: Optimize replicator. Use ``gen_server`` casts to queue docs
   for ``_bulk_docs`` in replication workers instead of synchronous calls.
-* :ghissue:`5992`: Do not run a full GC after each index doc update. Increase
+* :ghissue:`5987`: Do not run a full GC after each index doc update. Increase
   view queue size from 100KB to 10MB. This should improve view index building
   times.
-* :ghissue:`5942`: Pre-fetch design docs once per cleanup request and reuse
-  signatures across nodes (instead of fetching them on every worker).
 
 Bugfixes
 --------
 
-* :ghissue:`5776`, :ghissue:`5704`, :ghissue:`5701`, :ghissue:`5708`,
-  :ghissue:`5707`, :ghissue:`5702`, :ghissue:`5694`, :ghissue:`5691`,
-  :ghissue:`5731`, :ghissue:`5867`: QuickJS updates. Memory leak fixes,
-  use-after-free fixes in workers and regex, regex memory blowup fix, Unicode
-  17 support, FP16 support, optimized string operations, faster context
-  creation, closure optimization, iterator improvements.
-* :ghissue:`5776`: Fix purge ``mem3_rep`` client verification.
-* :ghissue:`5830`: Fix race condition during purge checkpoint creation.
-* :ghissue:`5825`: Fix handling shards dbs purge checkpoints in ``mem3_rep``.
-  Consider previous-node replications for ``_dbs`` purge checkpoints.
-* :ghissue:`5917`: Fix signatures in mrview purge checkpoints. Avoid creating
-  purge checkpoints for invalid views. Do not reset dreyfus ``purge_seq`` back
-  to 0.
+* :ghissue:`5751`, :ghissue:`5759`, :ghissue:`5795`, :ghissue:`5836`,
+  :ghissue:`5937`: QuickJS engine updates. Memory leak fixes, use-after-free
+  fixes in workers and regex, regex memory blowup fix, Unicode 17 support,
+  FP16 support, optimized string operations, faster context creation, closure
+  optimization, iterator improvements.
+* :ghissue:`5746`, :ghissue:`5748`, :ghissue:`5882`, :ghissue:`5941`: QuickJS
+  scanner plugin and dispatch fixes. Reset ``docs_size`` in the scanner. Add
+  a skip option to the ``doc_fdi`` callback. Simplify the scanner plugin. Fix
+  ``ReferenceError`` in QuickJS dispatch for unknown commands.
+* :ghissue:`5758`: Fix purge ``mem3_rep`` client verification.
+* :ghissue:`5827`: Fix race condition during purge checkpoint creation.
+* :ghissue:`5832`, :ghissue:`5833`: Fix handling shards dbs purge checkpoints in
+  ``mem3_rep``. Consider previous-node replications for ``_dbs`` purge
+  checkpoints.
+* :ghissue:`5912`, :ghissue:`5913`, :ghissue:`5918`: Fix signatures in mrview
+  purge checkpoints. Avoid creating purge checkpoints for invalid views. Do not
+  reset dreyfus ``purge_seq`` back to 0.
 * :ghissue:`5940`: Initialise nouveau index ``purge_seq`` from db ``purge_seq``,
   and commit purge seq update before returning.
-* :ghissue:`5939`: Handle cases when dreyfus checkpoint is out-of-sync with the
-  index. Fix view compaction duration logging.
-* :ghissue:`5793`: Fix replicator scheduler total jobs metric.
+* :ghissue:`5931`: Handle cases when dreyfus checkpoint is out-of-sync with the
+  index.
+* :ghissue:`5939`: Fix view compaction duration logging.
+* :ghissue:`5777`: Fix replicator scheduler total jobs metric.
 * :ghissue:`5793`: Fix Prometheus metrics annotations.
-* :ghissue:`5893`: Improve replication ``since_seq`` parameter handling.
-* :ghissue:`5865`: Fix intermittent ``_scheduler/docs`` 500 error.
+* :ghissue:`5881`: Improve replication ``since_seq`` parameter handling.
+* :ghissue:`5876`: Fix intermittent ``_scheduler/docs`` 500 error.
 * :ghissue:`5853`: Tolerate invalid ``typ`` claim when not required.
 * :ghissue:`5846`: Tolerate maintenance mode and a node down in partition info
   calls.
-* :ghissue:`5628`: Fix ``bulk_get`` error handling.
-* :ghissue:`5978`: Fix ``_find`` when over threshold. Use ``errstr()`` instead
-  of ``toSource()`` in nouveau JS wrapper.
-* :ghissue:`5984`: Fix ``ReferenceError`` in QuickJS dispatch.
+* :ghissue:`5807`: Fix ``bulk_get`` error handling.
+* :ghissue:`5978`: Fix ``_find`` when over threshold.
+* :ghissue:`5976`: Use ``errstr()`` instead of ``toSource()`` in nouveau JS
+  wrapper.
 * :ghissue:`5893`: Send 404 for ``/_all_dbs`` and ``/_dbs_info`` with extra path
   parts.
 
@@ -94,33 +97,32 @@ Docs
 
 * :ghissue:`5973`: Fix Jenkins badge link in README.
 * :ghissue:`5974`: Update CI badge URL in ``README.rst``.
-* :ghissue:`5984`: Add missing comment from docs.
-* :ghissue:`5865`: Fix docs about replication.
+* :ghissue:`5992`: Add missing comment from docs.
+* :ghissue:`5875`: Fix docs about replication.
 * :ghissue:`5925`: Change CouchDB links to use HTTPS.
 * :ghissue:`5924`: Update URLs to use HTTPS in mac installation guide.
 
 Tests/CI/Builds
 ---------------
 
-* :ghissue:`5825`, :ghissue:`5914`, :ghissue:`5854`, :ghissue:`5843`: CI
-  parallelism. Parallel ``make eunit`` (sub-targets / ``-j4`` / Windows).
-  Concat eunit test logs and remove tmp dirs in ``Makefile``. Speed up
-  compiling and release building.
+* :ghissue:`5808`, :ghissue:`5847`, :ghissue:`5914`: CI parallelism. Parallel
+  ``make eunit`` (sub-targets / ``-j4`` / Windows). Concat eunit test logs and
+  remove tmp dirs in ``Makefile``. Speed up compiling and release building.
 * :ghissue:`5971`: Update Black to ``26.3.1``.
-* :ghissue:`5967`: Make creation of ``couch.uri`` independent of
-  ``--auto-ports``. Make file path for ``couch.uri`` absolute.
-* :ghissue:`5964`: Use ``couchdb.uri`` only when auto-ports is enabled. Clean up
-  the ``couch.uri`` on ``make devclean``.
-* :ghissue:`5687`: Write ``couch_uri`` files so ports are discoverable with
-  ``--auto-ports`` option.
+* :ghissue:`5687`, :ghissue:`5964`, :ghissue:`5967`, :ghissue:`5968`:
+  ``couch.uri`` improvements. Write ``couch_uri`` files so ports are
+  discoverable with ``--auto-ports``. Use ``couchdb.uri`` only when auto-ports
+  is enabled. Make file path for ``couch.uri`` absolute. Make creation of
+  ``couch.uri`` independent of ``--auto-ports``. Clean up the ``couch.uri`` on
+  ``make devclean``.
 * :ghissue:`5864`: Enable EUnit/Elixir/Nouveau tests on Windows.
-* :ghissue:`5894`: Improve / fix Jenkins workspace cleanup.
-* :ghissue:`5938`: CI: enable xref checking for undefined functions.
-* :ghissue:`5805`: Don't run tests if we only change ``.github`` configuration.
+* :ghissue:`5933`, :ghissue:`5936`, :ghissue:`5950`: Improve / fix Jenkins
+  workspace cleanup.
+* :ghissue:`5946`: CI: enable xref checking for undefined functions.
+* :ghissue:`5813`: Don't run tests if we only change ``.github`` configuration.
 * :ghissue:`5897`: Temporarily disable freebsd-arm worker.
-* :ghissue:`5908`: Improve CI performance by combining some stages.
-* :ghissue:`5908`: Add Trixie to CI.
-* :ghissue:`5805`: Update Elixir tests and config files.
+* :ghissue:`5935`: Improve CI performance by combining some stages.
+* :ghissue:`5665`: Add Trixie to CI.
 
 .. _release/3.5.1:
 
