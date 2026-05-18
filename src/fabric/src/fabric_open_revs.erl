@@ -23,6 +23,10 @@
     idrevs,
     wcnt = 0,
     rcnt = 0,
+    % count of non-error responses regardless if they added anything to `response` list
+    % for example a worker might returtn {ok,[]} when we get Revs=all and we have make sure
+    % we count  that towards sucess_possible/1 returning true.
+    received = 0,
     responses = []
 }).
 
@@ -95,7 +99,7 @@ init_state(DbName, IdsRevsOpts, Options) ->
 
 responses_fold({ArgRef, NewResp}, #{} = Reqs) ->
     #{ArgRef := Req} = Reqs,
-    #req{rcnt = R, wcnt = W, responses = Resps} = Req,
+    #req{rcnt = R, wcnt = W, received = Recv, responses = Resps} = Req,
     Resps1 = merge_responses(Resps, NewResp),
     % If responses don't match or are "not found", don't bump rcnt so we can
     % wait for more workers.
@@ -112,6 +116,7 @@ responses_fold({ArgRef, NewResp}, #{} = Reqs) ->
         ArgRef => Req#req{
             rcnt = NewR,
             wcnt = W - 1,
+            received = Recv + 1,
             responses = Resps1
         }
     }.
@@ -231,8 +236,8 @@ success_possible(#{} = Reqs) ->
 
 success_possible_fold(_Key, #req{}, _Acc = false) ->
     false;
-success_possible_fold(_Key, #req{wcnt = W, responses = Resps}, _Acc) ->
-    W > 0 orelse Resps =/= [].
+success_possible_fold(_Key, #req{wcnt = W, received = Recv}, _Acc) ->
+    W > 0 orelse Recv > 0.
 
 r_met(#{} = Reqs, ExpectedR) ->
     Fun = fun(_, #req{rcnt = R}, Acc) -> min(R, Acc) end,
@@ -346,6 +351,7 @@ open_revs_quorum_test_() ->
                 ?TDEF_FE(t_stemmed_merge_correctly),
                 ?TDEF_FE(t_not_found_counted_as_descendant),
                 ?TDEF_FE(t_all_not_found),
+                ?TDEF_FE(t_all_not_found_then_maintenance_mode),
                 ?TDEF_FE(t_rev_not_found_returned),
                 ?TDEF_FE(t_rexi_errors_progress),
                 ?TDEF_FE(t_generic_errors_progress),
@@ -490,6 +496,15 @@ t_all_not_found(_) ->
     {ok, S1} = handle_message([[]], W1, S0),
     {ok, S2} = handle_message([[]], W2, S1),
     ?assertEqual({stop, [[]]}, handle_message([[]], W3, S2)).
+
+t_all_not_found_then_maintenance_mode(_) ->
+    % two revs=all not_founds + one last mm mode
+    S0 = #st{workers = Workers0} = st0(),
+    [W1, W2, W3] = lists:sort(maps:keys(Workers0)),
+    {ok, S1} = handle_message([[]], W1, S0),
+    {ok, S2} = handle_message([[]], W2, S1),
+    Res = handle_message({rexi_EXIT, {maintenance_mode, foo}}, W3, S2),
+    ?assertEqual({stop, [[]]}, Res).
 
 t_rev_not_found_returned(_) ->
     % If a specific rev is not found that is returned
