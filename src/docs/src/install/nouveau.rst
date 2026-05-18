@@ -25,10 +25,12 @@ service that embeds `Apache Lucene <https://lucene.apache.org>`_. Typically, thi
 service is installed on the same host as CouchDB and communicates with it over
 the loopback network.
 
-Nouveau server is runtime-compatible with Java 21 or higher.
+.. important::
 
-If your Linux distribution does not provide Java 21 packages you can get third
-party ones, `like Adoptium for Debian <https://adoptium.net/en-GB/installation/linux>`_.
+    Nouveau server is runtime-compatible with Java 21 or higher.
+
+    If your Linux distribution does not provide Java 21 packages you can get third
+    party ones, `like Adoptium for Debian <https://adoptium.net/en-GB/installation/linux>`_.
 
 Enable Nouveau
 ==============
