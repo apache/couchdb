@@ -122,11 +122,13 @@ responses_fold({ArgRef, NewResp}, #{} = Reqs) ->
     }.
 
 handle_error(Error, #st{workers = Workers, errors = Errors, reqs = Reqs} = St) ->
+    Errors1 = lists:uniq([Error | Errors]),
+    St1 = St#st{errors = Errors1},
     case success_possible(Reqs) of
         true ->
             case have_viable_workers(Workers) of
                 true ->
-                    {ok, St};
+                    {ok, St1};
                 false ->
                     % Don't have a choice, have to stop
                     {stop, finalize(St#st.args, Reqs)}
@@ -134,7 +136,7 @@ handle_error(Error, #st{workers = Workers, errors = Errors, reqs = Reqs} = St) -
         false ->
             stop_workers(Workers),
             % We may have multiple errors but need to pick one, so pick the first
-            {error, hd(merge_errors(Errors, Error))}
+            {error, hd(merge_errors(Errors1))}
     end.
 
 % De-duplicate identical responses as we go along
@@ -156,11 +158,10 @@ sort_key(NotFound) ->
 % non-maintenance mode errors, such as timeouts, etc, we remove the maintenance
 % mode from the list, otherwise, we keep it.
 %
-merge_errors(Errors, Error) ->
-    Errors1 = lists:uniq([Error | Errors]),
-    case Errors1 of
+merge_errors(Errors) ->
+    case Errors of
         [maintenance_mode] -> [maintenance_mode];
-        [_ | _] -> lists:delete(maintenance_mode, Errors1)
+        [_ | _] -> lists:delete(maintenance_mode, Errors)
     end.
 
 % Build a #{ArgRef => #req{}} map. ArgRef references the initial {{Id, Revs},
@@ -355,7 +356,8 @@ open_revs_quorum_test_() ->
                 ?TDEF_FE(t_rev_not_found_returned),
                 ?TDEF_FE(t_rexi_errors_progress),
                 ?TDEF_FE(t_generic_errors_progress),
-                ?TDEF_FE(t_failure_on_all_errors)
+                ?TDEF_FE(t_failure_on_all_errors),
+                ?TDEF_FE(t_maintenance_mode_masked_by_other_errors)
             ]
         }
     }.
@@ -536,5 +538,16 @@ t_failure_on_all_errors(_) ->
     {ok, S1} = handle_message({error, k}, W1, S0),
     {ok, S2} = handle_message({rexi_DOWN, nodedown, {x, n2}, y}, z, S1),
     ?assertEqual({error, e}, handle_message({rexi_EXIT, e}, W3, S2)).
+
+t_maintenance_mode_masked_by_other_errors(_) ->
+    % When we get mm at the end success_possible/1 becomes false. but we would
+    % like to return the other errors instead of the mm one. Ideally we'd
+    % return the last error before the mm one.
+    S0 = #st{workers = Workers0} = st0(),
+    [W1, W2, W3] = lists:sort(maps:keys(Workers0)),
+    {ok, S1} = handle_message({error, timeout}, W1, S0),
+    {ok, S2} = handle_message({error, foo}, W2, S1),
+    Res = handle_message({rexi_EXIT, {maintenance_mode, n3}}, W3, S2),
+    ?assertEqual({error, foo}, Res).
 
 -endif.
