@@ -284,7 +284,7 @@ Replicator Database Configuration
         Comma delimited ``host:port:target_host:target_port`` mappings to use for
         replicator requests. This is useful for cases where outbound HTTP requests
         must be made through a transparent proxy or when port rewriting is needed.
-        
+
         This feature is similar to curl's ``--connect-to`` option.
 
         ``host`` may be either an exact hostname such as ``foo.bar.com`` or a
