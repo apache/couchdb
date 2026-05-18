@@ -279,6 +279,31 @@ Replicator Database Configuration
         on error; however, in some cases it may be useful to prevent spending
         time attempting to call ``_bulk_get`` altogether.
 
+    .. config:option:: connect_to :: Connection routing overrides for replication requests
+
+        Comma delimited ``host:port:target_host:target_port`` mappings to use for
+        replicator requests. This is useful for cases where outbound HTTP requests
+        must be made through a transparent proxy or when port rewriting is needed.
+
+        This feature is similar to curl's ``--connect-to`` option.
+
+        ``host`` may be either an exact hostname such as ``foo.bar.com`` or a
+        leading wildcard for subdomains such as ``*.example.test``. Wildcards
+        are supported only at the start of the pattern.
+
+        ``port`` is the port number in the source URL (e.g., 443 for HTTPS).
+
+        ``target_host`` may be an IPv4 address, a hostname, or a bracketed IPv6
+        address. Brackets avoid ambiguity with the ``:`` separator.
+
+        ``target_port`` is the port number to connect to on the target host.
+
+        This allows both host and port rewriting. For example, to route HTTPS
+        requests on port 443 to a local proxy on port 9443::
+
+            [replicator]
+            connect_to = foo.bar.com:443:127.0.0.1:9443
+
     .. config:option:: cert_file :: Path to user PEM certificate file
 
         Path to a file containing the user's certificate::
