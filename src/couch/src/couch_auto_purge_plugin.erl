@@ -70,6 +70,8 @@ db(St, DbName) ->
         TTL when is_integer(TTL) ->
             {ok, St#{ttl => TTL}};
         undefined ->
+            {skip, St};
+        infinity ->
             {skip, St}
     catch
         error:database_does_not_exist ->
