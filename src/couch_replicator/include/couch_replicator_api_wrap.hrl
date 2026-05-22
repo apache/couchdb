@@ -10,8 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -define(COUCH_REPLICATOR_USER_AGENT, "CouchDB-Replicator/" ++ couch_server:get_version()).
+
+-define(COMPRESS_NONE, "none").
+-define(COMPRESS_GZIP, "gzip").
+-define(COMPRESS_MIN_SIZE, 1024).
 
 -record(httpdb, {
     url,
@@ -20,13 +23,14 @@
         {"Accept", "application/json"},
         {"User-Agent", ?COUCH_REPLICATOR_USER_AGENT}
     ],
-    timeout,            % milliseconds
+    timeout,
     ibrowse_options = [],
     retries = 5,
-    wait = 250,         % milliseconds
+    wait = 250,
     httpc_pool = nil,
     http_connections,
     first_error_timestamp = nil,
     proxy_url,
-    auth_context = nil
+    auth_context = nil,
+    request_compression = ?COMPRESS_NONE
 }).
