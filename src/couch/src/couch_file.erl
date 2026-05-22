@@ -36,6 +36,7 @@
     is_sys,
     eof = 0,
     db_monitor,
+    read_only,
     filepath
 }).
 
@@ -451,6 +452,7 @@ init_status_error(ReturnPid, Ref, Error) ->
 % server functions
 
 init({Filepath, Options, ReturnPid, Ref}) ->
+    ReadOnly = lists:member(read_only, Options),
     OpenOptions = file_open_options(Options),
     IsSys = lists:member(sys_db, Options),
     File = #file{filepath = Filepath, is_sys = IsSys},
@@ -474,7 +476,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = fsync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    {ok, dup(File#file{fd = Fd})};
+                                    {ok, dup(File#file{fd = Fd, read_only = ReadOnly})};
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -482,7 +484,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, dup(File#file{fd = Fd})}
+                            {ok, dup(File#file{fd = Fd, read_only = ReadOnly})}
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -499,7 +501,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, dup(File#file{fd = Fd, eof = Eof})};
+                            {ok, dup(File#file{fd = Fd, eof = Eof, read_only = ReadOnly})};
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -578,12 +580,14 @@ handle_call({append_bin, Bin}, _From, #file{} = File) ->
     % a mixed cluster
     case append_bins(File, [Bin]) of
         {{ok, [{Pos, Len}]}, File1} -> {reply, {ok, Pos, Len}, File1};
-        {Error, File1} -> {reply, Error, File1}
+        {Error, File1} when File#file.read_only -> {reply, Error, File1};
+        {Error, File1} -> {stop, Error, Error, File1}
     end;
 handle_call({append_bins, Bins}, _From, #file{} = File) ->
     case append_bins(File, Bins) of
         {{ok, Resps}, File1} -> {reply, {ok, Resps}, File1};
-        {Error, File1} -> {reply, Error, File1}
+        {Error, File1} when File#file.read_only -> {reply, Error, File1};
+        {Error, File1} -> {stop, Error, Error, File1}
     end;
 handle_call({write_header, Bin, Opts}, _From, #file{} = File) ->
     try
@@ -592,8 +596,10 @@ handle_call({write_header, Bin, Opts}, _From, #file{} = File) ->
             {ok, NewFile} ->
                 ok = header_fsync(NewFile, Opts),
                 {reply, ok, NewFile};
+            {{error, Err}, NewFile} when File#file.read_only ->
+                {reply, {error, Err}, NewFile};
             {{error, Err}, NewFile} ->
-                {reply, {error, Err}, NewFile}
+                {stop, {error, Err}, {error, Err}, NewFile}
         end
     catch
         error:{fsync_error, Error} ->
@@ -637,7 +643,7 @@ append_bins(#file{fd = Fd, eof = Pos} = File, Bins) ->
     {AllBlocks, Resps} = lists:unzip(BlockResps),
     case file:write(Fd, AllBlocks) of
         ok -> {{ok, Resps}, File#file{eof = FinalPos}};
-        Error -> {Error, reset_eof(File)}
+        Error -> {Error, File}
     end.
 
 pread(#file{} = File, PosL) ->
@@ -779,7 +785,7 @@ handle_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
     case file:write(Fd, FinalBin) of
         ok -> {ok, File#file{eof = Pos + iolist_size(FinalBin)}};
-        {error, Error} -> {{error, Error}, reset_eof(File)}
+        {error, Error} -> {{error, Error}, File}
     end.
 
 read_multi_raw_iolists_int(#file{fd = Fd, eof = Eof} = File, PosLens) ->
@@ -958,11 +964,6 @@ is_idle(#file{is_sys = false}) ->
 
 process_info(Pid) ->
     couch_util:process_dict_get(Pid, couch_file_fd).
-
-%% in event of a partially successful write.
-reset_eof(#file{} = File) ->
-    {ok, Eof} = file:position(File#file.fd, eof),
-    File#file{eof = Eof}.
 
 -spec generate_checksum(binary()) -> <<_:128>>.
 generate_checksum(Bin) when is_binary(Bin) ->
