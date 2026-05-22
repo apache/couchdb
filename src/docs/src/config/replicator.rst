@@ -122,6 +122,35 @@ Replicator Database Configuration
             [replicator]
             connection_timeout = 30000
 
+    .. config:option:: request_compression :: Compress outbound request bodies
+
+        .. versionadded:: 3.6
+
+        Compress outbound replication request bodies (``_bulk_docs``,
+        ``_revs_diff``, ``_bulk_get``) using gzip before sending. Accepted
+        values are ``none`` (disabled, the default) and ``gzip``. Enable only
+        when the replication target supports ``Content-Encoding: gzip`` on
+        inbound requests, which all CouchDB servers do::
+
+            [replicator]
+            request_compression = none
+
+        This option can also be set per replication job by including
+        ``"request_compression": "gzip"`` in the replication document or
+        ``_replicate`` request body, which overrides the global setting.
+
+    .. config:option:: compress_min_size :: Minimum body size for compression
+
+        .. versionadded:: 3.6
+
+        Minimum request body size in bytes before compression is applied.
+        Bodies smaller than this threshold are sent uncompressed even if
+        :config:option:`request_compression <replicator/request_compression>`
+        is enabled::
+
+            [replicator]
+            compress_min_size = 1024
+
     .. config:option:: retries_per_request :: Number of retries per request
 
         .. versionchanged:: 2.1.1

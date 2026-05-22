@@ -171,13 +171,15 @@ ensure_full_commit(#httpdb{} = Db) ->
 
 get_missing_revs(#httpdb{} = Db, IdRevs) ->
     JsonBody = {[{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- IdRevs]},
+    RawBody = ?JSON_ENCODE(JsonBody),
+    {Body, ExtraHeaders} = maybe_compress_request(Db, RawBody),
     send_req(
         Db,
         [
             {method, post},
             {path, "_revs_diff"},
-            {body, ?JSON_ENCODE(JsonBody)},
-            {headers, [{"Content-Type", "application/json"}]}
+            {body, Body},
+            {headers, [{"Content-Type", "application/json"} | ExtraHeaders]}
         ],
         fun
             (200, _, {Props}) ->
@@ -211,14 +213,17 @@ bulk_get(#httpdb{} = Db, #{} = IdRevs, Options) ->
     % that at some point in the future we could make that the default, instead
     % of having to send query parameters with a POST request as we do today
     Body = options_to_json_map(Options, #{<<"docs">> => ReqDocsMaps}),
+    RawBody = ?JSON_ENCODE(Body),
+    {ReqBody, ExtraHeaders} = maybe_compress_request(Db, RawBody),
     Req = [
         {method, post},
         {path, "_bulk_get"},
         {qs, options_to_query_args(Options, [])},
-        {body, ?JSON_ENCODE(Body)},
+        {body, ReqBody},
         {headers, [
             {"Content-Type", "application/json"},
             {"Accept", "application/json"}
+            | ExtraHeaders
         ]}
     ],
     try
@@ -500,17 +505,24 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
         ([Doc | RestDocs]) ->
             {ok, [Doc, ","], RestDocs}
     end,
-    Headers = [
-        {"Content-Length", Len},
+    Headers0 = [
         {"Content-Type", "application/json"},
         {"X-Couch-Full-Commit", FullCommit}
     ],
+    {Body, Headers} =
+        case should_compress_request(HttpDb, Len) of
+            true ->
+                FullBody = [Prefix, lists:join(",", Docs), Suffix],
+                gzip_request_body(FullBody, Headers0);
+            false ->
+                {{BodyFun, [prefix | Docs]}, [{"Content-Length", Len} | Headers0]}
+        end,
     send_req(
         HttpDb,
         [
             {method, post},
             {path, "_bulk_docs"},
-            {body, {BodyFun, [prefix | Docs]}},
+            {body, Body},
             {headers, Headers}
         ],
         fun
@@ -1051,6 +1063,30 @@ header_value(Key, Headers, Default) ->
             Value;
         _ ->
             Default
+    end.
+
+%% Returns true if compression is enabled and body meets the minimum size threshold.
+should_compress_request(#httpdb{request_compression = ?COMPRESS_GZIP}, BodySize) ->
+    MinSize = config:get_integer("replicator", "compress_min_size", ?COMPRESS_MIN_SIZE),
+    BodySize >= MinSize;
+should_compress_request(#httpdb{}, _BodySize) ->
+    false.
+
+%% Compress Body with gzip, prepend Content-Encoding header.
+%% Returns {CompressedBody, Headers}.
+gzip_request_body(Body, Headers) ->
+    Compressed = zlib:gzip(Body),
+    couch_stats:increment_counter([couch_replicator, requests_compressed, gzip]),
+    {Compressed, [{"Content-Encoding", "gzip"} | Headers]}.
+
+%% Compress Body if compression is enabled and body meets minimum size.
+%% Returns {Body, ExtraHeaders} where ExtraHeaders may contain Content-Encoding.
+maybe_compress_request(#httpdb{} = HttpDb, Body) ->
+    case should_compress_request(HttpDb, iolist_size(Body)) of
+        true ->
+            gzip_request_body(Body, []);
+        false ->
+            {Body, []}
     end.
 
 % Normalize an #httpdb{} or #db{} record such that it can be used for
