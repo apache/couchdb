@@ -514,7 +514,7 @@ file_open_options(Options) ->
             true ->
                 [];
             false ->
-                [append]
+                [write]
         end.
 
 maybe_track_open_os_files(Options) ->
@@ -635,9 +635,9 @@ append_bins(#file{fd = Fd, eof = Pos} = File, Bins) ->
         Bins
     ),
     {AllBlocks, Resps} = lists:unzip(BlockResps),
-    case file:write(Fd, AllBlocks) of
+    case file:pwrite(Fd, Pos, AllBlocks) of
         ok -> {{ok, Resps}, File#file{eof = FinalPos}};
-        Error -> {Error, reset_eof(File)}
+        Error -> {Error, File}
     end.
 
 pread(#file{} = File, PosL) ->
@@ -777,9 +777,9 @@ handle_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
         BlockOffset -> Padding = <<0:(8 * (?SIZE_BLOCK - BlockOffset))>>
     end,
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
-    case file:write(Fd, FinalBin) of
+    case file:pwrite(Fd, Pos, FinalBin) of
         ok -> {ok, File#file{eof = Pos + iolist_size(FinalBin)}};
-        {error, Error} -> {{error, Error}, reset_eof(File)}
+        {error, Error} -> {{error, Error}, File}
     end.
 
 read_multi_raw_iolists_int(#file{fd = Fd, eof = Eof} = File, PosLens) ->
@@ -958,11 +958,6 @@ is_idle(#file{is_sys = false}) ->
 
 process_info(Pid) ->
     couch_util:process_dict_get(Pid, couch_file_fd).
-
-%% in event of a partially successful write.
-reset_eof(#file{} = File) ->
-    {ok, Eof} = file:position(File#file.fd, eof),
-    File#file{eof = Eof}.
 
 -spec generate_checksum(binary()) -> <<_:128>>.
 generate_checksum(Bin) when is_binary(Bin) ->

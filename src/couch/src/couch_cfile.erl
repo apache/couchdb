@@ -31,6 +31,7 @@
     position/2,
     datasync/1,
     write/2,
+    pwrite/3,
     truncate/1,
     fd/1,
     advise/4
@@ -53,6 +54,7 @@
     eof_nif/1,
     seek_nif/3,
     write_nif/2,
+    pwrite_nif/3,
     datasync_nif/1,
     truncate_nif/1
 ]).
@@ -118,6 +120,9 @@ datasync(_) ->
 
 write(#file_descriptor{module = ?MODULE} = Fd, IOData) ->
     write_1(owner_handle(Fd), erlang:iolist_to_iovec(IOData)).
+
+pwrite(#file_descriptor{module = ?MODULE} = Fd, Pos, IOData) ->
+    pwrite_1(owner_handle(Fd), Pos, erlang:iolist_to_iovec(IOData)).
 
 truncate(#file_descriptor{module = ?MODULE} = Fd) ->
     truncate_nif(owner_handle(Fd)).
@@ -215,6 +220,16 @@ write_1(Ref, IOVec) ->
             {error, Reason}
     end.
 
+pwrite_1(Ref, Pos, IOVec) ->
+    case pwrite_nif(Ref, Pos, IOVec) of
+        {continue, BytesWritten, Remainder} ->
+            pwrite_1(Ref, Pos + BytesWritten, Remainder);
+        ok ->
+            ok;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
 init() ->
     case os:type() of
         {unix, _} ->
@@ -281,6 +296,9 @@ seek_nif(_, _, _) ->
     {error, einval}.
 
 write_nif(_, _) ->
+    {error, einval}.
+
+pwrite_nif(_, _, _) ->
     {error, einval}.
 
 datasync_nif(_) ->

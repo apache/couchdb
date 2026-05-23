@@ -1021,11 +1021,11 @@ should_handle_error_of_the_second_sync(Fd) ->
 should_handle_error_of_the_file_write(Fd) ->
     meck:expect(
         file,
-        write,
-        ['_', '_'],
+        pwrite,
+        ['_', '_', '_'],
         meck:val({error, terminated})
     ),
     ?assertEqual({error, terminated}, couch_file:write_header(Fd, {<<"some_data">>, 32}, [sync])),
     ?assertEqual(1, meck:num_calls(file, datasync, ['_'])),
-    ?assertEqual(1, meck:num_calls(file, write, ['_', '_'])),
+    ?assertEqual(1, meck:num_calls(file, pwrite, ['_', '_', '_'])),
     ok.

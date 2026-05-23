@@ -199,6 +199,42 @@ static long efile_writev(int fd, SysIOVec *iov, int iovlen, posix_errno_t* res_e
     return result;
 }
 
+// Copied from OTP just like efile_preadv. Differences are:
+//  - Pass file descriptor as int and errno result as a separate arg
+//  - Assume pwritev exists
+//
+long efile_pwritev(int fd, long offset, SysIOVec *iov, int iovlen, posix_errno_t* res_errno) {
+
+    long bytes_written;
+    ssize_t result;
+
+    bytes_written = 0;
+
+    do {
+        if(iovlen < 1) {
+            result = 0;
+            break;
+        }
+
+        result = pwritev(fd, (const struct iovec *)iov, MIN(IOV_MAX, iovlen), offset);
+
+        if(result > 0) {
+            shift_iov(&iov, &iovlen, result);
+            bytes_written += result;
+            offset += result;
+        }
+    } while(result > 0 || (result < 0 && errno == EINTR));
+
+    *res_errno = errno;
+
+    if(result == 0 && bytes_written > 0) {
+        return bytes_written;
+    }
+
+    return result;
+}
+
+
 // Copied from OTP. Differences are:
 //    - File descriptor and return error passed in as separate args
 //    - This is for datasync only so don't pass that extra argument in
@@ -458,6 +494,52 @@ static ERL_NIF_TERM write_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     return err_tup(env, EINVAL)
 #endif
 }
+
+// Follows implementation from prim_file_nif.c
+//
+static ERL_NIF_TERM pwrite_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+#ifdef COUCH_CFILE_SUPPORTED
+    handle_t* hdl;
+    ErlNifIOVec vec, *input = &vec;
+    posix_errno_t  res_errno = 0;
+    long bytes_written, offset;
+    ERL_NIF_TERM tail;
+
+    if (argc != 3
+	|| !get_handle(env, argv[0], &hdl)
+	|| !enif_is_number(env, argv[1])
+	|| !enif_inspect_iovec(env, 64, argv[2], &tail, &input)) {
+      return badarg(env);
+    }
+
+    if(!enif_get_int64(env, argv[1], &offset) || offset < 0) {
+        return err_tup(env, EINVAL);
+    }
+
+    // ------ Critical section start ------
+    READ_LOCK;
+    if (hdl->fd < 0) {
+       READ_UNLOCK;
+       return err_tup(env, EINVAL);
+    }
+    bytes_written = efile_pwritev(hdl->fd, offset, input->iov, input->iovcnt, &res_errno);
+    READ_UNLOCK;
+    // ------- Critical section end ------
+
+    if(bytes_written < 0) {
+      return err_tup(env, res_errno);
+    }
+
+    if(!enif_is_empty_list(env, tail)) {
+      return enif_make_tuple3(env, ATOM_CONTINUE, bytes_written, tail);
+    }
+
+    return ATOM_OK;
+#else
+    return err_tup(env, EINVAL)
+#endif
+}
+
 
 static ERL_NIF_TERM seek_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
 #ifdef COUCH_CFILE_SUPPORTED
@@ -719,6 +801,7 @@ static ErlNifFunc funcs[] = {
     {"eof_nif",      1, eof_nif,      ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"seek_nif",     3, seek_nif,     ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"write_nif",    2, write_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"pwrite_nif",   3, pwrite_nif,   ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"datasync_nif", 1, datasync_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"truncate_nif", 1, truncate_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"info_nif",     1, info_nif}
