@@ -236,7 +236,7 @@ should_not_read_beyond_eof(_) ->
     file:close(Io),
     unlink(Fd),
     ?assertMatch(
-        {error, {read_beyond_eof, Filepath, _, _, _, _}}, couch_file:pread_binary(Fd, Pos)
+        {error, {read_beyond_eof, Filepath, _, _, _}}, couch_file:pread_binary(Fd, Pos)
     ),
     catch file:close(Fd).
 
@@ -253,7 +253,7 @@ should_not_read_beyond_eof_when_externally_truncated(_) ->
     file:close(Io),
     unlink(Fd),
     ?assertMatch(
-        {error, {read_beyond_eof, Filepath, _, _, _, _}}, couch_file:pread_binary(Fd, Pos)
+        {error, {read_beyond_eof, Filepath, _, _, _}}, couch_file:pread_binary(Fd, Pos)
     ),
     catch file:close(Fd).
 
@@ -319,7 +319,7 @@ should_apply_overwrite_create_option(Fd) ->
     {ok, Fd1} = couch_file:open(Path, [create, overwrite]),
     unlink(Fd1),
     ?assertMatch(
-        {error, {read_beyond_eof, Path, Pos, _, _, _}},
+        {error, {read_beyond_eof, Path, Pos, _, _}},
         couch_file:pread_term(Fd1, Pos)
     ).
 
