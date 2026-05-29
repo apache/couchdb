@@ -179,16 +179,20 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'base-intermediate-erlang': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}",
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
+  // Skip this temporarily. We have too many CI jobs for the workers available
+  // which forces a CI job to wait for some of the worker to full run the CI
+  // before continuing effectively making the runs take about 2x the time. When
+  // we remove bullseye we can uncomment this perhaps
+  // 'base-intermediate-erlang': [
+  //   name: 'Debian x86_64',
+  //   spidermonkey_vsn: '78',
+  //   with_nouveau: true,
+  //   with_clouseau: true,
+  //   clouseau_java_home: '/opt/java/openjdk',
+  //   quickjs_test262: false,
+  //   image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}",
+  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  // ],
 
   'base-quickjs': [
     name: 'Debian 12 with QuickJS',
