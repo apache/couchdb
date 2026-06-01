@@ -42,7 +42,12 @@
 
 try_compile(Proc, FunctionType, FunctionName, FunctionSource) ->
     try
-        proc_prompt(Proc, [<<"add_fun">>, FunctionSource]),
+        case FunctionType of
+            validate_doc_update ->
+                proc_prompt(Proc, [<<"validate_fun">>, FunctionSource]);
+            _ ->
+                proc_prompt(Proc, [<<"add_fun">>, FunctionSource])
+        end,
         ok
     catch
         {compilation_error, E} ->
