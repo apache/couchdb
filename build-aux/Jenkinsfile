@@ -566,7 +566,7 @@ def generateContainerStage(platform) {
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/couchdb", label: 'Unpack release' )
                   sh( script: "cd ${platform} && git clone https://github.com/apache/couchdb-pkg", label: 'Clone packaging helper repo' )
                   dir( "${platform}/couchdb-pkg" ) {
-                    sh( script: 'make', label: 'Build packages' )
+                    sh( script: 'make --output-sync=target', label: 'Build packages' )
                   }
                   sh( label: 'Stage package artifacts for archival', script: """
                     rm -rf pkgs/${platform}
@@ -706,7 +706,7 @@ pipeline {
         sh 'make erlfmt-check'
         sh 'make elixir-source-checks'
         sh 'make python-black'
-        sh 'make -j4 dist'
+        sh 'make -j4 --output-sync=target dist'
       }
       post {
         success {
