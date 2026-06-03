@@ -107,6 +107,8 @@
 //#define DUMP_PROMISE
 //#define DUMP_READ_OBJECT
 //#define DUMP_ROPE_REBALANCE
+/* add asm labels to each opcode so that it is easier to see the generated code */
+//#define OPCODE_ASM_LABEL
 
 /* test the GC by forcing it before each object allocation */
 //#define FORCE_GC_AT_MALLOC
@@ -17761,6 +17763,11 @@ typedef enum {
 #define FUNC_RET_YIELD_STAR    2
 #define FUNC_RET_INITIAL_YIELD 3
 
+#ifdef OPCODE_ASM_LABEL
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-label"
+#endif
+
 /* argv[] is modified if (flags & JS_CALL_FLAG_COPY_ARGV) = 0. */
 static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
                                JSValueConst this_obj, JSValueConst new_target,
@@ -17794,7 +17801,11 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
         [ OP_COUNT ... 255 ] = &&case_default
     };
 #define SWITCH(pc)      goto *dispatch_table[opcode = *pc++];
+#ifdef OPCODE_ASM_LABEL
+#define CASE(op)        case_ ## op: asm volatile("label_" #op ":\n.globl label_" #op); dummy_case_ ## op
+#else
 #define CASE(op)        case_ ## op
+#endif
 #define DEFAULT         case_default
 #define BREAK           SWITCH(pc)
 #endif
@@ -20534,6 +20545,10 @@ static JSValue JS_CallInternal(JSContext *caller_ctx, JSValueConst func_obj,
     rt->current_stack_frame = sf->prev_frame;
     return ret_val;
 }
+
+#ifdef OPCODE_ASM_LABEL
+#pragma GCC diagnostic pop
+#endif
 
 JSValue JS_Call(JSContext *ctx, JSValueConst func_obj, JSValueConst this_obj,
                 int argc, JSValueConst *argv)
