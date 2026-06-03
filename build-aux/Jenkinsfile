@@ -261,15 +261,17 @@ meta = [
   //    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   // ],
 
-  'macos': [
-     name: 'macOS',
-     disable_spidermonkey: true,
-     with_nouveau: true,
-     with_clouseau: true,
-     clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
-     gnu_make: 'gmake',
-     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-   ],
+  // Disable temporarily as it is running out of space and Jenkins
+  // keeps auto-disabling it which blocks CI jobs
+  // 'macos': [
+  //    name: 'macOS',
+  //    disable_spidermonkey: true,
+  //    with_nouveau: true,
+  //    with_clouseau: true,
+  //    clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
+  //    gnu_make: 'gmake',
+  //    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  //  ],
 
    'win2022': [
      name: 'Windows 2022',
