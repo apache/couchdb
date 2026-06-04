@@ -40,6 +40,8 @@
 -include("couch_server_int.hrl").
 
 -define(MAX_DBS_OPEN, 500).
+-define(DEFAULT_SHARDS, 16).
+-define(SHARD_COUNT_PKEY, {?MODULE, max_couch_server_shards}).
 -define(RELISTEN_DELAY, 5000).
 -define(DEFAULT_ENGINE, "couch").
 -define(AVAILABLE_JS_ENGINES, ["spidermonkey", "quickjs"]).
@@ -998,7 +1000,18 @@ name(BaseName, N) when is_integer(N), N > 0 ->
     list_to_atom(BaseName ++ "_" ++ integer_to_list(N)).
 
 num_servers() ->
-    erlang:system_info(schedulers).
+    % This value is not allowed to change at runtime. When we call this the
+    % first time from the supervisor we'll fix the value at that point and
+    % always return that from then on.
+    case persistent_term:get(?SHARD_COUNT_PKEY, undefined) of
+        undefined ->
+            Max = config:get_integer("couchdb", "max_couch_server_shards", ?DEFAULT_SHARDS),
+            N = max(1, min(Max, erlang:system_info(schedulers))),
+            ok = persistent_term:put(?SHARD_COUNT_PKEY, N),
+            N;
+        N when is_integer(N), N >= 1 ->
+            N
+    end.
 
 aggregate_queue_len() ->
     N = num_servers(),
