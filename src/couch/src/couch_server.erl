@@ -478,6 +478,7 @@ maybe_close_lru_db(#server{lru = Lru} = Server) ->
         {true, NewLru} ->
             {ok, db_closed(Server#server{lru = NewLru}, [])};
         false ->
+            couch_stats:increment_counter([couchdb, couch_server, all_dbs_active]),
             {error, all_dbs_active}
     end.
 
