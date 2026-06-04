@@ -151,7 +151,7 @@ static int cpu_count(void)
             count += 1 & (procmask >> i);
     return count;
 }
-#else
+#elif defined(__linux__)
 /* return the number of available physical cores or -1 if not available */
 static int get_cpu_info_physical_cores(void)
 {
@@ -215,7 +215,12 @@ static int cpu_count(void)
         n = 1;
     return n;
 }
-#endif /* !_WIN32 */
+#else /* __linux__ */
+static int cpu_count(void)
+{
+    return sysconf(_SC_NPROCESSORS_ONLN);
+}
+#endif /* !__linux__ */
 
 static void init_thread_local_storage(ThreadLocalStorage *tls)
 {
