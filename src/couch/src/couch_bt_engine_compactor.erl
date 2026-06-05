@@ -658,7 +658,7 @@ open_compaction_file(FilePath) ->
 
 reset_compaction_file(Fd, Header) ->
     ok = couch_file:truncate(Fd, 0),
-    ok = couch_file:write_header(Fd, Header).
+    ok = couch_file:write_header(Fd, Header, [sync]).
 
 commit_compaction_data(#comp_st{new_st = St} = CompSt) ->
     % Compaction needs to write headers to both the data file
