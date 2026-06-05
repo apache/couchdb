@@ -926,7 +926,7 @@ delete_file(FName) ->
 
 reset_index(Db, Fd, #mrst{sig = Sig} = State) ->
     ok = couch_file:truncate(Fd, 0),
-    ok = couch_file:write_header(Fd, {Sig, nil}),
+    ok = couch_file:write_header(Fd, {Sig, nil}, [sync]),
     {_Commit, NewSt} = init_state(Db, Fd, reset_state(State), nil),
     NewSt.
 

@@ -172,7 +172,7 @@ init(FilePath, Options) ->
                 delete_compaction_files(FilePath),
                 Header0 = couch_bt_engine_header:new(),
                 Header1 = init_set_props(Fd, Header0, Options),
-                ok = couch_file:write_header(Fd, Header1),
+                ok = couch_file:write_header(Fd, Header1, [sync]),
                 Header1;
             false ->
                 case couch_file:read_header(Fd) of
@@ -181,7 +181,7 @@ init(FilePath, Options) ->
                     no_valid_header ->
                         delete_compaction_files(FilePath),
                         Header0 = couch_bt_engine_header:new(),
-                        ok = couch_file:write_header(Fd, Header0),
+                        ok = couch_file:write_header(Fd, Header0, [sync]),
                         Header0
                 end
         end,
