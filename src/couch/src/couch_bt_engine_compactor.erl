@@ -509,7 +509,9 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
     ),
 
     EMSortFd = couch_emsort:get_fd(NewSt#st.id_tree),
-    {ok, LocSizes} = couch_file:append_terms(EMSortFd, NewInfos),
+    {ok, LocSizes} = couch_file:append_terms(
+        EMSortFd, NewInfos, [{compression, NewSt#st.compression}]
+    ),
     EMSortEntries = lists:zipwith(
         fun(FDI, {Loc, _}) ->
             #full_doc_info{
@@ -603,7 +605,8 @@ copy_meta_data(#comp_st{new_st = St} = CompSt) ->
     {ok, IdTree0} = couch_btree:open(DstState, Fd, [
         {split, fun couch_bt_engine:id_tree_split/1},
         {join, fun couch_bt_engine:id_tree_join/2},
-        {reduce, fun couch_bt_engine:id_tree_reduce/2}
+        {reduce, fun couch_bt_engine:id_tree_reduce/2},
+        {compression, St#st.compression}
     ]),
     {ok, Iter} = couch_emsort:iter(Src),
     Acc0 = #merge_st{
@@ -689,20 +692,21 @@ commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     bind_emsort(St2, MetaFd, MetaState).
 
 bind_emsort(St, Fd, nil) ->
-    {ok, Ems} = couch_emsort:open(Fd),
-    St#st{id_tree = Ems};
+    bind_emsort(St, Fd, []);
 bind_emsort(St, Fd, {BB, _} = Root) when is_list(BB) ->
     % Upgrade clause when we find old compaction files
     bind_emsort(St, Fd, [{root, Root}]);
-bind_emsort(St, Fd, State) ->
-    {ok, Ems} = couch_emsort:open(Fd, State),
+bind_emsort(St, Fd, State) when is_list(State) ->
+    Options = [{compression, St#st.compression} | State],
+    {ok, Ems} = couch_emsort:open(Fd, Options),
     St#st{id_tree = Ems}.
 
 bind_id_tree(St, Fd, State) ->
     {ok, IdBtree} = couch_btree:open(State, Fd, [
         {split, fun couch_bt_engine:id_tree_split/1},
         {join, fun couch_bt_engine:id_tree_join/2},
-        {reduce, fun couch_bt_engine:id_tree_reduce/2}
+        {reduce, fun couch_bt_engine:id_tree_reduce/2},
+        {compression, St#st.compression}
     ]),
     St#st{id_tree = IdBtree}.
 

@@ -844,7 +844,7 @@ init_state(FilePath, Fd, Header0, Options) ->
 
     Header1 = couch_bt_engine_header:upgrade(Header0),
     Header2 = set_default_security_object(Fd, Header1, Compression, Options),
-    Header = upgrade_purge_info(Fd, Header2),
+    Header = upgrade_purge_info(Fd, Header2, Compression),
 
     IdTreeState = couch_bt_engine_header:id_tree_state(Header),
     {ok, IdTree} = couch_btree:open(IdTreeState, Fd, [
@@ -877,6 +877,7 @@ init_state(FilePath, Fd, Header0, Options) ->
         {split, fun ?MODULE:purge_tree_split/1},
         {join, fun ?MODULE:purge_tree_join/2},
         {reduce, fun ?MODULE:purge_tree_reduce/2},
+        {compression, Compression},
         {cache_depth, btree_cache_depth()}
     ]),
 
@@ -885,6 +886,7 @@ init_state(FilePath, Fd, Header0, Options) ->
         {split, fun ?MODULE:purge_seq_tree_split/1},
         {join, fun ?MODULE:purge_seq_tree_join/2},
         {reduce, fun ?MODULE:purge_tree_reduce/2},
+        {compression, Compression},
         {cache_depth, btree_cache_depth()}
     ]),
 
@@ -943,7 +945,7 @@ set_default_security_object(Fd, Header, Compression, Options) ->
 
 % This function is here, and not in couch_bt_engine_header
 % because it requires modifying file contents
-upgrade_purge_info(Fd, Header) ->
+upgrade_purge_info(Fd, Header, Compression) ->
     case couch_bt_engine_header:get(Header, purge_tree_state) of
         nil ->
             Header;
@@ -979,7 +981,8 @@ upgrade_purge_info(Fd, Header) ->
                     {ok, PurgeTree} = couch_btree:open(nil, Fd, [
                         {split, fun ?MODULE:purge_tree_split/1},
                         {join, fun ?MODULE:purge_tree_join/2},
-                        {reduce, fun ?MODULE:purge_tree_reduce/2}
+                        {reduce, fun ?MODULE:purge_tree_reduce/2},
+                        {compression, Compression}
                     ]),
                     {ok, PurgeTree2} = couch_btree:add(PurgeTree, Infos),
                     PurgeTreeSt = couch_btree:get_state(PurgeTree2),
@@ -987,7 +990,8 @@ upgrade_purge_info(Fd, Header) ->
                     {ok, PurgeSeqTree} = couch_btree:open(nil, Fd, [
                         {split, fun ?MODULE:purge_seq_tree_split/1},
                         {join, fun ?MODULE:purge_seq_tree_join/2},
-                        {reduce, fun ?MODULE:purge_tree_reduce/2}
+                        {reduce, fun ?MODULE:purge_tree_reduce/2},
+                        {compression, Compression}
                     ]),
                     {ok, PurgeSeqTree2} = couch_btree:add(PurgeSeqTree, Infos),
                     PurgeSeqTreeSt = couch_btree:get_state(PurgeSeqTree2),
