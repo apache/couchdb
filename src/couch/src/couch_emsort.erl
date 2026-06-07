@@ -133,13 +133,16 @@
 -export([add/2, merge/2, iter/1, next/1]).
 -export([num_kvs/1, num_merges/1]).
 
+-include_lib("couch/include/couch_db.hrl").
+
 -record(ems, {
     fd,
     root,
     bb_chunk = 10,
     chain_chunk = 100,
     num_kvs = 0,
-    num_bb = 0
+    num_bb = 0,
+    compression = ?DEFAULT_COMPRESSION
 }).
 
 -define(REPORT_INTERVAL, 1000).
@@ -161,7 +164,9 @@ set_options(Ems, [{back_bone_chunk, Count} | Rest]) when is_integer(Count) ->
 set_options(Ems, [{num_kvs, NumKVs} | Rest]) when is_integer(NumKVs) ->
     set_options(Ems#ems{num_kvs = NumKVs}, Rest);
 set_options(Ems, [{num_bb, NumBB} | Rest]) when is_integer(NumBB) ->
-    set_options(Ems#ems{num_bb = NumBB}, Rest).
+    set_options(Ems#ems{num_bb = NumBB}, Rest);
+set_options(Ems, [{compression, Comp} | Rest]) ->
+    set_options(Ems#ems{compression = Comp}, Rest).
 
 get_fd(#ems{fd = Fd}) ->
     Fd.
@@ -231,7 +236,9 @@ write_kvs(Ems, KVs) ->
             {[], nil},
             lists:sort(KVs)
         ),
-    {ok, Final, _} = couch_file:append_term(Ems#ems.fd, {LastKVs, LastPos}),
+    {ok, Final, _} = couch_file:append_term(
+        Ems#ems.fd, {LastKVs, LastPos}, [{compression, Ems#ems.compression}]
+    ),
     Final.
 
 decimate(#ems{root = {_BB, nil}} = Ems, _Reporter) ->
@@ -274,7 +281,9 @@ merge_chains(Ems, Choose, BB, Reporter) ->
     merge_chains(Ems, Choose, Chains, {[], nil}, Reporter, 0).
 
 merge_chains(Ems, _Choose, [], ChainAcc, _Reporter, _Count) ->
-    {ok, CPos, _} = couch_file:append_term(Ems#ems.fd, ChainAcc),
+    {ok, CPos, _} = couch_file:append_term(
+        Ems#ems.fd, ChainAcc, [{compression, Ems#ems.compression}]
+    ),
     CPos;
 merge_chains(#ems{chain_chunk = CC} = Ems, Choose, Chains, Acc, Reporter, Count0) ->
     {KV, RestChains} = choose_kv(Choose, Ems, Chains),
@@ -327,7 +336,9 @@ ins_big_chain(Rest, Chain, Acc) ->
     lists:reverse(Acc, [Chain | Rest]).
 
 append_item(Ems, {List, Prev}, Pos, Size) when length(List) >= Size ->
-    {ok, PrevList, _} = couch_file:append_term(Ems#ems.fd, {List, Prev}),
+    {ok, PrevList, _} = couch_file:append_term(
+        Ems#ems.fd, {List, Prev}, [{compression, Ems#ems.compression}]
+    ),
     {[Pos], PrevList};
 append_item(_Ems, {List, Prev}, Pos, _Size) ->
     {[Pos | List], Prev}.
