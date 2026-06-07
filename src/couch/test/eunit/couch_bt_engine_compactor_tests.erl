@@ -70,7 +70,7 @@ is_compacting_works(DbName) ->
         {_Pid, Ref} = spawn_monitor(fun() -> compact_db(DbName) end),
         receive
             {in_emsort_bind, From} ->
-                % When emsort:open(Fd) is called the files should
+                % When emsort:open(Fd, Options) is called the files should
                 % have been created already
                 ?assert(couch_db:is_compacting(DbName)),
                 From ! {please_continue, self()}
@@ -145,11 +145,15 @@ wait_db_compact_done(DbName, N) ->
     end.
 
 wait_in_emsort_bind(WaitingPid) when is_pid(WaitingPid) ->
-    meck:expect(couch_emsort, open, fun(Fd) ->
+    meck:expect(couch_emsort, open, fun(Fd, Options) ->
+        % Intercept first call to bind only the rest should pass through
+        meck:expect(couch_emsort, open, fun(F, O) ->
+            meck:passthrough([F, O])
+        end),
         WaitingPid ! {in_emsort_bind, self()},
         receive
             {please_continue, WaitingPid} ->
                 ok
         end,
-        meck:passthrough([Fd])
+        meck:passthrough([Fd, Options])
     end).
