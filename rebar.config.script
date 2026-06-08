@@ -162,7 +162,7 @@ DepDescs = [
 {ibrowse,          "ibrowse",          {tag, "v4.5.0"}},
 {gun,              "gun",              {tag, "2.2.0-couchdb"}},
 {jiffy,            "jiffy",            {tag, "2.0.0"}},
-{mochiweb,         "mochiweb",         {tag, "v3.3.0"}},
+{mochiweb,         "mochiweb",         {tag, "v3.4.0"}},
 {meck,             "meck",             {tag, "v1.1.1"}},
 {recon,            "recon",            {tag, "2.5.6"}}
 ].
