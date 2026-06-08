@@ -237,16 +237,18 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'freebsd-x86_64': [
-      name: 'FreeBSD x86_64',
-      spidermonkey_vsn: '91',
-      with_nouveau: false,
-      with_clouseau: true,
-      clouseau_java_home: '/usr/local/openjdk21',
-      quickjs_test262: false,
-      gnu_make: 'gmake',
-      gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
+  // Disable temporarily to not block PR merging. Worker unexpectedly went
+  // offline.
+  // 'freebsd-x86_64': [
+  //     name: 'FreeBSD x86_64',
+  //     spidermonkey_vsn: '91',
+  //     with_nouveau: false,
+  //     with_clouseau: true,
+  //     clouseau_java_home: '/usr/local/openjdk21',
+  //     quickjs_test262: false,
+  //     gnu_make: 'gmake',
+  //     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  // ],
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
   // use QuickJS for now
