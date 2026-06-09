@@ -37,6 +37,7 @@
 
 -define(DEFLATE_COMPRESSION, {deflate, 9}).
 -define(DEFLATE_COMPRESSION_ZERO, {deflate, 0}).
+-define(ZSTD_COMPRESSION, {zstd, 3}).
 
 couch_compress_test_() ->
     {
@@ -46,7 +47,8 @@ couch_compress_test_() ->
             fun t_decompress/0,
             fun t_recompress/0,
             fun t_is_compressed/0,
-            fun t_uncompressed_size/0
+            fun t_uncompressed_size/0,
+            fun t_zstd/0
         ]
     }.
 
@@ -126,3 +128,38 @@ t_uncompressed_size() ->
     ),
 
     ?assertError(invalid_compression, couch_compress:uncompressed_size(?CORRUPT)).
+
+t_zstd() ->
+    case couch_zstd:available() of
+        false ->
+            % Only available on 28+
+            ?assertNot(couch_zstd:available());
+        true ->
+            Z = couch_compress:compress(?TERM, ?ZSTD_COMPRESSION),
+            ?assertMatch(<<16#28, 16#B5, 16#2F, 16#FD, _/binary>>, Z),
+            ?assert(bit_size(Z) < bit_size(?NONE)),
+            ?assertEqual(?TERM, couch_compress:decompress(Z)),
+
+            % Method checks
+            ?assert(couch_compress:is_compressed(Z, ?ZSTD_COMPRESSION)),
+            ?assert(couch_compress:is_compressed(Z, {zstd, 19})),
+            ?assertNot(couch_compress:is_compressed(Z, snappy)),
+            ?assertNot(couch_compress:is_compressed(Z, none)),
+            ?assertNot(couch_compress:is_compressed(Z, ?DEFLATE_COMPRESSION)),
+            ?assertNot(couch_compress:is_compressed(?NONE, ?ZSTD_COMPRESSION)),
+            ?assertNot(couch_compress:is_compressed(?SNAPPY, ?ZSTD_COMPRESSION)),
+            ?assertNot(couch_compress:is_compressed(?DEFLATE, ?ZSTD_COMPRESSION)),
+
+            ?assertEqual(49, couch_compress:uncompressed_size(Z)),
+
+            % Already compressed checks
+            ?assertEqual(Z, couch_compress:compress(Z, ?ZSTD_COMPRESSION)),
+            Snappy = couch_compress:compress(?SNAPPY, ?ZSTD_COMPRESSION),
+            ?assert(couch_compress:is_compressed(Snappy, ?ZSTD_COMPRESSION)),
+            ?assertEqual(?TERM, couch_compress:decompress(Snappy)),
+            Deflate = couch_compress:compress(Z, ?DEFLATE_COMPRESSION),
+            ?assert(couch_compress:is_compressed(Deflate, ?DEFLATE_COMPRESSION)),
+            ?assertEqual(?TERM, couch_compress:decompress(Deflate)),
+            None = couch_compress:compress(Z, none),
+            ?assert(couch_compress:is_compressed(None, none))
+    end.
