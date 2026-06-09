@@ -44,6 +44,7 @@ couch_file_compression_test_() ->
                 ?TDEF_FE(should_use_deflate_1, ?TIMEOUT),
                 ?TDEF_FE(should_use_deflate_9, ?TIMEOUT),
                 ?TDEF_FE(should_use_snappy, ?TIMEOUT),
+                ?TDEF_FE(should_use_zstd, ?TIMEOUT),
                 ?TDEF_FE(should_compare_compression_methods, ?TIMEOUT)
             ]}
         }
@@ -101,6 +102,11 @@ should_use_deflate_9(DbName) ->
 
 should_use_snappy(DbName) ->
     config:set("couchdb", "file_compression", "deflate_9", false),
+    compact_db(DbName),
+    compact_view(DbName).
+
+should_use_zstd(DbName) ->
+    config:set("couchdb", "file_compression", "zstd_3", false),
     compact_db(DbName),
     compact_view(DbName).
 
