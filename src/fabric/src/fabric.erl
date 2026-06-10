@@ -833,7 +833,9 @@ setup() ->
         meta = []
     },
     ok = application:ensure_started(config),
+    meck:expect(mem3, shards, fun(_) -> [] end),
     meck:expect(mem3, shards, fun(_, _) -> [] end),
+    meck:expect(mem3, shards, fun(_, _, _) -> [] end),
     meck:expect(mem3, quorum, fun(_) -> 1 end),
     meck:expect(rexi, cast, fun(_, _) -> ok end),
     meck:expect(rexi_utils, recv, fun(_, _, _, _, _, _) -> {ok, {error, [{Doc, conflict}]}} end),
