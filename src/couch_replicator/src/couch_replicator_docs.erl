@@ -25,6 +25,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("mem3/include/mem3.hrl").
 -include("couch_replicator.hrl").
 
 % The ID of now deleted design doc. On every *_replicator db discovery we try
@@ -213,7 +214,9 @@ save_rep_doc(DbName, Doc) ->
     ioq:maybe_set_io_priority({system, DbName}),
     {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
     try
-        couch_db:update_doc(Db, Doc, [])
+        Res = couch_db:update_doc(Db, Doc, []),
+        maybe_push_to_copies(DbName, Doc#doc.id),
+        Res
     catch
         % User can accidentally write a VDU which prevents _replicator from
         % updating replication documents. Avoid crashing replicator and thus
@@ -222,6 +225,54 @@ save_rep_doc(DbName, Doc) ->
             Msg = "~p VDU function preventing doc update to ~s ~s ~p",
             couch_log:error(Msg, [?MODULE, DbName, Doc#doc.id, Reason]),
             {ok, forbidden}
+    after
+        couch_db:close(Db)
+    end.
+
+% State updates are written to the local shard copy only and the rest of the
+% copies catch up via internal replicator. Internal replicator pushes can be
+% kind of slow (it's a a hold-off wait, could have backup,s etc) and with
+% `serialize_worker_startup=true` with job owner nodes and primary update nodes
+% diverging (60% chance) user would be stuck getting 409s after trying to
+% delete or update docs, even after they get bona-fide latest rev from the
+% quorum doc get. To fix that update the doc states (they are small) eagerly.
+maybe_push_to_copies(<<"shards/", _/binary>> = ShardName, DocId) ->
+    spawn(fun() -> push_to_copies(ShardName, DocId) end),
+    ok;
+maybe_push_to_copies(_DbName, _DocId) ->
+    % A local db
+    ok.
+
+push_to_copies(ShardName, DocId) ->
+    try
+        Docs = open_doc_leaves(ShardName, DocId),
+        Shards = mem3:shards(mem3:dbname(ShardName), DocId),
+        Copies = [
+            S
+         || #shard{name = Name, node = N} = S <- Shards, Name =:= ShardName, N =/= node()
+        ],
+        Opts = [?REPLICATED_CHANGES, ?ADMIN_CTX, {io_priority, {internal_repl, ShardName}}],
+        lists:foreach(
+            fun(#shard{node = Node, name = Name}) ->
+                case Docs of
+                    [] -> ok;
+                    [_ | _] -> mem3_rpc:update_docs(Node, Name, Docs, Opts)
+                end
+            end,
+            Copies
+        )
+    catch
+        Tag:Err ->
+            Msg = "~p : failed to push update of doc ~s/~s to other copies ~p:~p",
+            couch_log:debug(Msg, [?MODULE, ShardName, DocId, Tag, Err])
+    end.
+
+% Get all the revisions to push them to the rest of the copies in the shard range
+open_doc_leaves(ShardName, DocId) ->
+    {ok, Db} = couch_db:open_int(ShardName, [?CTX, sys_db]),
+    try
+        {ok, Results} = couch_db:open_doc_revs(Db, DocId, all, []),
+        [Doc || {ok, #doc{} = Doc} <- Results]
     after
         couch_db:close(Db)
     end.
@@ -622,5 +673,69 @@ read_doc(DbName, DocId, Ctx) ->
     {ok, Doc} = couch_db:open_doc(Db, DocId),
     couch_db:close(Db),
     ejson_to_map(Doc#doc.body).
+
+-define(OTHER_NODE, 'other@127.0.0.1').
+
+eager_push_test_() ->
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        {
+            foreach,
+            fun setup_eager_push/0,
+            fun teardown_eager_push/1,
+            [
+                ?TDEF_FE(t_push_updates_to_other_copies),
+                ?TDEF_FE(t_no_push_for_unclustered_dbs)
+            ]
+        }
+    }.
+
+setup_eager_push() ->
+    ShardName = ?tempshard(),
+    {ok, Db} = couch_db:create(ShardName, [?ADMIN_CTX]),
+    ok = couch_db:close(Db),
+    meck:new(mem3, [passthrough]),
+    meck:expect(mem3, shards, fun(DbName, _DocId) ->
+        [
+            #shard{name = ShardName, node = node(), dbname = DbName},
+            #shard{name = ShardName, node = ?OTHER_NODE, dbname = DbName}
+        ]
+    end),
+    meck:new(mem3_rpc, [passthrough]),
+    meck:expect(mem3_rpc, update_docs, fun(_, _, _, _) -> {ok, []} end),
+    meck:new(ddoc_cache, [passthrough]),
+    meck:expect(ddoc_cache, open, fun(_, validation_funs) -> {ok, []} end),
+    ShardName.
+
+teardown_eager_push(ShardName) ->
+    meck:unload(),
+    couch_server:delete(ShardName, [?ADMIN_CTX]),
+    ok.
+
+t_push_updates_to_other_copies(ShardName) ->
+    DocId = <<"doc1">>,
+    Doc = #doc{id = DocId, body = {[]}},
+    save_rep_doc(ShardName, Doc),
+    meck:wait(1, mem3_rpc, update_docs, '_', 2000),
+    update_doc_completed(ShardName, DocId, [{<<"foo">>, 1}]),
+    meck:wait(2, mem3_rpc, update_docs, '_', 2000),
+    % Only other copies should get it
+    ?assertEqual(2, meck:num_calls(mem3_rpc, update_docs, [?OTHER_NODE, ShardName, '_', '_'])),
+    % Push the state with the full path (length 2)
+    [Pushed] = meck:capture(last, mem3_rpc, update_docs, '_', 3),
+    ?assertMatch(#doc{id = DocId, revs = {2, [_, _]}}, Pushed).
+
+t_no_push_for_unclustered_dbs(_ShardName) ->
+    DbName = ?tempdb(),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
+    ok = couch_db:close(Db),
+    try
+        save_rep_doc(DbName, #doc{id = <<"doc1">>, body = {[]}}),
+        ?assertEqual(0, meck:num_calls(mem3_rpc, update_docs, '_'))
+    after
+        couch_server:delete(DbName, [?ADMIN_CTX])
+    end.
 
 -endif.
