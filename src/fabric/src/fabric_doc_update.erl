@@ -339,32 +339,39 @@ good_reply(_, _) ->
 
 -spec group_docs_by_shard(binary(), [#doc{}]) -> [{#shard{}, [#doc{}]}].
 group_docs_by_shard(DbName, Docs) ->
+    Shards = mem3:shards(DbName),
+    Grouped = group_docs([{Doc, mem3:shards(DbName, Id, Shards)} || #doc{id = Id} = Doc <- Docs]),
+    rotate_ranges(DbName, Grouped).
+
+group_docs(DocsShards) ->
     dict:to_list(
         lists:foldl(
-            fun(#doc{id = Id} = Doc, D0) ->
+            fun({Doc, Shards}, D0) ->
                 lists:foldl(
                     fun(Shard, D1) ->
                         dict:append(Shard, Doc, D1)
                     end,
                     D0,
-                    begin
-                        case mem3:shards(DbName, Id) of
-                            [] ->
-                                [];
-                            [#shard{range = Range} | _] = Shards ->
-                                owner_order(DbName, Range, Shards)
-                        end
-                    end
+                    Shards
                 )
             end,
             dict:new(),
-            Docs
+            DocsShards
         )
     ).
 
-owner_order(DbName, Range, Shards) ->
-    Owners = mem3:owners(DbName, Range, [N || #shard{node = N} <- Shards]),
-    [S || N <- Owners, #shard{node = N1} = S <- Shards, N1 =:= N].
+% Deterministically order each range's workers by ownership. When serialized,
+% workers start with the first entry of each range.
+rotate_ranges(DbName, Grouped) ->
+    FoldF = fun({#shard{range = R}, _} = E, D) -> orddict:append(R, E, D) end,
+    ByRange = orddict:to_list(lists:foldl(FoldF, orddict:new(), Grouped)),
+    lists:append([owner_order(DbName, R, G) || {R, G} <- ByRange]).
+
+% Order {Shards, Docs} kvs by the membership in mem3:owners/3 It's
+% important that we use the same ownership order as the replicator and peruser.
+owner_order(DbName, Range, Entries) ->
+    Owners = mem3:owners(DbName, Range, [N || {#shard{node = N}, _} <- Entries]),
+    [E || N <- Owners, {#shard{node = N1}, _} = E <- Entries, N1 =:= N].
 
 append_update_replies([], [], DocReplyDict) ->
     DocReplyDict;
@@ -513,7 +520,11 @@ doc_update_test_() ->
             fun parallel_in_flight_after_conflict/0,
             fun serial_filters_conflicts_at_cast/0,
             fun sws_false_mode_conflict_not_final/0,
-            fun sws_false_mode_ok_can_outvote_conflict/0
+            fun sws_false_mode_ok_can_outvote_conflict/0,
+            fun group_docs_content_and_order/0,
+            fun rotate_ranges_rotates_each_range/0,
+            fun rotate_ranges_varies_by_db/0,
+            fun rotate_ranges_preserves_entries/0
         ]
     }.
 
@@ -1149,33 +1160,93 @@ sws_false_mode_ok_can_outvote_conflict() ->
     ).
 
 owner_order_test() ->
-    S1 = #shard{name = <<"r1">>, node = n1, range = [0, 10]},
-    S2 = #shard{name = <<"r1">>, node = n2, range = [0, 10]},
-    S3 = #shard{name = <<"r1">>, node = n3, range = [0, 10]},
+    S1 = mk_shard(<<"r1">>, n1, [0, 10]),
+    S2 = mk_shard(<<"r1">>, n2, [0, 10]),
+    S3 = mk_shard(<<"r1">>, n3, [0, 10]),
     % The rotation amounts, erlang:phash2({Db, Range}) rem 3, are 0 for
     % {<<"dba">>, [0, 10]} and 2 for {<<"dbe">>, [0, 10]}
-    ?assertEqual([S1, S2, S3], owner_order(<<"dba">>, [0, 10], [S2, S3, S1])),
-    ?assertEqual([S3, S1, S2], owner_order(<<"dbe">>, [0, 10], [S2, S3, S1])),
-    % the first copy is on the owner node
+    Entries = [{S2, d2}, {S3, d3}, {S1, d1}],
+    ?assertEqual([{S1, d1}, {S2, d2}, {S3, d3}], rotate_ranges(<<"dba">>, Entries)),
+    ?assertEqual([{S3, d3}, {S1, d1}, {S2, d2}], rotate_ranges(<<"dbe">>, Entries)),
+    % the first copy of each range is on the owner node
     ?assertEqual(n1, hd(mem3:owners(<<"dba">>, [0, 10], [n1, n2, n3]))),
     ?assertEqual(n3, hd(mem3:owners(<<"dbe">>, [0, 10], [n1, n2, n3]))).
 
-% needed for testing to avoid having to start the mem3 application
-group_docs_by_shard_hack(_DbName, Shards, Docs) ->
-    dict:to_list(
-        lists:foldl(
-            fun(#doc{id = _Id} = Doc, D0) ->
-                lists:foldl(
-                    fun(Shard, D1) ->
-                        dict:append(Shard, Doc, D1)
-                    end,
-                    D0,
-                    Shards
-                )
-            end,
-            dict:new(),
-            Docs
-        )
+group_docs_content_and_order() ->
+    S1 = mk_shard(<<"r1">>, n1, [0, 10]),
+    S2 = mk_shard(<<"r1">>, n2, [0, 10]),
+    DocA = #doc{id = <<"a">>},
+    DocB = #doc{id = <<"b">>},
+    DocC = #doc{id = <<"c">>},
+    Grouped = group_docs([
+        {DocA, [S1, S2]},
+        {DocB, [S1]},
+        {DocC, [S2, S1]}
+    ]),
+    ?assertEqual(2, length(Grouped)),
+    % Every shard gets exactly its docs in original batch order
+    ?assertEqual([DocA, DocB, DocC], couch_util:get_value(S1, Grouped)),
+    ?assertEqual([DocA, DocC], couch_util:get_value(S2, Grouped)).
+
+rotate_ranges_rotates_each_range() ->
+    {[S11, S12, S13, S21, S22, S23], Entries} = rotate_fixture(),
+    % each range's group is sorted, rotated by the {DbName, Range} membership
+    % hash (both amounts are 2 for <<"dbe">>), and its first entry is the copy
+    % start_workers/1 will start first
+    ?assertEqual(
+        [
+            {S13, docs13},
+            {S11, docs11},
+            {S12, docs12},
+            {S23, docs23},
+            {S21, docs21},
+            {S22, docs22}
+        ],
+        rotate_ranges(<<"dbe">>, Entries)
     ).
+
+rotate_ranges_varies_by_db() ->
+    {[S11, _, S13, S21, S22, S23], Entries} = rotate_fixture(),
+    HeadsFor = fun(DbName) ->
+        Rotated = rotate_ranges(DbName, Entries),
+        Ranges = lists:usort([R || {#shard{range = R}, _} <- Rotated]),
+        [hd([S || {#shard{range = R1} = S, _} <- Rotated, R1 =:= R]) || R <- Ranges]
+    end,
+    % different db names => different first copies (phash2({Db, Range}) rem 3
+    % amounts: dba {0, 0}, dbb {0, 1}, dbe {2, 2})
+    ?assertEqual([S11, S21], HeadsFor(<<"dba">>)),
+    ?assertEqual([S11, S22], HeadsFor(<<"dbb">>)),
+    ?assertEqual([S13, S23], HeadsFor(<<"dbe">>)),
+    ?assertNotEqual(HeadsFor(<<"dba">>), HeadsFor(<<"dbe">>)).
+
+rotate_ranges_preserves_entries() ->
+    {_, Entries} = rotate_fixture(),
+    ?assertEqual(lists:sort(Entries), lists:sort(rotate_ranges(<<"dba">>, Entries))),
+    ?assertEqual(lists:sort(Entries), lists:sort(rotate_ranges(<<"dbb">>, Entries))).
+
+rotate_fixture() ->
+    S11 = mk_shard(<<"r1">>, n1, [0, 10]),
+    S12 = mk_shard(<<"r1">>, n2, [0, 10]),
+    S13 = mk_shard(<<"r1">>, n3, [0, 10]),
+    S21 = mk_shard(<<"r2">>, n1, [11, 20]),
+    S22 = mk_shard(<<"r2">>, n2, [11, 20]),
+    S23 = mk_shard(<<"r2">>, n3, [11, 20]),
+    % In a jumbled order to see how rotate_ranges will sort it (or not)
+    Entries = [
+        {S22, docs22},
+        {S11, docs11},
+        {S13, docs13},
+        {S21, docs21},
+        {S12, docs12},
+        {S23, docs23}
+    ],
+    {[S11, S12, S13, S21, S22, S23], Entries}.
+
+mk_shard(Name, Node, Range) ->
+    #shard{name = Name, node = Node, range = Range}.
+
+% needed for testing to avoid having to start the mem3 application
+group_docs_by_shard_hack(DbName, Shards, Docs) ->
+    rotate_ranges(DbName, group_docs([{Doc, Shards} || Doc <- Docs])).
 
 -endif.

@@ -19,7 +19,7 @@
     nodes/0,
     node_info/2,
     props/1,
-    shards/1, shards/2,
+    shards/1, shards/2, shards/3,
     choose_shards/2,
     n/1, n/2,
     dbname/1,
@@ -169,6 +169,11 @@ shards_int(DbName, DocId, Options) when is_list(DocId) ->
     shards_int(DbName, list_to_binary(DocId), Options);
 shards_int(DbName, DocId, Options) ->
     mem3_shards:for_docid(DbName, DocId, Options).
+
+-spec shards(DbName :: binary(), DocId :: binary(), Shards :: [#shard{}]) -> [#shard{}].
+shards(DbName, DocId, Shards) when is_binary(DbName), is_binary(DocId) ->
+    HashKey = mem3_hash:calculate(DbName, DocId),
+    [S || #shard{range = [B, E]} = S <- Shards, B =< HashKey, HashKey =< E].
 
 -spec ushards(DbName :: iodata()) -> [#shard{}].
 ushards(DbName) ->
@@ -636,6 +641,33 @@ live_owner_test() ->
     ?assertEqual(n2, live_owner(Owners, [n2])),
     % no live copy nodes
     ?assertError(badarg, live_owner(Owners, [])).
+
+shards_3_test_() ->
+    {
+        setup,
+        fun() ->
+            meck:new(mem3_hash, [passthrough]),
+            ok = meck:expect(mem3_hash, calculate, fun(_Db, DocId) ->
+                case DocId of
+                    <<"low">> -> 5;
+                    <<"hi">> -> 15;
+                    <<"edge">> -> 10
+                end
+            end)
+        end,
+        fun(_) -> meck:unload() end,
+        fun() ->
+            S1a = #shard{node = n1, range = [0, 10]},
+            S1b = #shard{node = n2, range = [0, 10]},
+            S2a = #shard{node = n1, range = [11, 20]},
+            S2b = #shard{node = n2, range = [11, 20]},
+            Shards = [S1a, S2a, S1b, S2b],
+            ?assertEqual([S1a, S1b], shards(<<"db">>, <<"low">>, Shards)),
+            ?assertEqual([S2a, S2b], shards(<<"db">>, <<"hi">>, Shards)),
+            ?assertEqual([S1a, S1b], shards(<<"db">>, <<"edge">>, Shards)),
+            ?assertEqual([], shards(<<"db">>, <<"low">>, []))
+        end
+    }.
 
 rotate_rand_degenerate_test() ->
     ?assertEqual([1], rotate_rand([1])).
