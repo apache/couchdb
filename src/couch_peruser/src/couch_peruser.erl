@@ -269,10 +269,7 @@ should_handle_doc(ShardName, DocId) ->
 ) -> boolean().
 should_handle_doc_int(ShardName, DocId) ->
     DbName = mem3:dbname(ShardName),
-    Live = [erlang:node() | nodes()],
-    Shards = mem3:shards(DbName, DocId),
-    Nodes = [N || #shard{node = N} <- Shards, lists:member(N, Live)],
-    case mem3:owner(DbName, DocId, Nodes) of
+    case mem3:owner(DbName, DocId) of
         ThisNode when ThisNode =:= node() ->
             couch_log:debug("peruser: handling ~s/~s", [DbName, DocId]),
             % do the database action

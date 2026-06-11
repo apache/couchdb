@@ -352,7 +352,7 @@ group_docs_by_shard(DbName, Docs) ->
                             [] ->
                                 [];
                             [#shard{range = Range} | _] = Shards ->
-                                mem3_util:rotate_list({Range, DbName}, Shards)
+                                owner_order(DbName, Range, Shards)
                         end
                     end
                 )
@@ -361,6 +361,10 @@ group_docs_by_shard(DbName, Docs) ->
             Docs
         )
     ).
+
+owner_order(DbName, Range, Shards) ->
+    Owners = mem3:owners(DbName, Range, [N || #shard{node = N} <- Shards]),
+    [S || N <- Owners, #shard{node = N1} = S <- Shards, N1 =:= N].
 
 append_update_replies([], [], DocReplyDict) ->
     DocReplyDict;
@@ -1143,6 +1147,18 @@ sws_false_mode_ok_can_outvote_conflict() ->
         lists:sort([{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]),
         lists:sort(Reply)
     ).
+
+owner_order_test() ->
+    S1 = #shard{name = <<"r1">>, node = n1, range = [0, 10]},
+    S2 = #shard{name = <<"r1">>, node = n2, range = [0, 10]},
+    S3 = #shard{name = <<"r1">>, node = n3, range = [0, 10]},
+    % The rotation amounts, erlang:phash2({Db, Range}) rem 3, are 0 for
+    % {<<"dba">>, [0, 10]} and 2 for {<<"dbe">>, [0, 10]}
+    ?assertEqual([S1, S2, S3], owner_order(<<"dba">>, [0, 10], [S2, S3, S1])),
+    ?assertEqual([S3, S1, S2], owner_order(<<"dbe">>, [0, 10], [S2, S3, S1])),
+    % the first copy is on the owner node
+    ?assertEqual(n1, hd(mem3:owners(<<"dba">>, [0, 10], [n1, n2, n3]))),
+    ?assertEqual(n3, hd(mem3:owners(<<"dbe">>, [0, 10], [n1, n2, n3]))).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->

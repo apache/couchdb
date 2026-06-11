@@ -52,11 +52,7 @@
 
 -spec owner(Dbname :: binary(), DocId :: binary()) -> node().
 owner(<<"shards/", _/binary>> = ShardName, DocId) ->
-    DbName = mem3:dbname(ShardName),
-    Live = [node() | nodes()],
-    Shards = mem3:shards(DbName, DocId),
-    Nodes = [N || #shard{node = N} <- Shards, lists:member(N, Live)],
-    mem3:owner(DbName, DocId, Nodes);
+    mem3:owner(mem3:dbname(ShardName), DocId);
 owner(_ShardName, _DocId) ->
     node().
 
