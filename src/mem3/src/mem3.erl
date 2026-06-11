@@ -31,7 +31,7 @@
 -export([compare_nodelists/0, compare_shards/1]).
 -export([quorum/1, group_by_proximity/1]).
 -export([live_shards/2]).
--export([belongs/2, owner/3]).
+-export([belongs/2, owner/2, owners/3]).
 -export([get_placement/1]).
 -export([ping/1, ping/2]).
 -export([ping_nodes/0, ping_nodes/1, ping_nodes/2]).
@@ -414,11 +414,26 @@ name(#shard{name = Name}) ->
 name(#ordered_shard{name = Name}) ->
     Name.
 
-% Direct calculation of node membership. This is the algorithm part. It
-% doesn't read the shard map, just picks owner based on a hash.
--spec owner(binary(), binary(), [node()]) -> node().
-owner(DbName, DocId, Nodes) ->
-    hd(mem3_util:rotate_list({DbName, DocId}, lists:usort(Nodes))).
+% Owner node order rotated by {DbName, Range}.
+-spec owners(binary(), binary()) -> [node()].
+owners(DbName, DocId) ->
+    [#shard{range = Range} | _] = Shards = shards(DbName, DocId),
+    owners(DbName, Range, [N || #shard{node = N} <- Shards]).
+
+% Ownership calculation. This is the algorithm part. It doesn't read the shard
+% map, just rotates the given nodes based on a hash of {DbName, Range}.
+-spec owners(binary(), [non_neg_integer()], [node()]) -> [node()].
+owners(DbName, Range, Nodes) ->
+    mem3_util:rotate_list({DbName, Range}, lists:usort(Nodes)).
+
+% Pick the owner node as first live node in the owners/2 order. When a node
+% goes down, ownership of its docs funnels to the next live node in the list.
+-spec owner(binary(), binary()) -> node().
+owner(DbName, DocId) ->
+    live_owner(owners(DbName, DocId), [node() | erlang:nodes()]).
+
+live_owner(Owners, Live) ->
+    hd([N || N <- Owners, lists:member(N, Live)]).
 
 %% Check whether a node is up or down
 %%  side effect: set up a connection to Node if there not yet is one.
@@ -609,6 +624,18 @@ allowed_nodes_test_() ->
             ]
         }
     ]}.
+
+live_owner_test() ->
+    Owners = [n2, n3, n1],
+    % all nodes live: the head of the try-order owns the doc
+    ?assertEqual(n2, live_owner(Owners, [n1, n2, n3])),
+    % owner down: its docs funnel to the next node in the try-order
+    ?assertEqual(n3, live_owner(Owners, [n1, n3])),
+    ?assertEqual(n1, live_owner(Owners, [n1])),
+    % other nodes down: ownership of n2's docs is unaffected
+    ?assertEqual(n2, live_owner(Owners, [n2])),
+    % no live copy nodes
+    ?assertError(badarg, live_owner(Owners, [])).
 
 rotate_rand_degenerate_test() ->
     ?assertEqual([1], rotate_rand([1])).
