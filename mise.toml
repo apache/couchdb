@@ -1,6 +1,6 @@
 [tools]
-elixir = "1.19.5-otp-26"
-erlang = '26'
+elixir = "1.20.1-otp-27"
+erlang = '27'
 java = '21'
 nodejs = '24'
 python = '3'
