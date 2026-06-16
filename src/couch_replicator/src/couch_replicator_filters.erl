@@ -52,7 +52,10 @@ parse(Options) ->
         {undefined, _, undefined} ->
             {ok, {docids, DocIds}};
         {undefined, undefined, _} ->
-            {ok, {mango, ejsort(mango_selector:normalize(Selector))}};
+            % We need paths to hashed with <<"a.b">> form not the new
+            % normalized [<<"a">>, <<"b">>] form
+            Normalized = mango_util:join_keys(mango_selector:normalize(Selector)),
+            {ok, {mango, ejsort(Normalized)}};
         _ ->
             Err = "`selector`, `filter` and `doc_ids` are mutually exclusive",
             {error, list_to_binary(Err)}
@@ -215,6 +218,22 @@ ejsort_compound_values_test() ->
     ?assertEqual(
         ejsort(Ej2),
         {[{<<"x">>, Ej1s}, {<<"y">>, [Ej1s, Ej1s]}, {<<"z">>, Ej1s}]}
+    ).
+
+% Regression tests for replication checkpoint stability. The hashed mango
+% selector must use field paths with dots: <<"a.b">> or we get rewinds!
+mango_selector_single_field_path_test() ->
+    Sel = {[{<<"name">>, <<"x">>}]},
+    ?assertEqual(
+        {ok, {mango, {[{<<"name">>, {[{<<"$eq">>, <<"x">>}]}}]}}},
+        parse([{selector, Sel}])
+    ).
+
+mango_selector_nested_field_path_test() ->
+    Sel = {[{<<"a">>, {[{<<"b">>, 1}]}}]},
+    ?assertEqual(
+        {ok, {mango, {[{<<"a.b">>, {[{<<"$eq">>, 1}]}}]}}},
+        parse([{selector, Sel}])
     ).
 
 -endif.
