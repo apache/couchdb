@@ -838,7 +838,9 @@ setup() ->
     meck:expect(mem3, shards, fun(_, _, _) -> [] end),
     meck:expect(mem3, quorum, fun(_) -> 1 end),
     meck:expect(rexi, cast, fun(_, _) -> ok end),
-    meck:expect(rexi_utils, recv, fun(_, _, _, _, _, _) -> {ok, {error, [{Doc, conflict}]}} end),
+    meck:expect(rexi_utils, recv, fun(_, _, _, _, _, _) ->
+        {ok, {error, [{Doc#doc{meta = [{ref, 1}]}, conflict}]}}
+    end),
     meck:expect(couch_util, reorder_results, fun(_, [{_, Res}], _) -> [Res] end),
     meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
     meck:expect(rexi_monitor, stop, fun(_) -> ok end),

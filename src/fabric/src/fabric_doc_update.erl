@@ -50,7 +50,7 @@ go(DbName, AllDocs0, Opts) ->
         doc_count = length(AllDocs),
         w = fabric_util:w_from_opts(DbName, Options),
         grouped_docs = GroupedDocs,
-        reply = dict:new(),
+        reply = #{},
         dbname = DbName,
         update_options = Options,
         serialize_worker_startup = serialize_worker_startup(Options)
@@ -71,7 +71,7 @@ go(DbName, AllDocs0, Opts) ->
             } = Acc,
             {DefunctWorkers, _} = lists:unzip(GroupedDocs1),
             fabric_util:log_timeout(DefunctWorkers, "update_docs"),
-            {Health, _, _, Resp} = dict:fold(
+            {Health, _, _, Resp} = fold_replies(
                 fun force_reply/3,
                 {ok, W1, SWS, []},
                 DocReplDict
@@ -119,10 +119,10 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
     Conflicts = collect_conflicts(Docs, Replies, Conflicts0, SWS),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),
     Acc1 = Acc0#acc{conflicts = Conflicts},
-    case {WaitingCount, dict:size(DocReplyDict)} of
+    case {WaitingCount, map_size(DocReplyDict)} of
         {1, _} ->
             % last message has arrived, we need to conclude things
-            {Health, W, _, Reply} = dict:fold(
+            {Health, W, _, Reply} = fold_replies(
                 fun force_reply/3,
                 {ok, W, SWS, []},
                 DocReplyDict
@@ -131,7 +131,7 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
             {stop, {Health, Reply}};
         {_, DocCount} ->
             % we've got at least one reply for each document, let's take a look
-            case dict:fold(fun maybe_reply/3, {stop, W, SWS, []}, DocReplyDict) of
+            case fold_replies(fun maybe_reply/3, {stop, W, SWS, []}, DocReplyDict) of
                 continue ->
                     {ok,
                         start_workers(Acc1#acc{
@@ -196,10 +196,20 @@ before_doc_update(DbName, Docs, Opts) ->
             Docs
     end.
 
-tag_docs([]) ->
+% We can't rely on doc ids for uniqueness as we can have duplicates in a batch.
+% Instead we tag each document with a unique lightweight tag so we can match
+% and reorder replies later.
+tag_docs(Docs) ->
+    tag_docs(Docs, 1).
+
+tag_docs([], _Tag) ->
     [];
-tag_docs([#doc{meta = Meta} = Doc | Rest]) ->
-    [Doc#doc{meta = [{ref, make_ref()} | Meta]} | tag_docs(Rest)].
+tag_docs([#doc{meta = Meta} = Doc | Rest], Tag) ->
+    [Doc#doc{meta = [{ref, Tag} | Meta]} | tag_docs(Rest, Tag + 1)].
+
+doc_tag(#doc{meta = Meta}) ->
+    {ref, Tag} = lists:keyfind(ref, 1, Meta),
+    Tag.
 
 untag_docs([]) ->
     [];
@@ -265,11 +275,14 @@ maybe_reply(Doc, Replies, {stop, W, SWS, Acc}) ->
 
 % this ensures that we got some response for all documents being updated
 ensure_all_responses(Health, AllDocs, Resp) ->
+    % Matching docs by their lightweight tag not by #doc{} boides
+    RespByTag = [{doc_tag(Doc), R} || {Doc, R} <- Resp],
+    AllTags = [doc_tag(Doc) || Doc <- AllDocs],
     Results = [
         R
      || R <- couch_util:reorder_results(
-            AllDocs,
-            Resp,
+            AllTags,
+            RespByTag,
             {error, internal_server_error}
         ),
         R =/= noreply
@@ -344,21 +357,19 @@ group_docs_by_shard(DbName, Docs) ->
     rotate_ranges(DbName, Grouped).
 
 group_docs(DocsShards) ->
-    dict:to_list(
-        lists:foldl(
-            fun({Doc, Shards}, D0) ->
-                lists:foldl(
-                    fun(Shard, D1) ->
-                        dict:append(Shard, Doc, D1)
-                    end,
-                    D0,
-                    Shards
-                )
-            end,
-            dict:new(),
-            DocsShards
-        )
-    ).
+    Groups = lists:foldl(
+        fun({Doc, Shards}, Acc0) ->
+            AppendF = fun(DocsAcc) -> [Doc | DocsAcc] end,
+            FoldF = fun(Shard, Acc) -> maps:update_with(Shard, AppendF, [Doc], Acc) end,
+            lists:foldl(FoldF, Acc0, Shards)
+        end,
+        #{},
+        DocsShards
+    ),
+    % Docs are prepended above, so reverse to restore the batch order. Worker
+    % replies are matched positionally against these per-shard doc lists so
+    % we're ensuring they are in the same order.
+    [{Shard, lists:reverse(DocsAcc)} || {Shard, DocsAcc} <- maps:to_list(Groups)].
 
 % Deterministically order each range's workers by ownership. When serialized,
 % workers start with the first entry of each range.
@@ -373,17 +384,33 @@ owner_order(DbName, Range, Entries) ->
     Owners = mem3:owners(DbName, Range, [N || {#shard{node = N}, _} <- Entries]),
     [E || N <- Owners, {#shard{node = N1}, _} = E <- Entries, N1 =:= N].
 
+% Reply accumulator is a map #{doc_tag(Doc) => {Doc, Replies}}. The tags
+% are small integers, so they hash much faster as keys than whole doc bodies.
 append_update_replies([], [], DocReplyDict) ->
     DocReplyDict;
 append_update_replies([Doc | Rest], [], Dict0) ->
     % icky, if replicated_changes only errors show up in result
-    append_update_replies(Rest, [], dict:append(Doc, noreply, Dict0));
+    append_update_replies(Rest, [], append_update_reply(Doc, noreply, Dict0));
 append_update_replies([Doc | Rest1], [Reply | Rest2], Dict0) ->
-    append_update_replies(Rest1, Rest2, dict:append(Doc, Reply, Dict0)).
+    append_update_replies(Rest1, Rest2, append_update_reply(Doc, Reply, Dict0)).
+
+append_update_reply(#doc{} = Doc, Reply, DocReplyDict) ->
+    maps:update_with(
+        doc_tag(Doc),
+        fun({D, Replies}) -> {D, Replies ++ [Reply]} end,
+        {Doc, [Reply]},
+        DocReplyDict
+    ).
+
+% Fold the reply map in reverse tag order so that, with the fold callbacks
+% prepending to their result list, replies come out in the original batch order.
+fold_replies(Fun, Acc0, DocReplyDict) ->
+    Sorted = lists:reverse(lists:sort(maps:to_list(DocReplyDict))),
+    lists:foldl(fun({_Tag, {Doc, Replies}}, Acc) -> Fun(Doc, Replies, Acc) end, Acc0, Sorted).
 
 skip_message(#acc{waiting_count = 0} = Acc) ->
     #acc{w = W, reply = DocReplyDict, serialize_worker_startup = SWS} = Acc,
-    {Health, W, _, Reply} = dict:fold(fun force_reply/3, {ok, W, SWS, []}, DocReplyDict),
+    {Health, W, _, Reply} = fold_replies(fun force_reply/3, {ok, W, SWS, []}, DocReplyDict),
     {stop, {Health, Reply}};
 skip_message(#acc{} = Acc0) ->
     {ok, Acc0}.
@@ -530,12 +557,14 @@ doc_update_test_() ->
 
 % eunits
 doc_update1() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs2 =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Docs = [Doc1],
-    Docs2 = [Doc1, Doc2],
-    Dict = dict:from_list([{Doc, []} || Doc <- Docs]),
-    Dict2 = dict:from_list([{Doc, []} || Doc <- Docs2]),
+    Dict = reply_map(Docs),
+    Dict2 = reply_map(Docs2),
 
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
@@ -623,9 +652,11 @@ doc_update1() ->
     ).
 
 doc_update2() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -634,7 +665,7 @@ doc_update2() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -654,9 +685,11 @@ doc_update2() ->
     ).
 
 doc_update3() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -665,7 +698,7 @@ doc_update3() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -682,9 +715,11 @@ doc_update3() ->
     ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
 
 early_termination_on_conflict_1() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     [S1 | _] =
         Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
@@ -694,7 +729,7 @@ early_termination_on_conflict_1() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
     ?assertEqual(
         {stop, {ok, [{Doc1, conflict}, {Doc2, conflict}]}},
@@ -702,9 +737,11 @@ early_termination_on_conflict_1() ->
     ).
 
 early_termination_on_conflict_2() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     [S1, S2 | _] =
         Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
@@ -714,7 +751,7 @@ early_termination_on_conflict_2() ->
         doc_count = length(Docs),
         w = 3,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
     {ok, #acc{} = Acc1} =
         handle_message({ok, [internal_server_error, internal_server_error]}, S1, Acc0),
@@ -724,9 +761,11 @@ early_termination_on_conflict_2() ->
     ).
 
 handle_all_dbs_active() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -735,7 +774,7 @@ handle_all_dbs_active() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -752,9 +791,11 @@ handle_all_dbs_active() ->
     ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
 
 handle_two_all_dbs_actives() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -763,7 +804,7 @@ handle_two_all_dbs_actives() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -783,9 +824,11 @@ handle_two_all_dbs_actives() ->
     ).
 
 one_forbid() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -795,7 +838,7 @@ one_forbid() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -820,9 +863,11 @@ one_forbid() ->
     ).
 
 two_forbid() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -832,7 +877,7 @@ two_forbid() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -862,9 +907,11 @@ two_forbid() ->
 % tree is extended and so the VDU should forbid the document.
 % Leaving this test here to make sure quorum rules still apply.
 extend_tree_forbid() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -874,7 +921,7 @@ extend_tree_forbid() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -893,9 +940,11 @@ extend_tree_forbid() ->
     ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
 
 other_errors_one_forbid() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -905,7 +954,7 @@ other_errors_one_forbid() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -923,9 +972,11 @@ other_errors_one_forbid() ->
     ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {error, <<"foo">>}}}]}, Reply).
 
 one_error_two_forbid() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -935,7 +986,7 @@ one_error_two_forbid() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -957,9 +1008,11 @@ one_error_two_forbid() ->
     ).
 
 one_success_two_forbid() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -969,7 +1022,7 @@ one_success_two_forbid() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
 
     {ok, #acc{waiting_count = WaitingCount1} = Acc1} =
@@ -991,8 +1044,7 @@ one_success_two_forbid() ->
     ).
 
 worker_before_doc_update_forbidden() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Docs = [Doc1],
+    Docs = [Doc1] = tag_docs([#doc{revs = {1, [<<"foo">>]}}]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -1001,13 +1053,12 @@ worker_before_doc_update_forbidden() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
     ?assertThrow({forbidden, <<"msg">>}, handle_message({forbidden, <<"msg">>}, hd(Shards), Acc)).
 
 handle_bad_request() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Docs = [Doc1],
+    Docs = [Doc1] = tag_docs([#doc{revs = {1, [<<"foo">>]}}]),
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -1016,7 +1067,7 @@ handle_bad_request() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{Doc, []} || Doc <- Docs])
+        reply = reply_map(Docs)
     },
     ?assertThrow(
         {bad_request, msg},
@@ -1043,7 +1094,7 @@ filter_conflicts_drops_seen_docs() ->
 parallel_in_flight_after_conflict() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs = [Tagged1, Tagged2] = tag_docs([Doc1, Doc2]),
     [S1, S2 | _] =
         Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
@@ -1053,21 +1104,21 @@ parallel_in_flight_after_conflict() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{D, []} || D <- Docs])
+        reply = reply_map(Docs)
     },
 
-    % S1 returns Doc1=conflict / Doc2=ok. Doc1 should be added to conflicts. S2
-    % entry should be left alone
+    % S1 returns Doc1=conflict / Doc2=ok. Doc1 (untagged) should be added to
+    % conflicts. S2 entry should be left alone
     {ok, #acc{conflicts = [Doc1]} = Acc1} =
-        handle_message({ok, [conflict, {ok, Doc2}]}, S1, Acc0),
+        handle_message({ok, [conflict, {ok, Tagged2}]}, S1, Acc0),
     {S2, S2Docs} = lists:keyfind(S2, 1, Acc1#acc.grouped_docs),
-    ?assertEqual([Doc1, Doc2], S2Docs),
+    ?assertEqual([Tagged1, Tagged2], S2Docs),
 
     %% S2 reply comes back, and we want lengths to match exactly
     {stop, {ok, Reply}} =
-        handle_message({ok, [conflict, {ok, Doc2}]}, S2, Acc1),
+        handle_message({ok, [conflict, {ok, Tagged2}]}, S2, Acc1),
     ?assertEqual(
-        lists:sort([{Doc1, conflict}, {Doc2, {ok, Doc2}}]),
+        lists:sort([{Tagged1, conflict}, {Tagged2, {ok, Tagged2}}]),
         lists:sort(Reply)
     ).
 
@@ -1107,9 +1158,11 @@ serial_filters_conflicts_at_cast() ->
     ?assertEqual([Tagged2], Stored).
 
 sws_false_mode_conflict_not_final() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     [S1, S2 | _] =
         Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
@@ -1119,7 +1172,7 @@ sws_false_mode_conflict_not_final() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{D, []} || D <- Docs]),
+        reply = reply_map(Docs),
         serialize_worker_startup = false
     },
 
@@ -1134,9 +1187,11 @@ sws_false_mode_conflict_not_final() ->
     {ok, _Acc2} = handle_message({ok, [conflict, {ok, Doc2}]}, S2, Acc1).
 
 sws_false_mode_ok_can_outvote_conflict() ->
-    Doc1 = #doc{revs = {1, [<<"foo">>]}},
-    Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc1, Doc2],
+    Docs =
+        [Doc1, Doc2] = tag_docs([
+            #doc{revs = {1, [<<"foo">>]}},
+            #doc{revs = {1, [<<"bar">>]}}
+        ]),
     [S1, S2, S3] =
         Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
@@ -1146,7 +1201,7 @@ sws_false_mode_ok_can_outvote_conflict() ->
         doc_count = length(Docs),
         w = 2,
         grouped_docs = GroupedDocs,
-        reply = dict:from_list([{D, []} || D <- Docs]),
+        reply = reply_map(Docs),
         serialize_worker_startup = false
     },
     % With enough peers returning ok for both docs, resolve doc1 as ok
@@ -1248,5 +1303,9 @@ mk_shard(Name, Node, Range) ->
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(DbName, Shards, Docs) ->
     rotate_ranges(DbName, group_docs([{Doc, Shards} || Doc <- Docs])).
+
+% seed a reply map the way arriving worker replies would build it
+reply_map(Docs) ->
+    maps:from_list([{doc_tag(Doc), {Doc, []}} || Doc <- Docs]).
 
 -endif.
