@@ -104,7 +104,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
 
         % spawn a process for query
         Self = self(),
-        QPid = spawn(fun() ->
+        {QPid, MRef} = spawn_monitor(fun() ->
             {ok, Result} = couch_mrview:query_view(
                 Db, <<"_design/bar">>, <<"baz">>, []
             ),
@@ -115,7 +115,15 @@ check_indexing_stops_on_ddoc_change(Db) ->
         {ok, _} = couch_db:update_doc(Db, DDocJson2, []),
         receive
             {QPid, Msg} ->
-                ?assertEqual(Msg, ddoc_updated)
+                ?assertEqual(Msg, ddoc_updated);
+            {'DOWN', MRef, process, QPid, Reason} ->
+                error(
+                    {assertion_failed, [
+                        {module, ?MODULE},
+                        {line, ?LINE},
+                        {reason, Reason}
+                    ]}
+                )
         after ?TIMEOUT ->
             error(
                 {assertion_failed, [
