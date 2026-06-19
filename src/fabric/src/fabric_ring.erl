@@ -271,10 +271,19 @@ get_shard_replacements_int(UnusedShards, UsedShards) ->
     ).
 
 range_bounds(Workers, Responses) ->
-    RespRanges = lists:map(fun({R, _, _}) -> R end, Responses),
+    RespRanges = lists:map(fun response_range/1, Responses),
     Ranges = fabric_util:worker_ranges(Workers) ++ RespRanges,
     {Bs, Es} = lists:unzip(Ranges),
     {lists:min(Bs), lists:max(Es)}.
+
+% Responses can be in two shapes depending on ring options
+%  * {{B, E}, Shard, Response} : default and {rmin, R} rings
+%  * {Shard, Response} for all and any ring
+%
+response_range({{B, E}, #shard{}, _Response}) ->
+    {B, E};
+response_range({#shard{range = [B, E]}, _Response}) ->
+    {B, E}.
 
 get_responses([], _) ->
     [];
@@ -560,6 +569,49 @@ handle_response_ring_opts_all_test() ->
     % Stop only after all the shards respond
     Result3 = handle_response(W3, 44, Workers3, [], [all], undefined),
     ?assertMatch({stop, [_ | _]}, Result3).
+
+handle_error_ring_opts_all_test() ->
+    Shard1 = mk_shard("n1", [0, ?RING_END]),
+    Shard2 = mk_shard("n2", [0, ?RING_END]),
+    Shard3 = mk_shard("n3", [0, ?RING_END]),
+
+    ShardList = [Shard1, Shard2, Shard3],
+    [W1, W2, W3] = WithRefs = [S#shard{ref = make_ref()} || S <- ShardList],
+    Workers1 = fabric_dict:init(WithRefs, nil),
+
+    % One response is valid
+    {ok, {Workers2, Responses1}} = handle_response(W1, 42, Workers1, [], [all], undefined),
+    ?assertEqual([{W1, 42}], Responses1),
+    % Then an error happens
+    Result1 = handle_error(W2, Workers2, Responses1, [all]),
+    ?assertMatch({ok, _}, Result1),
+    {ok, Workers3} = Result1,
+    ?assertEqual(fabric_dict:erase(W2, Workers2), Workers3),
+
+    % Once the last worker errors out there is no progress possible
+    ?assertEqual(error, handle_error(W3, Workers3, Responses1, [all])).
+
+node_down_ring_opts_all_test() ->
+    Shard1 = mk_shard("n1", [0, ?RING_END]),
+    Shard2 = mk_shard("n2", [0, ?RING_END]),
+    Shard3 = mk_shard("n3", [0, ?RING_END]),
+
+    ShardList = [Shard1, Shard2, Shard3],
+    [W1, _W2, W3] = WithRefs = [S#shard{ref = make_ref()} || S <- ShardList],
+    Workers1 = fabric_dict:init(WithRefs, nil),
+
+    % n1 response, with all option we have a single {Shard, Response} tuple
+    {ok, {Workers2, Responses1}} = handle_response(W1, 42, Workers1, [], [all], undefined),
+    ?assertEqual([{W1, 42}], Responses1),
+
+    % n2 goes down but n3 is still around to make progress
+    Result1 = node_down(n2, Workers2, Responses1, [all]),
+    ?assertMatch({ok, _}, Result1),
+    {ok, Workers3} = Result1,
+    ?assertEqual([{W3, nil}], Workers3),
+
+    % With n3 down too there is nothing left
+    ?assertEqual(error, node_down(n3, Workers3, Responses1, [all])).
 
 handle_error_test() ->
     Shard1 = mk_shard("n1", [0, 5]),
