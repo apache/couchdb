@@ -72,11 +72,15 @@ chttpd_revs_diff_test_() ->
                     ?TDEF_FE(t_revs_diff_non_existent_doc),
                     ?TDEF_FE(t_revs_diff_all_revs),
                     ?TDEF_FE(t_revs_diff_some_missing_some_not),
+                    ?TDEF_FE(t_revs_diff_invalid_non_list_revs),
+                    ?TDEF_FE(t_revs_diff_invalid_rev_in_list),
                     ?TDEF_FE(t_empty_missing_revs),
                     ?TDEF_FE(t_missing_revs_no_revs),
                     ?TDEF_FE(t_missing_revs_non_existent_doc),
                     ?TDEF_FE(t_missing_revs_all_revs),
-                    ?TDEF_FE(t_missing_revs_some_missing_some_not)
+                    ?TDEF_FE(t_missing_revs_some_missing_some_not),
+                    ?TDEF_FE(t_missing_revs_invalid_non_list_revs),
+                    ?TDEF_FE(t_missing_revs_invalid_rev_in_list)
                 ]
             }
         }
@@ -140,6 +144,18 @@ t_revs_diff_some_missing_some_not({Top, Db}) ->
     #{<<"possible_ancestors">> := PAs1} = Doc1,
     ?assertEqual([<<"2-revb">>, <<"2-revc">>], lists:sort(PAs1)).
 
+t_revs_diff_invalid_non_list_revs({Top, Db}) ->
+    Body = #{?DOC1 => true},
+    {Code, Res} = req(post, Top ++ Db ++ "/_revs_diff", Body),
+    ?assertEqual(400, Code),
+    ?assertMatch(#{<<"error">> := <<"bad_request">>}, Res).
+
+t_revs_diff_invalid_rev_in_list({Top, Db}) ->
+    Body = #{?DOC1 => [true]},
+    {Code, Res} = req(post, Top ++ Db ++ "/_revs_diff", Body),
+    ?assertEqual(400, Code),
+    ?assertMatch(#{<<"error">> := <<"bad_request">>}, Res).
+
 t_empty_missing_revs({Top, Db}) ->
     {Code, Res} = req(post, Top ++ Db ++ "/_missing_revs", #{}),
     ?assertEqual(200, Code),
@@ -189,6 +205,18 @@ t_missing_revs_some_missing_some_not({Top, Db}) ->
         },
         Res
     ).
+
+t_missing_revs_invalid_non_list_revs({Top, Db}) ->
+    Body = #{?DOC1 => true},
+    {Code, Res} = req(post, Top ++ Db ++ "/_missing_revs", Body),
+    ?assertEqual(400, Code),
+    ?assertMatch(#{<<"error">> := <<"bad_request">>}, Res).
+
+t_missing_revs_invalid_rev_in_list({Top, Db}) ->
+    Body = #{?DOC1 => [true]},
+    {Code, Res} = req(post, Top ++ Db ++ "/_missing_revs", Body),
+    ?assertEqual(400, Code),
+    ?assertMatch(#{<<"error">> := <<"bad_request">>}, Res).
 
 create_db(Top, Db) ->
     case req(put, Top ++ Db) of
