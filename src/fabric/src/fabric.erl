@@ -722,12 +722,16 @@ design_doc(GroupName) ->
     <<"_design/", GroupName/binary>>.
 
 idrevs({Id, Revs}) when is_list(Revs) ->
-    {docid(Id), [rev(R) || R <- Revs]}.
+    {docid(Id), [rev(R) || R <- Revs]};
+idrevs({_Id, _Revs}) ->
+    throw({bad_request, <<"Invalid revisions, must be a list">>}).
 
 rev(Rev) when is_list(Rev); is_binary(Rev) ->
     couch_doc:parse_rev(Rev);
 rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
-    Rev.
+    Rev;
+rev(_BadRev) ->
+    throw({bad_request, <<"Invalid rev format">>}).
 
 %% @doc convenience method, useful when testing or calling fabric from the shell
 opts(Options) ->
