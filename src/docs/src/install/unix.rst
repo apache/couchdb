@@ -69,13 +69,21 @@ Enabling the Apache CouchDB package repository
     sudo yum install -y yum-utils
     sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
 
-**RedHat(>=9)**: Run the following commands::
+**RedHat(9)**: Run the following commands::
 
     sudo yum install -y yum-utils
     sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
     # Enable EPEL for the SpiderMonkey dependency
     sudo dnf config-manager --set-enabled crb
     sudo dnf install epel-release epel-next-release
+
+**RedHat(10)**: Run the following commands::
+
+    sudo yum install -y yum-utils
+    sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
+    # Enable EPEL for the SpiderMonkey dependency
+    sudo dnf config-manager --set-enabled crb
+    sudo dnf install epel-release
 
 Installing the Apache CouchDB packages
 --------------------------------------
