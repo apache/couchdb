@@ -192,7 +192,8 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
     end,
     Body0 = get_value(body, Params, []),
     CompressEnabled = config:get_boolean("replicator", "compress_requests", true),
-    {Body, UserHeaders2} = case CompressEnabled andalso should_compress_request(Body0) of
+    ShouldCompress = should_compress_request(Body0),
+    {Body, UserHeaders2} = case CompressEnabled andalso ShouldCompress of
         true ->
             Algorithm = get_compression_algorithm(),
             CompressedBody = compress_body(Body0),
@@ -202,8 +203,8 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
                 _ -> UserHeaders1
             end,
             % Track compression algorithm usage
-            couch_stats:increment_counter([couch_replicator, requests, compressed]),
-            couch_stats:increment_counter([couch_replicator, requests, compressed, Algorithm]),
+            couch_stats:increment_counter([couch_replicator, requests_compressed]),
+            couch_stats:increment_counter([couch_replicator, requests_compressed, Algorithm]),
             {CompressedBody, UpdatedHeaders};
         false ->
             {Body0, UserHeaders1}
