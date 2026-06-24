@@ -120,6 +120,7 @@ var Couch = {
 };
 
 function errstr(e) {
+  if (e == null) return String(e);
   // toSource() is a Spidermonkey "special"
   return (e.toSource ? e.toSource() : e.toString());
 };
