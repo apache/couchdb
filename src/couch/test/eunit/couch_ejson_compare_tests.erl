@@ -36,7 +36,8 @@
     <<"B">>,
     <<"ba">>,
     <<"bb">>,
-    % Highest sorting unicode value. Special case in the nif
+    % Highest sorting unicode value
+    % libicu >= 59 sorts it highest natively
     ?MAX_UNICODE_STRING,
     [<<"a">>],
     [<<"b">>],
