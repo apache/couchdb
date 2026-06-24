@@ -104,6 +104,18 @@ prop_any_json_is_less_than_max_json() ->
         less(V, ?MAX_JSON_OBJ) =:= -1
     end).
 
+% ?MAX_JSON_OBJ (used in Mango) sorts the highest
+prop_sort_key_test_values_less_than_max() ->
+    ?FORALL(V, oneof(?TEST_VALUES), begin
+        sort_key_cmp(V, ?MAX_JSON_OBJ) =:= -1
+    end).
+
+% Any json value sorts lower than ?MAX_JSON_OBJ
+prop_sort_key_any_json_less_than_max() ->
+    ?FORALL(V, json(), begin
+        sort_key_cmp(V, ?MAX_JSON_OBJ) =:= -1
+    end).
+
 % In general, for any json, the nif collator matches the erlang collator
 prop_nif_matches_erlang() ->
     ?FORALL(
@@ -113,6 +125,48 @@ prop_nif_matches_erlang() ->
             less_nif(A, B) =:= less_erl(A, B)
         end)
     ).
+
+% Check sort key orders json values same as as less
+prop_sort_key_matches_less() ->
+    ?FORALL(
+        A,
+        json(),
+        ?FORALL(B, json(), begin
+            sort_key_cmp(A, B) =:= less(A, B)
+        end)
+    ).
+
+% Sorting a list with sort key is the same as sorting it with less
+prop_sort_key_sorts_like_less() ->
+    ?FORALL(L, list(json()), begin
+        ByLess = lists:sort(fun(A, B) -> couch_ejson_compare:less(A, B) =< 0 end, L),
+        BySortKey = lists:sort(
+            fun(A, B) -> couch_ejson_compare:sort_key(A) =< couch_ejson_compare:sort_key(B) end, L
+        ),
+        ByLess =:= BySortKey
+    end).
+
+% Specifically check unicode strings. (The general idea here is we we'd like to
+% spend our "randomizaton budget" exploring unicode strings more than various
+% term shapes).
+prop_sort_key_nif_matches_less() ->
+    ?FORALL(
+        A,
+        sort_key_string(),
+        ?FORALL(B, sort_key_string(), begin
+            sort_key_nif_cmp(A, B) =:= less(A, B)
+        end)
+    ).
+
+% Extra check that grouping works. Surround the value various zero-width
+% characters and ensure sort string is the same as without them. In other words
+% we'd group things like this together.
+prop_sort_key_equivalent_strings() ->
+    ?FORALL({Prefix, Suffix}, {zero_width_list(), zero_width_list()}, begin
+        Binary = unicode:characters_to_binary(Prefix ++ [$a] ++ Suffix),
+        SortKey = couch_ejson_compare:get_sort_key_nif(<<"a">>),
+        SortKey =:= couch_ejson_compare:get_sort_key_nif(Binary)
+    end).
 
 % Generators
 
@@ -163,6 +217,24 @@ zero_width_list() ->
 
 zero_width_chars() ->
     oneof([16#200B, 16#200C, 16#200D]).
+
+% Besides handling json string we also handle ?MAX_UNICODE_STRING (the
+% <<255,255,255,255>> to sorting values so make we mix that top sorting value
+% into our values we pass into the ICU library. It should handle them as of ICU
+% version >= 59
+sort_key_string() ->
+    oneof([json_string(), ?MAX_UNICODE_STRING]).
+
+sort_key_cmp(A, B) ->
+    term_cmp(couch_ejson_compare:sort_key(A), couch_ejson_compare:sort_key(B)).
+
+sort_key_nif_cmp(A, B) ->
+    term_cmp(couch_ejson_compare:get_sort_key_nif(A), couch_ejson_compare:get_sort_key_nif(B)).
+
+% Helper to return the same shape as less/2
+term_cmp(A, B) when A < B -> -1;
+term_cmp(A, B) when A > B -> 1;
+term_cmp(_, _) -> 0.
 
 -else.
 
@@ -237,6 +309,36 @@ compare_strings_nif_test() ->
     ?assertError(badarg, compare_strings(42, <<"a">>)),
     ?assertError(badarg, compare_strings(<<"a">>, 42)),
     ?assertError(badarg, compare_strings(42, 42)).
+
+% Here we test sort key can handle keys larger than the internal 256 stack
+% buffer just so we can get some coverage there.
+get_sort_key_nif_large_test() ->
+    Small = binary:copy(<<"a">>, 16),
+    Large = binary:copy(<<"a">>, 1000),
+    SmallKey = couch_ejson_compare:get_sort_key_nif(Small),
+    LargeKey = couch_ejson_compare:get_sort_key_nif(Large),
+
+    ?assert(byte_size(SmallKey) =< 256),
+    ?assert(byte_size(LargeKey) > 512),
+
+    % Check the large heap path against less/2 just for belt and suspenders
+    Larger = <<Large/binary, "b">>,
+    ?assertEqual(-1, less(Large, Larger)),
+    ?assert(LargeKey < couch_ejson_compare:get_sort_key_nif(Larger)),
+
+    % Adding a lot of zero width junk to a large string still works
+    ZeroWidth = binary:copy(<<16#E2, 16#80, 16#8B>>, 300),
+    Equiv = <<Large/binary, ZeroWidth/binary>>,
+    ?assertEqual(0, less(Large, Equiv)),
+    ?assertEqual(LargeKey, couch_ejson_compare:get_sort_key_nif(Equiv)).
+
+sort_key_max_json_obj_test() ->
+    Max = couch_ejson_compare:sort_key(?MAX_JSON_OBJ),
+    ?assertEqual(Max, couch_ejson_compare:sort_key(?MAX_JSON_OBJ)),
+    lists:foreach(
+        fun(V) -> ?assertEqual(-1, sort_key_cmp(V, ?MAX_JSON_OBJ)) end,
+        [null, false, true, 42, <<"z">>, ?MAX_UNICODE_STRING, [1, 2], {[{<<"a">>, 1}]}]
+    ).
 
 % Helper functions
 
