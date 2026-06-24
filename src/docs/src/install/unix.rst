@@ -32,6 +32,7 @@ to install CouchDB is to use the convenience binary packages:
 * CentOS/RHEL 7
 * CentOS/RHEL 8
 * CentOS/RHEL 9 (with caveats: depends on EPEL repository)
+* CentOS/RHEL 10
 * Debian 11 (bullseye)
 * Debian 12 (bookworm)
 * Ubuntu 22.04 (jammy)
@@ -79,11 +80,7 @@ Enabling the Apache CouchDB package repository
 
 **RedHat(10)**: Run the following commands::
 
-    sudo yum install -y yum-utils
-    sudo yum-config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
-    # Enable EPEL for the SpiderMonkey dependency
-    sudo dnf config-manager --set-enabled crb
-    sudo dnf install epel-release
+    dnf config-manager --add-repo https://couchdb.apache.org/repo/couchdb.repo
 
 Installing the Apache CouchDB packages
 --------------------------------------
@@ -104,9 +101,13 @@ joined together and configured consistently across all machines; **follow the**
 
     sudo yum install -y couchdb
 
-**RedHat(>=9)**: Run the following commands::
+**RedHat(9)**: Run the following commands::
 
     sudo yum install -y mozjs78
+    sudo yum install -y couchdb
+
+**RedHat(10)**: Run the following command::
+
     sudo yum install -y couchdb
 
 Once installed, :ref:`create an admin user<config/admins>` by hand before
