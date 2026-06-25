@@ -174,7 +174,9 @@ all_dbs_info_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
 
 handle_dbs_info_req(#httpd{method = 'GET', path_parts = [<<"_dbs_info">>]} = Req) ->
     handle_all_dbs_info_req(Req);
-handle_dbs_info_req(#httpd{method = 'POST', path_parts = [<<"_dbs_info">>]} = Req) ->
+handle_dbs_info_req(#httpd{method = Method, path_parts = [<<"_dbs_info">>]} = Req) when
+    ?POST_OR_QUERY(Method)
+->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
@@ -191,7 +193,7 @@ handle_dbs_info_req(#httpd{method = 'POST', path_parts = [<<"_dbs_info">>]} = Re
         true -> ok;
         false -> throw({bad_request, too_many_keys})
     end,
-    {ok, Resp} = chttpd:start_json_response(Req, 200),
+    {ok, Resp} = chttpd:start_json_response(Req, 200, [?ACCEPT_QUERY]),
     send_chunk(Resp, "["),
     lists:foldl(
         fun(DbName, AccSeparator) ->
@@ -212,11 +214,11 @@ handle_dbs_info_req(#httpd{method = 'POST', path_parts = [<<"_dbs_info">>]} = Re
     send_chunk(Resp, "]"),
     chttpd:end_json_response(Resp);
 handle_dbs_info_req(#httpd{method = Method, path_parts = [<<"_dbs_info">> | _]} = Req) when
-    Method == 'GET'; Method == 'POST'
+    Method == 'GET'; ?POST_OR_QUERY(Method)
 ->
     chttpd:send_error(Req, not_found);
 handle_dbs_info_req(Req) ->
-    send_method_not_allowed(Req, "GET,HEAD,POST").
+    send_method_not_allowed(Req, "GET,HEAD,POST,QUERY").
 
 handle_task_status_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
