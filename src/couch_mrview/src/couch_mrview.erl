@@ -179,6 +179,7 @@ validate_ddoc_field1([{Key, Value} | Rest], Type) ->
 map_function_type({Props}) ->
     case couch_util:get_value(<<"language">>, Props) of
         <<"query">> -> object;
+        <<"selector">> -> object;
         _ -> string
     end.
 
