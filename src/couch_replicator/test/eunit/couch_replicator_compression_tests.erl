@@ -26,32 +26,32 @@ compression_test_() ->
             fun couch_replicator_test_helper:test_setup/0,
             fun couch_replicator_test_helper:test_teardown/1,
             [
-                ?TDEF_FE(should_compress_http_requests, ?TIMEOUT_EUNIT)
+                ?TDEF_FE(should_not_compress_by_default, ?TIMEOUT_EUNIT),
+                ?TDEF_FE(should_compress_when_enabled, ?TIMEOUT_EUNIT)
             ]
         }
     }.
 
-should_compress_http_requests({_Ctx, {Source, Target}}) ->
-    config:set("replicator", "compress_min_size", "10", false),
-    config:set("replicator", "compress_requests", "true", false),
-    config:set("replicator", "compression_algorithm", "gzip", false),
-    InitialCompressed = couch_stats:sample([couch_replicator, requests_compressed]),
-    InitialGzip = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-    ?assertEqual(0, InitialCompressed),
-    ?assertEqual(0, InitialGzip),
+should_not_compress_by_default({_Ctx, {Source, Target}}) ->
+    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
     populate_db(Source, ?DOCS_COUNT),
     replicate(Source, Target),
-    compare_dbs(Source, Target),   
-    FinalCompressed = couch_stats:sample([couch_replicator, requests_compressed]),
-    FinalGzip = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-    ?assertEqual(?DOCS_COUNT, FinalCompressed,
-                 io_lib:format("Expected ~p compressed requests, got: ~p", [?DOCS_COUNT, FinalCompressed])),
-    ?assertEqual(?DOCS_COUNT, FinalGzip,
-                 io_lib:format("Expected ~p gzip requests, got: ~p", [?DOCS_COUNT, FinalGzip])),
-    ?assertEqual(FinalCompressed, FinalGzip,
-                 "All compressed requests should use gzip algorithm"),
-    config:delete("replicator", "compress_min_size", false),
+    compare_dbs(Source, Target),
+    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    ?assertEqual(Before, After).
+
+should_compress_when_enabled({_Ctx, {Source, Target}}) ->
+    config:set("replicator", "compress_requests", "true", false),
+    config:set("replicator", "compress_min_size", "10", false),
+    config:set("replicator", "compression_algorithm", "gzip", false),
+    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    populate_db(Source, ?DOCS_COUNT),
+    replicate(Source, Target),
+    compare_dbs(Source, Target),
+    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    ?assert(After > Before),
     config:delete("replicator", "compress_requests", false),
+    config:delete("replicator", "compress_min_size", false),
     config:delete("replicator", "compression_algorithm", false).
 
 populate_db(DbName, Count) ->

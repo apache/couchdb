@@ -1,32 +1,16 @@
-# CouchDB Replicator Compression
+# CouchDB Replicator Request Compression
 
-## Overview
+The replicator can optionally gzip-compress outbound request bodies for
+`_bulk_docs` and `_revs_diff`. This reduces bandwidth during replication.
+CouchDB already supports `Content-Encoding: gzip` on inbound requests, so no
+server-side changes are needed.
 
-The replicator now supports configurable HTTP compression to reduce bandwidth during replication.
-
-## Configuration
+Compression is disabled by default. Relevant `[replicator]` config keys:
 
 ```ini
 [replicator]
-; Enable compression (default: true)
-compress_requests = true
-
-; Minimum body size to compress in bytes (default: 1024)
-compress_min_size = 1024
-
-; Algorithm: gzip (default), deflate
-compression_algorithm = gzip
-
-; Accept these encodings in responses
-accept_encodings = gzip, deflate
+compress_requests = false
+compress_min_size = 1024    ; minimum body size in bytes before compressing
 ```
 
-## Algorithms
-
-- **gzip** (default): Best compatibility, built-in to Erlang
-- **deflate**: Built-in to Erlang, slightly faster than gzip
-
-## Statistics
-
-- `couch_replicator.requests.compressed` - Total compressed requests
-- `couch_replicator.requests.compressed.{algorithm}` - Per-algorithm stats
+Metric: `couch_replicator.requests_compressed.gzip` — number of gzip-compressed requests sent.
