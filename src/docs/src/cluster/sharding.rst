@@ -103,33 +103,6 @@ rounding down. In a default cluster where
     Each node in a cluster can be a coordinating node for any one
     request. There are no special roles for nodes inside the cluster.
 
-The size of the required quorum can be configured at request time by
-setting the ``r`` parameter for document reads, and the ``w``
-parameter for document writes. The ``_view``, ``_find``, and
-``_search`` endpoints read only one copy no matter what quorum is
-configured, effectively making a quorum of 1 for these requests.
-
-For example, here is a request that directs the coordinating node to
-send a response once at least two nodes have responded:
-
-.. code-block:: bash
-
-    $ curl "$COUCH_URL:5984/{db}/{doc}?r=2"
-
-Here is a similar example for writing a document:
-
-.. code-block:: bash
-
-    $ curl -X PUT "$COUCH_URL:5984/{db}/{doc}?w=2" -d '{...}'
-
-Setting ``r`` or ``w`` to be equal to ``n`` (the number of replicas)
-means you will only receive a response once all nodes with relevant
-shards have responded or timed out, and as such this approach does not
-guarantee `ACIDic consistency
-<https://en.wikipedia.org/wiki/ACID#Consistency>`__. Setting ``r`` or
-``w`` to 1 means you will receive a response after only one relevant
-node has responded.
-
 .. _cluster/sharding/examine:
 
 Examining database shards
