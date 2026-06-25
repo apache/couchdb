@@ -142,10 +142,10 @@ function handleError(e) {
       respond(["error", e.error, e.reason]);
       return true;
     } else if (e.name) {
-      respond(["error", e.name, e]);
+      respond(["error", e.name, errstr(e)]);
       return true;
     } else {
-      respond(["error","unnamed_error", e.stack]);
+      respond(["error","unnamed_error", errstr(e)]);
       return true;
     }
   };
