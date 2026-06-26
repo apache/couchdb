@@ -30,6 +30,9 @@
 
 #define MAX_DEPTH 10
 
+/* Memory bound on the sort key buffer to guard against pathological cases */
+#define MAX_SORT_KEY_SIZE (128 * 1024 * 1024)
+
 #define NO_ERROR 0
 #define BAD_ARG_ERROR 1
 #define MAX_DEPTH_ERROR 2
@@ -230,6 +233,12 @@ get_sort_key_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
             break;
         }
         int32_t newcap = keycap * 2;
+        if (newcap > MAX_SORT_KEY_SIZE) {
+            if (key != keystack) {
+                enif_free(key);
+            }
+            return enif_make_badarg(env);
+        }
         if (key == keystack) {
             key = enif_alloc(newcap);
             memcpy(key, keystack, keylen);

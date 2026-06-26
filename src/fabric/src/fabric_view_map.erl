@@ -224,15 +224,21 @@ handle_message(insufficient_storage, _Worker, State) ->
     {stop, State}.
 
 merge_row(Dir, Collation, undefined, Row, Rows0) ->
+    % Use a sort key as the buffer key. When using ICU for collation (as we do
+    % by default) we spend some CPU time once to generate a sort key and then
+    % subsequently compare rows in Erlang during merging, as opposed to what we
+    % did previously, when we used ICU pair-wise comparisons NIF calls against
+    % all the existing rows in the buffer.
+    RowKey = fabric_view_row:get_key(Row),
+    BufKey = {fabric_view:buf_key(Collation, RowKey), fabric_view_row:get_id(Row)},
     Rows1 = lists:merge(
-        fun(RowA, RowB) ->
-            KeyA = fabric_view_row:get_key(RowA),
-            KeyB = fabric_view_row:get_key(RowB),
-            IdA = fabric_view_row:get_id(RowA),
-            IdB = fabric_view_row:get_id(RowB),
-            compare(Dir, Collation, {KeyA, IdA}, {KeyB, IdB})
+        fun({BKa, _}, {BKb, _}) ->
+            case Dir of
+                fwd -> BKa < BKb;
+                rev -> BKa > BKb
+            end
         end,
-        [Row],
+        [{BufKey, Row}],
         Rows0
     ),
     {Rows1, undefined};
@@ -282,11 +288,6 @@ merge_row(Dir, Collation, KeyDict0, Row, Rows0) ->
             {Rows1, KeyDict1}
     end.
 
-compare(fwd, <<"raw">>, A, B) -> A < B;
-compare(rev, <<"raw">>, A, B) -> B < A;
-compare(fwd, _, A, B) -> couch_ejson_compare:less_json_ids(A, B);
-compare(rev, _, A, B) -> couch_ejson_compare:less_json_ids(B, A).
-
 % KeyDict captures the user-supplied ordering of keys POSTed by the user by
 % mapping to integers (see fabric_view:keydict/1). It's possible that these keys
 % do not compare equal (i.e., =:=, used by dict) to those returned by the view
@@ -323,7 +324,7 @@ handle_message_test_() ->
         foreach,
         fun() ->
             meck:new(foo, [non_strict]),
-            meck:new(fabric_view)
+            meck:new(fabric_view, [passthrough])
         end,
         fun(_) -> meck:unload() end,
         [
@@ -465,10 +466,12 @@ t_handle_message_sorted(_) ->
     Rows21 = {view_row, #{id => id1, key => key1}},
     Rows22 = {view_row, #{id => id2, key => key2, doc => doc2, worker => Worker}},
     Rows23 = {view_row, #{id => id3, key => key3}},
-    Rows1 = [Rows11, Rows13],
-    Rows2 = [Rows21, Rows23],
-    Rows3 = [Rows11, Rows12, Rows13],
-    Rows4 = [Rows21, Rows22, Rows23],
+    % with no POSTed keys the buffer holds rows wrapped as {{BufKey, Id}, Row}
+    Wrap = fun(Rows) -> [wrap(<<"raw">>, R) || R <- Rows] end,
+    Rows1 = Wrap([Rows11, Rows13]),
+    Rows2 = Wrap([Rows21, Rows23]),
+    Rows3 = Wrap([Rows11, Rows12, Rows13]),
+    Rows4 = Wrap([Rows21, Rows22, Rows23]),
     State1 = #collector{
         sorted = true,
         limit = 10,
@@ -552,6 +555,7 @@ merge_row_test_() ->
         fun(_) -> ok end,
         [
             ?TDEF_FE(t_merge_row_no_keys),
+            ?TDEF_FE(t_merge_row_partition_keys),
             ?TDEF_FE(t_merge_row_raw),
             ?TDEF_FE(t_merge_row)
         ]
@@ -561,17 +565,45 @@ t_merge_row_no_keys(_) ->
     Row1 = #view_row{id = id2, key = <<"key2">>},
     Rows11 = #view_row{id = id1, key = <<"key1">>},
     Rows13 = #view_row{id = id3, key = <<"key3">>},
-    Rows1 = [Rows11, Rows13],
-    Rows3 = [Rows11, Row1, Rows13],
     Row2 = {view_row, #{id => id2, key => <<"key2">>}},
     Rows21 = {view_row, #{id => id1, key => <<"key1">>}},
     Rows23 = {view_row, #{id => id3, key => <<"key3">>}},
-    Rows2 = [Rows23, Rows21],
-    Rows4 = [Rows23, Row2, Rows21],
-    ?assertEqual({Rows3, undefined}, merge_row(fwd, <<"raw">>, undefined, Row1, Rows1)),
-    ?assertEqual({Rows3, undefined}, merge_row(fwd, <<"collation">>, undefined, Row1, Rows1)),
-    ?assertEqual({Rows4, undefined}, merge_row(rev, <<"raw">>, undefined, Row2, Rows2)),
-    ?assertEqual({Rows4, undefined}, merge_row(rev, <<"collation">>, undefined, Row2, Rows2)).
+    % check merged row order for row/icu and fwd/reverse cases
+    lists:foreach(
+        fun(Col) ->
+            Wrap = fun(Rows) -> [wrap(Col, R) || R <- Rows] end,
+            {Fwd, undefined} = merge_row(fwd, Col, undefined, Row1, Wrap([Rows11, Rows13])),
+            ?assertEqual([Rows11, Row1, Rows13], unwrap(Fwd)),
+            {Rev, undefined} = merge_row(rev, Col, undefined, Row2, Wrap([Rows23, Rows21])),
+            ?assertEqual([Rows23, Row2, Rows21], unwrap(Rev))
+        end,
+        [<<"raw">>, <<"icu">>]
+    ).
+
+% Partitioned views attach the partition to the key as {p, Partition, Key};
+% merge_row must handle that
+t_merge_row_partition_keys(_) ->
+    P = <<"foo">>,
+    Row1 = #view_row{id = id4, key = {p, P, 4}},
+    Rows12 = #view_row{id = id2, key = {p, P, 2}},
+    Rows16 = #view_row{id = id6, key = {p, P, 6}},
+    lists:foreach(
+        fun(Col) ->
+            Wrap = fun(Rows) -> [wrap(Col, R) || R <- Rows] end,
+            {Merged, undefined} = merge_row(fwd, Col, undefined, Row1, Wrap([Rows12, Rows16])),
+            ?assertEqual([Rows12, Row1, Rows16], unwrap(Merged))
+        end,
+        [<<"raw">>, <<"icu">>]
+    ).
+
+% This mimicks clause 1 of merge_row buffer
+wrap(Collation, Row) ->
+    Key = fabric_view_row:get_key(Row),
+    Id = fabric_view_row:get_id(Row),
+    {{fabric_view:buf_key(Collation, Key), Id}, Row}.
+
+unwrap(Buffer) ->
+    [Row || {_BufKey, Row} <- Buffer].
 
 t_merge_row_raw(_) ->
     Keys1 = dict:from_list([{key1, id1}, {key2, id2}, {key3, id3}]),

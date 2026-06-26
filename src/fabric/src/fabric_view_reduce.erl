@@ -89,7 +89,7 @@ go2(DbName, DDocId, VName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Cal
         os_proc = OsProc,
         reducer = RedSrc,
         collation = couch_util:get_value(<<"collation">>, View#mrview.options),
-        rows = #{},
+        rows = fabric_view:reduce_buffer_new(),
         user_acc = Acc0,
         update_seq =
             case UpdateSeq of
@@ -121,13 +121,13 @@ go2(DbName, DDocId, VName, Workers, {red, {_, Lang, View}, _} = VInfo, Args, Cal
     end.
 
 handle_row(Row0, {Worker, _} = Source, State) ->
-    #collector{counters = Counters0, rows = Rows0} = State,
+    #collector{counters = Counters0, rows = Buffer0, collation = Collation} = State,
     true = fabric_dict:is_key(Worker, Counters0),
     Row = fabric_view_row:set_worker(Row0, Source),
     Key = fabric_view_row:get_key(Row),
-    Rows = maps:update_with(Key, fun(Rs) -> Rs ++ [Row] end, [Row], Rows0),
+    Buffer = fabric_view:reduce_buffer_add(Collation, Key, Row, Buffer0),
     C1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    State1 = State#collector{rows = Rows, counters = C1},
+    State1 = State#collector{rows = Buffer, counters = C1},
     fabric_view:maybe_send_row(State1).
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
@@ -197,7 +197,7 @@ handle_message_test_() ->
         foreach,
         fun() ->
             meck:new(foo, [non_strict]),
-            meck:new(fabric_view)
+            meck:new(fabric_view, [passthrough])
         end,
         fun(_) -> meck:unload() end,
         [
@@ -282,18 +282,24 @@ t_handle_message_row(_) ->
     Worker = {worker, from},
     Counters1 = [{worker, 3}],
     Counters2 = [{worker, 4}],
+    Collation = <<"raw">>,
     Row1 = #view_row{key = key1},
     Row11 = #view_row{key = key1, worker = Worker},
-    Rows1 = maps:from_list([{key1, []}, {key2, []}, {key3, []}]),
-    Rows3 = maps:from_list([{key1, [Row11]}, {key2, []}, {key3, []}]),
     Row2 = {view_row, #{key => key1}},
     Row21 = {view_row, #{key => key1, worker => Worker}},
-    Rows2 = maps:from_list([{key1, []}, {key2, []}, {key3, []}]),
-    Rows4 = maps:from_list([{key1, [Row21]}, {key2, []}, {key3, []}]),
-    State1 = #collector{counters = Counters1, rows = Rows1},
-    State2 = #collector{counters = Counters1, rows = Rows2},
-    State3 = #collector{counters = Counters2, rows = Rows3},
-    State4 = #collector{counters = Counters2, rows = Rows4},
+    % Feed the same seed buffer to the input and expected to get the resulting
+    % trees to be the same
+    Seed = lists:foldl(
+        fun(K, T) -> gb_trees:insert(K, {K, []}, T) end,
+        fabric_view:reduce_buffer_new(),
+        [key1, key2, key3]
+    ),
+    Buffer3 = fabric_view:reduce_buffer_add(Collation, key1, Row11, Seed),
+    Buffer4 = fabric_view:reduce_buffer_add(Collation, key1, Row21, Seed),
+    State1 = #collector{counters = Counters1, rows = Seed, collation = Collation},
+    State2 = #collector{counters = Counters1, rows = Seed, collation = Collation},
+    State3 = #collector{counters = Counters2, rows = Buffer3, collation = Collation},
+    State4 = #collector{counters = Counters2, rows = Buffer4, collation = Collation},
     meck:expect(fabric_view, maybe_send_row, [
         {[State3], meck:val(maybe_row1)}, {[State4], meck:val(maybe_row2)}
     ]),
