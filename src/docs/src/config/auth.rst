@@ -617,3 +617,24 @@ Authentication Configuration
 
            [chttpd_auth_lockout]
            max_lifetime = 300000
+
+    .. config:option:: client_ip_header :: header carrying the real client IP
+
+        By default the client is identified by the socket peer address. When
+        CouchDB runs behind a reverse proxy or CDN, that peer is the proxy, so
+        every client shares a single address and the lockout becomes
+        ineffective (and may lock out unrelated clients sharing a proxy egress
+        IP). Set ``client_ip_header`` to the request header that carries the
+        real client IP, such as ``X-Forwarded-For``, ``X-Real-IP`` or
+        ``CF-Connecting-IP``. When the header holds a comma-separated list, the
+        first address is used. When unset (the default), the socket peer is
+        used. ::
+
+           [chttpd_auth_lockout]
+           client_ip_header = X-Forwarded-For
+
+        .. warning::
+            Only enable this when a trusted proxy **overwrites** this header on
+            every request. If clients can reach CouchDB directly, or the proxy
+            merely appends to a client-supplied header, an attacker can spoof
+            the header to evade the lockout.

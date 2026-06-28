@@ -47,7 +47,8 @@
   ],
   "AuthLockoutTest": [
     "lockout after multiple failed authentications",
-    "do not lockout after multiple failed authentications"
+    "do not lockout after multiple failed authentications",
+    "lockout is tracked per client_ip_header, not the shared socket peer"
   ],
   "BasicsTest": [
     "'+' in document name should encode to '+'",
