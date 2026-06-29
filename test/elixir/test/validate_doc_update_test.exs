@@ -77,6 +77,36 @@ defmodule ValidateDocUpdateTest do
     assert resp.status_code == 403
   end
 
+  @tag :with_db
+  test "invalid JavaScript VDU is detected on doc update", context do
+    Couch.put("/_node/_local/_config/couchdb/validate_vdu", body: "\"false\"")
+    db = context[:db_name]
+
+    resp = Couch.put("/#{db}/_design/js-test", body: %{
+      language: "javascript",
+      validate_doc_update: "function () {"
+    })
+
+    assert resp.status_code == 201
+
+    resp = Couch.put("/#{db}/doc", body: %{a: 1})
+    assert resp.status_code == 500
+  end
+
+  @tag :with_db
+  test "invalid JavaScript VDU is rejected on design doc update", context do
+    Couch.put("/_node/_local/_config/couchdb/validate_vdu", body: "\"true\"")
+    db = context[:db_name]
+
+    resp = Couch.put("/#{db}/_design/js-test", body: %{
+      language: "javascript",
+      validate_doc_update: "function () {"
+    })
+
+    assert resp.status_code == 400
+    assert resp.body["error"] == "compilation_error"
+  end
+
   @mango_type_check %{
     language: "query",
 
@@ -105,6 +135,11 @@ defmodule ValidateDocUpdateTest do
     resp = Couch.put("/#{db}/doc", body: %{"no" => "type"})
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
+    assert resp.body["reason"] == %{
+      "failures" => [
+        %{"path" => ["newDoc", "type"], "message" => "must be present"}
+      ]
+    }
   end
 
   @tag :with_db
@@ -208,5 +243,43 @@ defmodule ValidateDocUpdateTest do
     resp = Couch.put("/#{db}/doc3", body: %{"type" => "movie", "year" => 2094})
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
+  end
+
+  @tag :with_db
+  test "invalid Mango VDU is detected on doc update", context do
+    Couch.put("/_node/_local/_config/couchdb/validate_vdu", body: "\"false\"")
+    db = context[:db_name]
+
+    ddoc = %{
+      language: "query",
+
+      validate_doc_update: %{
+        "wrongField" => %{"year" => %{"$lt" => 2026}}
+      }
+    }
+
+    resp = Couch.put("/#{db}/_design/mango-test-2", body: ddoc)
+    assert resp.status_code == 201
+
+    resp = Couch.put("/#{db}/doc", body: %{a: 1})
+    assert resp.status_code == 500
+  end
+
+  @tag :with_db
+  test "Mango VDU rejects a design doc if it contains unknown fields", context do
+    Couch.put("/_node/_local/_config/couchdb/validate_vdu", body: "\"true\"")
+    db = context[:db_name]
+
+    ddoc = %{
+      language: "query",
+
+      validate_doc_update: %{
+        "wrongField" => %{"year" => %{"$lt" => 2026}}
+      }
+    }
+
+    resp = Couch.put("/#{db}/_design/mango-test-2", body: ddoc)
+    assert resp.status_code == 400
+    assert resp.body["error"] == "compilation_error"
   end
 end

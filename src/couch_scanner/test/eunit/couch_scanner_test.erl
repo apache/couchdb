@@ -95,7 +95,7 @@ setup() ->
             #{from => <<"x">>, to => <<"y">>}
         ],
         updates => #{u1 => <<"function(d,r){return [];}">>},
-        validate_doc_update => <<"function(n,o,u,s){return true;">>
+        validate_doc_update => <<"function(n,o,u,s){return true;}">>
     }),
     ok = add_doc(DbName2, ?DOC3, #{foo3 => bax}),
     ok = add_doc(DbName2, ?DOC4, #{foo4 => baw, <<>> => this_is_ok_apparently}),
