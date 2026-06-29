@@ -370,9 +370,10 @@ Replicator Database Configuration
 
         List of replicator client authentication plugins. Plugins will
         be tried in order and the first to initialize successfully will
-        be used. By default there are two plugins available:
+        be used. By default there are three plugins available:
         `couch_replicator_auth_session` implementing session (cookie)
-        authentication, and `couch_replicator_auth_noop` implementing basic
+        authentication, `couch_replicator_auth_ibm` integrating
+        with IBM's IAM service and `couch_replicator_auth_noop` implementing basic
         authentication. For backwards compatibility, the no-op plugin should be used at
         the end of the plugin list::
 
