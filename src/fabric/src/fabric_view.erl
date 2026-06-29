@@ -24,6 +24,7 @@
     maybe_update_others/5
 ]).
 -export([fix_skip_and_limit/1]).
+-export([reduce_buffer_new/0, reduce_buffer_add/4, buf_key/2]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -262,14 +263,16 @@ get_next_row(#collector{reducer = RedSrc} = State0) when RedSrc =/= undefined ->
     #collector{
         query_args = #mrargs{direction = Dir, extra = Options},
         keys = Keys,
-        rows = RowDict0,
+        rows = Buffer0,
         lang = Lang,
         counters = Counters0,
         collation = Collation
     } = State0,
-    {Key, RestKeys} = find_next_key(Keys, Dir, Collation, RowDict0),
-    case reduce_row_dict_take(Key, RowDict0, Collation) of
-        {Records, RowDict} ->
+    case reduce_take(Keys, Dir, Collation, Buffer0) of
+        {skip, RestKeys} ->
+            % explicit key not present in the buffer, move on to the next one
+            get_next_row(State0#collector{keys = RestKeys});
+        {Key, Rows, RestKeys, Buffer} ->
             Counters = lists:foldl(
                 fun(Row, CntrsAcc) ->
                     {Worker, From} = fabric_view_row:get_worker(Row),
@@ -282,9 +285,9 @@ get_next_row(#collector{reducer = RedSrc} = State0) when RedSrc =/= undefined ->
                     fabric_dict:update_counter(Worker, -1, CntrsAcc)
                 end,
                 Counters0,
-                Records
+                Rows
             ),
-            Wrapped = [[fabric_view_row:get_value(R)] || R <- Records],
+            Wrapped = [[fabric_view_row:get_value(R)] || R <- Rows],
             ReduceCtx = ?l2b(
                 io_lib:format("~s/~s/_view/~s", [
                     State0#collector.db_name,
@@ -294,66 +297,86 @@ get_next_row(#collector{reducer = RedSrc} = State0) when RedSrc =/= undefined ->
             ),
             {ok, [Reduced]} = couch_query_servers:rereduce(Lang, [RedSrc], Wrapped, ReduceCtx),
             {ok, Finalized} = couch_query_servers:finalize(RedSrc, Reduced),
-            State = State0#collector{keys = RestKeys, rows = RowDict, counters = Counters},
+            State = State0#collector{keys = RestKeys, rows = Buffer, counters = Counters},
             ViewRow = fabric_view_row:from_props(
                 [{key, Key}, {id, reduced}, {value, Finalized}], Options
             ),
-            {ViewRow, State};
-        error ->
-            get_next_row(State0#collector{keys = RestKeys})
+            {ViewRow, State}
     end;
 get_next_row(State) ->
-    #collector{rows = [Row | Rest], counters = Counters0} = State,
+    #collector{rows = [Head | Rest], counters = Counters0} = State,
+    % map rows may be wrapped as {BufKey, Row} by fabric_view_map:merge_row;
+    % a plain row is tagged view_row, a wrapped one has a sort-key tuple first.
+    Row =
+        case element(1, Head) of
+            view_row -> Head;
+            _ -> element(2, Head)
+        end,
     {Worker, From} = fabric_view_row:get_worker(Row),
     rexi:stream_ack(From),
     Counters1 = fabric_dict:update_counter(Worker, -1, Counters0),
     {Row, State#collector{rows = Rest, counters = Counters1}}.
 
-reduce_row_dict_take(Key, RowMap, <<"raw">>) ->
-    maps:take(Key, RowMap);
-reduce_row_dict_take(Key, RowMap, _Collation) ->
-    EqKeys = [K || K <- maps:keys(RowMap), couch_ejson_compare:less(K, Key) =:= 0],
-    case EqKeys of
-        [] ->
-            error;
-        [_ | _] ->
-            Vals = [map_get(K, RowMap) || K <- EqKeys],
-            {lists:flatten(Vals), maps:without(EqKeys, RowMap)}
+% The reduce buffer is a gb_tree keyed by buf_key. A buf_key can be either a
+% raw key (when using the "raw" collation) or an ICU sort term. Under ICU keys
+% that collate equal will group under the same buf_key. Then take_smallest of a
+% gb_tree will yield the next row to be emitted with an O(log N) complexity.
+% (As opposed O(n) if just search through all the entries with a pair-wise ICU
+% compare(A,B) function.
+reduce_buffer_new() ->
+    gb_trees:empty().
+
+reduce_buffer_add(Collation, Key, Row, Buffer) ->
+    BufKey = buf_key(Collation, Key),
+    case gb_trees:lookup(BufKey, Buffer) of
+        none ->
+            gb_trees:insert(BufKey, {Key, [Row]}, Buffer);
+        {value, {Key0, Rows}} ->
+            gb_trees:update(BufKey, {Key0, Rows ++ [Row]}, Buffer)
     end.
 
-%% TODO: rectify nil <-> undefined discrepancies
-find_next_key(nil, Dir, Collation, RowDict) ->
-    find_next_key(undefined, Dir, Collation, RowDict);
-find_next_key(undefined, Dir, Collation, RowDict) ->
-    % Note: we need the smallest key only here. Before this used to effectively
-    % be hd(lists:sort()). With a potentially expensive collator comparison
-    % function we'd like to avoid resorting instead we just get the minimum.
-    case maps:keys(RowDict) of
-        [] ->
-            throw(complete);
-        [First | Rest] ->
-            Less = fun(A, B) -> compare(Dir, Collation, A, B) end,
-            MinKey = lists:foldl(
-                fun(Key, Min) ->
-                    case Less(Key, Min) of
-                        true -> Key;
-                        false -> Min
-                    end
-                end,
-                First,
-                Rest
-            ),
-            {MinKey, nil}
-    end;
-find_next_key([], _, _, _) ->
-    throw(complete);
-find_next_key([Key | Rest], _, _, _) ->
-    {Key, Rest}.
+% The buffer key for views. For a "raw" collator it's just the key as is. For
+% the default ICU collation it's sort key generated by ICU We also handle the
+% partition wrapped rows and unwrap them before comparing (see detach_partition/1).
+buf_key(Collation, {p, Partition, Key}) ->
+    {p, Partition, buf_key(Collation, Key)};
+buf_key(<<"raw">>, Key) ->
+    Key;
+buf_key(_Collation, Key) ->
+    couch_ejson_compare:sort_key(Key).
 
-compare(fwd, <<"raw">>, A, B) -> A < B;
-compare(rev, <<"raw">>, A, B) -> B < A;
-compare(fwd, _, A, B) -> couch_ejson_compare:less_json(A, B);
-compare(rev, _, A, B) -> couch_ejson_compare:less_json(B, A).
+% Get the next key from the reduce buffer. This would be called from
+% get_next_row() and and only after we've checked fabric_dict:any(0, Counters),
+% so that when a group key is removed, all shards would have stream passed it.
+% The rows we return is the complete set and we can then re-reduce them.
+%
+reduce_take(undefined, Dir, _Collation, Buffer) ->
+    % Get the next key in collation order or throw(complete) when no more keys
+    case gb_trees:is_empty(Buffer) of
+        true ->
+            throw(complete);
+        false ->
+            {_BufKey, {Key, Rows}, Buffer1} =
+                case Dir of
+                    rev -> gb_trees:take_largest(Buffer);
+                    _ -> gb_trees:take_smallest(Buffer)
+                end,
+            {Key, Rows, undefined, Buffer1}
+    end;
+reduce_take([], _Dir, _Collation, _Buffer) ->
+    %   For an explicit list of user provided keys:
+    %     - Get the next matching key or throw(complete) if no more keys remain
+    %     - Return {skip, RestKeys} if we have keys but this key is not found
+    throw(complete);
+reduce_take([Key | RestKeys], _Dir, Collation, Buffer) ->
+    % Explicit keys are emitted in the requested order
+    BufKey = buf_key(Collation, Key),
+    case gb_trees:lookup(BufKey, Buffer) of
+        none ->
+            {skip, RestKeys};
+        {value, {Key0, Rows}} ->
+            {Key0, Rows, RestKeys, gb_trees:delete(BufKey, Buffer)}
+    end.
 
 extract_view(Pid, ViewName, [], _ViewType) ->
     couch_log:error("missing_named_view ~p", [ViewName]),
@@ -493,6 +516,15 @@ remove_finalizer(Args) ->
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
+
+% These used to be our main collation comparison before switching to sort keys.
+% Move them to the testing section to test before and after and that our sort
+% keys work the same as pair-wise comparisons
+%
+compare(fwd, <<"raw">>, A, B) -> A < B;
+compare(rev, <<"raw">>, A, B) -> B < A;
+compare(fwd, _, A, B) -> couch_ejson_compare:less_json(A, B);
+compare(rev, _, A, B) -> couch_ejson_compare:less_json(B, A).
 
 remove_overlapping_shards_test() ->
     Cb = undefined,
@@ -817,9 +849,13 @@ t_get_next_row_reduce(_) ->
         {view_row, #{value => value3, worker => {worker2, W2From}}}
     ],
     Values = [[value1], [value2], [value3]],
-    RowDict1 = maps:from_list([{key1, ViewRows1}, {key2, undefined}, {key3, undefined}]),
-    RowDict2 = maps:from_list([{key1, ViewRows2}, {key2, undefined}, {key3, undefined}]),
-    RowDict3 = maps:from_list([{key2, undefined}, {key3, undefined}]),
+    BuildBuffer = fun(Pairs) ->
+        lists:foldl(fun({K, V}, T) -> gb_trees:insert(K, {K, V}, T) end, gb_trees:empty(), Pairs)
+    end,
+    Buffer1 = BuildBuffer([{key1, ViewRows1}, {key2, undefined}, {key3, undefined}]),
+    Buffer2 = BuildBuffer([{key1, ViewRows2}, {key2, undefined}, {key3, undefined}]),
+    Buffer1Rest = gb_trees:delete(key1, Buffer1),
+    Buffer2Rest = gb_trees:delete(key1, Buffer2),
     Language = <<"language">>,
     Collation = <<"raw">>,
     Counters1 = [{worker1, 3}, {worker2, 5}],
@@ -827,7 +863,7 @@ t_get_next_row_reduce(_) ->
     State1 = #collector{
         query_args = QueryArgs1,
         keys = Keys,
-        rows = RowDict1,
+        rows = Buffer1,
         lang = Language,
         counters = Counters1,
         collation = Collation,
@@ -836,7 +872,7 @@ t_get_next_row_reduce(_) ->
     State2 = #collector{
         query_args = QueryArgs2,
         keys = Keys,
-        rows = RowDict2,
+        rows = Buffer2,
         lang = Language,
         counters = Counters1,
         collation = Collation,
@@ -845,7 +881,7 @@ t_get_next_row_reduce(_) ->
     State3 = #collector{
         query_args = QueryArgs1,
         keys = KeysRest,
-        rows = RowDict3,
+        rows = Buffer1Rest,
         lang = Language,
         collation = Collation,
         counters = Counters2,
@@ -854,7 +890,7 @@ t_get_next_row_reduce(_) ->
     State4 = #collector{
         query_args = QueryArgs2,
         keys = KeysRest,
-        rows = RowDict3,
+        rows = Buffer2Rest,
         lang = Language,
         collation = Collation,
         counters = Counters2,
@@ -870,91 +906,115 @@ t_get_next_row_reduce(_) ->
     ?assertEqual({Row1, State3}, get_next_row(State1)),
     ?assertEqual({Row2, State4}, get_next_row(State2)).
 
-find_next_key_empty_test() ->
-    ?assertThrow(complete, find_next_key(undefined, fwd, <<"raw">>, #{})),
-    ?assertThrow(complete, find_next_key(nil, fwd, <<"raw">>, #{})).
-
-find_next_key_min_raw_fwd_test() ->
-    RowDict = maps:from_list([{3, a}, {1, b}, {2, c}]),
-    ?assertEqual({1, nil}, find_next_key(undefined, fwd, <<"raw">>, RowDict)),
-    % a nil key list delegates to the undefined clause
-    ?assertEqual({1, nil}, find_next_key(nil, fwd, <<"raw">>, RowDict)).
-
-find_next_key_min_raw_rev_test() ->
-    RowDict = maps:from_list([{3, a}, {1, b}, {2, c}]),
-    ?assertEqual({3, nil}, find_next_key(undefined, rev, <<"raw">>, RowDict)).
-
-% Check ICU collator. Assert that sort and find_next_key does the same thing
-%
-find_next_key_min_collation_test() ->
-    % Not these are different under ICU vs raw Erlang
-    %  M, a, z (Erlang)
-    %  a, M, z (ICU)
-    Keys = [<<"z">>, <<"M">>, <<"a">>],
-    RowDict = maps:from_list([{K, v} || K <- Keys]),
-    lists:foreach(
-        fun(Dir) ->
-            Cmp = fun(A, B) -> compare(Dir, <<"icu">>, A, B) end,
-            [Expected | _] = lists:sort(Cmp, maps:keys(RowDict)),
-            ?assertEqual({Expected, nil}, find_next_key(undefined, Dir, <<"icu">>, RowDict))
+% Build reduce buffer as handle_row may do it, one row at a time
+red_buffer(Collation, KeyRows) ->
+    lists:foldl(
+        fun({Key, Rows}, Buffer) ->
+            lists:foldl(
+                fun(Row, Acc) -> reduce_buffer_add(Collation, Key, Row, Acc) end,
+                Buffer,
+                Rows
+            )
         end,
-        [fwd, rev]
-    ),
-    % Sanity check
-    IcuMin = element(1, find_next_key(undefined, fwd, <<"icu">>, RowDict)),
-    RawMin = element(1, find_next_key(undefined, fwd, <<"raw">>, RowDict)),
-    ?assertEqual(<<"a">>, IcuMin),
-    ?assertEqual(<<"M">>, RawMin),
-    % They do different things
-    ?assertNotEqual(IcuMin, RawMin).
-
-% Check min scan against sorting and taking the head
-find_next_key_matches_sort_test() ->
-    Keys = [<<"k5">>, <<"k1">>, <<"k3">>, <<"k2">>, <<"k4">>],
-    RowDict = maps:from_list([{K, v} || K <- Keys]),
-    lists:foreach(
-        fun(Dir) ->
-            CmpFun = fun(A, B) -> compare(Dir, <<"raw">>, A, B) end,
-            [Expected | _] = lists:sort(CmpFun, maps:keys(RowDict)),
-            ?assertEqual({Expected, nil}, find_next_key(undefined, Dir, <<"raw">>, RowDict))
-        end,
-        [fwd, rev]
+        reduce_buffer_new(),
+        KeyRows
     ).
 
-% A key list is returned head-first and untouched.
-find_next_key_explicit_keys_test() ->
-    ?assertEqual({k1, [k2, k3]}, find_next_key([k1, k2, k3], fwd, <<"raw">>, #{})),
-    ?assertThrow(complete, find_next_key([], fwd, <<"raw">>, #{})).
+reduce_take_empty_test() ->
+    Empty = reduce_buffer_new(),
+    ?assertThrow(complete, reduce_take(undefined, fwd, <<"raw">>, Empty)),
+    ?assertThrow(complete, reduce_take([], fwd, <<"raw">>, Empty)).
 
-% Raw collation: keys match exactly
-reduce_row_dict_take_raw_test() ->
-    RowMap = #{<<"a">> => [r1, r2], <<"b">> => [r3]},
-    ?assertEqual({[r1, r2], #{<<"b">> => [r3]}}, reduce_row_dict_take(<<"a">>, RowMap, <<"raw">>)).
+reduce_take_min_raw_fwd_test() ->
+    Buffer = red_buffer(<<"raw">>, [{3, [a]}, {1, [b]}, {2, [c]}]),
+    {Key, Rows, RestKeys, Buffer1} = reduce_take(undefined, fwd, <<"raw">>, Buffer),
+    ?assertEqual(1, Key),
+    ?assertEqual([b], Rows),
+    ?assertEqual(undefined, RestKeys),
+    % the next smallest is 2
+    ?assertEqual(2, element(1, reduce_take(undefined, fwd, <<"raw">>, Buffer1))).
 
-reduce_row_dict_take_raw_missing_test() ->
-    RowMap = #{<<"a">> => [r1]},
-    ?assertEqual(error, reduce_row_dict_take(<<"x">>, RowMap, <<"raw">>)).
+reduce_take_min_raw_rev_test() ->
+    Buffer = red_buffer(<<"raw">>, [{3, [a]}, {1, [b]}, {2, [c]}]),
+    ?assertEqual(3, element(1, reduce_take(undefined, rev, <<"raw">>, Buffer))).
 
-% With ICU use nfc and nfd forms of "é", they should match as equivalent but
-% not equal in raw. We're making sure ICU is doing ICU things here.
-reduce_row_dict_take_collation_test() ->
+% With ICU "a" < "M" < "z". With raw "M" < "a" < "z"
+reduce_take_collation_order_test() ->
+    Pairs = [{K, [v]} || K <- [<<"z">>, <<"M">>, <<"a">>]],
+    IcuMin = element(1, reduce_take(undefined, fwd, <<"icu">>, red_buffer(<<"icu">>, Pairs))),
+    RawMin = element(1, reduce_take(undefined, fwd, <<"raw">>, red_buffer(<<"raw">>, Pairs))),
+    ?assertEqual(<<"a">>, IcuMin),
+    ?assertEqual(<<"M">>, RawMin),
+    ?assertNotEqual(IcuMin, RawMin).
+
+% Sorting and taking the head returns th same as our sortkey consturct
+reduce_take_matches_sort_test() ->
+    Keys = [<<"k5">>, <<"k1">>, <<"k3">>, <<"k2">>, <<"k4">>],
+    Pairs = [{K, [v]} || K <- Keys],
+    lists:foreach(
+        fun(Col) ->
+            Buffer = red_buffer(Col, Pairs),
+            lists:foreach(
+                fun(Dir) ->
+                    Cmp = fun(A, B) -> compare(Dir, Col, A, B) end,
+                    [Expected | _] = lists:sort(Cmp, Keys),
+                    ?assertEqual(
+                        Expected, element(1, reduce_take(undefined, Dir, Col, Buffer))
+                    )
+                end,
+                [fwd, rev]
+            )
+        end,
+        [<<"raw">>, <<"icu">>]
+    ).
+
+% Check explicit keys (user passes keys=...).
+%  - They should emit in that order
+%  - If any missing they should be skipped
+%  - Empty keys throws `complete`
+reduce_take_explicit_keys_test() ->
+    Buffer = red_buffer(<<"raw">>, [{<<"a">>, [r1]}, {<<"b">>, [r2]}]),
+    {Key, Rows, RestKeys, Buffer1} = reduce_take([<<"a">>, <<"b">>], fwd, <<"raw">>, Buffer),
+    ?assertEqual(<<"a">>, Key),
+    ?assertEqual([r1], Rows),
+    ?assertEqual([<<"b">>], RestKeys),
+    ?assertEqual({skip, [<<"b">>]}, reduce_take([<<"x">>, <<"b">>], fwd, <<"raw">>, Buffer)),
+    ?assertThrow(complete, reduce_take([], fwd, <<"raw">>, Buffer1)).
+
+% A proper ICU check. "é" under NFC and NFD collate equal but have different
+% bytes
+reduce_take_collation_grouping_test() ->
     Nfc = <<195, 169>>,
     Nfd = <<101, 204, 129>>,
-    % Sanity check
     ?assertEqual(0, couch_ejson_compare:less(Nfc, Nfd)),
-    RowMap = #{Nfc => [r1], Nfd => [r2], <<"z">> => [r3]},
-    {Vals, Rest} = reduce_row_dict_take(Nfc, RowMap, <<"icu">>),
-    ?assertEqual([r1, r2], lists:sort(Vals)),
-    ?assertEqual(#{<<"z">> => [r3]}, Rest).
+    Buffer = red_buffer(<<"icu">>, [{Nfc, [r1]}, {Nfd, [r2]}, {<<"z">>, [r3]}]),
+    {Key, Rows, _, Buffer1} = reduce_take(undefined, fwd, <<"icu">>, Buffer),
+    ?assertEqual(Nfc, Key),
+    ?assertEqual([r1, r2], lists:sort(Rows)),
+    % We should have taken both r1 and r2 and only z should be left
+    {Key2, Rows2, _, _} = reduce_take(undefined, fwd, <<"icu">>, Buffer1),
+    ?assertEqual(<<"z">>, Key2),
+    ?assertEqual([r3], Rows2).
 
-% With ICU and key that only equals itself
-reduce_row_dict_take_collation_single_test() ->
-    RowMap = #{<<"a">> => [r1], <<"b">> => [r2]},
-    ?assertEqual({[r1], #{<<"b">> => [r2]}}, reduce_row_dict_take(<<"a">>, RowMap, <<"icu">>)).
+% With ICU and a key that only equals itself
+reduce_take_collation_single_test() ->
+    Buffer = red_buffer(<<"icu">>, [{<<"a">>, [r1]}, {<<"b">>, [r2]}]),
+    {Key, Rows, _, _} = reduce_take(undefined, fwd, <<"icu">>, Buffer),
+    ?assertEqual(<<"a">>, Key),
+    ?assertEqual([r1], Rows),
+    ?assertEqual({skip, []}, reduce_take([<<"zzz">>], fwd, <<"icu">>, Buffer)).
 
-% With ICU but key is missing altogether
-reduce_row_dict_take_collation_missing_test() ->
-    RowMap = #{<<"a">> => [r1], <<"b">> => [r2]},
-    ?assertEqual(error, reduce_row_dict_take(<<"zzz">>, RowMap, <<"icu">>)).
+% Partitioned view keys look like {p, Partition, Key}. Our buf_key should handle that.
+buf_key_partition_test() ->
+    P = <<"foo">>,
+    ?assertEqual({p, P, 2}, buf_key(<<"raw">>, {p, P, 2})),
+    ?assertEqual({p, P, couch_ejson_compare:sort_key(2)}, buf_key(<<"icu">>, {p, P, 2})),
+    lists:foreach(
+        fun(Collation) ->
+            ?assert(buf_key(Collation, {p, P, 2}) < buf_key(Collation, {p, P, 4})),
+            ?assert(buf_key(Collation, {p, P, <<"a">>}) < buf_key(Collation, {p, P, <<"b">>}))
+        end,
+        [<<"raw">>, <<"icu">>]
+    ).
 
 -endif.
