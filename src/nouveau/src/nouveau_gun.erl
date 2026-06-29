@@ -129,8 +129,16 @@ start_gun(URL) ->
     KeyFile = config:get("nouveau", "ssl_key_file"),
     CertFile = config:get("nouveau", "ssl_cert_file"),
     Password = config:get("nouveau", "ssl_password"),
+    Verify = verify(config:get_boolean("nouveau", "ssl_verify", true)),
     Transport = scheme_to_transport(Scheme),
     BaseConnOptions = #{transport => Transport, protocols => [http2]},
+    BaseTLSOptions =
+        if
+            CACertFile /= undefined ->
+                [{verify, Verify}, {cacertfile, CACertFile}];
+            true ->
+                [{verify, Verify}]
+        end,
     ConnOptions =
         if
             Transport == tls andalso KeyFile /= undefined andalso CertFile /= undefined ->
@@ -142,7 +150,11 @@ start_gun(URL) ->
                 },
                 CertKeyConf1 = maps:filter(fun remove_undefined/2, CertKeyConf0),
                 BaseConnOptions#{
-                    tls_opts => [{certs_keys, [CertKeyConf1]}]
+                    tls_opts => [{certs_keys, [CertKeyConf1]} | BaseTLSOptions]
+                };
+            Transport == tls ->
+                BaseConnOptions#{
+                    tls_opts => BaseTLSOptions
                 };
             true ->
                 BaseConnOptions
@@ -160,3 +172,8 @@ scheme_to_transport("http") ->
     tcp;
 scheme_to_transport("https") ->
     tls.
+
+verify(false) ->
+    verify_none;
+verify(true) ->
+    verify_peer.
