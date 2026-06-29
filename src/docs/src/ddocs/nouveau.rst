@@ -72,9 +72,18 @@ Nouveau has been upgraded to use Lucene 10, earlier releases used Lucene 9.
 
 Nouveau can query and update indexes created by Lucene 9 but will not create new
 ones. The index definition can optionally define a ``lucene_version`` field
-(which must be either 9 or 10 expressed as an integer). If not specified
-when defining a new index the current version (10) will be automatically
-added to the definition.
+(which must be either 9 or 10 expressed as an integer).
+
+If not specified when defining a new index the current version (10)
+will be automatically added to the definition.
+
+Updates to existing design documents do not get a version number
+inserted automatically so as not to invalidate working Lucene 9
+indexes.
+
+It is recommended to add an explicit ``lucene_version`` field when
+creating or modifying index definitions, setting it to the highest
+value your installation supports.
 
 As Lucene only supports indexes up to one major release behind the current, it
 is important to rebuild all indexes to the current release. As Lucene major
