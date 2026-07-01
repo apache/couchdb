@@ -54,7 +54,13 @@ all_docs_test_() ->
                     ?TDEF_FE(http_query_with_limit_and_skip),
                     ?TDEF_FE(http_query_with_limit_and_skip_and_query_limit),
                     ?TDEF_FE(http_query_with_query_limit_and_over_limit),
-                    ?TDEF_FE(http_query_with_include_docs)
+                    ?TDEF_FE(http_query_with_include_docs),
+                    ?TDEF_FE(should_throw_range_error_fwd),
+                    ?TDEF_FE(should_throw_range_error_rev),
+                    ?TDEF_FE(should_not_throw_range_error_valid_fwd),
+                    ?TDEF_FE(should_not_throw_range_error_valid_rev),
+                    ?TDEF_FE(http_impossible_range_fwd),
+                    ?TDEF_FE(http_impossible_range_rev)
                 ]
             }
         }
@@ -298,6 +304,58 @@ http_query_with_include_docs(Db) ->
             }
         ],
         http_query(Db, Params)
+    ).
+
+%% Direct Erlang API tests for check_range on _all_docs
+
+should_throw_range_error_fwd(Db) ->
+    Error = {query_parse_error,
+        <<"No rows can match your key range, reverse your ",
+          "start_key and end_key or set descending=true">>},
+    ?assertThrow(Error, run_query(Db, [{start_key, <<"z">>}, {end_key, <<"a">>}])).
+
+should_throw_range_error_rev(Db) ->
+    Error = {query_parse_error,
+        <<"No rows can match your key range, reverse your ",
+          "start_key and end_key or set descending=false">>},
+    ?assertThrow(Error, run_query(Db, [
+        {start_key, <<"a">>}, {end_key, <<"z">>}, {direction, rev}
+    ])).
+
+should_not_throw_range_error_valid_fwd(Db) ->
+    {ok, _} = run_query(Db, [{start_key, <<"3">>}, {end_key, <<"5">>}]).
+
+should_not_throw_range_error_valid_rev(Db) ->
+    {ok, _} = run_query(Db, [
+        {start_key, <<"5">>}, {end_key, <<"3">>}, {direction, rev}
+    ]).
+
+%% HTTP tests for check_range on _all_docs
+
+http_impossible_range_fwd(Db) ->
+    {Code, Res} = http_req(Db, "?start_key=\"z\"&end_key=\"a\""),
+    ?assertEqual(400, Code),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> :=
+                <<"No rows can match your key range, reverse your ",
+                  "start_key and end_key or set descending=true">>
+        },
+        Res
+    ).
+
+http_impossible_range_rev(Db) ->
+    {Code, Res} = http_req(Db, "?descending=true&start_key=\"a\"&end_key=\"z\""),
+    ?assertEqual(400, Code),
+    ?assertMatch(
+        #{
+            <<"error">> := <<"query_parse_error">>,
+            <<"reason">> :=
+                <<"No rows can match your key range, reverse your ",
+                  "start_key and end_key or set descending=false">>
+        },
+        Res
     ).
 
 db_url(Db) ->
