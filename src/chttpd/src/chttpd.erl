@@ -266,7 +266,7 @@ handle_request_int(MochiReq) ->
                 P
         end,
 
-    Peer = MochiReq:get(peer),
+    Peer = couch_httpd:peer(MochiReq),
 
     Method1 =
         case MochiReq:get(method) of
@@ -1693,5 +1693,29 @@ handle_req_after_auth_test() ->
     ),
     ok = meck:unload(chttpd_handlers),
     ok = meck:unload(chttpd_auth).
+
+custom_peer_test() ->
+    Headers = mochiweb_headers:make([
+        {"HOST", "127.0.0.1:15984"}, {"X-Couch-Client-IP", "1.2.3.4"}
+    ]),
+    MochiReq = mochiweb_request:new(
+        socket,
+        [],
+        'PUT',
+        "/newdb",
+        version,
+        Headers
+    ),
+    Req = #httpd{
+        mochi_req = MochiReq,
+        begin_ts = {1458, 588713, 124003},
+        original_method = 'GET',
+        peer = "4.3.2.1",
+        nonce = "nonce"
+    },
+    ok = meck:new(config, [passthrough]),
+    ok = meck:expect(config, get, fun("chttpd", "peer_header") -> "x-couch-client-ip" end),
+    ?assertEqual("1.2.3.4", couch_httpd:peer(Req)),
+    ok = meck:unload(config).
 
 -endif.

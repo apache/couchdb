@@ -93,7 +93,7 @@ json_req_obj_field(<<"body">>, #httpd{req_body = undefined, mochi_req = Req}, _D
 json_req_obj_field(<<"body">>, #httpd{req_body = Body}, _Db, _DocId) ->
     Body;
 json_req_obj_field(<<"peer">>, #httpd{peer = undefined, mochi_req = Req}, _, _) ->
-    ?l2b(Req:get(peer));
+    ?l2b(couch_httpd:peer(Req));
 json_req_obj_field(<<"peer">>, #httpd{peer = Peer}, _Db, _DocId) ->
     ?l2b(Peer);
 json_req_obj_field(<<"form">>, #httpd{mochi_req = Req, method = Method} = HttpReq, Db, DocId) ->

@@ -27,8 +27,8 @@ is_locked_out(#httpd{} = Req, UserName, UserSalt) ->
 
 is_locked_out_int(#httpd{} = Req, Mode, UserName, UserSalt) ->
     LockoutThreshold = lockout_threshold(),
-    case peer(Req) of
-        nopeer ->
+    case Req#httpd.peer of
+        Peer when is_atom(Peer) ->
             false;
         Peer ->
             case ets_lru:lookup_d(?LRU, {Peer, UserName, UserSalt}) of
@@ -48,8 +48,8 @@ is_locked_out_int(#httpd{} = Req, Mode, UserName, UserSalt) ->
     end.
 
 lockout(#httpd{} = Req, UserName, UserSalt) ->
-    case peer(Req) of
-        nopeer ->
+    case Req#httpd.peer of
+        Peer when is_atom(Peer) ->
             ok;
         Peer ->
             case lockout_mode() of
@@ -74,12 +74,3 @@ lockout_mode() ->
 
 lockout_threshold() ->
     config:get_integer("chttpd_auth_lockout", "threshold", 5).
-
-peer(#httpd{mochi_req = MochiReq}) ->
-    Socket = mochiweb_request:get(socket, MochiReq),
-    case Socket of
-        {remote, _Pid, _Ref} ->
-            nopeer;
-        _ ->
-            mochiweb_request:get(peer, MochiReq)
-    end.

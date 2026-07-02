@@ -46,6 +46,7 @@
 -export([handle_request/1]).
 -export([set_auth_handlers/0]).
 -export([maybe_decompress/2]).
+-export([peer/1]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
@@ -1424,7 +1425,23 @@ http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
+peer(#httpd{} = Req) ->
+    peer(Req#httpd.mochi_req);
 peer(MochiReq) ->
+    case config:get("chttpd", "peer_header") of
+        undefined ->
+            peer_from_socket(MochiReq);
+        PeerHeader ->
+            Peer = MochiReq:get_header_value(PeerHeader),
+            case inet:parse_address(Peer) of
+                {ok, Addr} ->
+                    inet:ntoa(Addr);
+                _ ->
+                    peer_from_socket(MochiReq)
+            end
+    end.
+
+peer_from_socket(MochiReq) ->
     case MochiReq:get(socket) of
         {remote, Pid, _} ->
             node(Pid);

@@ -288,6 +288,19 @@ HTTP Server Options
             [chttpd]
             disconnect_check_jitter_msec = 15000
 
+    .. config:option:: peer_header :: Header to use for peer
+
+        .. versionadded:: 3.5.3
+
+        If defined, CouchDB will use the value of this request header to determine peer.
+        The header value must be a single IPv4 or IPv6 address. If the header is missing,
+        CouchDB will look at the ``X-Forwarded-For`` header if present, or the socket
+        peer address if not.
+        This affects logging as well as the auth lockout feature. ::
+
+            [chttpd]
+            peer_header = X-Couch-Client-IP
+
 .. config:section:: httpd :: HTTP Server Options
 
     .. versionchanged:: 3.2 These options were moved to [chttpd] section:

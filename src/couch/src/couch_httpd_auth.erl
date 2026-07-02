@@ -813,18 +813,16 @@ integer_to_binary(Int, Len) when is_integer(Int), is_integer(Len) ->
     Padded = <<Padding/binary, Unpadded/binary>>,
     binary:part(Padded, byte_size(Padded), -Len).
 
-authentication_warning(#httpd{mochi_req = Req}, User) ->
-    Peer = Req:get(peer),
+authentication_warning(#httpd{} = Req, User) ->
     couch_log:warning(
         "~p: Authentication failed for user ~s from ~s",
-        [?MODULE, User, Peer]
+        [?MODULE, User, Req#httpd.peer]
     ).
 
-lockout_warning(#httpd{mochi_req = Req}, User) ->
-    Peer = Req:get(peer),
+lockout_warning(#httpd{} = Req, User) ->
     couch_log:warning(
         "~p: Authentication rejected for locked-out user ~s from ~s",
-        [?MODULE, User, Peer]
+        [?MODULE, User, Req#httpd.peer]
     ).
 
 -ifdef(TEST).
