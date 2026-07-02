@@ -631,17 +631,26 @@ config: [
       name: clouseau1
       domain: 127.0.0.1
     }
+    clouseau: {
+      dir: dev/lib/node1/indexes
+    }
   }
   {
     node: {
       name: clouseau2
       domain: 127.0.0.1
     }
+    clouseau: {
+      dir: dev/lib/node2/indexes
+    }
   }
   {
     node: {
       name: clouseau3
       domain: 127.0.0.1
+    }
+    clouseau: {
+      dir: dev/lib/node3/indexes
     }
   }
 ]
@@ -803,7 +812,7 @@ def boot_clouseau(ctx, idx):
 
         if is_ziose:
             clouseau_jars = glob.glob(
-                os.path.join(clouseau_dir, "clouseau", "target", "**", "*.jar"),
+                os.path.join(clouseau_dir, "target", "**", "clouseau", "*.jar"),
                 recursive=True,
             )
 
@@ -890,6 +899,7 @@ def boot_clouseau(ctx, idx):
         + clouseau_cookie
         + [main_class, config_path]
     )
+    print(f"Starting clouseau as {cmd}")
 
     try:
         return sp.Popen(
@@ -1186,6 +1196,7 @@ def boot_node(ctx, node):
 
 @log("Running cluster setup")
 def cluster_setup(ctx):
+    print("Running setup")
     lead_port = cluster_port(ctx, ctx["node_number_seed"])
     if enable_cluster(ctx["N"], lead_port, *ctx["admin"]):
         for num in range(1, ctx["N"]):
@@ -1260,6 +1271,7 @@ def set_cookie(port, user, pswd):
 
 
 def finish_cluster(port, user, pswd):
+    print("finishing cluster ", port, " ", user, " ", pswd)
     status, response = try_request(
         "127.0.0.1",
         port,
