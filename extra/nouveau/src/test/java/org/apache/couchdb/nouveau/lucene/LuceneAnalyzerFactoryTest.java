@@ -213,8 +213,8 @@ public class LuceneAnalyzerFactoryTest {
     }
 
     @Test
-    public void testportugese() throws Exception {
-        assertAnalyzer("portugese", PortugueseAnalyzer.class);
+    public void testportuguese() throws Exception {
+        assertAnalyzer("portuguese", PortugueseAnalyzer.class);
     }
 
     @Test

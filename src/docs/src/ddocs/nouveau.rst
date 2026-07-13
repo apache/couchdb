@@ -328,7 +328,7 @@ ourselves (``simple_asciifolding``);
 * norwegian
 * persian
 * polish
-* portugese
+* portuguese
 * romanian
 * russian
 * simple
