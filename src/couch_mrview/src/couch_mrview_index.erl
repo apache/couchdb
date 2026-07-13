@@ -245,14 +245,26 @@ verify_index_exists(DbName, Props) ->
                             DocSig = couch_util:get_value(<<"signature">>, Props),
                             match_signatures(IdxSig, DocSig);
                         {not_found, _} ->
-                            false
+                            false;
+                        Else ->
+                            cannot_verify(DbName, Props, Else)
                     end
                 end)
         end
     catch
-        _:_ ->
-            false
+        Tag:Reason ->
+            cannot_verify(DbName, Props, {Tag, Reason})
     end.
+
+% Couldn't verify index exists when checking purge client validity. There may
+% be a timeout or or db is not available. In such cases assume the client is
+% valid to avoid the chance of compacting away purge before valid clients saw
+% and processed them.
+cannot_verify(DbName, Props, Error) ->
+    DDocId = couch_util:get_value(<<"ddoc_id">>, Props),
+    Fmt = "~p : cannot verify purge client db:~p ddoc:~p error:~p, assume exists",
+    couch_log:warning(Fmt, [?MODULE, DbName, DDocId, Error]),
+    true.
 
 match_signatures(IdxSig, DocSig) when is_binary(IdxSig), is_list(DocSig) ->
     % Compatibility clause. In versions =< 3.5.1 mvrview signatures in purge
