@@ -42,7 +42,8 @@ e2e_test_() ->
                     ?TDEF_FE(t_metric_updated),
                     ?TDEF_FE(t_no_duplicate_metrics),
                     ?TDEF_FE(t_starts_with_couchdb),
-                    ?TDEF_FE(t_survives_mem3_sync_termination)
+                    ?TDEF_FE(t_survives_mem3_sync_termination),
+                    ?TDEF_FE(t_system_stats_metrics_present)
                 ]
             }
         }
@@ -185,6 +186,15 @@ t_survives_mem3_sync_termination(_) ->
         [_, _, <<"couchdb_internal_replication_jobs", _/binary>>],
         couch_prometheus:get_internal_replication_jobs_stat()
     ).
+
+t_system_stats_metrics_present(Port) ->
+    Url = node_local_url(Port),
+    Stats = get_stats(Url),
+    % Verify system stats metrics exist in the scrape output
+    ?assertNotEqual(not_found, metric_value(Stats, "couchdb_clouseau_connected")),
+    ?assertNotEqual(not_found, metric_value(Stats, "couchdb_database_count")),
+    ?assertNotEqual(not_found, metric_value(Stats, "couchdb_ioq_total_requests")),
+    ?assertNotEqual(not_found, metric_value(Stats, "couchdb_smoosh_channel_count")).
 
 node_local_url(Port) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),

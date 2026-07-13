@@ -15,7 +15,7 @@
 -behaviour(config_listener).
 
 -export([start_link/0, call/3, call_search/3]).
--export([get_queue_lengths/0]).
+-export([get_disk_queues/0, get_queue_lengths/0]).
 -export([get_io_priority/0, set_io_priority/1, maybe_set_io_priority/1]).
 -export([bypass/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2]).
@@ -69,6 +69,9 @@ call(Fd, Msg, Metadata) ->
 
 get_queue_lengths() ->
     gen_server:call(?MODULE, get_queue_lengths).
+
+get_disk_queues() ->
+    maps:to_list(get_queue_lengths()).
 
 bypass(Msg, Metadata) ->
     Priority = io_class(Msg, Metadata),
