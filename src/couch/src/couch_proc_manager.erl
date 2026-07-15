@@ -141,6 +141,8 @@ init([]) ->
 
     ok = configure_language_servers(),
 
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()),
+
     {ok, #state{
         config = get_proc_config(),
         threshold_ts = timestamp(),
@@ -250,6 +252,7 @@ handle_info({'EXIT', Pid, spawn_error}, State) ->
     % Assert when removing that we always expect the opener to have been there
     [{Pid, #client{lang = Lang}}] = ets:take(?OPENING, Pid),
     dec_count(Lang),
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()),
     ok = flush_waiters(State, Lang),
     {noreply, State};
 handle_info({'EXIT', Pid, Reason}, State) ->
@@ -370,7 +373,8 @@ find_proc(Lang, DbPat, DDocKey) when
 spawn_proc(#client{} = Client) ->
     Pid = spawn_link(?MODULE, new_proc, [Client]),
     ets:insert(?OPENING, {Pid, Client}),
-    inc_count(Client#client.lang).
+    inc_count(Client#client.lang),
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()).
 
 % This instance was spawned without a client to replenish
 % the untagged pool asynchronously
@@ -686,7 +690,8 @@ remove_proc(#proc{pid = Pid} = Proc) ->
         false ->
             ok
     end,
-    dec_count(Proc#proc.lang).
+    dec_count(Proc#proc.lang),
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()).
 
 flush_waiters(#state{} = State, Lang) ->
     #state{hard_limit = HardLimit, config = {[_ | _] = Cfg}} = State,
