@@ -49,28 +49,28 @@ jwt_io_ec_pubkey() ->
 b64_badarg_test() ->
     Encoded = <<"0.0.0">>,
     ?assertEqual(
-        {error, {bad_request, <<"Malformed token">>}},
+        {error, {bad_request, <<"Malformed authentication token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
 b64_bad_block_test() ->
     Encoded = <<" aGVsbG8. aGVsbG8. aGVsbG8">>,
     ?assertEqual(
-        {error, {bad_request, <<"Malformed token">>}},
+        {error, {bad_request, <<"Malformed authentication token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
 invalid_json_test() ->
     Encoded = <<"fQ.fQ.fQ">>,
     ?assertEqual(
-        {error, {bad_request, <<"Malformed token">>}},
+        {error, {bad_request, <<"Malformed authentication token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
 truncated_json_test() ->
     Encoded = <<"ew.ew.ew">>,
     ?assertEqual(
-        {error, {bad_request, <<"Malformed token">>}},
+        {error, {bad_request, <<"Malformed authentication token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
@@ -190,7 +190,7 @@ bad_rs256_sig_test() ->
     ),
     KS = fun(<<"RS256">>, undefined) -> jwt_io_rsa_pubkey() end,
     ?assertEqual(
-        {error, {bad_request, <<"Bad signature">>}},
+        {error, {bad_request, <<"Bad signature in authentication token">>}},
         jwtf:decode(Encoded, [], KS)
     ).
 
@@ -201,13 +201,13 @@ bad_hs256_sig_test() ->
     ),
     KS = fun(<<"HS256">>, undefined) -> <<"bad">> end,
     ?assertEqual(
-        {error, {bad_request, <<"Bad HMAC">>}},
+        {error, {bad_request, <<"Bad HMAC in authentication token">>}},
         jwtf:decode(Encoded, [], KS)
     ).
 
 malformed_token_test() ->
     ?assertEqual(
-        {error, {bad_request, <<"Malformed token">>}},
+        {error, {bad_request, <<"Malformed authentication token">>}},
         jwtf:decode(<<"a.b.c.d">>, [], nil)
     ).
 

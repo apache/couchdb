@@ -26,11 +26,19 @@
 
 -ifdef(TEST).
 -export([
-    get_internal_replication_jobs_stat/0
+    get_internal_replication_jobs_stat/0,
+    get_clouseau_status/0,
+    get_database_count/0,
+    get_ioq_stats/0,
+    get_smoosh_stats/0
 ]).
 -endif.
 
 -define(PROMETHEUS_VERSION, "2.0").
+
+%% Connection status constants
+-define(CLOUSEAU_CONNECTED, 1).
+-define(CLOUSEAU_DISCONNECTED, 0).
 
 scrape() ->
     CouchDB = get_couchdb_stats(),
@@ -69,7 +77,11 @@ get_system_stats() ->
         get_membership_stat(),
         get_membership_nodes(),
         get_distribution_stats(),
-        get_bt_engine_cache_stats()
+        get_bt_engine_cache_stats(),
+        get_clouseau_status(),
+        get_database_count(),
+        get_ioq_stats(),
+        get_smoosh_stats()
     ]).
 
 get_uptime_stat() ->
@@ -384,3 +396,117 @@ get_bt_engine_cache_stats() ->
         to_prom(couchdb_bt_engine_cache_memory, gauge, "memory used by the btree cache", Mem),
         to_prom(couchdb_bt_engine_cache_size, gauge, "number of entries in the btree cache", Size)
     ].
+
+get_clouseau_status() ->
+    Value =
+        case clouseau_rpc:connected() of
+            true -> ?CLOUSEAU_CONNECTED;
+            false -> ?CLOUSEAU_DISCONNECTED
+        end,
+    to_prom(clouseau_connected, gauge, "clouseau connectivity status", Value).
+
+get_database_count() ->
+    ShardsDb = config:get("mem3", "shards_db", "_dbs"),
+    case fabric:get_db_info(ShardsDb) of
+        {ok, Info} ->
+            DbCount = couch_util:get_value(doc_count, Info),
+            to_prom(database_count, gauge, "total database count", DbCount);
+        {error, Reason} ->
+            couch_log:warning("~p failed to get database count: ~p", [?MODULE, Reason]),
+            []
+    end.
+
+get_ioq_stats() ->
+    IOQData = ioq:get_disk_queues(),
+    Interactive = couch_util:get_value(interactive, IOQData),
+    Background = couch_util:get_value(background, IOQData),
+    case {Interactive, Background} of
+        {I, B} when is_integer(I), is_integer(B) ->
+            [
+                to_prom(ioq_interactive_requests, gauge, "IOQ interactive queue requests", I),
+                to_prom(ioq_background_requests, gauge, "IOQ background queue requests", B),
+                to_prom(ioq_total_requests, gauge, "IOQ total active requests", I + B)
+            ];
+        _ ->
+            Compaction = couch_util:get_value(compaction, IOQData, 0),
+            Low = couch_util:get_value(low, IOQData, 0),
+            Replication = couch_util:get_value(replication, IOQData, 0),
+            Channels =
+                case couch_util:get_value(channels, IOQData, []) of
+                    {List} when is_list(List) -> List;
+                    _ -> []
+                end,
+            ChannelRequests = count_channel_requests(Channels),
+            [
+                to_prom(ioq_active_channels, gauge, "IOQ active channels", length(Channels)),
+                to_prom(
+                    ioq_compaction_requests, gauge, "IOQ compaction queue requests", Compaction
+                ),
+                to_prom(ioq_low_requests, gauge, "IOQ low priority queue requests", Low),
+                to_prom(
+                    ioq_replication_requests, gauge, "IOQ replication queue requests", Replication
+                ),
+                to_prom(ioq_channel_requests, gauge, "IOQ channel requests", ChannelRequests),
+                to_prom(
+                    ioq_total_requests,
+                    gauge,
+                    "IOQ total active requests",
+                    ChannelRequests + Compaction + Low + Replication
+                )
+            ]
+    end.
+
+count_channel_requests(Channels) ->
+    lists:foldl(
+        fun
+            ({_User, Vals}, Acc) when is_list(Vals) ->
+                Acc + lists:sum(Vals);
+            (_, Acc) ->
+                Acc
+        end,
+        0,
+        Channels
+    ).
+
+get_smoosh_stats() ->
+    case smoosh:status() of
+        {ok, #{channels := Channels}} ->
+            ChannelsList = maps:to_list(Channels),
+            ChannelCount = length(ChannelsList),
+            InitAcc = #{active => 0, starting => 0, waiting => 0},
+            GlobalTotals = lists:foldl(
+                fun({_Channel, StatsMap}, Acc) ->
+                    Active = maps:get(active, StatsMap, 0),
+                    Starting = maps:get(starting, StatsMap, 0),
+                    WaitingMap = maps:get(waiting, StatsMap, #{}),
+                    WaitingSize = maps:get(size, WaitingMap, 0),
+                    #{
+                        active => Active + maps:get(active, Acc, 0),
+                        starting => Starting + maps:get(starting, Acc, 0),
+                        waiting => WaitingSize + maps:get(waiting, Acc, 0)
+                    }
+                end,
+                InitAcc,
+                ChannelsList
+            ),
+            TotalActive = maps:get(active, GlobalTotals, 0),
+            TotalStarting = maps:get(starting, GlobalTotals, 0),
+            TotalWaiting = maps:get(waiting, GlobalTotals, 0),
+            [
+                to_prom(smoosh_channel_count, gauge, "total active smoosh channels", ChannelCount),
+                to_prom(
+                    smoosh_active_jobs, gauge, "global total active compaction jobs", TotalActive
+                ),
+                to_prom(
+                    smoosh_starting_jobs,
+                    gauge,
+                    "global total starting compaction jobs",
+                    TotalStarting
+                ),
+                to_prom(
+                    smoosh_waiting_jobs, gauge, "global total waiting compaction jobs", TotalWaiting
+                )
+            ];
+        _ ->
+            []
+    end.
