@@ -500,9 +500,11 @@ match({[{<<"$elemMatch">>, _Arg}]}, [], #ctx{negate = false} = Ctx) ->
     [#failure{op = elemMatch, type = empty_list, ctx = Ctx}];
 match({[{<<"$elemMatch">>, _Arg}]}, [], #ctx{negate = true}) ->
     [];
-match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{negate = true} = Ctx) ->
+match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{negate = true} = Ctx) when is_list(Values) ->
     PosCtx = Ctx#ctx{negate = false},
     match({[{<<"$allMatch">>, {[{<<"$not">>, Arg}]}}]}, Values, PosCtx);
+match({[{<<"$elemMatch">>, _Arg}]}, _Values, #ctx{negate = true}) ->
+    [];
 match({[{<<"$elemMatch">>, Arg}]}, Values, #ctx{path = Path} = Ctx) when is_list(Values) ->
     ValueFailures = [
         match(Arg, V, Ctx#ctx{path = [Idx | Path]})
@@ -538,9 +540,11 @@ match({[{<<"$allMatch">>, _Arg}]}, [], #ctx{negate = false} = Ctx) ->
     [#failure{op = allMatch, type = empty_list, ctx = Ctx}];
 match({[{<<"$allMatch">>, _Arg}]}, [], #ctx{negate = true}) ->
     [];
-match({[{<<"$allMatch">>, Arg}]}, Values, #ctx{negate = true} = Ctx) ->
+match({[{<<"$allMatch">>, Arg}]}, Values, #ctx{negate = true} = Ctx) when is_list(Values) ->
     PosCtx = Ctx#ctx{negate = false},
     match({[{<<"$elemMatch">>, {[{<<"$not">>, Arg}]}}]}, Values, PosCtx);
+match({[{<<"$allMatch">>, _Arg}]}, _Values, #ctx{negate = true}) ->
+    [];
 match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, #ctx{path = Path} = Ctx) ->
     MatchValue = fun({Idx, V}) -> match(Arg, V, Ctx#ctx{path = [Idx | Path]}) end,
     EnumValues = lists:enumerate(0, Values),
@@ -579,6 +583,8 @@ match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{negate = true, path = Path} = C
     Keys = [Key || {Key, _} <- element(1, Value)],
     MatchKey = fun(K) -> match(Arg, K, Ctx#ctx{path = [K | Path]}) end,
     lists:flatmap(MatchKey, Keys);
+match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, #ctx{negate = true}) ->
+    [];
 match({[{<<"$keyMapMatch">>, Arg}]}, Value, #ctx{path = Path} = Ctx) when is_tuple(Value) ->
     Keys = [Key || {Key, _} <- element(1, Value)],
     KeyFailures = [match(Arg, K, Ctx#ctx{path = [K | Path]}) || K <- Keys],
@@ -2104,7 +2110,11 @@ match_allmatch_test() ->
     ?assertEqual(
         [{[{<<"path">>, [<<"x">>, 0]}, {<<"message">>, <<"must not be equal to 0">>}]}],
         FailsNeg
-    ).
+    ),
+
+    % negating an expression that produces an error should produce a success response
+    ?assertEqual(match_int(SelNeg, {[{<<"x">>, 0}]}), true),
+    ?assertEqual(match_failures(SelNeg, {[{<<"x">>, 0}]}), []).
 
 match_elemmatch_test() ->
     check_selector({[{<<"$elemMatch">>, {[{<<"$eq">>, 0}]}}]}, [
@@ -2129,7 +2139,11 @@ match_elemmatch_test() ->
     ?assertEqual(
         [{[{<<"path">>, [<<"x">>, 0]}, {<<"message">>, <<"must not be equal to 0">>}]}],
         FailsNeg
-    ).
+    ),
+
+    % negating an expression that produces an error should produce a success response
+    ?assertEqual(match_int(SelNeg, {[{<<"x">>, 0}]}), true),
+    ?assertEqual(match_failures(SelNeg, {[{<<"x">>, 0}]}), []).
 
 match_keymapmatch_test() ->
     check_selector({[{<<"$keyMapMatch">>, {[{<<"$regex">>, <<"^[a-z]+$">>}]}}]}, [
@@ -2157,7 +2171,11 @@ match_keymapmatch_test() ->
     ?assertEqual(
         [{[{<<"path">>, [<<"x">>, <<"alfa">>]}, {<<"message">>, <<"must not begin with 'a'">>}]}],
         FailsNeg
-    ).
+    ),
+
+    % negating an expression that produces an error should produce a success response
+    ?assertEqual(match_int(SelNeg, {[{<<"x">>, 0}]}), true),
+    ?assertEqual(match_failures(SelNeg, {[{<<"x">>, 0}]}), []).
 
 match_object_test() ->
     Doc1 = {[]},
