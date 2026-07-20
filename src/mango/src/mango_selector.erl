@@ -815,6 +815,8 @@ format_op(size, true, mismatch, [N]) ->
 
 format_path([]) ->
     [];
+format_path([<<>> | Rest]) ->
+    format_path(Rest) ++ [<<"">>];
 format_path([Item | Rest]) when is_binary(Item) ->
     {ok, Path} = mango_util:parse_field(Item),
     format_path(Rest) ++ Path;
@@ -2148,6 +2150,7 @@ match_elemmatch_test() ->
 match_keymapmatch_test() ->
     check_selector({[{<<"$keyMapMatch">>, {[{<<"$regex">>, <<"^[a-z]+$">>}]}}]}, [
         {true, {[{<<"hello">>, 0}]}},
+        {false, {[{<<"">>, 42}]}},
         {true, {[{<<"a">>, 1}, {<<"b">>, 2}]}},
         {true, {[{<<"a">>, 1}, {<<"b4">>, 2}]}},
         {false, {[{<<"b4">>, 2}]}},
@@ -2734,6 +2737,7 @@ format_path_test() ->
     ?assertEqual([], format_path([])),
     ?assertEqual([<<"a">>], format_path([<<"a">>])),
     ?assertEqual([<<"a">>, <<"b">>], format_path([<<"b">>, <<"a">>])),
+    ?assertEqual([<<"a">>, <<"">>], format_path([<<"">>, <<"a">>])),
     ?assertEqual([<<"a">>, <<"b">>, <<"c">>], format_path([<<"b.c">>, <<"a">>])),
     ?assertEqual([<<"a">>, 42, <<"b">>, <<"c">>], format_path([<<"b.c">>, 42, <<"a">>])).
 
