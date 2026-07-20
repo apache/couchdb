@@ -108,8 +108,12 @@ handle_call({prompt, [<<"validate_fun">>, Selector0 | _Rest]}, _From, St) ->
                 Error -> {reply, {error, Error}, St}
             end
     catch
-        throw:{mango_error, mango_selector, Error} ->
-            {reply, {error, Error}, St}
+        throw:{mango_error, mango_selector, {invalid_operator, Op}} ->
+            Msg = io_lib:format("invalid operator: ~p", [Op]),
+            {reply, {error, {compilation_error, Msg}}, St};
+        throw:{mango_error, mango_util, {invalid_field_name, Field}} ->
+            Msg = io_lib:format("invalid field name: ~p", [Field]),
+            {reply, {error, {compilation_error, Msg}}, St}
     end;
 handle_call({prompt, [<<"ddoc">>, <<"new">>, DDocId, {DDoc}]}, _From, St) ->
     NewSt =

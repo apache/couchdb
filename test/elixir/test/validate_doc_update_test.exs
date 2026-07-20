@@ -282,4 +282,40 @@ defmodule ValidateDocUpdateTest do
     assert resp.status_code == 400
     assert resp.body["error"] == "compilation_error"
   end
+
+  @tag :with_db
+  test "Mango VDU rejects a design doc if it contains an invalid field name", context do
+    set_config({"couchdb", "validate_vdu", "true"})
+    db = context[:db_name]
+
+    ddoc = %{
+      language: "query",
+
+      validate_doc_update: %{
+        "newDoc." => %{"$type" => "string"}
+      }
+    }
+
+    resp = Couch.put("/#{db}/_design/mango-test-2", body: ddoc)
+    assert resp.status_code == 400
+    assert resp.body["error"] == "compilation_error"
+  end
+
+  @tag :with_db
+  test "Mango VDU rejects a design doc if it contains an invalid operator", context do
+    set_config({"couchdb", "validate_vdu", "true"})
+    db = context[:db_name]
+
+    ddoc = %{
+      language: "query",
+
+      validate_doc_update: %{
+        "newDoc.a" => %{"$nope" => 1}
+      }
+    }
+
+    resp = Couch.put("/#{db}/_design/mango-test-2", body: ddoc)
+    assert resp.status_code == 400
+    assert resp.body["error"] == "compilation_error"
+  end
 end
