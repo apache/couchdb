@@ -54,6 +54,7 @@ default_options() ->
         {checkpoint_interval, cfg_int("checkpoint_interval", 30000)},
         {use_checkpoints,     cfg_boolean("use_checkpoints", true)},
         {use_bulk_get,        cfg_boolean("use_bulk_get", true)},
+        {request_compression, cfg_str("request_compression", "none")},
         {ibrowse_options,     cfg_ibrowse_opts()},
         {socket_options,      cfg_sock_opts()}
     ].
@@ -216,7 +217,8 @@ parse_rep_db({Props}, Proxy, Options) ->
         timeout = get_value(connection_timeout, Options),
         http_connections = get_value(http_connections, Options),
         retries = get_value(retries, Options),
-        proxy_url = ProxyURL
+        proxy_url = ProxyURL,
+        request_compression = get_value(request_compression, Options, "none")
     },
     couch_replicator_utils:normalize_basic_auth(HttpDb);
 parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
@@ -283,6 +285,9 @@ cfg_int(Var, Default) ->
 
 cfg_boolean(Var, Default) ->
     config:get_boolean("replicator", Var, Default).
+
+cfg_str(Var, Default) ->
+    config:get("replicator", Var, Default).
 
 cfg_atoms(Cfg, Default) ->
     case cfg(Cfg) of
@@ -388,6 +393,8 @@ convert_options([{<<"since_seq">>, V} | R]) ->
     [{since_seq, V} | convert_options(R)];
 convert_options([{<<"use_checkpoints">>, V} | R]) ->
     [{use_checkpoints, V} | convert_options(R)];
+convert_options([{<<"request_compression">>, V} | R]) when is_binary(V) ->
+    [{request_compression, binary_to_list(V)} | convert_options(R)];
 convert_options([{<<"use_bulk_get">>, V} | _R]) when not is_boolean(V) ->
     throw({bad_request, <<"parameter `use_bulk_get` must be a boolean">>});
 convert_options([{<<"use_bulk_get">>, V} | R]) ->
@@ -774,6 +781,7 @@ t_parse_sock_opts(_) ->
             {connection_timeout, 30000},
             {http_connections, 20},
             {ibrowse_options, []},
+            {request_compression, "none"},
             {retries, 5},
             {socket_options, [
                 {priority, 3},
@@ -819,6 +827,7 @@ t_parse_ibrowse_opts(_) ->
             {ibrowse_options, [
                 {prefer_ipv6, true}
             ]},
+            {request_compression, "none"},
             {retries, 5},
             {socket_options, [
                 {keepalive, true},

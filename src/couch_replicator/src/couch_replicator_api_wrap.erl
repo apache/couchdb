@@ -176,7 +176,7 @@ ensure_full_commit(#httpdb{} = Db) ->
 get_missing_revs(#httpdb{} = Db, IdRevs) ->
     JsonBody = {[{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- IdRevs]},
     RawBody = ?JSON_ENCODE(JsonBody),
-    {Body, ExtraHeaders} = maybe_compress(RawBody),
+    {Body, ExtraHeaders} = maybe_compress(Db, RawBody),
     send_req(
         Db,
         [
@@ -511,7 +511,7 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
         {"X-Couch-Full-Commit", FullCommit}
     ],
     {Body, Headers} =
-        case compress_requests(Len) of
+        case compress_requests(HttpDb, Len) of
             true ->
                 FullBody = iolist_to_binary([Prefix, lists:join(",", Docs), Suffix]),
                 gzip_request_body(FullBody, Headers0);
@@ -1066,15 +1066,12 @@ header_value(Key, Headers, Default) ->
             Default
     end.
     
-%% Returns true if compression is enabled and Body is large enough to compress.
-compress_requests(BodySize) ->
-    case config:get("replicator", "request_compression", ?COMPRESS_NONE) of
-        ?COMPRESS_NONE ->
-            false;
-        _ ->
-            MinSize = config:get_integer("replicator", "compress_min_size", ?COMPRESS_MIN_SIZE),
-            BodySize >= MinSize
-    end.
+%% Returns true if compression is enabled for HttpDb and Body is large enough.
+compress_requests(#httpdb{request_compression = ?COMPRESS_NONE}, _BodySize) ->
+    false;
+compress_requests(#httpdb{}, BodySize) ->
+    MinSize = config:get_integer("replicator", "compress_min_size", ?COMPRESS_MIN_SIZE),
+    BodySize >= MinSize.
 
 %% Compress Body with gzip, prepend Content-Length and Content-Encoding headers.
 %% Returns {CompressedBody, Headers}.
@@ -1085,8 +1082,8 @@ gzip_request_body(Body, Headers) ->
 
 %% Compress Body if compression is enabled and body meets minimum size.
 %% Returns {Body, ExtraHeaders} where ExtraHeaders may contain Content-Encoding.
-maybe_compress(Body) when is_binary(Body) ->
-    case compress_requests(byte_size(Body)) of
+maybe_compress(#httpdb{} = HttpDb, Body) when is_binary(Body) ->
+    case compress_requests(HttpDb, byte_size(Body)) of
         true ->
             gzip_request_body(Body, []);
         false ->

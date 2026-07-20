@@ -28,5 +28,6 @@
     http_connections,
     first_error_timestamp = nil,
     proxy_url,
-    auth_context = nil
+    auth_context = nil,
+    request_compression = "none"
 }).
