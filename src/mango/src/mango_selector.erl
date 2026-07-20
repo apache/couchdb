@@ -815,13 +815,12 @@ format_op(size, true, mismatch, [N]) ->
 
 format_path([]) ->
     [];
-format_path([<<>> | Rest]) ->
-    format_path(Rest) ++ [<<"">>];
 format_path([Item | Rest]) when is_binary(Item) ->
-    {ok, Path} = mango_util:parse_field(Item),
-    format_path(Rest) ++ Path;
+    format_path(Rest) ++ [Item];
 format_path([Item | Rest]) when is_integer(Item) ->
-    format_path(Rest) ++ [Item].
+    format_path(Rest) ++ [Item];
+format_path([Item | Rest]) when is_list(Item) ->
+    format_path(Rest) ++ Item.
 
 % Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.
@@ -2738,8 +2737,9 @@ format_path_test() ->
     ?assertEqual([<<"a">>], format_path([<<"a">>])),
     ?assertEqual([<<"a">>, <<"b">>], format_path([<<"b">>, <<"a">>])),
     ?assertEqual([<<"a">>, <<"">>], format_path([<<"">>, <<"a">>])),
-    ?assertEqual([<<"a">>, <<"b">>, <<"c">>], format_path([<<"b.c">>, <<"a">>])),
-    ?assertEqual([<<"a">>, 42, <<"b">>, <<"c">>], format_path([<<"b.c">>, 42, <<"a">>])).
+    ?assertEqual([<<"a">>, <<"b.c">>], format_path([<<"b.c">>, <<"a">>])),
+    ?assertEqual([<<"a">>, <<"b">>, <<"c">>], format_path([[<<"b">>, <<"c">>], <<"a">>])),
+    ?assertEqual([<<"a">>, 42, <<"b.c">>], format_path([<<"b.c">>, 42, <<"a">>])).
 
 % The following benchmarks can be run by adding the following dependencies to
 % rebar.config.script:
