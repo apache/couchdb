@@ -21,7 +21,6 @@
 -export([stop_http_worker/0]).
 -export([full_url/2]).
 
-
 -import(couch_util, [
     get_value/2,
     get_value/3

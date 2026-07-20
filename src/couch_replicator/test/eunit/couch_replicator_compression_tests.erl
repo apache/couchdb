@@ -41,18 +41,19 @@ should_not_compress_by_default({_Ctx, {Source, Target}}) ->
     ?assertEqual(Before, After).
 
 should_compress_when_enabled({_Ctx, {Source, Target}}) ->
-    config:set("replicator", "compress_requests", "true", false),
+    config:set("replicator", "request_compression", "gzip", false),
     config:set("replicator", "compress_min_size", "10", false),
-    config:set("replicator", "compression_algorithm", "gzip", false),
-    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-    populate_db(Source, ?DOCS_COUNT),
-    replicate(Source, Target),
-    compare_dbs(Source, Target),
-    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-    ?assert(After > Before),
-    config:delete("replicator", "compress_requests", false),
-    config:delete("replicator", "compress_min_size", false),
-    config:delete("replicator", "compression_algorithm", false).
+    try
+        Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+        populate_db(Source, ?DOCS_COUNT),
+        replicate(Source, Target),
+        compare_dbs(Source, Target),
+        After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+        ?assert(After > Before)
+    after
+        config:delete("replicator", "request_compression", false),
+        config:delete("replicator", "compress_min_size", false)
+    end.
 
 populate_db(DbName, Count) ->
     Docs = lists:map(
