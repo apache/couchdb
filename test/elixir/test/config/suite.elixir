@@ -535,6 +535,8 @@
     "deleting a Mango VDU removes its effects",
     "Mango VDU rejects a doc if any existing ddoc fails to match",
     "Mango VDU rejects a design doc if it contains unknown fields",
+    "Mango VDU rejects a design doc if it contains an invalid field name",
+    "Mango VDU rejects a design doc if it contains an invalid operator",
   ],
   "SecurityValidationTest": [
     "Author presence and user security",
