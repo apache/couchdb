@@ -62,10 +62,10 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
 
 index_call(Fun, DbName, Index, QueryArgs, MinSeq) ->
     case dreyfus_index_manager:get_index(DbName, Index) of
-        {ok, Pid} ->
-            case dreyfus_index:await(Pid, MinSeq) of
-                {ok, IndexPid, _Seq} ->
-                    dreyfus_index:Fun(IndexPid, QueryArgs);
+        {ok, Key} ->
+            case dreyfus_index:await(Key, MinSeq) of
+                {ok, IndexKey, _Seq} ->
+                    dreyfus_index:Fun(IndexKey, QueryArgs);
                 Error ->
                     Error
             end;
@@ -83,8 +83,8 @@ info_int(DbName, DDoc, IndexName) ->
     case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
         {ok, Index} ->
             case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    case dreyfus_index:info(Pid) of
+                {ok, Key} ->
+                    case dreyfus_index:info(Key) of
                         {ok, Fields} ->
                             Info = [{signature, Index#index.sig} | Fields],
                             rexi:reply({ok, Info});
