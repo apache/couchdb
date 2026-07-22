@@ -361,7 +361,7 @@ def check_boot_script(ctx):
 @log("Prepare configuration files")
 def setup_configs(ctx):
     for idx, node in enumerate(ctx["nodes"]):
-        cluster_port, backend_port, prometheus_port = get_ports(
+        cluster_port, prometheus_port = get_ports(
             ctx, idx + ctx["node_number_seed"]
         )
         env = {
@@ -379,7 +379,6 @@ def setup_configs(ctx):
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
             "clouseau_name": "clouseau%d@127.0.0.1" % (idx + 1),
-            "backend_port": backend_port,
             "prometheus_port": prometheus_port,
             "uuid": "fake_uuid_for_dev",
             "nouveau_enable": str(ctx["with_nouveau"]).lower(),
@@ -486,11 +485,10 @@ def get_ports(ctx, idnode):
     if idnode <= 5 and not ctx["auto_ports"]:
         return (
             (10000 * idnode) + 5984,
-            (10000 * idnode) + 5986,
             (10000 * idnode) + 7986,
         )
     else:
-        return tuple(get_available_ports(2))
+        return tuple(get_available_ports(1))
 
 
 def get_available_ports(num):
@@ -933,13 +931,6 @@ def maybe_check_clouseau_node_alive(ctx, idx):
 
 
 def hack_default_ini(ctx, node, contents):
-    contents = re.sub(
-        r"^\[httpd\]$",
-        "[httpd]\nenable = true",
-        contents,
-        flags=re.MULTILINE,
-    )
-
     if need_uri_file(ctx):
         contents = re.sub(
             r"^;uri_file =$",
