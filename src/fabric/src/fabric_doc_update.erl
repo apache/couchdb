@@ -53,7 +53,7 @@ go(DbName, AllDocs0, Opts) ->
         reply = #{},
         dbname = DbName,
         update_options = Options,
-        serialize_worker_startup = serialize_worker_startup(Options)
+        serialize_worker_startup = serialize_worker_startup(AllDocs, Options)
     },
     Timeout = fabric_util:request_timeout(),
     Acc1 = start_workers_strategy(Acc0),
@@ -434,11 +434,25 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     ),
     throw({aborted, PreCommitFailures}).
 
-% replicated changes are always in parallel
-serialize_worker_startup(Options) ->
-    case proplists:get_value(?REPLICATED_CHANGES, Options) of
+% Replicated changes and multipart attachment are always in parallel. MP parser
+% is designed to distribute attachment chunks to num_mp_writers concurrently,
+% so if we serialize them we make the MP parser buffer all the attachment
+% chunks (say 1GB of data) before the subsequent workers will be started.
+serialize_worker_startup(AllDocs, Options) ->
+    Replicated = proplists:get_value(?REPLICATED_CHANGES, Options) =:= true,
+    case Replicated orelse any_multipart_atts(AllDocs) of
         true -> false;
-        _ -> config:get_boolean("fabric", "serialize_worker_startup", true)
+        false -> config:get_boolean("fabric", "serialize_worker_startup", true)
+    end.
+
+any_multipart_atts(Docs) ->
+    DocHasMpAtt = fun(#doc{atts = Atts}) -> lists:any(fun is_multipart_att/1, Atts) end,
+    lists:any(DocHasMpAtt, Docs).
+
+is_multipart_att(Att) ->
+    case couch_att:fetch(data, Att) of
+        {follows, Parser, Ref} when is_pid(Parser), is_reference(Ref) -> true;
+        _ -> false
     end.
 
 start_workers_strategy(#acc{serialize_worker_startup = true} = Acc) ->
@@ -513,9 +527,10 @@ filter_conflicts(Docs, Conflicts) ->
 -include_lib("eunit/include/eunit.hrl").
 
 setup_all() ->
-    meck:new([couch_log, couch_stats]),
+    meck:new([couch_log, couch_stats, config]),
     meck:expect(couch_log, warning, fun(_, _) -> ok end),
     meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+    meck:expect(config, get_boolean, fun(_, _, Default) -> Default end),
     meck:new(rexi, [passthrough]),
     meck:expect(rexi, cast_ref, fun(Ref, _Node, _Msg) -> Ref end).
 
@@ -546,6 +561,7 @@ doc_update_test_() ->
             fun filter_conflicts_drops_seen_docs/0,
             fun parallel_in_flight_after_conflict/0,
             fun serial_filters_conflicts_at_cast/0,
+            fun sws_multipart_atts_check/0,
             fun sws_false_mode_conflict_not_final/0,
             fun sws_false_mode_ok_can_outvote_conflict/0,
             fun group_docs_content_and_order/0,
@@ -1156,6 +1172,32 @@ serial_filters_conflicts_at_cast() ->
     ?assert(lists:member(Ref, Acc1#acc.started)),
     {Worker, Stored} = lists:keyfind(Worker, 1, Acc1#acc.grouped_docs),
     ?assertEqual([Tagged2], Stored).
+
+% Docs with streaming attachment don't serialize workers
+sws_multipart_atts_check() ->
+    MpDoc = #doc{id = <<"m">>, atts = [mp_att()]},
+    InlineAtt = couch_att:new([
+        {name, <<"b">>}, {type, <<"text/plain">>}, {att_len, 1}, {data, <<"x">>}
+    ]),
+    StubAtt = couch_att:new([
+        {name, <<"c">>}, {type, <<"text/plain">>}, {att_len, 1}, {data, stub}
+    ]),
+    InlineDoc = #doc{id = <<"i">>, atts = [InlineAtt, StubAtt]},
+    PlainDoc = #doc{id = <<"p">>},
+    % Without multipart atts the config default applies
+    ?assert(serialize_worker_startup([PlainDoc], [])),
+    ?assert(serialize_worker_startup([InlineDoc], [])),
+    % Any doc with a mp att forces parallel startup
+    ?assertNot(serialize_worker_startup([MpDoc], [])),
+    ?assertNot(serialize_worker_startup([PlainDoc, MpDoc], [])).
+
+mp_att() ->
+    couch_att:new([
+        {name, <<"a">>},
+        {type, <<"text/plain">>},
+        {att_len, 4},
+        {data, {follows, self(), make_ref()}}
+    ]).
 
 sws_false_mode_conflict_not_final() ->
     Docs =

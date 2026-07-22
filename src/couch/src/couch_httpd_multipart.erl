@@ -94,7 +94,12 @@ mp_parse_atts({body, Bytes}, {Ref, Chunks, Offset, Counters, Waiting}) ->
 mp_parse_atts(eof, {Ref, Chunks, Offset, Counters, Waiting}) ->
     N = num_mp_writers(),
     M = length(Counters),
-    case (M == N) andalso Chunks == [] of
+    AllConsumed = (M == N) andalso Chunks == [],
+    % A writer waiting at eof is asking of bytes past the end of the stream, it
+    % means the stream ended before its declared length. A write then can never
+    % be satified so we should stop parsing. If we exit normal the waiting
+    % writers will fail as with "attachment shorter than expected".
+    case AllConsumed orelse Waiting =/= [] of
         true ->
             ok;
         false ->
