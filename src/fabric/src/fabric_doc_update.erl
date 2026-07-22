@@ -434,24 +434,26 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     ),
     throw({aborted, PreCommitFailures}).
 
-% Replicated changes and multipart attachment are always in parallel. MP parser
-% is designed to distribute attachment chunks to num_mp_writers concurrently,
-% so if we serialize them we make the MP parser buffer all the attachment
-% chunks (say 1GB of data) before the subsequent workers will be started.
+% Replicated changes streamed attachments are always in parallel. Both MP
+% parser and fabric_doc_atts are designed to distribute attachment chunks
+% concurrently. If we serialize them they would always buffer the whole
+% attachment in memory (say 1GB of data) until all workers have consumed the
+% byte ranges.
 serialize_worker_startup(AllDocs, Options) ->
     Replicated = proplists:get_value(?REPLICATED_CHANGES, Options) =:= true,
-    case Replicated orelse any_multipart_atts(AllDocs) of
+    case Replicated orelse any_streamed_atts(AllDocs) of
         true -> false;
         false -> config:get_boolean("fabric", "serialize_worker_startup", true)
     end.
 
-any_multipart_atts(Docs) ->
-    DocHasMpAtt = fun(#doc{atts = Atts}) -> lists:any(fun is_multipart_att/1, Atts) end,
-    lists:any(DocHasMpAtt, Docs).
+any_streamed_atts(Docs) ->
+    HasStreamedAtt = fun(#doc{atts = Atts}) -> lists:any(fun is_streamed_att/1, Atts) end,
+    lists:any(HasStreamedAtt, Docs).
 
-is_multipart_att(Att) ->
+is_streamed_att(Att) ->
     case couch_att:fetch(data, Att) of
         {follows, Parser, Ref} when is_pid(Parser), is_reference(Ref) -> true;
+        {fabric_attachment_receiver, Middleman, _} when is_pid(Middleman) -> true;
         _ -> false
     end.
 
@@ -561,7 +563,7 @@ doc_update_test_() ->
             fun filter_conflicts_drops_seen_docs/0,
             fun parallel_in_flight_after_conflict/0,
             fun serial_filters_conflicts_at_cast/0,
-            fun sws_multipart_atts_check/0,
+            fun sws_streamed_atts_check/0,
             fun sws_false_mode_conflict_not_final/0,
             fun sws_false_mode_ok_can_outvote_conflict/0,
             fun group_docs_content_and_order/0,
@@ -1174,8 +1176,10 @@ serial_filters_conflicts_at_cast() ->
     ?assertEqual([Tagged2], Stored).
 
 % Docs with streaming attachment don't serialize workers
-sws_multipart_atts_check() ->
+sws_streamed_atts_check() ->
     MpDoc = #doc{id = <<"m">>, atts = [mp_att()]},
+    ReceiverDoc = #doc{id = <<"r">>, atts = [receiver_att()]},
+    ChunkedReceiverDoc = #doc{id = <<"cr">>, atts = [chunked_receiver_att()]},
     InlineAtt = couch_att:new([
         {name, <<"b">>}, {type, <<"text/plain">>}, {att_len, 1}, {data, <<"x">>}
     ]),
@@ -1184,12 +1188,15 @@ sws_multipart_atts_check() ->
     ]),
     InlineDoc = #doc{id = <<"i">>, atts = [InlineAtt, StubAtt]},
     PlainDoc = #doc{id = <<"p">>},
-    % Without multipart atts the config default applies
+    % Without streamed atts the config default applies
     ?assert(serialize_worker_startup([PlainDoc], [])),
     ?assert(serialize_worker_startup([InlineDoc], [])),
-    % Any doc with a mp att forces parallel startup
+    % Parallel for mp parser and fabric attachment receiver
     ?assertNot(serialize_worker_startup([MpDoc], [])),
-    ?assertNot(serialize_worker_startup([PlainDoc, MpDoc], [])).
+    ?assertNot(serialize_worker_startup([PlainDoc, MpDoc], [])),
+    ?assertNot(serialize_worker_startup([ReceiverDoc], [])),
+    ?assertNot(serialize_worker_startup([PlainDoc, ReceiverDoc], [])),
+    ?assertNot(serialize_worker_startup([ChunkedReceiverDoc], [])).
 
 mp_att() ->
     couch_att:new([
@@ -1197,6 +1204,22 @@ mp_att() ->
         {type, <<"text/plain">>},
         {att_len, 4},
         {data, {follows, self(), make_ref()}}
+    ]).
+
+receiver_att() ->
+    couch_att:new([
+        {name, <<"a">>},
+        {type, <<"text/plain">>},
+        {att_len, 4},
+        {data, {fabric_attachment_receiver, self(), 4}}
+    ]).
+
+chunked_receiver_att() ->
+    couch_att:new([
+        {name, <<"a">>},
+        {type, <<"text/plain">>},
+        {att_len, undefined},
+        {data, {fabric_attachment_receiver, self(), chunked}}
     ]).
 
 sws_false_mode_conflict_not_final() ->
