@@ -631,17 +631,26 @@ config: [
       name: clouseau1
       domain: 127.0.0.1
     }
+    clouseau: {
+      dir: dev/lib/node1/indexes
+    }
   }
   {
     node: {
       name: clouseau2
       domain: 127.0.0.1
     }
+    clouseau: {
+      dir: dev/lib/node2/indexes
+    }
   }
   {
     node: {
       name: clouseau3
       domain: 127.0.0.1
+    }
+    clouseau: {
+      dir: dev/lib/node3/indexes
     }
   }
 ]
