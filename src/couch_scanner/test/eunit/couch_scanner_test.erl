@@ -29,6 +29,7 @@ couch_scanner_test_() ->
             ?TDEF_FE(t_run_through_all_callbacks_basic, 10),
             ?TDEF_FE(t_find_reporting_works, 10),
             ?TDEF_FE(t_ddoc_features_works, 20),
+            ?TDEF_FE(t_ddoc_features_empty_ddoc_body, 20),
             ?TDEF_FE(t_conflict_finder_works, 30),
             ?TDEF_FE(t_config_skips, 10),
             ?TDEF_FE(t_resume_after_error, 10),
@@ -249,6 +250,20 @@ t_ddoc_features_works({_, {_, DbName2, _}}) ->
     }),
     resume_couch_scanner(Plugin),
     ?assertEqual(2, meck:num_calls(couch_scanner_util, log, LogArgs)).
+
+t_ddoc_features_empty_ddoc_body({_, {_, DbName2, _}}) ->
+    % Handle empty/malformed ddocs by skipping them
+    ok = add_doc(DbName2, <<"_design/empty">>, #{}),
+    Plugin = atom_to_list(?FEATURES_PLUGIN),
+    meck:reset(couch_scanner_server),
+    meck:reset(couch_scanner_util),
+    config:set("couch_scanner_plugins", Plugin, "true", false),
+    wait_exit(10000),
+    ExitMsg = meck:capture(last, couch_scanner_server, handle_info, [{'EXIT', '_', '_'}, '_'], 1),
+    ?assertMatch({'EXIT', _, normal}, ExitMsg),
+    % Scan completes and still reports features from the other db
+    LogArgs = [warning, ?FEATURES_PLUGIN, '_', '_', '_'],
+    ?assertEqual(1, meck:num_calls(couch_scanner_util, log, LogArgs)).
 
 t_conflict_finder_works({_, {_, _, DbName3}}) ->
     % Run the "conflict_finder" plugin

@@ -125,12 +125,14 @@ db(#st{} = St, DbName) ->
 ddoc(#st{} = St, _DbName, #doc{id = <<"_design/_", _/binary>>}) ->
     % These are auto-inserted ddocs _design/_auth, etc.
     {ok, St};
-ddoc(#st{} = St, DbName, #doc{} = DDoc) ->
-    #doc{body = {Props = [_ | _]}} = DDoc,
+ddoc(#st{} = St, DbName, #doc{body = {Props = [_ | _]}} = DDoc) ->
     case couch_util:get_value(<<"language">>, Props, <<"javascript">>) of
         <<"javascript">> -> {ok, check_ddoc(St, DbName, DDoc)};
         _ -> {ok, St}
-    end.
+    end;
+ddoc(#st{} = St, _DbName, #doc{}) ->
+    % Skip ddocs with empty or malformed bodies
+    {ok, St}.
 
 % Private
 
