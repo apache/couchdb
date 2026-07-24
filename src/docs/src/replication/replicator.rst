@@ -809,6 +809,28 @@ they are used. If they are not, then URL userinfo is checked. If credentials
 are found there, then those credentials are used, otherwise basic auth header
 is used.
 
+Using an IBM IAM apikey
+=======================
+
+If you've enabled the optional `couch_replicator_auth_ibm_auth`
+replicator authentication plugin you can specify an IBM IAM apikey in
+your source or target as follows;
+
+    .. code-block:: javascript
+
+        {
+            "target": {
+                "url": "http://someurl.com/mydb",
+                "auth": {
+                    "ibm": {
+                        "apikey": "$apikey"
+                     }
+                }
+            },
+            ...
+        }
+
+
 Replicate Winning Revisions Only
 ================================
 
