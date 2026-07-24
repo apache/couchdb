@@ -50,7 +50,7 @@ document bodies in the leaves of the revision tree of each document. It
 includes storage overhead, on-disk btree structure but does not include document
 bodies not in leaf nodes. So, for instance, after deleting a document, that
 document's body revision will become an intermediate revision tree node and its
-size won't be relfected in the **active_bytes** ammount.
+size won't be reflected in the **active_bytes** amount.
 
 * **total_bytes**: the size of the file on disk.
 
@@ -153,7 +153,7 @@ And some standard names for ones we often have to add:
   _large_ means is very workload specific.
 
 Channels have certain defaults for their configuration, defined in the
-[smoosh readme][srconfig]. It's only neccessary to set up how this channel
+[smoosh readme][srconfig]. It's only necessary to set up how this channel
 differs from those defaults. Below, we just need to set the `min_size` and
 `concurrency` settings, and allow the `priority` to default to `ratio`
 along with the other defaults.

@@ -905,7 +905,7 @@ const query = async (opts) => {
 
 
 // smaller queries with the initial kvs added to the skiplist
-// this is used to varify the accuracy of the insert and query
+// this is used to verify the accuracy of the insert and query
 const simpleQueries = async () => {
     let result = {};
     result = await query({group_level: 0});
