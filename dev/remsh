@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
@@ -11,18 +11,48 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-if [ -z $NODE ]; then
-    if [ -z $1 ]; then
-        NODE=1
-    else
-        NODE=$1
-    fi
+# Cookies can be set in 3 different ways:
+# - Use `dev/run` script to pass cookies:
+#     `dev/run --erlang-cookie=crumbles`
+# - Use `vm.args` config file in rel/overlay/etc to set cookies:
+#     `-setcookie crumbles`
+# - Use cookies from the `.erlang.cookie` file in the user's home directory.
+
+# NOTE: If more than 2 cookies are passed to node, node will ignore them
+#       and use the default cookies from `~/.erlang.cookie`.
+
+if [ -z "$NODE" ]; then
+  if [ -z "$1" ]; then
+    NODE=1
+  else
+    NODE=$1
+  fi
 fi
 
-if [ -z $HOST ]; then
-    HOST="127.0.0.1"
+if [ -z "$HOST" ]; then
+  HOST="127.0.0.1"
 fi
 
 NAME="remsh$$@$HOST"
 NODE="node$NODE@$HOST"
-erl -name $NAME -remsh $NODE -hidden
+
+COOKIE_PY=$(ps ax |
+  grep -E "dev/run .* --erlang-cookie=" |
+  sed -n "s/.*--erlang-cookie=\([a-zA-Z0-9!@%^&*()_+-=(){}<>,;.:?/|]*\).*/\1/p")
+
+DIR="$(
+  cd "${0%/*}" 2>/dev/null || exit
+  echo "$PWD"/../rel/overlay/etc/
+)"
+COOKIE_VM=$(grep "^-setcookie" "$DIR"/vm.args |
+  sed -n "s/-setcookie *\([a-zA-Z0-9!@%^&*()_+-=(){}<>,;.:?/|]*\).*/\1/p")
+
+if [[ -n "$COOKIE_PY" && -z "$COOKIE_VM" ]]; then
+  erl -name "$NAME" -remsh "$NODE" -hidden -setcookie "$COOKIE_PY"
+elif [[ -z "$COOKIE_PY" && $(echo "$COOKIE_VM" | wc -l) -eq 1 ]]; then
+  erl -name "$NAME" -remsh "$NODE" -hidden -setcookie "$COOKIE_VM"
+else
+  erl -name "$NAME" -remsh "$NODE" -hidden
+fi
+
+erl -name "$NAME" -remsh "$NODE" -hidden
