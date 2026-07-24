@@ -248,12 +248,15 @@ validate(Db, DDoc) ->
             ok
     end,
 
-    try Views =/= [] andalso couch_query_servers:get_os_process(Lang) of
+    VDU = should_validate_vdu(DDoc),
+
+    try (Views =/= [] orelse VDU =/= nil) andalso couch_query_servers:get_os_process(Lang) of
         false ->
             ok;
         Proc ->
             try
-                lists:foreach(fun(V) -> ValidateView(Proc, V) end, Views)
+                lists:foreach(fun(V) -> ValidateView(Proc, V) end, Views),
+                validate_vdu(Proc, VDU)
             after
                 couch_query_servers:ret_os_process(Proc)
             end
@@ -261,6 +264,27 @@ validate(Db, DDoc) ->
         {unknown_query_language, _Lang} ->
             %% Allow users to save ddocs written in unknown languages
             ok
+    end.
+
+validate_vdu(Proc, VDU0) ->
+    case VDU0 of
+        {ok, VDU} ->
+            couch_query_servers:try_compile(
+                Proc, validate_doc_update, <<"validate_doc_update">>, VDU
+            );
+        _ ->
+            ok
+    end.
+
+should_validate_vdu(#doc{body = {Props}}) ->
+    case config:get_boolean("couchdb", "validate_vdu", false) of
+        true ->
+            case couch_util:get_value(<<"validate_doc_update">>, Props) of
+                undefined -> nil;
+                VDU -> {ok, VDU}
+            end;
+        _ ->
+            nil
     end.
 
 check_rank(<<N/binary>>) ->

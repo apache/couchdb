@@ -46,7 +46,12 @@ set_timeout(Pid, TimeOut) when is_integer(TimeOut), TimeOut > 0 ->
     gen_server:call(Pid, {set_timeout, TimeOut}).
 
 prompt(Pid, Data) ->
-    gen_server:call(Pid, {prompt, Data}).
+    case gen_server:call(Pid, {prompt, Data}) of
+        {error, Error} ->
+            throw(Error);
+        Other ->
+            Other
+    end.
 
 init(_) ->
     {ok, #st{}}.
@@ -95,6 +100,21 @@ handle_call({prompt, [<<"nouveau_index_doc">>, Doc]}, _From, St) ->
                 Else
         end,
     {reply, Vals, St};
+handle_call({prompt, [<<"validate_fun">>, Selector0 | _Rest]}, _From, St) ->
+    try mango_selector:normalize(Selector0) of
+        Selector ->
+            case validate_vdu(Selector) of
+                ok -> {reply, true, St};
+                Error -> {reply, {error, Error}, St}
+            end
+    catch
+        throw:{mango_error, mango_selector, {invalid_operator, Op}} ->
+            Msg = io_lib:format("invalid operator: ~p", [Op]),
+            {reply, {error, {compilation_error, Msg}}, St};
+        throw:{mango_error, mango_util, {invalid_field_name, Field}} ->
+            Msg = io_lib:format("invalid field name: ~p", [Field]),
+            {reply, {error, {compilation_error, Msg}}, St}
+    end;
 handle_call({prompt, [<<"ddoc">>, <<"new">>, DDocId, {DDoc}]}, _From, St) ->
     NewSt =
         case couch_util:get_value(<<"validate_doc_update">>, DDoc) of
@@ -112,17 +132,38 @@ handle_call({prompt, [<<"ddoc">>, DDocId, [<<"validate_doc_update">>], Args]}, _
             Msg = [<<"validate_doc_update">>, DDocId],
             {stop, {invalid_call, Msg}, {invalid_call, Msg}, St};
         Selector ->
-            [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
-            Struct = {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, OldDoc}]},
-            Reply =
-                case mango_selector:match(Selector, Struct) of
-                    true -> true;
-                    _ -> {[{<<"forbidden">>, <<"document is not valid">>}]}
-                end,
-            {reply, Reply, St}
+            case validate_vdu(Selector) of
+                {_, Error} ->
+                    {stop, {invalid_call, Error}, {invalid_call, Error}, St};
+                ok ->
+                    [NewDoc, OldDoc, _Ctx, _SecObj] = Args,
+                    Struct =
+                        case OldDoc of
+                            null -> {[{<<"newDoc">>, NewDoc}]};
+                            Doc -> {[{<<"newDoc">>, NewDoc}, {<<"oldDoc">>, Doc}]}
+                        end,
+                    Reply =
+                        case mango_selector:match_failures(Selector, Struct) of
+                            [] ->
+                                true;
+                            Failures ->
+                                {[{<<"forbidden">>, {[{<<"failures">>, Failures}]}}]}
+                        end,
+                    {reply, Reply, St}
+            end
     end;
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
+
+validate_vdu(VDU) ->
+    case mango_selector:has_allowed_fields(VDU, [<<"newDoc">>, <<"oldDoc">>]) of
+        true ->
+            ok;
+        false ->
+            Msg =
+                <<"'validate_doc_update' may only contain 'newDoc' and 'oldDoc' as top-level fields">>,
+            {compilation_error, Msg}
+    end.
 
 handle_cast(garbage_collect, St) ->
     garbage_collect(),

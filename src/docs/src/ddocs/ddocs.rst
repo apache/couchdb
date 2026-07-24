@@ -955,7 +955,8 @@ To use Mango selectors for validation, the design document must have the
 containing the following fields:
 
 * ``newDoc``: New version of document that will be stored.
-* ``oldDoc``: Previous version of document that is already stored.
+* ``oldDoc``: Previous version of document that is already stored; this field is
+  absent if the doc is being created for the first time.
 
 For example, to check that all docs contain a ``title`` which is a string, and a
 ``year`` which is a number:
@@ -1010,5 +1011,74 @@ this design document:
             }
           }
         }
+      }
+    }
+
+By using the ``oldDoc`` field, we can create rules that say a document can only
+be updated if it is currently in a certain state. For example, this rule would
+enforce that only documents describing actors can be updated:
+
+.. code-block:: json
+
+    {
+      "language": "query",
+
+      "validate_doc_update": {
+        "oldDoc": { "type": "actor" }
+      }
+    }
+
+This also makes it so that no new documents can be created, because a write is
+only accepted if a previous version of the doc already exists. To relax this
+constraint, allow ``oldDoc`` not to exist:
+
+.. code-block:: json
+
+    {
+      "language": "query",
+
+      "validate_doc_update": {
+        "oldDoc": {
+          "$or": [
+            { "$exists": false },
+            { "type": "actor" }
+          ]
+        }
+      }
+    }
+
+This validator will allow any new document creation, and updates to docs where
+the ``type`` field is ``"actor"``. We can also have multiple rules for new
+document states that depend on the current state, by combining ``$or`` with
+several sets of ``{ oldDoc, newDoc }`` rules:
+
+.. code-block:: json
+
+    {
+      "language": "query",
+
+      "validate_doc_update": {
+        "$or": [
+          // allow creation of docs with an acceptable type
+          {
+            "oldDoc": { "$exists": false },
+            "newDoc": {
+              "type": { "$in": ["movie", "actor"] }
+            }
+          },
+          // if a doc currently has "type": "actor", make sure its "movies"
+          // field is a non-empty list of strings
+          {
+            "oldDoc": { "type": "actor" },
+            "newDoc": {
+              "movies": {
+                "$type": "array",
+                "$not": { "$size": 0 },
+                "$allMatch": { "$type": "string" }
+              }
+            }
+          },
+          // etc.
+        ]
       }
     }
