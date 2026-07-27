@@ -912,11 +912,21 @@ commit_data(Db) ->
     Db2#db{committed_update_seq = UpdateSeq}.
 
 pair_write_info(Old, New) ->
+    % To avoid quadratic lookups, first build a map of Id => FDI and then
+    % look-up Ids in the map using O(1) complexity
+    OldMap = lists:foldl(
+        fun
+            (#full_doc_info{id = Id} = FDI, Acc) -> Acc#{Id => FDI};
+            (not_found, Acc) -> Acc
+        end,
+        #{},
+        Old
+    ),
     lists:map(
-        fun(FDI) ->
-            case lists:keyfind(FDI#full_doc_info.id, #full_doc_info.id, Old) of
-                #full_doc_info{} = OldFDI -> {OldFDI, FDI};
-                false -> {not_found, FDI}
+        fun(#full_doc_info{id = Id} = FDI) ->
+            case OldMap of
+                #{Id := OldFDI} -> {OldFDI, FDI};
+                _ -> {not_found, FDI}
             end
         end,
         New
