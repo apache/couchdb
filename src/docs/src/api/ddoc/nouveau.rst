@@ -65,7 +65,7 @@
         fieldname is the name of a string or double field. You can use a single string
         to sort by one field or an array of strings to sort by several fields in the
         same order as the array.
-        Some examples are ``"relevance"``, ``"bar"``, ``"-foo"`` and
+        Some examples are ``"-<score>"``, ``"bar"``, ``"-foo"`` and
         [``"-foo"``, ``"bar"``].
     :query number top_n: Limit the number of facets returned by group, defaulting to 10
         with a maximum of 1000.
