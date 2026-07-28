@@ -194,7 +194,7 @@ defmodule NouveauTest do
   end
 
   @tag :with_db
-  test "search returns all matches for hello by relevance", context do
+  test "search returns all matches for hello by relevance (implicit)", context do
     db_name = context[:db_name]
     create_search_docs(db_name)
     create_ddoc(db_name)
@@ -207,6 +207,38 @@ defmodule NouveauTest do
     # doc4 scores higher (more hello's)
     assert ids == ["doc4", "doc3"]
     assert Enum.at(Enum.at(orders, 0), 0)["value"] > Enum.at(Enum.at(orders, 1), 0)["value"]
+  end
+
+  @tag :with_db
+  test "search returns all matches for hello by relevance (explicit)", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "txt:hello", sort: "\"-<score>\"", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    orders = get_orders(resp)
+    # doc4 scores higher (more hello's)
+    assert ids == ["doc4", "doc3"]
+    assert Enum.at(Enum.at(orders, 0), 0)["value"] > Enum.at(Enum.at(orders, 1), 0)["value"]
+  end
+
+  @tag :with_db
+  test "search returns all matches for hello by reverse relevance (explicit)", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "txt:hello", sort: "\"<score>\"", include_docs: true})
+    assert_status_code(resp, 200)
+    ids = get_ids(resp)
+    orders = get_orders(resp)
+    # doc4 scores lower (fewer hello's)
+    assert ids == ["doc3", "doc4"]
+    assert Enum.at(Enum.at(orders, 0), 0)["value"] < Enum.at(Enum.at(orders, 1), 0)["value"]
   end
 
   @tag :with_db
