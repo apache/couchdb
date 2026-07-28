@@ -102,6 +102,7 @@ public class LuceneIndex extends Index {
     private static final Sort DEFAULT_SORT =
             new Sort(SortField.FIELD_SCORE, new SortField("_id", SortField.Type.STRING));
     private static final Pattern SORT_FIELD_RE = Pattern.compile("^([-+])?([\\.\\w]+)$");
+    private static final SortField FIELD_REVERSE_SCORE = new SortField(null, SortField.Type.SCORE, true);
 
     private final Analyzer analyzer;
     private final IndexWriter writer;
@@ -380,8 +381,11 @@ public class LuceneIndex extends Index {
     }
 
     private SortField convertSortField(final String sortString) {
-        if ("relevance".equals(sortString)) {
+        if ("-<score>".equals(sortString)) {
             return SortField.FIELD_SCORE;
+        }
+        if ("<score>".equals(sortString)) {
+            return FIELD_REVERSE_SCORE;
         }
         final Matcher m = SORT_FIELD_RE.matcher(sortString);
         if (!m.matches()) {
