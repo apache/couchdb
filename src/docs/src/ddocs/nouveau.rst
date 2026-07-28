@@ -512,8 +512,9 @@ If you provide a ``sort`` parameter, then matches are returned in that order, ig
 relevance.
 
 If you want to use a ``sort`` parameter, and also include ordering by relevance in your
-search results, use the special fields ``-<score>`` or ``<score>`` within the ``sort``
-parameter.
+search results, use the special field ``relevance`` within the ``sort`` parameter. Note
+that the ``relevance`` cannot be inverted like other fields using ``-relevance`` and it
+will be ignored as unknown field.
 
 POSTing search queries
 ----------------------
