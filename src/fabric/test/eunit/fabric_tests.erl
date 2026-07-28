@@ -15,6 +15,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 cleanup_index_files_test_() ->
     {
@@ -29,7 +30,9 @@ cleanup_index_files_test_() ->
             ?TDEF_FE(t_cleanup_index_file_after_ddoc_update),
             ?TDEF_FE(t_cleanup_index_file_after_ddoc_delete),
             ?TDEF_FE(t_cleanup_empty_view_checkpoints),
-            ?TDEF_FE(t_cleanup_disallowed_language_checkpoints)
+            ?TDEF_FE(t_cleanup_disallowed_language_checkpoints),
+            ?TDEF_FE(t_cleanup_index_files_with_node_down),
+            ?TDEF_FE(t_cleanup_search_indexes_with_node_down)
         ]
     }.
 
@@ -222,6 +225,60 @@ t_cleanup_disallowed_language_checkpoints({_, DbName}) ->
         ],
         purges(DbName)
     ).
+
+t_cleanup_index_files_with_node_down({_, DbName}) ->
+    FakeNode = 'bogus@nohost',
+    mock_node_down(DbName, FakeNode),
+    meck:new(mem3_util, [passthrough]),
+    meck:expect(mem3_util, live_nodes, fun() -> meck:passthrough([]) ++ [FakeNode] end),
+    ?assertEqual(ok, fabric:cleanup_index_files_all_nodes(DbName)),
+    ErpcError = {error, {erpc, noconnection}},
+    lists:foreach(
+        fun({M, F}) ->
+            Label = {FakeNode, M, F},
+            Args = [fabric_index_cleanup, DbName, Label, ErpcError],
+            ?assert(meck:called(couch_log, error, ['_', Args]))
+        end,
+        [
+            {couch_mrview_cleanup, cleanup},
+            {dreyfus_fabric_cleanup, go_local},
+            {nouveau_fabric_cleanup, go_local}
+        ]
+    ).
+
+t_cleanup_search_indexes_with_node_down({_, DbName}) ->
+    FakeNode = 'bogus@nohost',
+    mock_node_down(DbName, FakeNode),
+    ErpcError = {error, {erpc, noconnection}},
+    ?assertEqual(ok, dreyfus_fabric_cleanup:go(DbName)),
+    Args1 = [dreyfus_fabric_cleanup, DbName, FakeNode, ErpcError],
+    ?assert(meck:called(couch_log, error, ['_', Args1])),
+    ?assertEqual(ok, nouveau_fabric_cleanup:go(DbName)),
+    Args2 = [nouveau_fabric_cleanup, DbName, FakeNode, ErpcError],
+    ?assert(meck:called(couch_log, error, ['_', Args2])).
+
+% Jump through hoops to pretend we have a node down. We mock DbName's shard map
+% to return an extra shard copy on a bogus down node.
+%
+mock_node_down(DbName, FakeNode) ->
+    DDocRes = fabric_util:get_design_doc_records(DbName),
+    meck:new(fabric_util, [passthrough]),
+    meck:expect(fabric_util, get_design_doc_records, fun(Db) ->
+        case Db =:= DbName of
+            true -> DDocRes;
+            false -> meck:passthrough([Db])
+        end
+    end),
+    meck:new(mem3, [passthrough]),
+    meck:expect(mem3, shards, fun(Db) ->
+        Shards = meck:passthrough([Db]),
+        case Db =:= DbName of
+            true -> Shards ++ [(hd(Shards))#shard{node = FakeNode}];
+            false -> Shards
+        end
+    end),
+    meck:new(couch_log, [passthrough]),
+    meck:expect(couch_log, error, 2, ok).
 
 shard_names(DbName) ->
     [mem3:name(S) || S <- mem3:local_shards(DbName)].
@@ -494,3 +551,87 @@ teardown_fabric(Ctx) ->
 clear_shards_db() ->
     ShardsDb = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     couch_server:delete(ShardsDb, [?ADMIN_CTX]).
+
+index_cleanup_recv_test_() ->
+    {
+        foreach,
+        fun() -> meck:expect(couch_log, error, 2, ok) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_recv_no_requests),
+            ?TDEF_FE(t_recv_ok_responses),
+            ?TDEF_FE(t_recv_logs_non_ok_responses),
+            ?TDEF_FE(t_recv_handles_noconnection),
+            ?TDEF_FE(t_recv_handles_remote_exceptions),
+            ?TDEF_FE(t_recv_handles_timeout)
+        ]
+    }.
+
+t_recv_no_requests(_) ->
+    ?assertEqual(ok, recv(erpc:reqids_new(), 5000)),
+    ?assertEqual(0, meck:num_calls(couch_log, error, 2)).
+
+t_recv_ok_responses(_) ->
+    Reqs0 = erpc:reqids_new(),
+    Reqs1 = send_fun(node(), req1, fun() -> ok end, Reqs0),
+    Reqs2 = send_fun(node(), req2, fun() -> ok end, Reqs1),
+    ?assertEqual(ok, recv(Reqs2, 5000)),
+    ?assertEqual(0, meck:num_calls(couch_log, error, 2)).
+
+t_recv_logs_non_ok_responses(_) ->
+    Reqs1 = send_fun(node(), req1, fun() -> {error, potato} end, erpc:reqids_new()),
+    ?assertEqual(ok, recv(Reqs1, 5000)),
+    ?assert(meck:called(couch_log, error, ['_', ['_', '_', req1, {error, potato}]])).
+
+t_recv_handles_noconnection(_) ->
+    Self = self(),
+    Reqs0 = erpc:reqids_new(),
+    Reqs1 = erpc:send_request('bogus@totallybogus', erlang, node, [], down_node, Reqs0),
+    Reqs2 = send_fun(
+        node(),
+        req2,
+        fun() ->
+            Self ! req2_ran,
+            ok
+        end,
+        Reqs1
+    ),
+    ?assertEqual(ok, recv(Reqs2, 5000)),
+    % Log the bogus one but keep going otherwise
+    NoConn = {error, {erpc, noconnection}},
+    ?assert(meck:called(couch_log, error, ['_', ['_', '_', down_node, NoConn]])),
+    ?assertEqual(1, meck:num_calls(couch_log, error, 2)),
+    receive
+        req2_ran -> ok
+    end.
+
+t_recv_handles_remote_exceptions(_) ->
+    % A variety of failures on the other side: exits, errors and throws
+    Reqs0 = erpc:reqids_new(),
+    Reqs1 = send_fun(node(), err_req, fun() -> error(potato) end, Reqs0),
+    Reqs2 = send_fun(node(), throw_req, fun() -> throw(potato) end, Reqs1),
+    Reqs3 = send_fun(node(), exit_req, fun() -> exit(potato) end, Reqs2),
+    Reqs4 = send_fun(node(), ok_req, fun() -> ok end, Reqs3),
+    ?assertEqual(ok, recv(Reqs4, 5000)),
+    ?assert(
+        meck:called(couch_log, error, ['_', ['_', '_', err_req, {error, {exception, potato, '_'}}]])
+    ),
+    ?assert(meck:called(couch_log, error, ['_', ['_', '_', throw_req, {throw, potato}]])),
+    ?assert(
+        meck:called(couch_log, error, ['_', ['_', '_', exit_req, {exit, {exception, potato}}]])
+    ),
+    ?assertEqual(3, meck:num_calls(couch_log, error, 2)).
+
+t_recv_handles_timeout(_) ->
+    Reqs1 = send_fun(node(), slow_req, fun() -> timer:sleep(10000) end, erpc:reqids_new()),
+    ?assertEqual(ok, recv(Reqs1, 100)),
+    % Test the global timeout
+    ?assert(meck:called(couch_log, error, ['_', ['_', '_', [slow_req], timeout]])).
+
+recv(Reqs, TimeoutMSec) ->
+    % Note: this is a standard erpc format see https://www.erlang.org/doc/apps/kernel/erpc.html
+    Timeout = {abs, erlang:monotonic_time(millisecond) + TimeoutMSec},
+    fabric_index_cleanup:recv(?MODULE, <<"db">>, Reqs, Timeout).
+
+send_fun(Node, Label, Fun, Reqs) ->
+    erpc:send_request(Node, erlang, apply, [Fun, []], Label, Reqs).
