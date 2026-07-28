@@ -16,7 +16,8 @@
     cleanup_all_nodes/0,
     cleanup_all_nodes/1,
     cleanup_this_node/0,
-    cleanup_this_node/1
+    cleanup_this_node/1,
+    recv/4
 ]).
 
 cleanup_all_nodes() ->
@@ -55,7 +56,7 @@ cleanup_indexes(DbName, Nodes) ->
                 Acc3
             end,
             Reqs = maps:fold(Fun, erpc:reqids_new(), ByNode),
-            recv(DbName, Reqs, fabric_util:abs_request_timeout());
+            recv(?MODULE, DbName, Reqs, fabric_util:abs_request_timeout());
         Error ->
             couch_log:error("~p : error fetching ddocs db:~p ~p", [?MODULE, DbName, Error]),
             Error
@@ -68,14 +69,30 @@ send(Node, M, F, A, Reqs) ->
     Label = {Node, M, F},
     erpc:send_request(Node, M, F, A, Label, Reqs).
 
-recv(DbName, Reqs, Timeout) ->
-    case erpc:receive_response(Reqs, Timeout, true) of
+% Receive responses for an erpc request collection built with
+% erpc:send_request/6. Used by this module and the dreyfus and nouveau cleanup
+% modules. Cleanup or timeout are best-effort we log them and keep going (a
+% node might be off for hardware replacement or something).
+%
+recv(Module, DbName, Reqs, Timeout) ->
+    try erpc:receive_response(Reqs, Timeout, true) of
         {ok, _Label, Reqs1} ->
-            recv(DbName, Reqs1, Timeout);
-        {Error, Label, Reqs1} ->
-            ErrMsg = "~p : error cleaning indexes db:~p req:~p error:~p",
-            couch_log:error(ErrMsg, [?MODULE, DbName, Label, Error]),
-            recv(DbName, Reqs1, Timeout);
+            recv(Module, DbName, Reqs1, Timeout);
+        {Res, Label, Reqs1} ->
+            log_error(Module, DbName, Label, Res),
+            recv(Module, DbName, Reqs1, Timeout);
         no_request ->
             ok
+    catch
+        error:{erpc, timeout} ->
+            Labels = [Label || {_ReqId, Label} <- erpc:reqids_to_list(Reqs)],
+            log_error(Module, DbName, Labels, timeout),
+            ok;
+        Class:{Reason, Label, Reqs1} when is_map(Reqs1) ->
+            log_error(Module, DbName, Label, {Class, Reason}),
+            recv(Module, DbName, Reqs1, Timeout)
     end.
+
+log_error(Module, DbName, Label, Error) ->
+    ErrMsg = "~p : error cleaning indexes db:~p req:~p error:~p",
+    couch_log:error(ErrMsg, [Module, DbName, Label, Error]).
