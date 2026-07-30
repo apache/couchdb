@@ -1,5 +1,6 @@
 defmodule ReshardHelpers do
-  use CouchTestCase
+  import ExUnit.Assertions
+  import Couch.DBTest, only: [retry_until: 3]
 
   def get_summary do
     resp = Couch.get("/_reshard")

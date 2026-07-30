@@ -845,7 +845,6 @@
     "scenario no matches, indexed column"
   ],
   "ChooseCorrectIndexForDocs": [
-    "retrieve conflicts",
     "choose index with one field in index",
     "choose index with two",
     "choose index alphabetically",
@@ -856,6 +855,9 @@
     "can query with range on secondary column",
     "choose index with id",
     "choose index with rev"
+  ],
+  "FindConflictsTest": [
+    "retrieve conflicts"
   ],
   "RegularCoveringIndexTest": [
     "index covers query 1 field index id",
