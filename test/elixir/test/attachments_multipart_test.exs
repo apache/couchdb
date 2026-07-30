@@ -386,11 +386,10 @@ defmodule AttachmentMultipartTest do
     if Enum.at(inner_sections, 1).body == hello_data do
       assert Enum.at(inner_sections, 2).body != lorem
     else
-      if assert Enum.at(inner_sections, 2).body == hello_data do
-        assert Enum.at(inner_sections, 1).body != lorem
-      else
-        assert false, "Could not found data.bin attachment data"
-      end
+      assert Enum.at(inner_sections, 2).body == hello_data,
+             "Could not find data.bin attachment data"
+
+      assert Enum.at(inner_sections, 1).body != lorem
     end
 
     # now test that it works together with the atts_since parameter

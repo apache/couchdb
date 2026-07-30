@@ -78,7 +78,7 @@ defmodule ElemMatchTests do
   end
 
   test "elem match non object" do
-    q = %{"bestfriends" => %{"$elemMatch" => %{"$eq" => "Wolverine", "$eq" => "Cyclops"}}}
+    q = %{"bestfriends" => %{"$elemMatch" => %{"$eq" => "Cyclops"}}}
     {:ok, docs} = MangoDatabase.find(@db_name, q)
     assert length(docs) == 1
     assert Enum.at(docs, 0)["bestfriends"] == ["Wolverine", "Cyclops"]
