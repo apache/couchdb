@@ -50,7 +50,7 @@ defmodule CouchDBTest.Mixfile do
     [
       app: :couchdbtest,
       version: "0.1.0",
-      elixir: "~> 1.17",
+      elixir: "~> 1.20",
       lockfile: Path.expand("mix.lock", __DIR__),
       deps_path: Path.expand("src", __DIR__),
       build_path: Path.expand("_build", __DIR__),
@@ -85,7 +85,7 @@ defmodule CouchDBTest.Mixfile do
       {:httpotion, ">= 3.2.0", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.18.5", only: :test},
       {:ibrowse, path: path("ibrowse"), override: true},
-      {:credo, "== 1.7.16", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "== 1.7.19", only: [:dev, :test, :integration], runtime: false}
     ]
 
     extra_deps = [:b64url, :jiffy, :jwtf, :meck, :mochiweb]
