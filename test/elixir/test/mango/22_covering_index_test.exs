@@ -11,7 +11,6 @@
 # the License.
 
 defmodule CoveringIndexTest do
-  use CouchTestCase
   defmacro describe(db) do
     quote do
       test "index covers query 1 field index id" do

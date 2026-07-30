@@ -1,5 +1,5 @@
 defmodule PartitionHelpers do
-  use ExUnit.Case
+  import ExUnit.Assertions
 
   def create_partition_docs(db_name, pk1 \\ "foo", pk2 \\ "bar") do
     docs =

@@ -10,7 +10,7 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-defmodule ChooseCorrectIndexForDocs do
+defmodule FindConflictsTest do
   use CouchTestCase
 
   @db_name "find-conflicts"

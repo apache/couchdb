@@ -61,7 +61,7 @@ defmodule Couch.Test.Suite do
   def pretty_print(tests) do
     tests = Enum.join(Enum.sort(Enum.map(tests, fn {module_name, test_names} ->
       test_names = test_names
-        |> Enum.map_join(fn x -> ~s("#{x}") end, ",\n    ")
+        |> Enum.map_join(",\n    ", fn x -> ~s("#{x}") end)
       ~s(  "#{module_name}": [\n    #{test_names}\n  ])
     end)), ",\n")
     "%{\n#{tests}\n}"
@@ -159,7 +159,7 @@ defmodule Couch.Test.Suite do
   end
 
   defp test_files(directory) do
-    files = Path.wildcard(Path.join(directory, "*_test.exs"))
+    files = Path.wildcard(Path.join(directory, "**/*_test.exs"))
     Enum.filter(files, &File.regular?/1)
   end
 

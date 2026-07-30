@@ -50,7 +50,8 @@ defmodule CouchDBTest.Mixfile do
     [
       app: :couchdbtest,
       version: "0.1.0",
-      elixir: "~> 1.20",
+      # Depends on elixir available in our CI images
+      elixir: "~> 1.18",
       lockfile: Path.expand("mix.lock", __DIR__),
       deps_path: Path.expand("src", __DIR__),
       build_path: Path.expand("_build", __DIR__),
@@ -60,6 +61,7 @@ defmodule CouchDBTest.Mixfile do
       deps: deps(),
       consolidate_protocols: Mix.env() not in [:test, :dev, :integration],
       test_paths: get_test_paths(Mix.env()),
+      test_ignore_filters: [~r/_helpers\.exs$/],
       elixirc_paths: elixirc_paths(Mix.env()),
       prune_code_paths: false,
       test_coverage: [
