@@ -203,13 +203,6 @@ defmodule IndexSelectionTest do
           "_id" => "_design/bad_view_index",
           "language" => "query",
           "views" => %{
-            "queryidx1" => %{
-              "map" => %{"fields" => %{"age" => "asc"}},
-              "reduce" => "_count",
-              "options" => %{"def" => %{"fields" => [%{"age" => "asc"}]}, "w" => 2},
-            }
-          },
-          "views" => %{
             "views001" => %{
               "map" => "function(employee){if(employee.training)"
               <> "{emit(employee.number, employee.training);}}"
@@ -354,19 +347,6 @@ defmodule TextIndexSelectionTest do
     design_doc = %{
       "_id" => "_design/bad_text_index",
       "language" => "query",
-      "indexes" => %{
-        "text_index" => %{
-          "default_analyzer" => "keyword",
-          "default_field" => %{},
-          "selector" => %{},
-          "fields" => "all_fields",
-          "analyzer" => %{
-            "name" => "perfield",
-            "default" => "keyword",
-            "fields" => %{"$default" => "standard"},
-          },
-        }
-      },
       "indexes" => %{
         "st_index" => %{
           "analyzer" => "standard",

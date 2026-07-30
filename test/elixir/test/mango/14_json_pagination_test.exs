@@ -57,7 +57,6 @@ defmodule PaginateJsonDocs do
 
     # Page 3
     {:ok, resp} = MangoDatabase.find(@db_name, selector, bookmark: bookmark, limit: 5, return_raw: true)
-    bookmark = resp["bookmark"]
     docs = resp["docs"]
     assert Enum.empty?(docs)
   end
@@ -104,7 +103,6 @@ defmodule PaginateJsonDocs do
     assert Enum.at(docs, 0)["_id"] == "800"
     assert length(docs) == 1
     {:ok, resp} = MangoDatabase.find(@db_name, selector, bookmark: bookmark, limit: 5, return_raw: true)
-    bookmark = resp["bookmark"]
     docs = resp["docs"]
     assert Enum.empty?(docs)
   end

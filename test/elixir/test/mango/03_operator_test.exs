@@ -44,7 +44,7 @@ defmodule OperatorTest do
 
     q = %{
       "_id" => %{"$gt" => nil},
-      "bang" => %{"$elemMatch" => %{"foo": %{"$gte": 1}, "bam": true}}
+      "bang" => %{"$elemMatch" => %{"foo" => %{"$gte" => 1}, "bam" => true}}
     }
     {:ok, docs} = MangoDatabase.find(@db_name, q)
 

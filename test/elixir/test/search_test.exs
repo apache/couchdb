@@ -313,7 +313,6 @@ defmodule SearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_design/inventory/_search/fruits"
-    ranges = %{"price" => %{}}
     resp = Couch.get(url, query: %{q: "*:*", group_field: "state"})
     assert_on_status(resp, 200, "Fail to do search.")
 
