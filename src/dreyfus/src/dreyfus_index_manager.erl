@@ -64,12 +64,12 @@ handle_call({get_index, DbName, #index{sig = Sig} = Index}, From, State) ->
             ets:insert(?BY_SIG, {{DbName, Sig}, [From | WaitList]}),
             {noreply, State};
         [{_, ExistingPid}] ->
-            {reply, {ok, ExistingPid}, State}
+            {reply, {ok, clouseau_rpc:index_key_from_pid(ExistingPid)}, State}
     end;
 handle_call({open_ok, DbName, Sig, NewPid}, {OpenerPid, _}, State) ->
     link(NewPid),
     [{_, WaitList}] = ets:lookup(?BY_SIG, {DbName, Sig}),
-    [gen_server:reply(From, {ok, NewPid}) || From <- WaitList],
+    [gen_server:reply(From, {ok, clouseau_rpc:index_key_from_pid(NewPid)}) || From <- WaitList],
     ets:delete(?BY_PID, OpenerPid),
     add_to_ets(NewPid, DbName, Sig),
     {reply, ok, State};
