@@ -46,7 +46,7 @@ database is relocated to a different FoundationDB cluster. Thus the majority of
 the time an Incarnation fits into a single byte, or two bytes if the database
 has been moved around a small number of times.
 
-`Sequence`: the combinination of the current `Incarnation` for the database and
+`Sequence`: the combination of the current `Incarnation` for the database and
 the `Versionstamp` of the transaction. Sequences are monotonically increasing
 even when a database is relocated across FoundationDB clusters.
 
