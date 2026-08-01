@@ -1239,13 +1239,17 @@ error_headers(#httpd{mochi_req = MochiReq} = Req, 401 = Code, ErrorStr, ReasonSt
                                 undefined ->
                                     {Code, []};
                                 AuthRedirect ->
-                                    case
+                                    RequireValidUser =
                                         chttpd_util:get_chttpd_config_boolean(
                                             "require_valid_user", false
-                                        )
-                                    of
+                                        ) orelse
+                                            chttpd_util:get_chttpd_config_boolean(
+                                                "require_valid_user_except_for_up", false
+                                            ),
+                                    case RequireValidUser of
                                         true ->
-                                            % send the browser popup header no matter what if we are require_valid_user
+                                            % send the browser popup header no matter what
+                                            % if we are require_valid_user or require_valid_user_except_up
                                             {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
                                         false ->
                                             case
