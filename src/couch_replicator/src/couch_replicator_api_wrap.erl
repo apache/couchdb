@@ -217,14 +217,17 @@ bulk_get(#httpdb{} = Db, #{} = IdRevs, Options) ->
     % that at some point in the future we could make that the default, instead
     % of having to send query parameters with a POST request as we do today
     Body = options_to_json_map(Options, #{<<"docs">> => ReqDocsMaps}),
+    RawBody = ?JSON_ENCODE(Body),
+    {ReqBody, ExtraHeaders} = maybe_compress(Db, RawBody),
     Req = [
         {method, post},
         {path, "_bulk_get"},
         {qs, options_to_query_args(Options, [])},
-        {body, ?JSON_ENCODE(Body)},
+        {body, ReqBody},
         {headers, [
             {"Content-Type", "application/json"},
             {"Accept", "application/json"}
+            | ExtraHeaders
         ]}
     ],
     try
@@ -1069,21 +1072,23 @@ header_value(Key, Headers, Default) ->
 %% Returns true if compression is enabled for HttpDb and Body is large enough.
 compress_requests(#httpdb{request_compression = ?COMPRESS_NONE}, _BodySize) ->
     false;
-compress_requests(#httpdb{}, BodySize) ->
+compress_requests(#httpdb{request_compression = ?COMPRESS_GZIP}, BodySize) ->
     MinSize = config:get_integer("replicator", "compress_min_size", ?COMPRESS_MIN_SIZE),
-    BodySize >= MinSize.
+    BodySize >= MinSize;
+compress_requests(#httpdb{}, _BodySize) ->
+    false.
 
 %% Compress Body with gzip, prepend Content-Length and Content-Encoding headers.
 %% Returns {CompressedBody, Headers}.
 gzip_request_body(Body, Headers) ->
-    Compressed = zlib:gzip(Body),
+    Compressed = zlib:gzip(iolist_to_binary(Body)),
     couch_stats:increment_counter([couch_replicator, requests_compressed, gzip]),
     {Compressed, [{"Content-Length", byte_size(Compressed)}, {"Content-Encoding", "gzip"} | Headers]}.
 
 %% Compress Body if compression is enabled and body meets minimum size.
 %% Returns {Body, ExtraHeaders} where ExtraHeaders may contain Content-Encoding.
-maybe_compress(#httpdb{} = HttpDb, Body) when is_binary(Body) ->
-    case compress_requests(HttpDb, byte_size(Body)) of
+maybe_compress(#httpdb{} = HttpDb, Body) ->
+    case compress_requests(HttpDb, iolist_size(Body)) of
         true ->
             gzip_request_body(Body, []);
         false ->
