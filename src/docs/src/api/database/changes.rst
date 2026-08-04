@@ -91,8 +91,7 @@
         compressed. Ignored if ``include_docs`` isn't ``true``.
         Default is ``false``.
     :query number last-event-id: Alias of `Last-Event-ID` header.
-    :query number limit: Limit number of result rows to the specified value
-        (note that using ``0`` here has the same effect as ``1``).
+    :query number limit: Limit number of result rows to the specified value.
     :query since: Start the results from the change immediately after the given
         update sequence. Default is ``0``. Other values can be:
 
