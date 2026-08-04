@@ -2153,7 +2153,21 @@ parse_changes_query(Req) ->
                 {"last-event-id", _} ->
                     Args#changes_args{since = Value};
                 {"limit", _} ->
-                    Args#changes_args{limit = list_to_integer(Value)};
+                    try list_to_integer(Value) of
+                        LimitInteger when LimitInteger >= 0 ->
+                            Args#changes_args{limit = list_to_integer(Value)};
+                        _ ->
+                            throw(
+                                {bad_request,
+                                    <<"The limit value should be a non-negative integer">>}
+                            )
+                    catch
+                        error:badarg ->
+                            throw(
+                                {bad_request,
+                                    <<"The limit parameter should be a non-negative integer">>}
+                            )
+                    end;
                 {"style", _} ->
                     Args#changes_args{style = list_to_existing_atom(Value)};
                 {"heartbeat", "true"} ->
@@ -2175,7 +2189,21 @@ parse_changes_query(Req) ->
                             )
                     end;
                 {"timeout", _} ->
-                    Args#changes_args{timeout = list_to_integer(Value)};
+                    try list_to_integer(Value) of
+                        TimeoutInteger when TimeoutInteger >= 0 ->
+                            Args#changes_args{timeout = list_to_integer(Value)};
+                        _ ->
+                            throw(
+                                {bad_request,
+                                    <<"The timeout value should be a non-negative integer">>}
+                            )
+                    catch
+                        error:badarg ->
+                            throw(
+                                {bad_request,
+                                    <<"The timeout parameter should be a non-negative integer">>}
+                            )
+                    end;
                 {"include_docs", "true"} ->
                     Args#changes_args{include_docs = true};
                 {"conflicts", "true"} ->
