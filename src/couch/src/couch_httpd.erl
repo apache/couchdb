@@ -858,7 +858,17 @@ http_1_0_keep_alive(Req, Headers) ->
 
 start_chunked_response(#httpd{mochi_req = MochiReq} = Req, Code, Headers0) ->
     Headers1 = add_headers(Req, Headers0),
-    Resp = handle_response(Req, Code, Headers1, chunked, respond),
+    Headers2 =
+        case accepts_gzip(Req) of
+            true ->
+                Z = zlib:open(),
+                ok = zlib:deflateInit(Z),
+                erlang:put(chunked_response_zstream, Z),
+                [{~"Content-Encoding", ~"gzip"} | Headers1];
+            false ->
+                Headers1
+        end,
+    Resp = handle_response(Req, Code, Headers2, chunked, respond),
     case MochiReq:get(method) of
         'HEAD' -> throw({http_head_abort, Resp});
         _ -> ok
@@ -1395,9 +1405,21 @@ before_response(Req0, Code0, Headers0, {json, JsonObj}) ->
     {ok, {Req1, Code1, Headers1, Body1}} =
         chttpd_plugin:before_response(Req0, Code0, Headers0, JsonObj),
     Body2 = [start_jsonp(), ?JSON_ENCODE(Body1), end_jsonp(), $\n],
-    {ok, {Req1, Code1, Headers1, Body2}};
+    {Headers2, Body3} = maybe_compress_request_body(Req0, Headers1, Body2),
+    {ok, {Req1, Code1, Headers2, Body3}};
 before_response(Req0, Code0, Headers0, Args0) ->
     chttpd_plugin:before_response(Req0, Code0, Headers0, Args0).
+
+maybe_compress_request_body(Req, Headers, Body) ->
+    case accepts_gzip(Req) of
+        true ->
+            {[{~"Content-Encoding", ~"gzip"} | Headers], zlib:gzip(Body)};
+        false ->
+            {Headers, Body}
+    end.
+
+accepts_gzip(#httpd{} = Req) ->
+    lists:member("gzip", accepted_encodings(Req)).
 
 respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, Type) ->
     case MochiReq:get(socket) of

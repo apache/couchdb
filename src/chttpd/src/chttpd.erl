@@ -921,7 +921,17 @@ start_chunked_response(#httpd{mochi_req = MochiReq} = Req, Code, Headers0) ->
 send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
     couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
-    Resp:write_chunk(Data),
+    case erlang:get(chunked_response_zstream) of
+        undefined ->
+            Resp:write_chunk(Data);
+        Z ->
+            Flush =
+                if
+                    Data == [] -> finish;
+                    true -> sync
+                end,
+            Resp:write_chunk(zlib:deflate(Z, Data, Flush))
+    end,
     {ok, Resp}.
 
 send_response(Req, Code, Headers0, Body) ->
