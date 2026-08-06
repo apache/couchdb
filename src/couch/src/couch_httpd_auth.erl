@@ -93,7 +93,7 @@ basic_name_pw(Req) ->
                 _ ->
                     nil
             catch
-                error:function_clause ->
+                error:_ ->
                     throw({bad_request, "Authorization header has invalid base64 value"})
             end;
         _ ->
@@ -860,5 +860,25 @@ simple_pbkdf2_test() ->
             ]
         )
     ).
+
+basic_name_pw_valid_test_() ->
+    [
+        ?_assertEqual(
+            {"foo", "bar"}, basic_name_pw(mock_request([{"Authorization", "Basic Zm9vOmJhcg=="}]))
+        ),
+        ?_assertThrow(
+            {bad_request, "Authorization header has invalid base64 value"},
+            basic_name_pw(mock_request([{"Authorization", "Basic x"}]))
+        ),
+        ?_assertThrow(
+            {bad_request, "Authorization header has invalid base64 value"},
+            basic_name_pw(mock_request([{"Authorization", "Basic XX="}]))
+        )
+    ].
+
+mock_request(Headers) ->
+    MochiReq = mochiweb_request:new(nil, 'GET', "/", {1, 1}, mochiweb_headers:make(Headers)),
+    MochiReq:cleanup(),
+    #httpd{mochi_req = MochiReq}.
 
 -endif.
