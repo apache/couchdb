@@ -57,10 +57,6 @@
 -define(MAX_URL_LEN, 7000).
 -define(MIN_URL_LEN, 200).
 
--define(COMPRESS_MIN_SIZE, 1024).
--define(COMPRESS_NONE, "none").
--define(COMPRESS_GZIP, "gzip").
-
 db_uri(#httpdb{url = Url}) ->
     couch_util:url_strip_password(Url).
 
@@ -176,7 +172,7 @@ ensure_full_commit(#httpdb{} = Db) ->
 get_missing_revs(#httpdb{} = Db, IdRevs) ->
     JsonBody = {[{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- IdRevs]},
     RawBody = ?JSON_ENCODE(JsonBody),
-    {Body, ExtraHeaders} = maybe_compress(Db, RawBody),
+    {Body, ExtraHeaders} = maybe_compress_request(Db, RawBody),
     send_req(
         Db,
         [
@@ -218,7 +214,7 @@ bulk_get(#httpdb{} = Db, #{} = IdRevs, Options) ->
     % of having to send query parameters with a POST request as we do today
     Body = options_to_json_map(Options, #{<<"docs">> => ReqDocsMaps}),
     RawBody = ?JSON_ENCODE(Body),
-    {ReqBody, ExtraHeaders} = maybe_compress(Db, RawBody),
+    {ReqBody, ExtraHeaders} = maybe_compress_request(Db, RawBody),
     Req = [
         {method, post},
         {path, "_bulk_get"},
@@ -514,7 +510,7 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
         {"X-Couch-Full-Commit", FullCommit}
     ],
     {Body, Headers} =
-        case compress_requests(HttpDb, Len) of
+        case should_compress_request(HttpDb, Len) of
             true ->
                 FullBody = iolist_to_binary([Prefix, lists:join(",", Docs), Suffix]),
                 gzip_request_body(FullBody, Headers0);
@@ -1069,26 +1065,25 @@ header_value(Key, Headers, Default) ->
             Default
     end.
     
-%% Returns true if compression is enabled for HttpDb and Body is large enough.
-compress_requests(#httpdb{request_compression = ?COMPRESS_NONE}, _BodySize) ->
-    false;
-compress_requests(#httpdb{request_compression = ?COMPRESS_GZIP}, BodySize) ->
+%% Returns true if compression is enabled and body meets the minimum size threshold.
+should_compress_request(#httpdb{request_compression = ?COMPRESS_GZIP}, BodySize) ->
     MinSize = config:get_integer("replicator", "compress_min_size", ?COMPRESS_MIN_SIZE),
     BodySize >= MinSize;
-compress_requests(#httpdb{}, _BodySize) ->
+should_compress_request(#httpdb{}, _BodySize) ->
     false.
 
 %% Compress Body with gzip, prepend Content-Length and Content-Encoding headers.
 %% Returns {CompressedBody, Headers}.
 gzip_request_body(Body, Headers) ->
-    Compressed = zlib:gzip(iolist_to_binary(Body)),
+    Compressed = zlib:gzip(Body),
+    Len = byte_size(Compressed),
     couch_stats:increment_counter([couch_replicator, requests_compressed, gzip]),
-    {Compressed, [{"Content-Length", byte_size(Compressed)}, {"Content-Encoding", "gzip"} | Headers]}.
+    {Compressed, [{"Content-Length", Len}, {"Content-Encoding", "gzip"} | Headers]}.
 
 %% Compress Body if compression is enabled and body meets minimum size.
 %% Returns {Body, ExtraHeaders} where ExtraHeaders may contain Content-Encoding.
-maybe_compress(#httpdb{} = HttpDb, Body) ->
-    case compress_requests(HttpDb, iolist_size(Body)) of
+maybe_compress_request(#httpdb{} = HttpDb, Body) ->
+    case should_compress_request(HttpDb, iolist_size(Body)) of
         true ->
             gzip_request_body(Body, []);
         false ->

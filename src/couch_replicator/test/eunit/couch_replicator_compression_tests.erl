@@ -16,76 +16,84 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(DOCS_COUNT, 10).
--define(TIMEOUT_EUNIT, 30).
+-define(LARGE_DOCS_COUNT, 500).
+-define(TIMEOUT_EUNIT, 60).
 
 compression_test_() ->
     {
         "Replication compression tests",
         {
             foreach,
-            fun couch_replicator_test_helper:test_setup/0,
-            fun couch_replicator_test_helper:test_teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 ?TDEF_FE(should_not_compress_by_default, ?TIMEOUT_EUNIT),
                 ?TDEF_FE(should_compress_when_enabled, ?TIMEOUT_EUNIT),
+                ?TDEF_FE(should_compress_large_batch, ?TIMEOUT_EUNIT),
                 ?TDEF_FE(should_compress_per_job, ?TIMEOUT_EUNIT),
                 ?TDEF_FE(job_compression_overrides_global_disabled, ?TIMEOUT_EUNIT)
             ]
         }
     }.
 
+setup() ->
+    Ctx = couch_replicator_test_helper:test_setup(),
+    config:set("replicator", "request_compression", "none", false),
+    config:set("replicator", "compress_min_size", "1024", false),
+    Ctx.
+
+teardown(Ctx) ->
+    config:delete("replicator", "request_compression", false),
+    config:delete("replicator", "compress_min_size", false),
+    couch_replicator_test_helper:test_teardown(Ctx).
+
 should_not_compress_by_default({_Ctx, {Source, Target}}) ->
     Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
     populate_db(Source, ?DOCS_COUNT),
     replicate(Source, Target),
-    compare_dbs(Source, Target),
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target),
     After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
     ?assertEqual(Before, After).
 
 should_compress_when_enabled({_Ctx, {Source, Target}}) ->
     config:set("replicator", "request_compression", "gzip", false),
     config:set("replicator", "compress_min_size", "10", false),
-    try
-        Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-        populate_db(Source, ?DOCS_COUNT),
-        replicate(Source, Target),
-        compare_dbs(Source, Target),
-        After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-        ?assert(After > Before)
-    after
-        config:delete("replicator", "request_compression", false),
-        config:delete("replicator", "compress_min_size", false)
-    end.
+    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    populate_db(Source, ?DOCS_COUNT),
+    replicate(Source, Target),
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target),
+    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    ?assert(After > Before).
+
+should_compress_large_batch({_Ctx, {Source, Target}}) ->
+    config:set("replicator", "request_compression", "gzip", false),
+    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    populate_db(Source, ?LARGE_DOCS_COUNT),
+    replicate(Source, Target),
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target),
+    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    ?assert(After > Before).
 
 should_compress_per_job({_Ctx, {Source, Target}}) ->
     % global config is none (default), but job sets gzip
     config:set("replicator", "compress_min_size", "10", false),
-    try
-        Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-        populate_db(Source, ?DOCS_COUNT),
-        replicate_with_options(Source, Target, [{<<"request_compression">>, <<"gzip">>}]),
-        compare_dbs(Source, Target),
-        After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-        ?assert(After > Before)
-    after
-        config:delete("replicator", "compress_min_size", false)
-    end.
+    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    populate_db(Source, ?DOCS_COUNT),
+    replicate_with_options(Source, Target, [{<<"request_compression">>, <<"gzip">>}]),
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target),
+    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    ?assert(After > Before).
 
 job_compression_overrides_global_disabled({_Ctx, {Source, Target}}) ->
     % global config is gzip, but job disables it
     config:set("replicator", "request_compression", "gzip", false),
     config:set("replicator", "compress_min_size", "10", false),
-    try
-        Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-        populate_db(Source, ?DOCS_COUNT),
-        replicate_with_options(Source, Target, [{<<"request_compression">>, <<"none">>}]),
-        compare_dbs(Source, Target),
-        After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
-        ?assertEqual(Before, After)
-    after
-        config:delete("replicator", "request_compression", false),
-        config:delete("replicator", "compress_min_size", false)
-    end.
+    Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    populate_db(Source, ?DOCS_COUNT),
+    replicate_with_options(Source, Target, [{<<"request_compression">>, <<"none">>}]),
+    couch_replicator_test_helper:cluster_compare_dbs(Source, Target),
+    After = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
+    ?assertEqual(Before, After).
 
 populate_db(DbName, Count) ->
     Docs = lists:map(
@@ -116,11 +124,3 @@ replicate_with_options(Source, Target, ExtraOptions) ->
         | ExtraOptions
     ]},
     {ok, _} = couch_replicator_test_helper:replicate(RepObject).
-
-compare_dbs(Source, Target) ->
-    {ok, SourceInfo} = fabric:get_db_info(Source),
-    {ok, TargetInfo} = fabric:get_db_info(Target),
-    SourceDocCount = couch_util:get_value(doc_count, SourceInfo),
-    TargetDocCount = couch_util:get_value(doc_count, TargetInfo),
-    ?assertEqual(SourceDocCount, TargetDocCount),
-    ?assertEqual(?DOCS_COUNT, TargetDocCount).
