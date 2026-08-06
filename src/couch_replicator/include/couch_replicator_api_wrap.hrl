@@ -13,6 +13,10 @@
 
 -define(COUCH_REPLICATOR_USER_AGENT, "CouchDB-Replicator/" ++ couch_server:get_version()).
 
+-define(COMPRESS_NONE, "none").
+-define(COMPRESS_GZIP, "gzip").
+-define(COMPRESS_MIN_SIZE, 1024).
+
 -record(httpdb, {
     url,
     auth_props = [],
@@ -28,5 +32,6 @@
     http_connections,
     first_error_timestamp = nil,
     proxy_url,
-    auth_context = nil
+    auth_context = nil,
+    request_compression = ?COMPRESS_NONE
 }).
