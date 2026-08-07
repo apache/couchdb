@@ -27,14 +27,14 @@
 
 -import(chttpd, [
     send_method_not_allowed/2,
-    send_json/2, send_json/3,
+    send_json/2, send_json/3, send_json/4,
     send_error/2
 ]).
 
 -define(RETRY_LIMIT, 20).
 -define(RETRY_SLEEP, 500).
 
-handle_analyze_req(#httpd{method = 'POST'} = Req) ->
+handle_analyze_req(#httpd{method = Method} = Req) when ?POST_OR_QUERY(Method) ->
     check_if_enabled(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
@@ -42,12 +42,12 @@ handle_analyze_req(#httpd{method = 'POST'} = Req) ->
     Text = couch_util:get_value(<<"text">>, Fields),
     case nouveau_api:analyze(Text, Analyzer) of
         {ok, Tokens} ->
-            send_json(Req, 200, {[{<<"tokens">>, Tokens}]});
+            send_json(Req, 200, [?ACCEPT_QUERY], {[{<<"tokens">>, Tokens}]});
         {error, Reason} ->
             send_error(Req, Reason)
     end;
 handle_analyze_req(Req) ->
-    send_method_not_allowed(Req, "POST").
+    send_method_not_allowed(Req, "POST,QUERY").
 
 handle_search_req(Req, Db, DDoc) ->
     check_if_enabled(),
@@ -79,8 +79,8 @@ handle_search_req_int(#httpd{method = 'GET', path_parts = [_, _, _, _, IndexName
     }),
     handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
 handle_search_req_int(
-    #httpd{method = 'POST', path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc
-) ->
+    #httpd{method = Method, path_parts = [_, _, _, _, IndexName]} = Req, Db, DDoc
+) when ?POST_OR_QUERY(Method) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     DbName = couch_db:name(Db),
     ReqBody = chttpd:json_body(Req, [return_maps]),
@@ -99,7 +99,7 @@ handle_search_req_int(
     }),
     handle_search_req(Req, DbName, DDoc, IndexName, QueryArgs, ?RETRY_LIMIT);
 handle_search_req_int(Req, _Db, _DDoc) ->
-    send_method_not_allowed(Req, "GET, POST").
+    send_method_not_allowed(Req, "GET,POST,QUERY").
 
 handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
     IncludeDocs = maps:get(include_docs, QueryArgs, false),
@@ -118,7 +118,7 @@ handle_search_req(#httpd{} = Req, DbName, DDoc, IndexName, QueryArgs, Retry) ->
             },
             HitCount = length(maps:get(<<"hits">>, RespBody)),
             incr_stats(HitCount, IncludeDocs),
-            send_json(Req, 200, RespBody);
+            send_json(Req, 200, [?ACCEPT_QUERY], RespBody);
         {error, {service_unavailable, _}} when Retry > 1 ->
             couch_log:warning("search unavailable, retrying (~p of ~p)", [
                 ?RETRY_LIMIT - Retry + 1, ?RETRY_LIMIT

@@ -26,7 +26,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -import(chttpd, [
     send_method_not_allowed/2,
-    send_json/2, send_json/3,
+    send_json/2, send_json/3, send_json/4,
     send_error/2
 ]).
 
@@ -40,7 +40,7 @@ handle_search_req(
     RetryCount,
     RetryPause
 ) when
-    Method == 'GET'; Method == 'POST'
+    Method == 'GET'; ?POST_OR_QUERY(Method)
 ->
     verify_search_available(),
     DbName = couch_db:name(Db),
@@ -85,7 +85,7 @@ handle_search_req(
                                 _ ->
                                     [{ranges, facets_to_json(Ranges0)}]
                             end,
-                        send_json(Req, 200, {
+                        send_json(Req, 200, [?ACCEPT_QUERY], {
                             [
                                 {total_rows, TotalHits},
                                 {bookmark, Bookmark},
@@ -132,7 +132,7 @@ handle_search_req(
     couch_stats:update_histogram([dreyfus, httpd, search], RequestTime),
     Response;
 handle_search_req(#httpd{path_parts = [_, _, _, _, _]} = Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
-    send_method_not_allowed(Req, "GET,POST");
+    send_method_not_allowed(Req, "GET,POST,QUERY");
 handle_search_req(Req, _Db, _DDoc, _RetryCount, _RetryPause) ->
     send_error(Req, {bad_request, "path not recognized"}).
 
@@ -195,7 +195,7 @@ handle_analyze_req(#httpd{method = 'GET'} = Req) ->
     Analyzer = couch_httpd:qs_value(Req, "analyzer"),
     Text = couch_httpd:qs_value(Req, "text"),
     analyze(Req, Analyzer, Text);
-handle_analyze_req(#httpd{method = 'POST'} = Req) ->
+handle_analyze_req(#httpd{method = Method} = Req) when ?POST_OR_QUERY(Method) ->
     verify_search_available(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
@@ -203,7 +203,7 @@ handle_analyze_req(#httpd{method = 'POST'} = Req) ->
     Text = couch_util:get_value(<<"text">>, Fields),
     analyze(Req, Analyzer, Text);
 handle_analyze_req(Req) ->
-    send_method_not_allowed(Req, "GET,POST").
+    send_method_not_allowed(Req, "GET,POST,QUERY").
 
 analyze(Req, Analyzer, Text) ->
     case Analyzer of
@@ -235,7 +235,7 @@ analyze(Req, Analyzer, Text) ->
         )
     of
         {ok, Tokens} ->
-            send_json(Req, 200, {[{tokens, Tokens}]});
+            send_json(Req, 200, [?ACCEPT_QUERY], {[{tokens, Tokens}]});
         {error, Reason} ->
             send_error(Req, Reason)
     end.
@@ -246,7 +246,7 @@ parse_index_params(#httpd{method = 'GET'} = Req, Db) ->
         chttpd:qs(Req)
     ),
     parse_index_params(IndexParams, Db);
-parse_index_params(#httpd{method = 'POST'} = Req, Db) ->
+parse_index_params(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     {JsonBody} = chttpd:json_body_obj(Req),
     QSEntry =
         case chttpd:qs_value(Req, "partition") of
@@ -692,7 +692,7 @@ send_grouped_response(Req, {TotalHits, TotalGroupedHits, Groups}, UseNewApi) ->
             false ->
                 [{total_hits, TotalHits}, {total_grouped_hits, TotalGroupedHits}, {groups, Groups}]
         end,
-    send_json(Req, 200, {GroupResponsePairs}).
+    send_json(Req, 200, [?ACCEPT_QUERY], {GroupResponsePairs}).
 
 handle_error(Req, Db, DDoc, RetryCount, RetryPause, {exit, _} = Err) ->
     backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause, Err);
