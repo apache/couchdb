@@ -15,23 +15,23 @@
 
 // This is image used to build the tarball, check source formatting and build
 // the docs
-DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
+DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:trixie-erlang'
 
 // Erlang version embedded in binary packages. Also the version most builds
 // will run.
-ERLANG_VERSION = '27.3.4.13'
+ERLANG_VERSION = '27.3.4.16'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '27.3.4.13'
+MINIMUM_ERLANG_VERSION = '27.3.4.16'
 
 // Highest support Erlang version.
-MAXIMUM_ERLANG_VERSION = '29.0.2'
+MAXIMUM_ERLANG_VERSION = '29.0.5'
 
 // Test a min + 1 version. This is specially useful before we're about
 // to bump the minimum version to at least make sure the CI image
 // works.
-INTERMEDIATE_ERLANG_VERSION = '28.5.0.2'
+INTERMEDIATE_ERLANG_VERSION = '28.5.0.5'
 
 // Default GNU Make Eunit Options for supported platforms
 DEFAULT_GNU_MAKE_EUNIT_OPTS = '-j2 --output-sync=target'
@@ -110,17 +110,6 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'bullseye': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
-
   // Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
   // seems like a good thing, however, those workers allow running multiple
   // agents at a time and often time out even with retries. The build times
@@ -130,7 +119,7 @@ meta = [
   //
   'base-ppc64': [
     name: 'Debian POWER',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     quickjs_test262: true,
@@ -147,7 +136,7 @@ meta = [
   //
   'base-s390x': [
     name: 'Debian s390x',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
     // Test262Error: 51539607552,42,0,4,5,6,7,8
@@ -159,11 +148,11 @@ meta = [
 
   'base': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the bookworm-quickjs variant
+    // Test this in in the trixie-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
@@ -171,7 +160,7 @@ meta = [
 
   'base-max-erlang': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
@@ -180,20 +169,16 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  // Skip this temporarily. We have too many CI jobs for the workers available
-  // which forces a CI job to wait for some of the worker to full run the CI
-  // before continuing effectively making the runs take about 2x the time. When
-  // we remove bullseye we can uncomment this perhaps
-  // 'base-intermediate-erlang': [
-  //   name: 'Debian x86_64',
-  //   spidermonkey_vsn: '78',
-  //   with_nouveau: true,
-  //   with_clouseau: true,
-  //   clouseau_java_home: '/opt/java/openjdk',
-  //   quickjs_test262: false,
-  //   image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}",
-  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  // ],
+  'base-intermediate-erlang': [
+    name: 'Debian x86_64',
+    spidermonkey_vsn: '128',
+    with_nouveau: true,
+    with_clouseau: true,
+    clouseau_java_home: '/opt/java/openjdk',
+    quickjs_test262: false,
+    image: "${DOCKER_IMAGE_BASE}-${INTERMEDIATE_ERLANG_VERSION}",
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  ],
 
   'base-quickjs': [
     name: 'Debian 12 with QuickJS',
@@ -216,25 +201,25 @@ meta = [
   //
   'base-arm64': [
     name: 'Debian ARM64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the bookworm-quickjs variant
+    // Test this in in the trixie-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
     node_label: 'docker-arm64',
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'trixie': [
+  'bookworm': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '128',
+    spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}",
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
@@ -707,7 +692,7 @@ pipeline {
       }
       steps {
         sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-        sh "./configure --spidermonkey-version 78 --with-nouveau"
+        sh "./configure --spidermonkey-version 128 --with-nouveau"
         sh 'make erlfmt-check'
         sh 'make elixir-source-checks'
         sh 'make python-black'
