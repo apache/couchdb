@@ -394,8 +394,8 @@ pending_count(Dict) ->
 pack_seqs(Workers) ->
     SeqList = [{N, R, S} || {#shard{node = N, range = R}, S} <- Workers],
     SeqSum = lists:sum([fake_packed_seq(S) || {_, _, S} <- SeqList]),
-    Opaque = couch_util:encodeBase64Url(?term_to_bin(SeqList, [compressed])),
-    <<(integer_to_binary(SeqSum))/binary, $-, Opaque/binary>>.
+    Opaque = couch_util:encodeBase64Url(encrypt(?term_to_bin(SeqList, [compressed]))),
+    <<(integer_to_binary(SeqSum))/binary, $-, $., $1, Opaque/binary>>.
 
 % Generate the sequence number used to build the emitted N-... prefix.
 %
@@ -419,11 +419,28 @@ fake_packed_seq(Seq) -> Seq.
 unpack_seq_regex_match(Packed) ->
     Pattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
     Options = [{capture, [opaque], binary}],
-    {match, Match} = re:run(Packed, Pattern, Options),
+    {match, [Match]} = re:run(Packed, Pattern, Options),
     Match.
 
+unpack_seq_decode_term(<<$., $1, EncryptedOpaque/binary>>) ->
+    binary_to_term(decrypt(couch_util:decodeBase64Url(EncryptedOpaque)));
 unpack_seq_decode_term(Opaque) ->
     binary_to_term(couch_util:decodeBase64Url(Opaque)).
+
+encrypt(Bin) when is_binary(Bin) ->
+    Secret = ?l2b(chttpd_util:get_chttpd_auth_config("secret")),
+    IV = crypto:strong_rand_bytes(12),
+    {CipherText, Tag} = crypto:crypto_one_time_aead(aes_256_gcm, Secret, IV, Bin, [], true),
+    <<IV/binary, Tag/binary, CipherText/binary>>.
+
+decrypt(<<IV:12/binary, Tag:16/binary, CipherText/binary>>) ->
+    Secret = ?l2b(chttpd_util:get_chttpd_auth_config("secret")),
+    case crypto:crypto_one_time_aead(aes_256_gcm, Secret, IV, CipherText, [], Tag, false) of
+        error ->
+            throw(since_decryption_error);
+        PlainText ->
+            PlainText
+    end.
 
 % This is used for testing and for remsh debugging
 %
