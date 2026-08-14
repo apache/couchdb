@@ -134,17 +134,22 @@ meta = [
   // elixir tests fail. That's why we're using the s390x_own label instead of
   // s390x
   //
-  'base-s390x': [
-    name: 'Debian s390x',
-    spidermonkey_vsn: '128',
-    with_nouveau: true,
-    // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
-    // Test262Error: 51539607552,42,0,4,5,6,7,8
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 's390x_own',
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
+  // Noticed repeated timeouts in couch_cfile_prop_tests:'-property_test_/0-fun-2-'/1
+  //    (test/eunit/couch_cfile_prop_tests.erl) in function prim_file:datasync/1 on this
+  // CI worker. Fio tests indicate good throughput but often enough all 3 retries fail
+  // cfile tests. Disabled to avoid blocking PR merging
+  //
+  // 'base-s390x': [
+  //   name: 'Debian s390x',
+  //   spidermonkey_vsn: '128',
+  //   with_nouveau: true,
+  //   // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
+  //   // Test262Error: 51539607552,42,0,4,5,6,7,8
+  //   quickjs_test262: false,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 's390x_own',
+  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  // ],
 
   'base': [
     name: 'Debian x86_64',
