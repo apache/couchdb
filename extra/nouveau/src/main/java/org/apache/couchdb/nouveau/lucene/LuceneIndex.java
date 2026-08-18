@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.couchdb.nouveau.api.DocumentDeleteRequest;
@@ -107,6 +108,7 @@ public class LuceneIndex extends Index {
     private final Analyzer analyzer;
     private final IndexWriter writer;
     private final SearcherManager searcherManager;
+    private final AtomicBoolean searcherManagerStale = new AtomicBoolean(false);
     private final LuceneIndexSchema schema;
 
     public LuceneIndex(
@@ -147,11 +149,13 @@ public class LuceneIndex extends Index {
         final Document doc = toDocument(docId, request);
         schema.update(request.fields());
         writer.updateDocument(docIdTerm, doc);
+        searcherManagerStale.set(true);
     }
 
     @Override
     public void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException {
         writer.deleteDocuments(docIdTerm(docId));
+        searcherManagerStale.set(true);
     }
 
     @Override
@@ -208,7 +212,9 @@ public class LuceneIndex extends Index {
             cm = new MultiCollectorManager(hits);
         }
 
-        searcherManager.maybeRefreshBlocking();
+        if (searcherManagerStale.getAndSet(false)) {
+            searcherManager.maybeRefreshBlocking();
+        }
 
         final IndexSearcher searcher = searcherManager.acquire();
         try {
