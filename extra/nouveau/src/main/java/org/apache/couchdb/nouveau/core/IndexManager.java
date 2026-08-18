@@ -417,7 +417,7 @@ public final class IndexManager implements Managed {
                 return Long.parseLong(entry.getValue());
             }
         }
-        return 0L;
+        return defaultValue;
     }
 
     private void close(final String name, final IndexHolder holder) throws IOException {
