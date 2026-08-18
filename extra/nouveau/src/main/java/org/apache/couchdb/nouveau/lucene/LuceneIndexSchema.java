@@ -56,6 +56,8 @@ final class LuceneIndexSchema {
 
     private final ConcurrentMap<String, Type> map;
 
+    private final ConcurrentMap<Locale, Map<String, PointsConfig>> pointsConfigCache = new ConcurrentHashMap<>();
+
     private LuceneIndexSchema(Map<String, Type> map) {
         this.map = new ConcurrentHashMap<>(map);
         this.map.put("_id", Type.STRING);
@@ -78,7 +80,11 @@ final class LuceneIndexSchema {
     public void update(final Collection<Field> fields) {
         Objects.requireNonNull(fields);
         for (var field : fields) {
-            map.putIfAbsent(field.name(), Type.fromField(field));
+            var type = Type.fromField(field);
+            var result = map.putIfAbsent(field.name(), type);
+            if (result == null && type == Type.DOUBLE) {
+                pointsConfigCache.clear();
+            }
             assertType(field);
         }
     }
@@ -102,6 +108,10 @@ final class LuceneIndexSchema {
     }
 
     public Map<String, PointsConfig> toPointsConfigMap(final Locale locale) {
+        return pointsConfigCache.computeIfAbsent(locale, l -> buildPointsConfigMap(l));
+    }
+
+    private Map<String, PointsConfig> buildPointsConfigMap(final Locale locale) {
         Objects.requireNonNull(locale);
         var numberFormat = NumberFormat.getInstance(locale);
         var doublePointsConfig = new PointsConfig(numberFormat, Double.class);
