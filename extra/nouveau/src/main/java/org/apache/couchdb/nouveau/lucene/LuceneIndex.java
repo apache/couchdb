@@ -181,6 +181,9 @@ public class LuceneIndex extends Index {
                     writer.rollback();
                 },
                 () -> {
+                    analyzer.close();
+                },
+                () -> {
                     if (isDeleteOnClose()) {
                         var dir = writer.getDirectory();
                         for (final String name : dir.listAll()) {
