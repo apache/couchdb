@@ -118,35 +118,39 @@ should_not_return_any_csp_headers_when_disabled(_DbName) ->
             ok = config:set("csp", "utils_enable", "false", false),
             ok = config:set("csp", "enable", "false", false),
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
-            proplists:get_value("Content-Security-Policy", Headers)
+            proplists:get_value(~"content-security-policy", Headers)
         end
     ).
 
 should_apply_default_policy(_DbName) ->
     ?_assertEqual(
-        "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;",
+        <<
+            "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
+            "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;"
+        >>,
         begin
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
-            proplists:get_value("Content-Security-Policy", Headers)
+            proplists:get_value(~"content-security-policy", Headers)
         end
     ).
 
 should_apply_default_policy_with_legacy_config(_DbName) ->
     ?_assertEqual(
-        "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;",
+        <<
+            "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
+            "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;"
+        >>,
         begin
             ok = config:set("csp", "utils_enable", "false", false),
             ok = config:set("csp", "enable", "true", false),
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
-            proplists:get_value("Content-Security-Policy", Headers)
+            proplists:get_value(~"content-security-policy", Headers)
         end
     ).
 
 should_return_custom_policy(_DbName) ->
     ?_assertEqual(
-        "default-src 'http://example.com';",
+        ~"default-src 'http://example.com';",
         begin
             ok = config:set(
                 "csp",
@@ -155,7 +159,7 @@ should_return_custom_policy(_DbName) ->
                 false
             ),
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
-            proplists:get_value("Content-Security-Policy", Headers)
+            proplists:get_value(~"content-security-policy", Headers)
         end
     ).
 
@@ -273,4 +277,4 @@ req(Method, {_, _} = Auth, Url, ContentType, #{} = Body) ->
     {Code, is_sandboxed(RespHdrs)}.
 
 is_sandboxed(Headers) ->
-    lists:member({"Content-Security-Policy", "sandbox"}, Headers).
+    lists:member({~"content-security-policy", ~"sandbox"}, Headers).

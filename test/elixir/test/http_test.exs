@@ -8,7 +8,7 @@ defmodule HttpTest do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/test", body: %{})
     db_url = Couch.process_url("/" <> db_name)
-    assert resp.headers.hdrs["location"] == db_url <> "/test"
+    assert resp.headers["location"] == db_url <> "/test"
   end
 
   @tag :with_db
@@ -21,7 +21,7 @@ defmodule HttpTest do
         headers: ["X-Forwarded-Host": "mysite.com"]
       )
 
-    assert resp.headers.hdrs["location"] == "http://mysite.com/#{db_name}/test2"
+    assert resp.headers["location"] == "http://mysite.com/#{db_name}/test2"
   end
 
   @tag :with_db
@@ -43,7 +43,7 @@ defmodule HttpTest do
           headers: ["X-Host": "mysite2.com"]
         )
 
-      assert resp.headers.hdrs["location"] == "http://mysite2.com/#{db_name}/test3"
+      assert resp.headers["location"] == "http://mysite2.com/#{db_name}/test3"
     end)
   end
 
@@ -58,7 +58,7 @@ defmodule HttpTest do
       )
 
     db_url = Couch.process_url("/" <> db_name)
-    assert resp.headers.hdrs["location"] == db_url <> "/docid%0A/attachment.txt"
+    assert resp.headers["location"] == db_url <> "/docid%0A/attachment.txt"
 
     resp =
       Couch.put("/#{db_name}/docidtest%0A",
@@ -67,7 +67,7 @@ defmodule HttpTest do
       )
 
     db_url = Couch.process_url("/" <> db_name)
-    assert resp.headers.hdrs["location"] == db_url <> "/docidtest%0A"
+    assert resp.headers["location"] == db_url <> "/docidtest%0A"
 
     resp =
       Couch.post("/#{db_name}/",
@@ -76,6 +76,6 @@ defmodule HttpTest do
       )
 
     db_url = Couch.process_url("/" <> db_name)
-    assert resp.headers.hdrs["location"] == db_url <> "/docidtestpost%250A"
+    assert resp.headers["location"] == db_url <> "/docidtestpost%250A"
   end
 end

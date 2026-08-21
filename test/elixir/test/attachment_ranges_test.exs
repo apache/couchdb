@@ -32,8 +32,8 @@ defmodule AttachmentRangesTest do
 
     assert(resp.status_code == 206)
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Range"] == "bytes 0-28/29"
-    assert resp.headers["Content-Length"] == "29"
+    assert resp.headers["content-range"] == "bytes 0-28/29"
+    assert resp.headers["content-length"] == "29"
 
     # Fetch the whole entity without an end offset is a 200
     resp =
@@ -44,8 +44,8 @@ defmodule AttachmentRangesTest do
 
     assert(resp.status_code == 200)
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Range"] == nil
-    assert resp.headers["Content-Length"] == "29"
+    assert resp.headers["content-range"] == nil
+    assert resp.headers["content-length"] == "29"
 
     # Even if you ask multiple times.
     resp =
@@ -74,8 +74,8 @@ defmodule AttachmentRangesTest do
 
     assert(resp.status_code == 206)
     assert resp.body == "is is a base64 encoded text"
-    assert resp.headers["Content-Range"] == "bytes 2-28/29"
-    assert resp.headers["Content-Length"] == "27"
+    assert resp.headers["content-range"] == "bytes 2-28/29"
+    assert resp.headers["content-length"] == "27"
 
     # Fetch first part of entity is a 206
     resp =
@@ -86,8 +86,8 @@ defmodule AttachmentRangesTest do
 
     assert(resp.status_code == 206)
     assert resp.body == "This"
-    assert resp.headers["Content-Range"] == "bytes 0-3/29"
-    assert resp.headers["Content-Length"] == "4"
+    assert resp.headers["content-range"] == "bytes 0-3/29"
+    assert resp.headers["content-length"] == "4"
 
     # Fetch middle of entity is also a 206
     resp =
@@ -98,8 +98,8 @@ defmodule AttachmentRangesTest do
 
     assert(resp.status_code == 206)
     assert resp.body == "base64"
-    assert resp.headers["Content-Range"] == "bytes 10-15/29"
-    assert resp.headers["Content-Length"] == "6"
+    assert resp.headers["content-range"] == "bytes 10-15/29"
+    assert resp.headers["content-length"] == "6"
 
     # Fetch end of entity is also a 206
     resp =
@@ -110,8 +110,8 @@ defmodule AttachmentRangesTest do
 
     assert(resp.status_code == 206)
     assert resp.body == "ext"
-    assert resp.headers["Content-Range"] == "bytes 26-28/29"
-    assert resp.headers["Content-Length"] == "3"
+    assert resp.headers["content-range"] == "bytes 26-28/29"
+    assert resp.headers["content-length"] == "3"
 
     # backward range is 416
     resp =

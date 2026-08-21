@@ -10,7 +10,7 @@ defmodule JsonpTest do
 
     resp = Couch.get("/#{db_name}/0?callback=jsonp_no_chunk")
     assert resp.status_code == 200
-    assert resp.headers.hdrs["content-type"] == "application/json"
+    assert resp.headers["content-type"] == "application/json"
   end
 
   @tag :with_db
@@ -31,7 +31,7 @@ defmodule JsonpTest do
       resp = Couch.get("/#{db_name}/0?callback=jsonp_no_chunk")
 
       assert resp.status_code == 200
-      assert resp.headers.hdrs["content-type"] == "application/javascript"
+      assert resp.headers["content-type"] == "application/javascript"
 
       {callback_fun, callback_param} = parse_callback(resp.body)
 
@@ -71,7 +71,7 @@ defmodule JsonpTest do
     run_on_modified_server(server_config, fn ->
       resp = Couch.get("/#{db_name}/_design/test/_view/all_docs?callback=jsonp_chunk")
       assert resp.status_code == 200
-      assert resp.headers.hdrs["content-type"] == "application/javascript"
+      assert resp.headers["content-type"] == "application/javascript"
 
       {callback_fun, callback_param} = parse_callback(resp.body)
 
@@ -83,12 +83,11 @@ defmodule JsonpTest do
 
       resp = Couch.get("/#{db_name}/_changes?callback=jsonp_chunk")
       assert resp.status_code == 200
-      assert resp.headers.hdrs["content-type"] == "application/javascript"
+      assert resp.headers["content-type"] == "application/javascript"
 
       {callback_fun, callback_param} = parse_callback(resp.body)
       assert callback_fun == "jsonp_chunk"
       assert length(callback_param["results"]) == 3
-
     end)
   end
 

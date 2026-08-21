@@ -65,7 +65,7 @@ defmodule BasicsTest do
     assert db_count > 0
     assert Couch.get("/_all_dbs?limit=0").body == []
     assert not Enum.empty?(Couch.get("/_all_dbs?limit=1").body)
-    assert length(Couch.get("/_all_dbs?skip=1").body) == (db_count - 1)
+    assert length(Couch.get("/_all_dbs?skip=1").body) == db_count - 1
     assert [db] == Couch.get("/_all_dbs?start_key=\"#{db}\"&limit=1").body
   end
 
@@ -158,7 +158,7 @@ defmodule BasicsTest do
     etag = ~s("#{resp.body["rev"]}")
     resp = Couch.get("/#{db_name}/foo", headers: ["If-None-Match": etag])
     assert resp.status_code == 304, "Should be 304 Not Modified"
-    assert resp.headers[:"Content-Length"] == "0", "Should have zero content length"
+    assert resp.headers["content-length"] == "0", "Should have zero content length"
     assert resp.body == "", "Should have an empty body"
   end
 
@@ -267,7 +267,7 @@ defmodule BasicsTest do
     db_name = context[:db_name]
     resp = Couch.post("/#{db_name}", body: %{:foo => :bar})
     assert resp.body["ok"]
-    loc = resp.headers["Location"]
+    loc = resp.headers["location"]
     assert loc, "should have a Location header"
     locs = Enum.reverse(String.split(loc, "/"))
     assert hd(locs) == resp.body["id"]
@@ -378,15 +378,15 @@ defmodule BasicsTest do
     post_response = Couch.post("/#{db_name}", body: %{:foo => :bar})
     id = post_response.body["id"]
     head_response = Couch.head("/#{db_name}/#{id}?open_revs=all")
-    assert head_response.headers["X-Couch-Request-ID"]
-    assert head_response.headers["X-CouchDB-Body-Time"]
+    assert head_response.headers["x-couch-request-id"]
+    assert head_response.headers["x-couchdb-body-time"]
   end
 
   @tag :with_db
   test "request ID can be specified at the client", _context do
     uuid = "E7498DE1-B661-42FA-943D-17F890143068"
     resp = Couch.get("/", headers: ["X-Couch-Request-ID": uuid])
-    assert resp.headers["X-Couch-Request-ID"] == uuid
+    assert resp.headers["x-couch-request-id"] == uuid
   end
 
   test "_all_dbs/_all_docs is not found", _context do
@@ -400,5 +400,4 @@ defmodule BasicsTest do
     assert resp.status_code == 404
     assert resp.body["error"] == "not_found"
   end
-
 end

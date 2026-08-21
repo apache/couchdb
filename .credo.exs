@@ -30,7 +30,6 @@
           ~r"/src/fast_pbkdf2/",
           ~r"/src/jason",
           ~r"/src/hackney",
-          ~r"/src/httpotion",
           ~r"/src/file_system",
           ~r"/src/credo",
           ~r"/src/idna",

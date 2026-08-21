@@ -155,7 +155,7 @@ should_not_allow_origin(_, {_, _, Url, Headers0}) ->
                 [{"Origin", "http://127.0.0.1"}] ++
                     Headers1,
             {ok, _, Resp, _} = test_request:get(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -170,7 +170,7 @@ should_not_allow_origin_with_port_mismatch({_, VHost}, {_, _, Url, _}) ->
                 ] ++
                     maybe_append_vhost(VHost),
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -185,7 +185,7 @@ should_not_allow_origin_with_scheme_mismatch({_, VHost}, {_, _, Url, _}) ->
                 ] ++
                     maybe_append_vhost(VHost),
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -200,7 +200,7 @@ should_not_all_origin_due_case_mismatch({_, VHost}, {_, _, Url, _}) ->
                 ] ++
                     maybe_append_vhost(VHost),
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -209,15 +209,15 @@ should_make_simple_request(_, {_, _, Url, DefaultHeaders}) ->
         {ok, _, Resp, _} = test_request:get(Url, DefaultHeaders),
         ?assertEqual(
             undefined,
-            proplists:get_value("Access-Control-Allow-Credentials", Resp)
+            proplists:get_value(~"access-control-allow-credentials", Resp)
         ),
         ?assertEqual(
-            "http://example.com",
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            ~"http://example.com",
+            proplists:get_value(~"access-control-allow-origin", Resp)
         ),
         ?assertEqualLists(
             ?COUCH_HEADERS ++ list_simple_headers(Resp),
-            split_list(proplists:get_value("Access-Control-Expose-Headers", Resp))
+            split_list(proplists:get_value(~"access-control-expose-headers", Resp))
         )
     end).
 
@@ -229,13 +229,13 @@ should_make_preflight_request(_, {_, _, Url, DefaultHeaders}) ->
                 DefaultHeaders ++
                     [{"Access-Control-Request-Method", "GET"}],
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            split_list(proplists:get_value("Access-Control-Allow-Methods", Resp))
+            split_list(proplists:get_value(~"access-control-allow-methods", Resp))
         end
     ).
 
 should_make_prefligh_request_with_port({_, VHost}, {_, _, Url, _}) ->
     ?_assertEqual(
-        "http://example.com:5984",
+        ~"http://example.com:5984",
         begin
             config:set(
                 "cors",
@@ -250,13 +250,13 @@ should_make_prefligh_request_with_port({_, VHost}, {_, _, Url, _}) ->
                 ] ++
                     maybe_append_vhost(VHost),
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
 should_make_prefligh_request_with_scheme({_, VHost}, {_, _, Url, _}) ->
     ?_assertEqual(
-        "https://example.com:5984",
+        ~"https://example.com:5984",
         begin
             config:set(
                 "cors",
@@ -271,13 +271,13 @@ should_make_prefligh_request_with_scheme({_, VHost}, {_, _, Url, _}) ->
                 ] ++
                     maybe_append_vhost(VHost),
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
 should_make_prefligh_request_with_wildcard_origin({_, VHost}, {_, _, Url, _}) ->
     ?_assertEqual(
-        "https://example.com:5984",
+        ~"https://example.com:5984",
         begin
             config:set("cors", "origins", "*", false),
             Headers =
@@ -287,23 +287,23 @@ should_make_prefligh_request_with_wildcard_origin({_, VHost}, {_, _, Url, _}) ->
                 ] ++
                     maybe_append_vhost(VHost),
             {ok, _, Resp, _} = test_request:options(Url, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
 should_make_request_with_credentials(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual(
-        "true",
+        ~"true",
         begin
             ok = config:set("cors", "credentials", "true", false),
             {ok, _, Resp, _} = test_request:options(Url, DefaultHeaders),
-            proplists:get_value("Access-Control-Allow-Credentials", Resp)
+            proplists:get_value(~"access-control-allow-credentials", Resp)
         end
     ).
 
 should_make_origin_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
     ?_assertEqual(
-        "http://example.com",
+        ~"http://example.com",
         begin
             Hashed = couch_passwords:hash_admin_password(<<"test">>),
             config:set("admins", "test", ?b2l(Hashed), false),
@@ -311,7 +311,7 @@ should_make_origin_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
                 Url, DefaultHeaders, [{basic_auth, {"test", "test"}}]
             ),
             config:delete("admins", "test", false),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -328,7 +328,7 @@ should_make_preflight_request_with_auth(_, {_, _, Url, DefaultHeaders}) ->
                 Url, Headers, [{basic_auth, {"test", "test"}}]
             ),
             config:delete("admins", "test", false),
-            split_list(proplists:get_value("Access-Control-Allow-Methods", Resp))
+            split_list(proplists:get_value(~"access-control-allow-methods", Resp))
         end
     ).
 
@@ -338,7 +338,7 @@ should_not_return_cors_headers_for_invalid_origin({Host, _}) ->
         begin
             Headers = [{"Origin", "http://127.0.0.1"}],
             {ok, _, Resp, _} = test_request:get(Host, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -351,7 +351,7 @@ should_not_return_cors_headers_for_invalid_origin_preflight({Host, _}) ->
                 {"Access-Control-Request-Method", "GET"}
             ],
             {ok, _, Resp, _} = test_request:options(Host, Headers),
-            proplists:get_value("Access-Control-Allow-Origin", Resp)
+            proplists:get_value(~"access-control-allow-origin", Resp)
         end
     ).
 
@@ -407,7 +407,7 @@ should_make_request_with_if_none_match_header({Host, DbName}) ->
                     Url ++ "/doc", [{"Content-Type", "application/json"}], "{}"
                 ),
                 ?assert(Code0 =:= 201),
-                ETag = proplists:get_value("ETag", Headers0),
+                ETag = proplists:get_value(~"etag", Headers0),
                 {ok, Code, _, _} = test_request:get(
                     Url ++ "/doc", [
                         {"Origin", "http://example.com"},
@@ -427,5 +427,5 @@ split_list(S) ->
     re:split(S, "\\s*,\\s*", [trim, {return, list}]).
 
 list_simple_headers(Headers) ->
-    LCHeaders = [string:to_lower(K) || {K, _V} <- Headers],
+    LCHeaders = [binary_to_list(K) || {K, _V} <- Headers],
     lists:filter(fun(H) -> lists:member(H, ?SIMPLE_HEADERS) end, LCHeaders).

@@ -46,7 +46,7 @@
 
 -record(test_context, {mocked = [], started = [], module}).
 
--define(DEFAULT_APPS, [inets, ibrowse, ssl, config, couch_epi, couch_event, couch]).
+-define(DEFAULT_APPS, [inets, gun, ssl, config, couch_epi, couch_event, couch]).
 
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
@@ -58,7 +58,8 @@ init_code_path() ->
     Paths = [
         "couchdb",
         "jiffy",
-        "ibrowse",
+        "gun",
+        "cowlib",
         "mochiweb",
         "snappy"
     ],

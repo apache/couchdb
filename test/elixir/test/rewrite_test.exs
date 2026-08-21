@@ -298,11 +298,11 @@ defmodule RewriteTest do
       # Test simple rewriting
       resp = Couch.get("/#{db_name}/_design/test/_rewrite/foo")
       assert resp.body == "This is a base64 encoded text"
-      assert resp.headers["Content-Type"] == "text/plain"
+      assert resp.headers["content-type"] == "text/plain"
 
       resp = Couch.get("/#{db_name}/_design/test/_rewrite/foo2")
       assert resp.body == "This is a base64 encoded text"
-      assert resp.headers["Content-Type"] == "text/plain"
+      assert resp.headers["content-type"] == "text/plain"
 
       # Test POST, hello update world
       resp =
@@ -315,7 +315,7 @@ defmodule RewriteTest do
       resp = Couch.put("/#{db_name}/_design/test/_rewrite/hello/#{doc_id}")
       assert resp.status_code in [201, 202]
       assert resp.body == "hello doc"
-      assert String.match?(resp.headers["Content-Type"], ~r/charset=utf-8/)
+      assert String.match?(resp.headers["content-type"], ~r/charset=utf-8/)
 
       assert Couch.get("/#{db_name}/#{doc_id}").body["world"] == "hello"
 
@@ -331,7 +331,7 @@ defmodule RewriteTest do
       resp = Couch.put("/#{db_name}/_design/test/_rewrite/welcome3/test")
       assert resp.status_code in [201, 202]
       assert resp.body == "New World"
-      assert String.match?(resp.headers["Content-Type"], ~r/charset=utf-8/)
+      assert String.match?(resp.headers["content-type"], ~r/charset=utf-8/)
 
       resp = Couch.get("/#{db_name}/_design/test/_rewrite/welcome3/test")
       assert resp.body == "Welcome test"

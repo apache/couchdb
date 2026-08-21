@@ -319,7 +319,7 @@ should_get_att_without_accept_gzip_encoding(_, {Data, {_, _, AttUrl}}) ->
     ?_test(begin
         {ok, Code, Headers, Body} = test_request:get(AttUrl),
         ?assertEqual(200, Code),
-        ?assertNot(lists:member({"Content-Encoding", "gzip"}, Headers)),
+        ?assertNot(lists:member({~"content-encoding", ~"gzip"}, Headers)),
         ?assertEqual(Data, iolist_to_binary(Body))
     end).
 
@@ -329,7 +329,7 @@ should_get_att_with_accept_gzip_encoding(compressed, {Data, {_, _, AttUrl}}) ->
             AttUrl, [{"Accept-Encoding", "gzip"}]
         ),
         ?assertEqual(200, Code),
-        ?assert(lists:member({"Content-Encoding", "gzip"}, Headers)),
+        ?assert(lists:member({~"content-encoding", ~"gzip"}, Headers)),
         ?assertEqual(Data, zlib:gunzip(iolist_to_binary(Body)))
     end);
 should_get_att_with_accept_gzip_encoding({text, _}, {Data, {_, _, AttUrl}}) ->
@@ -338,7 +338,7 @@ should_get_att_with_accept_gzip_encoding({text, _}, {Data, {_, _, AttUrl}}) ->
             AttUrl, [{"Accept-Encoding", "gzip"}]
         ),
         ?assertEqual(200, Code),
-        ?assert(lists:member({"Content-Encoding", "gzip"}, Headers)),
+        ?assert(lists:member({~"content-encoding", ~"gzip"}, Headers)),
         ?assertEqual(Data, zlib:gunzip(iolist_to_binary(Body)))
     end);
 should_get_att_with_accept_gzip_encoding({binary, _}, {Data, {_, _, AttUrl}}) ->
@@ -349,7 +349,7 @@ should_get_att_with_accept_gzip_encoding({binary, _}, {Data, {_, _, AttUrl}}) ->
         ?assertEqual(200, Code),
         ?assertEqual(
             undefined,
-            couch_util:get_value("Content-Encoding", Headers)
+            couch_util:get_value(~"content-encoding", Headers)
         ),
         ?assertEqual(Data, iolist_to_binary(Body))
     end).
@@ -362,7 +362,7 @@ should_get_att_with_accept_deflate_encoding(_, {Data, {_, _, AttUrl}}) ->
         ?assertEqual(200, Code),
         ?assertEqual(
             undefined,
-            couch_util:get_value("Content-Encoding", Headers)
+            couch_util:get_value(~"content-encoding", Headers)
         ),
         ?assertEqual(Data, iolist_to_binary(Body))
     end).
