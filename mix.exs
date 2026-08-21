@@ -73,7 +73,7 @@ defmodule CouchDBTest.Mixfile do
   end
 
   # Run "mix help compile.app" to learn about applications.
-  def application, do: [applications: [:logger, :httpotion]]
+  def application, do: [applications: [:logger]]
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["test/elixir/lib", "test/elixir/test/support"]
@@ -84,9 +84,7 @@ defmodule CouchDBTest.Mixfile do
   defp deps() do
     deps1 = [
       {:junit_formatter, "~> 3.4", only: [:dev, :test, :integration]},
-      {:httpotion, ">= 3.2.0", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.18.5", only: :test},
-      {:ibrowse, path: path("ibrowse"), override: true},
       {:credo, "== 1.7.19", only: [:dev, :test, :integration], runtime: false}
     ]
 
@@ -95,14 +93,14 @@ defmodule CouchDBTest.Mixfile do
 
     deps_list = deps1 ++ deps2
 
-    [:config, :couch, :fabric]
+    [:config, :couch, :fabric, :gun, :cowlib]
     |> Enum.map(&path("#{&1}/ebin"))
     |> Enum.map(&String.to_charlist/1)
     |> Enum.each(&:code.add_patha/1)
 
     # Some deps may be missing during source check
     # Besides we don't want to spend time checking them anyway
-    List.foldl([:ibrowse | extra_deps], deps_list, fn dep, acc ->
+    List.foldl(extra_deps, deps_list, fn dep, acc ->
       if File.dir?(acc[dep][:path]) do
         acc
       else
@@ -133,7 +131,6 @@ defmodule CouchDBTest.Mixfile do
       "credo",
       "excoveralls",
       "hackney",
-      "httpotion",
       "ibrowse",
       "idna",
       "jason",

@@ -394,8 +394,9 @@ req(Method, Url, Headers, Body) ->
     {ok, Code, _, Res} = test_request:request(Method, Url, Headers1, Body),
     {Code, json_decode(Res)}.
 
-% Data streaming generator for ibrowse client. ibrowse will repeatedly call the
-% function with State and it should return {ok, Data, NewState} or eof at end.
+% Data streaming generator for the test http client, which repeatedly calls
+% the function with State; it should return {ok, Data, NewState} or eof at
+% the end.
 data_stream_fun(Size) ->
     Fun = fun
         (0) -> eof;

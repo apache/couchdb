@@ -20,6 +20,8 @@
 -export([options/1, options/2, options/3]).
 -export([request/3, request/4, request/5]).
 
+-define(TIMEOUT, 30000).
+
 copy(Url) ->
     copy(Url, []).
 
@@ -86,25 +88,65 @@ request(Method, Url, Headers, Body, Opts) ->
 request(_Method, _Url, _Headers, _Body, _Opts, 0) ->
     {error, request_failed};
 request(Method, Url, Headers, Body, Opts, N) ->
-    case code:is_loaded(ibrowse) of
-        false ->
-            {ok, _} = ibrowse:start();
-        _ ->
-            ok
-    end,
-    case ibrowse:send_req(Url, Headers, Method, Body, Opts) of
-        {ok, Code0, RespHeaders, RespBody0} ->
-            Code = list_to_integer(Code0),
-            RespBody = iolist_to_binary(RespBody0),
-            {ok, Code, RespHeaders, RespBody};
-        {error, {'EXIT', {normal, _}}} ->
-            % Connection closed right after a successful request that
-            % used the same connection.
-            request(Method, Url, Headers, Body, Opts, N - 1);
-        {error, retry_later} ->
-            % CouchDB is busy, let’s wait a bit
-            timer:sleep(3000 div N),
+    {ok, _} = application:ensure_all_started(gun),
+    Headers1 = headers(Headers, Opts),
+    ReqOpts = #{timeout => ?TIMEOUT, tls_opts => [{verify, verify_none}]},
+    case couch_gun:req(Method, Url, Headers1, Body, ReqOpts) of
+        {ok, _Code, _RespHeaders, _RespBody} = Resp ->
+            Resp;
+        {error, closed} ->
+            % Retry. Possible race with the server starting.
             request(Method, Url, Headers, Body, Opts, N - 1);
         Error ->
             Error
     end.
+
+headers(Headers, Opts) ->
+    lists:foldl(fun apply_opt/2, couch_gun:headers(Headers), Opts).
+
+apply_opt({host_header, Value}, Headers) ->
+    [Host] = couch_gun:headers([{host, Value}]),
+    lists:keystore(~"host", 1, Headers, Host);
+apply_opt({basic_auth, {User, Pass}}, Headers) ->
+    Auth = couch_gun:basic_auth(User, Pass),
+    lists:keystore(~"authorization", 1, Headers, Auth);
+apply_opt(_Other, Headers) ->
+    Headers.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+headers_test() ->
+    ?assertEqual([], headers([], [])),
+    ?assertEqual(
+        [{~"content-type", ~"application/json"}],
+        headers([{"Content-Type", "application/json"}], [])
+    ),
+    Auth = couch_gun:basic_auth("u", "p"),
+    ?assertEqual(
+        [{~"authorization", ~"Basic dTpw"}],
+        headers([{basic_auth, {"u", "p"}}], [])
+    ),
+    ?assertEqual(
+        [{~"cookie", ~"k=v"}],
+        headers([{cookie, "k=v"}], [])
+    ),
+    ?assertEqual(
+        [{~"accept", ~"*/*"}, {~"host", ~"potato.local"}],
+        headers([{"Accept", "*/*"}], [{host_header, "potato.local"}])
+    ),
+    ?assertEqual(
+        [{~"host", ~"b"}],
+        headers([{"Host", "a"}], [{host_header, "b"}])
+    ),
+    ?assertEqual(
+        [Auth],
+        headers([], [{basic_auth, {"u", "p"}}])
+    ),
+    ?assertEqual(
+        [Auth],
+        headers([{basic_auth, {"x", "y"}}], [{basic_auth, {"u", "p"}}])
+    ).
+
+-endif.

@@ -60,12 +60,12 @@ defmodule AttachmentPathsTest do
     resp = Couch.get("/#{db_name}/bin_doc/foo/bar.txt")
     assert resp.status_code == 200
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Type"] == "text/plain"
+    assert resp.headers["content-type"] == "text/plain"
 
     resp = Couch.get("/#{db_name}/bin_doc/foo%2Fbar.txt")
     assert resp.status_code == 200
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Type"] == "text/plain"
+    assert resp.headers["content-type"] == "text/plain"
 
     resp = Couch.get("/#{db_name}/bin_doc/foo/baz.txt")
     assert resp.status_code == 404
@@ -126,12 +126,12 @@ defmodule AttachmentPathsTest do
     resp = Couch.get("/#{db_name}/_design/bin_doc/foo/bar.txt")
     assert resp.status_code == 200
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Type"] == "text/plain"
+    assert resp.headers["content-type"] == "text/plain"
 
     resp = Couch.get("/#{db_name}/_design/bin_doc/foo%2Fbar.txt")
     assert resp.status_code == 200
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Type"] == "text/plain"
+    assert resp.headers["content-type"] == "text/plain"
 
     resp = Couch.get("/#{db_name}/_design/bin_doc/foo/baz.txt")
     assert resp.status_code == 404

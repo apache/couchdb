@@ -25,11 +25,9 @@ defmodule DesignPathTest do
     resp = Couch.get("/#{db_name}/_design/test")
     assert resp.body["_id"] == "_design/test"
 
-    resp =
-      Couch.get(Couch.process_url("/#{db_name}/_design%2Ftest"),
-        follow_redirects: true
-      )
-
+    resp = Couch.get("/#{db_name}/_design%2Ftest")
+    assert resp.status_code == 301
+    resp = Couch.get(resp.headers["location"])
     assert resp.body["_id"] == "_design/test"
 
     resp = Couch.get("/#{db_name}/_design/test/_view/testing")
@@ -50,11 +48,9 @@ defmodule DesignPathTest do
     resp = Couch.get("/#{db_name}/_design/test2")
     assert resp.body["_id"] == "_design/test2"
 
-    resp =
-      Couch.get(Couch.process_url("/#{db_name}/_design%2Ftest2"),
-        follow_redirects: true
-      )
-
+    resp = Couch.get("/#{db_name}/_design%2Ftest2")
+    assert resp.status_code == 301
+    resp = Couch.get(resp.headers["location"])
     assert resp.body["_id"] == "_design/test2"
 
     resp = Couch.get("/#{db_name}/_design/test2/_view/testing")

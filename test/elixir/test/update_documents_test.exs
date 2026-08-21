@@ -125,15 +125,15 @@ defmodule UpdateDocumentsTest do
     resp = Couch.put("/#{db_name}/_design/update/_update/hello/#{docid}")
     assert resp.status_code == 201
     assert resp.body == "<p>hello doc</p>"
-    assert String.contains?(resp.headers["Content-Type"], "charset=utf-8")
-    assert resp.headers["X-Couch-Id"] == docid
+    assert String.contains?(resp.headers["content-type"], "charset=utf-8")
+    assert resp.headers["x-couch-id"] == docid
 
     resp = Couch.get("/#{db_name}/#{docid}")
     assert resp.status_code == 200
     assert resp.body["world"] == "hello"
 
     # Fix for COUCHDB-379
-    assert String.starts_with?(resp.headers["Server"], "CouchDB")
+    assert String.starts_with?(resp.headers["server"], "CouchDB")
 
     resp = Couch.put("/#{db_name}/_design/update/_update/hello")
     assert resp.status_code == 200
@@ -234,7 +234,7 @@ defmodule UpdateDocumentsTest do
         headers: ["X-Couch-Full-Commit": "true"]
       )
 
-    newrev = resp.headers["X-Couch-Update-NewRev"]
+    newrev = resp.headers["x-couch-update-newrev"]
 
     resp = Couch.get("/#{db_name}/#{docid}")
     assert resp.status_code == 200
@@ -309,7 +309,7 @@ defmodule UpdateDocumentsTest do
 
     assert resp.status_code == 201
     assert resp.body == "hello world!"
-    assert String.contains?(resp.headers["Content-Type"], "application/octet-stream")
+    assert String.contains?(resp.headers["content-type"], "application/octet-stream")
   end
 
   @tag :with_db

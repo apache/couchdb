@@ -63,7 +63,7 @@ defmodule Couch.DBTest do
         on_exit(fn ->
           query = %{:rev => user["_rev"]}
           resp = Couch.delete("/_users/#{user["_id"]}", query: query)
-          assert HTTPotion.Response.success?(resp)
+          assert Couch.Response.success?(resp)
         end)
 
         context = Map.put(context, :user, user)
@@ -159,7 +159,7 @@ defmodule Couch.DBTest do
       end
 
     resp = Couch.post("/_users", body: user_doc)
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["ok"]
     Map.put(user_doc, "_rev", resp.body["rev"])
   end
@@ -337,7 +337,7 @@ defmodule Couch.DBTest do
     options = Map.put(options, :body, body)
 
     resp = Couch.post("/_replicate", Enum.to_list(options))
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
+    assert Couch.Response.success?(resp), "#{inspect(resp)}"
     resp.body
   end
 
@@ -562,7 +562,7 @@ defmodule Couch.DBTest do
   defp restart_node(node, port) do
     url = "http://127.0.0.1:#{port}/_node/#{node}/_restart"
     resp = Couch.post(url)
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["ok"]
     # make sure node went down. we assuming the node can't bounce quick
     # enough to inroduce a race here
@@ -575,7 +575,7 @@ defmodule Couch.DBTest do
     url = "http://127.0.0.1:#{port}/_up"
     resp = Couch.get(url)
 
-    case HTTPotion.Response.success?(resp) do
+    case Couch.Response.success?(resp) do
       true -> resp.status_code in 200..399
       false -> false
     end
@@ -584,7 +584,7 @@ defmodule Couch.DBTest do
   defp node_to_port(node) do
     url = "/_node/#{node}/_config/chttpd/port"
     resp = Couch.get(url)
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     resp.body
   end
 end

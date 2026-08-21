@@ -21,7 +21,7 @@
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
 start() ->
-    Ctx = test_util:start_couch([inets, chttpd]),
+    Ctx = test_util:start_couch([chttpd]),
     DbDir = config:get("couchdb", "database_dir"),
     Suffix = ?b2l(couch_uuids:random()),
     test_util:with_couch_server_restart(fun() ->
@@ -183,17 +183,12 @@ should_return_nothing_when_db_not_exist_for_get_dbs_info(_) ->
 
 should_return_500_time_out_when_time_is_not_enough_for_get_dbs_info(_) ->
     mock_timeout(),
-    Auth = base64:encode_to_string(?USER ++ ":" ++ ?PASS),
-    Headers = [{"Authorization", "Basic " ++ Auth}],
-    Request = {dbs_info_url("buffer_response=true"), Headers},
+    Url = dbs_info_url("buffer_response=true"),
     {Props} =
         test_util:wait(
             fun() ->
-                % Use httpc to avoid ibrowse returning {error,
-                % retry_later} in some cases, causing test_request to
-                % sleep and retry, resulting in timeout failures.
-                case httpc:request(get, Request, [], []) of
-                    {ok, {{_, Code, _}, _, Body}} ->
+                case test_request:get(Url, [?CONTENT_JSON, ?AUTH]) of
+                    {ok, Code, _, Body} ->
                         ?assertEqual(500, Code),
                         jiffy:decode(Body);
                     _ ->

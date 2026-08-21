@@ -211,10 +211,10 @@ defmodule ShowDocumentsTest do
 
     resp = Rawresp.get("/#{db_name}/_design/template/_show/hello/test-doc-id")
     assert resp.body == "Hello World"
-    assert String.match?(resp.headers["Content-Type"], ~r/charset=utf-8/)
+    assert String.match?(resp.headers["content-type"], ~r/charset=utf-8/)
 
     # Fix for COUCHDB-379
-    assert String.match?(resp.headers["Server"], ~r/^CouchDB/)
+    assert String.match?(resp.headers["server"], ~r/^CouchDB/)
   end
 
   test "show without docid", context do
@@ -276,8 +276,8 @@ defmodule ShowDocumentsTest do
         headers: [Accept: "text/html;text/plain;*/*"]
       )
 
-    assert String.match?(resp.headers["Content-Type"], ~r/text\/html/)
-    assert resp.headers["Vary"] == "Accept"
+    assert String.match?(resp.headers["content-type"], ~r/text\/html/)
+    assert resp.headers["vary"] == "Accept"
 
     etag = resp.headers["etag"]
 
@@ -287,7 +287,7 @@ defmodule ShowDocumentsTest do
       )
 
     assert String.match?(resp.body, ~r/PNG/)
-    assert resp.headers["Content-Type"] == "image/png"
+    assert resp.headers["content-type"] == "image/png"
 
     etag2 = resp.headers["etag"]
 
@@ -337,8 +337,8 @@ defmodule ShowDocumentsTest do
         headers: [Accept: "text/html,application/atom+xml; q=0.9"]
       )
 
-    assert String.match?(resp.headers["Content-Type"], ~r/text\/html/)
-    assert String.match?(resp.headers["Content-Type"], ~r/charset=utf-8/)
+    assert String.match?(resp.headers["content-type"], ~r/text\/html/)
+    assert String.match?(resp.headers["content-type"], ~r/charset=utf-8/)
     assert resp.body == "Ha ha, you said \"plankton\"."
   end
 
@@ -350,7 +350,7 @@ defmodule ShowDocumentsTest do
         headers: [Accept: "application/x-foo"]
       )
 
-    assert resp.headers["Content-Type"] == "application/x-foo"
+    assert resp.headers["content-type"] == "application/x-foo"
     assert String.match?(resp.body, ~r/foofoo/)
   end
 
@@ -386,7 +386,7 @@ defmodule ShowDocumentsTest do
 
     resp = Rawresp.get("/#{db_name}/_design/template/_show/list-api/foo")
     assert resp.body == "Hey"
-    assert resp.headers["X-Couch-Test-Header"] == "Yeah"
+    assert resp.headers["x-couch-test-header"] == "Yeah"
   end
 
   test "list() compatible API with provides function", context do
@@ -411,12 +411,12 @@ defmodule ShowDocumentsTest do
 
     resp = Rawresp.get("/#{db_name}/_design/template/_show/list-api-mix/foo")
     assert resp.body == "Hey Dude"
-    assert resp.headers["X-Couch-Test-Header"] == "Yeah"
+    assert resp.headers["x-couch-test-header"] == "Yeah"
 
     resp = Rawresp.get("/#{db_name}/_design/template/_show/list-api-mix-with-header/foo")
     assert resp.body == "Hey Dude"
-    assert resp.headers["X-Couch-Test-Header"] == "Yeah"
-    assert resp.headers["X-Couch-Test-Header-Awesome"] == "Oh Yeah!"
+    assert resp.headers["x-couch-test-header"] == "Yeah"
+    assert resp.headers["x-couch-test-header-awesome"] == "Oh Yeah!"
   end
 
   test "deleted docs", context do

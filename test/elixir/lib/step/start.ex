@@ -4,7 +4,7 @@ defmodule Couch.Test.Setup.Step.Start do
   list of applications from DEFAULT_APPS macro defined in `test_util.erl`.
   At the time of writing this list included:
     - inets
-    - ibrowse
+    - gun
     - ssl
     - config
     - couch_epi

@@ -14,7 +14,7 @@ defmodule EtagsHeadTest do
       )
 
     assert resp.status_code == 201
-    assert Map.has_key?(resp.headers.hdrs, "etag")
+    assert Map.has_key?(resp.headers, "etag")
   end
 
   @tag :with_db
@@ -27,11 +27,11 @@ defmodule EtagsHeadTest do
         body: %{}
       )
 
-    etag = resp.headers.hdrs["etag"]
+    etag = resp.headers["etag"]
 
     # get the doc and verify the headers match
     resp = Couch.get("/#{db_name}/1")
-    assert etag == resp.headers.hdrs["etag"]
+    assert etag == resp.headers["etag"]
 
     # 'head' the doc and verify the headers match
     resp =
@@ -39,7 +39,7 @@ defmodule EtagsHeadTest do
         headers: ["if-none-match": "s"]
       )
 
-    assert etag == resp.headers.hdrs["etag"]
+    assert etag == resp.headers["etag"]
   end
 
   @tag :with_db
@@ -52,7 +52,7 @@ defmodule EtagsHeadTest do
         body: %{}
       )
 
-    etag = resp.headers.hdrs["etag"]
+    etag = resp.headers["etag"]
 
     # 'head' the doc and verify the headers match
     resp =
@@ -60,7 +60,7 @@ defmodule EtagsHeadTest do
         headers: ["if-none-match": "s"]
       )
 
-    assert etag == resp.headers.hdrs["etag"]
+    assert etag == resp.headers["etag"]
   end
 
   @tag :with_db
@@ -74,13 +74,13 @@ defmodule EtagsHeadTest do
       )
 
     assert resp.status_code == 201
-    assert Map.has_key?(resp.headers.hdrs, "etag")
+    assert Map.has_key?(resp.headers, "etag")
 
-    etag = resp.headers.hdrs["etag"]
+    etag = resp.headers["etag"]
 
     # get the doc and verify the headers match
     resp = Couch.get("/#{db_name}/1")
-    assert etag == resp.headers.hdrs["etag"]
+    assert etag == resp.headers["etag"]
 
     # 'head' the doc and verify the headers match
     resp =
@@ -88,7 +88,7 @@ defmodule EtagsHeadTest do
         headers: ["if-none-match": "s"]
       )
 
-    assert etag == resp.headers.hdrs["etag"]
+    assert etag == resp.headers["etag"]
 
     # replace a doc
     resp =
@@ -101,7 +101,7 @@ defmodule EtagsHeadTest do
 
     # extract the new ETag value
     previous_etag = etag
-    etag = resp.headers.hdrs["etag"]
+    etag = resp.headers["etag"]
 
     # fail to replace a doc
     resp =

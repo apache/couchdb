@@ -131,7 +131,7 @@ defmodule AttachmentMultipartTest do
       )
 
     assert resp.status_code == 200
-    assert resp.headers["Content-length"] == "790"
+    assert resp.headers["content-length"] == "790"
     # parse out the multipart
     sections = parse_multipart(resp)
 
@@ -139,17 +139,17 @@ defmodule AttachmentMultipartTest do
     # The first section is the json doc. Check it's content-type.
     # Each part carries their own meta data.
 
-    assert Enum.at(sections, 0).headers["Content-Type"] == "application/json"
-    assert Enum.at(sections, 1).headers["Content-Type"] == "application/test"
-    assert Enum.at(sections, 2).headers["Content-Type"] == "application/test"
+    assert Enum.at(sections, 0).headers["content-type"] == "application/json"
+    assert Enum.at(sections, 1).headers["content-type"] == "application/test"
+    assert Enum.at(sections, 2).headers["content-type"] == "application/test"
 
-    assert Enum.at(sections, 1).headers["Content-Length"] == "21"
-    assert Enum.at(sections, 2).headers["Content-Length"] == "18"
+    assert Enum.at(sections, 1).headers["content-length"] == "21"
+    assert Enum.at(sections, 2).headers["content-length"] == "18"
 
-    assert Enum.at(sections, 1).headers["Content-Disposition"] ==
+    assert Enum.at(sections, 1).headers["content-disposition"] ==
              ~s(attachment; filename="foo.txt")
 
-    assert Enum.at(sections, 2).headers["Content-Disposition"] ==
+    assert Enum.at(sections, 2).headers["content-disposition"] ==
              ~s(attachment; filename="bar.txt")
 
     doc = :jiffy.decode(Enum.at(sections, 0).body, [:return_maps, :use_nil])
@@ -198,13 +198,13 @@ defmodule AttachmentMultipartTest do
     # 1 section, with a multipart/related Content-Type
     assert length(sections) == 1
 
-    ctype_value = Enum.at(sections, 0).headers["Content-Type"]
+    ctype_value = Enum.at(sections, 0).headers["content-type"]
     assert String.starts_with?(ctype_value, "multipart/related;") == true
 
     inner_sections = parse_multipart(Enum.at(sections, 0))
     # 2 inner sections: a document body section plus an attachment data section
     assert length(inner_sections) == 2
-    assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
+    assert Enum.at(inner_sections, 0).headers["content-type"] == "application/json"
 
     doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["foo.txt"]["stub"] == true
@@ -265,6 +265,7 @@ defmodule AttachmentMultipartTest do
 
     att_data = String.duplicate("x", 100_000)
     att_len = byte_size(att_data)
+
     document = """
     {
       "body": "This is a body.",
@@ -312,14 +313,11 @@ defmodule AttachmentMultipartTest do
   end
 
   defp put_multipart_new_edits_false(db_name, rev, multipart_data) do
-    # Help ensure we're re-using client connections
-    ibrowse_opts = [{:max_sessions, 1}, {:max_pipeline_size, 1}]
     resp =
       Couch.put(
         "/#{db_name}/multipart_replicated_changes?new_edits=false&rev=#{rev}",
         body: multipart_data,
-        headers: ["Content-Type": "multipart/related;boundary=\"abc123\""],
-        ibrowse: ibrowse_opts
+        headers: ["Content-Type": "multipart/related;boundary=\"abc123\""]
       )
 
     assert resp.status_code in [201, 202]
@@ -369,13 +367,13 @@ defmodule AttachmentMultipartTest do
     sections = parse_multipart(resp)
     # 1 section, with a multipart/related Content-Type
     assert length(sections) == 1
-    ctype_value = Enum.at(sections, 0).headers["Content-Type"]
+    ctype_value = Enum.at(sections, 0).headers["content-type"]
     assert String.starts_with?(ctype_value, "multipart/related;") == true
 
     inner_sections = parse_multipart(Enum.at(sections, 0))
     # 3 inner sections: a document body section plus 2 attachment data sections
     assert length(inner_sections) == 3
-    assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
+    assert Enum.at(inner_sections, 0).headers["content-type"] == "application/json"
 
     doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["lorem.txt"]["follows"] == true
@@ -406,13 +404,13 @@ defmodule AttachmentMultipartTest do
     # 1 section, with a multipart/related Content-Type
 
     assert length(sections) == 1
-    ctype_value = Enum.at(sections, 0).headers["Content-Type"]
+    ctype_value = Enum.at(sections, 0).headers["content-type"]
     assert String.starts_with?(ctype_value, "multipart/related;") == true
 
     inner_sections = parse_multipart(Enum.at(sections, 0))
     # 2 inner sections: a document body section plus 1 attachment data section
     assert length(inner_sections) == 2
-    assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
+    assert Enum.at(inner_sections, 0).headers["content-type"] == "application/json"
     doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps, :use_nil])
     assert doc["_attachments"]["lorem.txt"]["follows"] == true
     assert doc["_attachments"]["lorem.txt"]["encoding"] == "gzip"
@@ -420,7 +418,7 @@ defmodule AttachmentMultipartTest do
   end
 
   def get_boundary(response) do
-    ctype = response.headers["Content-Type"]
+    ctype = response.headers["content-type"]
     ctype_args = String.split(ctype, "; ")
     ctype_args = Enum.slice(ctype_args, 1, length(ctype_args))
 
@@ -459,7 +457,12 @@ defmodule AttachmentMultipartTest do
         Enum.reduce(raw_headers, %{}, fn raw_header, acc ->
           if raw_header != "" do
             header_parts = String.split(raw_header, ": ")
-            Map.put(acc, Enum.at(header_parts, 0), Enum.at(header_parts, 1))
+
+            Map.put(
+              acc,
+              String.downcase(Enum.at(header_parts, 0)),
+              Enum.at(header_parts, 1)
+            )
           else
             acc
           end

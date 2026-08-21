@@ -42,9 +42,12 @@ defmodule Couch.Session do
   # if the need arises.
   def go(%Couch.Session{} = sess, method, url, opts) do
     parse_response = Keyword.get(opts, :parse_response, true)
-    opts = opts
-           |> Keyword.merge(cookie: sess.cookie)
-           |> Keyword.delete(:parse_response)
+
+    opts =
+      opts
+      |> Keyword.merge(cookie: sess.cookie)
+      |> Keyword.delete(:parse_response)
+
     if parse_response do
       Couch.request(method, url, opts)
     else
@@ -54,9 +57,12 @@ defmodule Couch.Session do
 
   def go!(%Couch.Session{} = sess, method, url, opts) do
     parse_response = Keyword.get(opts, :parse_response, true)
-    opts = opts
-           |> Keyword.merge(cookie: sess.cookie)
-           |> Keyword.delete(:parse_response)
+
+    opts =
+      opts
+      |> Keyword.merge(cookie: sess.cookie)
+      |> Keyword.delete(:parse_response)
+
     if parse_response do
       Couch.request!(method, url, opts)
     else
@@ -66,110 +72,35 @@ defmodule Couch.Session do
 end
 
 defmodule Couch do
-  use HTTPotion.Base
-
   @moduledoc """
   CouchDB library to power test suite.
   """
 
-  # These constants are supplied to the underlying HTTP client and control
-  # how long we will wait before timing out a test. The inactivity timeout
-  # specifically fires during an active HTTP response and defaults to 10_000
-  # if not specified. We're defining it to a different value than the
-  # request_timeout largely just so we know which timeout fired.
-  @request_timeout 60_000
-  @inactivity_timeout 55_000
+  defdelegate process_url(url), to: Couch.Http
 
-  def process_url("http://" <> _ = url) do
-    url
+  def get(url, opts \\ []), do: request(:get, url, opts)
+  def get!(url, opts \\ []), do: request!(:get, url, opts)
+  def put(url, opts \\ []), do: request(:put, url, opts)
+  def put!(url, opts \\ []), do: request!(:put, url, opts)
+  def post(url, opts \\ []), do: request(:post, url, opts)
+  def post!(url, opts \\ []), do: request!(:post, url, opts)
+  def delete(url, opts \\ []), do: request(:delete, url, opts)
+  def delete!(url, opts \\ []), do: request!(:delete, url, opts)
+  def head(url, opts \\ []), do: request(:head, url, opts)
+  def head!(url, opts \\ []), do: request!(:head, url, opts)
+
+  def request(method, url, opts \\ []) do
+    Couch.Http.request(method, url, opts, :json)
   end
 
-  def process_url(url) do
-    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
-    base_url <> url
-  end
+  def request!(method, url, opts \\ []) do
+    case request(method, url, opts) do
+      %Couch.ErrorResponse{message: message} ->
+        raise "HTTP request failed: #{method} #{url}: #{message}"
 
-  def process_request_headers(headers, _body, options) do
-    headers = Keyword.put(headers, :"User-Agent", "couch-potion")
-
-    headers =
-      if headers[:"Content-Type"] do
-        headers
-      else
-        Keyword.put(headers, :"Content-Type", "application/json")
-      end
-
-    case Keyword.get(options, :cookie) do
-      nil ->
-        headers
-
-      cookie ->
-        Keyword.put(headers, :Cookie, cookie)
+      resp ->
+        resp
     end
-  end
-
-  def process_options(options) do
-    options
-     |> set_auth_options()
-     |> set_inactivity_timeout()
-     |> set_request_timeout()
-  end
-
-  def process_request_body(body) do
-    if is_map(body) do
-      :jiffy.encode(body, [:use_nil])
-    else
-      body
-    end
-  end
-
-  def process_response_body(_headers, body) when body == [] do
-    ""
-  end
-
-  def process_response_body(headers, body) do
-    content_type = headers[:"Content-Type"]
-
-    if !!content_type and String.match?(content_type, ~r/application\/json/) do
-      body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
-    else
-      process_response_body(body)
-    end
-  end
-
-  def set_auth_options(options) do
-    cond do
-      Keyword.get(options, :no_auth, false) ->
-        options
-      Keyword.get(options, :cookie) == nil ->
-        headers = Keyword.get(options, :headers, [])
-        if headers[:basic_auth] != nil or headers[:authorization] != nil
-          or List.keymember?(headers, :"X-Auth-CouchDB-UserName", 0) do
-          options
-        else
-          username = System.get_env("EX_USERNAME") || "adm"
-          password = System.get_env("EX_PASSWORD") || "pass"
-          Keyword.put(options, :basic_auth, {username, password})
-        end
-      true ->
-        options
-    end
-  end
-
-  def set_inactivity_timeout(options) do
-    Keyword.update(
-      options,
-      :ibrowse,
-      [{:inactivity_timeout, @inactivity_timeout}],
-      fn ibrowse ->
-        Keyword.put_new(ibrowse, :inactivity_timeout, @inactivity_timeout)
-      end
-    )
-  end
-
-  def set_request_timeout(options) do
-    timeout = Application.get_env(:httpotion, :default_timeout, @request_timeout)
-    Keyword.put_new(options, :timeout, timeout)
   end
 
   def login(userinfo) do
@@ -182,7 +113,7 @@ defmodule Couch do
 
     if expect == :success do
       true = resp.body["ok"]
-      cookie = resp.headers[:"set-cookie"]
+      cookie = resp.headers["set-cookie"]
       [token | _] = String.split(cookie, ";")
       %Couch.Session{cookie: token}
     else

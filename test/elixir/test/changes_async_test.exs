@@ -38,12 +38,10 @@ defmodule ChangesAsyncTest do
     assert last_seq_prefix == "1-", "seq must start with 1-"
 
     last_seq = changes["last_seq"]
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
 
     req_id =
       Couch.get("/#{db_name}/_changes?feed=longpoll&since=#{last_seq}",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
@@ -60,8 +58,7 @@ defmodule ChangesAsyncTest do
 
     req_id =
       Couch.get("/#{db_name}/_changes?feed=longpoll&since=now",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
@@ -82,12 +79,10 @@ defmodule ChangesAsyncTest do
     check_empty_db(db_name)
 
     create_doc(db_name, sample_doc_foo())
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
 
     req_id =
       Rawresp.get("/#{db_name}/_changes?feed=eventsource&timeout=500",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
@@ -99,8 +94,6 @@ defmodule ChangesAsyncTest do
     assert length(changes) == 2
     assert Enum.at(changes, 0)["id"] == "foo"
     assert Enum.at(changes, 1)["id"] == "bar"
-
-    HTTPotion.stop_worker_process(worker_pid)
   end
 
   @tag :with_db
@@ -110,12 +103,10 @@ defmodule ChangesAsyncTest do
     check_empty_db(db_name)
 
     create_doc(db_name, sample_doc_foo())
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
 
     req_id =
       Rawresp.get("/#{db_name}/_changes?feed=eventsource&limit=1",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
@@ -125,8 +116,6 @@ defmodule ChangesAsyncTest do
     changes = process_response(req_id.id, &parse_event/1)
     assert length(changes) == 1
     assert Enum.at(changes, 0)["id"] == "foo"
-
-    HTTPotion.stop_worker_process(worker_pid)
   end
 
   @tag :with_db
@@ -136,12 +125,10 @@ defmodule ChangesAsyncTest do
     check_empty_db(db_name)
 
     create_doc(db_name, sample_doc_foo())
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
 
     req_id =
       Rawresp.get("/#{db_name}/_changes?feed=eventsource&limit=2",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
@@ -152,8 +139,6 @@ defmodule ChangesAsyncTest do
     assert length(changes) == 2
     assert Enum.at(changes, 0)["id"] == "foo"
     assert Enum.at(changes, 1)["id"] == "bar"
-
-    HTTPotion.stop_worker_process(worker_pid)
   end
 
   @tag :with_db
@@ -166,12 +151,9 @@ defmodule ChangesAsyncTest do
 
     t0 = :erlang.monotonic_time(:millisecond)
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
-
     req_id =
       Rawresp.get("/#{db_name}/_changes?feed=eventsource&timeout=1100&limit=2",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     changes = process_response(req_id.id, &parse_event/1, 5000)
@@ -181,8 +163,6 @@ defmodule ChangesAsyncTest do
     assert length(changes) == 1
     assert Enum.at(changes, 0)["id"] == "foo"
     assert dt_msec > 1000
-
-    HTTPotion.stop_worker_process(worker_pid)
   end
 
   @tag :with_db
@@ -197,34 +177,31 @@ defmodule ChangesAsyncTest do
 
     lines = String.split(resp.body, "\n")
 
-    all_lines = lines
-    |> Enum.map(fn p -> Enum.at(String.split(p, ":"), 0) end)
+    all_lines =
+      lines
+      |> Enum.map(fn p -> Enum.at(String.split(p, ":"), 0) end)
 
     allowed = ["", "data", "id", "event"]
 
-    allowed_lines = all_lines
-    |> Enum.filter(fn p -> Enum.member?(allowed, p) end)
+    allowed_lines =
+      all_lines
+      |> Enum.filter(fn p -> Enum.member?(allowed, p) end)
 
     assert length(all_lines) == length(allowed_lines)
-
   end
 
   @tag :with_db
   test "eventsource heartbeat", context do
     db_name = context[:db_name]
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
-
     req_id =
       Rawresp.get("/#{db_name}/_changes?feed=eventsource&heartbeat=10",
-        stream_to: {self(), :once},
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
     beats = wait_for_heartbeats(req_id.id, 0, 3)
     assert beats == 3
-    HTTPotion.stop_worker_process(worker_pid)
   end
 
   @tag :with_db
@@ -247,13 +224,11 @@ defmodule ChangesAsyncTest do
 
     last_seq = changes["last_seq"]
     # longpoll waits until a matching change before returning
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
 
     req_id =
       Couch.get(
         "/#{db_name}/_changes?feed=longpoll&filter=changes_filter/bop&since=#{last_seq}",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
@@ -279,20 +254,17 @@ defmodule ChangesAsyncTest do
     create_doc(db_name, %{bop: false})
     create_doc(db_name, %{_id: "bingo", bop: "bingo"})
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
-
     req_id =
       Rawresp.get(
         "/#{db_name}/_changes?feed=continuous&filter=changes_filter/bop&timeout=500",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "rusty", bop: "plankton"})
 
     retry_until(fn ->
-      changes = process_response(req_id.id, &parse_changes_line_chunk/1)
+      changes = process_response(req_id.id, &parse_changes_line/1)
 
       changes_ids =
         changes
@@ -300,8 +272,8 @@ defmodule ChangesAsyncTest do
         |> Enum.map(fn p -> p["id"] end)
 
       Enum.member?(changes_ids, "bingo") and
-      Enum.member?(changes_ids, "rusty") and
-      length(changes_ids) == 2
+        Enum.member?(changes_ids, "rusty") and
+        length(changes_ids) == 2
     end)
   end
 
@@ -313,21 +285,18 @@ defmodule ChangesAsyncTest do
     create_doc(db_name, %{_id: "doc1", value: 1})
     create_doc(db_name, %{_id: "doc2", value: 2})
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
-
     req_id =
       Rawresp.post(
         "/#{db_name}/_changes?feed=continuous&timeout=500&filter=_doc_ids",
         body: doc_ids,
         headers: ["Content-Type": "application/json"],
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "doc3", value: 3})
 
-    changes = process_response(req_id.id, &parse_changes_line_chunk/1)
+    changes = process_response(req_id.id, &parse_changes_line/1)
 
     changes_ids =
       changes
@@ -352,15 +321,12 @@ defmodule ChangesAsyncTest do
     assert length(resp.body["results"]) == 4
     seq = Enum.at(resp.body["results"], 1)["seq"]
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
-
     # simulate an EventSource request with a Last-Event-ID header
     req_id =
       Rawresp.get(
         "/#{db_name}/_changes?feed=eventsource&timeout=100&since=0",
         headers: [Accept: "text/event-stream", "Last-Event-ID": seq],
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     changes = process_response(req_id.id, &parse_event/1)
@@ -369,13 +335,16 @@ defmodule ChangesAsyncTest do
 
   defp wait_for_heartbeats(id, beats, expexted_beats) do
     if beats < expexted_beats do
-      :ibrowse.stream_next(id)
-      is_heartbeat = process_response(id, &parse_heartbeat/1)
+      case next_chunk(id) do
+        :timeout ->
+          beats
 
-      case is_heartbeat do
-        :heartbeat -> wait_for_heartbeats(id, beats + 1, expexted_beats)
-        :timeout -> beats
-        _ -> wait_for_heartbeats(id, beats, expexted_beats)
+        chunk ->
+          if Regex.match?(~r/event: heartbeat/, chunk) do
+            wait_for_heartbeats(id, beats + 1, expexted_beats)
+          else
+            wait_for_heartbeats(id, beats, expexted_beats)
+          end
       end
     else
       beats
@@ -384,7 +353,7 @@ defmodule ChangesAsyncTest do
 
   defp wait_for_headers(id, status, timeout \\ 1000) do
     receive do
-      %HTTPotion.AsyncHeaders{id: ^id, status_code: ^status} ->
+      %Couch.AsyncHeaders{id: ^id, status_code: ^status} ->
         :ok
 
       _ ->
@@ -394,24 +363,51 @@ defmodule ChangesAsyncTest do
     end
   end
 
-  defp process_response(id, chunk_parser, timeout \\ 3000) do
-    receive do
-      %HTTPotion.AsyncChunk{id: ^id} = msg ->
-        chunk_parser.(msg)
+  # Gather response until stream ends and also handles timeouts as we'd expect
+  # them in the _changes feeds responses normally and we have tests for those
+  defp process_response(id, parser, timeout \\ 3000) do
+    acc = Process.delete({:chunk_acc, id}) || []
+    case gather_response(id, acc, timeout) do
+      {:done, body} ->
+        parser.(body)
+      {:timeout, []} ->
+        :timeout
+      {:timeout, acc} ->
+        Process.put({:chunk_acc, id}, acc)
+        :timeout
+    end
+  end
 
+  defp gather_response(id, acc, timeout) do
+    receive do
+      %Couch.AsyncChunk{id: ^id, chunk: chunk} ->
+        gather_response(id, [acc | chunk], timeout)
+      %Couch.AsyncEnd{id: ^id} ->
+        if acc == [], do: {:timeout, []}, else: {:done, IO.iodata_to_binary(acc)}
       _ ->
-        process_response(id, chunk_parser, timeout)
+        gather_response(id, acc, timeout)
+    after
+      timeout -> {:timeout, acc}
+    end
+  end
+
+  defp next_chunk(id, timeout \\ 3000) do
+    receive do
+      %Couch.AsyncChunk{id: ^id, chunk: chunk} ->
+        chunk
+      _ ->
+        next_chunk(id, timeout)
     after
       timeout -> :timeout
     end
   end
 
-  defp parse_chunk(msg) do
-    msg.chunk |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
+  defp parse_chunk(body) do
+    :jiffy.decode(body, [:return_maps, :use_nil])
   end
 
-  defp parse_event(msg) do
-    captures = Regex.scan(~r/data: (.*)/, msg.chunk)
+  defp parse_event(body) do
+    captures = Regex.scan(~r/data: (.*)/, body)
 
     captures
     |> Enum.map(fn p -> Enum.at(p, 1) end)
@@ -421,16 +417,6 @@ defmodule ChangesAsyncTest do
       |> IO.iodata_to_binary()
       |> :jiffy.decode([:return_maps, :use_nil])
     end)
-  end
-
-  defp parse_heartbeat(msg) do
-    is_heartbeat = Regex.match?(~r/event: heartbeat/, msg.chunk)
-
-    if is_heartbeat do
-      :heartbeat
-    else
-      :other
-    end
   end
 
   defp parse_changes_response(changes) do
@@ -466,29 +452,21 @@ defmodule ChangesAsyncTest do
     assert String.at(change["last_seq"], 0) == "1"
 
     # create_doc_bar(db_name,"bar")
-    {:ok, worker_pid} = HTTPotion.spawn_worker_process(Couch.process_url(""))
 
-    %HTTPotion.AsyncResponse{id: req_id} =
+    %Couch.AsyncResponse{id: req_id} =
       Rawresp.get("/#{db_name}/_changes?feed=#{feed}&timeout=500",
-        stream_to: self(),
-        direct: worker_pid
+        stream_to: self()
       )
 
     :ok = wait_for_headers(req_id, 200)
     create_doc_bar(db_name, "bar")
 
-    changes = process_response(req_id, &parse_changes_line_chunk/1)
+    changes = process_response(req_id, &parse_changes_line/1)
     assert length(changes) == 3
-
-    HTTPotion.stop_worker_process(worker_pid)
   end
 
   def create_doc_bar(db_name, id) do
     create_doc(db_name, %{:_id => id, :bar => 1})
-  end
-
-  defp parse_changes_line_chunk(msg) do
-    parse_changes_line(msg.chunk)
   end
 
   defp parse_changes_line(body) do

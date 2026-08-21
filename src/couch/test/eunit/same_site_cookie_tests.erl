@@ -37,7 +37,7 @@ get_cookie(BaseUri, User, Password) ->
         [{"Content-Type", "application/json"}],
         couch_util:json_encode(#{username => ?l2b(User), password => ?l2b(Password)})
     ),
-    proplists:get_value("Set-Cookie", Headers).
+    proplists:get_value(~"set-cookie", Headers).
 
 same_site_cookie_test_() ->
     {

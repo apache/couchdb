@@ -464,7 +464,7 @@ defmodule ListViewsTest do
         headers: [Accept: "text/html"]
       )
 
-    assert resp.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert resp.headers["content-type"] == "text/html; charset=utf-8"
     assert String.match?(resp.body, ~r/HTML/)
     assert String.match?(resp.body, ~r/Value/)
   end
@@ -561,7 +561,7 @@ defmodule ListViewsTest do
 
     resp = Rawresp.get("/#{db_name}/_design/lists/_list/setHeaderAfterGotRow/basicView")
     assert resp.status_code == 400
-    assert resp.headers["X-My-Header"] == "MyHeader"
+    assert resp.headers["x-my-header"] == "MyHeader"
     assert String.match?(resp.body, ~r/^bad request$/)
   end
 

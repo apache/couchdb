@@ -58,8 +58,8 @@ defmodule AttachmentsTest do
     resp = Couch.get("/#{db_name}/bin_doc/foo.txt", body: @bin_att_doc)
 
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Type"] == "application/octet-stream"
-    assert resp.headers["Etag"] == "\"aEI7pOYCRBLTRQvvqYrrJQ==\""
+    assert resp.headers["content-type"] == "application/octet-stream"
+    assert resp.headers["etag"] == "\"aEI7pOYCRBLTRQvvqYrrJQ==\""
   end
 
   @tag :with_db
@@ -82,7 +82,7 @@ defmodule AttachmentsTest do
 
     resp = Couch.get("/#{db_name}/bin_doc2/foo.txt")
 
-    assert resp.headers["Content-Type"] == "text/plain"
+    assert resp.headers["content-type"] == "text/plain"
     assert resp.body == ""
 
     resp =
@@ -124,17 +124,23 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
-  test "delete attachment request with a payload should not block following requests", context do
+  test "delete attachment request with a payload should not block following requests",
+       context do
     db_name = context[:db_name]
 
     resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc, query: %{w: 3})
     assert resp.status_code in [201, 202]
     rev = resp.body["rev"]
 
-    resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", body: "some payload", query: %{w: 3, rev: rev}, ibrowse: [{:max_sessions, 1}, {:max_pipeline_size, 1}])
+    resp =
+      Couch.delete("/#{db_name}/bin_doc/foo.txt",
+        body: "some payload",
+        query: %{w: 3, rev: rev}
+      )
+
     assert resp.status_code == 200
 
-    resp = Couch.get("/", timeout: 1000, ibrowse: [{:max_sessions, 1}, {:max_pipeline_size, 1}])
+    resp = Couch.get("/", timeout: 1000)
     assert resp.status_code == 200
   end
 
@@ -190,11 +196,11 @@ defmodule AttachmentsTest do
     rev = resp.body["rev"]
 
     resp = Couch.get("/#{db_name}/bin_doc3/attachment.txt")
-    assert String.downcase(resp.headers["Content-Type"]) == "text/plain;charset=utf-8"
+    assert String.downcase(resp.headers["content-type"]) == "text/plain;charset=utf-8"
     assert resp.body == bin_data
 
     resp = Couch.get("/#{db_name}/bin_doc3/attachment.txt", query: %{rev: rev})
-    assert String.downcase(resp.headers["Content-Type"]) == "text/plain;charset=utf-8"
+    assert String.downcase(resp.headers["content-type"]) == "text/plain;charset=utf-8"
     assert resp.body == bin_data
 
     resp = Couch.delete("/#{db_name}/bin_doc3/attachment.txt", query: %{rev: rev, w: 3})
@@ -204,7 +210,7 @@ defmodule AttachmentsTest do
     assert resp.status_code == 404
 
     resp = Couch.get("/#{db_name}/bin_doc3/attachment.txt", query: %{rev: rev})
-    assert String.downcase(resp.headers["Content-Type"]) == "text/plain;charset=utf-8"
+    assert String.downcase(resp.headers["content-type"]) == "text/plain;charset=utf-8"
     assert resp.body == bin_data
   end
 
@@ -265,7 +271,7 @@ defmodule AttachmentsTest do
     assert resp.body["ok"]
 
     resp = Couch.get("/#{db_name}/bin_doc5/attachment.txt")
-    assert String.downcase(resp.headers["Content-Type"]) == "text/plain;charset=utf-8"
+    assert String.downcase(resp.headers["content-type"]) == "text/plain;charset=utf-8"
     assert resp.body == large_att
 
     lorem_b64 =

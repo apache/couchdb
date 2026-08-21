@@ -54,8 +54,8 @@ defmodule AttachmentNamesTest do
 
     resp = Couch.get("/#{db_name}/good_doc/#{filename}")
     assert resp.body == "This is a base64 encoded text"
-    assert resp.headers["Content-Type"] == "application/octet-stream"
-    assert resp.headers["Etag"] == ~s("aEI7pOYCRBLTRQvvqYrrJQ==")
+    assert resp.headers["content-type"] == "application/octet-stream"
+    assert resp.headers["etag"] == ~s("aEI7pOYCRBLTRQvvqYrrJQ==")
 
     resp = Couch.post("/#{db_name}", body: @bin_att_doc)
     assert(resp.status_code == 201)

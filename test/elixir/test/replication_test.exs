@@ -87,7 +87,7 @@ defmodule ReplicationTest do
 
     opts = [headers: [Accept: "application/json"], query: query]
     resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}", opts)
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert is_map(resp.body)
     refute Map.has_key?(resp.body, "_conflicts")
     refute Map.has_key?(resp.body, "_deleted_conflicts")
@@ -190,16 +190,16 @@ defmodule ReplicationTest do
 
   test "default headers returned for _scheduler/jobs" do
     resp = Couch.get("/_scheduler/jobs")
-    assert resp.headers["Content-Type"] == "application/json"
-    assert resp.headers["X-Couch-Request-ID"]
-    assert resp.headers["X-CouchDB-Body-Time"]
+    assert resp.headers["content-type"] == "application/json"
+    assert resp.headers["x-couch-request-id"]
+    assert resp.headers["x-couchdb-body-time"]
   end
 
   test "default headers returned for _scheduler/docs " do
     resp = Couch.get("/_scheduler/docs")
-    assert resp.headers["Content-Type"] == "application/json"
-    assert resp.headers["X-Couch-Request-ID"]
-    assert resp.headers["X-CouchDB-Body-Time"]
+    assert resp.headers["content-type"] == "application/json"
+    assert resp.headers["x-couch-request-id"]
+    assert resp.headers["x-couchdb-body-time"]
   end
 
   Enum.each(@db_pairs_prefixes, fn {name, src_prefix, tgt_prefix} ->
@@ -904,11 +904,11 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     resp = Couch.get!("/#{tgt_db_name}/foo1")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["value"] == 1
 
     resp = Couch.get!("/#{tgt_db_name}/foo2")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["value"] == 2
 
     resp = Couch.get!("/#{tgt_db_name}/foo3")
@@ -932,23 +932,23 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     resp = Couch.get!("/#{tgt_db_name}/foo1")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["value"] == 1
 
     resp = Couch.get!("/#{tgt_db_name}/foo2")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["value"] == 2
 
     resp = Couch.get!("/#{tgt_db_name}/foo3")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["value"] == 3
 
     resp = Couch.get!("/#{tgt_db_name}/foo4")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["value"] == 4
 
     resp = Couch.get!("/#{tgt_db_name}/_design/mydesign")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
   end
 
   def run_by_id_repl(src_prefix, tgt_prefix) do
@@ -1046,8 +1046,8 @@ defmodule ReplicationTest do
         assert orig.status_code == 404
         assert copy.status_code == 404
       else
-        assert HTTPotion.Response.success?(orig)
-        assert HTTPotion.Response.success?(copy)
+        assert Couch.Response.success?(orig)
+        assert Couch.Response.success?(copy)
         assert cmp_json(orig.body, copy.body)
       end
     end)
@@ -1059,7 +1059,7 @@ defmodule ReplicationTest do
       is_doc_id = &Enum.member?(doc_ids, &1)
 
       if is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id) do
-        assert HTTPotion.Response.success?(copy)
+        assert Couch.Response.success?(copy)
       else
         assert copy.status_code == 404
       end
@@ -1101,8 +1101,8 @@ defmodule ReplicationTest do
         assert orig.status_code == 404
         assert copy.status_code == 404
       else
-        assert HTTPotion.Response.success?(orig)
-        assert HTTPotion.Response.success?(copy)
+        assert Couch.Response.success?(orig)
+        assert Couch.Response.success?(copy)
         assert cmp_json(orig.body, copy.body)
       end
     end)
@@ -1116,7 +1116,7 @@ defmodule ReplicationTest do
       is_doc_id = &Enum.member?(all_doc_ids, &1)
 
       if is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id) do
-        assert HTTPotion.Response.success?(copy)
+        assert Couch.Response.success?(copy)
       else
         assert copy.status_code == 404
       end
@@ -1161,7 +1161,7 @@ defmodule ReplicationTest do
 
     query = %{"conflicts" => "true"}
     copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query)
-    assert HTTPotion.Response.success?(copy)
+    assert Couch.Response.success?(copy)
     assert copy.body["integer"] == 666
     assert String.starts_with?(copy.body["_rev"], "4-")
     assert not Map.has_key?(doc, "_conflicts")
@@ -1537,7 +1537,7 @@ defmodule ReplicationTest do
       if String.starts_with?(doc["_id"], "_design/") do
         assert resp.status_code == 404
       else
-        assert HTTPotion.Response.success?(resp)
+        assert Couch.Response.success?(resp)
         assert cmp_json(doc, resp.body)
       end
     end)
@@ -1593,10 +1593,9 @@ defmodule ReplicationTest do
 
   def get_db_info(db_name) do
     resp = Couch.get("/#{db_name}")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     resp.body
   end
-
 
   def cancel_replication(src, tgt) do
     body = %{:cancel => true}
@@ -1610,7 +1609,7 @@ defmodule ReplicationTest do
 
   def get_db_changes(db_name, query \\ %{}) do
     resp = Couch.get("/#{db_name}/_changes", query: query)
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)} #{inspect(query)}"
+    assert Couch.Response.success?(resp), "#{inspect(resp)} #{inspect(query)}"
     resp.body
   end
 
@@ -1618,7 +1617,7 @@ defmodule ReplicationTest do
     query = %{w: 3}
     body = %{docs: docs}
     resp = Couch.post("/#{db_name}/_bulk_docs", query: query, body: body)
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
 
     for {doc, resp} <- Enum.zip(docs, resp.body) do
       assert resp["ok"], "Error saving doc: #{doc["_id"]}"
@@ -1628,7 +1627,7 @@ defmodule ReplicationTest do
 
   def set_security(db_name, sec_props) do
     resp = Couch.put("/#{db_name}/_security", body: :jiffy.encode(sec_props, [:use_nil]))
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert resp.body["ok"]
   end
 
@@ -1652,7 +1651,7 @@ defmodule ReplicationTest do
 
     retry_until(fn ->
       resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
-      assert HTTPotion.Response.success?(resp)
+      assert Couch.Response.success?(resp)
       Map.put(doc, "_rev", resp.body["rev"])
     end)
   end
@@ -1718,7 +1717,7 @@ defmodule ReplicationTest do
 
   def try_get_task(repl_id) do
     resp = Couch.get("/_active_tasks")
-    assert HTTPotion.Response.success?(resp)
+    assert Couch.Response.success?(resp)
     assert is_list(resp.body)
 
     Enum.find(resp.body, nil, fn task ->

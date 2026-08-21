@@ -9,9 +9,9 @@ defmodule UUIDsTest do
   test "cache busting headers are set" do
     resp = Couch.get("/_uuids")
     assert resp.status_code == 200
-    assert Regex.match?(~r/no-cache/, resp.headers["Cache-Control"])
-    assert resp.headers["Pragma"] == "no-cache"
-    assert String.length(resp.headers["ETag"]) > 0
+    assert Regex.match?(~r/no-cache/, resp.headers["cache-control"])
+    assert resp.headers["pragma"] == "no-cache"
+    assert String.length(resp.headers["etag"]) > 0
   end
 
   test "can return single uuid" do

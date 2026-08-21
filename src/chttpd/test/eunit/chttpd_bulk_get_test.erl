@@ -1524,11 +1524,11 @@ req_mp(Method, Url, #{} = Body, MpType) ->
 req_mp(Method, Url, Body, MpType) ->
     Headers = [?JSON, ?AUTH, MpType],
     {ok, Code, ResHeaders, Res} = test_request:request(Method, Url, Headers, Body),
-    CType = header_value("Content-Type", ResHeaders),
+    CType = header_value(~"content-type", ResHeaders),
     case CType of
-        "application/json" ->
+        ~"application/json" ->
             {Code, json_decode(Res)};
-        "multipart/" ++ _ ->
+        <<"multipart/", _/binary>> ->
             Chunks = split(Res, CType),
             {Code, lists:map(fun chunk_parse_fun/1, Chunks)}
     end.
@@ -1574,8 +1574,7 @@ header_value(Key, Headers) ->
     header_value(Key, Headers, undefined).
 
 header_value(Key, Headers, Default) ->
-    Headers1 = [{string:to_lower(K), V} || {K, V} <- Headers],
-    case lists:keyfind(string:to_lower(Key), 1, Headers1) of
+    case lists:keyfind(Key, 1, Headers) of
         {_, Value} -> Value;
         _ -> Default
     end.

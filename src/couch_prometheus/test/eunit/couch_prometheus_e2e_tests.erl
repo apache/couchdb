@@ -105,7 +105,7 @@ t_prometheus_port(_) ->
 
 t_reject_prometheus_port(Port) ->
     Response = test_request:get(node_local_url(Port), [?CONTENT_JSON, ?AUTH]),
-    ?assertEqual({error, {conn_failed, {error, econnrefused}}}, Response).
+    ?assertEqual({error, econnrefused}, Response).
 
 t_no_duplicate_metrics(Port) ->
     Url = node_local_url(Port),

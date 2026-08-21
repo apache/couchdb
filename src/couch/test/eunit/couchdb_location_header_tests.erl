@@ -54,14 +54,14 @@ should_work_with_newlines_in_docs({Host, DbName}) ->
     Url = Host ++ "/" ++ DbName ++ "/docid%0A",
     {"COUCHDB-708",
         ?_assertEqual(
-            Url,
+            list_to_binary(Url),
             begin
                 {ok, _, Headers, _} = test_request:put(
                     Url,
                     [{"Content-Type", "application/json"}],
                     "{}"
                 ),
-                proplists:get_value("Location", Headers)
+                proplists:get_value(~"location", Headers)
             end
         )}.
 
@@ -70,7 +70,7 @@ should_work_with_newlines_in_attachments({Host, DbName}) ->
     AttUrl = Url ++ "/docid%0A/readme.txt",
     {"COUCHDB-708",
         ?_assertEqual(
-            AttUrl,
+            list_to_binary(AttUrl),
             begin
                 Body = "We all live in a yellow submarine!",
                 Headers0 = [
@@ -78,6 +78,6 @@ should_work_with_newlines_in_attachments({Host, DbName}) ->
                     {"Content-Type", "text/plain"}
                 ],
                 {ok, _, Headers, _} = test_request:put(AttUrl, Headers0, Body),
-                proplists:get_value("Location", Headers)
+                proplists:get_value(~"location", Headers)
             end
         )}.

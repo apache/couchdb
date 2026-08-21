@@ -91,8 +91,8 @@ should_make_shows_request(_, {Host, DbName}) ->
             ?AUTH
         ],
         {ok, _, Resp, Body} = test_request:get(ReqUrl, Headers),
-        Origin = proplists:get_value("Access-Control-Allow-Origin", Resp),
-        ?assertEqual("http://example.com", Origin),
+        Origin = proplists:get_value(~"access-control-allow-origin", Resp),
+        ?assertEqual(~"http://example.com", Origin),
         ?assertEqual(<<"<h1>wosh</h1>">>, Body)
     end).
 
