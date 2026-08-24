@@ -84,12 +84,6 @@ the following::
          com.cloudant.ziose.clouseau.Main \
          /path/to/clouseau.conf
 
-Chef
-====
-
-The CouchDB `cookbook`_ can build the search plugin from source and install it
-on a server alongside CouchDB.
-
 Kubernetes
 ==========
 
