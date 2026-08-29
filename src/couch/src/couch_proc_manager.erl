@@ -140,6 +140,7 @@ init([]) ->
     ets:new(?COUNTERS, [named_table]),
 
     ok = configure_language_servers(),
+    ets:insert(?SERVERS, [{"SELECTOR", {mango_simple_proc, start_link, []}}]),
 
     couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()),
 
