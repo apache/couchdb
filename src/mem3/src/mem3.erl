@@ -375,7 +375,7 @@ group_by_proximity(Shards, ZoneMap) ->
         fun(S) -> mem3:node(S) =:= config:node_name() end,
         Shards
     ),
-    LocalZone = proplists:get_value(config:node_name(), ZoneMap),
+    LocalZone = node_info(config:node_name(), <<"zone">>),
     Fun = fun(S) -> proplists:get_value(mem3:node(S), ZoneMap) =:= LocalZone end,
     {SameZone, DifferentZone} = lists:partition(Fun, Remote),
     {Local, SameZone, DifferentZone}.
