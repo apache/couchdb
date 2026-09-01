@@ -45,9 +45,8 @@ public final class AnalyzeResource {
 
     @POST
     public AnalyzeResponse analyzeText(@NotNull @Valid AnalyzeRequest request) throws IOException {
-        try {
-            final List<String> tokens = tokenize(LuceneAnalyzerFactory.newAnalyzer(request.analyzer()), request.text());
-            return new AnalyzeResponse(tokens);
+        try (Analyzer analyzer = LuceneAnalyzerFactory.newAnalyzer(request.analyzer())) {
+            return new AnalyzeResponse(tokenize(analyzer, request.text()));
         } catch (IllegalArgumentException e) {
             throw new WebApplicationException(request.analyzer() + " not a valid analyzer", Status.BAD_REQUEST);
         }
