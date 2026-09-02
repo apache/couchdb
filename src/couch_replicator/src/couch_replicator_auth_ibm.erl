@@ -82,9 +82,7 @@
     api_key_uuid,
     api_key,
     expires_ref,
-    gun_body = [],
-    gun_status_code,
-    gun_stream_ref,
+    acquire_mref,
     last_used,
     refresh_ref,
     token_updated_at,
@@ -179,7 +177,7 @@ handle_call({register, APIKey}, _From, State) ->
             self() ! {update_last_used, Entry#private_entry.api_key_mac},
             {reply, {ok, Entry#private_entry.api_key_mac}, State};
         [] ->
-            GunStreamRef = acquire_token(APIKey, State),
+            AcquireMRef = acquire_token(APIKey, State),
             APIKeyMAC = mac(State#state.mac_key, APIKey),
             true = ets:insert_new(?PUBLIC, #public_entry{
                 api_key_mac = APIKeyMAC
@@ -187,7 +185,7 @@ handle_call({register, APIKey}, _From, State) ->
             true = ets:insert_new(?PRIVATE, #private_entry{
                 api_key = APIKey,
                 api_key_mac = APIKeyMAC,
-                gun_stream_ref = GunStreamRef,
+                acquire_mref = AcquireMRef,
                 last_used = now_secs()
             }),
             {reply, {ok, APIKeyMAC}, State}
@@ -202,9 +200,7 @@ handle_call({get_token, APIKeyMAC}, From, State) ->
             [#private_entry{} = Entry] = ets:lookup(?PRIVATE, APIKeyMAC),
             ets:insert(?PRIVATE, Entry#private_entry{waiters = [From | Entry#private_entry.waiters]}),
             case Entry of
-                #private_entry{gun_stream_ref = GunStreamRef} when
-                    GunStreamRef /= undefined
-                ->
+                #private_entry{acquire_mref = AcquireMRef} when AcquireMRef /= undefined ->
                     ok;
                 #private_entry{} ->
                     self() ! {refresh_token, APIKeyMAC}
@@ -224,14 +220,14 @@ handle_info({refresh_token, APIKeyMAC}, State) ->
     case ets:lookup(?PRIVATE, APIKeyMAC) of
         [] ->
             ok;
-        [#private_entry{gun_stream_ref = undefined} = Entry] ->
+        [#private_entry{acquire_mref = undefined} = Entry] ->
             case Entry#private_entry.last_used > Entry#private_entry.token_updated_at of
                 true ->
                     couch_log:notice("~p: refreshing api key ~s", [
                         ?MODULE, Entry#private_entry.api_key_uuid
                     ]),
-                    GunStreamRef = acquire_token(Entry#private_entry.api_key, State),
-                    ets:insert(?PRIVATE, Entry#private_entry{gun_stream_ref = GunStreamRef});
+                    AcquireMRef = acquire_token(Entry#private_entry.api_key, State),
+                    ets:insert(?PRIVATE, Entry#private_entry{acquire_mref = AcquireMRef});
                 false ->
                     %% let it expire
                     ok
@@ -255,43 +251,21 @@ handle_info({expire_api_key_entry, APIKeyMAC}, State) ->
             reply_all(Entry, {error, expired_api_key_entry})
     end,
     {noreply, State};
-handle_info(
-    {gun_response, GunPid, GunStreamRef, fin, StatusCode, _Headers},
-    #state{gun_pid = GunPid} = State
-) ->
-    case match_on_gun_stream_ref(GunStreamRef) of
+handle_info({'DOWN', AcquireMRef, process, _AcquirePid, {error, Reason}}, #state{} = State) ->
+    case match_on_acquire_mref(AcquireMRef) of
         [#private_entry{} = Entry] ->
-            reply_and_reset(Entry, {error, {unexpected_status_code, StatusCode}});
-        _ ->
+            reply_and_reset(Entry, {error, Reason});
+        [] ->
             ok
     end,
     {noreply, State};
 handle_info(
-    {gun_response, GunPid, GunStreamRef, nofin, StatusCode, _Headers},
-    #state{gun_pid = GunPid} = State
+    {'DOWN', AcquireMRef, process, _AcquirePid, {ok, StatusCode, _ResponseHeaders, ResponseBody}},
+    #state{} = State
 ) ->
-    case match_on_gun_stream_ref(GunStreamRef) of
+    case match_on_acquire_mref(AcquireMRef) of
         [#private_entry{} = Entry] ->
-            ets:insert(?PRIVATE, Entry#private_entry{gun_status_code = StatusCode});
-        _ ->
-            ok
-    end,
-    {noreply, State};
-handle_info({gun_data, GunPid, GunStreamRef, nofin, Data}, #state{gun_pid = GunPid} = State) ->
-    case match_on_gun_stream_ref(GunStreamRef) of
-        [#private_entry{} = Entry] ->
-            ets:insert(?PRIVATE, Entry#private_entry{
-                gun_body = [Data | Entry#private_entry.gun_body]
-            });
-        _ ->
-            ok
-    end,
-    {noreply, State};
-handle_info({gun_data, GunPid, GunStreamRef, fin, Data}, #state{gun_pid = GunPid} = State) ->
-    case match_on_gun_stream_ref(GunStreamRef) of
-        [#private_entry{} = Entry] ->
-            ResponseBody = lists:reverse([Data | Entry#private_entry.gun_body]),
-            case Entry#private_entry.gun_status_code of
+            case StatusCode of
                 200 ->
                     case decode_iam_response(ResponseBody) of
                         {ok, Token, ExpiresInMs} ->
@@ -355,14 +329,6 @@ handle_info({gun_data, GunPid, GunStreamRef, fin, Data}, #state{gun_pid = GunPid
             ok
     end,
     {noreply, State};
-handle_info({gun_error, GunPid, GunStreamRef, Reason}, #state{gun_pid = GunPid} = State) ->
-    case match_on_gun_stream_ref(GunStreamRef) of
-        [#private_entry{} = Entry] ->
-            reply_and_reset(Entry, {error, Reason});
-        _ ->
-            ok
-    end,
-    {noreply, State};
 handle_info({gun_error, GunPid, Reason}, #state{gun_pid = GunPid} = State) ->
     couch_log:warning("~p: gun error ~p", [?MODULE, Reason]),
     {noreply, State};
@@ -375,19 +341,10 @@ handle_info({gun_up, GunPid, _Protocol}, #state{gun_pid = GunPid} = State) ->
     {noreply, State};
 handle_info({gun_down, GunPid, _Protocol, closed, []}, #state{gun_pid = GunPid} = State) ->
     {noreply, State};
-handle_info({gun_down, GunPid, _Protocol, Reason, KilledStreams}, #state{gun_pid = GunPid} = State) ->
+handle_info(
+    {gun_down, GunPid, _Protocol, Reason, _KilledStreams}, #state{gun_pid = GunPid} = State
+) ->
     couch_log:warning("~p: gun connection down for reason: ~p", [?MODULE, Reason]),
-    lists:foreach(
-        fun(GunStreamRef) ->
-            case match_on_gun_stream_ref(GunStreamRef) of
-                [#private_entry{} = Entry] ->
-                    reply_and_reset(Entry, {error, Reason});
-                [] ->
-                    ok
-            end
-        end,
-        KilledStreams
-    ),
     {noreply, State};
 handle_info(restart_gun, State) ->
     case start_gun(State) of
@@ -475,7 +432,28 @@ acquire_token(APIKey, #state{} = State) ->
         {~"apikey", APIKey}
     ]),
     #{path := Path} = State#state.token_uri_map,
-    gun:post(State#state.gun_pid, fix_path(Path), Headers, Body).
+    {_Pid, Ref} = spawn_monitor(
+        post(State#state.gun_pid, State#state.gun_mref, fix_path(Path), Headers, Body)
+    ),
+    Ref.
+
+post(GunPid, GunRef, Path, ReqHeaders, ReqBody) ->
+    fun() ->
+        StreamRef = gun:post(GunPid, Path, ReqHeaders, ReqBody),
+        case gun:await(GunPid, StreamRef, GunRef) of
+            {response, fin, StatusCode, _RespHeaders} ->
+                exit({error, {unexpected_status_code, StatusCode}});
+            {response, nofin, StatusCode, RespHeaders} ->
+                case gun:await_body(GunPid, StreamRef, GunRef) of
+                    {ok, RespBody} ->
+                        exit({ok, StatusCode, RespHeaders, RespBody});
+                    {error, Reason} ->
+                        exit({error, Reason})
+                end;
+            {error, Reason} ->
+                exit({error, Reason})
+        end
+    end.
 
 fix_path([]) ->
     ~"/";
@@ -544,15 +522,13 @@ token_uri_map() ->
 token_timeout() ->
     config:get_integer("ibm", "token_timeout", 30000).
 
-match_on_gun_stream_ref(GunStreamRef) ->
-    ets:match_object(?PRIVATE, #private_entry{gun_stream_ref = GunStreamRef, _ = '_'}).
+match_on_acquire_mref(AcquireMRef) ->
+    ets:match_object(?PRIVATE, #private_entry{acquire_mref = AcquireMRef, _ = '_'}).
 
 -spec reply_and_reset(Entry :: #private_entry{}, Reply :: term()) -> ok.
 reply_and_reset(#private_entry{} = Entry, Reply) ->
     ets:insert(?PRIVATE, Entry#private_entry{
-        gun_stream_ref = undefined,
-        gun_status_code = undefined,
-        gun_body = [],
+        acquire_mref = undefined,
         waiters = []
     }),
     reply_all(Entry, Reply).
