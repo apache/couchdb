@@ -66,8 +66,6 @@
 }).
 
 -record(state, {
-    gun_mref,
-    gun_pid,
     mac_key,
     token_uri_map
 }).
@@ -329,32 +327,6 @@ handle_info(
             ok
     end,
     {noreply, State};
-handle_info({gun_error, GunPid, Reason}, #state{gun_pid = GunPid} = State) ->
-    couch_log:warning("~p: gun error ~p", [?MODULE, Reason]),
-    {noreply, State};
-handle_info(
-    {'DOWN', GunMRef, process, GunPid, Reason}, #state{gun_pid = GunPid, gun_mref = GunMRef} = State
-) ->
-    couch_log:warning("~p: gun process crashed for reason: ~p", [?MODULE, Reason]),
-    handle_info(restart_gun, State#state{gun_pid = undefined, gun_mref = undefined});
-handle_info({gun_up, GunPid, _Protocol}, #state{gun_pid = GunPid} = State) ->
-    {noreply, State};
-handle_info({gun_down, GunPid, _Protocol, closed, []}, #state{gun_pid = GunPid} = State) ->
-    {noreply, State};
-handle_info(
-    {gun_down, GunPid, _Protocol, Reason, _KilledStreams}, #state{gun_pid = GunPid} = State
-) ->
-    couch_log:warning("~p: gun connection down for reason: ~p", [?MODULE, Reason]),
-    {noreply, State};
-handle_info(restart_gun, State) ->
-    case start_gun(State) of
-        {ok, NewState} ->
-            {noreply, NewState};
-        {error, Reason} ->
-            couch_log:warning("~p: gun restart failed for reason: ~p", [?MODULE, Reason]),
-            erlang:send_after(5000, self(), restart_gun),
-            {noreply, State}
-    end;
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State};
@@ -376,7 +348,7 @@ handle_info(Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, State) ->
-    State#state.gun_pid == undefined orelse gun:close(State#state.gun_pid),
+    stop_gun(State),
     ets:foldl(
         fun(#private_entry{} = Entry, Acc) ->
             cancel_timer(Entry#private_entry.refresh_ref),
@@ -424,7 +396,8 @@ extract_api_key(#httpdb{auth_props = AuthProps}) ->
 
 acquire_token(APIKey, #state{} = State) ->
     Headers = [
-        {~"content-type", ~"application/x-www-form-urlencoded"}
+        {~"content-type", ~"application/x-www-form-urlencoded"},
+        host_header(State)
     ],
     Body = mochiweb_util:urlencode([
         {~"grant_type", ~"urn:ibm:params:oauth:grant-type:apikey"},
@@ -433,26 +406,45 @@ acquire_token(APIKey, #state{} = State) ->
     ]),
     #{path := Path} = State#state.token_uri_map,
     {_Pid, Ref} = spawn_monitor(
-        post(State#state.gun_pid, State#state.gun_mref, fix_path(Path), Headers, Body)
+        post(fix_path(Path), Headers, Body)
     ),
     Ref.
 
-post(GunPid, GunRef, Path, ReqHeaders, ReqBody) ->
+post(Path, ReqHeaders, ReqBody) ->
+    post(Path, ReqHeaders, ReqBody, 5).
+
+post(Path, ReqHeaders, ReqBody, RemainingTries) ->
     fun() ->
-        StreamRef = gun:post(GunPid, Path, ReqHeaders, ReqBody),
-        case gun:await(GunPid, StreamRef, GunRef) of
-            {response, fin, StatusCode, _RespHeaders} ->
-                exit({error, {unexpected_status_code, StatusCode}});
-            {response, nofin, StatusCode, RespHeaders} ->
-                case gun:await_body(GunPid, StreamRef, GunRef) of
-                    {ok, RespBody} ->
-                        exit({ok, StatusCode, RespHeaders, RespBody});
-                    {error, Reason} ->
-                        exit({error, Reason})
+        case gun_pool:post(Path, ReqHeaders, ReqBody) of
+            {async, PoolStreamRef} ->
+                Timeout = config:get_integer("ibm", "request_timeout", 30000),
+                case gun_pool:await(PoolStreamRef, Timeout) of
+                    {response, fin, StatusCode, _RespHeaders} ->
+                        exit({error, {unexpected_status_code, StatusCode}});
+                    {response, nofin, StatusCode, RespHeaders} ->
+                        case gun_pool:await_body(PoolStreamRef, Timeout) of
+                            {ok, RespBody} ->
+                                exit({ok, StatusCode, RespHeaders, RespBody});
+                            {error, Reason} ->
+                                exit({error, Reason})
+                        end
                 end;
-            {error, Reason} ->
+            {error, no_connection_available, _Reason} when RemainingTries > 0 ->
+                timer:sleep(1000),
+                post(Path, ReqHeaders, ReqBody, RemainingTries - 1);
+            {error, _Type, Reason} ->
                 exit({error, Reason})
         end
+    end.
+
+host_header(#state{} = State) ->
+    #{host := Host} = State#state.token_uri_map,
+    Port = maps:get(port, State#state.token_uri_map, undefined),
+    case Port of
+        undefined ->
+            {~"host", Host};
+        _ when is_integer(Port) ->
+            {~"host", [Host, $:, integer_to_list(Port)]}
     end.
 
 fix_path([]) ->
@@ -546,27 +538,33 @@ cancel_timer(TimerRef) when is_reference(TimerRef) ->
     erlang:cancel_timer(TimerRef).
 
 start_gun(#state{} = State) ->
-    #{host := Host} = State#state.token_uri_map,
-    Options = #{tls_opts => [{cacerts, couch_replicator_utils:cacert_get()}]},
-    {ok, GunPid} = gun:open(Host, port(State#state.token_uri_map), Options),
-    case gun:await_up(GunPid) of
-        {ok, _Protocol} ->
-            couch_log:notice("~p: gun connection up", [?MODULE]),
-            MRef = monitor(process, GunPid),
-            {ok, State#state{gun_pid = GunPid, gun_mref = MRef}};
+    #{host := Host, scheme := Scheme} = State#state.token_uri_map,
+    Port = port(State#state.token_uri_map),
+    ConnOptions = #{
+        transport => transport(Scheme), tls_opts => [{cacerts, couch_replicator_utils:cacert_get()}]
+    },
+    case gun_pool:start_pool(Host, Port, #{size => 5, conn_opts => ConnOptions}) of
+        {ok, PoolPid} ->
+            gun_pool:await_up(PoolPid),
+            {ok, State};
         {error, Reason} ->
             {error, Reason}
     end.
 
 stop_gun(#state{} = State) ->
-    erlang:demonitor(State#state.gun_mref, [flush]),
-    gun:flush(State#state.gun_pid),
-    gun:close(State#state.gun_pid).
+    #{host := Host, scheme := Scheme} = State#state.token_uri_map,
+    Port = port(State#state.token_uri_map),
+    gun_pool:stop_pool(Host, Port, #{transport => transport(Scheme)}).
 
 port(#{port := Port}) ->
     Port;
 port(#{scheme := "https"}) ->
     443.
+
+transport("http") ->
+    tcp;
+transport("https") ->
+    tls.
 
 mac(Key, Data) when is_binary(Key), is_binary(Data) ->
     crypto:mac(hmac, sha256, Key, Data).
