@@ -59,6 +59,7 @@
     changes/4,
     query_view/3, query_view/4, query_view/6, query_view/7,
     get_view_group_info/2,
+    get_index_info/2,
     end_changes/0
 ]).
 
@@ -594,6 +595,13 @@ query_view(Db, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     ]}.
 get_view_group_info(DbName, DesignId) ->
     fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
+
+%% @doc get index info of all indexes: view, search and nouveau etc
+%%
+-spec get_index_info(dbname(), [view | search | nouveau]) ->
+    {ok, {non_neg_integer(), [{binary(), any()}]}}.
+get_index_info(DbName, Types) ->
+    fabric_index_info:go(dbname(DbName), Types).
 
 -spec end_changes() -> ok.
 end_changes() ->

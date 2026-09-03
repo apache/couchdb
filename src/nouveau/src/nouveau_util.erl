@@ -22,6 +22,8 @@
     index_name/1,
     design_doc_to_indexes/2,
     design_doc_to_index/3,
+    index_info/2,
+    index_info/3,
     verify_index_exists/2,
     ensure_local_purge_docs/2,
     maybe_create_local_purge_doc/2,
@@ -39,6 +41,35 @@ index_name(#index{} = Index) ->
 
 node_prefix() ->
     atom_to_binary(node(), utf8).
+
+index_info(DbName, #index{} = Index0) ->
+    %% Incorporate the shard name into the record.
+    Index1 = Index0#index{dbname = DbName},
+    case nouveau_api:index_info(Index1) of
+        {ok, Info} ->
+            {ok, Info#{
+                signature => Index1#index.sig,
+                pending_updates => pending_updates(DbName, Info)
+            }};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+index_info(DbName, DDoc, IndexName) ->
+    case design_doc_to_index(DbName, DDoc, IndexName) of
+        {ok, Index} ->
+            index_info(DbName, Index);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+% Similar idea to view's pending_updates in couch_index. Return number of how
+% much committed db seq is ahead of the index
+pending_updates(DbName, #{} = Info) ->
+    GetCommSeq = fun(Db) -> couch_db:get_committed_update_seq(Db) end,
+    CommittedSeq = couch_util:with_db(DbName, GetCommSeq),
+    IndexSeq = maps:get(<<"update_seq">>, Info, 0),
+    max(CommittedSeq - IndexSeq, 0).
 
 %% copied from dreyfus_index.erl
 design_doc_to_indexes(DbName, #doc{body = {Fields}} = Doc) ->

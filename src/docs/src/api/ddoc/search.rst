@@ -169,6 +169,14 @@
             "doc_del_count": 129180,
             "doc_count": 1066173,
             "disk_size": 728305827,
-            "committed_seq": 7125496
+            "committed_seq": 7125496,
+            "pending_updates": 0,
+            "signature": "13083011f9554446a4ac093927e75d07"
         }
     }
+
+.. versionadded:: 3.6
+    ``pending_updates`` is the number of database updates the index still
+    has to process, summed over shard ranges. ``0`` means the index is up to
+    date with the database. To obtain it for every index of a database in one
+    request see :get:`/{db}/_index_info`.
