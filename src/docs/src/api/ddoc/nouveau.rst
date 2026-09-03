@@ -143,6 +143,14 @@
         "search_index": {
             "num_docs": 1000,
             "update_seq": 5000,
-            "disk_size": 1048576
+            "disk_size": 1048576,
+            "pending_updates": 100,
+            "signature": "ef30790cdaf74ad78daebee9597a17393d875db085184cf688aa0e8abcb972f2"
         }
     }
+
+.. versionadded:: 3.6
+    ``pending_updates`` is the number of database updates the index still
+    has to process, summed over shard ranges. ``0`` means the index is up to
+    date with the database. To obtain it for every index of a database in one
+    request see :get:`/{db}/_index_info`.
