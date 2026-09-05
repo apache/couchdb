@@ -22,7 +22,7 @@ to handle.
 
 ## Abstract
 
-The main addition is to add new bookmark based pagination scheme to all quiery
+The main addition is to add new bookmark based pagination scheme to all query
 like endpoints. As a first step we would keep `_all_dbs`, `_dbs_info` and
 `_changes` out of scope for the following reasons:
 - _all_dbs - the endpoint returns a list instead of object as the rest of the endpoints
