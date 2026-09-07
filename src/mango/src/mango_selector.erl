@@ -690,8 +690,14 @@ match({[{<<"$", _/binary>> = Op, _}]}, _, _) ->
 % mango_doc:get_field/2 may return either not_found or
 % bad_path in which case matching fails.
 match({[{Field, Cond}]}, Value, #ctx{verbose = Verb, path = Path} = Ctx) ->
-    InnerPath = extend_path(Field, Path),
-    InnerCtx = Ctx#ctx{path = InnerPath},
+    InnerCtx =
+        case Verb of
+            true ->
+                InnerPath = extend_path(Field, Path),
+                Ctx#ctx{path = InnerPath};
+            _ ->
+                Ctx
+        end,
     case mango_doc:get_field(Value, Field) of
         not_found when Cond == {[{<<"$exists">>, false}]} ->
             case Verb of
