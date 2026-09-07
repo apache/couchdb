@@ -139,6 +139,9 @@ Replicator Database Configuration
         ``"request_compression": "gzip"`` in the replication document or
         ``_replicate`` request body, which overrides the global setting.
 
+        Monitor the number of compressed requests via the
+        ``couch_replicator.requests_compressed.gzip`` stat.
+
     .. config:option:: compress_min_size :: Minimum body size for compression
 
         .. versionadded:: 3.6
@@ -150,6 +153,19 @@ Replicator Database Configuration
 
             [replicator]
             compress_min_size = 1024
+
+    .. config:option:: response_compression :: Decompress inbound response bodies
+
+        .. versionadded:: 3.6
+
+        Decompress gzip-encoded inbound response bodies (``_bulk_docs``,
+        ``_revs_diff``, ``_bulk_get``) received from the replication source.
+        The replicator always sends ``Accept-Encoding: gzip`` and automatically
+        decompresses gzip responses received from the remote server. This
+        behaviour is always enabled.
+
+        Monitor the number of decompressed responses via the
+        ``couch_replicator.responses_decompressed.gzip`` stat.
 
     .. config:option:: retries_per_request :: Number of retries per request
 
