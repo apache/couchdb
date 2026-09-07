@@ -394,7 +394,6 @@ cat > rel/couchdb.config << EOF
 {with_spidermonkey, $WITH_SPIDERMONKEY}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
-{backend_port, 5986}.
 {prometheus_port, 17986}.
 EOF
 
