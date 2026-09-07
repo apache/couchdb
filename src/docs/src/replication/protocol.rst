@@ -300,7 +300,7 @@ an HTTP error response:
 
     .. code-block:: http
 
-        HTTP/1.1 500 Internal Server Error
+        HTTP/1.1 404 Not Found
         Cache-Control: must-revalidate
         Content-Length: 56
         Content-Type: application/json
