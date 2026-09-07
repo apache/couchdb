@@ -209,15 +209,31 @@ Reverse proxying CouchDB in a subdirectory with Caddy 2
 It can be useful to provide CouchDB as a subdirectory of your overall domain,
 especially to avoid CORS concerns. Here's an excerpt of a basic Caddy
 configuration that proxies the URL ``http(s)://domain.com/couchdb`` to
-``http://localhost:5984`` so that requests appended to the subdirectory, such
+``http://localhost:5984/couchdb`` so that requests appended to the subdirectory, such
 as ``http(s)://domain.com/couchdb/db1/doc1`` are proxied to
-``http://localhost:5984/db1/doc1``.
+``http://localhost:5984/couchdb/db1/doc1``.
 
 .. code-block:: text
 
     domain.com {
 
         reverse_proxy /couchdb/* localhost:5984
+
+    }
+
+To proxy the URL ``http(s)://domain.com/couchdb`` to
+``http://localhost:5984`` so that requests appended to the subdirectory, such
+as ``http(s)://domain.com/couchdb/db1/doc1`` are proxied to
+``http://localhost:5984/db1/doc1``, you have to configure a route in Caddy and strip the subdirectory from the target URI with ``uri strip_prefix``:
+
+.. code-block:: text
+
+    domain.com {
+
+        route /couchdb/* {
+            uri strip_prefix /couchdb
+            reverse_proxy localhost:5984        
+        }
 
     }
 
