@@ -423,3 +423,67 @@
         {
             "status": "ok"
         }
+
+.. http:post:: /{db}/_design/{ddoc}/_update/{func}/{docid}
+    :synopsis: Executes an update function against the specified document.
+
+    Executes :ref:`update function <updatefun>` on server side for the specified
+    document.
+
+    .. warning:: This has been supported historically, but is deprecated in favor of PUT.
+
+    :param db: Database name
+    :param ddoc: Design document name
+    :param func: Update function name
+    :param docid: Document ID
+    :>header X-Couch-Id: Created/updated document's ID
+    :>header X-Couch-Update-NewRev: Created/updated document's revision
+    :code 200: No document was created or updated
+    :code 201: Document was created or updated
+    :code 401: Unauthorized request to a protected API
+    :code 403: Insufficient permissions / :ref:`Too many requests with invalid credentials<error/403>`
+    :code 500: Query server error
+
+    **Function**:
+
+    .. code-block:: javascript
+
+        function(doc, req) {
+            if (!doc){
+                return [null, {'code': 400,
+                               'json': {'error': 'missed',
+                                        'reason': 'no document to update'}}]
+            } else {
+                doc.ingredients.push(req.body);
+                return [doc, {'json': {'status': 'ok'}}];
+            }
+        }
+
+    **Request**:
+
+    .. code-block:: http
+
+        POST /recipes/_design/recipe/_update/ingredients/SpaghettiWithMeatballs HTTP/1.1
+        Accept: application/json
+        Content-Length: 5
+        Content-Type: application/json
+        Host: localhost:5984
+
+        "love"
+
+    **Response**:
+
+    .. code-block:: http
+
+        HTTP/1.1 201 Created
+        Cache-Control: must-revalidate
+        Content-Length: 16
+        Content-Type: application/json
+        Date: Wed, 21 Aug 2013 14:11:34 GMT
+        Server: CouchDB (Erlang/OTP)
+        X-Couch-Id: SpaghettiWithMeatballs
+        X-Couch-Update-NewRev: 12-a5e099df5720988dae90c8b664496baf
+
+        {
+            "status": "ok"
+        }
