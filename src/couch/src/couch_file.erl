@@ -34,6 +34,7 @@
 -record(file, {
     fd,
     is_sys,
+    eof = 0,
     db_monitor,
     filepath
 }).
@@ -496,8 +497,9 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             put(couch_file_fd, {Fd, Filepath}),
                             ok = file:close(Fd_Read),
                             maybe_track_open_os_files(Options),
+                            {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, dup(File#file{fd = Fd})};
+                            {ok, dup(File#file{fd = Fd, eof = Eof})};
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -566,7 +568,7 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
     {ok, Pos} = file:position(Fd, Pos),
     case file:truncate(Fd) of
         ok ->
-            {reply, ok, File};
+            {reply, ok, File#file{eof = Pos}};
         Error ->
             {reply, Error, File}
     end;
@@ -599,8 +601,7 @@ handle_call({write_header, Bin, Opts}, _From, #file{} = File) ->
             % handle_call(sync, ...) why we're dropping the fd
             {stop, {error, Error}, {error, Error}, #file{fd = nil}}
     end;
-handle_call(find_header, _From, #file{fd = Fd} = File) ->
-    {ok, Pos} = eof(File),
+handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
 
 handle_cast(Msg, #file{} = File) ->
@@ -623,9 +624,8 @@ handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor = Ref} = File)
 eof(#file{fd = Fd}) ->
     file:position(Fd, eof).
 
-append_bins(#file{fd = Fd} = File, Bins) ->
-    {ok, Pos} = eof(File),
-    {BlockResps, _} = lists:mapfoldl(
+append_bins(#file{fd = Fd, eof = Pos} = File, Bins) ->
+    {BlockResps, FinalPos} = lists:mapfoldl(
         fun(Bin, PosAcc) ->
             Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
             Size = iolist_size(Blocks),
@@ -636,8 +636,8 @@ append_bins(#file{fd = Fd} = File, Bins) ->
     ),
     {AllBlocks, Resps} = lists:unzip(BlockResps),
     case file:write(Fd, AllBlocks) of
-        ok -> {{ok, Resps}, File};
-        Error -> {Error, File}
+        ok -> {{ok, Resps}, File#file{eof = FinalPos}};
+        Error -> {Error, reset_eof(File)}
     end.
 
 pread(#file{} = File, PosL) ->
@@ -770,19 +770,20 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
             find_newest_header(Fd, LocationSizes)
     end.
 
-handle_write_header(Bin, #file{fd = Fd} = File) ->
+handle_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
     BinSize = byte_size(Bin),
-    {ok, Pos} = eof(File),
     case Pos rem ?SIZE_BLOCK of
         0 -> Padding = <<>>;
         BlockOffset -> Padding = <<0:(8 * (?SIZE_BLOCK - BlockOffset))>>
     end,
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
-    {file:write(Fd, FinalBin), File}.
+    case file:write(Fd, FinalBin) of
+        ok -> {ok, File#file{eof = Pos + iolist_size(FinalBin)}};
+        {error, Error} -> {{error, Error}, reset_eof(File)}
+    end.
 
-read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
-    {ok, Eof} = eof(File),
-    MapFun = fun({Pos, Len}) -> get_pread_locnum(File, Pos, Len, Eof) end,
+read_multi_raw_iolists_int(#file{fd = Fd, eof = Eof} = File, PosLens) ->
+    MapFun = fun({Pos, Len}) -> get_pread_locnum(File, Pos, Len) end,
     LocNums = lists:map(MapFun, PosLens),
     ZipFun = fun({Pos, TotalBytes}, Bin) ->
         case is_binary(Bin) andalso byte_size(Bin) == TotalBytes of
@@ -790,8 +791,9 @@ read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
                 {remove_block_prefixes(Pos rem ?SIZE_BLOCK, Bin), Pos + TotalBytes};
             false ->
                 couch_stats:increment_counter([pread, exceed_eof]),
+                {ok, CurEof} = file:position(File#file.fd, eof),
                 Filepath = File#file.filepath,
-                throw_stop({read_beyond_eof, Filepath, Pos, TotalBytes, Eof}, File)
+                throw_stop({read_beyond_eof, Filepath, Pos, TotalBytes, Eof, CurEof}, File)
         end
     end,
     case file:pread(Fd, LocNums) of
@@ -802,14 +804,15 @@ read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
             throw_stop({pread, Filepath, Error, hd(LocNums)}, File)
     end.
 
-get_pread_locnum(#file{} = File, Pos, Len, Eof) ->
+get_pread_locnum(#file{eof = Eof} = File, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
     case Pos + TotalBytes of
-        EndPos when EndPos > Eof ->
+        Size when Size > Eof ->
             couch_stats:increment_counter([pread, exceed_eof]),
+            {ok, CurEof} = file:position(File#file.fd, eof),
             Filepath = File#file.filepath,
-            throw_stop({read_beyond_eof, Filepath, Pos, TotalBytes, Eof}, File);
+            throw_stop({read_beyond_eof, Filepath, Pos, TotalBytes, Eof, CurEof}, File);
         _ ->
             {Pos, TotalBytes}
     end.
@@ -956,6 +959,11 @@ is_idle(#file{is_sys = false}) ->
 process_info(Pid) ->
     couch_util:process_dict_get(Pid, couch_file_fd).
 
+%% in event of a partially successful write.
+reset_eof(#file{} = File) ->
+    {ok, Eof} = file:position(File#file.fd, eof),
+    File#file{eof = Eof}.
+
 -spec generate_checksum(binary()) -> <<_:128>>.
 generate_checksum(Bin) when is_binary(Bin) ->
     case generate_xxhash_checksums() of
@@ -1008,7 +1016,8 @@ dup(#file{fd = Fd} = File) ->
                     ok = file:close(Fd),
                     CFile = File#file{fd = CFd},
                     put(couch_file_fd, {CFd, CFile#file.filepath}),
-                    put(?CFILE_HANDLE, CFile),
+                    % Use an effective infinity for eof max limit for now
+                    put(?CFILE_HANDLE, CFile#file{eof = 1 bsl 60}),
                     CFile;
                 {error, _Error} ->
                     File
