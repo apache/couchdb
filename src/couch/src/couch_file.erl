@@ -625,6 +625,12 @@ eof(#file{fd = Fd}) ->
     file:position(Fd, eof).
 
 append_bins(#file{fd = Fd, eof = Pos} = File, Bins) ->
+    case config:get_boolean("couch_file", "append_bin_eof_check", false) of
+        true ->
+            validate_eof(File);
+        false ->
+            ok
+    end,
     {BlockResps, FinalPos} = lists:mapfoldl(
         fun(Bin, PosAcc) ->
             Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
@@ -771,6 +777,12 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
     end.
 
 handle_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
+    case config:get_boolean("couch_file", "write_header_eof_check", false) of
+        true ->
+            validate_eof(File);
+        false ->
+            ok
+    end,
     BinSize = byte_size(Bin),
     case Pos rem ?SIZE_BLOCK of
         0 -> Padding = <<>>;
@@ -1024,6 +1036,15 @@ dup(#file{fd = Fd} = File) ->
             end;
         false ->
             File
+    end.
+
+validate_eof(#file{} = File) ->
+    {ok, ActualPos} = file:position(File#file.fd, eof),
+    if
+        File#file.eof /= ActualPos ->
+            throw_stop({eof_sync, ActualPos, File#file.eof}, File);
+        true ->
+            ok
     end.
 
 -ifdef(TEST).
