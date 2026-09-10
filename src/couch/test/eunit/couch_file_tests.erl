@@ -157,7 +157,8 @@ read_write_test_() ->
                     ?TDEF_FE(should_close_on_idle),
                     ?TDEF_FE(should_crash_on_unexpected_cast),
                     ?TDEF_FE(should_handle_pread_iolist_upgrade_clause),
-                    ?TDEF_FE(should_handle_append_bin_upgrade_clause)
+                    ?TDEF_FE(should_handle_append_bin_upgrade_clause),
+                    ?TDEF_FE(should_detect_eof_mismatch)
                 ]
             }
         }
@@ -400,6 +401,18 @@ should_handle_append_bin_upgrade_clause(Fd) ->
     ?assert(Len2 > byte_size(Bin) + 16),
     ?assertEqual(Pos2, Len1),
     ?assertEqual({ok, Bin}, couch_file:pread_binary(Fd, Pos2)).
+
+should_detect_eof_mismatch(_) ->
+    Filepath = ?tempfile(),
+    {ok, Fd} = couch_file:open(Filepath, [create, overwrite]),
+    {ok, Io} = file:open(Filepath, [append, binary]),
+    file:write(Io, ~"0000"),
+    file:close(Io),
+    unlink(Fd),
+    ?assertMatch(
+        {error, {eof_mismatch, 4, 0, _}}, couch_file:write_header(Fd, ~"1111")
+    ),
+    catch couch_file:close(Fd).
 
 header_test_() ->
     {
