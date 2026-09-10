@@ -771,6 +771,7 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
     end.
 
 handle_write_header(Bin, #file{fd = Fd, eof = Pos} = File) ->
+    validate_eof(File),
     BinSize = byte_size(Bin),
     case Pos rem ?SIZE_BLOCK of
         0 -> Padding = <<>>;
@@ -1024,6 +1025,23 @@ dup(#file{fd = Fd} = File) ->
             end;
         false ->
             File
+    end.
+
+validate_eof(#file{} = File) ->
+    case config:get_boolean("couchdb", "validate_eof", true) of
+        false ->
+            ok;
+        true ->
+            {ok, ActualPos} = file:position(File#file.fd, eof),
+            if
+                File#file.eof /= ActualPos ->
+                    couch_stats:increment_counter([couchdb, eof_mismatch]),
+                    throw_stop(
+                        {eof_mismatch, ActualPos, File#file.eof, File#file.filepath}, File
+                    );
+                true ->
+                    ok
+            end
     end.
 
 -ifdef(TEST).
