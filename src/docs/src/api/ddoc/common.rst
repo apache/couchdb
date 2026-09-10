@@ -148,6 +148,10 @@
     index, index size and current status of the design document and associated
     index information.
 
+    To obtain this information for every design document of a database,
+    including search and nouveau indexes, in a single request see
+    :get:`/{db}/_index_info`.
+
     :param db: Database name
     :param ddoc: Design document name
     :<header Accept: - :mimetype:`application/json`

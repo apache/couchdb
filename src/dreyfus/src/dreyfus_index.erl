@@ -26,6 +26,7 @@
     await/2,
     search/2,
     info/1,
+    info/3,
     group1/2,
     group2/2,
     design_doc_to_indexes/2
@@ -78,6 +79,39 @@ info(Pid0) ->
     Pid = to_index_pid(Pid0),
     MFA = {?MODULE, info_int, [Pid]},
     dreyfus_util:time([index, info], MFA).
+
+% Get shard local index info based on ddoc and index name. This can be used by
+% _index_info worker when getting index info batches.
+info(DbName, DDoc, IndexName) ->
+    case design_doc_to_index(DbName, DDoc, IndexName) of
+        {ok, Index} ->
+            case dreyfus_index_manager:get_index(DbName, Index) of
+                {ok, Pid} ->
+                    case info(Pid) of
+                        {ok, Fields} ->
+                            Info = [
+                                {signature, Index#index.sig},
+                                {pending_updates, pending_updates(DbName, Fields)}
+                                | Fields
+                            ],
+                            {ok, Info};
+                        Else ->
+                            Else
+                    end;
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
+    end.
+
+% Similar idea as view pending_updates from couch_index. Return a difference
+% betweenn committed db seq and index
+pending_updates(DbName, Fields) ->
+    GetCommSeq = fun(Db) -> couch_db:get_committed_update_seq(Db) end,
+    CommittedSeq = couch_util:with_db(DbName, GetCommSeq),
+    IndexSeq = couch_util:get_value(pending_seq, Fields, 0),
+    max(CommittedSeq - IndexSeq, 0).
 
 %% We either have a dreyfus_index gen_server pid or the remote
 %% clouseau pid.

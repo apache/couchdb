@@ -26,6 +26,7 @@
     handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3,
+    handle_index_info_req/2,
     handle_view_cleanup_req/2,
     update_doc/4,
     http_code_from_status/1,
@@ -463,6 +464,65 @@ handle_design_info_req(#httpd{method = 'GET'} = Req, Db, #doc{} = DDoc) ->
     );
 handle_design_info_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET").
+
+% $db/_index_info: build status of indexes in a db
+handle_index_info_req(#httpd{method = 'GET', path_parts = [_, _]} = Req, Db) ->
+    Types = parse_types(Req),
+    DbName = couch_db:name(Db),
+    {ok, {CopiesExpected, Indexes}} = fabric:get_index_info(DbName, Types),
+    IndexesEjson = {index_info_to_json(Indexes)},
+    Ejson = {[{name, DbName}, {copies_expected, CopiesExpected}, {indexes, IndexesEjson}]},
+    send_json(Req, 200, Ejson);
+handle_index_info_req(#httpd{method = 'GET'} = Req, _Db) ->
+    chttpd:send_error(Req, not_found);
+handle_index_info_req(Req, _Db) ->
+    send_method_not_allowed(Req, "GET").
+
+% _index_info types: one or more index types. ex: ?type=nouveau,search
+parse_types(Req) ->
+    TypeArgs = [V || {K, V} <- chttpd:qs(Req), K == "type"],
+    case TypeArgs of
+        [] ->
+            [view, search, nouveau];
+        [_ | _] ->
+            Tokens = lists:flatmap(fun(V) -> string:tokens(V, ",") end, TypeArgs),
+            case lists:usort(lists:map(fun parse_type/1, Tokens)) of
+                [] -> throw({query_parse_error, <<"`type` must not be empty">>});
+                Types -> [T || T <- [view, search, nouveau], lists:member(T, Types)]
+            end
+    end.
+
+parse_type("view") ->
+    view;
+parse_type("search") ->
+    search;
+parse_type("nouveau") ->
+    nouveau;
+parse_type(Other) ->
+    Msg = io_lib:format("Invalid index type: ~s. Must be view, search or nouveau", [Other]),
+    throw({query_parse_error, ?l2b(Msg)}).
+
+index_info_to_json(Indexes) ->
+    [{DDocId, index_info(Res)} || {DDocId, Res} <- Indexes].
+
+index_info({error, Error}) ->
+    errobj(Error);
+index_info({Sections}) ->
+    {[{Sect, index_section_json(Sect, Val)} || {Sect, Val} <- Sections]}.
+
+index_section_json(view_index, Res) ->
+    res_to_json(Res);
+index_section_json(_Named, {Idxs}) ->
+    {[{Name, res_to_json(Res)} || {Name, Res} <- Idxs]}.
+
+res_to_json({error, Error}) ->
+    errobj(Error);
+res_to_json(Info) ->
+    Info.
+
+errobj(Error) ->
+    {_Code, ErrorStr, ReasonStr} = chttpd:error_info(Error),
+    {[{error, ErrorStr}, {reason, ReasonStr}]}.
 
 create_db_req(#httpd{} = Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
@@ -2659,6 +2719,38 @@ monitor_attachments_test_() ->
         Atts = [couch_att:new([{data, stub}])],
         ?_assertEqual([], monitor_attachments(Atts))
     end}.
+
+index_info_to_json_test_() ->
+    % {error, Reason} turn into {"error":..., "reason":...}
+    Unavailable = {service_unavailable, <<"Search is not available">>},
+    Indexes = [
+        {<<"_design/err">>, {error, not_found}},
+        {<<"_design/ok">>,
+            {[
+                {view_index, {[{update_seq, 1}]}},
+                {search_indexes,
+                    {[{<<"i">>, {[{doc_count, 2}]}}, {<<"j">>, {error, Unavailable}}]}},
+                {nouveau_indexes, {[{<<"n">>, #{num_docs => 3}}]}}
+            ]}}
+    ],
+    Expected = [
+        {<<"_design/err">>, {[{error, <<"not_found">>}, {reason, <<"missing">>}]}},
+        {<<"_design/ok">>,
+            {[
+                {view_index, {[{update_seq, 1}]}},
+                {search_indexes,
+                    {[
+                        {<<"i">>, {[{doc_count, 2}]}},
+                        {<<"j">>,
+                            {[
+                                {error, <<"service unavailable">>},
+                                {reason, <<"Search is not available">>}
+                            ]}}
+                    ]}},
+                {nouveau_indexes, {[{<<"n">>, #{num_docs => 3}}]}}
+            ]}}
+    ],
+    ?_assertEqual(Expected, index_info_to_json(Indexes)).
 
 parse_partitioned_opt_test_() ->
     {

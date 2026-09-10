@@ -80,23 +80,7 @@ info(DbName, DDoc, IndexName) ->
 info_int(DbName, DDoc, IndexName) ->
     erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
-    case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
-        {ok, Index} ->
-            case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    case dreyfus_index:info(Pid) of
-                        {ok, Fields} ->
-                            Info = [{signature, Index#index.sig} | Fields],
-                            rexi:reply({ok, Info});
-                        Else ->
-                            rexi:reply(Else)
-                    end;
-                Error ->
-                    rexi:reply(Error)
-            end;
-        Error ->
-            rexi:reply(Error)
-    end.
+    rexi:reply(dreyfus_index:info(DbName, DDoc, IndexName)).
 
 disk_size(DbName, DDoc, IndexName) ->
     erlang:put(io_priority, {search, DbName}),

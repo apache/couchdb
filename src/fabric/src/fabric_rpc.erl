@@ -26,7 +26,7 @@
     get_missing_revs/2, get_missing_revs/3,
     update_docs/3
 ]).
--export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
+-export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2, index_info/3]).
 -export([
     create_db/1, create_db/2,
     delete_db/1,
@@ -65,6 +65,9 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+
+% How many design docs an index_info/3 worker processes concurrently
+-define(MAX_CONCURRENCY, 8).
 
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a Db instance
@@ -336,6 +339,130 @@ purge_docs(DbName, UUIdsIdsRevs, Options) ->
 %% @equiv group_info(DbName, DDocId, [])
 group_info(DbName, DDocId) ->
     group_info(DbName, DDocId, []).
+
+% Shard local worker _index_info. Get info for all ddocs on this shard copy.
+index_info(DbName, DDocs, Types) ->
+    set_io_priority(DbName, []),
+    Avail = {search_available(), nouveau_enabled()},
+    Infos = pmap(fun(DDoc) -> ddoc_info(DbName, DDoc, Types, Avail) end, DDocs),
+    rexi:reply({ok, lists:append(Infos)}).
+
+% Return [{DDocId, Sections}] or [] for empty ddocs
+ddoc_info(ShardName, {Props} = DDocEJson, Types, Avail) ->
+    DDocId = couch_util:get_value(<<"_id">>, Props),
+    try
+        #doc{body = {Body}} = DDoc = couch_doc:from_json_obj(DDocEJson),
+        Sections = lists:append([section(T, ShardName, DDoc, Body, Avail) || T <- Types]),
+        case Sections of
+            [] -> [];
+            [_ | _] -> [{DDocId, Sections}]
+        end
+    catch
+        _Tag:Error ->
+            [{DDocId, {error, Error}}]
+    end.
+
+section(view, ShardName, DDoc, Body, _Avail) ->
+    case couch_util:get_value(<<"views">>, Body) of
+        {[_ | _]} -> [{view_index, view_info(ShardName, DDoc)}];
+        _ -> []
+    end;
+section(search, ShardName, DDoc, Body, {SearchAvailable, _}) ->
+    case couch_util:get_value(<<"indexes">>, Body) of
+        {[_ | _] = Indexes} ->
+            Infos = [
+                {Name, search_info(SearchAvailable, ShardName, DDoc, Name)}
+             || {Name, _} <- Indexes
+            ],
+            [{search_indexes, Infos}];
+        _ ->
+            []
+    end;
+section(nouveau, ShardName, DDoc, Body, {_, NouveauEnabled}) ->
+    case couch_util:get_value(<<"nouveau">>, Body) of
+        {[_ | _] = Indexes} ->
+            Infos = [
+                {Name, nouveau_info(NouveauEnabled, ShardName, DDoc, Name)}
+             || {Name, _} <- Indexes
+            ],
+            [{nouveau_indexes, Infos}];
+        _ ->
+            []
+    end.
+
+% Same node local call as group_info/3 above. An index which cannot be
+% opened is reported as {error, Reason} instead of crashing the worker.
+view_info(ShardName, DDoc) ->
+    try
+        norm_error(couch_mrview:get_info(ShardName, DDoc))
+    catch
+        error:{badmatch, Error} -> norm_error(Error);
+        _Tag:Error -> {error, Error}
+    end.
+
+search_info(false, _ShardName, _DDoc, _IndexName) ->
+    {error, {service_unavailable, <<"Search is not available">>}};
+search_info(true, ShardName, DDoc, IndexName) ->
+    try
+        norm_error(dreyfus_index:info(ShardName, DDoc, IndexName))
+    catch
+        _Tag:Error -> {error, Error}
+    end.
+
+nouveau_info(false, _ShardName, _DDoc, _IndexName) ->
+    {error, {service_unavailable, <<"nouveau is not enabled">>}};
+nouveau_info(true, ShardName, DDoc, IndexName) ->
+    try
+        norm_error(nouveau_util:index_info(ShardName, DDoc, IndexName))
+    catch
+        _Tag:Error -> {error, Error}
+    end.
+
+norm_error({ok, Info}) ->
+    {ok, Info};
+norm_error({error, Error}) ->
+    {error, Error};
+norm_error(Else) ->
+    {error, Else}.
+
+search_available() ->
+    try
+        dreyfus:available()
+    catch
+        _:_ -> false
+    end.
+
+nouveau_enabled() ->
+    try
+        nouveau:enabled()
+    catch
+        _:_ -> false
+    end.
+
+% Run fun with bounded concurrency and isolated in separate processes
+%
+pmap(Fun, Items) ->
+    lists:append([pmap_chunk(Fun, Chunk) || Chunk <- chunk(Items, ?MAX_CONCURRENCY)]).
+
+pmap_chunk(Fun, Items) ->
+    PidRefs = [spawn_monitor(fun() -> exit({pmap_res, Fun(Item)}) end) || Item <- Items],
+    lists:map(
+        fun({Pid, Ref}) ->
+            receive
+                {'DOWN', Ref, process, Pid, {pmap_res, Result}} -> Result;
+                {'DOWN', Ref, process, Pid, Error} -> exit(Error)
+            end
+        end,
+        PidRefs
+    ).
+
+chunk([], _N) ->
+    [];
+chunk(Items, N) when length(Items) =< N ->
+    [Items];
+chunk(Items, N) ->
+    {Chunk, Rest} = lists:split(N, Items),
+    [Chunk | chunk(Rest, N)].
 
 group_info(DbName, DDocId, DbOptions) ->
     with_db(DbName, DbOptions, {couch_mrview, get_info, [DDocId]}).
