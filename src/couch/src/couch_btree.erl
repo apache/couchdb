@@ -17,6 +17,7 @@
 -export([fold_reduce/4, lookup/2, set_options/2]).
 -export([is_btree/1, get_state/1, get_fd/1, get_reduce_fun/1]).
 -export([extract/2, assemble/3, less/3]).
+-export([get_chunk_size/0]).
 
 -include_lib("couch/include/couch_db.hrl").
 

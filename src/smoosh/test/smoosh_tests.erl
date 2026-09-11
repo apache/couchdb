@@ -473,11 +473,18 @@ wait_update_status() ->
 
 setup_db_compactor_intercept() ->
     TestPid = self(),
-    meck:expect(couch_emsort, open, fun(Fd) ->
-        TestPid ! {compactor_paused, self()},
-        receive
-            continue -> meck:passthrough([Fd]);
-            {raise, Tag, Reason} -> meck:exception(Tag, Reason)
+    meck:expect(couch_emsort, open, fun(Fd, Options) ->
+        % in the intercept is called a few times on first bind it has not
+        % persistent root so pause there and let the bind pass through.
+        case lists:keymember(root, 1, Options) of
+            false ->
+                TestPid ! {compactor_paused, self()},
+                receive
+                    continue -> meck:passthrough([Fd, Options]);
+                    {raise, Tag, Reason} -> meck:exception(Tag, Reason)
+                end;
+            true ->
+                meck:passthrough([Fd, Options])
         end
     end).
 

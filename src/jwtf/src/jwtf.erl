@@ -297,7 +297,7 @@ public_key_verify(Algorithm, Message, Signature, PublicKey) ->
         true ->
             ok;
         false ->
-            throw({bad_request, <<"Bad signature">>})
+            throw({bad_request, <<"Bad signature in authentication token">>})
     end.
 
 hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
@@ -305,7 +305,7 @@ hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
         HMAC ->
             ok;
         _ ->
-            throw({bad_request, <<"Bad HMAC">>})
+            throw({bad_request, <<"Bad HMAC in authentication token">>})
     end.
 
 jose_to_der(Signature) ->
@@ -325,7 +325,7 @@ rs_len(<<"ES", SizeBin/binary>>) ->
 split(EncodedToken) ->
     case binary:split(EncodedToken, <<$.>>, [global]) of
         [_, _, _] = Split -> Split;
-        _ -> throw({bad_request, <<"Malformed token">>})
+        _ -> throw({bad_request, <<"Malformed authentication token">>})
     end.
 
 decode_passthrough(B64UrlEncoded) ->
@@ -341,7 +341,7 @@ decode_b64url_json(B64UrlEncoded) ->
         end
     catch
         _:_ ->
-            throw({bad_request, <<"Malformed token">>})
+            throw({bad_request, <<"Malformed authentication token">>})
     end.
 
 props({Props}) ->

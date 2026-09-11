@@ -49,7 +49,8 @@ init({Engine, DbName, FilePath, Options0}) ->
         % couch_db:validate_doc_update, which loads them lazily.
         NewDb = Db#db{main_pid = self()},
         proc_lib:init_ack({ok, NewDb}),
-        gen_server:enter_loop(?MODULE, [], NewDb)
+        GenOpts = couch_util:hibernate_after(?MODULE),
+        gen_server:enter_loop(?MODULE, GenOpts, NewDb)
     catch
         throw:InitError ->
             proc_lib:init_ack(InitError)
@@ -215,11 +216,11 @@ handle_info(
                     false ->
                         Db2
                 end,
-            {noreply, Db3, hibernate}
+            {noreply, Db3}
     catch
         throw:retry ->
             [catch (ClientPid ! {retry, self()}) || ClientPid <- Clients],
-            {noreply, Db, hibernate}
+            {noreply, Db}
     end;
 handle_info({'EXIT', _Pid, normal}, Db) ->
     {noreply, Db};
@@ -892,11 +893,21 @@ commit_data(Db) ->
     }.
 
 pair_write_info(Old, New) ->
+    % To avoid quadratic lookups, first build a map of Id => FDI and then
+    % look-up Ids in the map using O(1) complexity
+    OldMap = lists:foldl(
+        fun
+            (#full_doc_info{id = Id} = FDI, Acc) -> Acc#{Id => FDI};
+            (not_found, Acc) -> Acc
+        end,
+        #{},
+        Old
+    ),
     lists:map(
-        fun(FDI) ->
-            case lists:keyfind(FDI#full_doc_info.id, #full_doc_info.id, Old) of
-                #full_doc_info{} = OldFDI -> {OldFDI, FDI};
-                false -> {not_found, FDI}
+        fun(#full_doc_info{id = Id} = FDI) ->
+            case OldMap of
+                #{Id := OldFDI} -> {OldFDI, FDI};
+                _ -> {not_found, FDI}
             end
         end,
         New

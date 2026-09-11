@@ -154,16 +154,16 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{snappy,           "snappy",           {tag, "CouchDB-1.0.10"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.11"}},
 
 %% %% Non-Erlang deps
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.3.6"}, [raw]},
-{ibrowse,          "ibrowse",          {tag, "v4.5.0"}},
-{gun,              "gun",              {tag, "2.2.0-couchdb"}},
-{jiffy,            "jiffy",            {tag, "2.0.0"}},
-{mochiweb,         "mochiweb",         {tag, "v3.3.0"}},
-{meck,             "meck",             {tag, "v1.1.1"}},
+{ibrowse,          "ibrowse",          {tag, "CouchDB-4.5.0-1"}},
+{gun,              "gun",              {tag, "CouchDB-2.5.0-1"}},
+{jiffy,            "jiffy",            {tag, "2.0.2"}},
+{mochiweb,         "mochiweb",         {tag, "v3.5.0"}},
+{meck,             "meck",             {tag, "v1.2.0"}},
 {recon,            "recon",            {tag, "2.5.6"}}
 ].
 
@@ -194,7 +194,7 @@ end.
 AddConfig = [
     {cover_enabled, true},
     {cover_print_enabled, true},
-    {require_otp_vsn, "26|27|28"},
+    {require_otp_vsn, "27|28|29"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},

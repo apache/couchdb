@@ -32,11 +32,11 @@ Server Administrators
 
     CouchDB server administrators and passwords are not stored in the
     ``_users`` database, but in the last ``[admins]`` section that CouchDB
-    finds when loading its ini files. See :config:intro for details on config
+    finds when loading its ini files. See :ref:`config/intro` for details on config
     file order and behaviour. This file (which could be something like
     ``/opt/couchdb/etc/local.ini`` or
     ``/opt/couchdb/etc/local.d/10-admins.ini`` when CouchDB is installed from
-    packages) should be appropriately secured and     readable only by system
+    packages) should be appropriately secured and readable only by system
     administrators::
 
         [admins]

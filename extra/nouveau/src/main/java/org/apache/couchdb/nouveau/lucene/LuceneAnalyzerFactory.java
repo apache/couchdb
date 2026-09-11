@@ -106,7 +106,7 @@ public final class LuceneAnalyzerFactory {
         norwegian(NorwegianAnalyzer::new),
         persian(PersianAnalyzer::new),
         polish(PolishAnalyzer::new),
-        portugese(PortugueseAnalyzer::new),
+        portuguese(PortugueseAnalyzer::new),
         romanian(RomanianAnalyzer::new),
         russian(RussianAnalyzer::new),
         simple(SimpleAnalyzer::new),

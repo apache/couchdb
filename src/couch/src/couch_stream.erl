@@ -58,7 +58,8 @@ open({_StreamEngine, _StreamEngineState} = Engine) ->
     open(Engine, []).
 
 open({_StreamEngine, _StreamEngineState} = Engine, Options) ->
-    gen_server:start_link(?MODULE, {Engine, self(), erlang:get(io_priority), Options}, []).
+    GenOpts = couch_util:hibernate_after(?MODULE),
+    gen_server:start_link(?MODULE, {Engine, self(), erlang:get(io_priority), Options}, GenOpts).
 
 close(Pid) ->
     gen_server:call(Pid, close, infinity).
@@ -223,17 +224,15 @@ handle_call({write, Bin}, _From, Stream) ->
                     Md5_2 = couch_hash:md5_hash_update(Md5, WriteBin2)
             end,
 
-            {reply, ok,
-                Stream#stream{
-                    engine = NewEngine,
-                    written_len = WrittenLen2,
-                    buffer_list = [],
-                    buffer_len = 0,
-                    md5 = Md5_2,
-                    identity_md5 = IdenMd5_2,
-                    identity_len = IdenLen + BinSize
-                },
-                hibernate};
+            {reply, ok, Stream#stream{
+                engine = NewEngine,
+                written_len = WrittenLen2,
+                buffer_list = [],
+                buffer_len = 0,
+                md5 = Md5_2,
+                identity_md5 = IdenMd5_2,
+                identity_len = IdenLen + BinSize
+            }};
         true ->
             {reply, ok, Stream#stream{
                 buffer_list = [Bin | Buffer],
