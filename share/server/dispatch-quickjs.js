@@ -162,6 +162,9 @@ globalThis.dispatch = function(line) {
     case "reset":
       State.reset.apply(null, cmd);
       break;
+    case "validate_fun":
+      State.validateFun.apply(null, cmd);
+      break;
     case "add_fun":
       State.addFun.apply(null, cmd);
       break;
