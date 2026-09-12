@@ -97,7 +97,7 @@ handle_info(_Info, State) ->
 initialize_nodelist() ->
     DbName = mem3_sync:nodes_db(),
     {ok, Db} = mem3_util:ensure_exists(DbName),
-    {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
+    {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, [include_deleted]),
 
     insert_if_missing(Db, [config:node_name() | mem3_seeds:get_seeds()]),
 
@@ -119,6 +119,11 @@ initialize_nodelist() ->
     Seq.
 
 first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
+    {ok, Acc};
+first_fold(#full_doc_info{deleted = true, id = Id}, Acc) when byte_size(Id) =< 255 ->
+    % Turn deleted nodes names into atoms so binary_to_term/2 with [safe] can
+    % decode sequences with those atoms.
+    mem3_util:to_atom(Id),
     {ok, Acc};
 first_fold(#full_doc_info{deleted = true}, Acc) ->
     {ok, Acc};
@@ -221,3 +226,64 @@ save_to_db(Db, Node, Props) ->
     {ok, _} = couch_db:update_doc(Db, Doc, []),
     update_ets(Node, NodeInfo),
     ok.
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+tombstones_reach_first_fold_test_() ->
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        fun(_) ->
+            [fun t_tombstones_reach_first_fold/0]
+        end
+    }.
+
+t_tombstones_reach_first_fold() ->
+    DbName = ?tempdb(),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
+    try
+        Id1 = <<"tombstoned@baz">>,
+        Id2 = <<"alsodeleted@baz">>,
+        lists:foreach(
+            fun(Id) ->
+                {ok, DbA} = couch_db:reopen(Db),
+                {ok, {Pos, Rev}} = couch_db:update_doc(DbA, #doc{id = Id}, []),
+                {ok, DbB} = couch_db:reopen(DbA),
+                Del = #doc{id = Id, revs = {Pos, [Rev]}, deleted = true},
+                {ok, _} = couch_db:update_doc(DbB, Del, [])
+            end,
+            [Id1, Id2]
+        ),
+        {ok, Db1} = couch_db:reopen(Db),
+        % Without include_deleted tombstones not visited
+        {ok, _} = couch_db:fold_docs(Db1, fun first_fold/2, Db1, []),
+        ?assertError(badarg, binary_to_existing_atom(Id1, utf8)),
+        % With include_deleted they are visited
+        {ok, _} = couch_db:fold_docs(Db1, fun first_fold/2, Db1, [include_deleted]),
+        ?assert(is_atom(binary_to_existing_atom(Id1, utf8))),
+        ?assert(is_atom(binary_to_existing_atom(Id2, utf8)))
+    after
+        couch_db:close(Db),
+        couch_server:delete(DbName, [?ADMIN_CTX])
+    end.
+
+first_fold_interns_deleted_node_names_test() ->
+    Id = <<"decom@baz">>,
+    % Atom doesn't exist. Folding tombstone must create it
+    ?assertError(badarg, binary_to_existing_atom(Id, utf8)),
+    ?assertEqual({ok, acc}, first_fold(#full_doc_info{id = Id, deleted = true}, acc)),
+    ?assert(is_atom(binary_to_existing_atom(Id, utf8))),
+    % Silly huge ids skipped without crashing (otherwise we hit a system limit
+    % and can never boot a node).
+    Big = binary:copy(<<"x">>, 256),
+    ?assertEqual({ok, acc}, first_fold(#full_doc_info{id = Big, deleted = true}, acc)),
+    ?assertError(badarg, binary_to_existing_atom(Big, utf8)),
+    % Deleted design docs are also skipped by the earlier clause
+    DDocId = <<"_design/deleted@baz">>,
+    ?assertEqual({ok, acc}, first_fold(#full_doc_info{id = DDocId, deleted = true}, acc)),
+    ?assertError(badarg, binary_to_existing_atom(DDocId, utf8)).
+
+-endif.
