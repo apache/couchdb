@@ -63,8 +63,24 @@ unpack(DbName, Packed) when is_binary(Packed) ->
                     {PlaceHolder, After}
             end
         end,
-        binary_to_term(couch_util:decodeBase64Url(Packed))
+        unpack_entries(Packed)
     ).
+
+unpack_entries(Packed) ->
+    case binary_to_term(couch_util:decodeBase64Url(Packed), [safe]) of
+        Entries when is_list(Entries) ->
+            lists:foreach(fun validate_entry/1, Entries),
+            Entries;
+        _ ->
+            error(badarg)
+    end.
+
+validate_entry({Node, [B, E], _After}) when
+    is_atom(Node), is_integer(B), is_integer(E), B >= 0, B =< E, E =< ?RING_END
+->
+    ok;
+validate_entry(_) ->
+    error(badarg).
 
 pack(nil) ->
     null;
