@@ -12,7 +12,7 @@
 
 
 % The last element in the ring
--define(RING_END, 2 bsl 31 - 1).
+-define(RING_END, (2 bsl 31 - 1)).
 
 
 % type specification hacked to suppress dialyzer warning re: match spec

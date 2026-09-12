@@ -29,6 +29,16 @@
 
 -define(RFC3339_TIME, [_, _, _, _, $-, _, _, $-, _, _, $T, _, _, $:, _, _, $:, _, _, $Z]).
 
+-define(IN_RANGE(X, Min, Max), (is_integer(X) andalso X >= Min andalso X =< Max)).
+-define(IS_BOUND(X), ?IN_RANGE(X, 0, ?RING_END)).
+-define(IS_SEQ_NUM(X), ?IN_RANGE(X, 0, (1 bsl 64) - 1)).
+-define(IS_UUID(X), (is_binary(X) andalso ?IN_RANGE(byte_size(X), 1, 255))).
+% Bad sequence error to indicate the passed in sequence cannot be decoded. A
+% common reason is it references node names unknown on this node. This error
+% unlike a malformed base64 string will result in a rewind. That's done for
+% compatibilty reasons and to make replication self-healing.
+-define(BADSEQ, badseq).
+
 go(DbName, Feed, Options, Callback, Acc0) when
     Feed == "continuous" orelse
         Feed == "longpoll" orelse Feed == "eventsource"
@@ -416,14 +426,84 @@ fake_packed_seq({Seq, _Uuid, _Node}) -> Seq;
 fake_packed_seq({Seq, _Uuid}) -> Seq;
 fake_packed_seq(Seq) -> Seq.
 
-unpack_seq_regex_match(Packed) ->
-    Pattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
-    Options = [{capture, [opaque], binary}],
-    {match, Match} = re:run(Packed, Pattern, Options),
-    Match.
+% Strip quotes and the N- prefix
+unpack_seq_opaque(Packed) ->
+    Bin = iolist_to_binary(Packed),
+    strip_sum_prefix(strip_quote_suffix(strip_quote_prefix(Bin))).
 
-unpack_seq_decode_term(Opaque) ->
-    binary_to_term(couch_util:decodeBase64Url(Opaque)).
+strip_quote_prefix(<<$", Rest/binary>>) ->
+    Rest;
+strip_quote_prefix(Bin) ->
+    Bin.
+
+strip_quote_suffix(Bin) when byte_size(Bin) >= 1 ->
+    case binary:last(Bin) of
+        $" -> binary:part(Bin, 0, byte_size(Bin) - 1);
+        _ -> Bin
+    end;
+strip_quote_suffix(Bin) ->
+    Bin.
+
+strip_sum_prefix(Bin) ->
+    case binary:split(Bin, <<"-">>) of
+        [Digits, Rest] ->
+            case all_digits(Digits) of
+                true -> Rest;
+                false -> Bin
+            end;
+        [Bin] ->
+            Bin
+    end.
+
+all_digits(<<>>) ->
+    false;
+all_digits(Bin) ->
+    all_digits1(Bin).
+
+all_digits1(<<D, Rest/binary>>) when D >= $0, D =< $9 ->
+    all_digits1(Rest);
+all_digits1(<<_, _/binary>>) ->
+    false;
+all_digits1(<<>>) ->
+    true.
+
+unpack_seq_term(Opaque) ->
+    case couch_util:decodeBase64Url(Opaque) of
+        <<131, _/binary>> = Bin ->
+            % Looks like a valid term_to_binary at least
+            SeqList =
+                try
+                    binary_to_term(Bin, [safe])
+                catch
+                    error:badarg -> error(?BADSEQ)
+                end,
+            validate_seq_list(SeqList);
+        _ ->
+            % Not even a valid term_to_binary result. Throw a badarg which
+            % becomes a 4xx error at the HTTP API level.
+            error(badarg)
+    end.
+
+validate_seq_list(SeqList) when is_list(SeqList) ->
+    lists:foreach(fun validate_seq_item/1, SeqList),
+    SeqList;
+validate_seq_list(_) ->
+    error(badarg).
+
+validate_seq_item({Node, [B, E], Val}) when is_atom(Node), ?IS_BOUND(B), ?IS_BOUND(E) ->
+    case valid_seq_val(Val) of
+        true -> ok;
+        false -> error(badarg)
+    end;
+validate_seq_item(_) ->
+    error(badarg).
+
+valid_seq_val({Seq, {split, Uuid}, Epoch}) ->
+    ?IS_SEQ_NUM(Seq) andalso ?IS_UUID(Uuid) andalso is_atom(Epoch);
+valid_seq_val({Seq, Uuid, Epoch}) ->
+    ?IS_SEQ_NUM(Seq) andalso ?IS_UUID(Uuid) andalso is_atom(Epoch);
+valid_seq_val(Seq) ->
+    ?IS_SEQ_NUM(Seq).
 
 % This is used for testing and for remsh debugging
 %
@@ -433,8 +513,8 @@ unpack_seq_decode_term(Opaque) ->
 %
 -spec decode_seq(binary()) -> [tuple()].
 decode_seq(Packed) ->
-    Opaque = unpack_seq_regex_match(Packed),
-    unpack_seq_decode_term(Opaque).
+    Opaque = unpack_seq_opaque(Packed),
+    unpack_seq_term(Opaque).
 
 % Returns fabric_dict with {Shard, Seq} entries
 %
@@ -445,14 +525,20 @@ unpack_seqs(0, DbName) ->
 unpack_seqs("0", DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
 unpack_seqs(Packed, DbName) ->
-    Opaque = unpack_seq_regex_match(Packed),
-    do_unpack_seqs(Opaque, DbName).
+    Opaque = unpack_seq_opaque(Packed),
+    try
+        do_unpack_seqs(Opaque, DbName)
+    catch
+        error:?BADSEQ ->
+            couch_log:warning("~p cannot decode since seq db:~s, rewinding", [?MODULE, DbName]),
+            fabric_dict:init(mem3:shards(DbName), 0)
+    end.
 
 do_unpack_seqs(Opaque, DbName) ->
     % A preventative fix for FB 13533 to remove duplicate shards.
     % This just picks each unique shard and keeps the largest seq
     % value recorded.
-    Decoded = unpack_seq_decode_term(Opaque),
+    Decoded = unpack_seq_term(Opaque),
     DedupDict = lists:foldl(
         fun({Node, [A, B], Seq}, Acc) ->
             dict:append({Node, [A, B]}, Seq, Acc)
@@ -741,10 +827,13 @@ validate_start_seq("0") ->
     ok;
 validate_start_seq(Seq) when is_list(Seq) orelse is_binary(Seq) ->
     try
-        Opaque = unpack_seq_regex_match(Seq),
-        unpack_seq_decode_term(Opaque),
+        Opaque = unpack_seq_opaque(Seq),
+        unpack_seq_term(Opaque),
         ok
     catch
+        error:?BADSEQ ->
+            % Rewound by unpack_seqs/2
+            ok;
         _:_ ->
             Reason = <<"Malformed sequence supplied in 'since' parameter.">>,
             {error, {bad_request, Reason}}
@@ -773,7 +862,11 @@ unpack_seq_setup() ->
     meck:new(fabric_view),
     meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
     meck:expect(mem3, shards, fun(_) -> [#shard{}] end),
-    meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end).
+    meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end),
+    meck:new(couch_log),
+    meck:expect(couch_log, warning, fun(_, _) -> ok end),
+    % Some tests use this atom and it must exist already
+    list_to_atom("dev1@127.0.0.1").
 
 unpack_seqs_test_() ->
     {
@@ -788,6 +881,7 @@ unpack_seqs_test_() ->
             ?TDEF(t_no_numeric_prefix),
             ?TDEF(t_zero_seq_int),
             ?TDEF(t_zero_seq_string),
+            ?TDEF(t_badseq_rewinds),
             ?TDEF(t_fail_now),
             ?TDEF(t_fail_numeric_int),
             ?TDEF(t_fail_numeric_string),
@@ -840,6 +934,15 @@ t_zero_seq_int(_) ->
 
 t_zero_seq_string(_) ->
     assert_shards("0").
+
+t_badseq_rewinds(_) ->
+    %> term_to_binary('otherclust@baz').
+    %> <<131,119,14,111,116,104,101,114,99,108,117,115,116,64,98,97,122>>
+    Ext = <<131, 119, 14, 111, 116, 104, 101, 114, 99, 108, 117, 115, 116, 64, 98, 97, 122>>,
+    Seq = <<"42-", (couch_util:encodeBase64Url(Ext))/binary>>,
+    ?assertEqual(ok, validate_start_seq(Seq)),
+    ?assertEqual(fabric_dict:init([#shard{}], 0), unpack_seqs(Seq, <<"foo">>)),
+    ?assertError(badarg, binary_to_existing_atom(<<"otherclust@baz">>, utf8)).
 
 t_fail_now(_) ->
     % "now" should have been transformed into a sequence in get_start_seq/2
@@ -1066,5 +1169,47 @@ pack_split_seq_test() ->
         ],
         DecodedSeq
     ).
+
+decode_seq_unknown_atom_test() ->
+    Uniq = integer_to_binary(erlang:unique_integer([positive])),
+    Name = <<"nonexistent", Uniq/binary, "@127.0.0.1">>,
+    % Create via external term [{Atom, [0, 10], 42}] so the atom is not created
+    Ext = fun(AtomExt) ->
+        <<131, 108, 1:32, 104, 3, AtomExt/binary, 108, 2:32, 97, 0, 97, 10, 106, 97, 42, 106>>
+    end,
+    BadSeq = Ext(<<119, (byte_size(Name)):8, Name/binary>>),
+    BadB64 = couch_util:encodeBase64Url(BadSeq),
+    % Distinct from badarg: unpack_seqs/2 rewinds these instead of failing
+    ?assertError(?BADSEQ, decode_seq(<<"42-", BadB64/binary>>)),
+    % With existing atom should be good
+    Ok = Ext(<<119, 2, "n1">>),
+    OkB64 = couch_util:encodeBase64Url(Ok),
+    ?assertEqual([{n1, [0, 10], 42}], decode_seq(<<"42-", OkB64/binary>>)),
+    % We didn't create a bad atom
+    ?assertError(badarg, binary_to_existing_atom(Name, utf8)).
+
+decode_bad_shape_test() ->
+    T = fun(Term) ->
+        B64 = couch_util:encodeBase64Url(term_to_binary(Term, [{minor_version, 1}])),
+        <<"1-", B64/binary>>
+    end,
+    SeqList = [
+        {n1, [0, 10], 0},
+        {n1, [11, 20], {7, <<"u">>, n1}},
+        {n2, [21, ?RING_END], {8, {split, <<"u">>}, n1}}
+    ],
+    ?assertEqual(SeqList, decode_seq(T(SeqList))),
+    ?assertError(badarg, decode_seq(T({n1, [0, 10], 0}))),
+    ?assertError(badarg, decode_seq(T(42))),
+    ?assertError(badarg, decode_seq(T([{n1, [0, 10]}]))),
+    ?assertError(badarg, decode_seq(T([{n1, [0, 10, 20], 0}]))),
+    ?assertError(badarg, decode_seq(T([{n1, {0, 10}, 0}]))),
+    ?assertError(badarg, decode_seq(T([{n1, [0, 10], {7, <<"u">>}}]))),
+    ?assertError(badarg, decode_seq(T([{n1, [0, 10], -1}]))),
+    ?assertError(badarg, decode_seq(T([{n1, [0, 1 bsl 32], 0}]))),
+    ?assertError(badarg, decode_seq(T([{n1, [-1, 10], 0}]))),
+    ?assertError(badarg, decode_seq(T([{n1, [0, 10], {7, u, n1}}]))),
+    ?assertError(badarg, decode_seq(T([{42, [0, 10], 0}]))),
+    ?assertError(badarg, decode_seq(T([{<<"n1">>, [0, 10], 0}]))).
 
 -endif.
