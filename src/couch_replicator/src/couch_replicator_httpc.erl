@@ -194,8 +194,9 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
         Ok when Ok >= 200, Ok < 500 ->
             backoff_success(HttpDb, Params),
             couch_stats:increment_counter([couch_replicator, responses, success]),
+            Body1 = maybe_decompress_response(Headers, Body),
             EJson =
-                case Body of
+                case Body1 of
                     <<>> ->
                         null;
                     Json ->
@@ -263,6 +264,17 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
         % seem to be always true when there's a very high rate of requests
         % and many open connections.
         maybe_retry(timeout, Worker, HttpDb, Params)
+    end.
+
+maybe_decompress_response(_Headers, <<>>) ->
+    <<>>;
+maybe_decompress_response(Headers, Body) ->
+    case lists:keyfind("content-encoding", 1, [{string:to_lower(K), V} || {K, V} <- Headers]) of
+        {_, "gzip"} ->
+            couch_stats:increment_counter([couch_replicator, responses_decompressed, gzip]),
+            zlib:gunzip(Body);
+        _ ->
+            Body
     end.
 
 process_auth_response(HttpDb, Code, Headers, Params) ->
