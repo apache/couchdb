@@ -193,6 +193,7 @@
     "commonjs require",
     "consistent _rev for design docs",
     "design doc deletion",
+    "design doc info reports updates_pending across all shard copies",
     "language not specified, Javascript is implied",
     "module id values are as expected",
     "startkey and endkey",
@@ -238,6 +239,12 @@
     "location header",
     "location header should include X-Forwarded-Host",
     "location header should include custom header"
+  ],
+  "IndexInfoTest": [
+    "index info lists every index with its per index info object",
+    "index info pages design docs like _design_docs",
+    "index info reports mango indexes by the ddoc and name _index uses",
+    "index info takes keys like _design_docs and caps the design docs"
   ],
   "InvalidDocIDsTest": [
     "_local-prefixed ids are illegal",

@@ -81,6 +81,69 @@ defmodule SearchTest do
   end
 
   @tag :with_db
+  test "search info", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    # this builds the index
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    resp = Couch.get(url, query: %{q: "*:*"})
+    assert_on_status(resp, 200, "Fail to do search.")
+
+    url = "/#{db_name}/_design/inventory/_search_info/fruits"
+    resp = Couch.get(url)
+    assert_on_status(resp, 200, "Fail to get search info.")
+    info = resp.body["search_index"]
+    assert info["doc_count"] == 4
+    assert String.length(info["signature"]) > 0
+
+    pending = info["updates_pending"]
+
+    assert Enum.sort(Map.keys(pending)) ==
+             ["copies", "copies_expected", "maximum", "minimum", "preferred", "total"]
+
+    copies = shard_copies(db_name)
+    assert pending["copies"] == copies
+    assert pending["copies_expected"] == copies
+
+    # after we build the index max and total are both 0
+    retry_until(fn ->
+      pending = Couch.get(url).body["search_index"]["updates_pending"]
+      pending["maximum"] == 0 and pending["total"] == 0
+    end)
+  end
+
+  @tag :with_db
+  test "index info matches search info", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/inventory/_search/fruits"
+    resp = Couch.get(url, query: %{q: "*:*"})
+    assert_on_status(resp, 200, "Fail to do search.")
+
+    # assert _index_info "info" is the same as _search_info
+    retry_until(fn ->
+      resp = Couch.get("/#{db_name}/_index_info", query: %{type: "search"})
+      assert_on_status(resp, 200, "Fail to get index info.")
+      # only the requested type is gathered, the other lists are empty
+      assert resp.body["view_indexes"] == []
+      assert resp.body["nouveau_indexes"] == []
+      [entry] = resp.body["search_indexes"]
+      assert entry["ddoc"] == "_design/inventory"
+      assert entry["name"] == "fruits"
+      assert entry["ok"] == true
+
+      resp = Couch.get("/#{db_name}/_design/inventory/_search_info/fruits")
+      assert_on_status(resp, 200, "Fail to get search info.")
+      info = entry["info"]
+      info["updates_pending"]["maximum"] == 0 and info == resp.body["search_index"]
+    end)
+  end
+
+  @tag :with_db
   test "drilldown single key single value for GET", context do
     db_name = context[:db_name]
     create_search_docs(db_name)

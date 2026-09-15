@@ -59,12 +59,13 @@
     changes/4,
     query_view/3, query_view/4, query_view/6, query_view/7,
     get_view_group_info/2,
+    get_index_info/2, get_index_info/3, get_index_info/4,
     end_changes/0
 ]).
 
 % miscellany
 -export([
-    design_docs/1,
+    design_docs/1, design_docs/2,
     reset_validation_funs/1,
     cleanup_index_files_all_nodes/0,
     cleanup_index_files_all_nodes/1,
@@ -590,40 +591,70 @@ query_view(Db, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
             {minimum, non_neg_integer()}
             | {preferred, non_neg_integer()}
             | {total, non_neg_integer()}
+            | {maximum, non_neg_integer()}
+            | {copies, non_neg_integer()}
+            | {copies_expected, non_neg_integer()}
         ]}
     ]}.
 get_view_group_info(DbName, DesignId) ->
     fabric_group_info:go(dbname(DbName), design_doc(DesignId)).
 
+%% @doc get index info of all indexes: view, search and nouveau etc
+get_index_info(DbName, Types) ->
+    get_index_info(DbName, Types, #mrargs{}).
+
+%% @doc same as get_index_info/2 restricted to the design docs selected by
+%%      the all_docs style arguments (start_key, end_key, limit, skip, keys)
+get_index_info(DbName, Types, #mrargs{} = Args) ->
+    fabric_index_info:go(dbname(DbName), Types, Args).
+
+%% @doc same as get_index_info/3 with options. {max_ddocs, N} rejects a
+%%      request with {error, too_many_design_docs} if we pick more than N design docs
+get_index_info(DbName, Types, #mrargs{} = Args, Opts) ->
+    fabric_index_info:go(dbname(DbName), Types, Args, Opts).
+
 -spec end_changes() -> ok.
 end_changes() ->
     fabric_view_changes:increment_changes_epoch().
 
-%% @doc retrieve all the design docs from a database
+%% @doc retrieve all the design docs from a database and the meta info
 -spec design_docs(dbname()) -> {ok, [json_obj()]} | {error, Reason :: term()}.
 design_docs(DbName) ->
-    Extra0 = [{view_row_map, true}],
+    case design_docs(DbName, #mrargs{}) of
+        {ok, _Meta, DDocs} -> {ok, DDocs};
+        {error, Reason} -> {error, Reason}
+    end.
+
+design_docs(DbName, #mrargs{extra = Extra0} = Args0) ->
+    Extra1 = [{view_row_map, true} | Extra0],
     Extra =
         case get(io_priority) of
-            undefined -> Extra0;
-            Else -> [{io_priority, Else} | Extra0]
+            undefined -> Extra1;
+            Else -> [{io_priority, Else} | Extra1]
         end,
-    QueryArgs0 = #mrargs{
+    QueryArgs0 = Args0#mrargs{
         include_docs = true,
         extra = Extra
     },
     QueryArgs = set_namespace(<<"_design">>, QueryArgs0),
     Callback = fun
-        ({meta, _}, []) ->
-            {ok, []};
-        ({row, Props}, Acc) ->
-            {ok, [couch_util:get_value(doc, Props) | Acc]};
-        (complete, Acc) ->
-            {ok, lists:reverse(Acc)};
+        ({meta, Meta}, {_, Acc}) ->
+            {ok, {Meta, Acc}};
+        ({row, Props}, {Meta, Acc}) ->
+            % For "keys" rows of missing docs won't have a "doc" property
+            case couch_util:get_value(doc, Props) of
+                {_} = DDoc -> {ok, {Meta, [DDoc | Acc]}};
+                _ -> {ok, {Meta, Acc}}
+            end;
+        (complete, {Meta, Acc}) ->
+            {ok, {Meta, lists:reverse(Acc)}};
         ({error, Reason}, _Acc) ->
             {error, Reason}
     end,
-    fabric:all_docs(dbname(DbName), [?ADMIN_CTX], Callback, [], QueryArgs).
+    case fabric:all_docs(dbname(DbName), [?ADMIN_CTX], Callback, {[], []}, QueryArgs) of
+        {ok, {Meta, DDocs}} -> {ok, Meta, DDocs};
+        {error, Reason} -> {error, Reason}
+    end.
 
 %% @doc forces a reload of validation functions, this is performed after
 %%      design docs are update
