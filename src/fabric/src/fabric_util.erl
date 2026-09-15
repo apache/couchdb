@@ -38,6 +38,7 @@
 -export([isolate/1, isolate/2]).
 -export([get_design_doc_records/1]).
 -export([w_from_opts/2, r_from_opts/2]).
+-export([aggregate_pending/2]).
 
 -compile({inline, [{doc_id_and_rev, 1}]}).
 
@@ -435,6 +436,48 @@ do_isolate(Fun) ->
             {'$isolerr', Tag, Reason, Stack}
     end.
 
+% Aggregate per-hard index pending data. PerRange is entry per shard range,
+% listing. Each entry is prefixed with {true|false = IsPreferred, ...} flag
+% indicating if that's a preferred copy.
+% Pending stats returned:
+%   minimum:   best copy, 0 => at least one complete copy of every range exists
+%   preferred: pending count on preferred copies
+%   total:     all copies added together
+%   maximum:   worst copy, 0 => every copy returning a result is completely built
+%   copies:    number of shard which returned a response
+%   copies_expected: the number of shard workers we expected to return a result
+aggregate_pending(PerRange, Expected) ->
+    case lists:foldl(fun aggregate_pending_range/2, undefined, PerRange) of
+        undefined ->
+            undefined;
+        {Min, Pref, Total, Max, Copies} ->
+            [
+                {minimum, Min},
+                {preferred, Pref},
+                {total, Total},
+                {maximum, Max},
+                {copies, Copies},
+                {copies_expected, Expected}
+            ]
+    end.
+
+aggregate_pending_range(Copies, Acc) ->
+    case lists:sort([P || {_, P} <- Copies, is_integer(P)]) of
+        [] ->
+            Acc;
+        [_ | _] = Ps ->
+            {Min0, Pref0, Tot0, Max0, Copies0} =
+                case Acc of
+                    undefined -> {0, 0, 0, 0, 0};
+                    _ -> Acc
+                end,
+            Pref = lists:sum([P || {true, P} <- Copies, is_integer(P)]),
+            Min = Min0 + hd(Ps),
+            Tot = Tot0 + lists:sum(Ps),
+            Max = Max0 + lists:last(Ps),
+            {Min, Pref0 + Pref, Tot, Max, Copies0 + length(Ps)}
+    end.
+
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
@@ -540,5 +583,32 @@ t_r_opts_get(_) ->
     ?assertEqual(3, r_from_opts(any_db, [{r, some_other_type}])),
     ?assertEqual(3, r_from_opts(any_db, [{r, "five"}])),
     ?assertEqual(3, r_from_opts(any_db, [])).
+
+aggregate_pending_test() ->
+    ?assertEqual(undefined, aggregate_pending([], 6)),
+    ?assertEqual(undefined, aggregate_pending([[]], 6)),
+    ?assertEqual(undefined, aggregate_pending([[{true, undefined}]], 6)),
+    % a single copy per range
+    ?assertEqual(
+        [{minimum, 5}, {preferred, 0}, {total, 5}, {maximum, 5}, {copies, 1}, {copies_expected, 3}],
+        aggregate_pending([[{false, 5}]], 3)
+    ),
+    % several copies per range: best and worst copy of each range, summed
+    ?assertEqual(
+        [
+            {minimum, 3},
+            {preferred, 7},
+            {total, 18},
+            {maximum, 11},
+            {copies, 5},
+            {copies_expected, 6}
+        ],
+        aggregate_pending([[{true, 4}, {false, 0}, {false, 8}], [{true, 3}, {false, 3}]], 6)
+    ),
+    % copies without a reported backlog are skipped and not counted
+    ?assertEqual(
+        [{minimum, 2}, {preferred, 0}, {total, 2}, {maximum, 2}, {copies, 1}, {copies_expected, 6}],
+        aggregate_pending([[{true, undefined}, {false, 2}], [{false, undefined}]], 6)
+    ).
 
 -endif.

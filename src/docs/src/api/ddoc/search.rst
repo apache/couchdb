@@ -165,10 +165,26 @@
     {
         "name": "_design/cookbook/ingredients",
         "search_index": {
+            "updates_pending": {
+                "minimum": 0,
+                "preferred": 0,
+                "total": 0,
+                "maximum": 0,
+                "copies": 6,
+                "copies_expected": 6
+            },
             "pending_seq": 7125496,
             "doc_del_count": 129180,
             "doc_count": 1066173,
             "disk_size": 728305827,
-            "committed_seq": 7125496
+            "committed_seq": 7125496,
+            "signature": "efc82e779a1f10ec90b2fbf0bc5246dd"
         }
     }
+
+.. versionadded:: 3.6
+    ``updates_pending`` reports how far the index lags behind the database
+    across all copies of every shard range, with the same fields as the
+    ``updates_pending`` object of :ref:`api/ddoc/view_index_info`. To obtain
+    it for every index of a database in one request see
+    :get:`/{db}/_index_info`.

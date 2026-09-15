@@ -77,13 +77,5 @@ update_and_retry(DbName, Index, QueryArgs, UpdateLatency) ->
             rexi:reply(Else)
     end.
 
-info(DbName, #index{} = Index0) ->
-    %% Incorporate the shard name into the record.
-    Index1 = Index0#index{dbname = DbName},
-    case nouveau_api:index_info(Index1) of
-        {ok, Info0} ->
-            Info1 = Info0#{signature => Index0#index.sig},
-            rexi:reply({ok, Info1});
-        {error, Reason} ->
-            rexi:reply({error, Reason})
-    end.
+info(DbName, #index{} = Index) ->
+    rexi:reply(nouveau_util:index_info(DbName, Index)).
