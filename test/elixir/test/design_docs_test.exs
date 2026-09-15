@@ -282,6 +282,46 @@ defmodule DesignDocsTest do
     end
   end
 
+  @tag :with_db
+  test "design doc info reports updates_pending across all shard copies", context do
+    db_name = context[:db_name]
+    {:ok, _} = create_doc(db_name, @design_doc)
+    bulk_save(db_name, make_docs(1..50))
+    copies = shard_copies(db_name)
+
+    # with autoupdate:false we don't query teh view for all copies are behind
+    resp = Couch.get("/#{db_name}/_design/test/_info")
+    assert resp.status_code == 200
+    pending = resp.body["view_index"]["updates_pending"]
+
+    assert Enum.sort(Map.keys(pending)) ==
+             ["copies", "copies_expected", "maximum", "minimum", "preferred", "total"]
+
+    assert pending["copies"] == copies
+    assert pending["copies_expected"] == copies
+    assert pending["minimum"] > 0
+    assert pending["minimum"] <= pending["preferred"]
+    assert pending["preferred"] <= pending["maximum"]
+    assert pending["maximum"] <= pending["total"]
+
+    # one query mean it will build on all copies which server the query
+    resp = Couch.get("/#{db_name}/_design/test/_view/summate")
+    assert resp.status_code == 200
+
+    retry_until(fn ->
+      resp = Couch.get("/#{db_name}/_design/test/_info")
+
+      resp.body["view_index"]["updates_pending"] == %{
+        "minimum" => 0,
+        "preferred" => 0,
+        "total" => 0,
+        "maximum" => 0,
+        "copies" => copies,
+        "copies_expected" => copies
+      }
+    end)
+  end
+
   test "commonjs in map functions", context do
     db_name = context[:db_name]
 

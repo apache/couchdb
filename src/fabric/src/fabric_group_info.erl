@@ -13,6 +13,8 @@
 -module(fabric_group_info).
 
 -export([go/2]).
+% Used by fabric_index_info
+-export([build_final_response/3]).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -26,87 +28,85 @@ go(DbName, #doc{id = DDocId}) ->
     Workers = fabric_util:submit_jobs(Shards, group_info, [DDocId]),
     RexiMon = fabric_util:create_monitors(Shards),
     USet = couch_util:set_from_list([{Id, N} || #shard{name = Id, node = N} <- Ushards]),
-    Acc = {fabric_dict:init(Workers, nil), [], USet},
+    Acc = {fabric_dict:init(Workers, nil), [], USet, length(Workers), undefined},
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc) of
-        {timeout, {WorkersDict, _, _}} ->
+        {timeout, {WorkersDict, Resps, _, Expected, _}} ->
             DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
             fabric_util:log_timeout(DefunctWorkers, "group_info"),
-            {error, timeout};
+            fabric_util:cleanup(DefunctWorkers),
+            finish(Resps, USet, Expected, timeout);
         Else ->
             Else
     after
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, {Counters, Resps, USet}) ->
-    case fabric_ring:node_down(NodeRef, Counters, Resps) of
-        {ok, Counters1} -> {ok, {Counters1, Resps, USet}};
-        error -> {error, {nodedown, <<"progress not possible">>}}
-    end;
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps, USet}) ->
-    case fabric_ring:handle_error(Shard, Counters, Resps) of
-        {ok, Counters1} -> {ok, {Counters1, Resps, USet}};
-        error -> {error, Reason}
-    end;
-handle_message({ok, Info}, Shard, {Counters, Resps, USet}) ->
-    case fabric_ring:handle_response(Shard, Info, Counters, Resps) of
-        {ok, {Counters1, Resps1}} ->
-            {ok, {Counters1, Resps1, USet}};
-        {stop, Resps1} ->
-            {stop, build_final_response(USet, Resps1)}
-    end;
-handle_message(Reason, Shard, {Counters, Resps, USet}) ->
-    case fabric_ring:handle_error(Shard, Counters, Resps) of
-        {ok, Counters1} -> {ok, {Counters1, Resps, USet}};
-        error -> {error, Reason}
+handle_message({ok, Info}, Shard, {Counters, Resps, USet, Expected, LastErr}) ->
+    Counters1 = fabric_dict:erase(Shard, Counters),
+    maybe_stop(Counters1, [{Shard, Info} | Resps], USet, Expected, LastErr);
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, {Counters, Resps, USet, Expected, LastErr}) ->
+    Counters1 = fabric_dict:filter(fun(#shard{node = N}, _) -> N =/= NodeRef end, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, LastErr);
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps, USet, Expected, _}) ->
+    Counters1 = fabric_dict:erase(Shard, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, Reason);
+handle_message(Reason, Shard, {Counters, Resps, USet, Expected, _}) ->
+    Counters1 = fabric_dict:erase(Shard, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, Reason).
+
+maybe_stop(Counters, Resps, USet, Expected, FinalErr) ->
+    case fabric_dict:size(Counters) of
+        0 ->
+            Error =
+                case FinalErr of
+                    undefined -> {nodedown, <<"progress not possible">>};
+                    _ -> FinalErr
+                end,
+            case finish(Resps, USet, Expected, Error) of
+                {ok, Result} -> {stop, Result};
+                {error, _} = E -> E
+            end;
+        _ ->
+            {ok, {Counters, Resps, USet, Expected, FinalErr}}
     end.
 
-build_final_response(USet, Responses) ->
-    AccF = fabric_dict:fold(
-        fun(#shard{name = Id, node = Node}, Info, Acc) ->
-            IsPreferred = sets:is_element({Id, Node}, USet),
-            dict:append(Id, {Node, IsPreferred, Info}, Acc)
+% Every range needs at least one reporting copy.
+finish(Resps, USet, Expected, Error) ->
+    Ranges = [{B, E} || {#shard{range = [B, E]}, _} <- Resps],
+    case mem3_util:get_ring(Ranges) of
+        [] -> {error, Error};
+        _ -> {ok, build_final_response(USet, Expected, Resps)}
+    end.
+
+build_final_response(USet, Expected, Resps) ->
+    ByRange = lists:foldl(
+        fun({#shard{range = Range, name = Id, node = Node}, Info}, Acc) ->
+            orddict:append(Range, {sets:is_element({Id, Node}, USet), Info}, Acc)
         end,
-        dict:new(),
-        Responses
+        orddict:new(),
+        Resps
     ),
-    Pending = aggregate_pending(AccF),
-    Infos = get_infos(AccF),
-    [{updates_pending, {Pending}} | merge_results(Infos)].
+    RangeCopies = [Copies || {_Range, Copies} <- ByRange],
+    Reps = [representative(Copies) || Copies <- RangeCopies],
+    PerRange = [
+        [{Pref, couch_util:get_value(pending_updates, Info)} || {Pref, Info} <- Copies]
+     || Copies <- RangeCopies
+    ],
+    Merged = merge_results(lists:append(Reps)),
+    case fabric_util:aggregate_pending(PerRange, Expected) of
+        undefined -> Merged;
+        Pending -> [{updates_pending, {Pending}} | Merged]
+    end.
 
-get_infos(Acc) ->
-    Values = [V || {_, V} <- dict:to_list(Acc)],
-    lists:flatten([Info || {_Node, _Pref, Info} <- lists:flatten(Values)]).
-
-aggregate_pending(Dict) ->
-    {Preferred, Total, Minimum} =
-        dict:fold(
-            fun(_Name, Results, {P, T, M}) ->
-                {Preferred, Total, Minimum} = calculate_pending(Results),
-                {P + Preferred, T + Total, M + Minimum}
-            end,
-            {0, 0, 0},
-            Dict
-        ),
-    [
-        {minimum, Minimum},
-        {preferred, Preferred},
-        {total, Total}
-    ].
-
-calculate_pending(Results) ->
-    lists:foldl(
-        fun
-            ({_Node, true, Info}, {P, T, V}) ->
-                Pending = couch_util:get_value(pending_updates, Info),
-                {P + Pending, T + Pending, min(Pending, V)};
-            ({_Node, false, Info}, {P, T, V}) ->
-                Pending = couch_util:get_value(pending_updates, Info),
-                {P, T + Pending, min(Pending, V)}
-        end,
-        {0, 0, infinity},
-        Results
-    ).
+% If there is a ushard pick that so we don't flop as much from one call to the next
+representative(Copies) ->
+    case [Info || {true, Info} <- Copies] of
+        [Info | _] ->
+            Info;
+        [] ->
+            [{_Pref, Info} | _] = Copies,
+            Info
+    end.
 
 merge_results(Info) ->
     Dict = lists:foldl(
@@ -161,3 +161,54 @@ merge_object(Objects) ->
         [],
         Dict
     ).
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+shard(Range, Node) ->
+    #shard{name = ?l2b(io_lib:format("~p", [Range])), node = Node, range = Range}.
+
+info(Seq, Pending) ->
+    [{update_seq, Seq}, {pending_updates, Pending}, {signature, ~"s"}].
+
+build_final_response_test() ->
+    R1 = [0, 10],
+    R2 = [11, 20],
+    R1N1 = shard(R1, n1),
+    R2N2 = shard(R2, n2),
+    USet = couch_util:set_from_list([
+        {R1N1#shard.name, n1}, {R2N2#shard.name, n2}
+    ]),
+    Resps = [
+        {R1N1, info(100, 0)},
+        {shard(R1, n2), info(94, 6)},
+        {R2N2, info(98, 2)},
+        {shard(R2, n3), info(96, 4)}
+    ],
+    Result = build_final_response(USet, 6, Resps),
+    % update_seq comes from the prefered set of shards only (100+98=198)
+    ?assertEqual(198, couch_util:get_value(update_seq, Result)),
+    ?assertEqual(~"s", couch_util:get_value(signature, Result)),
+    ?assertEqual(undefined, couch_util:get_value(pending_updates, Result)),
+    ?assertEqual(
+        {[
+            {minimum, 2},
+            {preferred, 2},
+            {total, 12},
+            {maximum, 10},
+            {copies, 4},
+            {copies_expected, 6}
+        ]},
+        couch_util:get_value(updates_pending, Result)
+    ).
+
+finish_requires_complete_ring_test() ->
+    A = [0, 2147483647],
+    B = [2147483648, 4294967295],
+    Info = info(1, 0),
+    ?assertEqual({error, boom}, finish([{shard(A, n1), Info}], sets:new(), 4, boom)),
+    ?assertMatch(
+        {ok, [_ | _]}, finish([{shard(A, n1), Info}, {shard(B, n2), Info}], sets:new(), 4, boom)
+    ).
+
+-endif.

@@ -213,6 +213,13 @@ defmodule Couch.DBTest do
     resp.body
   end
 
+  # Get Q*N
+  def shard_copies(db_name) do
+    resp = Couch.get("/#{db_name}/_shards")
+    assert resp.status_code == 200
+    Enum.reduce(resp.body["shards"], 0, fn {_range, nodes}, acc -> acc + length(nodes) end)
+  end
+
   def save(db_name, document) do
     resp = Couch.put("/#{db_name}/#{document["_id"]}", body: document)
     assert resp.status_code in [201, 202]
