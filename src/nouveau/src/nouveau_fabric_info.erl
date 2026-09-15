@@ -16,6 +16,8 @@
 -module(nouveau_fabric_info).
 
 -export([go/3]).
+% Used by fabric_index_info to merge its per copy results the same way
+-export([build_final_response/3]).
 
 -include_lib("mem3/include/mem3.hrl").
 
@@ -32,6 +34,8 @@ go(DbName, DDoc, IndexName) ->
 
 go(DbName, _DDoc, _IndexName, Index) ->
     Shards = mem3:shards(DbName),
+    Ushards = mem3:ushards(DbName),
+    USet = couch_util:set_from_list([{Id, N} || #shard{name = Id, node = N} <- Ushards]),
     Counters0 = lists:map(
         fun(#shard{} = Shard) ->
             Ref = rexi:cast(
@@ -46,63 +50,137 @@ go(DbName, _DDoc, _IndexName, Index) ->
     Workers = fabric_dict:fetch_keys(Counters),
     RexiMon = fabric_util:create_monitors(Workers),
 
-    Acc0 = {fabric_dict:init(Workers, nil), #{}},
-    try
-        fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0)
+    Acc0 = {Counters, [], USet, length(Workers), undefined},
+    try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
+        {timeout, {WorkersDict, Resps, _, Expected, _}} ->
+            DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
+            fabric_util:log_timeout(DefunctWorkers, "nouveau_info"),
+            finish(Resps, USet, Expected, timeout);
+        Else ->
+            Else
     after
         rexi_monitor:stop(RexiMon),
         fabric_util:cleanup(Workers)
     end.
 
-handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Worker, {Counters, Acc}) ->
-    case fabric_util:remove_down_workers(Counters, NodeRef) of
-        {ok, NewCounters} ->
-            {ok, {NewCounters, Acc}};
-        error ->
-            {error, {nodedown, <<"progress not possible">>}}
-    end;
-handle_message({rexi_EXIT, Reason}, Worker, {Counters, Acc}) ->
-    NewCounters = fabric_dict:erase(Worker, Counters),
-    case fabric_ring:is_progress_possible(NewCounters) of
-        true ->
-            {ok, {NewCounters, Acc}};
-        false ->
-            {error, Reason}
-    end;
-handle_message({ok, Info}, Worker, {Counters, Acc0}) ->
-    case fabric_dict:lookup_element(Worker, Counters) of
-        undefined ->
-            % already heard from someone else in this range
-            {ok, {Counters, Acc0}};
-        nil ->
-            C1 = fabric_dict:store(Worker, ok, Counters),
-            C2 = fabric_view:remove_overlapping_shards(Worker, C1),
-            Acc1 = maps:merge_with(fun merge_info/3, Info, Acc0),
-            case fabric_dict:any(nil, C2) of
-                true ->
-                    {ok, {C2, Acc1}};
-                false ->
-                    {stop, Acc1}
-            end
-    end;
-handle_message({error, Reason}, Worker, {Counters, Acc}) ->
-    NewCounters = fabric_dict:erase(Worker, Counters),
-    case fabric_ring:is_progress_possible(NewCounters) of
-        true ->
-            {ok, {NewCounters, Acc}};
-        false ->
-            {error, Reason}
-    end;
-handle_message({'EXIT', _}, Worker, {Counters, Acc}) ->
-    NewCounters = fabric_dict:erase(Worker, Counters),
-    case fabric_ring:is_progress_possible(NewCounters) of
-        true ->
-            {ok, {NewCounters, Acc}};
-        false ->
-            {error, {nodedown, <<"progress not possible">>}}
+handle_message({ok, Info}, Worker, {Counters, Resps, USet, Expected, LastErr}) ->
+    Counters1 = fabric_dict:erase(Worker, Counters),
+    maybe_stop(Counters1, [{Worker, Info} | Resps], USet, Expected, LastErr);
+handle_message(
+    {rexi_DOWN, _, {_, NodeRef}, _}, _Worker, {Counters, Resps, USet, Expected, LastErr}
+) ->
+    Counters1 = fabric_dict:filter(fun(#shard{node = N}, _) -> N =/= NodeRef end, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, LastErr);
+handle_message({rexi_EXIT, Reason}, Worker, {Counters, Resps, USet, Expected, _}) ->
+    Counters1 = fabric_dict:erase(Worker, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, Reason);
+handle_message({error, Reason}, Worker, {Counters, Resps, USet, Expected, _}) ->
+    Counters1 = fabric_dict:erase(Worker, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, Reason);
+handle_message(Reason, Worker, {Counters, Resps, USet, Expected, _}) ->
+    Counters1 = fabric_dict:erase(Worker, Counters),
+    maybe_stop(Counters1, Resps, USet, Expected, Reason).
+
+maybe_stop(Counters, Resps, USet, Expected, FinalErr) ->
+    case fabric_dict:size(Counters) of
+        0 ->
+            Error =
+                case FinalErr of
+                    undefined -> {nodedown, <<"progress not possible">>};
+                    _ -> FinalErr
+                end,
+            case finish(Resps, USet, Expected, Error) of
+                {ok, Result} -> {stop, Result};
+                {error, _} = E -> E
+            end;
+        _ ->
+            {ok, {Counters, Resps, USet, Expected, FinalErr}}
+    end.
+
+% Need at least one response per range for succcess
+finish(Resps, USet, Expected, Error) ->
+    Ranges = [{B, E} || {#shard{range = [B, E]}, _} <- Resps],
+    case mem3_util:get_ring(Ranges) of
+        [] -> {error, Error};
+        _ -> {ok, build_final_response(USet, Expected, Resps)}
+    end.
+
+build_final_response(USet, Expected, Resps) ->
+    ByRange = lists:foldl(
+        fun({#shard{range = Range, name = Id, node = Node}, Info}, Acc) ->
+            orddict:append(Range, {sets:is_element({Id, Node}, USet), Info}, Acc)
+        end,
+        orddict:new(),
+        Resps
+    ),
+    RangeCopies = [Copies || {_Range, Copies} <- ByRange],
+    Reps = [maps:remove(pending_updates, representative(Copies)) || Copies <- RangeCopies],
+    PerRange = [
+        [{Pref, maps:get(pending_updates, Info, undefined)} || {Pref, Info} <- Copies]
+     || Copies <- RangeCopies
+    ],
+    Merged = lists:foldl(
+        fun(Info, Acc) -> maps:merge_with(fun merge_info/3, Info, Acc) end,
+        #{},
+        Reps
+    ),
+    case fabric_util:aggregate_pending(PerRange, Expected) of
+        undefined -> Merged;
+        Pending -> Merged#{updates_pending => maps:from_list(Pending)}
+    end.
+
+% Prefer ushards if available first
+representative(Copies) ->
+    case [Info || {true, Info} <- Copies] of
+        [Info | _] ->
+            Info;
+        [] ->
+            [{_Pref, Info} | _] = Copies,
+            Info
     end.
 
 merge_info(signature, Val, Val) ->
     Val;
 merge_info(_Key, Val1, Val2) ->
     Val1 + Val2.
+
+-ifdef(TEST).
+-include_lib("couch/include/couch_eunit.hrl").
+
+shard(Range, Node) ->
+    #shard{name = list_to_binary(io_lib:format("~p", [Range])), node = Node, range = Range}.
+
+info(Docs, Pending) ->
+    #{~"num_docs" => Docs, pending_updates => Pending, signature => ~"s"}.
+
+build_final_response_test() ->
+    R1 = [0, 10],
+    R2 = [11, 20],
+    R1N1 = shard(R1, n1),
+    R2N2 = shard(R2, n2),
+    USet = couch_util:set_from_list([
+        {R1N1#shard.name, n1}, {R2N2#shard.name, n2}
+    ]),
+    Resps = [
+        {R1N1, info(100, 0)},
+        {shard(R1, n2), info(94, 6)},
+        {R2N2, info(98, 2)},
+        {shard(R2, n3), info(96, 4)}
+    ],
+    Result = build_final_response(USet, 6, Resps),
+    ?assertEqual(198, maps:get(~"num_docs", Result)),
+    ?assertEqual(~"s", maps:get(signature, Result)),
+    ?assertNot(maps:is_key(pending_updates, Result)),
+    ?assertEqual(
+        #{
+            minimum => 2,
+            preferred => 2,
+            total => 12,
+            maximum => 10,
+            copies => 4,
+            copies_expected => 6
+        },
+        maps:get(updates_pending, Result)
+    ).
+
+-endif.

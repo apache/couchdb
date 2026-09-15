@@ -44,5 +44,6 @@ Where ``{db}`` is the name of any database.
     changes
     compact
     cleanup
+    index_info
     security
     misc
