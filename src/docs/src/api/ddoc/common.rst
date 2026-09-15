@@ -182,6 +182,14 @@
         {
             "name": "recipe",
             "view_index": {
+                "updates_pending": {
+                    "minimum": 0,
+                    "preferred": 0,
+                    "total": 0,
+                    "maximum": 0,
+                    "copies": 6,
+                    "copies_expected": 6
+                },
                 "compact_running": false,
                 "language": "python",
                 "purge_seq": 0,
@@ -222,3 +230,24 @@ The response from :get:`/{db}/_design/{ddoc}/_info` contains
   this design document
 * **waiting_commit** (*boolean*): Indicates if there are outstanding commits
   to the underlying database that need to processed
+* **updates_pending** (*object*): Information about the pending updates for
+  this index calculated over all available copies of all the shards.
+
+  * **minimum** (*number*): Most up to date copy of each
+    range. ``0`` means at least one complete copy exists for every range.
+  * **preferred** (*number*): Backlog of stable=true set of shard copies.
+  * **total** (*number*): Backlog over all copies added up.
+  * **maximum** (*number*): THe least up to date copy of each
+    range. ``0`` means the index is fully built.
+  * **copies** (*number*): The number shard which reported an answer. Shard may
+    be unrecheable or in maintenance mode. In that case they won't be included
+    in the results. Compare with ``copies_expected`` number.
+  * **copies_expected** (*number*): Expected number of shard responses. If
+    ``copies`` is smaller than this, the results maybe partial and ``maximum``
+    for instance may not represent the true backlog.
+
+  .. versionchanged:: 3.6
+      Information is now gathered from every shard copy instead of the first
+      responding copy of each range. ``maximum``, ``copies`` and
+      ``copies_expected`` were added and ``total`` now adds up all copies.
+

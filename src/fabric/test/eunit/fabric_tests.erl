@@ -402,9 +402,12 @@ design_docs_test_() ->
         fun(_) -> meck:unload() end,
         [
             ?TDEF_FE(t_design_docs_configuration),
-            ?TDEF_FE(t_design_docs_configuration_io_priority)
+            ?TDEF_FE(t_design_docs_configuration_io_priority),
+            ?TDEF_FE(t_design_docs_meta)
         ]
     }.
+
+-define(DDOC_RES, {ok, {[{total, 2}, {offset, 1}], [{[{<<"_id">>, <<"_design/d">>}]}]}}).
 
 t_design_docs_configuration(_) ->
     DbName = <<"db">>,
@@ -415,9 +418,9 @@ t_design_docs_configuration(_) ->
             extra = [{namespace, <<"_design">>}, {view_row_map, true}]
         },
     meck:expect(
-        fabric, all_docs, [DbName, AdminCtx, '_', [], QueryArgs], meck:val(all_docs_result)
+        fabric, all_docs, [DbName, AdminCtx, '_', '_', QueryArgs], meck:val(?DDOC_RES)
     ),
-    ?assertEqual(all_docs_result, fabric:design_docs(DbName)).
+    ?assertEqual({ok, [{[{<<"_id">>, <<"_design/d">>}]}]}, fabric:design_docs(DbName)).
 
 t_design_docs_configuration_io_priority(_) ->
     DbName = <<"db">>,
@@ -428,10 +431,21 @@ t_design_docs_configuration_io_priority(_) ->
             extra = [{namespace, <<"_design">>}, {io_priority, io_priority}, {view_row_map, true}]
         },
     meck:expect(
-        fabric, all_docs, [DbName, AdminCtx, '_', [], QueryArgs], meck:val(all_docs_result)
+        fabric, all_docs, [DbName, AdminCtx, '_', '_', QueryArgs], meck:val(?DDOC_RES)
     ),
     put(io_priority, io_priority),
-    ?assertEqual(all_docs_result, fabric:design_docs(DbName)).
+    ?assertEqual({ok, [{[{<<"_id">>, <<"_design/d">>}]}]}, fabric:design_docs(DbName)).
+
+t_design_docs_meta(_) ->
+    DbName = <<"db">>,
+    meck:expect(fabric, all_docs, 5, meck:val(?DDOC_RES)),
+    ?assertEqual(
+        {ok, [{total, 2}, {offset, 1}], [{[{<<"_id">>, <<"_design/d">>}]}]},
+        fabric:design_docs(DbName, #mrargs{})
+    ),
+    meck:expect(fabric, all_docs, 5, meck:val({error, timeout})),
+    ?assertEqual({error, timeout}, fabric:design_docs(DbName, #mrargs{})),
+    ?assertEqual({error, timeout}, fabric:design_docs(DbName)).
 
 query_view_test_() ->
     {

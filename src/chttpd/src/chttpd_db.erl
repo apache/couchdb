@@ -26,6 +26,7 @@
     handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3,
+    handle_index_info_req/2,
     handle_view_cleanup_req/2,
     update_doc/4,
     http_code_from_status/1,
@@ -80,6 +81,8 @@
         T == <<"_find">> orelse
         T == <<"_explain">>)
 ).
+
+-define(MAX_DDOC_NUM_FOR_INDEX_INFO, 1000).
 
 % Database request handlers
 handle_request(#httpd{path_parts = [DbName | RestParts], method = Method} = Req) ->
@@ -463,6 +466,101 @@ handle_design_info_req(#httpd{method = 'GET'} = Req, Db, #doc{} = DDoc) ->
     );
 handle_design_info_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET").
+
+% Get index status info for all design docs in the database. Takes
+% `type=view|search|nouveau` as a filtering parameter as well as wll the
+% _design_doc paging parameters: startkey, endkey, limit, etc.
+handle_index_info_req(#httpd{method = 'GET', path_parts = [_, _]} = Req, Db) ->
+    Args = couch_mrview_http:parse_params(Req, undefined),
+    index_info_req(Req, Db, Args);
+handle_index_info_req(#httpd{method = 'POST', path_parts = [_, _]} = Req, Db) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    Keys =
+        case couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)) of
+            undefined -> throw({bad_request, "`keys` member must exist."});
+            Keys0 -> Keys0
+        end,
+    Args = couch_mrview_http:parse_params(Req, Keys),
+    index_info_req(Req, Db, Args);
+handle_index_info_req(#httpd{path_parts = [_, _]} = Req, _Db) ->
+    send_method_not_allowed(Req, "GET,HEAD,POST");
+handle_index_info_req(Req, _Db) ->
+    chttpd:send_error(Req, not_found).
+
+index_info_req(Req, Db, #mrargs{keys = Keys} = Args) ->
+    Types = parse_types(Req),
+    Default = ?MAX_DDOC_NUM_FOR_INDEX_INFO,
+    Max = config:get_integer("chttpd", "max_ddoc_number_for_index_info_req", Default),
+    case is_list(Keys) andalso length(Keys) > Max of
+        true -> throw({bad_request, too_many_keys});
+        false -> ok
+    end,
+    DbName = couch_db:name(Db),
+    case fabric:get_index_info(DbName, Types, Args, [{max_ddocs, Max}]) of
+        {ok, Meta, ByType} ->
+            send_json(Req, 200, {meta_to_json(Meta) ++ index_info_to_json(ByType)});
+        {error, too_many_design_docs} ->
+            throw({bad_request, too_many_design_docs})
+    end.
+
+% Since we're gathering index info based on design docs, total_rows and
+% offset counts design docs. For a `keys` request the offset will be null.
+meta_to_json(Meta) ->
+    [
+        {total_rows, couch_util:get_value(total, Meta, null)},
+        {offset, couch_util:get_value(offset, Meta, null)}
+    ].
+
+% Types for _index_info. Must be one or more of view, search, nouveau
+parse_types(Req) ->
+    TypeArgs = [V || {K, V} <- chttpd:qs(Req), K == "type"],
+    case TypeArgs of
+        [] ->
+            [view, search, nouveau];
+        [_ | _] ->
+            Tokens = lists:flatmap(fun(V) -> string:tokens(V, ",") end, TypeArgs),
+            case lists:usort(lists:map(fun parse_type/1, Tokens)) of
+                [] -> throw({query_parse_error, <<"`type` must not be empty">>});
+                Types -> [T || T <- [view, search, nouveau], lists:member(T, Types)]
+            end
+    end.
+
+parse_type("view") ->
+    view;
+parse_type("search") ->
+    search;
+parse_type("nouveau") ->
+    nouveau;
+parse_type(Other) ->
+    Msg = io_lib:format("Invalid type: ~s. Must be view, search or nouveau", [Other]),
+    throw({query_parse_error, ?l2b(Msg)}).
+
+% Return one list per index type. Each entry has the ddoc and either a name or
+% views list (view indexes are actually groups of views building together). If
+% index info is succesfully returned there is an "ok": true entry. If it
+% couldn't be returned all copies are not responding or index subsystem is
+% disabled) "ok":false is returned for that index along with an "error" and
+% "reason" field.
+index_info_to_json(ByType) ->
+    [{idx_type(Type), idx_entries(Type, ByType)} || Type <- [view, search, nouveau]].
+
+idx_entries(Type, ByType) ->
+    [idx_info(E) || E <- couch_util:get_value(Type, ByType, [])].
+
+idx_type(view) -> view_indexes;
+idx_type(search) -> search_indexes;
+idx_type(nouveau) -> nouveau_indexes.
+
+% view and search infos are {[...]} ejson objects, nouveau's is a map. Both
+% encode as they are.
+idx_info({Ident, {ok, Info}}) ->
+    {Ident ++ [{ok, true}, {info, Info}]};
+idx_info({Ident, {error, Error}}) ->
+    {Ident ++ [{ok, false}] ++ errobj(Error)}.
+
+errobj(Error) ->
+    {_Code, ErrorStr, ReasonStr} = chttpd:error_info(Error),
+    [{error, ErrorStr}, {reason, ReasonStr}].
 
 create_db_req(#httpd{} = Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
@@ -2659,6 +2757,90 @@ monitor_attachments_test_() ->
         Atts = [couch_att:new([{data, stub}])],
         ?_assertEqual([], monitor_attachments(Atts))
     end}.
+
+index_info_to_json_test_() ->
+    % {error, Reason} become {"ok": false, "error":.., "reason":..}
+    % {ok, Info} entries will have an "info" object returned
+    Oops = {service_unavailable, <<"Search is not available">>},
+    Pending = [
+        {minimum, 0},
+        {preferred, 0},
+        {total, 2},
+        {maximum, 2},
+        {copies, 6},
+        {copies_expected, 6}
+    ],
+    D = <<"_design/d">>,
+    View = {[{updates_pending, {Pending}}, {update_seq, 1}]},
+    Search = {[{updates_pending, {Pending}}, {doc_count, 2}]},
+    Nouveau = #{num_docs => 3, updates_pending => maps:from_list(Pending)},
+    Res = [
+        {view, [
+            {[{ddoc, D}, {views, [<<"v">>]}], {ok, View}},
+            {[{ddoc, <<"_design/e">>}, {views, []}], {error, not_found}}
+        ]},
+        {search, [
+            {[{ddoc, D}, {name, <<"i">>}], {ok, Search}},
+            {[{ddoc, D}, {name, <<"j">>}], {error, Oops}}
+        ]},
+        {nouveau, [{[{ddoc, D}, {name, <<"n">>}], {ok, Nouveau}}]}
+    ],
+    Expected = [
+        {view_indexes, [
+            {[{ddoc, D}, {views, [<<"v">>]}, {ok, true}, {info, View}]},
+            {[
+                {ddoc, <<"_design/e">>},
+                {views, []},
+                {ok, false},
+                {error, <<"not_found">>},
+                {reason, <<"missing">>}
+            ]}
+        ]},
+        {search_indexes, [
+            {[{ddoc, D}, {name, <<"i">>}, {ok, true}, {info, Search}]},
+            {[
+                {ddoc, D},
+                {name, <<"j">>},
+                {ok, false},
+                {error, <<"service unavailable">>},
+                {reason, <<"Search is not available">>}
+            ]}
+        ]},
+        {nouveau_indexes, [
+            {[{ddoc, D}, {name, <<"n">>}, {ok, true}, {info, Nouveau}]}
+        ]}
+    ],
+    ?_assertEqual(Expected, index_info_to_json(Res)).
+
+meta_to_json_test_() ->
+    [
+        ?_assertEqual(
+            [{total_rows, 3}, {offset, 1}], meta_to_json([{total, 3}, {offset, 1}])
+        ),
+        ?_assertEqual(
+            [{total_rows, 3}, {offset, null}], meta_to_json([{total, 3}, {offset, null}])
+        ),
+        ?_assertEqual([{total_rows, null}, {offset, null}], meta_to_json([]))
+    ].
+
+index_info_type_filter_test_() ->
+    ByType = [{search, [{[{ddoc, <<"_design/d">>}, {name, <<"i">>}], {error, not_found}}]}],
+    ?_assertEqual(
+        [
+            {view_indexes, []},
+            {search_indexes, [
+                {[
+                    {ddoc, <<"_design/d">>},
+                    {name, <<"i">>},
+                    {ok, false},
+                    {error, <<"not_found">>},
+                    {reason, <<"missing">>}
+                ]}
+            ]},
+            {nouveau_indexes, []}
+        ],
+        index_info_to_json(ByType)
+    ).
 
 parse_partitioned_opt_test_() ->
     {
