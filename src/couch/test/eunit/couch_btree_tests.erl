@@ -39,7 +39,7 @@ setup_kvs_with_cache(_) ->
     {Fd, Btree}.
 
 setup_kvs_with_small_chunk_size(_) ->
-    % Less than a 1/4 than current default 1279
+    % Well below the default chunk size
     config:set("couchdb", "btree_chunk_size", "300", false),
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     {ok, Btree} = couch_btree:open(nil, Fd, [
@@ -49,7 +49,7 @@ setup_kvs_with_small_chunk_size(_) ->
     {Fd, Btree}.
 
 setup_kvs_with_large_chunk_size(_) ->
-    % About 4x than current default 1279
+    % Above the default chunk size
     config:set("couchdb", "btree_chunk_size", "5000", false),
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     {ok, Btree} = couch_btree:open(nil, Fd, [
@@ -771,3 +771,53 @@ test_traversal_callbacks(Btree, _KeyValues) ->
     % With 250 items the root is a kp. Always skipping should reduce to true.
     {ok, _, true} = couch_btree:fold(Btree, FoldFun, true, [{dir, fwd}]),
     ok.
+
+depth_test_() ->
+    {
+        setup,
+        fun() -> test_util:start(?MODULE, [ioq]) end,
+        fun test_util:stop/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                fun should_have_zero_depth_for_empty_btree/1,
+                fun should_have_depth_one_after_insert/1,
+                fun should_depth_increase_with_more_keys/1,
+                fun should_depth_return_zero_after_all_keys_removed/1
+            ]
+        }
+    }.
+
+should_have_zero_depth_for_empty_btree({_, Btree}) ->
+    ?_assertEqual(0, couch_btree:depth(Btree)).
+
+should_have_depth_one_after_insert({_, Btree}) ->
+    ?_test(begin
+        {ok, Btree1} = couch_btree:add_remove(Btree, [{1, a}], []),
+        ?assertEqual(1, couch_btree:depth(Btree1))
+    end).
+
+should_depth_increase_with_more_keys({_, Btree}) ->
+    ?_test(begin
+        config:set("couchdb", "btree_chunk_size", "1279", false),
+        % A few keys fit in a single kv_node
+        SmallKVs = [{K, K} || K <- lists:seq(1, 5)],
+        {ok, Btree1} = couch_btree:add_remove(Btree, SmallKVs, []),
+        ?assertEqual(1, couch_btree:depth(Btree1)),
+        % More kv should spill into level 2
+        LargeKVs = [{K, K} || K <- lists:seq(1, ?ROWS)],
+        {ok, Btree2} = couch_btree:add_remove(Btree1, LargeKVs, []),
+        ?assertEqual(2, couch_btree:depth(Btree2))
+    end).
+
+should_depth_return_zero_after_all_keys_removed({_, Btree}) ->
+    ?_test(begin
+        KVs = [{K, K} || K <- lists:seq(1, 10)],
+        {ok, Btree1} = couch_btree:add_remove(Btree, KVs, []),
+        ?assertEqual(1, couch_btree:depth(Btree1)),
+        Keys = [K || {K, _} <- KVs],
+        {ok, Btree2} = couch_btree:add_remove(Btree1, [], Keys),
+        ?assertEqual(0, couch_btree:depth(Btree2))
+    end).

@@ -62,6 +62,15 @@
     print_tree/2
 ]).
 
+-export([
+    btree_depths/1,
+    btree_depths_local/1
+]).
+
+-include_lib("couch/include/couch_db.hrl").
+-include("couch_db_int.hrl").
+-include("couch_bt_engine.hrl").
+
 -define(PING_TIMEOUT_IN_MS, 60000).
 
 -type throw(_Reason) :: no_return().
@@ -105,7 +114,10 @@ help() ->
         dead_nodes,
         ping,
         ping_nodes,
-        node_events
+        node_events,
+        btree_depths,
+        btree_depths_local,
+        btree_depths_cluster
     ].
 
 -spec help(Function :: function_name()) -> ok.
@@ -508,6 +520,22 @@ help(node_events) ->
         Return the list of nodeup/nodedown events for each node in the cluster.
 
         ---
+    ", []);
+help(btree_depths) ->
+    io:format("
+    btree_depths(ShardName)
+    -----------------------
+
+    Get btree depths of ID and Seq trees.
+    ---
+    ", []);
+help(btree_depths_local) ->
+    io:format("
+    btree_depths_local(DbName)
+    --------------------------
+
+    Get btree depths of ID and Seq trees for all local shards of db.
+    ---
     ", []);
 help(Unknown) ->
     io:format("Unknown function: `~p`. Please try one of the following:~n", [Unknown]),
@@ -1006,6 +1034,35 @@ ping_nodes(Nodes) ->
 
 ping_nodes(Nodes, Timeout) ->
     mem3:ping_nodes(Nodes, Timeout).
+
+btree_depths(DbName) when is_binary(DbName) ->
+    couch_util:with_db(DbName, fun db_btree_depths/1).
+
+btree_depths_local(DbName) when is_binary(DbName) ->
+    try mem3:local_shards(DbName) of
+        Shards ->
+            [shard_btree_depths(mem3:name(S)) || S <- Shards]
+    catch
+        error:database_does_not_exist ->
+            {error, database_does_not_exist}
+    end.
+
+shard_btree_depths(ShardName) ->
+    try
+        {ShardName, btree_depths(ShardName)}
+    catch
+        Tag:Err ->
+            {ShardName, {error, {Tag, Err}}}
+    end.
+
+db_btree_depths(#db{engine = {couch_bt_engine, St}}) ->
+    Trees = [
+        {id_tree, St#st.id_tree},
+        {seq_tree, St#st.seq_tree}
+    ],
+    [{Name, couch_btree:depth(Tree)} || {Name, Tree} <- Trees, couch_btree:is_btree(Tree)];
+db_btree_depths(#db{engine = {Engine, _}}) ->
+    {error, {unsupported_engine, Engine}}.
 
 node_events() ->
     mem3_distribution:events().
