@@ -298,7 +298,7 @@ updated with terminal states of `failed` and `completed`. Users should use
 
 Advantages:
 
- * Simplicity: re-using `couch_jobs` means having a lot less code to maintain
+ * Simplicity: reusing `couch_jobs` means having a lot less code to maintain
    in `couch_replicator`. In the draft implementation there are about 3000
    lines of code saved compared to the replicator application in CouchDB 3.x
 

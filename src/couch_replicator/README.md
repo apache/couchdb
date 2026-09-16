@@ -25,7 +25,7 @@ A description of each child:
     interface is `acquire/1` and `release/1`. The general idea is once a
     connection is established, it is kept around for
     `replicator.connection_close_interval` milliseconds in case another
-    replication task wants to re-use it. It is worth pointing out how linking
+    replication task wants to reuse it. It is worth pointing out how linking
     and monitoring is handled: workers are linked to the connection pool when
     they are created. If they crash, the connection pool will receive an 'EXIT'
     event and clean up after the worker. The connection pool also monitors

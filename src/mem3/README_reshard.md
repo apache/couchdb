@@ -86,7 +86,7 @@ These are mostly random notes about various modules involved in resharding. Most
 
 * `mem3_reshard_job_sup` : Simple one for one supervisor which keeps track of running jobs.
 
-* `mem3_reshard_store` : State persistence module. It knows how to save/restore `#job{}` and `#state{}` records to/from `_local` docs. It is also re-used for serializing `#job{}` into ejson by the HTTP API module.
+* `mem3_reshard_store` : State persistence module. It knows how to save/restore `#job{}` and `#state{}` records to/from `_local` docs. It is also reused for serializing `#job{}` into ejson by the HTTP API module.
 
 * `mem3_reshard_validate` : Validate that source exists, target ranges don't have gaps in them, etc.
 
