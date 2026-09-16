@@ -17,11 +17,11 @@
 -export([fold_reduce/4, lookup/2, set_options/2]).
 -export([is_btree/1, get_state/1, get_fd/1, get_reduce_fun/1]).
 -export([extract/2, assemble/3, less/3]).
--export([get_chunk_size/0]).
+-export([get_chunk_size/0, depth/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
--define(DEFAULT_CHUNK_SIZE, 1279).
+-define(DEFAULT_CHUNK_SIZE, 4096).
 
 % For the btree cache, the priority of the root node will be
 % this value. The priority is roughly how many cleanup interval
@@ -157,6 +157,18 @@ size(#btree{root = {_P, _Red}}) ->
     nil;
 size(#btree{root = {_P, _Red, Size}}) ->
     Size.
+
+depth(#btree{root = nil}) ->
+    0;
+depth(#btree{} = Bt) ->
+    depth(Bt, Bt#btree.root, 1).
+
+depth(Bt, Node, Depth) ->
+    Pointer = element(1, Node),
+    case get_node(Bt, Pointer, Depth) of
+        {kv_node, _} -> Depth;
+        {kp_node, [{_Key, First} | _]} -> depth(Bt, First, Depth + 1)
+    end.
 
 get_group_fun(Bt, Options) ->
     case couch_util:get_value(key_group_level, Options) of
