@@ -269,8 +269,9 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
 maybe_decompress_response(_Headers, <<>>) ->
     <<>>;
 maybe_decompress_response(Headers, Body) ->
-    case lists:keyfind("content-encoding", 1, [{string:to_lower(K), V} || {K, V} <- Headers]) of
-        {_, "gzip"} ->
+    MochiHeaders = mochiweb_headers:make(Headers),
+    case mochiweb_headers:get_value("content-encoding", MochiHeaders) of
+        "gzip" ->
             couch_stats:increment_counter([couch_replicator, responses_decompressed, gzip]),
             zlib:gunzip(Body);
         _ ->

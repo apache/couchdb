@@ -158,8 +158,9 @@ Replicator Database Configuration
 
         .. versionadded:: 3.6
 
-        Decompress gzip-encoded inbound response bodies (``_bulk_docs``,
-        ``_revs_diff``, ``_bulk_get``) received from the replication source.
+        Decompress gzip-encoded inbound response bodies (``_bulk_get``)
+        received from the replication source, and (``_bulk_docs``,
+        ``_revs_diff``) received from the replication target.
         The replicator always sends ``Accept-Encoding: gzip`` and automatically
         decompresses gzip responses received from the remote server. This
         behaviour is always enabled.
