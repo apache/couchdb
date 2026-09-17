@@ -733,6 +733,26 @@ maybe_decompress(Httpd, Body) ->
             throw({bad_ctype, [Else, " is not a supported content encoding."]})
     end.
 
+maybe_compress_response(#httpd{mochi_req = MochiReq} = _Req, Headers, Body) when
+    is_binary(Body) orelse is_list(Body)
+->
+    Enabled = config:get_boolean("chttpd", "response_compression", false),
+    case Enabled of
+        false ->
+            {Headers, Body};
+        true ->
+            Encodings = MochiReq:accepted_encodings(["gzip", "identity"]),
+            case lists:member("gzip", Encodings) of
+                true ->
+                    Compressed = zlib:gzip(Body),
+                    {[{"Content-Encoding", "gzip"} | Headers], Compressed};
+                false ->
+                    {Headers, Body}
+            end
+    end;
+maybe_compress_response(_Req, Headers, Body) ->
+    {Headers, Body}.
+
 doc_etag(#doc{id = Id, body = Body, revs = {Start, [DiskRev | _]}}) ->
     doc_etag(Id, Body, {Start, DiskRev}).
 
@@ -1387,9 +1407,10 @@ basic_headers_no_cors(Req, Headers) ->
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
     {ok, {Req1, Code1, Headers1, Args1}} = before_response(Req0, Code0, Headers0, Args0),
+    {Headers2, Args2} = maybe_compress_response(Req1, Headers1, Args1),
     couch_stats:increment_counter([couchdb, httpd_status_codes, Code1]),
     log_request(Req0, Code1),
-    respond_(Req1, Code1, Headers1, Args1, Type).
+    respond_(Req1, Code1, Headers2, Args2, Type).
 
 before_response(Req0, Code0, Headers0, {json, JsonObj}) ->
     {ok, {Req1, Code1, Headers1, Body1}} =
