@@ -258,6 +258,22 @@ Base CouchDB Options
             [couchdb]
             js_engine = spidermonkey
 
+    .. config:option:: validate_vdu :: Enable checking of ``validate_doc_update``
+
+        .. versionadded:: TODO
+
+        When set to ``true``, the ``validate_doc_update`` field in
+        ``javascript`` design docs will be validated when the docs are updated.
+        For ``javascript`` design docs, the field must contain a well-formed
+        JavaScript function. For design docs where the ``language`` is
+        ``query``, the ``validate_doc_update`` field is always validated to make
+        sure it contains a correctly structured Mango selector, whether this
+        option is set or not. This option exists for backwards compatibility
+        since ``javascript`` design docs were not always checked in this way. ::
+
+            [couchdb]
+            validate_vdu = true
+
     .. config:option:: time_seq_min_time :: Minimum time-seq threshold
 
         .. versionchanged:: 3.6
