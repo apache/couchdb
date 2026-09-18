@@ -177,6 +177,53 @@ defmodule NouveauTest do
     assert Map.get(info, "num_docs") > 0
     assert Map.get(info, "update_seq") > 0
     assert String.length(Map.get(info, "signature")) > 0
+
+    pending = Map.get(info, "updates_pending")
+
+    assert Enum.sort(Map.keys(pending)) ==
+             ["copies", "copies_expected", "maximum", "minimum", "preferred", "total"]
+
+    copies = shard_copies(db_name)
+    assert pending["copies"] == copies
+    assert pending["copies_expected"] == copies
+
+    # after the query builds it we should have 0 for total and maximum
+    retry_until(fn ->
+      resp = Couch.get(url)
+      assert_status_code(resp, 200)
+      pending = resp.body["search_index"]["updates_pending"]
+      pending["maximum"] == 0 and pending["total"] == 0
+    end)
+  end
+
+  @tag :with_db
+  test "index info matches nouveau info", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    # this builds the index
+    url = "/#{db_name}/_design/foo/_nouveau/bar"
+    resp = Couch.get(url, query: %{q: "*:*"})
+    assert_status_code(resp, 200)
+
+    # consistency assert that _index_info is the same as _nouveau_info
+    retry_until(fn ->
+      resp = Couch.get("/#{db_name}/_index_info", query: %{type: "nouveau"})
+      assert_status_code(resp, 200)
+      # we filter by typo, other types should be []
+      assert resp.body["view_indexes"] == []
+      assert resp.body["search_indexes"] == []
+      [entry] = resp.body["nouveau_indexes"]
+      assert entry["ddoc"] == "_design/foo"
+      assert entry["name"] == "bar"
+      assert entry["ok"] == true
+
+      resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
+      assert_status_code(resp, 200)
+      info = entry["info"]
+      info["updates_pending"]["maximum"] == 0 and info == resp.body["search_index"]
+    end)
   end
 
   @tag :with_db
