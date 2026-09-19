@@ -390,27 +390,31 @@ maybe_remonitor_cpid(#state{} = State, DbName, Reason) when is_binary(DbName) ->
     #state{name = Name, active = Active} = State,
     case couch_db:open_int(DbName, []) of
         {ok, Db} ->
-            try couch_db:get_compactor_pid_sync(Db) of
-                nil ->
-                    LogMsg = "~s : exit for compaction of ~p: ~p",
-                    LogArgs = [Name, smoosh_utils:stringify(DbName), Reason],
-                    couch_log:warning(LogMsg, LogArgs),
-                    re_enqueue(DbName),
-                    State;
-                CPid when is_pid(CPid) ->
-                    monitor(process, CPid),
-                    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
-                    LogMsg = "~s: ~s compaction already running. Re-monitor Pid ~p",
-                    LogArgs = [Name, smoosh_utils:stringify(DbName), CPid],
-                    couch_log:Level(LogMsg, LogArgs),
-                    State#state{active = Active#{DbName => CPid}}
+            try
+                case couch_db:get_compactor_pid_sync(Db) of
+                    nil ->
+                        LogMsg = "~s : exit for compaction of ~p: ~p",
+                        LogArgs = [Name, smoosh_utils:stringify(DbName), Reason],
+                        couch_log:warning(LogMsg, LogArgs),
+                        re_enqueue(DbName),
+                        State;
+                    CPid when is_pid(CPid) ->
+                        monitor(process, CPid),
+                        Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+                        LogMsg = "~s: ~s compaction already running. Re-monitor Pid ~p",
+                        LogArgs = [Name, smoosh_utils:stringify(DbName), CPid],
+                        couch_log:Level(LogMsg, LogArgs),
+                        State#state{active = Active#{DbName => CPid}}
+                end
             catch
                 _:Error ->
-                    LogMsg = "~s: error remonitoring db compaction ~p error:~p",
-                    LogArgs = [Name, smoosh_utils:stringify(DbName), Error],
-                    couch_log:warning(LogMsg, LogArgs),
+                    ErrLogMsg = "~s: error remonitoring db compaction ~p error:~p",
+                    ErrLogArgs = [Name, smoosh_utils:stringify(DbName), Error],
+                    couch_log:warning(ErrLogMsg, ErrLogArgs),
                     re_enqueue(DbName),
                     State
+            after
+                couch_db:close(Db)
             end;
         Error = {not_found, no_db_file} ->
             LogMsg = "~s : exit for compaction of ~p: ~p",

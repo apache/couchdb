@@ -34,7 +34,8 @@ init(_Args) ->
         worker(couch_replicator_connection),
         worker(couch_replicator_rate_limiter),
         worker(couch_replicator_scheduler),
-        worker(couch_replicator_doc_processor)
+        worker(couch_replicator_doc_processor),
+        worker(couch_replicator_auth)
     ],
     SupFlags = #{strategy => rest_for_one, intensity => 10, period => 1},
     {ok, {SupFlags, Children}}.

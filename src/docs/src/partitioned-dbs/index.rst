@@ -282,7 +282,7 @@ id.
         if(doc._id.indexOf(":sensor-reading-") < 0) {
             return;
         }
-        for(var r in doc.readings) {
+        for(var r of doc.readings) {
             emit([doc.sensor_id, r[0]], r[1])
         }
     }
@@ -308,10 +308,10 @@ After uploading our design document, we can try out a partitioned query:
     }
     shell> curl http://adm:pass@127.0.0.1:5984/my_new_db/_partition/sensor-260/_design/sensor-readings/_view/by_sensor
     {"total_rows":4,"offset":0,"rows":[
-    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","0"],"value":null},
-    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","1"],"value":null},
-    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","2"],"value":null},
-    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","3"],"value":null}
+    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","2019-01-21T00:00:00"],"value":0.15},
+    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","2019-01-21T06:00:00"],"value":0.14},
+    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","2019-01-21T12:00:00"],"value":0.16},
+    {"id":"sensor-260:sensor-reading-ca33c748-2d2c-4ed1-8abf-1bca4d9d03cf","key":["sensor-260","2019-01-21T18:00:00"],"value":0.11}
     ]}
 
 Hooray! Our first partitioned query. For experienced users, that may not

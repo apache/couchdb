@@ -442,19 +442,34 @@ verify_index_exists(DbName, Props) ->
                 couch_util:with_db(DbName, fun(Db) ->
                     case couch_db:get_design_doc(Db, DDocId) of
                         {ok, #doc{} = DDoc} ->
-                            {ok, IdxState} = dreyfus_index:design_doc_to_index(
-                                DbName, DDoc, IndexName
-                            ),
-                            IdxState#index.sig == Sig;
+                            case dreyfus_index:design_doc_to_index(DbName, DDoc, IndexName) of
+                                {ok, #index{sig = IdxSig}} ->
+                                    IdxSig == Sig;
+                                {error, _} ->
+                                    false
+                            end;
                         {not_found, _} ->
-                            false
+                            false;
+                        Else ->
+                            cannot_verify(DbName, Props, Else)
                     end
                 end)
         end
     catch
-        _:_ ->
-            false
+        Tag:Reason ->
+            cannot_verify(DbName, Props, {Tag, Reason})
     end.
+
+% Couldn't verify index exists when checking purge client validity. There may
+% be a timeout or or db is not available. In such cases assume the client is
+% valid to avoid the chance of compacting away purge before valid clients saw
+% and processed them.
+cannot_verify(DbName, Props, Error) ->
+    DDocId = couch_util:get_value(<<"ddoc_id">>, Props),
+    IndexName = couch_util:get_value(<<"indexname">>, Props),
+    Fmt = "~p : can't verify purge client db:~p ddoc:~p index:~p error:~p, assume exists",
+    couch_log:warning(Fmt, [?MODULE, DbName, DDocId, IndexName, Error]),
+    true.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

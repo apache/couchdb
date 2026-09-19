@@ -19,7 +19,7 @@
 -include_lib("kernel/include/file.hrl").
 
 property_test_() ->
-    ?EUNIT_QUICKCHECK(60, 25000).
+    ?EUNIT_QUICKCHECK(90, 25000).
 
 -define(SIZE_LIMIT, 5000).
 -define(CFILE_FD, cfile_fd).

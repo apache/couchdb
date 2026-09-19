@@ -89,6 +89,23 @@ open_db_test_() ->
         }
     }.
 
+all_dbs_active_test_() ->
+    {
+        "all_dbs_active metric tests",
+        {
+            setup,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun() -> ?tempdb() end,
+                [
+                    fun should_bump_all_dbs_active_metric/1
+                ]
+            }
+        }
+    }.
+
 should_create_db(DbName) ->
     ?_test(begin
         {ok, Before} = couch_server:all_databases(),
@@ -197,6 +214,18 @@ locking_should_work(DbName) ->
         couch_server:unlock(DbName),
         {ok, Db1} = couch_db:open(DbName, [{create_if_missing, true}]),
         ok = couch_db:close(Db1)
+    end).
+
+should_bump_all_dbs_active_metric(DbName) ->
+    ?_test(begin
+        Metric = [couchdb, couch_server, all_dbs_active],
+        Shard = couch_server:couch_server(DbName),
+        ok = gen_server:call(Shard, {set_max_dbs_open, 0}),
+        Before = couch_stats:sample(Metric),
+        ?assertEqual({error, all_dbs_active}, couch_db:create(DbName, [])),
+        ?assertEqual(Before + 1, couch_stats:sample(Metric)),
+        ?assertEqual({error, all_dbs_active}, couch_db:open(DbName, [])),
+        ?assertEqual(Before + 2, couch_stats:sample(Metric))
     end).
 
 create_db(DbName) ->

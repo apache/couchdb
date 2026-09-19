@@ -152,13 +152,7 @@ check_source_removed(#shard{name = Name}) ->
     Nodes = lists:usort([N || N <- ShardNodes, lists:member(N, Live)]),
     {Responses, _} = rpc:multicall(Nodes, mem3, shards, [DbName]),
     Shards = lists:usort(lists:flatten(Responses)),
-    SourcePresent = [
-        S
-     || S = #shard{name = S, node = N} <- Shards,
-        S =:= Name,
-        N =:= node()
-    ],
-    case SourcePresent of
-        [] -> true;
-        [_ | _] -> false
-    end.
+    [] =:= matching_shards(Name, node(), Shards).
+
+matching_shards(Name, Node, Shards) ->
+    [S || #shard{name = SN, node = N} = S <- Shards, SN =:= Name, N =:= Node].

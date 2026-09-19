@@ -46,6 +46,7 @@
 -export([remove_sensitive_data/1]).
 -export([ejson_to_map/1]).
 -export([new_set/0, set_from_list/1]).
+-export([hibernate_after/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -63,6 +64,8 @@
     <<"query_servers">>,
     <<"feature_flags">>
 ]).
+
+-define(DEFAULT_HIBERNATE_AFTER, 5000).
 
 priv_dir() ->
     case code:priv_dir(couch) of
@@ -806,3 +809,13 @@ new_set() ->
 
 set_from_list(KVs) ->
     sets:from_list(KVs, [{version, 2}]).
+
+hibernate_after(Module) when is_atom(Module) ->
+    Key = atom_to_list(Module),
+    Default = ?DEFAULT_HIBERNATE_AFTER,
+    case config:get_integer_or_infinity("hibernate_after", Key, Default) of
+        infinity ->
+            [];
+        Timeout when is_integer(Timeout) ->
+            [{hibernate_after, Timeout}]
+    end.

@@ -23,6 +23,10 @@
     idrevs,
     wcnt = 0,
     rcnt = 0,
+    % count of non-error responses regardless if they added anything to `response` list
+    % for example a worker might returtn {ok,[]} when we get Revs=all and we have make sure
+    % we count  that towards sucess_possible/1 returning true.
+    received = 0,
     responses = []
 }).
 
@@ -95,7 +99,7 @@ init_state(DbName, IdsRevsOpts, Options) ->
 
 responses_fold({ArgRef, NewResp}, #{} = Reqs) ->
     #{ArgRef := Req} = Reqs,
-    #req{rcnt = R, wcnt = W, responses = Resps} = Req,
+    #req{rcnt = R, wcnt = W, received = Recv, responses = Resps} = Req,
     Resps1 = merge_responses(Resps, NewResp),
     % If responses don't match or are "not found", don't bump rcnt so we can
     % wait for more workers.
@@ -112,16 +116,19 @@ responses_fold({ArgRef, NewResp}, #{} = Reqs) ->
         ArgRef => Req#req{
             rcnt = NewR,
             wcnt = W - 1,
+            received = Recv + 1,
             responses = Resps1
         }
     }.
 
 handle_error(Error, #st{workers = Workers, errors = Errors, reqs = Reqs} = St) ->
+    Errors1 = lists:uniq([Error | Errors]),
+    St1 = St#st{errors = Errors1},
     case success_possible(Reqs) of
         true ->
             case have_viable_workers(Workers) of
                 true ->
-                    {ok, St};
+                    {ok, St1};
                 false ->
                     % Don't have a choice, have to stop
                     {stop, finalize(St#st.args, Reqs)}
@@ -129,7 +136,7 @@ handle_error(Error, #st{workers = Workers, errors = Errors, reqs = Reqs} = St) -
         false ->
             stop_workers(Workers),
             % We may have multiple errors but need to pick one, so pick the first
-            {error, hd(merge_errors(Errors, Error))}
+            {error, hd(merge_errors(Errors1))}
     end.
 
 % De-duplicate identical responses as we go along
@@ -151,11 +158,10 @@ sort_key(NotFound) ->
 % non-maintenance mode errors, such as timeouts, etc, we remove the maintenance
 % mode from the list, otherwise, we keep it.
 %
-merge_errors(Errors, Error) ->
-    Errors1 = lists:uniq([Error | Errors]),
-    case Errors1 of
+merge_errors(Errors) ->
+    case Errors of
         [maintenance_mode] -> [maintenance_mode];
-        [_ | _] -> lists:delete(maintenance_mode, Errors1)
+        [_ | _] -> lists:delete(maintenance_mode, Errors)
     end.
 
 % Build a #{ArgRef => #req{}} map. ArgRef references the initial {{Id, Revs},
@@ -231,8 +237,8 @@ success_possible(#{} = Reqs) ->
 
 success_possible_fold(_Key, #req{}, _Acc = false) ->
     false;
-success_possible_fold(_Key, #req{wcnt = W, responses = Resps}, _Acc) ->
-    W > 0 orelse Resps =/= [].
+success_possible_fold(_Key, #req{wcnt = W, received = Recv}, _Acc) ->
+    W > 0 orelse Recv > 0.
 
 r_met(#{} = Reqs, ExpectedR) ->
     Fun = fun(_, #req{rcnt = R}, Acc) -> min(R, Acc) end,
@@ -346,10 +352,12 @@ open_revs_quorum_test_() ->
                 ?TDEF_FE(t_stemmed_merge_correctly),
                 ?TDEF_FE(t_not_found_counted_as_descendant),
                 ?TDEF_FE(t_all_not_found),
+                ?TDEF_FE(t_all_not_found_then_maintenance_mode),
                 ?TDEF_FE(t_rev_not_found_returned),
                 ?TDEF_FE(t_rexi_errors_progress),
                 ?TDEF_FE(t_generic_errors_progress),
-                ?TDEF_FE(t_failure_on_all_errors)
+                ?TDEF_FE(t_failure_on_all_errors),
+                ?TDEF_FE(t_maintenance_mode_masked_by_other_errors)
             ]
         }
     }.
@@ -491,6 +499,15 @@ t_all_not_found(_) ->
     {ok, S2} = handle_message([[]], W2, S1),
     ?assertEqual({stop, [[]]}, handle_message([[]], W3, S2)).
 
+t_all_not_found_then_maintenance_mode(_) ->
+    % two revs=all not_founds + one last mm mode
+    S0 = #st{workers = Workers0} = st0(),
+    [W1, W2, W3] = lists:sort(maps:keys(Workers0)),
+    {ok, S1} = handle_message([[]], W1, S0),
+    {ok, S2} = handle_message([[]], W2, S1),
+    Res = handle_message({rexi_EXIT, {maintenance_mode, foo}}, W3, S2),
+    ?assertEqual({stop, [[]]}, Res).
+
 t_rev_not_found_returned(_) ->
     % If a specific rev is not found that is returned
     S0 = #st{workers = Workers0} = st0(),
@@ -521,5 +538,16 @@ t_failure_on_all_errors(_) ->
     {ok, S1} = handle_message({error, k}, W1, S0),
     {ok, S2} = handle_message({rexi_DOWN, nodedown, {x, n2}, y}, z, S1),
     ?assertEqual({error, e}, handle_message({rexi_EXIT, e}, W3, S2)).
+
+t_maintenance_mode_masked_by_other_errors(_) ->
+    % When we get mm at the end success_possible/1 becomes false. but we would
+    % like to return the other errors instead of the mm one. Ideally we'd
+    % return the last error before the mm one.
+    S0 = #st{workers = Workers0} = st0(),
+    [W1, W2, W3] = lists:sort(maps:keys(Workers0)),
+    {ok, S1} = handle_message({error, timeout}, W1, S0),
+    {ok, S2} = handle_message({error, foo}, W2, S1),
+    Res = handle_message({rexi_EXIT, {maintenance_mode, n3}}, W3, S2),
+    ?assertEqual({error, foo}, Res).
 
 -endif.

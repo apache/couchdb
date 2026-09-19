@@ -141,6 +141,8 @@ init([]) ->
 
     ok = configure_language_servers(),
 
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()),
+
     {ok, #state{
         config = get_proc_config(),
         threshold_ts = timestamp(),
@@ -798,10 +800,12 @@ foreach_proc(Fun) when is_function(Fun, 1) ->
 
 inc_count(Lang) ->
     ets:update_counter(?COUNTERS, Lang, 1, {Lang, 0}),
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()),
     ok.
 
 dec_count(Lang) ->
     ets:update_counter(?COUNTERS, Lang, -1, {Lang, 0}),
+    couch_stats:update_gauge([couchdb, query_server, process_count], get_proc_count()),
     ok.
 
 get_count(Lang) ->

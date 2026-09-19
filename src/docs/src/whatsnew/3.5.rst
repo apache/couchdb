@@ -20,6 +20,110 @@
     :depth: 1
     :local:
 
+.. _release/3.5.3:
+
+Version 3.5.3
+=============
+
+.. note::
+    Erlang/OTP 27 is the minimum supported version
+
+Performance
+-----------
+
+* :ghissue:`6077`: Remove a quadratic scan in the ``_bulk_docs`` hot path in
+  ``couch_db_updater``.
+* :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`: QuickJS engine updates.
+  Custom small-block allocator (10-40% faster in microbenchmarks), fix for a
+  large performance regression with recent GCC versions, faster math ops.
+* :ghissue:`5883`: Use the BTree term cache for view files as well as
+  database files, which improves latency of concurrent view queries. Adds
+  the ``[bt_engine_cache] view_btree_cache_depth`` setting.
+* :ghissue:`5890`: Use ``hibernate_after`` instead of hibernating after
+  every message in ``couch_work_queue``, ``couch_db_updater``,
+  ``couch_stream`` and ``rexi_buffer``. Adds the ``[hibernate_after]``
+  section to configure or disable idle timeouts.
+
+Bugfixes
+--------
+
+* :ghissue:`6004`, :ghissue:`6005`: Fix ``_bulk_get`` ``not_found`` handling
+  when ``revs=all`` and a node is in maintenance mode, and accumulate worker
+  errors properly.
+* :ghissue:`6016`: Fix a leaked database handle in ``smoosh``, which kept
+  deleted database files open.
+* :ghissue:`6025`: ``fsync`` after resetting or truncating file headers.
+* :ghissue:`6026`: Always apply the user-configured ``file_compression``
+  setting. Purge trees and the compactor's external sort used ``snappy``
+  regardless of the setting.
+* :ghissue:`6022`, :ghissue:`6024`: Limit ``couch_server`` sharding with the
+  new ``[couchdb] max_couch_server_shards`` setting so that ``max_dbs_open``
+  is not split into tiny per-shard limits on many-core nodes. Add an
+  ``all_dbs_active`` metric.
+* :ghissue:`6043`: Fix ``function_clause`` in ``fabric_ring`` for
+  operations using the ``all`` ring option (``_uuids``, ``_purged_infos``,
+  db metadata updates) when a node is in maintenance mode.
+* :ghissue:`6045`: Return ``400 Bad Request`` instead of ``500`` for invalid
+  revisions passed to ``_missing_revs``, ``_revs_diff`` and ``_purge``.
+* :ghissue:`6089`: Validate ``limit`` and ``timeout`` parameters to
+  ``_changes`` and return ``400`` instead of ``500``.
+* :ghissue:`6090`: Handle ``badarg`` from ``base64:decode`` when parsing
+  authorization headers.
+* :ghissue:`6061`: Improve JWT error messages.
+* :ghissue:`6066`: Assume a purge client exists when its existence cannot be
+  verified, in view, Dreyfus and Nouveau purge checkpoints.
+* :ghissue:`6081`: Handle ``noconnection``, timeouts and exits from remote
+  nodes during index cleanup.
+* :ghissue:`6074`: Handle empty design documents in the ``ddoc_features``
+  scanner plugin.
+* :ghissue:`6100`: Fix a variable shadowing typo in the ``mem3`` reshard
+  source shard check.
+* :ghissue:`6102`: Fix ``group_by_proximity`` returning an empty same-zone
+  shard list when the coordinator does not hold a copy of the shard.
+* :ghissue:`5948`: Handle ``{bad_request, Error, Reason}`` triples from
+  design document validators in ``fabric_doc_update``.
+* :ghissue:`5839`: Only increment the ``vdu_rejects`` counter on actual VDU
+  rejections. Only this fix from that pull request is included.
+* :ghissue:`6056`: Nouveau: always use ``cacertfile`` when specified and make
+  peer verification explicit. Adds the ``[nouveau] ssl_verify`` setting.
+* :ghissue:`6078`: Nouveau: fix explicit sorting by relevance (``-<score>``).
+* :ghissue:`6067`: Nouveau: fix a typo in the Portuguese analyzer name and
+  remove unused query serializer classes.
+* :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`: QuickJS engine updates.
+* :ghissue:`6058`: Update Jiffy to ``2.0.2``
+* :ghissue:`6037`, :ghissue:`6082`: Update Gun to ``2.5.0``.
+* :ghissue:`6065`,  New Prometheus metrics for Clouseau connectivity, database
+  count, IOQ and Smoosh.
+* :ghissue:`6068`: Add a query server ``process_count`` gauge.
+* :ghissue:`6070`: Supervisor-level replicator auth plugin callbacks
+  ``sup_initialize/0`` and ``sup_cleanup/1``.
+
+Docs
+----
+
+* :ghissue:`6047`, :ghissue:`6049`: Update RHEL 10 install instructions.
+* :ghissue:`6099`: Update Search (Clouseau) installation instructions.
+* :ghissue:`6055`: Clarify Nouveau ``lucene_version`` handling.
+* :ghissue:`6057`: Fix a JavaScript ``for`` loop in the partitioned dbs example.
+* :ghissue:`6062`: Fix the revision label in the consistency introduction.
+* :ghissue:`6089`: Remove an erroneous comment about ``_changes`` ``limit=0``.
+* :ghissue:`6094`: Fix an inline link in the auth configuration docs.
+* :ghissue:`6097`: Update the build status link in ``README.rst``.
+
+Tests/CI/Builds
+---------------
+
+* :ghissue:`6009`, :ghissue:`6036`, :ghissue:`6038`: Set OTP 27 minimum version.
+* :ghissue:`6027`, :ghissue:`6035`, :ghissue:`6037`, :ghissue:`6083`,
+  :ghissue:`6095`: Update dependencies: mochiweb, snappy, ibrowse, meck.
+* :ghissue:`6007`: Update Gradle to ``9.5.1`` for Nouveau.
+* :ghissue:`6017`, :ghissue:`6019`, :ghissue:`6021`, :ghissue:`6073`,
+  :ghissue:`6091`, :ghissue:`6093`, :ghissue:`5990`: CI updates: match
+  variants to worker count, move base images to Trixie, adjust
+  Windows settings.
+* :ghissue:`6033`, :ghissue:`6042`, :ghissue:`6084`: Test reliability fixes.
+* :ghissue:`6076`: Use OTP 27 sigils in ``chttpd_db_doc_size_tests``.
+
 .. _release/3.5.2:
 
 Version 3.5.2

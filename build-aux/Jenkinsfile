@@ -15,23 +15,23 @@
 
 // This is image used to build the tarball, check source formatting and build
 // the docs
-DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:bookworm-erlang'
+DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:trixie-erlang'
 
 // Erlang version embedded in binary packages. Also the version most builds
 // will run.
-ERLANG_VERSION = '26.2.5.20'
+ERLANG_VERSION = '27.3.4.16'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '26.2.5.20'
+MINIMUM_ERLANG_VERSION = '27.3.4.16'
 
 // Highest support Erlang version.
-MAXIMUM_ERLANG_VERSION = '28.4.3'
+MAXIMUM_ERLANG_VERSION = '29.0.5'
 
 // Test a min + 1 version. This is specially useful before we're about
 // to bump the minimum version to at least make sure the CI image
 // works.
-INTERMEDIATE_ERLANG_VERSION = '27.3.4.11'
+INTERMEDIATE_ERLANG_VERSION = '28.5.0.5'
 
 // Default GNU Make Eunit Options for supported platforms
 DEFAULT_GNU_MAKE_EUNIT_OPTS = '-j2 --output-sync=target'
@@ -110,59 +110,54 @@ meta = [
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'bullseye': [
-    name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
-    with_nouveau: true,
-    with_clouseau: true,
-    clouseau_java_home: '/opt/java/openjdk',
-    quickjs_test262: true,
-    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
-
   // Sometimes we "pick up" ppc64le workers from the asf jenkins intance That
   // seems like a good thing, however, those workers allow running multiple
   // agents at a time and often time out even with retries. The build times
   // take close to an hour, which is at least x2 as long as it takes to run
   // other arch CI jobs and they still time out often and fail. Disable for
-  // now. This is a low demand arch distro, maybe remove support altogether?
+  // now. That's why we have the ppc64le_own label and not ppc64le.
   //
-  // 'base-ppc64': [
-  //   name: 'Debian POWER',
-  //   spidermonkey_vsn: '78',
-  //   with_nouveau: true,
-  //   with_clouseau: true,
-  //   quickjs_test262: true,
-  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-  //   node_label: 'ppc64le',
-  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  // ],
+  'base-ppc64': [
+    name: 'Debian POWER',
+    spidermonkey_vsn: '128',
+    with_nouveau: true,
+    with_clouseau: true,
+    quickjs_test262: true,
+    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+    node_label: 'ppc64le_own',
+    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  ],
 
-  // Just like in the ppc64le case we sometimes "pick up" built-in s390x workers added to
-  // our jenkins, but since those are managed by us, our .mix/.venv/.hex packaging
-  // cache hack in /home/jenkins doesn't work, and so elixir tests fail. Skip this arch build
-  // until we figure out caching (probably need to use a proper caching plugin).
+  // Just like in the ppc64le case we sometimes "pick up" built-in s390x
+  // workers added to our jenkins, but since those are managed by us, our
+  // .mix/.venv/.hex packaging cache hack in /home/jenkins doesn't work, and so
+  // elixir tests fail. That's why we're using the s390x_own label instead of
+  // s390x
+  //
+  // Noticed repeated timeouts in couch_cfile_prop_tests:'-property_test_/0-fun-2-'/1
+  //    (test/eunit/couch_cfile_prop_tests.erl) in function prim_file:datasync/1 on this
+  // CI worker. Fio tests indicate good throughput but often enough all 3 retries fail
+  // cfile tests. Disabled to avoid blocking PR merging
   //
   // 'base-s390x': [
   //   name: 'Debian s390x',
-  //   spidermonkey_vsn: '78',
+  //   spidermonkey_vsn: '128',
   //   with_nouveau: true,
   //   // QuickJS test262 shows a discrepancy typedarray-arg-set-values-same-buffer-other-type.js
   //   // Test262Error: 51539607552,42,0,4,5,6,7,8
   //   quickjs_test262: false,
   //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-  //   node_label: 's390x',
+  //   node_label: 's390x_own',
   //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   // ],
 
   'base': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the bookworm-quickjs variant
+    // Test this in in the trixie-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
@@ -170,7 +165,7 @@ meta = [
 
   'base-max-erlang': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
@@ -181,7 +176,7 @@ meta = [
 
   'base-intermediate-erlang': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
@@ -211,38 +206,40 @@ meta = [
   //
   'base-arm64': [
     name: 'Debian ARM64',
-    spidermonkey_vsn: '78',
+    spidermonkey_vsn: '128',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the bookworm-quickjs variant
+    // Test this in in the trixie-quickjs variant
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
     node_label: 'docker-arm64',
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'trixie': [
+  'bookworm': [
     name: 'Debian x86_64',
-    spidermonkey_vsn: '128',
+    spidermonkey_vsn: '78',
     with_nouveau: true,
     with_clouseau: true,
     clouseau_java_home: '/opt/java/openjdk',
     quickjs_test262: true,
-    image: "apache/couchdbci-debian:trixie-erlang-${ERLANG_VERSION}",
+    image: "apache/couchdbci-debian:bookworm-erlang-${ERLANG_VERSION}",
     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   ],
 
-  'freebsd-x86_64': [
-      name: 'FreeBSD x86_64',
-      spidermonkey_vsn: '91',
-      with_nouveau: false,
-      with_clouseau: true,
-      clouseau_java_home: '/usr/local/openjdk21',
-      quickjs_test262: false,
-      gnu_make: 'gmake',
-      gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
+  // Disable temporarily to not block PR merging. Worker unexpectedly went
+  // offline.
+  // 'freebsd-x86_64': [
+  //     name: 'FreeBSD x86_64',
+  //     spidermonkey_vsn: '91',
+  //     with_nouveau: false,
+  //     with_clouseau: true,
+  //     clouseau_java_home: '/usr/local/openjdk21',
+  //     quickjs_test262: false,
+  //     gnu_make: 'gmake',
+  //     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  // ],
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
   // use QuickJS for now
@@ -257,25 +254,28 @@ meta = [
   //    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
   // ],
 
-  'macos': [
-     name: 'macOS',
-     disable_spidermonkey: true,
-     with_nouveau: true,
-     with_clouseau: true,
-     clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
-     gnu_make: 'gmake',
-     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-   ],
+  // Disable temporarily as it is running out of space and Jenkins
+  // keeps auto-disabling it which blocks CI jobs
+  // 'macos': [
+  //    name: 'macOS',
+  //    disable_spidermonkey: true,
+  //    with_nouveau: true,
+  //    with_clouseau: true,
+  //    clouseau_java_home: '/opt/homebrew/opt/openjdk@21',
+  //    gnu_make: 'gmake',
+  //    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  //  ],
 
    'win2022': [
      name: 'Windows 2022',
      spidermonkey_vsn: '128',
      with_nouveau: true,
      with_clouseau: true,
-     clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
+     //Usually set via https://github.com/apache/couchdb-glazier/blob/main/bin/shell.ps1
+     //clouseau_java_home: /C:\tools\zulu21.46.19-ca-jdk21.0.9-win_x64/,
      quickjs_test262: false,
      node_label: 'win',
-     gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+     gnu_make_eunit_opts: "-j3 --output-sync=target"
    ]
 ]
 
@@ -562,7 +562,7 @@ def generateContainerStage(platform) {
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/couchdb", label: 'Unpack release' )
                   sh( script: "cd ${platform} && git clone https://github.com/apache/couchdb-pkg", label: 'Clone packaging helper repo' )
                   dir( "${platform}/couchdb-pkg" ) {
-                    sh( script: 'make', label: 'Build packages' )
+                    sh( script: 'make --output-sync=target', label: 'Build packages' )
                   }
                   sh( label: 'Stage package artifacts for archival', script: """
                     rm -rf pkgs/${platform}
@@ -698,11 +698,11 @@ pipeline {
       }
       steps {
         sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-        sh "./configure --spidermonkey-version 78 --with-nouveau"
+        sh "./configure --spidermonkey-version 128 --with-nouveau"
         sh 'make erlfmt-check'
         sh 'make elixir-source-checks'
         sh 'make python-black'
-        sh 'make -j4 dist'
+        sh 'make -j4 --output-sync=target dist'
       }
       post {
         success {

@@ -19,8 +19,8 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
--define(CONTENT_MULTI_RELATED, {"Content-Type", "multipart/related;boundary=\"bound\""}).
--define(CONTENT_MULTI_FORM, {"Content-Type", "multipart/form-data;boundary=\"bound\""}).
+-define(CONTENT_MULTI_RELATED, {"Content-Type", ~s(multipart/related;boundary="bound")}).
+-define(CONTENT_MULTI_FORM, {"Content-Type", ~s(multipart/form-data;boundary="bound")}).
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
@@ -75,8 +75,10 @@ all_test_() ->
 
 post_single_doc(Url) ->
     NewDoc =
-        "{\"post_single_doc\": \"some_doc\",\n"
-        "        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
+        """
+        {"post_single_doc": "some_doc",
+                "_id": "testdoc", "should_be" : "too_large"}
+        """,
     {ok, _, _, ResultBody} = test_request:post(
         Url,
         [?CONTENT_JSON, ?AUTH],
@@ -87,8 +89,10 @@ post_single_doc(Url) ->
 
 put_single_doc(Url) ->
     NewDoc =
-        "{\"post_single_doc\": \"some_doc\",\n"
-        "        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
+        """
+        {"post_single_doc": "some_doc",
+                "_id": "testdoc", "should_be" : "too_large"}
+        """,
     {ok, _, _, ResultBody} = test_request:put(
         Url ++ "/" ++ "testid",
         [?CONTENT_JSON, ?AUTH],
@@ -99,8 +103,10 @@ put_single_doc(Url) ->
 
 bulk_doc(Url) ->
     NewDoc =
-        "{\"docs\": [{\"doc1\": 1}, {\"errordoc\":\n"
-        "        \"this_should_be_the_too_large_error_document\"}]}",
+        """
+        {"docs": [{"doc1": 1}, {"errordoc":
+                "this_should_be_the_too_large_error_document"}]}
+        """,
     {ok, _, _, ResultBody} = test_request:post(
         Url ++ "/_bulk_docs/",
         [?CONTENT_JSON, ?AUTH],
@@ -111,16 +117,12 @@ bulk_doc(Url) ->
     ?_assertEqual(Expect, ResultJson).
 
 put_post_doc_attach_inline(Url) ->
-    Body1 = "{\"body\":\"This is a body.\",",
-    Body2 = lists:concat([
-        "{\"body\":\"This is a body it should fail",
-        "because there are too many characters.\","
-    ]),
-    DocRest = lists:concat([
-        "\"_attachments\":{\"foo.txt\":{",
-        "\"content_type\":\"text/plain\",",
-        "\"data\": \"VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=\"}}}"
-    ]),
+    Body1 = ~s({"body":"This is a body.",),
+    Body2 = ~s({"body":"This is a body it should failbecause there are too many characters.",),
+    DocRest =
+        """
+        "_attachments":{"foo.txt":{"content_type":"text/plain","data": "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="}}}
+        """,
     Doc1 = lists:concat([Body1, DocRest]),
     Doc2 = lists:concat([Body2, DocRest]),
 
@@ -157,11 +159,8 @@ put_post_doc_attach_inline(Url) ->
     ].
 
 put_multi_part_related(Url) ->
-    Body1 = "{\"body\":\"This is a body.\",",
-    Body2 = lists:concat([
-        "{\"body\":\"This is a body it should fail",
-        "because there are too many characters.\","
-    ]),
+    Body1 = ~s({"body":"This is a body.",),
+    Body2 = ~s({"body":"This is a body it should failbecause there are too many characters.",),
     DocBeg = "--bound\r\nContent-Type: application/json\r\n\r\n",
     DocRest = lists:concat([
         "\"_attachments\":{\"foo.txt\":{\"follows\":true,",
@@ -193,12 +192,9 @@ post_multi_part_form(Url) ->
     Port = mochiweb_socket_server:get(chttpd, port),
     Host = lists:concat(["http://127.0.0.1:", Port]),
     Referer = {"Referer", Host},
-    Body1 = "{\"body\":\"This is a body.\"}",
-    Body2 = lists:concat([
-        "{\"body\":\"This is a body it should fail",
-        "because there are too many characters.\"}"
-    ]),
-    DocBeg = "--bound\r\nContent-Disposition: form-data; name=\"_doc\"\r\n\r\n",
+    Body1 = ~s({"body":"This is a body."}),
+    Body2 = ~s({"body":"This is a body it should failbecause there are too many characters."}),
+    DocBeg = ~s(--bound\r\nContent-Disposition: form-data; name="_doc"\r\n\r\n),
     DocRest = lists:concat([
         "\r\n--bound\r\nContent-Disposition:",
         "form-data; name=\"_attachments\"; filename=\"file.txt\"\r\n",

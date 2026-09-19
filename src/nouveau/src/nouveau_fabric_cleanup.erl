@@ -26,7 +26,7 @@ go(DbName) ->
                 erpc:send_request(Node, ?MODULE, go_local, [DbName, Dbs, Sigs], Node, Acc)
             end,
             Reqs = maps:fold(Fun, erpc:reqids_new(), ByNode),
-            recv(DbName, Reqs, fabric_util:abs_request_timeout());
+            fabric_index_cleanup:recv(?MODULE, DbName, Reqs, fabric_util:abs_request_timeout());
         Error ->
             couch_log:error("~p : error fetching ddocs db:~p ~p", [?MODULE, DbName, Error]),
             Error
@@ -49,17 +49,5 @@ go_local(DbName, Dbs, Sigs) ->
         )
     catch
         error:database_does_not_exist ->
-            ok
-    end.
-
-recv(DbName, Reqs, Timeout) ->
-    case erpc:receive_response(Reqs, Timeout, true) of
-        {ok, _Label, Reqs1} ->
-            recv(DbName, Reqs1, Timeout);
-        {Error, Label, Reqs1} ->
-            ErrMsg = "~p : error cleaning nouveau indexes db:~p node: ~p error:~p",
-            couch_log:error(ErrMsg, [?MODULE, DbName, Label, Error]),
-            recv(DbName, Reqs1, Timeout);
-        no_request ->
             ok
     end.
