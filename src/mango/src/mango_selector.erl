@@ -556,7 +556,7 @@ match({[{Field, Cond}]}, Value, Cmp) ->
             false;
         bad_path ->
             false;
-        SubValue when Field == <<"_id">> ->
+        SubValue when Field == [<<"_id">>] ->
             match(Cond, SubValue, fun mango_json:cmp_raw/2);
         SubValue ->
             match(Cond, SubValue, Cmp)
@@ -1711,5 +1711,10 @@ match_nor_test() ->
     ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 2}]})),
     ?assertEqual(false, match_int(SelMulti, {[{<<"x">>, 9}]})),
     ?assertEqual(false, match_int(SelMulti, {[]})).
+
+match_id_raw_collation_test() ->
+    % _id compares by byte-order, not by ICU rules
+    Sel = normalize({[{<<"_id">>, {[{<<"$gte">>, <<"Z">>}]}}]}),
+    ?assertEqual(true, match_int(Sel, {[{<<"_id">>, <<"a">>}]})).
 
 -endif.
