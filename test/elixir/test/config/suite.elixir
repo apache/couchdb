@@ -903,6 +903,11 @@
     "no matches",
     "case sensitivity"
   ],
+  "IdCollationTest": [
+    "_id range find is the same as _all_docs",
+    "_id range in _changes selector",
+    "icu collation for nested _id fields"
+  ],
   "JSONIndexSelectionTest": [
     "basic",
     "with and",
