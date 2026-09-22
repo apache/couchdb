@@ -117,16 +117,19 @@ meta = [
   // other arch CI jobs and they still time out often and fail. Disable for
   // now. That's why we have the ppc64le_own label and not ppc64le.
   //
-  'base-ppc64': [
-    name: 'Debian POWER',
-    spidermonkey_vsn: '128',
-    with_nouveau: true,
-    with_clouseau: true,
-    quickjs_test262: true,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 'ppc64le_own',
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
-  ],
+  // As of 2026-09-22 the worker stopped responding and is not reachable
+  // via ssh. We'll just disable it for now. If it comes back we'll re-enable it
+  // if it's gone for good, we'll just remove support for PPC64LE
+  // 'base-ppc64': [
+  //   name: 'Debian POWER',
+  //   spidermonkey_vsn: '128',
+  //   with_nouveau: true,
+  //   with_clouseau: true,
+  //   quickjs_test262: true,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 'ppc64le_own',
+  //   gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+  // ],
 
   // Just like in the ppc64le case we sometimes "pick up" built-in s390x
   // workers added to our jenkins, but since those are managed by us, our
