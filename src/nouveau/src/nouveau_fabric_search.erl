@@ -203,21 +203,23 @@ compare_order(null, As, Bs) ->
 %% server-side adds _id on the end of sort order if not present
 compare_order([], [A], [B]) ->
     couch_ejson_compare:less(convert_item(A), convert_item(B)) < 1;
+compare_order(Order, [#{<<"value">> := _} = A | ARest], [#{<<"value">> := _} = B | BRest]) ->
+    compare_order(Order, [convert_item(A) | ARest], [convert_item(B) | BRest]);
 %% reverse order specified
 compare_order([<<"-", _/binary>> | SortRest], [A | ARest], [B | BRest]) ->
-    case couch_ejson_compare:less(convert_item(B), convert_item(A)) of
-        0 ->
+    if
+        A == B ->
             compare_order(SortRest, ARest, BRest);
-        Less ->
-            Less < 1
+        true ->
+            B < A
     end;
 %% forward order specified
 compare_order([_ | SortRest], [A | ARest], [B | BRest]) ->
-    case couch_ejson_compare:less(convert_item(A), convert_item(B)) of
-        0 ->
+    if
+        A == B ->
             compare_order(SortRest, ARest, BRest);
-        Less ->
-            Less < 1
+        true ->
+            A < B
     end.
 
 convert_item(Item) ->
