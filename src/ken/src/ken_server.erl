@@ -106,6 +106,7 @@ init(_) ->
     erlang:send(self(), start_event_handler),
     ets:new(ken_pending, [named_table]),
     ets:new(ken_resubmit, [named_table]),
+    ets:new(ken_resubmit_count, [named_table]),
     ets:new(ken_workers, [named_table, public, {keypos, #job.name}]),
     {ok, #state{pruned_last = erlang:monotonic_time()}}.
 
@@ -130,6 +131,8 @@ handle_cast({add, DbName}, State) ->
 handle_cast({remove, DbName}, State) ->
     Q2 = queue:filter(fun(X) -> X =/= DbName end, State#state.q),
     ets:delete(ken_pending, DbName),
+    ets:delete(ken_resubmit, DbName),
+    ets:delete(ken_resubmit_count, DbName),
     % Delete search index workers
     ets:match_delete(ken_workers, #job{name = {DbName, '_', '_'}, _ = '_'}),
     % Delete view index workers
@@ -499,8 +502,9 @@ debrief_worker(Pid, Reason, _State) ->
             ok
     end.
 
-maybe_resubmit(_DbName, normal) ->
-    ok;
+maybe_resubmit(DbName, normal) ->
+    ets:delete(ken_resubmit, DbName),
+    ets:delete(ken_resubmit_count, DbName);
 maybe_resubmit(_DbName, {database_does_not_exist, _}) ->
     ok;
 maybe_resubmit(_DbName, {not_found, no_db_file}) ->
@@ -511,11 +515,23 @@ maybe_resubmit(DbName, _) ->
     resubmit(5000, DbName).
 
 resubmit(Delay, DbName) ->
-    case ets:insert_new(ken_resubmit, {DbName}) of
+    Limit = config:get_integer("ken", "max_resubmit_attempts", 5),
+    Count =
+        case ets:lookup(ken_resubmit_count, DbName) of
+            [{DbName, N}] -> N;
+            [] -> 0
+        end,
+    if
+        Count >= Limit ->
+            couch_log:warning(
+                "~p: giving up resubmit for ~p after ~p attempts",
+                [?MODULE, DbName, Count]
+            ),
+            ets:delete(ken_resubmit_count, DbName);
         true ->
-            erlang:send_after(Delay, ?MODULE, {'$gen_cast', {resubmit, DbName}});
-        false ->
-            ok
+            ets:insert(ken_resubmit_count, {DbName, Count + 1}),
+            ets:insert_new(ken_resubmit, {DbName}),
+            erlang:send_after(Delay, ?MODULE, {'$gen_cast', {resubmit, DbName}})
     end.
 
 prune_worker_table(State) ->
