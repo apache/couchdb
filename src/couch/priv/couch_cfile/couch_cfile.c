@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <sys/file.h>
 
 // erl_driver.h is for erl_errno_id()
 #include "erl_driver.h"
@@ -43,6 +44,9 @@ static ERL_NIF_TERM ATOM_BADARG;
 static ERL_NIF_TERM ATOM_OK;
 static ERL_NIF_TERM ATOM_CLOSE;
 static ERL_NIF_TERM ATOM_CONTINUE;
+static ERL_NIF_TERM ATOM_EXCLUSIVE;
+static ERL_NIF_TERM ATOM_SHARED;
+static ERL_NIF_TERM ATOM_UNLOCK;
 
 typedef int posix_errno_t;
 
@@ -570,6 +574,46 @@ static ERL_NIF_TERM truncate_nif(ErlNifEnv *env, int argc, const ERL_NIF_TERM ar
 #endif
 }
 
+static ERL_NIF_TERM flock_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+#ifdef COUCH_CFILE_SUPPORTED
+  handle_t* hdl;
+  int op, res;
+
+  if (argc != 2 || !get_handle(env, argv[0], &hdl) || !enif_is_atom(env, argv[1])) {
+    return badarg(env);
+  }
+
+    // ------ Critical section start ------
+    READ_LOCK;
+    if (hdl->fd < 0) {
+        READ_UNLOCK;
+        return err_tup(env, EINVAL);
+    }
+    op = LOCK_NB;
+    if (enif_is_identical(argv[1], ATOM_EXCLUSIVE)) {
+      op |= LOCK_EX;
+    } else if (enif_is_identical(argv[1], ATOM_SHARED)) {
+      op |= LOCK_SH;
+    } else if (enif_is_identical(argv[1], ATOM_UNLOCK)) {
+      op = LOCK_UN;
+    } else {
+        return badarg(env);
+    }
+    res = flock(hdl->fd, op);
+    if (res == -1) {
+      READ_UNLOCK;
+      return err_tup(env, errno);
+    }
+    READ_UNLOCK;
+    // ------ Critical section end ------
+
+    return ATOM_OK;
+#else
+  return err_tup(env, EINVAL);
+#endif
+}
+
 // Return a tuple with info about the handle The fields are:
 //   fd : file descriptor (int)
 //   old_fd : file descriptor we dup()-ed from (int)
@@ -698,13 +742,16 @@ static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM pid)
       return -1;
   }
 
-  ATOM_BOF      = enif_make_atom(env, "bof");
-  ATOM_EOF      = enif_make_atom(env, "eof");
-  ATOM_ERROR    = enif_make_atom(env, "error");
-  ATOM_OK       = enif_make_atom(env, "ok");
-  ATOM_CLOSE    = enif_make_atom(env, "close");
-  ATOM_BADARG   = enif_make_atom(env, "badarg");
-  ATOM_CONTINUE = enif_make_atom(env, "continue");
+  ATOM_BOF       = enif_make_atom(env, "bof");
+  ATOM_EOF       = enif_make_atom(env, "eof");
+  ATOM_ERROR     = enif_make_atom(env, "error");
+  ATOM_OK        = enif_make_atom(env, "ok");
+  ATOM_CLOSE     = enif_make_atom(env, "close");
+  ATOM_BADARG    = enif_make_atom(env, "badarg");
+  ATOM_CONTINUE  = enif_make_atom(env, "continue");
+  ATOM_EXCLUSIVE = enif_make_atom(env, "exclusive");
+  ATOM_SHARED    = enif_make_atom(env, "shared");
+  ATOM_UNLOCK    = enif_make_atom(env, "unlock");
 
   *priv_data = NULL;
 
@@ -721,6 +768,7 @@ static ErlNifFunc funcs[] = {
     {"write_nif",    2, write_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"datasync_nif", 1, datasync_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"truncate_nif", 1, truncate_nif, ERL_NIF_DIRTY_JOB_IO_BOUND},
+    {"flock_nif",    2, flock_nif,    ERL_NIF_DIRTY_JOB_IO_BOUND},
     {"info_nif",     1, info_nif}
 };
 

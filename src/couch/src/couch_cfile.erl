@@ -33,7 +33,8 @@
     write/2,
     truncate/1,
     fd/1,
-    advise/4
+    advise/4,
+    flock/2
 ]).
 
 % Internal exports
@@ -54,7 +55,8 @@
     seek_nif/3,
     write_nif/2,
     datasync_nif/1,
-    truncate_nif/1
+    truncate_nif/1,
+    flock_nif/2
 ]).
 
 -include_lib("kernel/include/file.hrl").
@@ -151,6 +153,9 @@ advise(#file_descriptor{module = ?MODULE} = Fd, Offset, Length, Advice) when
     ok;
 advise(_, _, _, _) ->
     {error, einval}.
+
+flock(#file_descriptor{module = ?MODULE} = Fd, Type) ->
+    flock_nif(owner_handle(Fd), Type).
 
 % Internal helpers
 
@@ -287,4 +292,7 @@ datasync_nif(_) ->
     {error, einval}.
 
 truncate_nif(_) ->
+    {error, einval}.
+
+flock_nif(_, _) ->
     {error, einval}.
