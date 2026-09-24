@@ -29,7 +29,9 @@
 -export([
     size_info/1,
     to_disk_term/1,
-    from_disk_term/2
+    from_disk_term/2,
+    disk_term_set_revpos/2,
+    stub_from_disk_term/1
 ]).
 
 -export([
@@ -364,6 +366,28 @@ to_disk_term(Att) ->
         BaseProps
     ),
     {list_to_tuple(lists:reverse(Base)), Extended}.
+
+%% Set revpos in a disk term
+disk_term_set_revpos({Base, Extended}, RevPos) when is_tuple(Base), is_list(Extended) ->
+    {disk_term_set_revpos(Base, RevPos), Extended};
+disk_term_set_revpos({_Name, _Type, _Sp, _AttLen, _DiskLen, _RevPos, _Md5, _Enc} = Term, RevPos) ->
+    setelement(6, Term, RevPos).
+
+%% Make a stub from a disk term the same way as to_disk_term/1. It has everything
+%% except the data so we don't need to open a stream here
+stub_from_disk_term({Base, Extended}) when is_tuple(Base), is_list(Extended) ->
+    store(Extended, stub_from_disk_term(Base));
+stub_from_disk_term({Name, Type, _Sp, AttLen, DiskLen, RevPos, Md5, Enc}) ->
+    #att{
+        name = Name,
+        type = Type,
+        att_len = AttLen,
+        disk_len = DiskLen,
+        md5 = Md5,
+        revpos = RevPos,
+        data = stub,
+        encoding = upgrade_encoding(Enc)
+    }.
 
 %% The new disk term format is a simple wrapper around the legacy format. Base
 %% properties will remain in a tuple while the new fields and possibly data from
@@ -896,6 +920,29 @@ attachment_stub_merge_test_() ->
     %% Stub merging needs to demonstrate revpos matching, skipping, and missing
     %% attachment errors.
     {"Attachment stub merging tests", []}.
+
+disk_term_set_revpos_test() ->
+    {Base, Ext} = disk_term_set_revpos({{~"a", t, sp, 1, 1, 1, m, e}, []}, 5),
+    ?assertEqual({~"a", t, sp, 1, 1, 5, m, e}, Base),
+    ?assertEqual([], Ext),
+    Term = disk_term_set_revpos({~"a", t, sp, 1, 1, 1, m, e}, 7),
+    ?assertEqual(7, element(6, Term)).
+
+stub_from_disk_term_test() ->
+    Att = new([
+        {name, ~"a.txt"},
+        {type, ~"text/plain"},
+        {att_len, 3},
+        {disk_len, 5},
+        {md5, ~"md5"},
+        {revpos, 2},
+        {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
+        {encoding, gzip}
+    ]),
+    ?assertEqual(Att#att{data = stub}, stub_from_disk_term(to_disk_term(Att))),
+    ExtendedAtt = store(headers, [{~"X-Foo", ~"bar"}], Att),
+    ExtendedStub = store(data, stub, ExtendedAtt),
+    ?assertEqual(ExtendedStub, stub_from_disk_term(to_disk_term(ExtendedAtt))).
 
 %% Test generators
 

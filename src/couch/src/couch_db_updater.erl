@@ -28,7 +28,8 @@
     add_infos = [],
     rem_seqs = [],
     cur_seq,
-    full_partitions = []
+    full_partitions = [],
+    db
 }).
 
 init({Engine, DbName, FilePath, Options0}) ->
@@ -474,14 +475,15 @@ merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
     #merge_acc{
         revs_limit = Limit,
         replicated_changes = ReplicatedChanges,
-        full_partitions = FullPartitions
+        full_partitions = FullPartitions,
+        db = Db
     } = Acc,
 
     % Track doc ids so we can debug large revision trees
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id),
     NewDocInfo0 = lists:foldl(
         fun({Client, NewDoc}, OldInfoAcc) ->
-            NewInfo = merge_rev_tree(OldInfoAcc, NewDoc, Client, ReplicatedChanges),
+            NewInfo = merge_rev_tree(Db, OldInfoAcc, NewDoc, Client, ReplicatedChanges),
             case is_overflowed(NewInfo, OldInfoAcc, FullPartitions) of
                 true when not ReplicatedChanges ->
                     DocId = NewInfo#full_doc_info.id,
@@ -535,7 +537,7 @@ merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
             merge_rev_trees(RestDocsList, RestOldInfo, NewAcc)
     end.
 
-merge_rev_tree(OldInfo, NewDoc, Client, false) when
+merge_rev_tree(Db, OldInfo, NewDoc, Client, false) when
     OldInfo#full_doc_info.deleted
 ->
     % We're recreating a document that was previously
@@ -561,12 +563,17 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) when
                     _ ->
                         NewDoc#doc.body
                 end,
+            % Attachments here are disk terms. new_revid/1 can't read them, it
+            % wants stubs. So we'll give it stubs with the right digests.
+            Atts = [couch_att:stub_from_disk_term(Att) || Att <- NewDoc#doc.atts],
             RevIdDoc = NewDoc#doc{
                 revs = {OldPos, [OldRev]},
-                body = Body
+                body = Body,
+                atts = Atts
             },
             NewRevId = couch_db:new_revid(RevIdDoc),
-            NewDoc2 = NewDoc#doc{revs = {OldPos + 1, [NewRevId, OldRev]}},
+            NewDoc1 = set_recreated_att_revpos(Db, NewDoc, OldPos + 1),
+            NewDoc2 = NewDoc1#doc{revs = {OldPos + 1, [NewRevId, OldRev]}},
 
             % Merge our modified new doc into the tree
             #full_doc_info{rev_tree = OldTree} = OldInfo,
@@ -586,7 +593,7 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) when
             send_result(Client, NewDoc, conflict),
             OldInfo
     end;
-merge_rev_tree(OldInfo, NewDoc, Client, false) ->
+merge_rev_tree(_Db, OldInfo, NewDoc, Client, false) ->
     % We're attempting to merge a new revision into an
     % undeleted document. To not be a conflict we require
     % that the merge results in extending a branch.
@@ -612,13 +619,35 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) ->
             send_result(Client, NewDoc, conflict),
             OldInfo
     end;
-merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
+merge_rev_tree(_Db, OldInfo, NewDoc, _Client, true) ->
     % We're merging in revisions without caring about
     % conflicts. Most likely this is a replication update.
     OldTree = OldInfo#full_doc_info.rev_tree,
     NewTree0 = couch_doc:to_path(NewDoc),
     {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
+
+% Revpos were set before the document was grafted onto the deleted revision and
+% point to rev 1. Update them to the new revpos. This is needed when we
+% re-create a document which was previously deleted.
+set_recreated_att_revpos(_Db, #doc{atts = []} = Doc, _RevPos) ->
+    Doc;
+set_recreated_att_revpos(Db, #doc{atts = Atts, meta = Meta} = Doc, RevPos) ->
+    Atts1 = [couch_att:disk_term_set_revpos(Att, RevPos) || Att <- Atts],
+    case lists:keytake(comp_body, 1, Meta) of
+        {value, {comp_body, CompBody}, Meta1} ->
+            % comp_body existence means the doc summary was already serialized
+            % with old atts. We can't use that, we need to re-serialize it with
+            % the new atts. keytake removes the old comp_body and then
+            % serialize_doc will re-create it.
+            Doc1 = Doc#doc{body = CompBody, atts = Atts1, meta = Meta1},
+            couch_db_engine:serialize_doc(Db, Doc1);
+        false ->
+            % This is in the odd case we use a different engine than the b-tree
+            % engine which doesn't need the comp_body hack. Just update the
+            % atts then.
+            Doc#doc{atts = Atts1}
+    end.
 
 is_overflowed(_New, _Old, []) ->
     false;
@@ -697,7 +726,8 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
         add_infos = [],
         rem_seqs = [],
         cur_seq = UpdateSeq,
-        full_partitions = FullPartitions
+        full_partitions = FullPartitions,
+        db = Db
     },
     {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
     #merge_acc{
