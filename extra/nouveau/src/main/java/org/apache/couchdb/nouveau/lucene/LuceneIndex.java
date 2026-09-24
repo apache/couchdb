@@ -151,8 +151,7 @@ public class LuceneIndex extends Index {
 
     @Override
     public void doDelete(final String docId, final DocumentDeleteRequest request) throws IOException {
-        final Query query = docIdQuery(docId);
-        writer.deleteDocuments(query);
+        writer.deleteDocuments(docIdTerm(docId));
     }
 
     @Override
@@ -180,6 +179,9 @@ public class LuceneIndex extends Index {
                 },
                 () -> {
                     writer.rollback();
+                },
+                () -> {
+                    analyzer.close();
                 },
                 () -> {
                     if (isDeleteOnClose()) {
@@ -512,10 +514,6 @@ public class LuceneIndex extends Index {
 
     private static byte[] toBytes(final BytesRef bytesRef) {
         return Arrays.copyOfRange(bytesRef.bytes, bytesRef.offset, bytesRef.offset + bytesRef.length);
-    }
-
-    private static Query docIdQuery(final String docId) {
-        return new TermQuery(docIdTerm(docId));
     }
 
     private static Term docIdTerm(final String docId) {
