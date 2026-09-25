@@ -858,7 +858,13 @@ http_1_0_keep_alive(Req, Headers) ->
 
 start_chunked_response(#httpd{mochi_req = MochiReq} = Req, Code, Headers0) ->
     Headers1 = add_headers(Req, Headers0),
-    Resp = handle_response(Req, Code, Headers1, chunked, respond),
+    {ChunkedBody, Headers2} =
+        case should_compress(Req) of
+            true -> {{chunked, {gzip, default}},
+                     [{"Vary", "Accept-Encoding"} | Headers1]};
+            false -> {chunked, Headers1}
+        end,
+    Resp = handle_response(Req, Code, Headers2, ChunkedBody, respond),
     case MochiReq:get(method) of
         'HEAD' -> throw({http_head_abort, Resp});
         _ -> ok
@@ -1422,8 +1428,29 @@ http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     Socket = MochiReq:get(socket),
     mochiweb_socket:recv(Socket, ?MAX_DRAIN_BYTES, ?MAX_DRAIN_TIME_MSEC),
     Result;
+http_respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, respond) when
+    is_binary(Args) orelse is_list(Args)
+->
+    case should_compress(Req) of
+        true ->
+            Headers2 = [{"Vary", "Accept-Encoding"} | Headers],
+            MochiReq:respond({Code, Headers2, {compressed, {gzip, default}, Args}});
+        false ->
+            MochiReq:respond({Code, Headers, Args})
+    end;
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
+
+should_compress(#httpd{mochi_req = MochiReq}) ->
+    case config:get_boolean("chttpd", "response_compression", false) of
+        false ->
+            false;
+        true ->
+            case MochiReq:accepted_encodings(["gzip", "identity"]) of
+                bad_accept_encoding_value -> false;
+                Encs -> lists:member("gzip", Encs)
+            end
+    end.
 
 peer(#httpd{} = Req) ->
     peer(Req#httpd.mochi_req);
