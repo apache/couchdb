@@ -24,6 +24,7 @@
 -define(WRITE_XXHASH_CHECKSUMS_DEFAULT, true).
 
 -define(USE_CFILE_DEFAULT, true).
+-define(USE_CFILE_FLOCK_DEFAULT, true).
 -define(CFILE_SKIP_IOQ_DEFAULT, false).
 -define(CFILE_HANDLE, cfile_handle).
 
@@ -474,7 +475,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = fsync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    {ok, dup(File#file{fd = Fd})};
+                                    maybe_cfile(File#file{fd = Fd}, ReturnPid, Ref);
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -482,7 +483,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, dup(File#file{fd = Fd})}
+                            maybe_cfile(File#file{fd = Fd}, ReturnPid, Ref)
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -499,7 +500,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, dup(File#file{fd = Fd, eof = Eof})};
+                            maybe_cfile(File#file{fd = Fd, eof = Eof}, ReturnPid, Ref);
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -1007,7 +1008,7 @@ get_cfile(Pid) when is_pid(Pid) ->
             end
     end.
 
-dup(#file{fd = Fd} = File) ->
+maybe_cfile(#file{fd = Fd} = File, ReturnPid, Ref) ->
     case config:get_boolean("couchdb", "use_cfile", ?USE_CFILE_DEFAULT) of
         true ->
             case couch_cfile:dup(Fd) of
@@ -1019,12 +1020,24 @@ dup(#file{fd = Fd} = File) ->
                     put(couch_file_fd, {CFd, CFile#file.filepath}),
                     % Use an effective infinity for eof max limit for now
                     put(?CFILE_HANDLE, CFile#file{eof = 1 bsl 60}),
-                    CFile;
-                {error, _Error} ->
-                    File
+                    case
+                        config:get_boolean("couchdb", "use_cfile_flock", ?USE_CFILE_FLOCK_DEFAULT)
+                    of
+                        true ->
+                            case couch_cfile:flock(CFd, exclusive) of
+                                ok ->
+                                    {ok, CFile};
+                                {error, Reason} ->
+                                    init_status_error(ReturnPid, Ref, {error, Reason})
+                            end;
+                        false ->
+                            {ok, CFile}
+                    end;
+                {error, Reason} ->
+                    init_status_error(ReturnPid, Ref, {error, Reason})
             end;
         false ->
-            File
+            {ok, File}
     end.
 
 validate_eof(#file{} = File) ->
