@@ -87,6 +87,8 @@ typedef struct {
 namelist_t test_list;
 namelist_t exclude_list;
 namelist_t exclude_dir_list;
+namelist_t error_list;
+pthread_mutex_t error_list_mutex;
 
 int nthreads;
 pthread_t progress_thread;
@@ -121,7 +123,6 @@ char *harness_skip_features;
 int *harness_skip_features_count;
 char *error_filename;
 char *error_file;
-FILE *error_out;
 char *report_filename;
 int update_errors;
 int slow_test_threshold;
@@ -390,20 +391,22 @@ int namelist_cmp_indirect(const void *a, const void *b)
     return namelist_cmp(*(const char **)a, *(const char **)b);
 }
 
-void namelist_sort(namelist_t *lp)
+void namelist_sort(namelist_t *lp, BOOL remove_duplicates)
 {
     int i, count;
     if (lp->count > 1) {
         qsort(lp->array, lp->count, sizeof(*lp->array), namelist_cmp_indirect);
         /* remove duplicates */
-        for (count = i = 1; i < lp->count; i++) {
-            if (namelist_cmp(lp->array[count - 1], lp->array[i]) == 0) {
-                free(lp->array[i]);
-            } else {
-                lp->array[count++] = lp->array[i];
+        if (remove_duplicates) {
+            for (count = i = 1; i < lp->count; i++) {
+                if (namelist_cmp(lp->array[count - 1], lp->array[i]) == 0) {
+                    free(lp->array[i]);
+                } else {
+                    lp->array[count++] = lp->array[i];
+                }
             }
+            lp->count = count;
         }
-        lp->count = count;
     }
 }
 
@@ -1077,7 +1080,7 @@ void update_exclude_dirs(void)
     }
     ep->count = count;
 
-    namelist_sort(dp);
+    namelist_sort(dp, TRUE);
 
     /* filter out excluded directories */
     for (count = i = 0; i < lp->count; i++) {
@@ -1358,6 +1361,36 @@ int longest_match(const char *str, const char *find, int pos, int *ppos, int lin
     return maxlen;
 }
 
+static __attribute__((__format__(__printf__, 1, 2))) void print_error(const char *fmt, ...)
+{
+    va_list ap;
+    if (update_errors) {
+        char buf[256], *str;
+        int len;
+
+        va_start(ap, fmt);
+        len = vsnprintf(buf, sizeof(buf), fmt, ap);
+        va_end(ap);
+        if (len >= sizeof(buf)) {
+            str = malloc(len + 1);
+            va_start(ap, fmt);
+            vsnprintf(str, len + 1, fmt, ap);
+            va_end(ap);
+        } else {
+            str = buf;
+        }
+        pthread_mutex_lock(&error_list_mutex);
+        namelist_add(&error_list, NULL, str);
+        pthread_mutex_unlock(&error_list_mutex);
+        if (str != buf)
+            free(str);
+    } else {
+        va_start(ap, fmt);
+        vprintf(fmt, ap);
+        va_end(ap);
+    }
+}
+
 static int eval_buf(JSContext *ctx, const char *buf, size_t buf_len,
                     const char *filename, int is_test, int is_negative,
                     const char *error_type, FILE *outfile, int eval_flags,
@@ -1505,11 +1538,11 @@ static int eval_buf(JSContext *ctx, const char *buf, size_t buf_len,
             } else {
                 if (!s) {   // not yet reported
                     if (msg) {
-                        fprintf(error_out, "%s:%d: %sunexpected error type: %s\n",
-                                filename, error_line, strict_mode, msg);
+                        print_error("%s:%d: %sunexpected error type: %s\n",
+                                    filename, error_line, strict_mode, msg);
                     } else {
-                        fprintf(error_out, "%s:%d: %sexpected error\n",
-                                filename, error_line, strict_mode);
+                        print_error("%s:%d: %sexpected error\n",
+                                    filename, error_line, strict_mode);
                     }
                     new_errors++;
                 }
@@ -1525,8 +1558,8 @@ static int eval_buf(JSContext *ctx, const char *buf, size_t buf_len,
                             longest_match(buf, p, pos, &pos, pos_line, &error_line);
                         }
                     }
-                    fprintf(error_out, "%s:%d: %s%s%s\n", filename, error_line, strict_mode,
-                            error_file ? "unexpected error: " : "", msg);
+                    print_error("%s:%d: %s%s%s\n", filename, error_line, strict_mode,
+                                error_file ? "unexpected error: " : "", msg);
 
                     if (s && (!str_equal(s, msg) || error_line != s_line)) {
                         printf("%s:%d: %sprevious error: %s\n", filename, s_line, strict_mode, s);
@@ -1757,15 +1790,6 @@ int run_test_buf(ThreadLocalStorage *tls,
     js_agent_free(ctx);
     JS_FreeContext(ctx);
     JS_FreeRuntime(rt);
-
-    atomic_inc(&test_count);
-    if (ret) {
-        atomic_inc(&test_failed);
-        if (outfile) {
-            /* do not output a failure number to minimize diff */
-            fprintf(outfile, "  FAILED\n");
-        }
-    }
     return ret;
 }
 
@@ -1992,12 +2016,25 @@ int run_test(ThreadLocalStorage *tls, const char *filename, int index)
                                error_type, eval_flags, is_negative, is_async,
                                can_block);
         }
-        if (use_strict) {
+        /* we avoid running the strict mode test if there was an error
+           in the nostrict case to have a single error report per
+           test */
+        if (use_strict && ret == 0) {
             ret |= run_test_buf(tls, filename, harness, ip, buf, buf_len,
                                 error_type, eval_flags | JS_EVAL_FLAG_STRICT,
                                 is_negative, is_async, can_block);
         }
         clocks = clock() - clocks;
+
+        atomic_inc(&test_count);
+        if (ret) {
+            atomic_inc(&test_failed);
+            if (outfile) {
+                /* do not output a failure number to minimize diff */
+                fprintf(outfile, "  FAILED\n");
+            }
+        }
+        
         if (outfile && index >= 0 && clocks >= CLOCKS_PER_SEC / 10) {
             /* output timings for tests that take more than 100 ms */
             fprintf(outfile, " time: %d ms\n", (int)(clocks * 1000LL / CLOCKS_PER_SEC));
@@ -2205,6 +2242,7 @@ void help(void)
            "-s             run tests in strict mode, skip @nostrict tests\n"
            "-E             only run tests from the error file\n"
            "-C             use compact progress indicator\n"
+           "-q             no progress indicator\n"
            "-t             show timings\n"
            "-u             update error file\n"
            "-v             verbose: output error messages\n"
@@ -2240,13 +2278,14 @@ int main(int argc, char **argv)
     BOOL is_module = FALSE;
     BOOL can_block = TRUE;
     BOOL count_skipped_features = FALSE;
+    int enable_progress = -1;
     clock_t clocks;
     
     init_thread_local_storage(tls);
     pthread_mutex_init(&stats_mutex, NULL);
+    pthread_mutex_init(&error_list_mutex, NULL);
 
 #if !defined(_WIN32)
-    compact = !isatty(STDERR_FILENO);
     /* Date tests assume California local time */
     setenv("TZ", "America/Los_Angeles", 1);
 #endif
@@ -2289,7 +2328,10 @@ int main(int argc, char **argv)
         } else if (str_equal(arg, "-v")) {
             verbose++;
         } else if (str_equal(arg, "-C")) {
+            enable_progress = 1;
             compact = 1;
+        } else if (str_equal(arg, "-q")) {
+            enable_progress = 0;
         } else if (str_equal(arg, "-c")) {
             load_config(get_opt_arg(arg, argv[optind++]), ignore);
         } else if (str_equal(arg, "-d")) {
@@ -2338,7 +2380,6 @@ int main(int argc, char **argv)
     }
     nthreads = max_int(nthreads, 1);
 
-    error_out = stdout;
     if (error_filename) {
         error_file = load_file(error_filename, NULL);
         if (only_check_errors && error_file) {
@@ -2348,15 +2389,19 @@ int main(int argc, char **argv)
         if (update_errors) {
             free(error_file);
             error_file = NULL;
-            error_out = fopen(error_filename, "w");
-            if (!error_out) {
-                perror_exit(1, error_filename);
-            }
         }
     }
 
     update_exclude_dirs();
 
+    if (enable_progress < 0) {
+#if defined(_WIN32)
+        enable_progress = 1;
+#else
+        enable_progress = (isatty(STDERR_FILENO) != 0);
+#endif
+    }
+    
     clocks = clock();
 
     if (count_skipped_features) {
@@ -2397,8 +2442,8 @@ int main(int argc, char **argv)
         }
 
         // exclude_dir_list has already been sorted by update_exclude_dirs()
-        namelist_sort(&test_list);
-        namelist_sort(&exclude_list);
+        namelist_sort(&test_list, TRUE);
+        namelist_sort(&exclude_list, TRUE);
         
         for (i = 0; i < test_list.count; i++) {
             switch (include_exclude_or_skip(i)) {
@@ -2413,8 +2458,10 @@ int main(int argc, char **argv)
 
         pthread_cond_init(&progress_cond, NULL);
         pthread_mutex_init(&progress_mutex, NULL);
-        pthread_create(&progress_thread, NULL, show_progress, NULL);
-
+        if (enable_progress) {
+            pthread_create(&progress_thread, NULL, show_progress, NULL);
+        }
+        
         threads = malloc(sizeof(threads[0]) * nthreads);
         for (i = 0; i < nthreads; i++) {
             RunTestDirThread *th = &threads[i];
@@ -2431,12 +2478,13 @@ int main(int argc, char **argv)
             pthread_join(threads[i].tid, NULL);
         free(threads);
 
-        pthread_mutex_lock(&progress_mutex);
-        progress_exit_request = TRUE;
-        pthread_cond_signal(&progress_cond);
-        pthread_mutex_unlock(&progress_mutex);
-        pthread_join(progress_thread, NULL);
-
+        if (enable_progress) {
+            pthread_mutex_lock(&progress_mutex);
+            progress_exit_request = TRUE;
+            pthread_cond_signal(&progress_cond);
+            pthread_mutex_unlock(&progress_mutex);
+            pthread_join(progress_thread, NULL);
+        }
         pthread_mutex_destroy(&progress_mutex);
         pthread_cond_destroy(&progress_cond);
 
@@ -2444,6 +2492,9 @@ int main(int argc, char **argv)
             fclose(outfile);
             outfile = NULL;
         }
+        /* useful to have the report at the end in case stdout and
+           stderr are redirected to a single file */
+        fflush(stdout); 
     } else {
         outfile = stdout;
         while (optind < argc) {
@@ -2509,14 +2560,25 @@ int main(int argc, char **argv)
             fprintf(stderr, "Total user time: %.3fs (nthreads=%d)\n", (double)clocks / CLOCKS_PER_SEC, nthreads);
     }
 
-    if (error_out && error_out != stdout) {
+    if (update_errors) {
+        FILE *error_out = fopen(error_filename, "w");
+        int i;
+        if (!error_out) {
+            perror_exit(1, error_filename);
+        }
+        /* sort the error list so that its order does not depend on
+           the thread scheduling */
+        namelist_sort(&error_list, FALSE);
+        for (i = 0; i < error_list.count; i++) {
+            fputs(error_list.array[i], error_out);
+        }
         fclose(error_out);
-        error_out = NULL;
     }
 
     namelist_free(&test_list);
     namelist_free(&exclude_list);
     namelist_free(&exclude_dir_list);
+    namelist_free(&error_list);
     free(harness_dir);
     free(harness_skip_features);
     free(harness_skip_features_count);
@@ -2525,5 +2587,9 @@ int main(int argc, char **argv)
     free(error_file);
 
     /* Signal that the error file is out of date. */
-    return new_errors || changed_errors || fixed_errors;
+    if (update_errors) {
+        return 0;
+    } else {
+        return new_errors || changed_errors || fixed_errors;
+    }
 }

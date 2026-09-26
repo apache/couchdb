@@ -1,6 +1,6 @@
---- quickjs-master/quickjs.c	2026-06-04 08:53:29
-+++ quickjs/quickjs.c	2026-06-04 13:06:09
-@@ -31922,10 +31922,24 @@
+--- quickjs-master/quickjs.c	2026-09-26 10:44:20.000000000 -0400
++++ quickjs/quickjs.c	2026-09-26 12:50:22.209803231 -0400
+@@ -32088,10 +32088,24 @@
      if (s->token.val == TOK_FUNCTION ||
          (token_is_pseudo_keyword(s, JS_ATOM_async) &&
           peek_token(s, TRUE) == TOK_FUNCTION)) {
