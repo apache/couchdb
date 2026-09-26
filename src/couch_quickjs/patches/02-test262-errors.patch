@@ -1,11 +1,10 @@
---- quickjs-master/test262_errors.txt	2026-06-04 08:53:29
-+++ quickjs/test262_errors.txt	2026-06-04 13:06:09
-@@ -23,6 +23,8 @@
- test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from-and-import-star-as-and-export.js:74: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js' is ambiguous
+--- quickjs-master/test262_errors.txt	2026-09-26 10:44:20.000000000 -0400
++++ quickjs/test262_errors.txt	2026-09-26 12:50:22.212803072 -0400
+@@ -26,6 +26,7 @@
  test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js:75: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-export-star-as-from.js' is ambiguous
  test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js:74: SyntaxError: export 'foo' in module 'test262/test/language/module-code/ambiguous-export-bindings/namespace-unambiguous-if-import-star-as-and-export.js' is ambiguous
-+test262/test/language/statements/expression/S12.4_A1.js:15: unexpected error type: Test262: This statement should not be evaluated.
-+test262/test/language/statements/expression/S12.4_A1.js:15: strict mode: unexpected error type: Test262: This statement should not be evaluated.
+ test262/test/language/module-code/namespace/internals/super-access-to-tdz-binding.js:32: Test262Error: Expected a ReferenceError but got a TypeError
++test262/test/language/statements/expression/S12.4_A1.js:15: unexpected error type: Test262: This statement should not be evaluated
  test262/test/staging/sm/Function/arguments-parameter-shadowing.js:14: Test262Error: Expected SameValue(«true», «false») to be true
  test262/test/staging/sm/Function/constructor-binding.js:11: Test262Error: Expected SameValue(«"function"», «"undefined"») to be true
- test262/test/staging/sm/Function/constructor-binding.js:11: strict mode: Test262Error: Expected SameValue(«"function"», «"undefined"») to be true
+ test262/test/staging/sm/Function/function-bind.js:24: Test262Error: Conforms to NativeFunction Syntax: "function bound unbound() {\n    [native code]\n}"
