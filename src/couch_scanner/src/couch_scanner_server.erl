@@ -266,7 +266,7 @@ sched_exit_update(Id, #sched{} = Sched, Error) ->
     Now = tsec(),
     % If process has been running successfully for a while without crashing
     % reset (forgive) its previous errors.
-    case Now - Start =< heal_threshold_sec() of
+    case Now - Start > heal_threshold_sec() of
         true -> penalize(Now, Sched1#sched{error_count = 1});
         false -> penalize(Now, Sched1#sched{error_count = ErrorCount + 1})
     end.
