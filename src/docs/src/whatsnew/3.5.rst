@@ -43,6 +43,8 @@ Performance
   every message in ``couch_work_queue``, ``couch_db_updater``,
   ``couch_stream`` and ``rexi_buffer``. Adds the ``[hibernate_after]``
   section to configure or disable idle timeouts.
+* :ghissue:`6115`: Optimize and improve validation of changes sequence decoding. Decoding
+  is 2-3x faster. The improvements apply to search (Dreyfus) bookmarks as well.
 
 Bugfixes
 --------
@@ -72,6 +74,11 @@ Bugfixes
 * :ghissue:`6061`: Improve JWT error messages.
 * :ghissue:`6066`: Assume a purge client exists when its existence cannot be
   verified, in view, Dreyfus and Nouveau purge checkpoints.
+* :ghissue:`6130`: Preserve view purge sequences when compacting. No longer
+  skip purges that happen right before a view is compacted.
+* :ghissue:`6129`: Fix attachment revision positions when re-creating a deleted
+  document. Attachments re-created with the same name will now replicate from
+  source to target when previously they weren't.
 * :ghissue:`6081`: Handle ``noconnection``, timeouts and exits from remote
   nodes during index cleanup.
 * :ghissue:`6074`: Handle empty design documents in the ``ddoc_features``
@@ -89,10 +96,15 @@ Bugfixes
 * :ghissue:`6078`: Nouveau: fix explicit sorting by relevance (``-<score>``).
 * :ghissue:`6067`: Nouveau: fix a typo in the Portuguese analyzer name and
   remove unused query serializer classes.
-* :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`: QuickJS engine updates.
+* :ghissue:`6096`: Nouveau: close analyzers after use and use the default value
+  in all cases in the index manager.
+* :ghissue:`6125`: Nouveau: fix string sorting order to match Java's
+  lexicographic order.
+* :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`, :ghissue:`6133`: QuickJS
+  engine updates.
 * :ghissue:`6058`: Update Jiffy to ``2.0.2``
 * :ghissue:`6037`, :ghissue:`6082`: Update Gun to ``2.5.0``.
-* :ghissue:`6065`,  New Prometheus metrics for Clouseau connectivity, database
+* :ghissue:`6065`: New Prometheus metrics for Clouseau connectivity, database
   count, IOQ and Smoosh.
 * :ghissue:`6068`: Add a query server ``process_count`` gauge.
 * :ghissue:`6070`: Supervisor-level replicator auth plugin callbacks
@@ -118,9 +130,10 @@ Tests/CI/Builds
   :ghissue:`6095`: Update dependencies: mochiweb, snappy, ibrowse, meck.
 * :ghissue:`6007`: Update Gradle to ``9.5.1`` for Nouveau.
 * :ghissue:`6017`, :ghissue:`6019`, :ghissue:`6021`, :ghissue:`6073`,
-  :ghissue:`6091`, :ghissue:`6093`, :ghissue:`5990`: CI updates: match
-  variants to worker count, move base images to Trixie, adjust
-  Windows settings.
+  :ghissue:`6091`, :ghissue:`6093`, :ghissue:`5990`, :ghissue:`6112`,
+  :ghissue:`6131`, :ghissue:`6123`: CI updates: match variants to worker
+  count, move base images to Trixie, adjust Windows settings, update Erlang
+  patch versions, skip PPC64LE for now.
 * :ghissue:`6033`, :ghissue:`6042`, :ghissue:`6084`: Test reliability fixes.
 * :ghissue:`6076`: Use OTP 27 sigils in ``chttpd_db_doc_size_tests``.
 
