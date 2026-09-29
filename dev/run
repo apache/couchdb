@@ -1031,7 +1031,8 @@ def startup(ctx):
 
 
 def kill_processes(ctx):
-    for proc in ctx["procs"]:
+    procs = ctx["procs"]
+    for proc in procs:
         if proc and proc.returncode is None:
             if os.name == "nt":
                 sp.call(
@@ -1039,6 +1040,23 @@ def kill_processes(ctx):
                 )
             else:
                 proc.terminate()
+    # A deadlocked Clouseau can ignore SIGTERM (its JVM shutdown hook wedges), which
+    # leaves it holding its epmd node name and poisons the next `make` retry. Give
+    # each process a short grace period to exit on SIGTERM, then SIGKILL any survivor.
+    if os.name != "nt":
+        deadline = time.time() + 5
+        for proc in procs:
+            if proc and proc.returncode is None:
+                try:
+                    proc.wait(timeout=max(0.0, deadline - time.time()))
+                except sp.TimeoutExpired:
+                    pass
+        for proc in procs:
+            if proc and proc.poll() is None:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
     ctx["procs"] = []
 
 
