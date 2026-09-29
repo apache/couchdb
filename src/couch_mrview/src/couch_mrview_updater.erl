@@ -69,14 +69,22 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
 
     {ok, InitState}.
 
-purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
+purge(Db, PurgeSeq, PurgedIdRevs, State) ->
     #mrst{
         id_btree = IdBtree,
         views = Views,
         partitioned = Partitioned
     } = State,
 
-    Ids = [Id || {Id, _Revs} <- PurgedIdRevs],
+    % Keep index entries for docs which still exist and didn't change since the
+    % last index update. An FDI which still exists and changed since the last
+    % index update will have a newer update sequence (because of mrview updater
+    % sequence relabeling) or the doc was re-created, will be processed by the
+    % main indexing update path.
+    Ids0 = [Id || {Id, _Revs} <- PurgedIdRevs],
+    FDIs = couch_db:get_full_doc_infos(Db, Ids0),
+    IdxSeq = State#mrst.update_seq,
+    Ids = [Id || {Id, FDI} <- lists:zip(Ids0, FDIs), gone_or_changed_since(FDI, IdxSeq)],
     {ok, Lookups, IdBtree2} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
 
     MakeDictFun = fun
@@ -118,6 +126,13 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
         views = Views2,
         purge_seq = PurgeSeq
     }}.
+
+% For purging figure out if the FDI was completely purged or has changed since
+% the given index sequence (the last seq index processed).
+gone_or_changed_since(not_found, _IdxSeq) ->
+    true;
+gone_or_changed_since(#full_doc_info{update_seq = Seq}, IdxSeq) ->
+    Seq > IdxSeq.
 
 process_doc(Doc, Seq, #mrst{doc_acc = Acc} = State) when length(Acc) > 100 ->
     couch_work_queue:queue(State#mrst.doc_queue, lists:reverse(Acc)),
