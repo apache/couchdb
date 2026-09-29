@@ -29,6 +29,7 @@
 -export([calculate_external_size/1]).
 -export([calculate_active_size/1]).
 -export([validate_all_docs_args/2, validate_args/1, validate_args/3]).
+-export([check_range/2]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
 -export([extract_view/4, extract_view_reduce/1]).
