@@ -252,47 +252,41 @@ index_definition(#index{} = Index, InitialPurgeSeq) ->
     }.
 
 purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
-    Proc = get_os_process(Index#index.def_lang),
-    try
-        true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def, <<"nouveau">>]),
-        FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, #purge_acc{} = PurgeAcc1) ->
-            PurgeAcc3 =
-                case couch_db:get_full_doc_info(Db, Id) of
-                    not_found ->
-                        Item = nouveau_api:make_purge(
-                            Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
-                        ),
-                        PurgeAcc2 = PurgeAcc1#purge_acc{batch = [Item | PurgeAcc1#purge_acc.batch]},
-                        PurgeAcc2#purge_acc{index_purge_seq = PurgeSeq};
-                    FDI ->
-                        DI = couch_doc:to_doc_info(FDI),
-                        #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
-                        case lists:member({Id, Rev}, PurgeAcc1#purge_acc.exclude_list) of
-                            true ->
-                                PurgeAcc1;
-                            false ->
-                                PurgeAcc1#purge_acc{
-                                    exclude_list = [{Id, Rev} | PurgeAcc1#purge_acc.exclude_list]
-                                }
-                        end
-                end,
-            update_task(1),
-            maybe_flush_batch(PurgeAcc3)
-        end,
+    FoldFun = fun({PurgeSeq, _UUID, Id, _Revs}, #purge_acc{} = PurgeAcc1) ->
+        PurgeAcc3 =
+            case couch_db:get_full_doc_info(Db, Id) of
+                not_found ->
+                    Item = nouveau_api:make_purge(
+                        Id, PurgeAcc1#purge_acc.index_purge_seq, PurgeSeq
+                    ),
+                    PurgeAcc2 = PurgeAcc1#purge_acc{batch = [Item | PurgeAcc1#purge_acc.batch]},
+                    PurgeAcc2#purge_acc{index_purge_seq = PurgeSeq};
+                FDI ->
+                    DI = couch_doc:to_doc_info(FDI),
+                    #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
+                    case lists:member({Id, Rev}, PurgeAcc1#purge_acc.exclude_list) of
+                        true ->
+                            PurgeAcc1;
+                        false ->
+                            PurgeAcc1#purge_acc{
+                                exclude_list = [{Id, Rev} | PurgeAcc1#purge_acc.exclude_list]
+                            }
+                    end
+            end,
+        update_task(1),
+        maybe_flush_batch(PurgeAcc3)
+    end,
 
-        {ok, #purge_acc{} = PurgeAcc3} = couch_db:fold_purge_infos(
-            Db, PurgeAcc0#purge_acc.index_purge_seq, FoldFun, PurgeAcc0, []
-        ),
-        {ok, PurgeAcc4} = flush_batch(PurgeAcc3),
-        DbPurgeSeq = couch_db:get_purge_seq(Db),
-        ok = nouveau_api:set_purge_seq(
-            Index, PurgeAcc4#purge_acc.index_purge_seq, DbPurgeSeq
-        ),
-        update_local_doc(Db, Index, DbPurgeSeq),
-        {ok, PurgeAcc4}
-    after
-        ret_os_process(Proc)
-    end.
+    {ok, #purge_acc{} = PurgeAcc3} = couch_db:fold_purge_infos(
+        Db, PurgeAcc0#purge_acc.index_purge_seq, FoldFun, PurgeAcc0, []
+    ),
+    {ok, PurgeAcc4} = flush_batch(PurgeAcc3),
+    DbPurgeSeq = couch_db:get_purge_seq(Db),
+    ok = nouveau_api:set_purge_seq(
+        Index, PurgeAcc4#purge_acc.index_purge_seq, DbPurgeSeq
+    ),
+    update_local_doc(Db, Index, DbPurgeSeq),
+    {ok, PurgeAcc4}.
 
 update_task(NumChanges) ->
     [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
