@@ -266,18 +266,13 @@ purge_index(Db, Index, #purge_acc{} = PurgeAcc0) ->
                         PurgeAcc2#purge_acc{index_purge_seq = PurgeSeq};
                     FDI ->
                         DI = couch_doc:to_doc_info(FDI),
-                        #doc_info{id = Id, high_seq = Seq, revs = [#rev_info{rev = Rev} | _]} = DI,
+                        #doc_info{id = Id, revs = [#rev_info{rev = Rev} | _]} = DI,
                         case lists:member({Id, Rev}, PurgeAcc1#purge_acc.exclude_list) of
                             true ->
                                 PurgeAcc1;
                             false ->
-                                Item = update_or_delete_index(
-                                    Db, PurgeAcc1#purge_acc.index_update_seq, DI, Proc
-                                ),
                                 PurgeAcc1#purge_acc{
-                                    batch = [Item | PurgeAcc1#purge_acc.batch],
-                                    exclude_list = [{Id, Rev} | PurgeAcc1#purge_acc.exclude_list],
-                                    index_update_seq = Seq
+                                    exclude_list = [{Id, Rev} | PurgeAcc1#purge_acc.exclude_list]
                                 }
                         end
                 end,
