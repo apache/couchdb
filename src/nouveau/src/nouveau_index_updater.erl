@@ -41,7 +41,6 @@
 -record(purge_acc, {
     index,
     exclude_list = [],
-    index_update_seq,
     index_purge_seq,
     batch_size,
     batch
@@ -89,7 +88,6 @@ update(#index{} = Index) ->
 
                 PurgeAcc0 = #purge_acc{
                     index = Index,
-                    index_update_seq = IndexUpdateSeq,
                     index_purge_seq = IndexPurgeSeq,
                     batch_size = config:get_integer("nouveau", "batch_size", 20),
                     batch = []
@@ -108,7 +106,7 @@ update(#index{} = Index) ->
                         changes_done = 0,
                         total_changes = TotalChanges,
                         exclude_idrevs = PurgeAcc1#purge_acc.exclude_list,
-                        update_seq = PurgeAcc1#purge_acc.index_update_seq,
+                        update_seq = IndexUpdateSeq,
                         batch_size = config:get_integer("nouveau", "batch_size", 20),
                         batch = []
                     },
