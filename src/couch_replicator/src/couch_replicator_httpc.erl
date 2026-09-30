@@ -28,6 +28,7 @@
 
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
 -define(MAX_WAIT, 5 * 60 * 1000).
+-define(MAX_REDIRECTS, 5).
 -define(STREAM_STATUS, ibrowse_stream_status).
 -define(STOP_HTTP_WORKER, stop_http_worker).
 
@@ -458,10 +459,16 @@ query_args_to_string([], Acc) ->
 query_args_to_string([{K, V} | Rest], Acc) ->
     query_args_to_string(Rest, [K ++ "=" ++ couch_httpd:quote(V) | Acc]).
 
-do_redirect(_Worker, Code, Headers, #httpdb{url = Url} = HttpDb, Params, _Cb) ->
-    RedirectUrl = redirect_url(Headers, Url),
-    {HttpDb2, Params2} = after_redirect(RedirectUrl, Code, HttpDb, Params),
-    throw({retry, HttpDb2, Params2}).
+do_redirect(Worker, Code, Headers, #httpdb{url = Url} = HttpDb, Params, _Cb) ->
+    Redirects = get_value(redirects, Params, 0),
+    case Redirects >= ?MAX_REDIRECTS of
+        true ->
+            report_error(Worker, HttpDb, Params, {error, too_many_redirects});
+        false ->
+            RedirectUrl = redirect_url(Headers, Url),
+            {HttpDb2, Params2} = after_redirect(RedirectUrl, Code, HttpDb, Params),
+            throw({retry, HttpDb2, ?replace(Params2, redirects, Redirects + 1)})
+    end.
 
 redirect_url(RespHeaders, OrigUrl) ->
     MochiHeaders = mochiweb_headers:make(RespHeaders),
