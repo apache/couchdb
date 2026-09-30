@@ -823,8 +823,10 @@ your source or target as follows;
                 "url": "http://someurl.com/mydb",
                 "auth": {
                     "ibm": {
-                        "apikey": "$apikey"
-                     }
+                        "iam": {
+                            "api_key": "$apikey"
+                        }
+                    }
                 }
             },
             ...
