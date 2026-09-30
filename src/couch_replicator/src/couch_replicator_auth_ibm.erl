@@ -391,9 +391,14 @@ now_secs() ->
 extract_api_key(#httpdb{auth_props = AuthProps}) ->
     case proplists:get_value(~"ibm", AuthProps) of
         {IBMProps} when is_list(IBMProps) ->
-            case proplists:get_value(~"apikey", IBMProps) of
-                APIKey when is_binary(APIKey), byte_size(APIKey) > 0 ->
-                    {ok, APIKey};
+            case proplists:get_value(~"iam", IBMProps) of
+                {IAMProps} when is_list(IAMProps) ->
+                    case proplists:get_value(~"api_key", IAMProps) of
+                        APIKey when is_binary(APIKey), byte_size(APIKey) > 0 ->
+                            {ok, APIKey};
+                        _ ->
+                            {error, missing_api_key}
+                    end;
                 _ ->
                     {error, missing_api_key}
             end;
@@ -541,7 +546,9 @@ retry_ms() ->
 extract_api_key_test() ->
     ?assertEqual(
         {ok, ~"fake_api_key"},
-        extract_api_key(#httpdb{auth_props = [{~"ibm", {[{~"apikey", ~"fake_api_key"}]}}]})
+        extract_api_key(#httpdb{
+            auth_props = [{~"ibm", {[{~"iam", {[{~"api_key", ~"fake_api_key"}]}}]}}]
+        })
     ),
     ?assertEqual({error, missing_api_key}, extract_api_key(#httpdb{auth_props = []})).
 
@@ -594,7 +601,9 @@ test_get_token(_) ->
 test_initialize(_) ->
     ?_test(
         begin
-            HttpDb = #httpdb{auth_props = [{~"ibm", {[{~"apikey", ~"fake_api_key"}]}}]},
+            HttpDb = #httpdb{
+                auth_props = [{~"ibm", {[{~"iam", {[{~"api_key", ~"fake_api_key"}]}}]}}]
+            },
             Result2 = initialize(HttpDb),
             ?assertMatch(
                 {ok, HttpDb, #worker_state{api_key_mac = MAC}} when is_binary(MAC), Result2
