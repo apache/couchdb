@@ -293,9 +293,6 @@ config: [
       name: clouseau1
       domain: 127.0.0.1
     }
-    clouseau: {
-      commit_interval_secs: 1
-    }
   }
 ]
 '''

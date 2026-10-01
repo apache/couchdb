@@ -66,7 +66,7 @@ Param(
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauMethod = "dist", # method for Clouseau to deploy: git or dist (default dist)
     [ValidateNotNullOrEmpty()]
-    [string]$ClouseauVersion = "3.3.0", # select the version of Clouseau to use (default 3.3.0)
+    [string]$ClouseauVersion = "3.4.1-snapshot1", # select the version of Clouseau to use (default 3.3.0)
     [ValidateNotNullOrEmpty()]
     [string]$ClouseauUri = "https://github.com/cloudant-labs/clouseau/releases/download/{0}/clouseau-{0}-dist.zip", # location for retrieving Clouseau (default https://github.com/cloudant-labs/clouseau/releases/download/3.3.0/clouseau-3.3.0-dist.zip)
     [ValidateNotNullOrEmpty()]
@@ -347,13 +347,20 @@ if ($WithClouseau) {
             exit 1
         }
 
-        Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
-        If ($LASTEXITCODE -ne 0) {
+        Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+
+        try {
+            $Archive = [System.IO.Compression.ZipFile]::OpenRead("clouseau.zip")
+            Foreach ($entry in $Archive.Entries.Where( { $_.Name.length -gt 0 })) {
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$ClouseauDir\$($entry.Name)")
+            }
+        }
+        catch {
             Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
             exit 1
         }
 
-        Remove-Item clouseau.zip
+        $Archive.Dispose()
 
         If (-not $WithZIOSE) {
             Invoke-WebRequest -MaximumRedirection 1 -OutFile "$ClouseauDir\$LogbackCoreJar" $LogbackCoreJarUrl
