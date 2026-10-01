@@ -109,7 +109,7 @@ handle_request(#httpd{path_parts = [DbName | RestParts], method = Method} = Req)
             do_db_req(Req, Handler)
     end.
 
-handle_changes_req(#httpd{method = 'POST'} = Req, Db) ->
+handle_changes_req(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     case chttpd:body_length(Req) of
         0 ->
@@ -121,7 +121,7 @@ handle_changes_req(#httpd{method = 'POST'} = Req, Db) ->
 handle_changes_req(#httpd{method = 'GET'} = Req, Db) ->
     handle_changes_req1(Req, Db);
 handle_changes_req(#httpd{path_parts = [_, <<"_changes">>]} = Req, _Db) ->
-    send_method_not_allowed(Req, "GET,POST,HEAD").
+    send_method_not_allowed(Req, "GET,POST,QUERY,HEAD").
 
 handle_changes_req1(#httpd{} = Req, Db) ->
     #changes_args{filter = Raw, style = Style} = Args0 = parse_changes_query(Req),
@@ -166,7 +166,7 @@ handle_changes_req1(#httpd{} = Req, Db) ->
 
 % callbacks for continuous feed (newline-delimited JSON Objects)
 changes_callback(start, #cacc{feed = continuous} = Acc) ->
-    {ok, Resp} = chttpd:start_delayed_json_response(Acc#cacc.mochi, 200),
+    {ok, Resp} = chttpd:start_delayed_json_response(Acc#cacc.mochi, 200, [?ACCEPT_QUERY]),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
     chttpd_stats:incr_rows(),
@@ -188,7 +188,8 @@ changes_callback(start, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Req} = Acc,
     Headers = [
         {"Content-Type", "text/event-stream"},
-        {"Cache-Control", "no-cache"}
+        {"Cache-Control", "no-cache"},
+        ?ACCEPT_QUERY
     ],
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
@@ -221,14 +222,14 @@ changes_callback(start, #cacc{feed = normal} = Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(
         Req,
         200,
-        [{"ETag", Etag}],
+        [{"ETag", Etag}, ?ACCEPT_QUERY],
         FirstChunk
     ),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback(start, Acc) ->
     #cacc{mochi = Req} = Acc,
     FirstChunk = "{\"results\":[\n",
-    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [?ACCEPT_QUERY], FirstChunk),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, Change}, Acc) ->
     chttpd_stats:incr_rows(),
@@ -806,7 +807,9 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_docs">>], user_ctx = Ct
     end;
 db_req(#httpd{path_parts = [_, <<"_bulk_docs">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "POST");
-db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_get">>]} = Req, Db) ->
+db_req(#httpd{method = Method, path_parts = [_, <<"_bulk_get">>]} = Req, Db) when
+    ?POST_OR_QUERY(Method)
+->
     couch_stats:increment_counter([couchdb, httpd, bulk_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
@@ -824,7 +827,7 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_get">>]} = Req, Db) ->
             end
     end;
 db_req(#httpd{path_parts = [_, <<"_bulk_get">>]} = Req, _Db) ->
-    send_method_not_allowed(Req, "POST");
+    send_method_not_allowed(Req, "POST,QUERY");
 db_req(#httpd{method = 'POST', path_parts = [_, <<"_purge">>]} = Req, Db) ->
     couch_stats:increment_counter([couchdb, httpd, purge_requests]),
     chttpd:validate_ctype(Req, "application/json"),
@@ -878,11 +881,11 @@ db_req(#httpd{method = 'GET', path_parts = [_, OP]} = Req, Db) when ?IS_ALL_DOCS
     end;
 db_req(
     #httpd{
-        method = 'POST',
+        method = Method,
         path_parts = [_, OP, <<"queries">>]
     } = Req,
     Db
-) when ?IS_ALL_DOCS(OP) ->
+) when ?IS_ALL_DOCS(OP), ?POST_OR_QUERY(Method) ->
     Props = chttpd:json_body_obj(Req),
     case couch_mrview_util:get_view_queries(Props) of
         undefined ->
@@ -894,8 +897,10 @@ db_req(
     #httpd{path_parts = [_, OP, <<"queries">>]} = Req,
     _Db
 ) when ?IS_ALL_DOCS(OP) ->
-    send_method_not_allowed(Req, "POST");
-db_req(#httpd{method = 'POST', path_parts = [_, OP]} = Req, Db) when ?IS_ALL_DOCS(OP) ->
+    send_method_not_allowed(Req, "POST,QUERY");
+db_req(#httpd{method = Method, path_parts = [_, OP]} = Req, Db) when
+    ?IS_ALL_DOCS(OP), ?POST_OR_QUERY(Method)
+->
     chttpd:validate_ctype(Req, "application/json"),
     {Fields} = chttpd:json_body_obj(Req),
     case couch_util:get_value(<<"keys">>, Fields, nil) of
@@ -907,8 +912,10 @@ db_req(#httpd{method = 'POST', path_parts = [_, OP]} = Req, Db) when ?IS_ALL_DOC
             throw({bad_request, "`keys` body member must be an array."})
     end;
 db_req(#httpd{path_parts = [_, OP]} = Req, _Db) when ?IS_ALL_DOCS(OP) ->
-    send_method_not_allowed(Req, "GET,HEAD,POST");
-db_req(#httpd{method = 'POST', path_parts = [_, <<"_missing_revs">>]} = Req, Db) ->
+    send_method_not_allowed(Req, "GET,HEAD,POST,QUERY");
+db_req(#httpd{method = Method, path_parts = [_, <<"_missing_revs">>]} = Req, Db) when
+    ?POST_OR_QUERY(Method)
+->
     chttpd:validate_ctype(Req, "application/json"),
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     case fabric:get_missing_revs(Db, JsonDocIdRevs) of
@@ -927,8 +934,10 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_missing_revs">>]} = Req, Db)
             )
     end;
 db_req(#httpd{path_parts = [_, <<"_missing_revs">>]} = Req, _Db) ->
-    send_method_not_allowed(Req, "POST");
-db_req(#httpd{method = 'POST', path_parts = [_, <<"_revs_diff">>]} = Req, Db) ->
+    send_method_not_allowed(Req, "POST,QUERY");
+db_req(#httpd{method = Method, path_parts = [_, <<"_revs_diff">>]} = Req, Db) when
+    ?POST_OR_QUERY(Method)
+->
     chttpd:validate_ctype(Req, "application/json"),
     {JsonDocIdRevs} = chttpd:json_body_obj(Req),
     case fabric:get_missing_revs(Db, JsonDocIdRevs) of
@@ -956,7 +965,7 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_revs_diff">>]} = Req, Db) ->
             send_json(Req, {Results2})
     end;
 db_req(#httpd{path_parts = [_, <<"_revs_diff">>]} = Req, _Db) ->
-    send_method_not_allowed(Req, "POST");
+    send_method_not_allowed(Req, "POST,QUERY");
 db_req(
     #httpd{method = 'PUT', path_parts = [_, <<"_security">>], user_ctx = Ctx} = Req,
     Db
@@ -1081,7 +1090,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     {ok, Resp0} = chttpd:start_delayed_json_response(
         VAcc0#vacc.req,
         200,
-        [],
+        [?ACCEPT_QUERY],
         FirstChunk
     ),
     VAcc1 = VAcc0#vacc{resp = Resp0},
@@ -2234,7 +2243,14 @@ parse_doc_query({Key, Value}, Args) ->
             Args
     end.
 
-parse_changes_query(Req) ->
+parse_changes_query(#httpd{method = 'QUERY'} = Req) ->
+    {JsonProps0} = Req#httpd.req_body,
+    JsonProps1 = lists:map(fun to_qs/1, JsonProps0),
+    parse_changes_query(Req, JsonProps1);
+parse_changes_query(#httpd{} = Req) ->
+    parse_changes_query(Req, chttpd:qs(Req)).
+
+parse_changes_query(#httpd{} = Req, Props) ->
     erlang:erase(changes_seq_interval),
     ChangesArgs = lists:foldl(
         fun({Key, Value}, Args) ->
@@ -2331,7 +2347,7 @@ parse_changes_query(Req) ->
             end
         end,
         #changes_args{},
-        chttpd:qs(Req)
+        Props
     ),
     %% if it's an EventSource request with a Last-event-ID header
     %% that should override the `since` query string, since it's
@@ -2347,6 +2363,13 @@ parse_changes_query(Req) ->
         _ ->
             ChangesArgs
     end.
+
+to_qs({Key, Value}) when is_binary(Key), is_binary(Value) ->
+    {binary_to_list(Key), binary_to_list(Value)};
+to_qs({Key, Value}) when is_binary(Key), is_integer(Value) ->
+    {binary_to_list(Key), integer_to_list(Value)};
+to_qs({Key, Value}) when is_list(Key), is_list(Value) ->
+    {Key, Value}.
 
 extract_header_rev(Req, ExplicitRev) when is_binary(ExplicitRev) or is_list(ExplicitRev) ->
     extract_header_rev(Req, couch_doc:parse_rev(ExplicitRev));
