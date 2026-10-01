@@ -57,6 +57,7 @@ all_test_() ->
                     ?TDEF_FE(t_return_400_new_edits_false_no_revs_on_doc_update, ?TIMEOUT),
                     ?TDEF_FE(t_return_ok_true_on_ensure_full_commit, ?TIMEOUT),
                     ?TDEF_FE(t_return_404_for_ensure_full_commit_on_no_db, ?TIMEOUT),
+                    ?TDEF_FE(t_return_404_for_delete_db_with_stale_shard_cache, ?TIMEOUT),
                     ?TDEF_FE(t_accept_live_as_an_alias_for_continuous, ?TIMEOUT),
                     ?TDEF_FE(t_return_headers_after_starting_continuous, ?TIMEOUT),
                     ?TDEF_FE(t_return_404_for_delete_att_on_notadoc, ?TIMEOUT),
@@ -138,6 +139,29 @@ t_return_ok_true_on_ensure_full_commit(Db) ->
 
 t_return_404_for_ensure_full_commit_on_no_db(Db) ->
     {Status, Response} = req(post, url(Db) ++ "-missing-db" ++ "/_ensure_full_commit"),
+    ?assertEqual(404, Status),
+    ?assertMatch(#{<<"error">> := <<"not_found">>}, Response).
+
+% If we delete and then read the db, the deletion can put shard map back into
+% the cache until dbs changes feed kicks it out again. A second delete request
+% then can reach nodes after the dbs doc is gone and so it should answer with a
+% 404.
+t_return_404_for_delete_db_with_stale_shard_cache(_Db) ->
+    Db = ?tempdb(),
+    create_db(Db),
+    Shards = lists:sort(mem3:shards(Db)),
+    delete_db(Db),
+    test_util:wait(fun() ->
+        try mem3:shards(Db) of
+            _ -> wait
+        catch
+            error:database_does_not_exist -> ok
+        end
+    end),
+    % simulate the re-insert
+    true = ets:insert(mem3_shards, Shards),
+    ?assertEqual(Shards, lists:sort(mem3:shards(Db))),
+    {Status, Response} = req(delete, url(Db)),
     ?assertEqual(404, Status),
     ?assertMatch(#{<<"error">> := <<"not_found">>}, Response).
 
