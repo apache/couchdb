@@ -301,6 +301,17 @@ HTTP Server Options
             [chttpd]
             peer_header = X-Couch-Client-IP
 
+    .. config:option:: response_compression :: Compress HTTP responses with gzip
+
+        .. versionadded:: 3.6
+
+        When set to ``true``, CouchDB will compress one-shot HTTP responses with
+        gzip when the client sends an ``Accept-Encoding: gzip`` request header.
+        Chunked responses (e.g. ``_changes``, streaming views) are not affected. ::
+
+            [chttpd]
+            response_compression = false
+
 .. config:section:: httpd :: HTTP Server Options
 
     .. versionchanged:: 3.2 These options were moved to [chttpd] section:
