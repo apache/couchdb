@@ -32,14 +32,14 @@ go(DbName, _Options) ->
         Error ->
             Error
     after
-        % delete the shard files
+        % delete the shard files on nodes which hold the shards
         fabric_util:submit_jobs(Shards, delete_db, [])
     end.
 
-delete_shard_db_doc(Doc) ->
-    Shards = [#shard{node = N} || N <- mem3:nodes()],
+delete_shard_db_doc(DbName) ->
+    Shards = [#shard{node = N, dbname = DbName} || N <- mem3:nodes()],
     RexiMon = fabric_util:create_monitors(Shards),
-    Workers = fabric_util:submit_jobs(Shards, delete_shard_db_doc, [Doc]),
+    Workers = fabric_util:submit_jobs(Shards, delete_shard_db_doc, [DbName]),
     Acc0 = {length(Shards), fabric_dict:init(Workers, nil)},
     try fabric_util:recv(Workers, #shard.ref, fun handle_db_update/3, Acc0) of
         {timeout, {_, WorkersDict}} ->
@@ -74,8 +74,8 @@ maybe_stop(W, Counters) ->
             {Ok, NotFound} = fabric_dict:fold(fun count_replies/3, {0, 0}, Counters),
             case {Ok + NotFound, Ok, NotFound} of
                 {W, 0, W} ->
-                    {#shard{dbname = Name}, _} = hd(Counters),
-                    couch_log:warning("~p not_found ~d", [?MODULE, Name]),
+                    {#shard{dbname = DbName}, _} = hd(Counters),
+                    couch_log:warning("~p not_found ~s", [?MODULE, DbName]),
                     {stop, not_found};
                 {W, _, _} ->
                     {stop, ok};
