@@ -860,8 +860,7 @@ start_chunked_response(#httpd{mochi_req = MochiReq} = Req, Code, Headers0) ->
     Headers1 = add_headers(Req, Headers0),
     {ChunkedBody, Headers2} =
         case should_compress(Req) of
-            true -> {{chunked, {gzip, default}},
-                     [{"Vary", "Accept-Encoding"} | Headers1]};
+            true -> {{chunked, {gzip, default}}, [{"Vary", "Accept-Encoding"} | Headers1]};
             false -> {chunked, Headers1}
         end,
     Resp = handle_response(Req, Code, Headers2, ChunkedBody, respond),
