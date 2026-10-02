@@ -721,14 +721,14 @@ defmodule NouveauTest do
     assert get_total_hits(resp) == 4
 
     # purge two docs in separate requests
-    doc_a = (Enum.at(create_resp.body, 0))
+    doc_a = Enum.at(create_resp.body, 0)
     resp =
       Couch.post("/#{db_name}/_purge",
         body: %{doc_a["id"] => [doc_a["rev"]]}
       )
     assert_status_code(resp, 201)
 
-    doc_b = (Enum.at(create_resp.body, 1))
+    doc_b = Enum.at(create_resp.body, 1)
     resp =
       Couch.post("/#{db_name}/_purge",
         body: %{doc_b["id"] => [doc_b["rev"]]}
@@ -750,6 +750,15 @@ defmodule NouveauTest do
     resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
     assert_status_code(resp, 200)
     assert get_total_hits(resp) == 5
+
+    # b (doc3) should have "foo" instead of "bar"
+    resp = Couch.get(search_url, query: %{q: "foo:bar"})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 0
+
+    resp = Couch.get(search_url, query: %{q: "foo:foo"})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 2
 
     # confirm nouveau responds and has correct sequences
     resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
