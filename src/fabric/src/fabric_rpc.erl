@@ -66,6 +66,8 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
+-define(SEARCH_UNAVAILABLE, {service_unavailable, ~"Search is not available"}).
+
 % How many design docs an index_info/3 worker can process concurrently
 -define(INDEX_INFO_CONCURRENCY, 8).
 
@@ -398,13 +400,23 @@ view_info(ShardName, DDoc) ->
     end.
 
 search_info(false, _ShardName, _DDoc, _IndexName) ->
-    {error, {service_unavailable, ~"Search is not available"}};
+    {error, ?SEARCH_UNAVAILABLE};
 search_info(true, ShardName, DDoc, IndexName) ->
     try
-        norm_error(dreyfus_index:info(ShardName, DDoc, IndexName))
+        search_error(norm_error(dreyfus_index:info(ShardName, DDoc, IndexName)))
     catch
-        _Tag:Error -> {error, Error}
+        _Tag:Error -> search_error({error, Error})
     end.
+
+% search (clouseau) may return different exit/noconnection shapes depending if
+% it was cached in dreyfus:available() or at what point after that we noticed
+% it wasn't connected make the error more uniform and less flaky
+search_error({error, {'EXIT', noconnection}}) ->
+    {error, ?SEARCH_UNAVAILABLE};
+search_error({error, {noconnection, _}}) ->
+    {error, ?SEARCH_UNAVAILABLE};
+search_error(Else) ->
+    Else.
 
 nouveau_info(false, _ShardName, _DDoc, _IndexName) ->
     {error, {service_unavailable, ~"nouveau is not enabled"}};
