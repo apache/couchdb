@@ -244,29 +244,42 @@ purge_index(Db, Index, StartUpdateSeq, #purge_acc{} = PurgeAcc0) ->
             case couch_db:get_full_doc_info(Db, Id) of
                 not_found ->
                     queue_purge(Id, PurgeSeq, PurgeAcc1);
-                #full_doc_info{} = FDI ->
-                    #doc_info{high_seq = Seq} = couch_doc:to_doc_info(FDI),
+                #full_doc_info{update_seq = Seq} ->
+                    %% FDI still exists. If it changed after index last saw it
+                    %% (eg. doc was re-created, or a leaf was purged and all
+                    %% leafs were re-labeled with new sequences), remove it and
+                    %% let the changes phase index the winner (if there is a
+                    %% new one). If the FDI didn't change, then the index
+                    %% already has its current winner (this may be when purging
+                    %% a non-leaf or non-existent revision).
                     case Seq > StartUpdateSeq of
-                        true ->
-                            queue_purge(Id, PurgeSeq, PurgeAcc1);
-                        false ->
-                            PurgeAcc1
+                        true -> queue_purge(Id, PurgeSeq, PurgeAcc1);
+                        false -> PurgeAcc1
                     end
             end,
         update_task(1),
-        maybe_flush_batch(PurgeAcc2)
+        case maybe_flush_batch(PurgeAcc2) of
+            {ok, PurgeAcc3} ->
+                {ok, PurgeAcc3};
+            {error, Reason} ->
+                exit({error, Reason})
+        end
     end,
 
-    {ok, #purge_acc{} = PurgeAcc3} = couch_db:fold_purge_infos(
+    {ok, #purge_acc{} = PurgeAcc4} = couch_db:fold_purge_infos(
         Db, PurgeAcc0#purge_acc.index_purge_seq, FoldFun, PurgeAcc0, []
     ),
-    {ok, PurgeAcc4} = flush_batch(PurgeAcc3),
-    DbPurgeSeq = couch_db:get_purge_seq(Db),
-    ok = nouveau_api:set_purge_seq(
-        Index, PurgeAcc4#purge_acc.index_purge_seq, DbPurgeSeq
-    ),
-    update_local_doc(Db, Index, DbPurgeSeq),
-    ok.
+    case flush_batch(PurgeAcc4) of
+        {ok, PurgeAcc5} ->
+            DbPurgeSeq = couch_db:get_purge_seq(Db),
+            ok = nouveau_api:set_purge_seq(
+                Index, PurgeAcc5#purge_acc.index_purge_seq, DbPurgeSeq
+            ),
+            update_local_doc(Db, Index, DbPurgeSeq),
+            ok;
+        {error, Reason} ->
+            exit({error, Reason})
+    end.
 
 queue_purge(Id, PurgeSeq, #purge_acc{} = PurgeAcc) ->
     Item = nouveau_api:make_purge(
