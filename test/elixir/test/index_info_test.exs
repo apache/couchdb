@@ -8,7 +8,6 @@ defmodule IndexInfoTest do
   """
 
   @pending_keys ["copies", "copies_expected", "maximum", "minimum", "preferred", "total"]
-  @lists ["nouveau_indexes", "search_indexes", "view_indexes"]
   # expected keys in every response
   @keys ["bookmark", "nouveau_indexes", "search_indexes", "total_rows", "view_indexes"]
 
