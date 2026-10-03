@@ -547,7 +547,7 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
             true ->
                 AttData =
                     case Enc of
-                        gzip -> zlib:gunzip(to_binary(Att));
+                        gzip -> couch_util:gunzip_with_limit(to_binary(Att));
                         identity -> to_binary(Att)
                     end,
                 [{<<"data">>, base64:encode(AttData)}]
