@@ -208,7 +208,7 @@ proxy_auth_user(Req) ->
                 true ->
                     case chttpd_util:get_chttpd_auth_config("secret") of
                         undefined ->
-                            Req#httpd{user_ctx = #user_ctx{name = ?l2b(UserName), roles = Roles}};
+                            nil;
                         _Secret ->
                             Token =
                                 try
