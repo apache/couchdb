@@ -283,13 +283,13 @@ Proxy Authentication
 
 .. note::
     To use this authentication method make sure that the
-    ``{chttpd_auth, proxy_authentication_handler}`` value is added to the
+    ``proxy`` value is added to the
     list of the active :config:option:`chttpd/authentication_handlers`:
 
     .. code-block:: ini
 
         [chttpd]
-        authentication_handlers = {chttpd_auth, cookie_authentication_handler}, {chttpd_auth, proxy_authentication_handler}, {chttpd_auth, default_authentication_handler}
+        authentication_handlers = cookie, proxy, default
 
 `Proxy authentication` is very useful in case your application already uses
 some external authentication service and you don't want to duplicate users and
@@ -372,13 +372,13 @@ JWT Authentication
 
 .. note::
     To use this authentication method, make sure that the
-    ``{chttpd_auth, jwt_authentication_handler}`` value is added to the
+    ``jwt`` value is added to the
     list of the active :config:option:`chttpd/authentication_handlers`:
 
     .. code-block:: ini
 
         [chttpd]
-        authentication_handlers = {chttpd_auth, cookie_authentication_handler}, {chttpd_auth, jwt_authentication_handler}, {chttpd_auth, default_authentication_handler}
+        authentication_handlers = cookie, jwt, default
 
 ``JWT authentication`` enables CouchDB to use externally-generated JWT tokens
 instead of defining users or roles in the ``_users`` database.
