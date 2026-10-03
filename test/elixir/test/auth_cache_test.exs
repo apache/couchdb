@@ -22,7 +22,7 @@ defmodule AuthCacheTest do
       %{
         :section => "httpd",
         :key => "authentication_handlers",
-        :value => "{couch_httpd_auth, default_authentication_handler}"
+        :value => "default"
       },
       %{
         :section => "chttpd_auth",
