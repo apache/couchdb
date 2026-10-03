@@ -754,6 +754,68 @@ defmodule NouveauTest do
   end
 
   @tag :with_db
+  @tag query: %{q: 1}
+  test "purge with out of order edits", context do
+    db_name = context[:db_name]
+    create_resp = create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    search_url = "/#{db_name}/_design/foo/_nouveau/bar"
+
+    # confirm all hits
+    resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 4
+
+    # purge two docs in separate requests
+    doc_a = Enum.at(create_resp.body, 0)
+    resp =
+      Couch.post("/#{db_name}/_purge",
+        body: %{doc_a["id"] => [doc_a["rev"]]}
+      )
+    assert_status_code(resp, 201)
+
+    doc_b = Enum.at(create_resp.body, 1)
+    resp =
+      Couch.post("/#{db_name}/_purge",
+        body: %{doc_b["id"] => [doc_b["rev"]]}
+      )
+    assert_status_code(resp, 201)
+
+    # add another doc to catch if update seq has skipped docs
+    resp = Couch.put("/#{db_name}/docC", body: %{"foo" => "c", "bar" => 1})
+    assert_status_code(resp, 201)
+
+    # recreate the purged docs in a different order
+    resp = Couch.put("/#{db_name}/#{doc_b["id"]}", body: %{"foo" => "foo", "bar" => 42})
+    assert_status_code(resp, 201)
+
+    resp = Couch.put("/#{db_name}/#{doc_a["id"]}", body: %{"foo" => "foo", "bar" => 42})
+    assert_status_code(resp, 201)
+
+    # confirm a and b are back
+    resp = Couch.get(search_url, query: %{q: "*:*", include_docs: true})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 5
+
+    # b (doc3) should have "foo" instead of "bar"
+    resp = Couch.get(search_url, query: %{q: "foo:bar"})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 0
+
+    resp = Couch.get(search_url, query: %{q: "foo:foo"})
+    assert_status_code(resp, 200)
+    assert get_total_hits(resp) == 2
+
+    # confirm nouveau responds and has correct sequences
+    resp = Couch.get("/#{db_name}/_design/foo/_nouveau_info/bar")
+    assert_status_code(resp, 200)
+    db_info = info(db_name)
+    assert seq(db_info["update_seq"]) == resp.body["search_index"]["update_seq"]
+    assert seq(db_info["purge_seq"]) == resp.body["search_index"]["purge_seq"]
+  end
+
+  @tag :with_db
   test "index same field with different field types", context do
     db_name = context[:db_name]
     create_search_docs(db_name)
