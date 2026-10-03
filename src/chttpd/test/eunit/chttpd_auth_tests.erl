@@ -28,7 +28,7 @@ teardown(_Url) ->
     ok.
 
 setup_proxy_auth() ->
-    {StartCtx, ProxyCfgFile} = start_couch_with_cfg("{chttpd_auth, proxy_authentication_handler}"),
+    {StartCtx, ProxyCfgFile} = start_couch_with_cfg("proxy"),
     config:set("chttpd", "require_valid_user", "false", false),
     config:set("chttpd_auth", "hash_algorithms", ?WORKING_HASHES, false),
     config:set("chttpd_auth", "proxy_use_secret", "true", false),

@@ -81,17 +81,15 @@ HTTP Server Options
     .. config:option:: authentication_handlers :: Authentication handlers
 
         List of authentication handlers used by CouchDB. You may
-        extend them via third-party plugins or remove some of them if you won't
-        let users to use one of provided methods::
+        remove some of them if you won't let users to use one of provided methods::
 
             [chttpd]
-            authentication_handlers = {chttpd_auth, cookie_authentication_handler}, {chttpd_auth, default_authentication_handler}
+            authentication_handlers = cookie, default
 
-        - ``{chttpd_auth, cookie_authentication_handler}``: used for Cookie auth;
-        - ``{chttpd_auth, proxy_authentication_handler}``: used for Proxy auth;
-        - ``{chttpd_auth, jwt_authentication_handler}``: used for JWT auth;
-        - ``{chttpd_auth, default_authentication_handler}``: used for Basic auth;
-        - ``{couch_httpd_auth, null_authentication_handler}``: disables auth, breaks CouchDB.
+        - ``cookie``: used for Cookie auth;
+        - ``proxy``: used for Proxy auth;
+        - ``jwt``: used for JWT auth;
+        - ``default``: used for Basic auth.
 
     .. config:option:: buffer_response :: Buffered response
 

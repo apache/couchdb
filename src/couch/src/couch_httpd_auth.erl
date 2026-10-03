@@ -23,7 +23,6 @@
     special_test_authentication_handler/1
 ]).
 -export([cookie_authentication_handler/1, cookie_authentication_handler/2]).
--export([null_authentication_handler/1]).
 -export([proxy_authentication_handler/1, proxy_authentification_handler/1]).
 -export([cookie_auth_header/2]).
 -export([handle_session_req/1, handle_session_req/2]).
@@ -153,9 +152,6 @@ default_authentication_handler(Req, AuthModule) ->
                     end
             end
     end.
-
-null_authentication_handler(Req) ->
-    Req#httpd{user_ctx = ?ADMIN_USER}.
 
 %% @doc proxy auth handler.
 %

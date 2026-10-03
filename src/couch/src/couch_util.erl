@@ -15,7 +15,7 @@
 -export([priv_dir/0, normpath/1, fold_files/5]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2]).
--export([abs_pathname/1, abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
+-export([abs_pathname/1, abs_pathname/2, trim/1, remove_whitespace/1, drop_dot_couch_ext/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([validate_utf8/1, to_hex/1, to_hex_bin/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
@@ -350,6 +350,9 @@ trim(String) when is_binary(String) ->
 trim(String) ->
     String2 = lists:dropwhile(fun is_whitespace/1, String),
     lists:reverse(lists:dropwhile(fun is_whitespace/1, lists:reverse(String2))).
+
+remove_whitespace(Str) ->
+    re:replace(Str, "\\s+", "", [global, {return, list}]).
 
 drop_dot_couch_ext(DbName) when is_binary(DbName) ->
     PrefixLen = size(DbName) - 6,
