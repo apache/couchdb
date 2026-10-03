@@ -648,31 +648,35 @@ extract_cookie(#httpd{mochi_req = MochiReq}) ->
 
 %% erlfmt-ignore
 set_auth_handlers() ->
-    AuthenticationDefault =  "{chttpd_auth, cookie_authentication_handler},
-      {chttpd_auth, default_authentication_handler}",
-    AuthenticationSrcs = couch_httpd:make_fun_spec_strs(
-        config:get("chttpd", "authentication_handlers", AuthenticationDefault)),
-    AuthHandlers = lists:map(
-        fun(A) -> {auth_handler_name(A), couch_httpd:make_arity_1_fun(A)} end, AuthenticationSrcs),
-    AuthenticationFuns = AuthHandlers ++ [
+    AuthenticationHandlers0 = config:get("chttpd", "authentication_handlers", "cookie, default"),
+    AuthenticationHandlers1 = couch_httpd:authentication_handler_match(AuthenticationHandlers0),
+    AuthenticationHandlers2 = lists:filtermap(fun authentication_handler_map/1, AuthenticationHandlers1),
+    AuthenticationFuns = AuthenticationHandlers2 ++ [
         fun chttpd_auth:party_mode_handler/1 %% must be last
     ],
     ok = application:set_env(chttpd, auth_handlers, AuthenticationFuns).
 
-% SpecStr is a string like "{my_module, my_fun}"
-% Takes the first token of the function name in front '_' as auth handler name
-% e.g.
-% chttpd_auth:default_authentication_handler: default
-% chttpd_auth_cookie_authentication_handler: cookie
-% couch_http_auth:proxy_authentication_handler: proxy
-%
-% couch_http:auth_handler_name can't be used here, since it assumes the name
-% of the auth handler to be the 6th token split by [\\W_]
-% - this only works for modules with exactly two underscores in their name
-% - is not very robust (a space after the ',' is assumed)
-auth_handler_name(SpecStr) ->
-    {ok, {_, Fun}} = couch_util:parse_term(SpecStr),
-    hd(binary:split(atom_to_binary(Fun, latin1), <<"_">>)).
+% aliases
+authentication_handler_map("cookie") ->
+    {true, {~"cookie", fun chttpd_auth:cookie_authentication_handler/1}};
+authentication_handler_map("default") ->
+    {true, {~"default", fun chttpd_auth:default_authentication_handler/1}};
+authentication_handler_map("jwt") ->
+    {true, {~"jwt", fun chttpd_auth:jwt_authentication_handler/1}};
+authentication_handler_map("proxy") ->
+    {true, {~"proxy", fun chttpd_auth:proxy_authentication_handler/1}};
+% deprecated
+authentication_handler_map("{chttpd_auth,jwt_authentication_handler}") ->
+    {true, {~"jwt", fun chttpd_auth:jwt_authentication_handler/1}};
+authentication_handler_map("{chttpd_auth,cookie_authentication_handler}") ->
+    {true, {~"cookie", fun chttpd_auth:cookie_authentication_handler/1}};
+authentication_handler_map("{chttpd_auth,default_authentication_handler}") ->
+    {true, {~"default", fun chttpd_auth:default_authentication_handler/1}};
+authentication_handler_map("{chttpd_auth,proxy_authentication_handler}") ->
+    {true, {~"proxy", fun chttpd_auth:proxy_authentication_handler/1}};
+% reject everything else
+authentication_handler_map(_) ->
+    false.
 
 authenticate_request(Req) ->
     {ok, AuthenticationFuns} = application:get_env(chttpd, auth_handlers),

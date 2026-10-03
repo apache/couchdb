@@ -5,11 +5,7 @@ defmodule JwtRolesClaimTest do
     %{
       :section => "chttpd",
       :key => "authentication_handlers",
-      :value => [
-                  "{chttpd_auth, jwt_authentication_handler}, ",
-                  "{chttpd_auth, cookie_authentication_handler}, ",
-                  "{chttpd_auth, default_authentication_handler})"
-                ] |> Enum.join
+      :value => "jwt, cookie, default"
     },
     %{
       :section => "jwt_keys",

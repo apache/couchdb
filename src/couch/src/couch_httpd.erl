@@ -21,7 +21,6 @@
 -export([header_value/2, header_value/3, qs_value/2, qs_value/3, qs/1, qs_json_value/3]).
 -export([path/1, absolute_uri/2, body_length/1]).
 -export([verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4, error_info/1]).
--export([make_fun_spec_strs/1]).
 -export([make_arity_1_fun/1, make_arity_2_fun/1, make_arity_3_fun/1]).
 -export([parse_form/1, json_body/1, json_body_obj/1, body/1]).
 -export([doc_etag/1, doc_etag/3, make_etag/1, etag_match/2, etag_respond/3, etag_maybe/2]).
@@ -47,15 +46,13 @@
 -export([set_auth_handlers/0]).
 -export([maybe_decompress/2]).
 -export([peer/1]).
+-export([authentication_handler_match/1]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
 -define(MAX_DRAIN_TIME_MSEC, 1000).
 -define(DEFAULT_SOCKET_OPTIONS, "[{sndbuf, 262144}]").
--define(DEFAULT_AUTHENTICATION_HANDLERS,
-    "{couch_httpd_auth, cookie_authentication_handler}, "
-    "{couch_httpd_auth, default_authentication_handler}"
-).
+-define(DEFAULT_AUTHENTICATION_HANDLERS, "cookie, default").
 
 start_link() ->
     start_link(http).
@@ -186,26 +183,48 @@ stop() ->
     catch mochiweb_http:stop(https).
 
 set_auth_handlers() ->
-    AuthenticationSrcs = make_fun_spec_strs(
-        config:get(
-            "httpd",
-            "authentication_handlers",
-            ?DEFAULT_AUTHENTICATION_HANDLERS
-        )
+    AuthenticationHandlers0 = config:get(
+        "httpd", "authentication_handlers", ?DEFAULT_AUTHENTICATION_HANDLERS
     ),
-    AuthHandlers = lists:map(
-        fun(A) -> {auth_handler_name(A), make_arity_1_fun(A)} end, AuthenticationSrcs
+    AuthenticationHandlers1 = authentication_handler_match(AuthenticationHandlers0),
+    AuthenticationHandlers2 = lists:filtermap(
+        fun authentication_handler_map/1, AuthenticationHandlers1
     ),
     AuthenticationFuns =
-        AuthHandlers ++
+        AuthenticationHandlers2 ++
             [
                 %% must be last
                 fun couch_httpd_auth:party_mode_handler/1
             ],
     ok = application:set_env(couch, auth_handlers, AuthenticationFuns).
 
-auth_handler_name(SpecStr) ->
-    lists:nth(?HANDLER_NAME_IN_MODULE_POS, re:split(SpecStr, "[\\W_]", [])).
+authentication_handler_match(Str) ->
+    case
+        re:run(couch_util:remove_whitespace(Str), "({[a-z0-9_]+,[a-z0-9_]+}|[a-z0-9_]+)", [
+            global, {capture, first, list}
+        ])
+    of
+        {match, Matches} ->
+            [M || [M] <- Matches];
+        nomatch ->
+            []
+    end.
+
+% aliases
+authentication_handler_map("cookie") ->
+    {true, {~"cookie", fun couch_httpd_auth:cookie_authentication_handler/1}};
+authentication_handler_map("default") ->
+    {true, {~"default", fun couch_httpd_auth:default_authentication_handler/1}};
+% deprecated or tests
+authentication_handler_map("{couch_httpd_auth,cookie_authentication_handler}") ->
+    {true, {~"cookie", fun couch_httpd_auth:cookie_authentication_handler/1}};
+authentication_handler_map("{couch_httpd_auth,default_authentication_handler}") ->
+    {true, {~"default", fun couch_httpd_auth:default_authentication_handler/1}};
+authentication_handler_map("{couch_httpd_auth,special_test_authentication_handler}") ->
+    {true, {~"special_test", fun couch_httpd_auth:special_test_authentication_handler/1}};
+% reject everything else
+authentication_handler_map(_) ->
+    false.
 
 get_httpd_handlers() ->
     {ok, HttpdGlobalHandlers} = application:get_env(couch, httpd_global_handlers),
@@ -266,10 +285,6 @@ make_arity_3_fun(SpecStr) ->
         {ok, {Mod, Fun}} ->
             fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3) end
     end.
-
-% SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
-make_fun_spec_strs(SpecStr) ->
-    re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
 
 handle_request(MochiReq) ->
     Body = proplists:get_value(body, MochiReq:get(opts)),
@@ -1537,5 +1552,14 @@ should_accept_code_and_message(DontLogFlag) ->
         {"Should accept code >= 500 and JSON error",
             ?_assertEqual(ok, log_response(500, {json, {[{error, undef}]}}))}
     ]}.
+
+authentication_handler_match_test() ->
+    ?assertEqual("", authentication_handler_match("")),
+    ?assertEqual(["foo", "bar"], authentication_handler_match(" foo , bar ")),
+    ?assertEqual(["foo", "bar"], authentication_handler_match("foo,bar")),
+    ?assertEqual(["{foo,bar}"], authentication_handler_match("{foo,bar}")),
+    ?assertEqual(["{foo,bar}"], authentication_handler_match("{foo, bar}")),
+    ?assertEqual(["foo", "{foo,bar}", "bar"], authentication_handler_match("foo, {foo, bar}, bar")),
+    ?assertEqual(["{foo,bar}", "baz"], authentication_handler_match("{foo , bar}, baz")).
 
 -endif.
