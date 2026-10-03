@@ -45,7 +45,7 @@
 -export([check_max_request_length/1]).
 -export([handle_request/1]).
 -export([set_auth_handlers/0]).
--export([maybe_decompress/2]).
+-export([maybe_decompress/2, maybe_decompress/3]).
 -export([peer/1]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
@@ -724,9 +724,13 @@ json_body_obj(Httpd) ->
     end.
 
 maybe_decompress(Httpd, Body) ->
+    MaxSize = chttpd_util:get_chttpd_config_integer("max_http_request_size", 4294967296),
+    maybe_decompress(Httpd, Body, MaxSize).
+
+maybe_decompress(Httpd, Body, MaxSize) ->
     case header_value(Httpd, "Content-Encoding", "identity") of
         "gzip" ->
-            zlib:gunzip(Body);
+            couch_util:gunzip_with_limit(Body, MaxSize);
         "identity" ->
             Body;
         Else ->
