@@ -41,9 +41,15 @@ authorize_request_int(#httpd{path_parts = [<<"_replicator">>], method = 'PUT'} =
     require_admin(Req);
 authorize_request_int(#httpd{path_parts = [<<"_replicator">>], method = 'DELETE'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts = [<<"_replicator">>, <<"_all_docs">> | _]} = Req) ->
+authorize_request_int(#httpd{path_parts = [DbName, <<"_all_docs">> | _]} = Req) when
+    DbName =:= <<"_replicator">>;
+    binary_part(DbName, {byte_size(DbName), -12}) =:= <<"/_replicator">>
+->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts = [<<"_replicator">>, <<"_changes">> | _]} = Req) ->
+authorize_request_int(#httpd{path_parts = [DbName, <<"_changes">> | _]} = Req) when
+    DbName =:= <<"_replicator">>;
+    binary_part(DbName, {byte_size(DbName), -12}) =:= <<"/_replicator">>
+->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts = [<<"_replicator">> | _]} = Req) ->
     db_authorization_check(Req);
@@ -53,9 +59,15 @@ authorize_request_int(#httpd{path_parts = [<<"_users">>], method = 'PUT'} = Req)
     require_admin(Req);
 authorize_request_int(#httpd{path_parts = [<<"_users">>], method = 'DELETE'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts = [<<"_users">>, <<"_all_docs">> | _]} = Req) ->
+authorize_request_int(#httpd{path_parts = [DbName, <<"_all_docs">> | _]} = Req) when
+    DbName =:= <<"_users">>;
+    binary_part(DbName, {byte_size(DbName), -7}) =:= <<"/_users">>
+->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts = [<<"_users">>, <<"_changes">> | _]} = Req) ->
+authorize_request_int(#httpd{path_parts = [DbName, <<"_changes">> | _]} = Req) when
+    DbName =:= <<"_users">>;
+    binary_part(DbName, {byte_size(DbName), -7}) =:= <<"/_users">>
+->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts = [<<"_users">> | _]} = Req) ->
     db_authorization_check(Req);
@@ -166,3 +178,130 @@ maybe_admin_only_dbs(Req) ->
         true -> require_admin(Req);
         false -> Req
     end.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+users_all_docs_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"_users">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+users_all_docs_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"_users">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+foo_users_all_docs_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"foo/_users">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+foo_users_all_docs_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"foo/_users">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+users_changes_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"_users">>, <<"_changes">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+users_changes_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"_users">>, <<"_changes">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+foo_users_changes_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"foo/_users">>, <<"_changes">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+foo_users_changes_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"foo/_users">>, <<"_changes">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+%%%
+
+replicator_all_docs_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"_replicator">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+replicator_all_docs_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"_replicator">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+foo_replicator_all_docs_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"foo/_replicator">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+foo_replicator_all_docs_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"foo/_replicator">>, <<"_all_docs">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+replicator_changes_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"_replicator">>, <<"_changes">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+replicator_changes_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"_replicator">>, <<"_changes">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+foo_replicator_changes_no_admin_test() ->
+    Throw = {unauthorized, <<"You are not a server admin.">>},
+    Req = #httpd{
+        path_parts = [<<"foo/_replicator">>, <<"_changes">>],
+        user_ctx = #user_ctx{}
+    },
+    ?assertThrow(Throw, authorize_request_int(Req)).
+
+foo_replicator_changes_admin_test() ->
+    Req = #httpd{
+        path_parts = [<<"foo/_replicator">>, <<"_changes">>],
+        user_ctx = #user_ctx{roles = [<<"_admin">>]}
+    },
+    ?assertEqual(Req, authorize_request_int(Req)).
+
+-endif.
