@@ -347,10 +347,22 @@ if ($WithClouseau) {
             exit 1
         }
 
-        Expand-Archive clouseau.zip -DestinationPath $ClouseauDir -Force
-        If ($LASTEXITCODE -ne 0) {
+        Add-Type -AssemblyName 'System.IO.Compression.FileSystem'
+
+        try {
+            $Archive = [System.IO.Compression.ZipFile]::OpenRead("clouseau.zip")
+            Foreach ($entry in $Archive.Entries.Where({ $_.Name.length -gt 0 })) {
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$ClouseauDir\$($entry.Name)")
+            }
+        }
+        catch {
             Write-Output "ERROR: Clouseau distribution package (clouseau.zip) could not be extracted."
             exit 1
+        }
+        finally {
+            if ($null -ne $Archive) {
+                $Archive.Dispose()
+            }
         }
 
         Remove-Item clouseau.zip
