@@ -88,7 +88,7 @@ interact with the local node's configuration.
                 "secure_rewrites": "true"
             },
             "httpd": {
-                "authentication_handlers": "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}",
+                "authentication_handlers": "cookie, default",
                 "bind_address": "192.168.0.2",
                 "max_connections": "2048",
                 "port": "5984",
@@ -156,7 +156,7 @@ interact with the local node's configuration.
         Server: CouchDB (Erlang/OTP)
 
         {
-            "authentication_handlers": "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}",
+            "authentication_handlers": "cookie, default",
             "bind_address": "127.0.0.1",
             "default_handler": "{couch_httpd_db, handle_request}",
             "port": "5984"
