@@ -47,6 +47,7 @@
 -export([ejson_to_map/1]).
 -export([new_set/0, set_from_list/1]).
 -export([hibernate_after/1]).
+-export([gunzip_with_limit/1, gunzip_with_limit/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -818,4 +819,30 @@ hibernate_after(Module) when is_atom(Module) ->
             [];
         Timeout when is_integer(Timeout) ->
             [{hibernate_after, Timeout}]
+    end.
+
+gunzip_with_limit(Data) ->
+    Limit = chttpd_util:get_chttpd_config_integer("max_http_request_size", 4294967296),
+    gunzip_with_limit(Data, Limit).
+
+gunzip_with_limit(Data, Limit) when is_integer(Limit), Limit >= 0 ->
+    Z = zlib:open(),
+    try
+        ok = zlib:inflateInit(Z, 16 + 15),
+        Result = gunzip_loop(Z, Limit, zlib:safeInflate(Z, Data), 0, []),
+        ok = zlib:inflateEnd(Z),
+        iolist_to_binary(lists:reverse(Result))
+    after
+        zlib:close(Z)
+    end.
+
+gunzip_loop(Z, Limit, {Action, Output}, AccLen0, AccChunks) ->
+    AccLen1 = AccLen0 + iolist_size(Output),
+    case AccLen1 > Limit of
+        true ->
+            exit({body_too_large, AccLen1});
+        false when Action == continue ->
+            gunzip_loop(Z, Limit, zlib:safeInflate(Z, []), AccLen1, [Output | AccChunks]);
+        false when Action == finished ->
+            [Output | AccChunks]
     end.
