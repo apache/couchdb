@@ -1447,7 +1447,7 @@ maybe_decompress(Httpd, Body) ->
     case header_value(Httpd, "Content-Encoding", "identity") of
         "gzip" ->
             try
-                zlib:gunzip(Body)
+                couch_util:gunzip_with_limit(Body)
             catch
                 error:data_error ->
                     throw({bad_request, "Request body is not properly gzipped."})
