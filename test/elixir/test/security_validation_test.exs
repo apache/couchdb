@@ -61,7 +61,7 @@ defmodule SecurityValidationTest do
 
     configs = [
       {"chttpd", "authentication_handlers",
-       "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
+       "cookie, default"},
       {"chttpd_auth", "authentication_db", auth_db_name}
     ]
 

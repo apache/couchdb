@@ -26,8 +26,7 @@ setup() ->
     ok = config:set(
         "httpd",
         "authentication_handlers",
-        "{couch_httpd_auth, cookie_authentication_handler}, "
-        "{couch_httpd_auth, default_authentication_handler}",
+        "cookie, default",
         Persist
     ),
     ok = config:set("chttpd", "require_valid_user", "false", Persist),
