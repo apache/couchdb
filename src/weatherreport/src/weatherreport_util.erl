@@ -30,7 +30,7 @@
 -module(weatherreport_util).
 -export([
     short_name/1,
-    run_command/1,
+    run_command/2,
     binary_to_float/1,
     flush_stdout/0,
     check_proc_count/3
@@ -46,16 +46,25 @@ short_name(Mod) when is_atom(Mod) ->
 
 %% @doc Runs a shell command and returns the output. stderr is
 %% redirected to stdout so its output will be included.
--spec run_command(Command :: iodata()) -> StdOut :: iodata().
-run_command(Command) ->
-    weatherreport_log:log(
-        node(),
-        debug,
-        "Running shell command: ~s",
-        [Command]
-    ),
-    Port = open_port({spawn, Command}, [exit_status, stderr_to_stdout]),
-    do_read(Port, []).
+-spec run_command(Command :: string(), Args :: [string() | binary()]) -> StdOut :: iodata().
+run_command(Command, Args) ->
+    case os:find_executable(Command) of
+        false ->
+            [];
+        FileName ->
+            weatherreport_log:log(
+                node(),
+                debug,
+                "Running shell command: ~s with args: ~p",
+                [FileName, Args]
+            ),
+            Port = open_port({spawn_executable, FileName}, [
+                {args, Args},
+                exit_status,
+                stderr_to_stdout
+            ]),
+            do_read(Port, [])
+    end.
 
 do_read(Port, Acc) ->
     receive
