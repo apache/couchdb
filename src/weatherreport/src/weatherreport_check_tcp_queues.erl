@@ -77,7 +77,7 @@ sum_to_message(Sum, Prefix) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-    Netstats = weatherreport_util:run_command("netstat"),
+    Netstats = weatherreport_util:run_command("netstat", []),
     {SumRecvQ, SumSendQ} = sum_queues(Netstats),
     [sum_to_message(SumRecvQ, "recv_q"), sum_to_message(SumSendQ, "send_q")].
 
