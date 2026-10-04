@@ -76,6 +76,7 @@ Bugfixes
   verified, in view, Dreyfus and Nouveau purge checkpoints.
 * :ghissue:`6130`: Preserve view purge sequences when compacting. No longer
   skip purges that happen right before a view is compacted.
+* :ghissue:`6140`: Fix purging non-leaf revisions in map-reduce views.
 * :ghissue:`6129`: Fix attachment revision positions when re-creating a deleted
   document. Attachments re-created with the same name will now replicate from
   source to target when previously they weren't.
@@ -87,6 +88,7 @@ Bugfixes
   source shard check.
 * :ghissue:`6102`: Fix ``group_by_proximity`` returning an empty same-zone
   shard list when the coordinator does not hold a copy of the shard.
+* :ghissue:`6145`: Fix spurious ``500`` during concurrent database deletion.
 * :ghissue:`5948`: Handle ``{bad_request, Error, Reason}`` triples from
   design document validators in ``fabric_doc_update``.
 * :ghissue:`5839`: Only increment the ``vdu_rejects`` counter on actual VDU
@@ -100,6 +102,7 @@ Bugfixes
   in all cases in the index manager.
 * :ghissue:`6125`: Nouveau: fix string sorting order to match Java's
   lexicographic order.
+* :ghissue:`6138`: Nouveau: fix purge out of order index update
 * :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`, :ghissue:`6133`: QuickJS
   engine updates.
 * :ghissue:`6058`: Update Jiffy to ``2.0.2``
@@ -109,6 +112,16 @@ Bugfixes
 * :ghissue:`6068`: Add a query server ``process_count`` gauge.
 * :ghissue:`6070`: Supervisor-level replicator auth plugin callbacks
   ``sup_initialize/0`` and ``sup_cleanup/1``.
+* :ghissue:`6141`: Limit number of redirects in replicator.
+* :ghissue:`6147`: Make ``_search_cleanup`` and ``_nouveau_cleanup`` admin-only
+  like ``_view_cleanup``.
+* :ghissue:`6149`: Fix the ``_users`` and ``_replicator`` database name suffix
+  check in the auth handler.
+* :ghissue:`6148`: Fix default proxy authentication headers config value.
+* :ghissue:`6151`: Use incremental decompression for reques bodies
+* :ghissue:`6152`: Use short names for auth handlers. The previous tuple forms
+  are still accepted.
+* :ghissue:`6153`: Improve command running in ``weatherreport``
 
 Docs
 ----
