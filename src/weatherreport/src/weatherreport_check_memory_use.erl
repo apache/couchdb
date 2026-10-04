@@ -52,7 +52,7 @@ valid() ->
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
     Pid = weatherreport_node:pid(),
-    Output = weatherreport_util:run_command("ps -o pmem,rss -p " ++ Pid),
+    Output = weatherreport_util:run_command("ps", ["-o", "pmem,rss", "-p", Pid]),
     [_, _, Percent, RealSize | _] = string:tokens(Output, "/n \n"),
     Messages = [{info, {process_usage, Percent, RealSize}}],
     case weatherreport_util:binary_to_float(list_to_binary(Percent)) >= 90 of

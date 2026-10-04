@@ -81,7 +81,7 @@ get_vm_env(Key) ->
 %% @doc Determines the user/uid that the script is running as.
 -spec user() -> string().
 user() ->
-    case weatherreport_util:run_command("whoami") of
+    case weatherreport_util:run_command("whoami", []) of
         [] ->
             undefined;
         Resp ->
