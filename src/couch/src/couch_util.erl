@@ -517,10 +517,12 @@ reorder_results(Keys, SortedResults, Default) ->
     [maps:get(Key, Map, Default) || Key <- Keys].
 
 url_strip_password(Url) when is_list(Url) ->
+    % \1: any scheme any case
+    % \2: username, possibly empty
     re:replace(
         Url,
-        "(http|https|socks5)://([^:]+):[^@]+@(.*)$",
-        "\\1://\\2:*****@\\3",
+        "^(\\s*[a-zA-Z][a-zA-Z0-9+.-]*://)([^:/?#]*):[^/?#]*@",
+        "\\1\\2:*****@",
         [{return, list}]
     );
 url_strip_password(Other) ->
