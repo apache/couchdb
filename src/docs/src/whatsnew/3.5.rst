@@ -28,6 +28,13 @@ Version 3.5.3
 .. note::
     Erlang/OTP 27 is the minimum supported version
 
+Features
+--------
+
+* :ghissue:`6069`, :ghissue:`6143`: New replicator authentication plugin
+  ``couch_replicator_auth_ibm`` for IBM IAM API keys. Disabled by default.
+  Enabled through ``[replicator] auth_plugins``.
+
 Performance
 -----------
 
@@ -103,8 +110,8 @@ Bugfixes
 * :ghissue:`6125`: Nouveau: fix string sorting order to match Java's
   lexicographic order.
 * :ghissue:`6138`: Nouveau: fix purge out of order index update
-* :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`, :ghissue:`6133`: QuickJS
-  engine updates.
+* :ghissue:`6018`, :ghissue:`6021`, :ghissue:`6023`, :ghissue:`6133`,
+  :ghissue:`6156`: QuickJS updates.
 * :ghissue:`6058`: Update Jiffy to ``2.0.2``
 * :ghissue:`6037`, :ghissue:`6082`: Update Gun to ``2.5.0``.
 * :ghissue:`6065`: New Prometheus metrics for Clouseau connectivity, database
@@ -122,6 +129,11 @@ Bugfixes
 * :ghissue:`6152`: Use short names for auth handlers. The previous tuple forms
   are still accepted.
 * :ghissue:`6153`: Improve command running in ``weatherreport``
+* :ghissue:`6134`: Fix the scanner backoff logic.
+* :ghissue:`6157`: Strip credentials from replication documents read by
+  non-owners in a shared ``_replicator`` database, from log messages and from
+  replication status responses.
+* :ghissue:`6155`: Update Fauxton to ``v1.3.7``.
 
 Docs
 ----
@@ -149,6 +161,10 @@ Tests/CI/Builds
   patch versions, skip PPC64LE for now.
 * :ghissue:`6033`, :ghissue:`6042`, :ghissue:`6084`: Test reliability fixes.
 * :ghissue:`6076`: Use OTP 27 sigils in ``chttpd_db_doc_size_tests``.
+* :ghissue:`6135`: ``dev/run`` escalates to ``SIGKILL`` when a Clouseau
+  process ignores ``SIGTERM`` during teardown.
+* :ghissue:`6150`: Windows: ``configure.ps1`` extracts ``clouseau.zip`` flat,
+  as needed since Clouseau 3.4.0.
 
 .. _release/3.5.2:
 
