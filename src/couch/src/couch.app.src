@@ -36,6 +36,7 @@
         os_mon,
 
         % Upstream deps
+        gun,
         ibrowse,
         mochiweb,
 
