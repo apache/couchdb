@@ -286,3 +286,33 @@ wait_hibernate(Pid) ->
         end
     end,
     test_util:wait(WaitFun).
+
+url_strip_password_test() ->
+    Cases = [
+        {"http://h/db", "http://h/db"},
+        {"http://h:15984/db", "http://h:15984/db"},
+        {"http://u@h/db", "http://u@h/db"},
+        {"http://u:p@h/db", "http://u:*****@h/db"},
+        {"https://u:p@h:5984/db?a=b", "https://u:*****@h:5984/db?a=b"},
+        {"socks5://u:p@h:1081", "socks5://u:*****@h:1081"},
+        {"HTTPS://u:p@h/db", "HTTPS://u:*****@h/db"},
+        {"https://:p@h/db", "https://:*****@h/db"},
+        {"https://u:p@ss@h/db", "https://u:*****@h/db"},
+        {"https://u:p%40ss@h/db", "https://u:*****@h/db"},
+        {"http://u:p@[::1]:25984/db", "http://u:*****@[::1]:25984/db"},
+        {"http://u:p@h/d@b", "http://u:*****@h/d@b"},
+        {"http://h/d:x@b", "http://h/d:x@b"},
+        {"http://h:35984?x=a@b", "http://h:35984?x=a@b"},
+        {"https://z@foo.bar:p@h/db", "https://z@foo.bar:*****@h/db"},
+        {"https://z@foo.bar:p@ss@h/db", "https://z@foo.bar:*****@h/db"},
+        {"https://z@foo.bar@h/db", "https://z@foo.bar@h/db"},
+        {"http://u@h:15984/db", "http://u@h:15984/db"},
+        {"http://[::1]:25984/d@b", "http://[::1]:25984/d@b"}
+    ],
+    lists:foreach(
+        fun({Url, Expect}) ->
+            ?assertEqual(Expect, couch_util:url_strip_password(Url))
+        end,
+        Cases
+    ),
+    ?assertEqual(undefined, couch_util:url_strip_password(undefined)).

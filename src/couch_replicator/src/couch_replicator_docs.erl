@@ -295,10 +295,7 @@ after_doc_read(#doc{body = {Body}} = Doc, Db) ->
                     % replicator app: this is another user reading it. Strip
                     % the creds and make up a fake "rev" since we're returning
                     % a technically non-existent document body
-                    Source = strip_credentials(get_value(<<"source">>, Body)),
-                    Target = strip_credentials(get_value(<<"target">>, Body)),
-                    NewBody0 = ?replace(Body, <<"source">>, Source),
-                    NewBody = ?replace(NewBody0, <<"target">>, Target),
+                    NewBody = strip_body_credentials(Body),
                     #doc{revs = {Pos, [_ | Revs]}} = Doc,
                     NewDoc = Doc#doc{body = {NewBody}, revs = {Pos - 1, Revs}},
                     NewRevId = couch_db:new_revid(NewDoc),
@@ -306,25 +303,61 @@ after_doc_read(#doc{body = {Body}} = Doc, Db) ->
             end
     end.
 
+-define(CREDS, [~"source", ~"target", ~"proxy", ~"source_proxy", ~"target_proxy"]).
+
+strip_body_credentials(Body) ->
+    lists:map(
+        fun({K, V}) ->
+            case lists:member(K, ?CREDS) of
+                true -> {K, strip_credentials(V)};
+                false -> {K, V}
+            end
+        end,
+        Body
+    ).
+
 -spec strip_credentials
-    (undefined) -> undefined;
-    (binary()) -> binary();
-    ({[_]}) -> {[_]}.
-strip_credentials(undefined) ->
-    undefined;
+    (binary()) -> binary() | null;
+    ({[_]}) -> {[_]};
+    (number() | boolean() | null | list()) -> null.
 strip_credentials(Url) when is_binary(Url) ->
-    re:replace(
-        Url,
-        "http(s)?://(?:[^:]+):[^@]+@(.*)$",
-        "http\\1://\\2",
-        [{return, binary}]
-    );
-strip_credentials({Props0}) ->
+    strip_url_userinfo(Url);
+strip_credentials({Props0}) when is_list(Props0) ->
     Props1 = lists:keydelete(<<"headers">>, 1, Props0),
     % Strip "auth" just like headers, for replication plugins it can be a place
     % to stash credential that are not necessarily in headers
     Props2 = lists:keydelete(<<"auth">>, 1, Props1),
-    {Props2}.
+    % Object form endpoints may have creds in "url"
+    Props3 =
+        case lists:keyfind(~"url", 1, Props2) of
+            {~"url", Url} -> ?replace(Props2, ~"url", strip_credentials(Url));
+            false -> Props2
+        end,
+    {Props3};
+strip_credentials(_Other) ->
+    % Failed or broken replication docs. Just hide the whole thing as might
+    % still contain mistyped creds.
+    null.
+
+% Remove userinfo from url. Match the parser with the replicator. If we can't
+% parse remove everything between scheme and last "@"
+%
+strip_url_userinfo(Url) when is_binary(Url) ->
+    case uri_string:parse(Url) of
+        #{userinfo := _} = UriMap ->
+            case uri_string:recompose(maps:remove(userinfo, UriMap)) of
+                <<_/binary>> = NoCreds -> NoCreds;
+                {error, _, _} -> null
+            end;
+        #{} ->
+            Url;
+        {error, _, _} ->
+            % \1 is scheme in any case, maybe with leading spaces. Use dotall
+            % to match even newlines in case passwords have those too somehow
+            re:replace(Url, "^(\\s*[a-zA-Z][a-zA-Z0-9+.-]*://).*@", "\\1", [
+                dotall, {return, binary}
+            ])
+    end.
 
 error_reason({shutdown, Error}) ->
     error_reason(Error);
@@ -357,10 +390,6 @@ check_strip_credentials_test() ->
         ?assertEqual(Expected, strip_credentials(Body))
      || {Expected, Body} <- [
             {
-                undefined,
-                undefined
-            },
-            {
                 <<"https://remote_server/database">>,
                 <<"https://foo:bar@remote_server/database">>
             },
@@ -379,9 +408,94 @@ check_strip_credentials_test() ->
             {
                 {[{<<"_id">>, <<"foo">>}]},
                 {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
+            },
+            {
+                {[{~"url", ~"https://remote_server/database"}]},
+                {[{~"url", ~"https://foo:bar@remote_server/database"}]}
+            },
+            {
+                {[{~"url", ~"http://remote_server/database"}]},
+                {[
+                    {~"url", ~"http://foo:bar@remote_server/database"},
+                    {~"headers", ~"bar"},
+                    {~"auth", ~"pluginsecret"}
+                ]}
+            },
+            {
+                {[{~"url", ~"https://remote_server/database"}]},
+                {[{~"url", ~"https://foo:p%40ss%3Aw@remote_server/database"}]}
+            },
+            {
+                ~"HTTPS://remote_server/database",
+                ~"HTTPS://foo:bar@remote_server/database"
+            },
+            {
+                ~"https://remote_server/database",
+                ~"https://:bar@remote_server/database"
+            },
+            {
+                ~"https://remote_server/database",
+                ~"https://foo@remote_server/database"
+            },
+            {
+                ~"https://remote_server/database",
+                ~"https://foo:b@r@remote_server/database"
+            },
+            {
+                ~"https://remote_server/database",
+                ~"https://foo:b/r@remote_server/database"
+            },
+            {
+                ~"http://[::1]:5984/db?a=b",
+                ~"http://foo:bar@[::1]:5984/db?a=b"
+            },
+            {
+                ~"http://remote_server/d@b",
+                ~"http://foo:bar@remote_server/d@b"
+            },
+            {
+                ~"http://remote_server/database",
+                ~"http://remote_server/database"
+            },
+            {
+                ~"localdb",
+                ~"localdb"
+            },
+            {
+                null,
+                [~"https://foo:bar@remote_server/database"]
+            },
+            {
+                null,
+                42
             }
         ]
     ].
+
+check_strip_body_credentials_test() ->
+    Body = [
+        {~"_id", ~"foo"},
+        {~"source", {[{~"url", ~"https://u:p1@s/db"}]}},
+        {~"target", ~"https://u:p2@t/db"},
+        {~"proxy", ~"http://u:p3@proxy:3128"},
+        {~"source_proxy", ~"socks5://u:p4@sproxy:1080"},
+        {~"target_proxy", ~"http://u:p5@tproxy:3128"},
+        {~"other", ~"https://u:p6@x/db"}
+    ],
+    ?assertEqual(
+        [
+            {~"_id", ~"foo"},
+            {~"source", {[{~"url", ~"https://s/db"}]}},
+            {~"target", ~"https://t/db"},
+            {~"proxy", ~"http://proxy:3128"},
+            {~"source_proxy", ~"socks5://sproxy:1080"},
+            {~"target_proxy", ~"http://tproxy:3128"},
+            {~"other", ~"https://u:p6@x/db"}
+        ],
+        strip_body_credentials(Body)
+    ),
+    % Missing fields are not added
+    ?assertEqual([{~"_id", ~"foo"}], strip_body_credentials([{~"_id", ~"foo"}])).
 
 setup() ->
     TmpDbName = ?tempdb(),
@@ -450,7 +564,9 @@ replicator_can_update_docs_test_() ->
                 ?TDEF_FE(t_after_doc_read_as_replicator),
                 ?TDEF_FE(t_after_doc_read_internal_replicator),
                 ?TDEF_FE(t_after_doc_read_matching_owner),
-                ?TDEF_FE(t_after_doc_read_not_matching_owner)
+                ?TDEF_FE(t_after_doc_read_not_matching_owner),
+                ?TDEF_FE(t_after_doc_read_not_matching_owner_object_endpoints),
+                ?TDEF_FE(t_after_doc_read_not_matching_owner_proxies)
             ]
         }
     }.
@@ -604,6 +720,53 @@ t_after_doc_read_not_matching_owner(DbName) ->
         ?OWNER => <<"o1">>
     },
     ?assertEqual(StrippedMap, Map1).
+
+t_after_doc_read_not_matching_owner_object_endpoints(DbName) ->
+    DocId = ~"doc1",
+    Map = #{
+        ~"source" => #{~"url" => ~"https://user1:pass1@localhost:5984/db1"},
+        ~"target" => #{
+            ~"url" => ~"https://user2:pass2@localhost:5984/db2",
+            ~"headers" => #{~"Authorization" => ~"Bearer secret"},
+            ~"auth" => #{
+                ~"basic" => #{~"username" => ~"u", ~"password" => ~"p"}
+            }
+        },
+        ?OWNER => ~"o1"
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Ctx = {user_ctx, #user_ctx{name = ~"o2", roles = [~"tomato", ~"potato"]}},
+    Map1 = read_doc(DbName, DocId, Ctx),
+    StrippedMap = #{
+        ~"source" => #{~"url" => ~"https://localhost:5984/db1"},
+        ~"target" => #{~"url" => ~"https://localhost:5984/db2"},
+        ?OWNER => ~"o1"
+    },
+    ?assertEqual(StrippedMap, Map1).
+
+t_after_doc_read_not_matching_owner_proxies(DbName) ->
+    DocId = ~"doc1",
+    Map = #{
+        ~"source" => ~"https://localhost:5984/db1",
+        ~"target" => ~"https://localhost:5984/db2",
+        ~"source_proxy" => ~"http://user1:pass1@proxy1:3128",
+        ~"target_proxy" => ~"socks5://user2:pass2@proxy2:1080",
+        ?OWNER => ~"o1"
+    },
+    {ok, _} = write_doc(DbName, DocId, Map),
+    Ctx = {user_ctx, #user_ctx{name = ~"o2", roles = [~"tomato", ~"potato"]}},
+    Map1 = read_doc(DbName, DocId, Ctx),
+    StrippedMap = #{
+        ~"source" => ~"https://localhost:5984/db1",
+        ~"target" => ~"https://localhost:5984/db2",
+        ~"source_proxy" => ~"http://proxy1:3128",
+        ~"target_proxy" => ~"socks5://proxy2:1080",
+        ?OWNER => ~"o1"
+    },
+    ?assertEqual(StrippedMap, Map1),
+    % Owner still sees everything
+    OwnerCtx = {user_ctx, #user_ctx{name = ~"o1", roles = []}},
+    ?assertEqual(Map, read_doc(DbName, DocId, OwnerCtx)).
 
 ejson_from_map(#{} = Map) ->
     ?JSON_DECODE(?JSON_ENCODE(Map)).
