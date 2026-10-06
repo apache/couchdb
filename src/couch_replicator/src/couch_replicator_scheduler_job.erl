@@ -544,10 +544,48 @@ headers_strip_creds([{Key, Value0} | Rest], Acc) ->
         end,
     headers_strip_creds(Rest, [{Key, Value} | Acc]).
 
-httpdb_strip_creds(#httpdb{url = Url, headers = Headers} = HttpDb) ->
+% normalize_basic_auth moves basic user:pass combo to an auth props object
+auth_props_strip_creds(Props) ->
+    lists:map(
+        fun
+            ({~"username", User}) when is_binary(User) -> {~"username", User};
+            ({Key, {Nested}}) when is_list(Nested) -> {Key, {auth_props_strip_creds(Nested)}};
+            ({Key, _}) -> {Key, ~"*****"};
+            (_) -> ~"*****"
+        end,
+        Props
+    ).
+
+% ibrowse opts can have cred too for proxies and ssl options
+ibrowse_options_strip_creds(Options) ->
+    lists:map(
+        fun
+            ({proxy_password, _}) ->
+                {proxy_password, "*****"};
+            ({socks5_password, _}) ->
+                {socks5_password, "*****"};
+            ({ssl_options, SslOpts}) when is_list(SslOpts) ->
+                {ssl_options, lists:keyreplace(password, 1, SslOpts, {password, "*****"})};
+            (Opt) ->
+                Opt
+        end,
+        Options
+    ).
+
+httpdb_strip_creds(#httpdb{} = HttpDb) ->
+    #httpdb{
+        url = Url,
+        headers = Headers,
+        proxy_url = ProxyUrl,
+        auth_props = AuthProps,
+        ibrowse_options = IbrowseOptions
+    } = HttpDb,
     HttpDb#httpdb{
         url = couch_util:url_strip_password(Url),
-        headers = headers_strip_creds(Headers, [])
+        headers = headers_strip_creds(Headers, []),
+        proxy_url = couch_util:url_strip_password(ProxyUrl),
+        auth_props = auth_props_strip_creds(AuthProps),
+        ibrowse_options = ibrowse_options_strip_creds(IbrowseOptions)
     };
 httpdb_strip_creds(LocalDb) ->
     LocalDb.
@@ -1273,5 +1311,81 @@ t_scheduler_job_format_status(_) ->
     ?assertEqual(<<"3">>, maps:get(committed_seq, State)),
     ?assertEqual(<<"4">>, maps:get(current_through_seq, State)),
     ?assertEqual(<<"5">>, maps:get(highest_seq_done, State)).
+
+httpdb_rec_strip_creds_test_() ->
+    {
+        foreach,
+        fun meck_config/0,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF_FE(t_httpdb_strip_creds),
+            ?TDEF_FE(t_httpdb_strip_creds_socks5)
+        ]
+    }.
+
+t_httpdb_strip_creds(_) ->
+    Endpoint =
+        {[
+            {~"url", ~"http://u:urlpass@h1/d1"},
+            {~"headers", {[{~"Authorization", ~"Bearer hidethebear"}]}}
+        ]},
+    Proxy = ~"http://pu:psecret@myproxy:8080",
+    HttpDb = couch_replicator_parse:parse_rep_db(Endpoint, Proxy, []),
+    HttpDb1 = httpdb_strip_creds(HttpDb),
+    % Doesn't show up if we dump the data structure to the log
+    ToStr = lists:flatten(io_lib:format("~p", [HttpDb1])),
+    [
+        ?assertEqual(nomatch, string:find(ToStr, S))
+     || S <- ["urlpass", "hidethebear", "psecret"]
+    ],
+    ?assertEqual("http://pu:*****@myproxy:8080", HttpDb1#httpdb.proxy_url),
+    ?assertEqual({"u", "*****"}, couch_replicator_utils:get_basic_auth_creds(HttpDb1)).
+
+t_httpdb_strip_creds_socks5(_) ->
+    % The proxy password can gets stuck into the ibrowse options so we check
+    % it's cleaned up there too
+    Proxy = ~"socks5://pu:psecret@myproxy:2080",
+    HttpDb = couch_replicator_parse:parse_rep_db(~"http://h1/d1", Proxy, []),
+    HttpDb1 = httpdb_strip_creds(HttpDb),
+    ToStr = lists:flatten(io_lib:format("~p", [HttpDb1])),
+    ?assertEqual(nomatch, string:find(ToStr, "psecret")),
+    ?assertEqual("*****", couch_util:get_value(socks5_password, HttpDb1#httpdb.ibrowse_options)).
+
+httpdb_strip_creds_basic_auth_test() ->
+    % normalize_basic_auth/1 moves the creds from the url/headers to auth_props
+    % see if that gets cleaned up
+    Header = {"Authorization", "Basic " ++ base64:encode_to_string("user2:secret2")},
+    Basic = {[{~"username", ~"user3"}, {~"password", ~"secret3"}]},
+    lists:foreach(
+        fun({User, Pass, HttpDb0}) ->
+            HttpDb = couch_replicator_utils:normalize_basic_auth(HttpDb0),
+            ?assertEqual({User, Pass}, couch_replicator_utils:get_basic_auth_creds(HttpDb)),
+            HttpDb1 = httpdb_strip_creds(HttpDb),
+            ToStr = lists:flatten(io_lib:format("~p", [HttpDb1])),
+            ?assertEqual(nomatch, string:find(ToStr, Pass))
+        end,
+        [
+            {"user1", "secret1", #httpdb{url = "http://user1:secret1@h/db/"}},
+            {"user2", "secret2", #httpdb{url = "http://h/db/", headers = [Header]}},
+            {"user3", "secret3", #httpdb{url = "http://h/db/", auth_props = [{~"basic", Basic}]}}
+        ]
+    ).
+
+httpdb_strip_creds_auth_plugins_test() ->
+    % We clean up various plugins as well
+    IAM = {[{~"iam", {[{~"api_key", ~"secret4"}]}}]},
+    Other = {[{~"token", ~"secret5"}]},
+    AuthProps = [{~"ibm", IAM}, {~"other", Other}],
+    HttpDb1 = httpdb_strip_creds(#httpdb{url = "http://h/db/", auth_props = AuthProps}),
+    ToStr = lists:flatten(io_lib:format("~p", [HttpDb1])),
+    ?assertEqual(nomatch, string:find(ToStr, "secret4")),
+    ?assertEqual(nomatch, string:find(ToStr, "secret5")),
+    ?assertEqual(
+        [
+            {~"ibm", {[{~"iam", {[{~"api_key", ~"*****"}]}}]}},
+            {~"other", {[{~"token", ~"*****"}]}}
+        ],
+        HttpDb1#httpdb.auth_props
+    ).
 
 -endif.
