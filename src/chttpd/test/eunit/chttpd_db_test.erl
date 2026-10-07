@@ -58,6 +58,7 @@ all_test_() ->
                     ?TDEF_FE(t_return_ok_true_on_ensure_full_commit, ?TIMEOUT),
                     ?TDEF_FE(t_return_404_for_ensure_full_commit_on_no_db, ?TIMEOUT),
                     ?TDEF_FE(t_return_404_for_delete_db_with_stale_shard_cache, ?TIMEOUT),
+                    ?TDEF_FE(t_return_404_for_get_security_with_stale_shard_cache, ?TIMEOUT),
                     ?TDEF_FE(t_accept_live_as_an_alias_for_continuous, ?TIMEOUT),
                     ?TDEF_FE(t_return_headers_after_starting_continuous, ?TIMEOUT),
                     ?TDEF_FE(t_return_404_for_delete_att_on_notadoc, ?TIMEOUT),
@@ -147,21 +148,14 @@ t_return_404_for_ensure_full_commit_on_no_db(Db) ->
 % then can reach nodes after the dbs doc is gone and so it should answer with a
 % 404.
 t_return_404_for_delete_db_with_stale_shard_cache(_Db) ->
-    Db = ?tempdb(),
-    create_db(Db),
-    Shards = lists:sort(mem3:shards(Db)),
-    delete_db(Db),
-    test_util:wait(fun() ->
-        try mem3:shards(Db) of
-            _ -> wait
-        catch
-            error:database_does_not_exist -> ok
-        end
-    end),
-    % simulate the re-insert
-    true = ets:insert(mem3_shards, Shards),
-    ?assertEqual(Shards, lists:sort(mem3:shards(Db))),
+    Db = stale_shard_cache_db(),
     {Status, Response} = req(delete, url(Db)),
+    ?assertEqual(404, Status),
+    ?assertMatch(#{<<"error">> := <<"not_found">>}, Response).
+
+t_return_404_for_get_security_with_stale_shard_cache(_Db) ->
+    Db = stale_shard_cache_db(),
+    {Status, Response} = req(get, url(Db, "_security")),
     ?assertEqual(404, Status),
     ?assertMatch(#{<<"error">> := <<"not_found">>}, Response).
 
@@ -337,6 +331,26 @@ helper_queries_with_keys_limit_skip(Db, Path, ExpectedOffset, ExpectedRows1, Exp
     ?assertEqual(ExpectedRows2, length(Rows2)).
 
 %%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
+
+% Create and delete a db, then put its shard map back into the shard cache to
+% simulate a read racing the delete. Returns the db name.
+stale_shard_cache_db() ->
+    Db = ?tempdb(),
+    create_db(Db),
+    Shards = lists:sort(mem3:shards(Db)),
+    delete_db(Db),
+    test_util:wait(fun() ->
+        try mem3:shards(Db) of
+            _ -> wait
+        catch
+            error:database_does_not_exist -> ok
+        end
+    end),
+    % simulate the re-insert
+    true = ets:insert(mem3_shards, Shards),
+    ?assertEqual(Shards, lists:sort(mem3:shards(Db))),
+    Db.
+
 url(Db) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),

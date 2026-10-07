@@ -139,11 +139,21 @@ get_db(DbName, Options) ->
     MinTimeout = config:get_integer("fabric", "shard_timeout_min_msec", 100),
     MaxTimeout = request_timeout(),
     Timeout = get_db_timeout(length(Live), Factor, MinTimeout, MaxTimeout),
-    get_shard(Live, Options, Timeout, Factor).
+    case get_shard(Live, Options, Timeout, Factor, []) of
+        {ok, Db} ->
+            {ok, Db};
+        {error, Failures} ->
+            % missing_target means the shard doc is missing. If every worker
+            % returns that the shard map from our cache is stale
+            case all_missing_target(Failures) of
+                true -> error(database_does_not_exist, [DbName]);
+                false -> error({internal_server_error, "No DB shards could be opened."})
+            end
+    end.
 
-get_shard([], _Opts, _Timeout, _Factor) ->
-    error({internal_server_error, "No DB shards could be opened."});
-get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
+get_shard([], _Opts, _Timeout, _Factor, Failures) ->
+    {error, Failures};
+get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor, Failures) ->
     Mon = rexi_monitor:start([rexi_utils:server_pid(Node)]),
     MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
     Ref = rexi:cast(Node, self(), MFA, [sync]),
@@ -157,14 +167,24 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
                 throw(Error);
             {Ref, Reason} ->
                 couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
-                get_shard(Rest, Opts, Timeout, Factor)
+                get_shard(Rest, Opts, Timeout, Factor, [Reason | Failures])
         after Timeout ->
             couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
-            get_shard(Rest, Opts, Factor * Timeout, Factor)
+            get_shard(Rest, Opts, Factor * Timeout, Factor, [timeout | Failures])
         end
     after
         rexi_monitor:stop(Mon)
     end.
+
+all_missing_target([]) ->
+    false;
+all_missing_target(Failures) ->
+    lists:all(fun is_missing_target/1, Failures).
+
+is_missing_target({'rexi_EXIT', {{error, missing_target}, _}}) ->
+    true;
+is_missing_target(_) ->
+    false.
 
 get_db_timeout(N, Factor, MinTimeout, infinity) ->
     % MaxTimeout may be infinity so we just use the largest Erlang small int to
