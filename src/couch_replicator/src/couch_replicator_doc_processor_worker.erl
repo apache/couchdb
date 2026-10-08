@@ -144,18 +144,23 @@ maybe_add_job_to_scheduler({DbName, DocId}, Rep, WRef) ->
 
 doc_processor_worker_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            ?TDEF_FE(t_should_add_job),
-            ?TDEF_FE(t_already_running_same_docid),
-            ?TDEF_FE(t_already_running_transient),
-            ?TDEF_FE(t_already_running_other_db_other_doc),
-            ?TDEF_FE(t_spawn_worker),
-            ?TDEF_FE(t_ignore_if_doc_deleted),
-            ?TDEF_FE(t_ignore_if_worker_ref_does_not_match)
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                ?TDEF_FE(t_should_add_job),
+                ?TDEF_FE(t_already_running_same_docid),
+                ?TDEF_FE(t_already_running_transient),
+                ?TDEF_FE(t_already_running_other_db_other_doc),
+                ?TDEF_FE(t_spawn_worker),
+                ?TDEF_FE(t_ignore_if_doc_deleted),
+                ?TDEF_FE(t_ignore_if_worker_ref_does_not_match)
+            ]
+        }
     }.
 
 % Replication is already running, with same doc id. Ignore change.
@@ -246,17 +251,30 @@ t_ignore_if_worker_ref_does_not_match(_) ->
 
 % Test helper functions
 
-setup() ->
+setup_all() ->
     meck:expect(couch_replicator_scheduler, add_job, 1, ok),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
     meck:expect(couch_server, get_uuid, 0, this_is_snek),
     meck:expect(couch_replicator_docs, update_failed, 3, ok),
     meck:expect(couch_replicator_scheduler, rep_state, 1, nil),
-    meck:expect(couch_replicator_doc_processor, get_worker_ref, 1, nil),
-    ok.
+    meck:expect(couch_replicator_doc_processor, get_worker_ref, 1, nil).
+
+teardown_all(_) ->
+    meck:unload().
+
+setup() ->
+    meck:reset([
+        config,
+        couch_server,
+        couch_replicator_docs,
+        couch_replicator_doc_processor,
+        couch_replicator_scheduler
+    ]),
+    meck:expect(couch_replicator_scheduler, rep_state, 1, nil),
+    meck:expect(couch_replicator_doc_processor, get_worker_ref, 1, nil).
 
 teardown(_) ->
-    meck:unload().
+    ok.
 
 mock_already_running(DbName, DocId) ->
     meck:expect(
