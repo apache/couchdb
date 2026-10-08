@@ -176,21 +176,23 @@ maybe_fetch_and_filter_doc(_Id, Doc, _State) ->
 
 handle_message_test_() ->
     {
-        foreach,
+        setup,
         fun() ->
             meck:new(foo, [non_strict]),
-            meck:new(fabric_view)
+            meck:new(fabric_view),
+            meck:new(rexi, [passthrough]),
+            meck:new(couch_replicator, [passthrough])
         end,
         fun(_) -> meck:unload() end,
-        [
-            ?TDEF_FE(t_handle_message_rexi_down),
-            ?TDEF_FE(t_handle_message_rexi_exit),
-            ?TDEF_FE(t_handle_message_meta_zero),
-            ?TDEF_FE(t_handle_message_meta),
-            ?TDEF_FE(t_handle_message_row_skip),
-            ?TDEF_FE(t_handle_message_row),
-            ?TDEF_FE(t_handle_message_complete)
-        ]
+        with([
+            ?TDEF(t_handle_message_rexi_down),
+            ?TDEF(t_handle_message_rexi_exit),
+            ?TDEF(t_handle_message_meta_zero),
+            ?TDEF(t_handle_message_meta),
+            ?TDEF(t_handle_message_row_skip),
+            ?TDEF(t_handle_message_row),
+            ?TDEF(t_handle_message_complete)
+        ])
     }.
 
 t_handle_message_rexi_down(_) ->
@@ -316,17 +318,17 @@ t_handle_message_complete(_) ->
 
 merge_row_test_() ->
     {
-        foreach,
+        setup,
         fun() -> ok end,
         fun(_) -> ok end,
-        [
-            ?TDEF_FE(t_merge_row_record_fwd),
-            ?TDEF_FE(t_merge_row_record_rev),
-            ?TDEF_FE(t_merge_row_map_fwd),
-            ?TDEF_FE(t_merge_row_map_rev),
-            ?TDEF_FE(t_merge_row_mixed_fwd),
-            ?TDEF_FE(t_merge_row_mixed_rev)
-        ]
+        with([
+            ?TDEF(t_merge_row_record_fwd),
+            ?TDEF(t_merge_row_record_rev),
+            ?TDEF(t_merge_row_map_fwd),
+            ?TDEF(t_merge_row_map_rev),
+            ?TDEF(t_merge_row_mixed_fwd),
+            ?TDEF(t_merge_row_mixed_rev)
+        ])
     }.
 
 t_merge_row_record_fwd(_) ->

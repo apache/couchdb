@@ -23,7 +23,7 @@ revs_diff_test_() ->
         "Use _revs_diff when replicating",
         {
             foreach,
-            fun couch_replicator_test_helper:test_setup/0,
+            fun setup/0,
             fun couch_replicator_test_helper:test_teardown/1,
             [
                 ?TDEF_FE(use_revs_diff_when_most_docs_are_present, 15),
@@ -32,10 +32,14 @@ revs_diff_test_() ->
         }
     }.
 
+setup() ->
+    Ctx = couch_replicator_test_helper:test_setup(),
+    meck:new(couch_replicator_api_wrap, [passthrough]),
+    Ctx.
+
 use_revs_diff_when_most_docs_are_present({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOC_COUNT),
     populate_db(Target, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target),
     Calls = meck:num_calls(couch_replicator_api_wrap, get_missing_revs, 2),
     ExpectAtLeast = ?DOC_COUNT / ?BATCH_SIZE,
@@ -43,7 +47,6 @@ use_revs_diff_when_most_docs_are_present({_Ctx, {Source, Target}}) ->
 
 skip_revs_diff_when_most_docs_are_missing({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target),
     Calls = meck:num_calls(couch_replicator_api_wrap, get_missing_revs, 2),
     % This is not exact. But expect to skip at least half the revs_diffs calls.

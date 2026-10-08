@@ -296,50 +296,38 @@ check_authorization(RepId, #user_ctx{name = Name} = Ctx) ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 authorization_test_() ->
     {
-        foreach,
-        fun() -> ok end,
+        setup,
+        fun() -> meck:new(couch_replicator_scheduler, [passthrough]) end,
         fun(_) -> meck:unload() end,
-        [
-            t_admin_is_always_authorized(),
-            t_username_must_match(),
-            t_replication_not_found()
-        ]
+        with([
+            ?TDEF(t_admin_is_always_authorized),
+            ?TDEF(t_username_must_match),
+            ?TDEF(t_replication_not_found)
+        ])
     }.
 
-t_admin_is_always_authorized() ->
-    ?_test(begin
-        expect_rep_user_ctx(<<"someuser">>, <<"_admin">>),
-        UserCtx = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
-        ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx))
-    end).
+t_admin_is_always_authorized(_) ->
+    expect_rep_user_ctx(<<"someuser">>, <<"_admin">>),
+    UserCtx = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
+    ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx)).
 
-t_username_must_match() ->
-    ?_test(begin
-        expect_rep_user_ctx(<<"user">>, <<"somerole">>),
-        UserCtx1 = #user_ctx{name = <<"user">>, roles = [<<"somerole">>]},
-        ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx1)),
-        UserCtx2 = #user_ctx{name = <<"other">>, roles = [<<"somerole">>]},
-        ?assertThrow(
-            {unauthorized, _},
-            check_authorization(
-                <<"RepId">>,
-                UserCtx2
-            )
-        )
-    end).
+t_username_must_match(_) ->
+    expect_rep_user_ctx(<<"user">>, <<"somerole">>),
+    UserCtx1 = #user_ctx{name = <<"user">>, roles = [<<"somerole">>]},
+    ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx1)),
+    UserCtx2 = #user_ctx{name = <<"other">>, roles = [<<"somerole">>]},
+    ?assertThrow({unauthorized, _}, check_authorization(<<"RepId">>, UserCtx2)).
 
-t_replication_not_found() ->
-    ?_test(begin
-        meck:expect(couch_replicator_scheduler, rep_state, 1, nil),
-        UserCtx1 = #user_ctx{name = <<"user">>, roles = [<<"somerole">>]},
-        ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx1)),
-        UserCtx2 = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
-        ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx2))
-    end).
+t_replication_not_found(_) ->
+    meck:expect(couch_replicator_scheduler, rep_state, 1, nil),
+    UserCtx1 = #user_ctx{name = <<"user">>, roles = [<<"somerole">>]},
+    ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx1)),
+    UserCtx2 = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
+    ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx2)).
 
 expect_rep_user_ctx(Name, Role) ->
     meck:expect(
@@ -360,59 +348,50 @@ strip_url_creds_test_() ->
         fun(_) ->
             meck:unload()
         end,
-        [
-            t_strip_http_basic_creds(),
-            t_strip_http_props_creds(),
-            t_strip_local_db_creds(),
-            t_strip_url_creds_errors()
-        ]
+        with([
+            ?TDEF(t_strip_http_basic_creds),
+            ?TDEF(t_strip_http_props_creds),
+            ?TDEF(t_strip_local_db_creds),
+            ?TDEF(t_strip_url_creds_errors)
+        ])
     }.
 
-t_strip_local_db_creds() ->
-    ?_test(?assertEqual(<<"localdb">>, strip_url_creds(<<"localdb">>))).
+t_strip_local_db_creds(_) ->
+    ?assertEqual(<<"localdb">>, strip_url_creds(<<"localdb">>)).
 
-t_strip_http_basic_creds() ->
-    ?_test(begin
-        Url1 = <<"http://adm:pass@host/db">>,
-        ?assertEqual(<<"http://host/db/">>, strip_url_creds(Url1)),
-        Url2 = <<"https://adm:pass@host/db">>,
-        ?assertEqual(<<"https://host/db/">>, strip_url_creds(Url2)),
-        Url3 = <<"http://adm:pass@host:80/db">>,
-        ?assertEqual(<<"http://host:80/db/">>, strip_url_creds(Url3)),
-        Url4 = <<"http://adm:pass@host/db?a=b&c=d">>,
-        ?assertEqual(
-            <<"http://host/db?a=b&c=d">>,
-            strip_url_creds(Url4)
-        )
-    end).
+t_strip_http_basic_creds(_) ->
+    Url1 = <<"http://adm:pass@host/db">>,
+    ?assertEqual(<<"http://host/db/">>, strip_url_creds(Url1)),
+    Url2 = <<"https://adm:pass@host/db">>,
+    ?assertEqual(<<"https://host/db/">>, strip_url_creds(Url2)),
+    Url3 = <<"http://adm:pass@host:80/db">>,
+    ?assertEqual(<<"http://host:80/db/">>, strip_url_creds(Url3)),
+    Url4 = <<"http://adm:pass@host/db?a=b&c=d">>,
+    ?assertEqual(<<"http://host/db?a=b&c=d">>, strip_url_creds(Url4)).
 
-t_strip_http_props_creds() ->
-    ?_test(begin
-        Props1 = {[{<<"url">>, <<"http://adm:pass@host/db">>}]},
-        ?assertEqual(<<"http://host/db/">>, strip_url_creds(Props1)),
-        Props2 =
-            {[
-                {<<"url">>, <<"http://host/db">>},
-                {<<"headers">>, {[{<<"Authorization">>, <<"Basic pa55">>}]}}
-            ]},
-        ?assertEqual(<<"http://host/db/">>, strip_url_creds(Props2))
-    end).
+t_strip_http_props_creds(_) ->
+    Props1 = {[{<<"url">>, <<"http://adm:pass@host/db">>}]},
+    ?assertEqual(<<"http://host/db/">>, strip_url_creds(Props1)),
+    Props2 =
+        {[
+            {<<"url">>, <<"http://host/db">>},
+            {<<"headers">>, {[{<<"Authorization">>, <<"Basic pa55">>}]}}
+        ]},
+    ?assertEqual(<<"http://host/db/">>, strip_url_creds(Props2)).
 
-t_strip_url_creds_errors() ->
-    ?_test(begin
-        Bad1 = {[{<<"url">>, <<"http://adm:pass/bad">>}]},
-        ?assertEqual(null, strip_url_creds(Bad1)),
-        Bad2 = {[{<<"garbage">>, <<"more garbage">>}]},
-        ?assertEqual(null, strip_url_creds(Bad2)),
-        Bad3 = <<"http://a:b:c">>,
-        ?assertEqual(null, strip_url_creds(Bad3)),
-        Bad4 = <<"http://adm:pass:pass/bad">>,
-        ?assertEqual(null, strip_url_creds(Bad4)),
-        ?assertEqual(null, strip_url_creds(null)),
-        ?assertEqual(null, strip_url_creds(42)),
-        ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
-        Bad5 = {[{<<"source_proxy">>, <<"http://adm:pass/bad">>}]},
-        ?assertEqual(null, strip_url_creds(Bad5))
-    end).
+t_strip_url_creds_errors(_) ->
+    Bad1 = {[{<<"url">>, <<"http://adm:pass/bad">>}]},
+    ?assertEqual(null, strip_url_creds(Bad1)),
+    Bad2 = {[{<<"garbage">>, <<"more garbage">>}]},
+    ?assertEqual(null, strip_url_creds(Bad2)),
+    Bad3 = <<"http://a:b:c">>,
+    ?assertEqual(null, strip_url_creds(Bad3)),
+    Bad4 = <<"http://adm:pass:pass/bad">>,
+    ?assertEqual(null, strip_url_creds(Bad4)),
+    ?assertEqual(null, strip_url_creds(null)),
+    ?assertEqual(null, strip_url_creds(42)),
+    ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
+    Bad5 = {[{<<"source_proxy">>, <<"http://adm:pass/bad">>}]},
+    ?assertEqual(null, strip_url_creds(Bad5)).
 
 -endif.

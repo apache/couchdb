@@ -103,8 +103,12 @@ get_doc_state({Props}) ->
 docs_test_() ->
     {
         foreach,
-        fun() -> ok end,
-        fun(_) -> ok end,
+        fun() ->
+            meck:new(couch_replicator_scheduler, [passthrough]),
+            meck:new(couch_db, [passthrough]),
+            meck:new(couch_mrview, [passthrough])
+        end,
+        fun(_) -> meck:unload() end,
         [
             ?TDEF_FE(t_docs, 15)
         ]
@@ -133,18 +137,20 @@ t_docs(_) ->
 
 docs_cb_test_() ->
     {
-        foreach,
+        setup,
         fun() ->
             meck:new(mem3),
-            meck:new(rexi)
+            meck:new(rexi),
+            meck:new(couch_replicator, [passthrough]),
+            meck:new(couch_replicator_doc_processor, [passthrough])
         end,
         fun(_) -> meck:unload() end,
-        [
-            ?TDEF_FE(t_docs_cb_meta, 15),
-            ?TDEF_FE(t_docs_cb_row_skip, 15),
-            ?TDEF_FE(t_docs_cb_row, 15),
-            ?TDEF_FE(t_docs_cb_complete, 15)
-        ]
+        with([
+            ?TDEF(t_docs_cb_meta, 15),
+            ?TDEF(t_docs_cb_row_skip, 15),
+            ?TDEF(t_docs_cb_row, 15),
+            ?TDEF(t_docs_cb_complete, 15)
+        ])
     }.
 
 t_docs_cb_meta(_) ->
