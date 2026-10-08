@@ -22,7 +22,7 @@ bulk_get_test_() ->
         "Use _bulk_get when replicating",
         {
             foreach,
-            fun couch_replicator_test_helper:test_setup/0,
+            fun setup/0,
             fun couch_replicator_test_helper:test_teardown/1,
             [
                 ?TDEF_FE(use_bulk_get),
@@ -37,9 +37,13 @@ bulk_get_test_() ->
         }
     }.
 
+setup() ->
+    Ctx = couch_replicator_test_helper:test_setup(),
+    meck:new(couch_replicator_api_wrap, [passthrough]),
+    Ctx.
+
 use_bulk_get({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, true),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -51,7 +55,6 @@ use_bulk_get({_Ctx, {Source, Target}}) ->
 
 use_bulk_get_with_ddocs({_Ctx, {Source, Target}}) ->
     populate_db_ddocs(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, true),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -63,7 +66,6 @@ use_bulk_get_with_ddocs({_Ctx, {Source, Target}}) ->
 
 use_bulk_get_with_attachments({_Ctx, {Source, Target}}) ->
     populate_db_atts(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, true),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -75,7 +77,6 @@ use_bulk_get_with_attachments({_Ctx, {Source, Target}}) ->
 
 dont_use_bulk_get({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, false),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -87,7 +88,6 @@ dont_use_bulk_get({_Ctx, {Source, Target}}) ->
 
 dont_use_bulk_get_ddocs({_Ctx, {Source, Target}}) ->
     populate_db_ddocs(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, false),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -99,7 +99,6 @@ dont_use_bulk_get_ddocs({_Ctx, {Source, Target}}) ->
 
 dont_use_bulk_get_attachments({_Ctx, {Source, Target}}) ->
     populate_db_atts(Source, ?DOC_COUNT),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, false),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -113,7 +112,6 @@ job_enable_overrides_global_disable({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOC_COUNT),
     Persist = false,
     config:set("replicator", "use_bulk_get", "false", Persist),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target, true),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
@@ -125,7 +123,6 @@ global_disable_works({_Ctx, {Source, Target}}) ->
     populate_db(Source, ?DOC_COUNT),
     Persist = false,
     config:set("replicator", "use_bulk_get", "false", Persist),
-    meck:new(couch_replicator_api_wrap, [passthrough]),
     replicate(Source, Target),
     BulkGets = meck:num_calls(couch_replicator_api_wrap, bulk_get, 3),
     JustGets = meck:num_calls(couch_replicator_api_wrap, open_doc_revs, 6),
