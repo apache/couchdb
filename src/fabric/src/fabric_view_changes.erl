@@ -287,7 +287,11 @@ handle_message({complete, Props}, Worker, #collector{limit = 0} = State) ->
         end,
     maybe_stop(State#collector{offset = O1});
 handle_message({no_pass, [_ | _] = Props}, {Worker, From}, #collector{limit = 0} = State) ->
-    #collector{counters = S0, offset = O0} = State,
+    % We aren't sending more rows back, but keep receiving rows until we have
+    % pending updates from every worker. Just like for change and complete
+    % clauses we have to leave the worker's sequence as is. If we keep
+    % advancing then our last_seq could have undelivered changes in it.
+    #collector{offset = O0} = State,
     O1 =
         case fabric_dict:lookup_element(Worker, O0) of
             null ->
@@ -295,9 +299,8 @@ handle_message({no_pass, [_ | _] = Props}, {Worker, From}, #collector{limit = 0}
             _ ->
                 O0
         end,
-    S1 = fabric_dict:store(Worker, couch_util:get_value(seq, Props), S0),
     rexi:stream_ack(From),
-    maybe_stop(State#collector{counters = S1, offset = O1});
+    maybe_stop(State#collector{offset = O1});
 handle_message({change, Props}, {Worker, From}, St) ->
     #collector{
         callback = Callback,
@@ -1211,5 +1214,85 @@ decode_bad_shape_test() ->
     ?assertError(badarg, decode_seq(T([{n1, [0, 10], {7, u, n1}}]))),
     ?assertError(badarg, decode_seq(T([{42, [0, 10], 0}]))),
     ?assertError(badarg, decode_seq(T([{<<"n1">>, [0, 10], 0}]))).
+
+limit_0_keeps_seq_test() ->
+    {A, B, #collector{counters = Seqs0} = St0} = limit_0_state(),
+    % Worker a sends us seq=11 after limit reached. We have to drop it and
+    % sequence must stay at 10.
+    {ok, St1} = handle_message({change, chprops(11, n1, 1)}, {A, self()}, St0),
+    ?assertEqual(Seqs0, St1#collector.counters),
+    ?assertEqual([{A, 2}, {B, null}], St1#collector.offset),
+    ?assertEqual(0, St1#collector.limit),
+    % Haven't heard from b yet. We wait for it to get the pending count but we
+    % must not update the sequence.
+    {stop, St2} = handle_message({change, chprops(4, n2, 5)}, {B, self()}, St1),
+    ?assertEqual(Seqs0, St2#collector.counters),
+    ?assertEqual([{A, 2}, {B, 6}], St2#collector.offset),
+    ?assertEqual(8, pending_count(St2#collector.offset)).
+
+limit_0_no_pass_keeps_seq_test() ->
+    {A, B, #collector{counters = Seqs0} = St0} = limit_0_state(),
+    % Worker a sends row seq=11. It gets dropped. Then sends a no_pass at
+    % seq=12.
+    {ok, St1} = handle_message({change, chprops(11, n1, 1)}, {A, self()}, St0),
+    {ok, St2} = handle_message({no_pass, no_pass_props(12, n1, 0)}, {A, self()}, St1),
+    % We do not advance the sequence to 12 since we never delivered 11. It
+    % could be a considered a data loss if we do and user checkpoints.
+    ?assertEqual(Seqs0, St2#collector.counters),
+    ?assertEqual([{A, 2}, {B, null}], St2#collector.offset),
+    % Worker b returns a no_pass. After this every worker has a pending count
+    % reported so we stop.
+    {stop, St3} = handle_message({no_pass, no_pass_props(4, n2, 5)}, {B, self()}, St2),
+    % This is the main assert: seq didn't change, stays at Seq0
+    ?assertEqual(Seqs0, St3#collector.counters),
+    ?assertEqual([{A, 2}, {B, 5}], St3#collector.offset),
+    ?assertEqual(7, pending_count(St3#collector.offset)),
+    % Last seq check
+    ?assertEqual(
+        [{n1, [0, 10], nseq(10, n1)}, {n2, [11, ?RING_END], nseq(3, n2)}],
+        decode_seq(pack_seqs(St3#collector.counters))
+    ).
+
+limit_0_complete_keeps_seq_test() ->
+    {A, B, #collector{counters = Seqs0} = St0} = limit_0_state(),
+    {ok, St1} = handle_message({change, chprops(11, n1, 0)}, {A, self()}, St0),
+    {ok, St2} = handle_message({complete, complete_props(11, n1, 0)}, A, St1),
+    ?assertEqual(Seqs0, St2#collector.counters),
+    ?assertEqual([{A, 2}, {B, null}], St2#collector.offset),
+    {stop, St3} = handle_message({complete, complete_props(5, n2, 0)}, B, St2),
+    ?assertEqual(Seqs0, St3#collector.counters),
+    ?assertEqual([{A, 2}, {B, 0}], St3#collector.offset),
+    ?assertEqual(2, pending_count(St3#collector.offset)).
+
+% Worker A makes limit = 0. Worker B hasn't returned yet so we don't know its
+% pending state.
+limit_0_state() ->
+    A = mk_shard("n1", 0, 10),
+    B = mk_shard("n2", 11, ?RING_END),
+    State = #collector{
+        limit = 0,
+        counters = orddict:from_list([{A, nseq(10, n1)}, {B, nseq(3, n2)}]),
+        offset = orddict:from_list([{A, 2}, {B, null}])
+    },
+    {A, B, State}.
+
+nseq(Seq, Node) ->
+    {Seq, <<"uuid">>, Node}.
+
+chprops(Seq, Node, Pending) ->
+    DocId = integer_to_binary(Seq),
+    [
+        {pending, Pending},
+        {seq, nseq(Seq, Node)},
+        {id, <<"doc", DocId/binary>>},
+        {changes, [{[{~"rev", ~"1-abc"}]}]},
+        {deleted, false}
+    ].
+
+no_pass_props(Seq, Node, Pending) ->
+    [{pending, Pending}, {seq, nseq(Seq, Node)}].
+
+complete_props(Seq, Node, Pending) ->
+    [{seq, nseq(Seq, Node)}, {pending, Pending}].
 
 -endif.
