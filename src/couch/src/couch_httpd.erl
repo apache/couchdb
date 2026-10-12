@@ -1441,7 +1441,7 @@ http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
 should_compress(#httpd{mochi_req = MochiReq}) ->
-    case config:get_boolean("chttpd", "response_compression", false) of
+    case chttpd_util:get_chttpd_config_boolean("response_compression", false) of
         false ->
             false;
         true ->

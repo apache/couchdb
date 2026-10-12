@@ -23,14 +23,14 @@
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), false),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     lists:concat(["http://", Addr, ":", Port, "/"]).
 
 teardown(_Url) ->
-    ok = config:delete("chttpd", "response_compression", _Persist = false),
-    ok = config:delete("admins", ?USER, _Persist = false).
+    ok = config:delete("chttpd", "response_compression", false),
+    ok = config:delete("admins", ?USER, false).
 
 compression_test_() ->
     {
