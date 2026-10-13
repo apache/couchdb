@@ -93,6 +93,18 @@ changes_test_() ->
 % so we'll test all the changes return and that the sequences
 % are increasing.
 %
+heartbeat_test_() ->
+    {
+        foreach,
+        fun setup_basic/0,
+        fun teardown_basic/1,
+        [
+            ?TDEF_FE(t_continuous_heartbeat_idle),
+            ?TDEF_FE(t_continuous_heartbeat),
+            ?TDEF_FE(t_eventsource_heartbeat)
+        ]
+    }.
+
 changes_q8_test_() ->
     {
         setup,
@@ -297,6 +309,54 @@ t_continuous_limit_over_total({_, DbUrl}) ->
     ?assertMatch({8, 0, [_, _, _]}, changes(DbUrl, Params)),
     DtMSec = erlang:monotonic_time(millisecond) - T0,
     ?assert(DtMSec > 500).
+
+t_continuous_heartbeat_idle({_, DbUrl}) ->
+    % Heartbeats sent every interval if nothing else happens
+    Params = "?feed=continuous&heartbeat=10",
+    Body = with_changes_dur(100, fun() -> changes_raw(DbUrl, Params) end),
+    ?assert(heartbeats(Body) >= 3),
+    {Seq, Pending, Rows} = res(Body, Params),
+    ?assertEqual(8, Seq),
+    ?assertEqual(0, Pending),
+    ?assertEqual(3, length(Rows)).
+
+t_continuous_heartbeat({_, DbUrl}) ->
+    % Coordinator could wake up on every update, but heartbeats should still be
+    % sent only once per interval.
+    Params = "?feed=continuous&filter=_selector&heartbeat=100",
+    Selector = #{<<"selector">> => #{<<"_id">> => <<"nomatch">>}},
+    Self = self(),
+    Writer = spawn_link(fun() -> Self ! {self(), write_docs_for(DbUrl, 300)} end),
+    Body = with_changes_dur(300, fun() -> changes_raw_post(DbUrl, Params, Selector) end),
+    Written =
+        receive
+            {Writer, N} -> N
+        after 5000 -> error(writer_timeout)
+        end,
+    ?assert(Written >= 3),
+    Heartbeats = heartbeats(Body),
+    ?assert(Heartbeats >= 1),
+    ?assert(Heartbeats =< 6),
+    {_, _, Rows} = res(Body, Params),
+    ?assertEqual([], Rows).
+
+t_eventsource_heartbeat({_, DbUrl}) ->
+    % Like for continuous heartbeat test but for eventsource
+    Params = "?feed=eventsource&filter=_selector&heartbeat=100",
+    Selector = #{<<"selector">> => #{<<"_id">> => <<"nomatch">>}},
+    Self = self(),
+    Writer = spawn_link(fun() -> Self ! {self(), write_docs_for(DbUrl, 300)} end),
+    Body = with_changes_dur(300, fun() -> changes_raw_post(DbUrl, Params, Selector) end),
+    Written =
+        receive
+            {Writer, N} -> N
+        after 5000 -> error(writer_timeout)
+        end,
+    ?assert(Written >= 3),
+    Heartbeats = length(binary:matches(Body, <<"event: heartbeat">>)),
+    ?assert(Heartbeats >= 1),
+    ?assert(Heartbeats =< 6),
+    ?assertEqual(0, length(binary:matches(Body, <<"data: {">>))).
 
 t_limit_one({_, DbUrl}) ->
     Params = "?limit=1",
@@ -1207,6 +1267,44 @@ seq(<<_/binary>> = Seq) ->
     binary_to_integer(NumStr);
 seq(null) ->
     null.
+
+with_changes_dur(Msec, Fun) ->
+    config:set("fabric", "changes_duration", integer_to_list(Msec), false),
+    try
+        Fun()
+    after
+        config:delete("fabric", "changes_duration", false)
+    end.
+
+changes_raw(DbUrl, Params) ->
+    {Code, Res} = reqraw(get, DbUrl ++ "/_changes" ++ Params),
+    ?assertEqual(200, Code),
+    Res.
+
+changes_raw_post(DbUrl, Params, #{} = Body) ->
+    {Code, Res} = reqraw(post, DbUrl ++ "/_changes" ++ Params, Body),
+    ?assertEqual(200, Code),
+    Res.
+
+% heartbeats are empty lines. Request ends with a newline so we subtract one.
+heartbeats(Body) ->
+    Lines = binary:split(Body, ~"\n", [global]),
+    length([L || L <- Lines, L =:= <<>>]) - 1.
+
+% Create docs for the given number of msec. Return how many were created.
+write_docs_for(DbUrl, MSec) ->
+    AbsMSec = erlang:monotonic_time(millisecond) + MSec,
+    write_docs_until(DbUrl, AbsMSec, 0).
+
+write_docs_until(DbUrl, AbsMSec, N) ->
+    case erlang:monotonic_time(millisecond) < AbsMSec of
+        true ->
+            Url = DbUrl ++ "/writer" ++ integer_to_list(N),
+            {201, #{~"ok" := true}} = req(put, Url, #{}),
+            write_docs_until(DbUrl, AbsMSec, N + 1);
+        false ->
+            N
+    end.
 
 called_times(ReqFun, DbUrl) ->
     meck:reset(couch_db),
