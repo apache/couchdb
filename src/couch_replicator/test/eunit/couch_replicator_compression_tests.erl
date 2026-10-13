@@ -31,21 +31,22 @@ compression_test_() ->
                 ?TDEF_FE(should_compress_when_enabled, ?TIMEOUT_EUNIT),
                 ?TDEF_FE(should_compress_large_batch, ?TIMEOUT_EUNIT),
                 ?TDEF_FE(should_compress_per_job, ?TIMEOUT_EUNIT),
-                ?TDEF_FE(job_compression_overrides_global_disabled, ?TIMEOUT_EUNIT)
+                ?TDEF_FE(job_compression_overrides_global_disabled, ?TIMEOUT_EUNIT),
+                ?TDEF_FE(decompress_counter_increments_on_replication, ?TIMEOUT_EUNIT)
             ]
         }
     }.
 
 setup() ->
-    Ctx = couch_replicator_test_helper:test_setup(),
+    {Ctx, {Source, Target}} = couch_replicator_test_helper:test_setup(),
     config:set("replicator", "request_compression", "none", false),
     config:set("replicator", "compress_min_size", "1024", false),
-    Ctx.
+    {Ctx, {Source, Target}}.
 
-teardown(Ctx) ->
+teardown({Ctx, {Source, Target}}) ->
     config:delete("replicator", "request_compression", false),
     config:delete("replicator", "compress_min_size", false),
-    couch_replicator_test_helper:test_teardown(Ctx).
+    couch_replicator_test_helper:test_teardown({Ctx, {Source, Target}}).
 
 should_not_compress_by_default({_Ctx, {Source, Target}}) ->
     Before = couch_stats:sample([couch_replicator, requests_compressed, gzip]),
