@@ -67,7 +67,9 @@
     chunks_sent = 0,
     buffer = [],
     bufsize = 0,
-    threshold
+    threshold,
+    heartbeat_dt,
+    heartbeat_ts
 }).
 
 -define(IS_ALL_DOCS(T),
@@ -149,10 +151,13 @@ handle_changes_req1(#httpd{} = Req, Db) ->
             end);
         Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource" ->
             couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
+            {HDt, _} = couch_changes:get_changes_timeout(ChangesArgs, fun changes_callback/2),
             Acc0 = #cacc{
                 feed = list_to_atom(Feed),
                 mochi = Req,
-                threshold = Max
+                threshold = Max,
+                heartbeat_dt = HDt,
+                heartbeat_ts = now_msec()
             },
             try
                 fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
@@ -206,10 +211,7 @@ changes_callback({change, {ChangeProp} = Change}, #cacc{feed = eventsource} = Ac
     Len = iolist_size(Chunk),
     maybe_flush_changes_feed(Acc, Chunk, Len);
 changes_callback(timeout, #cacc{feed = eventsource} = Acc) ->
-    #cacc{mochi = Resp, chunks_sent = ChunksSet} = Acc,
-    Chunk = "event: heartbeat\ndata: \n\n",
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
-    {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSet + 1}};
+    maybe_heartbeat(Acc, "event: heartbeat\ndata: \n\n");
 changes_callback({stop, _EndSeq, _Pending}, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
@@ -246,28 +248,16 @@ changes_callback({stop, EndSeq, Pending}, Acc) ->
     ],
     {ok, Resp1} = chttpd:close_delayed_json_object(Resp, Buf, Terminator, Max),
     chttpd:end_delayed_json_response(Resp1);
+changes_callback(waiting_for_updates, #cacc{buffer = [], chunks_sent = 0} = Acc) ->
+    % didn't send anything yet, send response headers
+    send_changes_chunk(Acc, ~"\n");
 changes_callback(waiting_for_updates, #cacc{buffer = []} = Acc) ->
-    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
-    case ChunksSent > 0 of
-        true ->
-            {ok, Acc};
-        false ->
-            {ok, Resp1} = chttpd:send_delayed_chunk(Resp, <<"\n">>),
-            {ok, Acc#cacc{mochi = Resp1, chunks_sent = 1}}
-    end;
+    {ok, Acc};
 changes_callback(waiting_for_updates, Acc) ->
-    #cacc{buffer = Buf, mochi = Resp, chunks_sent = ChunksSent} = Acc,
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
-    {ok, Acc#cacc{
-        buffer = [],
-        bufsize = 0,
-        mochi = Resp1,
-        chunks_sent = ChunksSent + 1
-    }};
+    #cacc{buffer = Buf} = Acc,
+    send_changes_chunk(Acc#cacc{buffer = [], bufsize = 0}, Buf);
 changes_callback(timeout, Acc) ->
-    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
-    {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSent + 1}};
+    maybe_heartbeat(Acc, "\n");
 changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->
     #cacc{mochi = Req} = Acc,
     chttpd:send_error(Req, Reason);
@@ -280,9 +270,8 @@ changes_callback({error, Reason}, Acc) ->
 maybe_flush_changes_feed(#cacc{bufsize = Size, threshold = Max} = Acc, Data, Len) when
     Size > 0 andalso (Size + Len) > Max
 ->
-    #cacc{buffer = Buffer, mochi = Resp} = Acc,
-    {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
-    {ok, Acc#cacc{prepend = ",\r\n", buffer = Data, bufsize = Len, mochi = R1}};
+    #cacc{buffer = Buffer} = Acc,
+    send_changes_chunk(Acc#cacc{prepend = ",\r\n", buffer = Data, bufsize = Len}, Buffer);
 maybe_flush_changes_feed(Acc0, Data, Len) ->
     #cacc{buffer = Buf, bufsize = Size, chunks_sent = ChunksSent} = Acc0,
     Acc = Acc0#cacc{
@@ -292,6 +281,25 @@ maybe_flush_changes_feed(Acc0, Data, Len) ->
         chunks_sent = ChunksSent + 1
     },
     {ok, Acc}.
+
+send_changes_chunk(#cacc{} = Acc, Data) ->
+    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Data),
+    Acc1 = Acc#cacc{
+        mochi = Resp1,
+        chunks_sent = ChunksSent + 1,
+        heartbeat_ts = now_msec()
+    },
+    {ok, Acc1}.
+
+% Send a heartbeat if nothing else was sent for a whole interval
+maybe_heartbeat(#cacc{heartbeat_dt = undefined} = Acc, Data) ->
+    send_changes_chunk(Acc, Data);
+maybe_heartbeat(#cacc{heartbeat_dt = DtMSec, heartbeat_ts = Ts} = Acc, Data) ->
+    case now_msec() - Ts >= DtMSec of
+        true -> send_changes_chunk(Acc, Data);
+        false -> {ok, Acc}
+    end.
 
 handle_compact_req(#httpd{method = 'POST'} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
@@ -2748,6 +2756,9 @@ bulk_get_rev_error(all) ->
     <<"undefined">>;
 bulk_get_rev_error([{Pos, RevId} = Rev]) when is_integer(Pos), is_binary(RevId) ->
     couch_doc:rev_to_str(Rev).
+
+now_msec() ->
+    erlang:monotonic_time(millisecond).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
