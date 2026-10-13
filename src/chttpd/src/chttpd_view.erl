@@ -125,12 +125,12 @@ handle_view_req(
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
 handle_view_req(
     #httpd{
-        method = 'POST',
+        method = Method,
         path_parts = [_, _, _, _, ViewName]
     } = Req,
     Db,
     DDoc
-) ->
+) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
@@ -138,7 +138,7 @@ handle_view_req(
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys);
 handle_view_req(Req, _Db, _DDoc) ->
-    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,QUERY,HEAD").
 
 handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,

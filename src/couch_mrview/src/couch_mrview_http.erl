@@ -45,30 +45,30 @@
 
 handle_all_docs_req(#httpd{method = 'GET'} = Req, Db) ->
     all_docs_req(Req, Db, undefined);
-handle_all_docs_req(#httpd{method = 'POST'} = Req, Db) ->
+handle_all_docs_req(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys);
 handle_all_docs_req(Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,QUERY,HEAD").
 
 handle_local_docs_req(#httpd{method = 'GET'} = Req, Db) ->
     all_docs_req(Req, Db, undefined, <<"_local">>);
-handle_local_docs_req(#httpd{method = 'POST'} = Req, Db) ->
+handle_local_docs_req(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_local">>);
 handle_local_docs_req(Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,QUERY,HEAD").
 
 handle_design_docs_req(#httpd{method = 'GET'} = Req, Db) ->
     all_docs_req(Req, Db, undefined, <<"_design">>);
-handle_design_docs_req(#httpd{method = 'POST'} = Req, Db) ->
+handle_design_docs_req(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     Keys = couch_mrview_util:get_view_keys(chttpd:json_body_obj(Req)),
     all_docs_req(Req, Db, Keys, <<"_design">>);
 handle_design_docs_req(Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,QUERY,HEAD").
 
 handle_reindex_req(
     #httpd{
@@ -108,7 +108,7 @@ handle_view_req(#httpd{method = 'GET'} = Req, Db, DDoc) ->
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_view(Req, Db, DDoc, ViewName, undefined);
-handle_view_req(#httpd{method = 'POST'} = Req, Db, DDoc) ->
+handle_view_req(#httpd{method = Method} = Req, Db, DDoc) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     [_, _, _, _, ViewName] = Req#httpd.path_parts,
     Props = chttpd:json_body_obj(Req),
@@ -125,13 +125,13 @@ handle_view_req(#httpd{method = 'POST'} = Req, Db, DDoc) ->
         {undefined, undefined} ->
             throw({
                 bad_request,
-                "POST body must contain `keys` or `queries` field"
+                "request body must contain `keys` or `queries` field"
             });
         {_, _} ->
             throw({bad_request, "`keys` and `queries` are mutually exclusive"})
     end;
 handle_view_req(Req, _Db, _DDoc) ->
-    chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
+    chttpd:send_method_not_allowed(Req, "GET,POST,QUERY,HEAD").
 
 handle_temp_view_req(#httpd{method = 'POST'} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
@@ -346,11 +346,12 @@ view_cb({error, Reason}, #vacc{resp = undefined} = Acc) ->
     {ok, Acc#vacc{resp = Resp}};
 view_cb(complete, #vacc{resp = undefined} = Acc) ->
     % Nothing in view
-    {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, {[{rows, []}]}),
+    Headers = [?ACCEPT_QUERY],
+    {ok, Resp} = chttpd:send_json(Acc#vacc.req, 200, Headers, {[{rows, []}]}),
     {ok, Acc#vacc{resp = Resp}};
 view_cb(Msg, #vacc{resp = undefined} = Acc) ->
     %% Start response
-    Headers = [],
+    Headers = [?ACCEPT_QUERY],
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#vacc.req, 200, Headers),
     view_cb(Msg, Acc#vacc{resp = Resp, should_close = true});
 %% ---------------------------------------------------
@@ -502,7 +503,7 @@ parse_params(Props, Keys, #mrargs{} = Args0, Options) ->
         Props
     ).
 
-parse_body_and_query(#httpd{method = 'POST'} = Req, Keys) ->
+parse_body_and_query(#httpd{method = Method} = Req, Keys) when ?POST_OR_QUERY(Method) ->
     Props = chttpd:json_body_obj(Req),
     parse_body_and_query(Req, Props, Keys);
 parse_body_and_query(Req, Keys) ->

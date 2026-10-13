@@ -194,17 +194,17 @@ handle_index_req(
 handle_index_req(Req, _Db) ->
     chttpd:send_error(Req, not_found).
 
-handle_explain_req(#httpd{method = 'POST'} = Req, Db) ->
+handle_explain_req(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     Body = maybe_set_partition(Req),
     {ok, Opts0} = mango_opts:validate_find(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     Resp = mango_crud:explain(Db, Sel, Opts),
-    chttpd:send_json(Req, Resp);
+    chttpd:send_json(Req, 200, [?ACCEPT_QUERY], Resp);
 handle_explain_req(Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "POST").
+    chttpd:send_method_not_allowed(Req, "POST,QUERY").
 
-handle_find_req(#httpd{method = 'POST'} = Req, Db) ->
+handle_find_req(#httpd{method = Method} = Req, Db) when ?POST_OR_QUERY(Method) ->
     chttpd:validate_ctype(Req, "application/json"),
     Body = maybe_set_partition(Req),
     {ok, Opts0} = mango_opts:validate_find(Body),
@@ -222,7 +222,7 @@ handle_find_req(#httpd{method = 'POST'} = Req, Db) ->
             chttpd:send_error(Req, Error)
     end;
 handle_find_req(Req, _Db) ->
-    chttpd:send_method_not_allowed(Req, "POST").
+    chttpd:send_method_not_allowed(Req, "POST,QUERY").
 
 set_user_ctx(#httpd{user_ctx = Ctx}, Db) ->
     {ok, NewDb} = couch_db:set_user_ctx(Db, Ctx),
@@ -277,7 +277,7 @@ convert_to_design_id(DDocId) ->
     end.
 
 start_find_resp(Req) ->
-    chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
+    chttpd:start_delayed_json_response(Req, 200, [?ACCEPT_QUERY], "{\"docs\":[").
 
 end_find_resp(Acc0) ->
     #vacc{resp = Resp00, buffer = Buf, kvs = KVs, threshold = Max} = Acc0,
