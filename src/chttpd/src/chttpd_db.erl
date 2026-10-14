@@ -69,7 +69,9 @@
     bufsize = 0,
     threshold,
     heartbeat_dt,
-    heartbeat_ts
+    heartbeat_ts,
+    heartbeat_seq = false,
+    heartbeat_seq_sent
 }).
 
 -define(IS_ALL_DOCS(T),
@@ -126,11 +128,13 @@ handle_changes_req(#httpd{path_parts = [_, <<"_changes">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_changes_req1(#httpd{} = Req, Db) ->
-    #changes_args{filter = Raw, style = Style} = Args0 = parse_changes_query(Req),
+    {Args0, HeartbeatSeq} = parse_changes_query(Req),
+    #changes_args{filter = Raw, style = Style} = Args0,
     ChangesArgs = Args0#changes_args{
         filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db),
         db_open_options = [{user_ctx, couch_db:get_user_ctx(Db)}]
     },
+    {HDt, _} = couch_changes:get_changes_timeout(ChangesArgs, fun changes_callback/2),
     Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
         "normal" ->
@@ -145,19 +149,22 @@ handle_changes_req1(#httpd{} = Req, Db) ->
                     feed = normal,
                     etag = Etag,
                     mochi = Req,
-                    threshold = Max
+                    threshold = Max,
+                    heartbeat_dt = HDt,
+                    heartbeat_seq = HeartbeatSeq,
+                    heartbeat_seq_sent = {now_msec(), undefined}
                 },
                 fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
             end);
         Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource" ->
             couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
-            {HDt, _} = couch_changes:get_changes_timeout(ChangesArgs, fun changes_callback/2),
             Acc0 = #cacc{
                 feed = list_to_atom(Feed),
                 mochi = Req,
                 threshold = Max,
                 heartbeat_dt = HDt,
-                heartbeat_ts = now_msec()
+                heartbeat_ts = now_msec(),
+                heartbeat_seq = HeartbeatSeq
             },
             try
                 fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
@@ -178,6 +185,14 @@ changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
     Data = [?JSON_ENCODE(Change) | "\n"],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
+changes_callback({timeout, Seq}, #cacc{feed = continuous, heartbeat_seq = true} = Acc) ->
+    case heartbeat_seq_due(Seq, Acc) of
+        true ->
+            Data = [?JSON_ENCODE(heartbeat_json(Seq)) | "\n"],
+            send_heartbeat_seq(Seq, Acc, Data);
+        false ->
+            maybe_heartbeat(Acc, "\n")
+    end;
 changes_callback({stop, EndSeq, Pending}, #cacc{feed = continuous} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
     Row =
@@ -210,7 +225,15 @@ changes_callback({change, {ChangeProp} = Change}, #cacc{feed = eventsource} = Ac
     ],
     Len = iolist_size(Chunk),
     maybe_flush_changes_feed(Acc, Chunk, Len);
-changes_callback(timeout, #cacc{feed = eventsource} = Acc) ->
+changes_callback({timeout, Seq}, #cacc{feed = eventsource, heartbeat_seq = true} = Acc) ->
+    case heartbeat_seq_due(Seq, Acc) of
+        true ->
+            Chunk = ["event: heartbeat\ndata: \nid: ", ?JSON_ENCODE(Seq), "\n\n"],
+            send_heartbeat_seq(Seq, Acc, Chunk);
+        false ->
+            maybe_heartbeat(Acc, "event: heartbeat\ndata: \n\n")
+    end;
+changes_callback({timeout, _Seq}, #cacc{feed = eventsource} = Acc) ->
     maybe_heartbeat(Acc, "event: heartbeat\ndata: \n\n");
 changes_callback({stop, _EndSeq, _Pending}, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
@@ -256,7 +279,15 @@ changes_callback(waiting_for_updates, #cacc{buffer = []} = Acc) ->
 changes_callback(waiting_for_updates, Acc) ->
     #cacc{buffer = Buf} = Acc,
     send_changes_chunk(Acc#cacc{buffer = [], bufsize = 0}, Buf);
-changes_callback(timeout, Acc) ->
+changes_callback({timeout, Seq}, #cacc{heartbeat_seq = true} = Acc) ->
+    case heartbeat_seq_due(Seq, Acc) of
+        true ->
+            Data = [Acc#cacc.prepend, ?JSON_ENCODE(heartbeat_json(Seq))],
+            send_heartbeat_seq(Seq, Acc#cacc{prepend = ",\r\n"}, Data);
+        false ->
+            maybe_heartbeat(Acc, "\n")
+    end;
+changes_callback({timeout, _Seq}, Acc) ->
     maybe_heartbeat(Acc, "\n");
 changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->
     #cacc{mochi = Req} = Acc,
@@ -293,13 +324,35 @@ send_changes_chunk(#cacc{} = Acc, Data) ->
     {ok, Acc1}.
 
 % Send a heartbeat if nothing else was sent for a whole interval
-maybe_heartbeat(#cacc{heartbeat_dt = undefined} = Acc, Data) ->
+maybe_heartbeat(#cacc{feed = normal} = Acc, Data) ->
     send_changes_chunk(Acc, Data);
 maybe_heartbeat(#cacc{heartbeat_dt = DtMSec, heartbeat_ts = Ts} = Acc, Data) ->
     case now_msec() - Ts >= DtMSec of
         true -> send_changes_chunk(Acc, Data);
         false -> {ok, Acc}
     end.
+
+heartbeat_json(Seq) ->
+    {[
+        {~"seq", Seq},
+        {~"id", null},
+        {~"changes", []}
+    ]}.
+
+% Heartbeats are sent _after_ any pending rows
+send_heartbeat_seq(Seq, #cacc{buffer = Buf} = Acc, Data) ->
+    Acc1 = Acc#cacc{
+        buffer = [],
+        bufsize = 0,
+        heartbeat_seq_sent = {now_msec(), Seq}
+    },
+    send_changes_chunk(Acc1, [Buf, Data]).
+
+% Send heartbeat seq if it's due and different than the last one
+heartbeat_seq_due(_Seq, #cacc{heartbeat_seq_sent = undefined}) ->
+    true;
+heartbeat_seq_due(Seq, #cacc{heartbeat_dt = Dt, heartbeat_seq_sent = {T0, OldSeq}}) ->
+    Seq /= OldSeq andalso (now_msec() - T0) >= Dt.
 
 handle_compact_req(#httpd{method = 'POST'} = Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
@@ -2242,8 +2295,11 @@ parse_doc_query({Key, Value}, Args) ->
             Args
     end.
 
+% Return {#changes_args{}, HeartbeatSeq}. HeartbeatSeq is not sent to the workers
+% so we keep it in the coordinator only (it's formatting hint for heartbeats)
 parse_changes_query(Req) ->
     erlang:erase(changes_seq_interval),
+    QArgs = chttpd:qs(Req),
     ChangesArgs = lists:foldl(
         fun({Key, Value}, Args) ->
             case {string:to_lower(Key), Value} of
@@ -2339,22 +2395,36 @@ parse_changes_query(Req) ->
             end
         end,
         #changes_args{},
-        chttpd:qs(Req)
+        QArgs
     ),
     %% if it's an EventSource request with a Last-event-ID header
     %% that should override the `since` query string, since it's
     %% probably the browser reconnecting.
-    case ChangesArgs#changes_args.feed of
-        "eventsource" ->
-            case couch_httpd:header_value(Req, "last-event-id") of
-                undefined ->
-                    ChangesArgs;
-                Value ->
-                    ChangesArgs#changes_args{since = Value}
-            end;
-        _ ->
-            ChangesArgs
-    end.
+    ChangesArgs1 =
+        case ChangesArgs#changes_args.feed of
+            "eventsource" ->
+                case couch_httpd:header_value(Req, "last-event-id") of
+                    undefined ->
+                        ChangesArgs;
+                    Value ->
+                        ChangesArgs#changes_args{since = Value}
+                end;
+            _ ->
+                ChangesArgs
+        end,
+    {ChangesArgs1, parse_heartbeat_seq(QArgs)}.
+
+parse_heartbeat_seq(QArgs) ->
+    lists:foldl(
+        fun({K, V}, Acc) ->
+            case string:to_lower(K) of
+                "heartbeat_seq" -> V =:= "true";
+                _ -> Acc
+            end
+        end,
+        false,
+        QArgs
+    ).
 
 extract_header_rev(Req, ExplicitRev) when is_binary(ExplicitRev) or is_list(ExplicitRev) ->
     extract_header_rev(Req, couch_doc:parse_rev(ExplicitRev));
