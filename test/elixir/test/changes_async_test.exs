@@ -228,6 +228,52 @@ defmodule ChangesAsyncTest do
   end
 
   @tag :with_db
+  test "continuous heartbeat with seq", context do
+    db_name = context[:db_name]
+    create_doc(db_name, sample_doc_foo())
+
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+
+    req_id =
+      Rawresp.get(
+        "/#{db_name}/_changes?feed=continuous&heartbeat=10&heartbeat_seq=true",
+        stream_to: {self(), :once},
+        direct: worker_pid
+      )
+
+    :ok = wait_for_headers(req_id.id, 200)
+
+    rows = wait_for_rows(req_id.id, [], 2)
+    assert length(rows) == 2
+    {changes, heartbeats} = Enum.split_with(rows, fn row -> row["id"] != nil end)
+    assert [change] = changes
+    assert change["id"] == "foo"
+    assert String.starts_with?(change["seq"], "1-")
+    assert [heartbeat] = heartbeats
+    assert heartbeat == %{"seq" => heartbeat["seq"], "id" => nil, "changes" => []}
+    assert String.starts_with?(heartbeat["seq"], "1-")
+
+    # A new change bumps the sequence. We should get a row then a heartbeat
+    # with a seq.
+    create_doc_bar(db_name, "bar")
+    seq2? = fn row -> row["id"] == nil and String.starts_with?(row["seq"], "2-") end
+
+    rows =
+      wait_until(req_id.id, &parse_changes_line/1, [], fn rows ->
+        Enum.any?(rows, seq2?)
+      end)
+
+    {changes, heartbeats} = Enum.split_with(rows, fn row -> row["id"] != nil end)
+    assert [change] = changes
+    assert change["id"] == "bar"
+    assert String.starts_with?(change["seq"], "2-")
+    assert [heartbeat] = heartbeats
+    assert heartbeat["changes"] == []
+    assert String.starts_with?(heartbeat["seq"], "2-")
+    HTTPotion.stop_worker_process(worker_pid)
+  end
+
+  @tag :with_db
   test "longpoll filtered changes", context do
     db_name = context[:db_name]
     create_filters_view(db_name)
@@ -382,6 +428,43 @@ defmodule ChangesAsyncTest do
     end
   end
 
+  defp wait_for_rows(id, rows, expected) do
+    if length(rows) < expected do
+      case next_chunk(id) do
+        :timeout -> rows
+        chunk -> wait_for_rows(id, rows ++ parse_changes_line(chunk), expected)
+      end
+    else
+      rows
+    end
+  end
+
+  # Get items from feed until `done?` or the feed is quiet
+  defp wait_until(id, parser, items, done?) do
+    if done?.(items) do
+      items
+    else
+      case next_chunk(id) do
+        :timeout -> items
+        chunk -> wait_until(id, parser, items ++ parser.(chunk), done?)
+      end
+    end
+  end
+
+  defp next_chunk(id, timeout \\ 3000) do
+    :ibrowse.stream_next(id)
+
+    receive do
+      %HTTPotion.AsyncChunk{id: ^id, chunk: chunk} ->
+        chunk
+
+      _ ->
+        next_chunk(id, timeout)
+    after
+      timeout -> :timeout
+    end
+  end
+
   defp wait_for_headers(id, status, timeout \\ 1000) do
     receive do
       %HTTPotion.AsyncHeaders{id: ^id, status_code: ^status} ->
@@ -497,7 +580,7 @@ defmodule ChangesAsyncTest do
     body_lines
     |> Enum.filter(fn line -> line != "" end)
     |> Enum.map(fn line ->
-      line |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+      line |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps, :use_nil])
     end)
   end
 

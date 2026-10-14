@@ -37,6 +37,9 @@
 % compatibilty reasons and to make replication self-healing.
 -define(BADSEQ, badseq).
 
+% Heartbeat frequency for normal feeds
+-define(NORMAL_TIMEOUT, 5000).
+
 go(DbName, Feed, Options, Callback, Acc0) when
     Feed == "continuous" orelse
         Feed == "longpoll" orelse Feed == "eventsource"
@@ -88,13 +91,18 @@ go(DbName, "normal", Options, Callback, Acc0) ->
                 Callback,
                 Since,
                 Acc,
-                5000
+                normal_timeout(Args)
             ),
             #collector{counters = Seqs, user_acc = AccOut, offset = Offset} = Collector,
             Callback({stop, pack_seqs(Seqs), pending_count(Offset)}, AccOut);
         Error ->
             Callback(Error, Acc0)
     end.
+
+normal_timeout(#changes_args{heartbeat = HB}) when is_integer(HB) ->
+    min(?NORMAL_TIMEOUT, HB);
+normal_timeout(#changes_args{}) ->
+    ?NORMAL_TIMEOUT.
 
 keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0) ->
     #changes_args{limit = Limit, feed = Feed, heartbeat = Heartbeat, dir = Dir} = Args,
@@ -118,7 +126,10 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
         NewEpoch ->
             Callback({stop, LastSeq, PendingCount}, AccOut0);
         true ->
-            {ok, AccOut} = Callback(waiting_for_updates, AccOut0),
+            {ok, AccOut1} = Callback(waiting_for_updates, AccOut0),
+            % Heartbeat the sequence at end of pass and emit it before waiting
+            % for updates. THis way we cover the updates just processed.
+            {ok, AccOut} = Callback({timeout, LastSeq}, AccOut1),
             WaitForUpdate = wait_db_updated(UpListen),
             AccumulatedTime = timer:now_diff(os:timestamp(), T0) div 1000,
             Max =
@@ -136,10 +147,9 @@ keep_sending_changes(DbName, Args, Callback, Seqs, AccIn, Timeout, UpListen, T0)
                 {_, true, timeout} ->
                     Callback({stop, LastSeq, PendingCount}, AccOut);
                 _ ->
-                    {ok, AccTimeout} = Callback(timeout, AccOut),
                     Args1 = Args#changes_args{limit = Limit2},
                     keep_sending_changes(
-                        DbName, Args1, Callback, LastSeq, AccTimeout, Timeout, UpListen, T0
+                        DbName, Args1, Callback, LastSeq, AccOut, Timeout, UpListen, T0
                     )
             end
     end.
@@ -251,7 +261,10 @@ receive_results(Workers, State, Timeout, Callback) ->
         )
     of
         {timeout, NewState0} ->
-            {ok, AccOut} = Callback(timeout, NewState0#collector.user_acc),
+            % Send the seq with the heartbeat so callbacks can checkpoint if
+            % they want to.
+            Seq = pack_seqs(NewState0#collector.counters),
+            {ok, AccOut} = Callback({timeout, Seq}, NewState0#collector.user_acc),
             NewState = NewState0#collector{user_acc = AccOut},
             receive_results(Workers, NewState, Timeout, Callback);
         {_, NewState} ->
