@@ -196,7 +196,7 @@ changes_cb(start, Acc) ->
 changes_cb({change, Row}, Acc) ->
     _ = jiffy:encode(Row),
     {ok, Acc + 1};
-changes_cb(timeout, Acc) ->
+changes_cb({timeout, _Seq}, Acc) ->
     {ok, Acc};
 changes_cb({stop, _, _}, Acc) ->
     {ok, Acc}.

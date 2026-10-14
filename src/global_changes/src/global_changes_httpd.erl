@@ -150,7 +150,7 @@ changes_callback({change, {ChangeProp} = Change}, #acc{resp = Resp, feed = "even
     ],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
     maybe_finish(Acc#acc{resp = Resp1});
-changes_callback(timeout, #acc{feed = "eventsource"} = Acc) ->
+changes_callback({timeout, _Seq}, #acc{feed = "eventsource"} = Acc) ->
     #acc{resp = Resp} = Acc,
     Chunk = "event: heartbeat\ndata: \n\n",
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
@@ -204,7 +204,7 @@ changes_callback({stop, EndSeq, _Pending}, Acc) ->
         ["\n],\n\"last_seq\":", ?JSON_ENCODE(EndSeq), "}\n"]
     ),
     chttpd:end_delayed_json_response(Resp1);
-changes_callback(timeout, Acc) ->
+changes_callback({timeout, _Seq}, Acc) ->
     {ok, maybe_send_heartbeat(Acc)};
 changes_callback({error, Reason}, #acc{resp = Req = #httpd{}}) ->
     chttpd:send_error(Req, Reason);

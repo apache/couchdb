@@ -195,7 +195,7 @@ continuous_feed_should_work_during_split(#{db1 := Db}) ->
                         {"in_process", _} ->
                             {ok, Acc}
                     end;
-                (timeout, Acc) ->
+                ({timeout, _Seq}, Acc) ->
                     {ok, Acc};
                 ({change, {Change}}, Acc) ->
                     CM = maps:from_list(Change),
