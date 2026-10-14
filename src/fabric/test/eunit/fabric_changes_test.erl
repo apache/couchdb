@@ -32,7 +32,8 @@ fabric_changes_test_() ->
             ?TDEF(t_main_only_include_docs),
             ?TDEF(t_all_docs_include_docs),
             ?TDEF(t_main_only_include_docs_conflicts),
-            ?TDEF(t_all_docs_include_docs_conflicts)
+            ?TDEF(t_all_docs_include_docs_conflicts),
+            ?TDEF(t_continuous_timeout_seq)
         ])
     }.
 
@@ -515,9 +516,26 @@ t_custom_all_docs_include_docs_conflicts({_, DbName, Rev}) ->
         Doc
     ).
 
+t_continuous_timeout_seq({_, DbName}) ->
+    config:set("fabric", "changes_duration", "200", false),
+    Args = #changes_args{feed = "continuous", heartbeat = 20},
+    {ok, Events, EndSeq, 0} = changes_events(DbName, Args),
+    Changes = [C || {change, C} <- Events],
+    ?assertMatch([#{id := ~"a"}], Changes),
+    Timeouts = [Seq || {timeout, Seq} <- Events],
+    ?assert(length(Timeouts) >= 1),
+    ?assert(lists:all(fun(Seq) -> Seq =:= EndSeq end, Timeouts)),
+    % The feed ends with the one change we have
+    [#{seq := ChangeSeq}] = Changes,
+    ?assertEqual(seq_num(ChangeSeq), seq_num(EndSeq)),
+    % First we get the change row, then the heartbeat
+    ?assertMatch([{change, _}, {timeout, EndSeq} | _], Events),
+    config:delete("fabric", "changes_duration", false).
+
 %%%%%%%%%%%%%%%%%%%% Utility Functions %%%%%%%%%%%%%%%%%%%%
 setup() ->
     Ctx = test_util:start_couch([fabric]),
+    config:delete("fabric", "changes_duration", false),
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, [{q, 1}, {n, 1}]),
     Docs = [
@@ -544,6 +562,7 @@ teardown({Ctx, DbName, _}) ->
     teardown({Ctx, DbName});
 teardown({Ctx, DbName}) ->
     ok = fabric:delete_db(DbName, [?ADMIN_CTX]),
+    config:delete("fabric", "changes_duration", false),
     test_util:stop_couch(Ctx).
 
 changes_callback(start, Acc) ->
@@ -556,3 +575,21 @@ changes_callback({stop, EndSeq, Pending}, Acc) ->
 
 changes(DbName, #changes_args{} = Args) ->
     fabric_util:isolate(fun() -> fabric:changes(DbName, fun changes_callback/2, [], Args) end).
+
+changes_fun(start, Acc) ->
+    {ok, Acc};
+changes_fun({change, {Change}}, Acc) ->
+    {ok, [{change, maps:from_list(Change)} | Acc]};
+changes_fun({timeout, Seq}, Acc) ->
+    {ok, [{timeout, Seq} | Acc]};
+changes_fun(waiting_for_updates, Acc) ->
+    {ok, Acc};
+changes_fun({stop, EndSeq, Pending}, Acc) ->
+    {ok, lists:reverse(Acc), EndSeq, Pending}.
+
+changes_events(DbName, #changes_args{} = Args) ->
+    fabric_util:isolate(fun() -> fabric:changes(DbName, fun changes_fun/2, [], Args) end).
+
+seq_num(<<_/binary>> = Seq) ->
+    [NumStr, _] = binary:split(Seq, ~"-"),
+    binary_to_integer(NumStr).

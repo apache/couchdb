@@ -76,6 +76,16 @@
         :ref:`eventsource <changes/eventsource>` feeds. Overrides any timeout
         to keep the feed alive indefinitely. Default is ``60000``. May be
         ``true`` to use default value.
+    :query boolean heartbeat_seq: Send heartbeats with the current update
+        sequence. They are sent at most once per ``heartbeat`` interval, or per
+        ``timeout`` when no heartbeat is set. On :ref:`continuous
+        <changes/continuous>`, :ref:`normal <changes/normal>` and
+        :ref:`longpoll <changes/longpoll>` feeds, a heartbeat is a row of the
+        form ``{"seq": "...", "id": null, "changes": []}``. It is sent as a
+        line of its own or as an element of ``results``. On :ref:`eventsource
+        <changes/eventsource>` feeds it's a ``heartbeat`` event with ``id`` set
+        to the sequence. These types of heartbeats can help a client checkpoint
+        a restrictive filtered feed. Default is ``false``.
     :query boolean include_docs: Include the associated document with each
         result. If there are conflicts, only the winning revision is returned.
         Default is ``false``. When used with ``all_docs`` style and a filter,
@@ -376,6 +386,12 @@ By default all changes are immediately returned within the JSON body::
     "last_seq":"5-g1AAAAIreJyVkEsKwjAURZ-toI5cgq5A0sQ0OrI70XyppcaRY92J7kR3ojupaSPUUgotgRd4yTlwbw4A0zRUMLdnpaMkwmyF3Ily9xBwEIuiKLI05KOTW0wkV4rruP29UyGWbordzwKVxWBNOGMKZhertDlarbr5pOT3DV4gudUC9-MPJX9tpEAYx4TQASns2E24ucuJ7rXJSL1BbEgf3vTwpmedCZkYa7Pulck7Xt7x_usFU2aIHOD4eEfVTVA5KMGUkqhNZV-8_o5i",
     "pending": 0}
 
+Reading a large changes feed with a selective filter can take a long time, and
+produce few results. With ``heartbeat_seq=true`` the ``results`` array then
+might contain heartbeat rows that look like ``{"seq": "...", "id": null,
+"changes": []}``. A client incrementally parsing the response can then
+checkpoint those sequences before the response is complete.
+
 ``results`` is the list of changes in sequential order. New and changed
 documents only differ in the value of the rev; deleted documents include the
 ``"deleted": true`` attribute. (In the ``style=all_docs mode``, deleted applies
@@ -449,6 +465,11 @@ if no change arrives, and hold the connection indefinitely" while ``timeout``
 means "Hold this connection open for ``x`` ms, and if no change arrives in that
 time, close the socket."  ``heartbeat`` overrides ``timeout``.
 
+With ``heartbeat_seq=true`` the ``results`` array may have rows of the form
+``{"seq": "...", "id": null, "changes": []}``. They periodically indicate how
+far the changes feed has made progress even if the changes feed runs a very
+selective filter.
+
 .. _changes/continuous:
 
 Continuous
@@ -477,6 +498,27 @@ or a JSON object representing a single change, as found in the normal feed's
 results.
 
 If `limit` has been specified the feed will end with a `{ last_seq }` object.
+
+By default, a heartbeat is an empty line. With a very restrictive filter, a
+client may go a long time without receiving back any matching rows. With
+``heartbeat_seq=true`` a heartbeat will return a current update sequence which
+a client then may use to checkpoint the progress made so far.
+
+.. code-block:: http
+
+    GET /db/_changes?feed=continuous&filter=mailbox/new_mail&heartbeat=10000&heartbeat_seq=true HTTP/1.1
+    Accept: application/json
+    Host: localhost:5984
+
+.. code-block:: javascript
+
+    {"seq":"5-g1AAAAIreJyVkEsKwjAURZ...","id":null,"changes":[]}
+
+The ``seq`` value can be used as a ``since`` parameter when resuming the feed.
+Heartbeats are sent at most once per interval and only when the sequence
+changed. When ``heartbeat`` is not set, ``timeout`` (1 minute by default) is
+the interval, and the feed still ends with ``last_seq`` after a ``timeout``
+without updates, just like it does without ``heartbeat_seq``.
 
 .. code-block:: http
 
@@ -533,7 +575,7 @@ parameter.
     }
 
 If you set a heartbeat interval (using the ``heartbeat`` query argument),
-CouchDB will send a ``hearbeat`` event that you can subscribe to with:
+CouchDB will send a ``heartbeat`` event that you can subscribe to with:
 
 .. code-block:: javascript
 
@@ -542,6 +584,13 @@ CouchDB will send a ``hearbeat`` event that you can subscribe to with:
 This can be monitored by the client application to restart the EventSource
 connection if needed (i.e. if the TCP connection gets stuck in a half-open
 state).
+
+With ``heartbeat_seq=true`` a heartbeat event also has an ``id`` field set to
+the current update sequence, just like the change events do, when the sequence
+changed since the last one and at most once per heartbeat interval. Browsers
+send it back in the ``Last-Event-ID`` header when they reconnect, so a filtered
+feed resumes from its most recent heartbeat rather than from the last change
+event which passed the filter.
 
 .. note::
     EventSource connections are subject to cross-origin resource sharing

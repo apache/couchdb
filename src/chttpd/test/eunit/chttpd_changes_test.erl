@@ -66,6 +66,11 @@ changes_test_() ->
             ?TDEF(t_continuous_limit_under_total),
             ?TDEF(t_continuous_limit_exact_total),
             ?TDEF(t_continuous_limit_over_total),
+            ?TDEF(t_heartbeat_seq_normal),
+            ?TDEF(t_heartbeat_seq_longpoll),
+            ?TDEF(t_eventsource_heartbeat_plain),
+            ?TDEF(t_continuous_heartbeat_seq),
+            ?TDEF(t_eventsource_heartbeat_seq),
             ?TDEF(t_limit_one),
             ?TDEF(t_since_now),
             ?TDEF(t_continuous_since_now),
@@ -105,6 +110,22 @@ heartbeat_test_() ->
         ]
     }.
 
+% These tests write docs to the db so each one gets a fresh db in a foreach
+% setup to avoid messing with other tests.
+changes_heartbeat_seq_test_() ->
+    {
+        foreach,
+        fun setup_basic/0,
+        fun teardown_basic/1,
+        [
+            ?TDEF_FE(t_continuous_heartbeat_seq_no_heartbeat),
+            ?TDEF_FE(t_continuous_heartbeat_seq_deduped),
+            ?TDEF_FE(t_normal_heartbeat_seq_filtered),
+            ?TDEF_FE(t_longpoll_heartbeat_seq_filtered),
+            ?TDEF_FE(t_heartbeat_seq_not_true)
+        ]
+    }.
+
 changes_q8_test_() ->
     {
         setup,
@@ -113,6 +134,7 @@ changes_q8_test_() ->
         with([
             ?TDEF(t_basic_q8),
             ?TDEF(t_continuous_q8),
+            ?TDEF(t_continuous_heartbeat_seq_q8),
             ?TDEF(t_limit_zero),
             ?TDEF(t_limit_one_q8),
             ?TDEF(t_since_now),
@@ -357,6 +379,174 @@ t_eventsource_heartbeat({_, DbUrl}) ->
     ?assert(Heartbeats >= 1),
     ?assert(Heartbeats =< 6),
     ?assertEqual(0, length(binary:matches(Body, <<"data: {">>))).
+
+t_continuous_heartbeat_seq({_, DbUrl}) ->
+    Params = "?feed=continuous&heartbeat=10&heartbeat_seq=true",
+    Lines = with_changes_dur(100, fun() -> changes_lines(DbUrl, Params) end),
+    {LastSeq, Rows, Heartbeats} = parse_heartbeats(Lines),
+    ?assertMatch(#{~"last_seq" := _, ~"pending" := 0}, LastSeq),
+    ?assertEqual(
+        [
+            {6, {?DOC1, ~"2-c"}, ?LEAFREV},
+            {7, {?DOC3, ~"2-b"}, ?DELETED},
+            {8, {?DDOC2, ~"2-c"}, ?LEAFREV}
+        ],
+        lists:map(fun parse_row/1, Rows)
+    ),
+    ?assert(length(Heartbeats) >= 1),
+    #{~"last_seq" := EndSeq} = LastSeq,
+    lists:foreach(
+        fun(Heartbeat) ->
+            ?assertEqual([~"changes", ~"id", ~"seq"], lists:sort(maps:keys(Heartbeat))),
+            ?assertMatch(#{~"id" := null, ~"changes" := []}, Heartbeat)
+        end,
+        Heartbeats
+    ),
+    ?assertMatch(#{~"seq" := EndSeq}, lists:last(Heartbeats)),
+    ?assert(unique_seqs(Heartbeats)),
+    % Heartbeats never ahead of rows and seqs emitted in order
+    Seqs = [seq(S) || #{~"seq" := S} <- lists:droplast(Lines)],
+    ?assertEqual(lists:sort(Seqs), Seqs),
+    ?assertEqual(8, seq(EndSeq)).
+
+t_continuous_heartbeat_seq_q8({_, DbUrl}) ->
+    Params = "?feed=continuous&heartbeat=10&heartbeat_seq=true",
+    Lines = with_changes_dur(100, fun() -> changes_lines(DbUrl, Params) end),
+    {LastSeq, Rows, Heartbeats} = parse_heartbeats(Lines),
+    #{~"last_seq" := EndSeq} = LastSeq,
+    {_, Revs, _} = lists:unzip3(lists:map(fun parse_row/1, Rows)),
+    ?assertEqual(
+        [
+            {?DDOC2, ~"2-c"},
+            {?DOC1, ~"2-c"},
+            {?DOC3, ~"2-b"}
+        ],
+        lists:sort(Revs)
+    ),
+    ?assert(length(Heartbeats) >= 1),
+    ?assertMatch(#{~"seq" := EndSeq}, lists:last(Heartbeats)),
+    ?assert(unique_seqs(Heartbeats)),
+    Seqs = [seq(S) || #{~"seq" := S} <- lists:droplast(Lines)],
+    ?assertEqual(lists:sort(Seqs), Seqs),
+    ?assertEqual(8, length(fabric_view_changes:decode_seq(EndSeq))).
+
+t_continuous_heartbeat_seq_deduped({_, DbUrl}) ->
+    Params = "?feed=continuous&filter=_selector&heartbeat=100&heartbeat_seq=true",
+    Body = #{~"selector" => #{~"_id" => ~"nomatch"}},
+    Self = self(),
+    Writer = spawn_link(fun() -> Self ! {self(), write_docs_for(DbUrl, 300)} end),
+    Lines = with_changes_dur(300, fun() -> changes_lines_post(DbUrl, Params, Body) end),
+    Written =
+        receive
+            {Writer, N} -> N
+        after 5000 -> error(writer_timeout)
+        end,
+    ?assert(Written >= 3),
+    {LastSeq, Rows, Heartbeats} = parse_heartbeats(Lines),
+    ?assertMatch(#{~"last_seq" := _}, LastSeq),
+    ?assertEqual([], Rows),
+    % Feed will be open for 300msec + at least one more interval. So we should
+    % get a bunch of hearbeats.
+    ?assert(length(Heartbeats) >= 1),
+    ?assert(length(Heartbeats) =< 6),
+    ?assert(unique_seqs(Heartbeats)),
+    Seqs = [seq(S) || #{~"seq" := S} <- Heartbeats],
+    ?assertEqual(lists:sort(Seqs), Seqs).
+
+t_continuous_heartbeat_seq_no_heartbeat({_, DbUrl}) ->
+    % Seq heartbeat sent as soon as feed is caught up and then no more, since
+    % the timeoutu itnerval passes without any updates and feed ends there.
+    Params = "?feed=continuous&timeout=300&heartbeat_seq=true",
+    T0 = erlang:monotonic_time(millisecond),
+    Lines = changes_lines(DbUrl, Params),
+    Dt = erlang:monotonic_time(millisecond) - T0,
+    ?assert(Dt >= 250),
+    {#{~"last_seq" := EndSeq}, Rows, Heartbeats} = parse_heartbeats(Lines),
+    ?assertEqual(3, length(Rows)),
+    ?assertMatch([#{~"seq" := EndSeq}], Heartbeats).
+
+t_normal_heartbeat_seq_filtered({_, DbUrl}) ->
+    add_slow_filter(DbUrl, 30),
+    Params = "?filter=sloth/f&heartbeat=10&heartbeat_seq=true",
+    {Rows, Heartbeats, EndSeq} = results_with_heartbeats(DbUrl, Params),
+    ?assertEqual([{7, {?DOC3, ~"2-b"}, ?DELETED}], lists:map(fun parse_row/1, Rows)),
+    ?assert(length(Heartbeats) >= 1),
+    ?assertEqual(9, seq(EndSeq)),
+    % Seq heartbeats are not counted for the limit
+    {Rows1, _, _} = results_with_heartbeats(DbUrl, Params ++ "&limit=1"),
+    ?assertEqual(1, length(Rows1)),
+    % Without a heartbeat period, should get none for a small db
+    {_, [], _} = results_with_heartbeats(DbUrl, "?filter=sloth/f&heartbeat_seq=true").
+
+t_longpoll_heartbeat_seq_filtered({_, DbUrl}) ->
+    add_slow_filter(DbUrl, 30),
+    Params = "?feed=longpoll&filter=sloth/f&heartbeat=10&heartbeat_seq=true",
+    {Rows, Heartbeats, EndSeq} = results_with_heartbeats(DbUrl, Params),
+    ?assertEqual([{7, {?DOC3, ~"2-b"}, ?DELETED}], lists:map(fun parse_row/1, Rows)),
+    ?assert(length(Heartbeats) >= 1),
+    ?assertEqual(9, seq(EndSeq)).
+
+t_heartbeat_seq_not_true({_, DbUrl}) ->
+    % Anything besides true is false (like other boolean params)
+    add_slow_filter(DbUrl, 30),
+    Plain = results_with_heartbeats(DbUrl, "?filter=sloth/f&heartbeat=10"),
+    ?assertMatch({[_], [], _}, Plain),
+    lists:foreach(
+        fun(Value) ->
+            Params = "?filter=sloth/f&heartbeat=10&heartbeat_seq=" ++ Value,
+            ?assertEqual(Plain, results_with_heartbeats(DbUrl, Params))
+        end,
+        ["false", "0", "1000", "potato", ""]
+    ).
+
+t_eventsource_heartbeat_plain({_, DbUrl}) ->
+    Params = "?feed=eventsource&heartbeat=10",
+    {Events, Heartbeats} = with_changes_dur(100, fun() -> eventsource(DbUrl, Params) end),
+    ?assertEqual(
+        [
+            {6, {?DOC1, ~"2-c"}, ?LEAFREV},
+            {7, {?DOC3, ~"2-b"}, ?DELETED},
+            {8, {?DDOC2, ~"2-c"}, ?LEAFREV}
+        ],
+        [parse_row(Data) || #{data := Data} <- Events]
+    ),
+    ?assert(length(Heartbeats) >= 1),
+    ?assert(lists:all(fun(#{} = H) -> not maps:is_key(id, H) end, Heartbeats)).
+
+t_eventsource_heartbeat_seq({_, DbUrl}) ->
+    Params = "?feed=eventsource&heartbeat=10&heartbeat_seq=true",
+    {Events, Heartbeats} = with_changes_dur(100, fun() -> eventsource(DbUrl, Params) end),
+    ?assertEqual(
+        [
+            {6, {?DOC1, ~"2-c"}, ?LEAFREV},
+            {7, {?DOC3, ~"2-b"}, ?DELETED},
+            {8, {?DDOC2, ~"2-c"}, ?LEAFREV}
+        ],
+        [parse_row(Data) || #{data := Data} <- Events]
+    ),
+    % Heartbeats have a seq as their event id like the change events do. Those
+    % can then be used as Last-Event-ID when they reconnect. If there are no
+    % changes to the sequence then eventsource heartbeats have no id
+    {WithId, WithoutId} = lists:partition(fun(H) -> maps:is_key(id, H) end, Heartbeats),
+    ?assert(length(WithId) >= 1),
+    ?assert(length(WithoutId) >= 1),
+    lists:foreach(
+        fun(#{id := Id}) ->
+            ?assertMatch(<<"8-", _/binary>>, json(Id))
+        end,
+        WithId
+    ),
+    #{id := LastEventId} = lists:last(Events),
+    ?assertMatch(#{id := LastEventId}, lists:last(WithId)).
+
+t_heartbeat_seq_normal({_, DbUrl}) ->
+    % Db is small and with default times we don't get any heartbeats
+    ?assertEqual(changes(DbUrl), changes(DbUrl, "?heartbeat_seq=true")),
+    ?assertEqual(changes(DbUrl), changes(DbUrl, "?heartbeat_seq=false")).
+
+t_heartbeat_seq_longpoll({_, DbUrl}) ->
+    Params = "?feed=longpoll&timeout=10&heartbeat_seq=true",
+    ?assertEqual(changes(DbUrl, "?feed=longpoll&timeout=10"), changes(DbUrl, Params)).
 
 t_limit_one({_, DbUrl}) ->
     Params = "?limit=1",
@@ -1267,6 +1457,78 @@ seq(<<_/binary>> = Seq) ->
     binary_to_integer(NumStr);
 seq(null) ->
     null.
+
+changes_lines(DbUrl, Params) ->
+    {Code, Res} = reqraw(get, DbUrl ++ "/_changes" ++ Params),
+    ?assertEqual(200, Code),
+    jsonl(Res).
+
+changes_lines_post(DbUrl, Params, #{} = Body) ->
+    {Code, Res} = reqraw(post, DbUrl ++ "/_changes" ++ Params, Body),
+    ?assertEqual(200, Code),
+    jsonl(Res).
+
+unique_seqs(Heartbeats) ->
+    Seqs = [S || #{~"seq" := S} <- Heartbeats],
+    case length(lists:usort(Seqs)) =:= length(Seqs) of
+        true -> true;
+        false -> {false, Seqs}
+    end.
+
+parse_heartbeats(Lines) ->
+    LastSeq = lists:last(Lines),
+    Rows = lists:droplast(Lines),
+    IsHB = fun(#{~"id" := Id}) -> Id =:= null end,
+    {Heartbeats, Changes} = lists:partition(IsHB, Rows),
+    {LastSeq, Changes, Heartbeats}.
+
+% Parse an eventsource response into change events and heartbeat events. Each
+% event is a map of its fields, with data parsed as JSON.
+eventsource(DbUrl, Params) ->
+    {Code, Res} = reqraw(get, DbUrl ++ "/_changes" ++ Params),
+    ?assertEqual(200, Code),
+    Chunks = binary:split(Res, ~"\n\n", [global]),
+    Events = [parse_event(C) || C <- Chunks, C =/= <<>>],
+    lists:partition(fun(#{event := E}) -> E =/= ~"heartbeat" end, Events).
+
+parse_event(Chunk) ->
+    Lines = binary:split(Chunk, ~"\n", [global]),
+    Fields = [binary:split(L, ~": ") || L <- Lines, L =/= ~""],
+    Event = maps:from_list([{binary_to_atom(K), V} || [K, V] <- Fields]),
+    % HB events have an empty data field
+    ParseFun = fun
+        (~"") -> ~"";
+        (Data) -> json(Data)
+    end,
+    Event1 = maps:update_with(data, ParseFun, Event),
+    maps:merge(#{event => ~"message"}, Event1).
+
+% Slow filter which allows doc3 only through
+add_slow_filter(DbUrl, MSec) ->
+    T = integer_to_binary(MSec),
+    Oof = <<"var t = Date.now(); while (Date.now()-t < ", T/binary, ") {};">>,
+    Flt = <<"function(doc, req) {", Oof/binary, "return doc._id == 'doc3';}">>,
+    DDoc = #{~"filters" => #{~"f" => Flt}},
+    {201, #{~"ok" := true}} = req(put, DbUrl ++ "/_design/sloth", DDoc),
+    ok.
+
+% Get normal or longpoll result and split out rows, heartbeats and endseq
+results_with_heartbeats(DbUrl, Params) ->
+    {200, Res} = req(get, DbUrl ++ "/_changes" ++ Params),
+    #{~"results" := Results, ~"last_seq" := EndSeq} = Res,
+    Seqs = [seq(S) || #{~"seq" := S} <- Results],
+    ?assertEqual(lists:sort(Seqs), Seqs),
+    ?assert(lists:all(fun(S) -> S =< seq(EndSeq) end, Seqs)),
+    IsHB = fun(#{~"id" := Id}) -> Id =:= null end,
+    {Heartbeats, Rows} = lists:partition(IsHB, Results),
+    lists:foreach(
+        fun(HB) ->
+            ?assertEqual([~"changes", ~"id", ~"seq"], lists:sort(maps:keys(HB))),
+            ?assertMatch(#{~"changes" := []}, HB)
+        end,
+        Heartbeats
+    ),
+    {Rows, Heartbeats, EndSeq}.
 
 with_changes_dur(Msec, Fun) ->
     config:set("fabric", "changes_duration", integer_to_list(Msec), false),
