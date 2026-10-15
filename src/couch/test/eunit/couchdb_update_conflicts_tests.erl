@@ -20,6 +20,9 @@
 -define(LOCAL_DOC_ID, <<"_local/foobar">>).
 -define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
 -define(TIMEOUT, 20000).
+-define(VDU, ~"function(doc) {if (doc.balrog) {throw({forbidden:'shallnotpass'});}}").
+-define(ATT_NAME, ~"att.txt").
+-define(ATT_DATA, ~"original").
 
 start() ->
     test_util:start_couch().
@@ -345,4 +348,224 @@ spawn_client(DbName, Doc) ->
             end,
         ok = couch_db:close(Db),
         exit(Result)
+    end).
+
+% Test replicated changes coming in from sources with odd (non-default) revs
+% limits. With a VDU we used to shortcut the prep-and-validate and not properly
+% merge updated rev paths.
+%
+% Tests start with a two root tree that looks like:
+%
+%   1-a                :  1-a came in from a revs limit = 1 source
+%   2-b -> 3-c -> 4-d  :  4-d came from a revs revs limit = 3 source
+%
+% Then we get 4-d again with a full revpath history of 1-a -> ... 4->d and then
+% we have to check that we re-parent teh revision back to 1-a as a single path.
+
+replicated_mismatched_revslimit_test_() ->
+    {
+        "Replicated revs from mismatched revslimit sources",
+        {
+            setup,
+            fun start/0,
+            fun test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup_db/0,
+                fun teardown_db/1,
+                [
+                    ?TDEF_FE(t_no_vdu),
+                    ?TDEF_FE(t_with_vdu),
+                    ?TDEF_FE(t_no_vdu_keeps_body),
+                    ?TDEF_FE(t_no_vdu_internal_node_stays_bodyless),
+                    ?TDEF_FE(t_att_stub),
+                    ?TDEF_FE(t_att_data),
+                    ?TDEF_FE(t_internal_node_stemmed),
+                    ?TDEF_FE(t_internal_node_full_path_patches_rev_tree),
+                    ?TDEF_FE(t_multiple_revs_path_in_one_request)
+                ]
+            }
+        }
+    }.
+
+setup_db() ->
+    DbName = ?tempdb(),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
+    ok = couch_db:close(Db),
+    DbName.
+
+teardown_db(DbName) ->
+    ok = couch_server:delete(DbName, [?ADMIN_CTX]).
+
+t_no_vdu(DbName) ->
+    two_roots(DbName),
+    update(DbName, [d_4_full()]),
+    % leafs returns [{Pos, RevId, Deleted, RevPathLength}]
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    update(DbName, [e_5_deleted()]),
+    ?assertEqual([{5, ~"e", true, 5}], leafs(DbName)).
+
+t_no_vdu_keeps_body(DbName) ->
+    two_roots(DbName),
+    % 4-d again with a full path but a different body. The path is patched,
+    % the stored body stays.
+    update(DbName, [forbid(d_4_full())]),
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    ?assertEqual({[{~"val", ~"d"}]}, body(DbName, {4, ~"d"})).
+
+t_no_vdu_internal_node_stays_bodyless(DbName) ->
+    update(DbName, [d_4_stemmed()]),
+    % 3-c is an internal rev. Its full path patches the rev tree, but it
+    % doesn't get a body stored for it.
+    update(DbName, [doc(3, [~"c", ~"b", ~"a"], [{~"val", ~"c"}])]),
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    ?assertMatch([{{not_found, missing}, {3, ~"c"}}], revs(DbName, [{3, ~"c"}])),
+    % 1-a arriving later is an ancestor now, not a second root
+    update(DbName, [doc(1, [~"a"], [{~"val", ~"a"}])]),
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)).
+
+t_with_vdu(DbName) ->
+    vdu(DbName),
+    two_roots(DbName),
+    % Patch the rev path but keep the old body on disk
+    update(DbName, [forbid(d_4_full())]),
+    % One rev path
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    % Old body
+    ?assertEqual({[{~"val", ~"d"}]}, body(DbName, {4, ~"d"})),
+    update(DbName, [e_5_deleted()]),
+    ?assertEqual([{5, ~"e", true, 5}], leafs(DbName)),
+    % New revs are validated, though
+    ?assertMatch({ok, [{_, {forbidden, _}}]}, update(DbName, [forbid(f_5_full())])).
+
+t_att_stub(DbName) ->
+    two_roots_with_att(DbName),
+    Stub = couch_att:new([
+        {name, ?ATT_NAME},
+        {data, stub},
+        {type, ~"application/octet-stream"},
+        {revpos, 4}
+    ]),
+    Doc = d_4_full(),
+    ?assertEqual({ok, []}, update(DbName, [Doc#doc{atts = [Stub]}])),
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    % Rev path patched but we kept the stored attachment
+    ?assertEqual(?ATT_DATA, attbin(DbName, {4, ~"d"})).
+
+t_att_data(DbName) ->
+    two_roots_with_att(DbName),
+    Att = att(~"replaced"),
+    Doc = d_4_full(),
+    update(DbName, [Doc#doc{atts = [Att]}]),
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    % Rev path patched but we kept the stored attachment
+    ?assertEqual(?ATT_DATA, attbin(DbName, {4, ~"d"})).
+
+t_internal_node_stemmed(DbName) ->
+    vdu(DbName),
+    two_roots(DbName),
+    % 3-c is an internal rev. Sending its short path doesn't change anything
+    Doc = forbid(doc(3, [~"c", ~"b"], [{~"val", ~"c"}])),
+    update(DbName, [Doc]),
+    % Sanity check
+    ?assertMatch([{{not_found, missing}, {3, ~"c"}}], revs(DbName, [{3, ~"c"}])),
+    % Rev tree doesn't change
+    ?assertEqual([{1, ~"a", false, 1}, {4, ~"d", false, 3}], leafs(DbName)).
+
+t_internal_node_full_path_patches_rev_tree(DbName) ->
+    vdu(DbName),
+    update(DbName, [d_4_stemmed()]),
+    % 3-c is an internal rev. We send it with a full path it should patch up
+    % the revs tree. Doesn't touch any leafs though.
+    Doc = forbid(doc(3, [~"c", ~"b", ~"a"], [{~"val", ~"c"}])),
+    update(DbName, [Doc]),
+    ?assertEqual([{4, ~"d", false, 4}], leafs(DbName)),
+    % Sanity check
+    ?assertMatch([{{not_found, missing}, {3, ~"c"}}], revs(DbName, [{3, ~"c"}])).
+
+t_multiple_revs_path_in_one_request(DbName) ->
+    vdu(DbName),
+    two_roots(DbName),
+    % 5-e is internal so it doesn't get validated. 6-f body gets stored. Both
+    % are not long enought to re-parent with 1-a
+    Doc1 = forbid(doc(5, [~"e", ~"d", ~"c"], [{~"val", ~"e"}])),
+    Doc2 = doc(6, [~"f", ~"e", ~"d", ~"c"], [{~"val", ~"f"}]),
+    ?assertEqual({ok, []}, update(DbName, [Doc1, Doc2])),
+    ?assertEqual([{1, ~"a", false, 1}, {6, ~"f", false, 5}], leafs(DbName)),
+    ?assertEqual({[{~"val", ~"f"}]}, body(DbName, {6, ~"f"})),
+    % 5-e internal never go through
+    ?assertMatch([{{not_found, missing}, {5, ~"e"}}], revs(DbName, [{5, ~"e"}])).
+
+two_roots(DbName) ->
+    update(DbName, [doc(1, [~"a"], [{~"val", ~"a"}])]),
+    update(DbName, [d_4_stemmed()]),
+    ?assertEqual([{1, ~"a", false, 1}, {4, ~"d", false, 3}], leafs(DbName)).
+
+two_roots_with_att(DbName) ->
+    update(DbName, [doc(1, [~"a"], [{~"val", ~"a"}])]),
+    Doc = d_4_stemmed(),
+    update(DbName, [Doc#doc{atts = [att(?ATT_DATA)]}]),
+    ?assertEqual([{1, ~"a", false, 1}, {4, ~"d", false, 3}], leafs(DbName)).
+
+d_4_stemmed() ->
+    doc(4, [~"d", ~"c", ~"b"], [{~"val", ~"d"}]).
+
+d_4_full() ->
+    doc(4, [~"d", ~"c", ~"b", ~"a"], [{~"val", ~"d"}]).
+
+e_5_deleted() ->
+    Doc = doc(5, [~"e", ~"d", ~"c"], []),
+    Doc#doc{deleted = true}.
+
+f_5_full() ->
+    doc(5, [~"f", ~"d", ~"c", ~"b", ~"a"], [{~"val", ~"f"}]).
+
+% This one will be rejected by the VDU
+forbid(#doc{body = {Props}} = Doc) ->
+    Doc#doc{body = {Props ++ [{~"balrog", true}]}}.
+
+doc(Pos, Revs, Props) when is_list(Props) ->
+    #doc{id = ?DOC_ID, revs = {Pos, Revs}, body = {Props}}.
+
+att(Data) ->
+    couch_att:new([
+        {name, ?ATT_NAME},
+        {data, Data},
+        {type, ~"application/octet-stream"},
+        {att_len, byte_size(Data)},
+        {disk_len, byte_size(Data)},
+        {revpos, 4}
+    ]).
+
+body(DbName, Rev) ->
+    [{ok, #doc{body = Body}}] = revs(DbName, [Rev]),
+    Body.
+
+attbin(DbName, Rev) ->
+    [{ok, #doc{atts = [Att]}}] = revs(DbName, [Rev]),
+    couch_att:to_binary(Att).
+
+revs(DbName, Revs) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        {ok, Res} = couch_db:open_doc_revs(Db, ?DOC_ID, Revs, []),
+        Res
+    end).
+
+vdu(DbName) ->
+    DDoc = #doc{id = ~"_design/nobalrog", body = {[{~"validate_doc_update", ?VDU}]}},
+    couch_util:with_db(DbName, fun(Db) ->
+        {ok, _} = couch_db:update_doc(Db, DDoc, [])
+    end).
+
+update(DbName, Docs) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        couch_db:update_docs(Db, Docs, [], ?REPLICATED_CHANGES)
+    end).
+
+% Get a list of {Pos, RevId, Deleted, RevPathLength} for all leafs
+leafs(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        {ok, Res} = couch_db:open_doc_revs(Db, ?DOC_ID, all, []),
+        RList = [{P, R, D, length(Rs)} || {ok, #doc{revs = {P, [R | _] = Rs}, deleted = D}} <- Res],
+        lists:sort(RList)
     end).
