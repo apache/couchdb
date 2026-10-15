@@ -1237,18 +1237,18 @@ prep_and_validate_replicated_updates(
                     fun(#doc{id = Id, revs = {Pos, [RevId | _]}} = Doc, {AccValidated, AccErrors2}) ->
                         IsOldLeaf = lists:member({Pos, RevId}, OldLeafsLU),
                         case dict:find({Pos, RevId}, LeafRevsFullDict) of
-                            {ok, {Start, Path}} when not IsOldLeaf ->
-                                % our unflushed doc is a leaf node. Go back on the path
-                                % to find the previous rev that's on disk.
-
-                                LoadPrevRevFun = fun() ->
-                                    make_first_doc_on_disk(Db, Id, Start - 1, tl(Path))
+                            {ok, {Start, Path}} ->
+                                LoadRevFun = fun
+                                    () when IsOldLeaf ->
+                                        make_first_doc_on_disk(Db, Id, Start, tl(Path));
+                                    () ->
+                                        make_first_doc_on_disk(Db, Id, Start - 1, tl(Path))
                                 end,
 
                                 case couch_doc:has_stubs(Doc) of
                                     true ->
                                         DiskDoc =
-                                            case LoadPrevRevFun() of
+                                            case LoadRevFun() of
                                                 #doc{} = DiskDoc0 ->
                                                     DiskDoc0;
                                                 _ ->
@@ -1259,18 +1259,18 @@ prep_and_validate_replicated_updates(
                                         GetDiskDocFun = fun() -> DiskDoc end;
                                     false ->
                                         Doc2 = Doc,
-                                        GetDiskDocFun = LoadPrevRevFun
+                                        GetDiskDocFun = LoadRevFun
                                 end,
 
-                                case validate_doc_update(Db, Doc2, GetDiskDocFun) of
-                                    ok ->
+                                case
+                                    IsOldLeaf orelse validate_doc_update(Db, Doc2, GetDiskDocFun)
+                                of
+                                    Pass when Pass == true; Pass == ok ->
                                         {[Doc2 | AccValidated], AccErrors2};
                                     Error ->
                                         {AccValidated, [{Doc, Error} | AccErrors2]}
                                 end;
-                            _ ->
-                                % this doc isn't a leaf or already exists in the tree.
-                                % ignore but consider it a success.
+                            error ->
                                 {AccValidated, AccErrors2}
                         end
                     end,
