@@ -623,9 +623,38 @@ merge_rev_tree(_Db, OldInfo, NewDoc, _Client, true) ->
     % We're merging in revisions without caring about
     % conflicts. Most likely this is a replication update.
     OldTree = OldInfo#full_doc_info.rev_tree,
-    NewTree0 = couch_doc:to_path(NewDoc),
-    {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
-    OldInfo#full_doc_info{rev_tree = NewTree}.
+    case replicated_path(OldTree, NewDoc) of
+        {ok, NewTree0} ->
+            {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
+            OldInfo#full_doc_info{rev_tree = NewTree};
+        ignore ->
+            OldInfo
+    end.
+
+% A rev we already have keeps its leaf as stored (a body or nothing for an
+% internal node). Its path, though, is still merged, as it may patch the
+% revision history. A revs_only doc (see prep_and_validate for
+% replicated_updates) gets sent here without a body, so if its revision is not
+% in the tree any longer (it might have been purged, or is now an an internal
+% node of a longer path in the same request) there is nothing to store and it
+% is ignored, otherwise it's any revision not in the tree is a new revision.
+% revision not in the tree is new.
+replicated_path(OldTree, #doc{revs = {Pos, [RevId | _]}, meta = Meta} = Doc) ->
+    Path = couch_doc:to_path(Doc),
+    case couch_key_tree:get_full_key_paths(OldTree, [{Pos, RevId}]) of
+        {[{Pos, [{RevId, Value} | _]} | _], []} ->
+            Fun = fun
+                (_Rev, _V, leaf) -> Value;
+                (_Rev, V, branch) -> V
+            end,
+            [Path1] = couch_key_tree:map(Fun, [Path]),
+            {ok, Path1};
+        _ ->
+            case lists:keymember(revs_only, 1, Meta) of
+                true -> ignore;
+                false -> {ok, Path}
+            end
+    end.
 
 % Revpos were set before the document was grafted onto the deleted revision and
 % point to rev 1. Update them to the new revpos. This is needed when we

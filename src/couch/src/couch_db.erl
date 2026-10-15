@@ -1268,6 +1268,15 @@ prep_and_validate_replicated_updates(
                                     Error ->
                                         {AccValidated, [{Doc, Error} | AccErrors2]}
                                 end;
+                            _ when NewRevTree =/= OldTree ->
+                                % We already stored this revision or it's an
+                                % internal node. So we don't validate. But that
+                                % revision may bring in a longer connecting
+                                % revision path that we don't already have (say
+                                % if we had {1,[a]} and {2,[b]} but then get
+                                % {2,[a,b]}). We'd want to the update to get
+                                % new revpath {2, [a,b]} only.
+                                {[revs_only(Doc) | AccValidated], AccErrors2};
                             _ ->
                                 % this doc isn't a leaf or already exists in the tree.
                                 % ignore but consider it a success.
@@ -1285,6 +1294,9 @@ prep_and_validate_replicated_updates(
                 AccErrors3
             )
     end.
+
+revs_only(#doc{meta = Meta} = Doc) ->
+    Doc#doc{body = {[]}, atts = [], meta = [{revs_only, true} | Meta]}.
 
 new_revid(#doc{body = Body, revs = {OldStart, OldRevs}, atts = Atts, deleted = Deleted}) ->
     DigestedAtts = lists:foldl(
