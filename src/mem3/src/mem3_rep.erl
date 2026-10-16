@@ -843,10 +843,10 @@ chunk_revs([{Id, R, A} | Revs], {Count, Chunk}, Chunks, Limit) ->
     ).
 
 open_docs(Db, Infos, Missing) ->
+    InfoMap = #{Id => FDI || #full_doc_info{id = Id} = FDI <- Infos},
     lists:flatmap(
         fun({Id, Revs, _}) ->
-            FDI = lists:keyfind(Id, #full_doc_info.id, Infos),
-            #full_doc_info{rev_tree = RevTree} = FDI,
+            #full_doc_info{rev_tree = RevTree} = map_get(Id, InfoMap),
             {FoundRevs, _} = couch_key_tree:get_key_leafs(RevTree, Revs),
             lists:map(
                 fun({#leaf{deleted = IsDel, ptr = SummaryPtr}, FoundRevPath}) ->
