@@ -1,0 +1,49 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2026-90797:
+
+=================================================================================
+CVE-2026-90797: Pre-authentication gzip decompression bomb via ``POST /_session``
+=================================================================================
+
+:Date: 12.10.2026
+
+:Affected: 3.5.2 and below
+
+:Severity: High
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+CouchDB allows for gzip compressed request bodies to unauthenticated endpoints
+like ``/_session``. Only the compressed input is subject to request body
+limitations. This allows highly compressed gzip streams to produce out of memory
+scenarios for CouchDB’s ``beam.smp`` process.
+
+Mitigation
+==========
+
+HTTP request body decompression now happens in chunks and at each iteration,
+the uncompressed output length is subject to the request body limit.
+
+Workarounds
+===========
+
+N/A
+
+Credit
+======
+
+ZeroVuln labs

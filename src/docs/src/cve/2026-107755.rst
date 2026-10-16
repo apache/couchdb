@@ -1,0 +1,53 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. _cve/2026-107755:
+
+===========================================================================
+CVE-2026-107755: |longtitle|
+===========================================================================
+
+.. |longtitle| replace:: Credential Disclosure via Object-Form Replication URLs
+    in ``_replicator``
+
+:Date: 12.10.2026
+
+:Affected: 3.5.2 and below
+
+:Severity: High
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+The CouchDB ``/_replicator`` database (and prefixed variants) allow
+specification of source and target credentials in two forms: as a URL string and
+as a URL object. When non-owner users retrieve a replication documents, CouchDB
+obfuscates credentials only in the URL string case. URL objects will show non-
+owners the credentials.
+
+Mitigation
+==========
+
+URL objects in replication docs are now correctly obfuscating credentials for
+non-owners.
+
+Workarounds
+===========
+
+N/A
+
+Credit
+======
+
+Sakil Ahamed Gayen
