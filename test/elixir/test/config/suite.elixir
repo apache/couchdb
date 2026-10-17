@@ -106,6 +106,7 @@
     "continuous changes",
     "continuous filtered changes",
     "continuous filtered changes with doc ids",
+    "continuous heartbeat with seq",
     "eventsource changes",
     "eventsource changes with limit under",
     "eventsource changes with limit exact",

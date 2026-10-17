@@ -66,7 +66,7 @@ changes_callback({change, {Change}}, Acc) ->
     Revs = proplists:get_value(changes, Change),
     IdRevs = [{Id, couch_doc:parse_rev(R)} || {[{<<"rev">>, R}]} <- Revs],
     {ok, IdRevs ++ Acc};
-changes_callback(timeout, Acc) ->
+changes_callback({timeout, _Seq}, Acc) ->
     {ok, Acc};
 changes_callback({stop, _EndSeq, _Pending}, Acc) ->
     {ok, Acc}.
