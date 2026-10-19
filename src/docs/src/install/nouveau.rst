@@ -32,6 +32,8 @@ the loopback network.
     If your Linux distribution does not provide Java 21 packages you can get third
     party ones, `like Adoptium for Debian <https://adoptium.net/en-GB/installation/linux>`_.
 
+.. _nouveauconfig:
+
 Enable Nouveau
 ==============
 

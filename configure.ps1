@@ -8,7 +8,7 @@
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
   -DisableSpiderMonkey       do not use SpiderMonkey as JS engine (default false)
-  -WithNouveau               build the new experiemtal search module (default false)
+  -WithNouveau               build the Nouveau search module (default false)
   -WithClouseau              build the Clouseau search module (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)

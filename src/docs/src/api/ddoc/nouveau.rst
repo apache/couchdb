@@ -17,10 +17,6 @@
 =========================================
 
 .. warning::
-    Nouveau is an experimental feature. Future releases might change how the endpoints
-    work and might invalidate existing indexes.
-
-.. warning::
     Nouveau endpoints require a running nouveau server.
     See :ref:`Nouveau Server Installation <install/nouveau>` for details.
 
@@ -100,10 +96,6 @@
 ==============================================
 ``/{db}/_design/{ddoc}/_nouveau_info/{index}``
 ==============================================
-
-.. warning::
-    Nouveau is an experimental feature. Future releases might change how the endpoints
-    work and might invalidate existing indexes.
 
 .. warning::
     Nouveau endpoints require a running nouveau server.

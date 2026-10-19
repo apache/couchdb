@@ -256,7 +256,7 @@ CouchDB's search subsystem can be configured via the ``dreyfus`` configuration s
 Nouveau
 =======
 
-CouchDB's experimental search subsystem can be configured via the
+CouchDB's search subsystem can be configured via the
 ``nouveau`` configuration section.
 
 .. config:section:: nouveau :: Nouveau Server Configuration

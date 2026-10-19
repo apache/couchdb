@@ -16,10 +16,6 @@
 Nouveau
 =======
 
-.. warning::
-    Nouveau is an experimental feature. Future releases might change how the endpoints
-    work and might invalidate existing indexes.
-
 Nouveau indexes enable you to query a database by using the
 `Lucene Query Parser Syntax. <https://lucene.apache.org/core/9_5_0/queryparser/
 org/apache/lucene/queryparser/classic/package-summary.html#Overview>`_
