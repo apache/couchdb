@@ -36,6 +36,9 @@
 -define(term_to_bin(T, O), term_to_binary(T, O ++ [{minor_version, 1}])).
 -define(term_size(T), erlang:external_size(T, [{minor_version, 1}])).
 
+-define(POST_OR_QUERY(Method), (Method == 'POST' orelse Method == 'QUERY')).
+-define(ACCEPT_QUERY, {<<"Accept-Query">>, <<"\"application/json\"">>}).
+
 -define(DEFAULT_ATTACHMENT_CONTENT_TYPE, <<"application/octet-stream">>).
 
 -define(ADMIN_USER, #user_ctx{roles=[<<"_admin">>]}).
