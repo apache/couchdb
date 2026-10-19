@@ -68,7 +68,7 @@ Options:
   --disable-spidermonkey      disable spidermonkey, don't try to build it
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --js-engine=ENGINE          use js engine: spidermonkey or quickjs, defaults to spidermonkey
-  --with-nouveau              build the new experimental search module
+  --with-nouveau              build the Nouveau search module
   --with-clouseau             build the Clouseau search module
   --erlang-md5                use erlang for md5 hash operations
   --clouseau-method MTH       specify the method for Clouseau to deploy: git or dist (defaults to $CLOUSEAU_MTH)

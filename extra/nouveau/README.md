@@ -8,8 +8,6 @@ Nouveau is a modern replacement for dreyfus/clouseau and is built on;
 
 Nouveau transforms Apache CouchDB databases into Apache Lucene indexes at the shard level and then merges the results together.
 
-This work is currently EXPERIMENTAL and may change in ways that invalidate any existing Nouveau index.
-
 ## What works?
 
 * you can define a default analyzer and different analyzers by field name.
