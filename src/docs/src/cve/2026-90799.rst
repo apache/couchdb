@@ -1,0 +1,57 @@
+.. Licensed under the Apache License, Version 2.0 (the "License"); you may not
+.. use this file except in compliance with the License. You may obtain a copy of
+.. the License at
+..
+..   http://www.apache.org/licenses/LICENSE-2.0
+..
+.. Unless required by applicable law or agreed to in writing, software
+.. distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+.. WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+.. License for the specific language governing permissions and limitations under
+.. the License.
+
+.. How to reference a release: :ref:`3.3.3 <release/3.3.3>`
+
+.. _cve/2026-90799:
+
+===========================================================================
+CVE-2026-90799: |longtitle|
+===========================================================================
+
+.. |longtitle| replace:: Atom-table exhaustion in ``_changes`` sequences and
+    ``_search`` bookmarks with specially crafted sequence values
+
+:Date: 12.10.2026
+
+:Affected: 3.5.2 and below
+
+:Severity: High
+
+:Vendor: The Apache Software Foundation
+
+Description
+===========
+
+CouchDB makes opaque byte sequences available to clients to be passed back for
+resuming operations. These byte sequences are translated into Erlang terms.
+As long as only terms are supplied that have been emitted by CouchDB, no
+problems occur. But since clients can construct their own byte sequences,
+CouchDB can be tricked into allocating Erlang ``atom`` data types until the
+internal atom table capacity is exhausted. This causes the Erlang VM BEAM to
+hard abort, causing a denial of service.
+
+Mitigation
+==========
+
+CouchDB is now safely parsing byte sequences in a way that does not create
+new atoms.
+
+Workarounds
+===========
+
+N/A
+
+Credit
+======
+
+Piotr Karwasz & ZeroVuln Labs reported this issue independently.
