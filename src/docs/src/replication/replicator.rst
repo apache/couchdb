@@ -832,7 +832,6 @@ your source or target as follows;
             ...
         }
 
-
 Replicate Winning Revisions Only
 ================================
 
