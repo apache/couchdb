@@ -20,7 +20,6 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
-    config:set("couchdb", "stem_interactive_updates", "false", false),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db),
     DbName.
