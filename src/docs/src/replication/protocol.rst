@@ -766,6 +766,12 @@ request. This request MUST be made with the following query parameters:
   period in *milliseconds*. The RECOMMENDED value by default is ``10000``
   (10 seconds).
 
+- The ``heartbeat_seq=true`` parameter MAY be used so that heartbeats will be
+  emitted as rows of the form ``{"seq": ..., "id": null, "changes": []}``.
+  Replicator SHOULD use its sequence to record a Checkpoint. This advances
+  Checkpoints when a filter rejects the Changes for a long time. A Source which
+  does not support the parameter SHOULD ignore it.
+
 - If a startup Checkpoint was found during the Replication Logs comparison,
   the ``since`` query parameter MUST be passed with this value.
   In case of Full Replication it MAY be ``0`` (number zero) or
