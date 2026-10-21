@@ -132,18 +132,31 @@ process_change({last_seq, LS}, {_Parent, _, ChangesQueue, true = _Continuous}) -
             undefined -> get(last_seq);
             _ -> LS
         end,
-    OldSeq = get(last_seq),
-    if
-        Seq == OldSeq -> ok;
-        true -> ok = couch_work_queue:queue(ChangesQueue, {last_seq, Seq})
-    end,
-    put(last_seq, Seq),
+    queue_last_seq(ChangesQueue, Seq),
     throw(recurse);
 process_change({last_seq, _}, _) ->
     % This clause is unreachable today, but let's plan ahead for the future
     % where we checkpoint against last_seq instead of the sequence of the last
     % change.  The two can differ substantially in the case of a restrictive
     % filter.
+    ok;
+process_change({heartbeat_seq, Seq}, {_Parent, _, ChangesQueue, _Continuous}) when
+    is_binary(Seq); is_integer(Seq)
+->
+    queue_last_seq(ChangesQueue, Seq);
+process_change({heartbeat_seq, _}, _) ->
+    % We're being defensive here since we're in the replicator, and have to
+    % handle other, possibly non-ASF CouchDB implementations, or strange
+    % proxies. Here, we'd catch heartbeat objects without a seq or seq set to
+    % null, for example and we ignore them instead of crashing everything.
+    ok.
+
+queue_last_seq(ChangesQueue, Seq) ->
+    case get(last_seq) of
+        Seq -> ok;
+        _ -> ok = couch_work_queue:queue(ChangesQueue, {last_seq, Seq})
+    end,
+    put(last_seq, Seq),
     ok.
 
 is_doc_id_too_long(IdLength) ->
@@ -154,3 +167,32 @@ is_doc_id_too_long(IdLength) ->
             ConfigMax = list_to_integer(ConfigMaxStr),
             ConfigMax > 0 andalso IdLength > ConfigMax
     end.
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+heartbeat_seq_test() ->
+    {ok, Q} = couch_work_queue:new([{max_size, 100}, {max_items, 100}]),
+    Ctx = {self(), #httpdb{}, Q, true},
+    put(last_seq, ~"1-a"),
+    % new sequence => last_seq
+    ?assertEqual(ok, process_change({heartbeat_seq, ~"2-b"}, Ctx)),
+    ?assertEqual(~"2-b", get(last_seq)),
+    ?assertEqual({ok, [{last_seq, ~"2-b"}]}, couch_work_queue:dequeue(Q)),
+    % dedup works
+    ?assertEqual(ok, process_change({heartbeat_seq, ~"2-b"}, Ctx)),
+    ?assertEqual(0, couch_work_queue:item_count(Q)),
+    % new seq is queued
+    ?assertEqual(ok, process_change({heartbeat_seq, ~"4-d"}, Ctx)),
+    ?assertEqual({ok, [{last_seq, ~"4-d"}]}, couch_work_queue:dequeue(Q)),
+    ?assertEqual(~"4-d", get(last_seq)),
+    % old replicators had integer sequences, we're maximally backwards
+    % compatible so test them too
+    ?assertEqual(ok, process_change({heartbeat_seq, 5}, Ctx)),
+    ?assertEqual({ok, [{last_seq, 5}]}, couch_work_queue:dequeue(Q)),
+    ?assertEqual(5, get(last_seq)),
+    erase(last_seq),
+    couch_work_queue:close(Q).
+
+-endif.
