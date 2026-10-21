@@ -496,7 +496,7 @@ merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
         OldDocInfo,
         NewDocs
     ),
-    NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
+    NewDocInfo1 = stem_full_doc_info(NewDocInfo0, Limit),
     % When ReplicatedChanges is false, we updated #full_doc_info.deleted on every
     % iteration of merge_rev_tree. However, merge_rev_tree does not update
     % #full_doc_info.deleted when ReplicatedChanges is true, since we don't need
@@ -696,14 +696,8 @@ is_overflowed(New, Old, FullPartitions) ->
             end
     end.
 
-maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
-    case config:get_boolean("couchdb", "stem_interactive_updates", true) of
-        true ->
-            Stemmed = couch_key_tree:stem(Tree, Limit),
-            Info#full_doc_info{rev_tree = Stemmed};
-        false ->
-            Info
-    end.
+stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
+    Info#full_doc_info{rev_tree = couch_key_tree:stem(Tree, Limit)}.
 
 update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
