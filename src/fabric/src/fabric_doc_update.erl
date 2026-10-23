@@ -151,12 +151,10 @@ handle_message({ok, Replies}, Worker, #acc{} = Acc0) ->
                     reply = DocReplyDict
                 })}
     end;
-handle_message({missing_stub, Stub}, _, _) ->
-    throw({missing_stub, Stub});
+handle_message({missing_stub, _} = X, Worker, #acc{} = Acc0) ->
+    reply_for_all_docs(X, Worker, Acc0);
 handle_message({not_found, no_db_file} = X, Worker, #acc{} = Acc0) ->
-    #acc{grouped_docs = GroupedDocs} = Acc0,
-    Docs = couch_util:get_value(Worker, GroupedDocs),
-    handle_message({ok, [X || _D <- Docs]}, Worker, Acc0);
+    reply_for_all_docs(X, Worker, Acc0);
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg});
 handle_message({bad_request, Error, Reason}, _, _) ->
@@ -165,6 +163,12 @@ handle_message({forbidden, Msg}, _, _) ->
     throw({forbidden, Msg});
 handle_message({request_entity_too_large, Entity}, _, _) ->
     throw({request_entity_too_large, Entity}).
+
+% Count batch errors as a single error for all the documents in the batch.
+reply_for_all_docs(Reply, Worker, #acc{} = Acc0) ->
+    #acc{grouped_docs = GroupedDocs} = Acc0,
+    Docs = couch_util:get_value(Worker, GroupedDocs),
+    handle_message({ok, [Reply || _D <- Docs]}, Worker, Acc0).
 
 before_doc_update(DbName, Docs, Opts) ->
     % Use the same pattern as in couch_db:validate_doc_update/3. If the document was already
@@ -580,6 +584,8 @@ doc_update_test_() ->
             fun one_success_two_forbid/0,
             fun worker_before_doc_update_forbidden/0,
             fun handle_bad_request/0,
+            fun two_ok_one_missing_stub/0,
+            fun all_missing_stub/0,
             fun filter_conflicts_drops_seen_docs/0,
             fun parallel_in_flight_after_conflict/0,
             fun serial_filters_conflicts_at_cast/0,
@@ -1117,6 +1123,44 @@ handle_bad_request() ->
         {bad_request, err, reason},
         handle_message({bad_request, err, reason}, hd(Shards), Acc)
     ).
+
+two_ok_one_missing_stub() ->
+    Docs = [Doc1] = tag_docs([#doc{revs = {1, [<<"foo">>]}}]),
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc0 = #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 2,
+        grouped_docs = GroupedDocs,
+        reply = reply_map(Docs)
+    },
+    MissingStub = {missing_stub, <<"stub">>},
+
+    {ok, Acc1} = handle_message(MissingStub, hd(Shards), Acc0),
+    {ok, Acc2} = handle_message({ok, [{ok, Doc1}]}, lists:nth(2, Shards), Acc1),
+    {stop, Reply} = handle_message({ok, [{ok, Doc1}]}, lists:nth(3, Shards), Acc2),
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}]}, Reply).
+
+all_missing_stub() ->
+    Docs = [Doc1] = tag_docs([#doc{revs = {1, [<<"foo">>]}}]),
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+    Acc0 = #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 2,
+        grouped_docs = GroupedDocs,
+        reply = reply_map(Docs)
+    },
+    MissingStub = {missing_stub, <<"stub">>},
+
+    {ok, Acc1} = handle_message(MissingStub, hd(Shards), Acc0),
+    {ok, Acc2} = handle_message(MissingStub, lists:nth(2, Shards), Acc1),
+    {stop, Reply} = handle_message(MissingStub, lists:nth(3, Shards), Acc2),
+    ?assertEqual({ok, [{Doc1, MissingStub}]}, Reply).
 
 filter_conflicts_drops_seen_docs() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
