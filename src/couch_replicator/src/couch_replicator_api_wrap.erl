@@ -547,12 +547,7 @@ changes_since(
     Timeout = max(1000, InactiveTimeout div 3),
     EncodedSeq = couch_replicator_utils:seq_encode(StartSeq),
     BaseQArgs =
-        case get_value(continuous, Options, false) of
-            false ->
-                [{"feed", "normal"}];
-            true ->
-                [{"feed", "continuous"}]
-        end ++
+        changes_feed_qargs(Options) ++
             [
                 {"style", atom_to_list(Style)},
                 {"since", EncodedSeq},
@@ -668,6 +663,17 @@ maybe_add_changes_filter_q_args(BaseQS, Options) ->
                 )
             ]
     end.
+
+changes_feed_qargs(Options) ->
+    Feed =
+        case get_value(continuous, Options, false) of
+            false -> "normal";
+            true -> "continuous"
+        end,
+    % If the source supports heartbeat_seq=true we'll get and use {seq: ...,
+    % id: null, changes: []} heartbeat rows for checkpointing. If the source
+    % doesn't support it, it will ignore the parameter.
+    [{"feed", Feed}, {"heartbeat_seq", "true"}].
 
 parse_changes_feed(Options, UserFun, DataStreamFun) ->
     case get_value(continuous, Options, false) of
@@ -961,6 +967,9 @@ json_to_doc_info({Props}) ->
     case get_value(<<"changes">>, Props) of
         undefined ->
             {last_seq, get_value(<<"last_seq">>, Props)};
+        [] ->
+            % Got a heartbeat row from heartbeat_seq=true param
+            {heartbeat_seq, get_value(~"seq", Props)};
         Changes ->
             RevsInfo0 = lists:map(
                 fun({Change}) ->
@@ -1130,5 +1139,26 @@ normalize_http_db_test() ->
     },
     ?assertEqual(Expected, normalize_db(HttpDb)),
     ?assertEqual(<<"local">>, normalize_db(<<"local">>)).
+
+json_to_doc_info_test() ->
+    Seq = ~"42-abc",
+    ?assertEqual({last_seq, Seq}, json_to_doc_info({[{~"last_seq", Seq}]})),
+    ?assertEqual({last_seq, undefined}, json_to_doc_info({[{~"pending", 0}]})),
+    HB = {[{~"seq", Seq}, {~"id", null}, {~"changes", []}]},
+    ?assertEqual({heartbeat_seq, Seq}, json_to_doc_info(HB)),
+    Row =
+        {[
+            {~"seq", Seq},
+            {~"id", ~"doc1"},
+            {~"changes", [{[{~"rev", ~"1-abc"}]}]}
+        ]},
+    ?assertEqual(
+        #doc_info{
+            id = ~"doc1",
+            high_seq = Seq,
+            revs = [#rev_info{rev = {1, ~"abc"}}]
+        },
+        json_to_doc_info(Row)
+    ).
 
 -endif.
