@@ -409,6 +409,8 @@ update_doc(DbName, Doc, Options) ->
             % replication success
             #doc{revs = {Pos, [RevId | _]}} = doc(DbName, Doc),
             {ok, {Pos, RevId}};
+        {error, [{{_Id, _Rev}, Error}]} ->
+            throw(Error);
         {error, [Error]} ->
             throw(Error)
     end.

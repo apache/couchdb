@@ -165,10 +165,17 @@ handle_message({request_entity_too_large, Entity}, _, _) ->
     throw({request_entity_too_large, Entity}).
 
 % Count batch errors as a single error for all the documents in the batch.
-reply_for_all_docs(Reply, Worker, #acc{} = Acc0) ->
-    #acc{grouped_docs = GroupedDocs} = Acc0,
+% Replicated changes report per-doc errors as {{Id, {Pos, Rev}}, Error}
+reply_for_all_docs(Error, Worker, #acc{} = Acc0) ->
+    #acc{grouped_docs = GroupedDocs, update_options = Options} = Acc0,
     Docs = couch_util:get_value(Worker, GroupedDocs),
-    handle_message({ok, [Reply || _D <- Docs]}, Worker, Acc0).
+    Replicated = proplists:get_value(?REPLICATED_CHANGES, Options),
+    handle_message({ok, [doc_error(D, Error, Replicated) || D <- Docs]}, Worker, Acc0).
+
+doc_error(#doc{id = Id, revs = {Pos, [Rev | _]}}, Error, true) ->
+    {{Id, {Pos, Rev}}, Error};
+doc_error(#doc{}, Error, _Replicated) ->
+    Error.
 
 before_doc_update(DbName, Docs, Opts) ->
     % Use the same pattern as in couch_db:validate_doc_update/3. If the document was already
@@ -251,7 +258,7 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, SWS, Acc}) ->
                                 {forbidden, ForbiddenReply} ->
                                     {Health, W, SWS, [{Doc, ForbiddenReply} | Acc]};
                                 false ->
-                                    {error, W, SWS, [{Doc, FirstReply} | Acc]}
+                                    {error, W, SWS, [{Doc, first_error(Replies)} | Acc]}
                             end
                     end;
                 [AcceptedRev | _] ->
@@ -265,6 +272,11 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, SWS, Acc}) ->
                     {NewHealth, W, SWS, [{Doc, {accepted, AcceptedRev}} | Acc]}
             end
     end.
+
+% In replicated changes we use noreply for a successul write. Anything else is
+% an error.
+first_error(Replies) ->
+    hd([R || R <- Replies, R =/= noreply]).
 
 maybe_reply(_, _, continue) ->
     % we didn't meet quorum for all docs, so we're fast-forwarding the fold
@@ -586,6 +598,9 @@ doc_update_test_() ->
             fun handle_bad_request/0,
             fun two_ok_one_missing_stub/0,
             fun all_missing_stub/0,
+            fun replicated_all_missing_stub/0,
+            fun replicated_one_missing_stub/0,
+            fun replicated_two_missing_stub/0,
             fun filter_conflicts_drops_seen_docs/0,
             fun parallel_in_flight_after_conflict/0,
             fun serial_filters_conflicts_at_cast/0,
@@ -1161,6 +1176,52 @@ all_missing_stub() ->
     {ok, Acc2} = handle_message(MissingStub, lists:nth(2, Shards), Acc1),
     {stop, Reply} = handle_message(MissingStub, lists:nth(3, Shards), Acc2),
     ?assertEqual({ok, [{Doc1, MissingStub}]}, Reply).
+
+repl_acc(Docs, Shards) ->
+    #acc{
+        waiting_count = length(Shards),
+        doc_count = length(Docs),
+        w = 2,
+        grouped_docs = group_docs_by_shard_hack(~"foo", Shards, Docs),
+        reply = reply_map(Docs),
+        update_options = [?REPLICATED_CHANGES],
+        serialize_worker_startup = false
+    }.
+
+% No parent. Expect a stub error
+replicated_all_missing_stub() ->
+    Docs = [Doc1] = tag_docs([#doc{id = ~"d", revs = {2, [~"b", ~"a"]}}]),
+    [S1, S2, S3] = Shards = mem3_util:create_partition_map("foo", 3, 1, ["n1", "n2", "n3"]),
+    MissingStub = {missing_stub, ~"stub"},
+    {ok, Acc1} = handle_message(MissingStub, S1, repl_acc(Docs, Shards)),
+    {ok, Acc2} = handle_message(MissingStub, S2, Acc1),
+    ?assertEqual(
+        {stop, {ok, [{Doc1, {{~"d", {2, ~"b"}}, MissingStub}}]}},
+        handle_message(MissingStub, S3, Acc2)
+    ).
+
+% Two copies win (noreply) and one is lagging: two copies win and we hide the error.
+replicated_one_missing_stub() ->
+    Docs = [Doc1] = tag_docs([#doc{id = ~"d", revs = {2, [~"b", ~"a"]}}]),
+    [S1, S2, S3] = Shards = mem3_util:create_partition_map("foo", 3, 1, ["n1", "n2", "n3"]),
+    {ok, Acc1} = handle_message({missing_stub, ~"stub"}, S1, repl_acc(Docs, Shards)),
+    {ok, Acc2} = handle_message({ok, []}, S2, Acc1),
+    ?assertEqual({stop, {ok, [{Doc1, noreply}]}}, handle_message({ok, []}, S3, Acc2)).
+
+% Only one copy has a parent rev. Two stubs win and replicator would have to
+% resend the attachments. It follows the quorum logic.
+replicated_two_missing_stub() ->
+    Docs = [Doc1] = tag_docs([#doc{id = ~"d", revs = {2, [~"b", ~"a"]}}]),
+    [S1, S2, S3] = Shards = mem3_util:create_partition_map("foo", 3, 1, ["n1", "n2", "n3"]),
+    MissingStub = {missing_stub, ~"stub"},
+    Expect = {stop, {error, [{Doc1, {{~"d", {2, ~"b"}}, MissingStub}}]}},
+    Acc0 = repl_acc(Docs, Shards),
+    {ok, Acc1} = handle_message({ok, []}, S1, Acc0),
+    {ok, Acc2} = handle_message(MissingStub, S2, Acc1),
+    ?assertEqual(Expect, handle_message(MissingStub, S3, Acc2)),
+    {ok, Acc3} = handle_message(MissingStub, S1, Acc0),
+    {ok, Acc4} = handle_message(MissingStub, S2, Acc3),
+    ?assertEqual(Expect, handle_message({ok, []}, S3, Acc4)).
 
 filter_conflicts_drops_seen_docs() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
