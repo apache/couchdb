@@ -15,6 +15,7 @@
 -ifdef(WITH_PROPER).
 
 -include_lib("couch/include/couch_eunit_proper.hrl").
+-include_lib("couch/include/couch_db.hrl").
 
 % How much to reduce size with tree depth.
 -define(SIZE_REDUCTION, 3).
@@ -23,70 +24,52 @@
 -define(RAND_SIZE, 1 bsl 64).
 
 property_test_() ->
-    ?EUNIT_QUICKCHECK(60).
+    ?EUNIT_QUICKCHECK(120, 500).
 
 %
 % Properties
 %
 
 % Merge random paths from a revtree into itself. Check that no revisions have
-% been lost in the process and that result is one of the 3 expected values.
+% been lost in the process and that result we never create new leafs or
+% branches.
 %
 prop_revtree_merge_with_subset_of_own_nodes() ->
     ?FORALL(
-        Revs,
-        g_revs(),
-        ?FORALL(
-            {RevTree, Branch},
-            {g_revtree(Revs), g_revtree(Revs, 1)},
-            ?IMPLIES(
-                length(Branch) > 0 andalso repeating_revs(levels(RevTree ++ Branch)) == [],
-                begin
-                    {Merged, Result} = couch_key_tree:merge(RevTree, hd(Branch)),
-                    lists:member(Result, [new_leaf, new_branch, internal_node]) andalso
-                        same_keys(RevTree ++ Branch, Merged) andalso
-                        valid_revtree(Merged)
-                end
-            )
-        )
+        {RevTree, Start, Revs},
+        g_revtree_with_path(),
+        begin
+            {Merged, Result} = couch_key_tree:merge(RevTree, path(Start, Revs)),
+            Result == internal_node andalso Merged == RevTree
+        end
     ).
 
 % Merge random trees into revtree.
 %
 prop_revtree_merge_random_nodes() ->
     ?FORALL(
-        {RevTree, Branch},
-        {g_revtree(), g_revtree([], 1)},
-        ?IMPLIES(
-            length(Branch) > 0,
-            begin
-                {Merged, _} = couch_key_tree:merge(RevTree, hd(Branch)),
-                valid_revtree(Merged)
-            end
-        )
+        {RevTree, [Path]},
+        {g_revtree(), g_path(1, 20)},
+        begin
+            {Merged, _} = couch_key_tree:merge(RevTree, Path),
+            valid_revtree(Merged)
+        end
     ).
 
-% Merge mix or random and existing revtree paths into revtree
+% Extend rev tree with new revisions. Expect to not lose anything and get
+% either new leafs or branches.
 %
 prop_revtree_merge_some_existing_some_new() ->
     ?FORALL(
-        RevTree,
-        g_revtree(),
-        ?FORALL(
-            Branch,
-            begin
-                KeyList = keylist(RevTree),
-                Half = lists:sublist(KeyList, length(KeyList) div 2),
-                g_revtree(Half, 1)
-            end,
-            ?IMPLIES(
-                length(Branch) > 0 andalso repeating_revs(levels(RevTree ++ Branch)) == [],
-                begin
-                    {Merged, _} = couch_key_tree:merge(RevTree, hd(Branch)),
-                    valid_revtree(Merged)
-                end
-            )
-        )
+        {{RevTree, Start, Revs}, NewRevs},
+        {g_revtree_with_path(), ?LET(N, choose(1, 5), rand_list(N))},
+        begin
+            Path = path(Start, Revs ++ [{Rev, x} || Rev <- NewRevs]),
+            {Merged, Result} = couch_key_tree:merge(RevTree, Path),
+            lists:member(Result, [new_leaf, new_branch]) andalso
+                same_keys(RevTree ++ [Path], Merged) andalso
+                valid_revtree(Merged)
+        end
     ).
 
 % Stem deeper than the current max level. Expect no changes to the revtree
@@ -129,20 +112,14 @@ prop_stemming_results_in_same_or_less_total_revs() ->
 prop_stem_path_expect_size_to_get_smaller() ->
     ?FORALL(
         {RevTree, StemDepth},
-        {
-            ?SIZED(Size, g_revtree(Size * 10, [], 1)),
-            choose(1, 3)
-        },
-        ?IMPLIES(
-            real_depth(RevTree) > 3,
-            begin
-                Stemmed = couch_key_tree:stem(RevTree, StemDepth),
-                StemmedKeys = lists:usort(keylist(Stemmed)),
-                InputKeys = lists:usort(keylist(RevTree)),
-                length(InputKeys) > length(StemmedKeys) andalso
-                    real_depth(Stemmed) == StemDepth
-            end
-        )
+        {g_path(4, 30), choose(1, 3)},
+        begin
+            Stemmed = couch_key_tree:stem(RevTree, StemDepth),
+            StemmedKeys = lists:usort(keylist(Stemmed)),
+            InputKeys = lists:usort(keylist(RevTree)),
+            length(InputKeys) > length(StemmedKeys) andalso
+                real_depth(Stemmed) == StemDepth
+        end
     ).
 
 % After stemming all leaves are still present
@@ -207,26 +184,40 @@ prop_get_leafs() ->
         end
     ).
 
+% We could get revision history as two fragments 1..N and then S..T with a gap
+% in between (say if we have sources with different revs_limit values). Then if
+% also get a full path from another source, then the first two fragments could
+% connect and collapse into a single path. After merging and stemming we'd like
+% to still assert these properties:
+%  - every leaf has a value (no REV_MISSING in a leaf)
+%  - the only leaf should be the one from the full path connected path
+%
+prop_stem_connect_fragments() ->
+    ?FORALL(
+        {RevTree, Tip, Leaf},
+        g_fragments(),
+        begin
+            Cases = [{V, D} || V <- [stored, new], D <- lists:seq(1, Leaf + 1)],
+            Failed = [C || C <- Cases, not connect_fragments(RevTree, Tip, Leaf, C)],
+            ?WHENFAIL(
+                io:format("failed for {Val, Depth}: ~p~n", [Failed]),
+                Failed == []
+            )
+        end
+    ).
+
 %
 % Generators
 %
 
-% Generate a full rev tree. Most of the forms are just there to set up default
-% parameters, _revtree/3 does all heavy lifting.
+% Generate a full rev tree. g_revtree/3 does all the heavy lifting.
 %
 
 g_revtree() ->
     ?SIZED(Size, g_revtree(Size)).
 
-g_revtree(Size) when is_integer(Size) ->
-    g_revtree(Size, [], ?MAX_BRANCHES);
-g_revtree(Revs) when is_list(Revs) ->
-    ?SIZED(Size, g_revtree(Size, Revs, ?MAX_BRANCHES)).
-
-g_revtree(Size, Revs) when is_integer(Size), is_list(Revs) ->
-    g_revtree(Size, Revs, ?MAX_BRANCHES);
-g_revtree(Revs, MaxBranches) when is_list(Revs), is_integer(MaxBranches) ->
-    ?SIZED(Size, g_revtree(Size, Revs, MaxBranches)).
+g_revtree(Size) ->
+    g_revtree(Size, [], ?MAX_BRANCHES).
 
 g_revtree(0, _Revs, _MaxBranches) ->
     [];
@@ -270,6 +261,64 @@ g_nodes(Size, ChildCount, Revs, MaxBranches) ->
         ordered_nodes(ChildNodes)
     ).
 
+% Generate a revtree and the history of one of its revisions: the start
+% position and the root-first [{Rev, Value}] list of the path from the root of
+% the revision's branch down to it.
+%
+g_revtree_with_path() ->
+    ?LET(
+        RevTree,
+        g_revtree(),
+        ?LET(
+            {{LeafPos, LeafPath}, Drop},
+            ?LET(
+                LP,
+                elements(couch_key_tree:get_all_leafs_full(RevTree)),
+                {LP, choose(0, length(element(2, LP)) - 1)}
+            ),
+            {RevTree, LeafPos - length(LeafPath) + 1, lists:reverse(lists:nthtail(Drop, LeafPath))}
+        )
+    ).
+
+% Generate a path (revtree with no branches) of a given depth range
+%
+g_path(MinDepth, MaxDepth) ->
+    ?LET(
+        {Depth, Start},
+        {choose(MinDepth, MaxDepth), choose(1, 5)},
+        [path(Start, revs(Depth, []), x)]
+    ).
+
+% Generate the two fragments of length N1 (1..N1) and length N2 (S...T) from a
+% rev history with a gap in between.
+%
+% Fragment1:  1 .. N1
+% Fragment2:          S=N1+Gap+1 .. T=S+N2-1
+%
+% For example:
+%  [
+%          {1, [1,2]},
+%          {5,        [5,6,7]}
+%  ]
+% N1=2, N2=3. S=5, T=7, gap=2 (where 3 and 4 are)
+%
+% Also return the revision in the second fragment that we be used for sending
+% as the full path which should end up merging the fragments into one path.
+%
+g_fragments() ->
+    ?LET(
+        {N1, Gap, N2, TipOffset},
+        {choose(1, 4), choose(0, 3), choose(1, 5), choose(0, 4)},
+        begin
+            S = N1 + Gap + 1,
+            T = S + N2 - 1,
+            Fragment1 = path(1, lists:seq(1, N1), x),
+            Fragment2 = path(S, lists:seq(S, T), x),
+            RevTree = [Fragment1, Fragment2],
+            {RevTree, S + min(TipOffset, N2 - 1), T}
+        end
+    ).
+
 % Generate each subtree's stem depth
 %
 
@@ -296,12 +345,6 @@ g_shuffled_sublists(L, N) ->
 
 % Generate revision lists.
 %
-g_revs() ->
-    ?SIZED(Size, g_revs(Size)).
-
-g_revs(Size) when is_integer(Size) ->
-    g_revs(Size, []).
-
 g_revs(Size, Existing) when is_integer(Size), is_list(Existing) ->
     Expected = keys_needed(Size, ?SIZE_REDUCTION, ?MAX_BRANCHES),
     Revs = revs(Expected, Existing),
@@ -343,6 +386,47 @@ revs(0, _Existing) ->
 revs(Expected, Existing) when is_integer(Expected), is_list(Existing) ->
     Need = Expected - length(Existing),
     lists:usort(lists:append(Existing, rand_list(Need))).
+
+% Build a path starting at position Start from a [{rev,val}] position list with
+% root value first.
+%
+path(Start, RevVals) ->
+    [{Leaf, LeafValue} | Ancestors] = lists:reverse(RevVals),
+    Node = lists:foldl(
+        fun({R, V}, Child) -> {R, V, [Child]} end,
+        {Leaf, LeafValue, []},
+        Ancestors
+    ),
+    {Start, Node}.
+
+% Build a path start at position Start from revs list with empty (REV_MISSING)
+% internal values and the values as the leaf.
+%
+path(Start, Revs, Value) ->
+    Empty = [{Rev, ?REV_MISSING} || Rev <- lists:droplast(Revs)],
+    path(Start, Empty ++ [{lists:last(Revs), Value}]).
+
+% Empty leafs. We should never have these. This a broken rev tree shape.
+%
+leaves_without_value(RevTree) ->
+    [Rev || {?REV_MISSING, {_Pos, [Rev | _]}} <- couch_key_tree:get_all_leafs(RevTree)].
+
+% Merge rev 1...Tip into a rev tree made of fragments and stem. Then do a bunch
+% of validity check on on the result.
+%
+connect_fragments(RevTree, Tip, Leaf, {ValType, StemDepth}) ->
+    Value =
+        case ValType of
+            new -> x;
+            stored when Tip == Leaf -> x;
+            stored -> ?REV_MISSING
+        end,
+    Path = path(1, lists:seq(1, Tip), Value),
+    {Merged, _} = couch_key_tree:merge(RevTree, Path),
+    Stemmed = couch_key_tree:stem(Merged, StemDepth),
+    valid_revtree(Stemmed) andalso
+        leaves_without_value(Stemmed) == [] andalso
+        leaves(Stemmed) == [Leaf].
 
 % Get the list of all the keys in a revision tree. The input can also be a
 % an individual tree (tagged with the depth to virtual root) or a node.
