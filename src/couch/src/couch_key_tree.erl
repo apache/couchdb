@@ -546,14 +546,20 @@ check_key(Key, Seen) ->
     end.
 
 repair_tree(Trees, Limit) ->
+    % Handle duplicates first with their full paths then stem. If we stem we
+    % could cut off duplicates from descendentsand end up with extra leafs
+    FullPaths = merge_paths(get_all_leafs_full(Trees), infinity),
+    merge_paths(get_all_leafs_full(FullPaths), Limit).
+
+merge_paths(LeafPaths, Limit) ->
     % flatten each branch in a tree into a tree path, sort by starting rev #
     Paths = lists:sort(
         lists:map(
             fun({Pos, Path}) ->
-                StemmedPath = lists:sublist(Path, Limit),
+                StemmedPath = stem_path(Path, Limit),
                 {Pos + 1 - length(StemmedPath), StemmedPath}
             end,
-            get_all_leafs_full(Trees)
+            LeafPaths
         )
     ),
 
@@ -569,6 +575,11 @@ repair_tree(Trees, Limit) ->
         [],
         Paths
     ).
+
+stem_path(Path, infinity) ->
+    Path;
+stem_path(Path, Limit) ->
+    lists:sublist(Path, Limit).
 
 value_pref(Tuple, _) when
     is_tuple(Tuple),
