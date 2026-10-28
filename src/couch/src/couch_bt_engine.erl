@@ -166,6 +166,9 @@ is_compacting([_ | _] = FilePath) ->
 
 init(FilePath, Options) ->
     {ok, Fd} = open_db_file(FilePath, Options),
+    % couch_file auto-closes if idle so monitor it until init_state runs in
+    % case it gets stuck in ioq for longer than the idle timeout.
+    Ref = monitor(process, Fd),
     Header =
         case lists:member(create, Options) of
             true ->
@@ -185,7 +188,9 @@ init(FilePath, Options) ->
                         Header0
                 end
         end,
-    {ok, init_state(FilePath, Fd, Header, Options)}.
+    St = init_state(FilePath, Fd, Header, Options),
+    demonitor(Ref, [flush]),
+    {ok, St}.
 
 terminate(_Reason, St) ->
     % If the reason we died is because our fd disappeared
