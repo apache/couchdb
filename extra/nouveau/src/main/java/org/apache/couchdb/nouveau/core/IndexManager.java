@@ -20,9 +20,12 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -248,50 +251,44 @@ public final class IndexManager implements Managed {
         return Files.exists(indexDefinitionPath(name));
     }
 
-    public void deleteAll(final String path, final List<String> exclusions) throws IOException {
-        LOGGER.info(
-                "deleting indexes matching {} (excluding {})",
-                path,
-                exclusions == null || exclusions.isEmpty() ? "nothing" : exclusions);
+    public void deleteAll(final String path, List<String> exclusions) throws IOException {
+        if (exclusions == null) {
+            exclusions = Collections.emptyList();
+        }
+        LOGGER.info("deleting indexes matching {} (excluding {})", path, exclusions);
         var parts = path.split("/");
-        deleteAll(rootDir, parts, 0, exclusions);
+        deleteAll(rootDir, parts, exclusions);
     }
 
-    private void deleteAll(final Path path, final String[] parts, final int index, final List<String> exclusions)
-            throws IOException {
-        // End of the path
-        if (index == parts.length - 1) {
-            try (var stream = Files.newDirectoryStream(path, parts[index])) {
-                stream.forEach(p -> {
-                    if (exclusions != null && exclusions.indexOf(p.getFileName().toString()) != -1) {
-                        return;
-                    }
-                    final String relativeName = rootDir.relativize(p).toString();
+    private void deleteAll(final Path path, final String[] parts, final List<String> exclusions) throws IOException {
+        var glob = String.join(File.separator, "**", parts[0]);
+        var m = path.getFileSystem().getPathMatcher("glob:" + glob);
+        var subpaths = Files.list(path).toList();
+        for (var p : subpaths) {
+            if (m.matches(p)) {
+                if (parts.length > 1) {
+                    deleteAll(p, Arrays.copyOfRange(parts, 1, parts.length), exclusions);
+                } else if (!exclusions.contains(p.getFileName().toString())) {
+                    LOGGER.info("deleting index {}", p);
+                    var indexName = rootDir.relativize(p).toString();
                     try {
-                        deleteIndex(relativeName);
-                    } catch (final IOException | InterruptedException e) {
-                        LOGGER.error("Exception deleting {}", p, e);
+                        deleteIndex(indexName);
+                    } catch (InterruptedException e) {
+                        throw new WebApplicationException(
+                                "Interrupted while deleting " + indexName, e, Status.INTERNAL_SERVER_ERROR);
                     }
                     // Clean any newly empty directories.
                     do {
-                        final File f = p.toFile();
-                        if (f.isDirectory() && f.list().length == 0) {
-                            f.delete();
+                        if (Files.isDirectory(p)) {
+                            try {
+                                Files.delete(p);
+                            } catch (DirectoryNotEmptyException e) {
+                                // ignore
+                            }
                         }
                     } while ((p = p.getParent()) != null && !rootDir.equals(p));
-                });
-            }
-            return;
-        }
-        // Recurse
-        try (var stream = Files.newDirectoryStream(path, parts[index])) {
-            stream.forEach(p -> {
-                try {
-                    deleteAll(p, parts, index + 1, exclusions);
-                } catch (IOException e) {
-                    LOGGER.warn("Exception during delete of " + rootDir.relativize(p), e);
                 }
-            });
+            }
         }
     }
 
