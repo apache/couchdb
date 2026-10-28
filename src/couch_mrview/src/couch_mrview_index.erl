@@ -122,42 +122,48 @@ open(Db, State0) ->
 
     case couch_mrview_util:open_file(IndexFName) of
         {ok, Fd} ->
-            case couch_file:read_header(Fd) of
-                % upgrade code for <= 2.x
-                {ok, {OldSig, Header}} ->
-                    % Matching view signatures.
-                    NewSt = init_and_upgrade_state(Db, Fd, State, Header),
-                    ok = commit(NewSt),
-                    ensure_local_purge_doc(Db, NewSt),
-                    {ok, NewSt};
-                % end of upgrade code for <= 2.x
-                {ok, {Sig, Header}} ->
-                    % Matching view signatures.
-                    NewSt = init_and_upgrade_state(Db, Fd, State, Header),
-                    ensure_local_purge_doc(Db, NewSt),
-                    check_collator_versions(DbName, NewSt),
-                    {ok, NewSt};
-                {ok, {WrongSig, _}} ->
-                    couch_log:error(
-                        "~s has the wrong signature: expected: ~p but got ~p",
-                        [IndexFName, Sig, WrongSig]
-                    ),
-                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
-                    ensure_local_purge_doc(Db, NewSt),
-                    {ok, NewSt};
-                {ok, Else} ->
-                    couch_log:error(
-                        "~s has a bad header: got ~p",
-                        [IndexFName, Else]
-                    ),
-                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
-                    ensure_local_purge_doc(Db, NewSt),
-                    {ok, NewSt};
-                no_valid_header ->
-                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
-                    ensure_local_purge_doc(Db, NewSt),
-                    {ok, NewSt}
-            end;
+            % Monitor file while we setup our own monitor in index open to
+            % avoid it auto-closing due to couch_file idle check.
+            Ref = monitor(process, Fd),
+            Result =
+                case couch_file:read_header(Fd) of
+                    % upgrade code for <= 2.x
+                    {ok, {OldSig, Header}} ->
+                        % Matching view signatures.
+                        NewSt = init_and_upgrade_state(Db, Fd, State, Header),
+                        ok = commit(NewSt),
+                        ensure_local_purge_doc(Db, NewSt),
+                        {ok, NewSt};
+                    % end of upgrade code for <= 2.x
+                    {ok, {Sig, Header}} ->
+                        % Matching view signatures.
+                        NewSt = init_and_upgrade_state(Db, Fd, State, Header),
+                        ensure_local_purge_doc(Db, NewSt),
+                        check_collator_versions(DbName, NewSt),
+                        {ok, NewSt};
+                    {ok, {WrongSig, _}} ->
+                        couch_log:error(
+                            "~s has the wrong signature: expected: ~p but got ~p",
+                            [IndexFName, Sig, WrongSig]
+                        ),
+                        NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                        ensure_local_purge_doc(Db, NewSt),
+                        {ok, NewSt};
+                    {ok, Else} ->
+                        couch_log:error(
+                            "~s has a bad header: got ~p",
+                            [IndexFName, Else]
+                        ),
+                        NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                        ensure_local_purge_doc(Db, NewSt),
+                        {ok, NewSt};
+                    no_valid_header ->
+                        NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                        ensure_local_purge_doc(Db, NewSt),
+                        {ok, NewSt}
+                end,
+            demonitor(Ref, [flush]),
+            Result;
         {error, Reason} = Error ->
             couch_log:error(
                 "Failed to open view file '~s': ~s",
