@@ -122,7 +122,7 @@ handle_info(_Msg, State) ->
 
 handle_db_event(DbName, deleted, State) ->
     couch_log:notice("Deleting indexes for ~s as database was deleted", [DbName]),
-    nouveau_api:delete_path(nouveau_util:index_name(DbName)),
+    nouveau_api:delete_path(nouveau_util:index_name(<<DbName/binary, "/*">>)),
     {ok, State};
 handle_db_event(_DbName, _Event, State) ->
     {ok, State}.
