@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class IndexManager implements Managed {
 
-    private class LRUMap extends LinkedHashMap<String, IndexHolder> {
+    private class LRUMap extends LinkedHashMap<Path, IndexHolder> {
 
         private LRUMap(final int capacity) {
             super(capacity, 0.75f, true);
@@ -100,9 +100,14 @@ public final class IndexManager implements Managed {
 
     private LRUMap cache;
 
-    private StripedLock<String> createLock;
+    private StripedLock<Path> createLock;
 
     public <R> R with(final String name, final IndexFunction<Index, R> indexFun)
+            throws IOException, InterruptedException {
+        return with(Path.of(name), indexFun);
+    }
+
+    private <R> R with(final Path name, final IndexFunction<Index, R> indexFun)
             throws IOException, InterruptedException {
         evictIfOverCapacity();
 
@@ -167,7 +172,7 @@ public final class IndexManager implements Managed {
 
     private void evictIfOverCapacity() throws IOException, InterruptedException {
         while (true) {
-            final String candidate;
+            final Path candidate;
             synchronized (cache) {
                 if (cache.size() <= maxIndexesOpen) {
                     return;
@@ -178,7 +183,7 @@ public final class IndexManager implements Managed {
         }
     }
 
-    public void unload(final String name, final boolean forceDelete) throws IOException, InterruptedException {
+    private void unload(final Path name, final boolean forceDelete) throws IOException, InterruptedException {
         final IndexHolder holder;
         synchronized (cache) {
             holder = cache.computeIfAbsent(name, (k) -> new IndexHolder());
@@ -202,6 +207,7 @@ public final class IndexManager implements Managed {
                 case NOT_LOADED:
                 case UNLOADED:
                     if (forceDelete) {
+                        LOGGER.debug("deleting unloaded index {}", name);
                         IOUtils.rm(indexRootPath(name));
                     }
                     break;
@@ -215,6 +221,10 @@ public final class IndexManager implements Managed {
     }
 
     public void create(final String name, IndexDefinition indexDefinition) throws IOException {
+        create(Path.of(name), indexDefinition);
+    }
+
+    private void create(final Path name, IndexDefinition indexDefinition) throws IOException {
         if (exists(name)) {
             assertSame(indexDefinition, loadIndexDefinition(name));
             return;
@@ -244,7 +254,7 @@ public final class IndexManager implements Managed {
         }
     }
 
-    public boolean exists(final String name) {
+    public boolean exists(final Path name) {
         return Files.exists(indexDefinitionPath(name));
     }
 
@@ -266,7 +276,7 @@ public final class IndexManager implements Managed {
                     if (exclusions != null && exclusions.indexOf(p.getFileName().toString()) != -1) {
                         return;
                     }
-                    final String relativeName = rootDir.relativize(p).toString();
+                    final Path relativeName = rootDir.relativize(p);
                     try {
                         deleteIndex(relativeName);
                     } catch (final IOException | InterruptedException e) {
@@ -295,7 +305,7 @@ public final class IndexManager implements Managed {
         }
     }
 
-    private void deleteIndex(final String name) throws IOException, InterruptedException {
+    private void deleteIndex(final Path name) throws IOException, InterruptedException {
         unload(name, true);
     }
 
@@ -335,10 +345,10 @@ public final class IndexManager implements Managed {
         Objects.requireNonNull(this.schedulerExecutorService, "schedulerExecutorService must not be null");
 
         this.cache = new LRUMap(this.maxIndexesOpen);
-        this.createLock = new StripedLock<String>(100);
+        this.createLock = new StripedLock<Path>(100);
     }
 
-    private Runnable commitFun(final String name, final IndexHolder holder) {
+    private Runnable commitFun(final Path name, final IndexHolder holder) {
         return () -> {
             holder.lock.readLock().lock();
             try {
@@ -356,7 +366,7 @@ public final class IndexManager implements Managed {
     @Override
     public void stop() throws IOException, InterruptedException {
         synchronized (cache) {
-            var names = new HashSet<String>(cache.keySet());
+            var names = new HashSet<Path>(cache.keySet());
             for (var name : names) {
                 unload(name, false);
             }
@@ -368,19 +378,19 @@ public final class IndexManager implements Managed {
         return path.resolve("index_definition.json").toFile().exists();
     }
 
-    private Path indexDefinitionPath(final String name) {
+    private Path indexDefinitionPath(final Path name) {
         return indexRootPath(name).resolve("index_definition.json");
     }
 
-    private Path indexPath(final String name) {
+    private Path indexPath(final Path name) {
         return indexRootPath(name).resolve("index");
     }
 
-    private IndexDefinition loadIndexDefinition(final String name) throws IOException {
+    private IndexDefinition loadIndexDefinition(final Path name) throws IOException {
         return objectMapper.readValue(indexDefinitionPath(name).toFile(), IndexDefinition.class);
     }
 
-    private Path indexRootPath(final String name) {
+    private Path indexRootPath(final Path name) {
         final Path result = rootDir.resolve(name);
         if (result.startsWith(rootDir)) {
             return result;
@@ -388,7 +398,7 @@ public final class IndexManager implements Managed {
         throw new WebApplicationException(name + " attempts to escape from index root directory", Status.BAD_REQUEST);
     }
 
-    private Index load(final String name) throws IOException {
+    private Index load(final Path name) throws IOException {
         LOGGER.info("opening {}", name);
         final Path path = indexPath(name);
         final IndexDefinition indexDefinition = loadIndexDefinition(name);
@@ -420,7 +430,7 @@ public final class IndexManager implements Managed {
         return defaultValue;
     }
 
-    private void close(final String name, final IndexHolder holder) throws IOException {
+    private void close(final Path name, final IndexHolder holder) throws IOException {
         if (!holder.lock.isWriteLockedByCurrentThread()) {
             throw new IllegalStateException();
         }
