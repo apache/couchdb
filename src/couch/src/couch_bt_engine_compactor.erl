@@ -94,8 +94,8 @@ open_compaction_files(DbName, OldSt, Options) ->
     } = OldSt,
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
-    {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
-    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
+    {ok, DataFd, DataHdr, DataRef} = open_compaction_file(DataFile),
+    {ok, MetaFd, MetaHdr, _} = open_compaction_file(MetaFile),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
     CompSt =
         case {DataHdr, MetaHdr} of
@@ -146,8 +146,11 @@ open_compaction_files(DbName, OldSt, Options) ->
                     retry = nil
                 }
         end,
+    % From this point new_st fd_monitor keeps the data file until the decref
+    % later so we drop the DataRef. Meta file is monitored for the life of the
+    % compactor.
+    demonitor(DataRef, [flush]),
     unlink(DataFd),
-    monitor(process, MetaFd),
     {ok, CompSt}.
 
 copy_purge_info(#comp_st{} = CompSt) ->
@@ -650,13 +653,15 @@ compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
 open_compaction_file(FilePath) ->
     case couch_file:open(FilePath, [nologifmissing]) of
         {ok, Fd} ->
+            Ref = monitor(process, Fd),
             case couch_file:read_header(Fd) of
-                {ok, Header} -> {ok, Fd, Header};
-                no_valid_header -> {ok, Fd, nil}
+                {ok, Header} -> {ok, Fd, Header, Ref};
+                no_valid_header -> {ok, Fd, nil, Ref}
             end;
         {error, enoent} ->
             {ok, Fd} = couch_file:open(FilePath, [create]),
-            {ok, Fd, nil}
+            Ref = monitor(process, Fd),
+            {ok, Fd, nil, Ref}
     end.
 
 reset_compaction_file(Fd, Header) ->
