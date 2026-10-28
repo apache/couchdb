@@ -49,7 +49,12 @@ compact(State) ->
     {EmptyState, NumDocIds} = couch_util:with_db(DbName, fun(Db) ->
         CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
         {ok, Fd} = couch_mrview_util:open_file(CompactFName),
+        % Monitor the file until reset_index sets up its own monitor.
+        % Otherwise, couch_file could auto-close it on idle if it gets stuck in
+        % ioq for a long while.
+        Ref = monitor(process, Fd),
         ESt = couch_mrview_util:reset_index(Db, Fd, State),
+        demonitor(Ref, [flush]),
 
         {ok, Count} = couch_db:get_doc_count(Db),
 
