@@ -133,6 +133,22 @@ public class IndexManagerTest {
         assertThat(countIndexes()).isEqualTo(1);
     }
 
+    @Test
+    public void deleteAllByParentPathClosesLoadedIndex() throws Exception {
+        // CouchDB deletes a database's indexes by its shard directory, a parent of
+        // the actual index names (<shard>/<sig>).
+        manager.create("db.1700000000/sig", new IndexDefinition());
+        final Index index = manager.with("db.1700000000/sig", (i) -> i);
+        assertThat(index.isOpen()).isTrue();
+
+        manager.deleteAll("db.1700000000", null);
+
+        assertThat(index.isOpen())
+                .as("index below a deleted path must be closed")
+                .isFalse();
+        assertThat(countIndexes()).isEqualTo(0);
+    }
+
     private long countIndexes() throws IOException {
         try (var stream =
                 Files.find(rootDir, 10, (p, attr) -> p.getFileName().toString().equals("index_definition.json"))) {

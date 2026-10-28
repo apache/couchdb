@@ -268,6 +268,9 @@ public final class IndexManager implements Managed {
                     }
                     final String relativeName = rootDir.relativize(p).toString();
                     try {
+                        // p may be a parent of indexes (e.g. a deleted database's shard
+                        // directory), so close any loaded index below it before deleting.
+                        unloadAllUnder(relativeName);
                         deleteIndex(relativeName);
                     } catch (final IOException | InterruptedException e) {
                         LOGGER.error("Exception deleting {}", p, e);
@@ -292,6 +295,18 @@ public final class IndexManager implements Managed {
                     LOGGER.warn("Exception during delete of " + rootDir.relativize(p), e);
                 }
             });
+        }
+    }
+
+    private void unloadAllUnder(final String path) throws IOException, InterruptedException {
+        final List<String> loaded;
+        synchronized (cache) {
+            loaded = cache.keySet().stream()
+                    .filter(name -> name.startsWith(path + "/"))
+                    .toList();
+        }
+        for (final String name : loaded) {
+            unload(name, true);
         }
     }
 
