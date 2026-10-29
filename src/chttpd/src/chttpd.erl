@@ -795,9 +795,9 @@ absolute_uri(#httpd{mochi_req = MochiReq, absolute_uri = undefined}, Path) ->
                         end
                 end
         end,
-    Scheme ++ "://" ++ Host ++ Path;
+    Scheme ++ "://" ++ Host ++ couch_httpd:validate_uri(Path);
 absolute_uri(#httpd{absolute_uri = URI}, Path) ->
-    URI ++ Path.
+    URI ++ couch_httpd:validate_uri(Path).
 
 unquote(UrlEncodedString) ->
     case config:get_boolean("chttpd", "decode_plus_to_space", true) of
