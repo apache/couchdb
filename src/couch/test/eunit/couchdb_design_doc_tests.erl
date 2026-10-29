@@ -19,7 +19,7 @@ setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
-    create_design_doc(DbName, <<"_design/foo">>),
+    create_design_doc(DbName, ~"_design/foo"),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
     BaseUrl = "http://" ++ Addr ++ ":" ++ Port,
@@ -41,50 +41,68 @@ design_list_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_return_empty_when_plain_return/1,
-                    fun should_return_empty_when_no_docs/1
+                    ?TDEF_FE(should_return_empty_when_plain_return),
+                    ?TDEF_FE(should_return_empty_when_no_docs),
+                    ?TDEF_FE(should_serve_encoded_design_doc_path)
                 ]
             }
         }
     }.
 
 should_return_empty_when_plain_return({DbName, BaseUrl}) ->
-    ?_test(begin
-        ?assertEqual(
-            <<>>,
-            query_text(BaseUrl, DbName, "foo", "_list/plain_return/simple_view")
-        )
-    end).
+    ?assertEqual(
+        <<>>,
+        query_text(BaseUrl, DbName, "foo", "_list/plain_return/simple_view")
+    ).
 
 should_return_empty_when_no_docs({DbName, BaseUrl}) ->
-    ?_test(begin
-        ?assertEqual(
-            <<>>,
-            query_text(BaseUrl, DbName, "foo", "_list/simple_render/simple_view")
-        )
-    end).
+    ?assertEqual(
+        <<>>,
+        query_text(BaseUrl, DbName, "foo", "_list/simple_render/simple_view")
+    ).
+
+% test %2F slash in the ddoc id
+should_serve_encoded_design_doc_path({DbName, BaseUrl}) ->
+    Url = BaseUrl ++ "/" ++ DbName ++ "/_design%2Ffoo",
+    {ok, Code, _Headers, Body} = test_request:get(Url),
+    ?assertEqual(200, Code),
+    {Props} = couch_util:json_decode(Body),
+    ?assertEqual(~"_design/foo", couch_util:get_value(~"_id", Props)),
+    ViewUrl = Url ++ "/_view/simple_view?reduce=false",
+    Headers = [{"Content-Type", "application/json"}],
+    {ok, ViewCode, _, ViewBody} = test_request:post(ViewUrl, Headers, "{\"keys\": [\"x\"]}"),
+    ?assertEqual(200, ViewCode),
+    {ViewProps} = couch_util:json_decode(ViewBody),
+    ?assertEqual([], couch_util:get_value(~"rows", ViewProps)).
 
 create_design_doc(DbName, DDName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     DDoc = couch_doc:from_json_obj(
         {[
-            {<<"_id">>, DDName},
-            {<<"language">>, <<"javascript">>},
-            {<<"views">>,
+            {~"_id", DDName},
+            {~"language", ~"javascript"},
+            {
+                ~"views",
                 {[
-                    {<<"simple_view">>,
+                    {
+                        ~"simple_view",
                         {[
-                            {<<"map">>, <<"function(doc) {emit(doc._id, doc)}">>},
-                            {<<"reduce">>,
-                                <<"function (key, values, rereduce) {return sum(values);}">>}
-                        ]}}
-                ]}},
-            {<<"lists">>,
+                            {~"map", ~"function(doc) {emit(doc._id, doc)}"},
+                            {~"reduce", ~"function (key, values, rereduce) {return sum(values);}"}
+                        ]}
+                    }
+                ]}
+            },
+            {
+                ~"lists",
                 {[
-                    {<<"plain_return">>, <<"function(head, req) {return;}">>},
-                    {<<"simple_render">>,
-                        <<"function(head, req) {var row; while(row=getRow()) {send(JSON.stringify(row)); }}">>}
-                ]}}
+                    {~"plain_return", ~"function(head, req) {return;}"},
+                    {
+                        ~"simple_render",
+                        ~"function(head, req) {var row; while(row=getRow()) {send(JSON.stringify(row)); }}"
+                    }
+                ]}
+            }
         ]}
     ),
     {ok, Rev} = couch_db:update_doc(Db, DDoc, []),

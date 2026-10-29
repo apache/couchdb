@@ -56,6 +56,9 @@
 }).
 
 % Database request handlers
+handle_request(#httpd{path_parts = [DbName, <<"_design/", Name/binary>> | Rest]} = Req) ->
+    % handle _design%2Fname as _design/name
+    handle_request(Req#httpd{path_parts = [DbName, ~"_design", Name | Rest]});
 handle_request(
     #httpd{
         path_parts = [DbName | RestParts],
@@ -512,25 +515,6 @@ db_req(#httpd{method = 'GET', path_parts = [_, <<"_revs_limit">>]} = Req, Db) ->
     send_json(Req, couch_db:get_revs_limit(Db));
 db_req(#httpd{path_parts = [_, <<"_revs_limit">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
-% Special case to enable using an unencoded slash in the URL of design docs,
-% as slashes in document IDs must otherwise be URL encoded.
-db_req(
-    #httpd{
-        method = 'GET', mochi_req = MochiReq, path_parts = [DbName, <<"_design/", _/binary>> | _]
-    } = Req,
-    _Db
-) ->
-    PathFront = "/" ++ couch_httpd:quote(binary_to_list(DbName)) ++ "/",
-    [_ | PathTail] = re:split(
-        MochiReq:get(raw_path),
-        "_design%2F",
-        [{return, list}]
-    ),
-    couch_httpd:send_redirect(
-        Req,
-        PathFront ++ "_design/" ++
-            mochiweb_util:join(PathTail, "_design%2F")
-    );
 db_req(#httpd{path_parts = [_DbName, <<"_design">>, Name]} = Req, Db) ->
     db_doc_req(Req, Db, <<"_design/", Name/binary>>);
 db_req(#httpd{path_parts = [_DbName, <<"_design">>, Name | FileNameParts]} = Req, Db) ->
