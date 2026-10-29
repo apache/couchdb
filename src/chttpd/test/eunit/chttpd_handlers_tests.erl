@@ -26,12 +26,12 @@ replicate_endpoint_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            ?TDEF_FE(should_escape_local_dbname_on_replicate),
+            ?TDEF_FE(should_reject_local_dbname_on_replicate),
             ?TDEF_FE(require_authenticated_user)
         ]
     }.
 
-should_escape_local_dbname_on_replicate({_Ctx, Url}) ->
+should_reject_local_dbname_on_replicate({_Ctx, Url}) ->
     SrcPrefix = ?tempdb(),
     TgtPrefix = ?tempdb(),
     SrcDb = <<SrcPrefix/binary, "%2Fsrc">>,
@@ -43,7 +43,13 @@ should_escape_local_dbname_on_replicate({_Ctx, Url}) ->
         <<"source">> => endpoint(Url, SrcDb, ?USER, ?PASS),
         <<"target">> => endpoint("", <<TgtPrefix/binary, "/tgt">>, ?USER, ?PASS)
     }),
-    ?assertMatch({200, #{<<"ok">> := true}}, Res),
+    ?assertMatch(
+        {400, #{
+            <<"error">> := <<"invalid_replication">>,
+            <<"reason">> := <<"endpoint has an invalid url">>
+        }},
+        Res
+    ),
     delete_db(Url, SrcDb),
     delete_db(Url, TgtDb).
 

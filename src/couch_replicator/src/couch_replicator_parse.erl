@@ -228,7 +228,7 @@ parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
 parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
     throw({error, local_endpoints_not_supported});
 parse_rep_db(undefined, _Proxy, _Options) ->
-    throw({error, <<"Missing replicator database">>}).
+    throw({error, missing_replicator_database}).
 
 check_url(<<_/binary>> = Url, Type) when is_atom(Type) ->
     case ibrowse_lib:parse_url(?b2l(Url)) of
