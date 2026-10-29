@@ -296,6 +296,20 @@ defmodule CookieAuthTest do
     assert resp.body["error"] == "unauthorized"
     assert String.ends_with?(resp.headers["location"], "/_up")
 
+    # test redirect with invalid path
+    resp =
+      Couch.post(
+        "/_session",
+        query: [next: "/_up\r"],
+        body: %{
+          :username => "Jason Davies",
+          :password => @password
+        }
+      )
+
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+
     session = login("jchris", "funnybone")
     info = Couch.Session.info(session)
     assert info["userCtx"]["name"] == "jchris"
