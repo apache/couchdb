@@ -125,13 +125,16 @@ start_gun(URL) ->
     #{host := Host, port := Port, scheme := Scheme} = uri_string:parse(URL),
     persistent_term:put(?NOUVEAU_HOST_HEADER, {<<"host">>, [Host, $:, integer_to_binary(Port)]}),
     PoolSize = config:get_integer("nouveau", "pool_size", 10),
+    KeepAliveMS = config:get_integer("nouveau", "keepalive_ms", 10000),
     CACertFile = config:get("nouveau", "ssl_cacert_file"),
     KeyFile = config:get("nouveau", "ssl_key_file"),
     CertFile = config:get("nouveau", "ssl_cert_file"),
     Password = config:get("nouveau", "ssl_password"),
     Verify = verify(config:get_boolean("nouveau", "ssl_verify", true)),
     Transport = scheme_to_transport(Scheme),
-    BaseConnOptions = #{transport => Transport, protocols => [http2]},
+    BaseConnOptions = #{
+        transport => Transport, protocols => [http2], http2_opts => #{keepalive => KeepAliveMS}
+    },
     BaseTLSOptions =
         if
             CACertFile /= undefined ->
