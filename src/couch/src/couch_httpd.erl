@@ -660,7 +660,14 @@ host_for_request(#httpd{mochi_req = MochiReq}) ->
             Value
     end.
 
-absolute_uri(#httpd{mochi_req = MochiReq} = Req, [$/ | _] = Path) ->
+absolute_uri(#httpd{} = Req, [$/ | _] = Path) ->
+    case uri_string:parse(Path) of
+        {error, _Type, _Reason} ->
+            throw({bad_request, "invalid path"});
+        #{} = URIMap ->
+            absolute_uri(Req, URIMap)
+    end;
+absolute_uri(#httpd{mochi_req = MochiReq} = Req, #{path := Path}) ->
     Host = host_for_request(Req),
     XSsl = chttpd_util:get_chttpd_config("x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme =
