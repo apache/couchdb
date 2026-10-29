@@ -26,9 +26,16 @@ defmodule DesignPathTest do
     assert resp.body["_id"] == "_design/test"
 
     resp = Couch.get("/#{db_name}/_design%2Ftest")
-    assert resp.status_code == 301
-    resp = Couch.get(resp.headers["location"])
+    assert resp.status_code == 200
     assert resp.body["_id"] == "_design/test"
+
+    resp = Couch.get("/#{db_name}/_design%2Ftest/_view/testing")
+    assert resp.status_code == 200
+    assert Enum.empty?(resp.body["rows"])
+
+    resp = Couch.post("/#{db_name}/_design%2Ftest/_view/testing", body: %{keys: [1]})
+    assert resp.status_code == 200
+    assert Enum.empty?(resp.body["rows"])
 
     resp = Couch.get("/#{db_name}/_design/test/_view/testing")
     assert Enum.empty?(Map.get(resp, :body)["rows"])
@@ -49,8 +56,7 @@ defmodule DesignPathTest do
     assert resp.body["_id"] == "_design/test2"
 
     resp = Couch.get("/#{db_name}/_design%2Ftest2")
-    assert resp.status_code == 301
-    resp = Couch.get(resp.headers["location"])
+    assert resp.status_code == 200
     assert resp.body["_id"] == "_design/test2"
 
     resp = Couch.get("/#{db_name}/_design/test2/_view/testing")
