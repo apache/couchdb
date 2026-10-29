@@ -47,6 +47,7 @@
 -export([maybe_decompress/2, maybe_decompress/3]).
 -export([peer/1]).
 -export([authentication_handler_match/1]).
+-export([validate_uri/1]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
@@ -660,14 +661,7 @@ host_for_request(#httpd{mochi_req = MochiReq}) ->
             Value
     end.
 
-absolute_uri(#httpd{} = Req, [$/ | _] = Path) ->
-    case uri_string:parse(Path) of
-        {error, _Type, _Reason} ->
-            throw({bad_request, "invalid path"});
-        #{} = URIMap ->
-            absolute_uri(Req, URIMap)
-    end;
-absolute_uri(#httpd{mochi_req = MochiReq} = Req, #{path := Path}) ->
+absolute_uri(#httpd{mochi_req = MochiReq} = Req, [$/ | _] = Path) ->
     Host = host_for_request(Req),
     XSsl = chttpd_util:get_chttpd_config("x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme =
@@ -689,7 +683,7 @@ absolute_uri(#httpd{mochi_req = MochiReq} = Req, #{path := Path}) ->
                         end
                 end
         end,
-    Scheme ++ "://" ++ Host ++ Path;
+    Scheme ++ "://" ++ Host ++ validate_uri(Path);
 absolute_uri(_Req, _Path) ->
     throw({bad_request, "path must begin with a /."}).
 
@@ -1473,6 +1467,14 @@ peer_from_socket(MochiReq) ->
             node(Pid);
         _ ->
             MochiReq:get(peer)
+    end.
+
+validate_uri(URI) ->
+    case uri_string:parse(URI) of
+        {error, _Type, _Reason} ->
+            throw({bad_request, "invalid URI"});
+        #{} = URIMap ->
+            uri_string:recompose(URIMap)
     end.
 
 %%%%%%%% module tests below %%%%%%%%
