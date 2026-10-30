@@ -426,7 +426,7 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
             fun chttpd_db:handle_request/1
         ),
         AuthorizedReq = chttpd_auth:authorize(
-            possibly_hack(HttpReq),
+            HttpReq,
             fun chttpd_auth_request:authorize_request/1
         ),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
@@ -554,19 +554,6 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
 
-%% HACK: replication currently handles two forms of input, #db{} style
-%% and #http_db style. We need a third that makes use of fabric. #db{}
-%% works fine for replicating the dbs and nodes database because they
-%% aren't sharded. So for now when a local db is specified as the source or
-%% the target, it's hacked to make it a full url and treated as a remote.
-possibly_hack(#httpd{path_parts = [<<"_replicate">>]} = Req) ->
-    {Props0} = json_body_obj(Req),
-    Props1 = fix_uri(Req, Props0, <<"source">>),
-    Props2 = fix_uri(Req, Props1, <<"target">>),
-    Req#httpd{req_body = {Props2}};
-possibly_hack(Req) ->
-    Req.
-
 check_request_uri_length(Uri) ->
     check_request_uri_length(
         Uri,
@@ -591,60 +578,6 @@ check_url_encoding([$% | _]) ->
     throw({bad_request, invalid_url_encoding});
 check_url_encoding([_ | Rest]) ->
     check_url_encoding(Rest).
-
-fix_uri(Req, Props, Type) ->
-    case replication_uri(Type, Props) of
-        undefined ->
-            Props;
-        Uri0 ->
-            case is_http(Uri0) of
-                true ->
-                    Props;
-                false ->
-                    Uri = make_uri(Req, quote(Uri0)),
-                    [{Type, Uri} | proplists:delete(Type, Props)]
-            end
-    end.
-
-replication_uri(Type, PostProps) ->
-    case couch_util:get_value(Type, PostProps) of
-        {Props} ->
-            couch_util:get_value(<<"url">>, Props);
-        Else ->
-            Else
-    end.
-
-is_http(<<"http://", _/binary>>) ->
-    true;
-is_http(<<"https://", _/binary>>) ->
-    true;
-is_http(_) ->
-    false.
-
-make_uri(Req, Raw) ->
-    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
-    Url = list_to_binary([
-        "http://",
-        config:get("chttpd", "bind_address"),
-        ":",
-        Port,
-        "/",
-        Raw
-    ]),
-    Headers = [
-        {<<"authorization">>, ?l2b(header_value(Req, "authorization", ""))},
-        {<<"cookie">>, ?l2b(extract_cookie(Req))}
-    ],
-    {[{<<"url">>, Url}, {<<"headers">>, {Headers}}]}.
-
-extract_cookie(#httpd{mochi_req = MochiReq}) ->
-    case MochiReq:get_cookie_value("AuthSession") of
-        undefined ->
-            "";
-        AuthSession ->
-            "AuthSession=" ++ AuthSession
-    end.
-%%% end hack
 
 %% erlfmt-ignore
 set_auth_handlers() ->
