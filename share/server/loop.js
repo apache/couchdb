@@ -135,6 +135,10 @@ var Loop = function() {
     "rereduce" : Views.rereduce
   };
   function handleError(e) {
+    if (e == null) {
+      respond(["error", "unnamed_error", String(e)]);
+      return;
+    }
     var type = e[0];
     if (type == "fatal") {
       e[0] = "error"; // we tell the client it was a fatal error by dying

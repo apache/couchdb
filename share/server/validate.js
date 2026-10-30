@@ -16,7 +16,7 @@ var Validate = {
       fun.apply(ddoc, args);
       respond(1);
     } catch (error) {
-      if (error.name && error.stack) {
+      if (error && error.name && error.stack) {
         throw error;
       }
       respond(error);
