@@ -31,6 +31,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class IndexManagerTest {
 
@@ -88,49 +90,65 @@ public class IndexManagerTest {
         assertThat(isOpen);
     }
 
-    @Test
-    public void deleteAllRemovesIndexByName() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void deleteAllRemovesIndexByName(final boolean open) throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("bar", indexDefinition);
+        maybeOpenIndex("bar", open);
         assertThat(countIndexes()).isEqualTo(1);
         manager.deleteAll("bar", null);
         assertThat(countIndexes()).isEqualTo(0);
     }
 
-    @Test
-    public void deleteAllRemovesIndexByPath() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void deleteAllRemovesIndexByPath(final boolean open) throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
+        maybeOpenIndex("foo/bar", open);
         assertThat(countIndexes()).isEqualTo(1);
         manager.deleteAll("foo/bar", null);
         assertThat(countIndexes()).isEqualTo(0);
     }
 
-    @Test
-    public void deleteAllRemovesIndexByGlob() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void deleteAllRemovesIndexByGlob(final boolean open) throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
+        maybeOpenIndex("foo/bar", open);
         assertThat(countIndexes()).isEqualTo(1);
         manager.deleteAll("foo/*", null);
         assertThat(countIndexes()).isEqualTo(0);
     }
 
-    @Test
-    public void deleteAllRemovesIndexByGlobExceptExclusions() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void deleteAllRemovesIndexByGlobExceptExclusions(final boolean open) throws Exception {
         final IndexDefinition indexDefinition = new IndexDefinition();
 
         assertThat(countIndexes()).isEqualTo(0);
         manager.create("foo/bar", indexDefinition);
+        maybeOpenIndex("foo/bar", open);
         manager.create("foo/baz", indexDefinition);
+        maybeOpenIndex("foo/baz", open);
         assertThat(countIndexes()).isEqualTo(2);
         manager.deleteAll("foo/*", List.of("bar"));
         assertThat(countIndexes()).isEqualTo(1);
+    }
+
+    private void maybeOpenIndex(final String name, final boolean open) throws Exception {
+        if (open) {
+            final Index index = manager.with(name, (i) -> i);
+            assertThat(index.isOpen()).isTrue();
+        }
     }
 
     private long countIndexes() throws IOException {
