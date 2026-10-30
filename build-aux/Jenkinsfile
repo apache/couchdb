@@ -217,7 +217,7 @@ meta = [
     quickjs_test262: false,
     image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
     node_label: 'docker-arm64',
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+    gnu_make_eunit_opts: "-j4 --output-sync=target"
   ],
 
   'bookworm': [
