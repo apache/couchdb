@@ -75,6 +75,9 @@ cpse_set_security(DbName) ->
 cpse_set_revs_limit(DbName) ->
     check_prop_set(DbName, get_revs_limit, set_revs_limit, 1000, 50).
 
+cpse_set_purge_infos_limit(DbName) ->
+    check_prop_set(DbName, get_purge_infos_limit, set_purge_infos_limit, 1000, 50).
+
 check_prop_set(DbName, GetFun, SetFun, Default, Value) ->
     {ok, Db0} = cpse_util:create_db(DbName),
 
