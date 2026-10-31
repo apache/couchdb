@@ -92,8 +92,9 @@ handle_call({set_revs_limit, Limit}, _From, Db) ->
     {reply, ok, Db3};
 handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
-    ok = couch_server:db_updated(Db2),
-    {reply, ok, Db2};
+    Db3 = commit_data(Db2),
+    ok = couch_server:db_updated(Db3),
+    {reply, ok, Db3};
 handle_call({set_props, Props}, _From, Db) ->
     {ok, Db1} = couch_db_engine:set_props(Db, Props),
     Db2 = options_set_props(Db1, Props),
