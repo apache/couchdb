@@ -18,11 +18,15 @@ import io.dropwizard.lifecycle.Managed;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -259,54 +263,56 @@ public final class IndexManager implements Managed {
     }
 
     public void deleteAll(final String path, final List<String> exclusions) throws IOException {
+        Objects.requireNonNull(path);
         LOGGER.info(
                 "deleting indexes matching {} (excluding {})",
                 path,
                 exclusions == null || exclusions.isEmpty() ? "nothing" : exclusions);
-        var parts = path.split("/");
-        deleteAll(rootDir, parts, 0, exclusions);
-    }
-
-    private void deleteAll(final Path path, final String[] parts, final int index, final List<String> exclusions)
-            throws IOException {
-        // End of the path
-        if (index == parts.length - 1) {
-            try (var stream = Files.newDirectoryStream(path, parts[index])) {
-                stream.forEach(p -> {
-                    if (exclusions != null && exclusions.indexOf(p.getFileName().toString()) != -1) {
-                        return;
-                    }
-                    final Path relativeName = rootDir.relativize(p);
-                    try {
-                        deleteIndex(relativeName);
-                    } catch (final IOException | InterruptedException e) {
-                        LOGGER.error("Exception deleting {}", p, e);
-                    }
-                    // Clean any newly empty directories.
-                    do {
-                        final File f = p.toFile();
-                        if (f.isDirectory() && f.list().length == 0) {
-                            f.delete();
-                        }
-                    } while ((p = p.getParent()) != null && !rootDir.equals(p));
-                });
-            }
-            return;
+        var pathMatchers = new ArrayList<PathMatcher>();
+        for (var p : rootDir) {
+            pathMatchers.add(rootDir.getFileSystem().getPathMatcher("glob:" + p.getFileName()));
         }
-        // Recurse
-        try (var stream = Files.newDirectoryStream(path, parts[index])) {
-            stream.forEach(p -> {
-                try {
-                    deleteAll(p, parts, index + 1, exclusions);
-                } catch (IOException e) {
-                    LOGGER.warn("Exception during delete of " + rootDir.relativize(p), e);
+        for (var p : path.split("/")) {
+            pathMatchers.add(rootDir.getFileSystem().getPathMatcher("glob:" + p));
+        }
+
+        Files.walkFileTree(rootDir, new SimpleFileVisitor<Path>() {
+
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                // Skip subtree on first path component mismatch
+                for (int i = 0; i < dir.getNameCount(); i++) {
+                    if (!pathMatchers.get(i).matches(dir.subpath(i, i + 1))) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
                 }
-            });
-        }
-    }
+                // We're not at full depth yet
+                if (dir.getNameCount() < pathMatchers.size()) {
+                    return FileVisitResult.CONTINUE;
+                }
+                // Skip exclusions
+                if (exclusions != null && exclusions.contains(dir.getFileName().toString())) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                // Delete this index
+                try {
+                    unload(rootDir.relativize(dir), true);
+                } catch (InterruptedException e) {
+                    LOGGER.info("Interrupted during deleteAll", e);
+                    return FileVisitResult.TERMINATE;
+                }
+                return FileVisitResult.SKIP_SUBTREE;
+            }
 
-    private void deleteIndex(final Path name) throws IOException, InterruptedException {
-        unload(name, true);
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                // Delete parent dir if it just became empty, but don't delete root dir.
+                if (!rootDir.equals(dir) && Files.list(dir).count() == 0) {
+                    Files.delete(dir);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
     }
 
     public void setMaxIndexesOpen(int maxIndexesOpen) {
