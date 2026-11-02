@@ -476,19 +476,24 @@ mapfold_simple(Fun, Acc, Pos, [{Key, Value, SubTree} | RestTree]) ->
 
 stem(Trees, Limit) ->
     try
-        {_, Branches} = lists:foldl(
-            fun(Tree, {Seen, TreeAcc}) ->
-                {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
-                {NewSeen, NewBranches ++ TreeAcc}
-            end,
-            {#{}, []},
-            Trees
-        ),
-        lists:sort(Branches)
+        stem_trees(Trees, Limit)
     catch
         throw:dupe_keys ->
             repair_tree(Trees, Limit)
     end.
+
+% Stem each tree by walking it. Throws dupe_keys if a key is found more than
+% once across all the trees.
+stem_trees(Trees, Limit) ->
+    {_, Branches} = lists:foldl(
+        fun(Tree, {Seen, TreeAcc}) ->
+            {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
+            {NewSeen, NewBranches ++ TreeAcc}
+        end,
+        {#{}, []},
+        Trees
+    ),
+    lists:sort(Branches).
 
 stem_tree({Depth, Child}, Limit, Seen) ->
     case stem_tree(Depth, Child, Limit, Seen) of
@@ -546,10 +551,19 @@ check_key(Key, Seen) ->
     end.
 
 repair_tree(Trees, Limit) ->
-    % Handle duplicates first with their full paths then stem. If we stem we
-    % could cut off duplicates from descendentsand end up with extra leafs
-    FullPaths = merge_paths(get_all_leafs_full(Trees), infinity),
-    merge_paths(get_all_leafs_full(FullPaths), Limit).
+    % We could have duplicate keys when merge/2 extends a branch that also
+    % covers a fragment that may have come in earlier, maybe from a source with
+    % a different revs_limit setting or after a purge. To properly collapse the
+    % duplicates, merge again all the full path, then stem the result like any
+    % other tree. If that fails, fall back to stem each leaf separately
+    % anyway.
+    Collapsed = merge_paths(get_all_leafs_full(Trees), infinity),
+    try
+        stem_trees(Collapsed, Limit)
+    catch
+        throw:dupe_keys ->
+            lists:sort(merge_paths(get_all_leafs_full(Collapsed), Limit))
+    end.
 
 merge_paths(LeafPaths, Limit) ->
     % flatten each branch in a tree into a tree path, sort by starting rev #
