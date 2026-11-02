@@ -206,6 +206,24 @@ prop_stem_connect_fragments() ->
         end
     ).
 
+% If we rebuild the tree from paths (and fix dupes) we should end up with the
+% same shape. Also if we keep stemming the tree with the same revs limit it
+% should stay unchanged.
+%
+prop_stem_with_dupes_same_as_without() ->
+    ?FORALL(
+        {{RevTree, Fragment}, Depth},
+        {g_revtree_with_fragment(), choose(1, 20)},
+        begin
+            Stemmed = couch_key_tree:stem(RevTree, Depth),
+            WithDup = couch_key_tree:stem(RevTree ++ [Fragment], Depth),
+            ?WHENFAIL(
+                io:format("frag: ~p~nno dups: ~p~nwith dups: ~p~n", [Fragment, Stemmed, WithDup]),
+                Stemmed == WithDup andalso couch_key_tree:stem(WithDup, Depth) == WithDup
+            )
+        end
+    ).
+
 %
 % Generators
 %
@@ -277,6 +295,32 @@ g_revtree_with_path() ->
                 {LP, choose(0, length(element(2, LP)) - 1)}
             ),
             {RevTree, LeafPos - length(LeafPath) + 1, lists:reverse(lists:nthtail(Drop, LeafPath))}
+        )
+    ).
+
+% Generate a revtree and a fragment from the tree. The idea is if we merge the
+% fragment back in it will create duplicates which we then should handle
+% properly.
+%
+g_revtree_with_fragment() ->
+    ?LET(
+        RevTree,
+        g_revtree(),
+        ?LET(
+            {LeafPos, LeafPath},
+            elements(couch_key_tree:get_all_leafs_full(RevTree)),
+            ?LET(
+                {I, J},
+                {choose(1, length(LeafPath)), choose(1, length(LeafPath))},
+                begin
+                    First = min(I, J),
+                    Len = max(I, J) - First + 1,
+                    Revs = [Rev || {Rev, _} <- lists:reverse(LeafPath)],
+                    Start = LeafPos - length(LeafPath) + First,
+                    Fragment = path(Start, lists:sublist(Revs, First, Len), x),
+                    {RevTree, Fragment}
+                end
+            )
         )
     ).
 
