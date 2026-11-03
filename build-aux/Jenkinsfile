@@ -239,7 +239,7 @@ meta = [
     clouseau_java_home: '/usr/local/openjdk21',
     quickjs_test262: false,
     gnu_make: 'gmake',
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+    gnu_make_eunit_opts: "-j4 --output-sync=target"
   ],
 
   // Spidermonkey 91 has issues on ARM64 FreeBSD
@@ -252,7 +252,7 @@ meta = [
     clouseau_java_home: '/usr/local/openjdk21',
     quickjs_test262: false,
     gnu_make: 'gmake',
-    gnu_make_eunit_opts: "${DEFAULT_GNU_MAKE_EUNIT_OPTS}"
+    gnu_make_eunit_opts: "-j4 --output-sync=target"
   ],
 
   // Disable temporarily as it is running out of space and Jenkins
