@@ -80,7 +80,8 @@ replicator_bdu_test_main_db_test_() ->
         with([
             ?TDEF(t_local_docs_can_be_written),
             ?TDEF(t_design_docs_can_be_written),
-            ?TDEF(t_malformed_docs_are_rejected)
+            ?TDEF(t_malformed_docs_are_rejected),
+            ?TDEF(t_invalid_endpoints_are_rejected)
         ])
     }.
 
@@ -92,7 +93,8 @@ replicator_bdu_test_prefixed_db_test_() ->
         with([
             ?TDEF(t_local_docs_can_be_written),
             ?TDEF(t_design_docs_can_be_written),
-            ?TDEF(t_malformed_docs_are_rejected)
+            ?TDEF(t_malformed_docs_are_rejected),
+            ?TDEF(t_invalid_endpoints_are_rejected)
         ])
     }.
 
@@ -175,6 +177,25 @@ t_malformed_docs_are_rejected({_Ctx, {RepDb, _, _}}) ->
     ?assertMatch({403, _}, req(put, DocUrl1, #{})),
     DocUrl2 = rep_doc_url(RepDb, <<"rep2">>),
     ?assertMatch({403, _}, req(put, DocUrl2, #{<<"foo">> => <<"bar">>})).
+
+t_invalid_endpoints_are_rejected({_Ctx, {RepDb, Source, Target}}) ->
+    SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
+    TargetUrl = couch_replicator_test_helper:cluster_db_url(Target),
+    Docs = [
+        {~"rep_local", #{~"source" => ~"localdb", ~"target" => TargetUrl}},
+        {~"rep_missing", #{~"source" => SourceUrl}},
+        {~"rep_null", #{~"source" => SourceUrl, ~"target" => null}}
+    ],
+    lists:foreach(
+        fun({DocId, Doc}) ->
+            Res = req(put, rep_doc_url(RepDb, DocId), Doc),
+            ?assertMatch(
+                {403, #{~"error" := ~"forbidden", ~"reason" := ~"invalid endpoint"}},
+                Res
+            )
+        end,
+        Docs
+    ).
 
 t_doc_fields_are_updated({_Ctx, {RepDb, Source, Target}}) ->
     SourceUrl = couch_replicator_test_helper:cluster_db_url(Source),
