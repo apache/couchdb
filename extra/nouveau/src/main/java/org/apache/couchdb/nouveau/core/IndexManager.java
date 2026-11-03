@@ -21,6 +21,7 @@ import jakarta.ws.rs.core.Response.Status;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.SimpleFileVisitor;
@@ -209,6 +210,8 @@ public final class IndexManager implements Managed {
                     holder.index = null;
                     break;
                 case NOT_LOADED:
+                    holder.state = HolderState.UNLOADED;
+                // deliberate fall-through
                 case UNLOADED:
                     if (forceDelete) {
                         LOGGER.debug("deleting unloaded index {}", name);
@@ -269,9 +272,6 @@ public final class IndexManager implements Managed {
                 path,
                 exclusions == null || exclusions.isEmpty() ? "nothing" : exclusions);
         var pathMatchers = new ArrayList<PathMatcher>();
-        for (var p : rootDir) {
-            pathMatchers.add(rootDir.getFileSystem().getPathMatcher("glob:" + p.getFileName()));
-        }
         for (var p : path.split("/")) {
             pathMatchers.add(rootDir.getFileSystem().getPathMatcher("glob:" + p));
         }
@@ -280,35 +280,56 @@ public final class IndexManager implements Managed {
 
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                var relative = rootDir.relativize(dir);
+                if (dir.equals(rootDir)) {
+                    return FileVisitResult.CONTINUE;
+                }
                 // Skip subtree on first path component mismatch
-                for (int i = 0; i < dir.getNameCount(); i++) {
-                    if (!pathMatchers.get(i).matches(dir.subpath(i, i + 1))) {
+                for (int i = 0; i < relative.getNameCount(); i++) {
+                    if (!pathMatchers.get(i).matches(relative.subpath(i, i + 1))) {
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                 }
                 // We're not at full depth yet
-                if (dir.getNameCount() < pathMatchers.size()) {
+                if (relative.getNameCount() < pathMatchers.size()) {
                     return FileVisitResult.CONTINUE;
                 }
                 // Skip exclusions
-                if (exclusions != null && exclusions.contains(dir.getFileName().toString())) {
+                if (exclusions != null
+                        && exclusions.contains(relative.getFileName().toString())) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                // Skip non-indexes
+                if (!isIndex(dir)) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
                 // Delete this index
                 try {
-                    unload(rootDir.relativize(dir), true);
+                    unload(relative, true);
                 } catch (InterruptedException e) {
-                    LOGGER.info("Interrupted during deleteAll", e);
-                    return FileVisitResult.TERMINATE;
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted during deleteAll", e);
                 }
                 return FileVisitResult.SKIP_SUBTREE;
             }
 
             @Override
-            public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+            public FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
+                if (e instanceof NoSuchFileException) {
+                    return FileVisitResult.CONTINUE;
+                }
+                throw e;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
                 // Delete parent dir if it just became empty, but don't delete root dir.
-                if (!rootDir.equals(dir) && Files.list(dir).count() == 0) {
-                    Files.delete(dir);
+                if (!rootDir.equals(dir)) {
+                    try (var stream = Files.list(dir)) {
+                        if (stream.findFirst().isEmpty()) {
+                            Files.deleteIfExists(dir);
+                        }
+                    }
                 }
                 return FileVisitResult.CONTINUE;
             }
