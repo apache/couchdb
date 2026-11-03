@@ -935,7 +935,8 @@ apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
 
                         FDI1 = FDI0#full_doc_info{
                             update_seq = NewUpdateSeq,
-                            rev_tree = NewTree2
+                            rev_tree = NewTree2,
+                            deleted = couch_doc:is_deleted(NewTree2)
                         },
                         {FDI1, Removed, NewUpdateSeq}
                 end;

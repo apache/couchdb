@@ -51,6 +51,7 @@ purge_test_() ->
                     ?TDEF_FE(t_ok_purge_request),
                     ?TDEF_FE(t_accepted_purge_request),
                     ?TDEF_FE(t_partial_purge_request),
+                    ?TDEF_FE(t_purge_winning_with_a_deleted_remaining),
                     ?TDEF_FE(t_mixed_purge_request),
                     ?TDEF_FE(t_over_many_ids_or_revs_purge_request),
                     ?TDEF_FE(t_purged_infos_limit_only_get_put_allowed),
@@ -110,6 +111,39 @@ t_partial_purge_request(DbUrl) ->
     {Status2, #{<<"content">> := Content}} = req(get, url(DbUrl, "doc1")),
     ?assertEqual(<<"updated">>, Content),
     ?assert(Status2 =:= 200).
+
+t_purge_winning_with_a_deleted_remaining(DbUrl) ->
+    % a---b : live
+    %  \__c : deleted
+    %
+    % If we purge the live 2-b version, expect doc count to drop and deleted
+    % doc count to increase (since 2-c is now the winning rev and it's
+    % deleted).
+    Docs = #{
+        ~"new_edits" => false,
+        ~"docs" => [
+            #{
+                ~"_id" => ~"doc",
+                ~"_revisions" => #{~"start" => 2, ~"ids" => [~"b", ~"a"]},
+                ~"v" => 1
+            },
+            #{
+                ~"_id" => ~"doc",
+                ~"_deleted" => true,
+                ~"_revisions" => #{~"start" => 2, ~"ids" => [~"c", ~"a"]}
+            }
+        ]
+    },
+    {201, _} = req(post, url(DbUrl, "_bulk_docs"), Docs),
+    ?assertMatch({200, #{~"doc_count" := 1, ~"doc_del_count" := 0}}, req(get, DbUrl)),
+    {Status, _} = req(post, url(DbUrl, "_purge"), #{~"doc" => [~"2-b"]}),
+    ?assert(Status =:= 201 orelse Status =:= 202),
+    ?assertMatch({404, #{~"reason" := ~"deleted"}}, req(get, url(DbUrl, "doc"))),
+    ?assertMatch({200, #{~"doc_count" := 0, ~"doc_del_count" := 1}}, req(get, DbUrl)),
+    ?assertMatch({200, #{~"total_rows" := 0, ~"rows" := []}}, req(get, url(DbUrl, "_all_docs"))),
+    % can re-create a doc (note: we magically re-graft it on a previous deleted rev, so rev will be 3)
+    ?assertMatch({201, #{~"rev" := <<"3-", _/binary>>}}, req(put, url(DbUrl, "doc"), #{~"v" => 2})),
+    ?assertMatch({200, #{~"doc_count" := 1, ~"doc_del_count" := 0}}, req(get, DbUrl)).
 
 t_mixed_purge_request(DbUrl) ->
     Doc1IdRevs = create_and_update_doc(DbUrl, "doc1"),

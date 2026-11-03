@@ -472,8 +472,12 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
             NewActiveSize = FinalAS + TotalAttSize,
             NewExternalSize = FinalES + TotalAttSize,
             ?COMP_EVENT(seq_copy),
+            % In 3.5.3 and before we didn't always update the deleted flag
+            % properly (see issue #6199) so recompute the flag based on the rev
+            % tree in order to repair it.
             Info#full_doc_info{
                 rev_tree = NewRevTree,
+                deleted = couch_doc:is_deleted(NewRevTree),
                 sizes = #size_info{
                     active = NewActiveSize,
                     external = NewExternalSize
