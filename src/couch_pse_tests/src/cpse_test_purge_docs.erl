@@ -268,6 +268,66 @@ cpse_purge_partial_revs(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
+cpse_purge_winning_with_a_deleted_remaining(DbName) ->
+    % Delete the live one. The deleted one becomes live and doc counts to
+    % reflect that, too
+    Id = ~"cabbage",
+    {WinRev, _DelRev} = one_live_one_deleted(DbName, Id),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 1},
+        {changes, 1}
+    ]),
+    PurgeInfos = [{cpse_util:uuid(), Id, [WinRev]}],
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([WinRev], PRevs),
+    ?assertMatch(#full_doc_info{deleted = true}, fdi(DbName, Id)),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 1},
+        {update_seq, 2},
+        {changes, 1},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+cpse_purge_deleted_conflict_leaf(DbName) ->
+    % Purging deleted conflicts keeps the winning live one as is
+    Id = ~"tomato",
+    {_WinRev, DelRev} = one_live_one_deleted(DbName, Id),
+    PurgeInfos = [{cpse_util:uuid(), Id, [DelRev]}],
+    {ok, [{ok, PRevs}]} = cpse_util:purge(DbName, PurgeInfos),
+    ?assertEqual([DelRev], PRevs),
+    ?assertMatch(#full_doc_info{deleted = false}, fdi(DbName, Id)),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 1},
+        {del_doc_count, 0},
+        {update_seq, 2},
+        {changes, 1},
+        {purge_seq, 1},
+        {purge_infos, PurgeInfos}
+    ]).
+
+cpse_purge_winning_and_then_deleted(DbName) ->
+    % Clean everything, first the live one, then the deleted one
+    % FDI should be gone
+    Id = ~"potato",
+    {LiveRev, DelRev} = one_live_one_deleted(DbName, Id),
+    PurgeInfos1 = [{cpse_util:uuid(), Id, [LiveRev]}],
+    {ok, [{ok, [LiveRev]}]} = cpse_util:purge(DbName, PurgeInfos1),
+    PurgeInfos2 = [{cpse_util:uuid(), Id, [DelRev]}],
+    {ok, [{ok, [DelRev]}]} = cpse_util:purge(DbName, PurgeInfos2),
+    ?assertEqual(not_found, fdi(DbName, Id)),
+    cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
+        {doc_count, 0},
+        {del_doc_count, 0},
+        {update_seq, 3},
+        {changes, 0},
+        {purge_seq, 2},
+        {purge_infos, PurgeInfos1 ++ PurgeInfos2}
+    ]).
+
 cpse_purge_missing_docid(DbName) ->
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
@@ -460,3 +520,32 @@ cpse_purge_repeated_uuid(DbName) ->
 
 fold_all_infos(Info, Acc) ->
     {ok, [Info | Acc]}.
+
+one_live_one_deleted(DbName, DocId) ->
+    % a---b : live
+    %  \__c : deleted
+    Win =
+        {[
+            {'_id', DocId},
+            {'_revisions', {[{start, 2}, {ids, [~"b", ~"a"]}]}},
+            {vsn, 1}
+        ]},
+    Del =
+        {[
+            {'_id', DocId},
+            {'_deleted', true},
+            {'_revisions', {[{start, 2}, {ids, [~"c", ~"a"]}]}}
+        ]},
+    Docs = [Win, Del],
+    {ok, [WinRev, DelRev]} = cpse_util:save_docs(DbName, Docs, [?REPLICATED_CHANGES]),
+    ?assertEqual({2, ~"b"}, WinRev),
+    ?assertEqual({2, ~"c"}, DelRev),
+    {WinRev, DelRev}.
+
+fdi(DbName, DocId) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    try
+        couch_db:get_full_doc_info(Db, DocId)
+    after
+        couch_db:close(Db)
+    end.
