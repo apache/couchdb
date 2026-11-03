@@ -19,6 +19,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response.Status;
 import java.io.IOException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -307,8 +308,14 @@ public final class IndexManager implements Managed {
             @Override
             public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
                 // Delete parent dir if it just became empty, but don't delete root dir.
-                if (!rootDir.equals(dir) && Files.list(dir).count() == 0) {
-                    Files.delete(dir);
+                if (!rootDir.equals(dir)) {
+                    final boolean empty;
+                    try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+                        empty = !stream.iterator().hasNext();
+                    }
+                    if (empty) {
+                        Files.delete(dir);
+                    }
                 }
                 return FileVisitResult.CONTINUE;
             }
