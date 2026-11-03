@@ -141,7 +141,7 @@ strip_url_creds(Endpoint) ->
         #httpdb{url = Url} ->
             iolist_to_binary(couch_util:url_strip_password(Url))
     catch
-        throw:{error, local_endpoints_not_supported} ->
+        throw:{error, ~"invalid endpoint"} when is_binary(Endpoint) ->
             Endpoint;
         throw:{error, _} ->
             % Avoid exposing any part of the URL in case there is a password in

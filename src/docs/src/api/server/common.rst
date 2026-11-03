@@ -726,19 +726,11 @@
     :<json string/object source: Fully qualified source database URL or an
       object which contains the full URL of the source database with additional
       parameters like headers. Eg: 'http://example.com/source_db_name' or
-      {"url":"url in here", "headers": {"header1":"value1", ...}} . For
-      backwards compatibility, CouchDB 3.x will auto-convert bare database
-      names by prepending the address and port CouchDB is listening on, to
-      form a complete URL. This behaviour is deprecated in 3.x and will be
-      removed in CouchDB 4.0.
+      {"url":"url in here", "headers": {"header1":"value1", ...}} .
     :<json string/object target: Fully qualified target database URL or an
       object which contains the full URL of the target database with additional
       parameters like headers. Eg: 'http://example.com/target_db_name' or
-      {"url":"url in here", "headers": {"header1":"value1", ...}} . For
-      backwards compatibility, CouchDB 3.x will auto-convert bare database
-      names by prepending the address and port CouchDB is listening on, to
-      form a complete URL. This behaviour is deprecated in 3.x and will be
-      removed in CouchDB 4.0.
+      {"url":"url in here", "headers": {"header1":"value1", ...}} .
     :>header Content-Type: - :mimetype:`application/json`
                            - :mimetype:`text/plain; charset=utf-8`
     :>json array history: Replication history (see below)
@@ -893,7 +885,7 @@ following request:
     Accept: application/json
 
     {
-        "source" : "recipes",
+        "source" : "http://couchdb:5984/recipes",
         "target" : "http://coucdb-remote:5984/recipes",
     }
 
@@ -919,7 +911,7 @@ by adding the ``create_target`` field to the request object:
 
     {
         "create_target" : true
-        "source" : "recipes",
+        "source" : "http://couchdb:5984/recipes",
         "target" : "http://couchdb-remote:5984/recipes",
     }
 
@@ -942,8 +934,8 @@ synchronization between two databases by supplying the ``source`` and
     Content-Type: application/json
 
     {
-        "source" : "recipes",
-        "target" : "recipes-snapshot",
+        "source" : "http://couchdb:5984/recipes",
+        "target" : "http://couchdb:5984/recipes-snapshot",
     }
 
 In the above example, the databases ``recipes`` and ``recipes-snapshot`` will
@@ -996,7 +988,7 @@ replication ceases.
 
     {
         "continuous" : true
-        "source" : "recipes",
+        "source" : "http://couchdb:5984/recipes",
         "target" : "http://couchdb-remote:5984/recipes",
     }
 
@@ -1026,7 +1018,7 @@ For example, the replication request:
     Accept: application/json
 
     {
-        "source" : "recipes",
+        "source" : "http://couchdb:5984/recipes",
         "target" : "http://couchdb-remote:5984/recipes",
         "create_target" : true,
         "continuous" : true
@@ -1044,7 +1036,7 @@ Must be canceled using the request:
         "cancel" : true,
         "continuous" : true
         "create_target" : true,
-        "source" : "recipes",
+        "source" : "http://couchdb:5984/recipes",
         "target" : "http://couchdb-remote:5984/recipes",
     }
 
