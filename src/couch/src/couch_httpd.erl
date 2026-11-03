@@ -1450,7 +1450,7 @@ http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
 http_respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, respond) when
     is_binary(Args) orelse is_list(Args)
 ->
-    case should_compress(Req) of
+    case should_compress(Req, Args) of
         true ->
             Headers2 = [{"Vary", "Accept-Encoding"} | Headers],
             MochiReq:respond({Code, Headers2, {compressed, {gzip, default}, Args}});
@@ -1459,6 +1459,14 @@ http_respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, respond) 
     end;
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
+
+should_compress(Req, Body) ->
+    should_compress(Req) andalso compressible_size(iolist_size(Body)).
+
+compressible_size(0) ->
+    false;
+compressible_size(Size) ->
+    Size >= chttpd_util:get_chttpd_config_integer("compress_min_size", 1024).
 
 should_compress(#httpd{mochi_req = MochiReq}) ->
     case chttpd_util:get_chttpd_config_boolean("response_compression", false) of
