@@ -3,6 +3,12 @@ defmodule DiskMonitorTest do
 
   @moduletag :disk_monitor
 
+  # The monitor blocks only when the percentage of disk used is strictly
+  # above the threshold. df reports 0% for a nearly empty filesystem (for
+  # example a fresh ZFS dataset on a FreeBSD CI jail), so a threshold of 0
+  # would never block there. Use -1 to block regardless of disk usage and
+  # 100 to never block.
+
   setup_all do
     set_config({"disk_monitor", "enable", "true"})
     :ok
@@ -10,7 +16,7 @@ defmodule DiskMonitorTest do
 
   @tag :with_db
   test "block background view indexing", context do
-    set_config({"disk_monitor", "background_view_indexing_threshold", "0"})
+    set_config({"disk_monitor", "background_view_indexing_threshold", "-1"})
     set_config({"disk_monitor", "interactive_view_indexing_threshold", "100"})
 
     db_name = context[:db_name]
@@ -29,7 +35,7 @@ defmodule DiskMonitorTest do
   @tag :with_db
   test "block interactive view indexing", context do
     set_config({"disk_monitor", "background_view_indexing_threshold", "100"})
-    set_config({"disk_monitor", "interactive_view_indexing_threshold", "0"})
+    set_config({"disk_monitor", "interactive_view_indexing_threshold", "-1"})
 
     db_name = context[:db_name]
     resp = Couch.post("/#{db_name}", body: %{:_id => "foo"})
@@ -45,7 +51,7 @@ defmodule DiskMonitorTest do
 
   @tag :with_db
   test "block interactive database writes", context do
-    set_config({"disk_monitor", "interactive_database_writes_threshold", "0"})
+    set_config({"disk_monitor", "interactive_database_writes_threshold", "-1"})
 
     db_name = context[:db_name]
     resp = Couch.post("/#{db_name}", body: %{:_id => "foo"})
