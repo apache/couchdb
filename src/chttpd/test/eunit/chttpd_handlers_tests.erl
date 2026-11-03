@@ -27,6 +27,11 @@ replicate_endpoint_test_() ->
         fun teardown/1,
         [
             ?TDEF_FE(should_reject_local_dbname_on_replicate),
+            ?TDEF_FE(should_reject_local_source_on_replicate),
+            ?TDEF_FE(should_reject_local_target_on_replicate),
+            ?TDEF_FE(should_reject_missing_target_on_replicate),
+            ?TDEF_FE(should_reject_null_target_on_replicate),
+            ?TDEF_FE(should_reject_local_names_on_cancel),
             ?TDEF_FE(require_authenticated_user)
         ]
     }.
@@ -52,6 +57,57 @@ should_reject_local_dbname_on_replicate({_Ctx, Url}) ->
     ),
     delete_db(Url, SrcDb),
     delete_db(Url, TgtDb).
+
+should_reject_local_source_on_replicate({_Ctx, Url}) ->
+    % don't allow local (plain) db names any longer
+    Res = post(Url ++ "_replicate", [?AUTH], #{
+        ~"source" => ?tempdb(),
+        ~"target" => endpoint(Url, ?tempdb(), ?USER, ?PASS)
+    }),
+    ?assertMatch(
+        {400, #{~"error" := ~"invalid_replication", ~"reason" := ~"invalid endpoint"}},
+        Res
+    ).
+
+should_reject_local_target_on_replicate({_Ctx, Url}) ->
+    Res = post(Url ++ "_replicate", [?AUTH], #{
+        ~"source" => endpoint(Url, ?tempdb(), ?USER, ?PASS),
+        ~"target" => ?tempdb()
+    }),
+    ?assertMatch(
+        {400, #{~"error" := ~"invalid_replication", ~"reason" := ~"invalid endpoint"}},
+        Res
+    ).
+
+should_reject_missing_target_on_replicate({_Ctx, Url}) ->
+    Res = post(Url ++ "_replicate", [?AUTH], #{
+        ~"source" => endpoint(Url, ?tempdb(), ?USER, ?PASS)
+    }),
+    ?assertMatch(
+        {400, #{~"error" := ~"invalid_replication", ~"reason" := ~"invalid endpoint"}},
+        Res
+    ).
+
+should_reject_null_target_on_replicate({_Ctx, Url}) ->
+    Res = post(Url ++ "_replicate", [?AUTH], #{
+        ~"source" => endpoint(Url, ?tempdb(), ?USER, ?PASS),
+        ~"target" => null
+    }),
+    ?assertMatch(
+        {400, #{~"error" := ~"invalid_replication", ~"reason" := ~"invalid endpoint"}},
+        Res
+    ).
+
+should_reject_local_names_on_cancel({_Ctx, Url}) ->
+    Res = post(Url ++ "_replicate", [?AUTH], #{
+        ~"source" => ?tempdb(),
+        ~"target" => ?tempdb(),
+        ~"cancel" => true
+    }),
+    ?assertMatch(
+        {400, #{~"error" := ~"invalid_replication", ~"reason" := ~"invalid endpoint"}},
+        Res
+    ).
 
 require_authenticated_user({_Ctx, Url}) ->
     SrcDb = ?tempdb(),

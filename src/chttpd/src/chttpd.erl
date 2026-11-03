@@ -1088,9 +1088,7 @@ error_info({error, {database_name_too_long, DbName}}) ->
         <<"At least one path segment of `", DbName/binary, "` is too long.">>};
 error_info({doc_validation, Reason}) ->
     {400, <<"doc_validation">>, Reason};
-error_info({error, local_endpoints_not_supported}) ->
-    {400, ~"invalid_replication", ~"local database names are not supported, use a full URL"};
-error_info({error, ~"Missing replicator database" = Reason}) ->
+error_info({error, ~"invalid endpoint" = Reason}) ->
     {400, ~"invalid_replication", Reason};
 error_info({error, <<"endpoint has an invalid url">> = Reason}) ->
     {400, <<"invalid_replication">>, Reason};
