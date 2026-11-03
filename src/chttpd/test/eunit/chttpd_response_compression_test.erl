@@ -30,6 +30,7 @@ setup() ->
 
 teardown(_Url) ->
     ok = config:delete("chttpd", "response_compression", false),
+    ok = config:delete("chttpd", "compress_min_size", false),
     ok = config:delete("admins", ?USER, false).
 
 compression_test_() ->
@@ -46,6 +47,7 @@ compression_test_() ->
                 [
                     ?TDEF_FE(t_no_compression_by_default),
                     ?TDEF_FE(t_gzip_when_enabled_and_accepted),
+                    ?TDEF_FE(t_no_gzip_below_min_size),
                     ?TDEF_FE(t_no_gzip_when_enabled_but_not_accepted)
                 ]
             }
@@ -60,6 +62,7 @@ t_no_compression_by_default(Url) ->
 
 t_gzip_when_enabled_and_accepted(Url) ->
     ok = config:set("chttpd", "response_compression", "true", false),
+    ok = config:set("chttpd", "compress_min_size", "1", false),
     {ok, Code, Headers, Body} = req_get_raw(Url, [?CONTENT_JSON, ?AUTH, ?ACCEPT_GZIP]),
     ?assertEqual(200, Code),
     ContentEncoding = proplists:get_value(~"content-encoding", Headers, ~"identity"),
@@ -67,6 +70,14 @@ t_gzip_when_enabled_and_accepted(Url) ->
     % Verify the body is valid gzip
     Decompressed = zlib:gunzip(Body),
     ?assert(byte_size(Decompressed) > 0).
+
+t_no_gzip_below_min_size(Url) ->
+    ok = config:set("chttpd", "response_compression", "true", false),
+    ok = config:set("chttpd", "compress_min_size", "1048576", false),
+    {ok, Code, Headers, _Body} = req_get(Url, [?CONTENT_JSON, ?AUTH, ?ACCEPT_GZIP]),
+    ?assertEqual(200, Code),
+    ContentEncoding = proplists:get_value(~"content-encoding", Headers, ~"identity"),
+    ?assertNotEqual(~"gzip", ContentEncoding).
 
 t_no_gzip_when_enabled_but_not_accepted(Url) ->
     ok = config:set("chttpd", "response_compression", "true", false),
