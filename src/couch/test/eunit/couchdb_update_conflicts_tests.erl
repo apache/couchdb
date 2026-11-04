@@ -382,7 +382,10 @@ replicated_mismatched_revslimit_test_() ->
                     ?TDEF_FE(t_att_data),
                     ?TDEF_FE(t_internal_node_stemmed),
                     ?TDEF_FE(t_internal_node_full_path_patches_rev_tree),
-                    ?TDEF_FE(t_multiple_revs_path_in_one_request)
+                    ?TDEF_FE(t_multiple_revs_path_in_one_request),
+                    ?TDEF_FE(t_internal_node_bad_parent),
+                    ?TDEF_FE(t_revs_only_internal_node_bad_parent),
+                    ?TDEF_FE(t_internal_node_other_root)
                 ]
             }
         }
@@ -496,6 +499,40 @@ t_multiple_revs_path_in_one_request(DbName) ->
     % 5-e internal never go through
     ?assertMatch([{{not_found, missing}, {5, ~"e"}}], revs(DbName, [{5, ~"e"}])).
 
+t_internal_node_bad_parent(DbName) ->
+    update(DbName, [doc(4, [~"d", ~"c", ~"x"], [{~"val", ~"d"}])]),
+    % 3-c is an internal rev with parent 2-x. It's sent with a path that says
+    % its parent is 2-b (oops!), so we cannot fold it into 4-d's path. It
+    % should be a new rev (as opposed leaving a leaf behind with no body).
+    update(DbName, [doc(3, [~"c", ~"b", ~"a"], [{~"val", ~"c"}])]),
+    ?assertEqual([], i_got_no_body_and_nobody_cares(DbName)),
+    ?assertEqual([{3, ~"c", false, 3}, {4, ~"d", false, 3}], leafs(DbName)),
+    ?assertEqual(ok, compact(DbName)).
+
+t_revs_only_internal_node_bad_parent(DbName) ->
+    update(DbName, [doc(4, [~"d", ~"c", ~"x"], [{~"val", ~"d"}])]),
+    % As in t_internal_node_bad_parent but it's a prep_and_validate as revs_only case.
+    % Since we don't store anything anyway we expect it to be ignored.
+    Doc = doc(3, [~"c", ~"b", ~"a"], []),
+    update(DbName, [Doc#doc{meta = [{revs_only, true}]}]),
+    ?assertEqual([], i_got_no_body_and_nobody_cares(DbName)),
+    ?assertEqual([{4, ~"d", false, 3}], leafs(DbName)).
+
+t_internal_node_other_root(DbName) ->
+    update(DbName, [doc(3, [~"c", ~"x", ~"a"], [])]),
+    % 2-x is an internal rev under 1-a. Send it again as a leaf under 1-z
+    % (different root but same position). Paths can't be folded. We still
+    % shouldn't get a body-less leaf.
+    update(DbName, [doc(2, [~"x", ~"z"], [])]),
+    ?assertEqual([], i_got_no_body_and_nobody_cares(DbName)),
+    ?assertEqual([{2, ~"x", false, 2}, {3, ~"c", false, 3}], leafs(DbName)),
+    % Make sure we can open the doc and compact it
+    ?assertMatch(
+        {ok, #doc{revs = {3, [~"c" | _]}}},
+        couch_util:with_db(DbName, fun(Db) -> couch_db:open_doc(Db, ?DOC_ID, []) end)
+    ),
+    ?assertEqual(ok, compact(DbName)).
+
 two_roots(DbName) ->
     update(DbName, [doc(1, [~"a"], [{~"val", ~"a"}])]),
     update(DbName, [d_4_stemmed()]),
@@ -560,6 +597,19 @@ vdu(DbName) ->
 update(DbName, Docs) ->
     couch_util:with_db(DbName, fun(Db) ->
         couch_db:update_docs(Db, Docs, [], ?REPLICATED_CHANGES)
+    end).
+
+% Make sure we never have a bodyless leaf
+i_got_no_body_and_nobody_cares(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        #full_doc_info{rev_tree = Tree} = couch_db:get_full_doc_info(Db, ?DOC_ID),
+        [{P, R} || {?REV_MISSING, {P, [R | _]}} <- couch_key_tree:get_all_leafs(Tree)]
+    end).
+
+compact(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        {ok, _} = couch_db:start_compact(Db),
+        couch_db:wait_for_compaction(Db)
     end).
 
 % Get a list of {Pos, RevId, Deleted, RevPathLength} for all leafs
