@@ -17,6 +17,7 @@
 error_info_test() ->
     Error = <<"error">>,
     Reason = <<"reason">>,
+    InvalidEndpoint = ~"invalid endpoint",
     ArgResult = [
         {
             bad_request,
@@ -33,6 +34,10 @@ error_info_test() ->
         {
             {query_parse_error, Reason},
             {400, <<"query_parse_error">>, Reason}
+        },
+        {
+            {error, InvalidEndpoint},
+            {400, ~"invalid_replication", InvalidEndpoint}
         },
         {
             database_does_not_exist,

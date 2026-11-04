@@ -225,10 +225,9 @@ parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);
 parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);
-parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
-    throw({error, local_endpoints_not_supported});
-parse_rep_db(undefined, _Proxy, _Options) ->
-    throw({error, <<"Missing replicator database">>}).
+parse_rep_db(_, _Proxy, _Options) ->
+    % missing source, local dbs (no longer supported) or values of wrong type
+    throw({error, ~"invalid endpoint"}).
 
 check_url(<<_/binary>> = Url, Type) when is_atom(Type) ->
     case ibrowse_lib:parse_url(?b2l(Url)) of
@@ -635,7 +634,7 @@ local_replication_endpoint_error_test_() ->
         fun meck_config/0,
         fun(_) -> meck:unload() end,
         [
-            ?TDEF_FE(t_error_on_local_endpoint),
+            ?TDEF_FE(t_error_on_invalid_endpoint),
             ?TDEF_FE(t_proxy_params_default),
             ?TDEF_FE(t_parse_db_string),
             ?TDEF_FE(t_parse_db_url),
@@ -650,15 +649,23 @@ local_replication_endpoint_error_test_() ->
 meck_config() ->
     meck:expect(config, get, fun(_, _, Default) -> Default end).
 
-t_error_on_local_endpoint(_) ->
-    RepDoc =
-        {[
-            {<<"_id">>, <<"someid">>},
-            {<<"source">>, <<"localdb">>},
-            {<<"target">>, <<"http://somehost.local/tgt">>}
-        ]},
-    Expect = local_endpoints_not_supported,
-    ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc_without_id(RepDoc)).
+t_error_on_invalid_endpoint(_) ->
+    Url = ~"http://somehost.local/db",
+    Expect = {bad_rep_doc, ~"invalid endpoint"},
+    % local db names no longer supported
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc(~"localdb", Url))),
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc(Url, ~"localdb"))),
+    % missing endpoints altogether
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc(undefined, Url))),
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc(Url, undefined))),
+    % wrong endpoint types
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc(null, Url))),
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc(42, Url))),
+    ?assertThrow(Expect, parse_rep_doc_without_id(rep_doc([Url], Url))).
+
+rep_doc(Source, Target) ->
+    Endpoints = [{~"source", Source}, {~"target", Target}],
+    {[{~"_id", ~"someid"} | [KV || {_, V} = KV <- Endpoints, V =/= undefined]]}.
 
 t_proxy_params_default(_) ->
     ?assertEqual(
@@ -695,8 +702,9 @@ t_parse_db_string(_) ->
         },
         parse_rep_db(<<"https://a">>, <<"https://x">>, [])
     ),
-    ?assertThrow({error, _}, parse_rep_db(<<"abc">>, <<"foo">>, [])),
-    ?assertThrow({error, _}, parse_rep_db(undefined, <<"foo">>, [])).
+    ?assertThrow({error, ~"invalid endpoint"}, parse_rep_db(~"abc", ~"foo", [])),
+    ?assertThrow({error, ~"invalid endpoint"}, parse_rep_db(undefined, ~"foo", [])),
+    ?assertThrow({error, ~"invalid endpoint"}, parse_rep_db(null, ~"foo", [])).
 
 t_parse_db_url(_) ->
     ?assertMatch(
