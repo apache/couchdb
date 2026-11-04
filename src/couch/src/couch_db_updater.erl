@@ -21,6 +21,8 @@
 
 % 10 GiB
 -define(DEFAULT_MAX_PARTITION_SIZE, 16#280000000).
+% Stem depth to check for duplicate rev parents
+-define(STEM_DUP_CHECK_DEPTH, 16#7FFFFFFF).
 
 -record(merge_acc, {
     revs_limit,
@@ -624,9 +626,8 @@ merge_rev_tree(_Db, OldInfo, NewDoc, _Client, true) ->
     % We're merging in revisions without caring about
     % conflicts. Most likely this is a replication update.
     OldTree = OldInfo#full_doc_info.rev_tree,
-    case replicated_path(OldTree, NewDoc) of
-        {ok, NewTree0} ->
-            {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
+    case replicated_merge(OldTree, NewDoc) of
+        {ok, NewTree} ->
             OldInfo#full_doc_info{rev_tree = NewTree};
         ignore ->
             OldInfo
@@ -640,8 +641,16 @@ merge_rev_tree(_Db, OldInfo, NewDoc, _Client, true) ->
 % node of a longer path in the same request) there is nothing to store and it
 % is ignored, otherwise it's any revision not in the tree is a new revision.
 % revision not in the tree is new.
-replicated_path(OldTree, #doc{revs = {Pos, [RevId | _]}, meta = Meta} = Doc) ->
+%
+% When we merge, we may get a strange case of a revision parent being different
+% than what we already have in the tree. In that case after the merge we could
+% end up with a ?REV_MISSIING leaf (since merge aborts). In that case we merge
+% the sent Path body into the tree. It will create a conflict but that is the
+% best we can do in such cases and is the behavior we always had.
+%
+replicated_merge(OldTree, #doc{revs = {Pos, [RevId | _]}, meta = Meta} = Doc) ->
     Path = couch_doc:to_path(Doc),
+    RevsOnly = lists:keymember(revs_only, 1, Meta),
     case couch_key_tree:get_full_key_paths(OldTree, [{Pos, RevId}]) of
         {[{Pos, [{RevId, Value} | _]} | _], []} ->
             Fun = fun
@@ -649,13 +658,29 @@ replicated_path(OldTree, #doc{revs = {Pos, [RevId | _]}, meta = Meta} = Doc) ->
                 (_Rev, V, branch) -> V
             end,
             [Path1] = couch_key_tree:map(Fun, [Path]),
-            {ok, Path1};
+            case couch_key_tree:merge(OldTree, Path1) of
+                {NewTree, internal_node} ->
+                    {ok, NewTree};
+                {NewTree, _} ->
+                    Folded = couch_key_tree:stem(NewTree, ?STEM_DUP_CHECK_DEPTH),
+                    Leafs = couch_key_tree:get_all_leafs(Folded),
+                    % If we're creating a new branch/leaf and have a
+                    % REV_MISSING at a leaf and it's not a RevOnly update, put
+                    % the incoming body (Path) in that position.
+                    case lists:keymember(?REV_MISSING, 1, Leafs) of
+                        false -> {ok, Folded};
+                        true -> replicated_new_rev(OldTree, Path, RevsOnly)
+                    end
+            end;
         _ ->
-            case lists:keymember(revs_only, 1, Meta) of
-                true -> ignore;
-                false -> {ok, Path}
-            end
+            replicated_new_rev(OldTree, Path, RevsOnly)
     end.
+
+replicated_new_rev(_Tree, _Path, true = _RevsOnly) ->
+    ignore;
+replicated_new_rev(Tree, Path, false = _RevsOnly) ->
+    {Tree1, _} = couch_key_tree:merge(Tree, Path),
+    {ok, Tree1}.
 
 % Revpos were set before the document was grafted onto the deleted revision and
 % point to rev 1. Update them to the new revpos. This is needed when we
