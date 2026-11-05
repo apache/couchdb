@@ -230,6 +230,7 @@ stop() ->
 
 handle_request(MochiReq0) ->
     erlang:put(?REWRITE_COUNT, 0),
+    erlang:erase(body_time),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
     handle_request_int(MochiReq).
 
@@ -767,8 +768,14 @@ body(#httpd{mochi_req = MochiReq, req_body = ReqBody}) ->
             try
                 MochiReq:recv_body(MaxSize)
             after
-                T = timer:now_diff(os:timestamp(), Begin) div 1000,
-                put(body_time, T)
+                case get(body_time) of
+                    undefined ->
+                        T = timer:now_diff(os:timestamp(), Begin) div 1000,
+                        put(body_time, T);
+                    _ ->
+                        % Already read once and set it
+                        ok
+                end
             end;
         _Else ->
             ReqBody
