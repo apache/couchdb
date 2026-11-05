@@ -164,6 +164,6 @@ write_file(FileName, Contents) ->
             ok;
         {error, Reason} ->
             Args = [FileName, file:format_error(Reason)],
-            couch_log:error("Failed ot write ~s :: ~s", Args),
+            couch_log:error("Failed to write ~s :: ~s", Args),
             throw({error, Reason})
     end.
