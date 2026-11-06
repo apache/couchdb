@@ -345,6 +345,11 @@
 -callback read_doc_body(DbHandle :: db_handle(), RawDoc :: doc()) ->
     doc().
 
+% Batch version of read_doc_body/2. Returns the list of #doc{} records
+% in the same order as the RawDocs specs
+-callback read_doc_bodies(DbHandle :: db_handle(), RawDocs :: [doc()]) ->
+    [doc()].
+
 % This function will be called from many contexts concurrently.
 % If the storage engine has a purge_info() record for any of the
 % provided UUIDs, those purge_info() records should be returned. The
@@ -707,6 +712,7 @@
     open_docs/2,
     open_local_docs/2,
     read_doc_body/2,
+    read_doc_bodies/2,
     load_purge_infos/2,
 
     serialize_doc/2,
@@ -905,6 +911,10 @@ open_local_docs(#db{} = Db, DocIds) ->
 read_doc_body(#db{} = Db, RawDoc) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:read_doc_body(EngineState, RawDoc).
+
+read_doc_bodies(#db{} = Db, RawDocs) when is_list(RawDocs) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:read_doc_bodies(EngineState, RawDocs).
 
 load_purge_infos(#db{} = Db, UUIDs) ->
     #db{engine = {Engine, EngineState}} = Db,

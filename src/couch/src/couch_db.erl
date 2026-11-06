@@ -138,6 +138,7 @@
     validate_dbname/1,
 
     make_doc/5,
+    make_docs/2,
     new_revid/1
 ]).
 
@@ -2017,14 +2018,28 @@ make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath) ->
         atts = [],
         deleted = Deleted
     };
-make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}) ->
+make_doc(#db{} = Db, Id, Deleted, Bp, RevisionPath) ->
+    [Doc] = make_docs(Db, [{Id, Deleted, Bp, RevisionPath}]),
+    Doc.
+
+% Specs is [{Id, Deleted, BodyPtr, RevPath}], every spec with a body pointer
+make_docs(#db{} = Db, Specs) when is_list(Specs) ->
     RevsLimit = get_revs_limit(Db),
-    Doc0 = couch_db_engine:read_doc_body(Db, #doc{
-        id = Id,
-        revs = {Pos, lists:sublist(Revs, 1, RevsLimit)},
-        body = Bp,
-        deleted = Deleted
-    }),
+    Docs0 = lists:map(
+        fun({Id, Del, Bp, {Pos, Revs}}) ->
+            #doc{
+                id = Id,
+                revs = {Pos, lists:sublist(Revs, 1, RevsLimit)},
+                body = Bp,
+                deleted = Del
+            }
+        end,
+        Specs
+    ),
+    Docs1 = couch_db_engine:read_doc_bodies(Db, Docs0),
+    [doc_atts_and_opts(Db, Doc) || Doc <- Docs1].
+
+doc_atts_and_opts(#db{} = Db, #doc{} = Doc0) ->
     Doc1 =
         case Doc0#doc.atts of
             BinAtts when is_binary(BinAtts) ->

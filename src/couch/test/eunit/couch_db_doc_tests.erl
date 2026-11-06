@@ -40,24 +40,25 @@ couch_db_doc_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    fun should_truncate_number_of_revisions/1,
-                    fun should_raise_bad_request_on_invalid_rev/1,
-                    fun should_allow_access_in_doc_keys_test/1
+                    ?TDEF_FE(t_truncate_number_of_revisions),
+                    ?TDEF_FE(t_raise_bad_request_on_invalid_rev),
+                    ?TDEF_FE(t_allow_access_in_doc_keys),
+                    ?TDEF_FE(t_make_docs_in_batch)
                 ]
             }
         }
     }.
 
-should_truncate_number_of_revisions(DbName) ->
+t_truncate_number_of_revisions(DbName) ->
     DocId = <<"foo">>,
     Db = open_db(DbName),
     couch_db:set_revs_limit(Db, 5),
     Rev = create_doc(Db, DocId),
     Rev10 = add_revisions(Db, DocId, Rev, 10),
     {ok, [{ok, #doc{revs = {11, Revs}}}]} = open_doc_rev(Db, DocId, Rev10),
-    ?_assertEqual(5, length(Revs)).
+    ?assertEqual(5, length(Revs)).
 
-should_raise_bad_request_on_invalid_rev(DbName) ->
+t_raise_bad_request_on_invalid_rev(DbName) ->
     DocId = <<"foo">>,
     InvalidRev1 = <<"foo">>,
     InvalidRev2 = <<"a-foo">>,
@@ -65,24 +66,85 @@ should_raise_bad_request_on_invalid_rev(DbName) ->
     Expect = {bad_request, <<"Invalid rev format">>},
     Db = open_db(DbName),
     create_doc(Db, DocId),
-    [
-        {InvalidRev1, ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev1, 1))},
-        {InvalidRev2, ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev2, 1))},
-        {InvalidRev3, ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev3, 1))}
-    ].
+    ?assertThrow(Expect, add_revisions(Db, DocId, InvalidRev1, 1)),
+    ?assertThrow(Expect, add_revisions(Db, DocId, InvalidRev2, 1)),
+    ?assertThrow(Expect, add_revisions(Db, DocId, InvalidRev3, 1)).
 
-should_allow_access_in_doc_keys_test(_DbName) ->
+t_allow_access_in_doc_keys(_DbName) ->
     Json = <<"{\"_id\":\"foo\",\"_access\":[\"test\"]}">>,
     EJson = couch_util:json_decode(Json),
     Expected = {[{<<"_id">>, <<"foo">>}, {<<"_access">>, [<<"test">>]}]},
     EJson = Expected,
     Doc = couch_doc:from_json_obj(EJson),
     NewEJson = couch_doc:to_json_obj(Doc, []),
-    ?_assertEqual(NewEJson, Expected).
+    ?assertEqual(NewEJson, Expected).
+
+t_make_docs_in_batch(DbName) ->
+    Db0 = open_db(DbName),
+    Rev = create_doc(Db0, ~"somedoc"),
+    add_revisions(Db0, ~"somedoc", Rev, 3),
+    del_doc(Db0, ~"deleted", create_doc(Db0, ~"deleted")),
+    create_att_doc(Db0, ~"att"),
+    {ok, Db} = couch_db:reopen(Db0),
+    Ids = [~"somedoc", ~"deleted", ~"att"],
+    Specs = doc_specs(Db, Ids),
+    ?assertEqual(3, length(Specs)),
+
+    Expected = [
+        couch_db:make_doc(Db, Id, Del, Ptr, Path)
+     || {Id, Del, Ptr, Path} <- Specs
+    ],
+    ?assertEqual(Expected, couch_db:make_docs(Db, Specs)),
+    ?assertEqual(lists:reverse(Expected), couch_db:make_docs(Db, lists:reverse(Specs))),
+    ?assertEqual([], couch_db:make_docs(Db, [])),
+
+    % And the docs are the ones written
+    [#doc{revs = {4, RevIds}}] = couch_db:make_docs(Db, doc_specs(Db, [~"somedoc"])),
+    ?assertEqual(4, length(RevIds)),
+    [#doc{deleted = true}] = couch_db:make_docs(Db, doc_specs(Db, [~"deleted"])),
+    [#doc{atts = [Att]}] = couch_db:make_docs(Db, doc_specs(Db, [~"att"])),
+    ?assertEqual(~"a.txt", couch_att:fetch(name, Att)).
 
 open_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     Db.
+
+doc_specs(Db, Ids) ->
+    lists:flatmap(
+        fun(Id) ->
+            #full_doc_info{rev_tree = Tree} = couch_db:get_full_doc_info(Db, Id),
+            Leafs = couch_key_tree:get_all_leafs(Tree),
+            [{Id, Del, Ptr, Path} || {#leaf{deleted = Del, ptr = Ptr}, Path} <- Leafs]
+        end,
+        Ids
+    ).
+
+del_doc(Db0, DocId, Rev) ->
+    {ok, Db} = couch_db:reopen(Db0),
+    {Pos, RevId} = couch_doc:parse_rev(Rev),
+    Doc = #doc{id = DocId, revs = {Pos, [RevId]}, deleted = true, body = {[]}},
+    {ok, _} = couch_db:update_doc(Db, Doc, []).
+
+create_att_doc(Db0, DocId) ->
+    {ok, Db} = couch_db:reopen(Db0),
+    Doc = couch_doc:from_json_obj(
+        {[
+            {~"_id", DocId},
+            {
+                ~"_attachments",
+                {[
+                    {
+                        ~"a.txt",
+                        {[
+                            {~"content_type", ~"text/plain"},
+                            {~"data", base64:encode(~"xkcd")}
+                        ]}
+                    }
+                ]}
+            }
+        ]}
+    ),
+    {ok, _} = couch_db:update_doc(Db, Doc, []).
 
 create_doc(Db, DocId) ->
     add_revision(Db, DocId, undefined).
