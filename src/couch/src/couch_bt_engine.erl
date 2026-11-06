@@ -56,6 +56,7 @@
     open_docs/2,
     open_local_docs/2,
     read_doc_body/2,
+    read_doc_bodies/2,
     load_purge_infos/2,
 
     serialize_doc/2,
@@ -403,6 +404,15 @@ read_doc_body(#st{} = St, #doc{} = Doc) ->
         body = Body,
         atts = Atts
     }.
+
+read_doc_bodies(#st{} = St, Docs) when is_list(Docs) ->
+    Ptrs = [Ptr || #doc{body = Ptr} <- Docs],
+    {ok, Terms} = couch_file:pread_terms(St#st.fd, Ptrs),
+    lists:zipwith(
+        fun(#doc{} = Doc, {Body, Atts}) -> Doc#doc{body = Body, atts = Atts} end,
+        Docs,
+        Terms
+    ).
 
 load_purge_infos(St, UUIDs) ->
     Results = couch_btree:lookup(St#st.purge_tree, UUIDs),

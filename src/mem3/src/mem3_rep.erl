@@ -844,19 +844,15 @@ chunk_revs([{Id, R, A} | Revs], {Count, Chunk}, Chunks, Limit) ->
 
 open_docs(Db, Infos, Missing) ->
     InfoMap = #{Id => FDI || #full_doc_info{id = Id} = FDI <- Infos},
-    lists:flatmap(
+    Specs = lists:flatmap(
         fun({Id, Revs, _}) ->
-            #full_doc_info{rev_tree = RevTree} = map_get(Id, InfoMap),
-            {FoundRevs, _} = couch_key_tree:get_key_leafs(RevTree, Revs),
-            lists:map(
-                fun({#leaf{deleted = IsDel, ptr = SummaryPtr}, FoundRevPath}) ->
-                    couch_db:make_doc(Db, Id, IsDel, SummaryPtr, FoundRevPath)
-                end,
-                FoundRevs
-            )
+            #full_doc_info{rev_tree = Tree} = map_get(Id, InfoMap),
+            {Revs1, _} = couch_key_tree:get_key_leafs(Tree, Revs),
+            [{Id, Del, Ptr, Path} || {#leaf{deleted = Del, ptr = Ptr}, Path} <- Revs1]
         end,
         Missing
-    ).
+    ),
+    couch_db:make_docs(Db, Specs).
 
 save_on_target(Node, Name, Docs, Timeout) ->
     mem3_rpc:update_docs(
