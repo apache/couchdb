@@ -582,14 +582,18 @@ read_repair_filter(Db, Docs, NodeRevs) ->
     NodeSeqs = get_node_seqs(Db, Nodes),
 
     DbPSeq = couch_db:get_purge_seq(Db),
+    OldestPSeq = couch_db:get_oldest_purge_seq(Db),
     Lag = config:get_integer("couchdb", "read_repair_lag", 100),
 
     % Filter out read-repair updates from any node that is
     % so out of date that it would force us to scan a large
-    % number of purge infos
+    % number of purge infos. And drop nodes behind our oldest purge info.
+    % Compaction might already removed infos they haven't seen, so we can't tell if
+    % their revisions were purged, and fold_purge_infos/4 would
+    % fail with an invalid_start_purge_seq error.
     NodeFiltFun = fun({Node, _Revs}) ->
         {Node, NodeSeq} = lists:keyfind(Node, 1, NodeSeqs),
-        NodeSeq >= DbPSeq - Lag
+        NodeSeq >= DbPSeq - Lag andalso NodeSeq >= OldestPSeq - 1
     end,
     RecentNodeRevs = lists:filter(NodeFiltFun, NonLocalNodeRevs),
 
@@ -625,7 +629,9 @@ get_node_seqs(Db, Nodes) ->
     FoldFun = fun(#doc{id = Id, body = {Props}}, Acc) ->
         case Id of
             <<?LOCAL_DOC_PREFIX, "purge-mem3-", _/binary>> ->
-                TgtNode = couch_util:get_value(<<"target_node">>, Props),
+                % Should match mem3_rep:purge_cp_body/3. There "target"
+                % is the shard we replicate our purges TO.
+                TgtNode = couch_util:get_value(~"target", Props),
                 PurgeSeq = couch_util:get_value(<<"purge_seq">>, Props),
                 case lists:keyfind(TgtNode, 1, Acc) of
                     {_, OldSeq} ->

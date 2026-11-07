@@ -74,7 +74,8 @@ mem3_reshard_db_test_() ->
                     ?TDEF_FE(replicate_with_partitions, ?TIMEOUT),
                     ?TDEF_FE(replicate_to_and_from_local, ?TIMEOUT),
                     ?TDEF_FE(replicate_with_purges, ?TIMEOUT),
-                    ?TDEF_FE(clean_purge_checkpoints, ?TIMEOUT)
+                    ?TDEF_FE(clean_purge_checkpoints, ?TIMEOUT),
+                    ?TDEF_FE(pull_purges_checkpoints, ?TIMEOUT)
                 ]
             }
         }
@@ -287,6 +288,62 @@ clean_purge_checkpoints(#{allsrc := AllSrc, alltgt := AllTgt}) ->
     ?assertNot(is_map_key(Id3, LocalDocs)),
     ?assertNot(is_map_key(Id4, LocalDocs)).
 
+pull_purges_checkpoints(#{allsrc := AllSrc, alltgt := AllTgt}) ->
+    % Purge on the target, source has to pull purges both targets then
+    add_test_docs(AllTgt, #{docs => 10, purge => [0, 9]}),
+    [Src] = lists:sort(mem3:local_shards(AllSrc)),
+    [Tgt1, Tgt2] = lists:sort(mem3:local_shards(AllTgt)),
+    #shard{dbname = SrcDbName, range = SrcRange} = Src,
+    #shard{dbname = TgtDbName, range = R1} = Tgt1,
+    #shard{range = R2} = Tgt2,
+
+    % Fix up shard map as if source and target shards are copies of the same
+    % db. Then on each target the expected purge checkpoint is the same as the
+    % source
+    meck:expect(mem3, shards, fun(DbName) ->
+        case lists:member(DbName, [SrcDbName, TgtDbName]) of
+            true -> [Src, Tgt1, Tgt2];
+            false -> meck:passthrough([DbName])
+        end
+    end),
+    TgtNames = [Tgt1#shard.name, Tgt2#shard.name],
+    lists:foreach(
+        fun(TgtName) ->
+            % Targets should have some purges for source to pull
+            ?assert(purge_seq(TgtName) > 0),
+            ?assertNot(mem3_rep:have_all_purge_checkpoints(TgtName))
+        end,
+        TgtNames
+    ),
+
+    TMap = #{R1 => Tgt1, R2 => Tgt2},
+    Opts = [{batch_size, 1000}, {batch_count, all}],
+    ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
+    ?assertEqual(#{}, get_all_docs(AllSrc)),
+
+    % Source checkpoints pulls on the target. Those should look the same as if
+    % the target pushed to the source.
+    SrcUuid = uuid(Src#shard.name),
+    Node = atom_to_binary(Src#shard.node),
+    lists:foreach(
+        fun(TgtName) ->
+            TgtUuid = uuid(TgtName),
+            DocId = <<"_local/purge-mem3-", TgtUuid/binary, "-", SrcUuid/binary>>,
+            #{DocId := Body} = local_docs(TgtName),
+            ?assertMatch(
+                #{
+                    ~"source" := Node,
+                    ~"target" := Node,
+                    ~"range" := SrcRange,
+                    ~"purge_seq" := PSeq
+                } when PSeq > 0,
+                Body
+            ),
+            ?assert(mem3_rep:have_all_purge_checkpoints(TgtName))
+        end,
+        TgtNames
+    ).
+
 replicate_to_and_from_local(#{localdb := LocalDb, allsrc := ClusteredDb}) ->
     % We'll just tests that we can pull purges from the target
     add_test_docs(ClusteredDb, #{docs => 6, purge => [0, 2]}),
@@ -495,6 +552,12 @@ atts(Size) when is_integer(Size), Size >= 1 ->
             {data, Data}
         ])
     ].
+
+uuid(DbName) ->
+    couch_util:with_db(DbName, fun couch_db:get_uuid/1).
+
+purge_seq(DbName) ->
+    couch_util:with_db(DbName, fun couch_db:get_purge_seq/1).
 
 local_docs(DbName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),

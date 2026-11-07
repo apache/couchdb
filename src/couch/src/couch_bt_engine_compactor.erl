@@ -176,9 +176,12 @@ copy_purge_info(#comp_st{} = CompSt) ->
         % that case we'd end up with a "hole" between 500 and 1001 -- a new
         % minimum purge sequence of 500, but the oldest checkpoint is would be
         % 1001.
+        %
+        % Keep infos with PSeq > MinPurgeSeq. To get all of them, including the
+        % oldest need to use Oldest-1.
         case mem3_rep:have_all_purge_checkpoints(Db) of
             true -> couch_db:get_minimum_purge_seq(Db);
-            false -> couch_db:get_oldest_purge_seq(Db)
+            false -> max(0, couch_db:get_oldest_purge_seq(Db) - 1)
         end
     end),
     OldPSTree = OldSt#st.purge_seq_tree,
