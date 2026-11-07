@@ -91,6 +91,11 @@ into the project. You can talk with the community on our
 [developer mailing list][5].  We're always open to suggestions and will get
 back to you as soon as we can!
 
+**Trivial PRs** with small changes like fixing a typo in comments will not be
+accepted and closed as spam. These changes can be fixed while making more
+substantial contributions. The CouchDB development team will use its own
+discretion when deciding whether a PR is trivial.
+
 ### CouchDB commit message conventions
 
 A well-crafted Git commit message is the best way to communicate context about a
