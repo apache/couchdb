@@ -22,13 +22,20 @@
 
 -define(DEFAULT_BUFFER_SIZE, 16777216).
 
+% Source doc batching parameters
+-define(BODY_BATCH_COUNT, 1000).
+-define(BODY_BATCH_BYTES, 16777216).
+
 -record(state, {
     source_db,
     source_uuid,
     targets,
     pickfun,
     max_buffer_size = ?DEFAULT_BUFFER_SIZE,
-    hashfun
+    hashfun,
+    pending = [],
+    pending_count = 0,
+    pending_bytes = 0
 }).
 
 -record(target, {
@@ -42,6 +49,7 @@
     id,
     source_db,
     target_db,
+    bodies = #{},
     active = 0,
     external = 0,
     atts = []
@@ -378,26 +386,78 @@ commit_purge_infos(#target{buffer = PIs0, db = Db} = Target) ->
     Target#target{buffer = [], buffer_size = 0, db = Db2}.
 
 copy_docs(#state{source_db = Db} = State) ->
-    {ok, NewState} = couch_db:fold_changes(Db, 0, fun changes_cb/2, State),
+    {ok, State1} = couch_db:fold_changes(Db, 0, fun changes_cb/2, State),
+    State2 = copy_pending(State1),
     CommitTargets = maps:map(
         fun(_, #target{} = T) ->
             commit_docs(T)
         end,
-        NewState#state.targets
+        State2#state.targets
     ),
-    NewState#state{targets = CommitTargets}.
+    State2#state{targets = CommitTargets}.
 
 % Backwards compatibility clause. Seq trees used to hold #doc_infos at one time
 changes_cb(#doc_info{id = Id}, #state{source_db = Db} = State) ->
     [FDI = #full_doc_info{}] = couch_db_engine:open_docs(Db, [Id]),
     changes_cb(FDI, State);
-changes_cb(#full_doc_info{id = Id} = FDI, #state{} = State) ->
+changes_cb(#full_doc_info{} = FDI, #state{} = State) ->
+    #state{pending = Pending, pending_count = Count, pending_bytes = Bytes} = State,
+    Bytes1 = Bytes + active_size(FDI),
+    Count1 = Count + 1,
+    State1 = State#state{
+        pending = [FDI | Pending],
+        pending_count = Count1,
+        pending_bytes = Bytes1
+    },
+    case Count1 >= ?BODY_BATCH_COUNT orelse Bytes1 >= ?BODY_BATCH_BYTES of
+        true -> {ok, copy_pending(State1)};
+        false -> {ok, State1}
+    end.
+
+% Use batched make_docs read to get all the pending docs bodies
+copy_pending(#state{pending = []} = State) ->
+    State;
+copy_pending(#state{pending = Pending, source_db = SourceDb} = State) ->
+    FDIs = lists:reverse(Pending),
+    Bodies = get_bodies(SourceDb, FDIs),
+    State1 = State#state{pending = [], pending_count = 0, pending_bytes = 0},
+    lists:foldl(
+        fun(FDI, StateAcc) ->
+            copy_fdi(FDI, Bodies, StateAcc)
+        end,
+        State1,
+        FDIs
+    ).
+
+copy_fdi(#full_doc_info{id = Id} = FDI, #{} = Bodies, #state{} = State) ->
     #state{source_db = SourceDb, targets = Targets} = State,
     {Key, Target} = pick_target(Id, State, Targets, changes),
-    FDI1 = process_fdi(FDI, SourceDb, Target#target.db),
+    FDI1 = process_fdi(FDI, Bodies, SourceDb, Target#target.db),
     MaxBuffer = State#state.max_buffer_size,
     Target1 = acc_and_flush(FDI1, Target, MaxBuffer, fun commit_docs/1),
-    {ok, State#state{targets = Targets#{Key => Target1}}}.
+    State#state{targets = Targets#{Key => Target1}}.
+
+% Get a map of Ptr => #doc{} from a list if FDIs
+get_bodies(SourceDb, FDIs) ->
+    Docs = lists:flatmap(
+        fun(#full_doc_info{rev_tree = Tree}) ->
+            [#doc{body = Ptr} || {#leaf{ptr = Ptr}, _} <- couch_key_tree:get_all_leafs(Tree)]
+        end,
+        FDIs
+    ),
+    Docs1 = couch_db_engine:read_doc_bodies(SourceDb, Docs),
+    maps:from_list(
+        lists:zipwith(
+            fun(#doc{body = Ptr}, #doc{} = Doc) -> {Ptr, Doc} end,
+            Docs,
+            Docs1
+        )
+    ).
+
+active_size(#full_doc_info{sizes = #size_info{active = Active}}) when is_integer(Active) ->
+    Active;
+active_size(#full_doc_info{}) ->
+    0.
 
 commit_docs(#target{buffer = [], db = Db} = Target) ->
     Target#target{db = Db};
@@ -407,9 +467,9 @@ commit_docs(#target{buffer = FDIs, db = Db} = Target) ->
     {ok, Db2} = couch_db_engine:commit_data(Db1),
     Target#target{buffer = [], buffer_size = 0, db = Db2}.
 
-process_fdi(FDI, SourceDb, TargetDb) ->
+process_fdi(FDI, #{} = Bodies, SourceDb, TargetDb) ->
     #full_doc_info{id = Id, rev_tree = RTree} = FDI,
-    Acc = #racc{id = Id, source_db = SourceDb, target_db = TargetDb},
+    Acc = #racc{id = Id, source_db = SourceDb, target_db = TargetDb, bodies = Bodies},
     {NewRTree, NewAcc} = couch_key_tree:mapfold(fun revtree_cb/4, Acc, RTree),
     {Active, External} = total_sizes(NewAcc),
     FDI#full_doc_info{
@@ -420,16 +480,16 @@ process_fdi(FDI, SourceDb, TargetDb) ->
 revtree_cb(_Rev, _Leaf, branch, Acc) ->
     {[], Acc};
 revtree_cb({Pos, RevId}, Leaf, leaf, Acc) ->
-    #racc{id = Id, source_db = SourceDb, target_db = TargetDb} = Acc,
+    #racc{id = Id, source_db = SourceDb, target_db = TargetDb, bodies = Bodies} = Acc,
     #leaf{deleted = Deleted, ptr = Ptr, sizes = LeafSizes} = Leaf,
-    Doc0 = #doc{
+    #doc{body = Body, atts = AttInfos0} = maps:get(Ptr, Bodies),
+    Doc1 = #doc{
         id = Id,
         revs = {Pos, [RevId]},
         deleted = Deleted,
-        body = Ptr
+        body = Body,
+        atts = AttInfos0
     },
-    Doc1 = couch_db_engine:read_doc_body(SourceDb, Doc0),
-    #doc{body = Body, atts = AttInfos0} = Doc1,
     External =
         case LeafSizes#size_info.external of
             0 when is_binary(Body) ->
