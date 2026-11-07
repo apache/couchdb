@@ -41,7 +41,8 @@ basic_compaction_test_() ->
             fun teardown/1,
             [
                 fun compaction_resume/1,
-                fun is_compacting_works/1
+                fun is_compacting_works/1,
+                fun preserve_purges_without_all_checkpoints/1
             ]
         }
     }.
@@ -79,6 +80,36 @@ is_compacting_works(DbName) ->
             {'DOWN', Ref, _, _, _} -> ok
         end,
         meck:unload(couch_emsort)
+    end).
+
+preserve_purges_without_all_checkpoints(DbName) ->
+    ?_test(begin
+        purge_docs(DbName),
+        ?assertEqual({1, 3, 3}, purge_info_stats(DbName)),
+        meck:new(mem3_rep, [passthrough]),
+        meck:expect(mem3_rep, have_all_purge_checkpoints, 1, false),
+        compact_db(DbName),
+        ?assert(meck:called(mem3_rep, have_all_purge_checkpoints, 1)),
+        ?assertEqual({1, 3, 3}, purge_info_stats(DbName)),
+        meck:unload(mem3_rep)
+    end).
+
+purge_docs(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        PurgeFun = fun(DocId) ->
+            {ok, #doc{revs = {Pos, [Rev | _]}}} = couch_db:open_doc(Db, DocId, []),
+            {couch_uuids:random(), DocId, [{Pos, Rev}]}
+        end,
+        PInfos = lists:map(PurgeFun, [~"doc1", ~"doc2", ~"doc3"]),
+        {ok, _} = couch_db:purge_docs(Db, PInfos)
+    end).
+
+% Return {OldestPurgeSeq, PurgeSeq, PurgeInfosCount}
+purge_info_stats(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        FoldFun = fun(_, Acc) -> {ok, Acc + 1} end,
+        {ok, Count} = couch_db:fold_purge_infos(Db, FoldFun, 0),
+        {couch_db:get_oldest_purge_seq(Db), couch_db:get_purge_seq(Db), Count}
     end).
 
 check_db_validity(DbName) ->

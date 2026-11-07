@@ -60,6 +60,19 @@ main_test_() ->
                     ?TDEF_FE(t_no_filter_different_node),
                     ?TDEF_FE(t_no_filter_after_repl)
                 ]
+            },
+            {
+                foreach,
+                fun setup_trimmed_purge/0,
+                fun teardown_trimmed_purge/1,
+                [
+                    ?TDEF_FE(t_filter),
+                    ?TDEF_FE(t_filter_unknown_node),
+                    ?TDEF_FE(t_filter_local_node),
+                    ?TDEF_FE(t_no_filter_old_node),
+                    ?TDEF_FE(t_no_filter_different_node),
+                    ?TDEF_FE(t_no_filter_after_repl)
+                ]
             }
         ]
     }.
@@ -102,6 +115,21 @@ setup_multi_purge() ->
     {DbName, DocId, OldDoc, 3}.
 
 teardown_multi_purge(Ctx) ->
+    teardown_single_purge(Ctx).
+
+% Like the multi case above, but with the compactor trimmed oldest purge infos
+% 1 to 3. After that the oldest purge seq is 4. Nodes with checkpoints before 3
+% are too far behind and their read repair updates should be filtered out.
+setup_trimmed_purge() ->
+    {DbName, _, _, _} = Ctx = setup_multi_purge(),
+    couch_util:with_db(DbName, fun(Db) ->
+        ok = couch_db:set_purge_infos_limit(Db, 2)
+    end),
+    compact(DbName),
+    ?assertEqual({4, 5}, purge_seqs(DbName)),
+    Ctx.
+
+teardown_trimmed_purge(Ctx) ->
     teardown_single_purge(Ctx).
 
 t_no_purge_no_filter(DbName) ->
@@ -239,17 +267,36 @@ create_purge_checkpoint(DbName, PurgeSeq, TgtNode) when is_binary(TgtNode) ->
     Resp = couch_util:with_db(DbName, fun(Db) ->
         SrcUUID = couch_db:get_uuid(Db),
         TgtUUID = couch_uuids:random(),
+        % See mem3_rep:purge_cp_body/3
         CPDoc = #doc{
             id = mem3_rep:make_purge_id(SrcUUID, TgtUUID),
             body =
                 {[
-                    {<<"target_node">>, TgtNode},
-                    {<<"purge_seq">>, PurgeSeq}
+                    {~"type", ~"internal_replication"},
+                    {~"updated_on", os:system_time(second)},
+                    {~"purge_seq", PurgeSeq},
+                    {~"source", atom_to_binary(node())},
+                    {~"target", TgtNode},
+                    {~"range", [0, 16#ffffffff]}
                 ]}
         },
         couch_db:update_docs(Db, [CPDoc], [])
     end),
     ?assertMatch({ok, [_]}, Resp).
+
+compact(DbName) ->
+    {ok, _} = couch_util:with_db(DbName, fun couch_db:start_compact/1),
+    test_util:wait(fun() ->
+        case couch_util:with_db(DbName, fun couch_db:get_compactor_pid/1) of
+            Pid when is_pid(Pid) -> wait;
+            _ -> ok
+        end
+    end).
+
+purge_seqs(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        {couch_db:get_oldest_purge_seq(Db), couch_db:get_purge_seq(Db)}
+    end).
 
 rpc_update_doc(DbName, Doc) ->
     {Pos, [Rev | _]} = Doc#doc.revs,

@@ -226,12 +226,21 @@ have_all_purge_checkpoints(Db) ->
 have_all_purge_checkpoints(true, Db, [_ | _] = Shards) ->
     ShardName = couch_db:name(Db),
     UUID = couch_db:get_uuid(Db),
+    IsShardsDb = ShardName == mem3_sync:shards_db(),
     FoldFun = fun(#doc{id = Id, body = {Props}}, Acc) ->
         case Id of
             <<?PURGE_PREFIX, UUID:?UUID_SIZE/binary, "-", _:?UUID_SIZE/binary>> ->
                 case verify_checkpoint_shard(Shards, Props) of
                     true ->
-                        Range = couch_util:get_value(<<"range">>, Props),
+                        Range =
+                            case IsShardsDb of
+                                % Shards db doesn't have a bona-fide range but
+                                % we pretend it's a real db but giving it the
+                                % full range to prevent it from being
+                                % undefined.
+                                true -> [0, ?RING_END];
+                                false -> couch_util:get_value(<<"range">>, Props)
+                            end,
                         TBin = couch_util:get_value(<<"target">>, Props),
                         TNode = binary_to_existing_atom(TBin, latin1),
                         {ok, sets:add_element({TNode, Range}, Acc)};
@@ -244,7 +253,7 @@ have_all_purge_checkpoints(true, Db, [_ | _] = Shards) ->
     end,
     CheckpointSet = fold_purge_checkpoints(Db, FoldFun, couch_util:new_set()),
     CopySet =
-        case ShardName == mem3_sync:shards_db() of
+        case IsShardsDb of
             true ->
                 % We're dealing with the shards db itself. By convention
                 % mem3:shards/1 returns a single #shard{} record with node =
@@ -543,7 +552,10 @@ pull_purges(Db, Count, #shard{} = SrcShard, #tgt{} = Tgt0, HashFun) ->
             end,
             Infos1 = lists:filter(BelongsFun, Infos),
             {ok, _} = couch_db:purge_docs(Db, Infos1, [?REPLICATED_CHANGES]),
-            Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
+            % A checkpoint from the target, but it's the same one the target
+            % uses when it pushes to us. So we write it from the target's point
+            % of view: it's the source and we are the target.
+            Body = purge_cp_body(TgtShard, SrcShard, ThroughSeq),
             mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, RemoteId, Body)
     end,
     Tgt#tgt{remaining = max(0, Remaining)}.
@@ -1443,9 +1455,12 @@ t_have_all_shards_db(_) ->
     ],
     meck:expect(mem3, shards, 1, Shards),
 
-    Src1 = #shard{name = Dbs, node = node(), range = Range},
-    Tgt1 = #shard{name = Dbs, node = 'n2', range = Range},
-    Tgt2 = #shard{name = Dbs, node = 'n3', range = Range},
+    % Same as in go/3, mem3_sync replicates by name, so its source and target
+    % shards don't have a range
+    Src1 = add_range(#shard{name = Dbs, node = node()}),
+    Tgt1 = add_range(#shard{name = Dbs, node = 'n2'}),
+    Tgt2 = add_range(#shard{name = Dbs, node = 'n3'}),
+    ?assertEqual(undefined, Src1#shard.range),
 
     % We're the only node: don't expect any other checkpoints
     meck:expect(mem3_sync, find_next_node, 0, node()),
