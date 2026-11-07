@@ -36,7 +36,8 @@ split_test_() ->
         {"Should split an empty shard", 0, 2},
         {"Should split shard in half", 100, 2},
         {"Should split shard in three", 99, 3},
-        {"Should split shard in four", 100, 4}
+        {"Should split shard in four", 100, 4},
+        {"Should split shard with many docs", 2500, 2}
     ],
     {
         setup,
@@ -58,7 +59,8 @@ split_test_() ->
                     fun should_fail_on_existing_target/1,
                     fun should_fail_on_invalid_target_name/1,
                     fun should_crash_on_invalid_tmap/1,
-                    fun should_fail_on_opened_target/1
+                    fun should_fail_on_opened_target/1,
+                    fun should_keep_all_the_docs/1
                 ]
             }
         ]
@@ -99,6 +101,33 @@ should_split_shard({Desc, TotalDocs, Q}, DbName) ->
                     ok = file:delete(FilePath)
                 end,
                 TMap
+            )
+        end)}.
+
+should_keep_all_the_docs(DbName) ->
+    bunch_of_docs(DbName, 1200),
+    Before = all_the_docs(DbName),
+    Ranges = make_ranges(2),
+    TMap = make_targets(Ranges),
+    PickFun = fun(DocId, Rs, _HashFun) -> lists:nth(1 + erlang:phash2(DocId, 2), Rs) end,
+    {timeout, ?TIMEOUT,
+        ?_test(begin
+            ?assertEqual(1204, length(Before)),
+            ?assertEqual(2, length(proplists:get_value(~"conflict", Before))),
+            {ok, _} = couch_db_split:split(DbName, TMap, PickFun),
+            [SnapA, SnapB] = [all_the_docs(Name) || Name <- maps:values(TMap)],
+            ?assert(length(SnapA) > 0),
+            ?assert(length(SnapB) > 0),
+            ?assertEqual([], [Id || {Id, _} <- SnapA, lists:keymember(Id, 1, SnapB)]),
+            ?assertEqual(Before, lists:sort(SnapA ++ SnapB)),
+            lists:foreach(
+                fun(Name) ->
+                    {ok, Db} = couch_db:open_int(Name, []),
+                    FilePath = couch_db:get_filepath(Db),
+                    ok = couch_db:close(Db),
+                    ok = file:delete(FilePath)
+                end,
+                maps:values(TMap)
             )
         end)}.
 
@@ -349,8 +378,67 @@ create_local_doc(I) ->
     create_prefix_id_doc(I, "_local/").
 
 create_prefix_id_doc(I, Prefix) ->
-    Id = iolist_to_binary(io_lib:format(Prefix ++ "~3..0B", [I])),
+    Id = iolist_to_binary(io_lib:format(Prefix ++ "~4..0B", [I])),
     couch_doc:from_json_obj({[{<<"_id">>, Id}, {<<"value">>, I}]}).
+
+% Some plain, some large, conflicted and attachments in the mix
+bunch_of_docs(DbName, N) ->
+    Plain = [
+        couch_doc:from_json_obj(
+            {[
+                {~"_id", list_to_binary(io_lib:format("doc~6..0B", [I]))},
+                {~"v", I},
+                {~"s", binary:copy(~"x", I rem 500)}
+            ]}
+        )
+     || I <- lists:seq(1, N)
+    ],
+    Att = couch_doc:from_json_obj(
+        {[
+            {~"_id", ~"att"},
+            {
+                ~"_attachments",
+                {[
+                    {
+                        ~"a.txt",
+                        {[
+                            {~"content_type", ~"text/plain"},
+                            {~"data", base64:encode(~"xkcd")}
+                        ]}
+                    }
+                ]}
+            }
+        ]}
+    ),
+    Big = couch_doc:from_json_obj({[{~"_id", ~"big"}, {~"blob", binary:copy(~"y", 200000)}]}),
+    Del = couch_doc:from_json_obj({[{~"_id", ~"del"}, {~"v", 1}]}),
+    Conflicts = [
+        #doc{id = ~"conflict", revs = {1, [~"aaa"]}, body = {[{~"v", ~"a"}]}},
+        #doc{id = ~"conflict", revs = {1, [~"bbb"]}, body = {[{~"v", ~"b"}]}}
+    ],
+    couch_util:with_db(DbName, fun(Db) ->
+        {ok, _} = couch_db:update_docs(Db, Plain ++ [Att, Big]),
+        {ok, Db1} = couch_db:reopen(Db),
+        {ok, [{ok, {Pos, RevId}}]} = couch_db:update_docs(Db1, [Del]),
+        {ok, Db2} = couch_db:reopen(Db1),
+        Deleted = Del#doc{revs = {Pos, [RevId]}, deleted = true},
+        {ok, [{ok, _}]} = couch_db:update_docs(Db2, [Deleted]),
+        {ok, Db3} = couch_db:reopen(Db2),
+        {ok, []} = couch_db:update_docs(Db3, Conflicts, [], ?REPLICATED_CHANGES)
+    end).
+
+% This is like a snapshot of the db to compare before and after.
+all_the_docs(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        FoldFun = fun(#full_doc_info{id = Id}, Acc) -> {ok, [Id | Acc]} end,
+        {ok, Ids} = couch_db:fold_docs(Db, FoldFun, [], [include_deleted]),
+        lists:sort([{Id, all_the_revs(Db, Id)} || Id <- Ids])
+    end).
+
+all_the_revs(Db, Id) ->
+    {ok, Results} = couch_db:open_doc_revs(Db, Id, all, []),
+    Opts = [attachments, revs, conflicts, deleted_conflicts],
+    [couch_doc:to_json_obj(Doc, Opts) || {ok, #doc{} = Doc} <- Results].
 
 docid_to_integer(<<"_local/", DocId/binary>>) ->
     docid_to_integer(DocId);
