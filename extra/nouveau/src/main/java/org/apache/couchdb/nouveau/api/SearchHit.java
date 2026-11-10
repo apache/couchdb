@@ -22,4 +22,6 @@ import org.apache.couchdb.nouveau.core.ser.PrimitiveWrapper;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record SearchHit(
-        @NotEmpty String id, @NotNull PrimitiveWrapper<?>[] order, @NotNull Collection<@NotNull StoredField> fields) {}
+        @NotEmpty String id,
+        @NotNull PrimitiveWrapper<?>[] order,
+        @NotNull Collection<@NotNull StoredField> fields) {}

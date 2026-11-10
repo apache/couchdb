@@ -27,7 +27,9 @@ import java.util.OptionalLong;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public record IndexDefinition(
-        @Min(LEGACY_LUCENE_VERSION) @Max(LATEST_LUCENE_VERSION) OptionalInt luceneVersion,
+        @Min(LEGACY_LUCENE_VERSION) @Max(LATEST_LUCENE_VERSION)
+        OptionalInt luceneVersion,
+
         @NotEmpty String defaultAnalyzer,
         Optional<Map<@NotEmpty String, @NotEmpty String>> fieldAnalyzers,
         @NotNull OptionalLong initialPurgeSeq) {
