@@ -15,4 +15,5 @@ package org.apache.couchdb.nouveau.api;
 
 import jakarta.validation.constraints.NotEmpty;
 
-public record AnalyzeRequest(@NotEmpty String analyzer, @NotEmpty String text) {}
+public record AnalyzeRequest(
+        @NotEmpty String analyzer, @NotEmpty String text) {}

@@ -19,5 +19,5 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public record DocumentDeleteRequest(@PositiveOrZero long matchSeq, @Positive long seq, boolean purge)
-        implements DocumentRequest {}
+public record DocumentDeleteRequest(
+        @PositiveOrZero long matchSeq, @Positive long seq, boolean purge) implements DocumentRequest {}
