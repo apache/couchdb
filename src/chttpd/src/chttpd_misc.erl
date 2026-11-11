@@ -95,19 +95,22 @@ handle_utils_dir_req(Req) ->
 
 handle_utils_dir_req(#httpd{method = 'GET'} = Req, DocumentRoot) ->
     "/" ++ UrlPath = chttpd:path(Req),
+    CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
     case chttpd:partition(UrlPath) of
         {_ActionKey, "/", RelativePath} ->
             % GET /_utils/path or GET /_utils/
-            CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
             DefaultValues =
                 "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
                 "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-src https://blog.couchdb.org;",
             Headers = chttpd_util:maybe_add_csp_header("utils", CachingHeaders, DefaultValues),
             chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
         {_ActionKey, "", _RelativePath} ->
-            % GET /_utils
+            % redirect /_utils -> /_utils/. Target depends on request host,
+            % specific to this client, so use "private" to keep it outof the
+            % shared caches
             RedirectPath = chttpd:path(Req) ++ "/",
-            chttpd:send_redirect(Req, RedirectPath)
+            Location = {"Location", chttpd:absolute_uri(Req, RedirectPath)},
+            chttpd:send_response(Req, 301, [Location | CachingHeaders], <<>>)
     end;
 handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").

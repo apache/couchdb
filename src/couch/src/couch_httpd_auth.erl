@@ -43,6 +43,10 @@
 
 -define(MAX_SESSION_BODY_SIZE, 1048576).
 
+% Don't let caches store session responses on redirects, regardless of their
+% own silly policies
+-define(NO_STORE, {"Cache-Control", "no-store"}).
+
 party_mode_handler(Req) ->
     case
         chttpd_util:get_chttpd_config_boolean(
@@ -517,9 +521,11 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
             {Code, Headers} =
                 case couch_httpd:qs_value(Req, "next", nil) of
                     nil ->
-                        {200, [Cookie]};
+                        {200, [Cookie, ?NO_STORE]};
                     Redirect ->
-                        {302, [Cookie, {"Location", couch_httpd:absolute_uri(Req, Redirect)}]}
+                        {302, [
+                            Cookie, ?NO_STORE, {"Location", couch_httpd:absolute_uri(Req, Redirect)}
+                        ]}
                 end,
             send_json(
                 Req#httpd{req_body = ReqBody},
@@ -538,9 +544,11 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
             {Code, Headers} =
                 case couch_httpd:qs_value(Req, "fail", nil) of
                     nil ->
-                        {401, [Cookie]};
+                        {401, [Cookie, ?NO_STORE]};
                     Redirect ->
-                        {302, [Cookie, {"Location", couch_httpd:absolute_uri(Req, Redirect)}]}
+                        {302, [
+                            Cookie, ?NO_STORE, {"Location", couch_httpd:absolute_uri(Req, Redirect)}
+                        ]}
                 end,
             send_json(
                 Req,
@@ -560,6 +568,8 @@ handle_session_req(#httpd{method = 'GET', user_ctx = UserCtx} = Req, _AuthModule
         {Name, _} ->
             send_json(
                 Req,
+                200,
+                [?NO_STORE],
                 {[
                     % remove this ok
                     {ok, true},
@@ -595,9 +605,9 @@ handle_session_req(#httpd{method = 'DELETE'} = Req, _AuthModule) ->
     {Code, Headers} =
         case couch_httpd:qs_value(Req, "next", nil) of
             nil ->
-                {200, [Cookie]};
+                {200, [Cookie, ?NO_STORE]};
             Redirect ->
-                {302, [Cookie, {"Location", couch_httpd:absolute_uri(Req, Redirect)}]}
+                {302, [Cookie, ?NO_STORE, {"Location", couch_httpd:absolute_uri(Req, Redirect)}]}
         end,
     send_json(Req, Code, Headers, {[{ok, true}]});
 handle_session_req(Req, _AuthModule) ->

@@ -33,7 +33,6 @@
     send_response_no_cors/4,
     send_method_not_allowed/2,
     send_error/2, send_error/4,
-    send_redirect/2,
     send_chunked_error/2
 ]).
 -export([send_json/2, send_json/3, send_json/4, last_chunk/1, parse_multipart_request/3]).
@@ -1153,6 +1152,8 @@ error_headers(#httpd{mochi_req = MochiReq} = Req, Code, ErrorStr, ReasonStr) ->
                                                                         ]
                                                                     ),
                                                                     {302, [
+                                                                        {"Cache-Control",
+                                                                            "no-store"},
                                                                         {"Location",
                                                                             absolute_uri(
                                                                                 Req,
@@ -1211,9 +1212,6 @@ send_chunked_error(Resp, Error) ->
         ]},
     send_chunk(Resp, ?l2b([$\n, ?JSON_ENCODE(JsonError), $\n])),
     last_chunk(Resp).
-
-send_redirect(Req, Path) ->
-    send_response(Req, 301, [{"Location", absolute_uri(Req, Path)}], <<>>).
 
 negotiate_content_type(_Req) ->
     case get(jsonp) of
