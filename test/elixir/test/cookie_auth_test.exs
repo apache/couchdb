@@ -280,6 +280,7 @@ defmodule CookieAuthTest do
     assert resp.status_code == 302
     assert resp.body["ok"]
     assert String.ends_with?(resp.headers["location"], "/_up")
+    assert resp.headers["cache-control"] == "no-store"
 
     # test redirect on fail
     resp =
@@ -295,6 +296,7 @@ defmodule CookieAuthTest do
     assert resp.status_code == 302
     assert resp.body["error"] == "unauthorized"
     assert String.ends_with?(resp.headers["location"], "/_up")
+    assert resp.headers["cache-control"] == "no-store"
 
     # test redirect with invalid path
     resp =

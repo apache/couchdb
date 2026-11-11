@@ -43,7 +43,8 @@ session_test_() ->
                 [
                     ?TDEF_FE(session_authentication_db_absent),
                     ?TDEF_FE(session_authentication_db_present),
-                    ?TDEF_FE(session_authentication_gzip_request)
+                    ?TDEF_FE(session_authentication_gzip_request),
+                    ?TDEF_FE(session_cache_control)
                 ]
             }
         }
@@ -69,6 +70,38 @@ session_authentication_gzip_request(Url) ->
     ),
     {BodyJson} = jiffy:decode(Body),
     ?assert(lists:member({<<"name">>, list_to_binary(?USER)}, BodyJson)).
+
+session_cache_control(Url) ->
+    CT = {"Content-Type", "application/json"},
+    Auth = {basic_auth, {?USER, ?PASS}},
+    BUser = list_to_binary(?USER),
+    BPass = list_to_binary(?PASS),
+    Good = jiffy:encode({[{name, BUser}, {password, BPass}]}),
+    Bad = jiffy:encode({[{name, BUser}, {password, ~"badpass"}]}),
+    Cases = [
+        {"GET anon", 200, test_request:get(Url)},
+        {"GET auth", 200, test_request:get(Url, [Auth])},
+        {"POST succ 200", 200, test_request:post(Url, [CT], Good)},
+        {"POST succ 302", 302, test_request:post(Url ++ "?next=/_up", [CT], Good)},
+        {"POST fail 401", 401, test_request:post(Url, [CT], Bad)},
+        {"POST fail 302", 302, test_request:post(Url ++ "?fail=/_up", [CT], Bad)},
+        {"DELETE 200", 200, test_request:delete(Url)},
+        {"DELETE 302", 302, test_request:delete(Url ++ "?next=/_up")}
+    ],
+    lists:foreach(
+        fun({Desc, Expected, {ok, Code, Headers, _}}) ->
+            ?assertEqual({Desc, Expected}, {Desc, Code}),
+            ?assertEqual({Desc, "no-store"}, {Desc, cache_control(Headers)})
+        end,
+        Cases
+    ).
+
+% Headers can be a single or a list if duplicated
+cache_control(Headers) ->
+    case [V || {K, V} <- Headers, K =:= ~"cache-control"] of
+        [Value] -> binary_to_list(Value);
+        Values -> [binary_to_list(V) || V <- Values]
+    end.
 
 session_authentication_db(Url) ->
     {ok, 200, _, Body} = test_request:get(Url, [{basic_auth, {?USER, ?PASS}}]),
