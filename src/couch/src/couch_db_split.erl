@@ -24,7 +24,15 @@
 
 % Source doc batching parameters
 -define(BODY_BATCH_COUNT, 1000).
--define(BODY_BATCH_BYTES, 16777216).
+-define(BODY_BATCH_BYTES, 1048576).
+
+% Min binary virtual heap size of the splitting process. The default of ~370KB
+% is garbage collected a few times for each batch of bodies. Anything still in
+% use at that point will move to the old generation and only a full sweep will
+% free it after that. So we're increasing the minimum here to keep them in the
+% young heap. Benchmarking on OTP 27 showed a good speedup vs the default (63s
+% -> 44sec).
+-define(MIN_BIN_VHEAP_BYTES, 8388608).
 
 -record(state, {
     source_db,
@@ -65,6 +73,7 @@ split(Source, #{} = Targets, PickFun) when
             Engine = get_engine(SourceDb),
             Partitioned = couch_db:is_partitioned(SourceDb),
             HashFun = mem3_hash:get_hash_fun(couch_db:name(SourceDb)),
+            set_min_bin_vheap_size(),
             try
                 split(SourceDb, Partitioned, Engine, Targets, PickFun, HashFun)
             catch
@@ -571,6 +580,12 @@ add_sizes(Active, External, Atts, #racc{} = Acc) ->
 total_sizes(#racc{active = Active, external = External, atts = Atts}) ->
     TotalAtts = lists:foldl(fun({_, S}, A) -> S + A end, 0, Atts),
     {Active + TotalAtts, External + TotalAtts}.
+
+% We have to set it as a process flag as spawn_opt has a bug currently
+% (see https://github.com/erlang/otp/issues/11840)
+set_min_bin_vheap_size() ->
+    Words = ?MIN_BIN_VHEAP_BYTES div erlang:system_info(wordsize),
+    process_flag(min_bin_vheap_size, Words).
 
 get_max_buffer_size() ->
     config:get_integer("reshard", "split_buffer_size", ?DEFAULT_BUFFER_SIZE).
