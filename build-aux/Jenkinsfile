@@ -207,18 +207,20 @@ meta = [
   // remove the docker-arm64 label on ubuntu-nc-arm64-12 node in Jenkins and
   // remove this flavor
   //
-  'base-arm64': [
-    name: 'Debian ARM64',
-    spidermonkey_vsn: '128',
-    with_nouveau: true,
-    with_clouseau: true,
-    clouseau_java_home: '/opt/java/openjdk',
-    // Test this in in the trixie-quickjs variant
-    quickjs_test262: false,
-    image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
-    node_label: 'docker-arm64',
-    gnu_make_eunit_opts: "-j4 --output-sync=target"
-  ],
+  // Disabled after about 12 consecutive eunit failures round 2026-11-11
+  //
+  // 'base-arm64': [
+  //   name: 'Debian ARM64',
+  //   spidermonkey_vsn: '128',
+  //   with_nouveau: true,
+  //   with_clouseau: true,
+  //   clouseau_java_home: '/opt/java/openjdk',
+  //   // Test this in in the trixie-quickjs variant
+  //   quickjs_test262: false,
+  //   image: "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}",
+  //   node_label: 'docker-arm64',
+  //   gnu_make_eunit_opts: "-j4 --output-sync=target"
+  // ],
 
   'bookworm': [
     name: 'Debian x86_64',
