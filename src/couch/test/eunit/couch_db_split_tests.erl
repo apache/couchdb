@@ -112,7 +112,7 @@ should_keep_all_the_docs(DbName) ->
     PickFun = fun(DocId, Rs, _HashFun) -> lists:nth(1 + erlang:phash2(DocId, 2), Rs) end,
     {timeout, ?TIMEOUT,
         ?_test(begin
-            ?assertEqual(1204, length(Before)),
+            ?assertEqual(1209, length(Before)),
             ?assertEqual(2, length(proplists:get_value(~"conflict", Before))),
             {ok, _} = couch_db_split:split(DbName, TMap, PickFun),
             [SnapA, SnapB] = [all_the_docs(Name) || Name <- maps:values(TMap)],
@@ -411,13 +411,23 @@ bunch_of_docs(DbName, N) ->
         ]}
     ),
     Big = couch_doc:from_json_obj({[{~"_id", ~"big"}, {~"blob", binary:copy(~"y", 200000)}]}),
+    % Incompressible, to get over the source batch byte limit
+    Rand = [
+        couch_doc:from_json_obj(
+            {[
+                {~"_id", <<"rand", (integer_to_binary(I))/binary>>},
+                {~"blob", base64:encode(crypto:strong_rand_bytes(300000))}
+            ]}
+        )
+     || I <- lists:seq(1, 5)
+    ],
     Del = couch_doc:from_json_obj({[{~"_id", ~"del"}, {~"v", 1}]}),
     Conflicts = [
         #doc{id = ~"conflict", revs = {1, [~"aaa"]}, body = {[{~"v", ~"a"}]}},
         #doc{id = ~"conflict", revs = {1, [~"bbb"]}, body = {[{~"v", ~"b"}]}}
     ],
     couch_util:with_db(DbName, fun(Db) ->
-        {ok, _} = couch_db:update_docs(Db, Plain ++ [Att, Big]),
+        {ok, _} = couch_db:update_docs(Db, Plain ++ [Att, Big] ++ Rand),
         {ok, Db1} = couch_db:reopen(Db),
         {ok, [{ok, {Pos, RevId}}]} = couch_db:update_docs(Db1, [Del]),
         {ok, Db2} = couch_db:reopen(Db1),
