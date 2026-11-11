@@ -61,7 +61,6 @@
     send_response_no_cors/4,
     send_method_not_allowed/2,
     send_error/2, send_error/4,
-    send_redirect/2,
     send_chunked_error/2,
     send_json/2, send_json/3, send_json/4,
     validate_ctype/2
@@ -1225,6 +1224,7 @@ error_headers(#httpd{mochi_req = MochiReq} = Req, 401 = Code, ErrorStr, ReasonSt
                                                                 couch_util:url_encode(ReasonStr)
                                                             ]),
                                                             {302, [
+                                                                {"Cache-Control", "no-store"},
                                                                 {"Location",
                                                                     absolute_uri(
                                                                         Req, RedirectLocation
@@ -1339,10 +1339,6 @@ send_chunked_error(Resp, Error) ->
         ]},
     send_chunk(Resp, ?l2b([$\n, ?JSON_ENCODE(JsonError), $\n])),
     send_chunk(Resp, []).
-
-send_redirect(Req, Path) ->
-    Headers = [{"Location", absolute_uri(Req, Path)}],
-    send_response(Req, 301, Headers, <<>>).
 
 server_header() ->
     couch_httpd:server_header().
