@@ -71,10 +71,12 @@ changes_test_() ->
             ?TDEF(t_eventsource_heartbeat_plain),
             ?TDEF(t_continuous_heartbeat_seq),
             ?TDEF(t_eventsource_heartbeat_seq),
+            ?TDEF(t_eventsource_timeout),
             ?TDEF(t_limit_one),
             ?TDEF(t_since_now),
             ?TDEF(t_continuous_since_now),
             ?TDEF(t_longpoll_since_now),
+            ?TDEF(t_zero_buffer),
             ?TDEF(t_style_all_docs),
             ?TDEF(t_reverse),
             ?TDEF(t_continuous_reverse),
@@ -539,6 +541,16 @@ t_eventsource_heartbeat_seq({_, DbUrl}) ->
     #{id := LastEventId} = lists:last(Events),
     ?assertMatch(#{id := LastEventId}, lists:last(WithId)).
 
+t_eventsource_timeout({_, DbUrl}) ->
+    % When feed stop on nothing more left to send, there should still be a final newline sent.
+    % In other words it should end on: 'data:...\n\n\n'
+    % On idle (no changes) it would be \n on start and then a final \n so `\n\n`.
+    Idle = changes_raw(DbUrl, "?feed=eventsource&timeout=10&since=now"),
+    ?assertEqual(~"\n\n", Idle),
+    WithData = changes_raw(DbUrl, "?feed=eventsource&timeout=10"),
+    ?assertEqual(3, length(binary:matches(WithData, ~"data: {"))),
+    ?assertEqual(~"\n\n\n", binary:part(WithData, byte_size(WithData), -3)).
+
 t_heartbeat_seq_normal({_, DbUrl}) ->
     % Db is small and with default times we don't get any heartbeats
     ?assertEqual(changes(DbUrl), changes(DbUrl, "?heartbeat_seq=true")),
@@ -591,6 +603,17 @@ t_continuous_since_now({_, DbUrl}) ->
 t_longpoll_since_now({_, DbUrl}) ->
     Params = "?feed=longpoll&timeout=10&since=now",
     ?assertEqual({8, 0, []}, changes(DbUrl, Params)).
+
+t_zero_buffer({_, DbUrl}) ->
+    % If the user choses not to buffer, the end should still go out as its
+    % own chunk. When not more rows left and empty chunk sent would terminate
+    % the respone prematurily.
+    Expect = changes(DbUrl),
+    config:set("chttpd", "chunked_response_buffer", "0", false),
+    ?assertEqual(Expect, changes(DbUrl)),
+    ?assertEqual({8, 0, []}, changes(DbUrl, "?since=now")),
+    ?assertEqual({8, 0, []}, changes(DbUrl, "?feed=longpoll&timeout=10&since=now")),
+    config:delete("chttpd", "chunked_response_buffer", false).
 
 t_reverse({_, DbUrl}) ->
     Params = "?descending=true",
@@ -1314,6 +1337,7 @@ setup_basic() ->
     ok = create_docs(DbUrl, test_docs()),
     CfgKey = "changes_doc_ids_optimization_threshold",
     ok = config:set("couchdb", CfgKey, "2", _Persist = false),
+    ok = config:set("chttpd", "chunked_response_buffer", "1490", false),
     meck:new(couch_changes, [passthrough]),
     meck:new(couch_db, [passthrough]),
     {Ctx, DbUrl}.
@@ -1321,6 +1345,7 @@ setup_basic() ->
 teardown_basic({Ctx, DbUrl}) ->
     CfgKey = "changes_doc_ids_optimization_threshold",
     ok = config:delete("couchdb", CfgKey, _Persist = false),
+    ok = config:delete("chttpd", "chunked_response_buffer", false),
     teardown_ctx({Ctx, DbUrl}).
 
 create_db(Top, Db, Params) ->
@@ -1488,7 +1513,7 @@ eventsource(DbUrl, Params) ->
     {Code, Res} = reqraw(get, DbUrl ++ "/_changes" ++ Params),
     ?assertEqual(200, Code),
     Chunks = binary:split(Res, ~"\n\n", [global]),
-    Events = [parse_event(C) || C <- Chunks, C =/= <<>>],
+    Events = [parse_event(C) || C <- Chunks, C =/= ~"", C =/= ~"\n"],
     lists:partition(fun(#{event := E}) -> E =/= ~"heartbeat" end, Events).
 
 parse_event(Chunk) ->

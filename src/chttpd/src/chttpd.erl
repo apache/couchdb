@@ -955,6 +955,10 @@ send_delayed_error(#delayed_resp{resp = Resp, req = Req}, Reason) ->
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
+close_delayed_json_object(Resp, [], Terminator, 0) ->
+    % Nothing buffered. An empty chunk here would end the response before the
+    % terminator goes out.
+    send_delayed_chunk(Resp, Terminator);
 close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
     % Use a separate chunk to close the streamed array to maintain strict
     % compatibility with earlier versions. See COUCHDB-2724

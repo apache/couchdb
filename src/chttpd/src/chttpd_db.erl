@@ -238,6 +238,8 @@ changes_callback({timeout, Seq}, #cacc{feed = eventsource, heartbeat_seq = true}
     end;
 changes_callback({timeout, _Seq}, #cacc{feed = eventsource} = Acc) ->
     maybe_heartbeat(Acc, "event: heartbeat\ndata: \n\n");
+changes_callback({stop, _EndSeq, _Pending}, #cacc{feed = eventsource, buffer = []} = Acc) ->
+    chttpd:end_delayed_json_response(Acc#cacc.mochi);
 changes_callback({stop, _EndSeq, _Pending}, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
