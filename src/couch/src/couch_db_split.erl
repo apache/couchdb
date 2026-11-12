@@ -58,6 +58,7 @@
     source_db,
     target_db,
     bodies = #{},
+    docs = [],
     active = 0,
     external = 0,
     atts = []
@@ -426,25 +427,32 @@ changes_cb(#full_doc_info{} = FDI, #state{} = State) ->
 % Use batched make_docs read to get all the pending docs bodies
 copy_pending(#state{pending = []} = State) ->
     State;
-copy_pending(#state{pending = Pending, source_db = SourceDb} = State) ->
+copy_pending(#state{pending = Pending, source_db = SourceDb, targets = Targets} = State) ->
     FDIs = lists:reverse(Pending),
     Bodies = get_bodies(SourceDb, FDIs),
-    State1 = State#state{pending = [], pending_count = 0, pending_bytes = 0},
-    lists:foldl(
-        fun(FDI, StateAcc) ->
-            copy_fdi(FDI, Bodies, StateAcc)
+    KeyFun = fun(#full_doc_info{id = Id}) ->
+        {Key, #target{}} = pick_target(Id, State, Targets, changes),
+        Key
+    end,
+    Targets1 = maps:fold(
+        fun(Key, KeyFDIs, Acc) ->
+            Acc#{Key := copy_fdis(KeyFDIs, Bodies, map_get(Key, Acc), State)}
         end,
-        State1,
-        FDIs
-    ).
+        Targets,
+        maps:groups_from_list(KeyFun, FDIs)
+    ),
+    State#state{targets = Targets1, pending = [], pending_count = 0, pending_bytes = 0}.
 
-copy_fdi(#full_doc_info{id = Id} = FDI, #{} = Bodies, #state{} = State) ->
-    #state{source_db = SourceDb, targets = Targets} = State,
-    {Key, Target} = pick_target(Id, State, Targets, changes),
-    FDI1 = process_fdi(FDI, Bodies, SourceDb, Target#target.db),
-    MaxBuffer = State#state.max_buffer_size,
-    Target1 = acc_and_flush(FDI1, Target, MaxBuffer, fun commit_docs/1),
-    State#state{targets = Targets#{Key => Target1}}.
+% Write the docs bodies as a batch. First serialize the bodies of all the
+% leafs, then batch write them.
+copy_fdis(FDIs, #{} = Bodies, #target{db = TargetDb} = Target, #state{} = State) ->
+    #state{source_db = SourceDb, max_buffer_size = MaxBuffer} = State,
+    MapF = fun(FDI, Acc) -> serialize_fdi(FDI, Bodies, SourceDb, TargetDb, Acc) end,
+    {FDIs1, DocsRev} = lists:mapfoldl(MapF, [], FDIs),
+    {ok, Written} = couch_db_engine:write_doc_bodies(TargetDb, lists:reverse(DocsRev)),
+    {FDIs2, []} = lists:mapfoldl(fun finish_fdi/2, Written, FDIs1),
+    FoldF = fun(FDI, Acc) -> acc_and_flush(FDI, Acc, MaxBuffer, fun commit_docs/1) end,
+    lists:foldl(FoldF, Target, FDIs2).
 
 % Get a map of Ptr => #doc{} from a list if FDIs
 get_bodies(SourceDb, FDIs) ->
@@ -476,19 +484,23 @@ commit_docs(#target{buffer = FDIs, db = Db} = Target) ->
     {ok, Db2} = couch_db_engine:commit_data(Db1),
     Target#target{buffer = [], buffer_size = 0, db = Db2}.
 
-process_fdi(FDI, #{} = Bodies, SourceDb, TargetDb) ->
+% Copy attachments and serialize bodies. Leafs get their external and
+% attachment sizes here, then keep the source pointer until finish_fdi/2 call.
+serialize_fdi(FDI, #{} = Bodies, SourceDb, TargetDb, DocsAcc) ->
     #full_doc_info{id = Id, rev_tree = RTree} = FDI,
-    Acc = #racc{id = Id, source_db = SourceDb, target_db = TargetDb, bodies = Bodies},
-    {NewRTree, NewAcc} = couch_key_tree:mapfold(fun revtree_cb/4, Acc, RTree),
-    {Active, External} = total_sizes(NewAcc),
-    FDI#full_doc_info{
-        rev_tree = NewRTree,
-        sizes = #size_info{active = Active, external = External}
-    }.
+    Acc = #racc{
+        id = Id,
+        source_db = SourceDb,
+        target_db = TargetDb,
+        bodies = Bodies,
+        docs = DocsAcc
+    },
+    {NewRTree, #racc{docs = DocsAcc1}} = couch_key_tree:mapfold(fun serialize_cb/4, Acc, RTree),
+    {FDI#full_doc_info{rev_tree = NewRTree}, DocsAcc1}.
 
-revtree_cb(_Rev, _Leaf, branch, Acc) ->
+serialize_cb(_Rev, _Leaf, branch, Acc) ->
     {[], Acc};
-revtree_cb({Pos, RevId}, Leaf, leaf, Acc) ->
+serialize_cb({Pos, RevId}, Leaf, leaf, Acc) ->
     #racc{id = Id, source_db = SourceDb, target_db = TargetDb, bodies = Bodies} = Acc,
     #leaf{deleted = Deleted, ptr = Ptr, sizes = LeafSizes} = Leaf,
     #doc{body = Body, atts = AttInfos0} = maps:get(Ptr, Bodies),
@@ -516,16 +528,37 @@ revtree_cb({Pos, RevId}, Leaf, leaf, Acc) ->
     Atts = [process_attachment(Att, SourceDb, TargetDb) || Att <- AttInfos],
     Doc2 = Doc1#doc{atts = Atts},
     Doc3 = couch_db_engine:serialize_doc(TargetDb, Doc2),
-    {ok, Doc4, Active} = couch_db_engine:write_doc_body(TargetDb, Doc3),
     % element(3,...) and (4,...) are the stream pointer and size respecitively
     % (see couch_att.erl) They are numeric for compatibility with older formats
     AttSizes = [{element(3, A), element(4, A)} || A <- Atts],
     NewLeaf = Leaf#leaf{
-        ptr = Doc4#doc.body,
-        sizes = #size_info{active = Active, external = External},
+        sizes = #size_info{external = External},
         atts = AttSizes
     },
-    {NewLeaf, add_sizes(Active, External, AttSizes, Acc)}.
+    {NewLeaf, Acc#racc{docs = [Doc3 | Acc#racc.docs]}}.
+
+% Second pass over the leafs. Bodies are written already. Update sizes and
+% turn #doc{} records into proper leafs with ptr and size data.
+finish_fdi(#full_doc_info{rev_tree = RTree} = FDI, Written) ->
+    {NewRTree, {Written1, Acc}} = couch_key_tree:mapfold(
+        fun finish_cb/4, {Written, #racc{}}, RTree
+    ),
+    {Active, External} = total_sizes(Acc),
+    NewFDI = FDI#full_doc_info{
+        rev_tree = NewRTree,
+        sizes = #size_info{active = Active, external = External}
+    },
+    {NewFDI, Written1}.
+
+finish_cb(_Rev, Value, branch, Acc) ->
+    {Value, Acc};
+finish_cb(_Rev, #leaf{} = Leaf, leaf, {[{#doc{body = Ptr}, Active} | Rest], #racc{} = Acc}) ->
+    #leaf{sizes = #size_info{external = External} = Sizes, atts = AttSizes} = Leaf,
+    NewLeaf = Leaf#leaf{
+        ptr = Ptr,
+        sizes = Sizes#size_info{active = Active}
+    },
+    {NewLeaf, {Rest, add_sizes(Active, External, AttSizes, Acc)}}.
 
 % This is copied almost verbatim from the compactor
 process_attachment(
