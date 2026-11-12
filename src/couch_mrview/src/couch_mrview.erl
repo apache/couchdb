@@ -297,6 +297,7 @@ query_all_docs(Db, Args0, Callback, Acc) ->
     % remove.
     %
     Args2 = couch_mrview_util:validate_all_docs_args(Db, Args1),
+    couch_mrview_util:check_range(Args2, fun(A, B) -> A < B end),
     {ok, Acc1} =
         case Args2#mrargs.preflight_fun of
             PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
