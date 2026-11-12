@@ -304,3 +304,41 @@ cpse_delete_local_doc(Db1) ->
         [not_found],
         couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>])
     ).
+
+cpse_write_doc_bodies(Db1) ->
+    {ok, DbBatch} = cpse_util:create_db(),
+    try
+        Docs = [
+            #doc{id = ~"1", body = {[{~"a", 1}]}},
+            #doc{id = ~"2", body = {[{~"b", binary:copy(~"x", 10000)}]}},
+            #doc{id = ~"3", body = {[{~"c", 3}]}}
+        ],
+        SerializeF = fun(Doc) -> couch_db_engine:serialize_doc(Db1, Doc) end,
+        SDocs = lists:map(SerializeF, Docs),
+        IndividualF = fun(Doc) ->
+            {ok, Doc1, Written} = couch_db_engine:write_doc_body(Db1, Doc),
+            {Doc1, Written}
+        end,
+        Individual = lists:map(IndividualF, SDocs),
+        {ok, Batch} = couch_db_engine:write_doc_bodies(DbBatch, SDocs),
+        ?assertEqual(3, length(Batch)),
+        ?assertEqual(
+            [Written || {_, Written} <- Individual],
+            [Written || {_, Written} <- Batch]
+        ),
+        ?assertEqual(
+            [Doc#doc.body || {Doc, _} <- Individual],
+            [Doc#doc.body || {Doc, _} <- Batch]
+        ),
+        ReadBodyF = fun({Doc, _}) ->
+            Doc1 = couch_db_engine:read_doc_body(DbBatch, Doc),
+            couch_compress:decompress(Doc1#doc.body)
+        end,
+        Expected = [Doc#doc.body || Doc <- Docs],
+        Written = lists:map(ReadBodyF, Batch),
+        ?assertEqual(Expected, Written),
+        % Check the empty case
+        ?assertEqual({ok, []}, couch_db_engine:write_doc_bodies(DbBatch, []))
+    after
+        ok = couch_server:delete(couch_db:name(DbBatch), [])
+    end.
