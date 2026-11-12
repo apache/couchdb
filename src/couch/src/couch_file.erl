@@ -43,7 +43,7 @@
 -export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
 -export([pread_term/2, pread_binary/2]).
 -export([append_binary/2]).
--export([append_raw_chunk/2, assemble_file_chunk_and_checksum/1]).
+-export([append_raw_chunk/2, append_raw_chunks/2, assemble_file_chunk_and_checksum/1]).
 -export([append_term/2, append_term/3]).
 -export([pread_terms/2]).
 -export([append_terms/2, append_terms/3]).
