@@ -61,6 +61,7 @@
 
     serialize_doc/2,
     write_doc_body/2,
+    write_doc_bodies/2,
     write_doc_infos/3,
     purge_docs/3,
     copy_purge_infos/2,
@@ -451,6 +452,12 @@ write_doc_body(St, #doc{} = Doc) ->
     } = St,
     {ok, Ptr, Written} = couch_file:append_raw_chunk(Fd, Doc#doc.body),
     {ok, Doc#doc{body = Ptr}, Written}.
+
+write_doc_bodies(#st{fd = Fd}, Docs) when is_list(Docs) ->
+    Chunks = [Chunk || #doc{body = Chunk} <- Docs],
+    {ok, Resps} = couch_file:append_raw_chunks(Fd, Chunks),
+    Fun = fun(Doc, {Ptr, Written}) -> {Doc#doc{body = Ptr}, Written} end,
+    {ok, lists:zipwith(Fun, Docs, Resps)}.
 
 write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
     #st{

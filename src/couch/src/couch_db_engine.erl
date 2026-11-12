@@ -384,6 +384,14 @@
 -callback write_doc_body(DbHandle :: db_handle(), Doc :: doc()) ->
     {ok, FlushedDoc :: doc(), BytesWritten :: non_neg_integer()}.
 
+% Batch version of write_doc_body/2. It should be called with a list of
+% serialized docs. It should return a {FlushedDoc, BytesWritten} pair per input
+% document, in order. Engines implementations maybe write all the bodies
+% together (couch_bt_engine appends them with a one couch_file call, for
+% example).
+-callback write_doc_bodies(DbHandle :: db_handle(), Docs :: [doc()]) ->
+    {ok, [{FlushedDoc :: doc(), BytesWritten :: non_neg_integer()}]}.
+
 % This function is called from the context of couch_db_updater
 % and as such is guaranteed single threaded for the given
 % DbHandle.
@@ -717,6 +725,7 @@
 
     serialize_doc/2,
     write_doc_body/2,
+    write_doc_bodies/2,
     write_doc_infos/3,
     purge_docs/3,
     copy_purge_infos/2,
@@ -927,6 +936,10 @@ serialize_doc(#db{} = Db, #doc{} = Doc) ->
 write_doc_body(#db{} = Db, #doc{} = Doc) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:write_doc_body(EngineState, Doc).
+
+write_doc_bodies(#db{} = Db, Docs) when is_list(Docs) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:write_doc_bodies(EngineState, Docs).
 
 write_doc_infos(#db{} = Db, DocUpdates, LocalDocs) ->
     #db{engine = {Engine, EngineState}} = Db,
