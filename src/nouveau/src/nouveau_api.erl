@@ -23,9 +23,6 @@
     create_index/2,
     delete_path/1,
     delete_path/2,
-    delete_doc/4,
-    purge_doc/4,
-    update_doc/6,
     search/2,
     set_purge_seq/3,
     set_update_seq/3,
@@ -42,12 +39,6 @@
 ]).
 
 -define(JSON_CONTENT_TYPE, {"Content-Type", "application/json"}).
-
--deprecated([
-    {purge_doc, 4, "replaced by updates/2"},
-    {update_doc, 6, "replaced by updates/2"},
-    {delete_doc, 4, "replaced by updates/2"}
-]).
 
 analyze(Text, Analyzer) when
     is_binary(Text), is_binary(Analyzer)
@@ -103,79 +94,6 @@ delete_path(Path, Exclusions) when
 ->
     Resp = send_if_enabled(
         index_path(Path), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(Exclusions)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
-
-delete_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq) when
-    is_binary(DocId),
-    is_integer(MatchSeq),
-    MatchSeq >= 0,
-    is_integer(UpdateSeq),
-    UpdateSeq > 0
-->
-    ReqBody = #{match_seq => MatchSeq, seq => UpdateSeq, purge => false},
-    Resp = send_if_enabled(
-        doc_path(Index, DocId),
-        [?JSON_CONTENT_TYPE],
-        <<"DELETE">>,
-        jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
-
-purge_doc(#index{} = Index, DocId, MatchSeq, PurgeSeq) when
-    is_binary(DocId),
-    is_integer(MatchSeq),
-    MatchSeq >= 0,
-    is_integer(PurgeSeq),
-    PurgeSeq > 0
-->
-    ReqBody = #{match_seq => MatchSeq, seq => PurgeSeq, purge => true},
-    Resp = send_if_enabled(
-        doc_path(Index, DocId), [?JSON_CONTENT_TYPE], <<"DELETE">>, jiffy:encode(ReqBody)
-    ),
-    case Resp of
-        {ok, 200, _, _} ->
-            ok;
-        {ok, StatusCode, _, RespBody} ->
-            {error, jaxrs_error(StatusCode, RespBody)};
-        {error, Reason} ->
-            send_error(Reason)
-    end.
-
-update_doc(#index{} = Index, DocId, MatchSeq, UpdateSeq, Partition, Fields) when
-    is_binary(DocId),
-    is_integer(MatchSeq),
-    MatchSeq >= 0,
-    is_integer(UpdateSeq),
-    UpdateSeq > 0,
-    (is_binary(Partition) orelse Partition == null),
-    is_list(Fields)
-->
-    ReqBody = #{
-        match_seq => MatchSeq,
-        seq => UpdateSeq,
-        partition => Partition,
-        fields => Fields
-    },
-    Resp = send_if_enabled(
-        doc_path(Index, DocId),
-        [?JSON_CONTENT_TYPE],
-        <<"PUT">>,
-        jiffy:encode(ReqBody)
     ),
     case Resp of
         {ok, 200, _, _} ->
@@ -320,14 +238,6 @@ index_path(Path) when is_binary(Path) ->
     [<<"/index/">>, couch_util:url_encode(Path)];
 index_path(#index{} = Index) ->
     [<<"/index/">>, couch_util:url_encode(nouveau_util:index_name(Index))].
-
-doc_path(#index{} = Index, DocId) ->
-    [
-        <<"/index/">>,
-        couch_util:url_encode(nouveau_util:index_name(Index)),
-        <<"/doc/">>,
-        couch_util:url_encode(DocId)
-    ].
 
 search_path(#index{} = Index) ->
     [index_path(Index), <<"/search">>].
